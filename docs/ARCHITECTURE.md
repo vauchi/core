@@ -375,7 +375,7 @@ For users behind restrictive NATs or firewalls:
 
 ### Phase 8: Complete Integration
 - [x] Bidirectional name exchange (responder sends name back)
-- [ ] Double Ratchet integration for encrypted card updates
+- [x] Double Ratchet integration (storage, persistence, CLI)
 - [ ] Card update propagation to contacts
 - [ ] Visibility rules enforcement
 

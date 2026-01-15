@@ -10,6 +10,7 @@ use thiserror::Error;
 use crate::contact::Contact;
 use crate::contact_card::ContactCard;
 use crate::crypto::SymmetricKey;
+use crate::crypto::ratchet::DoubleRatchetState;
 
 /// Storage error types.
 #[derive(Error, Debug)]
@@ -114,6 +115,14 @@ impl Storage {
                 status TEXT DEFAULT 'pending',
                 error_message TEXT,
                 retry_at INTEGER
+            );
+
+            -- Double Ratchet state for each contact
+            CREATE TABLE IF NOT EXISTS contact_ratchets (
+                contact_id TEXT PRIMARY KEY REFERENCES contacts(id),
+                ratchet_state_encrypted BLOB NOT NULL,
+                is_initiator INTEGER NOT NULL,
+                updated_at INTEGER NOT NULL
             );
 
             -- Create indexes
@@ -225,6 +234,12 @@ impl Storage {
 
     /// Deletes a contact by ID.
     pub fn delete_contact(&self, id: &str) -> Result<bool, StorageError> {
+        // Also delete associated ratchet state
+        self.conn.execute(
+            "DELETE FROM contact_ratchets WHERE contact_id = ?1",
+            params![id],
+        )?;
+
         let rows_affected = self.conn.execute(
             "DELETE FROM contacts WHERE id = ?1",
             params![id],
@@ -456,6 +471,83 @@ impl Storage {
         )?;
         Ok(count as usize)
     }
+
+    // === Double Ratchet State Operations ===
+
+    /// Saves a Double Ratchet state for a contact.
+    pub fn save_ratchet_state(
+        &self,
+        contact_id: &str,
+        state: &DoubleRatchetState,
+        is_initiator: bool,
+    ) -> Result<(), StorageError> {
+        // Serialize the ratchet state
+        let serialized = state.serialize();
+        let state_json = serde_json::to_vec(&serialized)
+            .map_err(|e| StorageError::Serialization(e.to_string()))?;
+
+        // Encrypt the serialized state
+        let state_encrypted = crate::crypto::encrypt(&self.encryption_key, &state_json)
+            .map_err(|e| StorageError::Encryption(e.to_string()))?;
+
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+
+        self.conn.execute(
+            "INSERT OR REPLACE INTO contact_ratchets
+             (contact_id, ratchet_state_encrypted, is_initiator, updated_at)
+             VALUES (?1, ?2, ?3, ?4)",
+            params![
+                contact_id,
+                state_encrypted,
+                is_initiator as i32,
+                now as i64,
+            ],
+        )?;
+
+        Ok(())
+    }
+
+    /// Loads a Double Ratchet state for a contact.
+    ///
+    /// Returns the ratchet state and whether this side was the initiator.
+    pub fn load_ratchet_state(
+        &self,
+        contact_id: &str,
+    ) -> Result<Option<(DoubleRatchetState, bool)>, StorageError> {
+        let result = self.conn.query_row(
+            "SELECT ratchet_state_encrypted, is_initiator FROM contact_ratchets WHERE contact_id = ?1",
+            params![contact_id],
+            |row| {
+                Ok((
+                    row.get::<_, Vec<u8>>(0)?,
+                    row.get::<_, i32>(1)? != 0,
+                ))
+            },
+        );
+
+        match result {
+            Ok((encrypted, is_initiator)) => {
+                // Decrypt the state
+                let state_json = crate::crypto::decrypt(&self.encryption_key, &encrypted)
+                    .map_err(|e| StorageError::Encryption(e.to_string()))?;
+
+                // Deserialize
+                let serialized: crate::crypto::ratchet::SerializedRatchetState =
+                    serde_json::from_slice(&state_json)
+                        .map_err(|e| StorageError::Serialization(e.to_string()))?;
+
+                let state = DoubleRatchetState::deserialize(serialized)
+                    .map_err(|e| StorageError::Serialization(e.to_string()))?;
+
+                Ok(Some((state, is_initiator)))
+            }
+            Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+            Err(e) => Err(StorageError::Database(e)),
+        }
+    }
 }
 
 /// Internal struct for database row data.
@@ -652,5 +744,91 @@ mod tests {
         let pending = storage.get_pending_updates(contact.id()).unwrap();
         assert_eq!(pending[0].retry_count, 1);
         assert!(matches!(pending[0].status, UpdateStatus::Failed { .. }));
+    }
+
+    #[test]
+    fn test_storage_save_load_ratchet_state() {
+        use crate::crypto::ratchet::DoubleRatchetState;
+        use crate::crypto::SymmetricKey;
+        use crate::exchange::X3DHKeyPair;
+
+        let storage = create_test_storage();
+        let contact = create_test_contact("Alice");
+        storage.save_contact(&contact).unwrap();
+
+        // Create ratchet state (as initiator)
+        let shared_secret = SymmetricKey::generate();
+        let their_dh = X3DHKeyPair::generate();
+        let ratchet = DoubleRatchetState::initialize_initiator(&shared_secret, *their_dh.public_key());
+
+        // Save ratchet state
+        storage.save_ratchet_state(contact.id(), &ratchet, true).unwrap();
+
+        // Load ratchet state
+        let (loaded, is_initiator) = storage.load_ratchet_state(contact.id()).unwrap().unwrap();
+
+        assert!(is_initiator);
+        assert_eq!(loaded.dh_generation(), ratchet.dh_generation());
+        assert_eq!(loaded.our_public_key(), ratchet.our_public_key());
+    }
+
+    #[test]
+    fn test_storage_ratchet_state_encryption() {
+        use crate::crypto::ratchet::DoubleRatchetState;
+        use crate::crypto::SymmetricKey;
+        use crate::exchange::X3DHKeyPair;
+
+        let storage = create_test_storage();
+        let contact = create_test_contact("Alice");
+        storage.save_contact(&contact).unwrap();
+
+        let shared_secret = SymmetricKey::generate();
+        let their_dh = X3DHKeyPair::generate();
+        let mut ratchet = DoubleRatchetState::initialize_initiator(&shared_secret, *their_dh.public_key());
+
+        // Encrypt a message to advance the ratchet
+        let _msg = ratchet.encrypt(b"test message").unwrap();
+
+        // Save and load
+        storage.save_ratchet_state(contact.id(), &ratchet, true).unwrap();
+        let (mut loaded, _) = storage.load_ratchet_state(contact.id()).unwrap().unwrap();
+
+        // The loaded ratchet should be able to continue encrypting
+        let msg2 = loaded.encrypt(b"another message").unwrap();
+        assert!(!msg2.ciphertext.is_empty());
+    }
+
+    #[test]
+    fn test_storage_ratchet_deleted_with_contact() {
+        use crate::crypto::ratchet::DoubleRatchetState;
+        use crate::crypto::SymmetricKey;
+        use crate::exchange::X3DHKeyPair;
+
+        let storage = create_test_storage();
+        let contact = create_test_contact("Alice");
+        let contact_id = contact.id().to_string();
+        storage.save_contact(&contact).unwrap();
+
+        let shared_secret = SymmetricKey::generate();
+        let their_dh = X3DHKeyPair::generate();
+        let ratchet = DoubleRatchetState::initialize_initiator(&shared_secret, *their_dh.public_key());
+
+        storage.save_ratchet_state(&contact_id, &ratchet, true).unwrap();
+
+        // Verify ratchet exists
+        assert!(storage.load_ratchet_state(&contact_id).unwrap().is_some());
+
+        // Delete contact
+        storage.delete_contact(&contact_id).unwrap();
+
+        // Ratchet should also be deleted
+        assert!(storage.load_ratchet_state(&contact_id).unwrap().is_none());
+    }
+
+    #[test]
+    fn test_storage_ratchet_not_found() {
+        let storage = create_test_storage();
+        let result = storage.load_ratchet_state("nonexistent").unwrap();
+        assert!(result.is_none());
     }
 }

@@ -162,11 +162,15 @@ pub fn complete(config: &CliConfig, data: &str) -> Result<()> {
     let contact = Contact::from_exchange(
         *their_signing_key,
         their_card,
-        shared_secret,
+        shared_secret.clone(),
     );
+    let contact_id = contact.id().to_string();
 
     // Add the contact
     wb.add_contact(contact)?;
+
+    // Initialize Double Ratchet as initiator for forward secrecy
+    wb.create_ratchet_as_initiator(&contact_id, &shared_secret, *their_exchange_key)?;
 
     // Send exchange message via relay with our ephemeral key
     println!("Sending exchange request via relay...");

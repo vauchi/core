@@ -278,8 +278,16 @@ fn process_exchange_messages(
         let card = webbook_core::ContactCard::new(&exchange.display_name);
 
         // Create contact
-        let contact = Contact::from_exchange(identity_key, card, shared_secret);
+        let contact = Contact::from_exchange(identity_key, card, shared_secret.clone());
+        let contact_id = contact.id().to_string();
         wb.add_contact(contact)?;
+
+        // Initialize Double Ratchet as responder for forward secrecy
+        // Recreate the X3DH keypair since we can't clone it
+        let ratchet_dh = webbook_core::exchange::X3DHKeyPair::from_bytes(our_x3dh.secret_bytes());
+        if let Err(e) = wb.create_ratchet_as_responder(&contact_id, &shared_secret, ratchet_dh) {
+            display::warning(&format!("Failed to initialize ratchet: {:?}", e));
+        }
 
         display::success(&format!("Added contact: {}", exchange.display_name));
         added += 1;

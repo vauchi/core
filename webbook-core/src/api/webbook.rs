@@ -6,6 +6,7 @@ use std::sync::Arc;
 
 use crate::contact::Contact;
 use crate::contact_card::{ContactCard, ContactField};
+use crate::crypto::ratchet::DoubleRatchetState;
 use crate::crypto::SymmetricKey;
 use crate::identity::Identity;
 use crate::network::{MockTransport, Transport};
@@ -239,6 +240,49 @@ impl<T: Transport> WebBook<T> {
     pub fn verify_contact_fingerprint(&self, id: &str) -> WebBookResult<()> {
         let manager = ContactManager::new(&self.storage, self.events.clone());
         manager.verify_fingerprint(id)
+    }
+
+    // === Double Ratchet Operations ===
+
+    /// Gets the Double Ratchet state for a contact.
+    pub fn get_ratchet_state(&self, contact_id: &str) -> WebBookResult<Option<DoubleRatchetState>> {
+        Ok(self.storage.load_ratchet_state(contact_id)?.map(|(r, _)| r))
+    }
+
+    /// Saves a Double Ratchet state for a contact.
+    ///
+    /// If a ratchet state already exists, preserves the is_initiator flag.
+    pub fn save_ratchet_state(&self, contact_id: &str, state: &DoubleRatchetState) -> WebBookResult<()> {
+        // Load existing to preserve is_initiator flag
+        let is_initiator = self.storage.load_ratchet_state(contact_id)?
+            .map(|(_, i)| i)
+            .unwrap_or(true);
+        self.storage.save_ratchet_state(contact_id, state, is_initiator)?;
+        Ok(())
+    }
+
+    /// Creates and saves a new ratchet state for a contact as initiator.
+    pub fn create_ratchet_as_initiator(
+        &self,
+        contact_id: &str,
+        shared_secret: &SymmetricKey,
+        their_dh_public: [u8; 32],
+    ) -> WebBookResult<()> {
+        let ratchet = DoubleRatchetState::initialize_initiator(shared_secret, their_dh_public);
+        self.storage.save_ratchet_state(contact_id, &ratchet, true)?;
+        Ok(())
+    }
+
+    /// Creates and saves a new ratchet state for a contact as responder.
+    pub fn create_ratchet_as_responder(
+        &self,
+        contact_id: &str,
+        shared_secret: &SymmetricKey,
+        our_dh: crate::exchange::X3DHKeyPair,
+    ) -> WebBookResult<()> {
+        let ratchet = DoubleRatchetState::initialize_responder(shared_secret, our_dh);
+        self.storage.save_ratchet_state(contact_id, &ratchet, false)?;
+        Ok(())
     }
 
     // === Event Operations ===

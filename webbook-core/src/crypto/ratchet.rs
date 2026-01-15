@@ -8,6 +8,7 @@
 //! - Symmetric ratchets (chain keys) for forward secrecy
 
 use std::collections::HashMap;
+use serde::{Serialize, Deserialize};
 use thiserror::Error;
 use zeroize::Zeroize;
 
@@ -36,6 +37,36 @@ pub enum RatchetError {
 
     #[error("Invalid message: {0}")]
     InvalidMessage(String),
+
+    #[error("Deserialization error: {0}")]
+    Deserialization(String),
+}
+
+/// Serializable representation of DoubleRatchetState.
+///
+/// This struct captures all necessary state to persist and restore a ratchet session.
+#[derive(Serialize, Deserialize)]
+pub struct SerializedRatchetState {
+    /// Root key for deriving new chain keys
+    pub root_key: [u8; 32],
+    /// Our DH secret key bytes
+    pub our_dh_secret: [u8; 32],
+    /// Their current DH public key
+    pub their_dh: Option<[u8; 32]>,
+    /// Sending chain key and generation
+    pub send_chain: Option<([u8; 32], u32)>,
+    /// Receiving chain key and generation
+    pub recv_chain: Option<([u8; 32], u32)>,
+    /// Current DH ratchet generation
+    pub dh_generation: u32,
+    /// Number of messages sent in current sending chain
+    pub send_message_count: u32,
+    /// Number of messages received in current receiving chain
+    pub recv_message_count: u32,
+    /// Previous sending chain length
+    pub previous_send_chain_length: u32,
+    /// Skipped message keys: (dh_gen, msg_index) -> key_bytes
+    pub skipped_keys: Vec<((u32, u32), [u8; 32])>,
 }
 
 /// KDF info constants for domain separation.
@@ -314,6 +345,49 @@ impl DoubleRatchetState {
     pub fn dh_generation(&self) -> u32 {
         self.dh_generation
     }
+
+    /// Serializes the ratchet state for persistence.
+    pub fn serialize(&self) -> SerializedRatchetState {
+        SerializedRatchetState {
+            root_key: self.root_key,
+            our_dh_secret: self.our_dh.secret_bytes(),
+            their_dh: self.their_dh,
+            send_chain: self.send_chain.as_ref().map(|c| (*c.as_bytes(), c.generation())),
+            recv_chain: self.recv_chain.as_ref().map(|c| (*c.as_bytes(), c.generation())),
+            dh_generation: self.dh_generation,
+            send_message_count: self.send_message_count,
+            recv_message_count: self.recv_message_count,
+            previous_send_chain_length: self.previous_send_chain_length,
+            skipped_keys: self.skipped_keys.iter()
+                .map(|(k, v)| (*k, *v.symmetric_key().as_bytes()))
+                .collect(),
+        }
+    }
+
+    /// Deserializes a ratchet state from its serialized form.
+    pub fn deserialize(s: SerializedRatchetState) -> Result<Self, RatchetError> {
+        let our_dh = X3DHKeyPair::from_bytes(s.our_dh_secret);
+
+        let send_chain = s.send_chain.map(|(key, gen)| ChainKey::with_generation(key, gen));
+        let recv_chain = s.recv_chain.map(|(key, gen)| ChainKey::with_generation(key, gen));
+
+        let skipped_keys = s.skipped_keys.into_iter()
+            .map(|(k, v)| (k, MessageKey::from_bytes(v)))
+            .collect();
+
+        Ok(DoubleRatchetState {
+            root_key: s.root_key,
+            our_dh,
+            their_dh: s.their_dh,
+            send_chain,
+            recv_chain,
+            dh_generation: s.dh_generation,
+            send_message_count: s.send_message_count,
+            recv_message_count: s.recv_message_count,
+            previous_send_chain_length: s.previous_send_chain_length,
+            skipped_keys,
+        })
+    }
 }
 
 #[cfg(test)]
@@ -519,5 +593,67 @@ mod tests {
         let dec = bob.decrypt(&msg).unwrap();
 
         assert_eq!(large_data, dec);
+    }
+
+    #[test]
+    fn test_ratchet_serialize_roundtrip() {
+        let (alice, _bob) = create_test_pair();
+
+        // Serialize
+        let serialized = alice.serialize();
+
+        // Deserialize
+        let restored = DoubleRatchetState::deserialize(serialized).unwrap();
+
+        // Verify state is preserved
+        assert_eq!(alice.dh_generation(), restored.dh_generation());
+        assert_eq!(alice.our_public_key(), restored.our_public_key());
+    }
+
+    #[test]
+    fn test_ratchet_serialize_after_messages() {
+        let (mut alice, mut bob) = create_test_pair();
+
+        // Exchange some messages
+        let msg1 = alice.encrypt(b"Hello").unwrap();
+        bob.decrypt(&msg1).unwrap();
+
+        let msg2 = bob.encrypt(b"World").unwrap();
+        alice.decrypt(&msg2).unwrap();
+
+        // Serialize alice's state after messaging
+        let serialized = alice.serialize();
+        let mut restored = DoubleRatchetState::deserialize(serialized).unwrap();
+
+        // The restored state should be able to continue the conversation
+        let msg3 = restored.encrypt(b"Continued").unwrap();
+        let decrypted = bob.decrypt(&msg3).unwrap();
+        assert_eq!(b"Continued".as_slice(), decrypted.as_slice());
+    }
+
+    #[test]
+    fn test_ratchet_serialize_with_skipped_keys() {
+        let (mut alice, mut bob) = create_test_pair();
+
+        // Send messages to create skipped keys scenario
+        let msg1 = alice.encrypt(b"One").unwrap();
+        let msg2 = alice.encrypt(b"Two").unwrap();
+        let msg3 = alice.encrypt(b"Three").unwrap();
+
+        // Receive out of order to create skipped keys
+        bob.decrypt(&msg3).unwrap();
+
+        // Serialize bob with skipped keys
+        let serialized = bob.serialize();
+        let mut restored = DoubleRatchetState::deserialize(serialized).unwrap();
+
+        // Restored should still have the skipped keys
+        assert_eq!(restored.skipped_keys_count(), 2);
+
+        // And should be able to decrypt the skipped messages
+        let dec1 = restored.decrypt(&msg1).unwrap();
+        let dec2 = restored.decrypt(&msg2).unwrap();
+        assert_eq!(b"One".as_slice(), dec1.as_slice());
+        assert_eq!(b"Two".as_slice(), dec2.as_slice());
     }
 }

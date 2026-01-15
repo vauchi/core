@@ -169,6 +169,17 @@ impl MessageKey {
     pub fn into_symmetric_key(self) -> SymmetricKey {
         self.key
     }
+
+    /// Creates a MessageKey from raw bytes (for deserialization).
+    ///
+    /// Note: Generation is set to 0 since skipped keys don't track their generation
+    /// after being stored.
+    pub fn from_bytes(bytes: [u8; 32]) -> Self {
+        MessageKey {
+            key: SymmetricKey::from_bytes(bytes),
+            generation: 0,
+        }
+    }
 }
 
 #[cfg(test)]

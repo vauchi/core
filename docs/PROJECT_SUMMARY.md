@@ -115,7 +115,7 @@ WebBook is a privacy-focused, decentralized contact card exchange application th
 
 ### Phase 8: Complete Integration ⏳
 - ✅ Bidirectional name exchange
-- Double Ratchet for encrypted updates
+- ✅ Double Ratchet integration (storage, persistence, CLI integration)
 - Card update propagation
 - Visibility rules enforcement
 

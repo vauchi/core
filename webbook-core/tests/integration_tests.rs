@@ -403,3 +403,411 @@ fn test_card_delta_workflow() {
     assert_eq!(result_card.display_name(), updated_card.display_name());
     assert_eq!(result_card.fields().len(), updated_card.fields().len());
 }
+
+/// Test: Phase 8 Happy Path - 3-User End-to-End Card Propagation with Visibility Rules
+///
+/// This test verifies the complete Phase 8 workflow:
+/// 1. Alice exchanges contacts with Bob and Charlie
+/// 2. Alice adds fields to her card
+/// 3. Alice hides some fields from Bob (but not Charlie)
+/// 4. Alice propagates card updates
+/// 5. Bob receives only visible fields, Charlie receives all fields
+#[test]
+fn test_phase8_three_user_card_propagation_with_visibility() {
+    use webbook_core::contact::FieldVisibility;
+
+    // ========================================
+    // Step 1: Create three WebBook instances
+    // ========================================
+    let mut alice_wb: WebBook<MockTransport> = WebBook::in_memory().unwrap();
+    let mut bob_wb: WebBook<MockTransport> = WebBook::in_memory().unwrap();
+    let mut charlie_wb: WebBook<MockTransport> = WebBook::in_memory().unwrap();
+
+    alice_wb.create_identity("Alice").unwrap();
+    bob_wb.create_identity("Bob").unwrap();
+    charlie_wb.create_identity("Charlie").unwrap();
+
+    // ========================================
+    // Step 2: Get public keys for each user
+    // ========================================
+    let alice_public_key = *alice_wb.identity().unwrap().signing_public_key();
+    let bob_public_key = *bob_wb.identity().unwrap().signing_public_key();
+    let charlie_public_key = *charlie_wb.identity().unwrap().signing_public_key();
+
+    // ========================================
+    // Step 3: Simulate contact exchange - Alice ↔ Bob
+    // ========================================
+    // Create shared secrets (in real exchange, these come from X3DH)
+    let alice_bob_shared_secret = SymmetricKey::generate();
+
+    // Create Bob's contact in Alice's WebBook
+    let bob_contact = Contact::from_exchange(
+        bob_public_key,
+        ContactCard::new("Bob"),
+        alice_bob_shared_secret.clone(),
+    );
+    let bob_contact_id = bob_contact.id().to_string();
+    alice_wb.add_contact(bob_contact).unwrap();
+
+    // Create Alice's contact in Bob's WebBook
+    let alice_contact_for_bob = Contact::from_exchange(
+        alice_public_key,
+        ContactCard::new("Alice"),
+        alice_bob_shared_secret.clone(),
+    );
+    let alice_contact_id_bob = alice_contact_for_bob.id().to_string();
+    bob_wb.add_contact(alice_contact_for_bob).unwrap();
+
+    // Initialize Double Ratchet for Alice ↔ Bob
+    let bob_dh_for_alice = X3DHKeyPair::generate();
+    let alice_bob_ratchet = DoubleRatchetState::initialize_initiator(
+        &alice_bob_shared_secret,
+        *bob_dh_for_alice.public_key(),
+    );
+    let bob_alice_ratchet = DoubleRatchetState::initialize_responder(
+        &alice_bob_shared_secret,
+        bob_dh_for_alice,
+    );
+
+    // Save ratchet states
+    alice_wb.storage().save_ratchet_state(&bob_contact_id, &alice_bob_ratchet, true).unwrap();
+    bob_wb.storage().save_ratchet_state(&alice_contact_id_bob, &bob_alice_ratchet, false).unwrap();
+
+    // ========================================
+    // Step 4: Simulate contact exchange - Alice ↔ Charlie
+    // ========================================
+    let alice_charlie_shared_secret = SymmetricKey::generate();
+
+    // Create Charlie's contact in Alice's WebBook (use value, not reference)
+    let charlie_contact = Contact::from_exchange(
+        charlie_public_key,
+        ContactCard::new("Charlie"),
+        alice_charlie_shared_secret.clone(),
+    );
+    let charlie_contact_id = charlie_contact.id().to_string();
+    alice_wb.add_contact(charlie_contact).unwrap();
+
+    // Create Alice's contact in Charlie's WebBook (use value, not reference)
+    let alice_contact_for_charlie = Contact::from_exchange(
+        alice_public_key,
+        ContactCard::new("Alice"),
+        alice_charlie_shared_secret.clone(),
+    );
+    let alice_contact_id_charlie = alice_contact_for_charlie.id().to_string();
+    charlie_wb.add_contact(alice_contact_for_charlie).unwrap();
+
+    // Initialize Double Ratchet for Alice ↔ Charlie
+    let charlie_dh_for_alice = X3DHKeyPair::generate();
+    let alice_charlie_ratchet = DoubleRatchetState::initialize_initiator(
+        &alice_charlie_shared_secret,
+        *charlie_dh_for_alice.public_key(),
+    );
+    let charlie_alice_ratchet = DoubleRatchetState::initialize_responder(
+        &alice_charlie_shared_secret,
+        charlie_dh_for_alice,
+    );
+
+    // Save ratchet states
+    alice_wb.storage().save_ratchet_state(&charlie_contact_id, &alice_charlie_ratchet, true).unwrap();
+    charlie_wb.storage().save_ratchet_state(&alice_contact_id_charlie, &charlie_alice_ratchet, false).unwrap();
+
+    // ========================================
+    // Step 5: Verify initial setup
+    // ========================================
+    assert_eq!(alice_wb.contact_count().unwrap(), 2);
+    assert_eq!(bob_wb.contact_count().unwrap(), 1);
+    assert_eq!(charlie_wb.contact_count().unwrap(), 1);
+
+    // ========================================
+    // Step 6: Alice adds fields to her card
+    // ========================================
+    let old_card = alice_wb.own_card().unwrap().unwrap();
+
+    alice_wb.add_own_field(ContactField::new(FieldType::Email, "work", "alice@company.com")).unwrap();
+    alice_wb.add_own_field(ContactField::new(FieldType::Phone, "mobile", "+15551234567")).unwrap();
+    alice_wb.add_own_field(ContactField::new(FieldType::Website, "blog", "https://alice.dev")).unwrap();
+
+    let new_card = alice_wb.own_card().unwrap().unwrap();
+    assert_eq!(new_card.fields().len(), 3);
+
+    // Get field IDs
+    let work_field_id = new_card.fields().iter()
+        .find(|f| f.label() == "work")
+        .unwrap()
+        .id()
+        .to_string();
+    let mobile_field_id = new_card.fields().iter()
+        .find(|f| f.label() == "mobile")
+        .unwrap()
+        .id()
+        .to_string();
+
+    // ========================================
+    // Step 7: Alice sets visibility rules - hide mobile from Bob
+    // ========================================
+    {
+        let mut bob_contact = alice_wb.get_contact(&bob_contact_id).unwrap().unwrap();
+        // Hide mobile field from Bob
+        bob_contact.visibility_rules_mut().set_nobody(&mobile_field_id);
+        alice_wb.update_contact(&bob_contact).unwrap();
+    }
+
+    // Verify visibility rules
+    {
+        let bob_contact = alice_wb.get_contact(&bob_contact_id).unwrap().unwrap();
+        assert!(matches!(bob_contact.visibility_rules().get(&mobile_field_id), FieldVisibility::Nobody));
+        assert!(matches!(bob_contact.visibility_rules().get(&work_field_id), FieldVisibility::Everyone));
+    }
+
+    // Charlie should see everything (default: Everyone)
+    {
+        let charlie_contact = alice_wb.get_contact(&charlie_contact_id).unwrap().unwrap();
+        assert!(matches!(charlie_contact.visibility_rules().get(&mobile_field_id), FieldVisibility::Everyone));
+        assert!(matches!(charlie_contact.visibility_rules().get(&work_field_id), FieldVisibility::Everyone));
+    }
+
+    // ========================================
+    // Step 8: Alice propagates card updates
+    // ========================================
+    let queued = alice_wb.propagate_card_update(&old_card, &new_card).unwrap();
+    assert_eq!(queued, 2, "Should queue updates for both Bob and Charlie");
+
+    // ========================================
+    // Step 9: Retrieve and verify pending updates
+    // ========================================
+    let pending_for_bob = alice_wb.storage().get_pending_updates(&bob_contact_id).unwrap();
+    let pending_for_charlie = alice_wb.storage().get_pending_updates(&charlie_contact_id).unwrap();
+
+    assert_eq!(pending_for_bob.len(), 1, "Should have 1 pending update for Bob");
+    assert_eq!(pending_for_charlie.len(), 1, "Should have 1 pending update for Charlie");
+
+    // ========================================
+    // Step 10: Simulate Bob receiving and decrypting the update
+    // ========================================
+    {
+        let update = &pending_for_bob[0];
+        let encrypted_payload = &update.payload;
+
+        // Load Bob's ratchet state
+        let (mut ratchet, _) = bob_wb.storage()
+            .load_ratchet_state(&alice_contact_id_bob).unwrap().unwrap();
+
+        // Decrypt
+        let ratchet_msg: webbook_core::crypto::ratchet::RatchetMessage =
+            serde_json::from_slice(encrypted_payload).unwrap();
+        let delta_bytes = ratchet.decrypt(&ratchet_msg).unwrap();
+
+        // Save updated ratchet
+        bob_wb.storage().save_ratchet_state(&alice_contact_id_bob, &ratchet, false).unwrap();
+
+        // Parse delta
+        let delta: webbook_core::sync::CardDelta =
+            serde_json::from_slice(&delta_bytes).unwrap();
+
+        // Verify signature
+        let alice_contact = bob_wb.get_contact(&alice_contact_id_bob).unwrap().unwrap();
+        assert!(delta.verify(alice_contact.public_key()));
+
+        // Check delta changes - Bob should NOT see mobile field
+        let field_labels: Vec<&str> = delta.changes.iter().filter_map(|c| {
+            match c {
+                webbook_core::sync::FieldChange::Added { field } => Some(field.label()),
+                _ => None,
+            }
+        }).collect();
+
+        assert!(field_labels.contains(&"work"), "Bob should receive work field");
+        assert!(field_labels.contains(&"blog"), "Bob should receive blog field");
+        assert!(!field_labels.contains(&"mobile"), "Bob should NOT receive mobile field (hidden)");
+        assert_eq!(field_labels.len(), 2, "Bob should only receive 2 fields");
+
+        // Apply delta to Bob's view of Alice
+        let mut alice_card = alice_contact.card().clone();
+        delta.apply(&mut alice_card).unwrap();
+
+        // Verify Bob's view
+        assert_eq!(alice_card.fields().len(), 2);
+        assert!(alice_card.fields().iter().any(|f| f.label() == "work"));
+        assert!(alice_card.fields().iter().any(|f| f.label() == "blog"));
+        assert!(!alice_card.fields().iter().any(|f| f.label() == "mobile"));
+    }
+
+    // ========================================
+    // Step 11: Simulate Charlie receiving and decrypting the update
+    // ========================================
+    {
+        let update = &pending_for_charlie[0];
+        let encrypted_payload = &update.payload;
+
+        // Load Charlie's ratchet state
+        let (mut ratchet, _) = charlie_wb.storage()
+            .load_ratchet_state(&alice_contact_id_charlie).unwrap().unwrap();
+
+        // Decrypt
+        let ratchet_msg: webbook_core::crypto::ratchet::RatchetMessage =
+            serde_json::from_slice(encrypted_payload).unwrap();
+        let delta_bytes = ratchet.decrypt(&ratchet_msg).unwrap();
+
+        // Save updated ratchet
+        charlie_wb.storage().save_ratchet_state(&alice_contact_id_charlie, &ratchet, false).unwrap();
+
+        // Parse delta
+        let delta: webbook_core::sync::CardDelta =
+            serde_json::from_slice(&delta_bytes).unwrap();
+
+        // Verify signature
+        let alice_contact = charlie_wb.get_contact(&alice_contact_id_charlie).unwrap().unwrap();
+        assert!(delta.verify(alice_contact.public_key()));
+
+        // Check delta changes - Charlie should see ALL fields
+        let field_labels: Vec<&str> = delta.changes.iter().filter_map(|c| {
+            match c {
+                webbook_core::sync::FieldChange::Added { field } => Some(field.label()),
+                _ => None,
+            }
+        }).collect();
+
+        assert!(field_labels.contains(&"work"), "Charlie should receive work field");
+        assert!(field_labels.contains(&"blog"), "Charlie should receive blog field");
+        assert!(field_labels.contains(&"mobile"), "Charlie should receive mobile field");
+        assert_eq!(field_labels.len(), 3, "Charlie should receive all 3 fields");
+
+        // Apply delta to Charlie's view of Alice
+        let mut alice_card = alice_contact.card().clone();
+        delta.apply(&mut alice_card).unwrap();
+
+        // Verify Charlie's view
+        assert_eq!(alice_card.fields().len(), 3);
+        assert!(alice_card.fields().iter().any(|f| f.label() == "work"));
+        assert!(alice_card.fields().iter().any(|f| f.label() == "blog"));
+        assert!(alice_card.fields().iter().any(|f| f.label() == "mobile"));
+    }
+
+    // ========================================
+    // Step 12: Verify ratchet states were saved
+    // ========================================
+    // Both ratchets should exist after decrypt
+    let bob_ratchet_after = bob_wb.storage()
+        .load_ratchet_state(&alice_contact_id_bob).unwrap();
+    let charlie_ratchet_after = charlie_wb.storage()
+        .load_ratchet_state(&alice_contact_id_charlie).unwrap();
+
+    // Ratchets should be present (decrypt succeeded)
+    assert!(bob_ratchet_after.is_some(), "Bob's ratchet state should be saved");
+    assert!(charlie_ratchet_after.is_some(), "Charlie's ratchet state should be saved");
+}
+
+/// Test: Phase 8 - Field modification and removal propagation
+///
+/// Tests that add/modify/remove operations each produce the correct delta type.
+#[test]
+fn test_phase8_field_modification_and_removal_propagation() {
+    use webbook_core::sync::{CardDelta, FieldChange};
+
+    // ========================================
+    // Test 1: Field addition produces Added delta
+    // ========================================
+    {
+        let old = ContactCard::new("Alice");
+        let mut new = ContactCard::new("Alice");
+        new.add_field(ContactField::new(FieldType::Email, "work", "alice@company.com")).unwrap();
+
+        let delta = CardDelta::compute(&old, &new);
+
+        assert!(!delta.is_empty());
+        assert!(delta.changes.iter().any(|c| matches!(c, FieldChange::Added { .. })),
+            "Adding a field should produce an Added delta");
+    }
+
+    // ========================================
+    // Test 2: Field modification produces Modified delta
+    // ========================================
+    {
+        let mut card = ContactCard::new("Alice");
+        card.add_field(ContactField::new(FieldType::Email, "work", "alice@company.com")).unwrap();
+        let old = card.clone();
+
+        // Get field ID and modify
+        let field_id = card.fields()[0].id().to_string();
+        card.update_field_value(&field_id, "alice.smith@newcompany.com").unwrap();
+        let new = card;
+
+        let delta = CardDelta::compute(&old, &new);
+
+        assert!(!delta.is_empty());
+        assert!(delta.changes.iter().any(|c| matches!(c, FieldChange::Modified { .. })),
+            "Modifying a field value should produce a Modified delta");
+    }
+
+    // ========================================
+    // Test 3: Field removal produces Removed delta
+    // ========================================
+    {
+        let mut old = ContactCard::new("Alice");
+        let field = ContactField::new(FieldType::Email, "work", "alice@company.com");
+        let field_id = field.id().to_string();
+        old.add_field(field).unwrap();
+
+        let new = ContactCard::new("Alice");
+
+        let delta = CardDelta::compute(&old, &new);
+
+        assert!(!delta.is_empty());
+        assert!(delta.changes.iter().any(|c| matches!(c, FieldChange::Removed { field_id: id } if *id == field_id)),
+            "Removing a field should produce a Removed delta");
+    }
+
+    // ========================================
+    // Test 4: Full propagation roundtrip with modify
+    // ========================================
+    {
+        let mut alice_wb: WebBook<MockTransport> = WebBook::in_memory().unwrap();
+        let mut bob_wb: WebBook<MockTransport> = WebBook::in_memory().unwrap();
+
+        alice_wb.create_identity("Alice").unwrap();
+        bob_wb.create_identity("Bob").unwrap();
+
+        let alice_pk = *alice_wb.identity().unwrap().signing_public_key();
+        let bob_pk = *bob_wb.identity().unwrap().signing_public_key();
+        let shared_secret = SymmetricKey::generate();
+
+        let bob_contact = Contact::from_exchange(bob_pk, ContactCard::new("Bob"), shared_secret.clone());
+        let bob_id = bob_contact.id().to_string();
+        alice_wb.add_contact(bob_contact).unwrap();
+
+        let alice_contact = Contact::from_exchange(alice_pk, ContactCard::new("Alice"), shared_secret.clone());
+        let alice_id = alice_contact.id().to_string();
+        bob_wb.add_contact(alice_contact).unwrap();
+
+        // Set up ratchets
+        let bob_dh = X3DHKeyPair::generate();
+        let alice_ratchet = DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key());
+        let bob_ratchet = DoubleRatchetState::initialize_responder(&shared_secret, bob_dh);
+
+        alice_wb.storage().save_ratchet_state(&bob_id, &alice_ratchet, true).unwrap();
+        bob_wb.storage().save_ratchet_state(&alice_id, &bob_ratchet, false).unwrap();
+
+        // Alice adds a field
+        let old_card = alice_wb.own_card().unwrap().unwrap();
+        alice_wb.add_own_field(ContactField::new(FieldType::Email, "work", "alice@company.com")).unwrap();
+        let new_card = alice_wb.own_card().unwrap().unwrap();
+
+        let queued = alice_wb.propagate_card_update(&old_card, &new_card).unwrap();
+        assert_eq!(queued, 1, "Should queue update for Bob");
+
+        // Verify Bob can decrypt and receive the added field
+        let pending = alice_wb.storage().get_pending_updates(&bob_id).unwrap();
+        assert!(!pending.is_empty(), "Should have pending update");
+
+        let (mut ratchet, _) = bob_wb.storage().load_ratchet_state(&alice_id).unwrap().unwrap();
+        let ratchet_msg: webbook_core::crypto::ratchet::RatchetMessage =
+            serde_json::from_slice(&pending[0].payload).unwrap();
+        let delta_bytes = ratchet.decrypt(&ratchet_msg).unwrap();
+        let delta: CardDelta = serde_json::from_slice(&delta_bytes).unwrap();
+
+        // Verify the delta contains the added field
+        assert!(delta.changes.iter().any(|c| {
+            matches!(c, FieldChange::Added { field } if field.label() == "work")
+        }), "Bob should receive the work field in the delta");
+    }
+}

@@ -113,11 +113,11 @@ WebBook is a privacy-focused, decentralized contact card exchange application th
 - Identity, card, contact management
 - End-to-end exchange via relay
 
-### Phase 8: Complete Integration ⏳
+### Phase 8: Complete Integration ✅
 - ✅ Bidirectional name exchange
 - ✅ Double Ratchet integration (storage, persistence, CLI integration)
-- Card update propagation
-- Visibility rules enforcement
+- ✅ Card update propagation (encrypted delta sync)
+- ✅ Visibility rules enforcement (per-contact field visibility)
 
 ### Phase 9: Polish
 - UI/UX refinement

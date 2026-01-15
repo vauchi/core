@@ -318,7 +318,11 @@ impl<T: Transport> WebBook<T> {
             };
 
             // Compute delta
-            let mut delta = CardDelta::compute(old_card, new_card);
+            let delta = CardDelta::compute(old_card, new_card);
+            if delta.is_empty() { continue; }
+
+            // Filter delta based on visibility rules for this contact
+            let mut delta = delta.filter_for_contact(contact.id(), contact.visibility_rules());
             if delta.is_empty() { continue; }
 
             // Sign delta with our identity
@@ -793,6 +797,91 @@ mod tests {
         // Verify no pending updates
         let pending = wb.storage().get_pending_updates(&contact_id).unwrap();
         assert!(pending.is_empty());
+    }
+
+    #[test]
+    fn test_propagate_respects_visibility_rules() {
+        use crate::exchange::X3DHKeyPair;
+
+        let mut wb = create_test_webbook();
+        wb.create_identity("Alice").unwrap();
+
+        // Create the email field first to get its ID
+        let email_field = ContactField::new(FieldType::Email, "email", "alice@company.com");
+        let email_field_id = email_field.id().to_string();
+
+        // Create a contact with ratchet
+        let mut contact = Contact::from_exchange(
+            [1u8; 32],
+            ContactCard::new("Bob"),
+            SymmetricKey::generate(),
+        );
+        let contact_id = contact.id().to_string();
+
+        // Set visibility: hide the email field (by its ID) from Bob
+        contact.visibility_rules_mut().set_nobody(&email_field_id);
+        wb.add_contact(contact).unwrap();
+
+        // Initialize ratchet
+        let shared_secret = SymmetricKey::generate();
+        let their_dh = X3DHKeyPair::generate();
+        wb.create_ratchet_as_initiator(&contact_id, &shared_secret, *their_dh.public_key()).unwrap();
+
+        // Create old and new cards - add only email field
+        let old_card = wb.own_card().unwrap().unwrap();
+        let mut new_card = old_card.clone();
+
+        // Add the email field (which is hidden from Bob)
+        let _ = new_card.add_field(email_field);
+
+        // Propagate - should skip Bob because he can't see email field
+        let queued = wb.propagate_card_update(&old_card, &new_card).unwrap();
+        assert_eq!(queued, 0, "Update should not be queued when field is hidden from contact");
+    }
+
+    #[test]
+    fn test_propagate_partial_visibility() {
+        use crate::exchange::X3DHKeyPair;
+
+        let mut wb = create_test_webbook();
+        wb.create_identity("Alice").unwrap();
+
+        // Create fields first to get their IDs
+        let email_field = ContactField::new(FieldType::Email, "email", "alice@company.com");
+        let email_field_id = email_field.id().to_string();
+        let phone_field = ContactField::new(FieldType::Phone, "phone", "+1234567890");
+
+        // Create a contact with ratchet
+        let mut contact = Contact::from_exchange(
+            [1u8; 32],
+            ContactCard::new("Bob"),
+            SymmetricKey::generate(),
+        );
+        let contact_id = contact.id().to_string();
+
+        // Set visibility: hide only email field (by ID) from Bob
+        contact.visibility_rules_mut().set_nobody(&email_field_id);
+        wb.add_contact(contact).unwrap();
+
+        // Initialize ratchet
+        let shared_secret = SymmetricKey::generate();
+        let their_dh = X3DHKeyPair::generate();
+        wb.create_ratchet_as_initiator(&contact_id, &shared_secret, *their_dh.public_key()).unwrap();
+
+        // Create cards with both email (hidden) and phone (visible) fields
+        let old_card = wb.own_card().unwrap().unwrap();
+        let mut new_card = old_card.clone();
+
+        let _ = new_card.add_field(email_field);
+        let _ = new_card.add_field(phone_field);
+
+        // Propagate - should queue update with only phone field
+        let queued = wb.propagate_card_update(&old_card, &new_card).unwrap();
+        assert_eq!(queued, 1, "Update should be queued for visible field");
+
+        // Verify the pending update was created
+        let pending = wb.storage().get_pending_updates(&contact_id).unwrap();
+        assert_eq!(pending.len(), 1);
     }
 
     #[test]

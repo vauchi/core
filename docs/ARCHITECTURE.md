@@ -373,11 +373,11 @@ For users behind restrictive NATs or firewalls:
 - [x] Identity, card, contact management
 - [x] End-to-end exchange via relay
 
-### Phase 8: Complete Integration
+### Phase 8: Complete Integration ✅
 - [x] Bidirectional name exchange (responder sends name back)
 - [x] Double Ratchet integration (storage, persistence, CLI)
-- [ ] Card update propagation to contacts
-- [ ] Visibility rules enforcement
+- [x] Card update propagation to contacts (encrypted delta sync)
+- [x] Visibility rules enforcement (per-contact field filtering)
 
 ### Phase 9: Polish
 - [ ] UI/UX refinement

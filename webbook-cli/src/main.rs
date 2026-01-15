@@ -140,6 +140,28 @@ enum ContactCommands {
         /// Contact ID
         id: String,
     },
+
+    /// Hide a field from a contact
+    Hide {
+        /// Contact ID or name
+        contact: String,
+        /// Field label to hide
+        field: String,
+    },
+
+    /// Show a field to a contact (make visible)
+    Unhide {
+        /// Contact ID or name
+        contact: String,
+        /// Field label to unhide
+        field: String,
+    },
+
+    /// Show visibility rules for a contact
+    Visibility {
+        /// Contact ID or name
+        contact: String,
+    },
 }
 
 #[tokio::main]
@@ -186,6 +208,15 @@ async fn main() -> Result<()> {
             ContactCommands::Search { query } => commands::contacts::search(&config, &query)?,
             ContactCommands::Remove { id } => commands::contacts::remove(&config, &id)?,
             ContactCommands::Verify { id } => commands::contacts::verify(&config, &id)?,
+            ContactCommands::Hide { contact, field } => {
+                commands::contacts::hide_field(&config, &contact, &field)?;
+            }
+            ContactCommands::Unhide { contact, field } => {
+                commands::contacts::unhide_field(&config, &contact, &field)?;
+            }
+            ContactCommands::Visibility { contact } => {
+                commands::contacts::show_visibility(&config, &contact)?;
+            }
         },
         Commands::Sync => {
             commands::sync::run(&config).await?;

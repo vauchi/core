@@ -207,6 +207,33 @@ impl CardDelta {
         }).collect()
     }
 
+    /// Filters this delta based on visibility rules for a specific contact.
+    ///
+    /// Returns a new delta containing only the changes that the contact
+    /// is allowed to see according to the visibility rules.
+    pub fn filter_for_contact(&self, contact_id: &str, rules: &crate::contact::VisibilityRules) -> Self {
+        let filtered_changes: Vec<FieldChange> = self.changes.iter()
+            .filter(|change| {
+                match change {
+                    // Display name changes are always visible
+                    FieldChange::DisplayNameChanged { .. } => true,
+                    // For field changes, check visibility rules
+                    FieldChange::Added { field } => rules.can_see(field.id(), contact_id),
+                    FieldChange::Modified { field_id, .. } => rules.can_see(field_id, contact_id),
+                    FieldChange::Removed { field_id } => rules.can_see(field_id, contact_id),
+                }
+            })
+            .cloned()
+            .collect();
+
+        CardDelta {
+            version: self.version,
+            timestamp: self.timestamp,
+            changes: filtered_changes,
+            signature: self.signature,
+        }
+    }
+
     /// Returns the bytes to be signed/verified.
     fn signable_bytes(&self) -> Vec<u8> {
         // Create a version without the signature for signing
@@ -469,5 +496,92 @@ mod tests {
             matches!(c, FieldChange::Added { .. })
         });
         assert!(has_added);
+    }
+
+    #[test]
+    fn test_delta_filter_for_contact_all_visible() {
+        use crate::contact::VisibilityRules;
+
+        let mut old = ContactCard::new("Alice");
+        let mut new = ContactCard::new("Alice");
+        new.add_field(ContactField::new(FieldType::Email, "email", "alice@example.com"));
+        new.add_field(ContactField::new(FieldType::Phone, "phone", "+1234567890"));
+
+        let delta = CardDelta::compute(&old, &new);
+        let rules = VisibilityRules::new(); // Default: everyone can see all
+
+        let filtered = delta.filter_for_contact("bob", &rules);
+
+        // Bob should see both fields (default visibility is Everyone)
+        assert_eq!(filtered.changes.len(), 2);
+    }
+
+    #[test]
+    fn test_delta_filter_for_contact_some_hidden() {
+        use crate::contact::VisibilityRules;
+
+        let mut old = ContactCard::new("Alice");
+        let mut new = ContactCard::new("Alice");
+        let email_field = ContactField::new(FieldType::Email, "email", "alice@example.com");
+        let email_id = email_field.id().to_string();
+        new.add_field(email_field);
+        new.add_field(ContactField::new(FieldType::Phone, "phone", "+1234567890"));
+
+        let delta = CardDelta::compute(&old, &new);
+
+        // Hide email from Bob
+        let mut rules = VisibilityRules::new();
+        rules.set_nobody(&email_id);
+
+        let filtered = delta.filter_for_contact("bob", &rules);
+
+        // Bob should only see the phone field
+        assert_eq!(filtered.changes.len(), 1);
+        assert!(matches!(&filtered.changes[0], FieldChange::Added { field } if field.label() == "phone"));
+    }
+
+    #[test]
+    fn test_delta_filter_for_contact_restricted_access() {
+        use crate::contact::VisibilityRules;
+        use std::collections::HashSet;
+
+        let mut old = ContactCard::new("Alice");
+        let mut new = ContactCard::new("Alice");
+        let email_field = ContactField::new(FieldType::Email, "email", "alice@example.com");
+        let email_id = email_field.id().to_string();
+        new.add_field(email_field);
+
+        let delta = CardDelta::compute(&old, &new);
+
+        // Email only visible to specific contacts
+        let mut rules = VisibilityRules::new();
+        let mut allowed = HashSet::new();
+        allowed.insert("charlie".to_string());
+        rules.set_contacts(&email_id, allowed);
+
+        // Bob is not in the allowed list
+        let bob_filtered = delta.filter_for_contact("bob", &rules);
+        assert!(bob_filtered.is_empty());
+
+        // Charlie is in the allowed list
+        let charlie_filtered = delta.filter_for_contact("charlie", &rules);
+        assert_eq!(charlie_filtered.changes.len(), 1);
+    }
+
+    #[test]
+    fn test_delta_filter_display_name_always_visible() {
+        use crate::contact::VisibilityRules;
+
+        let old = ContactCard::new("Alice");
+        let new = ContactCard::new("Alice Smith");
+
+        let delta = CardDelta::compute(&old, &new);
+        let rules = VisibilityRules::new();
+
+        let filtered = delta.filter_for_contact("bob", &rules);
+
+        // Display name changes are always visible
+        assert_eq!(filtered.changes.len(), 1);
+        assert!(matches!(&filtered.changes[0], FieldChange::DisplayNameChanged { .. }));
     }
 }

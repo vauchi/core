@@ -78,7 +78,7 @@ WebBook is a privacy-focused, decentralized contact card exchange application th
 ## Development Phases
 
 ### Phase 1: Foundation (Weeks 1-4)
-- Core crypto library (Ed25519, X25519, XChaCha20-Poly1305)
+- Crypto via audited libraries: `ring` or `RustCrypto` (Ed25519, X25519, XChaCha20-Poly1305)
 - Data models (ContactCard, ContactField, VisibilityRule)
 - Local encrypted storage (SQLCipher)
 - CLI testing tool
@@ -168,7 +168,7 @@ cargo tarpaulin --out Html
 ## Contribution Model
 
 - **Code**: MIT License, open source
-- **Relay Nodes**: Volunteer-run, Docker images provided
+- **Relay Nodes**: Volunteer-run, with Docker, PHP, and Python deployment options
 - **No Freemium**: All features available to all users
 - **No Ads**: Privacy-focused, no data monetization
 
@@ -176,7 +176,7 @@ cargo tarpaulin --out Html
 
 ## Contact & Links
 
-- **Repository**: [GitHub](https://github.com/your-org/webbook)
+- **Repository**: [GitHub](https://github.com/f-u-f/webbook)
 - **Documentation**: See `/docs` directory
 - **Feature Requests**: GitHub Issues
-- **Security Issues**: security@webbook.app (once established)
+- **Security Issues**: mattia.egloff@pm.me

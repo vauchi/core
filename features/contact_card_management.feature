@@ -216,14 +216,14 @@ Feature: Contact Card Management
 
   @limits
   Scenario: Maximum number of fields
-    Given my contact card has 99 fields
+    Given my contact card has 24 fields
     When I try to add another field
     Then the field should be added successfully
-    And my contact card should have 100 fields
+    And my contact card should have 25 fields
 
   @limits
   Scenario: Exceed maximum fields
-    Given my contact card has 100 fields
+    Given my contact card has 25 fields
     When I try to add another field
     Then I should see an error "Maximum number of fields reached"
     And the field should not be added

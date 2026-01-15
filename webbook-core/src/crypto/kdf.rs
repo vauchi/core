@@ -56,7 +56,7 @@ impl HKDF {
         }
 
         let key = hmac::Key::new(hmac::HMAC_SHA256, prk);
-        let n = (length + HASH_LEN - 1) / HASH_LEN; // ceil(length / HASH_LEN)
+        let n = length.div_ceil(HASH_LEN);
 
         let mut okm = Vec::with_capacity(n * HASH_LEN);
         let mut t_prev: Vec<u8> = Vec::new();

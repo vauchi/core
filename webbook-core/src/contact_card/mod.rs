@@ -87,6 +87,11 @@ impl ContactCard {
         &self.fields
     }
 
+    /// Returns mutable access to all fields.
+    pub fn fields_mut(&mut self) -> &mut Vec<ContactField> {
+        &mut self.fields
+    }
+
     /// Adds a field to the card.
     pub fn add_field(&mut self, field: ContactField) -> Result<(), ContactCardError> {
         if self.fields.len() >= MAX_FIELDS {

@@ -25,7 +25,7 @@ pub enum FieldType {
 }
 
 /// A single contact field (phone, email, etc.).
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct ContactField {
     /// Unique identifier for this field.
     id: String,

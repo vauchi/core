@@ -45,6 +45,15 @@ impl X3DHKeyPair {
     pub fn secret_bytes(&self) -> [u8; 32] {
         self.secret.to_bytes()
     }
+
+    /// Performs Diffie-Hellman key agreement with a public key.
+    ///
+    /// Returns the 32-byte shared secret.
+    pub fn diffie_hellman(&self, their_public: &[u8; 32]) -> [u8; 32] {
+        let their_public_key = PublicKey::from(*their_public);
+        let shared = self.secret.diffie_hellman(&their_public_key);
+        *shared.as_bytes()
+    }
 }
 
 /// X3DH protocol implementation.

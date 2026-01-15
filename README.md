@@ -6,6 +6,8 @@ A privacy-focused platform for exchanging contact information that stays up-to-d
 
 When you exchange contact details with someone, that information becomes outdated the moment either of you changes your phone number, email, social media, or address. You end up with stale contacts, and people lose touch.
 
+Worse, social media platforms keep users captive by implicitly threatening them with losing their contacts if they leave. Your relationships become locked inside platforms you may no longer want to use.
+
 ## The Solution
 
 WebBook lets you exchange "living" contact cards. When you update your information, everyone you've shared it with automatically receives the update - securely and privately.

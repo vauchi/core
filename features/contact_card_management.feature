@@ -248,3 +248,78 @@ Feature: Contact Card Management
     Given I have reordered my fields to: "Twitter", "Mobile", "Email"
     When I restart the application
     Then my contact card fields should still be in order: "Twitter", "Mobile", "Email"
+
+  # Social Network Registry Configuration
+
+  @social-registry
+  Scenario: Load social network configurations from remote repository
+    Given the app has network connectivity
+    When I open the social field options
+    Then the app should fetch the social network config from GitHub
+    And I should see available networks including "Twitter", "GitHub", "LinkedIn"
+
+  @social-registry @offline
+  Scenario: Use cached social network config when offline
+    Given I have previously loaded the social network config
+    And the app has no network connectivity
+    When I open the social field options
+    Then I should see the cached list of social networks
+    And I should be able to add social fields normally
+
+  @social-registry @validation
+  Scenario Outline: Validate social network username format
+    Given the social network config has been loaded
+    When I add a social field for "<network>"
+    And I enter "<username>" as the value
+    Then the validation should "<result>"
+    And I should see message "<message>"
+
+    Examples:
+      | network  | username              | result | message                          |
+      | twitter  | @alicesmith           | pass   |                                  |
+      | twitter  | alice                 | pass   |                                  |
+      | twitter  | this_is_way_too_long! | fail   | Invalid Twitter username format  |
+      | github   | octocat               | pass   |                                  |
+      | github   | -invalid              | fail   | Invalid GitHub username format   |
+
+  @social-registry @profile-url
+  Scenario: Generate profile URL from social field
+    Given I have a social field for "github" with value "octocat"
+    When I view the field details
+    Then I should see the profile URL "https://github.com/octocat"
+    And I should be able to open the profile link
+
+  @social-registry @verification
+  Scenario: View verification workflow for social network
+    Given the social network config has been loaded
+    When I view the verification options for "twitter"
+    Then I should see the verification method "signed_post"
+    And I should see verification steps:
+      | step                                              |
+      | Generate a signed verification message            |
+      | Post the message as a tweet from your account     |
+      | Paste the tweet URL to verify ownership           |
+
+  @social-registry @verification
+  Scenario: View help text for finding social network ID
+    Given I am adding a social field for "mastodon"
+    When I tap the help icon
+    Then I should see instructions on how to find my Mastodon handle
+    And the instructions should mention "Your full handle like @user@instance.social"
+
+  @social-registry @config-update
+  Scenario: Update social network config on app launch
+    Given the cached config is older than 24 hours
+    And the app has network connectivity
+    When I launch the app
+    Then the social network config should be refreshed in the background
+    And new networks should be available when I add a social field
+
+  @social-registry @custom-network
+  Scenario: Add unlisted social network as custom field
+    Given the social network config is loaded
+    And "Signal" is not in the config
+    When I add a custom field labeled "Signal"
+    And I set the value to "+1-555-123-4567"
+    Then the field should be saved as a custom field
+    And no username validation should be applied

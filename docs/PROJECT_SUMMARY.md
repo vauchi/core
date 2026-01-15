@@ -49,8 +49,9 @@ WebBook is a privacy-focused, decentralized contact card exchange application th
 | `security.feature` | 28 | Encryption, keys, attack prevention |
 | `device_management.feature` | 25 | Multi-device linking and sync |
 | `relay_network.feature` | 22 | Volunteer relay infrastructure |
+| `social_profile_validation.feature` | 30 | Crowd-sourced profile verification |
 
-**Total: ~235 scenarios**
+**Total: ~265 scenarios**
 
 ---
 

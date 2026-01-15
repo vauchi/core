@@ -108,16 +108,15 @@ interface VisibilityRule {
 enum ContactFieldType {
   PHONE = "phone",
   EMAIL = "email",
-  SOCIAL_TWITTER = "social_twitter",
-  SOCIAL_INSTAGRAM = "social_instagram",
-  SOCIAL_LINKEDIN = "social_linkedin",
-  SOCIAL_FACEBOOK = "social_facebook",
-  SOCIAL_GITHUB = "social_github",
-  SOCIAL_OTHER = "social_other",
+  SOCIAL = "social",      // Label identifies network (e.g., "twitter", "github")
   ADDRESS = "address",
   WEBSITE = "website",
   CUSTOM = "custom"
 }
+
+// Social Network Registry provides URL templates for 35+ networks
+// including Twitter, GitHub, LinkedIn, Instagram, TikTok, etc.
+// Profile URLs are generated from usernames automatically.
 ```
 
 ### 3. Proximity Exchange Protocol

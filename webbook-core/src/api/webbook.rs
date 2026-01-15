@@ -285,6 +285,135 @@ impl<T: Transport> WebBook<T> {
         Ok(())
     }
 
+    // === Card Propagation Operations ===
+
+    /// Propagates own card update to all contacts.
+    ///
+    /// For each contact with an established ratchet:
+    /// 1. Computes delta between old and new card
+    /// 2. Signs delta with our identity
+    /// 3. Encrypts with contact's ratchet
+    /// 4. Queues for delivery via relay
+    ///
+    /// Returns the number of contacts queued for update.
+    pub fn propagate_card_update(
+        &self,
+        old_card: &ContactCard,
+        new_card: &ContactCard,
+    ) -> WebBookResult<usize> {
+        use crate::sync::delta::CardDelta;
+        use crate::storage::{PendingUpdate, UpdateStatus};
+
+        let identity = self.identity.as_ref()
+            .ok_or(WebBookError::IdentityNotInitialized)?;
+
+        let contacts = self.storage.list_contacts()?;
+        let mut queued = 0;
+
+        for contact in contacts {
+            // Skip contacts without ratchet (not yet synced)
+            let (mut ratchet, is_initiator) = match self.storage.load_ratchet_state(contact.id())? {
+                Some(r) => r,
+                None => continue,
+            };
+
+            // Compute delta
+            let mut delta = CardDelta::compute(old_card, new_card);
+            if delta.is_empty() { continue; }
+
+            // Sign delta with our identity
+            delta.sign(identity);
+
+            // Serialize delta
+            let delta_bytes = serde_json::to_vec(&delta)
+                .map_err(|e| WebBookError::Serialization(e.to_string()))?;
+
+            // Encrypt with ratchet
+            let ratchet_msg = ratchet.encrypt(&delta_bytes)
+                .map_err(|e| WebBookError::Crypto(format!("{:?}", e)))?;
+            let encrypted = serde_json::to_vec(&ratchet_msg)
+                .map_err(|e| WebBookError::Serialization(e.to_string()))?;
+
+            // Save updated ratchet state
+            self.storage.save_ratchet_state(contact.id(), &ratchet, is_initiator)?;
+
+            // Queue for delivery
+            let now = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_secs();
+
+            let update = PendingUpdate {
+                id: format!("{}-{}", contact.id(), now),
+                contact_id: contact.id().to_string(),
+                update_type: "card_delta".to_string(),
+                payload: encrypted,
+                created_at: now,
+                retry_count: 0,
+                status: UpdateStatus::Pending,
+            };
+            self.storage.queue_update(&update)?;
+            queued += 1;
+        }
+
+        Ok(queued)
+    }
+
+    /// Processes an encrypted card update from a contact.
+    ///
+    /// 1. Decrypts the update using the contact's ratchet
+    /// 2. Verifies the signature using the contact's public key
+    /// 3. Applies the delta to the contact's card
+    ///
+    /// Returns a list of changed field labels.
+    pub fn process_card_update(
+        &self,
+        contact_id: &str,
+        encrypted: &[u8],
+    ) -> WebBookResult<Vec<String>> {
+        use crate::sync::delta::CardDelta;
+        use crate::crypto::ratchet::RatchetMessage;
+
+        // Load contact
+        let mut contact = self.storage.load_contact(contact_id)?
+            .ok_or_else(|| WebBookError::NotFound(format!("contact: {}", contact_id)))?;
+
+        // Load and decrypt with ratchet
+        let (mut ratchet, is_initiator) = self.storage.load_ratchet_state(contact_id)?
+            .ok_or_else(|| WebBookError::NotFound("ratchet state".into()))?;
+
+        let ratchet_msg: RatchetMessage = serde_json::from_slice(encrypted)
+            .map_err(|e| WebBookError::Serialization(e.to_string()))?;
+        let delta_bytes = ratchet.decrypt(&ratchet_msg)
+            .map_err(|e| WebBookError::Crypto(format!("{:?}", e)))?;
+
+        // Save updated ratchet state
+        self.storage.save_ratchet_state(contact_id, &ratchet, is_initiator)?;
+
+        // Parse delta
+        let delta: CardDelta = serde_json::from_slice(&delta_bytes)
+            .map_err(|e| WebBookError::Serialization(e.to_string()))?;
+
+        // Verify signature with contact's public key
+        if !delta.verify(contact.public_key()) {
+            return Err(WebBookError::SignatureInvalid);
+        }
+
+        // Get changed fields before applying
+        let changed = delta.changed_fields();
+
+        // Apply delta to contact's card
+        let mut new_card = contact.card().clone();
+        delta.apply(&mut new_card)
+            .map_err(|e| WebBookError::InvalidState(e.to_string()))?;
+
+        // Update contact
+        contact.update_card(new_card);
+        self.storage.save_contact(&contact)?;
+
+        Ok(changed)
+    }
+
     // === Event Operations ===
 
     /// Adds an event handler.
@@ -573,5 +702,214 @@ mod tests {
 
         assert!(wb.has_identity());
         assert_eq!(wb.public_id().unwrap(), public_id);
+    }
+
+    #[test]
+    fn test_propagate_card_update_to_contacts() {
+        use crate::exchange::X3DHKeyPair;
+
+        let mut wb = create_test_webbook();
+        wb.create_identity("Alice").unwrap();
+
+        // Create a contact with ratchet
+        let bob_key = [1u8; 32];
+        let contact = Contact::from_exchange(
+            bob_key,
+            ContactCard::new("Bob"),
+            SymmetricKey::generate(),
+        );
+        let contact_id = contact.id().to_string();
+        wb.add_contact(contact).unwrap();
+
+        // Initialize ratchet for Bob
+        let shared_secret = SymmetricKey::generate();
+        let their_dh = X3DHKeyPair::generate();
+        wb.create_ratchet_as_initiator(&contact_id, &shared_secret, *their_dh.public_key()).unwrap();
+
+        // Get old card, update it
+        let old_card = wb.own_card().unwrap().unwrap();
+        let mut new_card = old_card.clone();
+        let _ = new_card.add_field(ContactField::new(FieldType::Email, "work", "alice@company.com"));
+
+        // Propagate update
+        let queued = wb.propagate_card_update(&old_card, &new_card).unwrap();
+        assert_eq!(queued, 1);
+
+        // Verify pending update was created
+        let pending = wb.storage().get_pending_updates(&contact_id).unwrap();
+        assert_eq!(pending.len(), 1);
+        assert_eq!(pending[0].update_type, "card_delta");
+    }
+
+    #[test]
+    fn test_propagate_skips_contacts_without_ratchet() {
+        let mut wb = create_test_webbook();
+        wb.create_identity("Alice").unwrap();
+
+        // Create a contact WITHOUT ratchet
+        let contact = Contact::from_exchange(
+            [1u8; 32],
+            ContactCard::new("Bob"),
+            SymmetricKey::generate(),
+        );
+        wb.add_contact(contact).unwrap();
+
+        // Get old card, update it
+        let old_card = wb.own_card().unwrap().unwrap();
+        let mut new_card = old_card.clone();
+        let _ = new_card.add_field(ContactField::new(FieldType::Email, "work", "alice@company.com"));
+
+        // Propagate - should skip Bob (no ratchet)
+        let queued = wb.propagate_card_update(&old_card, &new_card).unwrap();
+        assert_eq!(queued, 0);
+    }
+
+    #[test]
+    fn test_propagate_empty_delta_not_queued() {
+        use crate::exchange::X3DHKeyPair;
+
+        let mut wb = create_test_webbook();
+        wb.create_identity("Alice").unwrap();
+
+        // Create a contact with ratchet
+        let contact = Contact::from_exchange(
+            [1u8; 32],
+            ContactCard::new("Bob"),
+            SymmetricKey::generate(),
+        );
+        let contact_id = contact.id().to_string();
+        wb.add_contact(contact).unwrap();
+
+        // Initialize ratchet
+        let shared_secret = SymmetricKey::generate();
+        let their_dh = X3DHKeyPair::generate();
+        wb.create_ratchet_as_initiator(&contact_id, &shared_secret, *their_dh.public_key()).unwrap();
+
+        // Propagate with identical cards (empty delta)
+        let card = wb.own_card().unwrap().unwrap();
+        let queued = wb.propagate_card_update(&card, &card).unwrap();
+        assert_eq!(queued, 0);
+
+        // Verify no pending updates
+        let pending = wb.storage().get_pending_updates(&contact_id).unwrap();
+        assert!(pending.is_empty());
+    }
+
+    #[test]
+    fn test_process_incoming_card_update() {
+        use crate::exchange::X3DHKeyPair;
+        use crate::sync::delta::CardDelta;
+        use crate::crypto::ratchet::{DoubleRatchetState, RatchetMessage};
+        use crate::Identity;
+
+        // Create Alice's WebBook
+        let mut alice_wb = create_test_webbook();
+        alice_wb.create_identity("Alice").unwrap();
+
+        // Create Bob's identity and keypair for ratchet
+        let bob_identity = Identity::create("Bob");
+        let bob_dh = X3DHKeyPair::generate();
+        let shared_secret = SymmetricKey::generate();
+
+        // Add Bob as a contact on Alice's side
+        let contact = Contact::from_exchange(
+            *bob_identity.signing_public_key(),
+            ContactCard::new("Bob"),
+            shared_secret.clone(),
+        );
+        let bob_id = contact.id().to_string();
+        alice_wb.add_contact(contact).unwrap();
+
+        // Initialize ratchet as responder (Alice will receive from Bob)
+        alice_wb.create_ratchet_as_responder(
+            &bob_id,
+            &shared_secret,
+            X3DHKeyPair::from_bytes(bob_dh.secret_bytes()),
+        ).unwrap();
+
+        // Bob creates and encrypts an update
+        let mut bob_ratchet = DoubleRatchetState::initialize_initiator(
+            &shared_secret,
+            *bob_dh.public_key(),
+        );
+
+        // Create a delta (Bob adds an email field)
+        let old_card = ContactCard::new("Bob");
+        let mut new_card = ContactCard::new("Bob");
+        let _ = new_card.add_field(ContactField::new(FieldType::Email, "work", "bob@company.com"));
+
+        let mut delta = CardDelta::compute(&old_card, &new_card);
+        delta.sign(&bob_identity);
+
+        // Encrypt the delta
+        let delta_bytes = serde_json::to_vec(&delta).unwrap();
+        let ratchet_msg = bob_ratchet.encrypt(&delta_bytes).unwrap();
+        let encrypted = serde_json::to_vec(&ratchet_msg).unwrap();
+
+        // Alice processes the incoming update
+        let changed = alice_wb.process_card_update(&bob_id, &encrypted).unwrap();
+
+        // Verify the changes were applied
+        assert!(!changed.is_empty());
+        assert!(changed.iter().any(|f| f == "work"));
+
+        // Verify Bob's card was updated
+        let bob_contact = alice_wb.get_contact(&bob_id).unwrap().unwrap();
+        let bob_card = bob_contact.card();
+        assert!(bob_card.fields().iter().any(|f| f.label() == "work"));
+    }
+
+    #[test]
+    fn test_process_update_rejects_invalid_signature() {
+        use crate::exchange::X3DHKeyPair;
+        use crate::sync::delta::CardDelta;
+        use crate::crypto::ratchet::DoubleRatchetState;
+        use crate::Identity;
+
+        let mut alice_wb = create_test_webbook();
+        alice_wb.create_identity("Alice").unwrap();
+
+        // Create Bob's identity
+        let bob_identity = Identity::create("Bob");
+        let bob_dh = X3DHKeyPair::generate();
+        let shared_secret = SymmetricKey::generate();
+
+        // Add Bob as a contact
+        let contact = Contact::from_exchange(
+            *bob_identity.signing_public_key(),
+            ContactCard::new("Bob"),
+            shared_secret.clone(),
+        );
+        let bob_id = contact.id().to_string();
+        alice_wb.add_contact(contact).unwrap();
+
+        // Initialize ratchet
+        alice_wb.create_ratchet_as_responder(
+            &bob_id,
+            &shared_secret,
+            X3DHKeyPair::from_bytes(bob_dh.secret_bytes()),
+        ).unwrap();
+
+        // Create update signed by WRONG identity (not Bob)
+        let wrong_identity = Identity::create("Eve");
+        let mut bob_ratchet = DoubleRatchetState::initialize_initiator(
+            &shared_secret,
+            *bob_dh.public_key(),
+        );
+
+        let old_card = ContactCard::new("Bob");
+        let mut new_card = ContactCard::new("Bob");
+        let _ = new_card.add_field(ContactField::new(FieldType::Email, "work", "bob@company.com"));
+
+        let mut delta = CardDelta::compute(&old_card, &new_card);
+        delta.sign(&wrong_identity);  // WRONG signature!
+
+        let delta_bytes = serde_json::to_vec(&delta).unwrap();
+        let ratchet_msg = bob_ratchet.encrypt(&delta_bytes).unwrap();
+        let encrypted = serde_json::to_vec(&ratchet_msg).unwrap();
+
+        // Should fail signature verification
+        let result = alice_wb.process_card_update(&bob_id, &encrypted);
+        assert!(matches!(result, Err(WebBookError::SignatureInvalid)));
     }
 }

@@ -52,6 +52,22 @@ pub enum WebBookError {
     /// Configuration error.
     #[error("configuration error: {0}")]
     Configuration(String),
+
+    /// Serialization error.
+    #[error("serialization error: {0}")]
+    Serialization(String),
+
+    /// Cryptographic operation failed.
+    #[error("crypto error: {0}")]
+    Crypto(String),
+
+    /// Resource not found.
+    #[error("not found: {0}")]
+    NotFound(String),
+
+    /// Signature verification failed.
+    #[error("invalid signature")]
+    SignatureInvalid,
 }
 
 /// Result type for WebBook operations.

@@ -69,10 +69,20 @@ pub fn add(config: &CliConfig, field_type: &str, label: &str, value: &str) -> Re
     let wb = open_webbook(config)?;
     let ft = parse_field_type(field_type)?;
 
+    // Get old card for delta propagation
+    let old_card = wb.own_card()?.ok_or_else(|| anyhow::anyhow!("No contact card found"))?;
+
     let field = ContactField::new(ft, label, value);
     wb.add_own_field(field)?;
 
     display::success(&format!("Added {} field '{}'", field_type, label));
+
+    // Propagate update to contacts
+    let new_card = wb.own_card()?.unwrap();
+    let queued = wb.propagate_card_update(&old_card, &new_card)?;
+    if queued > 0 {
+        display::info(&format!("Update queued to {} contact(s)", queued));
+    }
 
     Ok(())
 }
@@ -81,8 +91,18 @@ pub fn add(config: &CliConfig, field_type: &str, label: &str, value: &str) -> Re
 pub fn remove(config: &CliConfig, label: &str) -> Result<()> {
     let wb = open_webbook(config)?;
 
+    // Get old card for delta propagation
+    let old_card = wb.own_card()?.ok_or_else(|| anyhow::anyhow!("No contact card found"))?;
+
     if wb.remove_own_field(label)? {
         display::success(&format!("Removed field '{}'", label));
+
+        // Propagate update to contacts
+        let new_card = wb.own_card()?.unwrap();
+        let queued = wb.propagate_card_update(&old_card, &new_card)?;
+        if queued > 0 {
+            display::info(&format!("Update queued to {} contact(s)", queued));
+        }
     } else {
         display::warning(&format!("Field '{}' not found", label));
     }
@@ -94,11 +114,11 @@ pub fn remove(config: &CliConfig, label: &str) -> Result<()> {
 pub fn edit(config: &CliConfig, label: &str, value: &str) -> Result<()> {
     let wb = open_webbook(config)?;
 
-    // Get current card
-    let card = wb.own_card()?.ok_or_else(|| anyhow::anyhow!("No contact card found"))?;
+    // Get current card (also serves as old card for delta)
+    let old_card = wb.own_card()?.ok_or_else(|| anyhow::anyhow!("No contact card found"))?;
 
     // Find the field
-    let field = card.fields().iter().find(|f| f.label() == label);
+    let field = old_card.fields().iter().find(|f| f.label() == label);
 
     match field {
         Some(f) => {
@@ -108,6 +128,13 @@ pub fn edit(config: &CliConfig, label: &str, value: &str) -> Result<()> {
             wb.add_own_field(new_field)?;
 
             display::success(&format!("Updated field '{}'", label));
+
+            // Propagate update to contacts
+            let new_card = wb.own_card()?.unwrap();
+            let queued = wb.propagate_card_update(&old_card, &new_card)?;
+            if queued > 0 {
+                display::info(&format!("Update queued to {} contact(s)", queued));
+            }
         }
         None => {
             display::warning(&format!("Field '{}' not found", label));

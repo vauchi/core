@@ -84,9 +84,9 @@ impl Identity {
             *byte ^= (i as u8).wrapping_add(0x42);
         }
 
-        // For X25519, we just store the public key derived from the seed
-        // The actual X25519 private key would be derived when needed
-        let exchange_public_key = exchange_seed; // Simplified - in real impl use X25519
+        // Create X25519 keypair and store the actual public key
+        let x3dh = X3DHKeyPair::from_bytes(exchange_seed);
+        let exchange_public_key = *x3dh.public_key();
 
         Identity {
             master_seed,

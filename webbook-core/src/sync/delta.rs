@@ -195,6 +195,18 @@ impl CardDelta {
         self.changes.is_empty()
     }
 
+    /// Returns a list of descriptive labels for the changes in this delta.
+    pub fn changed_fields(&self) -> Vec<String> {
+        self.changes.iter().map(|change| {
+            match change {
+                FieldChange::Added { field } => field.label().to_string(),
+                FieldChange::Modified { field_id, .. } => field_id.clone(),
+                FieldChange::Removed { field_id } => format!("{} (removed)", field_id),
+                FieldChange::DisplayNameChanged { new_name } => format!("name: {}", new_name),
+            }
+        }).collect()
+    }
+
     /// Returns the bytes to be signed/verified.
     fn signable_bytes(&self) -> Vec<u8> {
         // Create a version without the signature for signing

@@ -472,6 +472,15 @@ impl Storage {
         Ok(count as usize)
     }
 
+    /// Deletes a pending update by ID.
+    pub fn delete_pending_update(&self, id: &str) -> Result<bool, StorageError> {
+        let rows_affected = self.conn.execute(
+            "DELETE FROM pending_updates WHERE id = ?1",
+            params![id],
+        )?;
+        Ok(rows_affected > 0)
+    }
+
     // === Double Ratchet State Operations ===
 
     /// Saves a Double Ratchet state for a contact.

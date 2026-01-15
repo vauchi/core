@@ -104,12 +104,14 @@ fn send_exchange_response(
 }
 
 /// Receives and processes pending messages from relay.
+/// Returns: (total_received, exchange_messages, encrypted_card_updates)
 fn receive_pending(
     socket: &mut WebSocket<MaybeTlsStream<TcpStream>>,
     _wb: &WebBook<MockTransport>,
-) -> Result<(usize, Vec<ExchangeMessage>)> {
+) -> Result<(usize, Vec<ExchangeMessage>, Vec<(String, Vec<u8>)>)> {
     let mut received = 0;
     let mut exchange_messages = Vec::new();
+    let mut card_updates = Vec::new();  // (sender_id, ciphertext)
 
     // Set a read timeout so we don't block forever
     // The relay sends pending messages immediately after handshake
@@ -132,10 +134,12 @@ fn receive_pending(
                                         exchange_messages.push(exchange);
                                     }
                                 } else {
+                                    // This is an encrypted card update
                                     display::info(&format!(
-                                        "Received update from {}",
+                                        "Received encrypted update from {}",
                                         &update.sender_id[..8]
                                     ));
+                                    card_updates.push((update.sender_id.clone(), update.ciphertext));
                                 }
 
                                 // Send acknowledgment
@@ -176,7 +180,7 @@ fn receive_pending(
         }
     }
 
-    Ok((received, exchange_messages))
+    Ok((received, exchange_messages, card_updates))
 }
 
 /// Processes exchange messages and creates contacts.
@@ -307,6 +311,94 @@ fn process_exchange_messages(
     Ok((added, updated))
 }
 
+/// Processes encrypted card updates from contacts.
+fn process_card_updates(
+    wb: &WebBook<MockTransport>,
+    updates: Vec<(String, Vec<u8>)>,  // (sender_id, ciphertext)
+) -> Result<usize> {
+    let mut processed = 0;
+
+    for (sender_id, ciphertext) in updates {
+        // Get contact to display name
+        let contact_name = match wb.get_contact(&sender_id)? {
+            Some(c) => c.display_name().to_string(),
+            None => {
+                display::warning(&format!("Update from unknown contact: {}...", &sender_id[..8]));
+                continue;
+            }
+        };
+
+        // Process the encrypted update
+        match wb.process_card_update(&sender_id, &ciphertext) {
+            Ok(changed_fields) => {
+                if changed_fields.is_empty() {
+                    display::info(&format!("{} sent an update (no changes)", contact_name));
+                } else {
+                    display::success(&format!(
+                        "{} updated: {}",
+                        contact_name,
+                        changed_fields.join(", ")
+                    ));
+                }
+                processed += 1;
+            }
+            Err(e) => {
+                display::warning(&format!(
+                    "Failed to process update from {}: {:?}",
+                    contact_name, e
+                ));
+            }
+        }
+    }
+
+    Ok(processed)
+}
+
+/// Sends pending card updates to contacts via relay.
+fn send_pending_updates(
+    wb: &WebBook<MockTransport>,
+    socket: &mut WebSocket<MaybeTlsStream<TcpStream>>,
+    our_id: &str,
+) -> Result<usize> {
+    // Get all contacts and check for pending updates
+    let contacts = wb.list_contacts()?;
+    let mut sent = 0;
+
+    for contact in contacts {
+        let pending = wb.storage().get_pending_updates(contact.id())?;
+
+        for update in pending {
+            if update.update_type != "card_delta" {
+                continue;
+            }
+
+            // Create encrypted update message
+            let msg = EncryptedUpdate {
+                recipient_id: contact.id().to_string(),
+                sender_id: our_id.to_string(),
+                ciphertext: update.payload,
+            };
+
+            let envelope = create_envelope(MessagePayload::EncryptedUpdate(msg));
+            match encode_message(&envelope) {
+                Ok(data) => {
+                    if socket.send(Message::Binary(data)).is_ok() {
+                        // Mark as sent (delete from pending)
+                        let _ = wb.storage().delete_pending_update(&update.id);
+                        sent += 1;
+                        display::info(&format!("Sent update to {}", contact.display_name()));
+                    }
+                }
+                Err(e) => {
+                    display::warning(&format!("Failed to encode update: {}", e));
+                }
+            }
+        }
+    }
+
+    Ok(sent)
+}
+
 /// Runs the sync command.
 pub async fn run(config: &CliConfig) -> Result<()> {
     let wb = open_webbook(config)?;
@@ -335,23 +427,32 @@ pub async fn run(config: &CliConfig) -> Result<()> {
     std::thread::sleep(std::time::Duration::from_millis(500));
 
     // Receive pending messages
-    let (received, exchange_messages) = receive_pending(&mut socket, &wb)?;
+    let (received, exchange_messages, card_updates) = receive_pending(&mut socket, &wb)?;
 
     // Process exchange messages
     let (contacts_added, contacts_updated) = process_exchange_messages(&wb, exchange_messages, config)?;
+
+    // Process encrypted card updates
+    let cards_updated = process_card_updates(&wb, card_updates)?;
+
+    // Send pending outbound updates
+    let updates_sent = send_pending_updates(&wb, &mut socket, &client_id)?;
 
     // Close connection
     let _ = socket.close(None);
 
     // Display results
     println!();
-    if received > 0 || contacts_added > 0 || contacts_updated > 0 {
-        display::success(&format!(
-            "Sync complete: {} messages received, {} contacts added, {} contacts updated",
-            received, contacts_added, contacts_updated
-        ));
+    let total_changes = received + contacts_added + contacts_updated + cards_updated + updates_sent;
+    if total_changes > 0 {
+        let mut summary = format!("Sync complete: {} received", received);
+        if contacts_added > 0 { summary.push_str(&format!(", {} contacts added", contacts_added)); }
+        if contacts_updated > 0 { summary.push_str(&format!(", {} contacts updated", contacts_updated)); }
+        if cards_updated > 0 { summary.push_str(&format!(", {} cards updated", cards_updated)); }
+        if updates_sent > 0 { summary.push_str(&format!(", {} sent", updates_sent)); }
+        display::success(&summary);
     } else {
-        display::info("Sync complete: No new messages");
+        display::info("Sync complete: No new messages or pending updates");
     }
 
     Ok(())

@@ -73,7 +73,7 @@ pub struct SerializedRatchetState {
 const ROOT_RATCHET_INFO: &[u8] = b"WebBook_Root_Ratchet";
 
 /// A ratcheted message ready for transmission.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RatchetMessage {
     /// Sender's current DH public key
     pub dh_public: [u8; 32],

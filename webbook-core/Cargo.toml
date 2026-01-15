@@ -38,6 +38,10 @@ rusqlite = { version = "0.32", features = ["bundled"] }
 # UUID generation for IDs
 uuid = { version = "1.0", features = ["v4"] }
 
+# WebSocket transport
+tungstenite = { version = "0.24", features = ["native-tls"] }
+native-tls = "0.2"
+
 [dev-dependencies]
 # Temporary directories for storage tests
 tempfile = "3.0"

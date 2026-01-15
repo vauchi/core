@@ -37,6 +37,7 @@ mod transport;
 mod mock;
 mod connection;
 mod relay_client;
+mod websocket;
 
 // Error types
 pub use error::NetworkError;
@@ -64,6 +65,9 @@ pub use transport::{
 
 // Mock transport for testing
 pub use mock::MockTransport;
+
+// WebSocket transport for production
+pub use websocket::WebSocketTransport;
 
 // Connection management
 pub use connection::ConnectionManager;

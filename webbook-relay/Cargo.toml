@@ -1,0 +1,28 @@
+[package]
+name = "webbook-relay"
+version = "0.1.0"
+edition = "2021"
+description = "Relay server for WebBook - encrypted blob storage and forwarding"
+license = "MIT"
+
+[dependencies]
+# Async runtime
+tokio = { version = "1", features = ["full"] }
+
+# WebSocket server
+tokio-tungstenite = "0.24"
+futures-util = "0.3"
+
+# Serialization (compatible with webbook-core)
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# UUID for blob IDs
+uuid = { version = "1.0", features = ["v4"] }
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+[dev-dependencies]
+tokio-test = "0.4"

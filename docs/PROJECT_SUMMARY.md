@@ -77,40 +77,43 @@ WebBook is a privacy-focused, decentralized contact card exchange application th
 
 ## Development Phases
 
-### Phase 1: Foundation (Weeks 1-4)
-- Crypto via audited libraries: `ring` or `RustCrypto` (Ed25519, X25519, XChaCha20-Poly1305)
+### Phase 1: Foundation ✅
+- Crypto via `ring` library (Ed25519, X25519, AES-256-GCM)
 - Data models (ContactCard, ContactField, VisibilityRule)
-- Local encrypted storage (SQLCipher)
+- Local encrypted storage
 - CLI testing tool
 
-### Phase 2: Exchange Protocol (Weeks 5-8)
+### Phase 2: Exchange Protocol ✅
 - QR code generation/scanning
-- Audio proximity verification
-- BLE proximity exchange
 - X3DH key agreement
+- (Future: Audio proximity verification, BLE exchange)
 
-### Phase 3: Sync Layer (Weeks 9-12)
-- libp2p integration
-- DHT-based peer discovery
-- CRDT-based conflict resolution
-- Update propagation
+### Phase 3: Sync Layer ✅
+- WebSocket relay transport
+- Update propagation protocol
+- Double Ratchet for forward secrecy
+- (Future: libp2p/DHT-based discovery)
 
-### Phase 4: Mobile Apps (Weeks 13-18)
+### Phase 4: Mobile Apps
 - iOS app with Swift UI
 - Android app with Kotlin
 - Platform-specific features (NFC)
 
-### Phase 5: Desktop Apps (Weeks 19-22)
+### Phase 5: Desktop Apps
 - Tauri shell
 - Cross-platform UI
 - Device linking
 
-### Phase 6: Infrastructure (Weeks 23-26)
-- Relay node implementation
-- Docker deployment
-- Network monitoring
+### Phase 6: Infrastructure ✅
+- Relay server implementation (webbook-relay)
+- (Future: Docker deployment, monitoring)
 
-### Phase 7: Polish (Weeks 27-30)
+### Phase 7: CLI Tool ✅
+- Full CLI implementation (webbook-cli)
+- Identity, card, contact management
+- End-to-end exchange via relay
+
+### Phase 8: Polish
 - UI/UX refinement
 - Accessibility
 - Security audit

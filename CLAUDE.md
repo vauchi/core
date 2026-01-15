@@ -6,16 +6,33 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 WebBook is a privacy-focused, decentralized contact card exchange application. Users exchange contact cards only through physical proximity (in-person), and can control what contact information others see.
 
+## Project Structure
+
+```
+WebBook/
+├── webbook-core/     # Core Rust library (cryptography, data models, protocols)
+├── webbook-relay/    # WebSocket relay server for message forwarding
+└── webbook-cli/      # Command-line interface for testing and demonstration
+```
+
 ## Build & Test Commands
 
 ```bash
-# Run all tests
+# Run all tests (all crates)
 cargo test
 
-# Run tests for specific module
-cargo test crypto
-cargo test identity
-cargo test contact_card
+# Run tests for specific crate
+cargo test -p webbook-core
+cargo test -p webbook-relay
+cargo test -p webbook-cli
+
+# Run CLI commands
+cargo run -p webbook-cli -- --help
+cargo run -p webbook-cli -- init "Your Name"
+cargo run -p webbook-cli -- sync
+
+# Start relay server
+cargo run -p webbook-relay
 
 # Check code quality
 cargo clippy -- -D warnings
@@ -26,19 +43,39 @@ cargo fmt
 
 ## Architecture
 
-The project uses a **shared Rust core library** (`webbook-core/`) that will be compiled to native code for mobile (via FFI) and WebAssembly for web/desktop.
+The project uses a **shared Rust core library** (`webbook-core/`) that will be compiled to native code for mobile (via FFI) and WebAssembly for web/desktop. The relay server and CLI are separate crates that depend on the core.
 
-### Module Structure
+### webbook-core Modules
 
-- `crypto/` - Cryptographic primitives (Ed25519 signatures, AES-256-GCM encryption)
+- `crypto/` - Cryptographic primitives (Ed25519, X25519, AES-256-GCM, X3DH, Double Ratchet)
 - `identity/` - User identity management and encrypted backup/restore
 - `contact_card/` - Contact card and field management with validation
+- `contact/` - Contact storage with shared secrets
+- `exchange/` - QR code generation for contact exchange
+- `sync/` - Update propagation protocol
+- `storage/` - Encrypted local storage
+- `network/` - Transport abstractions
+
+### webbook-relay
+
+- WebSocket server using tokio-tungstenite
+- In-memory blob storage with automatic expiration
+- Rate limiting per client
+- Zero-knowledge design (only sees encrypted blobs)
+
+### webbook-cli
+
+- Full CLI for identity, card, contact, and exchange management
+- Real WebSocket sync with relay server
+- QR code generation for contact exchange
 
 ### Key Design Decisions
 
 - **Crypto**: Uses `ring` crate (audited, production-ready) - never implement custom crypto
 - **Encryption**: AES-256-GCM with random nonces, PBKDF2 for password-derived keys
 - **Signing**: Ed25519 for identity and message signatures
+- **Key Exchange**: X3DH for initial contact exchange
+- **Forward Secrecy**: Double Ratchet for update encryption
 - **Memory Safety**: Sensitive data (seeds, keys) zeroed on drop via `zeroize`
 
 ## Development Rules

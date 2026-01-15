@@ -24,21 +24,53 @@ WebBook lets you exchange "living" contact cards. When you update your informati
 
 ```
 WebBook/
-└── webbook-core/     # Core Rust library (complete)
+├── webbook-core/     # Core Rust library (cryptography, protocols, data models)
+├── webbook-relay/    # WebSocket relay server for message forwarding
+└── webbook-cli/      # Command-line interface for testing
 ```
 
 ### webbook-core
 
-The core library implements all cryptographic protocols and data management. Platform-independent, ready for integration.
+The core library implements all cryptographic protocols (X3DH, Double Ratchet), identity management, contact cards, and sync protocol. Platform-independent, ready for mobile integration via FFI.
 
 See [webbook-core/README.md](webbook-core/README.md) for details.
+
+### webbook-relay
+
+Lightweight WebSocket relay server that stores and forwards encrypted blobs between clients. Zero-knowledge design - the server only sees encrypted data it cannot decrypt.
+
+See [webbook-relay/README.md](webbook-relay/README.md) for details.
+
+### webbook-cli
+
+Command-line interface for testing and demonstration. Supports identity creation, contact card management, QR-based contact exchange, and synchronization via the relay server.
+
+See [webbook-cli/README.md](webbook-cli/README.md) for details.
+
+## Quick Start
+
+```bash
+# Start the relay server (in one terminal)
+cargo run -p webbook-relay
+
+# Create an identity (in another terminal)
+cargo run -p webbook-cli -- init "Alice"
+
+# Show your contact card
+cargo run -p webbook-cli -- card show
+
+# Generate exchange QR code
+cargo run -p webbook-cli -- exchange start
+
+# Sync with relay to receive messages
+cargo run -p webbook-cli -- sync
+```
 
 ## Planned Components
 
 - **iOS App** - Native Swift app using webbook-core via FFI
 - **Android App** - Native Kotlin app using webbook-core via FFI
 - **Desktop Apps** - Cross-platform GUI for macOS, Windows, Linux
-- **Relay Server** - Lightweight message relay (voluntary hosting)
 
 ## License
 

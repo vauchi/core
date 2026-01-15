@@ -336,22 +336,22 @@ For users behind restrictive NATs or firewalls:
 
 ## Development Phases
 
-### Phase 1: Foundation
-- [ ] Core crypto library in Rust
-- [ ] Data model and storage layer
-- [ ] Basic CLI for testing
+### Phase 1: Foundation ✅
+- [x] Core crypto library in Rust (Ed25519, X25519, AES-256-GCM)
+- [x] Data model and storage layer
+- [x] Basic CLI for testing
 
-### Phase 2: Exchange Protocol
-- [ ] QR code generation/scanning
-- [ ] Audio proximity verification
-- [ ] BLE exchange (mobile only)
-- [ ] Key exchange protocol
+### Phase 2: Exchange Protocol ✅
+- [x] QR code generation/scanning
+- [ ] Audio proximity verification (future)
+- [ ] BLE exchange (mobile only, future)
+- [x] X3DH key exchange protocol
 
-### Phase 3: Sync Layer
-- [ ] libp2p integration
-- [ ] DHT-based discovery
-- [ ] Update propagation
-- [ ] Conflict resolution (CRDT)
+### Phase 3: Sync Layer ✅
+- [x] WebSocket transport (relay-based)
+- [ ] libp2p/DHT-based discovery (future)
+- [x] Update propagation protocol
+- [x] Double Ratchet for forward secrecy
 
 ### Phase 4: Mobile Apps
 - [ ] iOS app (Swift UI)
@@ -363,12 +363,17 @@ For users behind restrictive NATs or firewalls:
 - [ ] Cross-platform UI
 - [ ] Device linking
 
-### Phase 6: Infrastructure
-- [ ] Relay node implementation
+### Phase 6: Infrastructure ✅
+- [x] Relay server implementation (webbook-relay)
 - [ ] Docker deployment
 - [ ] Monitoring and health checks
 
-### Phase 7: Polish
+### Phase 7: CLI Tool ✅
+- [x] Full CLI implementation (webbook-cli)
+- [x] Identity, card, contact management
+- [x] End-to-end exchange via relay
+
+### Phase 8: Polish
 - [ ] UI/UX refinement
 - [ ] Accessibility
 - [ ] Localization

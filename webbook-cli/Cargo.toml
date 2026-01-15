@@ -37,3 +37,13 @@ anyhow = "1"
 
 # QR code generation (re-export from webbook-core uses this)
 qrcode = "0.14"
+
+# WebSocket client
+tungstenite = "0.21"
+url = "2"
+
+# UUID generation
+uuid = { version = "1", features = ["v4"] }
+
+# Hex encoding
+hex = "0.4"

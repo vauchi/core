@@ -5,6 +5,7 @@
 mod commands;
 mod config;
 mod display;
+mod protocol;
 
 use std::path::PathBuf;
 

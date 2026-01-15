@@ -3,14 +3,21 @@
 //! Generate and complete contact exchanges.
 
 use std::fs;
+use std::net::TcpStream;
 
 use anyhow::{bail, Result};
+use tungstenite::{connect, Message, WebSocket};
+use tungstenite::stream::MaybeTlsStream;
 use webbook_core::{WebBook, WebBookConfig, Contact, SymmetricKey, Identity, IdentityBackup};
 use webbook_core::network::MockTransport;
 use webbook_core::exchange::ExchangeQR;
 
 use crate::config::CliConfig;
 use crate::display;
+use crate::protocol::{
+    MessagePayload, Handshake, EncryptedUpdate, ExchangeMessage,
+    create_envelope, encode_message,
+};
 
 /// Internal password for local identity storage.
 const LOCAL_STORAGE_PASSWORD: &str = "webbook-local-storage";
@@ -36,6 +43,65 @@ fn open_webbook(config: &CliConfig) -> Result<WebBook<MockTransport>> {
     Ok(wb)
 }
 
+/// Sends handshake message to relay.
+fn send_handshake(
+    socket: &mut WebSocket<MaybeTlsStream<TcpStream>>,
+    client_id: &str,
+) -> Result<()> {
+    let handshake = Handshake {
+        client_id: client_id.to_string(),
+    };
+    let envelope = create_envelope(MessagePayload::Handshake(handshake));
+    let data = encode_message(&envelope).map_err(|e| anyhow::anyhow!(e))?;
+    socket.send(Message::Binary(data))?;
+    Ok(())
+}
+
+/// Sends an exchange message to a recipient via the relay.
+fn send_exchange_message(
+    config: &CliConfig,
+    our_identity: &Identity,
+    recipient_id: &str,
+) -> Result<()> {
+    // Connect to relay
+    let (mut socket, _) = connect(&config.relay_url)?;
+
+    // Send handshake
+    let our_id = our_identity.public_id();
+    send_handshake(&mut socket, &our_id)?;
+
+    // Create exchange message
+    // Convert exchange public key to fixed-size array
+    let exchange_key: [u8; 32] = our_identity.exchange_public_key()
+        .try_into()
+        .map_err(|_| anyhow::anyhow!("Invalid exchange key length"))?;
+
+    let exchange_msg = ExchangeMessage::new(
+        our_identity.signing_public_key(),
+        &exchange_key,
+        our_identity.display_name(),
+    );
+
+    // Create encrypted update (using exchange message as ciphertext)
+    let update = EncryptedUpdate {
+        recipient_id: recipient_id.to_string(),
+        sender_id: our_id.clone(),
+        ciphertext: exchange_msg.to_bytes(),
+    };
+
+    let envelope = create_envelope(MessagePayload::EncryptedUpdate(update));
+    let data = encode_message(&envelope).map_err(|e| anyhow::anyhow!(e))?;
+    socket.send(Message::Binary(data))?;
+
+    // Wait briefly for acknowledgment
+    std::thread::sleep(std::time::Duration::from_millis(100));
+
+    // Close connection
+    let _ = socket.close(None);
+
+    Ok(())
+}
+
 /// Starts a contact exchange by generating a QR code.
 pub fn start(config: &CliConfig) -> Result<()> {
     let wb = open_webbook(config)?;
@@ -57,8 +123,7 @@ pub fn start(config: &CliConfig) -> Result<()> {
     println!("  {}", qr_data);
     println!();
 
-    display::info("After they scan, they can exchange contacts with:");
-    println!("  webbook exchange complete <data>");
+    display::info("After they complete the exchange, run 'webbook sync' to receive their info.");
 
     Ok(())
 }
@@ -77,16 +142,20 @@ pub fn complete(config: &CliConfig, data: &str) -> Result<()> {
 
     // Get their public key
     let their_public_key = qr.public_key();
+    let their_public_id = hex::encode(their_public_key);
+
+    // Check if we already have this contact
+    if wb.get_contact(&their_public_id)?.is_some() {
+        display::warning("You already have this contact.");
+        return Ok(());
+    }
 
     // For now, we create a contact with a generated shared secret
     // In a real implementation, this would use the X3DH session
     let shared_secret = SymmetricKey::generate();
 
-    // Get our card to show what we're sharing
-    let _our_card = wb.own_card()?.ok_or_else(|| anyhow::anyhow!("No contact card found"))?;
-
     // Create a placeholder contact
-    // In a real implementation, this would receive their card through the exchange
+    // The real name will be received via sync
     let their_card = webbook_core::ContactCard::new("New Contact");
 
     let contact = Contact::from_exchange(
@@ -95,26 +164,29 @@ pub fn complete(config: &CliConfig, data: &str) -> Result<()> {
         shared_secret,
     );
 
-    let contact_id = contact.id().to_string();
-
     // Add the contact
     wb.add_contact(contact)?;
 
-    display::success("Contact exchange started");
-    println!("  Contact ID: {}", contact_id);
-    println!();
-
-    display::warning("Note: Full exchange requires both parties to complete the protocol.");
-    display::info("The contact has been added but card sync will happen via relay.");
-
-    // Generate our response
+    // Get our identity for sending exchange message
     let identity = wb.identity().ok_or_else(|| anyhow::anyhow!("No identity found"))?;
-    let our_qr = ExchangeQR::generate(identity);
-    let our_data = our_qr.to_data_string();
+
+    // Send exchange message via relay
+    println!("Sending exchange request via relay...");
+    match send_exchange_message(config, identity, &their_public_id) {
+        Ok(()) => {
+            display::success("Exchange request sent");
+        }
+        Err(e) => {
+            display::warning(&format!("Could not send via relay: {}", e));
+            display::info("The contact has been added locally.");
+            display::info("Ask them to run 'webbook sync' or share your QR code manually.");
+        }
+    }
 
     println!();
-    display::info("Share your response with them:");
-    println!("  {}", our_data);
+    display::success(&format!("Contact added (ID: {}...)", &their_public_id[..16]));
+    display::info("They need to run 'webbook sync' to see your contact request.");
+    display::info("You should also run 'webbook sync' to receive their card updates.");
 
     Ok(())
 }

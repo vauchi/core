@@ -4,7 +4,7 @@ A privacy-focused platform for exchanging contact information that stays up-to-d
 
 ## The Problem
 
-When you exchange contact details with someone, that information becomes outdated the moment either of you changes your phone number, email, or address. You end up with stale contacts, and people lose touch.
+When you exchange contact details with someone, that information becomes outdated the moment either of you changes your phone number, email, social media, or address. You end up with stale contacts, and people lose touch.
 
 ## The Solution
 

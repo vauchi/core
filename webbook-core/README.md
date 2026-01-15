@@ -4,7 +4,7 @@ A privacy-focused library for exchanging contact information that stays up-to-da
 
 ## What is WebBook?
 
-WebBook solves a simple problem: when you exchange contact details with someone, that information becomes outdated the moment either of you changes your phone number, email, or address.
+WebBook solves a simple problem: when you exchange contact details with someone, that information becomes outdated the moment either of you changes your phone number, email, social media, or address.
 
 With WebBook, your contacts automatically receive updates when you change your information - securely and privately. No central server sees your data; everything is end-to-end encrypted.
 

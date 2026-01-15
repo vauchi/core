@@ -76,9 +76,8 @@ impl<T: Transport> WebBook<T> {
     where
         F: FnOnce() -> T,
     {
-        // Generate storage encryption key
-        // In production, this would be derived from user credentials
-        let storage_key = SymmetricKey::generate();
+        // Use provided storage key or generate a new one
+        let storage_key = config.storage_key.clone().unwrap_or_else(SymmetricKey::generate);
 
         // Open or create storage
         let storage = if config.storage_path.exists() {

@@ -4,6 +4,7 @@
 
 use std::path::PathBuf;
 
+use crate::crypto::SymmetricKey;
 use crate::network::{RelayClientConfig, TransportConfig};
 
 /// Configuration for WebBook instance.
@@ -20,6 +21,10 @@ pub struct WebBookConfig {
 
     /// Auto-save configuration.
     pub auto_save: bool,
+
+    /// Storage encryption key.
+    /// If None, a random key will be generated (not persistent across sessions).
+    pub storage_key: Option<SymmetricKey>,
 }
 
 impl Default for WebBookConfig {
@@ -29,6 +34,7 @@ impl Default for WebBookConfig {
             relay: RelayConfig::default(),
             sync: SyncConfig::default(),
             auto_save: true,
+            storage_key: None,
         }
     }
 }
@@ -51,6 +57,13 @@ impl WebBookConfig {
     /// Disables auto-save.
     pub fn without_auto_save(mut self) -> Self {
         self.auto_save = false;
+        self
+    }
+
+    /// Sets the storage encryption key.
+    /// Use this to persist data across sessions.
+    pub fn with_storage_key(mut self, key: SymmetricKey) -> Self {
+        self.storage_key = Some(key);
         self
     }
 }

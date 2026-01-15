@@ -3,4 +3,5 @@ resolver = "2"
 members = [
     "webbook-core",
     "webbook-relay",
+    "webbook-cli",
 ]

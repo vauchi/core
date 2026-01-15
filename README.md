@@ -1,14 +1,43 @@
 # WebBook
 
-The app idea:
-1. the goal of the app is to create an updatable contact card 
-2. users can exchange the contact card on their module device only in the real world (meaning they need to be together physically)
-3. A user can add and remove contact info on his own devices at will.
-4. A user can control what contact information about him other users can see on their end
-5. A contact info can be a phone number, a social media account (link or id), an email, a physical address, these contact infos should be relatively small data
-6. messages can not be exchanged
-7. if possible avoid a central server, keep comunications e2e encrypted, make sure attackers can not access data
-8. if a user adds or changes a contact info, users that he is in contact with and can see this info see the updated information
-9. the app should work on iOS, android  but there should also be  pc/mac/linux gui clients
-10. If there is need for a central server, users should be asked to contribute on a voluntary bases.
-11. the data the app handles should be considered sensible
+A privacy-focused platform for exchanging contact information that stays up-to-date.
+
+## The Problem
+
+When you exchange contact details with someone, that information becomes outdated the moment either of you changes your phone number, email, or address. You end up with stale contacts, and people lose touch.
+
+## The Solution
+
+WebBook lets you exchange "living" contact cards. When you update your information, everyone you've shared it with automatically receives the update - securely and privately.
+
+## Key Principles
+
+- **In-Person Exchange** - Contact cards can only be exchanged when physically together (QR code scan)
+- **Selective Sharing** - Control which contacts see which fields (work email vs personal)
+- **No Messages** - This is not a messenger; it only syncs contact information
+- **End-to-End Encrypted** - No server can read your data
+- **Decentralized** - Relay servers only pass encrypted blobs; they have zero knowledge
+
+## Project Structure
+
+```
+WebBook/
+└── webbook-core/     # Core Rust library (complete)
+```
+
+### webbook-core
+
+The core library implements all cryptographic protocols and data management. Platform-independent, ready for integration.
+
+See [webbook-core/README.md](webbook-core/README.md) for details.
+
+## Planned Components
+
+- **iOS App** - Native Swift app using webbook-core via FFI
+- **Android App** - Native Kotlin app using webbook-core via FFI
+- **Desktop Apps** - Cross-platform GUI for macOS, Windows, Linux
+- **Relay Server** - Lightweight message relay (voluntary hosting)
+
+## License
+
+MIT

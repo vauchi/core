@@ -104,8 +104,16 @@ webbook --relay ws://relay.example.com:8080 <command>
 
 1. **Alice** generates a QR code: `webbook exchange start`
 2. **Bob** scans and completes: `webbook exchange complete "wb://..."`
-3. **Alice** syncs to receive Bob's info: `webbook sync`
-4. Both now have each other as contacts
+   - Bob adds Alice as a contact (initially shows as "New Contact")
+   - Bob sends his name to Alice via the relay
+3. **Alice** syncs: `webbook sync`
+   - Receives Bob's exchange request
+   - Adds Bob as a contact with his display name
+   - Sends her name back to Bob (bidirectional exchange)
+4. **Bob** syncs: `webbook sync`
+   - Receives Alice's response
+   - Updates contact from "New Contact" to "Alice"
+5. Both now see each other's actual display names
 
 ## Architecture
 

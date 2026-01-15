@@ -15,7 +15,7 @@ use webbook_core::exchange::X3DH;
 use crate::config::CliConfig;
 use crate::display;
 use crate::protocol::{
-    MessagePayload, Handshake, AckStatus,
+    MessagePayload, Handshake, AckStatus, EncryptedUpdate,
     ExchangeMessage, create_envelope, encode_message, decode_message, create_ack,
 };
 
@@ -54,6 +54,52 @@ fn send_handshake(
     let envelope = create_envelope(MessagePayload::Handshake(handshake));
     let data = encode_message(&envelope).map_err(|e| anyhow::anyhow!(e))?;
     socket.send(Message::Binary(data))?;
+    Ok(())
+}
+
+/// Sends an exchange response with our name to a contact.
+fn send_exchange_response(
+    config: &CliConfig,
+    our_identity: &Identity,
+    recipient_id: &str,
+) -> Result<()> {
+    // Connect to relay
+    let (mut socket, _) = connect(&config.relay_url)?;
+
+    // Send handshake
+    let our_id = our_identity.public_id();
+    send_handshake(&mut socket, &our_id)?;
+
+    // Get our exchange key for the message
+    let exchange_key_slice = our_identity.exchange_public_key();
+    let exchange_key: [u8; 32] = exchange_key_slice
+        .try_into()
+        .map_err(|_| anyhow::anyhow!("Invalid exchange key length"))?;
+
+    // Create response message
+    let exchange_msg = ExchangeMessage::new_response(
+        our_identity.signing_public_key(),
+        &exchange_key,
+        our_identity.display_name(),
+    );
+
+    // Create encrypted update
+    let update = EncryptedUpdate {
+        recipient_id: recipient_id.to_string(),
+        sender_id: our_id,
+        ciphertext: exchange_msg.to_bytes(),
+    };
+
+    let envelope = create_envelope(MessagePayload::EncryptedUpdate(update));
+    let data = encode_message(&envelope).map_err(|e| anyhow::anyhow!(e))?;
+    socket.send(Message::Binary(data))?;
+
+    // Wait briefly for acknowledgment
+    std::thread::sleep(std::time::Duration::from_millis(100));
+
+    // Close connection
+    let _ = socket.close(None);
+
     Ok(())
 }
 
@@ -137,8 +183,10 @@ fn receive_pending(
 fn process_exchange_messages(
     wb: &WebBook<MockTransport>,
     messages: Vec<ExchangeMessage>,
-) -> Result<usize> {
+    config: &CliConfig,
+) -> Result<(usize, usize)> {
     let mut added = 0;
+    let mut updated = 0;
 
     // Get our identity for X3DH
     let identity = wb.identity().ok_or_else(|| anyhow::anyhow!("No identity found"))?;
@@ -161,6 +209,37 @@ fn process_exchange_messages(
             }
         };
 
+        let public_id = hex::encode(&identity_key);
+
+        // Check if this is a response to our exchange
+        if exchange.is_response {
+            // Update existing contact's name
+            if let Some(mut contact) = wb.get_contact(&public_id)? {
+                if contact.display_name() != exchange.display_name {
+                    if let Err(e) = contact.set_display_name(&exchange.display_name) {
+                        display::warning(&format!(
+                            "Failed to update contact name: {:?}", e
+                        ));
+                        continue;
+                    }
+                    wb.update_contact(&contact)?;
+                    display::success(&format!("Updated contact name: {}", exchange.display_name));
+                    updated += 1;
+                } else {
+                    display::info(&format!(
+                        "Contact {} already has correct name",
+                        exchange.display_name
+                    ));
+                }
+            } else {
+                display::warning(&format!(
+                    "Received response from unknown contact: {}",
+                    exchange.display_name
+                ));
+            }
+            continue;
+        }
+
         // Parse the ephemeral public key (for X3DH)
         let ephemeral_key = match hex::decode(&exchange.ephemeral_public_key) {
             Ok(bytes) if bytes.len() == 32 => {
@@ -178,7 +257,6 @@ fn process_exchange_messages(
         };
 
         // Check if we already have this contact
-        let public_id = hex::encode(&identity_key);
         if wb.get_contact(&public_id)?.is_some() {
             display::info(&format!("{} is already a contact", exchange.display_name));
             continue;
@@ -205,9 +283,20 @@ fn process_exchange_messages(
 
         display::success(&format!("Added contact: {}", exchange.display_name));
         added += 1;
+
+        // Send our name back to them
+        display::info(&format!("Sending our name to {}...", exchange.display_name));
+        match send_exchange_response(config, identity, &public_id) {
+            Ok(()) => {
+                display::success("Response sent");
+            }
+            Err(e) => {
+                display::warning(&format!("Could not send response: {}", e));
+            }
+        }
     }
 
-    Ok(added)
+    Ok((added, updated))
 }
 
 /// Runs the sync command.
@@ -241,17 +330,17 @@ pub async fn run(config: &CliConfig) -> Result<()> {
     let (received, exchange_messages) = receive_pending(&mut socket, &wb)?;
 
     // Process exchange messages
-    let contacts_added = process_exchange_messages(&wb, exchange_messages)?;
+    let (contacts_added, contacts_updated) = process_exchange_messages(&wb, exchange_messages, config)?;
 
     // Close connection
     let _ = socket.close(None);
 
     // Display results
     println!();
-    if received > 0 || contacts_added > 0 {
+    if received > 0 || contacts_added > 0 || contacts_updated > 0 {
         display::success(&format!(
-            "Sync complete: {} messages received, {} contacts added",
-            received, contacts_added
+            "Sync complete: {} messages received, {} contacts added, {} contacts updated",
+            received, contacts_added, contacts_updated
         ));
     } else {
         display::info("Sync complete: No new messages");

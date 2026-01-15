@@ -71,16 +71,31 @@ pub struct ExchangeMessage {
     pub ephemeral_public_key: String,
     /// Sender's display name.
     pub display_name: String,
+    /// True if this is a response to an exchange (for bidirectional name exchange).
+    #[serde(default)]
+    pub is_response: bool,
 }
 
 impl ExchangeMessage {
-    /// Creates a new exchange message.
+    /// Creates a new exchange message (initial exchange).
     pub fn new(identity_key: &[u8; 32], ephemeral_key: &[u8; 32], name: &str) -> Self {
         ExchangeMessage {
             msg_type: "exchange".to_string(),
             identity_public_key: hex::encode(identity_key),
             ephemeral_public_key: hex::encode(ephemeral_key),
             display_name: name.to_string(),
+            is_response: false,
+        }
+    }
+
+    /// Creates a response exchange message (for bidirectional name exchange).
+    pub fn new_response(identity_key: &[u8; 32], exchange_key: &[u8; 32], name: &str) -> Self {
+        ExchangeMessage {
+            msg_type: "exchange".to_string(),
+            identity_public_key: hex::encode(identity_key),
+            ephemeral_public_key: hex::encode(exchange_key),
+            display_name: name.to_string(),
+            is_response: true,
         }
     }
 

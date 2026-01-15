@@ -117,6 +117,13 @@ impl Contact {
         self.card = card;
     }
 
+    /// Updates the contact's display name.
+    pub fn set_display_name(&mut self, name: &str) -> Result<(), crate::contact_card::ContactCardError> {
+        self.card.set_display_name(name)?;
+        self.display_name = name.to_string();
+        Ok(())
+    }
+
     /// Returns a human-readable fingerprint for verification.
     pub fn fingerprint(&self) -> String {
         // Format as groups of 4 hex chars for readability

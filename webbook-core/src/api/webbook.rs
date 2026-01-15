@@ -229,6 +229,12 @@ impl<T: Transport> WebBook<T> {
         manager.remove_contact(id)
     }
 
+    /// Updates an existing contact.
+    pub fn update_contact(&self, contact: &Contact) -> WebBookResult<()> {
+        self.storage.save_contact(contact)?;
+        Ok(())
+    }
+
     /// Verifies a contact's fingerprint.
     pub fn verify_contact_fingerprint(&self, id: &str) -> WebBookResult<()> {
         let manager = ContactManager::new(&self.storage, self.events.clone());

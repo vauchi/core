@@ -8,6 +8,10 @@ license = "MIT"
 [dependencies]
 # Cryptography (audited library)
 ring = "0.17"
+x25519-dalek = { version = "2.0", features = ["static_secrets"] }
+
+# QR code generation
+qrcode = "0.14"
 
 # Serialization
 serde = { version = "1.0", features = ["derive"] }

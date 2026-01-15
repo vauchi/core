@@ -7,7 +7,7 @@ mod backup;
 
 pub use backup::IdentityBackup;
 
-use crate::crypto::{SigningKeyPair, encrypt, decrypt, SymmetricKey};
+use crate::crypto::{SigningKeyPair, Signature, encrypt, decrypt, SymmetricKey};
 use ring::rand::SystemRandom;
 use ring::pbkdf2;
 use thiserror::Error;
@@ -116,7 +116,7 @@ impl Identity {
     }
 
     /// Returns the public signing key bytes.
-    pub fn signing_public_key(&self) -> &[u8] {
+    pub fn signing_public_key(&self) -> &[u8; 32] {
         &self.signing_public_key
     }
 
@@ -128,6 +128,11 @@ impl Identity {
     /// Returns the public ID (hex fingerprint of signing key).
     pub fn public_id(&self) -> String {
         self.signing_keypair.public_key().fingerprint()
+    }
+
+    /// Signs a message using this identity's signing key.
+    pub fn sign(&self, message: &[u8]) -> Signature {
+        self.signing_keypair.sign(message)
     }
 
     /// Exports identity as encrypted backup.

@@ -48,8 +48,8 @@ impl SymmetricKey {
         SymmetricKey { bytes }
     }
 
-    /// Returns a reference to the key bytes (for internal use only).
-    fn as_bytes(&self) -> &[u8; 32] {
+    /// Returns a reference to the key bytes.
+    pub fn as_bytes(&self) -> &[u8; 32] {
         &self.bytes
     }
 }

@@ -73,6 +73,11 @@ pub struct PublicKey {
 }
 
 impl PublicKey {
+    /// Creates a public key from raw bytes.
+    pub fn from_bytes(bytes: [u8; 32]) -> Self {
+        PublicKey { bytes }
+    }
+
     /// Returns the raw bytes of the public key.
     pub fn as_bytes(&self) -> &[u8; 32] {
         &self.bytes
@@ -102,6 +107,11 @@ pub struct Signature {
 }
 
 impl Signature {
+    /// Creates a signature from raw bytes.
+    pub fn from_bytes(bytes: [u8; 64]) -> Self {
+        Signature { bytes }
+    }
+
     /// Returns the raw bytes of the signature.
     pub fn as_bytes(&self) -> &[u8; 64] {
         &self.bytes

@@ -342,10 +342,10 @@ For users behind restrictive NATs or firewalls:
 - [x] Basic CLI for testing
 
 ### Phase 2: Exchange Protocol ✅
-- [x] QR code generation/scanning
+- [x] QR code generation/scanning (v2 format with X25519 key)
 - [ ] Audio proximity verification (future)
 - [ ] BLE exchange (mobile only, future)
-- [x] X3DH key exchange protocol
+- [x] X3DH key exchange protocol (integrated into CLI)
 
 ### Phase 3: Sync Layer ✅
 - [x] WebSocket transport (relay-based)
@@ -373,7 +373,13 @@ For users behind restrictive NATs or firewalls:
 - [x] Identity, card, contact management
 - [x] End-to-end exchange via relay
 
-### Phase 8: Polish
+### Phase 8: Complete Integration
+- [ ] Bidirectional name exchange (responder sends name back)
+- [ ] Double Ratchet integration for encrypted card updates
+- [ ] Card update propagation to contacts
+- [ ] Visibility rules enforcement
+
+### Phase 9: Polish
 - [ ] UI/UX refinement
 - [ ] Accessibility
 - [ ] Localization

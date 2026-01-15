@@ -8,8 +8,9 @@ use std::net::TcpStream;
 use anyhow::{bail, Result};
 use tungstenite::{connect, Message, WebSocket};
 use tungstenite::stream::MaybeTlsStream;
-use webbook_core::{WebBook, WebBookConfig, Identity, IdentityBackup, Contact, SymmetricKey};
+use webbook_core::{WebBook, WebBookConfig, Identity, IdentityBackup, Contact};
 use webbook_core::network::MockTransport;
+use webbook_core::exchange::X3DH;
 
 use crate::config::CliConfig;
 use crate::display;
@@ -139,8 +140,12 @@ fn process_exchange_messages(
 ) -> Result<usize> {
     let mut added = 0;
 
+    // Get our identity for X3DH
+    let identity = wb.identity().ok_or_else(|| anyhow::anyhow!("No identity found"))?;
+    let our_x3dh = identity.x3dh_keypair();
+
     for exchange in messages {
-        // Parse the identity public key
+        // Parse the identity public key (signing key)
         let identity_key = match hex::decode(&exchange.identity_public_key) {
             Ok(bytes) if bytes.len() == 32 => {
                 let mut arr = [0u8; 32];
@@ -156,6 +161,22 @@ fn process_exchange_messages(
             }
         };
 
+        // Parse the ephemeral public key (for X3DH)
+        let ephemeral_key = match hex::decode(&exchange.ephemeral_public_key) {
+            Ok(bytes) if bytes.len() == 32 => {
+                let mut arr = [0u8; 32];
+                arr.copy_from_slice(&bytes);
+                arr
+            }
+            _ => {
+                display::warning(&format!(
+                    "Invalid ephemeral key from {}",
+                    exchange.display_name
+                ));
+                continue;
+            }
+        };
+
         // Check if we already have this contact
         let public_id = hex::encode(&identity_key);
         if wb.get_contact(&public_id)?.is_some() {
@@ -163,9 +184,17 @@ fn process_exchange_messages(
             continue;
         }
 
-        // Create a shared secret (in a real implementation, use X3DH)
-        // For now, derive from the ephemeral key
-        let shared_secret = SymmetricKey::generate();
+        // Perform X3DH as responder to derive shared secret
+        let shared_secret = match X3DH::respond(&our_x3dh, &identity_key, &ephemeral_key) {
+            Ok(secret) => secret,
+            Err(e) => {
+                display::warning(&format!(
+                    "X3DH key agreement failed for {}: {:?}",
+                    exchange.display_name, e
+                ));
+                continue;
+            }
+        };
 
         // Create contact card
         let card = webbook_core::ContactCard::new(&exchange.display_name);

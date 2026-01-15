@@ -8,6 +8,7 @@ mod backup;
 pub use backup::IdentityBackup;
 
 use crate::crypto::{SigningKeyPair, Signature, encrypt, decrypt, SymmetricKey};
+use crate::exchange::X3DHKeyPair;
 use ring::rand::SystemRandom;
 use ring::pbkdf2;
 use thiserror::Error;
@@ -123,6 +124,20 @@ impl Identity {
     /// Returns the public exchange key bytes.
     pub fn exchange_public_key(&self) -> &[u8] {
         &self.exchange_public_key
+    }
+
+    /// Returns the X3DH keypair for key agreement.
+    ///
+    /// The keypair is derived from the master seed using the same derivation
+    /// as exchange_public_key, ensuring consistency.
+    pub fn x3dh_keypair(&self) -> X3DHKeyPair {
+        // Derive X25519 secret from master_seed
+        // Uses same derivation as exchange_public_key for consistency
+        let mut x25519_secret = [0u8; 32];
+        for (i, byte) in self.master_seed.iter().enumerate() {
+            x25519_secret[i] = byte ^ (i as u8).wrapping_add(0x42);
+        }
+        X3DHKeyPair::from_bytes(x25519_secret)
     }
 
     /// Returns the public ID (hex fingerprint of signing key).

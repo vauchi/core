@@ -8,9 +8,9 @@ use std::net::TcpStream;
 use anyhow::{bail, Result};
 use tungstenite::{connect, Message, WebSocket};
 use tungstenite::stream::MaybeTlsStream;
-use webbook_core::{WebBook, WebBookConfig, Contact, SymmetricKey, Identity, IdentityBackup};
+use webbook_core::{WebBook, WebBookConfig, Contact, Identity, IdentityBackup};
 use webbook_core::network::MockTransport;
-use webbook_core::exchange::ExchangeQR;
+use webbook_core::exchange::{ExchangeQR, X3DH};
 
 use crate::config::CliConfig;
 use crate::display;
@@ -62,6 +62,7 @@ fn send_exchange_message(
     config: &CliConfig,
     our_identity: &Identity,
     recipient_id: &str,
+    ephemeral_public: &[u8; 32],
 ) -> Result<()> {
     // Connect to relay
     let (mut socket, _) = connect(&config.relay_url)?;
@@ -70,15 +71,10 @@ fn send_exchange_message(
     let our_id = our_identity.public_id();
     send_handshake(&mut socket, &our_id)?;
 
-    // Create exchange message
-    // Convert exchange public key to fixed-size array
-    let exchange_key: [u8; 32] = our_identity.exchange_public_key()
-        .try_into()
-        .map_err(|_| anyhow::anyhow!("Invalid exchange key length"))?;
-
+    // Create exchange message with the ephemeral key from X3DH
     let exchange_msg = ExchangeMessage::new(
         our_identity.signing_public_key(),
-        &exchange_key,
+        ephemeral_public,
         our_identity.display_name(),
     );
 
@@ -140,9 +136,10 @@ pub fn complete(config: &CliConfig, data: &str) -> Result<()> {
         bail!("This exchange QR code has expired. Ask them to generate a new one.");
     }
 
-    // Get their public key
-    let their_public_key = qr.public_key();
-    let their_public_id = hex::encode(their_public_key);
+    // Get their public keys
+    let their_signing_key = qr.public_key();
+    let their_exchange_key = qr.exchange_key();
+    let their_public_id = hex::encode(their_signing_key);
 
     // Check if we already have this contact
     if wb.get_contact(&their_public_id)?.is_some() {
@@ -150,16 +147,20 @@ pub fn complete(config: &CliConfig, data: &str) -> Result<()> {
         return Ok(());
     }
 
-    // For now, we create a contact with a generated shared secret
-    // In a real implementation, this would use the X3DH session
-    let shared_secret = SymmetricKey::generate();
+    // Get our identity for X3DH
+    let identity = wb.identity().ok_or_else(|| anyhow::anyhow!("No identity found"))?;
+    let our_x3dh = identity.x3dh_keypair();
+
+    // Perform X3DH as initiator to derive shared secret
+    let (shared_secret, ephemeral_public) = X3DH::initiate(&our_x3dh, their_exchange_key)
+        .map_err(|e| anyhow::anyhow!("X3DH key agreement failed: {:?}", e))?;
 
     // Create a placeholder contact
     // The real name will be received via sync
     let their_card = webbook_core::ContactCard::new("New Contact");
 
     let contact = Contact::from_exchange(
-        *their_public_key,
+        *their_signing_key,
         their_card,
         shared_secret,
     );
@@ -167,12 +168,9 @@ pub fn complete(config: &CliConfig, data: &str) -> Result<()> {
     // Add the contact
     wb.add_contact(contact)?;
 
-    // Get our identity for sending exchange message
-    let identity = wb.identity().ok_or_else(|| anyhow::anyhow!("No identity found"))?;
-
-    // Send exchange message via relay
+    // Send exchange message via relay with our ephemeral key
     println!("Sending exchange request via relay...");
-    match send_exchange_message(config, identity, &their_public_id) {
+    match send_exchange_message(config, identity, &their_public_id, &ephemeral_public) {
         Ok(()) => {
             display::success("Exchange request sent");
         }

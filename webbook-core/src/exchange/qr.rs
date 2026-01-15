@@ -10,7 +10,9 @@ use crate::crypto::{PublicKey, Signature};
 use super::ExchangeError;
 
 /// Protocol version for QR codes.
-const PROTOCOL_VERSION: u8 = 1;
+/// v1: Original format (signing key only)
+/// v2: Added X25519 exchange key for X3DH
+const PROTOCOL_VERSION: u8 = 2;
 
 /// QR code expiration time in seconds (5 minutes).
 const QR_EXPIRY_SECONDS: u64 = 300;
@@ -25,8 +27,10 @@ const MAGIC: &[u8; 4] = b"WBEX";
 pub struct ExchangeQR {
     /// Protocol version
     version: u8,
-    /// Initiator's Ed25519 public key
+    /// Initiator's Ed25519 public key (for identity/verification)
     public_key: [u8; 32],
+    /// Initiator's X25519 exchange key (for X3DH key agreement)
+    exchange_key: [u8; 32],
     /// Random token for this exchange session
     exchange_token: [u8; 32],
     /// Seed for audio proximity challenge
@@ -66,10 +70,16 @@ impl ExchangeQR {
 
         let public_key = *identity.signing_public_key();
 
+        // Get X25519 exchange key for X3DH
+        let exchange_key: [u8; 32] = identity.exchange_public_key()
+            .try_into()
+            .expect("Exchange key should be 32 bytes");
+
         // Create message to sign (all fields except signature)
         let mut message = Vec::new();
         message.push(PROTOCOL_VERSION);
         message.extend_from_slice(&public_key);
+        message.extend_from_slice(&exchange_key);
         message.extend_from_slice(&exchange_token);
         message.extend_from_slice(&audio_challenge);
         message.extend_from_slice(&timestamp.to_be_bytes());
@@ -80,6 +90,7 @@ impl ExchangeQR {
         ExchangeQR {
             version: PROTOCOL_VERSION,
             public_key,
+            exchange_key,
             exchange_token,
             audio_challenge,
             timestamp,
@@ -87,9 +98,14 @@ impl ExchangeQR {
         }
     }
 
-    /// Returns the public key.
+    /// Returns the Ed25519 signing public key (for identity verification).
     pub fn public_key(&self) -> &[u8; 32] {
         &self.public_key
+    }
+
+    /// Returns the X25519 exchange key (for X3DH key agreement).
+    pub fn exchange_key(&self) -> &[u8; 32] {
+        &self.exchange_key
     }
 
     /// Returns the exchange token.
@@ -123,6 +139,7 @@ impl ExchangeQR {
         let mut message = Vec::new();
         message.push(self.version);
         message.extend_from_slice(&self.public_key);
+        message.extend_from_slice(&self.exchange_key);
         message.extend_from_slice(&self.exchange_token);
         message.extend_from_slice(&self.audio_challenge);
         message.extend_from_slice(&self.timestamp.to_be_bytes());
@@ -136,11 +153,12 @@ impl ExchangeQR {
 
     /// Encodes the QR data to a string for embedding in QR code.
     pub fn to_data_string(&self) -> String {
-        // Format: base64(MAGIC || version || public_key || token || challenge || timestamp || signature)
+        // Format: base64(MAGIC || version || public_key || exchange_key || token || challenge || timestamp || signature)
         let mut data = Vec::new();
         data.extend_from_slice(MAGIC);
         data.push(self.version);
         data.extend_from_slice(&self.public_key);
+        data.extend_from_slice(&self.exchange_key);
         data.extend_from_slice(&self.exchange_token);
         data.extend_from_slice(&self.audio_challenge);
         data.extend_from_slice(&self.timestamp.to_be_bytes());
@@ -154,9 +172,9 @@ impl ExchangeQR {
         let bytes = BASE64.decode(data)
             .map_err(|_| ExchangeError::InvalidQRFormat)?;
 
-        // Check minimum length
-        // MAGIC(4) + version(1) + pubkey(32) + token(32) + challenge(16) + timestamp(8) + sig(64) = 157
-        if bytes.len() < 157 {
+        // Check minimum length for v2 format
+        // MAGIC(4) + version(1) + pubkey(32) + exchange_key(32) + token(32) + challenge(16) + timestamp(8) + sig(64) = 189
+        if bytes.len() < 189 {
             return Err(ExchangeError::InvalidQRFormat);
         }
 
@@ -173,22 +191,26 @@ impl ExchangeQR {
         let public_key: [u8; 32] = bytes[5..37].try_into()
             .map_err(|_| ExchangeError::InvalidQRFormat)?;
 
-        let exchange_token: [u8; 32] = bytes[37..69].try_into()
+        let exchange_key: [u8; 32] = bytes[37..69].try_into()
             .map_err(|_| ExchangeError::InvalidQRFormat)?;
 
-        let audio_challenge: [u8; 16] = bytes[69..85].try_into()
+        let exchange_token: [u8; 32] = bytes[69..101].try_into()
+            .map_err(|_| ExchangeError::InvalidQRFormat)?;
+
+        let audio_challenge: [u8; 16] = bytes[101..117].try_into()
             .map_err(|_| ExchangeError::InvalidQRFormat)?;
 
         let timestamp = u64::from_be_bytes(
-            bytes[85..93].try_into().map_err(|_| ExchangeError::InvalidQRFormat)?
+            bytes[117..125].try_into().map_err(|_| ExchangeError::InvalidQRFormat)?
         );
 
-        let signature: [u8; 64] = bytes[93..157].try_into()
+        let signature: [u8; 64] = bytes[125..189].try_into()
             .map_err(|_| ExchangeError::InvalidQRFormat)?;
 
         let qr = ExchangeQR {
             version,
             public_key,
+            exchange_key,
             exchange_token,
             audio_challenge,
             timestamp,

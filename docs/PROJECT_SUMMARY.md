@@ -31,6 +31,7 @@ WebBook is a privacy-focused, decentralized contact card exchange application th
 | Document | Purpose |
 |----------|---------|
 | [ARCHITECTURE.md](./ARCHITECTURE.md) | Technical design, data models, protocols |
+| [MVP_PLAN.md](./MVP_PLAN.md) | Minimum Viable Product roadmap |
 | [TDD_RULES.md](./TDD_RULES.md) | Test-driven development requirements |
 | `features/*.feature` | Gherkin behavior specifications |
 

@@ -12,6 +12,7 @@ pub mod storage;
 pub mod sync;
 pub mod network;
 pub mod api;
+pub mod social;
 
 pub use crypto::{SigningKeyPair, PublicKey, Signature, SymmetricKey, encrypt, decrypt, ExchangeKeyPair};
 pub use identity::{Identity, IdentityBackup};
@@ -22,3 +23,4 @@ pub use storage::{Storage, StorageError, PendingUpdate, UpdateStatus};
 pub use sync::{SyncState, SyncManager, SyncError, CardDelta, FieldChange, DeltaError};
 pub use network::{NetworkError, Transport, RelayClient, RelayClientConfig, MockTransport, ConnectionState, MessageEnvelope};
 pub use api::{WebBook, WebBookBuilder, WebBookConfig, WebBookError, WebBookResult, WebBookEvent};
+pub use social::{SocialNetwork, SocialNetworkRegistry, ProfileValidation, TrustLevel, ValidationStatus};

@@ -50,6 +50,10 @@ enum Commands {
     #[command(subcommand)]
     Contacts(ContactCommands),
 
+    /// Social network utilities
+    #[command(subcommand)]
+    Social(SocialCommands),
+
     /// Sync with the relay server
     Sync,
 
@@ -164,6 +168,23 @@ enum ContactCommands {
     },
 }
 
+#[derive(Subcommand)]
+enum SocialCommands {
+    /// List available social networks
+    List {
+        /// Optional search query
+        query: Option<String>,
+    },
+
+    /// Get profile URL for a social network
+    Url {
+        /// Social network (e.g., twitter, github)
+        network: String,
+        /// Username on that network
+        username: String,
+    },
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     let cli = Cli::parse();
@@ -216,6 +237,22 @@ async fn main() -> Result<()> {
             }
             ContactCommands::Visibility { contact } => {
                 commands::contacts::show_visibility(&config, &contact)?;
+            }
+        },
+        Commands::Social(cmd) => match cmd {
+            SocialCommands::List { query } => {
+                display::display_social_networks(query.as_deref());
+            }
+            SocialCommands::Url { network, username } => {
+                use webbook_core::SocialNetworkRegistry;
+                let registry = SocialNetworkRegistry::with_defaults();
+                match registry.profile_url(&network, &username) {
+                    Some(url) => println!("{}", url),
+                    None => {
+                        display::warning(&format!("Unknown network: {}", network));
+                        display::info("Use 'webbook social list' to see available networks");
+                    }
+                }
             }
         },
         Commands::Sync => {

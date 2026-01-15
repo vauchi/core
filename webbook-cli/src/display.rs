@@ -3,7 +3,7 @@
 //! Terminal output formatting and styling.
 
 use console::{style, Style};
-use webbook_core::{ContactCard, Contact, FieldType};
+use webbook_core::{ContactCard, Contact, FieldType, SocialNetworkRegistry};
 
 /// Prints a success message.
 pub fn success(msg: &str) {
@@ -40,7 +40,8 @@ fn field_icon(field_type: FieldType) -> &'static str {
 /// Displays a contact card in a formatted box.
 pub fn display_card(card: &ContactCard) {
     let name = card.display_name();
-    let width = 40;
+    let width = 50;
+    let registry = SocialNetworkRegistry::with_defaults();
 
     // Top border
     println!("{}", "─".repeat(width));
@@ -58,12 +59,38 @@ pub fn display_card(card: &ContactCard) {
         for field in card.fields() {
             let icon = field_icon(field.field_type());
             let label_style = Style::new().dim();
-            println!(
-                "  {:6} {:12} {}",
-                icon,
-                label_style.apply_to(field.label()),
-                field.value()
-            );
+
+            // For social fields, try to generate profile URL
+            if field.field_type() == FieldType::Social {
+                let label_lower = field.label().to_lowercase();
+                if let Some(url) = registry.profile_url(&label_lower, field.value()) {
+                    println!(
+                        "  {:6} {:12} {}",
+                        icon,
+                        label_style.apply_to(field.label()),
+                        field.value()
+                    );
+                    println!(
+                        "         {:12} {}",
+                        "",
+                        style(&url).dim().underlined()
+                    );
+                } else {
+                    println!(
+                        "  {:6} {:12} {}",
+                        icon,
+                        label_style.apply_to(field.label()),
+                        field.value()
+                    );
+                }
+            } else {
+                println!(
+                    "  {:6} {:12} {}",
+                    icon,
+                    label_style.apply_to(field.label()),
+                    field.value()
+                );
+            }
         }
     }
 
@@ -147,5 +174,64 @@ pub fn display_exchange_data(data: &str) {
     println!();
     println!("Or share this text:");
     println!("{}", style(data).cyan());
+    println!();
+}
+
+/// Displays the list of available social networks.
+pub fn display_social_networks(query: Option<&str>) {
+    let registry = SocialNetworkRegistry::with_defaults();
+
+    let networks: Vec<_> = if let Some(q) = query {
+        registry.search(q)
+    } else {
+        registry.all()
+    };
+
+    if networks.is_empty() {
+        if query.is_some() {
+            println!("No social networks matching '{}'", query.unwrap());
+        } else {
+            println!("No social networks available");
+        }
+        return;
+    }
+
+    println!();
+    println!("{}", style("Available Social Networks").bold());
+    println!("{}", "─".repeat(50));
+    println!();
+
+    // Group by category
+    let mut printed = 0;
+    for network in &networks {
+        println!(
+            "  {:16} {}",
+            style(network.id()).cyan(),
+            network.display_name()
+        );
+        println!(
+            "  {:16} {}",
+            "",
+            style(network.profile_url_template()).dim()
+        );
+        printed += 1;
+        if printed % 5 == 0 {
+            println!();
+        }
+    }
+
+    println!();
+    println!("{}", "─".repeat(50));
+    println!(
+        "Use: {} {} {} {}",
+        style("webbook card add social").cyan(),
+        style("<network>").yellow(),
+        style("<username>").yellow(),
+        ""
+    );
+    println!(
+        "Example: {}",
+        style("webbook card add social github octocat").dim()
+    );
     println!();
 }

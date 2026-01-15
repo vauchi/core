@@ -7,8 +7,10 @@ pub mod crypto;
 pub mod identity;
 pub mod contact_card;
 pub mod exchange;
+pub mod contact;
 
 pub use crypto::{SigningKeyPair, PublicKey, Signature, SymmetricKey, encrypt, decrypt, ExchangeKeyPair};
 pub use identity::{Identity, IdentityBackup};
 pub use contact_card::{ContactCard, ContactField, FieldType, ValidationError};
-pub use exchange::{ExchangeQR, X3DH, X3DHKeyPair, ExchangeError};
+pub use exchange::{ExchangeQR, X3DH, X3DHKeyPair, ExchangeError, ProximityVerifier, ProximityError, MockProximityVerifier};
+pub use contact::{Contact, FieldVisibility, VisibilityRules};

@@ -23,8 +23,18 @@ pub enum EncryptionError {
 const NONCE_SIZE: usize = 12;
 
 /// 256-bit symmetric encryption key.
+#[derive(Clone)]
 pub struct SymmetricKey {
     bytes: [u8; 32],
+}
+
+impl std::fmt::Debug for SymmetricKey {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // Don't expose key bytes in debug output
+        f.debug_struct("SymmetricKey")
+            .field("bytes", &"[REDACTED]")
+            .finish()
+    }
 }
 
 impl Drop for SymmetricKey {

@@ -88,7 +88,7 @@ impl PublicKey {
     /// The fingerprint is the full hex encoding of the public key,
     /// suitable for display and manual verification.
     pub fn fingerprint(&self) -> String {
-        hex::encode(&self.bytes)
+        hex::encode(self.bytes)
     }
 
     /// Verifies a signature against a message using this public key.

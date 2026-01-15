@@ -7,7 +7,6 @@ mod visibility;
 
 pub use visibility::{FieldVisibility, VisibilityRules};
 
-use serde::{Deserialize, Serialize};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::contact_card::ContactCard;
@@ -43,7 +42,7 @@ impl Contact {
         card: ContactCard,
         shared_key: SymmetricKey,
     ) -> Self {
-        let id = hex::encode(&public_key);
+        let id = hex::encode(public_key);
         let display_name = card.display_name().to_string();
         let exchange_timestamp = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -121,7 +120,7 @@ impl Contact {
     /// Returns a human-readable fingerprint for verification.
     pub fn fingerprint(&self) -> String {
         // Format as groups of 4 hex chars for readability
-        let hex = hex::encode(&self.public_key);
+        let hex = hex::encode(self.public_key);
         hex.chars()
             .collect::<Vec<_>>()
             .chunks(4)

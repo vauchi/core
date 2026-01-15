@@ -3,7 +3,7 @@
 //! Provides authenticated encryption using AES-256-GCM via the audited `ring` library.
 //! Each encryption uses a random 96-bit nonce prepended to the ciphertext.
 
-use ring::aead::{self, Aad, LessSafeKey, Nonce, UnboundKey, AES_256_GCM};
+use ring::aead::{Aad, LessSafeKey, Nonce, UnboundKey, AES_256_GCM};
 use ring::rand::{SecureRandom, SystemRandom};
 use thiserror::Error;
 use zeroize::Zeroize;

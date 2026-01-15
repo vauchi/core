@@ -3,7 +3,7 @@
 use thiserror::Error;
 
 /// Errors that can occur during contact exchange.
-#[derive(Error, Debug)]
+#[derive(Error, Debug, Clone)]
 pub enum ExchangeError {
     #[error("QR code has expired")]
     QRExpired,
@@ -31,4 +31,7 @@ pub enum ExchangeError {
 
     #[error("Invalid protocol version")]
     InvalidProtocolVersion,
+
+    #[error("Invalid session state: {0}")]
+    InvalidState(String),
 }

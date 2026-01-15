@@ -7,6 +7,8 @@ mod error;
 mod qr;
 mod x3dh;
 mod proximity;
+mod session;
+mod ble;
 
 pub use error::ExchangeError;
 pub use qr::ExchangeQR;
@@ -15,3 +17,5 @@ pub use proximity::{
     ProximityVerifier, ProximityError,
     MockProximityVerifier, ManualConfirmationVerifier,
 };
+pub use session::{ExchangeSession, ExchangeState, ExchangeRole, DuplicateAction};
+pub use ble::{BLEDevice, BLEProximityVerifier, MockBLEVerifier};

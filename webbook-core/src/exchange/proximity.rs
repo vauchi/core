@@ -21,8 +21,14 @@ pub enum ProximityError {
     #[error("Device not supported")]
     NotSupported,
 
+    #[error("Device is too far away")]
+    TooFar,
+
     #[error("Hardware error: {0}")]
     HardwareError(String),
+
+    #[error("Device error: {0}")]
+    DeviceError(String),
 }
 
 /// Trait for proximity verification backends.

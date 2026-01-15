@@ -6,20 +6,15 @@ use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 
 /// Visibility setting for a single field.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub enum FieldVisibility {
     /// Visible to everyone (default for new fields)
+    #[default]
     Everyone,
     /// Visible only to specific contacts
     Contacts(HashSet<String>),
     /// Visible to no one (private)
     Nobody,
-}
-
-impl Default for FieldVisibility {
-    fn default() -> Self {
-        FieldVisibility::Everyone
-    }
 }
 
 /// Visibility rules for all fields in a contact card.

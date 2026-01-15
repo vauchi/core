@@ -10,6 +10,7 @@ pub mod exchange;
 pub mod contact;
 pub mod storage;
 pub mod sync;
+pub mod network;
 
 pub use crypto::{SigningKeyPair, PublicKey, Signature, SymmetricKey, encrypt, decrypt, ExchangeKeyPair};
 pub use identity::{Identity, IdentityBackup};
@@ -18,3 +19,4 @@ pub use exchange::{ExchangeQR, X3DH, X3DHKeyPair, ExchangeError, ProximityVerifi
 pub use contact::{Contact, FieldVisibility, VisibilityRules};
 pub use storage::{Storage, StorageError, PendingUpdate, UpdateStatus};
 pub use sync::{SyncState, SyncManager, SyncError, CardDelta, FieldChange, DeltaError};
+pub use network::{NetworkError, Transport, RelayClient, RelayClientConfig, MockTransport, ConnectionState, MessageEnvelope};

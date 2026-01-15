@@ -17,7 +17,7 @@ pub mod social;
 pub use crypto::{SigningKeyPair, PublicKey, Signature, SymmetricKey, encrypt, decrypt, ExchangeKeyPair};
 pub use identity::{Identity, IdentityBackup};
 pub use contact_card::{ContactCard, ContactField, FieldType, ValidationError};
-pub use exchange::{ExchangeQR, X3DH, X3DHKeyPair, ExchangeError, ProximityVerifier, ProximityError, MockProximityVerifier};
+pub use exchange::{ExchangeQR, X3DH, X3DHKeyPair, ExchangeError, ProximityVerifier, ProximityError, MockProximityVerifier, ExchangeSession};
 pub use contact::{Contact, FieldVisibility, VisibilityRules};
 pub use storage::{Storage, StorageError, PendingUpdate, UpdateStatus};
 pub use sync::{SyncState, SyncManager, SyncError, CardDelta, FieldChange, DeltaError};

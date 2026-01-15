@@ -207,3 +207,87 @@ Feature: Social Profile Validation
     When I view the validation score
     Then validations from non-contacts should be weighted less
     And validations from verified exchange contacts should be weighted more
+
+  # ============================================================
+  # OAuth 2.0 Verification (LOW PRIORITY - Future Enhancement)
+  # ============================================================
+  # Allows users to cryptographically prove ownership of social
+  # profiles by authenticating with the social network directly.
+  # This provides stronger verification than crowd-sourced validation.
+
+  @oauth @low-priority
+  Scenario: View OAuth verification option for supported networks
+    Given the social network "github" supports OAuth verification
+    When I view my GitHub social field
+    Then I should see a "Verify with GitHub" option
+    And I should see this provides "cryptographic proof" of ownership
+
+  @oauth @low-priority
+  Scenario: Initiate OAuth verification flow
+    Given I have a GitHub social field with value "octocat"
+    When I tap "Verify with GitHub"
+    Then I should be redirected to GitHub's OAuth consent screen
+    And the app should request minimal permissions (read-only profile)
+    And my WebBook identity should NOT be shared with GitHub
+
+  @oauth @low-priority
+  Scenario: Complete OAuth verification successfully
+    Given I initiated OAuth verification for GitHub
+    When I authorize the app on GitHub
+    And GitHub confirms my username is "octocat"
+    Then my GitHub field should be marked as "OAuth verified"
+    And the verification should include a cryptographic proof
+    And contacts should see a special "verified" badge
+
+  @oauth @low-priority
+  Scenario: OAuth verification fails due to username mismatch
+    Given I have a GitHub field with value "octocat"
+    When I complete OAuth verification
+    And GitHub returns username "different_user"
+    Then verification should fail
+    And I should see "Username does not match your profile"
+    And no verification badge should be added
+
+  @oauth @low-priority
+  Scenario: OAuth verified profile shows stronger trust indicator
+    Given Bob's GitHub is OAuth verified
+    And Bob's Twitter has 5 crowd-sourced validations
+    When I view Bob's contact card
+    Then GitHub should show "Verified by GitHub" (highest trust)
+    And Twitter should show "Verified by 5 contacts" (high trust)
+    And OAuth verification should rank higher than crowd validation
+
+  @oauth @low-priority
+  Scenario: OAuth verification is privacy-preserving
+    Given I complete OAuth verification for Twitter
+    Then Twitter should NOT receive my WebBook identity
+    And Twitter should NOT receive my contact list
+    And only my username confirmation should be stored
+    And the OAuth token should be discarded after verification
+
+  @oauth @low-priority
+  Scenario: Supported OAuth providers
+    When I view OAuth verification options
+    Then I should see support for:
+      | provider  | method        |
+      | GitHub    | OAuth 2.0     |
+      | Twitter   | OAuth 2.0     |
+      | Google    | OAuth 2.0     |
+      | LinkedIn  | OAuth 2.0     |
+      | Discord   | OAuth 2.0     |
+      | Mastodon  | OAuth 2.0     |
+    And unsupported networks should only offer crowd validation
+
+  @oauth @low-priority
+  Scenario: Re-verification required after username change
+    Given my GitHub field is OAuth verified
+    When I change my GitHub username from "octocat" to "newname"
+    Then the OAuth verification should be invalidated
+    And I should be prompted to re-verify with the new username
+
+  @oauth @low-priority
+  Scenario: OAuth verification without network account
+    Given I want to verify a GitHub profile
+    But I don't have a GitHub account
+    Then I should still be able to use crowd-sourced validation
+    And OAuth verification should be shown as optional

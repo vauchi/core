@@ -20,9 +20,7 @@ pub mod sync;
 pub use api::{WebBook, WebBookBuilder, WebBookConfig, WebBookError, WebBookEvent, WebBookResult};
 pub use contact::{Contact, FieldVisibility, VisibilityRules};
 pub use contact_card::{ContactCard, ContactField, FieldType, ValidationError};
-pub use crypto::{
-    decrypt, encrypt, ExchangeKeyPair, PublicKey, Signature, SigningKeyPair, SymmetricKey,
-};
+pub use crypto::{decrypt, encrypt, PublicKey, Signature, SigningKeyPair, SymmetricKey};
 pub use exchange::{
     ExchangeError, ExchangeQR, ExchangeSession, MockProximityVerifier, ProximityError,
     ProximityVerifier, X3DHKeyPair, X3DH,

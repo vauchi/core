@@ -16,7 +16,6 @@ use super::config::WebBookConfig;
 use super::contact_manager::ContactManager;
 use super::error::{WebBookError, WebBookResult};
 use super::events::{EventDispatcher, EventHandler, WebBookEvent};
-use super::sync_controller::SyncController;
 
 /// Main WebBook orchestrator.
 ///
@@ -56,12 +55,7 @@ pub struct WebBook<T: Transport = MockTransport> {
     identity: Option<Identity>,
     storage: Storage,
     events: Arc<EventDispatcher>,
-    #[allow(dead_code)] // For future sync integration
-    sync_controller: Option<SyncController<'static, T>>,
-    /// Leaked storage reference for sync controller
-    /// This is necessary because SyncController needs a 'static reference
-    #[allow(dead_code)] // For future sync integration
-    storage_ref: Option<&'static Storage>,
+    _phantom: std::marker::PhantomData<T>,
 }
 
 impl WebBook<MockTransport> {
@@ -105,8 +99,7 @@ impl<T: Transport> WebBook<T> {
             identity: None,
             storage,
             events,
-            sync_controller: None,
-            storage_ref: None,
+            _phantom: std::marker::PhantomData,
         })
     }
 
@@ -124,8 +117,7 @@ impl<T: Transport> WebBook<T> {
             identity: None,
             storage,
             events,
-            sync_controller: None,
-            storage_ref: None,
+            _phantom: std::marker::PhantomData,
         })
     }
 

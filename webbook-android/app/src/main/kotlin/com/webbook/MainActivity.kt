@@ -56,11 +56,22 @@ enum class Screen {
 @Composable
 fun MainScreen(viewModel: MainViewModel = viewModel()) {
     val uiState by viewModel.uiState.collectAsState()
+    val snackbarMessage by viewModel.snackbarMessage.collectAsState()
     var currentScreen by remember { mutableStateOf(Screen.Home) }
     var selectedContactId by remember { mutableStateOf<String?>(null) }
     val coroutineScope = rememberCoroutineScope()
+    val snackbarHostState = remember { SnackbarHostState() }
 
-    when (currentScreen) {
+    // Show snackbar when message changes
+    LaunchedEffect(snackbarMessage) {
+        snackbarMessage?.let {
+            snackbarHostState.showSnackbar(it)
+            viewModel.clearSnackbar()
+        }
+    }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        when (currentScreen) {
         Screen.Home -> {
             when (val state = uiState) {
                 is UiState.Loading -> LoadingScreen()
@@ -135,6 +146,13 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
                 )
             }
         }
+        }
+
+        // Snackbar for feedback messages
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier.align(Alignment.BottomCenter)
+        )
     }
 }
 

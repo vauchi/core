@@ -36,6 +36,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _uiState = MutableStateFlow<UiState>(UiState.Loading)
     val uiState: StateFlow<UiState> = _uiState.asStateFlow()
 
+    // Snackbar message channel for user feedback
+    private val _snackbarMessage = MutableStateFlow<String?>(null)
+    val snackbarMessage: StateFlow<String?> = _snackbarMessage.asStateFlow()
+
+    fun clearSnackbar() {
+        _snackbarMessage.value = null
+    }
+
+    private fun showMessage(message: String) {
+        _snackbarMessage.value = message
+    }
+
     init {
         checkIdentity()
     }
@@ -100,8 +112,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     repository.addField(fieldType, label, value)
                 }
                 loadUserData()
+                showMessage("Field added")
             } catch (e: Exception) {
-                // Silently fail or show error
+                showMessage("Failed to add field: ${e.message}")
             }
         }
     }
@@ -113,8 +126,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     repository.updateField(label, newValue)
                 }
                 loadUserData()
+                showMessage("Field updated")
             } catch (e: Exception) {
-                // Silently fail or show error
+                showMessage("Failed to update field: ${e.message}")
             }
         }
     }
@@ -126,8 +140,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     repository.removeField(label)
                 }
                 loadUserData()
+                showMessage("Field removed")
             } catch (e: Exception) {
-                // Silently fail or show error
+                showMessage("Failed to remove field: ${e.message}")
             }
         }
     }
@@ -171,8 +186,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     repository.removeContact(id)
                 }
                 loadUserData()
+                showMessage("Contact removed")
             } catch (e: Exception) {
-                // Silently fail
+                showMessage("Failed to remove contact: ${e.message}")
             }
         }
     }
@@ -207,8 +223,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         repository.hideFieldFromContact(contactId, fieldLabel)
                     }
                 }
+                showMessage(if (visible) "Field shown to contact" else "Field hidden from contact")
             } catch (e: Exception) {
-                // Silently fail
+                showMessage("Failed to update visibility: ${e.message}")
             }
         }
     }

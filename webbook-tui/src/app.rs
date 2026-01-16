@@ -73,11 +73,11 @@ pub enum AddFieldFocus {
 impl App {
     /// Create a new application.
     pub fn new(backend: Backend) -> Self {
-        let has_identity = backend.has_identity();
+        let _has_identity = backend.has_identity();
 
         App {
             backend,
-            screen: if has_identity { Screen::Home } else { Screen::Home },
+            screen: Screen::Home,
             input_mode: InputMode::Normal,
             should_quit: false,
             status_message: None,

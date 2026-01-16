@@ -5,6 +5,10 @@ edition = "2021"
 description = "Terminal UI for WebBook - privacy-focused contact card exchange"
 license = "MIT"
 
+[features]
+default = []
+secure-storage = ["webbook-core/secure-storage"]
+
 [dependencies]
 # Core library
 webbook-core = { path = "../webbook-core" }

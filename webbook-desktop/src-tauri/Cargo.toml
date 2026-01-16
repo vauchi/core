@@ -33,9 +33,13 @@ anyhow = "1"
 # QR code generation
 qrcode = "0.14"
 
+# Base64 encoding for backups
+base64 = "0.22"
+
 # Platform directories
 dirs = "5"
 
 [features]
 default = ["custom-protocol"]
 custom-protocol = ["tauri/custom-protocol"]
+secure-storage = ["webbook-core/secure-storage"]

@@ -12,6 +12,7 @@ pub mod exchange;
 pub mod identity;
 #[cfg(feature = "network")]
 pub mod network;
+pub mod recovery;
 pub mod social;
 pub mod storage;
 pub mod sync;
@@ -33,6 +34,10 @@ pub use network::{
 };
 pub use social::{
     ProfileValidation, SocialNetwork, SocialNetworkRegistry, TrustLevel, ValidationStatus,
+};
+pub use recovery::{
+    RecoveryClaim, RecoveryError, RecoveryProof, RecoverySettings, RecoveryVoucher,
+    VerificationResult,
 };
 pub use storage::{PendingUpdate, Storage, StorageError, UpdateStatus};
 pub use sync::{CardDelta, DeltaError, FieldChange, SyncError, SyncManager, SyncState};

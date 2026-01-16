@@ -73,29 +73,70 @@ See `docs/development/testing.md` for full strategy.
 
 ## Phase 3: Launch
 
-| Task | Complexity | Status |
-|------|------------|--------|
-| Release signing | Low | Todo |
-| ProGuard/R8 | Low | Todo |
-| Relay deployment | Medium | Todo |
-| App store listings | Low | Todo |
-| Privacy policy | Low | Todo |
-| Desktop distribution | Low | Todo |
+### Core Features
+
+| Task | Complexity | Risk | Status |
+|------|------------|------|--------|
+| Contact recovery | High | High | Todo |
+| SecureStorage integration | Medium | Low | Todo |
+| Full iOS app integration | Medium | Medium | Todo |
+| Full Desktop app integration | Medium | Medium | Todo |
+
+### Privacy & Security
+
+| Task | Complexity | Risk | Status |
+|------|------------|------|--------|
+| Tor mode | Medium | Medium | Todo |
+| Hidden contacts | Low | Low | Todo |
+| Duress password | Low | Low | Todo |
+| Random jitter for sync timing | Low | Low | Todo |
+
+### Exchange Methods
+
+| Task | Complexity | Risk | Status |
+|------|------------|------|--------|
+| BLE/NFC exchange | Medium | Medium | Todo |
+| Audio proximity verification | Medium | Medium | Todo |
+
+### Infrastructure
+
+| Task | Complexity | Risk | Status |
+|------|------------|------|--------|
+| Relay deployment | Medium | Medium | Todo |
+| Docker deployment | Low | Low | Todo |
+| Relay federation | High | High | Todo |
+| Monitoring and health checks | Low | Low | Todo |
+| libp2p/DHT discovery | High | High | Todo |
+
+### Distribution
+
+| Task | Complexity | Risk | Status |
+|------|------------|------|--------|
+| Release signing | Low | Low | Todo |
+| ProGuard/R8 | Low | Low | Todo |
+| App store listings | Low | Low | Todo |
+| Privacy policy | Low | Low | Todo |
+| Desktop distribution | Low | Low | Todo |
+
+### Polish
+
+| Task | Complexity | Risk | Status |
+|------|------------|------|--------|
+| Visibility labels | Low | Low | Todo |
+| Social profile validation | Medium | Low | Todo |
+| UI/UX review | Low | Low | Todo |
+| Performance tuning | Low | Low | Todo |
 
 ---
 
-## Post-Launch
+### Feature Details
 
-| Feature | Complexity |
-|---------|------------|
-| Visibility labels | Low |
-| BLE/NFC exchange | Medium |
-| Social profile validation | Medium |
-| Docker deployment | Low |
-| Monitoring and health checks | Low |
-| Tor mode | Medium |
-| Hidden contacts | Low |
-| Duress password | Low |
-| Relay federation | High |
-| libp2p/DHT discovery | High |
-| Audio proximity verification | Medium |
+**Contact Recovery:**
+- Social vouching system (K-of-N contacts vouch for identity)
+- Spec: `docs/planning/done/P3-contact-recovery.md`
+- Threat analysis: `docs/THREAT_ANALYSIS.md` (T9.x threats)
+
+**SecureStorage Integration:**
+- Use `PlatformKeyring` in CLI/TUI/Desktop apps
+- Store encryption keys in OS keychain instead of files
+- Trait ready: `webbook-core/src/storage/secure.rs`

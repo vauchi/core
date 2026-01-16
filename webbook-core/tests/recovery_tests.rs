@@ -367,10 +367,190 @@ fn test_recovery_settings_default() {
 
 #[test]
 fn test_recovery_settings_custom() {
-    let settings = RecoverySettings::new(5, 3);
+    let settings = RecoverySettings::new(5, 3).unwrap();
 
     assert_eq!(settings.recovery_threshold(), 5);
     assert_eq!(settings.verification_threshold(), 3);
+}
+
+// =============================================================================
+// Recovery Threshold Limits Tests (Scenario: Recovery threshold limits)
+// =============================================================================
+
+#[test]
+fn test_recovery_threshold_minimum() {
+    // Scenario: Recovery threshold limits
+    // When I try to set my recovery threshold to 0
+    // Then the operation should fail with "Recovery threshold must be at least 1"
+    let result = RecoverySettings::new(0, 2);
+    assert!(result.is_err());
+    let err = result.unwrap_err();
+    assert!(err.to_string().contains("at least 1"));
+}
+
+#[test]
+fn test_recovery_threshold_maximum() {
+    // Scenario: Recovery threshold limits
+    // When I try to set my recovery threshold to 20
+    // Then the operation should fail with "Recovery threshold cannot exceed 10"
+    let result = RecoverySettings::new(20, 2);
+    assert!(result.is_err());
+    let err = result.unwrap_err();
+    assert!(err.to_string().contains("cannot exceed 10"));
+}
+
+#[test]
+fn test_recovery_threshold_valid_range() {
+    // Valid thresholds: 1-10
+    for threshold in 1..=10 {
+        // verification_threshold must be <= recovery_threshold
+        let verification = threshold.min(2);
+        let result = RecoverySettings::new(threshold, verification);
+        assert!(result.is_ok(), "threshold {} should be valid", threshold);
+    }
+}
+
+#[test]
+fn test_verification_threshold_minimum() {
+    // Verification threshold must be at least 1
+    let result = RecoverySettings::new(3, 0);
+    assert!(result.is_err());
+    let err = result.unwrap_err();
+    assert!(err.to_string().contains("at least 1"));
+}
+
+#[test]
+fn test_verification_threshold_maximum() {
+    // Verification threshold cannot exceed recovery threshold
+    let result = RecoverySettings::new(3, 5);
+    assert!(result.is_err());
+    let err = result.unwrap_err();
+    assert!(err.to_string().contains("cannot exceed"));
+}
+
+// =============================================================================
+// Voucher Timestamp Validation Tests (Scenario: Voucher timestamp validation)
+// =============================================================================
+
+#[test]
+fn test_voucher_claim_not_expired() {
+    // Scenario: Voucher timestamp validation
+    // Fresh claim should be accepted
+    let old_pk = [0x01u8; 32];
+    let new_pk = [0x02u8; 32];
+    let voucher_keypair = SigningKeyPair::generate();
+
+    let claim = RecoveryClaim::new(&old_pk, &new_pk);
+
+    // Create voucher from fresh claim
+    let result = RecoveryVoucher::create_from_claim(&claim, &voucher_keypair);
+    assert!(result.is_ok());
+}
+
+#[test]
+fn test_voucher_claim_expired_48_hours() {
+    // Scenario: Voucher timestamp validation
+    // When Bob vouches 48 hours later
+    // Then the voucher is rejected as expired
+    let old_pk = [0x01u8; 32];
+    let new_pk = [0x02u8; 32];
+    let voucher_keypair = SigningKeyPair::generate();
+
+    // Create a claim with timestamp 49 hours ago
+    let claim = RecoveryClaim::new_with_timestamp(&old_pk, &new_pk, expired_timestamp(49 * 3600));
+
+    // Should reject voucher creation for expired claim
+    let result = RecoveryVoucher::create_from_claim(&claim, &voucher_keypair);
+    assert!(result.is_err());
+    let err = result.unwrap_err();
+    assert!(err.to_string().contains("expired") || err.to_string().contains("Expired"));
+}
+
+#[test]
+fn test_voucher_claim_just_under_48_hours() {
+    // Claim that's 47 hours old should still be valid
+    let old_pk = [0x01u8; 32];
+    let new_pk = [0x02u8; 32];
+    let voucher_keypair = SigningKeyPair::generate();
+
+    // Create a claim with timestamp 47 hours ago
+    let claim = RecoveryClaim::new_with_timestamp(&old_pk, &new_pk, expired_timestamp(47 * 3600));
+
+    // Should accept voucher creation
+    let result = RecoveryVoucher::create_from_claim(&claim, &voucher_keypair);
+    assert!(result.is_ok());
+}
+
+/// Helper to create a timestamp N seconds in the past.
+fn expired_timestamp(seconds_ago: u64) -> u64 {
+    use std::time::{SystemTime, UNIX_EPOCH};
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("Time went backwards")
+        .as_secs();
+    now.saturating_sub(seconds_ago)
+}
+
+// =============================================================================
+// Self-Vouching Prevention Tests (Scenario: Cannot vouch for own recovery)
+// =============================================================================
+
+#[test]
+fn test_cannot_vouch_for_self() {
+    // Scenario: Cannot vouch for own recovery
+    // Given Alice claims recovery from "pk_old" to "pk_new"
+    // When Alice tries to vouch for herself (using pk_new)
+    // Then the self-voucher is rejected
+    let alice_old = Identity::create("Alice (old)");
+    let alice_new = Identity::create("Alice (new)");
+
+    let claim = RecoveryClaim::new(
+        alice_old.signing_public_key(),
+        alice_new.signing_public_key(),
+    );
+
+    // Alice tries to vouch for herself using her new identity
+    let result = RecoveryVoucher::create_from_claim(&claim, alice_new.signing_keypair());
+
+    assert!(result.is_err());
+    let err = result.unwrap_err();
+    assert!(err.to_string().contains("self") || err.to_string().contains("Self"));
+}
+
+#[test]
+fn test_proof_rejects_self_voucher() {
+    // Even if a self-voucher is somehow created, the proof should reject it
+    let old_pk = [0x01u8; 32];
+    let new_keypair = SigningKeyPair::generate();
+    let new_pk = *new_keypair.public_key().as_bytes();
+
+    let mut proof = RecoveryProof::new(&old_pk, &new_pk, 3);
+
+    // Create a voucher where voucher_pk == new_pk (self-vouching)
+    let self_voucher = RecoveryVoucher::create(&old_pk, &new_pk, &new_keypair);
+
+    let result = proof.add_voucher(self_voucher);
+
+    assert!(result.is_err());
+    let err = result.unwrap_err();
+    assert!(err.to_string().contains("self") || err.to_string().contains("Self"));
+}
+
+#[test]
+fn test_other_contacts_can_still_vouch() {
+    // Verify that other contacts can still vouch (not affected by self-vouch check)
+    let alice_old = Identity::create("Alice (old)");
+    let alice_new = Identity::create("Alice (new)");
+    let bob = Identity::create("Bob");
+
+    let claim = RecoveryClaim::new(
+        alice_old.signing_public_key(),
+        alice_new.signing_public_key(),
+    );
+
+    // Bob vouches for Alice - should succeed
+    let result = RecoveryVoucher::create_from_claim(&claim, bob.signing_keypair());
+    assert!(result.is_ok());
 }
 
 // =============================================================================

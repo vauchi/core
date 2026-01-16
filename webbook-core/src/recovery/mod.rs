@@ -44,6 +44,24 @@ pub enum RecoveryError {
 
     #[error("Serialization error: {0}")]
     SerializationError(String),
+
+    #[error("Recovery threshold must be at least 1")]
+    ThresholdTooLow,
+
+    #[error("Recovery threshold cannot exceed 10")]
+    ThresholdTooHigh,
+
+    #[error("Verification threshold must be at least 1")]
+    VerificationThresholdTooLow,
+
+    #[error("Verification threshold cannot exceed recovery threshold")]
+    VerificationThresholdTooHigh,
+
+    #[error("Recovery claim has expired (older than 48 hours)")]
+    ClaimExpired,
+
+    #[error("Cannot vouch for your own recovery (self-vouching not allowed)")]
+    SelfVouching,
 }
 
 /// Recovery claim shown as QR code.
@@ -59,6 +77,9 @@ pub struct RecoveryClaim {
 }
 
 impl RecoveryClaim {
+    /// Maximum age for a recovery claim (48 hours in seconds).
+    pub const MAX_AGE_SECS: u64 = 48 * 60 * 60;
+
     /// Creates a new recovery claim.
     pub fn new(old_pk: &[u8; 32], new_pk: &[u8; 32]) -> Self {
         let timestamp = SystemTime::now()
@@ -72,6 +93,28 @@ impl RecoveryClaim {
             new_pk: *new_pk,
             timestamp,
         }
+    }
+
+    /// Creates a new recovery claim with a specific timestamp.
+    /// Used for testing timestamp validation.
+    #[doc(hidden)]
+    pub fn new_with_timestamp(old_pk: &[u8; 32], new_pk: &[u8; 32], timestamp: u64) -> Self {
+        Self {
+            claim_type: "recovery_claim".to_string(),
+            old_pk: *old_pk,
+            new_pk: *new_pk,
+            timestamp,
+        }
+    }
+
+    /// Checks if this claim has expired (older than 48 hours).
+    pub fn is_expired(&self) -> bool {
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("Time went backwards")
+            .as_secs();
+
+        now.saturating_sub(self.timestamp) > Self::MAX_AGE_SECS
     }
 
     /// Returns the old (lost) public key.
@@ -146,6 +189,31 @@ pub struct RecoveryVoucher {
 }
 
 impl RecoveryVoucher {
+    /// Creates a signed voucher from a recovery claim.
+    ///
+    /// Validates that:
+    /// - The claim is not expired (less than 48 hours old)
+    /// - The voucher is not self-vouching (voucher_pk != new_pk)
+    ///
+    /// # Errors
+    /// - `ClaimExpired` if the claim is older than 48 hours
+    /// - `SelfVouching` if the voucher's public key matches the new identity
+    pub fn create_from_claim(
+        claim: &RecoveryClaim,
+        voucher_keypair: &SigningKeyPair,
+    ) -> Result<Self, RecoveryError> {
+        if claim.is_expired() {
+            return Err(RecoveryError::ClaimExpired);
+        }
+
+        // Prevent self-vouching
+        if voucher_keypair.public_key().as_bytes() == claim.new_pk() {
+            return Err(RecoveryError::SelfVouching);
+        }
+
+        Ok(Self::create(claim.old_pk(), claim.new_pk(), voucher_keypair))
+    }
+
     /// Creates a signed voucher.
     pub fn create(old_pk: &[u8; 32], new_pk: &[u8; 32], voucher_keypair: &SigningKeyPair) -> Self {
         let timestamp = SystemTime::now()
@@ -330,10 +398,21 @@ impl RecoveryProof {
     }
 
     /// Adds a voucher to the proof.
+    ///
+    /// # Errors
+    /// - `MismatchedKeys` if voucher keys don't match proof keys
+    /// - `InvalidSignature` if voucher signature is invalid
+    /// - `DuplicateVoucher` if voucher from same contact already exists
+    /// - `SelfVouching` if voucher is from the recovering identity
     pub fn add_voucher(&mut self, voucher: RecoveryVoucher) -> Result<(), RecoveryError> {
         // Verify keys match
         if voucher.old_pk() != &self.old_pk || voucher.new_pk() != &self.new_pk {
             return Err(RecoveryError::MismatchedKeys);
+        }
+
+        // Prevent self-vouching (voucher_pk == new_pk)
+        if voucher.voucher_pk() == &self.new_pk {
+            return Err(RecoveryError::SelfVouching);
         }
 
         // Verify signature
@@ -476,12 +555,36 @@ impl Default for RecoverySettings {
 }
 
 impl RecoverySettings {
-    /// Creates new recovery settings.
-    pub fn new(recovery_threshold: u32, verification_threshold: u32) -> Self {
-        Self {
+    /// Minimum allowed recovery threshold.
+    pub const MIN_RECOVERY_THRESHOLD: u32 = 1;
+    /// Maximum allowed recovery threshold.
+    pub const MAX_RECOVERY_THRESHOLD: u32 = 10;
+
+    /// Creates new recovery settings with validation.
+    ///
+    /// # Errors
+    /// - `ThresholdTooLow` if recovery_threshold < 1
+    /// - `ThresholdTooHigh` if recovery_threshold > 10
+    /// - `VerificationThresholdTooLow` if verification_threshold < 1
+    /// - `VerificationThresholdTooHigh` if verification_threshold > recovery_threshold
+    pub fn new(recovery_threshold: u32, verification_threshold: u32) -> Result<Self, RecoveryError> {
+        if recovery_threshold < Self::MIN_RECOVERY_THRESHOLD {
+            return Err(RecoveryError::ThresholdTooLow);
+        }
+        if recovery_threshold > Self::MAX_RECOVERY_THRESHOLD {
+            return Err(RecoveryError::ThresholdTooHigh);
+        }
+        if verification_threshold < 1 {
+            return Err(RecoveryError::VerificationThresholdTooLow);
+        }
+        if verification_threshold > recovery_threshold {
+            return Err(RecoveryError::VerificationThresholdTooHigh);
+        }
+
+        Ok(Self {
             recovery_threshold,
             verification_threshold,
-        }
+        })
     }
 
     /// Returns the recovery threshold.

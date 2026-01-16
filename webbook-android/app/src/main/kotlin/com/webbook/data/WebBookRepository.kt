@@ -1,0 +1,42 @@
+package com.webbook.data
+
+import android.content.Context
+import uniffi.webbook_mobile.MobileContactCard
+import uniffi.webbook_mobile.MobileExchangeData
+import uniffi.webbook_mobile.MobileFieldType
+import uniffi.webbook_mobile.WebBookMobile
+
+class WebBookRepository(context: Context) {
+    private val webbook: WebBookMobile
+
+    init {
+        val dataDir = context.filesDir.absolutePath
+        webbook = WebBookMobile(dataDir, "ws://localhost:8080")
+    }
+
+    fun hasIdentity(): Boolean = webbook.hasIdentity()
+
+    fun createIdentity(displayName: String) {
+        webbook.createIdentity(displayName)
+    }
+
+    fun getDisplayName(): String = webbook.getDisplayName()
+
+    fun getPublicId(): String = webbook.getPublicId()
+
+    fun getOwnCard(): MobileContactCard = webbook.getOwnCard()
+
+    fun addField(fieldType: MobileFieldType, label: String, value: String) {
+        webbook.addField(fieldType, label, value)
+    }
+
+    fun updateField(label: String, newValue: String) {
+        webbook.updateField(label, newValue)
+    }
+
+    fun removeField(label: String): Boolean = webbook.removeField(label)
+
+    fun generateExchangeQr(): MobileExchangeData = webbook.generateExchangeQr()
+
+    fun contactCount(): UInt = webbook.contactCount()
+}

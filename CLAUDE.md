@@ -1,5 +1,20 @@
 # CLAUDE.md
 
+## ⚠️ MANDATORY: Test-Driven Development
+
+**YOU MUST FOLLOW TDD. This is non-negotiable.**
+
+Before writing ANY production code:
+1. **RED**: Write a failing test first. Run it. Confirm it fails.
+2. **GREEN**: Write the minimal code to make it pass. Run tests.
+3. **REFACTOR**: Clean up while keeping tests green.
+
+**STOP and check yourself**: Did you write a test first? If not, delete your production code and start over with a test.
+
+See `docs/TDD_RULES.md` for full methodology. Tests come from `features/*.feature` Gherkin scenarios.
+
+---
+
 Privacy-focused contact card exchange app. Users exchange cards in-person via QR and control what each contact sees.
 
 ## Commands
@@ -26,11 +41,19 @@ features/         # Gherkin scenarios
 
 ## Coding Rules
 
-**TDD Required** - Follow `docs/TDD_RULES.md`:
-1. Write failing test first (from `features/*.feature`)
-2. Write minimal code to pass
-3. Refactor, keep tests green
-4. Commit when tests pass
+**TDD Workflow** (for EVERY new function/feature):
+```
+1. cargo test                    # Baseline - all pass
+2. [Write new test]              # Must reference a feature/*.feature scenario
+3. cargo test                    # Verify test FAILS (RED)
+4. [Write minimal implementation]
+5. cargo test                    # Verify test PASSES (GREEN)
+6. [Refactor if needed]
+7. cargo test                    # Still green
+8. git commit                    # Only when green
+```
+
+**If you catch yourself writing code before a test**: STOP. Delete the code. Write the test first.
 
 **Crypto** - Use `ring` crate only. Never implement custom crypto. Never mock crypto in tests.
 

@@ -11,7 +11,7 @@ use crate::contact::Contact;
 use crate::contact_card::ContactCard;
 use crate::crypto::SymmetricKey;
 use crate::crypto::ratchet::DoubleRatchetState;
-use crate::identity::device::{DeviceRegistry, RegisteredDevice};
+use crate::identity::device::DeviceRegistry;
 
 /// Storage error types.
 #[derive(Error, Debug)]

@@ -48,6 +48,8 @@ pub struct Identity {
     exchange_public_key: [u8; 32],
     /// User's display name.
     display_name: String,
+    /// Device-specific information for this device.
+    device_info: DeviceInfo,
 }
 
 impl Drop for Identity {
@@ -71,8 +73,18 @@ impl Identity {
         Self::from_seed(master_seed, display_name.to_string())
     }
 
-    /// Creates an identity from an existing seed.
+    /// Creates an identity from an existing seed with default device index 0.
     fn from_seed(master_seed: [u8; 32], display_name: String) -> Self {
+        Self::from_seed_with_device(master_seed, display_name, 0, "Primary Device".to_string())
+    }
+
+    /// Creates an identity from an existing seed with specific device info.
+    fn from_seed_with_device(
+        master_seed: [u8; 32],
+        display_name: String,
+        device_index: u32,
+        device_name: String,
+    ) -> Self {
         // Derive signing keypair from master seed
         let signing_keypair = SigningKeyPair::from_seed(&master_seed);
 
@@ -90,12 +102,16 @@ impl Identity {
         let x3dh = X3DHKeyPair::from_bytes(exchange_seed);
         let exchange_public_key = *x3dh.public_key();
 
+        // Create device info for this device
+        let device_info = DeviceInfo::derive(&master_seed, device_index, device_name);
+
         Identity {
             master_seed,
             signing_keypair,
             signing_public_key,
             exchange_public_key,
             display_name,
+            device_info,
         }
     }
 
@@ -152,6 +168,26 @@ impl Identity {
         self.signing_keypair.sign(message)
     }
 
+    /// Returns the signing keypair reference.
+    pub fn signing_keypair(&self) -> &SigningKeyPair {
+        &self.signing_keypair
+    }
+
+    /// Returns the device info for this device.
+    pub fn device_info(&self) -> &DeviceInfo {
+        &self.device_info
+    }
+
+    /// Returns the device index for this device.
+    pub fn device_index(&self) -> u32 {
+        self.device_info.device_index()
+    }
+
+    /// Returns the device ID for this device.
+    pub fn device_id(&self) -> &[u8; 32] {
+        self.device_info.device_id()
+    }
+
     /// Exports identity as encrypted backup.
     ///
     /// The backup contains the master seed encrypted with a key derived from the password.
@@ -178,13 +214,24 @@ impl Identity {
         );
         let encryption_key = SymmetricKey::from_bytes(key_bytes);
 
-        // Prepare backup data: display_name_len (4 bytes) || display_name || master_seed
+        // Prepare backup data:
+        // display_name_len (4 bytes) || display_name || master_seed (32 bytes)
+        // || device_index (4 bytes) || device_name_len (4 bytes) || device_name
         let name_bytes = self.display_name.as_bytes();
         let name_len = (name_bytes.len() as u32).to_le_bytes();
-        let mut plaintext = Vec::with_capacity(4 + name_bytes.len() + 32);
+        let device_name_bytes = self.device_info.device_name().as_bytes();
+        let device_name_len = (device_name_bytes.len() as u32).to_le_bytes();
+        let device_index = self.device_info.device_index().to_le_bytes();
+
+        let mut plaintext = Vec::with_capacity(
+            4 + name_bytes.len() + 32 + 4 + 4 + device_name_bytes.len()
+        );
         plaintext.extend_from_slice(&name_len);
         plaintext.extend_from_slice(name_bytes);
         plaintext.extend_from_slice(&self.master_seed);
+        plaintext.extend_from_slice(&device_index);
+        plaintext.extend_from_slice(&device_name_len);
+        plaintext.extend_from_slice(device_name_bytes);
 
         // Encrypt the data
         let ciphertext = encrypt(&encryption_key, &plaintext)
@@ -247,7 +294,37 @@ impl Identity {
             .try_into()
             .map_err(|_| IdentityError::RestoreFailed)?;
 
-        Ok(Self::from_seed(master_seed, display_name))
+        // Parse device info (if present, for backward compatibility)
+        let base_offset = 4 + name_len + 32;
+        let (device_index, device_name) = if plaintext.len() >= base_offset + 8 {
+            // New format with device info
+            let device_index = u32::from_le_bytes(
+                plaintext[base_offset..base_offset + 4]
+                    .try_into()
+                    .map_err(|_| IdentityError::RestoreFailed)?
+            );
+
+            let device_name_len = u32::from_le_bytes(
+                plaintext[base_offset + 4..base_offset + 8]
+                    .try_into()
+                    .map_err(|_| IdentityError::RestoreFailed)?
+            ) as usize;
+
+            if plaintext.len() < base_offset + 8 + device_name_len {
+                return Err(IdentityError::RestoreFailed);
+            }
+
+            let device_name = String::from_utf8(
+                plaintext[base_offset + 8..base_offset + 8 + device_name_len].to_vec()
+            ).map_err(|_| IdentityError::RestoreFailed)?;
+
+            (device_index, device_name)
+        } else {
+            // Old format without device info - use defaults
+            (0, "Primary Device".to_string())
+        };
+
+        Ok(Self::from_seed_with_device(master_seed, display_name, device_index, device_name))
     }
 }
 
@@ -268,5 +345,41 @@ mod tests {
         let backup = original.export_backup(password).unwrap();
         let restored = Identity::import_backup(&backup, password).unwrap();
         assert_eq!(original.public_id(), restored.public_id());
+    }
+
+    #[test]
+    fn test_identity_has_device_info() {
+        let identity = Identity::create("Alice");
+        assert_eq!(identity.device_index(), 0);
+        assert_eq!(identity.device_info().device_name(), "Primary Device");
+    }
+
+    #[test]
+    fn test_backup_restore_preserves_device_info() {
+        // Create identity with custom device info
+        let master_seed = [0x42u8; 32];
+        let original = Identity::from_seed_with_device(
+            master_seed,
+            "Alice".to_string(),
+            3,
+            "My Phone".to_string(),
+        );
+
+        let password = "SecurePassword123";
+        let backup = original.export_backup(password).unwrap();
+        let restored = Identity::import_backup(&backup, password).unwrap();
+
+        assert_eq!(restored.device_index(), 3);
+        assert_eq!(restored.device_info().device_name(), "My Phone");
+        assert_eq!(restored.device_id(), original.device_id());
+    }
+
+    #[test]
+    fn test_device_id_deterministic() {
+        let identity1 = Identity::create("Alice");
+        let identity2 = Identity::create("Bob");
+
+        // Different identities have different device IDs
+        assert_ne!(identity1.device_id(), identity2.device_id());
     }
 }

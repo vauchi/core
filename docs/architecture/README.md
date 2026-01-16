@@ -53,6 +53,7 @@ WebBook is a privacy-focused, decentralized contact card exchange application th
 |----------|-------------|
 | [Cryptography](./cryptography.md) | Identity, key derivation, encryption schemes |
 | [Data Models](./data-models.md) | Contact cards, fields, visibility rules |
+| [Schema](./schema.md) | Database tables, columns, relationships |
 | [Exchange Protocol](./exchange-protocol.md) | QR, BLE, NFC proximity verification |
 | [Device Linking](./device-linking.md) | Multi-device sync and device pairing |
 | [Sync](./sync.md) | Update propagation, P2P sync |
@@ -61,6 +62,7 @@ WebBook is a privacy-focused, decentralized contact card exchange application th
 | [Tech Stack](./tech-stack.md) | Languages, frameworks, platforms |
 | [Security](./security.md) | Threat model, data classification |
 | [API](./api.md) | Core library API design |
+| [Decisions](./decisions.md) | Architecture Decision Records (ADRs) |
 
 ## Glossary
 

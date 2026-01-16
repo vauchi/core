@@ -6,7 +6,7 @@
 - **Crypto**: ring (audited, production-ready)
 - **P2P**: libp2p (rust-libp2p) - planned
 - **Storage**: SQLite (encrypted)
-- **Serialization**: Protocol Buffers or MessagePack
+- **Serialization**: JSON (via serde_json)
 
 ## Mobile Apps
 

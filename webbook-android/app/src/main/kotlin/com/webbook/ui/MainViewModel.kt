@@ -222,6 +222,28 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             true // Default to visible on error
         }
     }
+
+    suspend fun exportBackup(password: String): String? {
+        return try {
+            withContext(Dispatchers.IO) {
+                repository.exportBackup(password)
+            }
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    suspend fun importBackup(backupData: String, password: String): Boolean {
+        return try {
+            withContext(Dispatchers.IO) {
+                repository.importBackup(backupData, password)
+            }
+            loadUserData()
+            true
+        } catch (e: Exception) {
+            false
+        }
+    }
 }
 
 private data class Tuple4<A, B, C, D>(val a: A, val b: B, val c: C, val d: D)

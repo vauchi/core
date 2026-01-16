@@ -60,4 +60,11 @@ class WebBookRepository(context: Context) {
     fun isFieldVisibleToContact(contactId: String, fieldLabel: String): Boolean {
         return webbook.isFieldVisibleToContact(contactId, fieldLabel)
     }
+
+    // Backup operations
+    fun exportBackup(password: String): String = webbook.exportBackup(password)
+
+    fun importBackup(backupData: String, password: String) {
+        webbook.importBackup(backupData, password)
+    }
 }

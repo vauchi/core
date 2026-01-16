@@ -12,10 +12,12 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Settings
 import com.webbook.ui.ExchangeScreen
 import com.webbook.ui.ContactsScreen
 import com.webbook.ui.ContactDetailScreen
 import com.webbook.ui.QrScannerScreen
+import com.webbook.ui.SettingsScreen
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -48,7 +50,7 @@ class MainActivity : ComponentActivity() {
 }
 
 enum class Screen {
-    Home, Exchange, Contacts, ContactDetail, QrScanner
+    Home, Exchange, Contacts, ContactDetail, QrScanner, Settings
 }
 
 @Composable
@@ -71,7 +73,8 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
                     onAddField = viewModel::addField,
                     onRemoveField = viewModel::removeField,
                     onExchange = { currentScreen = Screen.Exchange },
-                    onContacts = { currentScreen = Screen.Contacts }
+                    onContacts = { currentScreen = Screen.Contacts },
+                    onSettings = { currentScreen = Screen.Settings }
                 )
                 is UiState.Error -> ErrorScreen(message = state.message)
             }
@@ -118,6 +121,17 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
                     onIsFieldVisible = { cId, label ->
                         viewModel.isFieldVisibleToContact(cId, label)
                     }
+                )
+            }
+        }
+        Screen.Settings -> {
+            val state = uiState
+            if (state is UiState.Ready) {
+                SettingsScreen(
+                    displayName = state.displayName,
+                    onBack = { currentScreen = Screen.Home },
+                    onExportBackup = { password -> viewModel.exportBackup(password) },
+                    onImportBackup = { data, password -> viewModel.importBackup(data, password) }
                 )
             }
         }
@@ -188,11 +202,22 @@ fun ReadyScreen(
     onAddField: (MobileFieldType, String, String) -> Unit,
     onRemoveField: (String) -> Unit,
     onExchange: () -> Unit,
-    onContacts: () -> Unit
+    onContacts: () -> Unit,
+    onSettings: () -> Unit
 ) {
     var showAddDialog by remember { mutableStateOf(false) }
 
     Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("WebBook") },
+                actions = {
+                    IconButton(onClick = onSettings) {
+                        Icon(Icons.Default.Settings, contentDescription = "Settings")
+                    }
+                }
+            )
+        },
         floatingActionButton = {
             FloatingActionButton(onClick = { showAddDialog = true }) {
                 Icon(Icons.Default.Add, contentDescription = "Add field")

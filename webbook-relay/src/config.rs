@@ -28,7 +28,7 @@ impl Default for RelayConfig {
             listen_addr: "0.0.0.0:8080".parse().unwrap(),
             max_connections: 1000,
             max_message_size: 1_048_576, // 1 MB
-            blob_ttl_secs: 7 * 24 * 60 * 60, // 7 days
+            blob_ttl_secs: 90 * 24 * 60 * 60, // 90 days (3 months)
             rate_limit_per_min: 60,
             cleanup_interval_secs: 3600, // 1 hour
         }
@@ -101,7 +101,7 @@ mod tests {
         assert_eq!(config.listen_addr.port(), 8080);
         assert_eq!(config.max_connections, 1000);
         assert_eq!(config.max_message_size, 1_048_576);
-        assert_eq!(config.blob_ttl_secs, 7 * 24 * 60 * 60);
+        assert_eq!(config.blob_ttl_secs, 90 * 24 * 60 * 60); // 90 days
         assert_eq!(config.rate_limit_per_min, 60);
         assert_eq!(config.cleanup_interval_secs, 3600);
     }
@@ -109,7 +109,7 @@ mod tests {
     #[test]
     fn test_blob_ttl_duration() {
         let config = RelayConfig::default();
-        assert_eq!(config.blob_ttl(), Duration::from_secs(7 * 24 * 60 * 60));
+        assert_eq!(config.blob_ttl(), Duration::from_secs(90 * 24 * 60 * 60));
     }
 
     #[test]

@@ -1,10 +1,14 @@
 //! Blob Storage
 //!
 //! In-memory storage for encrypted blobs awaiting delivery.
+//!
+//! Note: Current implementation is in-memory and does not survive server restarts.
+//! For production deployments with long TTLs (90 days), consider adding persistent
+//! storage (SQLite or RocksDB) to preserve messages across restarts.
 
 use std::collections::{HashMap, VecDeque};
 use std::sync::RwLock;
-use std::time::{Duration, Instant};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 /// A stored encrypted blob.
 #[derive(Debug, Clone)]
@@ -15,24 +19,39 @@ pub struct StoredBlob {
     pub sender_id: String,
     /// The encrypted data (opaque to the relay).
     pub data: Vec<u8>,
-    /// When the blob was stored.
-    pub created_at: Instant,
+    /// When the blob was stored (Unix timestamp in seconds).
+    pub created_at_secs: u64,
 }
 
 impl StoredBlob {
     /// Creates a new stored blob.
     pub fn new(sender_id: String, data: Vec<u8>) -> Self {
+        let created_at_secs = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
+
         StoredBlob {
             id: uuid::Uuid::new_v4().to_string(),
             sender_id,
             data,
-            created_at: Instant::now(),
+            created_at_secs,
         }
+    }
+
+    /// Returns the age of this blob.
+    fn age_secs(&self) -> u64 {
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
+        now.saturating_sub(self.created_at_secs)
     }
 
     /// Checks if the blob has expired.
     pub fn is_expired(&self, ttl: Duration) -> bool {
-        self.created_at.elapsed() > ttl
+        // Use >= so that TTL of 0 means immediately expired
+        self.age_secs() >= ttl.as_secs()
     }
 }
 

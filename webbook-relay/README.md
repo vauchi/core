@@ -40,10 +40,15 @@ Environment variables:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `WEBBOOK_PORT` | `8080` | WebSocket listen port |
-| `WEBBOOK_MAX_BLOB_SIZE` | `65536` | Maximum blob size in bytes |
-| `WEBBOOK_BLOB_TTL` | `86400` | Blob expiration time in seconds |
+| `RELAY_LISTEN_ADDR` | `0.0.0.0:8080` | Address to listen on |
+| `RELAY_MAX_MESSAGE_SIZE` | `1048576` | Maximum message size in bytes (1 MB) |
+| `RELAY_BLOB_TTL_SECS` | `7776000` | Blob expiration time in seconds (90 days) |
+| `RELAY_RATE_LIMIT` | `60` | Messages per minute per client |
+| `RELAY_CLEANUP_INTERVAL` | `3600` | Cleanup interval in seconds (1 hour) |
 | `RUST_LOG` | `info` | Log level (trace, debug, info, warn, error) |
+
+**Note:** The 90-day TTL allows users who sync infrequently to still receive updates.
+However, current storage is in-memory and does not survive server restarts.
 
 ## Protocol
 
@@ -156,8 +161,21 @@ WantedBy=multi-user.target
 
 - **No Authentication**: The relay is open by design; security comes from E2E encryption
 - **Rate Limiting**: Prevents abuse and DoS
-- **No Persistence**: In-memory storage; restart clears all data
+- **In-Memory Storage**: Server restart clears all pending messages (persistence planned for production)
 - **TLS**: Deploy behind a reverse proxy (nginx, caddy) for TLS termination
+
+## Storage Considerations
+
+The default 90-day TTL enables users who rarely open the app to still receive contact updates.
+
+**Current limitations:**
+- In-memory storage (lost on restart)
+- Memory usage grows with pending messages
+
+**For production deployments**, consider:
+- Adding persistent storage (SQLite/RocksDB)
+- Setting `RELAY_BLOB_TTL_SECS` based on expected user activity
+- Monitoring memory usage
 
 ## License
 

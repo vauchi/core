@@ -3,6 +3,13 @@
 //! Provides encrypted local storage for contacts, identity, and sync state.
 //! Uses SQLite with application-level encryption for sensitive data.
 
+pub mod secure;
+
+pub use secure::{FileKeyStorage, SecureStorage};
+
+#[cfg(feature = "secure-storage")]
+pub use secure::PlatformKeyring;
+
 use rusqlite::{params, Connection};
 use std::path::Path;
 use thiserror::Error;

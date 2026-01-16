@@ -5,6 +5,7 @@
 
 mod backup;
 pub mod device;
+pub mod password;
 
 pub use backup::IdentityBackup;
 pub use device::{
@@ -25,16 +26,13 @@ use zeroize::Zeroize;
 pub enum IdentityError {
     #[error("Display name cannot be empty")]
     EmptyDisplayName,
-    #[error("Password too weak: minimum 8 characters required")]
+    #[error("Password too weak: requires minimum 8 characters and zxcvbn score >= 3")]
     WeakPassword,
     #[error("Backup encryption failed")]
     BackupFailed,
     #[error("Invalid backup or wrong password")]
     RestoreFailed,
 }
-
-/// Minimum password length for backups.
-const MIN_PASSWORD_LENGTH: usize = 8;
 
 /// PBKDF2 iterations for key derivation from password.
 const PBKDF2_ITERATIONS: u32 = 100_000;
@@ -195,11 +193,10 @@ impl Identity {
     /// Exports identity as encrypted backup.
     ///
     /// The backup contains the master seed encrypted with a key derived from the password.
+    /// Requires a strong password (zxcvbn score >= 3).
     pub fn export_backup(&self, password: &str) -> Result<IdentityBackup, IdentityError> {
-        // Validate password strength
-        if password.len() < MIN_PASSWORD_LENGTH {
-            return Err(IdentityError::WeakPassword);
-        }
+        // Validate password strength using zxcvbn
+        password::validate_password(password)?;
 
         // Generate random salt
         let rng = SystemRandom::new();
@@ -352,7 +349,7 @@ mod tests {
     #[test]
     fn test_backup_restore_roundtrip() {
         let original = Identity::create("Alice");
-        let password = "SecurePassword123";
+        let password = "correct-horse-battery-staple";
         let backup = original.export_backup(password).unwrap();
         let restored = Identity::import_backup(&backup, password).unwrap();
         assert_eq!(original.public_id(), restored.public_id());
@@ -376,7 +373,7 @@ mod tests {
             "My Phone".to_string(),
         );
 
-        let password = "SecurePassword123";
+        let password = "correct-horse-battery-staple";
         let backup = original.export_backup(password).unwrap();
         let restored = Identity::import_backup(&backup, password).unwrap();
 

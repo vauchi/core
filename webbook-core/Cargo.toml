@@ -8,6 +8,7 @@ license = "MIT"
 [features]
 default = ["network"]
 network = ["tungstenite", "native-tls"]
+secure-storage = ["keyring"]
 
 [dependencies]
 # Cryptography (audited library)
@@ -36,6 +37,9 @@ hex = "0.4"
 # Zeroize sensitive data in memory
 zeroize = { version = "1.8", features = ["derive"] }
 
+# Password strength estimation
+zxcvbn = "3"
+
 # Database storage
 rusqlite = { version = "0.32", features = ["bundled"] }
 
@@ -45,6 +49,9 @@ uuid = { version = "1.0", features = ["v4"] }
 # WebSocket transport (optional, not needed for mobile)
 tungstenite = { version = "0.24", features = ["native-tls"], optional = true }
 native-tls = { version = "0.2", optional = true }
+
+# Platform keychain access (optional, for desktop apps)
+keyring = { version = "3", optional = true }
 
 [dev-dependencies]
 # Temporary directories for storage tests

@@ -350,6 +350,240 @@ impl DeviceRegistry {
     pub fn from_json(json: &str) -> Result<Self, DeviceError> {
         serde_json::from_str(json).map_err(|_| DeviceError::InvalidRegistrySignature)
     }
+
+    /// Applies a revocation certificate to the registry.
+    ///
+    /// This is used when receiving a revocation certificate from a contact
+    /// to update our local knowledge of their device registry.
+    pub fn apply_revocation(
+        &mut self,
+        certificate: &DeviceRevocationCertificate,
+        public_key: &crate::crypto::PublicKey,
+    ) -> Result<(), DeviceError> {
+        // Verify certificate signature
+        if !certificate.verify(public_key) {
+            return Err(DeviceError::InvalidRegistrySignature);
+        }
+
+        // Find and revoke the device
+        let device = self.devices
+            .iter_mut()
+            .find(|d| &d.device_id == certificate.device_id())
+            .ok_or(DeviceError::DeviceNotFound)?;
+
+        device.revoked = true;
+        device.revoked_at = Some(certificate.revoked_at());
+        self.version += 1;
+
+        Ok(())
+    }
+}
+
+// ============================================================
+// Phase 5: Device Revocation Types
+// ============================================================
+
+/// A signed certificate proving that a device has been revoked.
+///
+/// This certificate can be shared with contacts so they stop sending
+/// messages to the revoked device.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DeviceRevocationCertificate {
+    /// ID of the revoked device.
+    device_id: [u8; 32],
+    /// Reason for revocation (optional).
+    reason: String,
+    /// Timestamp when revoked.
+    revoked_at: u64,
+    /// Signature over the certificate by the identity signing key.
+    #[serde(with = "signature_serde")]
+    signature: [u8; 64],
+}
+
+impl DeviceRevocationCertificate {
+    /// Creates a new revocation certificate.
+    pub fn create(
+        device_id: &[u8; 32],
+        reason: String,
+        signing_key: &SigningKeyPair,
+    ) -> Self {
+        let revoked_at = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
+
+        let mut certificate = Self {
+            device_id: *device_id,
+            reason,
+            revoked_at,
+            signature: [0u8; 64],
+        };
+
+        certificate.sign(signing_key);
+        certificate
+    }
+
+    /// Returns the revoked device ID.
+    pub fn device_id(&self) -> &[u8; 32] {
+        &self.device_id
+    }
+
+    /// Returns the revocation timestamp.
+    pub fn revoked_at(&self) -> u64 {
+        self.revoked_at
+    }
+
+    /// Returns the revocation reason.
+    pub fn reason(&self) -> &str {
+        &self.reason
+    }
+
+    /// Verifies the certificate signature.
+    pub fn verify(&self, public_key: &crate::crypto::PublicKey) -> bool {
+        let data = self.signing_data();
+        let signature = Signature::from_bytes(self.signature);
+        public_key.verify(&data, &signature)
+    }
+
+    /// Signs the certificate.
+    fn sign(&mut self, signing_key: &SigningKeyPair) {
+        let data = self.signing_data();
+        let signature = signing_key.sign(&data);
+        self.signature = *signature.as_bytes();
+    }
+
+    /// Returns the data to be signed.
+    fn signing_data(&self) -> Vec<u8> {
+        let mut data = Vec::new();
+        data.extend_from_slice(b"REVOKE:");
+        data.extend_from_slice(&self.device_id);
+        data.extend_from_slice(&self.revoked_at.to_le_bytes());
+        data.extend_from_slice(self.reason.as_bytes());
+        data
+    }
+
+    /// Serializes to JSON.
+    pub fn to_json(&self) -> String {
+        serde_json::to_string(self).expect("Certificate serialization should not fail")
+    }
+
+    /// Deserializes from JSON.
+    pub fn from_json(json: &str) -> Result<Self, DeviceError> {
+        serde_json::from_str(json).map_err(|_| DeviceError::InvalidRegistrySignature)
+    }
+}
+
+/// A message broadcasting the current device registry to contacts.
+///
+/// Contacts use this to know which devices to send updates to.
+/// Only active (non-revoked) devices are included.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RegistryBroadcast {
+    /// Version of the registry.
+    version: u64,
+    /// Active devices (ID -> exchange public key).
+    active_devices: Vec<BroadcastDevice>,
+    /// Timestamp of broadcast.
+    timestamp: u64,
+    /// Signature over the broadcast.
+    #[serde(with = "signature_serde")]
+    signature: [u8; 64],
+}
+
+/// A device entry in the broadcast (minimal info for contacts).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BroadcastDevice {
+    /// Device ID.
+    pub device_id: [u8; 32],
+    /// Device exchange public key for sending messages.
+    pub exchange_public_key: [u8; 32],
+}
+
+impl RegistryBroadcast {
+    /// Creates a new broadcast from a registry.
+    pub fn new(registry: &DeviceRegistry, signing_key: &SigningKeyPair) -> Self {
+        let active_devices: Vec<BroadcastDevice> = registry
+            .active_devices()
+            .iter()
+            .map(|d| BroadcastDevice {
+                device_id: d.device_id,
+                exchange_public_key: d.exchange_public_key,
+            })
+            .collect();
+
+        let timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
+
+        let mut broadcast = Self {
+            version: registry.version(),
+            active_devices,
+            timestamp,
+            signature: [0u8; 64],
+        };
+
+        broadcast.sign(signing_key);
+        broadcast
+    }
+
+    /// Returns the registry version.
+    pub fn version(&self) -> u64 {
+        self.version
+    }
+
+    /// Returns the number of active devices.
+    pub fn active_device_count(&self) -> usize {
+        self.active_devices.len()
+    }
+
+    /// Checks if a device is in the broadcast.
+    pub fn contains_device(&self, device_id: &[u8; 32]) -> bool {
+        self.active_devices.iter().any(|d| &d.device_id == device_id)
+    }
+
+    /// Returns the active devices.
+    pub fn active_devices(&self) -> &[BroadcastDevice] {
+        &self.active_devices
+    }
+
+    /// Verifies the broadcast signature.
+    pub fn verify(&self, public_key: &crate::crypto::PublicKey) -> bool {
+        let data = self.signing_data();
+        let signature = Signature::from_bytes(self.signature);
+        public_key.verify(&data, &signature)
+    }
+
+    /// Signs the broadcast.
+    fn sign(&mut self, signing_key: &SigningKeyPair) {
+        let data = self.signing_data();
+        let signature = signing_key.sign(&data);
+        self.signature = *signature.as_bytes();
+    }
+
+    /// Returns the data to be signed.
+    fn signing_data(&self) -> Vec<u8> {
+        let mut data = Vec::new();
+        data.extend_from_slice(b"BROADCAST:");
+        data.extend_from_slice(&self.version.to_le_bytes());
+        data.extend_from_slice(&self.timestamp.to_le_bytes());
+        data.extend_from_slice(&(self.active_devices.len() as u32).to_le_bytes());
+        for device in &self.active_devices {
+            data.extend_from_slice(&device.device_id);
+            data.extend_from_slice(&device.exchange_public_key);
+        }
+        data
+    }
+
+    /// Serializes to JSON.
+    pub fn to_json(&self) -> String {
+        serde_json::to_string(self).expect("Broadcast serialization should not fail")
+    }
+
+    /// Deserializes from JSON.
+    pub fn from_json(json: &str) -> Result<Self, DeviceError> {
+        serde_json::from_str(json).map_err(|_| DeviceError::InvalidRegistrySignature)
+    }
 }
 
 #[cfg(test)]
@@ -531,5 +765,163 @@ mod tests {
 
         let result = device.set_device_name("".to_string());
         assert!(matches!(result, Err(DeviceError::EmptyDeviceName)));
+    }
+
+    // ============================================================
+    // Phase 5 Tests: Device Revocation
+    // Based on features/device_management.feature @unlink and @security
+    // ============================================================
+
+    /// Scenario: Unlink a device remotely
+    /// "Device B should no longer receive updates"
+    /// "Device B should be notified of removal"
+    #[test]
+    fn test_device_revocation_certificate_creation() {
+        let seed = test_master_seed();
+        let signing_key = test_signing_keypair();
+        let device = DeviceInfo::derive(&seed, 1, "Lost Device".to_string());
+
+        // Create a revocation certificate
+        let certificate = DeviceRevocationCertificate::create(
+            device.device_id(),
+            "Lost device - reported stolen".to_string(),
+            &signing_key,
+        );
+
+        assert_eq!(certificate.device_id(), device.device_id());
+        assert!(certificate.verify(&signing_key.public_key()));
+    }
+
+    /// Scenario: Lost device revocation
+    /// "Device B's device key should be revoked"
+    #[test]
+    fn test_device_revocation_certificate_has_timestamp() {
+        let seed = test_master_seed();
+        let signing_key = test_signing_keypair();
+        let device = DeviceInfo::derive(&seed, 1, "Lost Device".to_string());
+
+        let certificate = DeviceRevocationCertificate::create(
+            device.device_id(),
+            "Lost".to_string(),
+            &signing_key,
+        );
+
+        // Certificate should have valid timestamp
+        assert!(certificate.revoked_at() > 0);
+    }
+
+    /// Test certificate serialization for transmission
+    #[test]
+    fn test_device_revocation_certificate_serialization() {
+        let seed = test_master_seed();
+        let signing_key = test_signing_keypair();
+        let device = DeviceInfo::derive(&seed, 1, "Lost Device".to_string());
+
+        let certificate = DeviceRevocationCertificate::create(
+            device.device_id(),
+            "Lost".to_string(),
+            &signing_key,
+        );
+
+        let json = certificate.to_json();
+        let restored = DeviceRevocationCertificate::from_json(&json).unwrap();
+
+        assert_eq!(certificate.device_id(), restored.device_id());
+        assert!(restored.verify(&signing_key.public_key()));
+    }
+
+    /// Scenario: contacts should be notified if necessary
+    #[test]
+    fn test_registry_broadcast_message_creation() {
+        let seed = test_master_seed();
+        let signing_key = test_signing_keypair();
+        let device = DeviceInfo::derive(&seed, 0, "Primary".to_string());
+
+        let registry = DeviceRegistry::new(device.to_registered(&seed), &signing_key);
+
+        // Create broadcast message for contacts
+        let broadcast = RegistryBroadcast::new(&registry, &signing_key);
+
+        assert_eq!(broadcast.version(), registry.version());
+        assert!(broadcast.verify(&signing_key.public_key()));
+    }
+
+    /// Test registry broadcast includes active device keys
+    #[test]
+    fn test_registry_broadcast_contains_active_devices() {
+        let seed = test_master_seed();
+        let signing_key = test_signing_keypair();
+        let device0 = DeviceInfo::derive(&seed, 0, "Primary".to_string());
+        let device1 = DeviceInfo::derive(&seed, 1, "Secondary".to_string());
+
+        let mut registry = DeviceRegistry::new(device0.to_registered(&seed), &signing_key);
+        registry.add_device(device1.to_registered(&seed), &signing_key).unwrap();
+
+        let broadcast = RegistryBroadcast::new(&registry, &signing_key);
+
+        assert_eq!(broadcast.active_device_count(), 2);
+        assert!(broadcast.contains_device(device0.device_id()));
+        assert!(broadcast.contains_device(device1.device_id()));
+    }
+
+    /// Test registry broadcast excludes revoked devices
+    #[test]
+    fn test_registry_broadcast_excludes_revoked() {
+        let seed = test_master_seed();
+        let signing_key = test_signing_keypair();
+        let device0 = DeviceInfo::derive(&seed, 0, "Primary".to_string());
+        let device1 = DeviceInfo::derive(&seed, 1, "Revoked".to_string());
+
+        let mut registry = DeviceRegistry::new(device0.to_registered(&seed), &signing_key);
+        registry.add_device(device1.to_registered(&seed), &signing_key).unwrap();
+        registry.revoke_device(device1.device_id(), &signing_key).unwrap();
+
+        let broadcast = RegistryBroadcast::new(&registry, &signing_key);
+
+        assert_eq!(broadcast.active_device_count(), 1);
+        assert!(broadcast.contains_device(device0.device_id()));
+        assert!(!broadcast.contains_device(device1.device_id()));
+    }
+
+    /// Test registry broadcast serialization for transmission
+    #[test]
+    fn test_registry_broadcast_serialization() {
+        let seed = test_master_seed();
+        let signing_key = test_signing_keypair();
+        let device = DeviceInfo::derive(&seed, 0, "Primary".to_string());
+
+        let registry = DeviceRegistry::new(device.to_registered(&seed), &signing_key);
+        let broadcast = RegistryBroadcast::new(&registry, &signing_key);
+
+        let json = broadcast.to_json();
+        let restored = RegistryBroadcast::from_json(&json).unwrap();
+
+        assert_eq!(broadcast.version(), restored.version());
+        assert!(restored.verify(&signing_key.public_key()));
+    }
+
+    /// Test applying revocation certificate to local knowledge of contact
+    #[test]
+    fn test_apply_revocation_to_contact_registry() {
+        let seed = test_master_seed();
+        let signing_key = test_signing_keypair();
+        let device0 = DeviceInfo::derive(&seed, 0, "Primary".to_string());
+        let device1 = DeviceInfo::derive(&seed, 1, "ToRevoke".to_string());
+
+        let mut registry = DeviceRegistry::new(device0.to_registered(&seed), &signing_key);
+        registry.add_device(device1.to_registered(&seed), &signing_key).unwrap();
+
+        // Create revocation certificate for device1
+        let certificate = DeviceRevocationCertificate::create(
+            device1.device_id(),
+            "Revoked".to_string(),
+            &signing_key,
+        );
+
+        // Apply certificate to registry (as if received from contact)
+        registry.apply_revocation(&certificate, &signing_key.public_key()).unwrap();
+
+        assert_eq!(registry.active_count(), 1);
+        assert!(!registry.find_device(device1.device_id()).unwrap().is_active());
     }
 }

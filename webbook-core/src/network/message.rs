@@ -34,6 +34,8 @@ pub enum MessagePayload {
     Handshake(Handshake),
     /// Presence/status update.
     Presence(PresenceUpdate),
+    /// Device-to-device sync message (between own devices).
+    DeviceSync(DeviceSyncMessage),
 }
 
 /// An encrypted update destined for a specific recipient.
@@ -118,10 +120,31 @@ pub enum PresenceStatus {
     Offline,
 }
 
+/// Device-to-device sync message for inter-device synchronization.
+///
+/// Used for syncing data between devices belonging to the same identity.
+/// The payload is encrypted using the target device's exchange key.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DeviceSyncMessage {
+    /// Target device ID (one of our own devices).
+    #[serde(with = "bytes_array_32")]
+    pub target_device_id: [u8; 32],
+    /// Sender device ID.
+    #[serde(with = "bytes_array_32")]
+    pub sender_device_id: [u8; 32],
+    /// Encrypted sync payload (SyncItems encrypted with device exchange key).
+    pub ciphertext: Vec<u8>,
+    /// Nonce for AES-GCM decryption.
+    #[serde(with = "bytes_array_12")]
+    pub nonce: [u8; 12],
+    /// Sync version number for ordering/deduplication.
+    pub sync_version: u64,
+}
+
 /// Serde helper for 32-byte arrays.
 mod bytes_array_32 {
-    use serde::{Deserialize, Deserializer, Serializer};
     use base64::Engine;
+    use serde::{Deserialize, Deserializer, Serializer};
 
     pub fn serialize<S>(bytes: &[u8; 32], serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -138,15 +161,16 @@ mod bytes_array_32 {
         let bytes = base64::engine::general_purpose::STANDARD
             .decode(&s)
             .map_err(serde::de::Error::custom)?;
-        bytes.try_into()
+        bytes
+            .try_into()
             .map_err(|_| serde::de::Error::custom("invalid length for 32-byte array"))
     }
 }
 
 /// Serde helper for 64-byte arrays.
 mod bytes_array_64 {
-    use serde::{Deserialize, Deserializer, Serializer};
     use base64::Engine;
+    use serde::{Deserialize, Deserializer, Serializer};
 
     pub fn serialize<S>(bytes: &[u8; 64], serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -163,8 +187,35 @@ mod bytes_array_64 {
         let bytes = base64::engine::general_purpose::STANDARD
             .decode(&s)
             .map_err(serde::de::Error::custom)?;
-        bytes.try_into()
+        bytes
+            .try_into()
             .map_err(|_| serde::de::Error::custom("invalid length for 64-byte array"))
+    }
+}
+
+/// Serde helper for 12-byte arrays (AES-GCM nonce).
+mod bytes_array_12 {
+    use base64::Engine;
+    use serde::{Deserialize, Deserializer, Serializer};
+
+    pub fn serialize<S>(bytes: &[u8; 12], serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_str(&base64::engine::general_purpose::STANDARD.encode(bytes))
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<[u8; 12], D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        let bytes = base64::engine::general_purpose::STANDARD
+            .decode(&s)
+            .map_err(serde::de::Error::custom)?;
+        bytes
+            .try_into()
+            .map_err(|_| serde::de::Error::custom("invalid length for 12-byte array"))
     }
 }
 
@@ -211,7 +262,10 @@ mod tests {
 
         assert_eq!(restored.recipient_id, update.recipient_id);
         assert_eq!(restored.sender_id, update.sender_id);
-        assert_eq!(restored.ratchet_header.dh_public, update.ratchet_header.dh_public);
+        assert_eq!(
+            restored.ratchet_header.dh_public,
+            update.ratchet_header.dh_public
+        );
         assert_eq!(restored.ciphertext, update.ciphertext);
     }
 
@@ -256,5 +310,59 @@ mod tests {
     fn test_presence_status_values() {
         assert_ne!(PresenceStatus::Online, PresenceStatus::Offline);
         assert_ne!(PresenceStatus::Away, PresenceStatus::Online);
+    }
+
+    // ============================================================
+    // Phase 2: Device Sync Message Tests (TDD)
+    // Based on features/device_management.feature @sync scenarios
+    // ============================================================
+
+    /// Test DeviceSyncMessage serialization for inter-device communication
+    #[test]
+    fn test_device_sync_message_serialize() {
+        let msg = DeviceSyncMessage {
+            target_device_id: [0x41u8; 32],
+            sender_device_id: [0x42u8; 32],
+            ciphertext: vec![0xDE, 0xAD, 0xBE, 0xEF],
+            nonce: [0x55u8; 12],
+            sync_version: 42,
+        };
+
+        let json = serde_json::to_string(&msg).unwrap();
+        let restored: DeviceSyncMessage = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(restored.target_device_id, msg.target_device_id);
+        assert_eq!(restored.sender_device_id, msg.sender_device_id);
+        assert_eq!(restored.ciphertext, msg.ciphertext);
+        assert_eq!(restored.nonce, msg.nonce);
+        assert_eq!(restored.sync_version, msg.sync_version);
+    }
+
+    /// Test DeviceSyncMessage in MessagePayload envelope
+    #[test]
+    fn test_device_sync_message_in_envelope() {
+        let envelope = MessageEnvelope {
+            version: PROTOCOL_VERSION,
+            message_id: "device-sync-123".to_string(),
+            timestamp: 1234567890,
+            payload: MessagePayload::DeviceSync(DeviceSyncMessage {
+                target_device_id: [0x41u8; 32],
+                sender_device_id: [0x42u8; 32],
+                ciphertext: vec![1, 2, 3, 4],
+                nonce: [0x55u8; 12],
+                sync_version: 1,
+            }),
+        };
+
+        let json = serde_json::to_string(&envelope).unwrap();
+        let restored: MessageEnvelope = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(restored.message_id, envelope.message_id);
+        if let MessagePayload::DeviceSync(msg) = restored.payload {
+            assert_eq!(msg.target_device_id, [0x41u8; 32]);
+            assert_eq!(msg.sync_version, 1);
+        } else {
+            panic!("Expected DeviceSync payload");
+        }
     }
 }

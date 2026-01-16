@@ -39,8 +39,8 @@ pub struct ContactSyncData {
 impl ContactSyncData {
     /// Creates sync data from a contact.
     pub fn from_contact(contact: &Contact) -> Self {
-        let card_json = serde_json::to_string(contact.card())
-            .expect("Card serialization should not fail");
+        let card_json =
+            serde_json::to_string(contact.card()).expect("Card serialization should not fail");
         let visibility_rules_json = serde_json::to_string(contact.visibility_rules())
             .expect("Visibility rules serialization should not fail");
 
@@ -100,13 +100,11 @@ impl DeviceSyncPayload {
 
     /// Creates a sync payload from contacts and card.
     pub fn new(contacts: &[Contact], own_card: &ContactCard, version: u64) -> Self {
-        let contacts_data: Vec<ContactSyncData> = contacts
-            .iter()
-            .map(ContactSyncData::from_contact)
-            .collect();
+        let contacts_data: Vec<ContactSyncData> =
+            contacts.iter().map(ContactSyncData::from_contact).collect();
 
-        let own_card_json = serde_json::to_string(own_card)
-            .expect("Card serialization should not fail");
+        let own_card_json =
+            serde_json::to_string(own_card).expect("Card serialization should not fail");
 
         DeviceSyncPayload {
             contacts: contacts_data,
@@ -140,11 +138,11 @@ pub enum DeviceSyncError {
     #[error("Deserialization failed: {0}")]
     Deserialization(String),
 
-    #[error("Encryption failed")]
-    EncryptionFailed,
+    #[error("Encryption failed: {0}")]
+    Encryption(String),
 
-    #[error("Decryption failed")]
-    DecryptionFailed,
+    #[error("Decryption failed: {0}")]
+    Decryption(String),
 }
 
 // ============================================================
@@ -233,9 +231,10 @@ impl SyncItem {
 ///
 /// Each device maintains one InterDeviceSyncState per other linked device
 /// to track what has been synced and what is pending.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct InterDeviceSyncState {
     /// ID of the target device.
+    #[serde(with = "bytes_array_32")]
     device_id: [u8; 32],
     /// Items pending sync to this device.
     pending_items: Vec<SyncItem>,
@@ -278,6 +277,16 @@ impl InterDeviceSyncState {
         self.pending_items.clear();
         self.last_sync_version = version;
     }
+
+    /// Serializes the sync state to JSON.
+    pub fn to_json(&self) -> String {
+        serde_json::to_string(self).expect("InterDeviceSyncState serialization should not fail")
+    }
+
+    /// Deserializes sync state from JSON.
+    pub fn from_json(json: &str) -> Result<Self, DeviceSyncError> {
+        serde_json::from_str(json).map_err(|e| DeviceSyncError::Deserialization(e.to_string()))
+    }
 }
 
 /// Version vector for causality tracking across devices.
@@ -287,6 +296,7 @@ impl InterDeviceSyncState {
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct VersionVector {
     /// Map of device ID to version number.
+    #[serde(with = "version_map_serde")]
     versions: HashMap<[u8; 32], u64>,
 }
 
@@ -362,11 +372,21 @@ impl VersionVector {
 
         dominated
     }
+
+    /// Serializes the version vector to JSON.
+    pub fn to_json(&self) -> String {
+        serde_json::to_string(self).expect("VersionVector serialization should not fail")
+    }
+
+    /// Deserializes version vector from JSON.
+    pub fn from_json(json: &str) -> Result<Self, DeviceSyncError> {
+        serde_json::from_str(json).map_err(|e| DeviceSyncError::Deserialization(e.to_string()))
+    }
 }
 
 /// Serde helper for 32-byte arrays.
 mod bytes_array_32 {
-    use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
+    use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
     use serde::{Deserialize, Deserializer, Serializer};
 
     pub fn serialize<S>(bytes: &[u8; 32], serializer: S) -> Result<S::Ok, S::Error>
@@ -385,6 +405,58 @@ mod bytes_array_32 {
         bytes
             .try_into()
             .map_err(|_| serde::de::Error::custom("invalid length for 32-byte array"))
+    }
+}
+
+/// Serde helper for HashMap<[u8; 32], u64> using hex-encoded keys.
+mod version_map_serde {
+    use serde::de::{MapAccess, Visitor};
+    use serde::ser::SerializeMap;
+    use serde::{Deserializer, Serializer};
+    use std::collections::HashMap;
+    use std::fmt;
+
+    pub fn serialize<S>(map: &HashMap<[u8; 32], u64>, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut ser_map = serializer.serialize_map(Some(map.len()))?;
+        for (key, value) in map {
+            ser_map.serialize_entry(&hex::encode(key), value)?;
+        }
+        ser_map.end()
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<HashMap<[u8; 32], u64>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        struct VersionMapVisitor;
+
+        impl<'de> Visitor<'de> for VersionMapVisitor {
+            type Value = HashMap<[u8; 32], u64>;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("a map with hex-encoded 32-byte keys and u64 values")
+            }
+
+            fn visit_map<M>(self, mut access: M) -> Result<Self::Value, M::Error>
+            where
+                M: MapAccess<'de>,
+            {
+                let mut map = HashMap::new();
+                while let Some((key, value)) = access.next_entry::<String, u64>()? {
+                    let bytes = hex::decode(&key).map_err(serde::de::Error::custom)?;
+                    let arr: [u8; 32] = bytes
+                        .try_into()
+                        .map_err(|_| serde::de::Error::custom("invalid key length"))?;
+                    map.insert(arr, value);
+                }
+                Ok(map)
+            }
+        }
+
+        deserializer.deserialize_map(VersionMapVisitor)
     }
 }
 

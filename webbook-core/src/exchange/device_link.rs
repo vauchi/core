@@ -4,13 +4,13 @@
 //! The existing device generates a QR containing a link key, the new device
 //! scans it and receives the encrypted master seed to derive identical keys.
 
-use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
+use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
 use ring::rand::SystemRandom;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use crate::crypto::{PublicKey, Signature, SymmetricKey, encrypt, decrypt};
-use crate::identity::{Identity, DeviceRegistry, DeviceInfo};
 use super::ExchangeError;
+use crate::crypto::{decrypt, encrypt, PublicKey, Signature, SymmetricKey};
+use crate::identity::{DeviceInfo, DeviceRegistry, Identity};
 
 /// QR code magic bytes for device linking.
 const DEVICE_LINK_MAGIC: &[u8; 4] = b"WBDL";
@@ -135,7 +135,8 @@ impl DeviceLinkQR {
 
     /// Parses QR data from a scanned string.
     pub fn from_data_string(data: &str) -> Result<Self, ExchangeError> {
-        let bytes = BASE64.decode(data)
+        let bytes = BASE64
+            .decode(data)
             .map_err(|_| ExchangeError::InvalidQRFormat)?;
 
         // Minimum length: MAGIC(4) + version(1) + identity_key(32) + link_key(32) + timestamp(8) + sig(64) = 141
@@ -153,17 +154,22 @@ impl DeviceLinkQR {
             return Err(ExchangeError::InvalidProtocolVersion);
         }
 
-        let identity_public_key: [u8; 32] = bytes[5..37].try_into()
+        let identity_public_key: [u8; 32] = bytes[5..37]
+            .try_into()
             .map_err(|_| ExchangeError::InvalidQRFormat)?;
 
-        let link_key: [u8; 32] = bytes[37..69].try_into()
+        let link_key: [u8; 32] = bytes[37..69]
+            .try_into()
             .map_err(|_| ExchangeError::InvalidQRFormat)?;
 
         let timestamp = u64::from_be_bytes(
-            bytes[69..77].try_into().map_err(|_| ExchangeError::InvalidQRFormat)?
+            bytes[69..77]
+                .try_into()
+                .map_err(|_| ExchangeError::InvalidQRFormat)?,
         );
 
-        let signature: [u8; 64] = bytes[77..141].try_into()
+        let signature: [u8; 64] = bytes[77..141]
+            .try_into()
             .map_err(|_| ExchangeError::InvalidQRFormat)?;
 
         let qr = DeviceLinkQR {
@@ -248,7 +254,9 @@ impl DeviceLinkRequest {
         }
 
         let name_len = u32::from_le_bytes(
-            data[..4].try_into().map_err(|_| ExchangeError::InvalidQRFormat)?
+            data[..4]
+                .try_into()
+                .map_err(|_| ExchangeError::InvalidQRFormat)?,
         ) as usize;
 
         if data.len() < 4 + name_len + 32 + 8 {
@@ -265,7 +273,7 @@ impl DeviceLinkRequest {
         let timestamp = u64::from_le_bytes(
             data[4 + name_len + 32..4 + name_len + 40]
                 .try_into()
-                .map_err(|_| ExchangeError::InvalidQRFormat)?
+                .map_err(|_| ExchangeError::InvalidQRFormat)?,
         );
 
         Ok(DeviceLinkRequest {
@@ -395,11 +403,14 @@ impl DeviceLinkResponse {
             return Err(ExchangeError::InvalidQRFormat);
         }
 
-        let master_seed: [u8; 32] = data[..32].try_into()
+        let master_seed: [u8; 32] = data[..32]
+            .try_into()
             .map_err(|_| ExchangeError::InvalidQRFormat)?;
 
         let name_len = u32::from_le_bytes(
-            data[32..36].try_into().map_err(|_| ExchangeError::InvalidQRFormat)?
+            data[32..36]
+                .try_into()
+                .map_err(|_| ExchangeError::InvalidQRFormat)?,
         ) as usize;
 
         if data.len() < 32 + 4 + name_len + 4 + 4 {
@@ -411,11 +422,15 @@ impl DeviceLinkResponse {
 
         let offset = 36 + name_len;
         let device_index = u32::from_le_bytes(
-            data[offset..offset + 4].try_into().map_err(|_| ExchangeError::InvalidQRFormat)?
+            data[offset..offset + 4]
+                .try_into()
+                .map_err(|_| ExchangeError::InvalidQRFormat)?,
         );
 
         let registry_len = u32::from_le_bytes(
-            data[offset + 4..offset + 8].try_into().map_err(|_| ExchangeError::InvalidQRFormat)?
+            data[offset + 4..offset + 8]
+                .try_into()
+                .map_err(|_| ExchangeError::InvalidQRFormat)?,
         ) as usize;
 
         if data.len() < offset + 8 + registry_len {
@@ -434,7 +449,7 @@ impl DeviceLinkResponse {
             let sync_len = u32::from_le_bytes(
                 data[sync_offset..sync_offset + 4]
                     .try_into()
-                    .map_err(|_| ExchangeError::InvalidQRFormat)?
+                    .map_err(|_| ExchangeError::InvalidQRFormat)?,
             ) as usize;
 
             if data.len() >= sync_offset + 4 + sync_len {
@@ -492,11 +507,7 @@ impl DeviceLinkInitiator {
     /// In a real implementation, we'd need a way to access the master seed
     /// from the identity - this is intentionally designed to require explicit
     /// seed access for security.
-    pub fn new(
-        master_seed: [u8; 32],
-        identity: &Identity,
-        registry: DeviceRegistry,
-    ) -> Self {
+    pub fn new(master_seed: [u8; 32], identity: &Identity, registry: DeviceRegistry) -> Self {
         let qr = DeviceLinkQR::generate(identity);
 
         DeviceLinkInitiator {
@@ -532,11 +543,13 @@ impl DeviceLinkInitiator {
         let device_index = self.registry.next_device_index();
 
         // Create device info for the new device
-        let new_device_info = DeviceInfo::derive(&self.master_seed, device_index, request.device_name.clone());
+        let new_device_info =
+            DeviceInfo::derive(&self.master_seed, device_index, request.device_name.clone());
 
         // Create updated registry with new device
         let mut updated_registry = self.registry.clone();
-        updated_registry.add_device_unsigned(new_device_info.to_registered(&self.master_seed))
+        updated_registry
+            .add_device_unsigned(new_device_info.to_registered(&self.master_seed))
             .map_err(|_| ExchangeError::CryptoError)?;
 
         // Create and encrypt response
@@ -545,6 +558,52 @@ impl DeviceLinkInitiator {
             self.display_name.clone(),
             device_index,
             updated_registry.clone(),
+        );
+
+        let encrypted_response = response.encrypt(self.qr.link_key())?;
+
+        // Create the new device's DeviceInfo for the caller to store
+        let new_device = DeviceInfo::derive(&self.master_seed, device_index, request.device_name);
+
+        Ok((encrypted_response, updated_registry, new_device))
+    }
+
+    /// Processes a link request and creates a response with sync payload.
+    ///
+    /// This variant includes the full sync payload for the new device.
+    pub fn process_request_with_sync(
+        &self,
+        encrypted_request: &[u8],
+        sync_payload_json: &str,
+    ) -> Result<(Vec<u8>, DeviceRegistry, DeviceInfo), ExchangeError> {
+        // Decrypt the request
+        let request = DeviceLinkRequest::decrypt(encrypted_request, self.qr.link_key())?;
+
+        // Validate device name
+        if request.device_name.is_empty() {
+            return Err(ExchangeError::InvalidQRFormat);
+        }
+
+        // Determine next device index
+        let device_index = self.registry.next_device_index();
+
+        // Create device info for the new device
+        let new_device_info =
+            DeviceInfo::derive(&self.master_seed, device_index, request.device_name.clone());
+
+        // Create updated registry with new device
+        let mut updated_registry = self.registry.clone();
+        updated_registry
+            .add_device_unsigned(new_device_info.to_registered(&self.master_seed))
+            .map_err(|_| ExchangeError::CryptoError)?;
+
+        // Create response with sync payload
+        let response = DeviceLinkResponse::with_sync_payload(
+            self.master_seed,
+            self.display_name.clone(),
+            device_index,
+            updated_registry.clone(),
+            sync_payload_json.to_string(),
         );
 
         let encrypted_response = response.encrypt(self.qr.link_key())?;
@@ -607,7 +666,10 @@ mod tests {
     fn create_test_registry(identity: &Identity) -> DeviceRegistry {
         let device_info = identity.device_info();
         let master_seed = [0x42u8; 32]; // Test seed
-        DeviceRegistry::new(device_info.to_registered(&master_seed), identity.signing_keypair())
+        DeviceRegistry::new(
+            device_info.to_registered(&master_seed),
+            identity.signing_keypair(),
+        )
     }
 
     #[test]
@@ -648,7 +710,8 @@ mod tests {
         let old_timestamp = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap()
-            .as_secs() - 1200;
+            .as_secs()
+            - 1200;
 
         let qr = DeviceLinkQR::generate_with_timestamp(&identity, old_timestamp);
         assert!(qr.is_expired());
@@ -682,12 +745,8 @@ mod tests {
         let identity = Identity::create("Alice");
         let registry = create_test_registry(&identity);
 
-        let response = DeviceLinkResponse::new(
-            master_seed,
-            "Alice".to_string(),
-            1,
-            registry.clone(),
-        );
+        let response =
+            DeviceLinkResponse::new(master_seed, "Alice".to_string(), 1, registry.clone());
 
         let bytes = response.to_bytes();
         let restored = DeviceLinkResponse::from_bytes(&bytes).unwrap();
@@ -703,12 +762,7 @@ mod tests {
         let identity = Identity::create("Alice");
         let registry = create_test_registry(&identity);
 
-        let response = DeviceLinkResponse::new(
-            master_seed,
-            "Alice".to_string(),
-            1,
-            registry,
-        );
+        let response = DeviceLinkResponse::new(master_seed, "Alice".to_string(), 1, registry);
 
         let link_key = [0x55u8; 32];
         let encrypted = response.encrypt(&link_key).unwrap();
@@ -833,7 +887,8 @@ mod tests {
         let old_timestamp = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap()
-            .as_secs() - 1200;
+            .as_secs()
+            - 1200;
 
         let qr = DeviceLinkQR::generate_with_timestamp(&identity, old_timestamp);
         let result = DeviceLinkResponder::from_qr(qr, "My Phone".to_string());
@@ -964,7 +1019,10 @@ mod tests {
         let qr = DeviceLinkQR::generate(&identity);
         let responder = DeviceLinkResponder::from_qr(qr, "My Phone".to_string()).unwrap();
 
-        assert_eq!(responder.identity_public_key(), identity.signing_public_key());
+        assert_eq!(
+            responder.identity_public_key(),
+            identity.signing_public_key()
+        );
     }
 
     #[test]
@@ -977,5 +1035,96 @@ mod tests {
         let qr = initiator.qr();
         assert_eq!(qr.identity_public_key(), identity.signing_public_key());
         assert!(!qr.is_expired());
+    }
+
+    // ============================================================
+    // Phase 8: Device Linking with Sync Payload Tests (TDD)
+    // ============================================================
+
+    use crate::contact::Contact;
+    use crate::contact_card::ContactCard;
+    use crate::storage::Storage;
+    use crate::sync::{DeviceSyncOrchestrator, DeviceSyncPayload};
+
+    fn create_test_storage() -> Storage {
+        Storage::in_memory(SymmetricKey::generate()).unwrap()
+    }
+
+    fn create_test_contact(name: &str) -> Contact {
+        let public_key = [0x42u8; 32];
+        let card = ContactCard::new(name);
+        let shared_key = SymmetricKey::generate();
+        Contact::from_exchange(public_key, card, shared_key)
+    }
+
+    #[test]
+    fn test_device_link_with_full_sync_payload() {
+        // Existing device (Device A) setup with data
+        let master_seed = [0x42u8; 32];
+        let identity = Identity::create("Alice");
+        let registry = create_test_registry(&identity);
+        let storage = create_test_storage();
+
+        // Add some data to sync
+        let contact = create_test_contact("Bob");
+        storage.save_contact(&contact).unwrap();
+
+        let mut own_card = ContactCard::new("Alice");
+        let _ = own_card.add_field(crate::contact_card::ContactField::new(
+            crate::contact_card::FieldType::Email,
+            "email",
+            "alice@example.com",
+        ));
+        storage.save_own_card(&own_card).unwrap();
+
+        // Create orchestrator to generate sync payload
+        let device_a = DeviceInfo::derive(&master_seed, 0, "Device A".to_string());
+        let orchestrator = DeviceSyncOrchestrator::new(&storage, device_a, registry.clone());
+        let sync_payload = orchestrator.create_full_sync_payload().unwrap();
+        let sync_json = serde_json::to_string(&sync_payload).unwrap();
+
+        // Create initiator with sync payload
+        let initiator = DeviceLinkInitiator::new(master_seed, &identity, registry.clone());
+
+        // New device scans QR
+        let qr_string = initiator.qr().to_data_string();
+        let scanned_qr = DeviceLinkQR::from_data_string(&qr_string).unwrap();
+        let responder = DeviceLinkResponder::from_qr(scanned_qr, "My Phone".to_string()).unwrap();
+
+        // Device B creates request
+        let encrypted_request = responder.create_request().unwrap();
+
+        // Device A processes request with sync payload
+        let (encrypted_response, _updated_registry, _new_device) = initiator
+            .process_request_with_sync(&encrypted_request, &sync_json)
+            .unwrap();
+
+        // Device B processes response
+        let response = responder.process_response(&encrypted_response).unwrap();
+
+        // Verify sync payload is included
+        assert!(!response.sync_payload_json().is_empty());
+
+        // Parse and verify sync payload contents
+        let received_payload: DeviceSyncPayload =
+            serde_json::from_str(response.sync_payload_json()).unwrap();
+        assert_eq!(received_payload.contact_count(), 1);
+        assert!(!received_payload.own_card_json.is_empty());
+    }
+
+    #[test]
+    fn test_new_device_applies_full_state() {
+        // Create sync payload
+        let contact = create_test_contact("Bob");
+        let own_card = ContactCard::new("Alice");
+        let payload = DeviceSyncPayload::new(&[contact], &own_card, 1);
+        let payload_json = serde_json::to_string(&payload).unwrap();
+
+        // New device receives and parses payload
+        let received: DeviceSyncPayload = serde_json::from_str(&payload_json).unwrap();
+
+        // Verify payload contents
+        assert_eq!(received.contact_count(), 1);
+        assert_eq!(received.version, 1);
     }
 }

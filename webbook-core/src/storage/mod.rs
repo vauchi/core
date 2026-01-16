@@ -3,15 +3,16 @@
 //! Provides encrypted local storage for contacts, identity, and sync state.
 //! Uses SQLite with application-level encryption for sensitive data.
 
+use rusqlite::{params, Connection};
 use std::path::Path;
-use rusqlite::{Connection, params};
 use thiserror::Error;
 
 use crate::contact::Contact;
 use crate::contact_card::ContactCard;
-use crate::crypto::SymmetricKey;
 use crate::crypto::ratchet::DoubleRatchetState;
+use crate::crypto::SymmetricKey;
 use crate::identity::device::DeviceRegistry;
+use crate::sync::device_sync::{InterDeviceSyncState, VersionVector};
 
 /// Storage error types.
 #[derive(Error, Debug)]
@@ -64,9 +65,15 @@ pub struct Storage {
 
 impl Storage {
     /// Opens or creates a storage database at the given path.
-    pub fn open<P: AsRef<Path>>(path: P, encryption_key: SymmetricKey) -> Result<Self, StorageError> {
+    pub fn open<P: AsRef<Path>>(
+        path: P,
+        encryption_key: SymmetricKey,
+    ) -> Result<Self, StorageError> {
         let conn = Connection::open(path)?;
-        let storage = Storage { conn, encryption_key };
+        let storage = Storage {
+            conn,
+            encryption_key,
+        };
         storage.initialize_schema()?;
         Ok(storage)
     }
@@ -74,7 +81,10 @@ impl Storage {
     /// Creates an in-memory storage (for testing).
     pub fn in_memory(encryption_key: SymmetricKey) -> Result<Self, StorageError> {
         let conn = Connection::open_in_memory()?;
-        let storage = Storage { conn, encryption_key };
+        let storage = Storage {
+            conn,
+            encryption_key,
+        };
         storage.initialize_schema()?;
         Ok(storage)
     }
@@ -151,10 +161,25 @@ impl Storage {
                 updated_at INTEGER NOT NULL
             );
 
+            -- Inter-device sync state (pending items per device)
+            CREATE TABLE IF NOT EXISTS device_sync_state (
+                device_id BLOB PRIMARY KEY,
+                state_json TEXT NOT NULL,
+                last_sync_version INTEGER NOT NULL,
+                updated_at INTEGER NOT NULL
+            );
+
+            -- Local version vector for causality tracking
+            CREATE TABLE IF NOT EXISTS version_vector (
+                id INTEGER PRIMARY KEY CHECK (id = 1),
+                vector_json TEXT NOT NULL,
+                updated_at INTEGER NOT NULL
+            );
+
             -- Create indexes
             CREATE INDEX IF NOT EXISTS idx_pending_contact ON pending_updates(contact_id);
             CREATE INDEX IF NOT EXISTS idx_pending_status ON pending_updates(status);
-            "
+            ",
         )?;
         Ok(())
     }
@@ -170,10 +195,9 @@ impl Storage {
             .map_err(|e| StorageError::Encryption(e.to_string()))?;
 
         // Encrypt the shared key
-        let shared_key_encrypted = crate::crypto::encrypt(
-            &self.encryption_key,
-            contact.shared_key().as_bytes(),
-        ).map_err(|e| StorageError::Encryption(e.to_string()))?;
+        let shared_key_encrypted =
+            crate::crypto::encrypt(&self.encryption_key, contact.shared_key().as_bytes())
+                .map_err(|e| StorageError::Encryption(e.to_string()))?;
 
         // Serialize visibility rules
         let visibility_json = serde_json::to_string(contact.visibility_rules())
@@ -205,7 +229,7 @@ impl Storage {
         let mut stmt = self.conn.prepare(
             "SELECT id, public_key, display_name, card_encrypted, shared_key_encrypted,
                     visibility_rules_json, exchange_timestamp, fingerprint_verified
-             FROM contacts WHERE id = ?1"
+             FROM contacts WHERE id = ?1",
         )?;
 
         let result = stmt.query_row(params![id], |row| {
@@ -233,7 +257,7 @@ impl Storage {
         let mut stmt = self.conn.prepare(
             "SELECT id, public_key, display_name, card_encrypted, shared_key_encrypted,
                     visibility_rules_json, exchange_timestamp, fingerprint_verified
-             FROM contacts ORDER BY display_name"
+             FROM contacts ORDER BY display_name",
         )?;
 
         let rows = stmt.query_map([], |row| {
@@ -266,10 +290,9 @@ impl Storage {
             params![id],
         )?;
 
-        let rows_affected = self.conn.execute(
-            "DELETE FROM contacts WHERE id = ?1",
-            params![id],
-        )?;
+        let rows_affected = self
+            .conn
+            .execute("DELETE FROM contacts WHERE id = ?1", params![id])?;
         Ok(rows_affected > 0)
     }
 
@@ -282,14 +305,18 @@ impl Storage {
             .map_err(|e| StorageError::Serialization(e.to_string()))?;
 
         // Decrypt shared key
-        let shared_key_bytes = crate::crypto::decrypt(&self.encryption_key, &row.shared_key_encrypted)
-            .map_err(|e| StorageError::Encryption(e.to_string()))?;
-        let shared_key_array: [u8; 32] = shared_key_bytes.try_into()
+        let shared_key_bytes =
+            crate::crypto::decrypt(&self.encryption_key, &row.shared_key_encrypted)
+                .map_err(|e| StorageError::Encryption(e.to_string()))?;
+        let shared_key_array: [u8; 32] = shared_key_bytes
+            .try_into()
             .map_err(|_| StorageError::Encryption("Invalid key length".into()))?;
         let shared_key = SymmetricKey::from_bytes(shared_key_array);
 
         // Parse public key
-        let public_key: [u8; 32] = row.public_key.try_into()
+        let public_key: [u8; 32] = row
+            .public_key
+            .try_into()
             .map_err(|_| StorageError::Encryption("Invalid public key length".into()))?;
 
         // Create contact
@@ -314,8 +341,8 @@ impl Storage {
 
     /// Saves the user's own contact card.
     pub fn save_own_card(&self, card: &ContactCard) -> Result<(), StorageError> {
-        let card_json = serde_json::to_string(card)
-            .map_err(|e| StorageError::Serialization(e.to_string()))?;
+        let card_json =
+            serde_json::to_string(card).map_err(|e| StorageError::Serialization(e.to_string()))?;
 
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -332,11 +359,11 @@ impl Storage {
 
     /// Loads the user's own contact card.
     pub fn load_own_card(&self) -> Result<Option<ContactCard>, StorageError> {
-        let result = self.conn.query_row(
-            "SELECT card_json FROM own_card WHERE id = 1",
-            [],
-            |row| row.get::<_, String>(0),
-        );
+        let result =
+            self.conn
+                .query_row("SELECT card_json FROM own_card WHERE id = 1", [], |row| {
+                    row.get::<_, String>(0)
+                });
 
         match result {
             Ok(json) => {
@@ -352,7 +379,11 @@ impl Storage {
     // === Identity Operations ===
 
     /// Saves identity backup data (encrypted).
-    pub fn save_identity(&self, backup_data: &[u8], display_name: &str) -> Result<(), StorageError> {
+    pub fn save_identity(
+        &self,
+        backup_data: &[u8],
+        display_name: &str,
+    ) -> Result<(), StorageError> {
         // Encrypt the backup data
         let encrypted = crate::crypto::encrypt(&self.encryption_key, backup_data)
             .map_err(|e| StorageError::Encryption(e.to_string()))?;
@@ -392,11 +423,11 @@ impl Storage {
 
     /// Checks if identity exists.
     pub fn has_identity(&self) -> Result<bool, StorageError> {
-        let count: i64 = self.conn.query_row(
-            "SELECT COUNT(*) FROM identity WHERE id = 1",
-            [],
-            |row| row.get(0),
-        )?;
+        let count: i64 =
+            self.conn
+                .query_row("SELECT COUNT(*) FROM identity WHERE id = 1", [], |row| {
+                    row.get(0)
+                })?;
         Ok(count > 0)
     }
 
@@ -433,7 +464,10 @@ impl Storage {
     }
 
     /// Gets pending updates for a contact.
-    pub fn get_pending_updates(&self, contact_id: &str) -> Result<Vec<PendingUpdate>, StorageError> {
+    pub fn get_pending_updates(
+        &self,
+        contact_id: &str,
+    ) -> Result<Vec<PendingUpdate>, StorageError> {
         let mut stmt = self.conn.prepare(
             "SELECT id, contact_id, update_type, payload, created_at, retry_count, status, error_message, retry_at
              FROM pending_updates WHERE contact_id = ?1 ORDER BY created_at"
@@ -551,10 +585,9 @@ impl Storage {
 
     /// Deletes a pending update by ID.
     pub fn delete_pending_update(&self, id: &str) -> Result<bool, StorageError> {
-        let rows_affected = self.conn.execute(
-            "DELETE FROM pending_updates WHERE id = ?1",
-            params![id],
-        )?;
+        let rows_affected = self
+            .conn
+            .execute("DELETE FROM pending_updates WHERE id = ?1", params![id])?;
         Ok(rows_affected > 0)
     }
 
@@ -585,12 +618,7 @@ impl Storage {
             "INSERT OR REPLACE INTO contact_ratchets
              (contact_id, ratchet_state_encrypted, is_initiator, updated_at)
              VALUES (?1, ?2, ?3, ?4)",
-            params![
-                contact_id,
-                state_encrypted,
-                is_initiator as i32,
-                now as i64,
-            ],
+            params![contact_id, state_encrypted, is_initiator as i32, now as i64,],
         )?;
 
         Ok(())
@@ -660,6 +688,7 @@ impl Storage {
 
     /// Loads current device info.
     /// Returns (device_id, device_index, device_name, created_at) if found.
+    #[allow(clippy::type_complexity)]
     pub fn load_device_info(&self) -> Result<Option<([u8; 32], u32, String, u64)>, StorageError> {
         let result = self.conn.query_row(
             "SELECT device_id, device_index, device_name, created_at FROM device_info WHERE id = 1",
@@ -676,9 +705,15 @@ impl Storage {
 
         match result {
             Ok((device_id_vec, device_index, device_name, created_at)) => {
-                let device_id: [u8; 32] = device_id_vec.try_into()
+                let device_id: [u8; 32] = device_id_vec
+                    .try_into()
                     .map_err(|_| StorageError::Encryption("Invalid device ID length".into()))?;
-                Ok(Some((device_id, device_index as u32, device_name, created_at as u64)))
+                Ok(Some((
+                    device_id,
+                    device_index as u32,
+                    device_name,
+                    created_at as u64,
+                )))
             }
             Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
             Err(e) => Err(StorageError::Database(e)),
@@ -687,11 +722,11 @@ impl Storage {
 
     /// Checks if device info exists.
     pub fn has_device_info(&self) -> Result<bool, StorageError> {
-        let count: i64 = self.conn.query_row(
-            "SELECT COUNT(*) FROM device_info WHERE id = 1",
-            [],
-            |row| row.get(0),
-        )?;
+        let count: i64 =
+            self.conn
+                .query_row("SELECT COUNT(*) FROM device_info WHERE id = 1", [], |row| {
+                    row.get(0)
+                })?;
         Ok(count > 0)
     }
 
@@ -708,11 +743,7 @@ impl Storage {
         self.conn.execute(
             "INSERT OR REPLACE INTO device_registry (id, registry_json, version, updated_at)
              VALUES (1, ?1, ?2, ?3)",
-            params![
-                registry_json,
-                registry.version() as i64,
-                now as i64,
-            ],
+            params![registry_json, registry.version() as i64, now as i64,],
         )?;
         Ok(())
     }
@@ -745,10 +776,116 @@ impl Storage {
         )?;
         Ok(count > 0)
     }
+
+    // === Device Sync State Operations ===
+
+    /// Saves inter-device sync state for a specific device.
+    pub fn save_device_sync_state(&self, state: &InterDeviceSyncState) -> Result<(), StorageError> {
+        let state_json = state.to_json();
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+
+        self.conn.execute(
+            "INSERT OR REPLACE INTO device_sync_state (device_id, state_json, last_sync_version, updated_at)
+             VALUES (?1, ?2, ?3, ?4)",
+            params![
+                state.device_id().as_slice(),
+                state_json,
+                state.last_sync_version() as i64,
+                now as i64,
+            ],
+        )?;
+        Ok(())
+    }
+
+    /// Loads inter-device sync state for a specific device.
+    pub fn load_device_sync_state(
+        &self,
+        device_id: &[u8; 32],
+    ) -> Result<Option<InterDeviceSyncState>, StorageError> {
+        let result = self.conn.query_row(
+            "SELECT state_json FROM device_sync_state WHERE device_id = ?1",
+            params![device_id.as_slice()],
+            |row| row.get::<_, String>(0),
+        );
+
+        match result {
+            Ok(json) => {
+                let state = InterDeviceSyncState::from_json(&json)
+                    .map_err(|e| StorageError::Serialization(e.to_string()))?;
+                Ok(Some(state))
+            }
+            Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+            Err(e) => Err(StorageError::Database(e)),
+        }
+    }
+
+    /// Lists all inter-device sync states.
+    pub fn list_device_sync_states(&self) -> Result<Vec<InterDeviceSyncState>, StorageError> {
+        let mut stmt = self
+            .conn
+            .prepare("SELECT state_json FROM device_sync_state")?;
+
+        let states = stmt
+            .query_map([], |row| row.get::<_, String>(0))?
+            .filter_map(|r| r.ok())
+            .filter_map(|json| InterDeviceSyncState::from_json(&json).ok())
+            .collect();
+
+        Ok(states)
+    }
+
+    /// Deletes inter-device sync state for a specific device.
+    pub fn delete_device_sync_state(&self, device_id: &[u8; 32]) -> Result<bool, StorageError> {
+        let rows = self.conn.execute(
+            "DELETE FROM device_sync_state WHERE device_id = ?1",
+            params![device_id.as_slice()],
+        )?;
+        Ok(rows > 0)
+    }
+
+    // === Version Vector Operations ===
+
+    /// Saves the local version vector.
+    pub fn save_version_vector(&self, vector: &VersionVector) -> Result<(), StorageError> {
+        let vector_json = vector.to_json();
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+
+        self.conn.execute(
+            "INSERT OR REPLACE INTO version_vector (id, vector_json, updated_at)
+             VALUES (1, ?1, ?2)",
+            params![vector_json, now as i64,],
+        )?;
+        Ok(())
+    }
+
+    /// Loads the local version vector.
+    pub fn load_version_vector(&self) -> Result<Option<VersionVector>, StorageError> {
+        let result = self.conn.query_row(
+            "SELECT vector_json FROM version_vector WHERE id = 1",
+            [],
+            |row| row.get::<_, String>(0),
+        );
+
+        match result {
+            Ok(json) => {
+                let vector = VersionVector::from_json(&json)
+                    .map_err(|e| StorageError::Serialization(e.to_string()))?;
+                Ok(Some(vector))
+            }
+            Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+            Err(e) => Err(StorageError::Database(e)),
+        }
+    }
 }
 
 /// Internal struct for database row data.
-#[allow(dead_code)]  // Fields are used via destructuring in row_to_contact
+#[allow(dead_code)] // Fields are used via destructuring in row_to_contact
 struct ContactRow {
     id: String,
     public_key: Vec<u8>,
@@ -929,14 +1066,16 @@ mod tests {
         storage.queue_update(&update).unwrap();
 
         // Update to failed status
-        storage.update_pending_status(
-            "update-1",
-            UpdateStatus::Failed {
-                error: "Connection failed".to_string(),
-                retry_at: 99999,
-            },
-            1,
-        ).unwrap();
+        storage
+            .update_pending_status(
+                "update-1",
+                UpdateStatus::Failed {
+                    error: "Connection failed".to_string(),
+                    retry_at: 99999,
+                },
+                1,
+            )
+            .unwrap();
 
         let pending = storage.get_pending_updates(contact.id()).unwrap();
         assert_eq!(pending[0].retry_count, 1);
@@ -956,10 +1095,13 @@ mod tests {
         // Create ratchet state (as initiator)
         let shared_secret = SymmetricKey::generate();
         let their_dh = X3DHKeyPair::generate();
-        let ratchet = DoubleRatchetState::initialize_initiator(&shared_secret, *their_dh.public_key());
+        let ratchet =
+            DoubleRatchetState::initialize_initiator(&shared_secret, *their_dh.public_key());
 
         // Save ratchet state
-        storage.save_ratchet_state(contact.id(), &ratchet, true).unwrap();
+        storage
+            .save_ratchet_state(contact.id(), &ratchet, true)
+            .unwrap();
 
         // Load ratchet state
         let (loaded, is_initiator) = storage.load_ratchet_state(contact.id()).unwrap().unwrap();
@@ -981,13 +1123,16 @@ mod tests {
 
         let shared_secret = SymmetricKey::generate();
         let their_dh = X3DHKeyPair::generate();
-        let mut ratchet = DoubleRatchetState::initialize_initiator(&shared_secret, *their_dh.public_key());
+        let mut ratchet =
+            DoubleRatchetState::initialize_initiator(&shared_secret, *their_dh.public_key());
 
         // Encrypt a message to advance the ratchet
         let _msg = ratchet.encrypt(b"test message").unwrap();
 
         // Save and load
-        storage.save_ratchet_state(contact.id(), &ratchet, true).unwrap();
+        storage
+            .save_ratchet_state(contact.id(), &ratchet, true)
+            .unwrap();
         let (mut loaded, _) = storage.load_ratchet_state(contact.id()).unwrap().unwrap();
 
         // The loaded ratchet should be able to continue encrypting
@@ -1008,9 +1153,12 @@ mod tests {
 
         let shared_secret = SymmetricKey::generate();
         let their_dh = X3DHKeyPair::generate();
-        let ratchet = DoubleRatchetState::initialize_initiator(&shared_secret, *their_dh.public_key());
+        let ratchet =
+            DoubleRatchetState::initialize_initiator(&shared_secret, *their_dh.public_key());
 
-        storage.save_ratchet_state(&contact_id, &ratchet, true).unwrap();
+        storage
+            .save_ratchet_state(&contact_id, &ratchet, true)
+            .unwrap();
 
         // Verify ratchet exists
         assert!(storage.load_ratchet_state(&contact_id).unwrap().is_some());
@@ -1042,7 +1190,9 @@ mod tests {
         assert!(!storage.has_device_info().unwrap());
 
         // Save device info
-        storage.save_device_info(&device_id, device_index, device_name, created_at).unwrap();
+        storage
+            .save_device_info(&device_id, device_index, device_name, created_at)
+            .unwrap();
 
         // Now has device info
         assert!(storage.has_device_info().unwrap());
@@ -1061,8 +1211,12 @@ mod tests {
     fn test_storage_device_info_update() {
         let storage = create_test_storage();
 
-        storage.save_device_info(&[1u8; 32], 0, "Old Name", 100).unwrap();
-        storage.save_device_info(&[2u8; 32], 1, "New Name", 200).unwrap();
+        storage
+            .save_device_info(&[1u8; 32], 0, "Old Name", 100)
+            .unwrap();
+        storage
+            .save_device_info(&[2u8; 32], 1, "New Name", 200)
+            .unwrap();
 
         let (id, index, name, _) = storage.load_device_info().unwrap().unwrap();
         assert_eq!(id, [2u8; 32]);
@@ -1111,12 +1265,133 @@ mod tests {
         let device1 = DeviceInfo::derive(&master_seed, 1, "Secondary".to_string());
 
         let mut registry = DeviceRegistry::new(device0.to_registered(&master_seed), &signing_key);
-        registry.add_device(device1.to_registered(&master_seed), &signing_key).unwrap();
+        registry
+            .add_device(device1.to_registered(&master_seed), &signing_key)
+            .unwrap();
 
         storage.save_device_registry(&registry).unwrap();
         let loaded = storage.load_device_registry().unwrap().unwrap();
 
         assert_eq!(loaded.version(), 2);
         assert_eq!(loaded.active_count(), 2);
+    }
+
+    // ============================================================
+    // Phase 1: Device Sync State Storage Tests (TDD)
+    // Based on features/device_management.feature @sync scenarios
+    // ============================================================
+
+    /// Scenario: Offline changes sync when reconnected
+    /// Need to persist pending sync items between app restarts
+    #[test]
+    fn test_storage_save_load_device_sync_state() {
+        use crate::sync::device_sync::{InterDeviceSyncState, SyncItem};
+
+        let storage = create_test_storage();
+        let device_id = [0x42u8; 32];
+
+        // Create sync state with pending items
+        let mut state = InterDeviceSyncState::new(device_id);
+        state.queue_item(SyncItem::CardUpdated {
+            field_label: "email".to_string(),
+            new_value: "test@example.com".to_string(),
+            timestamp: 1000,
+        });
+        state.queue_item(SyncItem::CardUpdated {
+            field_label: "phone".to_string(),
+            new_value: "+1234567890".to_string(),
+            timestamp: 2000,
+        });
+
+        // Save
+        storage.save_device_sync_state(&state).unwrap();
+
+        // Load
+        let loaded = storage.load_device_sync_state(&device_id).unwrap().unwrap();
+
+        assert_eq!(loaded.device_id(), &device_id);
+        assert_eq!(loaded.pending_items().len(), 2);
+        assert_eq!(loaded.pending_items()[0].timestamp(), 1000);
+        assert_eq!(loaded.pending_items()[1].timestamp(), 2000);
+    }
+
+    /// Test that we can list all device sync states
+    #[test]
+    fn test_storage_list_device_sync_states() {
+        use crate::sync::device_sync::{InterDeviceSyncState, SyncItem};
+
+        let storage = create_test_storage();
+
+        let device_a = [0x41u8; 32];
+        let device_b = [0x42u8; 32];
+
+        let mut state_a = InterDeviceSyncState::new(device_a);
+        state_a.queue_item(SyncItem::CardUpdated {
+            field_label: "email".to_string(),
+            new_value: "a@test.com".to_string(),
+            timestamp: 1000,
+        });
+
+        let mut state_b = InterDeviceSyncState::new(device_b);
+        state_b.queue_item(SyncItem::CardUpdated {
+            field_label: "phone".to_string(),
+            new_value: "+999".to_string(),
+            timestamp: 2000,
+        });
+
+        storage.save_device_sync_state(&state_a).unwrap();
+        storage.save_device_sync_state(&state_b).unwrap();
+
+        let states = storage.list_device_sync_states().unwrap();
+        assert_eq!(states.len(), 2);
+    }
+
+    /// Test version vector persistence for conflict detection
+    #[test]
+    fn test_storage_save_load_version_vector() {
+        use crate::sync::device_sync::VersionVector;
+
+        let storage = create_test_storage();
+
+        let device_a = [0x41u8; 32];
+        let device_b = [0x42u8; 32];
+
+        let mut vector = VersionVector::new();
+        vector.increment(&device_a);
+        vector.increment(&device_a);
+        vector.increment(&device_b);
+
+        // Save
+        storage.save_version_vector(&vector).unwrap();
+
+        // Load
+        let loaded = storage.load_version_vector().unwrap().unwrap();
+
+        assert_eq!(loaded.get(&device_a), 2);
+        assert_eq!(loaded.get(&device_b), 1);
+    }
+
+    /// Test that version vector updates correctly
+    #[test]
+    fn test_storage_version_vector_update() {
+        use crate::sync::device_sync::VersionVector;
+
+        let storage = create_test_storage();
+
+        let device_a = [0x41u8; 32];
+
+        let mut vector1 = VersionVector::new();
+        vector1.increment(&device_a);
+        storage.save_version_vector(&vector1).unwrap();
+
+        // Update with new version
+        let mut vector2 = VersionVector::new();
+        vector2.increment(&device_a);
+        vector2.increment(&device_a);
+        vector2.increment(&device_a);
+        storage.save_version_vector(&vector2).unwrap();
+
+        let loaded = storage.load_version_vector().unwrap().unwrap();
+        assert_eq!(loaded.get(&device_a), 3);
     }
 }

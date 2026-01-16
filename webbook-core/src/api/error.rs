@@ -8,6 +8,7 @@ use crate::contact_card::ValidationError;
 use crate::exchange::ExchangeError;
 use crate::network::NetworkError;
 use crate::storage::StorageError;
+use crate::sync::device_sync::DeviceSyncError;
 use crate::sync::SyncError;
 
 /// Unified error type for WebBook operations.
@@ -28,6 +29,10 @@ pub enum WebBookError {
     /// Sync operation failed.
     #[error("sync error: {0}")]
     Sync(#[from] SyncError),
+
+    /// Device sync operation failed.
+    #[error("device sync error: {0}")]
+    DeviceSync(#[from] DeviceSyncError),
 
     /// Network operation failed.
     #[error("network error: {0}")]

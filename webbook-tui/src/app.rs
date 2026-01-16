@@ -1,0 +1,125 @@
+//! Application State
+
+use crate::backend::Backend;
+
+/// Current screen in the application.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Screen {
+    /// Home screen with contact card
+    Home,
+    /// Contact list
+    Contacts,
+    /// Contact detail view
+    ContactDetail,
+    /// QR exchange screen
+    Exchange,
+    /// Settings screen
+    Settings,
+    /// Help screen
+    Help,
+    /// Add field dialog
+    AddField,
+}
+
+/// Input mode for text entry.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum InputMode {
+    /// Normal navigation mode
+    Normal,
+    /// Editing text
+    Editing,
+}
+
+/// Application state.
+#[allow(dead_code)]
+pub struct App {
+    /// WebBook backend
+    pub backend: Backend,
+    /// Current screen
+    pub screen: Screen,
+    /// Input mode
+    pub input_mode: InputMode,
+    /// Whether the app should quit (for future use)
+    pub should_quit: bool,
+    /// Status message
+    pub status_message: Option<String>,
+    /// Selected contact index (for contacts list)
+    pub selected_contact: usize,
+    /// Selected field index (for card fields)
+    pub selected_field: usize,
+    /// Text input buffer
+    pub input_buffer: String,
+    /// Add field state
+    pub add_field_state: AddFieldState,
+}
+
+/// State for the add field dialog.
+#[derive(Debug, Default)]
+pub struct AddFieldState {
+    pub field_type_index: usize,
+    pub label: String,
+    pub value: String,
+    pub focus: AddFieldFocus,
+}
+
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub enum AddFieldFocus {
+    #[default]
+    Type,
+    Label,
+    Value,
+}
+
+impl App {
+    /// Create a new application.
+    pub fn new(backend: Backend) -> Self {
+        let has_identity = backend.has_identity();
+
+        App {
+            backend,
+            screen: if has_identity { Screen::Home } else { Screen::Home },
+            input_mode: InputMode::Normal,
+            should_quit: false,
+            status_message: None,
+            selected_contact: 0,
+            selected_field: 0,
+            input_buffer: String::new(),
+            add_field_state: AddFieldState::default(),
+        }
+    }
+
+    /// Set a status message.
+    pub fn set_status(&mut self, msg: impl Into<String>) {
+        self.status_message = Some(msg.into());
+    }
+
+    /// Clear the status message.
+    #[allow(dead_code)]
+    pub fn clear_status(&mut self) {
+        self.status_message = None;
+    }
+
+    /// Navigate to a screen.
+    pub fn goto(&mut self, screen: Screen) {
+        self.screen = screen;
+        self.input_mode = InputMode::Normal;
+    }
+
+    /// Go back to the previous screen.
+    pub fn go_back(&mut self) {
+        match self.screen {
+            Screen::Contacts | Screen::Exchange | Screen::Settings | Screen::Help => {
+                self.screen = Screen::Home;
+            }
+            Screen::ContactDetail => {
+                self.screen = Screen::Contacts;
+            }
+            Screen::AddField => {
+                self.screen = Screen::Home;
+                self.add_field_state = AddFieldState::default();
+            }
+            _ => {}
+        }
+        self.input_mode = InputMode::Normal;
+    }
+}

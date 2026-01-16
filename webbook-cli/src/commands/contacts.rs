@@ -50,9 +50,7 @@ pub fn list(config: &CliConfig) -> Result<()> {
     println!("Contacts ({}):", contacts.len());
     println!();
 
-    for (i, contact) in contacts.iter().enumerate() {
-        display::display_contact_summary(contact, i + 1);
-    }
+    display::display_contacts_table(&contacts);
 
     println!();
 

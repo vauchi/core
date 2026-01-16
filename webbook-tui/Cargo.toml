@@ -1,0 +1,29 @@
+[package]
+name = "webbook-tui"
+version = "0.1.0"
+edition = "2021"
+description = "Terminal UI for WebBook - privacy-focused contact card exchange"
+license = "MIT"
+
+[dependencies]
+# Core library
+webbook-core = { path = "../webbook-core" }
+
+# Terminal UI
+ratatui = "0.28"
+crossterm = "0.28"
+
+# Async runtime
+tokio = { version = "1", features = ["full"] }
+
+# Error handling
+anyhow = "1.0"
+
+# Directories for config
+dirs = "5.0"
+
+# QR code rendering
+qrcode = "0.14"
+
+# Hex encoding
+hex = "0.4"

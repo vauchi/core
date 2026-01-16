@@ -5,6 +5,7 @@
 #![allow(dead_code)] // Utility functions for future use
 
 use console::{style, Style};
+use tabled::{Table, Tabled, settings::{Style as TableStyle, Modify, object::Columns, Alignment}};
 use webbook_core::{ContactCard, Contact, FieldType, SocialNetworkRegistry};
 
 /// Prints a success message.
@@ -235,4 +236,42 @@ pub fn display_social_networks(query: Option<&str>) {
         style("webbook card add social github octocat").dim()
     );
     println!();
+}
+
+/// Row structure for contact table display.
+#[derive(Tabled)]
+struct ContactRow {
+    #[tabled(rename = "#")]
+    index: usize,
+    #[tabled(rename = "Name")]
+    name: String,
+    #[tabled(rename = "ID")]
+    id: String,
+    #[tabled(rename = "Status")]
+    status: String,
+}
+
+/// Displays a list of contacts as a formatted table.
+pub fn display_contacts_table(contacts: &[Contact]) {
+    let rows: Vec<ContactRow> = contacts
+        .iter()
+        .enumerate()
+        .map(|(i, c)| ContactRow {
+            index: i + 1,
+            name: c.display_name().to_string(),
+            id: format!("{}...", &c.id()[..8.min(c.id().len())]),
+            status: if c.is_fingerprint_verified() {
+                "✓ verified".to_string()
+            } else {
+                "not verified".to_string()
+            },
+        })
+        .collect();
+
+    let table = Table::new(rows)
+        .with(TableStyle::rounded())
+        .with(Modify::new(Columns::first()).with(Alignment::right()))
+        .to_string();
+
+    println!("{}", table);
 }

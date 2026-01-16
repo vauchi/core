@@ -6,6 +6,7 @@ use std::fs;
 use std::net::TcpStream;
 
 use anyhow::{bail, Result};
+use indicatif::{ProgressBar, ProgressStyle};
 use tungstenite::{connect, Message, WebSocket};
 use tungstenite::stream::MaybeTlsStream;
 use webbook_core::{WebBook, WebBookConfig, Identity, IdentityBackup, Contact};
@@ -407,11 +408,20 @@ pub async fn run(config: &CliConfig) -> Result<()> {
     let identity = wb.identity().ok_or_else(|| anyhow::anyhow!("No identity found"))?;
     let client_id = identity.public_id();
 
-    println!("Connecting to {}...", config.relay_url);
+    // Create a spinner for connection progress
+    let spinner = ProgressBar::new_spinner();
+    spinner.set_style(
+        ProgressStyle::default_spinner()
+            .template("{spinner:.green} {msg}")
+            .unwrap()
+    );
+    spinner.set_message(format!("Connecting to {}...", config.relay_url));
+    spinner.enable_steady_tick(std::time::Duration::from_millis(80));
 
     // Connect via WebSocket
     let (mut socket, response) = connect(&config.relay_url)?;
 
+    spinner.finish_and_clear();
     if response.status().is_success() || response.status().as_u16() == 101 {
         display::success("Connected");
     }
@@ -427,8 +437,19 @@ pub async fn run(config: &CliConfig) -> Result<()> {
     // Small delay to let server send pending messages
     std::thread::sleep(std::time::Duration::from_millis(500));
 
+    // Create a spinner for receiving messages
+    let recv_spinner = ProgressBar::new_spinner();
+    recv_spinner.set_style(
+        ProgressStyle::default_spinner()
+            .template("{spinner:.blue} {msg}")
+            .unwrap()
+    );
+    recv_spinner.set_message("Receiving pending messages...");
+    recv_spinner.enable_steady_tick(std::time::Duration::from_millis(80));
+
     // Receive pending messages
     let (received, exchange_messages, card_updates) = receive_pending(&mut socket, &wb)?;
+    recv_spinner.finish_and_clear();
 
     // Process exchange messages
     let (contacts_added, contacts_updated) = process_exchange_messages(&wb, exchange_messages, config)?;

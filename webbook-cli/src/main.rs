@@ -9,8 +9,11 @@ mod protocol;
 
 use std::path::PathBuf;
 
+use std::io;
+
 use anyhow::Result;
-use clap::{Parser, Subcommand};
+use clap::{CommandFactory, Parser, Subcommand};
+use clap_complete::{generate, Shell};
 
 use config::CliConfig;
 
@@ -71,6 +74,13 @@ enum Commands {
     Import {
         /// Input file path
         input: PathBuf,
+    },
+
+    /// Generate shell completions
+    Completions {
+        /// Shell type
+        #[arg(value_enum)]
+        shell: Shell,
     },
 }
 
@@ -312,6 +322,10 @@ async fn main() -> Result<()> {
         }
         Commands::Import { input } => {
             commands::backup::import(&config, &input)?;
+        }
+        Commands::Completions { shell } => {
+            let mut cmd = Cli::command();
+            generate(shell, &mut cmd, "webbook", &mut io::stdout());
         }
     }
 

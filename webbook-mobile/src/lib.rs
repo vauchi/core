@@ -1388,7 +1388,7 @@ mod tests {
         )
         .unwrap();
 
-        let backup = wb.export_backup("SecurePassword123".to_string()).unwrap();
+        let backup = wb.export_backup("correct-horse-battery-staple".to_string()).unwrap();
         assert!(!backup.is_empty());
 
         // Create new instance and restore
@@ -1399,7 +1399,7 @@ mod tests {
         )
         .unwrap();
 
-        wb2.import_backup(backup, "SecurePassword123".to_string())
+        wb2.import_backup(backup, "correct-horse-battery-staple".to_string())
             .unwrap();
 
         assert!(wb2.has_identity());

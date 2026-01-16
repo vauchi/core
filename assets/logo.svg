@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="cardGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#4fc3f7"/>
+      <stop offset="100%" style="stop-color:#0288d1"/>
+    </linearGradient>
+    <linearGradient id="shieldGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#26c6da"/>
+      <stop offset="100%" style="stop-color:#00838f"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background circle -->
+  <circle cx="256" cy="256" r="240" fill="#1a1a2e"/>
+
+  <!-- Back card (slightly offset) -->
+  <rect x="140" y="160" width="200" height="140" rx="12" ry="12"
+        fill="#16213e" stroke="#4fc3f7" stroke-width="2"
+        transform="rotate(-8 240 230)"/>
+
+  <!-- Front card -->
+  <rect x="160" y="180" width="200" height="140" rx="12" ry="12"
+        fill="url(#cardGradient)"
+        transform="rotate(4 260 250)"/>
+
+  <!-- Card content lines -->
+  <g transform="rotate(4 260 250)">
+    <!-- Avatar circle -->
+    <circle cx="200" cy="230" r="24" fill="#1a1a2e" opacity="0.3"/>
+    <circle cx="200" cy="225" r="10" fill="#1a1a2e" opacity="0.5"/>
+    <ellipse cx="200" cy="245" rx="15" ry="10" fill="#1a1a2e" opacity="0.5"/>
+
+    <!-- Text lines -->
+    <rect x="235" y="215" width="100" height="8" rx="4" fill="#1a1a2e" opacity="0.4"/>
+    <rect x="235" y="235" width="70" height="6" rx="3" fill="#1a1a2e" opacity="0.3"/>
+    <rect x="235" y="250" width="85" height="6" rx="3" fill="#1a1a2e" opacity="0.3"/>
+  </g>
+
+  <!-- Privacy shield badge -->
+  <g transform="translate(320, 280)">
+    <path d="M0,-45 L35,-30 L35,15 C35,35 0,55 0,55 C0,55 -35,35 -35,15 L-35,-30 Z"
+          fill="url(#shieldGradient)" stroke="#1a1a2e" stroke-width="3"/>
+    <!-- Checkmark -->
+    <path d="M-12,5 L-3,14 L15,-8"
+          fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+
+  <!-- Connection dots representing exchange -->
+  <g fill="#4fc3f7" opacity="0.6">
+    <circle cx="120" cy="380" r="8"/>
+    <circle cx="150" cy="400" r="5"/>
+    <circle cx="100" cy="350" r="6"/>
+
+    <circle cx="392" cy="130" r="8"/>
+    <circle cx="362" cy="110" r="5"/>
+    <circle cx="412" cy="160" r="6"/>
+  </g>
+
+  <!-- Subtle connection lines -->
+  <g stroke="#4fc3f7" stroke-width="1.5" opacity="0.3" fill="none">
+    <path d="M120,380 Q200,420 256,360"/>
+    <path d="M392,130 Q312,90 256,150"/>
+  </g>
+</svg>

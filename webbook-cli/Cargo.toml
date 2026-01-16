@@ -15,6 +15,7 @@ webbook-core = { path = "../webbook-core" }
 
 # CLI framework
 clap = { version = "4", features = ["derive"] }
+clap_complete = "4"
 
 # Async runtime
 tokio = { version = "1", features = ["full"] }
@@ -24,6 +25,12 @@ dialoguer = "0.11"
 
 # Terminal styling
 console = "0.15"
+
+# Progress indicators
+indicatif = "0.17"
+
+# Table output
+tabled = "0.20"
 
 # Platform directories
 dirs = "5"

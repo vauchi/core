@@ -15,6 +15,7 @@ import uniffi.webbook_mobile.MobileContactCard
 import uniffi.webbook_mobile.MobileExchangeData
 import uniffi.webbook_mobile.MobileExchangeResult
 import uniffi.webbook_mobile.MobileFieldType
+import uniffi.webbook_mobile.MobileSocialNetwork
 
 sealed class UiState {
     object Loading : UiState()
@@ -259,6 +260,31 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             true
         } catch (e: Exception) {
             false
+        }
+    }
+
+    // Social network operations
+    fun listSocialNetworks(): List<MobileSocialNetwork> {
+        return try {
+            repository.listSocialNetworks()
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+
+    fun searchSocialNetworks(query: String): List<MobileSocialNetwork> {
+        return try {
+            repository.searchSocialNetworks(query)
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+
+    fun getProfileUrl(networkId: String, username: String): String? {
+        return try {
+            repository.getProfileUrl(networkId, username)
+        } catch (e: Exception) {
+            null
         }
     }
 }

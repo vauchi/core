@@ -67,4 +67,12 @@ class WebBookRepository(context: Context) {
     fun importBackup(backupData: String, password: String) {
         webbook.importBackup(backupData, password)
     }
+
+    // Social network operations
+    fun listSocialNetworks() = webbook.listSocialNetworks()
+
+    fun searchSocialNetworks(query: String) = webbook.searchSocialNetworks(query)
+
+    fun getProfileUrl(networkId: String, username: String): String? =
+        webbook.getProfileUrl(networkId, username)
 }

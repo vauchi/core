@@ -8,6 +8,9 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import android.content.Intent
+import android.net.Uri
+import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Share
@@ -23,6 +26,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import kotlinx.coroutines.launch
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -85,7 +89,9 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
                     onRemoveField = viewModel::removeField,
                     onExchange = { currentScreen = Screen.Exchange },
                     onContacts = { currentScreen = Screen.Contacts },
-                    onSettings = { currentScreen = Screen.Settings }
+                    onSettings = { currentScreen = Screen.Settings },
+                    socialNetworks = viewModel.listSocialNetworks(),
+                    onGetProfileUrl = viewModel::getProfileUrl
                 )
                 is UiState.Error -> ErrorScreen(message = state.message)
             }
@@ -221,7 +227,9 @@ fun ReadyScreen(
     onRemoveField: (String) -> Unit,
     onExchange: () -> Unit,
     onContacts: () -> Unit,
-    onSettings: () -> Unit
+    onSettings: () -> Unit,
+    socialNetworks: List<uniffi.webbook_mobile.MobileSocialNetwork> = emptyList(),
+    onGetProfileUrl: (String, String) -> String? = { _, _ -> null }
 ) {
     var showAddDialog by remember { mutableStateOf(false) }
 
@@ -291,8 +299,23 @@ fun ReadyScreen(
                 }
             } else {
                 items(card.fields) { field ->
+                    val context = LocalContext.current
+                    val isSocialField = field.fieldType == MobileFieldType.SOCIAL
+                    val profileUrl = if (isSocialField) {
+                        onGetProfileUrl(field.label, field.value)
+                    } else null
+
                     Card(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .then(
+                                if (profileUrl != null) {
+                                    Modifier.clickable {
+                                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(profileUrl))
+                                        context.startActivity(intent)
+                                    }
+                                } else Modifier
+                            ),
                         colors = CardDefaults.cardColors(
                             containerColor = MaterialTheme.colorScheme.surfaceVariant
                         )
@@ -310,8 +333,17 @@ fun ReadyScreen(
                                     style = MaterialTheme.typography.labelMedium
                                 )
                                 Text(
-                                    text = field.value,
-                                    style = MaterialTheme.typography.bodyLarge
+                                    text = if (isSocialField) "@${field.value}" else field.value,
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = if (profileUrl != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+                            if (profileUrl != null) {
+                                Icon(
+                                    Icons.Default.Share,
+                                    contentDescription = "Open profile",
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(20.dp)
                                 )
                             }
                             IconButton(onClick = { onRemoveField(field.label) }) {
@@ -368,7 +400,8 @@ fun ReadyScreen(
             onAdd = { type, label, value ->
                 onAddField(type, label, value)
                 showAddDialog = false
-            }
+            },
+            socialNetworks = socialNetworks
         )
     }
 }
@@ -377,12 +410,16 @@ fun ReadyScreen(
 @Composable
 fun AddFieldDialog(
     onDismiss: () -> Unit,
-    onAdd: (MobileFieldType, String, String) -> Unit
+    onAdd: (MobileFieldType, String, String) -> Unit,
+    socialNetworks: List<uniffi.webbook_mobile.MobileSocialNetwork> = emptyList()
 ) {
     var selectedType by remember { mutableStateOf(MobileFieldType.EMAIL) }
     var label by remember { mutableStateOf("") }
     var value by remember { mutableStateOf("") }
     var expanded by remember { mutableStateOf(false) }
+    var socialExpanded by remember { mutableStateOf(false) }
+    var selectedNetwork by remember { mutableStateOf<uniffi.webbook_mobile.MobileSocialNetwork?>(null) }
+    var socialSearch by remember { mutableStateOf("") }
 
     val fieldTypes = listOf(
         MobileFieldType.EMAIL to "Email",
@@ -393,11 +430,23 @@ fun AddFieldDialog(
         MobileFieldType.CUSTOM to "Custom"
     )
 
+    // Filter social networks by search
+    val filteredNetworks = remember(socialSearch, socialNetworks) {
+        if (socialSearch.isBlank()) {
+            socialNetworks.take(10)
+        } else {
+            socialNetworks.filter {
+                it.displayName.contains(socialSearch, ignoreCase = true)
+            }.take(10)
+        }
+    }
+
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Add Field") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                // Field type dropdown
                 ExposedDropdownMenuBox(
                     expanded = expanded,
                     onExpandedChange = { expanded = !expanded }
@@ -421,8 +470,12 @@ fun AddFieldDialog(
                                 text = { Text(name) },
                                 onClick = {
                                     selectedType = type
-                                    if (label.isEmpty()) {
+                                    if (type != MobileFieldType.SOCIAL && label.isEmpty()) {
                                         label = name
+                                    }
+                                    if (type == MobileFieldType.SOCIAL) {
+                                        label = ""
+                                        selectedNetwork = null
                                     }
                                     expanded = false
                                 }
@@ -431,21 +484,75 @@ fun AddFieldDialog(
                     }
                 }
 
-                OutlinedTextField(
-                    value = label,
-                    onValueChange = { label = it },
-                    label = { Text("Label") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
+                // Social network picker (only shown for SOCIAL type)
+                if (selectedType == MobileFieldType.SOCIAL) {
+                    ExposedDropdownMenuBox(
+                        expanded = socialExpanded,
+                        onExpandedChange = { socialExpanded = !socialExpanded }
+                    ) {
+                        OutlinedTextField(
+                            value = selectedNetwork?.displayName ?: socialSearch,
+                            onValueChange = {
+                                socialSearch = it
+                                selectedNetwork = null
+                                socialExpanded = true
+                            },
+                            label = { Text("Social Network") },
+                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = socialExpanded) },
+                            modifier = Modifier
+                                .menuAnchor()
+                                .fillMaxWidth()
+                        )
+                        ExposedDropdownMenu(
+                            expanded = socialExpanded,
+                            onDismissRequest = { socialExpanded = false }
+                        ) {
+                            filteredNetworks.forEach { network ->
+                                DropdownMenuItem(
+                                    text = { Text(network.displayName) },
+                                    onClick = {
+                                        selectedNetwork = network
+                                        label = network.displayName
+                                        socialSearch = network.displayName
+                                        socialExpanded = false
+                                    }
+                                )
+                            }
+                            if (filteredNetworks.isEmpty()) {
+                                DropdownMenuItem(
+                                    text = { Text("No networks found") },
+                                    onClick = { },
+                                    enabled = false
+                                )
+                            }
+                        }
+                    }
 
-                OutlinedTextField(
-                    value = value,
-                    onValueChange = { value = it },
-                    label = { Text("Value") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
+                    OutlinedTextField(
+                        value = value,
+                        onValueChange = { value = it },
+                        label = { Text("Username") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                } else {
+                    // Regular label and value fields
+                    OutlinedTextField(
+                        value = label,
+                        onValueChange = { label = it },
+                        label = { Text("Label") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    OutlinedTextField(
+                        value = value,
+                        onValueChange = { value = it },
+                        label = { Text("Value") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
             }
         },
         confirmButton = {

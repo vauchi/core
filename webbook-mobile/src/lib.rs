@@ -6,15 +6,154 @@
 //! Note: Storage connections are created on-demand for thread safety,
 //! as rusqlite's Connection is not Sync.
 
+use std::net::TcpStream;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
 use webbook_core::{
     Contact, ContactCard, ContactField, FieldType, Identity, IdentityBackup,
     SocialNetworkRegistry, Storage, SymmetricKey,
 };
+use webbook_core::crypto::ratchet::DoubleRatchetState;
+use webbook_core::exchange::X3DH;
+
+use tungstenite::{connect, Message, WebSocket};
+use tungstenite::stream::MaybeTlsStream;
 
 uniffi::setup_scaffolding!();
+
+// === Sync Protocol ===
+
+/// Wire protocol for relay communication (matches relay server expectations).
+mod sync_protocol {
+    use serde::{Deserialize, Serialize};
+
+    pub const PROTOCOL_VERSION: u8 = 1;
+    pub const FRAME_HEADER_SIZE: usize = 4;
+
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+    pub struct MessageEnvelope {
+        pub version: u8,
+        pub message_id: String,
+        pub timestamp: u64,
+        pub payload: MessagePayload,
+    }
+
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+    #[serde(tag = "type")]
+    pub enum MessagePayload {
+        EncryptedUpdate(EncryptedUpdate),
+        Acknowledgment(Acknowledgment),
+        Handshake(Handshake),
+        #[serde(other)]
+        Unknown,
+    }
+
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+    pub struct EncryptedUpdate {
+        pub recipient_id: String,
+        pub sender_id: String,
+        pub ciphertext: Vec<u8>,
+    }
+
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+    pub struct Acknowledgment {
+        pub message_id: String,
+        pub status: AckStatus,
+    }
+
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+    pub enum AckStatus {
+        Delivered,
+        ReceivedByRecipient,
+        #[allow(dead_code)]
+        Failed,
+    }
+
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+    pub struct Handshake {
+        pub client_id: String,
+    }
+
+    /// Exchange message for contact exchange.
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+    pub struct ExchangeMessage {
+        pub msg_type: String,
+        pub identity_public_key: String,
+        pub ephemeral_public_key: String,
+        pub display_name: String,
+        #[serde(default)]
+        pub is_response: bool,
+    }
+
+    impl ExchangeMessage {
+        pub fn is_exchange(data: &[u8]) -> bool {
+            if let Ok(msg) = serde_json::from_slice::<ExchangeMessage>(data) {
+                msg.msg_type == "exchange"
+            } else {
+                false
+            }
+        }
+
+        pub fn from_bytes(data: &[u8]) -> Option<Self> {
+            serde_json::from_slice(data).ok()
+        }
+
+        pub fn new_response(identity_key: &[u8; 32], exchange_key: &[u8; 32], name: &str) -> Self {
+            ExchangeMessage {
+                msg_type: "exchange".to_string(),
+                identity_public_key: hex::encode(identity_key),
+                ephemeral_public_key: hex::encode(exchange_key),
+                display_name: name.to_string(),
+                is_response: true,
+            }
+        }
+
+        pub fn to_bytes(&self) -> Vec<u8> {
+            serde_json::to_vec(self).unwrap_or_default()
+        }
+    }
+
+    pub fn create_envelope(payload: MessagePayload) -> MessageEnvelope {
+        MessageEnvelope {
+            version: PROTOCOL_VERSION,
+            message_id: uuid::Uuid::new_v4().to_string(),
+            timestamp: std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_secs(),
+            payload,
+        }
+    }
+
+    pub fn encode_message(envelope: &MessageEnvelope) -> Result<Vec<u8>, String> {
+        let json = serde_json::to_vec(envelope).map_err(|e| e.to_string())?;
+        let len = json.len() as u32;
+
+        let mut frame = Vec::with_capacity(FRAME_HEADER_SIZE + json.len());
+        frame.extend_from_slice(&len.to_be_bytes());
+        frame.extend_from_slice(&json);
+
+        Ok(frame)
+    }
+
+    pub fn decode_message(data: &[u8]) -> Result<MessageEnvelope, String> {
+        if data.len() < FRAME_HEADER_SIZE {
+            return Err("Frame too short".to_string());
+        }
+
+        let json = &data[FRAME_HEADER_SIZE..];
+        serde_json::from_slice(json).map_err(|e| e.to_string())
+    }
+
+    pub fn create_ack(message_id: &str, status: AckStatus) -> MessageEnvelope {
+        create_envelope(MessagePayload::Acknowledgment(Acknowledgment {
+            message_id: message_id.to_string(),
+            status,
+        }))
+    }
+}
 
 // === Error Types ===
 
@@ -189,6 +328,17 @@ pub enum MobileSyncStatus {
     Error,
 }
 
+/// Sync result with statistics.
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct MobileSyncResult {
+    /// Number of new contacts added from exchange messages.
+    pub contacts_added: u32,
+    /// Number of contact cards updated.
+    pub cards_updated: u32,
+    /// Number of outbound updates sent.
+    pub updates_sent: u32,
+}
+
 /// Social network info.
 #[derive(Debug, Clone, uniffi::Record)]
 pub struct MobileSocialNetwork {
@@ -237,6 +387,331 @@ impl WebBookMobile {
         // Use a fixed internal password for in-memory storage
         Identity::import_backup(&backup, "__internal_storage_key__")
             .map_err(|e| MobileError::CryptoError(e.to_string()))
+    }
+
+    // === Internal Sync Methods ===
+
+    /// Internal sync implementation.
+    fn do_sync(&self) -> Result<MobileSyncResult, MobileError> {
+        let identity = self.get_identity()?;
+        let client_id = identity.public_id();
+
+        // Connect to relay via WebSocket
+        let (mut socket, _response) = connect(&self.relay_url)
+            .map_err(|e| MobileError::NetworkError(format!("Connection failed: {}", e)))?;
+
+        // Set read timeout for non-blocking receive
+        if let MaybeTlsStream::Plain(ref stream) = socket.get_ref() {
+            let _ = stream.set_read_timeout(Some(Duration::from_millis(1000)));
+        }
+
+        // Send handshake
+        Self::send_handshake(&mut socket, &client_id)?;
+
+        // Wait briefly for server to send pending messages
+        std::thread::sleep(Duration::from_millis(500));
+
+        // Receive and process pending messages
+        let storage = self.open_storage()?;
+        let (exchange_messages, card_updates) = Self::receive_pending(&mut socket)?;
+
+        // Process exchange messages (creates new contacts)
+        let contacts_added = self.process_exchange_messages(&identity, &storage, exchange_messages)?;
+
+        // Process card updates from existing contacts
+        let cards_updated = Self::process_card_updates(&storage, card_updates)?;
+
+        // Send our pending outbound updates
+        let updates_sent = Self::send_pending_updates(&identity, &storage, &mut socket)?;
+
+        // Close connection
+        let _ = socket.close(None);
+
+        Ok(MobileSyncResult {
+            contacts_added,
+            cards_updated,
+            updates_sent,
+        })
+    }
+
+    /// Sends handshake to relay.
+    fn send_handshake(
+        socket: &mut WebSocket<MaybeTlsStream<TcpStream>>,
+        client_id: &str,
+    ) -> Result<(), MobileError> {
+        use sync_protocol::*;
+
+        let handshake = Handshake {
+            client_id: client_id.to_string(),
+        };
+        let envelope = create_envelope(MessagePayload::Handshake(handshake));
+        let data = encode_message(&envelope)
+            .map_err(|e| MobileError::SyncFailed(format!("Encode error: {}", e)))?;
+        socket.send(Message::Binary(data))
+            .map_err(|e| MobileError::NetworkError(e.to_string()))?;
+        Ok(())
+    }
+
+    /// Receives pending messages from relay.
+    #[allow(clippy::type_complexity)]
+    fn receive_pending(
+        socket: &mut WebSocket<MaybeTlsStream<TcpStream>>,
+    ) -> Result<(Vec<sync_protocol::ExchangeMessage>, Vec<(String, Vec<u8>)>), MobileError> {
+        use sync_protocol::*;
+
+        let mut exchange_messages = Vec::new();
+        let mut card_updates = Vec::new();
+
+        loop {
+            match socket.read() {
+                Ok(Message::Binary(data)) => {
+                    match decode_message(&data) {
+                        Ok(envelope) => {
+                            if let MessagePayload::EncryptedUpdate(update) = envelope.payload {
+                                // Check if this is an exchange message
+                                if ExchangeMessage::is_exchange(&update.ciphertext) {
+                                    if let Some(exchange) = ExchangeMessage::from_bytes(&update.ciphertext) {
+                                        exchange_messages.push(exchange);
+                                    }
+                                } else {
+                                    // This is a card update
+                                    card_updates.push((update.sender_id.clone(), update.ciphertext));
+                                }
+
+                                // Send acknowledgment
+                                let ack = create_ack(&envelope.message_id, AckStatus::ReceivedByRecipient);
+                                if let Ok(ack_data) = encode_message(&ack) {
+                                    let _ = socket.send(Message::Binary(ack_data));
+                                }
+                            }
+                        }
+                        Err(_) => { /* Skip malformed messages */ }
+                    }
+                }
+                Ok(Message::Ping(data)) => {
+                    let _ = socket.send(Message::Pong(data));
+                }
+                Ok(Message::Close(_)) => break,
+                Ok(_) => { /* Ignore other message types */ }
+                Err(tungstenite::Error::Io(ref e))
+                    if e.kind() == std::io::ErrorKind::WouldBlock
+                        || e.kind() == std::io::ErrorKind::TimedOut =>
+                {
+                    // No more messages
+                    break;
+                }
+                Err(_) => break,
+            }
+        }
+
+        Ok((exchange_messages, card_updates))
+    }
+
+    /// Processes exchange messages and creates new contacts.
+    fn process_exchange_messages(
+        &self,
+        identity: &Identity,
+        storage: &Storage,
+        messages: Vec<sync_protocol::ExchangeMessage>,
+    ) -> Result<u32, MobileError> {
+        let mut added = 0u32;
+        let our_x3dh = identity.x3dh_keypair();
+
+        for exchange in messages {
+            // Parse identity key
+            let identity_key = match hex::decode(&exchange.identity_public_key) {
+                Ok(bytes) if bytes.len() == 32 => {
+                    let mut arr = [0u8; 32];
+                    arr.copy_from_slice(&bytes);
+                    arr
+                }
+                _ => continue,
+            };
+
+            let public_id = hex::encode(identity_key);
+
+            // Handle response to our exchange (update contact name)
+            if exchange.is_response {
+                if let Ok(Some(mut contact)) = storage.load_contact(&public_id) {
+                    if contact.display_name() != exchange.display_name
+                        && contact.set_display_name(&exchange.display_name).is_ok()
+                    {
+                        let _ = storage.save_contact(&contact);
+                    }
+                }
+                continue;
+            }
+
+            // Check if contact already exists
+            if storage.load_contact(&public_id)?.is_some() {
+                continue;
+            }
+
+            // Parse ephemeral key
+            let ephemeral_key = match hex::decode(&exchange.ephemeral_public_key) {
+                Ok(bytes) if bytes.len() == 32 => {
+                    let mut arr = [0u8; 32];
+                    arr.copy_from_slice(&bytes);
+                    arr
+                }
+                _ => continue,
+            };
+
+            // Perform X3DH as responder
+            let shared_secret = match X3DH::respond(&our_x3dh, &identity_key, &ephemeral_key) {
+                Ok(secret) => secret,
+                Err(_) => continue,
+            };
+
+            // Create contact
+            let card = ContactCard::new(&exchange.display_name);
+            let contact = Contact::from_exchange(identity_key, card, shared_secret.clone());
+            let contact_id = contact.id().to_string();
+
+            // Save contact
+            storage.save_contact(&contact)?;
+
+            // Initialize ratchet as responder
+            let ratchet_dh = webbook_core::exchange::X3DHKeyPair::from_bytes(our_x3dh.secret_bytes());
+            let ratchet = DoubleRatchetState::initialize_responder(&shared_secret, ratchet_dh);
+            let _ = storage.save_ratchet_state(&contact_id, &ratchet, true);
+
+            added += 1;
+
+            // Send exchange response with our name
+            let _ = self.send_exchange_response(identity, &public_id);
+        }
+
+        Ok(added)
+    }
+
+    /// Sends exchange response with our name.
+    fn send_exchange_response(
+        &self,
+        identity: &Identity,
+        recipient_id: &str,
+    ) -> Result<(), MobileError> {
+        use sync_protocol::*;
+
+        let (mut socket, _) = connect(&self.relay_url)
+            .map_err(|e| MobileError::NetworkError(e.to_string()))?;
+
+        let our_id = identity.public_id();
+        Self::send_handshake(&mut socket, &our_id)?;
+
+        let exchange_key_slice = identity.exchange_public_key();
+        let exchange_key: [u8; 32] = exchange_key_slice.try_into()
+            .map_err(|_| MobileError::CryptoError("Invalid key length".to_string()))?;
+
+        let exchange_msg = ExchangeMessage::new_response(
+            identity.signing_public_key(),
+            &exchange_key,
+            identity.display_name(),
+        );
+
+        let update = EncryptedUpdate {
+            recipient_id: recipient_id.to_string(),
+            sender_id: our_id,
+            ciphertext: exchange_msg.to_bytes(),
+        };
+
+        let envelope = create_envelope(MessagePayload::EncryptedUpdate(update));
+        let data = encode_message(&envelope)
+            .map_err(MobileError::SyncFailed)?;
+        socket.send(Message::Binary(data))
+            .map_err(|e| MobileError::NetworkError(e.to_string()))?;
+
+        std::thread::sleep(Duration::from_millis(100));
+        let _ = socket.close(None);
+
+        Ok(())
+    }
+
+    /// Processes incoming card updates.
+    fn process_card_updates(
+        storage: &Storage,
+        updates: Vec<(String, Vec<u8>)>,
+    ) -> Result<u32, MobileError> {
+        let mut processed = 0u32;
+
+        for (sender_id, ciphertext) in updates {
+            // Get contact
+            let mut contact = match storage.load_contact(&sender_id)? {
+                Some(c) => c,
+                None => continue,
+            };
+
+            // Get ratchet state
+            let (mut ratchet, _is_initiator) = match storage.load_ratchet_state(&sender_id)? {
+                Some(state) => state,
+                None => continue,
+            };
+
+            // Try to parse as a RatchetMessage from JSON
+            let ratchet_msg: webbook_core::crypto::ratchet::RatchetMessage =
+                match serde_json::from_slice(&ciphertext) {
+                    Ok(msg) => msg,
+                    Err(_) => continue,
+                };
+
+            // Decrypt the card delta
+            let plaintext = match ratchet.decrypt(&ratchet_msg) {
+                Ok(pt) => pt,
+                Err(_) => continue,
+            };
+
+            // Parse and apply delta
+            if let Ok(delta) = serde_json::from_slice::<webbook_core::sync::CardDelta>(&plaintext) {
+                let mut card = contact.card().clone();
+                if delta.apply(&mut card).is_ok() {
+                    // Update contact's card
+                    contact.update_card(card);
+                    storage.save_contact(&contact)?;
+                    processed += 1;
+                }
+            }
+
+            // Save updated ratchet state
+            let _ = storage.save_ratchet_state(&sender_id, &ratchet, false);
+        }
+
+        Ok(processed)
+    }
+
+    /// Sends pending outbound updates.
+    fn send_pending_updates(
+        identity: &Identity,
+        storage: &Storage,
+        socket: &mut WebSocket<MaybeTlsStream<TcpStream>>,
+    ) -> Result<u32, MobileError> {
+        use sync_protocol::*;
+
+        let contacts = storage.list_contacts()?;
+        let our_id = identity.public_id();
+        let mut sent = 0u32;
+
+        for contact in contacts {
+            let pending = storage.get_pending_updates(contact.id())?;
+
+            for update in pending {
+                // Create encrypted update message
+                let msg = EncryptedUpdate {
+                    recipient_id: contact.id().to_string(),
+                    sender_id: our_id.clone(),
+                    ciphertext: update.payload,
+                };
+
+                let envelope = create_envelope(MessagePayload::EncryptedUpdate(msg));
+                if let Ok(data) = encode_message(&envelope) {
+                    if socket.send(Message::Binary(data)).is_ok() {
+                        let _ = storage.delete_pending_update(&update.id);
+                        sent += 1;
+                    }
+                }
+            }
+        }
+
+        Ok(sent)
     }
 }
 
@@ -661,15 +1136,21 @@ impl WebBookMobile {
 
     // === Sync Operations ===
 
-    /// Sync with relay (placeholder - full implementation requires async).
-    pub fn sync(&self) -> Result<(), MobileError> {
+    /// Sync with relay server.
+    ///
+    /// Connects to the configured relay, sends pending updates,
+    /// and receives incoming updates from contacts.
+    pub fn sync(&self) -> Result<MobileSyncResult, MobileError> {
         *self.sync_status.lock().unwrap() = MobileSyncStatus::Syncing;
 
-        // TODO: Implement actual relay sync
-        // For now, this is a placeholder that just changes status
+        let result = self.do_sync();
 
-        *self.sync_status.lock().unwrap() = MobileSyncStatus::Idle;
-        Ok(())
+        match &result {
+            Ok(_) => *self.sync_status.lock().unwrap() = MobileSyncStatus::Idle,
+            Err(_) => *self.sync_status.lock().unwrap() = MobileSyncStatus::Error,
+        }
+
+        result
     }
 
     /// Get sync status.

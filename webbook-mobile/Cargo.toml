@@ -10,8 +10,8 @@ crate-type = ["cdylib", "staticlib", "lib"]
 name = "webbook_mobile"
 
 [dependencies]
-# Core WebBook library (without network features for mobile)
-webbook-core = { path = "../webbook-core", default-features = false }
+# Core WebBook library (with network features for sync)
+webbook-core = { path = "../webbook-core" }
 
 # UniFFI for cross-language bindings
 uniffi = { version = "0.28", features = ["cli"] }
@@ -32,6 +32,12 @@ base64 = "0.22"
 
 # Hex encoding for public IDs
 hex = "0.4"
+
+# UUID for message IDs
+uuid = { version = "1.0", features = ["v4"] }
+
+# WebSocket for sync
+tungstenite = { version = "0.24", features = ["native-tls"] }
 
 [[bin]]
 name = "uniffi-bindgen"

@@ -143,6 +143,35 @@ impl Contact {
         self.card = card;
     }
 
+    /// Accepts a recovery, updating the contact's public key and shared secret.
+    ///
+    /// This is called when the user accepts a recovery proof from this contact.
+    /// The old shared secret is discarded and fingerprint verification is reset.
+    pub fn accept_recovery(&mut self, new_public_key: [u8; 32], new_shared_key: SymmetricKey) {
+        self.public_key = new_public_key;
+        self.id = hex::encode(new_public_key);
+        self.shared_key = new_shared_key;
+        self.fingerprint_verified = false;
+        // Update exchange timestamp to mark when recovery was accepted
+        self.exchange_timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("Time went backwards")
+            .as_secs();
+    }
+
+    /// Accepts a recovery with a new contact card.
+    ///
+    /// This is called when the recovering contact also provides an updated card.
+    pub fn accept_recovery_with_card(
+        &mut self,
+        new_public_key: [u8; 32],
+        new_shared_key: SymmetricKey,
+        new_card: ContactCard,
+    ) {
+        self.accept_recovery(new_public_key, new_shared_key);
+        self.update_card(new_card);
+    }
+
     /// Updates the contact's display name.
     pub fn set_display_name(
         &mut self,

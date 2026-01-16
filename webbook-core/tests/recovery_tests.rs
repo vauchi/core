@@ -596,3 +596,114 @@ fn test_full_recovery_flow() {
     let restored_proof = RecoveryProof::from_bytes(&proof_bytes).unwrap();
     assert!(restored_proof.validate().is_ok());
 }
+
+// =============================================================================
+// Recovery Acceptance Flow Tests (Scenario: Accept recovery and reconnect)
+// =============================================================================
+
+#[test]
+fn test_accept_recovery_updates_contact() {
+    // Scenario: Accept recovery and reconnect
+    // Given John has Alice as a contact with old_pk
+    // When John accepts Alice's recovery proof
+    // Then John's contact record for Alice is updated with new_pk
+    use webbook_core::contact::Contact;
+    use webbook_core::contact_card::ContactCard;
+    use webbook_core::crypto::SymmetricKey;
+
+    let alice_old_pk = [0x01u8; 32];
+    let alice_new_pk = [0x02u8; 32];
+    let old_shared_key = SymmetricKey::generate();
+    let new_shared_key = SymmetricKey::generate();
+
+    let card = ContactCard::new("Alice");
+    let mut contact = Contact::from_exchange(alice_old_pk, card, old_shared_key.clone());
+
+    let old_id = contact.id().to_string();
+    assert_eq!(contact.public_key(), &alice_old_pk);
+
+    // Accept recovery
+    contact.accept_recovery(alice_new_pk, new_shared_key.clone());
+
+    // Verify contact is updated
+    assert_eq!(contact.public_key(), &alice_new_pk);
+    assert_ne!(contact.id(), old_id); // ID changes because it's based on public key
+    assert_eq!(contact.display_name(), "Alice"); // Name stays the same
+}
+
+#[test]
+fn test_accept_recovery_discards_old_shared_secret() {
+    // Scenario: Accept recovery and reconnect
+    // And the old shared secret is discarded
+    use webbook_core::contact::Contact;
+    use webbook_core::contact_card::ContactCard;
+    use webbook_core::crypto::SymmetricKey;
+
+    let alice_old_pk = [0x01u8; 32];
+    let alice_new_pk = [0x02u8; 32];
+    let old_shared_key = SymmetricKey::generate();
+    let new_shared_key = SymmetricKey::generate();
+
+    let card = ContactCard::new("Alice");
+    let mut contact = Contact::from_exchange(alice_old_pk, card, old_shared_key.clone());
+
+    // Get reference to old key for comparison
+    let old_key_bytes = contact.shared_key().as_bytes().to_vec();
+
+    // Accept recovery
+    contact.accept_recovery(alice_new_pk, new_shared_key.clone());
+
+    // New shared key should be different
+    let new_key_bytes = contact.shared_key().as_bytes();
+    assert_ne!(old_key_bytes.as_slice(), new_key_bytes);
+}
+
+#[test]
+fn test_accept_recovery_resets_fingerprint_verification() {
+    // After recovery, fingerprint needs to be re-verified
+    use webbook_core::contact::Contact;
+    use webbook_core::contact_card::ContactCard;
+    use webbook_core::crypto::SymmetricKey;
+
+    let alice_old_pk = [0x01u8; 32];
+    let alice_new_pk = [0x02u8; 32];
+    let old_shared_key = SymmetricKey::generate();
+    let new_shared_key = SymmetricKey::generate();
+
+    let card = ContactCard::new("Alice");
+    let mut contact = Contact::from_exchange(alice_old_pk, card, old_shared_key);
+
+    // Mark as verified
+    contact.mark_fingerprint_verified();
+    assert!(contact.is_fingerprint_verified());
+
+    // Accept recovery
+    contact.accept_recovery(alice_new_pk, new_shared_key);
+
+    // Fingerprint verification should be reset
+    assert!(!contact.is_fingerprint_verified());
+}
+
+#[test]
+fn test_accept_recovery_with_new_card() {
+    // Scenario: Contact card is refreshed after recovery
+    use webbook_core::contact::Contact;
+    use webbook_core::contact_card::ContactCard;
+    use webbook_core::crypto::SymmetricKey;
+
+    let alice_old_pk = [0x01u8; 32];
+    let alice_new_pk = [0x02u8; 32];
+    let old_shared_key = SymmetricKey::generate();
+    let new_shared_key = SymmetricKey::generate();
+
+    let old_card = ContactCard::new("Alice");
+    let mut contact = Contact::from_exchange(alice_old_pk, old_card, old_shared_key);
+
+    let new_card = ContactCard::new("Alice Smith");
+
+    // Accept recovery with updated card
+    contact.accept_recovery_with_card(alice_new_pk, new_shared_key, new_card);
+
+    assert_eq!(contact.display_name(), "Alice Smith");
+    assert_eq!(contact.card().display_name(), "Alice Smith");
+}

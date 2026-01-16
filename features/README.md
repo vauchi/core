@@ -17,14 +17,15 @@ Gherkin scenarios defining WebBook behavior. Each scenario should have correspon
 | visibility_labels | 41 | 0 | P2 | Post-launch |
 | relay_network | 43 | 20 | P2 | Basic relay done |
 | social_profile_validation | 33 | 0 | P3 | Low priority |
-| **future/** | | | P3 | See `future/README.md` |
+| **future/** | | | P2-P3 | See `future/README.md` |
+| - contact_recovery | 47 | 0 | P2 | Social vouching recovery |
 | - tor_mode | 29 | 0 | P3 | Moved to `future/` |
 | - hidden_contacts | 36 | 0 | P3 | Moved to `future/` |
 | - duress_password | 45 | 0 | P3 | Moved to `future/` |
 
-**Total**: 467 scenarios | **Implemented**: ~245 (~52%)
+**Total**: 514 scenarios | **Implemented**: ~245 (~48%)
 
-> **Note**: P3 features (tor_mode, hidden_contacts, duress_password) have been moved to `features/future/` to clearly separate planned-but-unimplemented features from active development.
+> **Note**: Future features have been moved to `features/future/` to clearly separate planned-but-unimplemented features from active development. See `features/future/README.md` for details.
 
 ## Priority Definitions
 
@@ -98,6 +99,13 @@ Gherkin scenarios defining WebBook behavior. Each scenario should have correspon
 - Rate limiting, blob expiration
 - Federation (planned)
 - Code: `webbook-relay/`
+
+**future/contact_recovery.feature**
+- Recover contacts after device loss via social vouching
+- In-person verification with K contacts (configurable threshold)
+- Other contacts verify via mutual contact trust
+- Isolated contacts (no mutual vouchers) get warnings
+- Planning: `docs/planning/todo/contact-recovery.md`
 
 ### P3: Advanced Privacy (Post-Launch)
 

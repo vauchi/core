@@ -14,8 +14,11 @@
 | Device link hijacking | Signed QR codes, 10-minute expiry |
 | Rogue device after revocation | Revocation broadcast to all contacts |
 | Device registry tampering | Registry signed by identity key |
+| Recovery impersonation | K in-person vouchers required |
+| Social graph via recovery | Accepted tradeoff, voucher PKs only |
+| Isolated contact exploitation | Clear warnings, multiple verification options |
 
-For detailed threat analysis (25+ threats), see [THREAT_ANALYSIS.md](../THREAT_ANALYSIS.md).
+For detailed threat analysis (35+ threats), see [THREAT_ANALYSIS.md](../THREAT_ANALYSIS.md).
 
 ## Data Classification
 

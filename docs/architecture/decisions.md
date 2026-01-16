@@ -389,6 +389,68 @@ Master Seed
 
 ---
 
+## ADR-018: Contact Recovery via Social Vouching
+
+**Status**: Proposed
+**Date**: 2026-01
+
+**Context**: Users who lose all their devices lose their identity (master seed, keys) and cannot reconnect with contacts. Traditional recovery methods (phone number, cloud backup) have security weaknesses (SIM swap, account compromise). Users need a way to recover contact *relationships* without pre-designated recovery contacts that could also be lost.
+
+**Decision**: Implement social vouching recovery where:
+1. User creates new identity after device loss
+2. User meets K contacts in person (coordinated via phone/WhatsApp/etc.)
+3. Each contact creates a signed voucher linking old identity to new
+4. Recovery proof (K vouchers) uploaded to relay
+5. Other contacts discover via polling, verify via mutual contact trust
+6. Isolated contacts (no mutual vouchers) get warnings and verification options
+
+**Rationale**:
+- **No pre-designation needed**: Any contact can vouch, nothing to remember/lose
+- **In-person verification**: Human recognition as trust anchor (same as initial exchange)
+- **Distributed trust**: Each contact decides based on their own network
+- **Graceful degradation**: Isolated contacts aren't blocked, just warned
+- **Minimal relay knowledge**: Relay only stores opaque blobs under hashed keys
+
+**Key Design Elements**:
+- `RecoveryClaim`: QR code with old_pk, new_pk, timestamp
+- `RecoveryVoucher`: Signed attestation from contact (Ed25519)
+- `RecoveryProof`: Aggregated vouchers meeting threshold
+- Relay storage: `hash(old_pk) → RecoveryProof`
+- Verification: Count vouchers from contacts the verifier also knows
+
+**Alternatives Considered**:
+
+| Alternative | Why Rejected |
+|-------------|--------------|
+| Pre-designated recovery contacts | Lost with device, adds setup friction |
+| Password-protected backup | Single point of failure, users forget passwords |
+| Seed phrase | Users lose/expose phrases, not user-friendly |
+| Phone number recovery | Vulnerable to SIM swap attacks |
+| Cloud backup | Vulnerable to account compromise |
+| Threshold secret sharing | Requires pre-setup, complex key management |
+
+**Security Trade-offs**:
+
+| Benefit | Cost |
+|---------|------|
+| No setup required | Any contact can vouch (larger surface) |
+| Human verification | Requires physical meetings |
+| Distributed trust | Isolated contacts get warnings only |
+| Works after total loss | Voucher list reveals partial graph |
+
+**Threat Mitigations**:
+- Recovery impersonation → Requires fooling K people in person
+- Graph leakage → Only public keys revealed, accepted tradeoff
+- Conflicting claims → Relay detects, users warned
+- Isolated contacts → Clear warnings, multiple verification options
+
+**Implementation**:
+- Feature spec: `features/future/contact_recovery.feature`
+- Planning doc: `docs/planning/todo/contact-recovery.md`
+- Threat analysis: `docs/THREAT_ANALYSIS.md` (Section 9)
+
+---
+
 ## Template for New Decisions
 
 ```markdown

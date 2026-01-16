@@ -536,9 +536,231 @@ WebBook is a **contact card exchange** system, not a messaging app:
 
 ---
 
+### 9. Contact Recovery Threats
+
+Contact recovery allows users who lost all devices to reconnect with contacts through social vouching. This introduces new attack surfaces.
+
+#### T9.1: Recovery Impersonation Attack
+
+**Threat**: Attacker social-engineers K contacts to vouch for them as the victim.
+
+**Mitigation**:
+- Requires in-person meeting with each voucher
+- Human recognition is the trust anchor
+- K vouchers needed (default: 3), harder than fooling 1 person
+- Contacts prompted with victim's stored photo/name for verification
+
+**Residual Risk**:
+- Sophisticated attacker could potentially fool K contacts
+- Especially risky if contacts don't know victim well
+- **Impact**: Attacker gains access to victim's contact relationships
+
+#### T9.2: Social Graph Leakage via Vouchers
+
+**Threat**: Recovery proof reveals voucher identities, exposing partial social graph.
+
+**Mitigation**:
+- Only voucher public keys are revealed (not names)
+- Verifiers may not know all vouchers
+- Accepted tradeoff for recovery functionality
+
+**Residual Risk**:
+- Partial graph leakage is inherent to the design
+- Contacts who verify can see who else vouched
+- **Impact**: Medium - reveals some relationships
+
+#### T9.3: Conflicting Recovery Claims
+
+**Threat**: Attacker creates competing recovery proof for same old identity.
+
+**Mitigation**:
+- Relay detects conflicts (multiple proofs for same old_pk)
+- Contacts warned: "Multiple recovery claims detected"
+- Contacts advised to verify directly with victim
+
+**Residual Risk**:
+- User confusion during legitimate recovery
+- Attacker could delay legitimate recovery
+- **Impact**: DoS on recovery process
+
+#### T9.4: Stale Recovery Proof Replay
+
+**Threat**: Old recovery proof used after victim legitimately recovered.
+
+**Mitigation**:
+- Recovery proofs expire after 90 days
+- Revocation mechanism: victim can sign revocation with old key (if recovered)
+- New recovery with different new_pk invalidates old proof
+
+**Residual Risk**:
+- 90-day window before automatic expiration
+- Requires victim to actively revoke if they recover old device
+- **Impact**: Potential for confusion, not compromise
+
+#### T9.5: Voucher Coercion
+
+**Threat**: Attacker forces contacts to vouch under duress.
+
+**Mitigation**:
+- Requires coercing K separate people
+- In-person meeting required for each voucher
+- Coercion of multiple people is operationally difficult
+
+**Residual Risk**:
+- Targeted attack with resources could coerce multiple people
+- No technical defense against physical coercion
+- **Impact**: Critical if successful, but very difficult
+
+#### T9.6: Isolated Contact Exploitation
+
+**Threat**: Attacker exploits contacts who don't know any vouchers (David's case).
+
+**Mitigation**:
+- Clear warning: "You don't know any of the vouchers"
+- Multiple options: meet in person, verify out-of-band, reject
+- "Accept anyway" requires explicit confirmation with strong warning
+- User can set personal verification threshold
+
+**Residual Risk**:
+- Users may ignore warnings and accept anyway
+- Social pressure to accept ("Why don't you trust me?")
+- **Impact**: Medium - isolated contacts may accept impersonator
+
+#### T9.7: Relay Metadata About Recovery
+
+**Threat**: Relay learns that recovery events are happening.
+
+**Mitigation**:
+- Proof stored under hash(old_pk), not identity
+- Batch queries hide specific interest
+- Relay cannot correlate old_pk to real identity
+
+**Residual Risk**:
+- Relay sees: recovery proof uploaded, queries for specific hashes
+- Cannot determine who is recovering or who is querying
+- **Impact**: Low - metadata only, no content
+
+#### T9.8: Misconfigured Low Threshold
+
+**Threat**: User sets threshold too low (e.g., 1), easy to attack.
+
+**Mitigation**:
+- Default threshold is 3
+- Minimum threshold is 1 (cannot be 0)
+- UI warns when setting threshold below 3
+- Verifiers see the threshold in recovery proof
+
+**Residual Risk**:
+- User may intentionally set low threshold
+- Single voucher = single point of failure
+- **Impact**: High if threshold is 1 and single contact is compromised
+
+#### T9.9: Voucher Timestamp Manipulation
+
+**Threat**: Attacker uses old vouchers with manipulated timestamps.
+
+**Mitigation**:
+- Voucher timestamps are signed by voucher's key
+- Recovery claim has timestamp, voucher must be within 48 hours
+- Clock skew tolerance is limited
+
+**Residual Risk**: None if implementation validates timestamps correctly.
+
+#### T9.10: Self-Vouching Attack
+
+**Threat**: Attacker creates fake contacts, then vouches for self.
+
+**Mitigation**:
+- Vouchers must be *existing* contacts of victim
+- Voucher's public key must be in victim's contact list (verified by other contacts)
+- Cannot vouch with newly created identity
+
+**Residual Risk**:
+- Requires attacker to have been legitimate contact before attack
+- Long-term sleeper attack theoretically possible
+- **Impact**: Requires significant preparation
+
+---
+
+## Risk Summary Matrix
+
+| Threat | Likelihood | Impact | Mitigation Effectiveness | Residual Risk |
+|--------|------------|--------|-------------------------|---------------|
+| T1.1 Data exposure to relay | High | Critical | Strong (E2E) | None |
+| T2.1 Social graph inference | Medium | Medium | Partial (pseudonyms) | Low |
+| T2.2 Update timing correlation | Low | Low | Partial | Very Low |
+| T3.1 Message tampering | Medium | High | Strong (AEAD+sig) | None |
+| T3.4 Impersonation | Low | High | Strong (in-person) | Social eng. |
+| T4.1 Relay DoS | Medium | Medium | Moderate (rate limit) | Sustained attack |
+| T5.1 Cannot remove contact | Medium | Medium | Moderate (block) | Past data |
+| T6.1 Crypto bugs | Low | Critical | Strong (audited lib) | Library bugs |
+| T7.2 Relay DB breach | Medium | Low | Strong (E2E) | Metadata only |
+| T8.1 QR shoulder surfing | Low | Critical | Moderate (expiry) | Brief window |
+| T8.3 Rogue device after revocation | Low | Medium | Strong (broadcast) | Offline delay |
+| T8.5 Seed exposure during link | Low | Critical | Strong (encrypted) | Compromised device |
+| T9.1 Recovery impersonation | Low | Critical | Moderate (K vouchers) | Social eng. |
+| T9.2 Graph leakage via vouchers | High | Medium | Accepted tradeoff | Partial graph |
+| T9.5 Voucher coercion | Very Low | Critical | Moderate (K people) | Resourced attacker |
+| T9.6 Isolated contact exploitation | Medium | Medium | Moderate (warnings) | User ignores |
+
+---
+
+## Recommendations
+
+### For Users
+
+1. Use a strong password for identity backup
+2. Enable device encryption (OS-level)
+3. Verify contact fingerprints for sensitive relationships
+4. Use Tor mode for enhanced privacy (when available)
+5. Regularly backup encrypted identity
+6. **Set recovery threshold to at least 3**
+7. **Don't accept recovery claims without mutual contact verification or out-of-band confirmation**
+
+### For Relay Operators
+
+1. Don't log IP addresses
+2. Enable TLS (reverse proxy)
+3. Set appropriate rate limits
+4. Monitor for abuse patterns
+5. Keep software updated
+6. **Set recovery proof expiration (default: 90 days)**
+
+### For Developers
+
+1. Never implement custom cryptography
+2. Update dependencies regularly
+3. Run security-focused fuzzing
+4. Consider formal verification for critical paths
+5. External security audit before 1.0 release
+6. **Validate voucher timestamps strictly**
+7. **Implement conflict detection for recovery proofs**
+
+---
+
+## Comparison to Messaging Apps
+
+| Aspect | WebBook | Messaging Apps |
+|--------|---------|----------------|
+| Traffic volume | Very low (rare updates) | High (continuous) |
+| Message sensitivity | Contact info | Conversations |
+| Timing analysis value | Low | High |
+| Social graph value | Medium | High |
+| Metadata exposure | Recipient ID only | Sender + recipient |
+| Forward secrecy | Yes (Double Ratchet) | Varies |
+| Relay knowledge | Encrypted blobs only | Often plaintext |
+| **Recovery model** | Social vouching (K contacts) | Phone number / cloud backup |
+
+**Key insight**: WebBook's threat model benefits from infrequent, small updates. Traffic analysis yields less information than with messaging apps because there's less traffic to analyze.
+
+**Recovery comparison**: Unlike phone-number-based recovery (vulnerable to SIM swap) or cloud backup (vulnerable to account compromise), social vouching requires physical presence with multiple contacts.
+
+---
+
 ## Version History
 
 | Version | Date | Changes |
 |---------|------|---------|
 | 1.0 | 2024-01 | Initial threat analysis |
 | 1.1 | 2026-01 | Added device linking threats (T8.x) |
+| 1.2 | 2026-01 | Added contact recovery threats (T9.x) |

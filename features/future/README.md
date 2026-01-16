@@ -1,21 +1,28 @@
-# Future Features (P3)
+# Future Features (P2/P3)
 
-This directory contains feature specifications for planned but not-yet-implemented functionality. These are advanced privacy features scheduled for post-launch development.
+This directory contains feature specifications for planned but not-yet-implemented functionality. These are advanced features scheduled for post-launch development.
 
 ## Features in This Directory
 
-| Feature | Description | Scenarios |
-|---------|-------------|-----------|
-| `duress_password.feature` | Decoy profile under coercion, silent alerts | 45 |
-| `hidden_contacts.feature` | Secret gesture/PIN to reveal contacts, plausible deniability | 36 |
-| `tor_mode.feature` | Route traffic through Tor, circuit management, bridge support | 29 |
+| Feature | Description | Scenarios | Priority |
+|---------|-------------|-----------|----------|
+| `contact_recovery.feature` | Recover contacts via social vouching after device loss | 47 | P2 |
+| `duress_password.feature` | Decoy profile under coercion, silent alerts | 45 | P3 |
+| `hidden_contacts.feature` | Secret gesture/PIN to reveal contacts, plausible deniability | 36 | P3 |
+| `tor_mode.feature` | Route traffic through Tor, circuit management, bridge support | 29 | P3 |
 
-**Total**: 110 scenarios (unimplemented)
+**Total**: 157 scenarios (unimplemented)
 
-## Why P3 Priority?
+## Priority Definitions
 
-These features are classified as P3 (post-launch) because:
+### P2: Contact Recovery
+`contact_recovery.feature` is P2 because:
+- **Important for user confidence** - Users need assurance they can recover
+- **No external dependencies** - Uses existing relay infrastructure
+- **Clear implementation path** - Well-defined protocol
 
+### P3: Advanced Privacy
+Other features are P3 (post-launch) because:
 1. **Not required for MVP** - Core functionality works without them
 2. **Complex implementation** - Require significant additional infrastructure
 3. **Niche use cases** - Target users with specific threat models

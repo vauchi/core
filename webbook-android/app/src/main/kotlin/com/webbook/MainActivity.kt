@@ -15,9 +15,11 @@ import androidx.compose.material.icons.filled.Person
 import com.webbook.ui.ExchangeScreen
 import com.webbook.ui.ContactsScreen
 import com.webbook.ui.ContactDetailScreen
+import com.webbook.ui.QrScannerScreen
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -46,7 +48,7 @@ class MainActivity : ComponentActivity() {
 }
 
 enum class Screen {
-    Home, Exchange, Contacts, ContactDetail
+    Home, Exchange, Contacts, ContactDetail, QrScanner
 }
 
 @Composable
@@ -54,6 +56,7 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
     val uiState by viewModel.uiState.collectAsState()
     var currentScreen by remember { mutableStateOf(Screen.Home) }
     var selectedContactId by remember { mutableStateOf<String?>(null) }
+    val coroutineScope = rememberCoroutineScope()
 
     when (currentScreen) {
         Screen.Home -> {
@@ -77,7 +80,18 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
             ExchangeScreen(
                 onBack = { currentScreen = Screen.Home },
                 onGenerateQr = { viewModel.generateExchangeQr() },
-                onCompleteExchange = { qrData -> viewModel.completeExchange(qrData) }
+                onScanQr = { currentScreen = Screen.QrScanner }
+            )
+        }
+        Screen.QrScanner -> {
+            QrScannerScreen(
+                onBack = { currentScreen = Screen.Exchange },
+                onQrScanned = { qrData ->
+                    coroutineScope.launch {
+                        viewModel.completeExchange(qrData)
+                        currentScreen = Screen.Home
+                    }
+                }
             )
         }
         Screen.Contacts -> {

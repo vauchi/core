@@ -20,11 +20,10 @@ import uniffi.webbook_mobile.MobileExchangeData
 fun ExchangeScreen(
     onBack: () -> Unit,
     onGenerateQr: suspend () -> MobileExchangeData?,
-    onCompleteExchange: suspend (String) -> Unit
+    onScanQr: () -> Unit
 ) {
     var exchangeData by remember { mutableStateOf<MobileExchangeData?>(null) }
     var qrBitmap by remember { mutableStateOf<Bitmap?>(null) }
-    var showScanDialog by remember { mutableStateOf(false) }
     var isLoading by remember { mutableStateOf(true) }
 
     LaunchedEffect(Unit) {
@@ -93,23 +92,13 @@ fun ExchangeScreen(
                 Spacer(modifier = Modifier.weight(1f))
 
                 Button(
-                    onClick = { showScanDialog = true },
+                    onClick = onScanQr,
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text("Scan Contact's QR Code")
                 }
             }
         }
-    }
-
-    if (showScanDialog) {
-        ScanQrDialog(
-            onDismiss = { showScanDialog = false },
-            onScan = { qrData ->
-                showScanDialog = false
-                // Complete exchange would be called here
-            }
-        )
     }
 }
 

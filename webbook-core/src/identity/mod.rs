@@ -7,7 +7,10 @@ mod backup;
 pub mod device;
 
 pub use backup::IdentityBackup;
-pub use device::{DeviceInfo, DeviceRegistry, RegisteredDevice, DeviceError, MAX_DEVICES};
+pub use device::{
+    DeviceInfo, DeviceRegistry, RegisteredDevice, DeviceError, MAX_DEVICES,
+    DeviceRevocationCertificate, RegistryBroadcast, BroadcastDevice,
+};
 
 use crate::crypto::{SigningKeyPair, Signature, encrypt, decrypt, SymmetricKey};
 use crate::exchange::X3DHKeyPair;

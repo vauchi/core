@@ -387,10 +387,10 @@ mod tests {
         let manager = SyncManager::new(&storage);
 
         let mut old_card = ContactCard::new("Alice");
-        old_card.add_field(ContactField::new(FieldType::Email, "email", "old@example.com"));
+        let _ = old_card.add_field(ContactField::new(FieldType::Email, "email", "old@example.com"));
 
         let mut new_card = ContactCard::new("Alice");
-        new_card.add_field(ContactField::new(FieldType::Email, "email", "new@example.com"));
+        let _ = new_card.add_field(ContactField::new(FieldType::Email, "email", "new@example.com"));
 
         let update_id = manager.queue_card_update("contact-1", &old_card, &new_card).unwrap();
         assert!(!update_id.is_empty());
@@ -434,10 +434,10 @@ mod tests {
         let manager = SyncManager::new(&storage);
 
         let mut old_card = ContactCard::new("Alice");
-        old_card.add_field(ContactField::new(FieldType::Email, "email", "old@example.com"));
+        let _ = old_card.add_field(ContactField::new(FieldType::Email, "email", "old@example.com"));
 
         let mut new_card = ContactCard::new("Alice");
-        new_card.add_field(ContactField::new(FieldType::Email, "email", "new@example.com"));
+        let _ = new_card.add_field(ContactField::new(FieldType::Email, "email", "new@example.com"));
 
         let update_id = manager.queue_card_update("contact-1", &old_card, &new_card).unwrap();
 
@@ -454,10 +454,10 @@ mod tests {
         let manager = SyncManager::new(&storage);
 
         let mut old_card = ContactCard::new("Alice");
-        old_card.add_field(ContactField::new(FieldType::Email, "email", "old@example.com"));
+        let _ = old_card.add_field(ContactField::new(FieldType::Email, "email", "old@example.com"));
 
         let mut new_card = ContactCard::new("Alice");
-        new_card.add_field(ContactField::new(FieldType::Email, "email", "new@example.com"));
+        let _ = new_card.add_field(ContactField::new(FieldType::Email, "email", "new@example.com"));
 
         let update_id = manager.queue_card_update("contact-1", &old_card, &new_card).unwrap();
 
@@ -473,10 +473,10 @@ mod tests {
         let manager = SyncManager::new(&storage);
 
         let mut old_card = ContactCard::new("Alice");
-        old_card.add_field(ContactField::new(FieldType::Email, "email", "old@example.com"));
+        let _ = old_card.add_field(ContactField::new(FieldType::Email, "email", "old@example.com"));
 
         let mut new_card = ContactCard::new("Alice");
-        new_card.add_field(ContactField::new(FieldType::Email, "email", "new@example.com"));
+        let _ = new_card.add_field(ContactField::new(FieldType::Email, "email", "new@example.com"));
 
         manager.queue_card_update("contact-1", &old_card, &new_card).unwrap();
 
@@ -499,10 +499,10 @@ mod tests {
         let manager = SyncManager::new(&storage);
 
         let mut old_card = ContactCard::new("Alice");
-        old_card.add_field(ContactField::new(FieldType::Email, "email", "old@example.com"));
+        let _ = old_card.add_field(ContactField::new(FieldType::Email, "email", "old@example.com"));
 
         let mut new_card = ContactCard::new("Alice");
-        new_card.add_field(ContactField::new(FieldType::Email, "email", "new@example.com"));
+        let _ = new_card.add_field(ContactField::new(FieldType::Email, "email", "new@example.com"));
 
         let update_id = manager.queue_card_update("contact-1", &old_card, &new_card).unwrap();
         manager.mark_failed(&update_id, "Network error", 0).unwrap();
@@ -517,12 +517,12 @@ mod tests {
         let manager = SyncManager::new(&storage);
 
         // Queue multiple updates
-        let mut card1 = ContactCard::new("Alice");
+        let card1 = ContactCard::new("Alice");
         let mut card2 = ContactCard::new("Alice");
-        card2.add_field(ContactField::new(FieldType::Email, "email", "alice@example.com"));
+        let _ = card2.add_field(ContactField::new(FieldType::Email, "email", "alice@example.com"));
         let mut card3 = ContactCard::new("Alice");
-        card3.add_field(ContactField::new(FieldType::Email, "email", "alice@example.com"));
-        card3.add_field(ContactField::new(FieldType::Phone, "phone", "+1234567890"));
+        let _ = card3.add_field(ContactField::new(FieldType::Email, "email", "alice@example.com"));
+        let _ = card3.add_field(ContactField::new(FieldType::Phone, "phone", "+1234567890"));
 
         manager.queue_card_update("contact-1", &card1, &card2).unwrap();
         manager.queue_card_update("contact-1", &card2, &card3).unwrap();
@@ -542,9 +542,9 @@ mod tests {
         let storage = create_test_storage();
         let manager = SyncManager::new(&storage);
 
-        let mut card1 = ContactCard::new("Alice");
+        let card1 = ContactCard::new("Alice");
         let mut card2 = ContactCard::new("Alice");
-        card2.add_field(ContactField::new(FieldType::Email, "email", "alice@example.com"));
+        let _ = card2.add_field(ContactField::new(FieldType::Email, "email", "alice@example.com"));
 
         manager.queue_card_update("contact-1", &card1, &card2).unwrap();
         manager.queue_card_update("contact-2", &card1, &card2).unwrap();

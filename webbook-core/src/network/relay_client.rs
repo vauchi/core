@@ -298,7 +298,6 @@ mod tests {
     use super::*;
     use crate::crypto::SymmetricKey;
     use crate::network::mock::MockTransport;
-    use crate::network::message::{PROTOCOL_VERSION, PresenceUpdate, PresenceStatus};
     use crate::exchange::X3DHKeyPair;
 
     fn create_test_config() -> RelayClientConfig {
@@ -311,7 +310,7 @@ mod tests {
     }
 
     fn create_test_ratchet() -> (DoubleRatchetState, DoubleRatchetState) {
-        let alice_dh = X3DHKeyPair::generate();
+        let _alice_dh = X3DHKeyPair::generate();
         let bob_dh = X3DHKeyPair::generate();
         let shared_secret = SymmetricKey::generate();
 

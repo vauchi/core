@@ -575,7 +575,7 @@ mod tests {
         wb.create_identity("Alice").unwrap();
 
         let mut card = wb.own_card().unwrap().unwrap();
-        card.add_field(ContactField::new(FieldType::Email, "email", "alice@example.com"));
+        let _ = card.add_field(ContactField::new(FieldType::Email, "email", "alice@example.com"));
 
         let changed = wb.update_own_card(&card).unwrap();
         assert!(changed.contains(&"email".to_string()));
@@ -888,7 +888,7 @@ mod tests {
     fn test_process_incoming_card_update() {
         use crate::exchange::X3DHKeyPair;
         use crate::sync::delta::CardDelta;
-        use crate::crypto::ratchet::{DoubleRatchetState, RatchetMessage};
+        use crate::crypto::ratchet::DoubleRatchetState;
         use crate::Identity;
 
         // Create Alice's WebBook

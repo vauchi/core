@@ -2,6 +2,8 @@
 //!
 //! Terminal output formatting and styling.
 
+#![allow(dead_code)] // Utility functions for future use
+
 use console::{style, Style};
 use webbook_core::{ContactCard, Contact, FieldType, SocialNetworkRegistry};
 

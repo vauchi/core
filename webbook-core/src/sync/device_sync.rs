@@ -457,7 +457,7 @@ mod tests {
         use crate::contact_card::{ContactField, FieldType};
 
         let mut card = ContactCard::new("Alice");
-        card.add_field(ContactField::new(FieldType::Phone, "mobile", "+1234567890"));
+        let _ = card.add_field(ContactField::new(FieldType::Phone, "mobile", "+1234567890"));
 
         // Create a SyncItem representing a card field update
         let item = SyncItem::CardUpdated {

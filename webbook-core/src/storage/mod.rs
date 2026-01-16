@@ -773,7 +773,7 @@ mod tests {
     fn create_test_contact(name: &str) -> Contact {
         let public_key = [0u8; 32];
         let mut card = ContactCard::new(name);
-        card.add_field(ContactField::new(
+        let _ = card.add_field(ContactField::new(
             FieldType::Email,
             "email",
             &format!("{}@example.com", name.to_lowercase()),
@@ -847,7 +847,7 @@ mod tests {
         let storage = create_test_storage();
 
         let mut card = ContactCard::new("My Card");
-        card.add_field(ContactField::new(FieldType::Phone, "mobile", "+1234567890"));
+        let _ = card.add_field(ContactField::new(FieldType::Phone, "mobile", "+1234567890"));
 
         storage.save_own_card(&card).unwrap();
 

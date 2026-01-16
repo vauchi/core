@@ -3,7 +3,7 @@
 //! These tests map directly to scenarios in contact_card_management.feature
 //! Written FIRST (RED phase) before implementation.
 
-use webbook_core::contact_card::{ContactCard, ContactField, FieldType, ValidationError};
+use webbook_core::contact_card::{ContactCard, ContactField, FieldType};
 
 // =============================================================================
 // Contact Card Creation Tests

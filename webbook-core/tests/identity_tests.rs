@@ -3,7 +3,7 @@
 //! These tests map directly to scenarios in identity_management.feature
 //! Written FIRST (RED phase) before implementation.
 
-use webbook_core::identity::{Identity, IdentityBackup};
+use webbook_core::identity::Identity;
 
 // =============================================================================
 // Identity Creation Tests (from identity_management.feature)
@@ -157,7 +157,7 @@ fn test_change_display_name() {
 /// Maps to: "Display name is required"
 #[test]
 fn test_empty_display_name_rejected() {
-    let result = Identity::create("");
+    let _result = Identity::create("");
 
     // Creating with empty name should fail or use a default
     // Let's check the behavior - either it fails or provides a sensible default

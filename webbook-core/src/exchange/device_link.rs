@@ -473,8 +473,8 @@ impl DeviceLinkResponse {
 
 /// State machine for device linking from the existing device's perspective.
 pub struct DeviceLinkInitiator {
-    /// The identity on this device
-    identity_public_key: [u8; 32],
+    /// The identity on this device (reserved for future verification)
+    _identity_public_key: [u8; 32],
     /// Master seed to transfer (kept for creating response)
     master_seed: [u8; 32],
     /// Display name to transfer
@@ -500,7 +500,7 @@ impl DeviceLinkInitiator {
         let qr = DeviceLinkQR::generate(identity);
 
         DeviceLinkInitiator {
-            identity_public_key: *identity.signing_public_key(),
+            _identity_public_key: *identity.signing_public_key(),
             master_seed,
             display_name: identity.display_name().to_string(),
             qr,

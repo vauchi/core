@@ -43,7 +43,7 @@ fn test_x3dh_different_keys_different_secrets() {
     let charlie = X3DHKeyPair::generate();
 
     // Alice-Bob exchange
-    let (alice_bob_secret, alice_ephemeral) = X3DH::initiate(&alice, bob.public_key()).unwrap();
+    let (alice_bob_secret, _alice_ephemeral) = X3DH::initiate(&alice, bob.public_key()).unwrap();
 
     // Alice-Charlie exchange
     let (alice_charlie_secret, _) = X3DH::initiate(&alice, charlie.public_key()).unwrap();

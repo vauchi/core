@@ -17,6 +17,19 @@
 | UI/UX review | Low | Low | Todo |
 | Performance tuning | Low | Low | Todo |
 
+### Testing (Fail Fast)
+
+See `docs/development/testing.md` for full strategy.
+
+| Task | Value | Complexity | Status |
+|------|-------|------------|--------|
+| Fuzz testing (parsers) | High | Medium | Todo |
+| Concurrency tests (storage) | High | Medium | Todo |
+| Protocol compatibility tests | High | Low | Todo |
+| Migration tests (database) | High | Low | Todo |
+| Snapshot tests (serialization) | Medium | Low | Todo |
+| Performance benchmarks | Medium | Low | Todo |
+
 ## Phase 3: Launch
 
 | Task | Complexity | Status |

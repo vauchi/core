@@ -11,6 +11,9 @@
 | Metadata leakage | Minimal metadata, random padding |
 | Replay attacks | Timestamps and nonces in all messages |
 | Key compromise | Forward secrecy via ratcheting |
+| Device link hijacking | Signed QR codes, 10-minute expiry |
+| Rogue device after revocation | Revocation broadcast to all contacts |
+| Device registry tampering | Registry signed by identity key |
 
 For detailed threat analysis (25+ threats), see [THREAT_ANALYSIS.md](../THREAT_ANALYSIS.md).
 

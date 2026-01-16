@@ -373,6 +373,106 @@ WebBook is a **contact card exchange** system, not a messaging app:
 
 ---
 
+### 8. Device Linking Threats
+
+#### T8.1: QR Code Shoulder Surfing
+
+**Threat**: Attacker photographs device link QR code and links their own device.
+
+**Mitigation**:
+- Link QR expires after 10 minutes
+- Physical proximity required (must be in same location as victim)
+- Attacker would need to scan QR *and* complete linking before victim notices
+
+**Residual Risk**:
+- Brief exposure window if user leaves QR displayed unattended
+- Recommendation: Cancel linking flow if stepping away
+
+#### T8.2: Man-in-the-Middle During Device Link
+
+**Threat**: Attacker intercepts link QR, relays modified version to victim's new device.
+
+**Mitigation**:
+- Link QR is signed by identity key
+- New device verifies signature before proceeding
+- Attacker cannot forge signature without master seed
+
+**Residual Risk**: None if signature verification is implemented correctly.
+
+#### T8.3: Rogue Device Remains After Revocation
+
+**Threat**: Revoked device continues to receive updates.
+
+**Mitigation**:
+- Device revocation is broadcast to all contacts
+- Contacts remove revoked device from their recipient lists
+- Registry version numbers prevent rollback to pre-revocation state
+
+**Residual Risk**:
+- Offline contacts may not receive revocation immediately
+- Revoked device retains data received before revocation
+
+#### T8.4: Device Registry Tampering
+
+**Threat**: Attacker adds unauthorized device to registry.
+
+**Mitigation**:
+- Registry is signed by identity signing key
+- Signature verified before registry updates are accepted
+- Only devices with master seed can derive valid keys
+
+**Residual Risk**: None for properly signed registries.
+
+#### T8.5: Seed Exposure During Device Link
+
+**Threat**: Master seed intercepted during device linking transfer.
+
+**Mitigation**:
+- Seed encrypted with random link_key
+- Link key transmitted via QR (local camera, not network)
+- Encrypted response sent over secure channel (TLS + E2E)
+
+**Residual Risk**:
+- Compromised existing device exposes seed to attacker
+- Recommendation: Verify device linking in trusted environment
+
+#### T8.6: Device Key Collision
+
+**Threat**: Two devices derive same device_id, causing conflicts.
+
+**Mitigation**:
+- Device ID derived from master_seed + device_index
+- Indices assigned sequentially and uniquely
+- HKDF collision is cryptographically infeasible
+
+**Residual Risk**: None. HKDF is collision-resistant.
+
+#### T8.7: Excessive Device Linking
+
+**Threat**: Attacker links many devices to exhaust resources or create confusion.
+
+**Mitigation**:
+- Maximum 10 devices per identity
+- User must explicitly approve each device link
+- Device registry shows all linked devices
+
+**Residual Risk**:
+- 10 malicious devices could be linked if attacker has physical access repeatedly
+- Recommendation: Review linked devices periodically
+
+#### T8.8: Device Fingerprint Spoofing
+
+**Threat**: Attacker's device pretends to be victim's existing device.
+
+**Mitigation**:
+- Each device has unique device_id derived from master_seed + index
+- Device exchange keys are unique per device
+- Cannot spoof without knowing master_seed
+
+**Residual Risk**: None. Device identity is cryptographically bound.
+
+---
+
 ## Risk Summary Matrix
 
 | Threat | Likelihood | Impact | Mitigation Effectiveness | Residual Risk |
@@ -386,6 +486,9 @@ WebBook is a **contact card exchange** system, not a messaging app:
 | T5.1 Cannot remove contact | Medium | Medium | Moderate (block) | Past data |
 | T6.1 Crypto bugs | Low | Critical | Strong (audited lib) | Library bugs |
 | T7.2 Relay DB breach | Medium | Low | Strong (E2E) | Metadata only |
+| T8.1 QR shoulder surfing | Low | Critical | Moderate (expiry) | Brief window |
+| T8.3 Rogue device after revocation | Low | Medium | Strong (broadcast) | Offline delay |
+| T8.5 Seed exposure during link | Low | Critical | Strong (encrypted) | Compromised device |
 
 ---
 
@@ -438,3 +541,4 @@ WebBook is a **contact card exchange** system, not a messaging app:
 | Version | Date | Changes |
 |---------|------|---------|
 | 1.0 | 2024-01 | Initial threat analysis |
+| 1.1 | 2026-01 | Added device linking threats (T8.x) |

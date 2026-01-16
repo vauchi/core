@@ -5,6 +5,8 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -25,11 +27,19 @@ fun ExchangeScreen(
     var exchangeData by remember { mutableStateOf<MobileExchangeData?>(null) }
     var qrBitmap by remember { mutableStateOf<Bitmap?>(null) }
     var isLoading by remember { mutableStateOf(true) }
+    var hasError by remember { mutableStateOf(false) }
+    var retryTrigger by remember { mutableStateOf(0) }
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(retryTrigger) {
+        isLoading = true
+        hasError = false
         exchangeData = onGenerateQr()
-        exchangeData?.let { data ->
-            qrBitmap = generateQrBitmap(data.qrData)
+        if (exchangeData != null) {
+            exchangeData?.let { data ->
+                qrBitmap = generateQrBitmap(data.qrData)
+            }
+        } else {
+            hasError = true
         }
         isLoading = false
     }
@@ -57,6 +67,32 @@ fun ExchangeScreen(
             if (isLoading) {
                 CircularProgressIndicator()
                 Text("Generating QR code...")
+            } else if (hasError) {
+                // Error state
+                Icon(
+                    Icons.Default.Warning,
+                    contentDescription = null,
+                    modifier = Modifier.size(64.dp),
+                    tint = MaterialTheme.colorScheme.error
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = "Failed to generate QR code",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.error
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "Please check your internet connection and try again",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(24.dp))
+                Button(onClick = { retryTrigger++ }) {
+                    Icon(Icons.Default.Refresh, contentDescription = null)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Retry")
+                }
             } else {
                 Text(
                     text = "Show this QR code to add a contact",

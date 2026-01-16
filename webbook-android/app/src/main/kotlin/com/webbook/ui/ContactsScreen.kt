@@ -8,7 +8,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
@@ -29,12 +31,20 @@ fun ContactsScreen(
 ) {
     var contacts by remember { mutableStateOf<List<MobileContact>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
+    var hasError by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
+    var retryTrigger by remember { mutableStateOf(0) }
 
     val isRefreshing = syncState is SyncState.Syncing
 
-    LaunchedEffect(Unit) {
-        contacts = onListContacts()
+    LaunchedEffect(retryTrigger) {
+        isLoading = true
+        hasError = false
+        try {
+            contacts = onListContacts()
+        } catch (e: Exception) {
+            hasError = true
+        }
         isLoading = false
     }
 
@@ -112,6 +122,38 @@ fun ContactsScreen(
                     contentAlignment = Alignment.Center
                 ) {
                     CircularProgressIndicator()
+                }
+            } else if (hasError) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(
+                            Icons.Default.Warning,
+                            contentDescription = null,
+                            modifier = Modifier.size(64.dp),
+                            tint = MaterialTheme.colorScheme.error
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(
+                            text = "Failed to load contacts",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "Please try again",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.height(24.dp))
+                        Button(onClick = { retryTrigger++ }) {
+                            Icon(Icons.Default.Refresh, contentDescription = null)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Retry")
+                        }
+                    }
                 }
             } else if (contacts.isEmpty()) {
                 Box(

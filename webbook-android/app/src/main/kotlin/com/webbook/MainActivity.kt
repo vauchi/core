@@ -11,11 +11,17 @@ import androidx.compose.material.icons.Icons
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Warning
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import com.webbook.ui.ExchangeScreen
 import com.webbook.ui.ContactsScreen
 import com.webbook.ui.ContactDetailScreen
@@ -66,6 +72,8 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
     val uiState by viewModel.uiState.collectAsState()
     val snackbarMessage by viewModel.snackbarMessage.collectAsState()
     val syncState by viewModel.syncState.collectAsState()
+    val isOnline by viewModel.isOnline.collectAsState()
+    val lastSyncTime by viewModel.lastSyncTime.collectAsState()
     var currentScreen by remember { mutableStateOf(Screen.Home) }
     var selectedContactId by remember { mutableStateOf<String?>(null) }
     val coroutineScope = rememberCoroutineScope()
@@ -110,9 +118,16 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
                     onContacts = { currentScreen = Screen.Contacts },
                     onSettings = { currentScreen = Screen.Settings },
                     socialNetworks = viewModel.listSocialNetworks(),
-                    onGetProfileUrl = viewModel::getProfileUrl
+                    onGetProfileUrl = viewModel::getProfileUrl,
+                    syncState = syncState,
+                    isOnline = isOnline,
+                    lastSyncTime = lastSyncTime,
+                    onSync = { viewModel.sync() }
                 )
-                is UiState.Error -> ErrorScreen(message = state.message)
+                is UiState.Error -> ErrorScreen(
+                    message = state.message,
+                    onRetry = { viewModel.refresh() }
+                )
             }
         }
         Screen.Exchange -> {
@@ -254,7 +269,11 @@ fun ReadyScreen(
     onContacts: () -> Unit,
     onSettings: () -> Unit,
     socialNetworks: List<uniffi.webbook_mobile.MobileSocialNetwork> = emptyList(),
-    onGetProfileUrl: (String, String) -> String? = { _, _ -> null }
+    onGetProfileUrl: (String, String) -> String? = { _, _ -> null },
+    syncState: SyncState = SyncState.Idle,
+    isOnline: Boolean = true,
+    lastSyncTime: Instant? = null,
+    onSync: () -> Unit = {}
 ) {
     var showAddDialog by remember { mutableStateOf(false) }
 
@@ -263,6 +282,13 @@ fun ReadyScreen(
             TopAppBar(
                 title = { Text("WebBook") },
                 actions = {
+                    // Sync status indicator
+                    SyncStatusChip(
+                        syncState = syncState,
+                        isOnline = isOnline,
+                        lastSyncTime = lastSyncTime,
+                        onSync = onSync
+                    )
                     IconButton(onClick = onSettings) {
                         Icon(Icons.Default.Settings, contentDescription = "Settings")
                     }
@@ -275,23 +301,32 @@ fun ReadyScreen(
             }
         }
     ) { padding ->
-        LazyColumn(
+        Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(horizontal = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-            contentPadding = PaddingValues(vertical = 24.dp)
         ) {
-            item {
-                Text(
-                    text = "Hello, $displayName!",
-                    style = MaterialTheme.typography.headlineMedium
-                )
+            // Offline banner
+            if (!isOnline) {
+                OfflineBanner()
             }
 
-            item {
-                Card(modifier = Modifier.fillMaxWidth()) {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 24.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+                contentPadding = PaddingValues(vertical = 24.dp)
+            ) {
+                item {
+                    Text(
+                        text = "Hello, $displayName!",
+                        style = MaterialTheme.typography.headlineMedium
+                    )
+                }
+
+                item {
+                    Card(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text(
                             text = "Your Card",
@@ -415,6 +450,7 @@ fun ReadyScreen(
                         Text("Contacts")
                     }
                 }
+            }
             }
         }
     }
@@ -597,7 +633,10 @@ fun AddFieldDialog(
 }
 
 @Composable
-fun ErrorScreen(message: String) {
+fun ErrorScreen(
+    message: String,
+    onRetry: () -> Unit = {}
+) {
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -605,17 +644,96 @@ fun ErrorScreen(message: String) {
         contentAlignment = Alignment.Center
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(
-                text = "Error",
-                style = MaterialTheme.typography.headlineMedium,
-                color = MaterialTheme.colorScheme.error
+            Icon(
+                Icons.Default.Warning,
+                contentDescription = null,
+                modifier = Modifier.size(64.dp),
+                tint = MaterialTheme.colorScheme.error
             )
             Spacer(modifier = Modifier.height(16.dp))
             Text(
+                text = "Something went wrong",
+                style = MaterialTheme.typography.headlineMedium,
+                color = MaterialTheme.colorScheme.error
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
                 text = message,
                 style = MaterialTheme.typography.bodyLarge,
-                textAlign = TextAlign.Center
+                textAlign = TextAlign.Center,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+            Spacer(modifier = Modifier.height(24.dp))
+            Button(onClick = onRetry) {
+                Icon(Icons.Default.Refresh, contentDescription = null)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Retry")
+            }
         }
+    }
+}
+
+@Composable
+fun OfflineBanner() {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.errorContainer)
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            Icons.Default.Warning,
+            contentDescription = null,
+            modifier = Modifier.size(16.dp),
+            tint = MaterialTheme.colorScheme.onErrorContainer
+        )
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(
+            text = "You're offline",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onErrorContainer
+        )
+    }
+}
+
+@Composable
+fun SyncStatusChip(
+    syncState: SyncState,
+    isOnline: Boolean,
+    lastSyncTime: Instant?,
+    onSync: () -> Unit
+) {
+    val (text, color) = when {
+        !isOnline -> "Offline" to MaterialTheme.colorScheme.outline
+        syncState is SyncState.Syncing -> "Syncing..." to MaterialTheme.colorScheme.primary
+        syncState is SyncState.Error -> "Sync failed" to MaterialTheme.colorScheme.error
+        syncState is SyncState.Success || lastSyncTime != null -> {
+            val timeText = lastSyncTime?.let {
+                val formatter = DateTimeFormatter.ofPattern("HH:mm")
+                    .withZone(ZoneId.systemDefault())
+                formatter.format(it)
+            } ?: ""
+            "Synced $timeText" to MaterialTheme.colorScheme.primary
+        }
+        else -> "Tap to sync" to MaterialTheme.colorScheme.outline
+    }
+
+    TextButton(
+        onClick = { if (isOnline && syncState !is SyncState.Syncing) onSync() },
+        enabled = isOnline && syncState !is SyncState.Syncing
+    ) {
+        if (syncState is SyncState.Syncing) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(16.dp),
+                strokeWidth = 2.dp
+            )
+            Spacer(modifier = Modifier.width(4.dp))
+        }
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelMedium,
+            color = color
+        )
     }
 }

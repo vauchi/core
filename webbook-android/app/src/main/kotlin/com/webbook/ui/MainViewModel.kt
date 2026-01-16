@@ -4,10 +4,13 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.webbook.data.WebBookRepository
+import com.webbook.util.NetworkMonitor
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import uniffi.webbook_mobile.MobileContact
@@ -17,6 +20,7 @@ import uniffi.webbook_mobile.MobileExchangeResult
 import uniffi.webbook_mobile.MobileFieldType
 import uniffi.webbook_mobile.MobileSocialNetwork
 import uniffi.webbook_mobile.MobileSyncResult
+import java.time.Instant
 
 sealed class SyncState {
     object Idle : SyncState()
@@ -42,8 +46,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         WebBookRepository(application)
     }
 
+    private val networkMonitor = NetworkMonitor(application)
+
     private val _uiState = MutableStateFlow<UiState>(UiState.Loading)
     val uiState: StateFlow<UiState> = _uiState.asStateFlow()
+
+    // Network connectivity state
+    val isOnline: StateFlow<Boolean> = networkMonitor.isOnline
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
 
     // Snackbar message channel for user feedback
     private val _snackbarMessage = MutableStateFlow<String?>(null)
@@ -52,6 +62,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // Sync state
     private val _syncState = MutableStateFlow<SyncState>(SyncState.Idle)
     val syncState: StateFlow<SyncState> = _syncState.asStateFlow()
+
+    // Last sync timestamp
+    private val _lastSyncTime = MutableStateFlow<Instant?>(null)
+    val lastSyncTime: StateFlow<Instant?> = _lastSyncTime.asStateFlow()
 
     fun clearSnackbar() {
         _snackbarMessage.value = null
@@ -130,6 +144,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     repository.sync()
                 }
                 _syncState.value = SyncState.Success(result)
+                _lastSyncTime.value = Instant.now()
                 loadUserData()
                 val msg = buildString {
                     append("Sync complete")
@@ -138,8 +153,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
                 showMessage(msg)
             } catch (e: Exception) {
-                _syncState.value = SyncState.Error(e.message ?: "Sync failed")
-                showMessage("Sync failed: ${e.message}")
+                val errorMsg = if (!networkMonitor.isCurrentlyConnected()) {
+                    "No internet connection"
+                } else {
+                    e.message ?: "Sync failed"
+                }
+                _syncState.value = SyncState.Error(errorMsg)
+                showMessage("Sync failed: $errorMsg")
             }
         }
     }

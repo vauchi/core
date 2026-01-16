@@ -4,8 +4,10 @@
 //! Each identity has a unique Ed25519 signing keypair and X25519 exchange keypair.
 
 mod backup;
+pub mod device;
 
 pub use backup::IdentityBackup;
+pub use device::{DeviceInfo, DeviceRegistry, RegisteredDevice, DeviceError, MAX_DEVICES};
 
 use crate::crypto::{SigningKeyPair, Signature, encrypt, decrypt, SymmetricKey};
 use crate::exchange::X3DHKeyPair;

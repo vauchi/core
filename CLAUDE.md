@@ -93,16 +93,16 @@ Follow strict Test-Driven Development as defined in `docs/TDD_RULES.md`:
 
 1. **Test-first**: Every time all tests are green, create a commit
 2. **Documentation Updates**: Before committing, update relevant documentation if:
-   - New features → Update `docs/MVP_PLAN.md` status, add Gherkin scenarios to `features/`
-   - Architecture changes → Update `docs/ARCHITECTURE.md`
+   - New features → Update `docs/planning/` status, add Gherkin scenarios to `features/`
+   - Architecture changes → Update relevant file in `docs/architecture/`
    - API changes → Update relevant crate README (`webbook-core/`, `webbook-cli/`, `webbook-relay/`, `webbook-mobile/`)
-3. **Planning Documentation**: For significant features, create/update a plan document linking to:
+3. **Planning Documentation**: For significant features, create/update a plan in `docs/planning/todo/` linking to:
    - Related Gherkin feature files
    - Architecture decisions
    - Implementation approach
 4. **Feature Descriptions**: New user-facing features require:
    - Gherkin scenarios in `features/*.feature` (always first - TDD)
-   - Brief description in `docs/MVP_PLAN.md`
+   - Brief description in `docs/planning/`
 
 ### Test Requirements
 
@@ -116,8 +116,10 @@ Follow strict Test-Driven Development as defined in `docs/TDD_RULES.md`:
 |----------|---------|-------------|
 | `CLAUDE.md` | AI assistant quick reference | Build commands or project structure changes |
 | `README.md` | GitHub visitors intro | Project description or quick start changes |
-| `docs/ARCHITECTURE.md` | Technical design details | Architecture, protocols, or data model changes |
-| `docs/MVP_PLAN.md` | Current status and roadmap | Feature completion or roadmap changes |
+| `docs/architecture/` | Technical design details | Architecture, protocols, or data model changes |
+| `docs/planning/` | Status and roadmap | Feature completion or roadmap changes |
+| `docs/planning/done/` | Completed work | After completing a feature/milestone |
+| `docs/planning/todo/` | Planned work | When planning new features |
 | `docs/TDD_RULES.md` | Development methodology | Testing process changes |
 | `docs/THREAT_ANALYSIS.md` | Security threat model | Security-relevant changes |
 | `features/*.feature` | Gherkin scenarios | Before implementing any new feature (TDD) |

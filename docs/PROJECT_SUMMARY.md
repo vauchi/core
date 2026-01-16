@@ -31,8 +31,10 @@ WebBook is a privacy-focused, decentralized contact card exchange application th
 | Document | Audience | Purpose |
 |----------|----------|---------|
 | [CLAUDE.md](../CLAUDE.md) | AI/Contributors | Quick reference, build commands, commit rules |
-| [ARCHITECTURE.md](./ARCHITECTURE.md) | Developers | Technical design, data models, protocols |
-| [MVP_PLAN.md](./MVP_PLAN.md) | Sprint Planning | Current status, roadmap, what's next |
+| [architecture/](./architecture/) | Developers | Technical design, data models, protocols |
+| [planning/](./planning/) | Sprint Planning | Current status, roadmap, what's next |
+| [planning/done/](./planning/done/) | Reference | Completed milestones |
+| [planning/todo/](./planning/todo/) | Planning | Upcoming work |
 | [TDD_RULES.md](./TDD_RULES.md) | Developers | Test-driven development methodology |
 | [THREAT_ANALYSIS.md](./THREAT_ANALYSIS.md) | Security | Threat model, mitigations |
 | `features/*.feature` | All | Gherkin behavior specifications |

@@ -63,7 +63,7 @@ This project uses strict Test-Driven Development. Before contributing:
 
 1. Read [CLAUDE.md](CLAUDE.md) for project structure and commit rules
 2. Read [docs/TDD_RULES.md](docs/TDD_RULES.md) for the TDD workflow
-3. Read [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for technical design
+3. Read [docs/architecture/](docs/architecture/) for technical design
 
 ## Planned Components
 

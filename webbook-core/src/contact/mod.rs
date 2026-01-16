@@ -61,6 +61,32 @@ impl Contact {
         }
     }
 
+    /// Creates a contact from device sync data.
+    ///
+    /// Used when syncing contacts to a new device.
+    pub fn from_sync_data(
+        public_key: [u8; 32],
+        card: ContactCard,
+        shared_key: SymmetricKey,
+        exchange_timestamp: u64,
+        fingerprint_verified: bool,
+        visibility_rules: VisibilityRules,
+    ) -> Self {
+        let id = hex::encode(public_key);
+        let display_name = card.display_name().to_string();
+
+        Contact {
+            id,
+            public_key,
+            display_name,
+            card,
+            shared_key,
+            exchange_timestamp,
+            fingerprint_verified,
+            visibility_rules,
+        }
+    }
+
     /// Returns the contact's unique ID (public key fingerprint).
     pub fn id(&self) -> &str {
         &self.id

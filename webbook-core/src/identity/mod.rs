@@ -12,7 +12,7 @@ pub use device::{
     RegisteredDevice, RegistryBroadcast, MAX_DEVICES,
 };
 
-use crate::crypto::{decrypt, encrypt, Signature, SigningKeyPair, SymmetricKey};
+use crate::crypto::{decrypt, encrypt, Signature, SigningKeyPair, SymmetricKey, HKDF};
 use crate::exchange::X3DHKeyPair;
 use ring::pbkdf2;
 use ring::rand::SystemRandom;
@@ -94,12 +94,12 @@ impl Identity {
         // Cache the signing public key bytes
         let signing_public_key = *signing_keypair.public_key().as_bytes();
 
-        // Derive exchange keypair (simple derivation for now - XOR with constant)
-        // In production, use proper HKDF derivation
-        let mut exchange_seed = master_seed;
-        for (i, byte) in exchange_seed.iter_mut().enumerate() {
-            *byte ^= (i as u8).wrapping_add(0x42);
-        }
+        // Derive exchange keypair using HKDF with domain separation
+        let exchange_seed = HKDF::derive_key(
+            Some(&master_seed),
+            &[],
+            b"WebBook_Exchange_Seed",
+        );
 
         // Create X25519 keypair and store the actual public key
         let x3dh = X3DHKeyPair::from_bytes(exchange_seed);
@@ -149,15 +149,16 @@ impl Identity {
 
     /// Returns the X3DH keypair for key agreement.
     ///
-    /// The keypair is derived from the master seed using the same derivation
-    /// as exchange_public_key, ensuring consistency.
+    /// The keypair is derived from the master seed using HKDF with domain
+    /// separation, ensuring consistency with exchange_public_key.
     pub fn x3dh_keypair(&self) -> X3DHKeyPair {
-        // Derive X25519 secret from master_seed
+        // Derive X25519 secret from master_seed using HKDF
         // Uses same derivation as exchange_public_key for consistency
-        let mut x25519_secret = [0u8; 32];
-        for (i, byte) in self.master_seed.iter().enumerate() {
-            x25519_secret[i] = byte ^ (i as u8).wrapping_add(0x42);
-        }
+        let x25519_secret = HKDF::derive_key(
+            Some(&self.master_seed),
+            &[],
+            b"WebBook_Exchange_Seed",
+        );
         X3DHKeyPair::from_bytes(x25519_secret)
     }
 

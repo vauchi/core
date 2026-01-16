@@ -4,7 +4,6 @@
 
 | Feature | Complexity |
 |---------|------------|
-| Camera scanning | Low |
 | iOS app | Medium |
 | Desktop app (Tauri) | Medium |
 | Visibility labels | Low |
@@ -14,6 +13,7 @@
 | Feature | Complexity |
 |---------|------------|
 | Multi-device sync | High |
+| Relay PHP deployment | High |
 | BLE/NFC exchange | Medium |
 | Social profile validation | Medium |
 | Docker deployment | Low |

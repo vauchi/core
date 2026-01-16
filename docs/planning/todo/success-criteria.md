@@ -4,7 +4,7 @@
 - [x] Create identity
 - [x] Add/edit/remove fields
 - [x] Generate QR code
-- [ ] Scan QR code (camera)
+- [x] Scan QR code (camera)
 - [x] Bidirectional exchange
 - [x] Sync updates via relay
 - [x] Visibility rules enforced

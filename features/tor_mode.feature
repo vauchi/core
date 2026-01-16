@@ -1,12 +1,32 @@
-@privacy @tor @network
+@privacy @tor @network @opt-in
 Feature: Tor Mode
   As a privacy-conscious WebBook user
   I want to route my relay connections through Tor
   So that my IP address is hidden from relay operators and network observers
 
+  Note: This is an OPT-IN feature. Tor mode is disabled by default.
+  Users must explicitly enable it in Privacy settings.
+
   Background:
     Given I have an existing identity
     And I have contacts who may send me updates
+
+  # Opt-in Default State
+
+  @opt-in @default
+  Scenario: Tor mode is disabled by default
+    Given I have just installed the app
+    When I check Privacy settings
+    Then Tor mode should be OFF
+    And connections should use direct networking
+    And no Tor components should be loaded
+
+  @opt-in @default
+  Scenario: Tor mode not mentioned in basic onboarding
+    Given I am going through initial app setup
+    Then Tor mode should not be part of basic setup
+    And it should only be available in advanced Privacy settings
+    And new users should not be confused by Tor options
 
   # Enabling Tor Mode
 

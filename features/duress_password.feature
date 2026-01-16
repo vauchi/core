@@ -1,34 +1,62 @@
-@privacy @duress @plausible-deniability @security
+@privacy @duress @plausible-deniability @security @opt-in
 Feature: Duress Password
   As a WebBook user who may be coerced to unlock my phone
   I want a secondary password that shows a fake contact list
   So that I can comply with demands while protecting sensitive contacts
 
-  Note: This feature requires app password to be enabled first.
-  The duress password unlocks a decoy profile that looks legitimate.
+  Note: This is an OPT-IN feature with prerequisites:
+  1. App password must be enabled first
+  2. Duress password must be explicitly configured
+  3. The decoy profile must be manually set up
+
+  This feature is completely invisible until explicitly enabled.
 
   Background:
     Given I have an existing identity
-    And I have app password enabled
     And I have contacts in my real profile
+
+  # Opt-in Default State
+
+  @opt-in @default
+  Scenario: Duress password is disabled by default
+    Given I have just installed the app
+    When I check Security settings
+    Then there should be no duress password configured
+    And duress mode should be completely inactive
+    And only the real profile exists
+
+  @opt-in @default
+  Scenario: Duress option hidden until app password enabled
+    Given app password is not enabled
+    When I view Security settings
+    Then "Duress password" option should not be visible
+    And there should be no mention of duress functionality
+    And the feature should be completely hidden
+
+  @opt-in @default
+  Scenario: Duress option appears after enabling app password
+    Given app password is not enabled
+    When I enable app password
+    Then "Duress password" option should become visible in Security settings
+    And it should show as "OFF" / not configured
+    And a brief explanation should be available
 
   # Prerequisites
 
   @prerequisite
   Scenario: App password required for duress mode
     Given app password is not enabled
-    When I try to enable duress password
-    Then I should see "App password required"
-    And I should be prompted to set up app password first
-    And duress password option should be disabled
+    When I navigate to where duress password would be
+    Then the option should not be visible
+    And I must enable app password first
 
   @prerequisite
-  Scenario: Enable app password first
+  Scenario: Enable app password unlocks duress option
     Given app password is not enabled
     When I enable app password
     And I set a strong password
-    Then duress password option should become available
-    And I should see "Duress mode available" in security settings
+    Then duress password option should become visible
+    And it should be clearly marked as optional
 
   # Setting Up Duress Password
 

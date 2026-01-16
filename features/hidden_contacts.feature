@@ -1,12 +1,55 @@
-@privacy @hidden @plausible-deniability
+@privacy @hidden @plausible-deniability @opt-in
 Feature: Hidden Contacts
   As a WebBook user in a sensitive situation
   I want to hide certain contacts from casual view
   So that I have plausible deniability if someone looks at my phone
 
+  Note: This is an OPT-IN feature. Hidden contacts functionality is
+  disabled by default and must be explicitly enabled in Privacy settings.
+
   Background:
     Given I have an existing identity
     And I have multiple contacts
+
+  # Opt-in Default State
+
+  @opt-in @default
+  Scenario: Hidden contacts feature is disabled by default
+    Given I have just installed the app
+    When I view my contacts
+    Then there should be no "Hide contact" option
+    And hidden contacts feature should be OFF
+    And no secret gesture should be configured
+
+  @opt-in @default
+  Scenario: Enable hidden contacts feature
+    Given hidden contacts feature is disabled
+    When I go to Settings > Privacy > Hidden Contacts
+    And I toggle "Enable hidden contacts"
+    And I set up a secret gesture or PIN
+    Then hidden contacts feature should be enabled
+    And "Hide contact" option should appear in contact menus
+
+  @opt-in @default
+  Scenario: Must configure access method when enabling
+    Given I am enabling hidden contacts feature
+    When I toggle the feature ON
+    Then I must configure an access method before proceeding:
+      | method         | description                    |
+      | Secret gesture | Swipe/tap pattern              |
+      | Separate PIN   | PIN different from app lock    |
+      | App password   | Reuse existing app password    |
+    And I cannot skip this step
+
+  @opt-in @default
+  Scenario: Disable hidden contacts feature
+    Given hidden contacts feature is enabled
+    And I have hidden contacts
+    When I go to Settings > Privacy > Hidden Contacts
+    And I toggle "Enable hidden contacts" OFF
+    Then I should be warned "X contacts will be unhidden"
+    And after confirmation, all hidden contacts become visible
+    And the feature should be disabled
 
   # Hiding Contacts
 

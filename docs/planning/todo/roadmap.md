@@ -17,6 +17,7 @@
 | BLE/NFC exchange | Medium |
 | Social profile validation | Medium |
 | Docker deployment | Low |
+| Monitoring and health checks | Low |
 
 ## Low Priority
 

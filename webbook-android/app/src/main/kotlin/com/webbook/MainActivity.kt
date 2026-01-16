@@ -31,8 +31,12 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.webbook.ui.MainViewModel
+import com.webbook.ui.SyncState
 import com.webbook.ui.UiState
 import com.webbook.ui.theme.WebBookTheme
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import uniffi.webbook_mobile.MobileContactCard
 import uniffi.webbook_mobile.MobileFieldType
 
@@ -61,10 +65,25 @@ enum class Screen {
 fun MainScreen(viewModel: MainViewModel = viewModel()) {
     val uiState by viewModel.uiState.collectAsState()
     val snackbarMessage by viewModel.snackbarMessage.collectAsState()
+    val syncState by viewModel.syncState.collectAsState()
     var currentScreen by remember { mutableStateOf(Screen.Home) }
     var selectedContactId by remember { mutableStateOf<String?>(null) }
     val coroutineScope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
+    val lifecycleOwner = LocalLifecycleOwner.current
+
+    // Auto-sync when app comes to foreground
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME && uiState is UiState.Ready) {
+                viewModel.sync()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
 
     // Show snackbar when message changes
     LaunchedEffect(snackbarMessage) {
@@ -122,7 +141,9 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
                 onContactClick = { id ->
                     selectedContactId = id
                     currentScreen = Screen.ContactDetail
-                }
+                },
+                syncState = syncState,
+                onSync = { viewModel.sync() }
             )
         }
         Screen.ContactDetail -> {
@@ -148,7 +169,11 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
                     displayName = state.displayName,
                     onBack = { currentScreen = Screen.Home },
                     onExportBackup = { password -> viewModel.exportBackup(password) },
-                    onImportBackup = { data, password -> viewModel.importBackup(data, password) }
+                    onImportBackup = { data, password -> viewModel.importBackup(data, password) },
+                    relayUrl = viewModel.getRelayUrl(),
+                    onRelayUrlChange = { viewModel.setRelayUrl(it) },
+                    syncState = syncState,
+                    onSync = { viewModel.sync() }
                 )
             }
         }

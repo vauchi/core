@@ -1,18 +1,37 @@
 package com.webbook.data
 
 import android.content.Context
+import android.content.SharedPreferences
 import uniffi.webbook_mobile.MobileContactCard
 import uniffi.webbook_mobile.MobileExchangeData
 import uniffi.webbook_mobile.MobileFieldType
+import uniffi.webbook_mobile.MobileSyncResult
 import uniffi.webbook_mobile.WebBookMobile
 
 class WebBookRepository(context: Context) {
     private val webbook: WebBookMobile
+    private val prefs: SharedPreferences
+
+    companion object {
+        private const val PREFS_NAME = "webbook_settings"
+        private const val KEY_RELAY_URL = "relay_url"
+        private const val DEFAULT_RELAY_URL = "ws://localhost:8080"
+    }
 
     init {
         val dataDir = context.filesDir.absolutePath
-        webbook = WebBookMobile(dataDir, "ws://localhost:8080")
+        prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val relayUrl = prefs.getString(KEY_RELAY_URL, DEFAULT_RELAY_URL) ?: DEFAULT_RELAY_URL
+        webbook = WebBookMobile(dataDir, relayUrl)
     }
+
+    fun getRelayUrl(): String = prefs.getString(KEY_RELAY_URL, DEFAULT_RELAY_URL) ?: DEFAULT_RELAY_URL
+
+    fun setRelayUrl(url: String) {
+        prefs.edit().putString(KEY_RELAY_URL, url).apply()
+    }
+
+    fun sync(): MobileSyncResult = webbook.sync()
 
     fun hasIdentity(): Boolean = webbook.hasIdentity()
 

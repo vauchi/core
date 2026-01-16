@@ -10,6 +10,7 @@ import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -22,15 +23,26 @@ fun ContactsScreen(
     onBack: () -> Unit,
     onListContacts: suspend () -> List<MobileContact>,
     onRemoveContact: (String) -> Unit,
-    onContactClick: (String) -> Unit
+    onContactClick: (String) -> Unit,
+    syncState: SyncState = SyncState.Idle,
+    onSync: () -> Unit = {}
 ) {
     var contacts by remember { mutableStateOf<List<MobileContact>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
     var searchQuery by remember { mutableStateOf("") }
 
+    val isRefreshing = syncState is SyncState.Syncing
+
     LaunchedEffect(Unit) {
         contacts = onListContacts()
         isLoading = false
+    }
+
+    // Refresh contacts list when sync completes successfully
+    LaunchedEffect(syncState) {
+        if (syncState is SyncState.Success) {
+            contacts = onListContacts()
+        }
     }
 
     // Filter contacts based on search query
@@ -60,12 +72,17 @@ fun ContactsScreen(
             )
         }
     ) { padding ->
-        Column(
+        PullToRefreshBox(
+            isRefreshing = isRefreshing,
+            onRefresh = onSync,
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
         ) {
-            // Search bar
+            Column(
+                modifier = Modifier.fillMaxSize()
+            ) {
+                // Search bar
             if (!isLoading && contacts.isNotEmpty()) {
                 OutlinedTextField(
                     value = searchQuery,
@@ -142,6 +159,7 @@ fun ContactsScreen(
                         )
                     }
                 }
+            }
             }
         }
     }

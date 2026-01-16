@@ -23,12 +23,17 @@ fun SettingsScreen(
     displayName: String,
     onBack: () -> Unit,
     onExportBackup: suspend (String) -> String?,
-    onImportBackup: suspend (String, String) -> Boolean
+    onImportBackup: suspend (String, String) -> Boolean,
+    relayUrl: String = "",
+    onRelayUrlChange: (String) -> Unit = {},
+    syncState: SyncState = SyncState.Idle,
+    onSync: () -> Unit = {}
 ) {
     var showExportDialog by remember { mutableStateOf(false) }
     var showImportDialog by remember { mutableStateOf(false) }
     var snackbarMessage by remember { mutableStateOf<String?>(null) }
     val snackbarHostState = remember { SnackbarHostState() }
+    var editableRelayUrl by remember(relayUrl) { mutableStateOf(relayUrl) }
 
     LaunchedEffect(snackbarMessage) {
         snackbarMessage?.let {
@@ -83,6 +88,77 @@ fun SettingsScreen(
                         text = displayName,
                         style = MaterialTheme.typography.bodyLarge
                     )
+                }
+            }
+
+            HorizontalDivider()
+
+            // Sync Section
+            Text(
+                text = "Sync",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.primary
+            )
+
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant
+                )
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    OutlinedTextField(
+                        value = editableRelayUrl,
+                        onValueChange = { editableRelayUrl = it },
+                        label = { Text("Relay URL") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    if (editableRelayUrl != relayUrl) {
+                        Button(
+                            onClick = { onRelayUrlChange(editableRelayUrl) },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("Save Relay URL")
+                        }
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = when (syncState) {
+                                is SyncState.Idle -> "Ready to sync"
+                                is SyncState.Syncing -> "Syncing..."
+                                is SyncState.Success -> "Sync complete"
+                                is SyncState.Error -> "Sync failed"
+                            },
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = when (syncState) {
+                                is SyncState.Error -> MaterialTheme.colorScheme.error
+                                else -> MaterialTheme.colorScheme.onSurfaceVariant
+                            }
+                        )
+                        Button(
+                            onClick = onSync,
+                            enabled = syncState !is SyncState.Syncing
+                        ) {
+                            if (syncState is SyncState.Syncing) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(16.dp),
+                                    strokeWidth = 2.dp
+                                )
+                            } else {
+                                Text("Sync Now")
+                            }
+                        }
+                    }
                 }
             }
 

@@ -16,6 +16,14 @@ import uniffi.webbook_mobile.MobileExchangeData
 import uniffi.webbook_mobile.MobileExchangeResult
 import uniffi.webbook_mobile.MobileFieldType
 import uniffi.webbook_mobile.MobileSocialNetwork
+import uniffi.webbook_mobile.MobileSyncResult
+
+sealed class SyncState {
+    object Idle : SyncState()
+    object Syncing : SyncState()
+    data class Success(val result: MobileSyncResult) : SyncState()
+    data class Error(val message: String) : SyncState()
+}
 
 sealed class UiState {
     object Loading : UiState()
@@ -41,12 +49,20 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _snackbarMessage = MutableStateFlow<String?>(null)
     val snackbarMessage: StateFlow<String?> = _snackbarMessage.asStateFlow()
 
+    // Sync state
+    private val _syncState = MutableStateFlow<SyncState>(SyncState.Idle)
+    val syncState: StateFlow<SyncState> = _syncState.asStateFlow()
+
     fun clearSnackbar() {
         _snackbarMessage.value = null
     }
 
     private fun showMessage(message: String) {
         _snackbarMessage.value = message
+    }
+
+    fun clearSyncState() {
+        _syncState.value = SyncState.Idle
     }
 
     init {
@@ -104,6 +120,35 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             loadUserData()
         }
+    }
+
+    fun sync() {
+        viewModelScope.launch {
+            _syncState.value = SyncState.Syncing
+            try {
+                val result = withContext(Dispatchers.IO) {
+                    repository.sync()
+                }
+                _syncState.value = SyncState.Success(result)
+                loadUserData()
+                val msg = buildString {
+                    append("Sync complete")
+                    if (result.contactsAdded > 0u) append(" - ${result.contactsAdded} new contacts")
+                    if (result.cardsUpdated > 0u) append(" - ${result.cardsUpdated} cards updated")
+                }
+                showMessage(msg)
+            } catch (e: Exception) {
+                _syncState.value = SyncState.Error(e.message ?: "Sync failed")
+                showMessage("Sync failed: ${e.message}")
+            }
+        }
+    }
+
+    fun getRelayUrl(): String = repository.getRelayUrl()
+
+    fun setRelayUrl(url: String) {
+        repository.setRelayUrl(url)
+        showMessage("Relay URL updated (restart app to apply)")
     }
 
     fun addField(fieldType: MobileFieldType, label: String, value: String) {

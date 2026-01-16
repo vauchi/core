@@ -113,7 +113,10 @@ impl DeviceInfo {
     }
 
     /// Converts to a RegisteredDevice for the registry.
-    pub fn to_registered(&self) -> RegisteredDevice {
+    ///
+    /// Note: The master_seed parameter is intentionally unused here but included
+    /// for API consistency with device linking flows where the seed is available.
+    pub fn to_registered(&self, _master_seed: &[u8; 32]) -> RegisteredDevice {
         RegisteredDevice {
             device_id: self.device_id,
             exchange_public_key: *self.device_exchange_keypair.public_key(),
@@ -315,6 +318,38 @@ impl DeviceRegistry {
             .map(|_| 1u32)
             .sum::<u32>()
     }
+
+    /// Returns the total number of devices (including revoked).
+    pub fn device_count(&self) -> usize {
+        self.devices.len()
+    }
+
+    /// Adds a device without re-signing (for internal use during linking).
+    ///
+    /// This is used when the registry signature will be updated separately.
+    pub fn add_device_unsigned(&mut self, device: RegisteredDevice) -> Result<(), DeviceError> {
+        if self.active_count() >= MAX_DEVICES {
+            return Err(DeviceError::MaxDevicesReached);
+        }
+
+        if self.find_device(&device.device_id).is_some() {
+            return Err(DeviceError::DeviceAlreadyExists);
+        }
+
+        self.devices.push(device);
+        self.version += 1;
+        Ok(())
+    }
+
+    /// Serializes the registry to JSON.
+    pub fn to_json(&self) -> String {
+        serde_json::to_string(self).expect("Registry serialization should not fail")
+    }
+
+    /// Deserializes a registry from JSON.
+    pub fn from_json(json: &str) -> Result<Self, DeviceError> {
+        serde_json::from_str(json).map_err(|_| DeviceError::InvalidRegistrySignature)
+    }
 }
 
 #[cfg(test)]
@@ -369,7 +404,7 @@ mod tests {
         let signing_key = test_signing_keypair();
         let device = DeviceInfo::derive(&seed, 0, "Primary".to_string());
 
-        let registry = DeviceRegistry::new(device.to_registered(), &signing_key);
+        let registry = DeviceRegistry::new(device.to_registered(&seed), &signing_key);
 
         assert_eq!(registry.version(), 1);
         assert_eq!(registry.active_count(), 1);
@@ -383,8 +418,8 @@ mod tests {
         let device0 = DeviceInfo::derive(&seed, 0, "Primary".to_string());
         let device1 = DeviceInfo::derive(&seed, 1, "Secondary".to_string());
 
-        let mut registry = DeviceRegistry::new(device0.to_registered(), &signing_key);
-        registry.add_device(device1.to_registered(), &signing_key).unwrap();
+        let mut registry = DeviceRegistry::new(device0.to_registered(&seed), &signing_key);
+        registry.add_device(device1.to_registered(&seed), &signing_key).unwrap();
 
         assert_eq!(registry.version(), 2);
         assert_eq!(registry.active_count(), 2);
@@ -397,19 +432,19 @@ mod tests {
         let signing_key = test_signing_keypair();
         let device0 = DeviceInfo::derive(&seed, 0, "Device 0".to_string());
 
-        let mut registry = DeviceRegistry::new(device0.to_registered(), &signing_key);
+        let mut registry = DeviceRegistry::new(device0.to_registered(&seed), &signing_key);
 
         // Add devices up to limit
         for i in 1..MAX_DEVICES {
             let device = DeviceInfo::derive(&seed, i as u32, format!("Device {}", i));
-            registry.add_device(device.to_registered(), &signing_key).unwrap();
+            registry.add_device(device.to_registered(&seed), &signing_key).unwrap();
         }
 
         assert_eq!(registry.active_count(), MAX_DEVICES);
 
         // Adding one more should fail
         let extra = DeviceInfo::derive(&seed, MAX_DEVICES as u32, "Extra".to_string());
-        let result = registry.add_device(extra.to_registered(), &signing_key);
+        let result = registry.add_device(extra.to_registered(&seed), &signing_key);
         assert!(matches!(result, Err(DeviceError::MaxDevicesReached)));
     }
 
@@ -420,8 +455,8 @@ mod tests {
         let device0 = DeviceInfo::derive(&seed, 0, "Primary".to_string());
         let device1 = DeviceInfo::derive(&seed, 1, "Secondary".to_string());
 
-        let mut registry = DeviceRegistry::new(device0.to_registered(), &signing_key);
-        registry.add_device(device1.to_registered(), &signing_key).unwrap();
+        let mut registry = DeviceRegistry::new(device0.to_registered(&seed), &signing_key);
+        registry.add_device(device1.to_registered(&seed), &signing_key).unwrap();
 
         assert_eq!(registry.active_count(), 2);
 
@@ -438,7 +473,7 @@ mod tests {
         let signing_key = test_signing_keypair();
         let device = DeviceInfo::derive(&seed, 0, "Only Device".to_string());
 
-        let mut registry = DeviceRegistry::new(device.to_registered(), &signing_key);
+        let mut registry = DeviceRegistry::new(device.to_registered(&seed), &signing_key);
 
         let result = registry.revoke_device(device.device_id(), &signing_key);
         assert!(matches!(result, Err(DeviceError::CannotRemoveLastDevice)));
@@ -451,7 +486,7 @@ mod tests {
         let device = DeviceInfo::derive(&seed, 0, "Primary".to_string());
         let device_id = *device.device_id();
 
-        let registry = DeviceRegistry::new(device.to_registered(), &signing_key);
+        let registry = DeviceRegistry::new(device.to_registered(&seed), &signing_key);
 
         let found = registry.find_device(&device_id);
         assert!(found.is_some());
@@ -467,9 +502,9 @@ mod tests {
         let signing_key = test_signing_keypair();
         let device = DeviceInfo::derive(&seed, 0, "Primary".to_string());
 
-        let mut registry = DeviceRegistry::new(device.to_registered(), &signing_key);
+        let mut registry = DeviceRegistry::new(device.to_registered(&seed), &signing_key);
 
-        let result = registry.add_device(device.to_registered(), &signing_key);
+        let result = registry.add_device(device.to_registered(&seed), &signing_key);
         assert!(matches!(result, Err(DeviceError::DeviceAlreadyExists)));
     }
 
@@ -479,7 +514,7 @@ mod tests {
         let signing_key = test_signing_keypair();
         let device = DeviceInfo::derive(&seed, 0, "Primary".to_string());
 
-        let registry = DeviceRegistry::new(device.to_registered(), &signing_key);
+        let registry = DeviceRegistry::new(device.to_registered(&seed), &signing_key);
 
         let json = serde_json::to_string(&registry).unwrap();
         let restored: DeviceRegistry = serde_json::from_str(&json).unwrap();

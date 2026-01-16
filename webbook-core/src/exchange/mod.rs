@@ -9,6 +9,7 @@ mod x3dh;
 mod proximity;
 mod session;
 mod ble;
+pub mod device_link;
 
 pub use error::ExchangeError;
 pub use qr::ExchangeQR;
@@ -19,3 +20,4 @@ pub use proximity::{
 };
 pub use session::{ExchangeSession, ExchangeState, ExchangeRole, DuplicateAction};
 pub use ble::{BLEDevice, BLEProximityVerifier, MockBLEVerifier};
+pub use device_link::{DeviceLinkQR, DeviceLinkRequest, DeviceLinkResponse, DeviceLinkInitiator, DeviceLinkResponder};

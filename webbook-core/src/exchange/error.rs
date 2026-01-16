@@ -34,4 +34,10 @@ pub enum ExchangeError {
 
     #[error("Invalid session state: {0}")]
     InvalidState(String),
+
+    #[error("Token has expired")]
+    TokenExpired,
+
+    #[error("Cryptographic operation failed")]
+    CryptoError,
 }

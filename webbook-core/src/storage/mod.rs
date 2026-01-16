@@ -1080,7 +1080,7 @@ mod tests {
         let signing_key = SigningKeyPair::from_seed(&master_seed);
 
         let device = DeviceInfo::derive(&master_seed, 0, "Primary".to_string());
-        let registry = DeviceRegistry::new(device.to_registered(), &signing_key);
+        let registry = DeviceRegistry::new(device.to_registered(&master_seed), &signing_key);
 
         // Initially no registry
         assert!(!storage.has_device_registry().unwrap());
@@ -1110,8 +1110,8 @@ mod tests {
         let device0 = DeviceInfo::derive(&master_seed, 0, "Primary".to_string());
         let device1 = DeviceInfo::derive(&master_seed, 1, "Secondary".to_string());
 
-        let mut registry = DeviceRegistry::new(device0.to_registered(), &signing_key);
-        registry.add_device(device1.to_registered(), &signing_key).unwrap();
+        let mut registry = DeviceRegistry::new(device0.to_registered(&master_seed), &signing_key);
+        registry.add_device(device1.to_registered(&master_seed), &signing_key).unwrap();
 
         storage.save_device_registry(&registry).unwrap();
         let loaded = storage.load_device_registry().unwrap().unwrap();

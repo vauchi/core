@@ -89,15 +89,36 @@ Follow strict Test-Driven Development as defined in `docs/TDD_RULES.md`:
 3. **REFACTOR**: Improve code while keeping tests green
 4. **COMMIT**: When all tests pass, create a commit
 
-### Commit Rule
+### Commit Rules
 
-**Every time all tests are green, create a commit.** This ensures:
-- Progress is captured incrementally
-- Easy rollback if issues arise
-- Clear history of TDD cycles
+1. **Test-first**: Every time all tests are green, create a commit
+2. **Documentation Updates**: Before committing, update relevant documentation if:
+   - New features → Update `docs/MVP_PLAN.md` status, add Gherkin scenarios to `features/`
+   - Architecture changes → Update `docs/ARCHITECTURE.md`
+   - API changes → Update relevant crate README (`webbook-core/`, `webbook-cli/`, `webbook-relay/`, `webbook-mobile/`)
+3. **Planning Documentation**: For significant features, create/update a plan document linking to:
+   - Related Gherkin feature files
+   - Architecture decisions
+   - Implementation approach
+4. **Feature Descriptions**: New user-facing features require:
+   - Gherkin scenarios in `features/*.feature` (always first - TDD)
+   - Brief description in `docs/MVP_PLAN.md`
 
 ### Test Requirements
 
 - Minimum 90% code coverage for core library
 - All Gherkin scenarios must have corresponding tests
 - Never mock cryptographic operations - use real crypto in tests
+
+## Documentation Index
+
+| Document | Purpose | Update When |
+|----------|---------|-------------|
+| `CLAUDE.md` | AI assistant quick reference | Build commands or project structure changes |
+| `README.md` | GitHub visitors intro | Project description or quick start changes |
+| `docs/ARCHITECTURE.md` | Technical design details | Architecture, protocols, or data model changes |
+| `docs/MVP_PLAN.md` | Current status and roadmap | Feature completion or roadmap changes |
+| `docs/TDD_RULES.md` | Development methodology | Testing process changes |
+| `docs/THREAT_ANALYSIS.md` | Security threat model | Security-relevant changes |
+| `features/*.feature` | Gherkin scenarios | Before implementing any new feature (TDD) |
+| `webbook-*/README.md` | Crate-specific docs | Crate API or usage changes |

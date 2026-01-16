@@ -74,17 +74,19 @@ The MVP must provide a **complete, usable product** that delivers the core value
 | Mobile bindings | UniFFI wrapper for iOS/Android | ✅ Done |
 | Identity backup/restore | Encrypted backup with password | ✅ Done |
 | Contact search | Search contacts by name | ✅ Done |
-| **Mobile app (one platform)** | Android app with full functionality | 🔲 In Progress |
+| **Mobile app (one platform)** | Android app with full functionality | ✅ Done |
 
 ### What's Left for MVP
 
-| Task | Description | Complexity |
-|------|-------------|------------|
-| **Mobile sync implementation** | Complete `sync()` in webbook-mobile | Medium |
-| **Android UI** | Jetpack Compose screens | Medium |
-| **QR camera integration** | Scan QR codes on mobile | Medium |
-| **Background sync** | WorkManager periodic sync | Low |
-| **Polish & testing** | Error handling, UX | Low |
+| Task | Description | Status |
+|------|-------------|--------|
+| ~~Mobile sync implementation~~ | Complete `sync()` in webbook-mobile | ✅ Done |
+| ~~Android UI~~ | Jetpack Compose screens | ✅ Done |
+| QR camera integration | Native camera scanning | 📝 Planned |
+| ~~Background sync~~ | WorkManager periodic sync | ✅ Done |
+| ~~Polish & testing~~ | Error handling, UX | ✅ Done |
+
+**MVP Core is functionally complete.** Camera scanning is the only remaining enhancement.
 
 ### MVP Nice-to-Have (Post-Launch)
 
@@ -131,67 +133,43 @@ The MVP must provide a **complete, usable product** that delivers the core value
 
 ## MVP Implementation Plan
 
-### Phase MVP-1: Mobile App (Current Focus)
+### Phase MVP-1: Mobile App ✅
 
-#### MVP-1.1: Complete Mobile Sync ⬅️ **NEXT STEP**
+#### MVP-1.1: Complete Mobile Sync ✅
 
-The `webbook-mobile` crate exists but `sync()` is a placeholder.
+Mobile sync is fully implemented with WebSocket relay connection.
 
-**Required work:**
-1. Implement WebSocket connection to relay in mobile context
-2. Send pending updates from local storage
-3. Receive and process incoming updates
-4. Handle exchange name propagation
-5. Update Double Ratchet state after each message
+#### MVP-1.2: Android App ✅
 
-**Files to modify:**
-- `webbook-mobile/src/lib.rs` - Complete `sync()` method
+Android app with Jetpack Compose UI is complete:
+- Welcome/Setup screen with identity creation
+- My Card screen with field management
+- Contacts List with search
+- Contact Detail with visibility controls
+- Exchange screen with QR generation
+- Settings with backup/restore and relay URL
 
-#### MVP-1.2: Android App
+#### MVP-1.3: QR Exchange Flow ✅
 
-**Screens needed:**
-1. **Welcome/Setup** - Create identity, set display name
-2. **My Card** - View/edit own contact card
-3. **Contacts List** - List all contacts with search
-4. **Contact Detail** - View contact's card, visibility controls
-5. **Exchange** - Show/scan QR code
-6. **Settings** - Backup/restore, relay URL
+QR exchange is implemented (manual paste for now, camera scanning planned for future).
 
-**Project structure:**
-```
-webbook-android/
-├── app/
-│   ├── src/main/kotlin/
-│   │   ├── ui/           # Jetpack Compose screens
-│   │   ├── viewmodel/    # ViewModels
-│   │   └── repository/   # Rust bridge
-│   └── src/main/res/
-└── build.gradle.kts
-```
+#### MVP-1.4: Background Sync ✅
 
-#### MVP-1.3: QR Exchange Flow
+WorkManager periodic sync (15 min intervals) is implemented.
 
-1. Generate QR with identity + prekey bundle
-2. Camera permission and scanning
-3. Process scanned QR, initiate X3DH
-4. Sync to propagate exchange
+### Phase MVP-2: Polish ✅
 
-#### MVP-1.4: Background Sync
-
-1. WorkManager for periodic sync
-2. Sync on app foreground
-3. Battery-efficient scheduling
-
-### Phase MVP-2: Polish
-
-- Error handling and user feedback
-- Loading and empty states
-- Offline mode indicator
-- End-to-end testing
+- ✅ Error handling and user feedback (snackbar, retry buttons)
+- ✅ Loading and empty states
+- ✅ Offline mode indicator (NetworkMonitor, offline banner)
+- ✅ Sync status indicator in UI
+- End-to-end testing (manual)
 
 ---
 
 ## Technical Architecture
+
+For detailed technical design, protocols, and data models, see [ARCHITECTURE.md](./ARCHITECTURE.md).
 
 ### Current Crate Structure
 

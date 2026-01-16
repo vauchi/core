@@ -50,21 +50,20 @@ See [webbook-cli/README.md](webbook-cli/README.md) for details.
 ## Quick Start
 
 ```bash
-# Start the relay server (in one terminal)
-cargo run -p webbook-relay
-
-# Create an identity (in another terminal)
-cargo run -p webbook-cli -- init "Alice"
-
-# Show your contact card
-cargo run -p webbook-cli -- card show
-
-# Generate exchange QR code
-cargo run -p webbook-cli -- exchange start
-
-# Sync with relay to receive messages
-cargo run -p webbook-cli -- sync
+cargo run -p webbook-relay     # Start relay server (terminal 1)
+cargo run -p webbook-cli -- init "Alice"  # Create identity (terminal 2)
+cargo run -p webbook-cli -- sync          # Sync with relay
 ```
+
+For full build commands and development workflow, see [CLAUDE.md](CLAUDE.md).
+
+## Contributing
+
+This project uses strict Test-Driven Development. Before contributing:
+
+1. Read [CLAUDE.md](CLAUDE.md) for project structure and commit rules
+2. Read [docs/TDD_RULES.md](docs/TDD_RULES.md) for the TDD workflow
+3. Read [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for technical design
 
 ## Planned Components
 

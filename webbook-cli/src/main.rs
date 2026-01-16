@@ -54,6 +54,10 @@ enum Commands {
     #[command(subcommand)]
     Social(SocialCommands),
 
+    /// Manage linked devices
+    #[command(subcommand)]
+    Device(DeviceCommands),
+
     /// Sync with the relay server
     Sync,
 
@@ -185,6 +189,42 @@ enum SocialCommands {
     },
 }
 
+#[derive(Subcommand)]
+enum DeviceCommands {
+    /// List all linked devices
+    List,
+
+    /// Show info about the current device
+    Info,
+
+    /// Generate QR code to link a new device
+    Link,
+
+    /// Join an existing identity (on new device)
+    Join {
+        /// QR data from existing device
+        qr_data: String,
+    },
+
+    /// Complete device linking (on existing device)
+    Complete {
+        /// Request data from new device
+        request: String,
+    },
+
+    /// Finish device join (on new device)
+    Finish {
+        /// Response data from existing device
+        response: String,
+    },
+
+    /// Revoke a linked device
+    Revoke {
+        /// Device ID prefix
+        device_id: String,
+    },
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     let cli = Cli::parse();
@@ -254,6 +294,15 @@ async fn main() -> Result<()> {
                     }
                 }
             }
+        },
+        Commands::Device(cmd) => match cmd {
+            DeviceCommands::List => commands::device::list(&config)?,
+            DeviceCommands::Info => commands::device::info(&config)?,
+            DeviceCommands::Link => commands::device::link(&config)?,
+            DeviceCommands::Join { qr_data } => commands::device::join(&config, &qr_data)?,
+            DeviceCommands::Complete { request } => commands::device::complete(&config, &request)?,
+            DeviceCommands::Finish { response } => commands::device::finish(&config, &response)?,
+            DeviceCommands::Revoke { device_id } => commands::device::revoke(&config, &device_id)?,
         },
         Commands::Sync => {
             commands::sync::run(&config).await?;

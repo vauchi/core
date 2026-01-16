@@ -6,3 +6,4 @@ pub mod exchange;
 pub mod contacts;
 pub mod sync;
 pub mod backup;
+pub mod device;

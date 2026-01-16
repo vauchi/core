@@ -17,11 +17,14 @@ Gherkin scenarios defining WebBook behavior. Each scenario should have correspon
 | visibility_labels | 41 | 0 | P2 | Post-launch |
 | relay_network | 43 | 20 | P2 | Basic relay done |
 | social_profile_validation | 33 | 0 | P3 | Low priority |
-| tor_mode | 29 | 0 | P3 | Post-launch |
-| hidden_contacts | 36 | 0 | P3 | Post-launch |
-| duress_password | 45 | 0 | P3 | Post-launch |
+| **future/** | | | P3 | See `future/README.md` |
+| - tor_mode | 29 | 0 | P3 | Moved to `future/` |
+| - hidden_contacts | 36 | 0 | P3 | Moved to `future/` |
+| - duress_password | 45 | 0 | P3 | Moved to `future/` |
 
 **Total**: 467 scenarios | **Implemented**: ~245 (~52%)
+
+> **Note**: P3 features (tor_mode, hidden_contacts, duress_password) have been moved to `features/future/` to clearly separate planned-but-unimplemented features from active development.
 
 ## Priority Definitions
 
@@ -102,17 +105,21 @@ Gherkin scenarios defining WebBook behavior. Each scenario should have correspon
 - Crowd-sourced profile validation
 - OAuth verification (low priority)
 
-**tor_mode.feature**
+> The following P3 features have been moved to `features/future/`:
+
+**future/tor_mode.feature**
 - Route traffic through Tor
 - Circuit management, bridge support
 
-**hidden_contacts.feature**
+**future/hidden_contacts.feature**
 - Secret gesture/PIN to reveal contacts
 - Plausible deniability
 
-**duress_password.feature**
+**future/duress_password.feature**
 - Decoy profile under coercion
 - Silent alerts
+
+See `features/future/README.md` for implementation notes.
 
 ## Running Scenario Tests
 

@@ -223,6 +223,172 @@ Master Seed
 
 ---
 
+## ADR-011: Event-Driven Architecture
+
+**Status**: Decided
+**Date**: 2026-01
+
+**Context**: Mobile and desktop applications need to react to asynchronous events (contact updates, sync state changes, connection status) without polling.
+
+**Decision**: Implement an event system with typed events, handler traits, and a central dispatcher.
+
+**Rationale**:
+- Decouples core logic from UI layers
+- Enables multiple listeners (logging, UI updates, analytics)
+- Type-safe event handling via `WebBookEvent` enum
+- Thread-safe with `Send + Sync` requirements
+
+**Implementation**:
+- `WebBookEvent`: Enum of all possible events
+- `EventHandler`: Trait for event consumers
+- `EventDispatcher`: Broadcasts events to registered handlers
+- Location: `webbook-core/src/api/events.rs`
+
+---
+
+## ADR-012: Visibility Rule Enforcement
+
+**Status**: Decided
+**Date**: 2026-01
+
+**Context**: Users need fine-grained control over which contacts can see which fields on their contact card.
+
+**Decision**: Per-field visibility rules with three levels: Everyone, specific Contacts, or Nobody.
+
+**Rationale**:
+- Simple mental model for users
+- Flexible enough for privacy needs
+- Serializable for sync between devices
+- Efficient filtering at query time
+
+**Implementation**:
+- `FieldVisibility`: Enum (Everyone | Contacts(HashSet) | Nobody)
+- `VisibilityRules`: HashMap<field_id, FieldVisibility>
+- `can_see(field, contact)`: Fast visibility check
+- Location: `webbook-core/src/contact/visibility.rs`
+
+---
+
+## ADR-013: Unified Error Types
+
+**Status**: Decided
+**Date**: 2026-01
+
+**Context**: Multiple crates have their own error types. API layer needs consistent error handling for consumers.
+
+**Decision**: Single `WebBookError` enum that wraps all domain-specific errors via `#[from]`.
+
+**Rationale**:
+- Single error type for public API
+- Automatic conversion from internal errors via `thiserror`
+- Preserves error context through the chain
+- Consistent error messages for UI display
+
+**Implementation**:
+- `WebBookError`: Top-level enum with variants for each domain
+- `WebBookResult<T>`: Type alias for `Result<T, WebBookError>`
+- Variants: Validation, Exchange, Storage, Sync, Network, etc.
+- Location: `webbook-core/src/api/error.rs`
+
+---
+
+## ADR-014: Pending Update Queue
+
+**Status**: Decided
+**Date**: 2026-01
+
+**Context**: Devices may be offline when changes occur. Updates must be queued and retried reliably.
+
+**Decision**: SQLite-backed pending update queue with status tracking and retry support.
+
+**Rationale**:
+- Survives app restarts (persisted)
+- Supports retry with exponential backoff
+- Tracks per-update status (Pending, Sending, Failed)
+- Ordered by creation time
+
+**Implementation**:
+- `PendingUpdate`: Struct with id, contact_id, payload, retry_count, status
+- `UpdateStatus`: Enum (Pending | Sending | Failed)
+- Storage methods: `queue_update`, `get_pending_updates`, `mark_update_sent`
+- Location: `webbook-core/src/storage/mod.rs`
+
+---
+
+## ADR-015: Application-Level Encryption
+
+**Status**: Decided
+**Date**: 2026-01
+
+**Context**: SQLite stores sensitive data (contact cards, shared keys, ratchet states). Need encryption at rest.
+
+**Decision**: Application-level encryption for sensitive fields using AES-256-GCM.
+
+**Rationale**:
+- Works on all platforms without SQLCipher dependency
+- Fine-grained control over what gets encrypted
+- Encryption key derived from user's master key
+- Non-sensitive metadata (IDs, timestamps) remain queryable
+
+**Encrypted Fields**:
+- `card_encrypted`: Contact cards (JSON)
+- `shared_key_encrypted`: Per-contact symmetric keys
+- `ratchet_state_encrypted`: Double Ratchet state
+- `backup_data_encrypted`: Identity backup
+
+**Implementation**: `webbook-core/src/storage/mod.rs`
+
+---
+
+## ADR-016: Social Network Registry
+
+**Status**: Decided
+**Date**: 2026-01
+
+**Context**: Contact cards include social media profiles. Need standardized network identifiers and profile URL generation.
+
+**Decision**: Embedded JSON registry of 35+ social networks with URL templates.
+
+**Rationale**:
+- Compile-time embedding via `include_str!`
+- No network requests needed for URL generation
+- Handles username normalization (stripping @, etc.)
+- Extensible via merge for custom networks
+
+**Implementation**:
+- `SocialNetwork`: Network definition with URL template
+- `SocialNetworkRegistry`: HashMap with search, URL generation
+- `networks.json`: Embedded data file
+- Location: `webbook-core/src/social/registry.rs`
+
+---
+
+## ADR-017: Sync Controller Orchestration
+
+**Status**: Decided
+**Date**: 2026-01
+
+**Context**: Synchronization involves multiple components: relay client, sync manager, ratchet states, events. Need central coordination.
+
+**Decision**: `SyncController` as the orchestration layer integrating all sync concerns.
+
+**Rationale**:
+- Single entry point for sync operations
+- Manages ratchet lifecycle per contact
+- Coordinates relay connection and pending updates
+- Emits events for UI feedback
+- Handles timeout and retry logic
+
+**Responsibilities**:
+- Connection lifecycle (connect/disconnect)
+- Ratchet registration per contact
+- Sync cycle execution (send pending, process acks)
+- Device sync integration
+
+**Implementation**: `webbook-core/src/api/sync_controller.rs`
+
+---
+
 ## Template for New Decisions
 
 ```markdown

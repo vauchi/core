@@ -176,6 +176,52 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
     }
+
+    suspend fun getContact(id: String): MobileContact? {
+        return try {
+            withContext(Dispatchers.IO) {
+                repository.getContact(id)
+            }
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    suspend fun getOwnCard(): MobileContactCard? {
+        return try {
+            withContext(Dispatchers.IO) {
+                repository.getOwnCard()
+            }
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    fun setFieldVisibility(contactId: String, fieldLabel: String, visible: Boolean) {
+        viewModelScope.launch {
+            try {
+                withContext(Dispatchers.IO) {
+                    if (visible) {
+                        repository.showFieldToContact(contactId, fieldLabel)
+                    } else {
+                        repository.hideFieldFromContact(contactId, fieldLabel)
+                    }
+                }
+            } catch (e: Exception) {
+                // Silently fail
+            }
+        }
+    }
+
+    suspend fun isFieldVisibleToContact(contactId: String, fieldLabel: String): Boolean {
+        return try {
+            withContext(Dispatchers.IO) {
+                repository.isFieldVisibleToContact(contactId, fieldLabel)
+            }
+        } catch (e: Exception) {
+            true // Default to visible on error
+        }
+    }
 }
 
 private data class Tuple4<A, B, C, D>(val a: A, val b: B, val c: C, val d: D)

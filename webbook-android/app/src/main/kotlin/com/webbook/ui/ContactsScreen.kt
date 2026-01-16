@@ -1,5 +1,6 @@
 package com.webbook.ui
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -18,7 +19,8 @@ import uniffi.webbook_mobile.MobileContact
 fun ContactsScreen(
     onBack: () -> Unit,
     onListContacts: suspend () -> List<MobileContact>,
-    onRemoveContact: (String) -> Unit
+    onRemoveContact: (String) -> Unit,
+    onContactClick: (String) -> Unit
 ) {
     var contacts by remember { mutableStateOf<List<MobileContact>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
@@ -82,6 +84,7 @@ fun ContactsScreen(
                 items(contacts) { contact ->
                     ContactCard(
                         contact = contact,
+                        onClick = { onContactClick(contact.id) },
                         onRemove = { onRemoveContact(contact.id) }
                     )
                 }
@@ -93,12 +96,15 @@ fun ContactsScreen(
 @Composable
 fun ContactCard(
     contact: MobileContact,
+    onClick: () -> Unit,
     onRemove: () -> Unit
 ) {
     var showDeleteDialog by remember { mutableStateOf(false) }
 
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant
         )

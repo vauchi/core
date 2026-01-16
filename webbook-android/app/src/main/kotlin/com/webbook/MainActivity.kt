@@ -14,6 +14,7 @@ import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Person
 import com.webbook.ui.ExchangeScreen
 import com.webbook.ui.ContactsScreen
+import com.webbook.ui.ContactDetailScreen
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -45,13 +46,14 @@ class MainActivity : ComponentActivity() {
 }
 
 enum class Screen {
-    Home, Exchange, Contacts
+    Home, Exchange, Contacts, ContactDetail
 }
 
 @Composable
 fun MainScreen(viewModel: MainViewModel = viewModel()) {
     val uiState by viewModel.uiState.collectAsState()
     var currentScreen by remember { mutableStateOf(Screen.Home) }
+    var selectedContactId by remember { mutableStateOf<String?>(null) }
 
     when (currentScreen) {
         Screen.Home -> {
@@ -82,8 +84,28 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
             ContactsScreen(
                 onBack = { currentScreen = Screen.Home },
                 onListContacts = { viewModel.listContacts() },
-                onRemoveContact = { id -> viewModel.removeContact(id) }
+                onRemoveContact = { id -> viewModel.removeContact(id) },
+                onContactClick = { id ->
+                    selectedContactId = id
+                    currentScreen = Screen.ContactDetail
+                }
             )
+        }
+        Screen.ContactDetail -> {
+            selectedContactId?.let { contactId ->
+                ContactDetailScreen(
+                    contactId = contactId,
+                    onBack = { currentScreen = Screen.Contacts },
+                    onGetContact = { viewModel.getContact(it) },
+                    onGetOwnCard = { viewModel.getOwnCard() },
+                    onSetFieldVisibility = { cId, label, visible ->
+                        viewModel.setFieldVisibility(cId, label, visible)
+                    },
+                    onIsFieldVisible = { cId, label ->
+                        viewModel.isFieldVisibleToContact(cId, label)
+                    }
+                )
+            }
         }
     }
 }

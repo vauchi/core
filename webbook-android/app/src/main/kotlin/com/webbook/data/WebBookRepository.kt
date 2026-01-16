@@ -47,4 +47,17 @@ class WebBookRepository(context: Context) {
     fun getContact(id: String) = webbook.getContact(id)
 
     fun removeContact(id: String) = webbook.removeContact(id)
+
+    // Visibility operations
+    fun hideFieldFromContact(contactId: String, fieldLabel: String) {
+        webbook.hideFieldFromContact(contactId, fieldLabel)
+    }
+
+    fun showFieldToContact(contactId: String, fieldLabel: String) {
+        webbook.showFieldToContact(contactId, fieldLabel)
+    }
+
+    fun isFieldVisibleToContact(contactId: String, fieldLabel: String): Boolean {
+        return webbook.isFieldVisibleToContact(contactId, fieldLabel)
+    }
 }

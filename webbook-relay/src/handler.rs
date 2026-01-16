@@ -10,8 +10,45 @@ use tokio_tungstenite::tungstenite::Message;
 use tokio_tungstenite::WebSocketStream;
 use tracing::{debug, warn, error};
 
-use crate::storage::{BlobStore, StoredBlob};
 use crate::rate_limit::RateLimiter;
+use crate::recovery_storage::{RecoveryProofStore, StoredRecoveryProof};
+use crate::storage::{BlobStore, StoredBlob};
+
+/// Converts a hex string to a 32-byte hash.
+fn hex_to_hash(hex: &str) -> Result<[u8; 32], String> {
+    if hex.len() != 64 {
+        return Err("Invalid hex length".to_string());
+    }
+
+    let mut bytes = [0u8; 32];
+    for (i, chunk) in hex.as_bytes().chunks(2).enumerate() {
+        let high = hex_char_to_nibble(chunk[0])?;
+        let low = hex_char_to_nibble(chunk[1])?;
+        bytes[i] = (high << 4) | low;
+    }
+    Ok(bytes)
+}
+
+/// Converts a single hex character to its nibble value.
+fn hex_char_to_nibble(c: u8) -> Result<u8, String> {
+    match c {
+        b'0'..=b'9' => Ok(c - b'0'),
+        b'a'..=b'f' => Ok(c - b'a' + 10),
+        b'A'..=b'F' => Ok(c - b'A' + 10),
+        _ => Err("Invalid hex character".to_string()),
+    }
+}
+
+/// Converts a 32-byte hash to a hex string.
+fn hash_to_hex(hash: &[u8; 32]) -> String {
+    const HEX_CHARS: &[u8; 16] = b"0123456789abcdef";
+    let mut hex = String::with_capacity(64);
+    for byte in hash {
+        hex.push(HEX_CHARS[(byte >> 4) as usize] as char);
+        hex.push(HEX_CHARS[(byte & 0x0f) as usize] as char);
+    }
+    hex
+}
 
 /// Wire protocol message types (subset of webbook-core protocol).
 mod protocol {
@@ -34,6 +71,10 @@ mod protocol {
         EncryptedUpdate(EncryptedUpdate),
         Acknowledgment(Acknowledgment),
         Handshake(Handshake),
+        // Recovery proof operations
+        RecoveryProofStore(RecoveryProofStore),
+        RecoveryProofQuery(RecoveryProofQuery),
+        RecoveryProofResponse(RecoveryProofResponse),
         #[serde(other)]
         Unknown,
     }
@@ -61,6 +102,40 @@ mod protocol {
     #[derive(Debug, Clone, Serialize, Deserialize)]
     pub struct Handshake {
         pub client_id: String,
+    }
+
+    // =========================================================================
+    // Recovery Proof Messages
+    // =========================================================================
+
+    /// Store a recovery proof on the relay.
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+    pub struct RecoveryProofStore {
+        /// Hash of the old public key (32 bytes, hex-encoded).
+        pub key_hash: String,
+        /// Serialized recovery proof (opaque blob).
+        pub proof_data: Vec<u8>,
+    }
+
+    /// Query for recovery proofs (batch).
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+    pub struct RecoveryProofQuery {
+        /// List of key hashes to query (hex-encoded).
+        pub key_hashes: Vec<String>,
+    }
+
+    /// Response to a recovery proof query.
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+    pub struct RecoveryProofResponse {
+        /// Map of key_hash -> proof_data for found proofs.
+        pub proofs: Vec<RecoveryProofEntry>,
+    }
+
+    /// A single recovery proof entry in a response.
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+    pub struct RecoveryProofEntry {
+        pub key_hash: String,
+        pub proof_data: Vec<u8>,
     }
 
     /// Decodes a message from binary data (with length prefix).
@@ -117,12 +192,26 @@ mod protocol {
             }),
         }
     }
+
+    /// Creates a recovery proof response envelope.
+    pub fn create_recovery_response(proofs: Vec<RecoveryProofEntry>) -> MessageEnvelope {
+        MessageEnvelope {
+            version: PROTOCOL_VERSION,
+            message_id: uuid::Uuid::new_v4().to_string(),
+            timestamp: std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_secs(),
+            payload: MessagePayload::RecoveryProofResponse(RecoveryProofResponse { proofs }),
+        }
+    }
 }
 
 /// Handles a WebSocket connection.
 pub async fn handle_connection(
     ws_stream: WebSocketStream<TcpStream>,
     storage: Arc<dyn BlobStore>,
+    recovery_storage: Arc<dyn RecoveryProofStore>,
     rate_limiter: Arc<RateLimiter>,
     max_message_size: usize,
 ) {
@@ -226,6 +315,52 @@ pub async fn handle_connection(
                     }
                     protocol::MessagePayload::Handshake(_) => {
                         // Ignore duplicate handshakes
+                    }
+                    protocol::MessagePayload::RecoveryProofStore(store_msg) => {
+                        // Store a recovery proof
+                        if let Ok(key_hash) = hex_to_hash(&store_msg.key_hash) {
+                            let proof = StoredRecoveryProof::new(key_hash, store_msg.proof_data);
+                            recovery_storage.store(proof);
+
+                            // Send acknowledgment
+                            let ack = protocol::create_ack(&envelope.message_id, protocol::AckStatus::Delivered);
+                            if let Ok(ack_data) = protocol::encode_message(&ack) {
+                                let _ = write.send(Message::Binary(ack_data)).await;
+                            }
+
+                            debug!("Stored recovery proof for key hash {}", store_msg.key_hash);
+                        } else {
+                            warn!("Invalid key hash format from {}", client_id);
+                        }
+                    }
+                    protocol::MessagePayload::RecoveryProofQuery(query) => {
+                        // Batch query for recovery proofs
+                        let key_hashes: Vec<[u8; 32]> = query
+                            .key_hashes
+                            .iter()
+                            .filter_map(|h| hex_to_hash(h).ok())
+                            .collect();
+
+                        let results = recovery_storage.batch_get(&key_hashes);
+
+                        let entries: Vec<protocol::RecoveryProofEntry> = results
+                            .into_iter()
+                            .map(|(hash, proof)| protocol::RecoveryProofEntry {
+                                key_hash: hash_to_hex(&hash),
+                                proof_data: proof.proof_data,
+                            })
+                            .collect();
+
+                        let response = protocol::create_recovery_response(entries);
+                        if let Ok(data) = protocol::encode_message(&response) {
+                            let _ = write.send(Message::Binary(data)).await;
+                        }
+
+                        debug!("Processed recovery query with {} hashes from {}", query.key_hashes.len(), client_id);
+                    }
+                    protocol::MessagePayload::RecoveryProofResponse(_) => {
+                        // Clients shouldn't send responses, ignore
+                        debug!("Unexpected RecoveryProofResponse from {}", client_id);
                     }
                     protocol::MessagePayload::Unknown => {
                         debug!("Unknown message type from {}", client_id);

@@ -38,5 +38,13 @@ class WebBookRepository(context: Context) {
 
     fun generateExchangeQr(): MobileExchangeData = webbook.generateExchangeQr()
 
+    fun completeExchange(qrData: String) = webbook.completeExchange(qrData)
+
     fun contactCount(): UInt = webbook.contactCount()
+
+    fun listContacts() = webbook.listContacts()
+
+    fun getContact(id: String) = webbook.getContact(id)
+
+    fun removeContact(id: String) = webbook.removeContact(id)
 }

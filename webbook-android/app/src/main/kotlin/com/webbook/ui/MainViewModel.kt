@@ -10,7 +10,11 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import uniffi.webbook_mobile.MobileContact
 import uniffi.webbook_mobile.MobileContactCard
+import uniffi.webbook_mobile.MobileExchangeData
+import uniffi.webbook_mobile.MobileExchangeResult
+import uniffi.webbook_mobile.MobileFieldType
 
 sealed class UiState {
     object Loading : UiState()
@@ -86,6 +90,90 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun refresh() {
         viewModelScope.launch {
             loadUserData()
+        }
+    }
+
+    fun addField(fieldType: MobileFieldType, label: String, value: String) {
+        viewModelScope.launch {
+            try {
+                withContext(Dispatchers.IO) {
+                    repository.addField(fieldType, label, value)
+                }
+                loadUserData()
+            } catch (e: Exception) {
+                // Silently fail or show error
+            }
+        }
+    }
+
+    fun updateField(label: String, newValue: String) {
+        viewModelScope.launch {
+            try {
+                withContext(Dispatchers.IO) {
+                    repository.updateField(label, newValue)
+                }
+                loadUserData()
+            } catch (e: Exception) {
+                // Silently fail or show error
+            }
+        }
+    }
+
+    fun removeField(label: String) {
+        viewModelScope.launch {
+            try {
+                withContext(Dispatchers.IO) {
+                    repository.removeField(label)
+                }
+                loadUserData()
+            } catch (e: Exception) {
+                // Silently fail or show error
+            }
+        }
+    }
+
+    suspend fun generateExchangeQr(): MobileExchangeData? {
+        return try {
+            withContext(Dispatchers.IO) {
+                repository.generateExchangeQr()
+            }
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    suspend fun completeExchange(qrData: String): MobileExchangeResult? {
+        return try {
+            val result = withContext(Dispatchers.IO) {
+                repository.completeExchange(qrData)
+            }
+            loadUserData()
+            result
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    suspend fun listContacts(): List<MobileContact> {
+        return try {
+            withContext(Dispatchers.IO) {
+                repository.listContacts()
+            }
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+
+    fun removeContact(id: String) {
+        viewModelScope.launch {
+            try {
+                withContext(Dispatchers.IO) {
+                    repository.removeContact(id)
+                }
+                loadUserData()
+            } catch (e: Exception) {
+                // Silently fail
+            }
         }
     }
 }

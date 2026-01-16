@@ -254,3 +254,110 @@ Feature: Relay Network
     When I block those relays
     Then my traffic should avoid those nodes
     And delivery should use alternative routes
+
+  # Relay Federation - Message Offloading
+
+  @federation
+  Scenario: Relay detects high storage usage
+    Given a relay node has storage limits configured
+    When stored blobs exceed 80% of capacity
+    Then the relay should enter "offload mode"
+    And it should attempt to redistribute oldest blobs to peer relays
+    And new incoming blobs should still be accepted
+
+  @federation
+  Scenario: Relay offloads messages to peer relays
+    Given relay A is at 85% storage capacity
+    And relay A knows about peer relays B and C
+    When relay A initiates offloading
+    Then it should transfer some blobs to relay B or C
+    And transferred blobs should be removed from relay A
+    And relay A should record where blobs were sent
+
+  @federation
+  Scenario: Peer relay discovery
+    Given a relay node starts up
+    When it queries the relay registry
+    Then it should discover other relay nodes
+    And it should establish peer connections
+    And it should exchange capacity information periodically
+
+  @federation
+  Scenario: Relay registry for peer discovery
+    Given multiple relay nodes exist
+    Then there should be a registry of known relays
+    And the registry should include relay capacity status
+    And relays should self-register on startup
+    And the registry should remove unresponsive relays
+
+  @federation
+  Scenario: Client queries multiple relays for messages
+    Given my messages may be on relay A or B
+    When I sync for pending messages
+    Then the client should query all known relays
+    And messages should be collected from all sources
+    And duplicate messages should be deduplicated
+
+  @federation
+  Scenario: Relay includes forwarding hints
+    Given relay A has offloaded blob X to relay B
+    When the recipient queries relay A for messages
+    Then relay A should respond with "blob X is at relay B"
+    And the client should fetch blob X from relay B
+    And the hint should be temporary (TTL-based)
+
+  @federation
+  Scenario: Offloaded messages preserve TTL
+    Given a blob has 30 days remaining TTL
+    When it is offloaded to another relay
+    Then the new relay should honor the original expiration
+    And the blob should not get extra lifetime from transfer
+    And TTL should be included in transfer metadata
+
+  @federation
+  Scenario: Relay refuses offload when at capacity
+    Given relay B is at 95% capacity
+    When relay A tries to offload blobs to relay B
+    Then relay B should refuse the transfer
+    And relay A should try other peers
+    And relay A should mark relay B as "full" temporarily
+
+  @federation
+  Scenario: Graceful handling of relay shutdown
+    Given relay A is shutting down for maintenance
+    When it initiates graceful shutdown
+    Then it should offload all stored blobs to peers
+    And it should deregister from the relay registry
+    And clients should be directed to other relays
+
+  @federation
+  Scenario: Load balancing across relay network
+    Given the relay network has varying capacity
+    When a new blob needs to be stored
+    Then it should be routed to a relay with available capacity
+    And heavily loaded relays should receive less traffic
+    And the network should self-balance over time
+
+  # Federation Security
+
+  @federation @security
+  Scenario: Only authorized relays can join federation
+    Given the relay federation uses mutual TLS
+    When an unknown relay tries to join
+    Then it should be rejected unless it has valid credentials
+    And federation traffic should be encrypted
+    And relay identity should be verified
+
+  @federation @security
+  Scenario: Blob integrity preserved during transfer
+    Given a blob is being transferred between relays
+    Then the blob should be transferred with its signature
+    And the receiving relay should verify integrity
+    And corrupted blobs should be rejected
+
+  @federation @security
+  Scenario: Relay cannot read offloaded blobs
+    Given relay A offloads encrypted blobs to relay B
+    Then relay B receives the same encrypted data
+    And neither relay can decrypt the content
+    And the E2E encryption is preserved

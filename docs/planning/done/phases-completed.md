@@ -14,6 +14,18 @@
 - Update propagation protocol
 - Double Ratchet forward secrecy
 
+## Phase 4: Mobile App ✅
+- Android app with Jetpack Compose (6 screens)
+- QR camera scanning (CameraX + ML Kit)
+- Background sync (WorkManager)
+- Mobile UniFFI bindings
+
+## Phase 5: Polish ✅
+- Error handling with snackbar messages
+- Loading states and empty states
+- Offline indicator with NetworkMonitor
+- Sync status chip in TopAppBar
+
 ## Phase 6: Infrastructure ✅
 - Relay server (webbook-relay)
 - SQLite persistent storage
@@ -30,7 +42,16 @@
 - Card update propagation
 - Visibility rules enforcement
 
+## Phase 9: Multi-Device Sync ✅
+- Device module with DeviceInfo and DeviceRegistry
+- Device linking protocol (QR-based secure transfer)
+- Device-to-device contact sync module
+- Sync orchestration with version vectors
+- Device revocation certificates and registry broadcast
+- CLI device management commands
+- Architecture docs with 8 threat scenarios (T8.1-T8.8)
+
 ## Additional
-- Social Network Registry (35+ networks)
-- Mobile UniFFI Bindings
+- Social Network Registry (35+ networks, embedded JSON)
 - Contact Search
+- Property-based tests with proptest

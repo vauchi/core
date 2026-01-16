@@ -15,7 +15,7 @@
 - [x] Android app
 - [ ] iOS app
 - [ ] Desktop app (Tauri)
-- [ ] Multi-device sync / Device linking
+- [x] Multi-device sync / Device linking
 
 ## Performance
 - [ ] App start < 2s

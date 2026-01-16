@@ -4,9 +4,18 @@
 
 | Task | Complexity | Risk | Status |
 |------|------------|------|--------|
-| Multi-device sync | High | High (core arch) | Todo |
+| Multi-device sync | High | High (core arch) | ✅ Done |
 | iOS app | Medium | Low | Todo |
 | Desktop app (Tauri) | Medium | Low | Todo |
+
+### Multi-Device Sync (Completed)
+- Device module with DeviceInfo and DeviceRegistry
+- Device linking protocol (QR-based)
+- Device-to-device contact sync
+- Sync orchestration with version vectors
+- Device revocation certificates
+- CLI device management commands
+- Architecture docs and threat analysis (8 scenarios)
 
 ## Phase 2: Security & Quality
 

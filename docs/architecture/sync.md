@@ -47,4 +47,11 @@ Using **libp2p** with DHT (Distributed Hash Table):
 
 ## Current Implementation
 
-The MVP uses WebSocket relay transport with Double Ratchet for forward secrecy. DHT-based discovery is planned for future versions.
+The production implementation uses:
+
+1. **WebSocket relay transport** - For NAT traversal and offline message delivery
+2. **Double Ratchet** - Forward secrecy for all contact communications
+3. **Multi-device sync** - Version vectors for conflict resolution, device-to-device contact sync
+4. **Device linking** - QR-based secure pairing with HKDF-derived per-device keys
+
+DHT-based discovery (libp2p) is planned for future versions to enable fully decentralized P2P sync.

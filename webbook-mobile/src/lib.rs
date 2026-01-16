@@ -252,7 +252,23 @@ impl WebBookMobile {
             .map_err(|e| MobileError::StorageError(e.to_string()))?;
 
         let storage_path = data_path.join("webbook.db");
-        let storage_key = SymmetricKey::generate();
+        let key_path = data_path.join("storage.key");
+
+        // Load or generate storage key (must be consistent across sessions)
+        let storage_key = if key_path.exists() {
+            // Load existing key
+            let key_bytes = std::fs::read(&key_path)
+                .map_err(|e| MobileError::StorageError(format!("Failed to read key: {}", e)))?;
+            let key_array: [u8; 32] = key_bytes.try_into()
+                .map_err(|_| MobileError::StorageError("Invalid key length".to_string()))?;
+            SymmetricKey::from_bytes(key_array)
+        } else {
+            // Generate and save new key
+            let key = SymmetricKey::generate();
+            std::fs::write(&key_path, key.as_bytes())
+                .map_err(|e| MobileError::StorageError(format!("Failed to save key: {}", e)))?;
+            key
+        };
 
         // Initialize storage to ensure database is created
         let _storage = Storage::open(&storage_path, storage_key.clone())

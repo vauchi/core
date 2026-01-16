@@ -11,6 +11,7 @@ use crate::contact::Contact;
 use crate::contact_card::ContactCard;
 use crate::crypto::SymmetricKey;
 use crate::crypto::ratchet::DoubleRatchetState;
+use crate::identity::device::{DeviceRegistry, RegisteredDevice};
 
 /// Storage error types.
 #[derive(Error, Debug)]
@@ -130,6 +131,23 @@ impl Storage {
                 contact_id TEXT PRIMARY KEY REFERENCES contacts(id),
                 ratchet_state_encrypted BLOB NOT NULL,
                 is_initiator INTEGER NOT NULL,
+                updated_at INTEGER NOT NULL
+            );
+
+            -- Device info (current device)
+            CREATE TABLE IF NOT EXISTS device_info (
+                id INTEGER PRIMARY KEY CHECK (id = 1),
+                device_id BLOB NOT NULL,
+                device_index INTEGER NOT NULL,
+                device_name TEXT NOT NULL,
+                created_at INTEGER NOT NULL
+            );
+
+            -- Device registry (all linked devices)
+            CREATE TABLE IF NOT EXISTS device_registry (
+                id INTEGER PRIMARY KEY CHECK (id = 1),
+                registry_json TEXT NOT NULL,
+                version INTEGER NOT NULL,
                 updated_at INTEGER NOT NULL
             );
 
@@ -616,6 +634,117 @@ impl Storage {
             Err(e) => Err(StorageError::Database(e)),
         }
     }
+
+    // === Device Operations ===
+
+    /// Saves current device info.
+    pub fn save_device_info(
+        &self,
+        device_id: &[u8; 32],
+        device_index: u32,
+        device_name: &str,
+        created_at: u64,
+    ) -> Result<(), StorageError> {
+        self.conn.execute(
+            "INSERT OR REPLACE INTO device_info (id, device_id, device_index, device_name, created_at)
+             VALUES (1, ?1, ?2, ?3, ?4)",
+            params![
+                device_id.as_slice(),
+                device_index as i32,
+                device_name,
+                created_at as i64,
+            ],
+        )?;
+        Ok(())
+    }
+
+    /// Loads current device info.
+    /// Returns (device_id, device_index, device_name, created_at) if found.
+    pub fn load_device_info(&self) -> Result<Option<([u8; 32], u32, String, u64)>, StorageError> {
+        let result = self.conn.query_row(
+            "SELECT device_id, device_index, device_name, created_at FROM device_info WHERE id = 1",
+            [],
+            |row| {
+                Ok((
+                    row.get::<_, Vec<u8>>(0)?,
+                    row.get::<_, i32>(1)?,
+                    row.get::<_, String>(2)?,
+                    row.get::<_, i64>(3)?,
+                ))
+            },
+        );
+
+        match result {
+            Ok((device_id_vec, device_index, device_name, created_at)) => {
+                let device_id: [u8; 32] = device_id_vec.try_into()
+                    .map_err(|_| StorageError::Encryption("Invalid device ID length".into()))?;
+                Ok(Some((device_id, device_index as u32, device_name, created_at as u64)))
+            }
+            Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+            Err(e) => Err(StorageError::Database(e)),
+        }
+    }
+
+    /// Checks if device info exists.
+    pub fn has_device_info(&self) -> Result<bool, StorageError> {
+        let count: i64 = self.conn.query_row(
+            "SELECT COUNT(*) FROM device_info WHERE id = 1",
+            [],
+            |row| row.get(0),
+        )?;
+        Ok(count > 0)
+    }
+
+    /// Saves the device registry.
+    pub fn save_device_registry(&self, registry: &DeviceRegistry) -> Result<(), StorageError> {
+        let registry_json = serde_json::to_string(registry)
+            .map_err(|e| StorageError::Serialization(e.to_string()))?;
+
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+
+        self.conn.execute(
+            "INSERT OR REPLACE INTO device_registry (id, registry_json, version, updated_at)
+             VALUES (1, ?1, ?2, ?3)",
+            params![
+                registry_json,
+                registry.version() as i64,
+                now as i64,
+            ],
+        )?;
+        Ok(())
+    }
+
+    /// Loads the device registry.
+    pub fn load_device_registry(&self) -> Result<Option<DeviceRegistry>, StorageError> {
+        let result = self.conn.query_row(
+            "SELECT registry_json FROM device_registry WHERE id = 1",
+            [],
+            |row| row.get::<_, String>(0),
+        );
+
+        match result {
+            Ok(json) => {
+                let registry: DeviceRegistry = serde_json::from_str(&json)
+                    .map_err(|e| StorageError::Serialization(e.to_string()))?;
+                Ok(Some(registry))
+            }
+            Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+            Err(e) => Err(StorageError::Database(e)),
+        }
+    }
+
+    /// Checks if device registry exists.
+    pub fn has_device_registry(&self) -> Result<bool, StorageError> {
+        let count: i64 = self.conn.query_row(
+            "SELECT COUNT(*) FROM device_registry WHERE id = 1",
+            [],
+            |row| row.get(0),
+        )?;
+        Ok(count > 0)
+    }
 }
 
 /// Internal struct for database row data.
@@ -898,5 +1027,96 @@ mod tests {
         let storage = create_test_storage();
         let result = storage.load_ratchet_state("nonexistent").unwrap();
         assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_storage_save_load_device_info() {
+        let storage = create_test_storage();
+
+        let device_id = [0x42u8; 32];
+        let device_index = 0u32;
+        let device_name = "My Phone";
+        let created_at = 1234567890u64;
+
+        // Initially no device info
+        assert!(!storage.has_device_info().unwrap());
+
+        // Save device info
+        storage.save_device_info(&device_id, device_index, device_name, created_at).unwrap();
+
+        // Now has device info
+        assert!(storage.has_device_info().unwrap());
+
+        // Load and verify
+        let (loaded_id, loaded_index, loaded_name, loaded_created) =
+            storage.load_device_info().unwrap().unwrap();
+
+        assert_eq!(loaded_id, device_id);
+        assert_eq!(loaded_index, device_index);
+        assert_eq!(loaded_name, device_name);
+        assert_eq!(loaded_created, created_at);
+    }
+
+    #[test]
+    fn test_storage_device_info_update() {
+        let storage = create_test_storage();
+
+        storage.save_device_info(&[1u8; 32], 0, "Old Name", 100).unwrap();
+        storage.save_device_info(&[2u8; 32], 1, "New Name", 200).unwrap();
+
+        let (id, index, name, _) = storage.load_device_info().unwrap().unwrap();
+        assert_eq!(id, [2u8; 32]);
+        assert_eq!(index, 1);
+        assert_eq!(name, "New Name");
+    }
+
+    #[test]
+    fn test_storage_save_load_device_registry() {
+        use crate::crypto::SigningKeyPair;
+        use crate::identity::device::{DeviceInfo, DeviceRegistry};
+
+        let storage = create_test_storage();
+        let master_seed = [0x42u8; 32];
+        let signing_key = SigningKeyPair::from_seed(&master_seed);
+
+        let device = DeviceInfo::derive(&master_seed, 0, "Primary".to_string());
+        let registry = DeviceRegistry::new(device.to_registered(), &signing_key);
+
+        // Initially no registry
+        assert!(!storage.has_device_registry().unwrap());
+
+        // Save registry
+        storage.save_device_registry(&registry).unwrap();
+
+        // Now has registry
+        assert!(storage.has_device_registry().unwrap());
+
+        // Load and verify
+        let loaded = storage.load_device_registry().unwrap().unwrap();
+        assert_eq!(loaded.version(), registry.version());
+        assert_eq!(loaded.active_count(), 1);
+        assert!(loaded.verify(&signing_key.public_key()));
+    }
+
+    #[test]
+    fn test_storage_device_registry_roundtrip() {
+        use crate::crypto::SigningKeyPair;
+        use crate::identity::device::{DeviceInfo, DeviceRegistry};
+
+        let storage = create_test_storage();
+        let master_seed = [0x42u8; 32];
+        let signing_key = SigningKeyPair::from_seed(&master_seed);
+
+        let device0 = DeviceInfo::derive(&master_seed, 0, "Primary".to_string());
+        let device1 = DeviceInfo::derive(&master_seed, 1, "Secondary".to_string());
+
+        let mut registry = DeviceRegistry::new(device0.to_registered(), &signing_key);
+        registry.add_device(device1.to_registered(), &signing_key).unwrap();
+
+        storage.save_device_registry(&registry).unwrap();
+        let loaded = storage.load_device_registry().unwrap().unwrap();
+
+        assert_eq!(loaded.version(), 2);
+        assert_eq!(loaded.active_count(), 2);
     }
 }

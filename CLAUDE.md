@@ -36,7 +36,10 @@ features/         # Gherkin scenarios
 
 **Test Coverage** - Minimum 90% for webbook-core.
 
-**Fail Fast** - Return errors immediately. Validate at boundaries. Use `Result`/`Option`, never silently ignore failures.
+**Fail Fast**
+- When there is a choice, start with most difficult or riskiest things.
+- Return errors immediately. Validate at boundaries. Use `Result`/`Option`, never silently ignore failures.
+
 
 ## Commit Rules
 

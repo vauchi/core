@@ -2,20 +2,20 @@
 
 ## Phase 1: Cross-Platform Apps
 
-| Task | Complexity | Status |
-|------|------------|--------|
-| iOS app | Medium | Todo |
-| Desktop app (Tauri) | Medium | Todo |
-| Multi-device sync | High | Todo |
+| Task | Complexity | Risk | Status |
+|------|------------|------|--------|
+| Multi-device sync | High | High (core arch) | Todo |
+| iOS app | Medium | Low | Todo |
+| Desktop app (Tauri) | Medium | Low | Todo |
 
 ## Phase 2: Security & Quality
 
-| Task | Complexity | Status |
-|------|------------|--------|
-| Keys in secure storage | Medium | Todo |
-| Security audit | Medium | Todo |
-| UI/UX review | Low | Todo |
-| Performance tuning | Low | Todo |
+| Task | Complexity | Risk | Status |
+|------|------------|------|--------|
+| Security audit | Medium | High (could find flaws) | Todo |
+| Keys in secure storage | Medium | Medium | Todo |
+| UI/UX review | Low | Low | Todo |
+| Performance tuning | Low | Low | Todo |
 
 ## Phase 3: Launch
 

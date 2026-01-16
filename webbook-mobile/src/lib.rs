@@ -271,8 +271,30 @@ impl WebBookMobile {
     // === Identity Operations ===
 
     /// Check if identity exists.
+    /// This checks both in-memory cache and persistent storage.
     pub fn has_identity(&self) -> bool {
-        self.identity_data.lock().unwrap().is_some()
+        // First check in-memory cache
+        {
+            let data = self.identity_data.lock().unwrap();
+            if data.is_some() {
+                return true;
+            }
+        }
+
+        // Check storage and load if found
+        if let Ok(storage) = self.open_storage() {
+            if let Ok(Some((backup_data, display_name))) = storage.load_identity() {
+                // Load into memory cache
+                let identity_data = IdentityData {
+                    backup_data,
+                    display_name,
+                };
+                *self.identity_data.lock().unwrap() = Some(identity_data);
+                return true;
+            }
+        }
+
+        false
     }
 
     /// Create a new identity.
@@ -291,15 +313,20 @@ impl WebBookMobile {
             .export_backup("__internal_storage_key__")
             .map_err(|e| MobileError::CryptoError(e.to_string()))?;
 
+        let backup_data = backup.as_bytes().to_vec();
+
+        // Persist identity to storage
+        let storage = self.open_storage()?;
+        storage.save_identity(&backup_data, &display_name)?;
+
+        // Cache in memory
         let identity_data = IdentityData {
-            backup_data: backup.as_bytes().to_vec(),
+            backup_data,
             display_name: display_name.clone(),
         };
-
         *self.identity_data.lock().unwrap() = Some(identity_data);
 
         // Create initial contact card
-        let storage = self.open_storage()?;
         let card = ContactCard::new(&display_name);
         storage.save_own_card(&card)?;
 
@@ -687,17 +714,23 @@ impl WebBookMobile {
             .export_backup("__internal_storage_key__")
             .map_err(|e| MobileError::CryptoError(e.to_string()))?;
 
-        let identity_data = IdentityData {
-            backup_data: internal_backup.as_bytes().to_vec(),
-            display_name: identity.display_name().to_string(),
-        };
+        let internal_backup_data = internal_backup.as_bytes().to_vec();
+        let display_name = identity.display_name().to_string();
 
+        // Persist identity to storage
+        let storage = self.open_storage()?;
+        storage.save_identity(&internal_backup_data, &display_name)?;
+
+        // Cache in memory
+        let identity_data = IdentityData {
+            backup_data: internal_backup_data,
+            display_name: display_name.clone(),
+        };
         *self.identity_data.lock().unwrap() = Some(identity_data);
 
         // Create contact card if it doesn't exist
-        let storage = self.open_storage()?;
         if storage.load_own_card()?.is_none() {
-            let card = ContactCard::new(identity.display_name());
+            let card = ContactCard::new(&display_name);
             storage.save_own_card(&card)?;
         }
 

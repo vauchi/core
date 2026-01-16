@@ -776,4 +776,206 @@ mod tests {
 
         assert!(result.is_err());
     }
+
+    // ============================================================
+    // Additional edge case tests (added for coverage)
+    // ============================================================
+
+    #[test]
+    fn test_device_link_response_with_sync_payload() {
+        let master_seed = [0x42u8; 32];
+        let identity = Identity::create("Alice");
+        let registry = create_test_registry(&identity);
+
+        let sync_payload = r#"{"contacts":[],"own_card_json":"{}","version":1}"#;
+        let response = DeviceLinkResponse::with_sync_payload(
+            master_seed,
+            "Alice".to_string(),
+            1,
+            registry.clone(),
+            sync_payload.to_string(),
+        );
+
+        assert_eq!(response.sync_payload_json(), sync_payload);
+
+        // Test roundtrip preserves sync payload
+        let bytes = response.to_bytes();
+        let restored = DeviceLinkResponse::from_bytes(&bytes).unwrap();
+        assert_eq!(restored.sync_payload_json(), sync_payload);
+    }
+
+    #[test]
+    fn test_device_link_response_encryption_with_sync_payload() {
+        let master_seed = [0x42u8; 32];
+        let identity = Identity::create("Alice");
+        let registry = create_test_registry(&identity);
+
+        let sync_payload = r#"{"contacts":[{"id":"test"}]}"#;
+        let response = DeviceLinkResponse::with_sync_payload(
+            master_seed,
+            "Alice".to_string(),
+            1,
+            registry,
+            sync_payload.to_string(),
+        );
+
+        let link_key = [0x55u8; 32];
+        let encrypted = response.encrypt(&link_key).unwrap();
+        let decrypted = DeviceLinkResponse::decrypt(&encrypted, &link_key).unwrap();
+
+        assert_eq!(decrypted.sync_payload_json(), sync_payload);
+    }
+
+    #[test]
+    fn test_device_link_responder_expired_qr() {
+        let identity = create_test_identity();
+        // Create QR with timestamp 20 minutes ago (expired)
+        let old_timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs() - 1200;
+
+        let qr = DeviceLinkQR::generate_with_timestamp(&identity, old_timestamp);
+        let result = DeviceLinkResponder::from_qr(qr, "My Phone".to_string());
+
+        assert!(matches!(result, Err(ExchangeError::TokenExpired)));
+    }
+
+    #[test]
+    fn test_device_link_qr_invalid_base64() {
+        let result = DeviceLinkQR::from_data_string("not valid base64!!!");
+        assert!(matches!(result, Err(ExchangeError::InvalidQRFormat)));
+    }
+
+    #[test]
+    fn test_device_link_qr_invalid_version() {
+        // Create valid-looking data but with wrong version
+        let mut data = Vec::new();
+        data.extend_from_slice(DEVICE_LINK_MAGIC);
+        data.push(99); // Wrong version
+        data.extend_from_slice(&[0u8; 32]); // identity_key
+        data.extend_from_slice(&[0u8; 32]); // link_key
+        data.extend_from_slice(&0u64.to_be_bytes()); // timestamp
+        data.extend_from_slice(&[0u8; 64]); // signature
+
+        let encoded = BASE64.encode(&data);
+        let result = DeviceLinkQR::from_data_string(&encoded);
+
+        assert!(matches!(result, Err(ExchangeError::InvalidProtocolVersion)));
+    }
+
+    #[test]
+    fn test_device_link_qr_truncated_data() {
+        // Data too short
+        let data = BASE64.encode(b"WBDL\x01short");
+        let result = DeviceLinkQR::from_data_string(&data);
+
+        assert!(matches!(result, Err(ExchangeError::InvalidQRFormat)));
+    }
+
+    #[test]
+    fn test_device_link_qr_invalid_signature() {
+        let identity = create_test_identity();
+        let qr = DeviceLinkQR::generate(&identity);
+
+        // Corrupt the signature
+        let mut data = Vec::new();
+        data.extend_from_slice(DEVICE_LINK_MAGIC);
+        data.push(qr.version);
+        data.extend_from_slice(qr.identity_public_key());
+        data.extend_from_slice(qr.link_key());
+        data.extend_from_slice(&qr.timestamp().to_be_bytes());
+        data.extend_from_slice(&[0xFFu8; 64]); // Invalid signature
+
+        let encoded = BASE64.encode(&data);
+        let result = DeviceLinkQR::from_data_string(&encoded);
+
+        assert!(matches!(result, Err(ExchangeError::InvalidSignature)));
+    }
+
+    #[test]
+    fn test_device_link_process_request_empty_device_name() {
+        let master_seed = [0x42u8; 32];
+        let identity = Identity::create("Alice");
+        let registry = create_test_registry(&identity);
+        let initiator = DeviceLinkInitiator::new(master_seed, &identity, registry);
+
+        // Create a request with empty device name
+        let request = DeviceLinkRequest {
+            device_name: "".to_string(),
+            nonce: [0u8; 32],
+            timestamp: SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_secs(),
+        };
+        let encrypted = request.encrypt(initiator.qr().link_key()).unwrap();
+
+        let result = initiator.process_request(&encrypted);
+        assert!(matches!(result, Err(ExchangeError::InvalidQRFormat)));
+    }
+
+    #[test]
+    fn test_device_link_request_truncated_bytes() {
+        // Test with truncated data
+        let result = DeviceLinkRequest::from_bytes(&[0u8; 10]);
+        assert!(matches!(result, Err(ExchangeError::InvalidQRFormat)));
+    }
+
+    #[test]
+    fn test_device_link_response_truncated_bytes() {
+        // Test with truncated data
+        let result = DeviceLinkResponse::from_bytes(&[0u8; 10]);
+        assert!(matches!(result, Err(ExchangeError::InvalidQRFormat)));
+    }
+
+    #[test]
+    fn test_device_link_response_wrong_key() {
+        let master_seed = [0x42u8; 32];
+        let identity = Identity::create("Alice");
+        let registry = create_test_registry(&identity);
+
+        let response = DeviceLinkResponse::new(master_seed, "Alice".to_string(), 1, registry);
+
+        let correct_key = [0x42u8; 32];
+        let wrong_key = [0x99u8; 32];
+
+        let encrypted = response.encrypt(&correct_key).unwrap();
+        let result = DeviceLinkResponse::decrypt(&encrypted, &wrong_key);
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_device_link_qr_to_qr_image_string() {
+        let identity = create_test_identity();
+        let qr = DeviceLinkQR::generate(&identity);
+
+        let image_string = qr.to_qr_image_string();
+
+        // Should produce a non-empty string with blocks
+        assert!(!image_string.is_empty());
+        assert!(image_string.contains('█') || image_string.contains(' '));
+    }
+
+    #[test]
+    fn test_device_link_responder_identity_public_key() {
+        let identity = create_test_identity();
+        let qr = DeviceLinkQR::generate(&identity);
+        let responder = DeviceLinkResponder::from_qr(qr, "My Phone".to_string()).unwrap();
+
+        assert_eq!(responder.identity_public_key(), identity.signing_public_key());
+    }
+
+    #[test]
+    fn test_device_link_initiator_qr_accessor() {
+        let master_seed = [0x42u8; 32];
+        let identity = Identity::create("Alice");
+        let registry = create_test_registry(&identity);
+        let initiator = DeviceLinkInitiator::new(master_seed, &identity, registry);
+
+        let qr = initiator.qr();
+        assert_eq!(qr.identity_public_key(), identity.signing_public_key());
+        assert!(!qr.is_expired());
+    }
 }

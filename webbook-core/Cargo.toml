@@ -5,6 +5,10 @@ edition = "2021"
 description = "Core library for WebBook - privacy-focused contact card exchange"
 license = "MIT"
 
+[features]
+default = ["network"]
+network = ["tungstenite", "native-tls"]
+
 [dependencies]
 # Cryptography (audited library)
 ring = "0.17"
@@ -38,9 +42,9 @@ rusqlite = { version = "0.32", features = ["bundled"] }
 # UUID generation for IDs
 uuid = { version = "1.0", features = ["v4"] }
 
-# WebSocket transport
-tungstenite = { version = "0.24", features = ["native-tls"] }
-native-tls = "0.2"
+# WebSocket transport (optional, not needed for mobile)
+tungstenite = { version = "0.24", features = ["native-tls"], optional = true }
+native-tls = { version = "0.2", optional = true }
 
 [dev-dependencies]
 # Temporary directories for storage tests

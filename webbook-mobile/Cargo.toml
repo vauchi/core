@@ -10,11 +10,11 @@ crate-type = ["cdylib", "staticlib", "lib"]
 name = "webbook_mobile"
 
 [dependencies]
-# Core WebBook library
-webbook-core = { path = "../webbook-core" }
+# Core WebBook library (without network features for mobile)
+webbook-core = { path = "../webbook-core", default-features = false }
 
 # UniFFI for cross-language bindings
-uniffi = { version = "0.28" }
+uniffi = { version = "0.28", features = ["cli"] }
 
 # Serialization
 serde = { version = "1.0", features = ["derive"] }
@@ -32,6 +32,10 @@ base64 = "0.22"
 
 # Hex encoding for public IDs
 hex = "0.4"
+
+[[bin]]
+name = "uniffi-bindgen"
+path = "uniffi-bindgen.rs"
 
 [dev-dependencies]
 tempfile = "3.0"

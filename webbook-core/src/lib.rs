@@ -10,7 +10,9 @@ pub mod exchange;
 pub mod contact;
 pub mod storage;
 pub mod sync;
+#[cfg(feature = "network")]
 pub mod network;
+#[cfg(feature = "network")]
 pub mod api;
 pub mod social;
 
@@ -21,6 +23,8 @@ pub use exchange::{ExchangeQR, X3DH, X3DHKeyPair, ExchangeError, ProximityVerifi
 pub use contact::{Contact, FieldVisibility, VisibilityRules};
 pub use storage::{Storage, StorageError, PendingUpdate, UpdateStatus};
 pub use sync::{SyncState, SyncManager, SyncError, CardDelta, FieldChange, DeltaError};
+#[cfg(feature = "network")]
 pub use network::{NetworkError, Transport, RelayClient, RelayClientConfig, MockTransport, ConnectionState, MessageEnvelope};
+#[cfg(feature = "network")]
 pub use api::{WebBook, WebBookBuilder, WebBookConfig, WebBookError, WebBookResult, WebBookEvent};
 pub use social::{SocialNetwork, SocialNetworkRegistry, ProfileValidation, TrustLevel, ValidationStatus};

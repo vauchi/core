@@ -707,3 +707,340 @@ fn test_accept_recovery_with_new_card() {
     assert_eq!(contact.display_name(), "Alice Smith");
     assert_eq!(contact.card().display_name(), "Alice Smith");
 }
+
+// =============================================================================
+// Remind Me Later Tests (Scenario: Remind me later)
+// =============================================================================
+
+#[test]
+fn test_recovery_reminder_creation() {
+    // Scenario: Remind me later
+    // When John chooses "Remind Me Later"
+    // Then the notification is dismissed
+    use webbook_core::recovery::RecoveryReminder;
+
+    let old_pk = [0x01u8; 32];
+    let reminder = RecoveryReminder::new(old_pk);
+
+    assert_eq!(reminder.old_pk(), &old_pk);
+    assert!(!reminder.is_due());
+}
+
+#[test]
+fn test_recovery_reminder_default_7_days() {
+    // And John is reminded after 7 days
+    use webbook_core::recovery::RecoveryReminder;
+
+    let old_pk = [0x01u8; 32];
+    let reminder = RecoveryReminder::new(old_pk);
+
+    // Default reminder period is 7 days
+    assert_eq!(reminder.reminder_days(), 7);
+}
+
+#[test]
+fn test_recovery_reminder_custom_period() {
+    // And John can adjust the reminder period
+    use webbook_core::recovery::RecoveryReminder;
+
+    let old_pk = [0x01u8; 32];
+    let reminder = RecoveryReminder::with_days(old_pk, 14);
+
+    assert_eq!(reminder.reminder_days(), 14);
+}
+
+#[test]
+fn test_recovery_reminder_is_due_after_period() {
+    use webbook_core::recovery::RecoveryReminder;
+
+    let old_pk = [0x01u8; 32];
+    // Create a reminder that was set 8 days ago (past the 7-day default)
+    let reminder = RecoveryReminder::new_with_timestamp(old_pk, days_ago(8), 7);
+
+    assert!(reminder.is_due());
+}
+
+#[test]
+fn test_recovery_reminder_not_due_before_period() {
+    use webbook_core::recovery::RecoveryReminder;
+
+    let old_pk = [0x01u8; 32];
+    // Create a reminder that was set 5 days ago (before the 7-day default)
+    let reminder = RecoveryReminder::new_with_timestamp(old_pk, days_ago(5), 7);
+
+    assert!(!reminder.is_due());
+}
+
+#[test]
+fn test_recovery_reminder_snooze() {
+    use webbook_core::recovery::RecoveryReminder;
+
+    let old_pk = [0x01u8; 32];
+    // Create a reminder that is due
+    let mut reminder = RecoveryReminder::new_with_timestamp(old_pk, days_ago(8), 7);
+    assert!(reminder.is_due());
+
+    // Snooze for another 7 days
+    reminder.snooze(7);
+
+    // Should no longer be due
+    assert!(!reminder.is_due());
+}
+
+/// Helper to create a timestamp N days in the past.
+fn days_ago(days: u64) -> u64 {
+    use std::time::{SystemTime, UNIX_EPOCH};
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("Time went backwards")
+        .as_secs();
+    now.saturating_sub(days * 24 * 60 * 60)
+}
+
+// =============================================================================
+// Conflicting Recovery Claims Tests (Scenario: Detect conflicting recovery claims)
+// =============================================================================
+
+#[test]
+fn test_detect_conflicting_claims() {
+    // Scenario: Detect conflicting recovery claims
+    // Given Alice uploads a recovery proof for "pk_old" -> "pk_new_1"
+    // When an attacker uploads a recovery proof for "pk_old" -> "pk_new_2"
+    // Then contacts see a conflict warning
+    use webbook_core::recovery::RecoveryConflict;
+
+    let old_pk = [0x01u8; 32];
+    let new_pk_1 = [0x02u8; 32];
+    let new_pk_2 = [0x03u8; 32];
+
+    // Create two proofs for the same old_pk with different new_pks
+    let bob = Identity::create("Bob");
+    let charlie = Identity::create("Charlie");
+    let dave = Identity::create("Dave");
+
+    let mut proof1 = RecoveryProof::new(&old_pk, &new_pk_1, 2);
+    proof1.add_voucher(RecoveryVoucher::create(&old_pk, &new_pk_1, bob.signing_keypair())).unwrap();
+    proof1.add_voucher(RecoveryVoucher::create(&old_pk, &new_pk_1, charlie.signing_keypair())).unwrap();
+
+    let mut proof2 = RecoveryProof::new(&old_pk, &new_pk_2, 2);
+    proof2.add_voucher(RecoveryVoucher::create(&old_pk, &new_pk_2, dave.signing_keypair())).unwrap();
+    proof2.add_voucher(RecoveryVoucher::create(&old_pk, &new_pk_2, bob.signing_keypair())).unwrap();
+
+    // Detect conflict
+    let conflict = RecoveryConflict::detect(&[proof1.clone(), proof2.clone()]);
+
+    assert!(conflict.is_some());
+    let conflict = conflict.unwrap();
+    assert_eq!(conflict.old_pk(), &old_pk);
+    assert_eq!(conflict.claims().len(), 2);
+}
+
+#[test]
+fn test_no_conflict_single_proof() {
+    use webbook_core::recovery::RecoveryConflict;
+
+    let old_pk = [0x01u8; 32];
+    let new_pk = [0x02u8; 32];
+
+    let bob = Identity::create("Bob");
+    let charlie = Identity::create("Charlie");
+
+    let mut proof = RecoveryProof::new(&old_pk, &new_pk, 2);
+    proof.add_voucher(RecoveryVoucher::create(&old_pk, &new_pk, bob.signing_keypair())).unwrap();
+    proof.add_voucher(RecoveryVoucher::create(&old_pk, &new_pk, charlie.signing_keypair())).unwrap();
+
+    // No conflict with single proof
+    let conflict = RecoveryConflict::detect(&[proof]);
+    assert!(conflict.is_none());
+}
+
+#[test]
+fn test_no_conflict_same_new_pk() {
+    // Multiple proofs with same old_pk AND same new_pk is not a conflict
+    use webbook_core::recovery::RecoveryConflict;
+
+    let old_pk = [0x01u8; 32];
+    let new_pk = [0x02u8; 32];
+
+    let bob = Identity::create("Bob");
+    let charlie = Identity::create("Charlie");
+
+    let mut proof1 = RecoveryProof::new(&old_pk, &new_pk, 1);
+    proof1.add_voucher(RecoveryVoucher::create(&old_pk, &new_pk, bob.signing_keypair())).unwrap();
+
+    let mut proof2 = RecoveryProof::new(&old_pk, &new_pk, 1);
+    proof2.add_voucher(RecoveryVoucher::create(&old_pk, &new_pk, charlie.signing_keypair())).unwrap();
+
+    // No conflict since both have same new_pk
+    let conflict = RecoveryConflict::detect(&[proof1, proof2]);
+    assert!(conflict.is_none());
+}
+
+#[test]
+fn test_conflict_claim_info() {
+    use webbook_core::recovery::RecoveryConflict;
+
+    let old_pk = [0x01u8; 32];
+    let new_pk_1 = [0x02u8; 32];
+    let new_pk_2 = [0x03u8; 32];
+
+    let bob = Identity::create("Bob");
+    let charlie = Identity::create("Charlie");
+
+    let mut proof1 = RecoveryProof::new(&old_pk, &new_pk_1, 2);
+    proof1.add_voucher(RecoveryVoucher::create(&old_pk, &new_pk_1, bob.signing_keypair())).unwrap();
+    proof1.add_voucher(RecoveryVoucher::create(&old_pk, &new_pk_1, charlie.signing_keypair())).unwrap();
+
+    let mut proof2 = RecoveryProof::new(&old_pk, &new_pk_2, 1);
+    proof2.add_voucher(RecoveryVoucher::create(&old_pk, &new_pk_2, bob.signing_keypair())).unwrap();
+
+    let conflict = RecoveryConflict::detect(&[proof1, proof2]).unwrap();
+
+    // Claims should have correct voucher counts
+    let claims = conflict.claims();
+    assert!(claims.iter().any(|c| c.new_pk() == &new_pk_1 && c.voucher_count() == 2));
+    assert!(claims.iter().any(|c| c.new_pk() == &new_pk_2 && c.voucher_count() == 1));
+}
+
+// =============================================================================
+// Recovery Revocation Tests (Scenario: Revoke recovery proof)
+// =============================================================================
+
+#[test]
+fn test_create_revocation() {
+    // Scenario: Revoke recovery proof
+    // When Alice signs a revocation with her old private key
+    use webbook_core::recovery::RecoveryRevocation;
+
+    let alice_old = Identity::create("Alice (old)");
+    let alice_new = Identity::create("Alice (new)");
+
+    let revocation = RecoveryRevocation::create(
+        alice_old.signing_public_key(),
+        alice_new.signing_public_key(),
+        alice_old.signing_keypair(),
+    );
+
+    assert_eq!(revocation.old_pk(), alice_old.signing_public_key());
+    assert_eq!(revocation.new_pk(), alice_new.signing_public_key());
+}
+
+#[test]
+fn test_revocation_signature_valid() {
+    use webbook_core::recovery::RecoveryRevocation;
+
+    let alice_old = Identity::create("Alice (old)");
+    let alice_new = Identity::create("Alice (new)");
+
+    let revocation = RecoveryRevocation::create(
+        alice_old.signing_public_key(),
+        alice_new.signing_public_key(),
+        alice_old.signing_keypair(),
+    );
+
+    // Signature should verify
+    assert!(revocation.verify());
+}
+
+#[test]
+fn test_revocation_signature_invalid_wrong_key() {
+    use webbook_core::recovery::RecoveryRevocation;
+
+    let alice_old = Identity::create("Alice (old)");
+    let alice_new = Identity::create("Alice (new)");
+    let attacker = Identity::create("Attacker");
+
+    // Attacker tries to create revocation (but doesn't have old private key)
+    let revocation = RecoveryRevocation::create(
+        alice_old.signing_public_key(),
+        alice_new.signing_public_key(),
+        attacker.signing_keypair(), // Wrong key!
+    );
+
+    // Signature should NOT verify
+    assert!(!revocation.verify());
+}
+
+#[test]
+fn test_revocation_applies_to_proof() {
+    use webbook_core::recovery::RecoveryRevocation;
+
+    let alice_old = Identity::create("Alice (old)");
+    let alice_new = Identity::create("Alice (new)");
+    let bob = Identity::create("Bob");
+
+    // Create a recovery proof
+    let mut proof = RecoveryProof::new(
+        alice_old.signing_public_key(),
+        alice_new.signing_public_key(),
+        1,
+    );
+    proof.add_voucher(RecoveryVoucher::create(
+        alice_old.signing_public_key(),
+        alice_new.signing_public_key(),
+        bob.signing_keypair(),
+    )).unwrap();
+
+    // Create revocation
+    let revocation = RecoveryRevocation::create(
+        alice_old.signing_public_key(),
+        alice_new.signing_public_key(),
+        alice_old.signing_keypair(),
+    );
+
+    // Revocation should apply to this proof
+    assert!(revocation.applies_to(&proof));
+}
+
+#[test]
+fn test_revocation_does_not_apply_different_proof() {
+    use webbook_core::recovery::RecoveryRevocation;
+
+    let alice_old = Identity::create("Alice (old)");
+    let alice_new = Identity::create("Alice (new)");
+    let alice_other = Identity::create("Alice (other)");
+    let bob = Identity::create("Bob");
+
+    // Create a recovery proof for different new_pk
+    let mut proof = RecoveryProof::new(
+        alice_old.signing_public_key(),
+        alice_other.signing_public_key(), // Different new_pk
+        1,
+    );
+    proof.add_voucher(RecoveryVoucher::create(
+        alice_old.signing_public_key(),
+        alice_other.signing_public_key(),
+        bob.signing_keypair(),
+    )).unwrap();
+
+    // Create revocation for original new_pk
+    let revocation = RecoveryRevocation::create(
+        alice_old.signing_public_key(),
+        alice_new.signing_public_key(),
+        alice_old.signing_keypair(),
+    );
+
+    // Revocation should NOT apply to this proof (different new_pk)
+    assert!(!revocation.applies_to(&proof));
+}
+
+#[test]
+fn test_revocation_serialization() {
+    use webbook_core::recovery::RecoveryRevocation;
+
+    let alice_old = Identity::create("Alice (old)");
+    let alice_new = Identity::create("Alice (new)");
+
+    let revocation = RecoveryRevocation::create(
+        alice_old.signing_public_key(),
+        alice_new.signing_public_key(),
+        alice_old.signing_keypair(),
+    );
+
+    let bytes = revocation.to_bytes();
+    let restored = RecoveryRevocation::from_bytes(&bytes).unwrap();
+
+    assert_eq!(restored.old_pk(), revocation.old_pk());
+    assert_eq!(restored.new_pk(), revocation.new_pk());
+    assert!(restored.verify());
+}

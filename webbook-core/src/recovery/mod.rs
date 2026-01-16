@@ -11,7 +11,7 @@
 //! - `RecoveryProof`: Collection of vouchers proving identity
 //! - `RecoverySettings`: User's recovery preferences
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
@@ -595,6 +595,297 @@ impl RecoverySettings {
     /// Returns the verification threshold.
     pub fn verification_threshold(&self) -> u32 {
         self.verification_threshold
+    }
+}
+
+// =============================================================================
+// Recovery Reminder
+// =============================================================================
+
+/// Tracks a dismissed recovery notification for later reminder.
+///
+/// When a user chooses "Remind Me Later" for a recovery proof,
+/// this tracks when they should be reminded again.
+#[derive(Debug, Clone)]
+pub struct RecoveryReminder {
+    /// The old public key of the recovery claim.
+    old_pk: [u8; 32],
+    /// When the reminder was created/snoozed (Unix timestamp).
+    created_at: u64,
+    /// Number of days until reminder is due.
+    reminder_days: u32,
+}
+
+impl RecoveryReminder {
+    /// Default reminder period in days.
+    pub const DEFAULT_REMINDER_DAYS: u32 = 7;
+
+    /// Creates a new reminder with the default 7-day period.
+    pub fn new(old_pk: [u8; 32]) -> Self {
+        let created_at = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("Time went backwards")
+            .as_secs();
+
+        Self {
+            old_pk,
+            created_at,
+            reminder_days: Self::DEFAULT_REMINDER_DAYS,
+        }
+    }
+
+    /// Creates a new reminder with a custom period.
+    pub fn with_days(old_pk: [u8; 32], days: u32) -> Self {
+        let created_at = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("Time went backwards")
+            .as_secs();
+
+        Self {
+            old_pk,
+            created_at,
+            reminder_days: days,
+        }
+    }
+
+    /// Creates a reminder with a specific timestamp (for testing).
+    #[doc(hidden)]
+    pub fn new_with_timestamp(old_pk: [u8; 32], created_at: u64, reminder_days: u32) -> Self {
+        Self {
+            old_pk,
+            created_at,
+            reminder_days,
+        }
+    }
+
+    /// Returns the old public key this reminder is for.
+    pub fn old_pk(&self) -> &[u8; 32] {
+        &self.old_pk
+    }
+
+    /// Returns the reminder period in days.
+    pub fn reminder_days(&self) -> u32 {
+        self.reminder_days
+    }
+
+    /// Checks if the reminder is due (enough time has passed).
+    pub fn is_due(&self) -> bool {
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("Time went backwards")
+            .as_secs();
+
+        let elapsed_secs = now.saturating_sub(self.created_at);
+        let reminder_secs = u64::from(self.reminder_days) * 24 * 60 * 60;
+
+        elapsed_secs >= reminder_secs
+    }
+
+    /// Snoozes the reminder for the specified number of days.
+    ///
+    /// Resets the created_at timestamp to now.
+    pub fn snooze(&mut self, days: u32) {
+        self.created_at = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("Time went backwards")
+            .as_secs();
+        self.reminder_days = days;
+    }
+}
+
+// =============================================================================
+// Recovery Conflict Detection
+// =============================================================================
+
+/// Represents a conflicting claim in a recovery conflict.
+#[derive(Debug, Clone)]
+pub struct ConflictingClaim {
+    /// The new public key being claimed.
+    new_pk: [u8; 32],
+    /// Number of vouchers supporting this claim.
+    voucher_count: usize,
+}
+
+impl ConflictingClaim {
+    /// Returns the new public key.
+    pub fn new_pk(&self) -> &[u8; 32] {
+        &self.new_pk
+    }
+
+    /// Returns the number of vouchers.
+    pub fn voucher_count(&self) -> usize {
+        self.voucher_count
+    }
+}
+
+/// Represents conflicting recovery claims for the same identity.
+///
+/// This occurs when multiple recovery proofs exist for the same old_pk
+/// but with different new_pks, indicating a potential attack.
+#[derive(Debug, Clone)]
+pub struct RecoveryConflict {
+    /// The old public key that has conflicting claims.
+    old_pk: [u8; 32],
+    /// The conflicting claims.
+    claims: Vec<ConflictingClaim>,
+}
+
+impl RecoveryConflict {
+    /// Detects if there are conflicting recovery claims.
+    ///
+    /// Returns `Some(conflict)` if multiple proofs for the same old_pk
+    /// have different new_pks. Returns `None` if no conflict exists.
+    pub fn detect(proofs: &[RecoveryProof]) -> Option<Self> {
+        if proofs.is_empty() {
+            return None;
+        }
+
+        // Group proofs by old_pk
+        let mut by_old_pk: HashMap<[u8; 32], Vec<&RecoveryProof>> = HashMap::new();
+        for proof in proofs {
+            by_old_pk.entry(*proof.old_pk()).or_default().push(proof);
+        }
+
+        // Check each group for conflicts (different new_pks)
+        for (old_pk, group) in by_old_pk {
+            // Collect unique new_pks with their voucher counts
+            let mut new_pks: HashMap<[u8; 32], usize> = HashMap::new();
+            for proof in &group {
+                let entry = new_pks.entry(*proof.new_pk()).or_insert(0);
+                *entry = (*entry).max(proof.voucher_count());
+            }
+
+            // Conflict if more than one unique new_pk
+            if new_pks.len() > 1 {
+                let claims: Vec<ConflictingClaim> = new_pks
+                    .into_iter()
+                    .map(|(new_pk, voucher_count)| ConflictingClaim { new_pk, voucher_count })
+                    .collect();
+
+                return Some(Self { old_pk, claims });
+            }
+        }
+
+        None
+    }
+
+    /// Returns the old public key that has conflicting claims.
+    pub fn old_pk(&self) -> &[u8; 32] {
+        &self.old_pk
+    }
+
+    /// Returns the conflicting claims.
+    pub fn claims(&self) -> &[ConflictingClaim] {
+        &self.claims
+    }
+}
+
+// =============================================================================
+// Recovery Revocation
+// =============================================================================
+
+/// A signed revocation of a recovery proof.
+///
+/// When a user recovers their old device after having initiated recovery,
+/// they can sign a revocation with their old private key to invalidate
+/// the recovery proof.
+#[serde_as]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RecoveryRevocation {
+    /// Type marker for QR/serialization.
+    revocation_type: String,
+    /// The old public key (being recovered from).
+    #[serde_as(as = "[_; 32]")]
+    old_pk: [u8; 32],
+    /// The new public key (that was being recovered to).
+    #[serde_as(as = "[_; 32]")]
+    new_pk: [u8; 32],
+    /// Unix timestamp when revocation was created.
+    timestamp: u64,
+    /// Signature over (revocation_type || old_pk || new_pk || timestamp).
+    #[serde_as(as = "[_; 64]")]
+    signature: [u8; 64],
+}
+
+impl RecoveryRevocation {
+    /// Creates a signed revocation.
+    ///
+    /// Must be signed with the old private key to prove ownership.
+    pub fn create(
+        old_pk: &[u8; 32],
+        new_pk: &[u8; 32],
+        old_keypair: &SigningKeyPair,
+    ) -> Self {
+        let timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("Time went backwards")
+            .as_secs();
+
+        let revocation_type = "recovery_revocation".to_string();
+
+        // Build signing message
+        let mut msg = Vec::new();
+        msg.extend_from_slice(revocation_type.as_bytes());
+        msg.extend_from_slice(old_pk);
+        msg.extend_from_slice(new_pk);
+        msg.extend_from_slice(&timestamp.to_le_bytes());
+
+        let signature = old_keypair.sign(&msg);
+
+        Self {
+            revocation_type,
+            old_pk: *old_pk,
+            new_pk: *new_pk,
+            timestamp,
+            signature: *signature.as_bytes(),
+        }
+    }
+
+    /// Returns the old public key.
+    pub fn old_pk(&self) -> &[u8; 32] {
+        &self.old_pk
+    }
+
+    /// Returns the new public key (that was being recovered to).
+    pub fn new_pk(&self) -> &[u8; 32] {
+        &self.new_pk
+    }
+
+    /// Returns the timestamp.
+    pub fn timestamp(&self) -> u64 {
+        self.timestamp
+    }
+
+    /// Verifies the revocation signature using the old public key.
+    pub fn verify(&self) -> bool {
+        let pk = PublicKey::from_bytes(self.old_pk);
+        let sig = Signature::from_bytes(self.signature);
+
+        // Reconstruct signing message
+        let mut msg = Vec::new();
+        msg.extend_from_slice(self.revocation_type.as_bytes());
+        msg.extend_from_slice(&self.old_pk);
+        msg.extend_from_slice(&self.new_pk);
+        msg.extend_from_slice(&self.timestamp.to_le_bytes());
+
+        pk.verify(&msg, &sig)
+    }
+
+    /// Checks if this revocation applies to the given proof.
+    ///
+    /// Returns true if old_pk and new_pk match.
+    pub fn applies_to(&self, proof: &RecoveryProof) -> bool {
+        self.old_pk == *proof.old_pk() && self.new_pk == *proof.new_pk()
+    }
+
+    /// Serializes the revocation to bytes.
+    pub fn to_bytes(&self) -> Vec<u8> {
+        bincode::serialize(self).expect("Serialization should not fail")
+    }
+
+    /// Deserializes a revocation from bytes.
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, RecoveryError> {
+        bincode::deserialize(bytes).map_err(|e| RecoveryError::SerializationError(e.to_string()))
     }
 }
 

@@ -36,8 +36,8 @@ pub use social::{
     ProfileValidation, SocialNetwork, SocialNetworkRegistry, TrustLevel, ValidationStatus,
 };
 pub use recovery::{
-    RecoveryClaim, RecoveryError, RecoveryProof, RecoverySettings, RecoveryVoucher,
-    VerificationResult,
+    ConflictingClaim, RecoveryClaim, RecoveryConflict, RecoveryError, RecoveryProof,
+    RecoveryReminder, RecoveryRevocation, RecoverySettings, RecoveryVoucher, VerificationResult,
 };
 pub use storage::{PendingUpdate, Storage, StorageError, UpdateStatus};
 pub use sync::{CardDelta, DeltaError, FieldChange, SyncError, SyncManager, SyncState};

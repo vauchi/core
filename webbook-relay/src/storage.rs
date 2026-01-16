@@ -1,14 +1,14 @@
 //! Blob Storage
 //!
-//! In-memory storage for encrypted blobs awaiting delivery.
-//!
-//! Note: Current implementation is in-memory and does not survive server restarts.
-//! For production deployments with long TTLs (90 days), consider adding persistent
-//! storage (SQLite or RocksDB) to preserve messages across restarts.
+//! Storage backends for encrypted blobs awaiting delivery.
+//! Supports both in-memory (for testing) and SQLite (for production).
 
 use std::collections::{HashMap, VecDeque};
-use std::sync::RwLock;
+use std::path::Path;
+use std::sync::{Mutex, RwLock};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
+
+use rusqlite::{params, Connection};
 
 /// A stored encrypted blob.
 #[derive(Debug, Clone)]
@@ -39,38 +39,73 @@ impl StoredBlob {
         }
     }
 
-    /// Returns the age of this blob.
-    fn age_secs(&self) -> u64 {
+    /// Checks if the blob has expired.
+    pub fn is_expired(&self, ttl: Duration) -> bool {
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap_or_default()
             .as_secs();
-        now.saturating_sub(self.created_at_secs)
-    }
-
-    /// Checks if the blob has expired.
-    pub fn is_expired(&self, ttl: Duration) -> bool {
+        let age = now.saturating_sub(self.created_at_secs);
         // Use >= so that TTL of 0 means immediately expired
-        self.age_secs() >= ttl.as_secs()
+        age >= ttl.as_secs()
     }
 }
 
+/// Trait for blob storage backends.
+#[allow(dead_code)]
+pub trait BlobStore: Send + Sync {
+    /// Stores a blob for a recipient.
+    fn store(&self, recipient_id: &str, blob: StoredBlob);
+
+    /// Retrieves all pending blobs for a recipient (without removing them).
+    fn peek(&self, recipient_id: &str) -> Vec<StoredBlob>;
+
+    /// Retrieves and removes all pending blobs for a recipient.
+    fn take(&self, recipient_id: &str) -> Vec<StoredBlob>;
+
+    /// Acknowledges receipt of a specific blob (removes it).
+    fn acknowledge(&self, recipient_id: &str, blob_id: &str) -> bool;
+
+    /// Removes all expired blobs. Returns the number removed.
+    fn cleanup_expired(&self, ttl: Duration) -> usize;
+
+    /// Returns the total number of stored blobs.
+    fn blob_count(&self) -> usize;
+
+    /// Returns the number of recipients with pending blobs.
+    fn recipient_count(&self) -> usize;
+
+    /// Returns storage size in bytes (approximate).
+    /// Used for monitoring and federation offload decisions.
+    fn storage_size_bytes(&self) -> usize;
+}
+
+// ============================================================================
+// In-Memory Storage (for testing and development)
+// ============================================================================
+
 /// In-memory storage for blobs indexed by recipient ID.
-pub struct BlobStorage {
-    /// Blobs waiting for each recipient.
+pub struct MemoryBlobStore {
     blobs: RwLock<HashMap<String, VecDeque<StoredBlob>>>,
 }
 
-impl BlobStorage {
-    /// Creates a new empty storage.
+impl MemoryBlobStore {
+    /// Creates a new empty in-memory storage.
     pub fn new() -> Self {
-        BlobStorage {
+        MemoryBlobStore {
             blobs: RwLock::new(HashMap::new()),
         }
     }
+}
 
-    /// Stores a blob for a recipient.
-    pub fn store(&self, recipient_id: &str, blob: StoredBlob) {
+impl Default for MemoryBlobStore {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl BlobStore for MemoryBlobStore {
+    fn store(&self, recipient_id: &str, blob: StoredBlob) {
         let mut blobs = self.blobs.write().unwrap();
         blobs
             .entry(recipient_id.to_string())
@@ -78,8 +113,7 @@ impl BlobStorage {
             .push_back(blob);
     }
 
-    /// Retrieves all pending blobs for a recipient (without removing them).
-    pub fn peek(&self, recipient_id: &str) -> Vec<StoredBlob> {
+    fn peek(&self, recipient_id: &str) -> Vec<StoredBlob> {
         let blobs = self.blobs.read().unwrap();
         blobs
             .get(recipient_id)
@@ -87,9 +121,7 @@ impl BlobStorage {
             .unwrap_or_default()
     }
 
-    /// Retrieves and removes all pending blobs for a recipient.
-    #[allow(dead_code)]
-    pub fn take(&self, recipient_id: &str) -> Vec<StoredBlob> {
+    fn take(&self, recipient_id: &str) -> Vec<StoredBlob> {
         let mut blobs = self.blobs.write().unwrap();
         blobs
             .remove(recipient_id)
@@ -97,17 +129,13 @@ impl BlobStorage {
             .unwrap_or_default()
     }
 
-    /// Acknowledges receipt of a specific blob (removes it).
-    ///
-    /// Returns true if the blob was found and removed.
-    pub fn acknowledge(&self, recipient_id: &str, blob_id: &str) -> bool {
+    fn acknowledge(&self, recipient_id: &str, blob_id: &str) -> bool {
         let mut blobs = self.blobs.write().unwrap();
         if let Some(queue) = blobs.get_mut(recipient_id) {
             let initial_len = queue.len();
             queue.retain(|b| b.id != blob_id);
             let removed = queue.len() < initial_len;
 
-            // Clean up empty queues
             if queue.is_empty() {
                 blobs.remove(recipient_id);
             }
@@ -118,14 +146,10 @@ impl BlobStorage {
         }
     }
 
-    /// Removes all expired blobs.
-    ///
-    /// Returns the number of blobs removed.
-    pub fn cleanup_expired(&self, ttl: Duration) -> usize {
+    fn cleanup_expired(&self, ttl: Duration) -> usize {
         let mut blobs = self.blobs.write().unwrap();
         let mut removed = 0;
 
-        // Collect keys to avoid borrowing issues
         let keys: Vec<String> = blobs.keys().cloned().collect();
 
         for key in keys {
@@ -134,7 +158,6 @@ impl BlobStorage {
                 queue.retain(|b| !b.is_expired(ttl));
                 removed += initial_len - queue.len();
 
-                // Clean up empty queues
                 if queue.is_empty() {
                     blobs.remove(&key);
                 }
@@ -144,135 +167,377 @@ impl BlobStorage {
         removed
     }
 
-    /// Returns the total number of stored blobs.
-    #[allow(dead_code)]
-    pub fn blob_count(&self) -> usize {
+    fn blob_count(&self) -> usize {
         let blobs = self.blobs.read().unwrap();
         blobs.values().map(|q| q.len()).sum()
     }
 
-    /// Returns the number of recipients with pending blobs.
-    #[allow(dead_code)]
-    pub fn recipient_count(&self) -> usize {
+    fn recipient_count(&self) -> usize {
         let blobs = self.blobs.read().unwrap();
         blobs.len()
     }
-}
 
-impl Default for BlobStorage {
-    fn default() -> Self {
-        Self::new()
+    fn storage_size_bytes(&self) -> usize {
+        let blobs = self.blobs.read().unwrap();
+        blobs
+            .values()
+            .flat_map(|q| q.iter())
+            .map(|b| b.data.len() + b.id.len() + b.sender_id.len() + 8)
+            .sum()
     }
 }
+
+// ============================================================================
+// SQLite Storage (for production)
+// ============================================================================
+
+/// SQLite-backed persistent storage for blobs.
+pub struct SqliteBlobStore {
+    conn: Mutex<Connection>,
+}
+
+impl SqliteBlobStore {
+    /// Opens or creates a SQLite database at the given path.
+    pub fn open<P: AsRef<Path>>(path: P) -> Result<Self, rusqlite::Error> {
+        let conn = Connection::open(path)?;
+
+        // Create table if not exists
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS blobs (
+                id TEXT PRIMARY KEY,
+                recipient_id TEXT NOT NULL,
+                sender_id TEXT NOT NULL,
+                data BLOB NOT NULL,
+                created_at_secs INTEGER NOT NULL
+            )",
+            [],
+        )?;
+
+        // Create index for recipient lookups
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_blobs_recipient ON blobs(recipient_id)",
+            [],
+        )?;
+
+        // Create index for expiration cleanup
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_blobs_created ON blobs(created_at_secs)",
+            [],
+        )?;
+
+        Ok(SqliteBlobStore {
+            conn: Mutex::new(conn),
+        })
+    }
+
+    /// Creates an in-memory SQLite database (for testing).
+    #[cfg(test)]
+    pub fn in_memory() -> Result<Self, rusqlite::Error> {
+        Self::open(":memory:")
+    }
+}
+
+impl BlobStore for SqliteBlobStore {
+    fn store(&self, recipient_id: &str, blob: StoredBlob) {
+        let conn = self.conn.lock().unwrap();
+        let _ = conn.execute(
+            "INSERT INTO blobs (id, recipient_id, sender_id, data, created_at_secs)
+             VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![
+                blob.id,
+                recipient_id,
+                blob.sender_id,
+                blob.data,
+                blob.created_at_secs as i64
+            ],
+        );
+    }
+
+    fn peek(&self, recipient_id: &str) -> Vec<StoredBlob> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn
+            .prepare(
+                "SELECT id, sender_id, data, created_at_secs
+                 FROM blobs WHERE recipient_id = ?1
+                 ORDER BY created_at_secs ASC",
+            )
+            .unwrap();
+
+        stmt.query_map(params![recipient_id], |row| {
+            Ok(StoredBlob {
+                id: row.get(0)?,
+                sender_id: row.get(1)?,
+                data: row.get(2)?,
+                created_at_secs: row.get::<_, i64>(3)? as u64,
+            })
+        })
+        .unwrap()
+        .filter_map(|r| r.ok())
+        .collect()
+    }
+
+    fn take(&self, recipient_id: &str) -> Vec<StoredBlob> {
+        let blobs = self.peek(recipient_id);
+        let conn = self.conn.lock().unwrap();
+        let _ = conn.execute("DELETE FROM blobs WHERE recipient_id = ?1", params![recipient_id]);
+        blobs
+    }
+
+    fn acknowledge(&self, recipient_id: &str, blob_id: &str) -> bool {
+        let conn = self.conn.lock().unwrap();
+        let changes = conn
+            .execute(
+                "DELETE FROM blobs WHERE id = ?1 AND recipient_id = ?2",
+                params![blob_id, recipient_id],
+            )
+            .unwrap_or(0);
+        changes > 0
+    }
+
+    fn cleanup_expired(&self, ttl: Duration) -> usize {
+        let conn = self.conn.lock().unwrap();
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
+        let cutoff = now.saturating_sub(ttl.as_secs()) as i64;
+
+        conn.execute(
+            "DELETE FROM blobs WHERE created_at_secs <= ?1",
+            params![cutoff],
+        )
+        .unwrap_or(0)
+    }
+
+    fn blob_count(&self) -> usize {
+        let conn = self.conn.lock().unwrap();
+        conn.query_row("SELECT COUNT(*) FROM blobs", [], |row| row.get::<_, i64>(0))
+            .unwrap_or(0) as usize
+    }
+
+    fn recipient_count(&self) -> usize {
+        let conn = self.conn.lock().unwrap();
+        conn.query_row(
+            "SELECT COUNT(DISTINCT recipient_id) FROM blobs",
+            [],
+            |row| row.get::<_, i64>(0),
+        )
+        .unwrap_or(0) as usize
+    }
+
+    fn storage_size_bytes(&self) -> usize {
+        let conn = self.conn.lock().unwrap();
+        // Get page count and page size
+        let page_count: i64 = conn
+            .query_row("PRAGMA page_count", [], |row| row.get(0))
+            .unwrap_or(0);
+        let page_size: i64 = conn
+            .query_row("PRAGMA page_size", [], |row| row.get(0))
+            .unwrap_or(4096);
+        (page_count * page_size) as usize
+    }
+}
+
+// ============================================================================
+// Storage Factory
+// ============================================================================
+
+/// Storage backend type.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum StorageBackend {
+    /// In-memory storage (lost on restart).
+    Memory,
+    /// SQLite persistent storage.
+    #[default]
+    Sqlite,
+}
+
+/// Creates a blob store based on the backend type.
+pub fn create_blob_store(
+    backend: StorageBackend,
+    data_dir: Option<&Path>,
+) -> Box<dyn BlobStore> {
+    match backend {
+        StorageBackend::Memory => Box::new(MemoryBlobStore::new()),
+        StorageBackend::Sqlite => {
+            let path = data_dir
+                .map(|d| d.join("blobs.db"))
+                .unwrap_or_else(|| std::path::PathBuf::from("blobs.db"));
+
+            // Ensure directory exists
+            if let Some(parent) = path.parent() {
+                let _ = std::fs::create_dir_all(parent);
+            }
+
+            Box::new(SqliteBlobStore::open(&path).expect("Failed to open SQLite database"))
+        }
+    }
+}
+
+// ============================================================================
+// Tests
+// ============================================================================
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    #[test]
-    fn test_store_and_peek() {
-        let storage = BlobStorage::new();
-
+    fn test_store_impl(store: &dyn BlobStore) {
         let blob = StoredBlob::new("sender-1".to_string(), vec![1, 2, 3]);
         let blob_id = blob.id.clone();
 
-        storage.store("recipient-1", blob);
+        store.store("recipient-1", blob);
 
-        let peeked = storage.peek("recipient-1");
+        let peeked = store.peek("recipient-1");
         assert_eq!(peeked.len(), 1);
         assert_eq!(peeked[0].id, blob_id);
         assert_eq!(peeked[0].data, vec![1, 2, 3]);
 
         // Peek doesn't remove
-        let peeked_again = storage.peek("recipient-1");
+        let peeked_again = store.peek("recipient-1");
         assert_eq!(peeked_again.len(), 1);
     }
 
-    #[test]
-    fn test_take() {
-        let storage = BlobStorage::new();
+    fn test_take_impl(store: &dyn BlobStore) {
+        store.store("recipient-1", StoredBlob::new("sender-1".to_string(), vec![1]));
+        store.store("recipient-1", StoredBlob::new("sender-2".to_string(), vec![2]));
 
-        storage.store("recipient-1", StoredBlob::new("sender-1".to_string(), vec![1]));
-        storage.store("recipient-1", StoredBlob::new("sender-2".to_string(), vec![2]));
-
-        let taken = storage.take("recipient-1");
+        let taken = store.take("recipient-1");
         assert_eq!(taken.len(), 2);
 
         // Take removes all
-        let taken_again = storage.take("recipient-1");
+        let taken_again = store.take("recipient-1");
         assert!(taken_again.is_empty());
     }
 
-    #[test]
-    fn test_acknowledge() {
-        let storage = BlobStorage::new();
-
+    fn test_acknowledge_impl(store: &dyn BlobStore) {
         let blob1 = StoredBlob::new("sender-1".to_string(), vec![1]);
         let blob2 = StoredBlob::new("sender-2".to_string(), vec![2]);
         let blob1_id = blob1.id.clone();
 
-        storage.store("recipient-1", blob1);
-        storage.store("recipient-1", blob2);
+        store.store("recipient-1", blob1);
+        store.store("recipient-1", blob2);
 
-        // Acknowledge first blob
-        let removed = storage.acknowledge("recipient-1", &blob1_id);
+        let removed = store.acknowledge("recipient-1", &blob1_id);
         assert!(removed);
 
-        // Only one blob remains
-        let remaining = storage.peek("recipient-1");
+        let remaining = store.peek("recipient-1");
         assert_eq!(remaining.len(), 1);
         assert_ne!(remaining[0].id, blob1_id);
     }
 
+    fn test_cleanup_impl(store: &dyn BlobStore) {
+        store.store("recipient-1", StoredBlob::new("sender-1".to_string(), vec![1]));
+
+        // With a long TTL, nothing should be removed
+        let removed = store.cleanup_expired(Duration::from_secs(3600));
+        assert_eq!(removed, 0);
+        assert_eq!(store.blob_count(), 1);
+
+        // With zero TTL, everything should be removed
+        let removed = store.cleanup_expired(Duration::ZERO);
+        assert_eq!(removed, 1);
+        assert_eq!(store.blob_count(), 0);
+    }
+
+    // Memory backend tests
     #[test]
-    fn test_acknowledge_nonexistent() {
-        let storage = BlobStorage::new();
-
-        storage.store("recipient-1", StoredBlob::new("sender-1".to_string(), vec![1]));
-
-        let removed = storage.acknowledge("recipient-1", "nonexistent-id");
-        assert!(!removed);
-
-        let removed = storage.acknowledge("nonexistent-recipient", "any-id");
-        assert!(!removed);
+    fn test_memory_store_and_peek() {
+        test_store_impl(&MemoryBlobStore::new());
     }
 
     #[test]
-    fn test_cleanup_expired() {
-        let storage = BlobStorage::new();
+    fn test_memory_take() {
+        test_take_impl(&MemoryBlobStore::new());
+    }
 
-        // Store a blob
-        storage.store("recipient-1", StoredBlob::new("sender-1".to_string(), vec![1]));
+    #[test]
+    fn test_memory_acknowledge() {
+        test_acknowledge_impl(&MemoryBlobStore::new());
+    }
 
-        // With a long TTL, nothing should be removed
-        let removed = storage.cleanup_expired(Duration::from_secs(3600));
-        assert_eq!(removed, 0);
-        assert_eq!(storage.blob_count(), 1);
+    #[test]
+    fn test_memory_cleanup() {
+        test_cleanup_impl(&MemoryBlobStore::new());
+    }
 
-        // With zero TTL, everything should be removed
-        let removed = storage.cleanup_expired(Duration::ZERO);
-        assert_eq!(removed, 1);
-        assert_eq!(storage.blob_count(), 0);
+    // SQLite backend tests
+    #[test]
+    fn test_sqlite_store_and_peek() {
+        test_store_impl(&SqliteBlobStore::in_memory().unwrap());
+    }
+
+    #[test]
+    fn test_sqlite_take() {
+        test_take_impl(&SqliteBlobStore::in_memory().unwrap());
+    }
+
+    #[test]
+    fn test_sqlite_acknowledge() {
+        test_acknowledge_impl(&SqliteBlobStore::in_memory().unwrap());
+    }
+
+    #[test]
+    fn test_sqlite_cleanup() {
+        test_cleanup_impl(&SqliteBlobStore::in_memory().unwrap());
+    }
+
+    #[test]
+    fn test_sqlite_persistence() {
+        let dir = tempfile::tempdir().unwrap();
+        let db_path = dir.path().join("test.db");
+
+        // Store some blobs
+        {
+            let store = SqliteBlobStore::open(&db_path).unwrap();
+            store.store("recipient-1", StoredBlob::new("sender-1".to_string(), vec![1, 2, 3]));
+            store.store("recipient-2", StoredBlob::new("sender-2".to_string(), vec![4, 5, 6]));
+            assert_eq!(store.blob_count(), 2);
+        }
+
+        // Reopen and verify data persisted
+        {
+            let store = SqliteBlobStore::open(&db_path).unwrap();
+            assert_eq!(store.blob_count(), 2);
+            assert_eq!(store.recipient_count(), 2);
+
+            let blobs = store.peek("recipient-1");
+            assert_eq!(blobs.len(), 1);
+            assert_eq!(blobs[0].data, vec![1, 2, 3]);
+        }
     }
 
     #[test]
     fn test_blob_count() {
-        let storage = BlobStorage::new();
+        let store = MemoryBlobStore::new();
 
-        assert_eq!(storage.blob_count(), 0);
+        assert_eq!(store.blob_count(), 0);
 
-        storage.store("recipient-1", StoredBlob::new("sender-1".to_string(), vec![1]));
-        storage.store("recipient-1", StoredBlob::new("sender-2".to_string(), vec![2]));
-        storage.store("recipient-2", StoredBlob::new("sender-3".to_string(), vec![3]));
+        store.store("recipient-1", StoredBlob::new("sender-1".to_string(), vec![1]));
+        store.store("recipient-1", StoredBlob::new("sender-2".to_string(), vec![2]));
+        store.store("recipient-2", StoredBlob::new("sender-3".to_string(), vec![3]));
 
-        assert_eq!(storage.blob_count(), 3);
-        assert_eq!(storage.recipient_count(), 2);
+        assert_eq!(store.blob_count(), 3);
+        assert_eq!(store.recipient_count(), 2);
+    }
+
+    #[test]
+    fn test_acknowledge_nonexistent() {
+        let store = MemoryBlobStore::new();
+
+        store.store("recipient-1", StoredBlob::new("sender-1".to_string(), vec![1]));
+
+        let removed = store.acknowledge("recipient-1", "nonexistent-id");
+        assert!(!removed);
+
+        let removed = store.acknowledge("nonexistent-recipient", "any-id");
+        assert!(!removed);
     }
 
     #[test]
     fn test_peek_nonexistent_recipient() {
-        let storage = BlobStorage::new();
-        let peeked = storage.peek("nonexistent");
+        let store = MemoryBlobStore::new();
+        let peeked = store.peek("nonexistent");
         assert!(peeked.is_empty());
     }
 }

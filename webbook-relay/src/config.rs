@@ -3,7 +3,10 @@
 //! Configuration loaded from environment variables.
 
 use std::net::SocketAddr;
+use std::path::PathBuf;
 use std::time::Duration;
+
+use crate::storage::StorageBackend;
 
 /// Relay server configuration.
 #[derive(Debug, Clone)]
@@ -20,6 +23,10 @@ pub struct RelayConfig {
     pub rate_limit_per_min: u32,
     /// Cleanup interval in seconds.
     pub cleanup_interval_secs: u64,
+    /// Storage backend (memory or sqlite).
+    pub storage_backend: StorageBackend,
+    /// Data directory for persistent storage.
+    pub data_dir: PathBuf,
 }
 
 impl Default for RelayConfig {
@@ -31,6 +38,8 @@ impl Default for RelayConfig {
             blob_ttl_secs: 90 * 24 * 60 * 60, // 90 days (3 months)
             rate_limit_per_min: 60,
             cleanup_interval_secs: 3600, // 1 hour
+            storage_backend: StorageBackend::Sqlite, // Persistent by default
+            data_dir: PathBuf::from("./data"),
         }
     }
 }
@@ -76,6 +85,17 @@ impl RelayConfig {
             }
         }
 
+        if let Ok(val) = std::env::var("RELAY_STORAGE_BACKEND") {
+            config.storage_backend = match val.to_lowercase().as_str() {
+                "memory" => StorageBackend::Memory,
+                _ => StorageBackend::Sqlite,
+            };
+        }
+
+        if let Ok(val) = std::env::var("RELAY_DATA_DIR") {
+            config.data_dir = PathBuf::from(val);
+        }
+
         config
     }
 
@@ -104,6 +124,8 @@ mod tests {
         assert_eq!(config.blob_ttl_secs, 90 * 24 * 60 * 60); // 90 days
         assert_eq!(config.rate_limit_per_min, 60);
         assert_eq!(config.cleanup_interval_secs, 3600);
+        assert_eq!(config.storage_backend, StorageBackend::Sqlite);
+        assert_eq!(config.data_dir, std::path::PathBuf::from("./data"));
     }
 
     #[test]

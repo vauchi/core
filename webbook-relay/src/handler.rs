@@ -10,7 +10,7 @@ use tokio_tungstenite::tungstenite::Message;
 use tokio_tungstenite::WebSocketStream;
 use tracing::{debug, warn, error};
 
-use crate::storage::{BlobStorage, StoredBlob};
+use crate::storage::{BlobStore, StoredBlob};
 use crate::rate_limit::RateLimiter;
 
 /// Wire protocol message types (subset of webbook-core protocol).
@@ -122,7 +122,7 @@ mod protocol {
 /// Handles a WebSocket connection.
 pub async fn handle_connection(
     ws_stream: WebSocketStream<TcpStream>,
-    storage: Arc<BlobStorage>,
+    storage: Arc<dyn BlobStore>,
     rate_limiter: Arc<RateLimiter>,
     max_message_size: usize,
 ) {

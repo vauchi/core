@@ -14,7 +14,7 @@ use tokio_tungstenite::accept_async;
 use tracing::{info, error};
 
 use config::RelayConfig;
-use storage::BlobStorage;
+use storage::{BlobStore, create_blob_store};
 use rate_limit::RateLimiter;
 
 #[tokio::main]
@@ -31,9 +31,12 @@ async fn main() {
     let config = RelayConfig::from_env();
     info!("Starting WebBook Relay Server");
     info!("Listening on {}", config.listen_addr);
+    info!("Storage backend: {:?}", config.storage_backend);
 
     // Initialize shared state
-    let storage = Arc::new(BlobStorage::new());
+    let storage: Arc<dyn BlobStore> = Arc::from(
+        create_blob_store(config.storage_backend, Some(&config.data_dir))
+    );
     let rate_limiter = Arc::new(RateLimiter::new(config.rate_limit_per_min));
 
     // Start cleanup task

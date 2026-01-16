@@ -45,10 +45,12 @@ Environment variables:
 | `RELAY_BLOB_TTL_SECS` | `7776000` | Blob expiration time in seconds (90 days) |
 | `RELAY_RATE_LIMIT` | `60` | Messages per minute per client |
 | `RELAY_CLEANUP_INTERVAL` | `3600` | Cleanup interval in seconds (1 hour) |
+| `RELAY_STORAGE_BACKEND` | `sqlite` | Storage backend: `sqlite` (persistent) or `memory` |
+| `RELAY_DATA_DIR` | `./data` | Directory for SQLite database file |
 | `RUST_LOG` | `info` | Log level (trace, debug, info, warn, error) |
 
 **Note:** The 90-day TTL allows users who sync infrequently to still receive updates.
-However, current storage is in-memory and does not survive server restarts.
+SQLite storage (default) persists messages across server restarts.
 
 ## Protocol
 
@@ -161,21 +163,22 @@ WantedBy=multi-user.target
 
 - **No Authentication**: The relay is open by design; security comes from E2E encryption
 - **Rate Limiting**: Prevents abuse and DoS
-- **In-Memory Storage**: Server restart clears all pending messages (persistence planned for production)
+- **SQLite Storage**: Messages persist across restarts (use `memory` backend for volatile storage)
 - **TLS**: Deploy behind a reverse proxy (nginx, caddy) for TLS termination
 
 ## Storage Considerations
 
 The default 90-day TTL enables users who rarely open the app to still receive contact updates.
 
-**Current limitations:**
-- In-memory storage (lost on restart)
-- Memory usage grows with pending messages
+**Storage backends:**
+- `sqlite` (default): Persistent storage, survives restarts, disk-based
+- `memory`: Fast but volatile, lost on restart, RAM-based
 
-**For production deployments**, consider:
-- Adding persistent storage (SQLite/RocksDB)
-- Setting `RELAY_BLOB_TTL_SECS` based on expected user activity
-- Monitoring memory usage
+**For production deployments:**
+- Use SQLite (default) for message persistence
+- Set `RELAY_DATA_DIR` to a persistent volume
+- Monitor disk usage with long TTLs
+- Consider backup strategy for the SQLite database
 
 ## License
 

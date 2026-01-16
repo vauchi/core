@@ -3,28 +3,38 @@
 //! Privacy-focused contact card exchange library.
 //! All cryptographic operations use the audited `ring` crate.
 
-pub mod crypto;
-pub mod identity;
-pub mod contact_card;
-pub mod exchange;
-pub mod contact;
-pub mod storage;
-pub mod sync;
-#[cfg(feature = "network")]
-pub mod network;
 #[cfg(feature = "network")]
 pub mod api;
+pub mod contact;
+pub mod contact_card;
+pub mod crypto;
+pub mod exchange;
+pub mod identity;
+#[cfg(feature = "network")]
+pub mod network;
 pub mod social;
+pub mod storage;
+pub mod sync;
 
-pub use crypto::{SigningKeyPair, PublicKey, Signature, SymmetricKey, encrypt, decrypt, ExchangeKeyPair};
-pub use identity::{Identity, IdentityBackup};
-pub use contact_card::{ContactCard, ContactField, FieldType, ValidationError};
-pub use exchange::{ExchangeQR, X3DH, X3DHKeyPair, ExchangeError, ProximityVerifier, ProximityError, MockProximityVerifier, ExchangeSession};
+#[cfg(feature = "network")]
+pub use api::{WebBook, WebBookBuilder, WebBookConfig, WebBookError, WebBookEvent, WebBookResult};
 pub use contact::{Contact, FieldVisibility, VisibilityRules};
-pub use storage::{Storage, StorageError, PendingUpdate, UpdateStatus};
-pub use sync::{SyncState, SyncManager, SyncError, CardDelta, FieldChange, DeltaError};
+pub use contact_card::{ContactCard, ContactField, FieldType, ValidationError};
+pub use crypto::{
+    decrypt, encrypt, ExchangeKeyPair, PublicKey, Signature, SigningKeyPair, SymmetricKey,
+};
+pub use exchange::{
+    ExchangeError, ExchangeQR, ExchangeSession, MockProximityVerifier, ProximityError,
+    ProximityVerifier, X3DHKeyPair, X3DH,
+};
+pub use identity::{Identity, IdentityBackup};
 #[cfg(feature = "network")]
-pub use network::{NetworkError, Transport, RelayClient, RelayClientConfig, MockTransport, ConnectionState, MessageEnvelope};
-#[cfg(feature = "network")]
-pub use api::{WebBook, WebBookBuilder, WebBookConfig, WebBookError, WebBookResult, WebBookEvent};
-pub use social::{SocialNetwork, SocialNetworkRegistry, ProfileValidation, TrustLevel, ValidationStatus};
+pub use network::{
+    ConnectionState, MessageEnvelope, MockTransport, NetworkError, RelayClient, RelayClientConfig,
+    Transport,
+};
+pub use social::{
+    ProfileValidation, SocialNetwork, SocialNetworkRegistry, TrustLevel, ValidationStatus,
+};
+pub use storage::{PendingUpdate, Storage, StorageError, UpdateStatus};
+pub use sync::{CardDelta, DeltaError, FieldChange, SyncError, SyncManager, SyncState};

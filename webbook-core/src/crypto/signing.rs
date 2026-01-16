@@ -39,8 +39,8 @@ impl SigningKeyPair {
     /// The same seed will always produce the same keypair,
     /// enabling deterministic key recovery from backups.
     pub fn from_seed(seed: &[u8; 32]) -> Self {
-        let keypair = Ed25519KeyPair::from_seed_unchecked(seed)
-            .expect("Seed should be valid for Ed25519");
+        let keypair =
+            Ed25519KeyPair::from_seed_unchecked(seed).expect("Seed should be valid for Ed25519");
 
         SigningKeyPair {
             keypair,
@@ -51,7 +51,11 @@ impl SigningKeyPair {
     /// Returns the public key portion of this keypair.
     pub fn public_key(&self) -> PublicKey {
         PublicKey {
-            bytes: self.keypair.public_key().as_ref().try_into()
+            bytes: self
+                .keypair
+                .public_key()
+                .as_ref()
+                .try_into()
                 .expect("Ed25519 public key is always 32 bytes"),
         }
     }
@@ -60,7 +64,9 @@ impl SigningKeyPair {
     pub fn sign(&self, message: &[u8]) -> Signature {
         let sig = self.keypair.sign(message);
         Signature {
-            bytes: sig.as_ref().try_into()
+            bytes: sig
+                .as_ref()
+                .try_into()
                 .expect("Ed25519 signature is always 64 bytes"),
         }
     }

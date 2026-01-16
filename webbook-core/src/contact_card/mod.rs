@@ -106,8 +106,14 @@ impl ContactCard {
     }
 
     /// Updates a field's value by ID.
-    pub fn update_field_value(&mut self, field_id: &str, value: &str) -> Result<(), ContactCardError> {
-        let field = self.fields.iter_mut()
+    pub fn update_field_value(
+        &mut self,
+        field_id: &str,
+        value: &str,
+    ) -> Result<(), ContactCardError> {
+        let field = self
+            .fields
+            .iter_mut()
             .find(|f| f.id() == field_id)
             .ok_or(ContactCardError::FieldNotFound)?;
 
@@ -117,8 +123,14 @@ impl ContactCard {
     }
 
     /// Updates a field's label by ID.
-    pub fn update_field_label(&mut self, field_id: &str, label: &str) -> Result<(), ContactCardError> {
-        let field = self.fields.iter_mut()
+    pub fn update_field_label(
+        &mut self,
+        field_id: &str,
+        label: &str,
+    ) -> Result<(), ContactCardError> {
+        let field = self
+            .fields
+            .iter_mut()
             .find(|f| f.id() == field_id)
             .ok_or(ContactCardError::FieldNotFound)?;
 
@@ -128,7 +140,9 @@ impl ContactCard {
 
     /// Removes a field from the card by ID.
     pub fn remove_field(&mut self, field_id: &str) -> Result<(), ContactCardError> {
-        let index = self.fields.iter()
+        let index = self
+            .fields
+            .iter()
             .position(|f| f.id() == field_id)
             .ok_or(ContactCardError::FieldNotFound)?;
 

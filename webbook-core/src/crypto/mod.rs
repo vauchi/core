@@ -1,13 +1,13 @@
-pub mod signing;
-pub mod encryption;
-pub mod key_exchange;
-pub mod kdf;
 pub mod chain;
+pub mod encryption;
+pub mod kdf;
+pub mod key_exchange;
 pub mod ratchet;
+pub mod signing;
 
-pub use signing::{SigningKeyPair, PublicKey, Signature};
-pub use encryption::{SymmetricKey, encrypt, decrypt};
+pub use chain::{ChainError, ChainKey, MessageKey};
+pub use encryption::{decrypt, encrypt, SymmetricKey};
+pub use kdf::{KDFError, HKDF};
 pub use key_exchange::ExchangeKeyPair;
-pub use kdf::{HKDF, KDFError};
-pub use chain::{ChainKey, MessageKey, ChainError};
-pub use ratchet::{DoubleRatchetState, RatchetMessage, RatchetError};
+pub use ratchet::{DoubleRatchetState, RatchetError, RatchetMessage};
+pub use signing::{PublicKey, Signature, SigningKeyPair};

@@ -2,12 +2,12 @@
 //!
 //! Handles generation and parsing of exchange QR codes.
 
-use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
+use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use crate::identity::Identity;
-use crate::crypto::{PublicKey, Signature};
 use super::ExchangeError;
+use crate::crypto::{PublicKey, Signature};
+use crate::identity::Identity;
 
 /// Protocol version for QR codes.
 /// v1: Original format (signing key only)
@@ -71,7 +71,8 @@ impl ExchangeQR {
         let public_key = *identity.signing_public_key();
 
         // Get X25519 exchange key for X3DH
-        let exchange_key: [u8; 32] = identity.exchange_public_key()
+        let exchange_key: [u8; 32] = identity
+            .exchange_public_key()
             .try_into()
             .expect("Exchange key should be 32 bytes");
 
@@ -169,7 +170,8 @@ impl ExchangeQR {
 
     /// Parses QR data from a scanned string.
     pub fn from_data_string(data: &str) -> Result<Self, ExchangeError> {
-        let bytes = BASE64.decode(data)
+        let bytes = BASE64
+            .decode(data)
             .map_err(|_| ExchangeError::InvalidQRFormat)?;
 
         // Check minimum length for v2 format
@@ -188,23 +190,30 @@ impl ExchangeQR {
             return Err(ExchangeError::InvalidProtocolVersion);
         }
 
-        let public_key: [u8; 32] = bytes[5..37].try_into()
+        let public_key: [u8; 32] = bytes[5..37]
+            .try_into()
             .map_err(|_| ExchangeError::InvalidQRFormat)?;
 
-        let exchange_key: [u8; 32] = bytes[37..69].try_into()
+        let exchange_key: [u8; 32] = bytes[37..69]
+            .try_into()
             .map_err(|_| ExchangeError::InvalidQRFormat)?;
 
-        let exchange_token: [u8; 32] = bytes[69..101].try_into()
+        let exchange_token: [u8; 32] = bytes[69..101]
+            .try_into()
             .map_err(|_| ExchangeError::InvalidQRFormat)?;
 
-        let audio_challenge: [u8; 16] = bytes[101..117].try_into()
+        let audio_challenge: [u8; 16] = bytes[101..117]
+            .try_into()
             .map_err(|_| ExchangeError::InvalidQRFormat)?;
 
         let timestamp = u64::from_be_bytes(
-            bytes[117..125].try_into().map_err(|_| ExchangeError::InvalidQRFormat)?
+            bytes[117..125]
+                .try_into()
+                .map_err(|_| ExchangeError::InvalidQRFormat)?,
         );
 
-        let signature: [u8; 64] = bytes[125..189].try_into()
+        let signature: [u8; 64] = bytes[125..189]
+            .try_into()
             .map_err(|_| ExchangeError::InvalidQRFormat)?;
 
         let qr = ExchangeQR {

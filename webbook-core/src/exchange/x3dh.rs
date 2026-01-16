@@ -3,11 +3,11 @@
 //! Implements a simplified X3DH-style key agreement for contact exchange.
 //! Uses X25519 for Diffie-Hellman key agreement.
 
-use x25519_dalek::{EphemeralSecret, PublicKey, StaticSecret};
 use rand::rngs::OsRng;
+use x25519_dalek::{EphemeralSecret, PublicKey, StaticSecret};
 
-use crate::crypto::SymmetricKey;
 use super::ExchangeError;
+use crate::crypto::SymmetricKey;
 
 /// X25519 keypair for X3DH key agreement.
 ///

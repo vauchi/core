@@ -7,9 +7,9 @@ use std::collections::HashMap;
 use thiserror::Error;
 use uuid::Uuid;
 
-use crate::contact_card::ContactCard;
-use crate::storage::{Storage, StorageError, PendingUpdate, UpdateStatus};
 use super::delta::CardDelta;
+use crate::contact_card::ContactCard;
+use crate::storage::{PendingUpdate, Storage, StorageError, UpdateStatus};
 
 /// Sync error types.
 #[derive(Error, Debug)]
@@ -89,8 +89,8 @@ impl<'a> SyncManager<'a> {
         }
 
         // Serialize delta
-        let payload = serde_json::to_vec(&delta)
-            .map_err(|e| SyncError::Serialization(e.to_string()))?;
+        let payload =
+            serde_json::to_vec(&delta).map_err(|e| SyncError::Serialization(e.to_string()))?;
 
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -199,13 +199,17 @@ impl<'a> SyncManager<'a> {
         }
 
         // Check if any update is currently being sent
-        let is_syncing = pending.iter().any(|u| matches!(u.status, UpdateStatus::Sending));
+        let is_syncing = pending
+            .iter()
+            .any(|u| matches!(u.status, UpdateStatus::Sending));
         if is_syncing {
             return Ok(SyncState::Syncing);
         }
 
         // Check for failed updates
-        let failed = pending.iter().find(|u| matches!(u.status, UpdateStatus::Failed { .. }));
+        let failed = pending
+            .iter()
+            .find(|u| matches!(u.status, UpdateStatus::Failed { .. }));
         if let Some(f) = failed {
             if let UpdateStatus::Failed { error, retry_at } = &f.status {
                 return Ok(SyncState::Failed {
@@ -216,7 +220,8 @@ impl<'a> SyncManager<'a> {
         }
 
         // Has pending updates
-        let last_attempt = pending.iter()
+        let last_attempt = pending
+            .iter()
             .filter_map(|u| {
                 if u.retry_count > 0 {
                     Some(u.created_at) // Approximate last attempt
@@ -239,7 +244,8 @@ impl<'a> SyncManager<'a> {
         // Group by contact_id
         let mut by_contact: HashMap<String, Vec<&PendingUpdate>> = HashMap::new();
         for update in &all_pending {
-            by_contact.entry(update.contact_id.clone())
+            by_contact
+                .entry(update.contact_id.clone())
                 .or_default()
                 .push(update);
         }
@@ -261,7 +267,8 @@ impl<'a> SyncManager<'a> {
         let pending = self.storage.get_pending_updates(contact_id)?;
 
         // Only coalesce if there are multiple card_update entries
-        let card_updates: Vec<_> = pending.iter()
+        let card_updates: Vec<_> = pending
+            .iter()
             .filter(|u| u.update_type == "card_update")
             .collect();
 
@@ -329,13 +336,12 @@ impl<'a> SyncManager<'a> {
 
         let all_pending = self.storage.get_all_pending_updates()?;
 
-        Ok(all_pending.into_iter()
-            .filter(|u| {
-                match &u.status {
-                    UpdateStatus::Pending => true,
-                    UpdateStatus::Failed { retry_at, .. } => *retry_at <= now,
-                    UpdateStatus::Sending => false,
-                }
+        Ok(all_pending
+            .into_iter()
+            .filter(|u| match &u.status {
+                UpdateStatus::Pending => true,
+                UpdateStatus::Failed { retry_at, .. } => *retry_at <= now,
+                UpdateStatus::Sending => false,
             })
             .collect())
     }
@@ -346,13 +352,17 @@ impl<'a> SyncManager<'a> {
         }
 
         // Check for syncing
-        let is_syncing = updates.iter().any(|u| matches!(u.status, UpdateStatus::Sending));
+        let is_syncing = updates
+            .iter()
+            .any(|u| matches!(u.status, UpdateStatus::Sending));
         if is_syncing {
             return SyncState::Syncing;
         }
 
         // Check for failed
-        let failed = updates.iter().find(|u| matches!(u.status, UpdateStatus::Failed { .. }));
+        let failed = updates
+            .iter()
+            .find(|u| matches!(u.status, UpdateStatus::Failed { .. }));
         if let Some(f) = failed {
             if let UpdateStatus::Failed { error, retry_at } = &f.status {
                 return SyncState::Failed {
@@ -387,12 +397,22 @@ mod tests {
         let manager = SyncManager::new(&storage);
 
         let mut old_card = ContactCard::new("Alice");
-        let _ = old_card.add_field(ContactField::new(FieldType::Email, "email", "old@example.com"));
+        let _ = old_card.add_field(ContactField::new(
+            FieldType::Email,
+            "email",
+            "old@example.com",
+        ));
 
         let mut new_card = ContactCard::new("Alice");
-        let _ = new_card.add_field(ContactField::new(FieldType::Email, "email", "new@example.com"));
+        let _ = new_card.add_field(ContactField::new(
+            FieldType::Email,
+            "email",
+            "new@example.com",
+        ));
 
-        let update_id = manager.queue_card_update("contact-1", &old_card, &new_card).unwrap();
+        let update_id = manager
+            .queue_card_update("contact-1", &old_card, &new_card)
+            .unwrap();
         assert!(!update_id.is_empty());
 
         let pending = manager.get_pending("contact-1").unwrap();
@@ -416,10 +436,9 @@ mod tests {
         let storage = create_test_storage();
         let manager = SyncManager::new(&storage);
 
-        let update_id = manager.queue_visibility_change(
-            "contact-1",
-            vec!["email".to_string(), "phone".to_string()],
-        ).unwrap();
+        let update_id = manager
+            .queue_visibility_change("contact-1", vec!["email".to_string(), "phone".to_string()])
+            .unwrap();
 
         assert!(!update_id.is_empty());
 
@@ -434,12 +453,22 @@ mod tests {
         let manager = SyncManager::new(&storage);
 
         let mut old_card = ContactCard::new("Alice");
-        let _ = old_card.add_field(ContactField::new(FieldType::Email, "email", "old@example.com"));
+        let _ = old_card.add_field(ContactField::new(
+            FieldType::Email,
+            "email",
+            "old@example.com",
+        ));
 
         let mut new_card = ContactCard::new("Alice");
-        let _ = new_card.add_field(ContactField::new(FieldType::Email, "email", "new@example.com"));
+        let _ = new_card.add_field(ContactField::new(
+            FieldType::Email,
+            "email",
+            "new@example.com",
+        ));
 
-        let update_id = manager.queue_card_update("contact-1", &old_card, &new_card).unwrap();
+        let update_id = manager
+            .queue_card_update("contact-1", &old_card, &new_card)
+            .unwrap();
 
         assert_eq!(manager.get_pending("contact-1").unwrap().len(), 1);
 
@@ -454,14 +483,26 @@ mod tests {
         let manager = SyncManager::new(&storage);
 
         let mut old_card = ContactCard::new("Alice");
-        let _ = old_card.add_field(ContactField::new(FieldType::Email, "email", "old@example.com"));
+        let _ = old_card.add_field(ContactField::new(
+            FieldType::Email,
+            "email",
+            "old@example.com",
+        ));
 
         let mut new_card = ContactCard::new("Alice");
-        let _ = new_card.add_field(ContactField::new(FieldType::Email, "email", "new@example.com"));
+        let _ = new_card.add_field(ContactField::new(
+            FieldType::Email,
+            "email",
+            "new@example.com",
+        ));
 
-        let update_id = manager.queue_card_update("contact-1", &old_card, &new_card).unwrap();
+        let update_id = manager
+            .queue_card_update("contact-1", &old_card, &new_card)
+            .unwrap();
 
-        manager.mark_failed(&update_id, "Connection refused", 0).unwrap();
+        manager
+            .mark_failed(&update_id, "Connection refused", 0)
+            .unwrap();
 
         let pending = manager.get_pending("contact-1").unwrap();
         assert!(matches!(pending[0].status, UpdateStatus::Failed { .. }));
@@ -473,15 +514,31 @@ mod tests {
         let manager = SyncManager::new(&storage);
 
         let mut old_card = ContactCard::new("Alice");
-        let _ = old_card.add_field(ContactField::new(FieldType::Email, "email", "old@example.com"));
+        let _ = old_card.add_field(ContactField::new(
+            FieldType::Email,
+            "email",
+            "old@example.com",
+        ));
 
         let mut new_card = ContactCard::new("Alice");
-        let _ = new_card.add_field(ContactField::new(FieldType::Email, "email", "new@example.com"));
+        let _ = new_card.add_field(ContactField::new(
+            FieldType::Email,
+            "email",
+            "new@example.com",
+        ));
 
-        manager.queue_card_update("contact-1", &old_card, &new_card).unwrap();
+        manager
+            .queue_card_update("contact-1", &old_card, &new_card)
+            .unwrap();
 
         let state = manager.get_sync_state("contact-1").unwrap();
-        assert!(matches!(state, SyncState::Pending { queued_count: 1, .. }));
+        assert!(matches!(
+            state,
+            SyncState::Pending {
+                queued_count: 1,
+                ..
+            }
+        ));
     }
 
     #[test]
@@ -499,12 +556,22 @@ mod tests {
         let manager = SyncManager::new(&storage);
 
         let mut old_card = ContactCard::new("Alice");
-        let _ = old_card.add_field(ContactField::new(FieldType::Email, "email", "old@example.com"));
+        let _ = old_card.add_field(ContactField::new(
+            FieldType::Email,
+            "email",
+            "old@example.com",
+        ));
 
         let mut new_card = ContactCard::new("Alice");
-        let _ = new_card.add_field(ContactField::new(FieldType::Email, "email", "new@example.com"));
+        let _ = new_card.add_field(ContactField::new(
+            FieldType::Email,
+            "email",
+            "new@example.com",
+        ));
 
-        let update_id = manager.queue_card_update("contact-1", &old_card, &new_card).unwrap();
+        let update_id = manager
+            .queue_card_update("contact-1", &old_card, &new_card)
+            .unwrap();
         manager.mark_failed(&update_id, "Network error", 0).unwrap();
 
         let state = manager.get_sync_state("contact-1").unwrap();
@@ -519,13 +586,25 @@ mod tests {
         // Queue multiple updates
         let card1 = ContactCard::new("Alice");
         let mut card2 = ContactCard::new("Alice");
-        let _ = card2.add_field(ContactField::new(FieldType::Email, "email", "alice@example.com"));
+        let _ = card2.add_field(ContactField::new(
+            FieldType::Email,
+            "email",
+            "alice@example.com",
+        ));
         let mut card3 = ContactCard::new("Alice");
-        let _ = card3.add_field(ContactField::new(FieldType::Email, "email", "alice@example.com"));
+        let _ = card3.add_field(ContactField::new(
+            FieldType::Email,
+            "email",
+            "alice@example.com",
+        ));
         let _ = card3.add_field(ContactField::new(FieldType::Phone, "phone", "+1234567890"));
 
-        manager.queue_card_update("contact-1", &card1, &card2).unwrap();
-        manager.queue_card_update("contact-1", &card2, &card3).unwrap();
+        manager
+            .queue_card_update("contact-1", &card1, &card2)
+            .unwrap();
+        manager
+            .queue_card_update("contact-1", &card2, &card3)
+            .unwrap();
 
         assert_eq!(manager.get_pending("contact-1").unwrap().len(), 2);
 
@@ -544,10 +623,18 @@ mod tests {
 
         let card1 = ContactCard::new("Alice");
         let mut card2 = ContactCard::new("Alice");
-        let _ = card2.add_field(ContactField::new(FieldType::Email, "email", "alice@example.com"));
+        let _ = card2.add_field(ContactField::new(
+            FieldType::Email,
+            "email",
+            "alice@example.com",
+        ));
 
-        manager.queue_card_update("contact-1", &card1, &card2).unwrap();
-        manager.queue_card_update("contact-2", &card1, &card2).unwrap();
+        manager
+            .queue_card_update("contact-1", &card1, &card2)
+            .unwrap();
+        manager
+            .queue_card_update("contact-2", &card1, &card2)
+            .unwrap();
 
         let status = manager.sync_status().unwrap();
 

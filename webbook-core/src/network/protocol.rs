@@ -15,13 +15,15 @@ pub const FRAME_HEADER_SIZE: usize = 4;
 ///
 /// Format: [length: 4 bytes big-endian] [json payload]
 pub fn encode_message(message: &MessageEnvelope) -> Result<Vec<u8>, NetworkError> {
-    let json = serde_json::to_vec(message)
-        .map_err(|e| NetworkError::Serialization(e.to_string()))?;
+    let json =
+        serde_json::to_vec(message).map_err(|e| NetworkError::Serialization(e.to_string()))?;
 
     if json.len() > MAX_MESSAGE_SIZE {
-        return Err(NetworkError::InvalidMessage(
-            format!("Message too large: {} bytes (max {})", json.len(), MAX_MESSAGE_SIZE)
-        ));
+        return Err(NetworkError::InvalidMessage(format!(
+            "Message too large: {} bytes (max {})",
+            json.len(),
+            MAX_MESSAGE_SIZE
+        )));
     }
 
     let len = json.len() as u32;
@@ -37,26 +39,29 @@ pub fn encode_message(message: &MessageEnvelope) -> Result<Vec<u8>, NetworkError
 /// Expects just the JSON payload without the length prefix.
 pub fn decode_message(data: &[u8]) -> Result<MessageEnvelope, NetworkError> {
     if data.len() > MAX_MESSAGE_SIZE {
-        return Err(NetworkError::InvalidMessage(
-            format!("Message too large: {} bytes (max {})", data.len(), MAX_MESSAGE_SIZE)
-        ));
+        return Err(NetworkError::InvalidMessage(format!(
+            "Message too large: {} bytes (max {})",
+            data.len(),
+            MAX_MESSAGE_SIZE
+        )));
     }
 
-    let envelope: MessageEnvelope = serde_json::from_slice(data)
-        .map_err(|e| NetworkError::InvalidMessage(e.to_string()))?;
+    let envelope: MessageEnvelope =
+        serde_json::from_slice(data).map_err(|e| NetworkError::InvalidMessage(e.to_string()))?;
 
     // Version check
     if envelope.version != PROTOCOL_VERSION {
-        return Err(NetworkError::InvalidMessage(
-            format!("Unsupported protocol version: {} (expected {})", envelope.version, PROTOCOL_VERSION)
-        ));
+        return Err(NetworkError::InvalidMessage(format!(
+            "Unsupported protocol version: {} (expected {})",
+            envelope.version, PROTOCOL_VERSION
+        )));
     }
 
     Ok(envelope)
 }
 
 /// Reads the length prefix from a frame header.
-#[allow(dead_code)]  // Exported for use by transport implementations
+#[allow(dead_code)] // Exported for use by transport implementations
 pub fn read_frame_length(header: &[u8; FRAME_HEADER_SIZE]) -> usize {
     u32::from_be_bytes(*header) as usize
 }
@@ -77,7 +82,7 @@ pub fn create_envelope(payload: MessagePayload) -> MessageEnvelope {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::network::message::{PresenceUpdate, PresenceStatus};
+    use crate::network::message::{PresenceStatus, PresenceUpdate};
 
     fn create_test_envelope() -> MessageEnvelope {
         MessageEnvelope {
@@ -135,7 +140,10 @@ mod tests {
         let result = decode_message(&json);
 
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("Unsupported protocol version"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Unsupported protocol version"));
     }
 
     #[test]
@@ -166,6 +174,9 @@ mod tests {
         let result = decode_message(invalid);
 
         assert!(result.is_err());
-        assert!(matches!(result.unwrap_err(), NetworkError::InvalidMessage(_)));
+        assert!(matches!(
+            result.unwrap_err(),
+            NetworkError::InvalidMessage(_)
+        ));
     }
 }

@@ -25,12 +25,7 @@ pub struct ProfileValidation {
 
 impl ProfileValidation {
     /// Creates a new validation record.
-    pub fn new(
-        field_id: &str,
-        field_value: &str,
-        validator_id: &str,
-        signature: [u8; 64],
-    ) -> Self {
+    pub fn new(field_id: &str, field_value: &str, validator_id: &str, signature: [u8; 64]) -> Self {
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
@@ -214,11 +209,26 @@ impl ValidationStatus {
         let others = self.count.saturating_sub(known.len());
 
         match (known.len(), others) {
-            (0, n) => format!("Verified by {} {}", n, if n == 1 { "person" } else { "people" }),
+            (0, n) => format!(
+                "Verified by {} {}",
+                n,
+                if n == 1 { "person" } else { "people" }
+            ),
             (1, 0) => format!("Verified by {}", known[0]),
-            (1, n) => format!("Verified by {} and {} {}", known[0], n, if n == 1 { "other" } else { "others" }),
+            (1, n) => format!(
+                "Verified by {} and {} {}",
+                known[0],
+                n,
+                if n == 1 { "other" } else { "others" }
+            ),
             (2, 0) => format!("Verified by {} and {}", known[0], known[1]),
-            (2, n) => format!("Verified by {}, {} and {} {}", known[0], known[1], n, if n == 1 { "other" } else { "others" }),
+            (2, n) => format!(
+                "Verified by {}, {} and {} {}",
+                known[0],
+                known[1],
+                n,
+                if n == 1 { "other" } else { "others" }
+            ),
             _ => format!("Verified by {} people", self.count),
         }
     }
@@ -322,13 +332,16 @@ mod tests {
 
     #[test]
     fn test_validation_status_invalidated_on_value_change() {
-        let validations = vec![
-            ProfileValidation::new("field1", "@alice_old", "bob", [0u8; 64]),
-        ];
+        let validations = vec![ProfileValidation::new(
+            "field1",
+            "@alice_old",
+            "bob",
+            [0u8; 64],
+        )];
 
         let status = ValidationStatus::from_validations(
             &validations,
-            "@alice_new",  // Value changed
+            "@alice_new", // Value changed
             None,
             &HashSet::new(),
         );

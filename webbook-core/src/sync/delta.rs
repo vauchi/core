@@ -44,22 +44,13 @@ pub struct CardDelta {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum FieldChange {
     /// A new field was added.
-    Added {
-        field: ContactField,
-    },
+    Added { field: ContactField },
     /// An existing field's value was modified.
-    Modified {
-        field_id: String,
-        new_value: String,
-    },
+    Modified { field_id: String, new_value: String },
     /// A field was removed.
-    Removed {
-        field_id: String,
-    },
+    Removed { field_id: String },
     /// The display name was changed.
-    DisplayNameChanged {
-        new_name: String,
-    },
+    DisplayNameChanged { new_name: String },
 }
 
 impl CardDelta {
@@ -78,16 +69,12 @@ impl CardDelta {
         }
 
         // Build lookup map for old fields
-        let old_fields: std::collections::HashMap<&str, &ContactField> = old.fields()
-            .iter()
-            .map(|f| (f.id(), f))
-            .collect();
+        let old_fields: std::collections::HashMap<&str, &ContactField> =
+            old.fields().iter().map(|f| (f.id(), f)).collect();
 
         // Build lookup map for new fields
-        let new_fields: std::collections::HashMap<&str, &ContactField> = new.fields()
-            .iter()
-            .map(|f| (f.id(), f))
-            .collect();
+        let new_fields: std::collections::HashMap<&str, &ContactField> =
+            new.fields().iter().map(|f| (f.id(), f)).collect();
 
         // Check for modified or removed fields
         for (id, old_field) in &old_fields {
@@ -166,10 +153,11 @@ impl CardDelta {
                     card.add_field(field.clone())
                         .map_err(|e| DeltaError::ApplyError(e.to_string()))?;
                 }
-                FieldChange::Modified { field_id, new_value } => {
-                    let found = card.fields_mut()
-                        .iter_mut()
-                        .find(|f| f.id() == field_id);
+                FieldChange::Modified {
+                    field_id,
+                    new_value,
+                } => {
+                    let found = card.fields_mut().iter_mut().find(|f| f.id() == field_id);
 
                     match found {
                         Some(field) => {
@@ -197,22 +185,29 @@ impl CardDelta {
 
     /// Returns a list of descriptive labels for the changes in this delta.
     pub fn changed_fields(&self) -> Vec<String> {
-        self.changes.iter().map(|change| {
-            match change {
+        self.changes
+            .iter()
+            .map(|change| match change {
                 FieldChange::Added { field } => field.label().to_string(),
                 FieldChange::Modified { field_id, .. } => field_id.clone(),
                 FieldChange::Removed { field_id } => format!("{} (removed)", field_id),
                 FieldChange::DisplayNameChanged { new_name } => format!("name: {}", new_name),
-            }
-        }).collect()
+            })
+            .collect()
     }
 
     /// Filters this delta based on visibility rules for a specific contact.
     ///
     /// Returns a new delta containing only the changes that the contact
     /// is allowed to see according to the visibility rules.
-    pub fn filter_for_contact(&self, contact_id: &str, rules: &crate::contact::VisibilityRules) -> Self {
-        let filtered_changes: Vec<FieldChange> = self.changes.iter()
+    pub fn filter_for_contact(
+        &self,
+        contact_id: &str,
+        rules: &crate::contact::VisibilityRules,
+    ) -> Self {
+        let filtered_changes: Vec<FieldChange> = self
+            .changes
+            .iter()
             .filter(|change| {
                 match change {
                     // Display name changes are always visible
@@ -275,7 +270,8 @@ mod signature_serde {
         let s = String::deserialize(deserializer)?;
         let bytes = base64::Engine::decode(&base64::engine::general_purpose::STANDARD, &s)
             .map_err(serde::de::Error::custom)?;
-        bytes.try_into()
+        bytes
+            .try_into()
             .map_err(|_| serde::de::Error::custom("invalid signature length"))
     }
 }
@@ -312,7 +308,11 @@ mod tests {
         let old = ContactCard::new("Alice");
 
         let mut new = ContactCard::new("Alice");
-        let _ = new.add_field(ContactField::new(FieldType::Email, "email", "alice@example.com"));
+        let _ = new.add_field(ContactField::new(
+            FieldType::Email,
+            "email",
+            "alice@example.com",
+        ));
 
         let delta = CardDelta::compute(&old, &new);
 
@@ -323,10 +323,18 @@ mod tests {
     #[test]
     fn test_delta_compute_field_modified() {
         let mut old = ContactCard::new("Alice");
-        let _ = old.add_field(ContactField::new(FieldType::Email, "email", "old@example.com"));
+        let _ = old.add_field(ContactField::new(
+            FieldType::Email,
+            "email",
+            "old@example.com",
+        ));
 
         let mut new = ContactCard::new("Alice");
-        let _ = new.add_field(ContactField::new(FieldType::Email, "email", "new@example.com"));
+        let _ = new.add_field(ContactField::new(
+            FieldType::Email,
+            "email",
+            "new@example.com",
+        ));
 
         let delta = CardDelta::compute(&old, &new);
 
@@ -380,9 +388,7 @@ mod tests {
         let delta = CardDelta {
             version: 1,
             timestamp: 12345,
-            changes: vec![FieldChange::Added {
-                field: new_field,
-            }],
+            changes: vec![FieldChange::Added { field: new_field }],
             signature: [0u8; 64],
         };
 
@@ -418,7 +424,11 @@ mod tests {
 
         let mut new = ContactCard::new("Alice Smith");
         let _ = new.add_field(ContactField::new(FieldType::Phone, "phone", "+1234567890"));
-        let _ = new.add_field(ContactField::new(FieldType::Email, "email", "alice@example.com"));
+        let _ = new.add_field(ContactField::new(
+            FieldType::Email,
+            "email",
+            "alice@example.com",
+        ));
 
         let delta = CardDelta::compute(&old, &new);
 
@@ -451,10 +461,18 @@ mod tests {
     #[test]
     fn test_delta_serialization_roundtrip() {
         let mut old = ContactCard::new("Alice");
-        let _ = old.add_field(ContactField::new(FieldType::Email, "email", "old@example.com"));
+        let _ = old.add_field(ContactField::new(
+            FieldType::Email,
+            "email",
+            "old@example.com",
+        ));
 
         let mut new = ContactCard::new("Alice");
-        let _ = new.add_field(ContactField::new(FieldType::Email, "email", "new@example.com"));
+        let _ = new.add_field(ContactField::new(
+            FieldType::Email,
+            "email",
+            "new@example.com",
+        ));
 
         let delta = CardDelta::compute(&old, &new);
 
@@ -487,14 +505,16 @@ mod tests {
         });
         assert!(has_name_change);
 
-        let has_removed = delta.changes.iter().any(|c| {
-            matches!(c, FieldChange::Removed { field_id } if *field_id == field1_id)
-        });
+        let has_removed = delta
+            .changes
+            .iter()
+            .any(|c| matches!(c, FieldChange::Removed { field_id } if *field_id == field1_id));
         assert!(has_removed);
 
-        let has_added = delta.changes.iter().any(|c| {
-            matches!(c, FieldChange::Added { .. })
-        });
+        let has_added = delta
+            .changes
+            .iter()
+            .any(|c| matches!(c, FieldChange::Added { .. }));
         assert!(has_added);
     }
 
@@ -504,7 +524,11 @@ mod tests {
 
         let old = ContactCard::new("Alice");
         let mut new = ContactCard::new("Alice");
-        let _ = new.add_field(ContactField::new(FieldType::Email, "email", "alice@example.com"));
+        let _ = new.add_field(ContactField::new(
+            FieldType::Email,
+            "email",
+            "alice@example.com",
+        ));
         let _ = new.add_field(ContactField::new(FieldType::Phone, "phone", "+1234567890"));
 
         let delta = CardDelta::compute(&old, &new);
@@ -537,7 +561,9 @@ mod tests {
 
         // Bob should only see the phone field
         assert_eq!(filtered.changes.len(), 1);
-        assert!(matches!(&filtered.changes[0], FieldChange::Added { field } if field.label() == "phone"));
+        assert!(
+            matches!(&filtered.changes[0], FieldChange::Added { field } if field.label() == "phone")
+        );
     }
 
     #[test]
@@ -582,6 +608,9 @@ mod tests {
 
         // Display name changes are always visible
         assert_eq!(filtered.changes.len(), 1);
-        assert!(matches!(&filtered.changes[0], FieldChange::DisplayNameChanged { .. }));
+        assert!(matches!(
+            &filtered.changes[0],
+            FieldChange::DisplayNameChanged { .. }
+        ));
     }
 }

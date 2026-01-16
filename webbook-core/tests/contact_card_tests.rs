@@ -69,10 +69,26 @@ fn test_add_social_fields() {
     let mut card = ContactCard::new("Alice");
 
     // Social networks are identified by their label, not a specific type variant
-    card.add_field(ContactField::new(FieldType::Social, "Twitter", "@alicesmith")).unwrap();
-    card.add_field(ContactField::new(FieldType::Social, "Instagram", "alice.smith")).unwrap();
-    card.add_field(ContactField::new(FieldType::Social, "LinkedIn", "linkedin.com/in/as")).unwrap();
-    card.add_field(ContactField::new(FieldType::Social, "GitHub", "alicesmith")).unwrap();
+    card.add_field(ContactField::new(
+        FieldType::Social,
+        "Twitter",
+        "@alicesmith",
+    ))
+    .unwrap();
+    card.add_field(ContactField::new(
+        FieldType::Social,
+        "Instagram",
+        "alice.smith",
+    ))
+    .unwrap();
+    card.add_field(ContactField::new(
+        FieldType::Social,
+        "LinkedIn",
+        "linkedin.com/in/as",
+    ))
+    .unwrap();
+    card.add_field(ContactField::new(FieldType::Social, "GitHub", "alicesmith"))
+        .unwrap();
 
     assert_eq!(card.fields().len(), 4);
 
@@ -125,21 +141,26 @@ fn test_validate_phone_valid_formats() {
 
     for phone in valid_phones {
         let field = ContactField::new(FieldType::Phone, "Test", phone);
-        assert!(field.validate().is_ok(), "Phone '{}' should be valid", phone);
+        assert!(
+            field.validate().is_ok(),
+            "Phone '{}' should be valid",
+            phone
+        );
     }
 }
 
 /// Tests that invalid phone numbers are rejected
 #[test]
 fn test_validate_phone_invalid_formats() {
-    let invalid_phones = [
-        "not-a-phone",
-        "abc",
-    ];
+    let invalid_phones = ["not-a-phone", "abc"];
 
     for phone in invalid_phones {
         let field = ContactField::new(FieldType::Phone, "Test", phone);
-        assert!(field.validate().is_err(), "Phone '{}' should be invalid", phone);
+        assert!(
+            field.validate().is_err(),
+            "Phone '{}' should be invalid",
+            phone
+        );
     }
 }
 
@@ -154,22 +175,26 @@ fn test_validate_email_valid_formats() {
 
     for email in valid_emails {
         let field = ContactField::new(FieldType::Email, "Test", email);
-        assert!(field.validate().is_ok(), "Email '{}' should be valid", email);
+        assert!(
+            field.validate().is_ok(),
+            "Email '{}' should be valid",
+            email
+        );
     }
 }
 
 /// Tests that invalid emails are rejected
 #[test]
 fn test_validate_email_invalid_formats() {
-    let invalid_emails = [
-        "invalid-email",
-        "@example.com",
-        "alice@",
-    ];
+    let invalid_emails = ["invalid-email", "@example.com", "alice@"];
 
     for email in invalid_emails {
         let field = ContactField::new(FieldType::Email, "Test", email);
-        assert!(field.validate().is_err(), "Email '{}' should be invalid", email);
+        assert!(
+            field.validate().is_err(),
+            "Email '{}' should be invalid",
+            email
+        );
     }
 }
 
@@ -180,7 +205,10 @@ fn test_field_value_max_length() {
     let long_value = "x".repeat(1001); // Exceeds 1000 char limit
 
     let field = ContactField::new(FieldType::Custom, "Test", &long_value);
-    assert!(field.validate().is_err(), "Value exceeding 1000 chars should be invalid");
+    assert!(
+        field.validate().is_err(),
+        "Value exceeding 1000 chars should be invalid"
+    );
 }
 
 // =============================================================================
@@ -192,10 +220,16 @@ fn test_field_value_max_length() {
 #[test]
 fn test_edit_field_value() {
     let mut card = ContactCard::new("Alice");
-    card.add_field(ContactField::new(FieldType::Phone, "Mobile", "+1-555-123-4567")).unwrap();
+    card.add_field(ContactField::new(
+        FieldType::Phone,
+        "Mobile",
+        "+1-555-123-4567",
+    ))
+    .unwrap();
 
     let field_id = card.fields()[0].id().to_string();
-    card.update_field_value(&field_id, "+1-555-999-8888").expect("Update should succeed");
+    card.update_field_value(&field_id, "+1-555-999-8888")
+        .expect("Update should succeed");
 
     assert_eq!(card.fields()[0].value(), "+1-555-999-8888");
 }
@@ -205,10 +239,16 @@ fn test_edit_field_value() {
 #[test]
 fn test_edit_field_label() {
     let mut card = ContactCard::new("Alice");
-    card.add_field(ContactField::new(FieldType::Email, "Work", "alice@work.com")).unwrap();
+    card.add_field(ContactField::new(
+        FieldType::Email,
+        "Work",
+        "alice@work.com",
+    ))
+    .unwrap();
 
     let field_id = card.fields()[0].id().to_string();
-    card.update_field_label(&field_id, "Office").expect("Update should succeed");
+    card.update_field_label(&field_id, "Office")
+        .expect("Update should succeed");
 
     assert_eq!(card.fields()[0].label(), "Office");
 }
@@ -222,7 +262,12 @@ fn test_edit_field_label() {
 #[test]
 fn test_remove_field() {
     let mut card = ContactCard::new("Alice");
-    card.add_field(ContactField::new(FieldType::Phone, "Mobile", "+1-555-123-4567")).unwrap();
+    card.add_field(ContactField::new(
+        FieldType::Phone,
+        "Mobile",
+        "+1-555-123-4567",
+    ))
+    .unwrap();
 
     let field_id = card.fields()[0].id().to_string();
     card.remove_field(&field_id).expect("Remove should succeed");
@@ -240,7 +285,8 @@ fn test_remove_field() {
 fn test_update_display_name() {
     let mut card = ContactCard::new("Alice Smith");
 
-    card.set_display_name("Alice S.").expect("Update should succeed");
+    card.set_display_name("Alice S.")
+        .expect("Update should succeed");
 
     assert_eq!(card.display_name(), "Alice S.");
 }
@@ -281,7 +327,8 @@ fn test_card_max_fields_limit() {
     // Add 25 fields (the max)
     for i in 0..25 {
         let field = ContactField::new(FieldType::Custom, &format!("Field{}", i), "value");
-        card.add_field(field).expect(&format!("Adding field {} should succeed", i));
+        card.add_field(field)
+            .expect(&format!("Adding field {} should succeed", i));
     }
 
     assert_eq!(card.fields().len(), 25);

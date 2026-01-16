@@ -5,7 +5,9 @@
 use std::collections::VecDeque;
 
 use super::error::NetworkError;
-use super::message::{MessageEnvelope, MessagePayload, Acknowledgment, AckStatus, PROTOCOL_VERSION};
+use super::message::{
+    AckStatus, Acknowledgment, MessageEnvelope, MessagePayload, PROTOCOL_VERSION,
+};
 use super::transport::{ConnectionState, Transport, TransportConfig, TransportResult};
 
 /// Mock transport for testing.
@@ -165,7 +167,7 @@ impl Transport for MockTransport {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::network::message::{PresenceUpdate, PresenceStatus};
+    use crate::network::message::{PresenceStatus, PresenceUpdate};
 
     fn create_test_message() -> MessageEnvelope {
         MessageEnvelope {
@@ -281,7 +283,10 @@ mod tests {
         let mut transport = MockTransport::new();
 
         transport.set_state(ConnectionState::Reconnecting { attempt: 3 });
-        assert_eq!(transport.state(), ConnectionState::Reconnecting { attempt: 3 });
+        assert_eq!(
+            transport.state(),
+            ConnectionState::Reconnecting { attempt: 3 }
+        );
     }
 
     #[test]

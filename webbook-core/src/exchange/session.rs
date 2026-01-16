@@ -5,10 +5,10 @@
 
 use std::time::{Duration, Instant};
 
+use super::{ExchangeError, ExchangeQR, ProximityVerifier, X3DHKeyPair, X3DH};
 use crate::contact::Contact;
 use crate::contact_card::ContactCard;
 use crate::identity::Identity;
-use super::{ExchangeError, ExchangeQR, X3DH, X3DHKeyPair, ProximityVerifier};
 
 /// Session timeout duration (60 seconds for resumption).
 const SESSION_TIMEOUT: Duration = Duration::from_secs(60);
@@ -22,31 +22,23 @@ pub enum ExchangeState {
     /// Initial state
     Idle,
     /// Displaying QR code, waiting for scan
-    AwaitingScan {
-        qr: ExchangeQR,
-    },
+    AwaitingScan { qr: ExchangeQR },
     /// QR scanned by other party, waiting for proximity verification
     AwaitingProximity {
         their_public_key: [u8; 32],
         their_qr: ExchangeQR,
     },
     /// Proximity verified, performing key agreement
-    AwaitingKeyAgreement {
-        their_public_key: [u8; 32],
-    },
+    AwaitingKeyAgreement { their_public_key: [u8; 32] },
     /// Key agreement complete, exchanging cards
     AwaitingCardExchange {
         their_public_key: [u8; 32],
         shared_key: crate::crypto::SymmetricKey,
     },
     /// Exchange completed successfully
-    Complete {
-        contact: Contact,
-    },
+    Complete { contact: Contact },
     /// Exchange failed
-    Failed {
-        error: ExchangeError,
-    },
+    Failed { error: ExchangeError },
 }
 
 /// Role in the exchange.
@@ -135,7 +127,9 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
     /// Generates a QR code for the exchange (initiator only).
     pub fn generate_qr(&mut self) -> Result<&ExchangeQR, ExchangeError> {
         if self.role != ExchangeRole::Initiator {
-            return Err(ExchangeError::InvalidState("Only initiator can generate QR".into()));
+            return Err(ExchangeError::InvalidState(
+                "Only initiator can generate QR".into(),
+            ));
         }
 
         let qr = ExchangeQR::generate(&self.identity);
@@ -150,7 +144,9 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
     /// Processes a scanned QR code (responder only).
     pub fn process_scanned_qr(&mut self, qr: ExchangeQR) -> Result<(), ExchangeError> {
         if self.role != ExchangeRole::Responder {
-            return Err(ExchangeError::InvalidState("Only responder can process QR".into()));
+            return Err(ExchangeError::InvalidState(
+                "Only responder can process QR".into(),
+            ));
         }
 
         // Verify QR code
@@ -175,14 +171,19 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
     /// Performs proximity verification.
     pub fn verify_proximity(&mut self) -> Result<(), ExchangeError> {
         let (their_public_key, challenge) = match &self.state {
-            ExchangeState::AwaitingProximity { their_public_key, their_qr } => {
-                (*their_public_key, *their_qr.audio_challenge())
-            }
+            ExchangeState::AwaitingProximity {
+                their_public_key,
+                their_qr,
+            } => (*their_public_key, *their_qr.audio_challenge()),
             ExchangeState::AwaitingScan { qr } => {
                 // Initiator waits for proximity challenge from responder
                 (*qr.public_key(), *qr.audio_challenge())
             }
-            _ => return Err(ExchangeError::InvalidState("Not in proximity verification state".into())),
+            _ => {
+                return Err(ExchangeError::InvalidState(
+                    "Not in proximity verification state".into(),
+                ))
+            }
         };
 
         self.proximity
@@ -197,7 +198,11 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
     pub fn perform_key_agreement(&mut self) -> Result<(), ExchangeError> {
         let their_public_key = match &self.state {
             ExchangeState::AwaitingKeyAgreement { their_public_key } => *their_public_key,
-            _ => return Err(ExchangeError::InvalidState("Not in key agreement state".into())),
+            _ => {
+                return Err(ExchangeError::InvalidState(
+                    "Not in key agreement state".into(),
+                ))
+            }
         };
 
         let shared_key = match self.role {
@@ -223,15 +228,19 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
 
     /// Completes the exchange by exchanging cards.
     pub fn complete_exchange(&mut self, their_card: ContactCard) -> Result<Contact, ExchangeError> {
-        let (their_public_key, shared_key) = match std::mem::replace(&mut self.state, ExchangeState::Idle) {
-            ExchangeState::AwaitingCardExchange { their_public_key, shared_key } => {
-                (their_public_key, shared_key)
-            }
-            other => {
-                self.state = other;
-                return Err(ExchangeError::InvalidState("Not in card exchange state".into()));
-            }
-        };
+        let (their_public_key, shared_key) =
+            match std::mem::replace(&mut self.state, ExchangeState::Idle) {
+                ExchangeState::AwaitingCardExchange {
+                    their_public_key,
+                    shared_key,
+                } => (their_public_key, shared_key),
+                other => {
+                    self.state = other;
+                    return Err(ExchangeError::InvalidState(
+                        "Not in card exchange state".into(),
+                    ));
+                }
+            };
 
         let contact = Contact::from_exchange(their_public_key, their_card, shared_key);
 
@@ -257,17 +266,17 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
     /// Returns the existing contact if found (matched by public key).
     pub fn check_duplicate<'a>(&self, contacts: &'a [Contact]) -> Option<&'a Contact> {
         let their_key = match &self.state {
-            ExchangeState::AwaitingProximity { their_public_key, .. }
-            | ExchangeState::AwaitingKeyAgreement { their_public_key }
-            | ExchangeState::AwaitingCardExchange { their_public_key, .. } => {
-                Some(their_public_key)
+            ExchangeState::AwaitingProximity {
+                their_public_key, ..
             }
+            | ExchangeState::AwaitingKeyAgreement { their_public_key }
+            | ExchangeState::AwaitingCardExchange {
+                their_public_key, ..
+            } => Some(their_public_key),
             _ => None,
         };
 
-        their_key.and_then(|key| {
-            contacts.iter().find(|c| c.public_key() == key)
-        })
+        their_key.and_then(|key| contacts.iter().find(|c| c.public_key() == key))
     }
 }
 
@@ -307,7 +316,10 @@ mod tests {
         let qr = session.generate_qr().unwrap();
         assert!(!qr.is_expired());
 
-        assert!(matches!(session.state(), ExchangeState::AwaitingScan { .. }));
+        assert!(matches!(
+            session.state(),
+            ExchangeState::AwaitingScan { .. }
+        ));
     }
 
     #[test]
@@ -325,7 +337,10 @@ mod tests {
 
         bob_session.process_scanned_qr(alice_qr).unwrap();
 
-        assert!(matches!(bob_session.state(), ExchangeState::AwaitingProximity { .. }));
+        assert!(matches!(
+            bob_session.state(),
+            ExchangeState::AwaitingProximity { .. }
+        ));
     }
 
     #[test]
@@ -336,7 +351,8 @@ mod tests {
             std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap()
-                .as_secs() - 360, // 6 minutes ago
+                .as_secs()
+                - 360, // 6 minutes ago
         );
 
         let bob_identity = Identity::create("Bob");

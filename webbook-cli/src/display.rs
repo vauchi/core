@@ -190,8 +190,8 @@ pub fn display_social_networks(query: Option<&str>) {
     };
 
     if networks.is_empty() {
-        if query.is_some() {
-            println!("No social networks matching '{}'", query.unwrap());
+        if let Some(q) = query {
+            println!("No social networks matching '{}'", q);
         } else {
             println!("No social networks available");
         }
@@ -225,11 +225,10 @@ pub fn display_social_networks(query: Option<&str>) {
     println!();
     println!("{}", "─".repeat(50));
     println!(
-        "Use: {} {} {} {}",
+        "Use: {} {} {}",
         style("webbook card add social").cyan(),
         style("<network>").yellow(),
-        style("<username>").yellow(),
-        ""
+        style("<username>").yellow()
     );
     println!(
         "Example: {}",

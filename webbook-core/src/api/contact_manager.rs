@@ -43,7 +43,11 @@ impl<'a> ContactManager<'a> {
         let old_card = self.storage.load_own_card()?;
         let changed_fields = match &old_card {
             Some(old) => Self::compute_changed_fields(old, card),
-            None => card.fields().iter().map(|f| f.label().to_string()).collect(),
+            None => card
+                .fields()
+                .iter()
+                .map(|f| f.label().to_string())
+                .collect(),
         };
 
         self.storage.save_own_card(card)?;
@@ -59,7 +63,9 @@ impl<'a> ContactManager<'a> {
 
     /// Adds a field to the user's own card.
     pub fn add_field_to_own_card(&self, field: ContactField) -> WebBookResult<()> {
-        let mut card = self.storage.load_own_card()?
+        let mut card = self
+            .storage
+            .load_own_card()?
             .ok_or(WebBookError::IdentityNotInitialized)?;
 
         card.add_field(field.clone())
@@ -75,11 +81,14 @@ impl<'a> ContactManager<'a> {
 
     /// Removes a field from the user's own card by label.
     pub fn remove_field_from_own_card(&self, label: &str) -> WebBookResult<bool> {
-        let mut card = self.storage.load_own_card()?
+        let mut card = self
+            .storage
+            .load_own_card()?
             .ok_or(WebBookError::IdentityNotInitialized)?;
 
         // Find field by label
-        let field_id = card.fields()
+        let field_id = card
+            .fields()
             .iter()
             .find(|f| f.label() == label)
             .map(|f| f.id().to_string());
@@ -108,7 +117,8 @@ impl<'a> ContactManager<'a> {
 
     /// Gets a contact by ID, returning error if not found.
     pub fn get_contact_required(&self, id: &str) -> WebBookResult<Contact> {
-        self.storage.load_contact(id)?
+        self.storage
+            .load_contact(id)?
             .ok_or_else(|| WebBookError::ContactNotFound(id.to_string()))
     }
 
@@ -141,16 +151,16 @@ impl<'a> ContactManager<'a> {
 
         // Check if already exists
         if self.storage.load_contact(&contact_id)?.is_some() {
-            return Err(WebBookError::InvalidState(
-                format!("Contact {} already exists", contact_id)
-            ));
+            return Err(WebBookError::InvalidState(format!(
+                "Contact {} already exists",
+                contact_id
+            )));
         }
 
         self.storage.save_contact(&contact)?;
 
-        self.events.dispatch(WebBookEvent::ContactAdded {
-            contact_id,
-        });
+        self.events
+            .dispatch(WebBookEvent::ContactAdded { contact_id });
 
         Ok(())
     }
@@ -159,7 +169,9 @@ impl<'a> ContactManager<'a> {
     pub fn update_contact(&self, contact: &Contact) -> WebBookResult<Vec<String>> {
         let contact_id = contact.id().to_string();
 
-        let old_contact = self.storage.load_contact(&contact_id)?
+        let old_contact = self
+            .storage
+            .load_contact(&contact_id)?
             .ok_or_else(|| WebBookError::ContactNotFound(contact_id.clone()))?;
 
         let changed_fields = Self::compute_changed_fields(old_contact.card(), contact.card());
@@ -225,7 +237,9 @@ impl<'a> ContactManager<'a> {
         use std::collections::HashSet;
         let mut contact = self.get_contact_required(contact_id)?;
         let allowed_set: HashSet<String> = allowed_contacts.into_iter().collect();
-        contact.visibility_rules_mut().set_contacts(field, allowed_set);
+        contact
+            .visibility_rules_mut()
+            .set_contacts(field, allowed_set);
         self.storage.save_contact(&contact)?;
         Ok(())
     }
@@ -332,7 +346,12 @@ mod tests {
 
         // Create card with field
         let mut card = ContactCard::new("Test User");
-        card.add_field(ContactField::new(FieldType::Email, "email", "test@example.com")).unwrap();
+        card.add_field(ContactField::new(
+            FieldType::Email,
+            "email",
+            "test@example.com",
+        ))
+        .unwrap();
         manager.update_own_card(&card).unwrap();
 
         // Remove field
@@ -386,9 +405,15 @@ mod tests {
         let events = Arc::new(EventDispatcher::new());
         let manager = ContactManager::new(&storage, events);
 
-        manager.add_contact(create_test_contact("Alice", [1u8; 32])).unwrap();
-        manager.add_contact(create_test_contact("Bob", [2u8; 32])).unwrap();
-        manager.add_contact(create_test_contact("Alice Smith", [3u8; 32])).unwrap();
+        manager
+            .add_contact(create_test_contact("Alice", [1u8; 32]))
+            .unwrap();
+        manager
+            .add_contact(create_test_contact("Bob", [2u8; 32]))
+            .unwrap();
+        manager
+            .add_contact(create_test_contact("Alice Smith", [3u8; 32]))
+            .unwrap();
 
         // Search for "Alice"
         let results = manager.search_contacts("alice").unwrap();
@@ -411,10 +436,14 @@ mod tests {
 
         assert_eq!(manager.contact_count().unwrap(), 0);
 
-        manager.add_contact(create_test_contact("Alice", [1u8; 32])).unwrap();
+        manager
+            .add_contact(create_test_contact("Alice", [1u8; 32]))
+            .unwrap();
         assert_eq!(manager.contact_count().unwrap(), 1);
 
-        manager.add_contact(create_test_contact("Bob", [2u8; 32])).unwrap();
+        manager
+            .add_contact(create_test_contact("Bob", [2u8; 32]))
+            .unwrap();
         assert_eq!(manager.contact_count().unwrap(), 2);
     }
 
@@ -476,7 +505,9 @@ mod tests {
 
         let events = Arc::new(dispatcher);
         let manager = ContactManager::new(&storage, events);
-        manager.add_contact(create_test_contact("Alice", [1u8; 32])).unwrap();
+        manager
+            .add_contact(create_test_contact("Alice", [1u8; 32]))
+            .unwrap();
 
         assert_eq!(event_count.load(Ordering::SeqCst), 1);
     }
@@ -498,11 +529,25 @@ mod tests {
     #[test]
     fn test_compute_changed_fields() {
         let mut card1 = ContactCard::new("User");
-        card1.add_field(ContactField::new(FieldType::Email, "email", "old@example.com")).unwrap();
+        card1
+            .add_field(ContactField::new(
+                FieldType::Email,
+                "email",
+                "old@example.com",
+            ))
+            .unwrap();
 
         let mut card2 = ContactCard::new("User");
-        card2.add_field(ContactField::new(FieldType::Email, "email", "new@example.com")).unwrap();
-        card2.add_field(ContactField::new(FieldType::Phone, "phone", "+1234567890")).unwrap();
+        card2
+            .add_field(ContactField::new(
+                FieldType::Email,
+                "email",
+                "new@example.com",
+            ))
+            .unwrap();
+        card2
+            .add_field(ContactField::new(FieldType::Phone, "phone", "+1234567890"))
+            .unwrap();
 
         let changed = ContactManager::<'_>::compute_changed_fields(&card1, &card2);
 

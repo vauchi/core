@@ -57,7 +57,10 @@ mod tests {
     #[test]
     fn test_error_display_messages() {
         let errors = vec![
-            (NetworkError::ConnectionFailed("refused".into()), "Connection failed: refused"),
+            (
+                NetworkError::ConnectionFailed("refused".into()),
+                "Connection failed: refused",
+            ),
             (NetworkError::ConnectionClosed, "Connection closed"),
             (NetworkError::Timeout, "Connection timeout"),
             (NetworkError::NotConnected, "Transport not connected"),

@@ -111,8 +111,7 @@ impl<T: Transport> ConnectionManager<T> {
         }
 
         // Calculate backoff delay (not actually sleeping here - that's for the caller)
-        let _delay_ms = self.config.reconnect_base_delay_ms
-            * (1 << self.reconnect_attempt.min(6));
+        let _delay_ms = self.config.reconnect_base_delay_ms * (1 << self.reconnect_attempt.min(6));
 
         self.reconnect_attempt += 1;
 
@@ -157,7 +156,9 @@ impl<T: Transport> ConnectionManager<T> {
 
     /// Sends the authentication handshake message.
     fn send_handshake(&mut self) -> TransportResult<()> {
-        let identity = self.identity.as_ref()
+        let identity = self
+            .identity
+            .as_ref()
             .ok_or_else(|| NetworkError::AuthenticationFailed("No identity set".into()))?;
 
         let rng = SystemRandom::new();
@@ -224,14 +225,15 @@ mod tests {
         conn.connect().unwrap();
 
         // Simulate disconnect
-        conn.transport_mut().set_state(ConnectionState::Disconnected);
+        conn.transport_mut()
+            .set_state(ConnectionState::Disconnected);
 
         // Send should trigger reconnect
         let msg = create_envelope(MessagePayload::Presence(
             crate::network::message::PresenceUpdate {
                 status: crate::network::message::PresenceStatus::Online,
                 message: None,
-            }
+            },
         ));
 
         conn.send(&msg).unwrap();
@@ -250,7 +252,10 @@ mod tests {
         // Next attempt should fail with MaxRetriesExceeded
         let result = conn.reconnect();
         assert!(result.is_err());
-        assert!(matches!(result.unwrap_err(), NetworkError::MaxRetriesExceeded));
+        assert!(matches!(
+            result.unwrap_err(),
+            NetworkError::MaxRetriesExceeded
+        ));
     }
 
     #[test]
@@ -284,7 +289,7 @@ mod tests {
             crate::network::message::PresenceUpdate {
                 status: crate::network::message::PresenceStatus::Away,
                 message: Some("BRB".into()),
-            }
+            },
         ));
         transport.queue_receive(incoming.clone());
 
@@ -315,7 +320,7 @@ mod tests {
             crate::network::message::PresenceUpdate {
                 status: crate::network::message::PresenceStatus::Online,
                 message: None,
-            }
+            },
         )));
 
         let mut conn = ConnectionManager::new(transport, create_test_config());

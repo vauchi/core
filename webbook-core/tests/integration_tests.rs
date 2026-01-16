@@ -3,18 +3,17 @@
 //! These tests verify the full workflow from identity creation through contact exchange
 //! and synchronization.
 
-use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
 
 use webbook_core::{
-    WebBook, WebBookConfig, WebBookEvent,
-    ContactCard, ContactField, FieldType,
-    Contact, SymmetricKey,
     api::{CallbackHandler, EventDispatcher},
+    crypto::ratchet::DoubleRatchetState,
+    exchange::X3DHKeyPair,
     network::{MockTransport, RelayClient, RelayClientConfig, TransportConfig},
     sync::SyncManager,
-    exchange::X3DHKeyPair,
-    crypto::ratchet::DoubleRatchetState,
+    Contact, ContactCard, ContactField, FieldType, SymmetricKey, WebBook, WebBookConfig,
+    WebBookEvent,
 };
 
 /// Test: Full identity and contact card workflow
@@ -33,8 +32,18 @@ fn test_full_identity_workflow() {
     assert!(card.fields().is_empty());
 
     // Add fields to contact card
-    wb.add_own_field(ContactField::new(FieldType::Email, "work", "alice@company.com")).unwrap();
-    wb.add_own_field(ContactField::new(FieldType::Phone, "mobile", "+15551234567")).unwrap();
+    wb.add_own_field(ContactField::new(
+        FieldType::Email,
+        "work",
+        "alice@company.com",
+    ))
+    .unwrap();
+    wb.add_own_field(ContactField::new(
+        FieldType::Phone,
+        "mobile",
+        "+15551234567",
+    ))
+    .unwrap();
 
     // Verify fields were added
     let card = wb.own_card().unwrap().unwrap();
@@ -75,11 +84,7 @@ fn test_contact_management_workflow() {
         ContactCard::new("Alice"),
         SymmetricKey::generate(),
     );
-    let bob = Contact::from_exchange(
-        [2u8; 32],
-        ContactCard::new("Bob"),
-        SymmetricKey::generate(),
-    );
+    let bob = Contact::from_exchange([2u8; 32], ContactCard::new("Bob"), SymmetricKey::generate());
     let carol = Contact::from_exchange(
         [3u8; 32],
         ContactCard::new("Carol"),
@@ -181,14 +186,9 @@ fn test_double_ratchet_integration() {
     let shared_secret = SymmetricKey::generate();
 
     // Initialize ratchets
-    let mut alice_ratchet = DoubleRatchetState::initialize_initiator(
-        &shared_secret,
-        *bob_identity_dh.public_key(),
-    );
-    let mut bob_ratchet = DoubleRatchetState::initialize_responder(
-        &shared_secret,
-        bob_identity_dh,
-    );
+    let mut alice_ratchet =
+        DoubleRatchetState::initialize_initiator(&shared_secret, *bob_identity_dh.public_key());
+    let mut bob_ratchet = DoubleRatchetState::initialize_responder(&shared_secret, bob_identity_dh);
 
     // Alice encrypts a message
     let plaintext = b"Hello Bob! This is a secret message.";
@@ -226,12 +226,26 @@ fn test_sync_manager_workflow() {
 
     // Queue a card update
     let mut old_card = ContactCard::new("Test");
-    old_card.add_field(ContactField::new(FieldType::Email, "email", "old@example.com")).unwrap();
+    old_card
+        .add_field(ContactField::new(
+            FieldType::Email,
+            "email",
+            "old@example.com",
+        ))
+        .unwrap();
 
     let mut new_card = ContactCard::new("Test");
-    new_card.add_field(ContactField::new(FieldType::Email, "email", "new@example.com")).unwrap();
+    new_card
+        .add_field(ContactField::new(
+            FieldType::Email,
+            "email",
+            "new@example.com",
+        ))
+        .unwrap();
 
-    let update_id = sync_manager.queue_card_update("contact-1", &old_card, &new_card).unwrap();
+    let update_id = sync_manager
+        .queue_card_update("contact-1", &old_card, &new_card)
+        .unwrap();
     assert!(!update_id.is_empty());
 
     // Check pending updates
@@ -274,15 +288,13 @@ fn test_relay_client_workflow() {
     // Set up ratchet for encryption
     let bob_dh = X3DHKeyPair::generate();
     let shared_secret = SymmetricKey::generate();
-    let mut ratchet = DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key());
+    let mut ratchet =
+        DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key());
 
     // Send an update
-    let msg_id = client.send_update(
-        "recipient-id",
-        &mut ratchet,
-        b"test payload",
-        "update-1",
-    ).unwrap();
+    let msg_id = client
+        .send_update("recipient-id", &mut ratchet, b"test payload", "update-1")
+        .unwrap();
 
     assert!(!msg_id.is_empty());
     assert_eq!(client.in_flight_count(), 1);
@@ -299,8 +311,8 @@ fn test_relay_client_workflow() {
 /// Test: Configuration builder pattern
 #[test]
 fn test_config_builder() {
-    use webbook_core::api::WebBookBuilder;
     use std::path::PathBuf;
+    use webbook_core::api::WebBookBuilder;
 
     // Test default config
     let config = WebBookConfig::default();
@@ -362,20 +374,36 @@ fn test_card_delta_workflow() {
 
     // Create initial card
     let mut old_card = ContactCard::new("Test User");
-    old_card.add_field(ContactField::new(FieldType::Email, "work", "old@work.com")).unwrap();
-    old_card.add_field(ContactField::new(FieldType::Phone, "mobile", "+15551234567")).unwrap();
+    old_card
+        .add_field(ContactField::new(FieldType::Email, "work", "old@work.com"))
+        .unwrap();
+    old_card
+        .add_field(ContactField::new(
+            FieldType::Phone,
+            "mobile",
+            "+15551234567",
+        ))
+        .unwrap();
 
     // Clone and modify card (to preserve field IDs for modification detection)
     let mut updated_card = old_card.clone();
     updated_card.set_display_name("Test User Updated").unwrap();
     // Modify the email value (same field ID)
     let email_field_id = updated_card.fields()[0].id().to_string();
-    updated_card.update_field_value(&email_field_id, "new@work.com").unwrap();
+    updated_card
+        .update_field_value(&email_field_id, "new@work.com")
+        .unwrap();
     // Remove mobile field
     let mobile_field_id = updated_card.fields()[1].id().to_string();
     updated_card.remove_field(&mobile_field_id).unwrap();
     // Add new field
-    updated_card.add_field(ContactField::new(FieldType::Website, "blog", "https://blog.test.com")).unwrap();
+    updated_card
+        .add_field(ContactField::new(
+            FieldType::Website,
+            "blog",
+            "https://blog.test.com",
+        ))
+        .unwrap();
 
     // Compute delta
     let delta = CardDelta::compute(&old_card, &updated_card);
@@ -384,16 +412,28 @@ fn test_card_delta_workflow() {
     assert!(!delta.changes.is_empty());
 
     // Display name changed
-    assert!(delta.changes.iter().any(|c| matches!(c, FieldChange::DisplayNameChanged { .. })));
+    assert!(delta
+        .changes
+        .iter()
+        .any(|c| matches!(c, FieldChange::DisplayNameChanged { .. })));
 
     // Email modified (same field ID, different value)
-    assert!(delta.changes.iter().any(|c| matches!(c, FieldChange::Modified { .. })));
+    assert!(delta
+        .changes
+        .iter()
+        .any(|c| matches!(c, FieldChange::Modified { .. })));
 
     // Mobile removed
-    assert!(delta.changes.iter().any(|c| matches!(c, FieldChange::Removed { .. })));
+    assert!(delta
+        .changes
+        .iter()
+        .any(|c| matches!(c, FieldChange::Removed { .. })));
 
     // Blog added
-    assert!(delta.changes.iter().any(|c| matches!(c, FieldChange::Added { .. })));
+    assert!(delta
+        .changes
+        .iter()
+        .any(|c| matches!(c, FieldChange::Added { .. })));
 
     // Apply delta to a copy of old card
     let mut result_card = old_card.clone();
@@ -464,14 +504,18 @@ fn test_phase8_three_user_card_propagation_with_visibility() {
         &alice_bob_shared_secret,
         *bob_dh_for_alice.public_key(),
     );
-    let bob_alice_ratchet = DoubleRatchetState::initialize_responder(
-        &alice_bob_shared_secret,
-        bob_dh_for_alice,
-    );
+    let bob_alice_ratchet =
+        DoubleRatchetState::initialize_responder(&alice_bob_shared_secret, bob_dh_for_alice);
 
     // Save ratchet states
-    alice_wb.storage().save_ratchet_state(&bob_contact_id, &alice_bob_ratchet, true).unwrap();
-    bob_wb.storage().save_ratchet_state(&alice_contact_id_bob, &bob_alice_ratchet, false).unwrap();
+    alice_wb
+        .storage()
+        .save_ratchet_state(&bob_contact_id, &alice_bob_ratchet, true)
+        .unwrap();
+    bob_wb
+        .storage()
+        .save_ratchet_state(&alice_contact_id_bob, &bob_alice_ratchet, false)
+        .unwrap();
 
     // ========================================
     // Step 4: Simulate contact exchange - Alice ↔ Charlie
@@ -508,8 +552,14 @@ fn test_phase8_three_user_card_propagation_with_visibility() {
     );
 
     // Save ratchet states
-    alice_wb.storage().save_ratchet_state(&charlie_contact_id, &alice_charlie_ratchet, true).unwrap();
-    charlie_wb.storage().save_ratchet_state(&alice_contact_id_charlie, &charlie_alice_ratchet, false).unwrap();
+    alice_wb
+        .storage()
+        .save_ratchet_state(&charlie_contact_id, &alice_charlie_ratchet, true)
+        .unwrap();
+    charlie_wb
+        .storage()
+        .save_ratchet_state(&alice_contact_id_charlie, &charlie_alice_ratchet, false)
+        .unwrap();
 
     // ========================================
     // Step 5: Verify initial setup
@@ -523,20 +573,42 @@ fn test_phase8_three_user_card_propagation_with_visibility() {
     // ========================================
     let old_card = alice_wb.own_card().unwrap().unwrap();
 
-    alice_wb.add_own_field(ContactField::new(FieldType::Email, "work", "alice@company.com")).unwrap();
-    alice_wb.add_own_field(ContactField::new(FieldType::Phone, "mobile", "+15551234567")).unwrap();
-    alice_wb.add_own_field(ContactField::new(FieldType::Website, "blog", "https://alice.dev")).unwrap();
+    alice_wb
+        .add_own_field(ContactField::new(
+            FieldType::Email,
+            "work",
+            "alice@company.com",
+        ))
+        .unwrap();
+    alice_wb
+        .add_own_field(ContactField::new(
+            FieldType::Phone,
+            "mobile",
+            "+15551234567",
+        ))
+        .unwrap();
+    alice_wb
+        .add_own_field(ContactField::new(
+            FieldType::Website,
+            "blog",
+            "https://alice.dev",
+        ))
+        .unwrap();
 
     let new_card = alice_wb.own_card().unwrap().unwrap();
     assert_eq!(new_card.fields().len(), 3);
 
     // Get field IDs
-    let work_field_id = new_card.fields().iter()
+    let work_field_id = new_card
+        .fields()
+        .iter()
         .find(|f| f.label() == "work")
         .unwrap()
         .id()
         .to_string();
-    let mobile_field_id = new_card.fields().iter()
+    let mobile_field_id = new_card
+        .fields()
+        .iter()
         .find(|f| f.label() == "mobile")
         .unwrap()
         .id()
@@ -548,38 +620,68 @@ fn test_phase8_three_user_card_propagation_with_visibility() {
     {
         let mut bob_contact = alice_wb.get_contact(&bob_contact_id).unwrap().unwrap();
         // Hide mobile field from Bob
-        bob_contact.visibility_rules_mut().set_nobody(&mobile_field_id);
+        bob_contact
+            .visibility_rules_mut()
+            .set_nobody(&mobile_field_id);
         alice_wb.update_contact(&bob_contact).unwrap();
     }
 
     // Verify visibility rules
     {
         let bob_contact = alice_wb.get_contact(&bob_contact_id).unwrap().unwrap();
-        assert!(matches!(bob_contact.visibility_rules().get(&mobile_field_id), FieldVisibility::Nobody));
-        assert!(matches!(bob_contact.visibility_rules().get(&work_field_id), FieldVisibility::Everyone));
+        assert!(matches!(
+            bob_contact.visibility_rules().get(&mobile_field_id),
+            FieldVisibility::Nobody
+        ));
+        assert!(matches!(
+            bob_contact.visibility_rules().get(&work_field_id),
+            FieldVisibility::Everyone
+        ));
     }
 
     // Charlie should see everything (default: Everyone)
     {
         let charlie_contact = alice_wb.get_contact(&charlie_contact_id).unwrap().unwrap();
-        assert!(matches!(charlie_contact.visibility_rules().get(&mobile_field_id), FieldVisibility::Everyone));
-        assert!(matches!(charlie_contact.visibility_rules().get(&work_field_id), FieldVisibility::Everyone));
+        assert!(matches!(
+            charlie_contact.visibility_rules().get(&mobile_field_id),
+            FieldVisibility::Everyone
+        ));
+        assert!(matches!(
+            charlie_contact.visibility_rules().get(&work_field_id),
+            FieldVisibility::Everyone
+        ));
     }
 
     // ========================================
     // Step 8: Alice propagates card updates
     // ========================================
-    let queued = alice_wb.propagate_card_update(&old_card, &new_card).unwrap();
+    let queued = alice_wb
+        .propagate_card_update(&old_card, &new_card)
+        .unwrap();
     assert_eq!(queued, 2, "Should queue updates for both Bob and Charlie");
 
     // ========================================
     // Step 9: Retrieve and verify pending updates
     // ========================================
-    let pending_for_bob = alice_wb.storage().get_pending_updates(&bob_contact_id).unwrap();
-    let pending_for_charlie = alice_wb.storage().get_pending_updates(&charlie_contact_id).unwrap();
+    let pending_for_bob = alice_wb
+        .storage()
+        .get_pending_updates(&bob_contact_id)
+        .unwrap();
+    let pending_for_charlie = alice_wb
+        .storage()
+        .get_pending_updates(&charlie_contact_id)
+        .unwrap();
 
-    assert_eq!(pending_for_bob.len(), 1, "Should have 1 pending update for Bob");
-    assert_eq!(pending_for_charlie.len(), 1, "Should have 1 pending update for Charlie");
+    assert_eq!(
+        pending_for_bob.len(),
+        1,
+        "Should have 1 pending update for Bob"
+    );
+    assert_eq!(
+        pending_for_charlie.len(),
+        1,
+        "Should have 1 pending update for Charlie"
+    );
 
     // ========================================
     // Step 10: Simulate Bob receiving and decrypting the update
@@ -589,8 +691,11 @@ fn test_phase8_three_user_card_propagation_with_visibility() {
         let encrypted_payload = &update.payload;
 
         // Load Bob's ratchet state
-        let (mut ratchet, _) = bob_wb.storage()
-            .load_ratchet_state(&alice_contact_id_bob).unwrap().unwrap();
+        let (mut ratchet, _) = bob_wb
+            .storage()
+            .load_ratchet_state(&alice_contact_id_bob)
+            .unwrap()
+            .unwrap();
 
         // Decrypt
         let ratchet_msg: webbook_core::crypto::ratchet::RatchetMessage =
@@ -598,27 +703,40 @@ fn test_phase8_three_user_card_propagation_with_visibility() {
         let delta_bytes = ratchet.decrypt(&ratchet_msg).unwrap();
 
         // Save updated ratchet
-        bob_wb.storage().save_ratchet_state(&alice_contact_id_bob, &ratchet, false).unwrap();
+        bob_wb
+            .storage()
+            .save_ratchet_state(&alice_contact_id_bob, &ratchet, false)
+            .unwrap();
 
         // Parse delta
-        let delta: webbook_core::sync::CardDelta =
-            serde_json::from_slice(&delta_bytes).unwrap();
+        let delta: webbook_core::sync::CardDelta = serde_json::from_slice(&delta_bytes).unwrap();
 
         // Verify signature
         let alice_contact = bob_wb.get_contact(&alice_contact_id_bob).unwrap().unwrap();
         assert!(delta.verify(alice_contact.public_key()));
 
         // Check delta changes - Bob should NOT see mobile field
-        let field_labels: Vec<&str> = delta.changes.iter().filter_map(|c| {
-            match c {
+        let field_labels: Vec<&str> = delta
+            .changes
+            .iter()
+            .filter_map(|c| match c {
                 webbook_core::sync::FieldChange::Added { field } => Some(field.label()),
                 _ => None,
-            }
-        }).collect();
+            })
+            .collect();
 
-        assert!(field_labels.contains(&"work"), "Bob should receive work field");
-        assert!(field_labels.contains(&"blog"), "Bob should receive blog field");
-        assert!(!field_labels.contains(&"mobile"), "Bob should NOT receive mobile field (hidden)");
+        assert!(
+            field_labels.contains(&"work"),
+            "Bob should receive work field"
+        );
+        assert!(
+            field_labels.contains(&"blog"),
+            "Bob should receive blog field"
+        );
+        assert!(
+            !field_labels.contains(&"mobile"),
+            "Bob should NOT receive mobile field (hidden)"
+        );
         assert_eq!(field_labels.len(), 2, "Bob should only receive 2 fields");
 
         // Apply delta to Bob's view of Alice
@@ -640,8 +758,11 @@ fn test_phase8_three_user_card_propagation_with_visibility() {
         let encrypted_payload = &update.payload;
 
         // Load Charlie's ratchet state
-        let (mut ratchet, _) = charlie_wb.storage()
-            .load_ratchet_state(&alice_contact_id_charlie).unwrap().unwrap();
+        let (mut ratchet, _) = charlie_wb
+            .storage()
+            .load_ratchet_state(&alice_contact_id_charlie)
+            .unwrap()
+            .unwrap();
 
         // Decrypt
         let ratchet_msg: webbook_core::crypto::ratchet::RatchetMessage =
@@ -649,27 +770,43 @@ fn test_phase8_three_user_card_propagation_with_visibility() {
         let delta_bytes = ratchet.decrypt(&ratchet_msg).unwrap();
 
         // Save updated ratchet
-        charlie_wb.storage().save_ratchet_state(&alice_contact_id_charlie, &ratchet, false).unwrap();
+        charlie_wb
+            .storage()
+            .save_ratchet_state(&alice_contact_id_charlie, &ratchet, false)
+            .unwrap();
 
         // Parse delta
-        let delta: webbook_core::sync::CardDelta =
-            serde_json::from_slice(&delta_bytes).unwrap();
+        let delta: webbook_core::sync::CardDelta = serde_json::from_slice(&delta_bytes).unwrap();
 
         // Verify signature
-        let alice_contact = charlie_wb.get_contact(&alice_contact_id_charlie).unwrap().unwrap();
+        let alice_contact = charlie_wb
+            .get_contact(&alice_contact_id_charlie)
+            .unwrap()
+            .unwrap();
         assert!(delta.verify(alice_contact.public_key()));
 
         // Check delta changes - Charlie should see ALL fields
-        let field_labels: Vec<&str> = delta.changes.iter().filter_map(|c| {
-            match c {
+        let field_labels: Vec<&str> = delta
+            .changes
+            .iter()
+            .filter_map(|c| match c {
                 webbook_core::sync::FieldChange::Added { field } => Some(field.label()),
                 _ => None,
-            }
-        }).collect();
+            })
+            .collect();
 
-        assert!(field_labels.contains(&"work"), "Charlie should receive work field");
-        assert!(field_labels.contains(&"blog"), "Charlie should receive blog field");
-        assert!(field_labels.contains(&"mobile"), "Charlie should receive mobile field");
+        assert!(
+            field_labels.contains(&"work"),
+            "Charlie should receive work field"
+        );
+        assert!(
+            field_labels.contains(&"blog"),
+            "Charlie should receive blog field"
+        );
+        assert!(
+            field_labels.contains(&"mobile"),
+            "Charlie should receive mobile field"
+        );
         assert_eq!(field_labels.len(), 3, "Charlie should receive all 3 fields");
 
         // Apply delta to Charlie's view of Alice
@@ -687,14 +824,24 @@ fn test_phase8_three_user_card_propagation_with_visibility() {
     // Step 12: Verify ratchet states were saved
     // ========================================
     // Both ratchets should exist after decrypt
-    let bob_ratchet_after = bob_wb.storage()
-        .load_ratchet_state(&alice_contact_id_bob).unwrap();
-    let charlie_ratchet_after = charlie_wb.storage()
-        .load_ratchet_state(&alice_contact_id_charlie).unwrap();
+    let bob_ratchet_after = bob_wb
+        .storage()
+        .load_ratchet_state(&alice_contact_id_bob)
+        .unwrap();
+    let charlie_ratchet_after = charlie_wb
+        .storage()
+        .load_ratchet_state(&alice_contact_id_charlie)
+        .unwrap();
 
     // Ratchets should be present (decrypt succeeded)
-    assert!(bob_ratchet_after.is_some(), "Bob's ratchet state should be saved");
-    assert!(charlie_ratchet_after.is_some(), "Charlie's ratchet state should be saved");
+    assert!(
+        bob_ratchet_after.is_some(),
+        "Bob's ratchet state should be saved"
+    );
+    assert!(
+        charlie_ratchet_after.is_some(),
+        "Charlie's ratchet state should be saved"
+    );
 }
 
 /// Test: Phase 8 - Field modification and removal propagation
@@ -710,13 +857,23 @@ fn test_phase8_field_modification_and_removal_propagation() {
     {
         let old = ContactCard::new("Alice");
         let mut new = ContactCard::new("Alice");
-        new.add_field(ContactField::new(FieldType::Email, "work", "alice@company.com")).unwrap();
+        new.add_field(ContactField::new(
+            FieldType::Email,
+            "work",
+            "alice@company.com",
+        ))
+        .unwrap();
 
         let delta = CardDelta::compute(&old, &new);
 
         assert!(!delta.is_empty());
-        assert!(delta.changes.iter().any(|c| matches!(c, FieldChange::Added { .. })),
-            "Adding a field should produce an Added delta");
+        assert!(
+            delta
+                .changes
+                .iter()
+                .any(|c| matches!(c, FieldChange::Added { .. })),
+            "Adding a field should produce an Added delta"
+        );
     }
 
     // ========================================
@@ -724,19 +881,30 @@ fn test_phase8_field_modification_and_removal_propagation() {
     // ========================================
     {
         let mut card = ContactCard::new("Alice");
-        card.add_field(ContactField::new(FieldType::Email, "work", "alice@company.com")).unwrap();
+        card.add_field(ContactField::new(
+            FieldType::Email,
+            "work",
+            "alice@company.com",
+        ))
+        .unwrap();
         let old = card.clone();
 
         // Get field ID and modify
         let field_id = card.fields()[0].id().to_string();
-        card.update_field_value(&field_id, "alice.smith@newcompany.com").unwrap();
+        card.update_field_value(&field_id, "alice.smith@newcompany.com")
+            .unwrap();
         let new = card;
 
         let delta = CardDelta::compute(&old, &new);
 
         assert!(!delta.is_empty());
-        assert!(delta.changes.iter().any(|c| matches!(c, FieldChange::Modified { .. })),
-            "Modifying a field value should produce a Modified delta");
+        assert!(
+            delta
+                .changes
+                .iter()
+                .any(|c| matches!(c, FieldChange::Modified { .. })),
+            "Modifying a field value should produce a Modified delta"
+        );
     }
 
     // ========================================
@@ -753,8 +921,13 @@ fn test_phase8_field_modification_and_removal_propagation() {
         let delta = CardDelta::compute(&old, &new);
 
         assert!(!delta.is_empty());
-        assert!(delta.changes.iter().any(|c| matches!(c, FieldChange::Removed { field_id: id } if *id == field_id)),
-            "Removing a field should produce a Removed delta");
+        assert!(
+            delta
+                .changes
+                .iter()
+                .any(|c| matches!(c, FieldChange::Removed { field_id: id } if *id == field_id)),
+            "Removing a field should produce a Removed delta"
+        );
     }
 
     // ========================================
@@ -771,43 +944,68 @@ fn test_phase8_field_modification_and_removal_propagation() {
         let bob_pk = *bob_wb.identity().unwrap().signing_public_key();
         let shared_secret = SymmetricKey::generate();
 
-        let bob_contact = Contact::from_exchange(bob_pk, ContactCard::new("Bob"), shared_secret.clone());
+        let bob_contact =
+            Contact::from_exchange(bob_pk, ContactCard::new("Bob"), shared_secret.clone());
         let bob_id = bob_contact.id().to_string();
         alice_wb.add_contact(bob_contact).unwrap();
 
-        let alice_contact = Contact::from_exchange(alice_pk, ContactCard::new("Alice"), shared_secret.clone());
+        let alice_contact =
+            Contact::from_exchange(alice_pk, ContactCard::new("Alice"), shared_secret.clone());
         let alice_id = alice_contact.id().to_string();
         bob_wb.add_contact(alice_contact).unwrap();
 
         // Set up ratchets
         let bob_dh = X3DHKeyPair::generate();
-        let alice_ratchet = DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key());
+        let alice_ratchet =
+            DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key());
         let bob_ratchet = DoubleRatchetState::initialize_responder(&shared_secret, bob_dh);
 
-        alice_wb.storage().save_ratchet_state(&bob_id, &alice_ratchet, true).unwrap();
-        bob_wb.storage().save_ratchet_state(&alice_id, &bob_ratchet, false).unwrap();
+        alice_wb
+            .storage()
+            .save_ratchet_state(&bob_id, &alice_ratchet, true)
+            .unwrap();
+        bob_wb
+            .storage()
+            .save_ratchet_state(&alice_id, &bob_ratchet, false)
+            .unwrap();
 
         // Alice adds a field
         let old_card = alice_wb.own_card().unwrap().unwrap();
-        alice_wb.add_own_field(ContactField::new(FieldType::Email, "work", "alice@company.com")).unwrap();
+        alice_wb
+            .add_own_field(ContactField::new(
+                FieldType::Email,
+                "work",
+                "alice@company.com",
+            ))
+            .unwrap();
         let new_card = alice_wb.own_card().unwrap().unwrap();
 
-        let queued = alice_wb.propagate_card_update(&old_card, &new_card).unwrap();
+        let queued = alice_wb
+            .propagate_card_update(&old_card, &new_card)
+            .unwrap();
         assert_eq!(queued, 1, "Should queue update for Bob");
 
         // Verify Bob can decrypt and receive the added field
         let pending = alice_wb.storage().get_pending_updates(&bob_id).unwrap();
         assert!(!pending.is_empty(), "Should have pending update");
 
-        let (mut ratchet, _) = bob_wb.storage().load_ratchet_state(&alice_id).unwrap().unwrap();
+        let (mut ratchet, _) = bob_wb
+            .storage()
+            .load_ratchet_state(&alice_id)
+            .unwrap()
+            .unwrap();
         let ratchet_msg: webbook_core::crypto::ratchet::RatchetMessage =
             serde_json::from_slice(&pending[0].payload).unwrap();
         let delta_bytes = ratchet.decrypt(&ratchet_msg).unwrap();
         let delta: CardDelta = serde_json::from_slice(&delta_bytes).unwrap();
 
         // Verify the delta contains the added field
-        assert!(delta.changes.iter().any(|c| {
-            matches!(c, FieldChange::Added { field } if field.label() == "work")
-        }), "Bob should receive the work field in the delta");
+        assert!(
+            delta
+                .changes
+                .iter()
+                .any(|c| { matches!(c, FieldChange::Added { field } if field.label() == "work") }),
+            "Bob should receive the work field in the delta"
+        );
     }
 }

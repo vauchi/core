@@ -144,7 +144,10 @@ impl Contact {
     }
 
     /// Updates the contact's display name.
-    pub fn set_display_name(&mut self, name: &str) -> Result<(), crate::contact_card::ContactCardError> {
+    pub fn set_display_name(
+        &mut self,
+        name: &str,
+    ) -> Result<(), crate::contact_card::ContactCardError> {
         self.card.set_display_name(name)?;
         self.display_name = name.to_string();
         Ok(())
@@ -211,11 +214,15 @@ mod tests {
         let mut contact = create_test_contact();
 
         // Initially no specific rules
-        assert!(contact.visibility_rules().can_see("any_field", &contact.id()));
+        assert!(contact
+            .visibility_rules()
+            .can_see("any_field", &contact.id()));
 
         // Set a field as private
         contact.visibility_rules_mut().set_nobody("private_field");
-        assert!(!contact.visibility_rules().can_see("private_field", &contact.id()));
+        assert!(!contact
+            .visibility_rules()
+            .can_see("private_field", &contact.id()));
     }
 
     // ============================================================
@@ -234,15 +241,17 @@ mod tests {
             public_key,
             card,
             shared_key,
-            1234567890,  // Specific timestamp
-            true,        // Pre-verified
+            1234567890, // Specific timestamp
+            true,       // Pre-verified
             visibility_rules,
         );
 
         assert_eq!(contact.display_name(), "Synced User");
         assert_eq!(contact.exchange_timestamp(), 1234567890);
         assert!(contact.is_fingerprint_verified());
-        assert!(!contact.visibility_rules().can_see("private_field", "anyone"));
+        assert!(!contact
+            .visibility_rules()
+            .can_see("private_field", "anyone"));
     }
 
     #[test]

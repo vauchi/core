@@ -28,7 +28,7 @@ fn open_webbook(config: &CliConfig) -> Result<WebBook<MockTransport>> {
         bail!("WebBook not initialized. Run 'webbook init <name>' first.");
     }
 
-    let wb_config = WebBookConfig::with_storage_path(&config.storage_path())
+    let wb_config = WebBookConfig::with_storage_path(config.storage_path())
         .with_relay_url(&config.relay_url)
         .with_storage_key(config.storage_key());
 
@@ -105,6 +105,7 @@ fn send_exchange_response(
 
 /// Receives and processes pending messages from relay.
 /// Returns: (total_received, exchange_messages, encrypted_card_updates)
+#[allow(clippy::type_complexity)]
 fn receive_pending(
     socket: &mut WebSocket<MaybeTlsStream<TcpStream>>,
     _wb: &WebBook<MockTransport>,
@@ -213,7 +214,7 @@ fn process_exchange_messages(
             }
         };
 
-        let public_id = hex::encode(&identity_key);
+        let public_id = hex::encode(identity_key);
 
         // Check if this is a response to our exchange
         if exchange.is_response {

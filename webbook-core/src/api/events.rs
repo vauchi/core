@@ -266,7 +266,11 @@ mod tests {
 
         let cloned = event.clone();
 
-        if let WebBookEvent::ContactUpdated { contact_id, changed_fields } = cloned {
+        if let WebBookEvent::ContactUpdated {
+            contact_id,
+            changed_fields,
+        } = cloned
+        {
             assert_eq!(contact_id, "test");
             assert_eq!(changed_fields.len(), 2);
         } else {

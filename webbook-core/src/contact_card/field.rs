@@ -90,7 +90,9 @@ impl ContactField {
     pub fn validate(&self) -> Result<(), ValidationError> {
         // Check max length
         if self.value.len() > MAX_VALUE_LENGTH {
-            return Err(ValidationError::ValueTooLong { max: MAX_VALUE_LENGTH });
+            return Err(ValidationError::ValueTooLong {
+                max: MAX_VALUE_LENGTH,
+            });
         }
 
         // Type-specific validation

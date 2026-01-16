@@ -72,7 +72,9 @@ fn test_create_identity_backup() {
     let identity = Identity::create("Alice");
     let password = "SecureP@ssw0rd!";
 
-    let backup = identity.export_backup(password).expect("Backup should succeed");
+    let backup = identity
+        .export_backup(password)
+        .expect("Backup should succeed");
 
     // Backup should be non-empty
     assert!(!backup.as_bytes().is_empty(), "Backup should not be empty");
@@ -97,7 +99,9 @@ fn test_restore_identity_from_backup() {
     let original = Identity::create("Alice");
     let password = "SecureP@ssw0rd!";
 
-    let backup = original.export_backup(password).expect("Backup should succeed");
+    let backup = original
+        .export_backup(password)
+        .expect("Backup should succeed");
     let restored = Identity::import_backup(&backup, password).expect("Restore should succeed");
 
     // Restored identity should match original
@@ -113,7 +117,9 @@ fn test_restore_with_wrong_password_fails() {
     let correct_password = "SecureP@ssw0rd!";
     let wrong_password = "WrongPassword123!";
 
-    let backup = identity.export_backup(correct_password).expect("Backup should succeed");
+    let backup = identity
+        .export_backup(correct_password)
+        .expect("Backup should succeed");
     let result = Identity::import_backup(&backup, wrong_password);
 
     assert!(result.is_err(), "Restore with wrong password should fail");
@@ -126,7 +132,9 @@ fn test_restore_corrupted_backup_fails() {
     let identity = Identity::create("Alice");
     let password = "SecureP@ssw0rd!";
 
-    let mut backup = identity.export_backup(password).expect("Backup should succeed");
+    let mut backup = identity
+        .export_backup(password)
+        .expect("Backup should succeed");
 
     // Corrupt the backup
     let bytes = backup.as_bytes_mut();

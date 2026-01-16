@@ -4,8 +4,8 @@
 //! This module provides trait definitions and mock implementations
 //! for future mobile SDK integration.
 
+use super::{ProximityError, ProximityVerifier};
 use std::time::Duration;
-use super::{ProximityVerifier, ProximityError};
 
 /// A discovered BLE device.
 #[derive(Debug, Clone)]
@@ -157,7 +157,9 @@ impl BLEProximityVerifier for MockBLEVerifier {
         if self.should_succeed {
             Ok(self.simulated_distance)
         } else {
-            Err(ProximityError::DeviceError("Distance estimation failed".into()))
+            Err(ProximityError::DeviceError(
+                "Distance estimation failed".into(),
+            ))
         }
     }
 }
@@ -204,8 +206,7 @@ mod tests {
     #[test]
     fn test_ble_device_with_exchange_token() {
         let token = [42u8; 32];
-        let device = BLEDevice::new("test-id", -50)
-            .with_exchange_token(token);
+        let device = BLEDevice::new("test-id", -50).with_exchange_token(token);
 
         assert_eq!(device.exchange_token, Some(token));
     }

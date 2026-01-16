@@ -20,7 +20,7 @@ fn open_webbook(config: &CliConfig) -> Result<WebBook<MockTransport>> {
         bail!("WebBook not initialized. Run 'webbook init <name>' first.");
     }
 
-    let wb_config = WebBookConfig::with_storage_path(&config.storage_path())
+    let wb_config = WebBookConfig::with_storage_path(config.storage_path())
         .with_relay_url(&config.relay_url)
         .with_storage_key(config.storage_key());
 

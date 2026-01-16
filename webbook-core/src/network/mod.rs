@@ -30,13 +30,13 @@
 //! let acked = client.process_incoming()?;
 //! ```
 
+mod connection;
 mod error;
 mod message;
-mod protocol;
-mod transport;
 mod mock;
-mod connection;
+mod protocol;
 mod relay_client;
+mod transport;
 mod websocket;
 
 // Error types
@@ -44,24 +44,17 @@ pub use error::NetworkError;
 
 // Message types
 pub use message::{
-    MessageEnvelope, MessagePayload, MessageId,
-    EncryptedUpdate, RatchetHeader,
-    Acknowledgment, AckStatus,
-    Handshake,
-    PresenceUpdate, PresenceStatus,
-    PROTOCOL_VERSION,
+    AckStatus, Acknowledgment, EncryptedUpdate, Handshake, MessageEnvelope, MessageId,
+    MessagePayload, PresenceStatus, PresenceUpdate, RatchetHeader, PROTOCOL_VERSION,
 };
 
 // Protocol utilities
 pub use protocol::{
-    encode_message, decode_message, create_envelope,
-    MAX_MESSAGE_SIZE, FRAME_HEADER_SIZE,
+    create_envelope, decode_message, encode_message, FRAME_HEADER_SIZE, MAX_MESSAGE_SIZE,
 };
 
 // Transport abstraction
-pub use transport::{
-    Transport, TransportConfig, TransportResult, ConnectionState,
-};
+pub use transport::{ConnectionState, Transport, TransportConfig, TransportResult};
 
 // Mock transport for testing
 pub use mock::MockTransport;
@@ -73,4 +66,4 @@ pub use websocket::WebSocketTransport;
 pub use connection::ConnectionManager;
 
 // Relay client
-pub use relay_client::{RelayClient, RelayClientConfig, ProcessResult};
+pub use relay_client::{ProcessResult, RelayClient, RelayClientConfig};

@@ -56,11 +56,11 @@ pub struct WebBook<T: Transport = MockTransport> {
     identity: Option<Identity>,
     storage: Storage,
     events: Arc<EventDispatcher>,
-    #[allow(dead_code)]  // For future sync integration
+    #[allow(dead_code)] // For future sync integration
     sync_controller: Option<SyncController<'static, T>>,
     /// Leaked storage reference for sync controller
     /// This is necessary because SyncController needs a 'static reference
-    #[allow(dead_code)]  // For future sync integration
+    #[allow(dead_code)] // For future sync integration
     storage_ref: Option<&'static Storage>,
 }
 
@@ -73,12 +73,18 @@ impl WebBook<MockTransport> {
 
 impl<T: Transport> WebBook<T> {
     /// Creates a new WebBook instance with a custom transport factory.
-    pub fn with_transport_factory<F>(config: WebBookConfig, _transport_factory: F) -> WebBookResult<Self>
+    pub fn with_transport_factory<F>(
+        config: WebBookConfig,
+        _transport_factory: F,
+    ) -> WebBookResult<Self>
     where
         F: FnOnce() -> T,
     {
         // Use provided storage key or generate a new one
-        let storage_key = config.storage_key.clone().unwrap_or_else(SymmetricKey::generate);
+        let storage_key = config
+            .storage_key
+            .clone()
+            .unwrap_or_else(SymmetricKey::generate);
 
         // Open or create storage
         let storage = if config.storage_path.exists() {
@@ -157,7 +163,8 @@ impl<T: Transport> WebBook<T> {
 
     /// Returns the public ID of the current identity.
     pub fn public_id(&self) -> WebBookResult<String> {
-        self.identity.as_ref()
+        self.identity
+            .as_ref()
             .map(|id| id.public_id())
             .ok_or(WebBookError::IdentityNotInitialized)
     }
@@ -252,12 +259,19 @@ impl<T: Transport> WebBook<T> {
     /// Saves a Double Ratchet state for a contact.
     ///
     /// If a ratchet state already exists, preserves the is_initiator flag.
-    pub fn save_ratchet_state(&self, contact_id: &str, state: &DoubleRatchetState) -> WebBookResult<()> {
+    pub fn save_ratchet_state(
+        &self,
+        contact_id: &str,
+        state: &DoubleRatchetState,
+    ) -> WebBookResult<()> {
         // Load existing to preserve is_initiator flag
-        let is_initiator = self.storage.load_ratchet_state(contact_id)?
+        let is_initiator = self
+            .storage
+            .load_ratchet_state(contact_id)?
             .map(|(_, i)| i)
             .unwrap_or(true);
-        self.storage.save_ratchet_state(contact_id, state, is_initiator)?;
+        self.storage
+            .save_ratchet_state(contact_id, state, is_initiator)?;
         Ok(())
     }
 
@@ -269,7 +283,8 @@ impl<T: Transport> WebBook<T> {
         their_dh_public: [u8; 32],
     ) -> WebBookResult<()> {
         let ratchet = DoubleRatchetState::initialize_initiator(shared_secret, their_dh_public);
-        self.storage.save_ratchet_state(contact_id, &ratchet, true)?;
+        self.storage
+            .save_ratchet_state(contact_id, &ratchet, true)?;
         Ok(())
     }
 
@@ -281,7 +296,8 @@ impl<T: Transport> WebBook<T> {
         our_dh: crate::exchange::X3DHKeyPair,
     ) -> WebBookResult<()> {
         let ratchet = DoubleRatchetState::initialize_responder(shared_secret, our_dh);
-        self.storage.save_ratchet_state(contact_id, &ratchet, false)?;
+        self.storage
+            .save_ratchet_state(contact_id, &ratchet, false)?;
         Ok(())
     }
 
@@ -301,10 +317,12 @@ impl<T: Transport> WebBook<T> {
         old_card: &ContactCard,
         new_card: &ContactCard,
     ) -> WebBookResult<usize> {
-        use crate::sync::delta::CardDelta;
         use crate::storage::{PendingUpdate, UpdateStatus};
+        use crate::sync::delta::CardDelta;
 
-        let identity = self.identity.as_ref()
+        let identity = self
+            .identity
+            .as_ref()
             .ok_or(WebBookError::IdentityNotInitialized)?;
 
         let contacts = self.storage.list_contacts()?;
@@ -319,11 +337,15 @@ impl<T: Transport> WebBook<T> {
 
             // Compute delta
             let delta = CardDelta::compute(old_card, new_card);
-            if delta.is_empty() { continue; }
+            if delta.is_empty() {
+                continue;
+            }
 
             // Filter delta based on visibility rules for this contact
             let mut delta = delta.filter_for_contact(contact.id(), contact.visibility_rules());
-            if delta.is_empty() { continue; }
+            if delta.is_empty() {
+                continue;
+            }
 
             // Sign delta with our identity
             delta.sign(identity);
@@ -333,13 +355,15 @@ impl<T: Transport> WebBook<T> {
                 .map_err(|e| WebBookError::Serialization(e.to_string()))?;
 
             // Encrypt with ratchet
-            let ratchet_msg = ratchet.encrypt(&delta_bytes)
+            let ratchet_msg = ratchet
+                .encrypt(&delta_bytes)
                 .map_err(|e| WebBookError::Crypto(format!("{:?}", e)))?;
             let encrypted = serde_json::to_vec(&ratchet_msg)
                 .map_err(|e| WebBookError::Serialization(e.to_string()))?;
 
             // Save updated ratchet state
-            self.storage.save_ratchet_state(contact.id(), &ratchet, is_initiator)?;
+            self.storage
+                .save_ratchet_state(contact.id(), &ratchet, is_initiator)?;
 
             // Queue for delivery
             let now = std::time::SystemTime::now()
@@ -375,24 +399,30 @@ impl<T: Transport> WebBook<T> {
         contact_id: &str,
         encrypted: &[u8],
     ) -> WebBookResult<Vec<String>> {
-        use crate::sync::delta::CardDelta;
         use crate::crypto::ratchet::RatchetMessage;
+        use crate::sync::delta::CardDelta;
 
         // Load contact
-        let mut contact = self.storage.load_contact(contact_id)?
+        let mut contact = self
+            .storage
+            .load_contact(contact_id)?
             .ok_or_else(|| WebBookError::NotFound(format!("contact: {}", contact_id)))?;
 
         // Load and decrypt with ratchet
-        let (mut ratchet, is_initiator) = self.storage.load_ratchet_state(contact_id)?
+        let (mut ratchet, is_initiator) = self
+            .storage
+            .load_ratchet_state(contact_id)?
             .ok_or_else(|| WebBookError::NotFound("ratchet state".into()))?;
 
         let ratchet_msg: RatchetMessage = serde_json::from_slice(encrypted)
             .map_err(|e| WebBookError::Serialization(e.to_string()))?;
-        let delta_bytes = ratchet.decrypt(&ratchet_msg)
+        let delta_bytes = ratchet
+            .decrypt(&ratchet_msg)
             .map_err(|e| WebBookError::Crypto(format!("{:?}", e)))?;
 
         // Save updated ratchet state
-        self.storage.save_ratchet_state(contact_id, &ratchet, is_initiator)?;
+        self.storage
+            .save_ratchet_state(contact_id, &ratchet, is_initiator)?;
 
         // Parse delta
         let delta: CardDelta = serde_json::from_slice(&delta_bytes)
@@ -408,7 +438,8 @@ impl<T: Transport> WebBook<T> {
 
         // Apply delta to contact's card
         let mut new_card = contact.card().clone();
-        delta.apply(&mut new_card)
+        delta
+            .apply(&mut new_card)
             .map_err(|e| WebBookError::InvalidState(e.to_string()))?;
 
         // Update contact
@@ -512,7 +543,9 @@ impl<T: Transport> WebBookBuilder<T> {
     where
         T: Default,
     {
-        let factory = self.transport_factory.unwrap_or_else(|| Box::new(T::default));
+        let factory = self
+            .transport_factory
+            .unwrap_or_else(|| Box::new(T::default));
         let mut wb = WebBook::with_transport_factory(self.config, factory)?;
 
         if let Some(identity) = self.identity {
@@ -575,7 +608,11 @@ mod tests {
         wb.create_identity("Alice").unwrap();
 
         let mut card = wb.own_card().unwrap().unwrap();
-        let _ = card.add_field(ContactField::new(FieldType::Email, "email", "alice@example.com"));
+        let _ = card.add_field(ContactField::new(
+            FieldType::Email,
+            "email",
+            "alice@example.com",
+        ));
 
         let changed = wb.update_own_card(&card).unwrap();
         assert!(changed.contains(&"email".to_string()));
@@ -622,11 +659,8 @@ mod tests {
         assert!(wb.list_contacts().unwrap().is_empty());
 
         // Add contact
-        let contact = Contact::from_exchange(
-            [1u8; 32],
-            ContactCard::new("Bob"),
-            SymmetricKey::generate(),
-        );
+        let contact =
+            Contact::from_exchange([1u8; 32], ContactCard::new("Bob"), SymmetricKey::generate());
         let contact_id = contact.id().to_string();
         wb.add_contact(contact).unwrap();
 
@@ -648,11 +682,8 @@ mod tests {
     fn test_webbook_verify_fingerprint() {
         let wb = create_test_webbook();
 
-        let contact = Contact::from_exchange(
-            [1u8; 32],
-            ContactCard::new("Bob"),
-            SymmetricKey::generate(),
-        );
+        let contact =
+            Contact::from_exchange([1u8; 32], ContactCard::new("Bob"), SymmetricKey::generate());
         let contact_id = contact.id().to_string();
         wb.add_contact(contact).unwrap();
 
@@ -717,23 +748,25 @@ mod tests {
 
         // Create a contact with ratchet
         let bob_key = [1u8; 32];
-        let contact = Contact::from_exchange(
-            bob_key,
-            ContactCard::new("Bob"),
-            SymmetricKey::generate(),
-        );
+        let contact =
+            Contact::from_exchange(bob_key, ContactCard::new("Bob"), SymmetricKey::generate());
         let contact_id = contact.id().to_string();
         wb.add_contact(contact).unwrap();
 
         // Initialize ratchet for Bob
         let shared_secret = SymmetricKey::generate();
         let their_dh = X3DHKeyPair::generate();
-        wb.create_ratchet_as_initiator(&contact_id, &shared_secret, *their_dh.public_key()).unwrap();
+        wb.create_ratchet_as_initiator(&contact_id, &shared_secret, *their_dh.public_key())
+            .unwrap();
 
         // Get old card, update it
         let old_card = wb.own_card().unwrap().unwrap();
         let mut new_card = old_card.clone();
-        let _ = new_card.add_field(ContactField::new(FieldType::Email, "work", "alice@company.com"));
+        let _ = new_card.add_field(ContactField::new(
+            FieldType::Email,
+            "work",
+            "alice@company.com",
+        ));
 
         // Propagate update
         let queued = wb.propagate_card_update(&old_card, &new_card).unwrap();
@@ -751,17 +784,18 @@ mod tests {
         wb.create_identity("Alice").unwrap();
 
         // Create a contact WITHOUT ratchet
-        let contact = Contact::from_exchange(
-            [1u8; 32],
-            ContactCard::new("Bob"),
-            SymmetricKey::generate(),
-        );
+        let contact =
+            Contact::from_exchange([1u8; 32], ContactCard::new("Bob"), SymmetricKey::generate());
         wb.add_contact(contact).unwrap();
 
         // Get old card, update it
         let old_card = wb.own_card().unwrap().unwrap();
         let mut new_card = old_card.clone();
-        let _ = new_card.add_field(ContactField::new(FieldType::Email, "work", "alice@company.com"));
+        let _ = new_card.add_field(ContactField::new(
+            FieldType::Email,
+            "work",
+            "alice@company.com",
+        ));
 
         // Propagate - should skip Bob (no ratchet)
         let queued = wb.propagate_card_update(&old_card, &new_card).unwrap();
@@ -776,18 +810,16 @@ mod tests {
         wb.create_identity("Alice").unwrap();
 
         // Create a contact with ratchet
-        let contact = Contact::from_exchange(
-            [1u8; 32],
-            ContactCard::new("Bob"),
-            SymmetricKey::generate(),
-        );
+        let contact =
+            Contact::from_exchange([1u8; 32], ContactCard::new("Bob"), SymmetricKey::generate());
         let contact_id = contact.id().to_string();
         wb.add_contact(contact).unwrap();
 
         // Initialize ratchet
         let shared_secret = SymmetricKey::generate();
         let their_dh = X3DHKeyPair::generate();
-        wb.create_ratchet_as_initiator(&contact_id, &shared_secret, *their_dh.public_key()).unwrap();
+        wb.create_ratchet_as_initiator(&contact_id, &shared_secret, *their_dh.public_key())
+            .unwrap();
 
         // Propagate with identical cards (empty delta)
         let card = wb.own_card().unwrap().unwrap();
@@ -811,11 +843,8 @@ mod tests {
         let email_field_id = email_field.id().to_string();
 
         // Create a contact with ratchet
-        let mut contact = Contact::from_exchange(
-            [1u8; 32],
-            ContactCard::new("Bob"),
-            SymmetricKey::generate(),
-        );
+        let mut contact =
+            Contact::from_exchange([1u8; 32], ContactCard::new("Bob"), SymmetricKey::generate());
         let contact_id = contact.id().to_string();
 
         // Set visibility: hide the email field (by its ID) from Bob
@@ -825,7 +854,8 @@ mod tests {
         // Initialize ratchet
         let shared_secret = SymmetricKey::generate();
         let their_dh = X3DHKeyPair::generate();
-        wb.create_ratchet_as_initiator(&contact_id, &shared_secret, *their_dh.public_key()).unwrap();
+        wb.create_ratchet_as_initiator(&contact_id, &shared_secret, *their_dh.public_key())
+            .unwrap();
 
         // Create old and new cards - add only email field
         let old_card = wb.own_card().unwrap().unwrap();
@@ -836,7 +866,10 @@ mod tests {
 
         // Propagate - should skip Bob because he can't see email field
         let queued = wb.propagate_card_update(&old_card, &new_card).unwrap();
-        assert_eq!(queued, 0, "Update should not be queued when field is hidden from contact");
+        assert_eq!(
+            queued, 0,
+            "Update should not be queued when field is hidden from contact"
+        );
     }
 
     #[test]
@@ -852,11 +885,8 @@ mod tests {
         let phone_field = ContactField::new(FieldType::Phone, "phone", "+1234567890");
 
         // Create a contact with ratchet
-        let mut contact = Contact::from_exchange(
-            [1u8; 32],
-            ContactCard::new("Bob"),
-            SymmetricKey::generate(),
-        );
+        let mut contact =
+            Contact::from_exchange([1u8; 32], ContactCard::new("Bob"), SymmetricKey::generate());
         let contact_id = contact.id().to_string();
 
         // Set visibility: hide only email field (by ID) from Bob
@@ -866,7 +896,8 @@ mod tests {
         // Initialize ratchet
         let shared_secret = SymmetricKey::generate();
         let their_dh = X3DHKeyPair::generate();
-        wb.create_ratchet_as_initiator(&contact_id, &shared_secret, *their_dh.public_key()).unwrap();
+        wb.create_ratchet_as_initiator(&contact_id, &shared_secret, *their_dh.public_key())
+            .unwrap();
 
         // Create cards with both email (hidden) and phone (visible) fields
         let old_card = wb.own_card().unwrap().unwrap();
@@ -886,9 +917,9 @@ mod tests {
 
     #[test]
     fn test_process_incoming_card_update() {
+        use crate::crypto::ratchet::DoubleRatchetState;
         use crate::exchange::X3DHKeyPair;
         use crate::sync::delta::CardDelta;
-        use crate::crypto::ratchet::DoubleRatchetState;
         use crate::Identity;
 
         // Create Alice's WebBook
@@ -910,22 +941,26 @@ mod tests {
         alice_wb.add_contact(contact).unwrap();
 
         // Initialize ratchet as responder (Alice will receive from Bob)
-        alice_wb.create_ratchet_as_responder(
-            &bob_id,
-            &shared_secret,
-            X3DHKeyPair::from_bytes(bob_dh.secret_bytes()),
-        ).unwrap();
+        alice_wb
+            .create_ratchet_as_responder(
+                &bob_id,
+                &shared_secret,
+                X3DHKeyPair::from_bytes(bob_dh.secret_bytes()),
+            )
+            .unwrap();
 
         // Bob creates and encrypts an update
-        let mut bob_ratchet = DoubleRatchetState::initialize_initiator(
-            &shared_secret,
-            *bob_dh.public_key(),
-        );
+        let mut bob_ratchet =
+            DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key());
 
         // Create a delta (Bob adds an email field)
         let old_card = ContactCard::new("Bob");
         let mut new_card = ContactCard::new("Bob");
-        let _ = new_card.add_field(ContactField::new(FieldType::Email, "work", "bob@company.com"));
+        let _ = new_card.add_field(ContactField::new(
+            FieldType::Email,
+            "work",
+            "bob@company.com",
+        ));
 
         let mut delta = CardDelta::compute(&old_card, &new_card);
         delta.sign(&bob_identity);
@@ -950,9 +985,9 @@ mod tests {
 
     #[test]
     fn test_process_update_rejects_invalid_signature() {
+        use crate::crypto::ratchet::DoubleRatchetState;
         use crate::exchange::X3DHKeyPair;
         use crate::sync::delta::CardDelta;
-        use crate::crypto::ratchet::DoubleRatchetState;
         use crate::Identity;
 
         let mut alice_wb = create_test_webbook();
@@ -973,25 +1008,29 @@ mod tests {
         alice_wb.add_contact(contact).unwrap();
 
         // Initialize ratchet
-        alice_wb.create_ratchet_as_responder(
-            &bob_id,
-            &shared_secret,
-            X3DHKeyPair::from_bytes(bob_dh.secret_bytes()),
-        ).unwrap();
+        alice_wb
+            .create_ratchet_as_responder(
+                &bob_id,
+                &shared_secret,
+                X3DHKeyPair::from_bytes(bob_dh.secret_bytes()),
+            )
+            .unwrap();
 
         // Create update signed by WRONG identity (not Bob)
         let wrong_identity = Identity::create("Eve");
-        let mut bob_ratchet = DoubleRatchetState::initialize_initiator(
-            &shared_secret,
-            *bob_dh.public_key(),
-        );
+        let mut bob_ratchet =
+            DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key());
 
         let old_card = ContactCard::new("Bob");
         let mut new_card = ContactCard::new("Bob");
-        let _ = new_card.add_field(ContactField::new(FieldType::Email, "work", "bob@company.com"));
+        let _ = new_card.add_field(ContactField::new(
+            FieldType::Email,
+            "work",
+            "bob@company.com",
+        ));
 
         let mut delta = CardDelta::compute(&old_card, &new_card);
-        delta.sign(&wrong_identity);  // WRONG signature!
+        delta.sign(&wrong_identity); // WRONG signature!
 
         let delta_bytes = serde_json::to_vec(&delta).unwrap();
         let ratchet_msg = bob_ratchet.encrypt(&delta_bytes).unwrap();

@@ -53,11 +53,16 @@ impl WebSocketTransport {
             .strip_prefix("wss://")
             .or_else(|| url.strip_prefix("ws://"))
             .ok_or_else(|| {
-                NetworkError::ConnectionFailed("Invalid URL scheme (expected ws:// or wss://)".into())
+                NetworkError::ConnectionFailed(
+                    "Invalid URL scheme (expected ws:// or wss://)".into(),
+                )
             })?;
 
         // Split host:port/path
-        let host_port = url_without_scheme.split('/').next().unwrap_or(url_without_scheme);
+        let host_port = url_without_scheme
+            .split('/')
+            .next()
+            .unwrap_or(url_without_scheme);
 
         let (host, port) = if let Some(colon_pos) = host_port.rfind(':') {
             let host = &host_port[..colon_pos];
@@ -122,11 +127,10 @@ impl Transport for WebSocketTransport {
         };
 
         // WebSocket handshake
-        let (socket, _response) =
-            tungstenite::client(&config.server_url, stream).map_err(|e| {
-                self.state = ConnectionState::Disconnected;
-                NetworkError::ConnectionFailed(format!("WebSocket handshake failed: {}", e))
-            })?;
+        let (socket, _response) = tungstenite::client(&config.server_url, stream).map_err(|e| {
+            self.state = ConnectionState::Disconnected;
+            NetworkError::ConnectionFailed(format!("WebSocket handshake failed: {}", e))
+        })?;
 
         self.socket = Some(socket);
         self.state = ConnectionState::Connected;
@@ -166,9 +170,9 @@ impl Transport for WebSocketTransport {
         })?;
 
         // Flush to ensure message is sent
-        socket.flush().map_err(|e| {
-            NetworkError::SendFailed(format!("Flush failed: {}", e))
-        })?;
+        socket
+            .flush()
+            .map_err(|e| NetworkError::SendFailed(format!("Flush failed: {}", e)))?;
 
         Ok(())
     }
@@ -215,7 +219,9 @@ impl Transport for WebSocketTransport {
             }
             Ok(Message::Text(_)) => {
                 // We don't use text messages
-                Err(NetworkError::InvalidMessage("Unexpected text message".into()))
+                Err(NetworkError::InvalidMessage(
+                    "Unexpected text message".into(),
+                ))
             }
             Ok(Message::Frame(_)) => {
                 // Raw frames shouldn't reach here
@@ -249,7 +255,8 @@ mod tests {
 
     #[test]
     fn test_parse_url_wss() {
-        let (host, port, is_tls) = WebSocketTransport::parse_url("wss://relay.example.com").unwrap();
+        let (host, port, is_tls) =
+            WebSocketTransport::parse_url("wss://relay.example.com").unwrap();
         assert_eq!(host, "relay.example.com");
         assert_eq!(port, 443);
         assert!(is_tls);
@@ -265,7 +272,8 @@ mod tests {
 
     #[test]
     fn test_parse_url_with_path() {
-        let (host, port, is_tls) = WebSocketTransport::parse_url("wss://relay.example.com:9000/ws").unwrap();
+        let (host, port, is_tls) =
+            WebSocketTransport::parse_url("wss://relay.example.com:9000/ws").unwrap();
         assert_eq!(host, "relay.example.com");
         assert_eq!(port, 9000);
         assert!(is_tls);

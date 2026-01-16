@@ -42,10 +42,10 @@
 //! - [`sync_controller`] - Sync and network orchestration
 //! - [`webbook`] - Main WebBook orchestrator
 
-mod error;
 mod config;
-mod events;
 mod contact_manager;
+mod error;
+mod events;
 mod sync_controller;
 mod webbook;
 
@@ -53,10 +53,10 @@ mod webbook;
 pub use error::{WebBookError, WebBookResult};
 
 // Configuration
-pub use config::{WebBookConfig, RelayConfig, SyncConfig};
+pub use config::{RelayConfig, SyncConfig, WebBookConfig};
 
 // Events
-pub use events::{WebBookEvent, EventHandler, EventDispatcher, CallbackHandler};
+pub use events::{CallbackHandler, EventDispatcher, EventHandler, WebBookEvent};
 
 // Contact Manager
 pub use contact_manager::ContactManager;

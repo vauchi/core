@@ -6,11 +6,11 @@
 use proptest::prelude::*;
 use std::collections::HashSet;
 
+use webbook_core::contact::{FieldVisibility, VisibilityRules};
 use webbook_core::contact_card::{ContactCard, ContactField, FieldType};
-use webbook_core::contact::{VisibilityRules, FieldVisibility};
-use webbook_core::crypto::{SymmetricKey, encrypt, decrypt, SigningKeyPair};
+use webbook_core::crypto::{decrypt, encrypt, SigningKeyPair, SymmetricKey};
+use webbook_core::identity::{DeviceInfo, Identity};
 use webbook_core::sync::{SyncItem, VersionVector};
-use webbook_core::identity::{Identity, DeviceInfo};
 
 // ============================================================
 // Custom Strategies for generating test data
@@ -18,7 +18,8 @@ use webbook_core::identity::{Identity, DeviceInfo};
 
 /// Strategy for generating valid display names (non-empty, reasonable length)
 fn display_name_strategy() -> impl Strategy<Value = String> {
-    "[a-zA-Z][a-zA-Z0-9 ]{0,49}".prop_map(|s| s.trim().to_string())
+    "[a-zA-Z][a-zA-Z0-9 ]{0,49}"
+        .prop_map(|s| s.trim().to_string())
         .prop_filter("non-empty", |s| !s.is_empty())
 }
 

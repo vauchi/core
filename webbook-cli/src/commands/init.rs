@@ -26,7 +26,7 @@ pub fn run(name: &str, config: &CliConfig) -> Result<()> {
     fs::create_dir_all(&config.data_dir)?;
 
     // Initialize WebBook with persistent storage key
-    let wb_config = WebBookConfig::with_storage_path(&config.storage_path())
+    let wb_config = WebBookConfig::with_storage_path(config.storage_path())
         .with_relay_url(&config.relay_url)
         .with_storage_key(config.storage_key());
 

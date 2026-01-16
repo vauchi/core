@@ -52,7 +52,11 @@ pub trait ProximityVerifier: Send + Sync {
     /// Performs a complete proximity verification cycle.
     ///
     /// Default implementation emits challenge, listens for response, and verifies.
-    fn verify_proximity(&self, challenge: &[u8; 16], timeout: Duration) -> Result<(), ProximityError> {
+    fn verify_proximity(
+        &self,
+        challenge: &[u8; 16],
+        timeout: Duration,
+    ) -> Result<(), ProximityError> {
         self.emit_challenge(challenge)?;
         let response = self.listen_for_response(timeout)?;
         if self.verify_response(challenge, &response) {

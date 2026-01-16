@@ -24,7 +24,7 @@ fn open_webbook(config: &CliConfig) -> Result<WebBook<MockTransport>> {
         bail!("WebBook not initialized. Run 'webbook init <name>' first.");
     }
 
-    let wb_config = WebBookConfig::with_storage_path(&config.storage_path())
+    let wb_config = WebBookConfig::with_storage_path(config.storage_path())
         .with_relay_url(&config.relay_url)
         .with_storage_key(config.storage_key());
 
@@ -297,7 +297,7 @@ pub fn revoke(config: &CliConfig, device_id_prefix: &str) -> Result<()> {
 
     // Confirm revocation
     let confirm: String = Input::new()
-        .with_prompt(&format!("Revoke device '{}'? Type 'yes' to confirm", device.device_name))
+        .with_prompt(format!("Revoke device '{}'? Type 'yes' to confirm", device.device_name))
         .interact_text()?;
 
     if confirm.to_lowercase() != "yes" {

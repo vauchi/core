@@ -3,7 +3,7 @@
 //! Handles multi-device support for WebBook identities.
 //! Each device gets unique communication keys derived from the master seed.
 
-use crate::crypto::{HKDF, SigningKeyPair, Signature};
+use crate::crypto::{Signature, SigningKeyPair, HKDF};
 use crate::exchange::X3DHKeyPair;
 use serde::{Deserialize, Serialize};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -185,7 +185,9 @@ mod signature_serde {
     {
         let s = String::deserialize(deserializer)?;
         let bytes = hex::decode(&s).map_err(serde::de::Error::custom)?;
-        bytes.try_into().map_err(|_| serde::de::Error::custom("invalid signature length"))
+        bytes
+            .try_into()
+            .map_err(|_| serde::de::Error::custom("invalid signature length"))
     }
 }
 
@@ -261,7 +263,8 @@ impl DeviceRegistry {
             }
         }
 
-        let device = self.devices
+        let device = self
+            .devices
             .iter_mut()
             .find(|d| &d.device_id == device_id)
             .ok_or(DeviceError::DeviceNotFound)?;
@@ -275,7 +278,7 @@ impl DeviceRegistry {
             SystemTime::now()
                 .duration_since(UNIX_EPOCH)
                 .unwrap_or_default()
-                .as_secs()
+                .as_secs(),
         );
 
         self.version += 1;
@@ -313,10 +316,7 @@ impl DeviceRegistry {
 
     /// Returns the next available device index.
     pub fn next_device_index(&self) -> u32 {
-        self.devices
-            .iter()
-            .map(|_| 1u32)
-            .sum::<u32>()
+        self.devices.iter().map(|_| 1u32).sum::<u32>()
     }
 
     /// Returns the total number of devices (including revoked).
@@ -366,7 +366,8 @@ impl DeviceRegistry {
         }
 
         // Find and revoke the device
-        let device = self.devices
+        let device = self
+            .devices
             .iter_mut()
             .find(|d| &d.device_id == certificate.device_id())
             .ok_or(DeviceError::DeviceNotFound)?;
@@ -402,11 +403,7 @@ pub struct DeviceRevocationCertificate {
 
 impl DeviceRevocationCertificate {
     /// Creates a new revocation certificate.
-    pub fn create(
-        device_id: &[u8; 32],
-        reason: String,
-        signing_key: &SigningKeyPair,
-    ) -> Self {
+    pub fn create(device_id: &[u8; 32], reason: String, signing_key: &SigningKeyPair) -> Self {
         let revoked_at = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap_or_default()
@@ -539,7 +536,9 @@ impl RegistryBroadcast {
 
     /// Checks if a device is in the broadcast.
     pub fn contains_device(&self, device_id: &[u8; 32]) -> bool {
-        self.active_devices.iter().any(|d| &d.device_id == device_id)
+        self.active_devices
+            .iter()
+            .any(|d| &d.device_id == device_id)
     }
 
     /// Returns the active devices.
@@ -653,7 +652,9 @@ mod tests {
         let device1 = DeviceInfo::derive(&seed, 1, "Secondary".to_string());
 
         let mut registry = DeviceRegistry::new(device0.to_registered(&seed), &signing_key);
-        registry.add_device(device1.to_registered(&seed), &signing_key).unwrap();
+        registry
+            .add_device(device1.to_registered(&seed), &signing_key)
+            .unwrap();
 
         assert_eq!(registry.version(), 2);
         assert_eq!(registry.active_count(), 2);
@@ -671,7 +672,9 @@ mod tests {
         // Add devices up to limit
         for i in 1..MAX_DEVICES {
             let device = DeviceInfo::derive(&seed, i as u32, format!("Device {}", i));
-            registry.add_device(device.to_registered(&seed), &signing_key).unwrap();
+            registry
+                .add_device(device.to_registered(&seed), &signing_key)
+                .unwrap();
         }
 
         assert_eq!(registry.active_count(), MAX_DEVICES);
@@ -690,11 +693,15 @@ mod tests {
         let device1 = DeviceInfo::derive(&seed, 1, "Secondary".to_string());
 
         let mut registry = DeviceRegistry::new(device0.to_registered(&seed), &signing_key);
-        registry.add_device(device1.to_registered(&seed), &signing_key).unwrap();
+        registry
+            .add_device(device1.to_registered(&seed), &signing_key)
+            .unwrap();
 
         assert_eq!(registry.active_count(), 2);
 
-        registry.revoke_device(device1.device_id(), &signing_key).unwrap();
+        registry
+            .revoke_device(device1.device_id(), &signing_key)
+            .unwrap();
 
         assert_eq!(registry.active_count(), 1);
         assert_eq!(registry.all_devices().len(), 2); // Still in registry, just revoked
@@ -855,7 +862,9 @@ mod tests {
         let device1 = DeviceInfo::derive(&seed, 1, "Secondary".to_string());
 
         let mut registry = DeviceRegistry::new(device0.to_registered(&seed), &signing_key);
-        registry.add_device(device1.to_registered(&seed), &signing_key).unwrap();
+        registry
+            .add_device(device1.to_registered(&seed), &signing_key)
+            .unwrap();
 
         let broadcast = RegistryBroadcast::new(&registry, &signing_key);
 
@@ -873,8 +882,12 @@ mod tests {
         let device1 = DeviceInfo::derive(&seed, 1, "Revoked".to_string());
 
         let mut registry = DeviceRegistry::new(device0.to_registered(&seed), &signing_key);
-        registry.add_device(device1.to_registered(&seed), &signing_key).unwrap();
-        registry.revoke_device(device1.device_id(), &signing_key).unwrap();
+        registry
+            .add_device(device1.to_registered(&seed), &signing_key)
+            .unwrap();
+        registry
+            .revoke_device(device1.device_id(), &signing_key)
+            .unwrap();
 
         let broadcast = RegistryBroadcast::new(&registry, &signing_key);
 
@@ -909,7 +922,9 @@ mod tests {
         let device1 = DeviceInfo::derive(&seed, 1, "ToRevoke".to_string());
 
         let mut registry = DeviceRegistry::new(device0.to_registered(&seed), &signing_key);
-        registry.add_device(device1.to_registered(&seed), &signing_key).unwrap();
+        registry
+            .add_device(device1.to_registered(&seed), &signing_key)
+            .unwrap();
 
         // Create revocation certificate for device1
         let certificate = DeviceRevocationCertificate::create(
@@ -919,9 +934,14 @@ mod tests {
         );
 
         // Apply certificate to registry (as if received from contact)
-        registry.apply_revocation(&certificate, &signing_key.public_key()).unwrap();
+        registry
+            .apply_revocation(&certificate, &signing_key.public_key())
+            .unwrap();
 
         assert_eq!(registry.active_count(), 1);
-        assert!(!registry.find_device(device1.device_id()).unwrap().is_active());
+        assert!(!registry
+            .find_device(device1.device_id())
+            .unwrap()
+            .is_active());
     }
 }

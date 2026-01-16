@@ -7,13 +7,13 @@
 //! - A DH ratchet (using X25519) for break-in recovery
 //! - Symmetric ratchets (chain keys) for forward secrecy
 
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use serde::{Serialize, Deserialize};
 use thiserror::Error;
 use zeroize::Zeroize;
 
-use super::chain::{ChainKey, MessageKey, ChainError};
-use super::encryption::{SymmetricKey, encrypt, decrypt, EncryptionError};
+use super::chain::{ChainError, ChainKey, MessageKey};
+use super::encryption::{decrypt, encrypt, EncryptionError, SymmetricKey};
 use super::kdf::HKDF;
 use crate::exchange::X3DHKeyPair;
 
@@ -137,20 +137,14 @@ impl DoubleRatchetState {
     ///
     /// The initiator has performed X3DH and knows Bob's public key.
     /// They will send the first message.
-    pub fn initialize_initiator(
-        x3dh_secret: &SymmetricKey,
-        their_dh_public: [u8; 32],
-    ) -> Self {
+    pub fn initialize_initiator(x3dh_secret: &SymmetricKey, their_dh_public: [u8; 32]) -> Self {
         // Generate our first DH keypair
         let our_dh = X3DHKeyPair::generate();
 
         // Perform initial DH to get first root key and send chain
         let dh_output = our_dh.diffie_hellman(&their_dh_public);
-        let (root_key, send_chain_key) = HKDF::derive_key_pair(
-            Some(x3dh_secret.as_bytes()),
-            &dh_output,
-            ROOT_RATCHET_INFO,
-        );
+        let (root_key, send_chain_key) =
+            HKDF::derive_key_pair(Some(x3dh_secret.as_bytes()), &dh_output, ROOT_RATCHET_INFO);
 
         DoubleRatchetState {
             root_key,
@@ -169,10 +163,7 @@ impl DoubleRatchetState {
     /// Initialize as the responder (Bob) after X3DH.
     ///
     /// The responder waits for Alice's first message before they can send.
-    pub fn initialize_responder(
-        x3dh_secret: &SymmetricKey,
-        our_dh: X3DHKeyPair,
-    ) -> Self {
+    pub fn initialize_responder(x3dh_secret: &SymmetricKey, our_dh: X3DHKeyPair) -> Self {
         DoubleRatchetState {
             root_key: *x3dh_secret.as_bytes(),
             our_dh,
@@ -197,10 +188,11 @@ impl DoubleRatchetState {
     /// Advances the sending chain and returns an encrypted message.
     pub fn encrypt(&mut self, plaintext: &[u8]) -> Result<RatchetMessage, RatchetError> {
         // Ensure we have a sending chain
-        let send_chain = self.send_chain.as_ref()
-            .ok_or_else(|| RatchetError::InvalidMessage(
-                "Cannot send: no sending chain (responder must receive first)".into()
-            ))?;
+        let send_chain = self.send_chain.as_ref().ok_or_else(|| {
+            RatchetError::InvalidMessage(
+                "Cannot send: no sending chain (responder must receive first)".into(),
+            )
+        })?;
 
         // Ratchet the chain to get message key
         let (message_key, next_chain) = send_chain.ratchet()?;
@@ -228,19 +220,23 @@ impl DoubleRatchetState {
     pub fn decrypt(&mut self, message: &RatchetMessage) -> Result<Vec<u8>, RatchetError> {
         // Try skipped keys first
         if let Some(key) = self.try_skipped_key(message) {
-            return decrypt(key.symmetric_key(), &message.ciphertext)
-                .map_err(RatchetError::from);
+            return decrypt(key.symmetric_key(), &message.ciphertext).map_err(RatchetError::from);
         }
 
         // Check if we need to perform a DH ratchet
-        let their_dh_changed = self.their_dh
+        let their_dh_changed = self
+            .their_dh
             .map(|k| k != message.dh_public)
             .unwrap_or(true);
 
         if their_dh_changed {
             // Skip any remaining messages in current receiving chain (previous DH generation)
             if self.recv_chain.is_some() {
-                let prev_gen = if self.dh_generation > 0 { self.dh_generation - 1 } else { 0 };
+                let prev_gen = if self.dh_generation > 0 {
+                    self.dh_generation - 1
+                } else {
+                    0
+                };
                 self.skip_messages_for_gen(message.previous_chain_length, prev_gen)?;
             }
 
@@ -252,7 +248,9 @@ impl DoubleRatchetState {
         self.skip_messages_for_gen(message.message_index, message.dh_generation)?;
 
         // Get the message key
-        let recv_chain = self.recv_chain.as_ref()
+        let recv_chain = self
+            .recv_chain
+            .as_ref()
             .ok_or_else(|| RatchetError::InvalidMessage("No receiving chain".into()))?;
 
         let (message_key, next_chain) = recv_chain.ratchet()?;
@@ -260,8 +258,7 @@ impl DoubleRatchetState {
         self.recv_message_count = message.message_index + 1;
 
         // Decrypt
-        decrypt(message_key.symmetric_key(), &message.ciphertext)
-            .map_err(RatchetError::from)
+        decrypt(message_key.symmetric_key(), &message.ciphertext).map_err(RatchetError::from)
     }
 
     /// Try to decrypt using a previously skipped key.
@@ -307,11 +304,8 @@ impl DoubleRatchetState {
 
         // DH with their new key and our current key -> new receiving chain
         let dh_recv = self.our_dh.diffie_hellman(their_new_public);
-        let (root_key, recv_chain_key) = HKDF::derive_key_pair(
-            Some(&self.root_key),
-            &dh_recv,
-            ROOT_RATCHET_INFO,
-        );
+        let (root_key, recv_chain_key) =
+            HKDF::derive_key_pair(Some(&self.root_key), &dh_recv, ROOT_RATCHET_INFO);
         self.root_key = root_key;
         self.recv_chain = Some(ChainKey::new(recv_chain_key));
         self.recv_message_count = 0;
@@ -322,11 +316,8 @@ impl DoubleRatchetState {
 
         // DH with their key and our NEW key -> new sending chain
         let dh_send = self.our_dh.diffie_hellman(their_new_public);
-        let (root_key, send_chain_key) = HKDF::derive_key_pair(
-            Some(&self.root_key),
-            &dh_send,
-            ROOT_RATCHET_INFO,
-        );
+        let (root_key, send_chain_key) =
+            HKDF::derive_key_pair(Some(&self.root_key), &dh_send, ROOT_RATCHET_INFO);
         self.root_key = root_key;
         self.send_chain = Some(ChainKey::new(send_chain_key));
         self.send_message_count = 0;
@@ -352,13 +343,21 @@ impl DoubleRatchetState {
             root_key: self.root_key,
             our_dh_secret: self.our_dh.secret_bytes(),
             their_dh: self.their_dh,
-            send_chain: self.send_chain.as_ref().map(|c| (*c.as_bytes(), c.generation())),
-            recv_chain: self.recv_chain.as_ref().map(|c| (*c.as_bytes(), c.generation())),
+            send_chain: self
+                .send_chain
+                .as_ref()
+                .map(|c| (*c.as_bytes(), c.generation())),
+            recv_chain: self
+                .recv_chain
+                .as_ref()
+                .map(|c| (*c.as_bytes(), c.generation())),
             dh_generation: self.dh_generation,
             send_message_count: self.send_message_count,
             recv_message_count: self.recv_message_count,
             previous_send_chain_length: self.previous_send_chain_length,
-            skipped_keys: self.skipped_keys.iter()
+            skipped_keys: self
+                .skipped_keys
+                .iter()
                 .map(|(k, v)| (*k, *v.symmetric_key().as_bytes()))
                 .collect(),
         }
@@ -368,10 +367,16 @@ impl DoubleRatchetState {
     pub fn deserialize(s: SerializedRatchetState) -> Result<Self, RatchetError> {
         let our_dh = X3DHKeyPair::from_bytes(s.our_dh_secret);
 
-        let send_chain = s.send_chain.map(|(key, gen)| ChainKey::with_generation(key, gen));
-        let recv_chain = s.recv_chain.map(|(key, gen)| ChainKey::with_generation(key, gen));
+        let send_chain = s
+            .send_chain
+            .map(|(key, gen)| ChainKey::with_generation(key, gen));
+        let recv_chain = s
+            .recv_chain
+            .map(|(key, gen)| ChainKey::with_generation(key, gen));
 
-        let skipped_keys = s.skipped_keys.into_iter()
+        let skipped_keys = s
+            .skipped_keys
+            .into_iter()
             .map(|(k, v)| (k, MessageKey::from_bytes(v)))
             .collect();
 

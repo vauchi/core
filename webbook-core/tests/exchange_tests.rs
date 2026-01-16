@@ -2,9 +2,7 @@
 //!
 //! These tests are written FIRST (RED phase) before implementation.
 
-use webbook_core::exchange::{
-    ExchangeQR, X3DH, X3DHKeyPair,
-};
+use webbook_core::exchange::{ExchangeQR, X3DHKeyPair, X3DH};
 use webbook_core::Identity;
 
 // =============================================================================
@@ -19,17 +17,12 @@ fn test_x3dh_key_agreement_produces_same_secret() {
     let bob_keys = X3DHKeyPair::generate();
 
     // Alice initiates exchange with Bob's public key
-    let (alice_secret, alice_ephemeral_public) = X3DH::initiate(
-        &alice_keys,
-        bob_keys.public_key(),
-    ).expect("Key agreement should succeed");
+    let (alice_secret, alice_ephemeral_public) =
+        X3DH::initiate(&alice_keys, bob_keys.public_key()).expect("Key agreement should succeed");
 
     // Bob responds using Alice's ephemeral public key
-    let bob_secret = X3DH::respond(
-        &bob_keys,
-        alice_keys.public_key(),
-        &alice_ephemeral_public,
-    ).expect("Key agreement should succeed");
+    let bob_secret = X3DH::respond(&bob_keys, alice_keys.public_key(), &alice_ephemeral_public)
+        .expect("Key agreement should succeed");
 
     // Both should derive the same shared secret
     assert_eq!(alice_secret.as_bytes(), bob_secret.as_bytes());
@@ -68,7 +61,7 @@ fn test_x3dh_ephemeral_keys_unique_per_session() {
 /// Tests that shared secret can be used for encryption
 #[test]
 fn test_x3dh_shared_secret_usable_for_encryption() {
-    use webbook_core::crypto::{encrypt, decrypt};
+    use webbook_core::crypto::{decrypt, encrypt};
 
     let alice = X3DHKeyPair::generate();
     let bob = X3DHKeyPair::generate();
@@ -126,7 +119,8 @@ fn test_qr_expires_after_5_minutes() {
         std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
-            .as_secs() - 360, // 6 minutes ago
+            .as_secs()
+            - 360, // 6 minutes ago
     );
 
     assert!(old_qr.is_expired());

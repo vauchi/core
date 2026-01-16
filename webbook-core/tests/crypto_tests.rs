@@ -3,7 +3,7 @@
 //! These tests are written FIRST (RED phase) before implementation.
 //! Each test maps to scenarios from security.feature and identity_management.feature
 
-use webbook_core::crypto::{SigningKeyPair, SymmetricKey, encrypt, decrypt};
+use webbook_core::crypto::{decrypt, encrypt, SigningKeyPair, SymmetricKey};
 
 // =============================================================================
 // Ed25519 Keypair Generation Tests (from identity_management.feature)
@@ -142,7 +142,10 @@ fn test_verify_signature_tampered_message_fails() {
     let signature = keypair.sign(original_message);
     let is_valid = keypair.public_key().verify(tampered_message, &signature);
 
-    assert!(!is_valid, "Signature should not verify with tampered message");
+    assert!(
+        !is_valid,
+        "Signature should not verify with tampered message"
+    );
 }
 
 // =============================================================================
@@ -239,5 +242,9 @@ fn test_encrypt_empty_data() {
     let ciphertext = encrypt(&key, plaintext).expect("Encryption of empty data should succeed");
     let decrypted = decrypt(&key, &ciphertext).expect("Decryption should succeed");
 
-    assert_eq!(decrypted, plaintext.to_vec(), "Empty data roundtrip should work");
+    assert_eq!(
+        decrypted,
+        plaintext.to_vec(),
+        "Empty data roundtrip should work"
+    );
 }

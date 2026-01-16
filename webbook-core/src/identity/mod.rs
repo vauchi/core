@@ -8,17 +8,17 @@ pub mod device;
 
 pub use backup::IdentityBackup;
 pub use device::{
-    DeviceInfo, DeviceRegistry, RegisteredDevice, DeviceError, MAX_DEVICES,
-    DeviceRevocationCertificate, RegistryBroadcast, BroadcastDevice,
+    BroadcastDevice, DeviceError, DeviceInfo, DeviceRegistry, DeviceRevocationCertificate,
+    RegisteredDevice, RegistryBroadcast, MAX_DEVICES,
 };
 
-use crate::crypto::{SigningKeyPair, Signature, encrypt, decrypt, SymmetricKey};
+use crate::crypto::{decrypt, encrypt, Signature, SigningKeyPair, SymmetricKey};
 use crate::exchange::X3DHKeyPair;
-use ring::rand::SystemRandom;
 use ring::pbkdf2;
+use ring::rand::SystemRandom;
+use std::num::NonZeroU32;
 use thiserror::Error;
 use zeroize::Zeroize;
-use std::num::NonZeroU32;
 
 /// Identity-related errors.
 #[derive(Error, Debug)]
@@ -226,9 +226,8 @@ impl Identity {
         let device_name_len = (device_name_bytes.len() as u32).to_le_bytes();
         let device_index = self.device_info.device_index().to_le_bytes();
 
-        let mut plaintext = Vec::with_capacity(
-            4 + name_bytes.len() + 32 + 4 + 4 + device_name_bytes.len()
-        );
+        let mut plaintext =
+            Vec::with_capacity(4 + name_bytes.len() + 32 + 4 + 4 + device_name_bytes.len());
         plaintext.extend_from_slice(&name_len);
         plaintext.extend_from_slice(name_bytes);
         plaintext.extend_from_slice(&self.master_seed);
@@ -237,8 +236,8 @@ impl Identity {
         plaintext.extend_from_slice(device_name_bytes);
 
         // Encrypt the data
-        let ciphertext = encrypt(&encryption_key, &plaintext)
-            .map_err(|_| IdentityError::BackupFailed)?;
+        let ciphertext =
+            encrypt(&encryption_key, &plaintext).map_err(|_| IdentityError::BackupFailed)?;
 
         // Backup format: salt (16 bytes) || ciphertext
         let mut backup_data = Vec::with_capacity(16 + ciphertext.len());
@@ -274,8 +273,8 @@ impl Identity {
         let decryption_key = SymmetricKey::from_bytes(key_bytes);
 
         // Decrypt the data
-        let plaintext = decrypt(&decryption_key, &data[16..])
-            .map_err(|_| IdentityError::RestoreFailed)?;
+        let plaintext =
+            decrypt(&decryption_key, &data[16..]).map_err(|_| IdentityError::RestoreFailed)?;
 
         // Parse the plaintext
         if plaintext.len() < 4 + 32 {
@@ -283,7 +282,9 @@ impl Identity {
         }
 
         let name_len = u32::from_le_bytes(
-            plaintext[..4].try_into().map_err(|_| IdentityError::RestoreFailed)?
+            plaintext[..4]
+                .try_into()
+                .map_err(|_| IdentityError::RestoreFailed)?,
         ) as usize;
 
         if plaintext.len() < 4 + name_len + 32 {
@@ -304,13 +305,13 @@ impl Identity {
             let device_index = u32::from_le_bytes(
                 plaintext[base_offset..base_offset + 4]
                     .try_into()
-                    .map_err(|_| IdentityError::RestoreFailed)?
+                    .map_err(|_| IdentityError::RestoreFailed)?,
             );
 
             let device_name_len = u32::from_le_bytes(
                 plaintext[base_offset + 4..base_offset + 8]
                     .try_into()
-                    .map_err(|_| IdentityError::RestoreFailed)?
+                    .map_err(|_| IdentityError::RestoreFailed)?,
             ) as usize;
 
             if plaintext.len() < base_offset + 8 + device_name_len {
@@ -318,8 +319,9 @@ impl Identity {
             }
 
             let device_name = String::from_utf8(
-                plaintext[base_offset + 8..base_offset + 8 + device_name_len].to_vec()
-            ).map_err(|_| IdentityError::RestoreFailed)?;
+                plaintext[base_offset + 8..base_offset + 8 + device_name_len].to_vec(),
+            )
+            .map_err(|_| IdentityError::RestoreFailed)?;
 
             (device_index, device_name)
         } else {
@@ -327,7 +329,12 @@ impl Identity {
             (0, "Primary Device".to_string())
         };
 
-        Ok(Self::from_seed_with_device(master_seed, display_name, device_index, device_name))
+        Ok(Self::from_seed_with_device(
+            master_seed,
+            display_name,
+            device_index,
+            device_name,
+        ))
     }
 }
 

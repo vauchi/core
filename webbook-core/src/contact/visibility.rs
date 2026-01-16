@@ -36,22 +36,27 @@ impl VisibilityRules {
     ///
     /// Returns `Everyone` if no specific rule is set.
     pub fn get(&self, field_id: &str) -> &FieldVisibility {
-        self.rules.get(field_id).unwrap_or(&FieldVisibility::Everyone)
+        self.rules
+            .get(field_id)
+            .unwrap_or(&FieldVisibility::Everyone)
     }
 
     /// Sets visibility for a field to everyone.
     pub fn set_everyone(&mut self, field_id: &str) {
-        self.rules.insert(field_id.to_string(), FieldVisibility::Everyone);
+        self.rules
+            .insert(field_id.to_string(), FieldVisibility::Everyone);
     }
 
     /// Sets visibility for a field to specific contacts only.
     pub fn set_contacts(&mut self, field_id: &str, contact_ids: HashSet<String>) {
-        self.rules.insert(field_id.to_string(), FieldVisibility::Contacts(contact_ids));
+        self.rules
+            .insert(field_id.to_string(), FieldVisibility::Contacts(contact_ids));
     }
 
     /// Sets visibility for a field to nobody (private).
     pub fn set_nobody(&mut self, field_id: &str) {
-        self.rules.insert(field_id.to_string(), FieldVisibility::Nobody);
+        self.rules
+            .insert(field_id.to_string(), FieldVisibility::Nobody);
     }
 
     /// Removes the visibility rule for a field (reverts to default).

@@ -108,12 +108,18 @@ impl SocialNetwork {
     }
 }
 
+/// Compact format for loading networks from JSON.
+#[derive(Deserialize)]
+struct NetworkData {
+    id: String,
+    name: String,
+    url: String,
+}
+
 /// Registry of known social networks.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SocialNetworkRegistry {
-    /// Map of network ID to network definition.
     networks: HashMap<String, SocialNetwork>,
-    /// Version of the registry (for cache invalidation).
     version: u32,
 }
 
@@ -122,6 +128,9 @@ impl Default for SocialNetworkRegistry {
         Self::with_defaults()
     }
 }
+
+/// Embedded social network data (loaded at compile time).
+const NETWORKS_JSON: &str = include_str!("networks.json");
 
 impl SocialNetworkRegistry {
     /// Creates an empty registry.
@@ -135,235 +144,11 @@ impl SocialNetworkRegistry {
     /// Creates a registry with default social networks.
     pub fn with_defaults() -> Self {
         let mut registry = Self::new();
-
-        // Major social platforms
-        registry.add(
-            SocialNetwork::new("twitter", "Twitter / X", "https://twitter.com/{username}")
-                .with_icon("twitter"),
-        );
-
-        registry.add(
-            SocialNetwork::new("instagram", "Instagram", "https://instagram.com/{username}")
-                .with_icon("instagram"),
-        );
-
-        registry.add(
-            SocialNetwork::new("facebook", "Facebook", "https://facebook.com/{username}")
-                .with_icon("facebook"),
-        );
-
-        registry.add(
-            SocialNetwork::new("linkedin", "LinkedIn", "https://linkedin.com/in/{username}")
-                .with_icon("linkedin"),
-        );
-
-        registry.add(
-            SocialNetwork::new("tiktok", "TikTok", "https://tiktok.com/@{username}")
-                .with_icon("tiktok"),
-        );
-
-        registry.add(
-            SocialNetwork::new("youtube", "YouTube", "https://youtube.com/@{username}")
-                .with_icon("youtube"),
-        );
-
-        registry.add(
-            SocialNetwork::new("twitch", "Twitch", "https://twitch.tv/{username}")
-                .with_icon("twitch"),
-        );
-
-        // Developer platforms
-        registry.add(
-            SocialNetwork::new("github", "GitHub", "https://github.com/{username}")
-                .with_icon("github"),
-        );
-
-        registry.add(
-            SocialNetwork::new("gitlab", "GitLab", "https://gitlab.com/{username}")
-                .with_icon("gitlab"),
-        );
-
-        registry.add(
-            SocialNetwork::new("bitbucket", "Bitbucket", "https://bitbucket.org/{username}")
-                .with_icon("bitbucket"),
-        );
-
-        registry.add(
-            SocialNetwork::new(
-                "stackoverflow",
-                "Stack Overflow",
-                "https://stackoverflow.com/users/{username}",
-            )
-            .with_icon("stackoverflow"),
-        );
-
-        registry.add(
-            SocialNetwork::new("dev", "DEV Community", "https://dev.to/{username}")
-                .with_icon("dev"),
-        );
-
-        registry.add(
-            SocialNetwork::new("codepen", "CodePen", "https://codepen.io/{username}")
-                .with_icon("codepen"),
-        );
-
-        // Professional/Business
-        registry.add(
-            SocialNetwork::new("dribbble", "Dribbble", "https://dribbble.com/{username}")
-                .with_icon("dribbble"),
-        );
-
-        registry.add(
-            SocialNetwork::new("behance", "Behance", "https://behance.net/{username}")
-                .with_icon("behance"),
-        );
-
-        registry.add(
-            SocialNetwork::new("medium", "Medium", "https://medium.com/@{username}")
-                .with_icon("medium"),
-        );
-
-        registry.add(
-            SocialNetwork::new("substack", "Substack", "https://{username}.substack.com")
-                .with_icon("substack"),
-        );
-
-        // Messaging (profile pages)
-        registry.add(
-            SocialNetwork::new("telegram", "Telegram", "https://t.me/{username}")
-                .with_icon("telegram"),
-        );
-
-        registry.add(
-            SocialNetwork::new("discord", "Discord", "https://discord.com/users/{username}")
-                .with_icon("discord"),
-        );
-
-        registry.add(
-            SocialNetwork::new(
-                "snapchat",
-                "Snapchat",
-                "https://snapchat.com/add/{username}",
-            )
-            .with_icon("snapchat"),
-        );
-
-        // Decentralized/Fediverse
-        registry.add(
-            SocialNetwork::new(
-                "mastodon",
-                "Mastodon",
-                "https://mastodon.social/@{username}",
-            )
-            .with_icon("mastodon"),
-        );
-
-        registry.add(
-            SocialNetwork::new("threads", "Threads", "https://threads.net/@{username}")
-                .with_icon("threads"),
-        );
-
-        registry.add(
-            SocialNetwork::new("bluesky", "Bluesky", "https://bsky.app/profile/{username}")
-                .with_icon("bluesky"),
-        );
-
-        // Music
-        registry.add(
-            SocialNetwork::new(
-                "spotify",
-                "Spotify",
-                "https://open.spotify.com/user/{username}",
-            )
-            .with_icon("spotify"),
-        );
-
-        registry.add(
-            SocialNetwork::new(
-                "soundcloud",
-                "SoundCloud",
-                "https://soundcloud.com/{username}",
-            )
-            .with_icon("soundcloud"),
-        );
-
-        registry.add(
-            SocialNetwork::new("bandcamp", "Bandcamp", "https://{username}.bandcamp.com")
-                .with_icon("bandcamp"),
-        );
-
-        // Gaming
-        registry.add(
-            SocialNetwork::new("steam", "Steam", "https://steamcommunity.com/id/{username}")
-                .with_icon("steam"),
-        );
-
-        registry.add(
-            SocialNetwork::new(
-                "xbox",
-                "Xbox",
-                "https://account.xbox.com/profile?gamertag={username}",
-            )
-            .with_icon("xbox"),
-        );
-
-        registry.add(
-            SocialNetwork::new(
-                "playstation",
-                "PlayStation",
-                "https://psnprofiles.com/{username}",
-            )
-            .with_icon("playstation"),
-        );
-
-        // Other
-        registry.add(
-            SocialNetwork::new("reddit", "Reddit", "https://reddit.com/user/{username}")
-                .with_icon("reddit"),
-        );
-
-        registry.add(
-            SocialNetwork::new("pinterest", "Pinterest", "https://pinterest.com/{username}")
-                .with_icon("pinterest"),
-        );
-
-        registry.add(
-            SocialNetwork::new("tumblr", "Tumblr", "https://{username}.tumblr.com")
-                .with_icon("tumblr"),
-        );
-
-        registry.add(
-            SocialNetwork::new("flickr", "Flickr", "https://flickr.com/people/{username}")
-                .with_icon("flickr"),
-        );
-
-        registry.add(
-            SocialNetwork::new("vimeo", "Vimeo", "https://vimeo.com/{username}").with_icon("vimeo"),
-        );
-
-        registry.add(
-            SocialNetwork::new("patreon", "Patreon", "https://patreon.com/{username}")
-                .with_icon("patreon"),
-        );
-
-        registry.add(
-            SocialNetwork::new("kofi", "Ko-fi", "https://ko-fi.com/{username}").with_icon("kofi"),
-        );
-
-        registry.add(
-            SocialNetwork::new(
-                "buymeacoffee",
-                "Buy Me a Coffee",
-                "https://buymeacoffee.com/{username}",
-            )
-            .with_icon("buymeacoffee"),
-        );
-
-        registry.add(
-            SocialNetwork::new("linktree", "Linktree", "https://linktr.ee/{username}")
-                .with_icon("linktree"),
-        );
-
+        let networks: Vec<NetworkData> =
+            serde_json::from_str(NETWORKS_JSON).expect("Invalid embedded networks.json");
+        for n in networks {
+            registry.add(SocialNetwork::new(&n.id, &n.name, &n.url).with_icon(&n.id));
+        }
         registry
     }
 

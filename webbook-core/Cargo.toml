@@ -53,3 +53,9 @@ tempfile = "3.0"
 quickcheck = "1.0"
 quickcheck_macros = "1.0"
 proptest = "1.4"
+# Benchmarking
+criterion = "0.5"
+
+[[bench]]
+name = "crypto_benchmarks"
+harness = false

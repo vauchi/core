@@ -301,6 +301,8 @@ pub struct DeviceLinkResponse {
     device_index: u32,
     /// Current device registry
     registry: DeviceRegistry,
+    /// Sync payload containing contacts and card (optional, may be empty).
+    sync_payload_json: String,
 }
 
 impl DeviceLinkResponse {
@@ -319,6 +321,24 @@ impl DeviceLinkResponse {
             display_name,
             device_index,
             registry,
+            sync_payload_json: String::new(),
+        }
+    }
+
+    /// Creates a new device link response with sync payload.
+    pub fn with_sync_payload(
+        master_seed: [u8; 32],
+        display_name: String,
+        device_index: u32,
+        registry: DeviceRegistry,
+        sync_payload_json: String,
+    ) -> Self {
+        DeviceLinkResponse {
+            master_seed,
+            display_name,
+            device_index,
+            registry,
+            sync_payload_json,
         }
     }
 
@@ -342,6 +362,11 @@ impl DeviceLinkResponse {
         &self.registry
     }
 
+    /// Returns the sync payload JSON (may be empty).
+    pub fn sync_payload_json(&self) -> &str {
+        &self.sync_payload_json
+    }
+
     /// Serializes the response for transmission.
     pub fn to_bytes(&self) -> Vec<u8> {
         let name_bytes = self.display_name.as_bytes();
@@ -349,6 +374,8 @@ impl DeviceLinkResponse {
         let registry_json = self.registry.to_json();
         let registry_bytes = registry_json.as_bytes();
         let registry_len = (registry_bytes.len() as u32).to_le_bytes();
+        let sync_bytes = self.sync_payload_json.as_bytes();
+        let sync_len = (sync_bytes.len() as u32).to_le_bytes();
 
         let mut data = Vec::new();
         data.extend_from_slice(&self.master_seed);
@@ -357,6 +384,8 @@ impl DeviceLinkResponse {
         data.extend_from_slice(&self.device_index.to_le_bytes());
         data.extend_from_slice(&registry_len);
         data.extend_from_slice(registry_bytes);
+        data.extend_from_slice(&sync_len);
+        data.extend_from_slice(sync_bytes);
         data
     }
 
@@ -399,11 +428,31 @@ impl DeviceLinkResponse {
         let registry = DeviceRegistry::from_json(&registry_json)
             .map_err(|_| ExchangeError::InvalidQRFormat)?;
 
+        // Parse sync payload (optional, may be empty or missing in older formats)
+        let sync_offset = offset + 8 + registry_len;
+        let sync_payload_json = if data.len() >= sync_offset + 4 {
+            let sync_len = u32::from_le_bytes(
+                data[sync_offset..sync_offset + 4]
+                    .try_into()
+                    .map_err(|_| ExchangeError::InvalidQRFormat)?
+            ) as usize;
+
+            if data.len() >= sync_offset + 4 + sync_len {
+                String::from_utf8(data[sync_offset + 4..sync_offset + 4 + sync_len].to_vec())
+                    .map_err(|_| ExchangeError::InvalidQRFormat)?
+            } else {
+                String::new()
+            }
+        } else {
+            String::new()
+        };
+
         Ok(DeviceLinkResponse {
             master_seed,
             display_name,
             device_index,
             registry,
+            sync_payload_json,
         })
     }
 

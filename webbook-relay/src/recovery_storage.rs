@@ -282,6 +282,7 @@ impl RecoveryProofStore for SqliteRecoveryProofStore {
 // Tests
 // ============================================================================
 
+// INLINE_TEST_REQUIRED: Binary crate without lib.rs - tests cannot be external
 #[cfg(test)]
 mod tests {
     use super::*;

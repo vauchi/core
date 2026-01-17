@@ -17,6 +17,7 @@ pub use webbook_core::network::simple_message::{
 #[cfg(test)]
 pub use webbook_core::network::simple_message::SIMPLE_PROTOCOL_VERSION as PROTOCOL_VERSION;
 
+// INLINE_TEST_REQUIRED: Tests re-export compatibility layer - small module kept inline
 #[cfg(test)]
 mod tests {
     use super::*;

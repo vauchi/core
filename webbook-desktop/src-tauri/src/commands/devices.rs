@@ -44,7 +44,7 @@ pub fn list_devices(state: State<'_, Mutex<AppState>>) -> Result<Vec<DeviceInfo>
     // Try to load device registry for other devices
     if let Ok(Some(registry)) = state.storage.load_device_registry() {
         for (i, device) in registry.all_devices().iter().enumerate() {
-            let device_id = hex::encode(&device.device_id);
+            let device_id = hex::encode(device.device_id);
             if device_id != current_device_id {
                 devices.push(DeviceInfo {
                     device_id,

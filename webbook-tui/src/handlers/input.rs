@@ -351,12 +351,9 @@ fn handle_recovery_keys(app: &mut App, key: KeyCode) {
 }
 
 fn handle_sync_keys(app: &mut App, key: KeyCode) {
-    match key {
-        KeyCode::Char('s') => {
-            let status = app.backend.sync_status();
-            app.set_status(format!("Sync status: {}", status));
-        }
-        _ => {}
+    if let KeyCode::Char('s') = key {
+        let status = app.backend.sync_status();
+        app.set_status(format!("Sync status: {}", status));
     }
 }
 

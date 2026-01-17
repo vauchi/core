@@ -5,8 +5,26 @@
 | Task | Complexity | Risk | Status |
 |------|------------|------|--------|
 | Multi-device sync | High | High (core arch) | ✅ Done |
-| iOS app | Medium | Low | Todo |
-| Desktop app (Tauri) | Medium | Low | Todo |
+| iOS app | Medium | Low | ✅ Done (85%) |
+| Desktop app (Tauri) | Medium | Low | ✅ Done |
+| TUI app | Low | Low | ✅ Done |
+
+### iOS App (Completed - Jan 2026)
+- 7 SwiftUI screens with full feature set
+- UniFFI bindings integration
+- Keychain secure storage with biometric auth
+- Background sync via BGTaskScheduler
+- See `docs/planning/done/ios-app.md`
+
+### Desktop App (Completed)
+- Tauri 2.0 + Solid.js frontend
+- Cross-platform (macOS, Windows, Linux)
+- Full feature parity with mobile
+
+### TUI App (Completed)
+- Ratatui terminal UI
+- 12 screens with keyboard navigation
+- Direct webbook-core integration
 
 ### Multi-Device Sync (Completed)
 - Device module with DeviceInfo and DeviceRegistry
@@ -25,8 +43,22 @@
 | Password strength (zxcvbn) | Low | Low | ✅ Done |
 | Keys in secure storage | Medium | Medium | ✅ Done |
 | Security audit checklist | Low | Low | ✅ Done |
+| Security hardening (iOS/Android) | Medium | Medium | ✅ Done |
+| Code maintainability refactor | Medium | Low | ✅ Done |
 | UI/UX review | Low | Low | Todo |
 | Performance tuning | Low | Low | Todo |
+
+### Security Hardening (Completed - Jan 2026)
+- iOS: Keychain protection upgrade, biometric auth, wss:// enforcement
+- Android: KeyStore with hardware-backed encryption
+- Mobile: Certificate pinning, secure key constructor
+- Clipboard auto-clear (30 seconds)
+- See `docs/planning/done/security-hardening.md`
+
+### Code Maintainability (Completed - Jan 2026)
+- Split webbook-mobile/lib.rs (1,747→891 lines)
+- Split webbook-core/storage (1,404 lines into 6 modules)
+- Consolidated wire protocol in webbook-core
 
 ### Phase 2 Implementation Details
 
@@ -79,7 +111,7 @@ See `docs/development/testing.md` for full strategy.
 |------|------------|------|--------|
 | Contact recovery | High | High | ✅ Done |
 | SecureStorage integration | Medium | Low | ✅ Done |
-| Full iOS app integration | Medium | Medium | Todo |
+| Full iOS app integration | Medium | Medium | ✅ Done |
 | Full Desktop app integration | Medium | Medium | ✅ Done |
 
 ### Privacy & Security

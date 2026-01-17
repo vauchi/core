@@ -51,7 +51,28 @@
 - CLI device management commands
 - Architecture docs with 8 threat scenarios (T8.1-T8.8)
 
+## Phase 10: iOS App ✅
+- 7 SwiftUI screens (Home, Contacts, ContactDetail, Exchange, QRScanner, Settings, Setup)
+- UniFFI bindings integration with webbook-mobile
+- Keychain secure storage with biometric auth
+- Background sync via BGTaskScheduler
+- Security hardening (wss://, clipboard expiration)
+
+## Phase 11: Security Hardening ✅
+- iOS: Keychain protection upgrade, biometric auth for backups
+- Android: KeyStore with hardware-backed encryption
+- Certificate pinning support in mobile bindings
+- Transport security enforcement (wss:// only)
+- Clipboard auto-clear after 30 seconds
+
+## Phase 12: Code Maintainability ✅
+- Split webbook-mobile/lib.rs (1,747→891 lines, 6 modules)
+- Split webbook-core/storage (1,404 lines into 6 modules)
+- Consolidated wire protocol in webbook-core/src/network/simple_message.rs
+
 ## Additional
 - Social Network Registry (35+ networks, embedded JSON)
 - Contact Search
 - Property-based tests with proptest
+- TUI app with 12 screens (Ratatui)
+- Desktop app (Tauri + Solid.js)

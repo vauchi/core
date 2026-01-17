@@ -31,7 +31,7 @@ fn open_webbook(config: &CliConfig) -> Result<WebBook<MockTransport>> {
 
     let wb_config = WebBookConfig::with_storage_path(config.storage_path())
         .with_relay_url(&config.relay_url)
-        .with_storage_key(config.storage_key());
+        .with_storage_key(config.storage_key()?);
 
     let mut wb = WebBook::new(wb_config)?;
 

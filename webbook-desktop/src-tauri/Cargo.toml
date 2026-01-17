@@ -39,6 +39,9 @@ base64 = "0.22"
 # Platform directories
 dirs = "5"
 
+# Hex encoding for public keys
+hex = "0.4"
+
 [features]
 default = ["custom-protocol"]
 custom-protocol = ["tauri/custom-protocol"]

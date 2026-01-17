@@ -77,8 +77,8 @@ See `docs/development/testing.md` for full strategy.
 
 | Task | Complexity | Risk | Status |
 |------|------------|------|--------|
-| Contact recovery | High | High | Todo |
-| SecureStorage integration | Medium | Low | Todo |
+| Contact recovery | High | High | ✅ Done |
+| SecureStorage integration | Medium | Low | ✅ Done |
 | Full iOS app integration | Medium | Medium | Todo |
 | Full Desktop app integration | Medium | Medium | Todo |
 

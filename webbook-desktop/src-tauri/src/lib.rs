@@ -43,6 +43,9 @@ pub fn run() {
             commands::contacts::remove_contact,
             commands::exchange::generate_qr,
             commands::exchange::complete_exchange,
+            commands::backup::export_backup,
+            commands::backup::import_backup,
+            commands::backup::check_password_strength,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

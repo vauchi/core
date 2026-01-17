@@ -28,7 +28,7 @@ pub fn run(name: &str, config: &CliConfig) -> Result<()> {
     // Initialize WebBook with persistent storage key
     let wb_config = WebBookConfig::with_storage_path(config.storage_path())
         .with_relay_url(&config.relay_url)
-        .with_storage_key(config.storage_key());
+        .with_storage_key(config.storage_key()?);
 
     let mut wb: WebBook<MockTransport> = WebBook::new(wb_config)?;
     wb.create_identity(name)?;

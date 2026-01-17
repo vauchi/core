@@ -24,7 +24,7 @@ fn open_webbook(config: &CliConfig) -> Result<WebBook<MockTransport>> {
 
     let wb_config = WebBookConfig::with_storage_path(config.storage_path())
         .with_relay_url(&config.relay_url)
-        .with_storage_key(config.storage_key());
+        .with_storage_key(config.storage_key()?);
 
     let mut wb = WebBook::new(wb_config)?;
 
@@ -103,7 +103,7 @@ pub fn import(config: &CliConfig, input: &Path) -> Result<()> {
     // Initialize WebBook with restored identity
     let wb_config = WebBookConfig::with_storage_path(config.storage_path())
         .with_relay_url(&config.relay_url)
-        .with_storage_key(config.storage_key());
+        .with_storage_key(config.storage_key()?);
 
     let mut wb: WebBook<MockTransport> = WebBook::new(wb_config)?;
     wb.set_identity(identity)?;

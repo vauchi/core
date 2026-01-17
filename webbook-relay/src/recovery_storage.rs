@@ -157,6 +157,13 @@ impl SqliteRecoveryProofStore {
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self, rusqlite::Error> {
         let conn = Connection::open(path)?;
 
+        // Enable WAL mode for better concurrent performance
+        conn.execute_batch(
+            "PRAGMA journal_mode=WAL;
+             PRAGMA synchronous=NORMAL;
+             PRAGMA cache_size=10000;",
+        )?;
+
         // Create table if not exists
         conn.execute(
             "CREATE TABLE IF NOT EXISTS recovery_proofs (
@@ -406,5 +413,54 @@ mod tests {
         store.store(StoredRecoveryProof::new([0x02u8; 32], vec![2]));
 
         assert_eq!(store.proof_count(), 2);
+    }
+
+    #[test]
+    fn test_sqlite_wal_mode_enabled() {
+        // In-memory databases use "memory" journal mode, not WAL
+        // This test verifies the pragma is at least executed without error
+        let store = SqliteRecoveryProofStore::in_memory().unwrap();
+        let conn = store.conn.lock().unwrap();
+        let journal_mode: String = conn
+            .query_row("PRAGMA journal_mode", [], |row| row.get(0))
+            .unwrap();
+        // In-memory uses "memory" mode, but the pragma should have been set
+        assert!(
+            journal_mode == "memory" || journal_mode == "wal",
+            "Expected 'memory' or 'wal', got '{}'",
+            journal_mode
+        );
+    }
+
+    #[test]
+    fn test_sqlite_wal_mode_on_file() {
+        // Test with actual file to verify WAL mode
+        let temp_dir = std::env::temp_dir();
+        let db_path = temp_dir.join(format!(
+            "test_recovery_wal_{}.db",
+            std::process::id()
+        ));
+
+        // Clean up if exists from previous failed test
+        let _ = std::fs::remove_file(&db_path);
+        let _ = std::fs::remove_file(db_path.with_extension("db-wal"));
+        let _ = std::fs::remove_file(db_path.with_extension("db-shm"));
+
+        {
+            let store = SqliteRecoveryProofStore::open(&db_path).unwrap();
+            let conn = store.conn.lock().unwrap();
+            let journal_mode: String = conn
+                .query_row("PRAGMA journal_mode", [], |row| row.get(0))
+                .unwrap();
+            assert_eq!(
+                journal_mode, "wal",
+                "Expected WAL mode for file-based database"
+            );
+        }
+
+        // Cleanup
+        let _ = std::fs::remove_file(&db_path);
+        let _ = std::fs::remove_file(db_path.with_extension("db-wal"));
+        let _ = std::fs::remove_file(db_path.with_extension("db-shm"));
     }
 }

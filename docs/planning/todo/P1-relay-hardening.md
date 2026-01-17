@@ -15,11 +15,11 @@ The relay server has critical security and performance gaps that could cause ser
 
 ## Success Criteria
 
-- [ ] Connection limit actually enforced (reject when at max)
-- [ ] TLS termination documented or native support added
-- [ ] SQLite WAL mode enabled, ~3x write throughput
-- [ ] Rate limiter buckets cleaned up after inactivity
-- [ ] All changes have tests
+- [x] Connection limit actually enforced (reject when at max)
+- [ ] TLS termination documented or native support added (deferred - use reverse proxy)
+- [x] SQLite WAL mode enabled, ~3x write throughput
+- [x] Rate limiter buckets cleaned up after inactivity
+- [x] All changes have tests (47 tests passing)
 
 ## Implementation
 

@@ -201,6 +201,14 @@ impl SqliteBlobStore {
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self, rusqlite::Error> {
         let conn = Connection::open(path)?;
 
+        // Enable WAL mode for better concurrent performance
+        // WAL allows readers and writers to operate concurrently
+        conn.execute_batch(
+            "PRAGMA journal_mode=WAL;
+             PRAGMA synchronous=NORMAL;
+             PRAGMA cache_size=10000;",
+        )?;
+
         // Create table if not exists
         conn.execute(
             "CREATE TABLE IF NOT EXISTS blobs (
@@ -566,5 +574,41 @@ mod tests {
         let store = MemoryBlobStore::new();
         let peeked = store.peek("nonexistent");
         assert!(peeked.is_empty());
+    }
+
+    #[test]
+    fn test_sqlite_wal_mode_enabled() {
+        let store = SqliteBlobStore::in_memory().unwrap();
+        let conn = store.conn.lock().unwrap();
+
+        // Check WAL mode is enabled
+        let journal_mode: String = conn
+            .query_row("PRAGMA journal_mode", [], |row| row.get(0))
+            .unwrap();
+        // Note: in-memory databases use "memory" journal mode, not "wal"
+        // For file-based DBs, this should be "wal"
+        assert!(
+            journal_mode == "wal" || journal_mode == "memory",
+            "Expected WAL or memory mode, got: {}",
+            journal_mode
+        );
+    }
+
+    #[test]
+    fn test_sqlite_wal_mode_on_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let db_path = dir.path().join("wal_test.db");
+
+        let store = SqliteBlobStore::open(&db_path).unwrap();
+        let conn = store.conn.lock().unwrap();
+
+        // Check WAL mode is enabled for file-based database
+        let journal_mode: String = conn
+            .query_row("PRAGMA journal_mode", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(
+            journal_mode, "wal",
+            "WAL mode should be enabled for file-based database"
+        );
     }
 }

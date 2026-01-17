@@ -102,12 +102,24 @@ impl RateLimiter {
 
     /// Removes inactive client buckets (for memory cleanup).
     ///
-    /// Removes buckets that have been full for the given duration.
-    #[allow(dead_code)]
-    pub fn cleanup_inactive(&self, _max_idle: std::time::Duration) {
-        // For simplicity, we don't track idle time
-        // In production, you might want to periodically clean up
-        // buckets that haven't been used recently
+    /// Removes buckets that haven't been accessed for the given duration.
+    /// Returns the number of buckets removed.
+    pub fn cleanup_inactive(&self, max_idle: std::time::Duration) -> usize {
+        let mut buckets = self.buckets.write().unwrap();
+        let now = Instant::now();
+        let initial_count = buckets.len();
+
+        buckets.retain(|_, bucket| {
+            now.duration_since(bucket.last_update) < max_idle
+        });
+
+        initial_count - buckets.len()
+    }
+
+    /// Returns the number of client buckets currently tracked.
+    pub fn client_count(&self) -> usize {
+        let buckets = self.buckets.read().unwrap();
+        buckets.len()
     }
 }
 
@@ -186,5 +198,64 @@ mod tests {
 
         // Now check should return false
         assert!(!limiter.check("client-1"));
+    }
+
+    #[test]
+    fn test_cleanup_inactive_removes_stale_buckets() {
+        let limiter = RateLimiter::new(10);
+
+        // Create some client buckets
+        limiter.consume("client-1");
+        limiter.consume("client-2");
+        limiter.consume("client-3");
+
+        assert_eq!(limiter.client_count(), 3);
+
+        // Wait a tiny bit then access client-1 to keep it active
+        thread::sleep(Duration::from_millis(10));
+        limiter.consume("client-1");
+
+        // Cleanup with a very short idle time (5ms)
+        // client-2 and client-3 should be removed, client-1 should remain
+        let removed = limiter.cleanup_inactive(Duration::from_millis(5));
+
+        // At least client-2 and client-3 should be removed (idle > 5ms)
+        assert!(removed >= 2, "Expected at least 2 removed, got {}", removed);
+        assert_eq!(limiter.client_count(), 1);
+
+        // client-1 should still be there
+        assert!(limiter.consume("client-1"));
+    }
+
+    #[test]
+    fn test_cleanup_inactive_keeps_recent_buckets() {
+        let limiter = RateLimiter::new(10);
+
+        // Create buckets
+        limiter.consume("client-1");
+        limiter.consume("client-2");
+
+        // Cleanup with a long idle time (should remove nothing)
+        let removed = limiter.cleanup_inactive(Duration::from_secs(3600));
+
+        assert_eq!(removed, 0);
+        assert_eq!(limiter.client_count(), 2);
+    }
+
+    #[test]
+    fn test_client_count() {
+        let limiter = RateLimiter::new(10);
+
+        assert_eq!(limiter.client_count(), 0);
+
+        limiter.consume("client-1");
+        assert_eq!(limiter.client_count(), 1);
+
+        limiter.consume("client-2");
+        assert_eq!(limiter.client_count(), 2);
+
+        // Same client doesn't increase count
+        limiter.consume("client-1");
+        assert_eq!(limiter.client_count(), 2);
     }
 }

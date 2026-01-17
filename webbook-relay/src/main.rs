@@ -8,6 +8,7 @@
 //! - Recovery proof storage for contact recovery
 
 mod config;
+mod connection_limit;
 mod handler;
 mod http;
 mod metrics;
@@ -23,6 +24,7 @@ use tokio_tungstenite::accept_async;
 use tracing::{error, info};
 
 use config::RelayConfig;
+use connection_limit::ConnectionLimiter;
 use http::{create_router, HttpState};
 use metrics::RelayMetrics;
 use rate_limit::RateLimiter;
@@ -71,6 +73,7 @@ async fn main() {
     };
 
     let rate_limiter = Arc::new(RateLimiter::new(config.rate_limit_per_min));
+    let connection_limiter = ConnectionLimiter::new(config.max_connections);
     let start_time = Instant::now();
 
     // Start HTTP server for health/metrics
@@ -122,6 +125,19 @@ async fn main() {
         }
     });
 
+    // Start cleanup task for rate limiter (remove stale client buckets)
+    let cleanup_rate_limiter = rate_limiter.clone();
+    tokio::spawn(async move {
+        loop {
+            // Clean up every 10 minutes, removing clients idle for 30 minutes
+            tokio::time::sleep(std::time::Duration::from_secs(600)).await;
+            let removed = cleanup_rate_limiter.cleanup_inactive(std::time::Duration::from_secs(1800));
+            if removed > 0 {
+                info!("Cleaned up {} stale rate limiter entries", removed);
+            }
+        }
+    });
+
     // Start TCP listener for WebSocket
     let listener = TcpListener::bind(&config.listen_addr)
         .await
@@ -131,6 +147,23 @@ async fn main() {
 
     // Accept connections
     while let Ok((stream, addr)) = listener.accept().await {
+        // Enforce connection limit
+        let connection_guard = match connection_limiter.try_acquire() {
+            Some(guard) => guard,
+            None => {
+                tracing::warn!(
+                    "Connection rejected from {}: at max capacity ({}/{})",
+                    addr,
+                    connection_limiter.active_count(),
+                    config.max_connections
+                );
+                metrics.connection_errors.inc();
+                // Drop the stream to close the connection
+                drop(stream);
+                continue;
+            }
+        };
+
         let storage = storage.clone();
         let recovery_storage = recovery_storage.clone();
         let rate_limiter = rate_limiter.clone();
@@ -138,6 +171,9 @@ async fn main() {
         let max_message_size = config.max_message_size;
 
         tokio::spawn(async move {
+            // Keep the guard alive for the duration of the connection
+            let _guard = connection_guard;
+
             match accept_async(stream).await {
                 Ok(ws_stream) => {
                     info!("New connection from {}", addr);
@@ -161,6 +197,7 @@ async fn main() {
                     metrics.connection_errors.inc();
                 }
             }
+            // _guard dropped here, releasing the connection slot
         });
     }
 }

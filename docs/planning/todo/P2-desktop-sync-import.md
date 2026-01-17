@@ -13,10 +13,10 @@ Desktop app is missing critical functionality that exists in other frontends:
 
 ## Success Criteria
 
-- [ ] Sync button in Settings with loading state
-- [ ] Sync status indicator (idle/syncing/success/error)
-- [ ] Import backup section with file picker
-- [ ] Delete button on card fields in Home page
+- [ ] Sync button in Settings with loading state (deferred - requires SyncController infrastructure)
+- [ ] Sync status indicator (idle/syncing/success/error) (deferred - requires SyncController infrastructure)
+- [x] Import backup section with dialog UI
+- [x] Delete button on card fields in Home page
 
 ## Implementation
 

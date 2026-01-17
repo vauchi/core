@@ -115,6 +115,16 @@ function Home(props: HomeProps) {
     }
   }
 
+  const handleDeleteField = async (fieldId: string) => {
+    if (!confirm('Delete this field? This cannot be undone.')) return
+    try {
+      await invoke('remove_field', { fieldId })
+      refetchCard()
+    } catch (e) {
+      console.error('Failed to delete field:', e)
+    }
+  }
+
   const fieldIcon = (type: string) => {
     switch (type.toLowerCase()) {
       case 'email': return 'mail'
@@ -154,6 +164,13 @@ function Home(props: HomeProps) {
                   title="Manage who can see this field"
                 >
                   visibility
+                </button>
+                <button
+                  class="delete-btn"
+                  onClick={(e) => { e.stopPropagation(); handleDeleteField(field.id) }}
+                  title="Delete this field"
+                >
+                  ×
                 </button>
               </div>
             )}

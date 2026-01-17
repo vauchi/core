@@ -21,13 +21,18 @@ async function fetchIdentity(): Promise<IdentityInfo> {
 }
 
 function Settings(props: SettingsProps) {
-  const [identity] = createResource(fetchIdentity)
+  const [identity, { refetch: refetchIdentity }] = createResource(fetchIdentity)
   const [showBackupDialog, setShowBackupDialog] = createSignal(false)
+  const [showImportDialog, setShowImportDialog] = createSignal(false)
   const [backupPassword, setBackupPassword] = createSignal('')
   const [confirmPassword, setConfirmPassword] = createSignal('')
   const [backupData, setBackupData] = createSignal('')
   const [backupError, setBackupError] = createSignal('')
   const [passwordStrength, setPasswordStrength] = createSignal('')
+  const [importData, setImportData] = createSignal('')
+  const [importPassword, setImportPassword] = createSignal('')
+  const [importError, setImportError] = createSignal('')
+  const [importSuccess, setImportSuccess] = createSignal('')
 
   const checkPassword = async () => {
     const password = backupPassword()
@@ -87,6 +92,42 @@ function Settings(props: SettingsProps) {
     setPasswordStrength('')
   }
 
+  const handleImportBackup = async () => {
+    setImportError('')
+    setImportSuccess('')
+
+    if (!importData().trim()) {
+      setImportError('Please paste your backup data')
+      return
+    }
+
+    if (!importPassword().trim()) {
+      setImportError('Please enter your backup password')
+      return
+    }
+
+    try {
+      const result = await invoke('import_backup', {
+        backupData: importData(),
+        password: importPassword()
+      }) as string
+      setImportSuccess(result)
+      setImportData('')
+      setImportPassword('')
+      refetchIdentity()
+    } catch (e) {
+      setImportError(String(e))
+    }
+  }
+
+  const closeImportDialog = () => {
+    setShowImportDialog(false)
+    setImportData('')
+    setImportPassword('')
+    setImportError('')
+    setImportSuccess('')
+  }
+
   return (
     <div class="page settings">
       <header>
@@ -123,7 +164,10 @@ function Settings(props: SettingsProps) {
         <p class="setting-description">
           Export your identity to back it up or transfer to another device.
         </p>
-        <button class="secondary" onClick={() => setShowBackupDialog(true)}>Export Backup</button>
+        <div class="setting-buttons">
+          <button class="secondary" onClick={() => setShowBackupDialog(true)}>Export Backup</button>
+          <button class="secondary" onClick={() => setShowImportDialog(true)}>Import Backup</button>
+        </div>
       </section>
 
       <section class="settings-section">
@@ -186,6 +230,55 @@ function Settings(props: SettingsProps) {
                 <div class="dialog-actions">
                   <button class="primary" onClick={handleExportBackup}>Export</button>
                   <button class="secondary" onClick={closeDialog}>Cancel</button>
+                </div>
+              </div>
+            </Show>
+          </div>
+        </div>
+      </Show>
+
+      {/* Import Dialog */}
+      <Show when={showImportDialog()}>
+        <div class="dialog-overlay" onClick={closeImportDialog}>
+          <div class="dialog" onClick={(e) => e.stopPropagation()}>
+            <h3>Import Backup</h3>
+
+            <Show when={importSuccess()}>
+              <div class="import-result">
+                <p class="success">{importSuccess()}</p>
+                <div class="dialog-actions">
+                  <button class="primary" onClick={closeImportDialog}>Done</button>
+                </div>
+              </div>
+            </Show>
+
+            <Show when={!importSuccess()}>
+              <div class="import-form">
+                <p>Paste your backup data and enter the password used to encrypt it.</p>
+
+                <label>Backup Data</label>
+                <textarea
+                  value={importData()}
+                  onInput={(e) => setImportData(e.target.value)}
+                  placeholder="Paste your backup data here..."
+                  rows={4}
+                />
+
+                <label>Password</label>
+                <input
+                  type="password"
+                  value={importPassword()}
+                  onInput={(e) => setImportPassword(e.target.value)}
+                  placeholder="Enter backup password"
+                />
+
+                <Show when={importError()}>
+                  <p class="error">{importError()}</p>
+                </Show>
+
+                <div class="dialog-actions">
+                  <button class="primary" onClick={handleImportBackup}>Import</button>
+                  <button class="secondary" onClick={closeImportDialog}>Cancel</button>
                 </div>
               </div>
             </Show>

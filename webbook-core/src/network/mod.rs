@@ -36,6 +36,7 @@ mod message;
 mod mock;
 mod protocol;
 mod relay_client;
+pub mod simple_message;
 mod transport;
 mod websocket;
 

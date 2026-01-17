@@ -23,3 +23,6 @@ Thumbs.db
 # Node.js
 node_modules/
 dist/
+
+# Swift build artifacts
+.build/

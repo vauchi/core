@@ -11,18 +11,25 @@ struct HomeView: View {
         NavigationView {
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
-                    // Header
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Hello, \(viewModel.card?.displayName ?? "User")!")
-                            .font(.largeTitle)
-                            .fontWeight(.bold)
+                    // Header with sync indicator
+                    HStack(alignment: .top) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Hello, \(viewModel.card?.displayName ?? "User")!")
+                                .font(.largeTitle)
+                                .fontWeight(.bold)
 
-                        if let publicId = viewModel.identity?.publicId {
-                            Text("ID: \(String(publicId.prefix(16)))...")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                                .fontDesign(.monospaced)
+                            if let publicId = viewModel.identity?.publicId {
+                                Text("ID: \(String(publicId.prefix(16)))...")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                    .fontDesign(.monospaced)
+                            }
                         }
+
+                        Spacer()
+
+                        // Sync indicator
+                        SyncStatusIndicator(syncState: viewModel.syncState)
                     }
                     .padding(.horizontal)
 
@@ -40,7 +47,9 @@ struct HomeView: View {
 
                         if let fields = viewModel.card?.fields, !fields.isEmpty {
                             ForEach(fields) { field in
-                                FieldRow(field: field)
+                                FieldRow(field: field, onDelete: {
+                                    deleteField(field)
+                                })
                             }
                         } else {
                             Text("No fields yet. Add your first field!")
@@ -55,19 +64,87 @@ struct HomeView: View {
                     .background(Color(.systemGray6))
                     .cornerRadius(12)
                     .padding(.horizontal)
+
+                    // Sync info
+                    if viewModel.pendingUpdates > 0 {
+                        HStack {
+                            Image(systemName: "arrow.up.circle")
+                                .foregroundColor(.orange)
+                            Text("\(viewModel.pendingUpdates) pending updates")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        .padding(.horizontal)
+                    }
+
+                    if let lastSync = viewModel.lastSyncTime {
+                        HStack {
+                            Image(systemName: "clock")
+                                .foregroundColor(.secondary)
+                            Text("Last synced: \(lastSync, style: .relative) ago")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        .padding(.horizontal)
+                    }
                 }
                 .padding(.vertical)
             }
             .navigationTitle("Home")
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button(action: { Task { await viewModel.sync() } }) {
+                        Image(systemName: "arrow.triangle.2.circlepath")
+                    }
+                    .disabled(viewModel.syncState == .syncing)
+                }
+            }
             .sheet(isPresented: $showAddField) {
                 AddFieldSheet()
             }
+            .refreshable {
+                await viewModel.sync()
+            }
+        }
+    }
+
+    private func deleteField(_ field: FieldInfo) {
+        Task {
+            do {
+                try await viewModel.removeField(id: field.id)
+            } catch {
+                // Error handling - could show alert
+            }
+        }
+    }
+}
+
+struct SyncStatusIndicator: View {
+    let syncState: SyncState
+
+    var body: some View {
+        switch syncState {
+        case .idle:
+            Image(systemName: "checkmark.circle")
+                .foregroundColor(.green)
+        case .syncing:
+            ProgressView()
+                .scaleEffect(0.8)
+        case .success:
+            Image(systemName: "checkmark.circle.fill")
+                .foregroundColor(.green)
+        case .error:
+            Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundColor(.orange)
         }
     }
 }
 
 struct FieldRow: View {
     let field: FieldInfo
+    let onDelete: () -> Void
+
+    @State private var showDeleteAlert = false
 
     private func icon(for type: String) -> String {
         switch type.lowercased() {
@@ -95,10 +172,24 @@ struct FieldRow: View {
             }
 
             Spacer()
+
+            Button(action: { showDeleteAlert = true }) {
+                Image(systemName: "trash")
+                    .foregroundColor(.red)
+                    .font(.caption)
+            }
         }
         .padding()
         .background(Color(.systemBackground))
         .cornerRadius(8)
+        .alert("Delete Field", isPresented: $showDeleteAlert) {
+            Button("Cancel", role: .cancel) { }
+            Button("Delete", role: .destructive) {
+                onDelete()
+            }
+        } message: {
+            Text("Are you sure you want to delete \"\(field.label)\"?")
+        }
     }
 }
 
@@ -129,6 +220,7 @@ struct AddFieldSheet: View {
 
                     TextField("Value", text: $value)
                         .autocapitalization(.none)
+                        .keyboardType(keyboardType(for: fieldType))
                 }
 
                 if let error = errorMessage {
@@ -149,6 +241,15 @@ struct AddFieldSheet: View {
                         .disabled(label.isEmpty || value.isEmpty || isLoading)
                 }
             }
+        }
+    }
+
+    private func keyboardType(for type: String) -> UIKeyboardType {
+        switch type {
+        case "email": return .emailAddress
+        case "phone": return .phonePad
+        case "website": return .URL
+        default: return .default
         }
     }
 

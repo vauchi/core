@@ -7,7 +7,12 @@ import CoreImage.CIFilterBuiltins
 struct ExchangeView: View {
     @EnvironmentObject var viewModel: WebBookViewModel
     @State private var showScanner = false
-    @State private var qrData: String = ""
+    @State private var exchangeData: ExchangeDataInfo?
+    @State private var qrImage: UIImage?
+    @State private var isLoading = true
+    @State private var hasError = false
+    @State private var timeRemaining: TimeInterval = 0
+    @State private var timer: Timer?
 
     var body: some View {
         NavigationView {
@@ -23,18 +28,50 @@ struct ExchangeView: View {
                             .foregroundColor(.secondary)
                             .multilineTextAlignment(.center)
 
-                        if let qrImage = generateQRCode(from: qrData) {
-                            Image(uiImage: qrImage)
-                                .interpolation(.none)
-                                .resizable()
-                                .scaledToFit()
-                                .frame(width: 200, height: 200)
-                                .padding()
-                                .background(Color.white)
-                                .cornerRadius(12)
-                        } else {
+                        if isLoading {
                             ProgressView()
                                 .frame(width: 200, height: 200)
+                        } else if hasError {
+                            VStack(spacing: 12) {
+                                Image(systemName: "exclamationmark.triangle")
+                                    .font(.largeTitle)
+                                    .foregroundColor(.orange)
+                                Text("Failed to generate QR code")
+                                    .foregroundColor(.secondary)
+                                Button("Retry") {
+                                    loadExchangeData()
+                                }
+                                .buttonStyle(.bordered)
+                            }
+                            .frame(width: 200, height: 200)
+                        } else if let image = qrImage {
+                            VStack(spacing: 8) {
+                                Image(uiImage: image)
+                                    .interpolation(.none)
+                                    .resizable()
+                                    .scaledToFit()
+                                    .frame(width: 200, height: 200)
+                                    .padding()
+                                    .background(Color.white)
+                                    .cornerRadius(12)
+
+                                // Expiration timer
+                                HStack(spacing: 4) {
+                                    Image(systemName: "clock")
+                                        .font(.caption)
+                                    Text("Expires in \(formatTime(timeRemaining))")
+                                        .font(.caption)
+                                }
+                                .foregroundColor(timeRemaining < 60 ? .orange : .secondary)
+
+                                // Refresh button
+                                Button(action: { loadExchangeData() }) {
+                                    Label("Refresh", systemImage: "arrow.clockwise")
+                                        .font(.caption)
+                                }
+                                .buttonStyle(.bordered)
+                                .disabled(timeRemaining > 240) // Only allow refresh when < 4 min left
+                            }
                         }
                     }
                     .padding()
@@ -70,19 +107,54 @@ struct ExchangeView: View {
                 .padding(.vertical)
             }
             .navigationTitle("Exchange")
-            .onAppear { loadQRData() }
+            .onAppear { loadExchangeData() }
+            .onDisappear { stopTimer() }
             .sheet(isPresented: $showScanner) {
                 QRScannerView()
             }
         }
     }
 
-    private func loadQRData() {
+    private func loadExchangeData() {
+        isLoading = true
+        hasError = false
+        stopTimer()
+
         do {
-            qrData = try viewModel.generateQRData()
+            exchangeData = try viewModel.generateExchangeData()
+            if let data = exchangeData {
+                qrImage = generateQRCode(from: data.qrData)
+                timeRemaining = data.timeRemaining
+                startTimer()
+            }
+            hasError = exchangeData == nil
         } catch {
-            qrData = "Error generating QR code"
+            hasError = true
         }
+
+        isLoading = false
+    }
+
+    private func startTimer() {
+        timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
+            if timeRemaining > 0 {
+                timeRemaining -= 1
+            } else {
+                // QR expired, regenerate
+                loadExchangeData()
+            }
+        }
+    }
+
+    private func stopTimer() {
+        timer?.invalidate()
+        timer = nil
+    }
+
+    private func formatTime(_ seconds: TimeInterval) -> String {
+        let mins = Int(seconds) / 60
+        let secs = Int(seconds) % 60
+        return String(format: "%d:%02d", mins, secs)
     }
 
     private func generateQRCode(from string: String) -> UIImage? {

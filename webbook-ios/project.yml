@@ -1,0 +1,78 @@
+name: WebBook
+options:
+  bundleIdPrefix: app.webbook
+  deploymentTarget:
+    iOS: "16.0"
+  xcodeVersion: "15.0"
+  generateEmptyDirectories: true
+
+settings:
+  SWIFT_VERSION: "5.9"
+  IPHONEOS_DEPLOYMENT_TARGET: "16.0"
+
+targets:
+  WebBook:
+    type: application
+    platform: iOS
+    sources:
+      - path: WebBook
+        excludes:
+          - "**/*.xcassets"
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: app.webbook.ios
+        INFOPLIST_GENERATION_MODE: GeneratedFile
+        GENERATE_INFOPLIST_FILE: YES
+        MARKETING_VERSION: "1.0.0"
+        CURRENT_PROJECT_VERSION: "1"
+        DEVELOPMENT_TEAM: ""
+        CODE_SIGN_IDENTITY: ""
+        CODE_SIGNING_REQUIRED: NO
+        CODE_SIGNING_ALLOWED: NO
+    info:
+      path: WebBook/Info.plist
+      properties:
+        CFBundleDisplayName: WebBook
+        CFBundleShortVersionString: "1.0.0"
+        CFBundleVersion: "1"
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+        UISupportedInterfaceOrientations~ipad:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        NSCameraUsageDescription: "WebBook uses the camera to scan QR codes for contact exchange."
+
+  WebBookTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: WebBookTests
+    dependencies:
+      - target: WebBook
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: app.webbook.ios.tests
+        INFOPLIST_GENERATION_MODE: GeneratedFile
+        GENERATE_INFOPLIST_FILE: YES
+
+schemes:
+  WebBook:
+    build:
+      targets:
+        WebBook: all
+        WebBookTests: [test]
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        - WebBookTests
+    profile:
+      config: Release
+    analyze:
+      config: Debug
+    archive:
+      config: Release

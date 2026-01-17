@@ -5,8 +5,14 @@ import SwiftUI
 
 struct ContactDetailView: View {
     @EnvironmentObject var viewModel: WebBookViewModel
+    @Environment(\.dismiss) var dismiss
     let contact: ContactInfo
+
     @State private var showRemoveAlert = false
+    @State private var showVerifyAlert = false
+    @State private var isVerifying = false
+    @State private var fieldVisibility: [String: Bool] = [:]
+    @State private var isLoadingVisibility = true
 
     var body: some View {
         ScrollView {
@@ -40,29 +46,57 @@ struct ContactDetailView: View {
                         .font(.caption)
                         .foregroundColor(.secondary)
                         .fontDesign(.monospaced)
+
+                    if let addedAt = contact.addedAt {
+                        Text("Added \(addedAt, style: .relative) ago")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+
+                    // Verify button
+                    if !contact.verified {
+                        Button(action: { showVerifyAlert = true }) {
+                            Label("Verify Contact", systemImage: "checkmark.seal")
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 8)
+                                .background(Color.green.opacity(0.2))
+                                .foregroundColor(.green)
+                                .cornerRadius(8)
+                        }
+                        .disabled(isVerifying)
+                    }
                 }
                 .padding()
 
-                // Contact info section
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("Contact Info")
-                        .font(.headline)
-                        .padding(.horizontal)
+                // Contact's card info section
+                if let card = contact.card {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Contact Info")
+                            .font(.headline)
+                            .padding(.horizontal)
 
-                    VStack(spacing: 8) {
-                        Text("No visible fields")
-                            .foregroundColor(.secondary)
-                            .padding()
-                            .frame(maxWidth: .infinity)
-                            .background(Color(.systemGray6))
-                            .cornerRadius(10)
+                        if card.fields.isEmpty {
+                            Text("No visible fields")
+                                .foregroundColor(.secondary)
+                                .padding()
+                                .frame(maxWidth: .infinity)
+                                .background(Color(.systemGray6))
+                                .cornerRadius(10)
+                                .padding(.horizontal)
+                        } else {
+                            VStack(spacing: 8) {
+                                ForEach(card.fields) { field in
+                                    ContactFieldRow(field: field)
+                                }
+                            }
+                            .padding(.horizontal)
+                        }
                     }
-                    .padding(.horizontal)
                 }
 
-                // Visibility section
+                // Visibility section - what this contact can see of YOUR card
                 VStack(alignment: .leading, spacing: 12) {
-                    Text("Visibility")
+                    Text("Your Visibility")
                         .font(.headline)
                         .padding(.horizontal)
 
@@ -71,14 +105,39 @@ struct ContactDetailView: View {
                         .foregroundColor(.secondary)
                         .padding(.horizontal)
 
-                    // Visibility controls would go here
-                    Text("All fields visible")
-                        .foregroundColor(.secondary)
-                        .padding()
-                        .frame(maxWidth: .infinity)
-                        .background(Color(.systemGray6))
-                        .cornerRadius(10)
-                        .padding(.horizontal)
+                    if let myCard = viewModel.card {
+                        if myCard.fields.isEmpty {
+                            Text("You have no fields to share")
+                                .foregroundColor(.secondary)
+                                .padding()
+                                .frame(maxWidth: .infinity)
+                                .background(Color(.systemGray6))
+                                .cornerRadius(10)
+                                .padding(.horizontal)
+                        } else {
+                            VStack(spacing: 8) {
+                                ForEach(myCard.fields) { field in
+                                    VisibilityToggleRow(
+                                        field: field,
+                                        isVisible: fieldVisibility[field.label] ?? true,
+                                        onToggle: { newValue in
+                                            toggleVisibility(field: field, visible: newValue)
+                                        }
+                                    )
+                                }
+                            }
+                            .padding(.horizontal)
+                        }
+                    } else {
+                        if isLoadingVisibility {
+                            ProgressView()
+                                .padding()
+                        } else {
+                            Text("Unable to load your card")
+                                .foregroundColor(.secondary)
+                                .padding()
+                        }
+                    }
                 }
 
                 Spacer(minLength: 40)
@@ -98,16 +157,196 @@ struct ContactDetailView: View {
             .padding(.vertical)
         }
         .navigationBarTitleDisplayMode(.inline)
+        .onAppear {
+            loadVisibility()
+        }
         .alert("Remove Contact", isPresented: $showRemoveAlert) {
             Button("Cancel", role: .cancel) { }
             Button("Remove", role: .destructive) {
                 Task {
                     try? await viewModel.removeContact(id: contact.id)
+                    dismiss()
                 }
             }
         } message: {
             Text("Are you sure you want to remove \(contact.displayName)?")
         }
+        .alert("Verify Contact", isPresented: $showVerifyAlert) {
+            Button("Cancel", role: .cancel) { }
+            Button("Verify") {
+                verifyContact()
+            }
+        } message: {
+            Text("By verifying \(contact.displayName), you confirm that you have verified their identity in person (e.g., by comparing fingerprints).")
+        }
+    }
+
+    private func loadVisibility() {
+        isLoadingVisibility = true
+
+        Task {
+            guard let myCard = viewModel.card else {
+                isLoadingVisibility = false
+                return
+            }
+
+            var visibility: [String: Bool] = [:]
+            for field in myCard.fields {
+                do {
+                    let isVisible = try await viewModel.isFieldVisibleToContact(
+                        contactId: contact.id,
+                        fieldLabel: field.label
+                    )
+                    visibility[field.label] = isVisible
+                } catch {
+                    visibility[field.label] = true // Default to visible
+                }
+            }
+
+            fieldVisibility = visibility
+            isLoadingVisibility = false
+        }
+    }
+
+    private func toggleVisibility(field: FieldInfo, visible: Bool) {
+        fieldVisibility[field.label] = visible
+
+        Task {
+            do {
+                if visible {
+                    try await viewModel.showFieldToContact(contactId: contact.id, fieldLabel: field.label)
+                } else {
+                    try await viewModel.hideFieldFromContact(contactId: contact.id, fieldLabel: field.label)
+                }
+            } catch {
+                // Revert on error
+                fieldVisibility[field.label] = !visible
+            }
+        }
+    }
+
+    private func verifyContact() {
+        isVerifying = true
+
+        Task {
+            do {
+                try await viewModel.verifyContact(id: contact.id)
+            } catch {
+                // Handle error
+            }
+            isVerifying = false
+        }
+    }
+}
+
+struct ContactFieldRow: View {
+    let field: FieldInfo
+
+    private func icon(for type: String) -> String {
+        switch type.lowercased() {
+        case "email": return "envelope"
+        case "phone": return "phone"
+        case "website": return "globe"
+        case "address": return "house"
+        case "social": return "at"
+        default: return "note.text"
+        }
+    }
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: icon(for: field.fieldType))
+                .foregroundColor(.cyan)
+                .frame(width: 24)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(field.label)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                Text(field.value)
+                    .font(.body)
+            }
+
+            Spacer()
+
+            // Quick action buttons
+            if field.fieldType.lowercased() == "email" {
+                Button(action: {
+                    if let url = URL(string: "mailto:\(field.value)") {
+                        UIApplication.shared.open(url)
+                    }
+                }) {
+                    Image(systemName: "envelope.circle")
+                        .foregroundColor(.blue)
+                }
+            } else if field.fieldType.lowercased() == "phone" {
+                Button(action: {
+                    if let url = URL(string: "tel:\(field.value)") {
+                        UIApplication.shared.open(url)
+                    }
+                }) {
+                    Image(systemName: "phone.circle")
+                        .foregroundColor(.green)
+                }
+            } else if field.fieldType.lowercased() == "website" {
+                Button(action: {
+                    if let url = URL(string: field.value) {
+                        UIApplication.shared.open(url)
+                    }
+                }) {
+                    Image(systemName: "safari")
+                        .foregroundColor(.blue)
+                }
+            }
+        }
+        .padding()
+        .background(Color(.systemGray6))
+        .cornerRadius(8)
+    }
+}
+
+struct VisibilityToggleRow: View {
+    let field: FieldInfo
+    let isVisible: Bool
+    let onToggle: (Bool) -> Void
+
+    private func icon(for type: String) -> String {
+        switch type.lowercased() {
+        case "email": return "envelope"
+        case "phone": return "phone"
+        case "website": return "globe"
+        case "address": return "house"
+        case "social": return "at"
+        default: return "note.text"
+        }
+    }
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: icon(for: field.fieldType))
+                .foregroundColor(isVisible ? .cyan : .secondary)
+                .frame(width: 24)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(field.label)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                Text(field.value)
+                    .font(.body)
+                    .foregroundColor(isVisible ? .primary : .secondary)
+            }
+
+            Spacer()
+
+            Toggle("", isOn: Binding(
+                get: { isVisible },
+                set: { onToggle($0) }
+            ))
+            .labelsHidden()
+        }
+        .padding()
+        .background(Color(.systemGray6))
+        .cornerRadius(8)
     }
 }
 

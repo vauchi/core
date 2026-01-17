@@ -4,11 +4,8 @@
 import Foundation
 import SwiftUI
 
-// Note: Import the generated UniFFI bindings
-// import webbook_mobile
-
 /// Contact field for display
-struct FieldInfo: Identifiable {
+struct FieldInfo: Identifiable, Equatable {
     let id: String
     let fieldType: String
     let label: String
@@ -16,22 +13,70 @@ struct FieldInfo: Identifiable {
 }
 
 /// Contact card for display
-struct CardInfo {
+struct CardInfo: Equatable {
     let displayName: String
     let fields: [FieldInfo]
 }
 
 /// Contact for display
-struct ContactInfo: Identifiable {
+struct ContactInfo: Identifiable, Equatable {
     let id: String
     let displayName: String
     let verified: Bool
+    let card: CardInfo?
+    let addedAt: Date?
+
+    init(id: String, displayName: String, verified: Bool, card: CardInfo? = nil, addedAt: Date? = nil) {
+        self.id = id
+        self.displayName = displayName
+        self.verified = verified
+        self.card = card
+        self.addedAt = addedAt
+    }
 }
 
 /// Identity information
-struct IdentityInfo {
+struct IdentityInfo: Equatable {
     let displayName: String
     let publicId: String
+}
+
+/// Exchange data for QR code display
+struct ExchangeDataInfo: Equatable {
+    let qrData: String
+    let publicId: String
+    let expiresAt: Date
+
+    var isExpired: Bool {
+        Date() > expiresAt
+    }
+
+    var timeRemaining: TimeInterval {
+        max(0, expiresAt.timeIntervalSinceNow)
+    }
+}
+
+/// Exchange result after scanning QR
+struct ExchangeResultInfo: Equatable {
+    let contactId: String
+    let contactName: String
+    let success: Bool
+    let errorMessage: String?
+}
+
+/// Sync state enum
+enum SyncState: Equatable {
+    case idle
+    case syncing
+    case success(contactsAdded: Int, cardsUpdated: Int, updatesSent: Int)
+    case error(String)
+}
+
+/// Sync result
+struct SyncResultInfo: Equatable {
+    let contactsAdded: Int
+    let cardsUpdated: Int
+    let updatesSent: Int
 }
 
 @MainActor
@@ -44,16 +89,26 @@ class WebBookViewModel: ObservableObject {
     @Published var card: CardInfo?
     @Published var contacts: [ContactInfo] = []
     @Published var errorMessage: String?
+    @Published var syncState: SyncState = .idle
+    @Published var lastSyncTime: Date?
+    @Published var pendingUpdates: Int = 0
 
     // MARK: - Private Properties
 
-    // private var webbook: WebBookMobile?
+    private var repository: WebBookRepository?
 
     // MARK: - Initialization
 
     init() {
-        // Initialize WebBook mobile bindings
-        // webbook = try? WebBookMobile(dataDir: getDataDirectory())
+        initializeRepository()
+    }
+
+    private func initializeRepository() {
+        do {
+            repository = try WebBookRepository()
+        } catch {
+            errorMessage = "Failed to initialize: \(error.localizedDescription)"
+        }
     }
 
     // MARK: - State Management
@@ -63,18 +118,13 @@ class WebBookViewModel: ObservableObject {
         errorMessage = nil
 
         Task {
-            do {
-                // Check if identity exists
-                // hasIdentity = try webbook?.hasIdentity() ?? false
-                hasIdentity = false // Placeholder
+            hasIdentity = repository?.hasIdentity() ?? false
 
-                if hasIdentity {
-                    await loadIdentity()
-                    await loadCard()
-                    await loadContacts()
-                }
-            } catch {
-                errorMessage = error.localizedDescription
+            if hasIdentity {
+                await loadIdentity()
+                await loadCard()
+                await loadContacts()
+                await loadPendingUpdates()
             }
 
             isLoading = false
@@ -84,78 +134,330 @@ class WebBookViewModel: ObservableObject {
     // MARK: - Identity
 
     func createIdentity(name: String) async throws {
-        // try webbook?.createIdentity(displayName: name)
-        // Placeholder implementation
+        guard let repository = repository else {
+            throw WebBookRepositoryError.notInitialized
+        }
+
+        try repository.createIdentity(displayName: name)
         hasIdentity = true
-        identity = IdentityInfo(displayName: name, publicId: "placeholder-id")
-        card = CardInfo(displayName: name, fields: [])
+
+        // Load the created identity and card
+        await loadIdentity()
+        await loadCard()
     }
 
     private func loadIdentity() async {
-        // if let info = try? webbook?.getIdentity() {
-        //     identity = IdentityInfo(displayName: info.displayName, publicId: info.publicId)
-        // }
-        identity = IdentityInfo(displayName: "User", publicId: "placeholder")
+        guard let repository = repository else { return }
+
+        do {
+            let displayName = try repository.getDisplayName()
+            let publicId = try repository.getPublicId()
+            identity = IdentityInfo(displayName: displayName, publicId: publicId)
+        } catch {
+            // Identity not found is expected if not created yet
+            identity = nil
+        }
     }
 
     // MARK: - Card
 
     func loadCard() async {
-        // if let cardData = try? webbook?.getCard() {
-        //     card = CardInfo(
-        //         displayName: cardData.displayName,
-        //         fields: cardData.fields.map { FieldInfo(...) }
-        //     )
-        // }
-        card = CardInfo(displayName: identity?.displayName ?? "User", fields: [])
+        guard let repository = repository else { return }
+
+        do {
+            let cardData = try repository.getOwnCard()
+            card = CardInfo(
+                displayName: cardData.displayName,
+                fields: cardData.fields.map { field in
+                    FieldInfo(
+                        id: field.id,
+                        fieldType: field.fieldType.rawValue,
+                        label: field.label,
+                        value: field.value
+                    )
+                }
+            )
+        } catch {
+            // Card not found is expected if identity not created
+            card = nil
+        }
     }
 
     func addField(type: String, label: String, value: String) async throws {
-        // try webbook?.addField(fieldType: type, label: label, value: value)
-        // Placeholder
-        var fields = card?.fields ?? []
-        fields.append(FieldInfo(id: UUID().uuidString, fieldType: type, label: label, value: value))
-        card = CardInfo(displayName: card?.displayName ?? "User", fields: fields)
+        guard let repository = repository else {
+            throw WebBookRepositoryError.notInitialized
+        }
+
+        let fieldType = WebBookFieldType(rawValue: type) ?? .custom
+        try repository.addField(type: fieldType, label: label, value: value)
+        await loadCard()
+    }
+
+    func updateField(label: String, newValue: String) async throws {
+        guard let repository = repository else {
+            throw WebBookRepositoryError.notInitialized
+        }
+
+        try repository.updateField(label: label, newValue: newValue)
+        await loadCard()
     }
 
     func removeField(id: String) async throws {
-        // try webbook?.removeField(fieldId: id)
-        var fields = card?.fields ?? []
-        fields.removeAll { $0.id == id }
-        card = CardInfo(displayName: card?.displayName ?? "User", fields: fields)
+        guard let repository = repository else {
+            throw WebBookRepositoryError.notInitialized
+        }
+
+        // Find field by ID to get its label
+        guard let field = card?.fields.first(where: { $0.id == id }) else {
+            return
+        }
+
+        _ = try repository.removeField(label: field.label)
+        await loadCard()
+    }
+
+    func setDisplayName(_ name: String) async throws {
+        guard let repository = repository else {
+            throw WebBookRepositoryError.notInitialized
+        }
+
+        try repository.setDisplayName(name)
+        await loadIdentity()
+        await loadCard()
     }
 
     // MARK: - Contacts
 
     func loadContacts() async {
-        // if let contactsData = try? webbook?.listContacts() {
-        //     contacts = contactsData.map { ContactInfo(...) }
-        // }
-        contacts = []
+        guard let repository = repository else { return }
+
+        do {
+            let contactsData = try repository.listContacts()
+            contacts = contactsData.map { contact in
+                ContactInfo(
+                    id: contact.id,
+                    displayName: contact.displayName,
+                    verified: contact.isVerified,
+                    card: CardInfo(
+                        displayName: contact.card.displayName,
+                        fields: contact.card.fields.map { field in
+                            FieldInfo(
+                                id: field.id,
+                                fieldType: field.fieldType.rawValue,
+                                label: field.label,
+                                value: field.value
+                            )
+                        }
+                    ),
+                    addedAt: Date(timeIntervalSince1970: TimeInterval(contact.addedAt))
+                )
+            }
+        } catch {
+            contacts = []
+        }
+    }
+
+    func getContact(id: String) async -> ContactInfo? {
+        guard let repository = repository else { return nil }
+
+        do {
+            guard let contact = try repository.getContact(id: id) else {
+                return nil
+            }
+
+            return ContactInfo(
+                id: contact.id,
+                displayName: contact.displayName,
+                verified: contact.isVerified,
+                card: CardInfo(
+                    displayName: contact.card.displayName,
+                    fields: contact.card.fields.map { field in
+                        FieldInfo(
+                            id: field.id,
+                            fieldType: field.fieldType.rawValue,
+                            label: field.label,
+                            value: field.value
+                        )
+                    }
+                ),
+                addedAt: Date(timeIntervalSince1970: TimeInterval(contact.addedAt))
+            )
+        } catch {
+            return nil
+        }
+    }
+
+    func searchContacts(query: String) async -> [ContactInfo] {
+        guard let repository = repository else { return [] }
+
+        do {
+            let results = try repository.searchContacts(query: query)
+            return results.map { contact in
+                ContactInfo(
+                    id: contact.id,
+                    displayName: contact.displayName,
+                    verified: contact.isVerified
+                )
+            }
+        } catch {
+            return []
+        }
     }
 
     func removeContact(id: String) async throws {
-        // try webbook?.removeContact(contactId: id)
+        guard let repository = repository else {
+            throw WebBookRepositoryError.notInitialized
+        }
+
+        _ = try repository.removeContact(id: id)
         contacts.removeAll { $0.id == id }
+    }
+
+    func verifyContact(id: String) async throws {
+        guard let repository = repository else {
+            throw WebBookRepositoryError.notInitialized
+        }
+
+        try repository.verifyContact(id: id)
+        await loadContacts()
     }
 
     // MARK: - Exchange
 
     func generateQRData() throws -> String {
-        // return try webbook?.generateExchangeQr() ?? ""
-        return "wb://placeholder?name=\(identity?.displayName ?? "User")"
+        guard let repository = repository else {
+            throw WebBookRepositoryError.notInitialized
+        }
+
+        let exchangeData = try repository.generateExchangeQr()
+        return exchangeData.qrData
     }
 
-    func completeExchange(data: String) async throws {
-        // try webbook?.completeExchange(data: data)
+    func generateExchangeData() throws -> ExchangeDataInfo {
+        guard let repository = repository else {
+            throw WebBookRepositoryError.notInitialized
+        }
+
+        let data = try repository.generateExchangeQr()
+        return ExchangeDataInfo(
+            qrData: data.qrData,
+            publicId: data.publicId,
+            expiresAt: Date(timeIntervalSince1970: TimeInterval(data.expiresAt))
+        )
     }
 
-    // MARK: - Helpers
+    func completeExchange(qrData: String) async throws -> ExchangeResultInfo {
+        guard let repository = repository else {
+            throw WebBookRepositoryError.notInitialized
+        }
 
-    private func getDataDirectory() -> String {
-        let paths = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)
-        let appSupport = paths[0].appendingPathComponent("WebBook")
-        try? FileManager.default.createDirectory(at: appSupport, withIntermediateDirectories: true)
-        return appSupport.path
+        let result = try repository.completeExchange(qrData: qrData)
+        await loadContacts()
+
+        return ExchangeResultInfo(
+            contactId: result.contactId,
+            contactName: result.contactName,
+            success: result.success,
+            errorMessage: result.errorMessage
+        )
+    }
+
+    // MARK: - Sync
+
+    func sync() async {
+        guard let repository = repository else {
+            syncState = .error("Not initialized")
+            return
+        }
+
+        syncState = .syncing
+
+        do {
+            let result = try repository.sync()
+            syncState = .success(
+                contactsAdded: Int(result.contactsAdded),
+                cardsUpdated: Int(result.cardsUpdated),
+                updatesSent: Int(result.updatesSent)
+            )
+            lastSyncTime = Date()
+            await loadContacts()
+            await loadPendingUpdates()
+        } catch {
+            syncState = .error(error.localizedDescription)
+        }
+    }
+
+    func loadPendingUpdates() async {
+        guard let repository = repository else { return }
+
+        do {
+            pendingUpdates = Int(try repository.pendingUpdateCount())
+        } catch {
+            pendingUpdates = 0
+        }
+    }
+
+    // MARK: - Backup
+
+    func exportBackup(password: String) async throws -> String {
+        guard let repository = repository else {
+            throw WebBookRepositoryError.notInitialized
+        }
+
+        return try repository.exportBackup(password: password)
+    }
+
+    func importBackup(data: String, password: String) async throws {
+        guard let repository = repository else {
+            throw WebBookRepositoryError.notInitialized
+        }
+
+        try repository.importBackup(data: data, password: password)
+        hasIdentity = true
+        await loadIdentity()
+        await loadCard()
+        await loadContacts()
+    }
+
+    // MARK: - Visibility
+
+    func hideFieldFromContact(contactId: String, fieldLabel: String) async throws {
+        guard let repository = repository else {
+            throw WebBookRepositoryError.notInitialized
+        }
+
+        try repository.hideFieldFromContact(contactId: contactId, fieldLabel: fieldLabel)
+    }
+
+    func showFieldToContact(contactId: String, fieldLabel: String) async throws {
+        guard let repository = repository else {
+            throw WebBookRepositoryError.notInitialized
+        }
+
+        try repository.showFieldToContact(contactId: contactId, fieldLabel: fieldLabel)
+    }
+
+    func isFieldVisibleToContact(contactId: String, fieldLabel: String) async throws -> Bool {
+        guard let repository = repository else {
+            throw WebBookRepositoryError.notInitialized
+        }
+
+        return try repository.isFieldVisibleToContact(contactId: contactId, fieldLabel: fieldLabel)
+    }
+
+    // MARK: - Social Networks
+
+    func listSocialNetworks() -> [(id: String, displayName: String, urlTemplate: String)] {
+        guard let repository = repository else { return [] }
+
+        return repository.listSocialNetworks().map {
+            (id: $0.id, displayName: $0.displayName, urlTemplate: $0.urlTemplate)
+        }
+    }
+
+    func getProfileUrl(networkId: String, username: String) -> String? {
+        guard let repository = repository else { return nil }
+
+        return repository.getProfileUrl(networkId: networkId, username: username)
     }
 }

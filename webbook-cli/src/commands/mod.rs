@@ -7,3 +7,4 @@ pub mod contacts;
 pub mod sync;
 pub mod backup;
 pub mod device;
+pub mod recovery;

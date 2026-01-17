@@ -61,6 +61,10 @@ enum Commands {
     #[command(subcommand)]
     Device(DeviceCommands),
 
+    /// Contact recovery via social vouching
+    #[command(subcommand)]
+    Recovery(RecoveryCommands),
+
     /// Sync with the relay server
     Sync,
 
@@ -235,6 +239,60 @@ enum DeviceCommands {
     },
 }
 
+#[derive(Subcommand)]
+enum RecoveryCommands {
+    /// Create a recovery claim for a lost identity
+    Claim {
+        /// Old public key (hex) from lost device
+        old_pk: String,
+    },
+
+    /// Vouch for someone's recovery claim
+    Vouch {
+        /// Recovery claim data (base64)
+        claim: String,
+    },
+
+    /// Add a voucher to your recovery proof
+    AddVoucher {
+        /// Voucher data (base64)
+        voucher: String,
+    },
+
+    /// Show recovery status
+    Status,
+
+    /// Show completed recovery proof
+    Proof,
+
+    /// Verify a recovery proof from a contact
+    Verify {
+        /// Recovery proof data (base64)
+        proof: String,
+    },
+
+    /// Manage recovery settings
+    #[command(subcommand)]
+    Settings(RecoverySettingsCommands),
+}
+
+#[derive(Subcommand)]
+enum RecoverySettingsCommands {
+    /// Show current settings
+    Show,
+
+    /// Set recovery thresholds
+    Set {
+        /// Vouchers required for recovery (1-10)
+        #[arg(long, default_value = "3")]
+        recovery: u32,
+
+        /// Mutual contacts for high confidence (1-recovery)
+        #[arg(long, default_value = "2")]
+        verification: u32,
+    },
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     let cli = Cli::parse();
@@ -313,6 +371,20 @@ async fn main() -> Result<()> {
             DeviceCommands::Complete { request } => commands::device::complete(&config, &request)?,
             DeviceCommands::Finish { response } => commands::device::finish(&config, &response)?,
             DeviceCommands::Revoke { device_id } => commands::device::revoke(&config, &device_id)?,
+        },
+        Commands::Recovery(cmd) => match cmd {
+            RecoveryCommands::Claim { old_pk } => commands::recovery::claim(&config, &old_pk)?,
+            RecoveryCommands::Vouch { claim } => commands::recovery::vouch(&config, &claim)?,
+            RecoveryCommands::AddVoucher { voucher } => commands::recovery::add_voucher(&config, &voucher)?,
+            RecoveryCommands::Status => commands::recovery::status(&config)?,
+            RecoveryCommands::Proof => commands::recovery::proof_show(&config)?,
+            RecoveryCommands::Verify { proof } => commands::recovery::verify(&config, &proof)?,
+            RecoveryCommands::Settings(settings_cmd) => match settings_cmd {
+                RecoverySettingsCommands::Show => commands::recovery::settings_show(&config)?,
+                RecoverySettingsCommands::Set { recovery, verification } => {
+                    commands::recovery::settings_set(&config, recovery, verification)?;
+                }
+            },
         },
         Commands::Sync => {
             commands::sync::run(&config).await?;

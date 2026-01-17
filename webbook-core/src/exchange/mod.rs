@@ -48,7 +48,8 @@ mod x3dh;
 pub use audio::{AudioBackend, AudioCapability, AudioConfig, MockAudioBackend, UltrasonicVerifier};
 pub use ble::{BLEDevice, BLEProximityVerifier, MockBLEVerifier};
 pub use device_link::{
-    DeviceLinkInitiator, DeviceLinkQR, DeviceLinkRequest, DeviceLinkResponder, DeviceLinkResponse,
+    DeviceLinkInitiator, DeviceLinkInitiatorRestored, DeviceLinkQR, DeviceLinkRequest,
+    DeviceLinkResponder, DeviceLinkResponse,
 };
 pub use encrypted_message::{DecryptedExchangePayload, EncryptedExchangeMessage};
 pub use error::ExchangeError;

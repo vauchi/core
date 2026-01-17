@@ -82,6 +82,20 @@ impl Identity {
         Self::from_seed_with_device(master_seed, display_name, 0, "Primary Device".to_string())
     }
 
+    /// Creates an identity from a device link response.
+    ///
+    /// Used when joining an existing identity from another device.
+    /// The master seed and device index come from the device link response,
+    /// while the device name is chosen by the user for this device.
+    pub fn from_device_link(
+        master_seed: [u8; 32],
+        display_name: String,
+        device_index: u32,
+        device_name: String,
+    ) -> Self {
+        Self::from_seed_with_device(master_seed, display_name, device_index, device_name)
+    }
+
     /// Creates an identity from an existing seed with specific device info.
     fn from_seed_with_device(
         master_seed: [u8; 32],
@@ -184,6 +198,37 @@ impl Identity {
     /// Returns the device ID for this device.
     pub fn device_id(&self) -> &[u8; 32] {
         self.device_info.device_id()
+    }
+
+    /// Creates the initial device registry containing only this device.
+    pub fn initial_device_registry(&self) -> DeviceRegistry {
+        DeviceRegistry::new(
+            self.device_info.to_registered(&self.master_seed),
+            &self.signing_keypair,
+        )
+    }
+
+    /// Creates a device link initiator for linking a new device.
+    ///
+    /// This generates a QR code that can be scanned by a new device
+    /// to receive the identity's master seed.
+    pub fn create_device_link_initiator(
+        &self,
+        registry: DeviceRegistry,
+    ) -> crate::exchange::DeviceLinkInitiator {
+        crate::exchange::DeviceLinkInitiator::new(self.master_seed, self, registry)
+    }
+
+    /// Restores a device link initiator from a saved QR code.
+    ///
+    /// Used when the QR was generated earlier and saved, then the
+    /// request comes in later.
+    pub fn restore_device_link_initiator(
+        &self,
+        registry: DeviceRegistry,
+        qr: crate::exchange::DeviceLinkQR,
+    ) -> crate::exchange::DeviceLinkInitiatorRestored {
+        crate::exchange::DeviceLinkInitiatorRestored::new(self.master_seed, self, registry, qr)
     }
 
     /// Exports identity as encrypted backup.

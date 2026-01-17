@@ -105,22 +105,30 @@ pub fn link(config: &CliConfig) -> Result<()> {
         .identity()
         .ok_or_else(|| anyhow::anyhow!("No identity found"))?;
 
-    // We need the master seed to create the initiator
-    // For this demo, we'll use the backup approach to get the seed
-    // In a real implementation, the seed would be securely stored
+    // Get or create device registry
+    let registry = wb
+        .storage()
+        .load_device_registry()?
+        .unwrap_or_else(|| identity.initial_device_registry());
 
     display::info("Generating device link QR code...");
     println!();
 
-    // Generate device link QR
-    let qr = DeviceLinkQR::generate(identity);
+    // Create device link initiator (which generates the QR)
+    let initiator = identity.create_device_link_initiator(registry);
+    let qr = initiator.qr();
 
     // Display QR code
     println!("{}", qr.to_qr_image_string());
     println!();
 
-    // Also show the data string for testing
+    // Save the QR data for use in 'device complete'
     let data_string = qr.to_data_string();
+    let pending_link_path = config.data_dir.join(".pending_device_link");
+    fs::create_dir_all(&config.data_dir)?;
+    fs::write(&pending_link_path, &data_string)?;
+
+    // Also show the data string for testing
     display::info("Device link data (for testing):");
     println!("  {}", data_string);
     println!();
@@ -129,8 +137,6 @@ pub fn link(config: &CliConfig) -> Result<()> {
     display::info("Scan this QR code with your new device using 'webbook device join'");
     println!();
 
-    // In a real implementation, we'd wait for the request and respond
-    // For now, we just show the QR code
     display::info(
         "After scanning, run 'webbook device complete <request_data>' to finish linking.",
     );
@@ -170,7 +176,7 @@ pub fn join(config: &CliConfig, qr_data: &str) -> Result<()> {
         .interact_text()?;
 
     // Create responder
-    let responder = DeviceLinkResponder::from_qr(qr, device_name)?;
+    let responder = DeviceLinkResponder::from_qr(qr, device_name.clone())?;
 
     // Create request
     let encrypted_request = responder.create_request()?;
@@ -187,11 +193,12 @@ pub fn join(config: &CliConfig, qr_data: &str) -> Result<()> {
     println!("  webbook device complete {}", request_b64);
     println!();
 
-    // Save the link key temporarily for completing the join
-    // In a real implementation, this would be handled in a session
+    // Save the QR data and device name for completing the join
     let link_key_path = config.data_dir.join(".pending_link_key");
+    let device_name_path = config.data_dir.join(".pending_device_name");
     fs::create_dir_all(&config.data_dir)?;
     fs::write(&link_key_path, qr_data)?;
+    fs::write(&device_name_path, &device_name)?;
 
     display::info("After the existing device responds, run:");
     println!("  webbook device finish <response_data>");
@@ -203,23 +210,66 @@ pub fn join(config: &CliConfig, qr_data: &str) -> Result<()> {
 pub fn complete(config: &CliConfig, request_data: &str) -> Result<()> {
     let wb = open_webbook(config)?;
 
-    let _identity = wb
+    let identity = wb
         .identity()
         .ok_or_else(|| anyhow::anyhow!("No identity found"))?;
 
+    // Load the pending device link QR data
+    let pending_link_path = config.data_dir.join(".pending_device_link");
+    if !pending_link_path.exists() {
+        bail!("No pending device link. Run 'webbook device link' first.");
+    }
+
+    let qr_data_string = fs::read_to_string(&pending_link_path)?;
+    let saved_qr = DeviceLinkQR::from_data_string(&qr_data_string)?;
+
+    if saved_qr.is_expired() {
+        // Clean up expired link
+        let _ = fs::remove_file(&pending_link_path);
+        bail!("Device link QR has expired. Please run 'webbook device link' again.");
+    }
+
+    // Get or create device registry
+    let registry = wb
+        .storage()
+        .load_device_registry()?
+        .unwrap_or_else(|| identity.initial_device_registry());
+
+    // Restore the initiator with the saved QR
+    let initiator = identity.restore_device_link_initiator(registry, saved_qr);
+
     // Decode the request
-    let _encrypted_request = BASE64.decode(request_data)?;
+    let encrypted_request = BASE64.decode(request_data)?;
 
-    // We need the master seed and link key to process the request
-    // This is a limitation of the CLI demo - in a real app, we'd have
-    // the QR session state saved
+    // Process the request
+    let (encrypted_response, updated_registry, new_device) =
+        initiator.process_request(&encrypted_request)?;
 
-    display::warning("Note: In this demo, device linking requires manual key transfer.");
-    display::info("For full device linking, use the mobile app when available.");
+    // Save the updated registry
+    wb.storage().save_device_registry(&updated_registry)?;
 
-    // For now, just acknowledge that we received the request
-    display::success("Request received.");
-    display::info("Device linking will be fully implemented in the mobile app.");
+    // Encode response for display
+    let response_b64 = BASE64.encode(&encrypted_response);
+
+    display::success(&format!(
+        "Device '{}' approved for linking!",
+        new_device.device_name()
+    ));
+    println!();
+
+    display::info("Send this response to the new device:");
+    println!();
+    println!("  {}", response_b64);
+    println!();
+
+    display::info("On the new device, run:");
+    println!("  webbook device finish {}", response_b64);
+    println!();
+
+    // Clean up the pending link
+    let _ = fs::remove_file(&pending_link_path);
+
+    display::success("Device linking initiated. Registry updated with new device.");
 
     Ok(())
 }
@@ -228,12 +278,15 @@ pub fn complete(config: &CliConfig, request_data: &str) -> Result<()> {
 pub fn finish(config: &CliConfig, response_data: &str) -> Result<()> {
     // Check for pending link key
     let link_key_path = config.data_dir.join(".pending_link_key");
+    let device_name_path = config.data_dir.join(".pending_device_name");
+
     if !link_key_path.exists() {
         bail!("No pending device link. Run 'webbook device join' first.");
     }
 
-    // Read the saved QR data
+    // Read the saved QR data and device name
     let qr_data = fs::read_to_string(&link_key_path)?;
+    let device_name = fs::read_to_string(&device_name_path).unwrap_or_else(|_| "New Device".to_string());
     let qr = DeviceLinkQR::from_data_string(&qr_data)?;
 
     // Decode the response
@@ -243,23 +296,31 @@ pub fn finish(config: &CliConfig, response_data: &str) -> Result<()> {
     let response = DeviceLinkResponse::decrypt(&encrypted_response, qr.link_key())?;
 
     // Create identity from the received seed
-    // Note: In a real implementation, we'd use response.master_seed() directly
-    // to create the identity. This is a placeholder for the demo.
-    let _identity = Identity::import_backup(
-        &IdentityBackup::new(
-            Identity::create("temp") // Placeholder - real impl uses master_seed
-                .export_backup(LOCAL_STORAGE_PASSWORD)?
-                .as_bytes()
-                .to_vec(),
-        ),
-        LOCAL_STORAGE_PASSWORD,
-    )?;
+    let identity = Identity::from_device_link(
+        *response.master_seed(),
+        response.display_name().to_string(),
+        response.device_index(),
+        device_name,
+    );
+
+    // Save the identity
+    let backup = identity.export_backup(LOCAL_STORAGE_PASSWORD)?;
+    fs::create_dir_all(&config.data_dir)?;
+    fs::write(config.identity_path(), backup.as_bytes())?;
+
+    // Save the device registry
+    let wb_config = WebBookConfig::with_storage_path(config.storage_path())
+        .with_relay_url(&config.relay_url)
+        .with_storage_key(config.storage_key()?);
+    let wb = WebBook::new(wb_config)?;
+    wb.storage().save_device_registry(response.registry())?;
 
     display::success(&format!("Joined identity: {}", response.display_name()));
     display::info(&format!("Device index: {}", response.device_index()));
 
-    // Clean up pending link key
+    // Clean up pending files
     let _ = fs::remove_file(&link_key_path);
+    let _ = fs::remove_file(&device_name_path);
 
     // Check for sync payload
     if !response.sync_payload_json().is_empty() {
@@ -320,9 +381,15 @@ pub fn revoke(config: &CliConfig, device_id_prefix: &str) -> Result<()> {
         return Ok(());
     }
 
-    // In a real implementation, we'd update the registry and broadcast
-    display::warning("Device revocation requires registry update and broadcast.");
-    display::info("This will be fully implemented in the mobile app.");
+    // Update the registry with the revocation
+    let mut updated_registry = registry.clone();
+    updated_registry.revoke_device(&device.device_id, identity.signing_keypair())?;
+
+    // Save the updated registry
+    wb.storage().save_device_registry(&updated_registry)?;
+
+    display::success(&format!("Device '{}' has been revoked.", device.device_name));
+    display::info("The revocation will be propagated to contacts on next sync.");
 
     Ok(())
 }

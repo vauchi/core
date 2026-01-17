@@ -615,6 +615,87 @@ impl DeviceLinkInitiator {
     }
 }
 
+/// State machine for device linking from the existing device's perspective (restored from saved QR).
+///
+/// Used when the QR was generated earlier and saved to disk, then restored
+/// when the request comes in.
+pub struct DeviceLinkInitiatorRestored {
+    /// Master seed to transfer
+    master_seed: [u8; 32],
+    /// Display name to transfer
+    display_name: String,
+    /// The restored QR code
+    qr: DeviceLinkQR,
+    /// Current device registry
+    registry: DeviceRegistry,
+}
+
+impl DeviceLinkInitiatorRestored {
+    /// Creates a restored initiator with a previously saved QR code.
+    pub fn new(
+        master_seed: [u8; 32],
+        identity: &Identity,
+        registry: DeviceRegistry,
+        qr: DeviceLinkQR,
+    ) -> Self {
+        DeviceLinkInitiatorRestored {
+            master_seed,
+            display_name: identity.display_name().to_string(),
+            qr,
+            registry,
+        }
+    }
+
+    /// Returns the QR code.
+    pub fn qr(&self) -> &DeviceLinkQR {
+        &self.qr
+    }
+
+    /// Processes a link request and creates a response.
+    ///
+    /// Returns the encrypted response and the updated registry with the new device.
+    pub fn process_request(
+        &self,
+        encrypted_request: &[u8],
+    ) -> Result<(Vec<u8>, DeviceRegistry, DeviceInfo), ExchangeError> {
+        // Decrypt the request
+        let request = DeviceLinkRequest::decrypt(encrypted_request, self.qr.link_key())?;
+
+        // Validate device name
+        if request.device_name.is_empty() {
+            return Err(ExchangeError::InvalidQRFormat);
+        }
+
+        // Determine next device index
+        let device_index = self.registry.next_device_index();
+
+        // Create device info for the new device
+        let new_device_info =
+            DeviceInfo::derive(&self.master_seed, device_index, request.device_name.clone());
+
+        // Create updated registry with new device
+        let mut updated_registry = self.registry.clone();
+        updated_registry
+            .add_device_unsigned(new_device_info.to_registered(&self.master_seed))
+            .map_err(|_| ExchangeError::CryptoError)?;
+
+        // Create and encrypt response
+        let response = DeviceLinkResponse::new(
+            self.master_seed,
+            self.display_name.clone(),
+            device_index,
+            updated_registry.clone(),
+        );
+
+        let encrypted_response = response.encrypt(self.qr.link_key())?;
+
+        // Create the new device's DeviceInfo for the caller to store
+        let new_device = DeviceInfo::derive(&self.master_seed, device_index, request.device_name);
+
+        Ok((encrypted_response, updated_registry, new_device))
+    }
+}
+
 /// State machine for device linking from the new device's perspective.
 pub struct DeviceLinkResponder {
     /// The scanned QR code
@@ -1126,5 +1207,61 @@ mod tests {
         // Verify payload contents
         assert_eq!(received.contact_count(), 1);
         assert_eq!(received.version, 1);
+    }
+
+    #[test]
+    fn test_device_link_initiator_restored_flow() {
+        // Device A creates a QR and saves it
+        let master_seed = [0x42u8; 32];
+        let identity = Identity::create("Alice");
+        let registry = create_test_registry(&identity);
+
+        let initiator = DeviceLinkInitiator::new(master_seed, &identity, registry.clone());
+        let qr = initiator.qr().clone();
+        let qr_string = qr.to_data_string();
+
+        // Later, Device A restores the QR from saved string
+        let restored_qr = DeviceLinkQR::from_data_string(&qr_string).unwrap();
+        let restored_initiator =
+            DeviceLinkInitiatorRestored::new(master_seed, &identity, registry, restored_qr);
+
+        // Device B scans the QR and creates request
+        let scanned_qr = DeviceLinkQR::from_data_string(&qr_string).unwrap();
+        let responder = DeviceLinkResponder::from_qr(scanned_qr, "My Phone".to_string()).unwrap();
+        let encrypted_request = responder.create_request().unwrap();
+
+        // Device A processes request using restored initiator
+        let (encrypted_response, updated_registry, new_device) =
+            restored_initiator.process_request(&encrypted_request).unwrap();
+
+        // Device B processes response
+        let response = responder.process_response(&encrypted_response).unwrap();
+
+        // Verify the flow worked correctly
+        assert_eq!(response.master_seed(), &master_seed);
+        assert_eq!(response.display_name(), "Alice");
+        assert_eq!(response.device_index(), 1);
+        assert_eq!(new_device.device_name(), "My Phone");
+        assert_eq!(updated_registry.device_count(), 2);
+    }
+
+    #[test]
+    fn test_identity_device_link_helper_methods() {
+        // Test the new Identity helper methods
+        let identity = Identity::create("Alice");
+
+        // Test initial_device_registry
+        let registry = identity.initial_device_registry();
+        assert_eq!(registry.device_count(), 1);
+
+        // Test create_device_link_initiator
+        let initiator = identity.create_device_link_initiator(registry.clone());
+        assert!(!initiator.qr().is_expired());
+        assert_eq!(initiator.qr().identity_public_key(), identity.signing_public_key());
+
+        // Test restore_device_link_initiator
+        let qr_string = initiator.qr().to_data_string();
+        let restored_qr = DeviceLinkQR::from_data_string(&qr_string).unwrap();
+        let _restored = identity.restore_device_link_initiator(registry, restored_qr);
     }
 }

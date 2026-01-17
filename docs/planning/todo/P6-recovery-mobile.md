@@ -13,11 +13,12 @@ Recovery workflow is fully implemented in CLI but mobile apps only have informat
 
 ## Success Criteria
 
-- [ ] Mobile apps can create recovery claims
-- [ ] Mobile apps can vouch for contacts
-- [ ] Mobile apps can add vouchers to claims
-- [ ] Mobile apps show recovery progress (X/Y vouchers)
-- [ ] iOS has complete recovery UI
+- [x] Mobile apps can create recovery claims (bindings done)
+- [x] Mobile apps can vouch for contacts (bindings done)
+- [x] Mobile apps can add vouchers to claims (bindings done)
+- [x] Mobile apps show recovery progress (bindings done)
+- [ ] iOS has complete recovery UI (NOT STARTED)
+- [ ] Android uses new bindings in UI (PARTIAL - informational only)
 
 ## Current State
 

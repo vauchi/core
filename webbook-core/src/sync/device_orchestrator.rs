@@ -299,7 +299,10 @@ impl<'a> DeviceSyncOrchestrator<'a> {
     /// - Different fields/items don't conflict
     ///
     /// Returns the list of items that were applied.
-    pub fn process_incoming(&mut self, items: Vec<SyncItem>) -> Result<Vec<SyncItem>, DeviceSyncError> {
+    pub fn process_incoming(
+        &mut self,
+        items: Vec<SyncItem>,
+    ) -> Result<Vec<SyncItem>, DeviceSyncError> {
         let mut applied = Vec::new();
 
         for item in items {
@@ -343,7 +346,10 @@ impl<'a> DeviceSyncOrchestrator<'a> {
     /// Creates a sync message containing all pending items for a target device.
     ///
     /// This is used when reconnecting to send all queued changes to another device.
-    pub fn create_sync_message(&self, device_id: &[u8; 32]) -> Result<PendingSyncMessage, DeviceSyncError> {
+    pub fn create_sync_message(
+        &self,
+        device_id: &[u8; 32],
+    ) -> Result<PendingSyncMessage, DeviceSyncError> {
         let items = self.pending_for_device(device_id).to_vec();
         let version = self.version_vector.get(self.current_device.device_id());
 
@@ -769,7 +775,8 @@ mod tests {
 
         // Device C (attacker) tries to decrypt - should fail
         // Even if C knows A's public key, C doesn't have B's secret key
-        let device_a_public_key = *create_test_device(&master_seed, 0, "Device A").exchange_public_key();
+        let device_a_public_key =
+            *create_test_device(&master_seed, 0, "Device A").exchange_public_key();
         let result = orchestrator_c.decrypt_from_device(&device_a_public_key, &ciphertext);
 
         assert!(result.is_err());
@@ -889,7 +896,11 @@ mod tests {
         // The phone update should be applied (different field)
         assert_eq!(applied.len(), 1);
         match &applied[0] {
-            SyncItem::CardUpdated { field_label, new_value, .. } => {
+            SyncItem::CardUpdated {
+                field_label,
+                new_value,
+                ..
+            } => {
                 assert_eq!(field_label, "phone");
                 assert_eq!(new_value, "+1234567890");
             }

@@ -315,7 +315,11 @@ async fn main() -> Result<()> {
         }
         Commands::Card(cmd) => match cmd {
             CardCommands::Show => commands::card::show(&config)?,
-            CardCommands::Add { field_type, label, value } => {
+            CardCommands::Add {
+                field_type,
+                label,
+                value,
+            } => {
                 commands::card::add(&config, &field_type, &label, &value)?;
             }
             CardCommands::Remove { label } => {
@@ -375,13 +379,18 @@ async fn main() -> Result<()> {
         Commands::Recovery(cmd) => match cmd {
             RecoveryCommands::Claim { old_pk } => commands::recovery::claim(&config, &old_pk)?,
             RecoveryCommands::Vouch { claim } => commands::recovery::vouch(&config, &claim)?,
-            RecoveryCommands::AddVoucher { voucher } => commands::recovery::add_voucher(&config, &voucher)?,
+            RecoveryCommands::AddVoucher { voucher } => {
+                commands::recovery::add_voucher(&config, &voucher)?
+            }
             RecoveryCommands::Status => commands::recovery::status(&config)?,
             RecoveryCommands::Proof => commands::recovery::proof_show(&config)?,
             RecoveryCommands::Verify { proof } => commands::recovery::verify(&config, &proof)?,
             RecoveryCommands::Settings(settings_cmd) => match settings_cmd {
                 RecoverySettingsCommands::Show => commands::recovery::settings_show(&config)?,
-                RecoverySettingsCommands::Set { recovery, verification } => {
+                RecoverySettingsCommands::Set {
+                    recovery,
+                    verification,
+                } => {
                     commands::recovery::settings_set(&config, recovery, verification)?;
                 }
             },

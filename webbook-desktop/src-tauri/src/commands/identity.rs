@@ -23,11 +23,13 @@ pub fn has_identity(state: State<'_, Mutex<AppState>>) -> bool {
 
 /// Create a new identity.
 #[tauri::command]
-pub fn create_identity(name: String, state: State<'_, Mutex<AppState>>) -> Result<IdentityInfo, String> {
+pub fn create_identity(
+    name: String,
+    state: State<'_, Mutex<AppState>>,
+) -> Result<IdentityInfo, String> {
     let mut state = state.lock().unwrap();
 
-    state.create_identity(&name)
-        .map_err(|e| e.to_string())?;
+    state.create_identity(&name).map_err(|e| e.to_string())?;
 
     Ok(IdentityInfo {
         display_name: state.display_name().unwrap_or("").to_string(),

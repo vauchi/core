@@ -9,8 +9,8 @@ pub fn draw(f: &mut Frame, area: Rect, app: &App) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(3),  // Instructions
-            Constraint::Min(0),     // QR code
+            Constraint::Length(3), // Instructions
+            Constraint::Min(0),    // QR code
         ])
         .split(area);
 
@@ -42,13 +42,12 @@ fn render_qr_ascii(data: &str) -> String {
     use qrcode::QrCode;
 
     match QrCode::new(data) {
-        Ok(code) => {
-            code.render()
-                .dark_color('█')
-                .light_color(' ')
-                .quiet_zone(true)
-                .build()
-        }
+        Ok(code) => code
+            .render()
+            .dark_color('█')
+            .light_color(' ')
+            .quiet_zone(true)
+            .build(),
         Err(_) => "Failed to generate QR code".to_string(),
     }
 }

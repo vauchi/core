@@ -5,8 +5,11 @@
 #![allow(dead_code)] // Utility functions for future use
 
 use console::{style, Style};
-use tabled::{Table, Tabled, settings::{Style as TableStyle, Modify, object::Columns, Alignment}};
-use webbook_core::{ContactCard, Contact, FieldType, SocialNetworkRegistry};
+use tabled::{
+    settings::{object::Columns, Alignment, Modify, Style as TableStyle},
+    Table, Tabled,
+};
+use webbook_core::{Contact, ContactCard, FieldType, SocialNetworkRegistry};
 
 /// Prints a success message.
 pub fn success(msg: &str) {
@@ -73,11 +76,7 @@ pub fn display_card(card: &ContactCard) {
                         label_style.apply_to(field.label()),
                         field.value()
                     );
-                    println!(
-                        "         {:12} {}",
-                        "",
-                        style(&url).dim().underlined()
-                    );
+                    println!("         {:12} {}", "", style(&url).dim().underlined());
                 } else {
                     println!(
                         "  {:6} {:12} {}",
@@ -151,12 +150,13 @@ pub fn display_contact_details(contact: &Contact) {
 
 /// Displays a QR code in the terminal using Unicode blocks.
 pub fn display_qr_code(data: &str) {
-    use qrcode::QrCode;
     use qrcode::render::unicode;
+    use qrcode::QrCode;
 
     match QrCode::new(data) {
         Ok(code) => {
-            let image = code.render::<unicode::Dense1x2>()
+            let image = code
+                .render::<unicode::Dense1x2>()
                 .dark_color(unicode::Dense1x2::Light)
                 .light_color(unicode::Dense1x2::Dark)
                 .build();

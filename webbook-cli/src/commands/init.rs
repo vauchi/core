@@ -5,8 +5,8 @@
 use std::fs;
 
 use anyhow::{bail, Result};
-use webbook_core::{WebBook, WebBookConfig};
 use webbook_core::network::MockTransport;
+use webbook_core::{WebBook, WebBookConfig};
 
 use crate::config::CliConfig;
 use crate::display;
@@ -34,7 +34,9 @@ pub fn run(name: &str, config: &CliConfig) -> Result<()> {
     wb.create_identity(name)?;
 
     // Save identity to file for persistence
-    let identity = wb.identity().ok_or_else(|| anyhow::anyhow!("Identity not found after creation"))?;
+    let identity = wb
+        .identity()
+        .ok_or_else(|| anyhow::anyhow!("Identity not found after creation"))?;
     let backup = identity.export_backup(LOCAL_STORAGE_PASSWORD)?;
     fs::write(config.identity_path(), backup.as_bytes())?;
 

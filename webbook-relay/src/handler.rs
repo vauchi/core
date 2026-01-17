@@ -8,7 +8,7 @@ use futures_util::{SinkExt, StreamExt};
 use tokio::net::TcpStream;
 use tokio_tungstenite::tungstenite::Message;
 use tokio_tungstenite::WebSocketStream;
-use tracing::{debug, warn, error};
+use tracing::{debug, error, warn};
 
 use crate::rate_limit::RateLimiter;
 use crate::recovery_storage::{RecoveryProofStore, StoredRecoveryProof};
@@ -177,7 +177,12 @@ mod protocol {
     }
 
     /// Creates an encrypted update envelope for delivery.
-    pub fn create_update_delivery(blob_id: &str, sender_id: &str, recipient_id: &str, data: &[u8]) -> MessageEnvelope {
+    pub fn create_update_delivery(
+        blob_id: &str,
+        sender_id: &str,
+        recipient_id: &str,
+        data: &[u8],
+    ) -> MessageEnvelope {
         MessageEnvelope {
             version: PROTOCOL_VERSION,
             message_id: blob_id.to_string(),
@@ -219,22 +224,20 @@ pub async fn handle_connection(
 
     // Wait for handshake to get client ID
     let client_id = match read.next().await {
-        Some(Ok(Message::Binary(data))) => {
-            match protocol::decode_message(&data) {
-                Ok(envelope) => {
-                    if let protocol::MessagePayload::Handshake(hs) = envelope.payload {
-                        hs.client_id
-                    } else {
-                        warn!("Expected Handshake, got {:?}", envelope.payload);
-                        return;
-                    }
-                }
-                Err(e) => {
-                    warn!("Failed to decode handshake: {}", e);
+        Some(Ok(Message::Binary(data))) => match protocol::decode_message(&data) {
+            Ok(envelope) => {
+                if let protocol::MessagePayload::Handshake(hs) = envelope.payload {
+                    hs.client_id
+                } else {
+                    warn!("Expected Handshake, got {:?}", envelope.payload);
                     return;
                 }
             }
-        }
+            Err(e) => {
+                warn!("Failed to decode handshake: {}", e);
+                return;
+            }
+        },
         Some(Ok(_)) => {
             warn!("Expected binary message for handshake");
             return;
@@ -254,7 +257,8 @@ pub async fn handle_connection(
     // Send any pending blobs for this client
     let pending = storage.peek(&client_id);
     for blob in pending {
-        let envelope = protocol::create_update_delivery(&blob.id, &blob.sender_id, &client_id, &blob.data);
+        let envelope =
+            protocol::create_update_delivery(&blob.id, &blob.sender_id, &client_id, &blob.data);
         match protocol::encode_message(&envelope) {
             Ok(data) => {
                 if write.send(Message::Binary(data)).await.is_err() {
@@ -300,7 +304,10 @@ pub async fn handle_connection(
                         storage.store(&update.recipient_id, blob);
 
                         // Send acknowledgment
-                        let ack = protocol::create_ack(&envelope.message_id, protocol::AckStatus::Delivered);
+                        let ack = protocol::create_ack(
+                            &envelope.message_id,
+                            protocol::AckStatus::Delivered,
+                        );
                         if let Ok(ack_data) = protocol::encode_message(&ack) {
                             let _ = write.send(Message::Binary(ack_data)).await;
                         }
@@ -323,7 +330,10 @@ pub async fn handle_connection(
                             recovery_storage.store(proof);
 
                             // Send acknowledgment
-                            let ack = protocol::create_ack(&envelope.message_id, protocol::AckStatus::Delivered);
+                            let ack = protocol::create_ack(
+                                &envelope.message_id,
+                                protocol::AckStatus::Delivered,
+                            );
                             if let Ok(ack_data) = protocol::encode_message(&ack) {
                                 let _ = write.send(Message::Binary(ack_data)).await;
                             }
@@ -356,7 +366,11 @@ pub async fn handle_connection(
                             let _ = write.send(Message::Binary(data)).await;
                         }
 
-                        debug!("Processed recovery query with {} hashes from {}", query.key_hashes.len(), client_id);
+                        debug!(
+                            "Processed recovery query with {} hashes from {}",
+                            query.key_hashes.len(),
+                            client_id
+                        );
                     }
                     protocol::MessagePayload::RecoveryProofResponse(_) => {
                         // Clients shouldn't send responses, ignore

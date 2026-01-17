@@ -24,8 +24,7 @@ pub fn run() {
                 .join("webbook");
 
             // Initialize app state
-            let app_state = AppState::new(&data_dir)
-                .expect("Failed to initialize app state");
+            let app_state = AppState::new(&data_dir).expect("Failed to initialize app state");
 
             app.manage(Mutex::new(app_state));
 

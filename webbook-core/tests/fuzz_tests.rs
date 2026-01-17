@@ -18,8 +18,7 @@ fn arbitrary_bytes(len: usize) -> impl Strategy<Value = Vec<u8>> {
 
 /// Generate arbitrary JSON-like strings (may be invalid)
 fn arbitrary_json_string() -> impl Strategy<Value = String> {
-    prop::string::string_regex(r#"[\x00-\x7F]{0,1000}"#)
-        .unwrap()
+    prop::string::string_regex(r#"[\x00-\x7F]{0,1000}"#).unwrap()
 }
 
 // =============================================================================

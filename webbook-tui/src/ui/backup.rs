@@ -18,19 +18,23 @@ fn draw_menu(f: &mut Frame, area: Rect) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(5),  // Info
-            Constraint::Length(3),  // Export option
-            Constraint::Length(3),  // Import option
-            Constraint::Min(0),     // Spacer
+            Constraint::Length(5), // Info
+            Constraint::Length(3), // Export option
+            Constraint::Length(3), // Import option
+            Constraint::Min(0),    // Spacer
         ])
         .split(area);
 
     let info = Paragraph::new(
         "Back up your identity to transfer to another device or restore after reinstalling.\n\
-         Your backup is encrypted with a password you choose."
+         Your backup is encrypted with a password you choose.",
     )
     .style(Style::default().fg(Color::Cyan))
-    .block(Block::default().borders(Borders::ALL).title("Backup & Restore"));
+    .block(
+        Block::default()
+            .borders(Borders::ALL)
+            .title("Backup & Restore"),
+    );
     f.render_widget(info, chunks[0]);
 
     let export = Paragraph::new("[e] Export Backup - Create an encrypted backup")
@@ -48,11 +52,11 @@ fn draw_export(f: &mut Frame, area: Rect, app: &App) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(3),  // Info
-            Constraint::Length(3),  // Password
-            Constraint::Length(3),  // Confirm
-            Constraint::Length(3),  // Instructions
-            Constraint::Min(0),     // Spacer
+            Constraint::Length(3), // Info
+            Constraint::Length(3), // Password
+            Constraint::Length(3), // Confirm
+            Constraint::Length(3), // Instructions
+            Constraint::Min(0),    // Spacer
         ])
         .split(area);
 
@@ -62,7 +66,9 @@ fn draw_export(f: &mut Frame, area: Rect, app: &App) {
     f.render_widget(info, chunks[0]);
 
     let pw_style = if app.backup_state.focus == BackupFocus::Password {
-        Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)
+        Style::default()
+            .fg(Color::Yellow)
+            .add_modifier(Modifier::BOLD)
     } else {
         Style::default()
     };
@@ -75,7 +81,9 @@ fn draw_export(f: &mut Frame, area: Rect, app: &App) {
     f.render_widget(password, chunks[1]);
 
     let confirm_style = if app.backup_state.focus == BackupFocus::Confirm {
-        Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)
+        Style::default()
+            .fg(Color::Yellow)
+            .add_modifier(Modifier::BOLD)
     } else {
         Style::default()
     };
@@ -97,11 +105,11 @@ fn draw_import(f: &mut Frame, area: Rect, app: &App) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(3),  // Info
-            Constraint::Length(5),  // Data
-            Constraint::Length(3),  // Password
-            Constraint::Length(3),  // Instructions
-            Constraint::Min(0),     // Spacer
+            Constraint::Length(3), // Info
+            Constraint::Length(5), // Data
+            Constraint::Length(3), // Password
+            Constraint::Length(3), // Instructions
+            Constraint::Min(0),    // Spacer
         ])
         .split(area);
 
@@ -111,7 +119,9 @@ fn draw_import(f: &mut Frame, area: Rect, app: &App) {
     f.render_widget(info, chunks[0]);
 
     let data_style = if app.backup_state.focus == BackupFocus::Data {
-        Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)
+        Style::default()
+            .fg(Color::Yellow)
+            .add_modifier(Modifier::BOLD)
     } else {
         Style::default()
     };
@@ -126,7 +136,9 @@ fn draw_import(f: &mut Frame, area: Rect, app: &App) {
     f.render_widget(data, chunks[1]);
 
     let pw_style = if app.backup_state.focus == BackupFocus::Password {
-        Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)
+        Style::default()
+            .fg(Color::Yellow)
+            .add_modifier(Modifier::BOLD)
     } else {
         Style::default()
     };

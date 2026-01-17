@@ -340,11 +340,7 @@ fn test_rapid_open_close_cycles() {
     for i in 0..50 {
         let storage = Storage::open(&db_path, key.clone()).unwrap();
         let contacts = storage.list_contacts().unwrap();
-        assert!(
-            !contacts.is_empty(),
-            "Iteration {} found no contacts",
-            i
-        );
+        assert!(!contacts.is_empty(), "Iteration {} found no contacts", i);
     }
 }
 
@@ -373,12 +369,7 @@ fn test_interleaved_reads_writes() {
         {
             let storage = Storage::open(&db_path, key.clone()).unwrap();
             let contacts = storage.list_contacts().unwrap();
-            assert_eq!(
-                contacts.len(),
-                i + 1,
-                "Wrong count after iteration {}",
-                i
-            );
+            assert_eq!(contacts.len(), i + 1, "Wrong count after iteration {}", i);
         }
     }
 }
@@ -410,7 +401,12 @@ fn test_double_save_overwrites() {
 
     // Save contact
     let mut card = ContactCard::new("Original Name");
-    card.add_field(ContactField::new(FieldType::Email, "Work", "original@example.com")).unwrap();
+    card.add_field(ContactField::new(
+        FieldType::Email,
+        "Work",
+        "original@example.com",
+    ))
+    .unwrap();
     let shared_key = SymmetricKey::generate();
     let contact = Contact::from_exchange([1u8; 32], card, shared_key);
     let id = contact.id().to_string();
@@ -423,7 +419,13 @@ fn test_double_save_overwrites() {
 
     // Create new contact with same public key to get same ID
     let mut card2 = ContactCard::new("Updated Name");
-    card2.add_field(ContactField::new(FieldType::Email, "Work", "updated@example.com")).unwrap();
+    card2
+        .add_field(ContactField::new(
+            FieldType::Email,
+            "Work",
+            "updated@example.com",
+        ))
+        .unwrap();
     let shared_key2 = SymmetricKey::generate();
     let contact2 = Contact::from_exchange([1u8; 32], card2, shared_key2);
 

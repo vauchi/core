@@ -40,7 +40,9 @@ pub struct ExchangeResult {
 pub fn generate_qr(state: State<'_, Mutex<AppState>>) -> Result<ExchangeQRResponse, String> {
     let state = state.lock().unwrap();
 
-    let identity = state.identity.as_ref()
+    let identity = state
+        .identity
+        .as_ref()
         .ok_or("No identity found. Please create an identity first.")?;
 
     // Generate proper ExchangeQR with X3DH keys
@@ -61,16 +63,21 @@ pub fn generate_qr(state: State<'_, Mutex<AppState>>) -> Result<ExchangeQRRespon
 ///
 /// Performs X3DH key agreement and creates a new contact.
 #[tauri::command]
-pub fn complete_exchange(data: String, state: State<'_, Mutex<AppState>>) -> Result<ExchangeResult, String> {
+pub fn complete_exchange(
+    data: String,
+    state: State<'_, Mutex<AppState>>,
+) -> Result<ExchangeResult, String> {
     let state = state.lock().unwrap();
 
     // Get our identity for X3DH key agreement
-    let identity = state.identity.as_ref()
+    let identity = state
+        .identity
+        .as_ref()
         .ok_or("No identity found. Please create an identity first.")?;
 
     // Parse the QR data (validates signature internally)
-    let qr = CoreExchangeQR::from_data_string(&data)
-        .map_err(|e| format!("Invalid QR code: {:?}", e))?;
+    let qr =
+        CoreExchangeQR::from_data_string(&data).map_err(|e| format!("Invalid QR code: {:?}", e))?;
 
     // Check if QR code has expired
     if qr.is_expired() {
@@ -83,7 +90,13 @@ pub fn complete_exchange(data: String, state: State<'_, Mutex<AppState>>) -> Res
     let contact_id = hex::encode(their_public_key);
 
     // Check if we already have this contact
-    if state.storage.load_contact(&contact_id).ok().flatten().is_some() {
+    if state
+        .storage
+        .load_contact(&contact_id)
+        .ok()
+        .flatten()
+        .is_some()
+    {
         return Ok(ExchangeResult {
             success: false,
             contact_name: "Unknown".to_string(),
@@ -106,7 +119,9 @@ pub fn complete_exchange(data: String, state: State<'_, Mutex<AppState>>) -> Res
     let contact = Contact::from_exchange(their_public_key, card, shared_secret);
 
     // Save the contact to storage
-    state.storage.save_contact(&contact)
+    state
+        .storage
+        .save_contact(&contact)
         .map_err(|e| format!("Failed to save contact: {:?}", e))?;
 
     Ok(ExchangeResult {

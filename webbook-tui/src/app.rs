@@ -160,8 +160,14 @@ impl App {
     /// Go back to the previous screen.
     pub fn go_back(&mut self) {
         match self.screen {
-            Screen::Contacts | Screen::Exchange | Screen::Settings | Screen::Help
-            | Screen::Devices | Screen::Recovery | Screen::Sync | Screen::Backup => {
+            Screen::Contacts
+            | Screen::Exchange
+            | Screen::Settings
+            | Screen::Help
+            | Screen::Devices
+            | Screen::Recovery
+            | Screen::Sync
+            | Screen::Backup => {
                 self.screen = Screen::Home;
             }
             Screen::ContactDetail => {

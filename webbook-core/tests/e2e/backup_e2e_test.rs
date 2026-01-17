@@ -4,10 +4,8 @@
 //! Feature: device_management.feature
 
 use webbook_core::{
-    crypto::PublicKey,
-    network::MockTransport,
-    sync::CardDelta,
-    ContactCard, ContactField, FieldType, Identity, WebBook,
+    crypto::PublicKey, network::MockTransport, sync::CardDelta, ContactCard, ContactField,
+    FieldType, Identity, WebBook,
 };
 
 /// Tests the complete backup and recovery workflow.
@@ -21,13 +19,30 @@ fn test_backup_recovery_happy_path() {
     let original_public_id = identity.public_id();
 
     let mut card = ContactCard::new("Alice Smith");
-    card.add_field(ContactField::new(FieldType::Email, "work", "alice@company.com")).unwrap();
-    card.add_field(ContactField::new(FieldType::Phone, "mobile", "+15559876543")).unwrap();
-    card.add_field(ContactField::new(FieldType::Website, "blog", "https://alice.dev")).unwrap();
+    card.add_field(ContactField::new(
+        FieldType::Email,
+        "work",
+        "alice@company.com",
+    ))
+    .unwrap();
+    card.add_field(ContactField::new(
+        FieldType::Phone,
+        "mobile",
+        "+15559876543",
+    ))
+    .unwrap();
+    card.add_field(ContactField::new(
+        FieldType::Website,
+        "blog",
+        "https://alice.dev",
+    ))
+    .unwrap();
 
     // Step 2: Create encrypted backup
     let backup_password = "SecureP@ssw0rd!2024";
-    let backup = identity.export_backup(backup_password).expect("Backup creation should succeed");
+    let backup = identity
+        .export_backup(backup_password)
+        .expect("Backup creation should succeed");
     assert!(!backup.as_bytes().is_empty());
 
     // Step 3: Simulate new device - restore from backup
@@ -37,7 +52,10 @@ fn test_backup_recovery_happy_path() {
     // Step 4: Verify restored identity matches original
     assert_eq!(restored_identity.public_id(), original_public_id);
     assert_eq!(restored_identity.display_name(), "Alice Smith");
-    assert_eq!(restored_identity.signing_public_key(), identity.signing_public_key());
+    assert_eq!(
+        restored_identity.signing_public_key(),
+        identity.signing_public_key()
+    );
 
     // Step 5: Verify wrong password fails
     let wrong_password_result = Identity::import_backup(&backup, "wrong_password");
@@ -61,7 +79,11 @@ fn test_multi_device_linking_happy_path() {
     let mut device_a: WebBook<MockTransport> = WebBook::in_memory().unwrap();
     device_a.create_identity("Alice").unwrap();
     device_a
-        .add_own_field(ContactField::new(FieldType::Email, "work", "alice@company.com"))
+        .add_own_field(ContactField::new(
+            FieldType::Email,
+            "work",
+            "alice@company.com",
+        ))
         .unwrap();
 
     let device_a_public_id = device_a.public_id().unwrap();
@@ -69,7 +91,9 @@ fn test_multi_device_linking_happy_path() {
 
     // Step 2: Export backup for device linking
     let identity_a = device_a.identity().unwrap();
-    let backup = identity_a.export_backup("LinkingPassword123!").expect("Backup should succeed");
+    let backup = identity_a
+        .export_backup("LinkingPassword123!")
+        .expect("Backup should succeed");
 
     // Step 3: Import on Device B (simulate new device)
     let _device_b: WebBook<MockTransport> = WebBook::in_memory().unwrap();
@@ -78,11 +102,18 @@ fn test_multi_device_linking_happy_path() {
 
     // Step 4: Verify both devices share same identity
     assert_eq!(restored_identity.display_name(), "Alice");
-    assert_eq!(restored_identity.signing_public_key(), identity_a.signing_public_key());
+    assert_eq!(
+        restored_identity.signing_public_key(),
+        identity_a.signing_public_key()
+    );
 
     // Step 5: Simulate sync - Device A updates card
     device_a
-        .add_own_field(ContactField::new(FieldType::Phone, "mobile", "+15551234567"))
+        .add_own_field(ContactField::new(
+            FieldType::Phone,
+            "mobile",
+            "+15551234567",
+        ))
         .unwrap();
     let updated_card_a = device_a.own_card().unwrap().unwrap();
     assert_eq!(updated_card_a.fields().len(), 2);

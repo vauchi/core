@@ -118,11 +118,20 @@ mod tests {
 
     #[test]
     fn test_password_strength_from_score() {
-        assert_eq!(PasswordStrength::from(Score::Zero), PasswordStrength::TooWeak);
+        assert_eq!(
+            PasswordStrength::from(Score::Zero),
+            PasswordStrength::TooWeak
+        );
         assert_eq!(PasswordStrength::from(Score::One), PasswordStrength::Weak);
         assert_eq!(PasswordStrength::from(Score::Two), PasswordStrength::Fair);
-        assert_eq!(PasswordStrength::from(Score::Three), PasswordStrength::Strong);
-        assert_eq!(PasswordStrength::from(Score::Four), PasswordStrength::VeryStrong);
+        assert_eq!(
+            PasswordStrength::from(Score::Three),
+            PasswordStrength::Strong
+        );
+        assert_eq!(
+            PasswordStrength::from(Score::Four),
+            PasswordStrength::VeryStrong
+        );
     }
 
     #[test]

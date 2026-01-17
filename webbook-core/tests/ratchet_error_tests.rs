@@ -3,11 +3,7 @@
 //! Tests for Double Ratchet error conditions and edge cases.
 //! These tests ensure the cryptographic protocol handles errors correctly.
 
-use webbook_core::{
-    crypto::ratchet::DoubleRatchetState,
-    exchange::X3DHKeyPair,
-    SymmetricKey,
-};
+use webbook_core::{crypto::ratchet::DoubleRatchetState, exchange::X3DHKeyPair, SymmetricKey};
 
 // =============================================================================
 // Message Order Tests
@@ -175,10 +171,8 @@ fn test_different_secrets_produce_different_ratchets() {
     let secret2 = SymmetricKey::generate();
     let bob_dh = X3DHKeyPair::generate();
 
-    let mut ratchet1 =
-        DoubleRatchetState::initialize_initiator(&secret1, *bob_dh.public_key());
-    let mut ratchet2 =
-        DoubleRatchetState::initialize_initiator(&secret2, *bob_dh.public_key());
+    let mut ratchet1 = DoubleRatchetState::initialize_initiator(&secret1, *bob_dh.public_key());
+    let mut ratchet2 = DoubleRatchetState::initialize_initiator(&secret2, *bob_dh.public_key());
 
     let plaintext = b"Same message";
     let enc1 = ratchet1.encrypt(plaintext).unwrap();
@@ -288,7 +282,7 @@ fn test_consecutive_messages_same_party() {
 /// Test: Ratchet state can be serialized and restored
 #[test]
 fn test_ratchet_state_serialization() {
-    use webbook_core::{Contact, ContactCard, network::MockTransport, WebBook};
+    use webbook_core::{network::MockTransport, Contact, ContactCard, WebBook};
 
     let mut alice_wb: WebBook<MockTransport> = WebBook::in_memory().unwrap();
     let mut bob_wb: WebBook<MockTransport> = WebBook::in_memory().unwrap();
@@ -303,11 +297,13 @@ fn test_ratchet_state_serialization() {
     let bob_pk = *bob_wb.identity().unwrap().signing_public_key();
     let alice_pk = *alice_wb.identity().unwrap().signing_public_key();
 
-    let bob_contact = Contact::from_exchange(bob_pk, ContactCard::new("Bob"), shared_secret.clone());
+    let bob_contact =
+        Contact::from_exchange(bob_pk, ContactCard::new("Bob"), shared_secret.clone());
     let bob_contact_id = bob_contact.id().to_string();
     alice_wb.add_contact(bob_contact).unwrap();
 
-    let alice_contact = Contact::from_exchange(alice_pk, ContactCard::new("Alice"), shared_secret.clone());
+    let alice_contact =
+        Contact::from_exchange(alice_pk, ContactCard::new("Alice"), shared_secret.clone());
     let alice_contact_id = alice_contact.id().to_string();
     bob_wb.add_contact(alice_contact).unwrap();
 
@@ -317,19 +313,23 @@ fn test_ratchet_state_serialization() {
     let bob_ratchet = DoubleRatchetState::initialize_responder(&shared_secret, bob_dh);
 
     // Save to storage
-    alice_wb.storage()
+    alice_wb
+        .storage()
         .save_ratchet_state(&bob_contact_id, &alice_ratchet, true)
         .unwrap();
-    bob_wb.storage()
+    bob_wb
+        .storage()
         .save_ratchet_state(&alice_contact_id, &bob_ratchet, false)
         .unwrap();
 
     // Load back
-    let (loaded_alice, is_initiator_a) = alice_wb.storage()
+    let (loaded_alice, is_initiator_a) = alice_wb
+        .storage()
         .load_ratchet_state(&bob_contact_id)
         .unwrap()
         .unwrap();
-    let (loaded_bob, is_initiator_b) = bob_wb.storage()
+    let (loaded_bob, is_initiator_b) = bob_wb
+        .storage()
         .load_ratchet_state(&alice_contact_id)
         .unwrap()
         .unwrap();
@@ -371,6 +371,9 @@ fn test_ratchet_message_serialization() {
     assert_eq!(encrypted.dh_public, restored.dh_public);
     assert_eq!(encrypted.dh_generation, restored.dh_generation);
     assert_eq!(encrypted.message_index, restored.message_index);
-    assert_eq!(encrypted.previous_chain_length, restored.previous_chain_length);
+    assert_eq!(
+        encrypted.previous_chain_length,
+        restored.previous_chain_length
+    );
     assert_eq!(encrypted.ciphertext, restored.ciphertext);
 }

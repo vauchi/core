@@ -32,12 +32,12 @@ pub use network::{
     ConnectionState, MessageEnvelope, MockTransport, NetworkError, RelayClient, RelayClientConfig,
     Transport,
 };
-pub use social::{
-    ProfileValidation, SocialNetwork, SocialNetworkRegistry, TrustLevel, ValidationStatus,
-};
 pub use recovery::{
     ConflictingClaim, RecoveryClaim, RecoveryConflict, RecoveryError, RecoveryProof,
     RecoveryReminder, RecoveryRevocation, RecoverySettings, RecoveryVoucher, VerificationResult,
+};
+pub use social::{
+    ProfileValidation, SocialNetwork, SocialNetworkRegistry, TrustLevel, ValidationStatus,
 };
 pub use storage::{PendingUpdate, Storage, StorageError, UpdateStatus};
 pub use sync::{CardDelta, DeltaError, FieldChange, SyncError, SyncManager, SyncState};

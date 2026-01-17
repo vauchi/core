@@ -3,11 +3,11 @@
 use std::path::Path;
 
 use anyhow::{Context, Result};
+#[cfg(feature = "secure-storage")]
+use webbook_core::storage::secure::{PlatformKeyring, SecureStorage};
 use webbook_core::{
     ContactCard, ContactField, FieldType, Identity, IdentityBackup, Storage, SymmetricKey,
 };
-#[cfg(feature = "secure-storage")]
-use webbook_core::storage::secure::{PlatformKeyring, SecureStorage};
 
 #[cfg(not(feature = "secure-storage"))]
 use webbook_core::storage::secure::{FileKeyStorage, SecureStorage};
@@ -64,7 +64,8 @@ impl Backend {
                 Ok(None) => {
                     // Generate and save new key
                     let key = SymmetricKey::generate();
-                    storage.save_key(KEY_NAME, key.as_bytes())
+                    storage
+                        .save_key(KEY_NAME, key.as_bytes())
                         .map_err(|e| anyhow::anyhow!("Failed to save key to keychain: {}", e))?;
                     Ok(key)
                 }
@@ -80,10 +81,10 @@ impl Backend {
             // Use a derived key for encrypting the storage key file
             // Note: This provides defense-in-depth, not strong security
             let fallback_key = SymmetricKey::from_bytes([
-                0x57, 0x65, 0x62, 0x42, 0x6f, 0x6f, 0x6b, 0x54,  // "WebBookT"
-                0x55, 0x49, 0x53, 0x74, 0x6f, 0x72, 0x61, 0x67,  // "UIStorag"
-                0x65, 0x4b, 0x65, 0x79, 0x46, 0x61, 0x6c, 0x6c,  // "eKeyFall"
-                0x62, 0x61, 0x63, 0x6b, 0x56, 0x31, 0x00, 0x00,  // "backV1\0\0"
+                0x57, 0x65, 0x62, 0x42, 0x6f, 0x6f, 0x6b, 0x54, // "WebBookT"
+                0x55, 0x49, 0x53, 0x74, 0x6f, 0x72, 0x61, 0x67, // "UIStorag"
+                0x65, 0x4b, 0x65, 0x79, 0x46, 0x61, 0x6c, 0x6c, // "eKeyFall"
+                0x62, 0x61, 0x63, 0x6b, 0x56, 0x31, 0x00, 0x00, // "backV1\0\0"
             ]);
 
             let key_dir = data_dir.join("keys");
@@ -101,7 +102,8 @@ impl Backend {
                 Ok(None) => {
                     // Generate and save new key
                     let key = SymmetricKey::generate();
-                    storage.save_key(KEY_NAME, key.as_bytes())
+                    storage
+                        .save_key(KEY_NAME, key.as_bytes())
                         .map_err(|e| anyhow::anyhow!("Failed to save storage key: {}", e))?;
                     Ok(key)
                 }
@@ -115,27 +117,31 @@ impl Backend {
     /// Create a new backend.
     pub fn new(data_dir: &Path) -> Result<Self> {
         // Ensure data directory exists
-        std::fs::create_dir_all(data_dir)
-            .context("Failed to create data directory")?;
+        std::fs::create_dir_all(data_dir).context("Failed to create data directory")?;
 
         let db_path = data_dir.join("webbook.db");
 
         // Generate or load encryption key using SecureStorage
         let key = Self::load_or_create_storage_key(data_dir)?;
 
-        let storage = Storage::open(&db_path, key)
-            .context("Failed to open storage")?;
+        let storage = Storage::open(&db_path, key).context("Failed to open storage")?;
 
         // Try to load existing identity
-        let (identity, backup_data, display_name) = if let Ok(Some((backup, name))) = storage.load_identity() {
-            let backup_obj = IdentityBackup::new(backup.clone());
-            let identity = Identity::import_backup(&backup_obj, LOCAL_STORAGE_PASSWORD).ok();
-            (identity, Some(backup), Some(name))
-        } else {
-            (None, None, None)
-        };
+        let (identity, backup_data, display_name) =
+            if let Ok(Some((backup, name))) = storage.load_identity() {
+                let backup_obj = IdentityBackup::new(backup.clone());
+                let identity = Identity::import_backup(&backup_obj, LOCAL_STORAGE_PASSWORD).ok();
+                (identity, Some(backup), Some(name))
+            } else {
+                (None, None, None)
+            };
 
-        Ok(Backend { storage, identity, backup_data, display_name })
+        Ok(Backend {
+            storage,
+            identity,
+            backup_data,
+            display_name,
+        })
     }
 
     /// Check if identity exists.
@@ -147,11 +153,13 @@ impl Backend {
     #[allow(dead_code)]
     pub fn create_identity(&mut self, name: &str) -> Result<()> {
         let identity = Identity::create(name);
-        let backup = identity.export_backup(LOCAL_STORAGE_PASSWORD)
+        let backup = identity
+            .export_backup(LOCAL_STORAGE_PASSWORD)
             .map_err(|e| anyhow::anyhow!("Failed to create backup: {:?}", e))?;
         let backup_data = backup.as_bytes().to_vec();
 
-        self.storage.save_identity(&backup_data, name)
+        self.storage
+            .save_identity(&backup_data, name)
             .context("Failed to save identity")?;
 
         self.identity = Some(identity);
@@ -162,7 +170,9 @@ impl Backend {
 
     /// Get the display name.
     pub fn display_name(&self) -> Option<&str> {
-        self.identity.as_ref().map(|i| i.display_name())
+        self.identity
+            .as_ref()
+            .map(|i| i.display_name())
             .or(self.display_name.as_deref())
     }
 
@@ -176,33 +186,40 @@ impl Backend {
 
     /// Get the own contact card.
     pub fn get_card(&self) -> Result<Option<ContactCard>> {
-        self.storage.load_own_card()
+        self.storage
+            .load_own_card()
             .context("Failed to load own card")
     }
 
     /// Get card fields for display.
     pub fn get_card_fields(&self) -> Result<Vec<FieldInfo>> {
         let card = self.get_card()?;
-        Ok(card.map(|c| {
-            c.fields().iter().map(|f| FieldInfo {
-                field_type: format!("{:?}", f.field_type()),
-                label: f.label().to_string(),
-                value: f.value().to_string(),
-            }).collect()
-        }).unwrap_or_default())
+        Ok(card
+            .map(|c| {
+                c.fields()
+                    .iter()
+                    .map(|f| FieldInfo {
+                        field_type: format!("{:?}", f.field_type()),
+                        label: f.label().to_string(),
+                        value: f.value().to_string(),
+                    })
+                    .collect()
+            })
+            .unwrap_or_default())
     }
 
     /// Add a field to the card.
     pub fn add_field(&self, field_type: FieldType, label: &str, value: &str) -> Result<()> {
-        let mut card = self.get_card()?.unwrap_or_else(|| {
-            ContactCard::new(self.display_name().unwrap_or("User"))
-        });
+        let mut card = self
+            .get_card()?
+            .unwrap_or_else(|| ContactCard::new(self.display_name().unwrap_or("User")));
 
         let field = ContactField::new(field_type, label, value);
         card.add_field(field)
             .map_err(|e| anyhow::anyhow!("{}", e))?;
 
-        self.storage.save_own_card(&card)
+        self.storage
+            .save_own_card(&card)
             .context("Failed to save card")?;
 
         Ok(())
@@ -213,26 +230,34 @@ impl Backend {
         let mut card = self.get_card()?.context("No card found")?;
         card.remove_field(field_id)
             .map_err(|e| anyhow::anyhow!("{}", e))?;
-        self.storage.save_own_card(&card)
+        self.storage
+            .save_own_card(&card)
             .context("Failed to save card")?;
         Ok(())
     }
 
     /// List all contacts.
     pub fn list_contacts(&self) -> Result<Vec<ContactInfo>> {
-        let contacts = self.storage.list_contacts()
+        let contacts = self
+            .storage
+            .list_contacts()
             .context("Failed to list contacts")?;
 
-        Ok(contacts.into_iter().map(|c| ContactInfo {
-            id: c.id().to_string(),
-            display_name: c.display_name().to_string(),
-            verified: c.is_fingerprint_verified(),
-        }).collect())
+        Ok(contacts
+            .into_iter()
+            .map(|c| ContactInfo {
+                id: c.id().to_string(),
+                display_name: c.display_name().to_string(),
+                verified: c.is_fingerprint_verified(),
+            })
+            .collect())
     }
 
     /// Get contact count.
     pub fn contact_count(&self) -> Result<usize> {
-        let contacts = self.storage.list_contacts()
+        let contacts = self
+            .storage
+            .list_contacts()
             .context("Failed to list contacts")?;
         Ok(contacts.len())
     }
@@ -240,9 +265,9 @@ impl Backend {
     /// Generate exchange QR data.
     pub fn generate_exchange_qr(&self) -> Result<String> {
         let identity = self.identity.as_ref().context("No identity")?;
-        let card = self.get_card()?.unwrap_or_else(|| {
-            ContactCard::new(identity.display_name())
-        });
+        let card = self
+            .get_card()?
+            .unwrap_or_else(|| ContactCard::new(identity.display_name()));
 
         // Generate QR data (simplified - actual implementation uses X3DH)
         let public_id = identity.public_id();
@@ -273,28 +298,36 @@ impl Backend {
 
     /// Get visibility info for a contact (what fields they can see).
     pub fn get_contact_visibility(&self, contact_id: &str) -> Result<Vec<FieldVisibilityInfo>> {
-        let contact = self.storage.load_contact(contact_id)
+        let contact = self
+            .storage
+            .load_contact(contact_id)
             .context("Failed to get contact")?
             .context("Contact not found")?;
 
-        let card = self.get_card()?.unwrap_or_else(|| {
-            ContactCard::new(self.display_name().unwrap_or("User"))
-        });
+        let card = self
+            .get_card()?
+            .unwrap_or_else(|| ContactCard::new(self.display_name().unwrap_or("User")));
 
         let rules = contact.visibility_rules();
 
-        Ok(card.fields().iter().map(|field| {
-            let can_see = rules.can_see(field.label(), contact_id);
-            FieldVisibilityInfo {
-                field_label: field.label().to_string(),
-                can_see,
-            }
-        }).collect())
+        Ok(card
+            .fields()
+            .iter()
+            .map(|field| {
+                let can_see = rules.can_see(field.label(), contact_id);
+                FieldVisibilityInfo {
+                    field_label: field.label().to_string(),
+                    can_see,
+                }
+            })
+            .collect())
     }
 
     /// Toggle visibility of a field for a contact.
     pub fn toggle_field_visibility(&self, contact_id: &str, field_label: &str) -> Result<bool> {
-        let mut contact = self.storage.load_contact(contact_id)
+        let mut contact = self
+            .storage
+            .load_contact(contact_id)
             .context("Failed to get contact")?
             .context("Contact not found")?;
 
@@ -309,7 +342,8 @@ impl Backend {
 
         let new_can_see = !current_can_see;
 
-        self.storage.save_contact(&contact)
+        self.storage
+            .save_contact(&contact)
             .context("Failed to save contact")?;
 
         Ok(new_can_see)
@@ -317,7 +351,8 @@ impl Backend {
 
     /// Remove a contact by ID.
     pub fn remove_contact(&self, contact_id: &str) -> Result<()> {
-        self.storage.delete_contact(contact_id)
+        self.storage
+            .delete_contact(contact_id)
             .context("Failed to delete contact")?;
         Ok(())
     }
@@ -328,15 +363,20 @@ impl Backend {
     pub fn list_devices(&self) -> Result<Vec<DeviceInfo>> {
         // Try to load device registry from storage
         if let Ok(Some(registry)) = self.storage.load_device_registry() {
-            Ok(registry.all_devices().iter().enumerate().map(|(i, device)| {
-                DeviceInfo {
-                    device_index: i as u32,
-                    device_name: device.device_name.clone(),
-                    public_key_prefix: hex::encode(&device.device_id[..8]),
-                    is_current: i == 0, // First device is current for now
-                    is_active: !device.revoked,
-                }
-            }).collect())
+            Ok(registry
+                .all_devices()
+                .iter()
+                .enumerate()
+                .map(|(i, device)| {
+                    DeviceInfo {
+                        device_index: i as u32,
+                        device_name: device.device_name.clone(),
+                        public_key_prefix: hex::encode(&device.device_id[..8]),
+                        is_current: i == 0, // First device is current for now
+                        is_active: !device.revoked,
+                    }
+                })
+                .collect())
         } else {
             // Return current device only
             let identity = self.identity.as_ref().context("No identity")?;
@@ -355,7 +395,10 @@ impl Backend {
         let identity = self.identity.as_ref().context("No identity")?;
         // Generate a simplified link invitation
         let public_id = identity.public_id();
-        Ok(format!("wb://link/{}", &public_id[..32.min(public_id.len())]))
+        Ok(format!(
+            "wb://link/{}",
+            &public_id[..32.min(public_id.len())]
+        ))
     }
 
     // ========== Recovery ==========
@@ -376,21 +419,22 @@ impl Backend {
     /// Export identity backup with password.
     pub fn export_backup(&self, password: &str) -> Result<String> {
         let identity = self.identity.as_ref().context("No identity")?;
-        let backup = identity.export_backup(password)
+        let backup = identity
+            .export_backup(password)
             .map_err(|e| anyhow::anyhow!("Export failed: {:?}", e))?;
         Ok(hex::encode(backup.as_bytes()))
     }
 
     /// Import identity from backup with password.
     pub fn import_backup(&mut self, backup_data: &str, password: &str) -> Result<()> {
-        let bytes = hex::decode(backup_data.trim())
-            .context("Invalid hex data")?;
+        let bytes = hex::decode(backup_data.trim()).context("Invalid hex data")?;
         let backup = IdentityBackup::new(bytes.clone());
         let identity = Identity::import_backup(&backup, password)
             .map_err(|e| anyhow::anyhow!("Import failed: {:?}", e))?;
 
         let name = identity.display_name().to_string();
-        self.storage.save_identity(&bytes, &name)
+        self.storage
+            .save_identity(&bytes, &name)
             .context("Failed to save identity")?;
 
         self.identity = Some(identity);

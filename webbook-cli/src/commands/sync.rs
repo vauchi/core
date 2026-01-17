@@ -7,17 +7,17 @@ use std::net::TcpStream;
 
 use anyhow::{bail, Result};
 use indicatif::{ProgressBar, ProgressStyle};
-use tungstenite::{connect, Message, WebSocket};
 use tungstenite::stream::MaybeTlsStream;
-use webbook_core::{WebBook, WebBookConfig, Identity, IdentityBackup, Contact};
-use webbook_core::network::MockTransport;
+use tungstenite::{connect, Message, WebSocket};
 use webbook_core::exchange::X3DH;
+use webbook_core::network::MockTransport;
+use webbook_core::{Contact, Identity, IdentityBackup, WebBook, WebBookConfig};
 
 use crate::config::CliConfig;
 use crate::display;
 use crate::protocol::{
-    MessagePayload, Handshake, AckStatus, EncryptedUpdate,
-    ExchangeMessage, create_envelope, encode_message, decode_message, create_ack,
+    create_ack, create_envelope, decode_message, encode_message, AckStatus, EncryptedUpdate,
+    ExchangeMessage, Handshake, MessagePayload,
 };
 
 /// Internal password for local identity storage.
@@ -113,7 +113,7 @@ fn receive_pending(
 ) -> Result<(usize, Vec<ExchangeMessage>, Vec<(String, Vec<u8>)>)> {
     let mut received = 0;
     let mut exchange_messages = Vec::new();
-    let mut card_updates = Vec::new();  // (sender_id, ciphertext)
+    let mut card_updates = Vec::new(); // (sender_id, ciphertext)
 
     // Set a read timeout so we don't block forever
     // The relay sends pending messages immediately after handshake
@@ -128,7 +128,9 @@ fn receive_pending(
 
                                 // Check if this is an exchange message
                                 if ExchangeMessage::is_exchange(&update.ciphertext) {
-                                    if let Some(exchange) = ExchangeMessage::from_bytes(&update.ciphertext) {
+                                    if let Some(exchange) =
+                                        ExchangeMessage::from_bytes(&update.ciphertext)
+                                    {
                                         display::info(&format!(
                                             "Received exchange request from {}",
                                             exchange.display_name
@@ -141,17 +143,24 @@ fn receive_pending(
                                         "Received encrypted update from {}",
                                         &update.sender_id[..8]
                                     ));
-                                    card_updates.push((update.sender_id.clone(), update.ciphertext));
+                                    card_updates
+                                        .push((update.sender_id.clone(), update.ciphertext));
                                 }
 
                                 // Send acknowledgment
-                                let ack = create_ack(&envelope.message_id, AckStatus::ReceivedByRecipient);
+                                let ack = create_ack(
+                                    &envelope.message_id,
+                                    AckStatus::ReceivedByRecipient,
+                                );
                                 if let Ok(ack_data) = encode_message(&ack) {
                                     let _ = socket.send(Message::Binary(ack_data));
                                 }
                             }
                             MessagePayload::Acknowledgment(ack) => {
-                                display::info(&format!("Message {} acknowledged", &ack.message_id[..8]));
+                                display::info(&format!(
+                                    "Message {} acknowledged",
+                                    &ack.message_id[..8]
+                                ));
                             }
                             _ => {}
                         }
@@ -195,7 +204,9 @@ fn process_exchange_messages(
     let mut updated = 0;
 
     // Get our identity for X3DH
-    let identity = wb.identity().ok_or_else(|| anyhow::anyhow!("No identity found"))?;
+    let identity = wb
+        .identity()
+        .ok_or_else(|| anyhow::anyhow!("No identity found"))?;
     let our_x3dh = identity.x3dh_keypair();
 
     for exchange in messages {
@@ -223,9 +234,7 @@ fn process_exchange_messages(
             if let Some(mut contact) = wb.get_contact(&public_id)? {
                 if contact.display_name() != exchange.display_name {
                     if let Err(e) = contact.set_display_name(&exchange.display_name) {
-                        display::warning(&format!(
-                            "Failed to update contact name: {:?}", e
-                        ));
+                        display::warning(&format!("Failed to update contact name: {:?}", e));
                         continue;
                     }
                     wb.update_contact(&contact)?;
@@ -316,7 +325,7 @@ fn process_exchange_messages(
 /// Processes encrypted card updates from contacts.
 fn process_card_updates(
     wb: &WebBook<MockTransport>,
-    updates: Vec<(String, Vec<u8>)>,  // (sender_id, ciphertext)
+    updates: Vec<(String, Vec<u8>)>, // (sender_id, ciphertext)
 ) -> Result<usize> {
     let mut processed = 0;
 
@@ -325,7 +334,10 @@ fn process_card_updates(
         let contact_name = match wb.get_contact(&sender_id)? {
             Some(c) => c.display_name().to_string(),
             None => {
-                display::warning(&format!("Update from unknown contact: {}...", &sender_id[..8]));
+                display::warning(&format!(
+                    "Update from unknown contact: {}...",
+                    &sender_id[..8]
+                ));
                 continue;
             }
         };
@@ -405,7 +417,9 @@ fn send_pending_updates(
 pub async fn run(config: &CliConfig) -> Result<()> {
     let wb = open_webbook(config)?;
 
-    let identity = wb.identity().ok_or_else(|| anyhow::anyhow!("No identity found"))?;
+    let identity = wb
+        .identity()
+        .ok_or_else(|| anyhow::anyhow!("No identity found"))?;
     let client_id = identity.public_id();
 
     // Create a spinner for connection progress
@@ -413,7 +427,7 @@ pub async fn run(config: &CliConfig) -> Result<()> {
     spinner.set_style(
         ProgressStyle::default_spinner()
             .template("{spinner:.green} {msg}")
-            .unwrap()
+            .unwrap(),
     );
     spinner.set_message(format!("Connecting to {}...", config.relay_url));
     spinner.enable_steady_tick(std::time::Duration::from_millis(80));
@@ -442,7 +456,7 @@ pub async fn run(config: &CliConfig) -> Result<()> {
     recv_spinner.set_style(
         ProgressStyle::default_spinner()
             .template("{spinner:.blue} {msg}")
-            .unwrap()
+            .unwrap(),
     );
     recv_spinner.set_message("Receiving pending messages...");
     recv_spinner.enable_steady_tick(std::time::Duration::from_millis(80));
@@ -452,7 +466,8 @@ pub async fn run(config: &CliConfig) -> Result<()> {
     recv_spinner.finish_and_clear();
 
     // Process exchange messages
-    let (contacts_added, contacts_updated) = process_exchange_messages(&wb, exchange_messages, config)?;
+    let (contacts_added, contacts_updated) =
+        process_exchange_messages(&wb, exchange_messages, config)?;
 
     // Process encrypted card updates
     let cards_updated = process_card_updates(&wb, card_updates)?;
@@ -468,10 +483,18 @@ pub async fn run(config: &CliConfig) -> Result<()> {
     let total_changes = received + contacts_added + contacts_updated + cards_updated + updates_sent;
     if total_changes > 0 {
         let mut summary = format!("Sync complete: {} received", received);
-        if contacts_added > 0 { summary.push_str(&format!(", {} contacts added", contacts_added)); }
-        if contacts_updated > 0 { summary.push_str(&format!(", {} contacts updated", contacts_updated)); }
-        if cards_updated > 0 { summary.push_str(&format!(", {} cards updated", cards_updated)); }
-        if updates_sent > 0 { summary.push_str(&format!(", {} sent", updates_sent)); }
+        if contacts_added > 0 {
+            summary.push_str(&format!(", {} contacts added", contacts_added));
+        }
+        if contacts_updated > 0 {
+            summary.push_str(&format!(", {} contacts updated", contacts_updated));
+        }
+        if cards_updated > 0 {
+            summary.push_str(&format!(", {} cards updated", cards_updated));
+        }
+        if updates_sent > 0 {
+            summary.push_str(&format!(", {} sent", updates_sent));
+        }
         display::success(&summary);
     } else {
         display::info("Sync complete: No new messages or pending updates");

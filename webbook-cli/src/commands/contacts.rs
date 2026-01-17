@@ -5,8 +5,8 @@
 use std::fs;
 
 use anyhow::{bail, Result};
-use webbook_core::{WebBook, WebBookConfig, Identity, IdentityBackup};
 use webbook_core::network::MockTransport;
+use webbook_core::{Identity, IdentityBackup, WebBook, WebBookConfig};
 
 use crate::config::CliConfig;
 use crate::display;
@@ -62,12 +62,12 @@ pub fn show(config: &CliConfig, id: &str) -> Result<()> {
     let wb = open_webbook(config)?;
 
     // Try to find by ID first, then by name
-    let contact = wb.get_contact(id)?
-        .or_else(|| {
-            // Search by name
-            wb.search_contacts(id).ok()
-                .and_then(|results| results.into_iter().next())
-        });
+    let contact = wb.get_contact(id)?.or_else(|| {
+        // Search by name
+        wb.search_contacts(id)
+            .ok()
+            .and_then(|results| results.into_iter().next())
+    });
 
     match contact {
         Some(c) => {
@@ -129,7 +129,8 @@ pub fn verify(config: &CliConfig, id: &str) -> Result<()> {
     let wb = open_webbook(config)?;
 
     // Get contact first
-    let contact = wb.get_contact(id)?
+    let contact = wb
+        .get_contact(id)?
         .ok_or_else(|| anyhow::anyhow!("Contact '{}' not found", id))?;
 
     let name = contact.display_name().to_string();
@@ -148,10 +149,12 @@ pub fn verify(config: &CliConfig, id: &str) -> Result<()> {
 /// Helper to find contact by ID or name
 fn find_contact(wb: &WebBook<MockTransport>, id_or_name: &str) -> Result<webbook_core::Contact> {
     // Try to find by ID first, then by name
-    let contact = wb.get_contact(id_or_name)?
+    let contact = wb
+        .get_contact(id_or_name)?
         .or_else(|| {
             // Search by name
-            wb.search_contacts(id_or_name).ok()
+            wb.search_contacts(id_or_name)
+                .ok()
                 .and_then(|results| results.into_iter().next())
         })
         .ok_or_else(|| anyhow::anyhow!("Contact '{}' not found", id_or_name))?;
@@ -160,10 +163,13 @@ fn find_contact(wb: &WebBook<MockTransport>, id_or_name: &str) -> Result<webbook
 
 /// Helper to find field ID by label in own card
 fn find_field_id(wb: &WebBook<MockTransport>, label: &str) -> Result<String> {
-    let card = wb.own_card()?
+    let card = wb
+        .own_card()?
         .ok_or_else(|| anyhow::anyhow!("No contact card found"))?;
 
-    let field = card.fields().iter()
+    let field = card
+        .fields()
+        .iter()
         .find(|f| f.label() == label)
         .ok_or_else(|| anyhow::anyhow!("Field '{}' not found in your card", label))?;
 
@@ -229,7 +235,8 @@ pub fn show_visibility(config: &CliConfig, contact_id_or_name: &str) -> Result<(
     let contact_name = contact.display_name().to_string();
 
     // Get our card fields
-    let card = wb.own_card()?
+    let card = wb
+        .own_card()?
         .ok_or_else(|| anyhow::anyhow!("No contact card found"))?;
 
     println!();

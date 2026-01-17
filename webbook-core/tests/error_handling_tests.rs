@@ -124,8 +124,7 @@ fn test_decrypt_fails_with_wrong_ratchet() {
 
     let mut alice_ratchet =
         DoubleRatchetState::initialize_initiator(&shared_secret1, *bob_dh1.public_key());
-    let mut wrong_bob_ratchet =
-        DoubleRatchetState::initialize_responder(&shared_secret2, bob_dh2);
+    let mut wrong_bob_ratchet = DoubleRatchetState::initialize_responder(&shared_secret2, bob_dh2);
 
     // Alice encrypts with secret1
     let plaintext = b"Secret message";
@@ -174,7 +173,11 @@ fn test_delta_signature_rejects_wrong_signer() {
     let old_card = ContactCard::new("Alice");
     let mut new_card = ContactCard::new("Alice");
     new_card
-        .add_field(ContactField::new(FieldType::Email, "work", "alice@test.com"))
+        .add_field(ContactField::new(
+            FieldType::Email,
+            "work",
+            "alice@test.com",
+        ))
         .unwrap();
 
     let mut delta = CardDelta::compute(&old_card, &new_card);
@@ -206,7 +209,11 @@ fn test_delta_signature_rejects_tampered_delta() {
     let old_card = ContactCard::new("Alice");
     let mut new_card = ContactCard::new("Alice");
     new_card
-        .add_field(ContactField::new(FieldType::Email, "work", "alice@test.com"))
+        .add_field(ContactField::new(
+            FieldType::Email,
+            "work",
+            "alice@test.com",
+        ))
         .unwrap();
 
     let mut delta = CardDelta::compute(&old_card, &new_card);
@@ -291,7 +298,10 @@ fn test_empty_delta_when_cards_identical() {
 
     let delta = CardDelta::compute(&card, &card.clone());
 
-    assert!(delta.is_empty(), "Identical cards should produce empty delta");
+    assert!(
+        delta.is_empty(),
+        "Identical cards should produce empty delta"
+    );
 }
 
 /// Test: Cannot create identity twice
@@ -310,10 +320,16 @@ fn test_cannot_create_identity_twice() {
 fn test_cannot_add_duplicate_contact() {
     let wb: WebBook<MockTransport> = WebBook::in_memory().unwrap();
 
-    let contact =
-        Contact::from_exchange([1u8; 32], ContactCard::new("Test"), SymmetricKey::generate());
-    let contact_clone =
-        Contact::from_exchange([1u8; 32], ContactCard::new("Test"), SymmetricKey::generate());
+    let contact = Contact::from_exchange(
+        [1u8; 32],
+        ContactCard::new("Test"),
+        SymmetricKey::generate(),
+    );
+    let contact_clone = Contact::from_exchange(
+        [1u8; 32],
+        ContactCard::new("Test"),
+        SymmetricKey::generate(),
+    );
 
     wb.add_contact(contact).unwrap();
     let result = wb.add_contact(contact_clone);
@@ -392,8 +408,11 @@ fn test_empty_password_rejected_for_backup() {
 fn test_visibility_on_nonexistent_field() {
     let wb: WebBook<MockTransport> = WebBook::in_memory().unwrap();
 
-    let contact =
-        Contact::from_exchange([1u8; 32], ContactCard::new("Test"), SymmetricKey::generate());
+    let contact = Contact::from_exchange(
+        [1u8; 32],
+        ContactCard::new("Test"),
+        SymmetricKey::generate(),
+    );
     let contact_id = contact.id().to_string();
     wb.add_contact(contact).unwrap();
 

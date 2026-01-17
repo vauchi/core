@@ -181,13 +181,16 @@ fn test_empty_display_name_rejected() {
 // Tests for zxcvbn-based password validation
 // =============================================================================
 
-use webbook_core::identity::password::{validate_password, password_feedback, PasswordStrength};
+use webbook_core::identity::password::{password_feedback, validate_password, PasswordStrength};
 
 /// Tests that very weak passwords (e.g., "password") are rejected
 #[test]
 fn test_weak_password_rejected() {
     let result = validate_password("password");
-    assert!(result.is_err(), "Common password 'password' should be rejected");
+    assert!(
+        result.is_err(),
+        "Common password 'password' should be rejected"
+    );
 }
 
 /// Tests that short passwords are rejected regardless of complexity
@@ -219,7 +222,10 @@ fn test_strong_password_accepted() {
     assert!(result.is_ok(), "Strong passphrase should be accepted");
 
     let strength = result.unwrap();
-    assert!(matches!(strength, PasswordStrength::Strong | PasswordStrength::VeryStrong));
+    assert!(matches!(
+        strength,
+        PasswordStrength::Strong | PasswordStrength::VeryStrong
+    ));
 }
 
 /// Tests that mixed complexity passwords pass if strong enough
@@ -235,7 +241,10 @@ fn test_password_feedback_for_weak_password() {
     let feedback = password_feedback("password123");
     // Should provide some feedback (not empty)
     // Note: the actual feedback depends on zxcvbn's analysis
-    assert!(!feedback.is_empty() || true, "May or may not have feedback depending on zxcvbn");
+    assert!(
+        !feedback.is_empty() || true,
+        "May or may not have feedback depending on zxcvbn"
+    );
 }
 
 /// Tests that strong passwords don't need feedback
@@ -265,12 +274,7 @@ fn test_export_backup_rejects_weak_password() {
     let identity = Identity::create("Alice");
 
     // These should all be rejected
-    let weak_passwords = [
-        "password",
-        "12345678",
-        "qwertyui",
-        "abc12345",
-    ];
+    let weak_passwords = ["password", "12345678", "qwertyui", "abc12345"];
 
     for weak in weak_passwords {
         let result = identity.export_backup(weak);
@@ -289,5 +293,8 @@ fn test_export_backup_accepts_strong_password() {
 
     // This should be accepted
     let result = identity.export_backup("correct-horse-battery-staple");
-    assert!(result.is_ok(), "Strong passphrase should be accepted for backup");
+    assert!(
+        result.is_ok(),
+        "Strong passphrase should be accepted for backup"
+    );
 }

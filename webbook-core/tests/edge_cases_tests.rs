@@ -36,11 +36,7 @@ fn test_card_at_max_fields_rejects_addition() {
     assert_eq!(card.fields().len(), MAX_FIELDS);
 
     // Try to add one more - should fail
-    let result = card.add_field(ContactField::new(
-        FieldType::Custom,
-        "extra",
-        "value",
-    ));
+    let result = card.add_field(ContactField::new(FieldType::Custom, "extra", "value"));
     assert!(result.is_err(), "Should reject field beyond limit");
 }
 
@@ -87,11 +83,7 @@ fn test_card_at_max_fields_allows_removal() {
     assert_eq!(card.fields().len(), MAX_FIELDS - 1);
 
     // Now can add another field
-    let result = card.add_field(ContactField::new(
-        FieldType::Custom,
-        "new",
-        "value",
-    ));
+    let result = card.add_field(ContactField::new(FieldType::Custom, "new", "value"));
     assert!(result.is_ok(), "Should allow adding after removal");
 }
 
@@ -102,7 +94,10 @@ fn test_empty_card_delta_computation() {
     let new = ContactCard::new("Empty");
 
     let delta = CardDelta::compute(&old, &new);
-    assert!(delta.is_empty(), "Identical empty cards should produce empty delta");
+    assert!(
+        delta.is_empty(),
+        "Identical empty cards should produce empty delta"
+    );
 }
 
 // =============================================================================
@@ -129,7 +124,12 @@ fn test_field_with_emoji_roundtrip() {
     let loaded = wb.get_contact(&contact_id).unwrap().unwrap();
     assert_eq!(loaded.display_name(), "Test 🎉");
 
-    let emoji_field = loaded.card().fields().iter().find(|f| f.label() == "emoji").unwrap();
+    let emoji_field = loaded
+        .card()
+        .fields()
+        .iter()
+        .find(|f| f.label() == "emoji")
+        .unwrap();
     assert_eq!(emoji_field.value(), "Hello 👋 World 🌍");
 }
 
@@ -153,7 +153,12 @@ fn test_field_with_rtl_text() {
     let loaded = wb.get_contact(&contact_id).unwrap().unwrap();
     assert_eq!(loaded.display_name(), "مرحبا");
 
-    let greeting = loaded.card().fields().iter().find(|f| f.label() == "greeting").unwrap();
+    let greeting = loaded
+        .card()
+        .fields()
+        .iter()
+        .find(|f| f.label() == "greeting")
+        .unwrap();
     assert_eq!(greeting.value(), "שלום עולם");
 }
 
@@ -196,11 +201,7 @@ fn test_empty_string_field_value() {
     let mut card = ContactCard::new("Test");
 
     // Empty value should be allowed (or rejected depending on implementation)
-    let result = card.add_field(ContactField::new(
-        FieldType::Custom,
-        "empty",
-        "",
-    ));
+    let result = card.add_field(ContactField::new(FieldType::Custom, "empty", ""));
 
     // Document the behavior
     let _ = result; // Either ok or error is acceptable
@@ -310,7 +311,9 @@ fn test_device_revocation_when_at_two() {
     assert_eq!(registry.active_count(), 2);
 
     // Should allow revocation since we have 2 devices
-    registry.revoke_device(device1.device_id(), &signing_key).unwrap();
+    registry
+        .revoke_device(device1.device_id(), &signing_key)
+        .unwrap();
 
     assert_eq!(registry.active_count(), 1);
 }
@@ -324,7 +327,11 @@ fn test_device_revocation_when_at_two() {
 fn test_visibility_all_fields_hidden() {
     let wb: WebBook<MockTransport> = WebBook::in_memory().unwrap();
 
-    let contact = Contact::from_exchange([1u8; 32], ContactCard::new("Test"), SymmetricKey::generate());
+    let contact = Contact::from_exchange(
+        [1u8; 32],
+        ContactCard::new("Test"),
+        SymmetricKey::generate(),
+    );
     let contact_id = contact.id().to_string();
     wb.add_contact(contact).unwrap();
 
@@ -350,7 +357,11 @@ fn test_visibility_all_fields_hidden() {
 fn test_visibility_default_is_everyone() {
     let wb: WebBook<MockTransport> = WebBook::in_memory().unwrap();
 
-    let contact = Contact::from_exchange([1u8; 32], ContactCard::new("Test"), SymmetricKey::generate());
+    let contact = Contact::from_exchange(
+        [1u8; 32],
+        ContactCard::new("Test"),
+        SymmetricKey::generate(),
+    );
     let contact_id = contact.id().to_string();
     wb.add_contact(contact).unwrap();
 
@@ -411,9 +422,21 @@ fn test_contact_long_display_name() {
 fn test_contact_search_case_insensitive() {
     let wb: WebBook<MockTransport> = WebBook::in_memory().unwrap();
 
-    let contact1 = Contact::from_exchange([1u8; 32], ContactCard::new("Alice"), SymmetricKey::generate());
-    let contact2 = Contact::from_exchange([2u8; 32], ContactCard::new("ALICE"), SymmetricKey::generate());
-    let contact3 = Contact::from_exchange([3u8; 32], ContactCard::new("alice"), SymmetricKey::generate());
+    let contact1 = Contact::from_exchange(
+        [1u8; 32],
+        ContactCard::new("Alice"),
+        SymmetricKey::generate(),
+    );
+    let contact2 = Contact::from_exchange(
+        [2u8; 32],
+        ContactCard::new("ALICE"),
+        SymmetricKey::generate(),
+    );
+    let contact3 = Contact::from_exchange(
+        [3u8; 32],
+        ContactCard::new("alice"),
+        SymmetricKey::generate(),
+    );
 
     wb.add_contact(contact1).unwrap();
     wb.add_contact(contact2).unwrap();
@@ -432,9 +455,18 @@ fn test_contact_search_case_insensitive() {
 fn test_contact_search_partial_match() {
     let wb: WebBook<MockTransport> = WebBook::in_memory().unwrap();
 
-    let contact1 = Contact::from_exchange([1u8; 32], ContactCard::new("Alexander"), SymmetricKey::generate());
-    let contact2 = Contact::from_exchange([2u8; 32], ContactCard::new("Alexandra"), SymmetricKey::generate());
-    let contact3 = Contact::from_exchange([3u8; 32], ContactCard::new("Bob"), SymmetricKey::generate());
+    let contact1 = Contact::from_exchange(
+        [1u8; 32],
+        ContactCard::new("Alexander"),
+        SymmetricKey::generate(),
+    );
+    let contact2 = Contact::from_exchange(
+        [2u8; 32],
+        ContactCard::new("Alexandra"),
+        SymmetricKey::generate(),
+    );
+    let contact3 =
+        Contact::from_exchange([3u8; 32], ContactCard::new("Bob"), SymmetricKey::generate());
 
     wb.add_contact(contact1).unwrap();
     wb.add_contact(contact2).unwrap();
@@ -454,8 +486,12 @@ fn test_saving_contact_twice_updates() {
     let wb: WebBook<MockTransport> = WebBook::in_memory().unwrap();
 
     let mut card = ContactCard::new("Test");
-    card.add_field(ContactField::new(FieldType::Email, "work", "original@test.com"))
-        .unwrap();
+    card.add_field(ContactField::new(
+        FieldType::Email,
+        "work",
+        "original@test.com",
+    ))
+    .unwrap();
 
     let contact = Contact::from_exchange([1u8; 32], card, SymmetricKey::generate());
     let contact_id = contact.id().to_string();
@@ -466,13 +502,19 @@ fn test_saving_contact_twice_updates() {
     let mut contact = wb.get_contact(&contact_id).unwrap().unwrap();
     let field_id = contact.card().fields()[0].id().to_string();
     let mut card = contact.card().clone();
-    card.update_field_value(&field_id, "updated@test.com").unwrap();
+    card.update_field_value(&field_id, "updated@test.com")
+        .unwrap();
     contact.update_card(card);
     wb.storage().save_contact(&contact).unwrap();
 
     // Verify update persisted
     let loaded = wb.get_contact(&contact_id).unwrap().unwrap();
-    let email = loaded.card().fields().iter().find(|f| f.label() == "work").unwrap();
+    let email = loaded
+        .card()
+        .fields()
+        .iter()
+        .find(|f| f.label() == "work")
+        .unwrap();
     assert_eq!(email.value(), "updated@test.com");
 }
 
@@ -500,7 +542,11 @@ fn test_contact_count_accuracy() {
     assert_eq!(wb.contact_count().unwrap(), 2);
 
     // Add another
-    let contact = Contact::from_exchange([99u8; 32], ContactCard::new("New"), SymmetricKey::generate());
+    let contact = Contact::from_exchange(
+        [99u8; 32],
+        ContactCard::new("New"),
+        SymmetricKey::generate(),
+    );
     wb.add_contact(contact).unwrap();
     assert_eq!(wb.contact_count().unwrap(), 3);
 }

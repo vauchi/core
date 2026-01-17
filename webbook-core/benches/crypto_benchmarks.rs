@@ -60,17 +60,11 @@ fn bench_key_generation(c: &mut Criterion) {
 
     let mut group = c.benchmark_group("key_generation");
 
-    group.bench_function("symmetric_key", |b| {
-        b.iter(|| SymmetricKey::generate())
-    });
+    group.bench_function("symmetric_key", |b| b.iter(|| SymmetricKey::generate()));
 
-    group.bench_function("signing_keypair", |b| {
-        b.iter(|| SigningKeyPair::generate())
-    });
+    group.bench_function("signing_keypair", |b| b.iter(|| SigningKeyPair::generate()));
 
-    group.bench_function("x3dh_keypair", |b| {
-        b.iter(|| X3DHKeyPair::generate())
-    });
+    group.bench_function("x3dh_keypair", |b| b.iter(|| X3DHKeyPair::generate()));
 
     group.finish();
 }
@@ -87,13 +81,15 @@ fn bench_signing(c: &mut Criterion) {
 
     let mut group = c.benchmark_group("signing");
 
-    group.bench_function("sign", |b| {
-        b.iter(|| keypair.sign(black_box(message)))
-    });
+    group.bench_function("sign", |b| b.iter(|| keypair.sign(black_box(message))));
 
     let signature = keypair.sign(message);
     group.bench_function("verify", |b| {
-        b.iter(|| keypair.public_key().verify(black_box(message), black_box(&signature)))
+        b.iter(|| {
+            keypair
+                .public_key()
+                .verify(black_box(message), black_box(&signature))
+        })
     });
 
     group.finish();

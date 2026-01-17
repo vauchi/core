@@ -5,13 +5,13 @@
 use std::fs;
 
 use anyhow::{bail, Result};
-use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
+use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
 use dialoguer::{Confirm, Input};
-use webbook_core::{WebBook, WebBookConfig, Identity, IdentityBackup};
-use webbook_core::recovery::{
-    RecoveryClaim, RecoveryVoucher, RecoveryProof, RecoverySettings, VerificationResult,
-};
 use webbook_core::network::MockTransport;
+use webbook_core::recovery::{
+    RecoveryClaim, RecoveryProof, RecoverySettings, RecoveryVoucher, VerificationResult,
+};
+use webbook_core::{Identity, IdentityBackup, WebBook, WebBookConfig};
 
 use crate::config::CliConfig;
 use crate::display;
@@ -47,7 +47,8 @@ fn open_webbook(config: &CliConfig) -> Result<WebBook<MockTransport>> {
 pub fn claim(config: &CliConfig, old_pk_hex: &str) -> Result<()> {
     let wb = open_webbook(config)?;
 
-    let identity = wb.identity()
+    let identity = wb
+        .identity()
         .ok_or_else(|| anyhow::anyhow!("No identity found"))?;
 
     // Parse old public key
@@ -107,7 +108,8 @@ pub fn claim(config: &CliConfig, old_pk_hex: &str) -> Result<()> {
 pub fn vouch(config: &CliConfig, claim_data: &str) -> Result<()> {
     let wb = open_webbook(config)?;
 
-    let identity = wb.identity()
+    let identity = wb
+        .identity()
         .ok_or_else(|| anyhow::anyhow!("No identity found"))?;
 
     // Decode claim
@@ -123,12 +125,16 @@ pub fn vouch(config: &CliConfig, claim_data: &str) -> Result<()> {
 
     // Look up old_pk in contacts
     let contacts = wb.storage().list_contacts()?;
-    let contact = contacts.iter()
+    let contact = contacts
+        .iter()
         .find(|c| hex::encode(c.public_key()) == old_pk_hex);
 
     println!();
     println!("{}", "─".repeat(60));
-    println!("  {}", console::style("Recovery Claim Verification").bold().cyan());
+    println!(
+        "  {}",
+        console::style("Recovery Claim Verification").bold().cyan()
+    );
     println!("{}", "─".repeat(60));
     println!();
     println!("  Old Identity: {}...", &old_pk_hex[..16]);
@@ -173,7 +179,10 @@ pub fn vouch(config: &CliConfig, claim_data: &str) -> Result<()> {
 
     println!();
     println!("{}", "─".repeat(60));
-    println!("  {}", console::style("Recovery Voucher Created").bold().green());
+    println!(
+        "  {}",
+        console::style("Recovery Voucher Created").bold().green()
+    );
     println!("{}", "─".repeat(60));
     println!();
     println!("  Give this voucher to the person recovering:");
@@ -191,7 +200,8 @@ pub fn vouch(config: &CliConfig, claim_data: &str) -> Result<()> {
 pub fn add_voucher(config: &CliConfig, voucher_data: &str) -> Result<()> {
     let wb = open_webbook(config)?;
 
-    let _identity = wb.identity()
+    let _identity = wb
+        .identity()
         .ok_or_else(|| anyhow::anyhow!("No identity found"))?;
 
     // Decode voucher
@@ -210,7 +220,11 @@ pub fn add_voucher(config: &CliConfig, voucher_data: &str) -> Result<()> {
     } else {
         // Create new proof using settings
         let settings = RecoverySettings::default();
-        RecoveryProof::new(voucher.old_pk(), voucher.new_pk(), settings.recovery_threshold())
+        RecoveryProof::new(
+            voucher.old_pk(),
+            voucher.new_pk(),
+            settings.recovery_threshold(),
+        )
     };
 
     // Verify voucher matches proof
@@ -237,7 +251,10 @@ pub fn add_voucher(config: &CliConfig, voucher_data: &str) -> Result<()> {
         display::info("Share it with your contacts: webbook recovery proof show");
     } else {
         let needed = threshold as usize - voucher_count;
-        display::info(&format!("Need {} more voucher(s) to complete recovery.", needed));
+        display::info(&format!(
+            "Need {} more voucher(s) to complete recovery.",
+            needed
+        ));
     }
 
     Ok(())
@@ -265,7 +282,11 @@ pub fn status(config: &CliConfig) -> Result<()> {
         println!();
         println!("  Old Identity: {}...", hex::encode(&proof.old_pk()[..8]));
         println!("  New Identity: {}...", hex::encode(&proof.new_pk()[..8]));
-        println!("  Vouchers:     {}/{}", proof.voucher_count(), proof.threshold());
+        println!(
+            "  Vouchers:     {}/{}",
+            proof.voucher_count(),
+            proof.threshold()
+        );
         println!();
 
         if proof.voucher_count() >= proof.threshold() as usize {
@@ -311,8 +332,10 @@ pub fn proof_show(config: &CliConfig) -> Result<()> {
     let proof = RecoveryProof::from_bytes(&proof_bytes)?;
 
     if proof.voucher_count() < proof.threshold() as usize {
-        bail!("Recovery proof incomplete. Need {} more voucher(s).",
-            proof.threshold() as usize - proof.voucher_count());
+        bail!(
+            "Recovery proof incomplete. Need {} more voucher(s).",
+            proof.threshold() as usize - proof.voucher_count()
+        );
     }
 
     let proof_b64 = BASE64.encode(&proof_bytes);
@@ -355,7 +378,8 @@ pub fn verify(config: &CliConfig, proof_data: &str) -> Result<()> {
     let contacts = wb.storage().list_contacts()?;
 
     // Check if old_pk matches a contact
-    let contact = contacts.iter()
+    let contact = contacts
+        .iter()
         .find(|c| hex::encode(c.public_key()) == old_pk_hex);
 
     // Verify against our contacts
@@ -364,7 +388,10 @@ pub fn verify(config: &CliConfig, proof_data: &str) -> Result<()> {
 
     println!();
     println!("{}", "─".repeat(60));
-    println!("  {}", console::style("Recovery Proof Verification").bold().cyan());
+    println!(
+        "  {}",
+        console::style("Recovery Proof Verification").bold().cyan()
+    );
     println!("{}", "─".repeat(60));
     println!();
     println!("  Old Identity: {}...", &old_pk_hex[..16]);
@@ -380,7 +407,10 @@ pub fn verify(config: &CliConfig, proof_data: &str) -> Result<()> {
     println!();
 
     match result {
-        VerificationResult::HighConfidence { mutual_vouchers, total_vouchers } => {
+        VerificationResult::HighConfidence {
+            mutual_vouchers,
+            total_vouchers,
+        } => {
             display::success("HIGH CONFIDENCE - Trusted mutual contacts vouched.");
             println!();
             println!("  Mutual contacts who vouched:");
@@ -391,7 +421,11 @@ pub fn verify(config: &CliConfig, proof_data: &str) -> Result<()> {
             println!();
             display::info("Safe to accept this recovery.");
         }
-        VerificationResult::MediumConfidence { mutual_vouchers, required, total_vouchers } => {
+        VerificationResult::MediumConfidence {
+            mutual_vouchers,
+            required,
+            total_vouchers,
+        } => {
             display::warning("MEDIUM CONFIDENCE - Some mutual contacts vouched.");
             println!();
             println!("  Mutual contacts who vouched: {}", mutual_vouchers.len());
@@ -442,8 +476,14 @@ pub fn settings_show(_config: &CliConfig) -> Result<()> {
     println!("  {}", console::style("Recovery Settings").bold().cyan());
     println!("{}", "─".repeat(50));
     println!();
-    println!("  Recovery Threshold:     {} vouchers needed", settings.recovery_threshold());
-    println!("  Verification Threshold: {} mutual contacts for high confidence", settings.verification_threshold());
+    println!(
+        "  Recovery Threshold:     {} vouchers needed",
+        settings.recovery_threshold()
+    );
+    println!(
+        "  Verification Threshold: {} mutual contacts for high confidence",
+        settings.verification_threshold()
+    );
     println!();
     println!("{}", "─".repeat(50));
     println!();
@@ -460,7 +500,10 @@ pub fn settings_set(_config: &CliConfig, recovery: u32, verification: u32) -> Re
 
     // In full implementation, would persist settings
     display::success(&format!("Recovery threshold set to {} vouchers.", recovery));
-    display::success(&format!("Verification threshold set to {} mutual contacts.", verification));
+    display::success(&format!(
+        "Verification threshold set to {} mutual contacts.",
+        verification
+    ));
     display::info("Settings saved.");
 
     Ok(())

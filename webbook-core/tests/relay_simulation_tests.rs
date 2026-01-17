@@ -86,11 +86,17 @@ fn test_relay_send_update() {
     // Set up encryption
     let shared_secret = SymmetricKey::generate();
     let bob_dh = X3DHKeyPair::generate();
-    let mut ratchet = DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key());
+    let mut ratchet =
+        DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key());
 
     // Send update
     let msg_id = client
-        .send_update("recipient-id", &mut ratchet, b"card update data", "update-001")
+        .send_update(
+            "recipient-id",
+            &mut ratchet,
+            b"card update data",
+            "update-001",
+        )
         .unwrap();
 
     assert!(!msg_id.is_empty());
@@ -113,7 +119,8 @@ fn test_relay_multiple_in_flight() {
 
     let shared_secret = SymmetricKey::generate();
     let bob_dh = X3DHKeyPair::generate();
-    let mut ratchet = DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key());
+    let mut ratchet =
+        DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key());
 
     // Send multiple updates
     client
@@ -145,14 +152,22 @@ fn test_sync_manager_queue_for_relay() {
     let sync_manager = SyncManager::new(&storage);
 
     let mut old_card = ContactCard::new("Alice");
-    old_card.add_field(ContactField::new(FieldType::Email, "work", "old@test.com")).unwrap();
+    old_card
+        .add_field(ContactField::new(FieldType::Email, "work", "old@test.com"))
+        .unwrap();
 
     let mut new_card = ContactCard::new("Alice");
-    new_card.add_field(ContactField::new(FieldType::Email, "work", "new@test.com")).unwrap();
+    new_card
+        .add_field(ContactField::new(FieldType::Email, "work", "new@test.com"))
+        .unwrap();
 
     // Queue for multiple contacts
-    let update1 = sync_manager.queue_card_update("contact-1", &old_card, &new_card).unwrap();
-    let update2 = sync_manager.queue_card_update("contact-2", &old_card, &new_card).unwrap();
+    let update1 = sync_manager
+        .queue_card_update("contact-1", &old_card, &new_card)
+        .unwrap();
+    let update2 = sync_manager
+        .queue_card_update("contact-2", &old_card, &new_card)
+        .unwrap();
 
     assert!(!update1.is_empty());
     assert!(!update2.is_empty());
@@ -174,7 +189,9 @@ fn test_sync_manager_mark_delivered() {
     let old_card = ContactCard::new("Test");
     let new_card = ContactCard::new("Test Updated");
 
-    let update_id = sync_manager.queue_card_update("contact-1", &old_card, &new_card).unwrap();
+    let update_id = sync_manager
+        .queue_card_update("contact-1", &old_card, &new_card)
+        .unwrap();
 
     // Initially pending
     let pending = sync_manager.get_pending("contact-1").unwrap();
@@ -203,8 +220,12 @@ fn test_sync_state_pending_count() {
     let card3 = ContactCard::new("V3");
 
     // Queue 3 updates for same contact
-    sync_manager.queue_card_update("contact-1", &card1, &card2).unwrap();
-    sync_manager.queue_card_update("contact-1", &card2, &card3).unwrap();
+    sync_manager
+        .queue_card_update("contact-1", &card1, &card2)
+        .unwrap();
+    sync_manager
+        .queue_card_update("contact-1", &card2, &card3)
+        .unwrap();
 
     let state = sync_manager.get_sync_state("contact-1").unwrap();
     if let webbook_core::SyncState::Pending { queued_count, .. } = state {
@@ -235,29 +256,46 @@ fn test_full_update_propagation() {
     let shared_secret = SymmetricKey::generate();
 
     // Exchange contacts
-    let bob_contact = Contact::from_exchange(bob_pk, ContactCard::new("Bob"), shared_secret.clone());
+    let bob_contact =
+        Contact::from_exchange(bob_pk, ContactCard::new("Bob"), shared_secret.clone());
     let bob_id = bob_contact.id().to_string();
     alice_wb.add_contact(bob_contact).unwrap();
 
-    let alice_contact = Contact::from_exchange(alice_pk, ContactCard::new("Alice"), shared_secret.clone());
+    let alice_contact =
+        Contact::from_exchange(alice_pk, ContactCard::new("Alice"), shared_secret.clone());
     let alice_id = alice_contact.id().to_string();
     bob_wb.add_contact(alice_contact).unwrap();
 
     // Set up ratchets
     let bob_dh = X3DHKeyPair::generate();
-    let alice_ratchet = DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key());
+    let alice_ratchet =
+        DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key());
     let bob_ratchet = DoubleRatchetState::initialize_responder(&shared_secret, bob_dh);
 
-    alice_wb.storage().save_ratchet_state(&bob_id, &alice_ratchet, true).unwrap();
-    bob_wb.storage().save_ratchet_state(&alice_id, &bob_ratchet, false).unwrap();
+    alice_wb
+        .storage()
+        .save_ratchet_state(&bob_id, &alice_ratchet, true)
+        .unwrap();
+    bob_wb
+        .storage()
+        .save_ratchet_state(&alice_id, &bob_ratchet, false)
+        .unwrap();
 
     // Alice updates her card
     let old_card = alice_wb.own_card().unwrap().unwrap();
-    alice_wb.add_own_field(ContactField::new(FieldType::Email, "work", "alice@company.com")).unwrap();
+    alice_wb
+        .add_own_field(ContactField::new(
+            FieldType::Email,
+            "work",
+            "alice@company.com",
+        ))
+        .unwrap();
     let new_card = alice_wb.own_card().unwrap().unwrap();
 
     // Propagate update
-    let queued = alice_wb.propagate_card_update(&old_card, &new_card).unwrap();
+    let queued = alice_wb
+        .propagate_card_update(&old_card, &new_card)
+        .unwrap();
     assert_eq!(queued, 1);
 
     // Verify pending update exists
@@ -265,7 +303,11 @@ fn test_full_update_propagation() {
     assert_eq!(pending.len(), 1);
 
     // Bob decrypts and applies
-    let (mut bob_ratchet, _) = bob_wb.storage().load_ratchet_state(&alice_id).unwrap().unwrap();
+    let (mut bob_ratchet, _) = bob_wb
+        .storage()
+        .load_ratchet_state(&alice_id)
+        .unwrap()
+        .unwrap();
     let ratchet_msg: webbook_core::crypto::ratchet::RatchetMessage =
         serde_json::from_slice(&pending[0].payload).unwrap();
     let delta_bytes = bob_ratchet.decrypt(&ratchet_msg).unwrap();
@@ -279,7 +321,10 @@ fn test_full_update_propagation() {
 
     // Verify Bob has the new field
     assert_eq!(alice_card_at_bob.fields().len(), 1);
-    assert!(alice_card_at_bob.fields().iter().any(|f| f.label() == "work"));
+    assert!(alice_card_at_bob
+        .fields()
+        .iter()
+        .any(|f| f.label() == "work"));
 }
 
 // =============================================================================
@@ -335,7 +380,8 @@ fn test_relay_empty_payload() {
 
     let shared_secret = SymmetricKey::generate();
     let bob_dh = X3DHKeyPair::generate();
-    let mut ratchet = DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key());
+    let mut ratchet =
+        DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key());
 
     // Empty payload should still work
     let result = client.send_update("recipient-id", &mut ratchet, b"", "update-empty");
@@ -358,7 +404,8 @@ fn test_relay_large_payload() {
 
     let shared_secret = SymmetricKey::generate();
     let bob_dh = X3DHKeyPair::generate();
-    let mut ratchet = DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key());
+    let mut ratchet =
+        DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key());
 
     // Large payload (100KB)
     let large_payload = vec![0xABu8; 100 * 1024];

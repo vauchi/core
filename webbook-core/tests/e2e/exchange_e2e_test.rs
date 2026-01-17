@@ -4,10 +4,8 @@
 //! Scenario: Successful QR code exchange with proximity
 
 use webbook_core::{
-    crypto::ratchet::DoubleRatchetState,
-    exchange::X3DHKeyPair,
-    network::MockTransport,
-    Contact, ContactField, FieldType, SymmetricKey, WebBook,
+    crypto::ratchet::DoubleRatchetState, exchange::X3DHKeyPair, network::MockTransport, Contact,
+    ContactField, FieldType, SymmetricKey, WebBook,
 };
 
 /// Tests the complete contact exchange workflow between two users.
@@ -29,15 +27,27 @@ fn test_contact_exchange_happy_path() {
 
     // Add fields to Alice's card
     alice_wb
-        .add_own_field(ContactField::new(FieldType::Email, "work", "alice@company.com"))
+        .add_own_field(ContactField::new(
+            FieldType::Email,
+            "work",
+            "alice@company.com",
+        ))
         .unwrap();
     alice_wb
-        .add_own_field(ContactField::new(FieldType::Phone, "mobile", "+15551234567"))
+        .add_own_field(ContactField::new(
+            FieldType::Phone,
+            "mobile",
+            "+15551234567",
+        ))
         .unwrap();
 
     // Add fields to Bob's card
     bob_wb
-        .add_own_field(ContactField::new(FieldType::Email, "personal", "bob@email.com"))
+        .add_own_field(ContactField::new(
+            FieldType::Email,
+            "personal",
+            "bob@email.com",
+        ))
         .unwrap();
 
     // Step 2: Generate exchange data (simulating QR code)
@@ -53,22 +63,31 @@ fn test_contact_exchange_happy_path() {
     let shared_secret = SymmetricKey::generate();
 
     // Step 4: Create contacts from exchange
-    let bob_contact = Contact::from_exchange(bob_public_key, bob_card.clone(), shared_secret.clone());
+    let bob_contact =
+        Contact::from_exchange(bob_public_key, bob_card.clone(), shared_secret.clone());
     let bob_contact_id = bob_contact.id().to_string();
     alice_wb.add_contact(bob_contact).unwrap();
 
-    let alice_contact = Contact::from_exchange(alice_public_key, alice_card.clone(), shared_secret.clone());
+    let alice_contact =
+        Contact::from_exchange(alice_public_key, alice_card.clone(), shared_secret.clone());
     let alice_contact_id = alice_contact.id().to_string();
     bob_wb.add_contact(alice_contact).unwrap();
 
     // Step 5: Initialize Double Ratchet for encrypted communication
     let bob_dh = X3DHKeyPair::generate();
-    let alice_ratchet = DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key());
+    let alice_ratchet =
+        DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key());
     let bob_ratchet = DoubleRatchetState::initialize_responder(&shared_secret, bob_dh);
 
     // Save ratchet states for future communication
-    alice_wb.storage().save_ratchet_state(&bob_contact_id, &alice_ratchet, true).unwrap();
-    bob_wb.storage().save_ratchet_state(&alice_contact_id, &bob_ratchet, false).unwrap();
+    alice_wb
+        .storage()
+        .save_ratchet_state(&bob_contact_id, &alice_ratchet, true)
+        .unwrap();
+    bob_wb
+        .storage()
+        .save_ratchet_state(&alice_contact_id, &bob_ratchet, false)
+        .unwrap();
 
     // Step 6: Verify exchange completed successfully
     assert_eq!(alice_wb.contact_count().unwrap(), 1);
@@ -82,10 +101,16 @@ fn test_contact_exchange_happy_path() {
     assert_eq!(alice_in_bob.card().fields().len(), 2);
 
     // Ratchet states are persisted
-    let alice_ratchet_loaded = alice_wb.storage().load_ratchet_state(&bob_contact_id).unwrap();
+    let alice_ratchet_loaded = alice_wb
+        .storage()
+        .load_ratchet_state(&bob_contact_id)
+        .unwrap();
     assert!(alice_ratchet_loaded.is_some());
 
-    let bob_ratchet_loaded = bob_wb.storage().load_ratchet_state(&alice_contact_id).unwrap();
+    let bob_ratchet_loaded = bob_wb
+        .storage()
+        .load_ratchet_state(&alice_contact_id)
+        .unwrap();
     assert!(bob_ratchet_loaded.is_some());
 
     // Step 7: Verify encrypted communication works

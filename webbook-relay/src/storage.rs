@@ -279,7 +279,10 @@ impl BlobStore for SqliteBlobStore {
     fn take(&self, recipient_id: &str) -> Vec<StoredBlob> {
         let blobs = self.peek(recipient_id);
         let conn = self.conn.lock().unwrap();
-        let _ = conn.execute("DELETE FROM blobs WHERE recipient_id = ?1", params![recipient_id]);
+        let _ = conn.execute(
+            "DELETE FROM blobs WHERE recipient_id = ?1",
+            params![recipient_id],
+        );
         blobs
     }
 
@@ -353,10 +356,7 @@ pub enum StorageBackend {
 }
 
 /// Creates a blob store based on the backend type.
-pub fn create_blob_store(
-    backend: StorageBackend,
-    data_dir: Option<&Path>,
-) -> Box<dyn BlobStore> {
+pub fn create_blob_store(backend: StorageBackend, data_dir: Option<&Path>) -> Box<dyn BlobStore> {
     match backend {
         StorageBackend::Memory => Box::new(MemoryBlobStore::new()),
         StorageBackend::Sqlite => {
@@ -399,8 +399,14 @@ mod tests {
     }
 
     fn test_take_impl(store: &dyn BlobStore) {
-        store.store("recipient-1", StoredBlob::new("sender-1".to_string(), vec![1]));
-        store.store("recipient-1", StoredBlob::new("sender-2".to_string(), vec![2]));
+        store.store(
+            "recipient-1",
+            StoredBlob::new("sender-1".to_string(), vec![1]),
+        );
+        store.store(
+            "recipient-1",
+            StoredBlob::new("sender-2".to_string(), vec![2]),
+        );
 
         let taken = store.take("recipient-1");
         assert_eq!(taken.len(), 2);
@@ -427,7 +433,10 @@ mod tests {
     }
 
     fn test_cleanup_impl(store: &dyn BlobStore) {
-        store.store("recipient-1", StoredBlob::new("sender-1".to_string(), vec![1]));
+        store.store(
+            "recipient-1",
+            StoredBlob::new("sender-1".to_string(), vec![1]),
+        );
 
         // With a long TTL, nothing should be removed
         let removed = store.cleanup_expired(Duration::from_secs(3600));
@@ -490,8 +499,14 @@ mod tests {
         // Store some blobs
         {
             let store = SqliteBlobStore::open(&db_path).unwrap();
-            store.store("recipient-1", StoredBlob::new("sender-1".to_string(), vec![1, 2, 3]));
-            store.store("recipient-2", StoredBlob::new("sender-2".to_string(), vec![4, 5, 6]));
+            store.store(
+                "recipient-1",
+                StoredBlob::new("sender-1".to_string(), vec![1, 2, 3]),
+            );
+            store.store(
+                "recipient-2",
+                StoredBlob::new("sender-2".to_string(), vec![4, 5, 6]),
+            );
             assert_eq!(store.blob_count(), 2);
         }
 
@@ -513,9 +528,18 @@ mod tests {
 
         assert_eq!(store.blob_count(), 0);
 
-        store.store("recipient-1", StoredBlob::new("sender-1".to_string(), vec![1]));
-        store.store("recipient-1", StoredBlob::new("sender-2".to_string(), vec![2]));
-        store.store("recipient-2", StoredBlob::new("sender-3".to_string(), vec![3]));
+        store.store(
+            "recipient-1",
+            StoredBlob::new("sender-1".to_string(), vec![1]),
+        );
+        store.store(
+            "recipient-1",
+            StoredBlob::new("sender-2".to_string(), vec![2]),
+        );
+        store.store(
+            "recipient-2",
+            StoredBlob::new("sender-3".to_string(), vec![3]),
+        );
 
         assert_eq!(store.blob_count(), 3);
         assert_eq!(store.recipient_count(), 2);
@@ -525,7 +549,10 @@ mod tests {
     fn test_acknowledge_nonexistent() {
         let store = MemoryBlobStore::new();
 
-        store.store("recipient-1", StoredBlob::new("sender-1".to_string(), vec![1]));
+        store.store(
+            "recipient-1",
+            StoredBlob::new("sender-1".to_string(), vec![1]),
+        );
 
         let removed = store.acknowledge("recipient-1", "nonexistent-id");
         assert!(!removed);

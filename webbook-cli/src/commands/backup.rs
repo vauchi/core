@@ -7,8 +7,8 @@ use std::path::Path;
 
 use anyhow::{bail, Result};
 use dialoguer::{Input, Password};
-use webbook_core::{WebBook, WebBookConfig, Identity, IdentityBackup};
 use webbook_core::network::MockTransport;
+use webbook_core::{Identity, IdentityBackup, WebBook, WebBookConfig};
 
 use crate::config::CliConfig;
 use crate::display;
@@ -42,7 +42,8 @@ pub fn export(config: &CliConfig, output: &Path) -> Result<()> {
     let wb = open_webbook(config)?;
 
     // Get identity
-    let identity = wb.identity()
+    let identity = wb
+        .identity()
         .ok_or_else(|| anyhow::anyhow!("No identity found"))?;
 
     // Prompt for password

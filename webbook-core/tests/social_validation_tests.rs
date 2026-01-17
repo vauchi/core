@@ -6,7 +6,9 @@
 use std::collections::{HashMap, HashSet};
 use webbook_core::{
     identity::Identity,
-    social::{ProfileValidation, SocialNetwork, SocialNetworkRegistry, TrustLevel, ValidationStatus},
+    social::{
+        ProfileValidation, SocialNetwork, SocialNetworkRegistry, TrustLevel, ValidationStatus,
+    },
 };
 
 // =============================================================================
@@ -18,12 +20,7 @@ use webbook_core::{
 fn test_validation_record_creation() {
     let signature = [0xABu8; 64];
 
-    let validation = ProfileValidation::new(
-        "field-123",
-        "@alice",
-        "validator-id",
-        signature,
-    );
+    let validation = ProfileValidation::new("field-123", "@alice", "validator-id", signature);
 
     // Verify accessors
     assert_eq!(validation.field_id(), "field-123");
@@ -108,12 +105,8 @@ fn test_validation_invalidated_on_value_change() {
     ];
 
     // Status for old value
-    let status_old = ValidationStatus::from_validations(
-        &validations,
-        "@alice_old",
-        None,
-        &HashSet::new(),
-    );
+    let status_old =
+        ValidationStatus::from_validations(&validations, "@alice_old", None, &HashSet::new());
     assert_eq!(status_old.count, 2);
 
     // Status for new value - validations don't count
@@ -123,7 +116,10 @@ fn test_validation_invalidated_on_value_change() {
         None,
         &HashSet::new(),
     );
-    assert_eq!(status_new.count, 0, "Old validations shouldn't count for new value");
+    assert_eq!(
+        status_new.count, 0,
+        "Old validations shouldn't count for new value"
+    );
     assert_eq!(status_new.trust_level, TrustLevel::Unverified);
 }
 
@@ -140,7 +136,10 @@ fn test_validation_display_formatting() {
 
     let display = status.display(&names);
     assert!(display.contains("Bob"), "Should include known name Bob");
-    assert!(display.contains("Carol") || display.contains("1 other"), "Should include Carol or count");
+    assert!(
+        display.contains("Carol") || display.contains("1 other"),
+        "Should include Carol or count"
+    );
 }
 
 /// Test: Validation status tracks if I validated
@@ -152,12 +151,8 @@ fn test_validation_tracks_self_validation() {
         ProfileValidation::new("field1", "@alice", "carol", [0u8; 64]),
     ];
 
-    let status_with_me = ValidationStatus::from_validations(
-        &validations,
-        "@alice",
-        Some("me"),
-        &HashSet::new(),
-    );
+    let status_with_me =
+        ValidationStatus::from_validations(&validations, "@alice", Some("me"), &HashSet::new());
     assert!(status_with_me.validated_by_me);
 
     let status_without_me = ValidationStatus::from_validations(
@@ -276,11 +271,23 @@ fn test_custom_network_addition() {
 #[test]
 fn test_registry_merge() {
     let mut registry1 = SocialNetworkRegistry::new();
-    registry1.add(SocialNetwork::new("net1", "Net 1", "https://net1.com/{username}"));
+    registry1.add(SocialNetwork::new(
+        "net1",
+        "Net 1",
+        "https://net1.com/{username}",
+    ));
 
     let mut registry2 = SocialNetworkRegistry::new();
-    registry2.add(SocialNetwork::new("net2", "Net 2", "https://net2.com/{username}"));
-    registry2.add(SocialNetwork::new("net1", "Net 1 Updated", "https://updated.com/{username}"));
+    registry2.add(SocialNetwork::new(
+        "net2",
+        "Net 2",
+        "https://net2.com/{username}",
+    ));
+    registry2.add(SocialNetwork::new(
+        "net1",
+        "Net 1 Updated",
+        "https://updated.com/{username}",
+    ));
 
     registry1.merge(&registry2);
 
@@ -361,7 +368,13 @@ fn test_display_various_counts() {
     assert!(display.contains("1") && display.contains("person"));
 
     status.count = 5;
-    status.validator_ids = vec!["v1".into(), "v2".into(), "v3".into(), "v4".into(), "v5".into()];
+    status.validator_ids = vec![
+        "v1".into(),
+        "v2".into(),
+        "v3".into(),
+        "v4".into(),
+        "v5".into(),
+    ];
     let display = status.display(&names);
     assert!(display.contains("5") && display.contains("people"));
 }

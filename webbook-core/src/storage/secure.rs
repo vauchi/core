@@ -114,7 +114,13 @@ impl FileKeyStorage {
         // Sanitize the name to prevent path traversal
         let safe_name = name
             .chars()
-            .map(|c| if c.is_alphanumeric() || c == '_' { c } else { '_' })
+            .map(|c| {
+                if c.is_alphanumeric() || c == '_' {
+                    c
+                } else {
+                    '_'
+                }
+            })
             .collect::<String>();
         self.path.join(format!("{}.key", safe_name))
     }
@@ -159,8 +165,9 @@ impl SecureStorage for FileKeyStorage {
         let file_path = self.key_file_path(name);
 
         if file_path.exists() {
-            std::fs::remove_file(&file_path)
-                .map_err(|e| StorageError::Encryption(format!("Failed to delete key file: {}", e)))?;
+            std::fs::remove_file(&file_path).map_err(|e| {
+                StorageError::Encryption(format!("Failed to delete key file: {}", e))
+            })?;
         }
 
         Ok(())

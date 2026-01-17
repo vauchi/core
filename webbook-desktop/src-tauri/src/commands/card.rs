@@ -29,18 +29,21 @@ pub struct CardInfo {
 pub fn get_card(state: State<'_, Mutex<AppState>>) -> Result<CardInfo, String> {
     let state = state.lock().unwrap();
 
-    let card = state.storage.load_own_card()
-        .map_err(|e| e.to_string())?;
+    let card = state.storage.load_own_card().map_err(|e| e.to_string())?;
 
     match card {
         Some(c) => Ok(CardInfo {
             display_name: c.display_name().to_string(),
-            fields: c.fields().iter().map(|f| FieldInfo {
-                id: f.id().to_string(),
-                field_type: format!("{:?}", f.field_type()),
-                label: f.label().to_string(),
-                value: f.value().to_string(),
-            }).collect(),
+            fields: c
+                .fields()
+                .iter()
+                .map(|f| FieldInfo {
+                    id: f.id().to_string(),
+                    field_type: format!("{:?}", f.field_type()),
+                    label: f.label().to_string(),
+                    value: f.value().to_string(),
+                })
+                .collect(),
         }),
         None => {
             // Return empty card with display name
@@ -74,19 +77,20 @@ pub fn add_field(
     };
 
     // Get or create card
-    let mut card = state.storage.load_own_card()
+    let mut card = state
+        .storage
+        .load_own_card()
         .map_err(|e| e.to_string())?
-        .unwrap_or_else(|| {
-            ContactCard::new(state.display_name().unwrap_or("User"))
-        });
+        .unwrap_or_else(|| ContactCard::new(state.display_name().unwrap_or("User")));
 
     // Add field
     let field = ContactField::new(ft, &label, &value);
-    card.add_field(field)
-        .map_err(|e| format!("{}", e))?;
+    card.add_field(field).map_err(|e| format!("{}", e))?;
 
     // Save card
-    state.storage.save_own_card(&card)
+    state
+        .storage
+        .save_own_card(&card)
         .map_err(|e| e.to_string())?;
 
     Ok(())
@@ -97,14 +101,17 @@ pub fn add_field(
 pub fn remove_field(field_id: String, state: State<'_, Mutex<AppState>>) -> Result<(), String> {
     let state = state.lock().unwrap();
 
-    let mut card = state.storage.load_own_card()
+    let mut card = state
+        .storage
+        .load_own_card()
         .map_err(|e| e.to_string())?
         .ok_or("No card found")?;
 
-    card.remove_field(&field_id)
-        .map_err(|e| format!("{}", e))?;
+    card.remove_field(&field_id).map_err(|e| format!("{}", e))?;
 
-    state.storage.save_own_card(&card)
+    state
+        .storage
+        .save_own_card(&card)
         .map_err(|e| e.to_string())?;
 
     Ok(())

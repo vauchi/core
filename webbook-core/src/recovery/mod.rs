@@ -211,7 +211,11 @@ impl RecoveryVoucher {
             return Err(RecoveryError::SelfVouching);
         }
 
-        Ok(Self::create(claim.old_pk(), claim.new_pk(), voucher_keypair))
+        Ok(Self::create(
+            claim.old_pk(),
+            claim.new_pk(),
+            voucher_keypair,
+        ))
     }
 
     /// Creates a signed voucher.
@@ -273,7 +277,8 @@ impl RecoveryVoucher {
 
     /// Verifies the voucher signature.
     pub fn verify(&self) -> bool {
-        let data = Self::build_sign_data(&self.old_pk, &self.new_pk, &self.voucher_pk, self.timestamp);
+        let data =
+            Self::build_sign_data(&self.old_pk, &self.new_pk, &self.voucher_pk, self.timestamp);
         let public_key = PublicKey::from_bytes(self.voucher_pk);
         let signature = Signature::from_bytes(self.signature);
         public_key.verify(&data, &signature)
@@ -510,8 +515,7 @@ impl RecoveryProof {
 
     /// Deserializes a proof from bytes.
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, RecoveryError> {
-        bincode::deserialize(bytes)
-            .map_err(|e| RecoveryError::SerializationError(e.to_string()))
+        bincode::deserialize(bytes).map_err(|e| RecoveryError::SerializationError(e.to_string()))
     }
 }
 
@@ -567,7 +571,10 @@ impl RecoverySettings {
     /// - `ThresholdTooHigh` if recovery_threshold > 10
     /// - `VerificationThresholdTooLow` if verification_threshold < 1
     /// - `VerificationThresholdTooHigh` if verification_threshold > recovery_threshold
-    pub fn new(recovery_threshold: u32, verification_threshold: u32) -> Result<Self, RecoveryError> {
+    pub fn new(
+        recovery_threshold: u32,
+        verification_threshold: u32,
+    ) -> Result<Self, RecoveryError> {
         if recovery_threshold < Self::MIN_RECOVERY_THRESHOLD {
             return Err(RecoveryError::ThresholdTooLow);
         }
@@ -759,7 +766,10 @@ impl RecoveryConflict {
             if new_pks.len() > 1 {
                 let claims: Vec<ConflictingClaim> = new_pks
                     .into_iter()
-                    .map(|(new_pk, voucher_count)| ConflictingClaim { new_pk, voucher_count })
+                    .map(|(new_pk, voucher_count)| ConflictingClaim {
+                        new_pk,
+                        voucher_count,
+                    })
                     .collect();
 
                 return Some(Self { old_pk, claims });
@@ -811,11 +821,7 @@ impl RecoveryRevocation {
     /// Creates a signed revocation.
     ///
     /// Must be signed with the old private key to prove ownership.
-    pub fn create(
-        old_pk: &[u8; 32],
-        new_pk: &[u8; 32],
-        old_keypair: &SigningKeyPair,
-    ) -> Self {
+    pub fn create(old_pk: &[u8; 32], new_pk: &[u8; 32], old_keypair: &SigningKeyPair) -> Self {
         let timestamp = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .expect("Time went backwards")

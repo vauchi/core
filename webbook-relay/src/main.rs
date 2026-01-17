@@ -12,12 +12,12 @@ use std::sync::Arc;
 
 use tokio::net::TcpListener;
 use tokio_tungstenite::accept_async;
-use tracing::{info, error};
+use tracing::{error, info};
 
 use config::RelayConfig;
 use rate_limit::RateLimiter;
-use recovery_storage::{RecoveryProofStore, MemoryRecoveryProofStore, SqliteRecoveryProofStore};
-use storage::{BlobStore, create_blob_store, StorageBackend};
+use recovery_storage::{MemoryRecoveryProofStore, RecoveryProofStore, SqliteRecoveryProofStore};
+use storage::{create_blob_store, BlobStore, StorageBackend};
 
 #[tokio::main]
 async fn main() {
@@ -25,7 +25,7 @@ async fn main() {
     tracing_subscriber::fmt()
         .with_env_filter(
             tracing_subscriber::EnvFilter::from_default_env()
-                .add_directive("webbook_relay=info".parse().unwrap())
+                .add_directive("webbook_relay=info".parse().unwrap()),
         )
         .init();
 
@@ -36,16 +36,20 @@ async fn main() {
     info!("Storage backend: {:?}", config.storage_backend);
 
     // Initialize shared state
-    let storage: Arc<dyn BlobStore> = Arc::from(
-        create_blob_store(config.storage_backend, Some(&config.data_dir))
-    );
+    let storage: Arc<dyn BlobStore> = Arc::from(create_blob_store(
+        config.storage_backend,
+        Some(&config.data_dir),
+    ));
 
     // Initialize recovery proof storage
     let recovery_storage: Arc<dyn RecoveryProofStore> = match config.storage_backend {
         StorageBackend::Memory => Arc::new(MemoryRecoveryProofStore::new()),
         StorageBackend::Sqlite => {
             let path = config.data_dir.join("recovery_proofs.db");
-            Arc::new(SqliteRecoveryProofStore::open(&path).expect("Failed to open recovery proof database"))
+            Arc::new(
+                SqliteRecoveryProofStore::open(&path)
+                    .expect("Failed to open recovery proof database"),
+            )
         }
     };
 
@@ -79,7 +83,9 @@ async fn main() {
     });
 
     // Start TCP listener
-    let listener = TcpListener::bind(&config.listen_addr).await.expect("Failed to bind");
+    let listener = TcpListener::bind(&config.listen_addr)
+        .await
+        .expect("Failed to bind");
 
     // Accept connections
     while let Ok((stream, addr)) = listener.accept().await {
@@ -92,7 +98,14 @@ async fn main() {
             match accept_async(stream).await {
                 Ok(ws_stream) => {
                     info!("New connection from {}", addr);
-                    handler::handle_connection(ws_stream, storage, recovery_storage, rate_limiter, max_message_size).await;
+                    handler::handle_connection(
+                        ws_stream,
+                        storage,
+                        recovery_storage,
+                        rate_limiter,
+                        max_message_size,
+                    )
+                    .await;
                     info!("Connection closed: {}", addr);
                 }
                 Err(e) => {

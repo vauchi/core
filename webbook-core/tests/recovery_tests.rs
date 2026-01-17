@@ -71,7 +71,10 @@ fn test_recovery_voucher_creation() {
 
     assert_eq!(voucher.old_pk(), &old_pk);
     assert_eq!(voucher.new_pk(), &new_pk);
-    assert_eq!(voucher.voucher_pk(), voucher_keypair.public_key().as_bytes());
+    assert_eq!(
+        voucher.voucher_pk(),
+        voucher_keypair.public_key().as_bytes()
+    );
 }
 
 #[test]
@@ -195,7 +198,10 @@ fn test_recovery_proof_threshold_not_met() {
     }
 
     let result = proof.validate();
-    assert!(matches!(result, Err(RecoveryError::InsufficientVouchers(_))));
+    assert!(matches!(
+        result,
+        Err(RecoveryError::InsufficientVouchers(_))
+    ));
 }
 
 #[test]
@@ -320,7 +326,10 @@ fn test_verification_medium_confidence() {
 
     let result = proof.verify_for_contact(&contacts, &settings);
 
-    assert!(matches!(result, VerificationResult::MediumConfidence { .. }));
+    assert!(matches!(
+        result,
+        VerificationResult::MediumConfidence { .. }
+    ));
 }
 
 #[test]
@@ -819,12 +828,36 @@ fn test_detect_conflicting_claims() {
     let dave = Identity::create("Dave");
 
     let mut proof1 = RecoveryProof::new(&old_pk, &new_pk_1, 2);
-    proof1.add_voucher(RecoveryVoucher::create(&old_pk, &new_pk_1, bob.signing_keypair())).unwrap();
-    proof1.add_voucher(RecoveryVoucher::create(&old_pk, &new_pk_1, charlie.signing_keypair())).unwrap();
+    proof1
+        .add_voucher(RecoveryVoucher::create(
+            &old_pk,
+            &new_pk_1,
+            bob.signing_keypair(),
+        ))
+        .unwrap();
+    proof1
+        .add_voucher(RecoveryVoucher::create(
+            &old_pk,
+            &new_pk_1,
+            charlie.signing_keypair(),
+        ))
+        .unwrap();
 
     let mut proof2 = RecoveryProof::new(&old_pk, &new_pk_2, 2);
-    proof2.add_voucher(RecoveryVoucher::create(&old_pk, &new_pk_2, dave.signing_keypair())).unwrap();
-    proof2.add_voucher(RecoveryVoucher::create(&old_pk, &new_pk_2, bob.signing_keypair())).unwrap();
+    proof2
+        .add_voucher(RecoveryVoucher::create(
+            &old_pk,
+            &new_pk_2,
+            dave.signing_keypair(),
+        ))
+        .unwrap();
+    proof2
+        .add_voucher(RecoveryVoucher::create(
+            &old_pk,
+            &new_pk_2,
+            bob.signing_keypair(),
+        ))
+        .unwrap();
 
     // Detect conflict
     let conflict = RecoveryConflict::detect(&[proof1.clone(), proof2.clone()]);
@@ -846,8 +879,20 @@ fn test_no_conflict_single_proof() {
     let charlie = Identity::create("Charlie");
 
     let mut proof = RecoveryProof::new(&old_pk, &new_pk, 2);
-    proof.add_voucher(RecoveryVoucher::create(&old_pk, &new_pk, bob.signing_keypair())).unwrap();
-    proof.add_voucher(RecoveryVoucher::create(&old_pk, &new_pk, charlie.signing_keypair())).unwrap();
+    proof
+        .add_voucher(RecoveryVoucher::create(
+            &old_pk,
+            &new_pk,
+            bob.signing_keypair(),
+        ))
+        .unwrap();
+    proof
+        .add_voucher(RecoveryVoucher::create(
+            &old_pk,
+            &new_pk,
+            charlie.signing_keypair(),
+        ))
+        .unwrap();
 
     // No conflict with single proof
     let conflict = RecoveryConflict::detect(&[proof]);
@@ -866,10 +911,22 @@ fn test_no_conflict_same_new_pk() {
     let charlie = Identity::create("Charlie");
 
     let mut proof1 = RecoveryProof::new(&old_pk, &new_pk, 1);
-    proof1.add_voucher(RecoveryVoucher::create(&old_pk, &new_pk, bob.signing_keypair())).unwrap();
+    proof1
+        .add_voucher(RecoveryVoucher::create(
+            &old_pk,
+            &new_pk,
+            bob.signing_keypair(),
+        ))
+        .unwrap();
 
     let mut proof2 = RecoveryProof::new(&old_pk, &new_pk, 1);
-    proof2.add_voucher(RecoveryVoucher::create(&old_pk, &new_pk, charlie.signing_keypair())).unwrap();
+    proof2
+        .add_voucher(RecoveryVoucher::create(
+            &old_pk,
+            &new_pk,
+            charlie.signing_keypair(),
+        ))
+        .unwrap();
 
     // No conflict since both have same new_pk
     let conflict = RecoveryConflict::detect(&[proof1, proof2]);
@@ -888,18 +945,40 @@ fn test_conflict_claim_info() {
     let charlie = Identity::create("Charlie");
 
     let mut proof1 = RecoveryProof::new(&old_pk, &new_pk_1, 2);
-    proof1.add_voucher(RecoveryVoucher::create(&old_pk, &new_pk_1, bob.signing_keypair())).unwrap();
-    proof1.add_voucher(RecoveryVoucher::create(&old_pk, &new_pk_1, charlie.signing_keypair())).unwrap();
+    proof1
+        .add_voucher(RecoveryVoucher::create(
+            &old_pk,
+            &new_pk_1,
+            bob.signing_keypair(),
+        ))
+        .unwrap();
+    proof1
+        .add_voucher(RecoveryVoucher::create(
+            &old_pk,
+            &new_pk_1,
+            charlie.signing_keypair(),
+        ))
+        .unwrap();
 
     let mut proof2 = RecoveryProof::new(&old_pk, &new_pk_2, 1);
-    proof2.add_voucher(RecoveryVoucher::create(&old_pk, &new_pk_2, bob.signing_keypair())).unwrap();
+    proof2
+        .add_voucher(RecoveryVoucher::create(
+            &old_pk,
+            &new_pk_2,
+            bob.signing_keypair(),
+        ))
+        .unwrap();
 
     let conflict = RecoveryConflict::detect(&[proof1, proof2]).unwrap();
 
     // Claims should have correct voucher counts
     let claims = conflict.claims();
-    assert!(claims.iter().any(|c| c.new_pk() == &new_pk_1 && c.voucher_count() == 2));
-    assert!(claims.iter().any(|c| c.new_pk() == &new_pk_2 && c.voucher_count() == 1));
+    assert!(claims
+        .iter()
+        .any(|c| c.new_pk() == &new_pk_1 && c.voucher_count() == 2));
+    assert!(claims
+        .iter()
+        .any(|c| c.new_pk() == &new_pk_2 && c.voucher_count() == 1));
 }
 
 // =============================================================================
@@ -975,11 +1054,13 @@ fn test_revocation_applies_to_proof() {
         alice_new.signing_public_key(),
         1,
     );
-    proof.add_voucher(RecoveryVoucher::create(
-        alice_old.signing_public_key(),
-        alice_new.signing_public_key(),
-        bob.signing_keypair(),
-    )).unwrap();
+    proof
+        .add_voucher(RecoveryVoucher::create(
+            alice_old.signing_public_key(),
+            alice_new.signing_public_key(),
+            bob.signing_keypair(),
+        ))
+        .unwrap();
 
     // Create revocation
     let revocation = RecoveryRevocation::create(
@@ -1007,11 +1088,13 @@ fn test_revocation_does_not_apply_different_proof() {
         alice_other.signing_public_key(), // Different new_pk
         1,
     );
-    proof.add_voucher(RecoveryVoucher::create(
-        alice_old.signing_public_key(),
-        alice_other.signing_public_key(),
-        bob.signing_keypair(),
-    )).unwrap();
+    proof
+        .add_voucher(RecoveryVoucher::create(
+            alice_old.signing_public_key(),
+            alice_other.signing_public_key(),
+            bob.signing_keypair(),
+        ))
+        .unwrap();
 
     // Create revocation for original new_pk
     let revocation = RecoveryRevocation::create(

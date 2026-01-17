@@ -5,12 +5,12 @@
 use std::fs;
 
 use anyhow::{bail, Result};
-use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
+use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
 use dialoguer::Input;
-use webbook_core::{WebBook, WebBookConfig, Identity, IdentityBackup};
 use webbook_core::exchange::{DeviceLinkQR, DeviceLinkResponder, DeviceLinkResponse};
-use webbook_core::sync::DeviceSyncPayload;
 use webbook_core::network::MockTransport;
+use webbook_core::sync::DeviceSyncPayload;
+use webbook_core::{Identity, IdentityBackup, WebBook, WebBookConfig};
 
 use crate::config::CliConfig;
 use crate::display;
@@ -43,16 +43,22 @@ fn open_webbook(config: &CliConfig) -> Result<WebBook<MockTransport>> {
 pub fn list(config: &CliConfig) -> Result<()> {
     let wb = open_webbook(config)?;
 
-    let identity = wb.identity()
+    let identity = wb
+        .identity()
         .ok_or_else(|| anyhow::anyhow!("No identity found"))?;
 
     let device_info = identity.device_info();
 
     println!();
-    display::info(&format!("Current device: {} (index {})",
+    display::info(&format!(
+        "Current device: {} (index {})",
         device_info.device_name(),
-        device_info.device_index()));
-    println!("  Device ID: {}", hex::encode(&device_info.device_id()[..8]));
+        device_info.device_index()
+    ));
+    println!(
+        "  Device ID: {}",
+        hex::encode(&device_info.device_id()[..8])
+    );
     println!();
 
     // Try to load device registry from storage
@@ -73,7 +79,8 @@ pub fn list(config: &CliConfig) -> Result<()> {
                 ""
             };
 
-            println!("  {}. {} [{}]{}",
+            println!(
+                "  {}. {} [{}]{}",
                 i + 1,
                 device.device_name,
                 status,
@@ -94,7 +101,8 @@ pub fn list(config: &CliConfig) -> Result<()> {
 pub fn link(config: &CliConfig) -> Result<()> {
     let wb = open_webbook(config)?;
 
-    let identity = wb.identity()
+    let identity = wb
+        .identity()
         .ok_or_else(|| anyhow::anyhow!("No identity found"))?;
 
     // We need the master seed to create the initiator
@@ -123,7 +131,9 @@ pub fn link(config: &CliConfig) -> Result<()> {
 
     // In a real implementation, we'd wait for the request and respond
     // For now, we just show the QR code
-    display::info("After scanning, run 'webbook device complete <request_data>' to finish linking.");
+    display::info(
+        "After scanning, run 'webbook device complete <request_data>' to finish linking.",
+    );
 
     Ok(())
 }
@@ -166,9 +176,7 @@ pub fn join(config: &CliConfig, qr_data: &str) -> Result<()> {
     let encrypted_request = responder.create_request()?;
 
     // Encode request for display
-    let request_b64 = BASE64.encode(
-        &encrypted_request
-    );
+    let request_b64 = BASE64.encode(&encrypted_request);
 
     display::info("Send this request to the existing device:");
     println!();
@@ -195,13 +203,12 @@ pub fn join(config: &CliConfig, qr_data: &str) -> Result<()> {
 pub fn complete(config: &CliConfig, request_data: &str) -> Result<()> {
     let wb = open_webbook(config)?;
 
-    let _identity = wb.identity()
+    let _identity = wb
+        .identity()
         .ok_or_else(|| anyhow::anyhow!("No identity found"))?;
 
     // Decode the request
-    let _encrypted_request = BASE64.decode(
-        request_data
-    )?;
+    let _encrypted_request = BASE64.decode(request_data)?;
 
     // We need the master seed and link key to process the request
     // This is a limitation of the CLI demo - in a real app, we'd have
@@ -230,9 +237,7 @@ pub fn finish(config: &CliConfig, response_data: &str) -> Result<()> {
     let qr = DeviceLinkQR::from_data_string(&qr_data)?;
 
     // Decode the response
-    let encrypted_response = BASE64.decode(
-        response_data
-    )?;
+    let encrypted_response = BASE64.decode(response_data)?;
 
     // Decrypt the response
     let response = DeviceLinkResponse::decrypt(&encrypted_response, qr.link_key())?;
@@ -245,9 +250,9 @@ pub fn finish(config: &CliConfig, response_data: &str) -> Result<()> {
             Identity::create("temp") // Placeholder - real impl uses master_seed
                 .export_backup(LOCAL_STORAGE_PASSWORD)?
                 .as_bytes()
-                .to_vec()
+                .to_vec(),
         ),
-        LOCAL_STORAGE_PASSWORD
+        LOCAL_STORAGE_PASSWORD,
     )?;
 
     display::success(&format!("Joined identity: {}", response.display_name()));
@@ -259,7 +264,10 @@ pub fn finish(config: &CliConfig, response_data: &str) -> Result<()> {
     // Check for sync payload
     if !response.sync_payload_json().is_empty() {
         if let Ok(payload) = DeviceSyncPayload::from_json(response.sync_payload_json()) {
-            display::info(&format!("Received {} contacts from existing device.", payload.contact_count()));
+            display::info(&format!(
+                "Received {} contacts from existing device.",
+                payload.contact_count()
+            ));
         }
     }
 
@@ -272,15 +280,19 @@ pub fn finish(config: &CliConfig, response_data: &str) -> Result<()> {
 pub fn revoke(config: &CliConfig, device_id_prefix: &str) -> Result<()> {
     let wb = open_webbook(config)?;
 
-    let identity = wb.identity()
+    let identity = wb
+        .identity()
         .ok_or_else(|| anyhow::anyhow!("No identity found"))?;
 
     // Try to load device registry
-    let registry = wb.storage().load_device_registry()?
+    let registry = wb
+        .storage()
+        .load_device_registry()?
         .ok_or_else(|| anyhow::anyhow!("No device registry found"))?;
 
     // Find device by ID prefix
-    let device = registry.all_devices()
+    let device = registry
+        .all_devices()
         .iter()
         .find(|d| hex::encode(d.device_id).starts_with(device_id_prefix))
         .ok_or_else(|| anyhow::anyhow!("Device not found: {}", device_id_prefix))?;
@@ -297,7 +309,10 @@ pub fn revoke(config: &CliConfig, device_id_prefix: &str) -> Result<()> {
 
     // Confirm revocation
     let confirm: String = Input::new()
-        .with_prompt(format!("Revoke device '{}'? Type 'yes' to confirm", device.device_name))
+        .with_prompt(format!(
+            "Revoke device '{}'? Type 'yes' to confirm",
+            device.device_name
+        ))
         .interact_text()?;
 
     if confirm.to_lowercase() != "yes" {
@@ -316,7 +331,8 @@ pub fn revoke(config: &CliConfig, device_id_prefix: &str) -> Result<()> {
 pub fn info(config: &CliConfig) -> Result<()> {
     let wb = open_webbook(config)?;
 
-    let identity = wb.identity()
+    let identity = wb
+        .identity()
         .ok_or_else(|| anyhow::anyhow!("No identity found"))?;
 
     let device_info = identity.device_info();
@@ -329,8 +345,14 @@ pub fn info(config: &CliConfig) -> Result<()> {
     println!("  Name:        {}", device_info.device_name());
     println!("  Index:       {}", device_info.device_index());
     println!("  Device ID:   {}", hex::encode(device_info.device_id()));
-    println!("  Exchange Key: {}...", hex::encode(&device_info.exchange_public_key()[..16]));
-    println!("  Created:     {}", format_timestamp(device_info.created_at()));
+    println!(
+        "  Exchange Key: {}...",
+        hex::encode(&device_info.exchange_public_key()[..16])
+    );
+    println!(
+        "  Created:     {}",
+        format_timestamp(device_info.created_at())
+    );
     println!();
     println!("{}", "─".repeat(50));
 

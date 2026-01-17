@@ -11,15 +11,15 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use webbook_core::{
-    Contact, ContactCard, ContactField, FieldType, Identity, IdentityBackup,
-    SocialNetworkRegistry, Storage, SymmetricKey,
-};
 use webbook_core::crypto::ratchet::DoubleRatchetState;
 use webbook_core::exchange::X3DH;
+use webbook_core::{
+    Contact, ContactCard, ContactField, FieldType, Identity, IdentityBackup, SocialNetworkRegistry,
+    Storage, SymmetricKey,
+};
 
-use tungstenite::{connect, Message, WebSocket};
 use tungstenite::stream::MaybeTlsStream;
+use tungstenite::{connect, Message, WebSocket};
 
 uniffi::setup_scaffolding!();
 
@@ -354,7 +354,7 @@ pub struct MobileSocialNetwork {
 #[allow(dead_code)]
 struct IdentityData {
     backup_data: Vec<u8>,
-    display_name: String,  // Reserved for future use
+    display_name: String, // Reserved for future use
 }
 
 /// Main WebBook interface for mobile platforms.
@@ -365,7 +365,7 @@ pub struct WebBookMobile {
     storage_path: PathBuf,
     storage_key: SymmetricKey,
     #[allow(dead_code)]
-    relay_url: String,  // Reserved for future sync implementation
+    relay_url: String, // Reserved for future sync implementation
     identity_data: Mutex<Option<IdentityData>>,
     social_registry: SocialNetworkRegistry,
     sync_status: Mutex<MobileSyncStatus>,
@@ -416,7 +416,8 @@ impl WebBookMobile {
         let (exchange_messages, card_updates) = Self::receive_pending(&mut socket)?;
 
         // Process exchange messages (creates new contacts)
-        let contacts_added = self.process_exchange_messages(&identity, &storage, exchange_messages)?;
+        let contacts_added =
+            self.process_exchange_messages(&identity, &storage, exchange_messages)?;
 
         // Process card updates from existing contacts
         let cards_updated = Self::process_card_updates(&storage, card_updates)?;
@@ -447,7 +448,8 @@ impl WebBookMobile {
         let envelope = create_envelope(MessagePayload::Handshake(handshake));
         let data = encode_message(&envelope)
             .map_err(|e| MobileError::SyncFailed(format!("Encode error: {}", e)))?;
-        socket.send(Message::Binary(data))
+        socket
+            .send(Message::Binary(data))
             .map_err(|e| MobileError::NetworkError(e.to_string()))?;
         Ok(())
     }
@@ -470,16 +472,22 @@ impl WebBookMobile {
                             if let MessagePayload::EncryptedUpdate(update) = envelope.payload {
                                 // Check if this is an exchange message
                                 if ExchangeMessage::is_exchange(&update.ciphertext) {
-                                    if let Some(exchange) = ExchangeMessage::from_bytes(&update.ciphertext) {
+                                    if let Some(exchange) =
+                                        ExchangeMessage::from_bytes(&update.ciphertext)
+                                    {
                                         exchange_messages.push(exchange);
                                     }
                                 } else {
                                     // This is a card update
-                                    card_updates.push((update.sender_id.clone(), update.ciphertext));
+                                    card_updates
+                                        .push((update.sender_id.clone(), update.ciphertext));
                                 }
 
                                 // Send acknowledgment
-                                let ack = create_ack(&envelope.message_id, AckStatus::ReceivedByRecipient);
+                                let ack = create_ack(
+                                    &envelope.message_id,
+                                    AckStatus::ReceivedByRecipient,
+                                );
                                 if let Ok(ack_data) = encode_message(&ack) {
                                     let _ = socket.send(Message::Binary(ack_data));
                                 }
@@ -572,7 +580,8 @@ impl WebBookMobile {
             storage.save_contact(&contact)?;
 
             // Initialize ratchet as responder
-            let ratchet_dh = webbook_core::exchange::X3DHKeyPair::from_bytes(our_x3dh.secret_bytes());
+            let ratchet_dh =
+                webbook_core::exchange::X3DHKeyPair::from_bytes(our_x3dh.secret_bytes());
             let ratchet = DoubleRatchetState::initialize_responder(&shared_secret, ratchet_dh);
             let _ = storage.save_ratchet_state(&contact_id, &ratchet, true);
 
@@ -593,14 +602,15 @@ impl WebBookMobile {
     ) -> Result<(), MobileError> {
         use sync_protocol::*;
 
-        let (mut socket, _) = connect(&self.relay_url)
-            .map_err(|e| MobileError::NetworkError(e.to_string()))?;
+        let (mut socket, _) =
+            connect(&self.relay_url).map_err(|e| MobileError::NetworkError(e.to_string()))?;
 
         let our_id = identity.public_id();
         Self::send_handshake(&mut socket, &our_id)?;
 
         let exchange_key_slice = identity.exchange_public_key();
-        let exchange_key: [u8; 32] = exchange_key_slice.try_into()
+        let exchange_key: [u8; 32] = exchange_key_slice
+            .try_into()
             .map_err(|_| MobileError::CryptoError("Invalid key length".to_string()))?;
 
         let exchange_msg = ExchangeMessage::new_response(
@@ -616,9 +626,9 @@ impl WebBookMobile {
         };
 
         let envelope = create_envelope(MessagePayload::EncryptedUpdate(update));
-        let data = encode_message(&envelope)
-            .map_err(MobileError::SyncFailed)?;
-        socket.send(Message::Binary(data))
+        let data = encode_message(&envelope).map_err(MobileError::SyncFailed)?;
+        socket
+            .send(Message::Binary(data))
             .map_err(|e| MobileError::NetworkError(e.to_string()))?;
 
         std::thread::sleep(Duration::from_millis(100));
@@ -734,7 +744,8 @@ impl WebBookMobile {
             // Load existing key
             let key_bytes = std::fs::read(&key_path)
                 .map_err(|e| MobileError::StorageError(format!("Failed to read key: {}", e)))?;
-            let key_array: [u8; 32] = key_bytes.try_into()
+            let key_array: [u8; 32] = key_bytes
+                .try_into()
                 .map_err(|_| MobileError::StorageError("Invalid key length".to_string()))?;
             SymmetricKey::from_bytes(key_array)
         } else {
@@ -833,7 +844,9 @@ impl WebBookMobile {
     /// Get display name.
     pub fn get_display_name(&self) -> Result<String, MobileError> {
         let storage = self.open_storage()?;
-        let card = storage.load_own_card()?.ok_or(MobileError::IdentityNotFound)?;
+        let card = storage
+            .load_own_card()?
+            .ok_or(MobileError::IdentityNotFound)?;
         Ok(card.display_name().to_string())
     }
 
@@ -842,7 +855,9 @@ impl WebBookMobile {
     /// Get own contact card.
     pub fn get_own_card(&self) -> Result<MobileContactCard, MobileError> {
         let storage = self.open_storage()?;
-        let card = storage.load_own_card()?.ok_or(MobileError::IdentityNotFound)?;
+        let card = storage
+            .load_own_card()?
+            .ok_or(MobileError::IdentityNotFound)?;
         Ok(MobileContactCard::from(&card))
     }
 
@@ -855,10 +870,13 @@ impl WebBookMobile {
     ) -> Result<(), MobileError> {
         let storage = self.open_storage()?;
 
-        let mut card = storage.load_own_card()?.ok_or(MobileError::IdentityNotFound)?;
+        let mut card = storage
+            .load_own_card()?
+            .ok_or(MobileError::IdentityNotFound)?;
 
         let field = ContactField::new(field_type.into(), &label, &value);
-        card.add_field(field).map_err(|e| MobileError::InvalidInput(e.to_string()))?;
+        card.add_field(field)
+            .map_err(|e| MobileError::InvalidInput(e.to_string()))?;
 
         storage.save_own_card(&card)?;
         Ok(())
@@ -868,10 +886,14 @@ impl WebBookMobile {
     pub fn update_field(&self, label: String, new_value: String) -> Result<(), MobileError> {
         let storage = self.open_storage()?;
 
-        let mut card = storage.load_own_card()?.ok_or(MobileError::IdentityNotFound)?;
+        let mut card = storage
+            .load_own_card()?
+            .ok_or(MobileError::IdentityNotFound)?;
 
         // Find field by label to get its ID
-        let field_id = card.fields().iter()
+        let field_id = card
+            .fields()
+            .iter()
             .find(|f| f.label() == label)
             .ok_or_else(|| MobileError::InvalidInput(format!("Field '{}' not found", label)))?
             .id()
@@ -888,12 +910,14 @@ impl WebBookMobile {
     pub fn remove_field(&self, label: String) -> Result<bool, MobileError> {
         let storage = self.open_storage()?;
 
-        let mut card = storage.load_own_card()?.ok_or(MobileError::IdentityNotFound)?;
+        let mut card = storage
+            .load_own_card()?
+            .ok_or(MobileError::IdentityNotFound)?;
 
         // Find field by label to get its ID
         let field_id = match card.fields().iter().find(|f| f.label() == label) {
             Some(f) => f.id().to_string(),
-            None => return Ok(false),  // Field doesn't exist
+            None => return Ok(false), // Field doesn't exist
         };
 
         card.remove_field(&field_id)
@@ -907,7 +931,9 @@ impl WebBookMobile {
     pub fn set_display_name(&self, name: String) -> Result<(), MobileError> {
         let storage = self.open_storage()?;
 
-        let mut card = storage.load_own_card()?.ok_or(MobileError::IdentityNotFound)?;
+        let mut card = storage
+            .load_own_card()?
+            .ok_or(MobileError::IdentityNotFound)?;
 
         card.set_display_name(&name)
             .map_err(|e| MobileError::InvalidInput(e.to_string()))?;
@@ -990,12 +1016,16 @@ impl WebBookMobile {
             .ok_or_else(|| MobileError::ContactNotFound(contact_id.clone()))?;
 
         // Find field ID by label
-        let card = storage.load_own_card()?.ok_or(MobileError::IdentityNotFound)?;
+        let card = storage
+            .load_own_card()?
+            .ok_or(MobileError::IdentityNotFound)?;
         let field = card
             .fields()
             .iter()
             .find(|f| f.label() == field_label)
-            .ok_or_else(|| MobileError::InvalidInput(format!("Field not found: {}", field_label)))?;
+            .ok_or_else(|| {
+                MobileError::InvalidInput(format!("Field not found: {}", field_label))
+            })?;
 
         contact.visibility_rules_mut().set_nobody(field.id());
         storage.save_contact(&contact)?;
@@ -1015,12 +1045,16 @@ impl WebBookMobile {
             .load_contact(&contact_id)?
             .ok_or_else(|| MobileError::ContactNotFound(contact_id.clone()))?;
 
-        let card = storage.load_own_card()?.ok_or(MobileError::IdentityNotFound)?;
+        let card = storage
+            .load_own_card()?
+            .ok_or(MobileError::IdentityNotFound)?;
         let field = card
             .fields()
             .iter()
             .find(|f| f.label() == field_label)
-            .ok_or_else(|| MobileError::InvalidInput(format!("Field not found: {}", field_label)))?;
+            .ok_or_else(|| {
+                MobileError::InvalidInput(format!("Field not found: {}", field_label))
+            })?;
 
         contact.visibility_rules_mut().set_everyone(field.id());
         storage.save_contact(&contact)?;
@@ -1040,12 +1074,16 @@ impl WebBookMobile {
             .load_contact(&contact_id)?
             .ok_or_else(|| MobileError::ContactNotFound(contact_id.clone()))?;
 
-        let card = storage.load_own_card()?.ok_or(MobileError::IdentityNotFound)?;
+        let card = storage
+            .load_own_card()?
+            .ok_or(MobileError::IdentityNotFound)?;
         let field = card
             .fields()
             .iter()
             .find(|f| f.label() == field_label)
-            .ok_or_else(|| MobileError::InvalidInput(format!("Field not found: {}", field_label)))?;
+            .ok_or_else(|| {
+                MobileError::InvalidInput(format!("Field not found: {}", field_label))
+            })?;
 
         Ok(contact.visibility_rules().can_see(field.id(), &contact_id))
     }
@@ -1074,16 +1112,16 @@ impl WebBookMobile {
 
     /// Complete exchange with scanned QR data.
     pub fn complete_exchange(&self, qr_data: String) -> Result<MobileExchangeResult, MobileError> {
-        use webbook_core::{Contact, ExchangeQR, X3DH};
         use webbook_core::crypto::ratchet::DoubleRatchetState;
+        use webbook_core::{Contact, ExchangeQR, X3DH};
 
         let identity = self.get_identity()?;
         let storage = self.open_storage()?;
 
         // Parse QR data (remove "wb://" prefix if present)
         let data_str = qr_data.strip_prefix("wb://").unwrap_or(&qr_data);
-        let their_qr = ExchangeQR::from_data_string(data_str)
-            .map_err(|_| MobileError::InvalidQrCode)?;
+        let their_qr =
+            ExchangeQR::from_data_string(data_str).map_err(|_| MobileError::InvalidQrCode)?;
 
         // Check if expired
         if their_qr.is_expired() {
@@ -1097,7 +1135,9 @@ impl WebBookMobile {
 
         // Check for duplicate
         if storage.load_contact(&their_public_id)?.is_some() {
-            return Err(MobileError::ExchangeFailed("Contact already exists".to_string()));
+            return Err(MobileError::ExchangeFailed(
+                "Contact already exists".to_string(),
+            ));
         }
 
         // Perform X3DH key agreement
@@ -1107,11 +1147,7 @@ impl WebBookMobile {
 
         // Create placeholder contact (real name comes via sync)
         let their_card = webbook_core::ContactCard::new("New Contact");
-        let contact = Contact::from_exchange(
-            *their_signing_key,
-            their_card,
-            shared_secret.clone(),
-        );
+        let contact = Contact::from_exchange(*their_signing_key, their_card, shared_secret.clone());
 
         let contact_id = contact.id().to_string();
         let contact_name = contact.display_name().to_string();
@@ -1120,10 +1156,7 @@ impl WebBookMobile {
         storage.save_contact(&contact)?;
 
         // Initialize Double Ratchet as initiator
-        let ratchet = DoubleRatchetState::initialize_initiator(
-            &shared_secret,
-            *their_exchange_key,
-        );
+        let ratchet = DoubleRatchetState::initialize_initiator(&shared_secret, *their_exchange_key);
         storage.save_ratchet_state(&contact_id, &ratchet, true)?;
 
         Ok(MobileExchangeResult {
@@ -1371,7 +1404,10 @@ mod tests {
         wb.create_identity("Alice".to_string()).unwrap();
 
         let exchange_data = wb.generate_exchange_qr().unwrap();
-        assert!(exchange_data.qr_data.starts_with("wb://"), "QR data should start with wb://");
+        assert!(
+            exchange_data.qr_data.starts_with("wb://"),
+            "QR data should start with wb://"
+        );
         assert!(!exchange_data.public_id.is_empty());
         assert!(exchange_data.expires_at > 0);
     }
@@ -1388,7 +1424,9 @@ mod tests {
         )
         .unwrap();
 
-        let backup = wb.export_backup("correct-horse-battery-staple".to_string()).unwrap();
+        let backup = wb
+            .export_backup("correct-horse-battery-staple".to_string())
+            .unwrap();
         assert!(!backup.is_empty());
 
         // Create new instance and restore

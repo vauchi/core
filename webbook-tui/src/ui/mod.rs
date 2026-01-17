@@ -1,16 +1,16 @@
 //! UI Rendering
 
-mod home;
+mod backup;
 mod contacts;
-mod exchange;
-mod settings;
-mod help;
-mod widgets;
 mod devices;
+mod exchange;
+mod help;
+mod home;
 mod recovery;
+mod settings;
 mod sync;
 mod visibility;
-mod backup;
+mod widgets;
 
 use ratatui::prelude::*;
 use ratatui::widgets::{Block, Borders, Paragraph};
@@ -22,9 +22,9 @@ pub fn draw(f: &mut Frame, app: &App) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(3),  // Header
-            Constraint::Min(0),     // Content
-            Constraint::Length(3),  // Footer/status
+            Constraint::Length(3), // Header
+            Constraint::Min(0),    // Content
+            Constraint::Length(3), // Footer/status
         ])
         .split(f.area());
 
@@ -68,7 +68,11 @@ fn draw_header(f: &mut Frame, area: Rect, app: &App) {
     };
 
     let header = Paragraph::new(title)
-        .style(Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))
+        .style(
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD),
+        )
         .block(Block::default().borders(Borders::BOTTOM));
 
     f.render_widget(header, area);

@@ -34,10 +34,10 @@ impl Default for RelayConfig {
         RelayConfig {
             listen_addr: "0.0.0.0:8080".parse().unwrap(),
             max_connections: 1000,
-            max_message_size: 1_048_576, // 1 MB
+            max_message_size: 1_048_576,      // 1 MB
             blob_ttl_secs: 90 * 24 * 60 * 60, // 90 days (3 months)
             rate_limit_per_min: 60,
-            cleanup_interval_secs: 3600, // 1 hour
+            cleanup_interval_secs: 3600,             // 1 hour
             storage_backend: StorageBackend::Sqlite, // Persistent by default
             data_dir: PathBuf::from("./data"),
         }

@@ -6,17 +6,16 @@ use std::fs;
 use std::net::TcpStream;
 
 use anyhow::{bail, Result};
-use tungstenite::{connect, Message, WebSocket};
 use tungstenite::stream::MaybeTlsStream;
-use webbook_core::{WebBook, WebBookConfig, Contact, Identity, IdentityBackup};
-use webbook_core::network::MockTransport;
+use tungstenite::{connect, Message, WebSocket};
 use webbook_core::exchange::{ExchangeQR, X3DH};
+use webbook_core::network::MockTransport;
+use webbook_core::{Contact, Identity, IdentityBackup, WebBook, WebBookConfig};
 
 use crate::config::CliConfig;
 use crate::display;
 use crate::protocol::{
-    MessagePayload, Handshake, EncryptedUpdate, ExchangeMessage,
-    create_envelope, encode_message,
+    create_envelope, encode_message, EncryptedUpdate, ExchangeMessage, Handshake, MessagePayload,
 };
 
 /// Internal password for local identity storage.
@@ -103,7 +102,9 @@ pub fn start(config: &CliConfig) -> Result<()> {
     let wb = open_webbook(config)?;
 
     // Get our identity
-    let identity = wb.identity().ok_or_else(|| anyhow::anyhow!("No identity found"))?;
+    let identity = wb
+        .identity()
+        .ok_or_else(|| anyhow::anyhow!("No identity found"))?;
 
     // Generate exchange QR
     let qr = ExchangeQR::generate(identity);
@@ -148,7 +149,9 @@ pub fn complete(config: &CliConfig, data: &str) -> Result<()> {
     }
 
     // Get our identity for X3DH
-    let identity = wb.identity().ok_or_else(|| anyhow::anyhow!("No identity found"))?;
+    let identity = wb
+        .identity()
+        .ok_or_else(|| anyhow::anyhow!("No identity found"))?;
     let our_x3dh = identity.x3dh_keypair();
 
     // Perform X3DH as initiator to derive shared secret
@@ -159,11 +162,7 @@ pub fn complete(config: &CliConfig, data: &str) -> Result<()> {
     // The real name will be received via sync
     let their_card = webbook_core::ContactCard::new("New Contact");
 
-    let contact = Contact::from_exchange(
-        *their_signing_key,
-        their_card,
-        shared_secret.clone(),
-    );
+    let contact = Contact::from_exchange(*their_signing_key, their_card, shared_secret.clone());
     let contact_id = contact.id().to_string();
 
     // Add the contact
@@ -186,7 +185,10 @@ pub fn complete(config: &CliConfig, data: &str) -> Result<()> {
     }
 
     println!();
-    display::success(&format!("Contact added (ID: {}...)", &their_public_id[..16]));
+    display::success(&format!(
+        "Contact added (ID: {}...)",
+        &their_public_id[..16]
+    ));
     display::info("They need to run 'webbook sync' to see your contact request.");
     display::info("You should also run 'webbook sync' to receive their card updates.");
 

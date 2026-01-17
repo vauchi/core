@@ -4,10 +4,10 @@
 
 use std::sync::Mutex;
 
-use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
+use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
 use serde::Serialize;
 use tauri::State;
-use webbook_core::recovery::{RecoveryClaim, RecoveryVoucher, RecoverySettings};
+use webbook_core::recovery::{RecoveryClaim, RecoverySettings, RecoveryVoucher};
 
 use crate::state::AppState;
 
@@ -70,8 +70,7 @@ pub fn create_recovery_claim(
         .ok_or_else(|| "No identity found".to_string())?;
 
     // Parse old public key
-    let old_pk_bytes = hex::decode(&old_pk_hex)
-        .map_err(|e| format!("Invalid hex: {}", e))?;
+    let old_pk_bytes = hex::decode(&old_pk_hex).map_err(|e| format!("Invalid hex: {}", e))?;
 
     if old_pk_bytes.len() != 32 {
         return Err("Public key must be 32 bytes".to_string());
@@ -107,11 +106,12 @@ pub fn create_recovery_voucher(
         .ok_or_else(|| "No identity found".to_string())?;
 
     // Parse claim
-    let claim_bytes = BASE64.decode(&claim_b64)
+    let claim_bytes = BASE64
+        .decode(&claim_b64)
         .map_err(|e| format!("Invalid base64: {}", e))?;
 
-    let claim = RecoveryClaim::from_bytes(&claim_bytes)
-        .map_err(|e| format!("Invalid claim: {:?}", e))?;
+    let claim =
+        RecoveryClaim::from_bytes(&claim_bytes).map_err(|e| format!("Invalid claim: {:?}", e))?;
 
     if claim.is_expired() {
         return Err("Claim has expired".to_string());
@@ -134,16 +134,19 @@ pub fn check_recovery_claim(
     let state = state.lock().unwrap();
 
     // Parse claim
-    let claim_bytes = BASE64.decode(&claim_b64)
+    let claim_bytes = BASE64
+        .decode(&claim_b64)
         .map_err(|e| format!("Invalid base64: {}", e))?;
 
-    let claim = RecoveryClaim::from_bytes(&claim_bytes)
-        .map_err(|e| format!("Invalid claim: {:?}", e))?;
+    let claim =
+        RecoveryClaim::from_bytes(&claim_bytes).map_err(|e| format!("Invalid claim: {:?}", e))?;
 
     let old_pk_hex = hex::encode(claim.old_pk());
 
     // Check if old_pk matches any contact
-    let contacts = state.storage.list_contacts()
+    let contacts = state
+        .storage
+        .list_contacts()
         .map_err(|e| format!("Failed to list contacts: {:?}", e))?;
 
     for contact in contacts {
@@ -171,20 +174,24 @@ pub fn parse_recovery_claim(
 ) -> Result<ClaimInfo, String> {
     let state = state.lock().unwrap();
 
-    let claim_bytes = BASE64.decode(&claim_b64)
+    let claim_bytes = BASE64
+        .decode(&claim_b64)
         .map_err(|e| format!("Invalid base64: {}", e))?;
 
-    let claim = RecoveryClaim::from_bytes(&claim_bytes)
-        .map_err(|e| format!("Invalid claim: {:?}", e))?;
+    let claim =
+        RecoveryClaim::from_bytes(&claim_bytes).map_err(|e| format!("Invalid claim: {:?}", e))?;
 
     let old_pk_hex = hex::encode(claim.old_pk());
     let new_pk_hex = hex::encode(claim.new_pk());
 
     // Check if old_pk matches any contact
-    let contacts = state.storage.list_contacts()
+    let contacts = state
+        .storage
+        .list_contacts()
         .map_err(|e| format!("Failed to list contacts: {:?}", e))?;
 
-    let contact_name = contacts.iter()
+    let contact_name = contacts
+        .iter()
         .find(|c| hex::encode(c.public_key()) == old_pk_hex)
         .map(|c| c.display_name().to_string());
 

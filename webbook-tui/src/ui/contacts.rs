@@ -21,9 +21,16 @@ pub fn draw(f: &mut Frame, area: Rect, app: &App) {
         .enumerate()
         .map(|(i, contact)| {
             let verified = if contact.verified { "✓" } else { " " };
-            let content = format!("[{}] {}  ({}...)", verified, contact.display_name, &contact.id[..8]);
+            let content = format!(
+                "[{}] {}  ({}...)",
+                verified,
+                contact.display_name,
+                &contact.id[..8]
+            );
             let style = if i == app.selected_contact {
-                Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD)
             } else {
                 Style::default()
             };
@@ -49,10 +56,10 @@ pub fn draw_detail(f: &mut Frame, area: Rect, app: &App) {
             let chunks = Layout::default()
                 .direction(Direction::Vertical)
                 .constraints([
-                    Constraint::Length(3),  // Name
-                    Constraint::Length(3),  // ID
-                    Constraint::Length(3),  // Status
-                    Constraint::Min(0),     // Spacer
+                    Constraint::Length(3), // Name
+                    Constraint::Length(3), // ID
+                    Constraint::Length(3), // Status
+                    Constraint::Min(0),    // Spacer
                 ])
                 .split(area);
 
@@ -82,8 +89,7 @@ pub fn draw_detail(f: &mut Frame, area: Rect, app: &App) {
             f.render_widget(verified, chunks[2]);
         }
         None => {
-            let empty = Paragraph::new("Contact not found")
-                .style(Style::default().fg(Color::Red));
+            let empty = Paragraph::new("Contact not found").style(Style::default().fg(Color::Red));
             f.render_widget(empty, area);
         }
     }

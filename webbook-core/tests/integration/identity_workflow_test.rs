@@ -2,9 +2,7 @@
 //!
 //! Tests for identity creation, multi-device linking, and device registry operations.
 
-use webbook_core::{
-    network::MockTransport, ContactField, FieldType, WebBook,
-};
+use webbook_core::{network::MockTransport, ContactField, FieldType, WebBook};
 
 /// Test: Full identity and contact card workflow
 #[test]

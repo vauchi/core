@@ -42,12 +42,7 @@ const CONTACTS_COLUMNS_V1: &[&str] = &[
 
 const OWN_CARD_COLUMNS_V1: &[&str] = &["id", "card_json", "updated_at"];
 
-const IDENTITY_COLUMNS_V1: &[&str] = &[
-    "id",
-    "backup_data_encrypted",
-    "display_name",
-    "created_at",
-];
+const IDENTITY_COLUMNS_V1: &[&str] = &["id", "backup_data_encrypted", "display_name", "created_at"];
 
 const PENDING_UPDATES_COLUMNS_V1: &[&str] = &[
     "id",

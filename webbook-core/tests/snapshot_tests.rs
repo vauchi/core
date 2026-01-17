@@ -34,19 +34,38 @@ fn test_field_type_serialization_snapshot() {
     use webbook_core::FieldType;
 
     // Each variant should serialize to its exact name
-    assert_eq!(serde_json::to_string(&FieldType::Phone).unwrap(), "\"Phone\"");
-    assert_eq!(serde_json::to_string(&FieldType::Email).unwrap(), "\"Email\"");
-    assert_eq!(serde_json::to_string(&FieldType::Social).unwrap(), "\"Social\"");
-    assert_eq!(serde_json::to_string(&FieldType::Address).unwrap(), "\"Address\"");
-    assert_eq!(serde_json::to_string(&FieldType::Website).unwrap(), "\"Website\"");
-    assert_eq!(serde_json::to_string(&FieldType::Custom).unwrap(), "\"Custom\"");
+    assert_eq!(
+        serde_json::to_string(&FieldType::Phone).unwrap(),
+        "\"Phone\""
+    );
+    assert_eq!(
+        serde_json::to_string(&FieldType::Email).unwrap(),
+        "\"Email\""
+    );
+    assert_eq!(
+        serde_json::to_string(&FieldType::Social).unwrap(),
+        "\"Social\""
+    );
+    assert_eq!(
+        serde_json::to_string(&FieldType::Address).unwrap(),
+        "\"Address\""
+    );
+    assert_eq!(
+        serde_json::to_string(&FieldType::Website).unwrap(),
+        "\"Website\""
+    );
+    assert_eq!(
+        serde_json::to_string(&FieldType::Custom).unwrap(),
+        "\"Custom\""
+    );
 }
 
 #[test]
 fn test_contact_field_serialization_snapshot() {
     use webbook_core::ContactField;
 
-    let field_json = r#"{"id":"test-field","field_type":"Email","label":"Personal","value":"me@example.com"}"#;
+    let field_json =
+        r#"{"id":"test-field","field_type":"Email","label":"Personal","value":"me@example.com"}"#;
 
     let field: ContactField = serde_json::from_str(field_json).unwrap();
     let reserialized = serde_json::to_string(&field).unwrap();
@@ -66,7 +85,8 @@ fn test_field_change_added_serialization_snapshot() {
     use webbook_core::sync::FieldChange;
     use webbook_core::ContactField;
 
-    let field_json = r#"{"id":"new-field","field_type":"Phone","label":"Home","value":"+9876543210"}"#;
+    let field_json =
+        r#"{"id":"new-field","field_type":"Phone","label":"Home","value":"+9876543210"}"#;
     let field: ContactField = serde_json::from_str(field_json).unwrap();
 
     let change = FieldChange::Added { field };
@@ -138,8 +158,7 @@ fn test_sync_item_card_updated_serialization_snapshot() {
 
     let serialized = serde_json::to_string(&item).unwrap();
 
-    let expected =
-        r#"{"CardUpdated":{"field_label":"email","new_value":"new@example.com","timestamp":1700000000}}"#;
+    let expected = r#"{"CardUpdated":{"field_label":"email","new_value":"new@example.com","timestamp":1700000000}}"#;
     assert_eq!(serialized, expected);
 }
 
@@ -154,7 +173,8 @@ fn test_sync_item_contact_removed_serialization_snapshot() {
 
     let serialized = serde_json::to_string(&item).unwrap();
 
-    let expected = r#"{"ContactRemoved":{"contact_id":"contact-to-remove","timestamp":1700000100}}"#;
+    let expected =
+        r#"{"ContactRemoved":{"contact_id":"contact-to-remove","timestamp":1700000100}}"#;
     assert_eq!(serialized, expected);
 }
 

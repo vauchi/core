@@ -10,10 +10,10 @@ pub fn draw(f: &mut Frame, area: Rect, app: &App) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(4),  // Welcome
-            Constraint::Length(3),  // Public ID
-            Constraint::Min(0),     // Fields
-            Constraint::Length(2),  // Contact count
+            Constraint::Length(4), // Welcome
+            Constraint::Length(3), // Public ID
+            Constraint::Min(0),    // Fields
+            Constraint::Length(2), // Contact count
         ])
         .split(area);
 
@@ -26,7 +26,11 @@ pub fn draw(f: &mut Frame, area: Rect, app: &App) {
     };
 
     let welcome_para = Paragraph::new(welcome)
-        .style(Style::default().fg(Color::White).add_modifier(Modifier::BOLD))
+        .style(
+            Style::default()
+                .fg(Color::White)
+                .add_modifier(Modifier::BOLD),
+        )
         .block(Block::default().borders(Borders::NONE));
     f.render_widget(welcome_para, chunks[0]);
 
@@ -58,9 +62,14 @@ pub fn draw(f: &mut Frame, area: Rect, app: &App) {
                     _ => "📝",
                 };
 
-                let content = format!("{} {} ({})  {}", icon, field.label, field.field_type, field.value);
+                let content = format!(
+                    "{} {} ({})  {}",
+                    icon, field.label, field.field_type, field.value
+                );
                 let style = if i == app.selected_field {
-                    Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)
+                    Style::default()
+                        .fg(Color::Yellow)
+                        .add_modifier(Modifier::BOLD)
                 } else {
                     Style::default()
                 };
@@ -68,8 +77,8 @@ pub fn draw(f: &mut Frame, area: Rect, app: &App) {
             })
             .collect();
 
-        let list = List::new(items)
-            .block(Block::default().title("Your Card").borders(Borders::ALL));
+        let list =
+            List::new(items).block(Block::default().title("Your Card").borders(Borders::ALL));
 
         let mut state = ListState::default();
         state.select(Some(app.selected_field));
@@ -78,8 +87,8 @@ pub fn draw(f: &mut Frame, area: Rect, app: &App) {
 
     // Contact count
     let count = app.backend.contact_count().unwrap_or(0);
-    let count_para = Paragraph::new(format!("Contacts: {}", count))
-        .style(Style::default().fg(Color::DarkGray));
+    let count_para =
+        Paragraph::new(format!("Contacts: {}", count)).style(Style::default().fg(Color::DarkGray));
     f.render_widget(count_para, chunks[3]);
 }
 
@@ -87,10 +96,10 @@ pub fn draw_add_field(f: &mut Frame, area: Rect, app: &App) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(3),  // Type selector
-            Constraint::Length(3),  // Label input
-            Constraint::Length(3),  // Value input
-            Constraint::Min(0),     // Spacer
+            Constraint::Length(3), // Type selector
+            Constraint::Length(3), // Label input
+            Constraint::Length(3), // Value input
+            Constraint::Min(0),    // Spacer
         ])
         .margin(2)
         .split(area);
@@ -100,7 +109,9 @@ pub fn draw_add_field(f: &mut Frame, area: Rect, app: &App) {
     // Type selector
     let type_text = format!("< {} >", FIELD_TYPES[state.field_type_index]);
     let type_style = if state.focus == AddFieldFocus::Type {
-        Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)
+        Style::default()
+            .fg(Color::Yellow)
+            .add_modifier(Modifier::BOLD)
     } else {
         Style::default()
     };

@@ -49,12 +49,18 @@ const CONTACT_CARD_V1: &str = r#"{
 }"#;
 
 /// ContactField with each FieldType variant.
-const FIELD_TYPE_PHONE_V1: &str = r#"{"id":"f001","field_type":"Phone","label":"Mobile","value":"+1234567890"}"#;
-const FIELD_TYPE_EMAIL_V1: &str = r#"{"id":"f002","field_type":"Email","label":"Work","value":"test@example.com"}"#;
-const FIELD_TYPE_SOCIAL_V1: &str = r#"{"id":"f003","field_type":"Social","label":"GitHub","value":"octocat"}"#;
-const FIELD_TYPE_ADDRESS_V1: &str = r#"{"id":"f004","field_type":"Address","label":"Home","value":"123 Main St"}"#;
-const FIELD_TYPE_WEBSITE_V1: &str = r#"{"id":"f005","field_type":"Website","label":"Blog","value":"https://example.com"}"#;
-const FIELD_TYPE_CUSTOM_V1: &str = r#"{"id":"f006","field_type":"Custom","label":"Notes","value":"Custom data"}"#;
+const FIELD_TYPE_PHONE_V1: &str =
+    r#"{"id":"f001","field_type":"Phone","label":"Mobile","value":"+1234567890"}"#;
+const FIELD_TYPE_EMAIL_V1: &str =
+    r#"{"id":"f002","field_type":"Email","label":"Work","value":"test@example.com"}"#;
+const FIELD_TYPE_SOCIAL_V1: &str =
+    r#"{"id":"f003","field_type":"Social","label":"GitHub","value":"octocat"}"#;
+const FIELD_TYPE_ADDRESS_V1: &str =
+    r#"{"id":"f004","field_type":"Address","label":"Home","value":"123 Main St"}"#;
+const FIELD_TYPE_WEBSITE_V1: &str =
+    r#"{"id":"f005","field_type":"Website","label":"Blog","value":"https://example.com"}"#;
+const FIELD_TYPE_CUSTOM_V1: &str =
+    r#"{"id":"f006","field_type":"Custom","label":"Notes","value":"Custom data"}"#;
 
 /// CardDelta V1 with Added field change.
 /// Wire format for contact card updates.
@@ -243,7 +249,11 @@ fn test_contact_card_compatibility_v1() {
     let email_field = card.fields().iter().find(|f| f.label() == "Work").unwrap();
     assert_eq!(email_field.value(), "alice@example.com");
 
-    let phone_field = card.fields().iter().find(|f| f.label() == "Mobile").unwrap();
+    let phone_field = card
+        .fields()
+        .iter()
+        .find(|f| f.label() == "Mobile")
+        .unwrap();
     assert_eq!(phone_field.value(), "+1-555-123-4567");
 
     // Round-trip test
@@ -310,7 +320,10 @@ fn test_card_delta_modified_compatibility_v1() {
     assert_eq!(delta.changes.len(), 1);
 
     match &delta.changes[0] {
-        webbook_core::sync::FieldChange::Modified { field_id, new_value } => {
+        webbook_core::sync::FieldChange::Modified {
+            field_id,
+            new_value,
+        } => {
             assert_eq!(field_id, "existingfield");
             assert_eq!(new_value, "updated@example.com");
         }
@@ -356,8 +369,8 @@ fn test_card_delta_display_name_changed_compatibility_v1() {
 fn test_device_registry_compatibility_v1() {
     use webbook_core::identity::DeviceRegistry;
 
-    let registry: DeviceRegistry = serde_json::from_str(DEVICE_REGISTRY_V1)
-        .expect("Failed to deserialize DeviceRegistry V1");
+    let registry: DeviceRegistry =
+        serde_json::from_str(DEVICE_REGISTRY_V1).expect("Failed to deserialize DeviceRegistry V1");
 
     assert_eq!(registry.version(), 2);
     assert_eq!(registry.all_devices().len(), 2);

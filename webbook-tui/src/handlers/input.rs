@@ -62,44 +62,44 @@ fn handle_editing_mode(app: &mut App, key: KeyCode) -> Action {
             // Submit the input
             app.input_mode = InputMode::Normal;
         }
-        KeyCode::Backspace => {
-            match app.screen {
-                Screen::AddField => {
-                    match app.add_field_state.focus {
-                        AddFieldFocus::Label => { app.add_field_state.label.pop(); }
-                        AddFieldFocus::Value => { app.add_field_state.value.pop(); }
-                        _ => {}
-                    }
+        KeyCode::Backspace => match app.screen {
+            Screen::AddField => match app.add_field_state.focus {
+                AddFieldFocus::Label => {
+                    app.add_field_state.label.pop();
                 }
-                Screen::Backup => {
-                    match app.backup_state.focus {
-                        BackupFocus::Password => { app.backup_state.password.pop(); }
-                        BackupFocus::Confirm => { app.backup_state.confirm_password.pop(); }
-                        BackupFocus::Data => { app.backup_state.backup_data.pop(); }
-                    }
+                AddFieldFocus::Value => {
+                    app.add_field_state.value.pop();
                 }
-                _ => { app.input_buffer.pop(); }
+                _ => {}
+            },
+            Screen::Backup => match app.backup_state.focus {
+                BackupFocus::Password => {
+                    app.backup_state.password.pop();
+                }
+                BackupFocus::Confirm => {
+                    app.backup_state.confirm_password.pop();
+                }
+                BackupFocus::Data => {
+                    app.backup_state.backup_data.pop();
+                }
+            },
+            _ => {
+                app.input_buffer.pop();
             }
-        }
-        KeyCode::Char(c) => {
-            match app.screen {
-                Screen::AddField => {
-                    match app.add_field_state.focus {
-                        AddFieldFocus::Label => app.add_field_state.label.push(c),
-                        AddFieldFocus::Value => app.add_field_state.value.push(c),
-                        _ => {}
-                    }
-                }
-                Screen::Backup => {
-                    match app.backup_state.focus {
-                        BackupFocus::Password => app.backup_state.password.push(c),
-                        BackupFocus::Confirm => app.backup_state.confirm_password.push(c),
-                        BackupFocus::Data => app.backup_state.backup_data.push(c),
-                    }
-                }
-                _ => app.input_buffer.push(c),
-            }
-        }
+        },
+        KeyCode::Char(c) => match app.screen {
+            Screen::AddField => match app.add_field_state.focus {
+                AddFieldFocus::Label => app.add_field_state.label.push(c),
+                AddFieldFocus::Value => app.add_field_state.value.push(c),
+                _ => {}
+            },
+            Screen::Backup => match app.backup_state.focus {
+                BackupFocus::Password => app.backup_state.password.push(c),
+                BackupFocus::Confirm => app.backup_state.confirm_password.push(c),
+                BackupFocus::Data => app.backup_state.backup_data.push(c),
+            },
+            _ => app.input_buffer.push(c),
+        },
         _ => {}
     }
     Action::Continue
@@ -212,9 +212,16 @@ fn handle_visibility_keys(app: &mut App, key: KeyCode) {
             if let Some(ref contact_id) = app.visibility_state.contact_id.clone() {
                 if let Ok(fields) = app.backend.get_contact_visibility(contact_id) {
                     if let Some(field) = fields.get(app.visibility_state.selected_field) {
-                        match app.backend.toggle_field_visibility(contact_id, &field.field_label) {
+                        match app
+                            .backend
+                            .toggle_field_visibility(contact_id, &field.field_label)
+                        {
                             Ok(now_visible) => {
-                                let status = if now_visible { "now visible" } else { "now hidden" };
+                                let status = if now_visible {
+                                    "now visible"
+                                } else {
+                                    "now hidden"
+                                };
                                 app.set_status(format!("Field {} {}", field.field_label, status));
                             }
                             Err(e) => app.set_status(format!("Error: {}", e)),
@@ -262,9 +269,8 @@ fn handle_add_field_keys(app: &mut App, key: KeyCode) {
         KeyCode::Enter => {
             if app.add_field_state.focus == AddFieldFocus::Value {
                 // Submit the field
-                let field_type = Backend::parse_field_type(
-                    FIELD_TYPES[app.add_field_state.field_type_index]
-                );
+                let field_type =
+                    Backend::parse_field_type(FIELD_TYPES[app.add_field_state.field_type_index]);
                 if let Err(e) = app.backend.add_field(
                     field_type,
                     &app.add_field_state.label,
@@ -315,12 +321,10 @@ fn handle_devices_keys(app: &mut App, key: KeyCode) {
                 app.selected_device -= 1;
             }
         }
-        KeyCode::Char('l') => {
-            match app.backend.generate_device_link() {
-                Ok(link) => app.set_status(format!("Link code: {}", &link[..40.min(link.len())])),
-                Err(e) => app.set_status(format!("Error: {}", e)),
-            }
-        }
+        KeyCode::Char('l') => match app.backend.generate_device_link() {
+            Ok(link) => app.set_status(format!("Link code: {}", &link[..40.min(link.len())])),
+            Err(e) => app.set_status(format!("Error: {}", e)),
+        },
         _ => {}
     }
 }
@@ -333,19 +337,16 @@ fn handle_recovery_keys(app: &mut App, key: KeyCode) {
         KeyCode::Char('v') => {
             app.set_status("Vouch: use CLI 'webbook recovery vouch <claim>'");
         }
-        KeyCode::Char('s') => {
-            match app.backend.get_recovery_status() {
-                Ok(status) => {
-                    let msg = format!(
-                        "Recovery: {}/{} vouchers",
-                        status.voucher_count,
-                        status.required_vouchers
-                    );
-                    app.set_status(msg);
-                }
-                Err(e) => app.set_status(format!("Error: {}", e)),
+        KeyCode::Char('s') => match app.backend.get_recovery_status() {
+            Ok(status) => {
+                let msg = format!(
+                    "Recovery: {}/{} vouchers",
+                    status.voucher_count, status.required_vouchers
+                );
+                app.set_status(msg);
             }
-        }
+            Err(e) => app.set_status(format!("Error: {}", e)),
+        },
         _ => {}
     }
 }
@@ -359,90 +360,88 @@ fn handle_sync_keys(app: &mut App, key: KeyCode) {
 
 fn handle_backup_keys(app: &mut App, key: KeyCode) {
     match app.backup_state.mode {
-        BackupMode::Menu => {
-            match key {
-                KeyCode::Char('e') => {
-                    app.backup_state.mode = BackupMode::Export;
-                    app.backup_state.password.clear();
-                    app.backup_state.confirm_password.clear();
-                    app.backup_state.focus = BackupFocus::Password;
-                    app.input_mode = InputMode::Editing;
-                }
-                KeyCode::Char('i') => {
-                    app.backup_state.mode = BackupMode::Import;
-                    app.backup_state.backup_data.clear();
-                    app.backup_state.password.clear();
-                    app.backup_state.focus = BackupFocus::Data;
-                    app.input_mode = InputMode::Editing;
-                }
-                _ => {}
+        BackupMode::Menu => match key {
+            KeyCode::Char('e') => {
+                app.backup_state.mode = BackupMode::Export;
+                app.backup_state.password.clear();
+                app.backup_state.confirm_password.clear();
+                app.backup_state.focus = BackupFocus::Password;
+                app.input_mode = InputMode::Editing;
             }
-        }
-        BackupMode::Export => {
-            match key {
-                KeyCode::Tab => {
-                    app.backup_state.focus = match app.backup_state.focus {
-                        BackupFocus::Password => BackupFocus::Confirm,
-                        BackupFocus::Confirm => BackupFocus::Password,
-                        BackupFocus::Data => BackupFocus::Password,
-                    };
-                    app.input_mode = InputMode::Editing;
+            KeyCode::Char('i') => {
+                app.backup_state.mode = BackupMode::Import;
+                app.backup_state.backup_data.clear();
+                app.backup_state.password.clear();
+                app.backup_state.focus = BackupFocus::Data;
+                app.input_mode = InputMode::Editing;
+            }
+            _ => {}
+        },
+        BackupMode::Export => match key {
+            KeyCode::Tab => {
+                app.backup_state.focus = match app.backup_state.focus {
+                    BackupFocus::Password => BackupFocus::Confirm,
+                    BackupFocus::Confirm => BackupFocus::Password,
+                    BackupFocus::Data => BackupFocus::Password,
+                };
+                app.input_mode = InputMode::Editing;
+            }
+            KeyCode::Enter => {
+                if app.backup_state.password == app.backup_state.confirm_password
+                    && app.backup_state.password.len() >= 8
+                {
+                    match app.backend.export_backup(&app.backup_state.password) {
+                        Ok(data) => {
+                            app.set_status(format!("Backup: {}...", &data[..50.min(data.len())]));
+                            app.backup_state.mode = BackupMode::Menu;
+                            app.backup_state = Default::default();
+                        }
+                        Err(e) => app.set_status(format!("Export error: {}", e)),
+                    }
+                } else if app.backup_state.password.len() < 8 {
+                    app.set_status("Password must be at least 8 characters");
+                } else {
+                    app.set_status("Passwords don't match");
                 }
-                KeyCode::Enter => {
-                    if app.backup_state.password == app.backup_state.confirm_password
-                        && app.backup_state.password.len() >= 8
+            }
+            KeyCode::Esc => {
+                app.backup_state.mode = BackupMode::Menu;
+                app.input_mode = InputMode::Normal;
+            }
+            _ => {}
+        },
+        BackupMode::Import => match key {
+            KeyCode::Tab => {
+                app.backup_state.focus = match app.backup_state.focus {
+                    BackupFocus::Data => BackupFocus::Password,
+                    BackupFocus::Password => BackupFocus::Data,
+                    BackupFocus::Confirm => BackupFocus::Data,
+                };
+                app.input_mode = InputMode::Editing;
+            }
+            KeyCode::Enter => {
+                if !app.backup_state.backup_data.is_empty() && !app.backup_state.password.is_empty()
+                {
+                    match app
+                        .backend
+                        .import_backup(&app.backup_state.backup_data, &app.backup_state.password)
                     {
-                        match app.backend.export_backup(&app.backup_state.password) {
-                            Ok(data) => {
-                                app.set_status(format!("Backup: {}...", &data[..50.min(data.len())]));
-                                app.backup_state.mode = BackupMode::Menu;
-                                app.backup_state = Default::default();
-                            }
-                            Err(e) => app.set_status(format!("Export error: {}", e)),
+                        Ok(()) => {
+                            app.set_status("Backup imported successfully!");
+                            app.backup_state = Default::default();
+                            app.go_back();
                         }
-                    } else if app.backup_state.password.len() < 8 {
-                        app.set_status("Password must be at least 8 characters");
-                    } else {
-                        app.set_status("Passwords don't match");
+                        Err(e) => app.set_status(format!("Import error: {}", e)),
                     }
+                } else {
+                    app.set_status("Please enter backup data and password");
                 }
-                KeyCode::Esc => {
-                    app.backup_state.mode = BackupMode::Menu;
-                    app.input_mode = InputMode::Normal;
-                }
-                _ => {}
             }
-        }
-        BackupMode::Import => {
-            match key {
-                KeyCode::Tab => {
-                    app.backup_state.focus = match app.backup_state.focus {
-                        BackupFocus::Data => BackupFocus::Password,
-                        BackupFocus::Password => BackupFocus::Data,
-                        BackupFocus::Confirm => BackupFocus::Data,
-                    };
-                    app.input_mode = InputMode::Editing;
-                }
-                KeyCode::Enter => {
-                    if !app.backup_state.backup_data.is_empty() && !app.backup_state.password.is_empty() {
-                        match app.backend.import_backup(&app.backup_state.backup_data, &app.backup_state.password) {
-                            Ok(()) => {
-                                app.set_status("Backup imported successfully!");
-                                app.backup_state = Default::default();
-                                app.go_back();
-                            }
-                            Err(e) => app.set_status(format!("Import error: {}", e)),
-                        }
-                    } else {
-                        app.set_status("Please enter backup data and password");
-                    }
-                }
-                KeyCode::Esc => {
-                    app.backup_state.mode = BackupMode::Menu;
-                    app.input_mode = InputMode::Normal;
-                }
-                _ => {}
+            KeyCode::Esc => {
+                app.backup_state.mode = BackupMode::Menu;
+                app.input_mode = InputMode::Normal;
             }
-        }
+            _ => {}
+        },
     }
 }

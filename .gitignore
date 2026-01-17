@@ -19,3 +19,7 @@ Thumbs.db
 .env
 .env.local
 *.proptest-regressions
+
+# Node.js
+node_modules/
+dist/

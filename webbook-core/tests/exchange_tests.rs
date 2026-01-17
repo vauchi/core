@@ -61,7 +61,7 @@ fn test_x3dh_ephemeral_keys_unique_per_session() {
 /// Tests that shared secret can be used for encryption
 #[test]
 fn test_x3dh_shared_secret_usable_for_encryption() {
-use webbook_core::crypto::{decrypt, encrypt};
+    use webbook_core::crypto::{decrypt, encrypt};
 
     let alice = X3DHKeyPair::generate();
     let bob = X3DHKeyPair::generate();
@@ -379,18 +379,28 @@ fn test_exchange_message_is_encrypted_not_plaintext() {
         bob.public_key(),
         &alice_identity_key,
         alice_display_name,
-    ).expect("Creating encrypted exchange message should succeed");
+    )
+    .expect("Creating encrypted exchange message should succeed");
 
     // Then the ciphertext should NOT contain the plaintext identity key or name
     let ciphertext_str = String::from_utf8_lossy(&encrypted_msg.ciphertext);
-    assert!(!ciphertext_str.contains("Alice Smith"),
-        "Display name must not appear in plaintext");
-    assert!(!encrypted_msg.ciphertext.windows(32).any(|w| w == alice_identity_key),
-        "Identity key must not appear in plaintext");
+    assert!(
+        !ciphertext_str.contains("Alice Smith"),
+        "Display name must not appear in plaintext"
+    );
+    assert!(
+        !encrypted_msg
+            .ciphertext
+            .windows(32)
+            .any(|w| w == alice_identity_key),
+        "Identity key must not appear in plaintext"
+    );
 
     // And the ephemeral public key should be included (needed for X3DH)
-    assert_ne!(encrypted_msg.ephemeral_public_key, [0u8; 32],
-        "Ephemeral key must be present");
+    assert_ne!(
+        encrypted_msg.ephemeral_public_key, [0u8; 32],
+        "Ephemeral key must be present"
+    );
 }
 
 /// Tests that the recipient can decrypt the exchange message using X3DH.
@@ -408,7 +418,8 @@ fn test_exchange_message_recipient_can_decrypt() {
         bob.public_key(),
         &alice_identity_key,
         alice_display_name,
-    ).expect("Creating message should succeed");
+    )
+    .expect("Creating message should succeed");
 
     // When Bob receives and decrypts the message
     let (payload, _shared_secret) = encrypted_msg
@@ -437,7 +448,8 @@ fn test_exchange_message_wrong_key_fails_decrypt() {
         bob.public_key(),
         &alice_identity_key,
         alice_display_name,
-    ).expect("Creating message should succeed");
+    )
+    .expect("Creating message should succeed");
 
     // When Charlie (attacker) tries to decrypt
     let result = encrypted_msg.decrypt(&charlie);
@@ -456,12 +468,9 @@ fn test_relay_cannot_read_exchange_message() {
     let sensitive_name = "John Doe - CEO of SecretCorp";
     let identity_key = [0x44u8; 32];
 
-    let (encrypted_msg, _) = EncryptedExchangeMessage::create(
-        &alice,
-        bob.public_key(),
-        &identity_key,
-        sensitive_name,
-    ).expect("Creating message should succeed");
+    let (encrypted_msg, _) =
+        EncryptedExchangeMessage::create(&alice, bob.public_key(), &identity_key, sensitive_name)
+            .expect("Creating message should succeed");
 
     // The relay only sees:
     // 1. Ephemeral public key (random, unlinkable to identity)
@@ -471,10 +480,18 @@ fn test_relay_cannot_read_exchange_message() {
     let wire_bytes = encrypted_msg.to_bytes();
     let wire_str = String::from_utf8_lossy(&wire_bytes);
 
-    assert!(!wire_str.contains("John Doe"), "Name must not leak to relay");
-    assert!(!wire_str.contains("SecretCorp"), "Name must not leak to relay");
-    assert!(!wire_bytes.windows(32).any(|w| w == identity_key),
-        "Identity key must not leak to relay");
+    assert!(
+        !wire_str.contains("John Doe"),
+        "Name must not leak to relay"
+    );
+    assert!(
+        !wire_str.contains("SecretCorp"),
+        "Name must not leak to relay"
+    );
+    assert!(
+        !wire_bytes.windows(32).any(|w| w == identity_key),
+        "Identity key must not leak to relay"
+    );
 }
 
 /// Tests serialization roundtrip for encrypted exchange messages.
@@ -483,17 +500,14 @@ fn test_encrypted_exchange_message_roundtrip() {
     let alice = X3DHKeyPair::generate();
     let bob = X3DHKeyPair::generate();
 
-    let (original, _) = EncryptedExchangeMessage::create(
-        &alice,
-        bob.public_key(),
-        &[0x45u8; 32],
-        "Test User",
-    ).expect("Creating message should succeed");
+    let (original, _) =
+        EncryptedExchangeMessage::create(&alice, bob.public_key(), &[0x45u8; 32], "Test User")
+            .expect("Creating message should succeed");
 
     // Serialize and deserialize
     let bytes = original.to_bytes();
-    let restored = EncryptedExchangeMessage::from_bytes(&bytes)
-        .expect("Deserialization should succeed");
+    let restored =
+        EncryptedExchangeMessage::from_bytes(&bytes).expect("Deserialization should succeed");
 
     assert_eq!(restored.ephemeral_public_key, original.ephemeral_public_key);
     assert_eq!(restored.ciphertext, original.ciphertext);

@@ -293,6 +293,7 @@ impl AudioBackend for MockAudioBackend {
     fn stop(&self) {}
 }
 
+// INLINE_TEST_REQUIRED: Tests private encode_challenge/decode_response functions for audio protocol
 #[cfg(test)]
 mod tests {
     use super::*;

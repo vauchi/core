@@ -412,7 +412,15 @@ def cmd_extract(args, root: Path, crates: list[Path]):
     print()
     print("Next steps:")
     print("  1. Run 'cargo test -p webbook-core -p webbook-relay' to check compilation")
-    print("  2. If there are errors about private items, add pub(crate) visibility")
+    print("  2. If there are errors about private items, use ONE of these approaches:")
+    print("     a) Add test-specific constructor (PREFERRED):")
+    print("        #[doc(hidden)]")
+    print("        pub fn for_testing(...) -> Self { ... }")
+    print("     b) Mark as inline exception (RARE - only if testing private invariants):")
+    print("        // INLINE_TEST_REQUIRED: <reason>")
+    print("        #[cfg(test)]")
+    print("        mod tests { ... }")
+    print("     AVOID: pub(crate) - it exposes internals unnecessarily")
     print("  3. Run 'python3 scripts/refactor_tests.py rollback' to undo if needed")
 
 
@@ -435,7 +443,9 @@ def cmd_verify(args, root: Path, crates: list[Path]):
         print("\nAll tests passed!")
     else:
         print("\nTests failed. You may need to:")
-        print("  - Add pub(crate) visibility to private items used in tests")
+        print("  - Add test-specific constructors (#[doc(hidden)] pub fn for_testing(...))")
+        print("  - Or mark as inline exception with // INLINE_TEST_REQUIRED: <reason>")
+        print("  - AVOID pub(crate) - it exposes internals unnecessarily")
         print("  - Run 'python3 scripts/refactor_tests.py rollback' to undo changes")
 
 

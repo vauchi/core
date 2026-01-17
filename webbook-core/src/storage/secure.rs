@@ -174,6 +174,7 @@ impl SecureStorage for FileKeyStorage {
     }
 }
 
+// INLINE_TEST_REQUIRED: MemoryKeyStorage is a test-only implementation used for unit testing SecureStorage trait
 /// In-memory storage for testing.
 #[cfg(test)]
 pub struct MemoryKeyStorage {

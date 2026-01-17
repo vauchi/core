@@ -182,6 +182,7 @@ impl MessageKey {
     }
 }
 
+// INLINE_TEST_REQUIRED: Tests private MAX_SKIP and MAX_CHAIN_GENERATIONS constants for boundary conditions
 #[cfg(test)]
 mod tests {
     use super::*;

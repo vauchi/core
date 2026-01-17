@@ -1,0 +1,43 @@
+#!/bin/bash
+# Pre-commit hook: Enforces test structure rules
+# Install with: ./scripts/install-hooks.sh
+
+set -e
+
+# Check for inline tests without INLINE_TEST_REQUIRED marker
+echo "Checking test structure..."
+
+# Only check staged Rust files in src/ directories
+STAGED_RS_FILES=$(git diff --cached --name-only --diff-filter=ACM | grep -E '^.*src/.*\.rs$' || true)
+
+if [[ -z "$STAGED_RS_FILES" ]]; then
+    exit 0
+fi
+
+VIOLATIONS=0
+
+for file in $STAGED_RS_FILES; do
+    if [[ ! -f "$file" ]]; then
+        continue
+    fi
+
+    # Check if file contains #[cfg(test)] without INLINE_TEST_REQUIRED marker
+    if grep -q '#\[cfg(test)\]' "$file"; then
+        if ! grep -B5 '#\[cfg(test)\]' "$file" | grep -q 'INLINE_TEST_REQUIRED:'; then
+            echo "VIOLATION: $file"
+            echo "  Found #[cfg(test)] without INLINE_TEST_REQUIRED marker"
+            echo "  Either move tests to tests/ directory or add:"
+            echo "    // INLINE_TEST_REQUIRED: <reason>"
+            VIOLATIONS=$((VIOLATIONS + 1))
+        fi
+    fi
+done
+
+if [[ $VIOLATIONS -gt 0 ]]; then
+    echo ""
+    echo "Commit blocked: $VIOLATIONS file(s) have inline tests without justification."
+    echo "See CLAUDE.md: src/ = production only, tests/ = tests only"
+    exit 1
+fi
+
+echo "Test structure check passed."

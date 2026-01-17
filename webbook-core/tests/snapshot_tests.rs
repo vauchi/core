@@ -13,7 +13,7 @@
 
 #[test]
 fn test_contact_card_serialization_snapshot() {
-use webbook_core::ContactCard;
+    use webbook_core::ContactCard;
 
     // Create a card with known ID (normally random)
     let card_json = r#"{"id":"snapshot-card-001","display_name":"Snapshot User","fields":[{"id":"field-001","field_type":"Email","label":"Work","value":"work@example.com"},{"id":"field-002","field_type":"Phone","label":"Mobile","value":"+1234567890"}]}"#;
@@ -31,7 +31,7 @@ use webbook_core::ContactCard;
 
 #[test]
 fn test_field_type_serialization_snapshot() {
-use webbook_core::FieldType;
+    use webbook_core::FieldType;
 
     // Each variant should serialize to its exact name
     assert_eq!(
@@ -62,7 +62,7 @@ use webbook_core::FieldType;
 
 #[test]
 fn test_contact_field_serialization_snapshot() {
-use webbook_core::ContactField;
+    use webbook_core::ContactField;
 
     let field_json =
         r#"{"id":"test-field","field_type":"Email","label":"Personal","value":"me@example.com"}"#;
@@ -82,8 +82,8 @@ use webbook_core::ContactField;
 
 #[test]
 fn test_field_change_added_serialization_snapshot() {
-use webbook_core::sync::FieldChange;
-use webbook_core::ContactField;
+    use webbook_core::sync::FieldChange;
+    use webbook_core::ContactField;
 
     let field_json =
         r#"{"id":"new-field","field_type":"Phone","label":"Home","value":"+9876543210"}"#;
@@ -100,7 +100,7 @@ use webbook_core::ContactField;
 
 #[test]
 fn test_field_change_modified_serialization_snapshot() {
-use webbook_core::sync::FieldChange;
+    use webbook_core::sync::FieldChange;
 
     let change = FieldChange::Modified {
         field_id: "existing-field".to_string(),
@@ -116,7 +116,7 @@ use webbook_core::sync::FieldChange;
 
 #[test]
 fn test_field_change_removed_serialization_snapshot() {
-use webbook_core::sync::FieldChange;
+    use webbook_core::sync::FieldChange;
 
     let change = FieldChange::Removed {
         field_id: "removed-field".to_string(),
@@ -130,7 +130,7 @@ use webbook_core::sync::FieldChange;
 
 #[test]
 fn test_field_change_display_name_changed_serialization_snapshot() {
-use webbook_core::sync::FieldChange;
+    use webbook_core::sync::FieldChange;
 
     let change = FieldChange::DisplayNameChanged {
         new_name: "New Display Name".to_string(),
@@ -148,7 +148,7 @@ use webbook_core::sync::FieldChange;
 
 #[test]
 fn test_sync_item_card_updated_serialization_snapshot() {
-use webbook_core::sync::SyncItem;
+    use webbook_core::sync::SyncItem;
 
     let item = SyncItem::CardUpdated {
         field_label: "email".to_string(),
@@ -164,7 +164,7 @@ use webbook_core::sync::SyncItem;
 
 #[test]
 fn test_sync_item_contact_removed_serialization_snapshot() {
-use webbook_core::sync::SyncItem;
+    use webbook_core::sync::SyncItem;
 
     let item = SyncItem::ContactRemoved {
         contact_id: "contact-to-remove".to_string(),
@@ -180,7 +180,7 @@ use webbook_core::sync::SyncItem;
 
 #[test]
 fn test_sync_item_visibility_changed_serialization_snapshot() {
-use webbook_core::sync::SyncItem;
+    use webbook_core::sync::SyncItem;
 
     let item = SyncItem::VisibilityChanged {
         contact_id: "contact-123".to_string(),
@@ -201,7 +201,7 @@ use webbook_core::sync::SyncItem;
 
 #[test]
 fn test_registered_device_serialization_snapshot() {
-use webbook_core::identity::RegisteredDevice;
+    use webbook_core::identity::RegisteredDevice;
 
     let device = RegisteredDevice {
         device_id: [1u8; 32],
@@ -230,7 +230,7 @@ use webbook_core::identity::RegisteredDevice;
 
 #[test]
 fn test_registered_device_revoked_serialization_snapshot() {
-use webbook_core::identity::RegisteredDevice;
+    use webbook_core::identity::RegisteredDevice;
 
     let device = RegisteredDevice {
         device_id: [3u8; 32],
@@ -253,7 +253,7 @@ use webbook_core::identity::RegisteredDevice;
 
 #[test]
 fn test_ratchet_message_serialization_snapshot() {
-use webbook_core::crypto::ratchet::RatchetMessage;
+    use webbook_core::crypto::ratchet::RatchetMessage;
 
     let msg = RatchetMessage {
         dh_public: [5u8; 32],
@@ -285,7 +285,7 @@ use webbook_core::crypto::ratchet::RatchetMessage;
 
 #[test]
 fn test_field_visibility_everyone_serialization_snapshot() {
-use webbook_core::FieldVisibility;
+    use webbook_core::FieldVisibility;
 
     let visibility = FieldVisibility::Everyone;
     let serialized = serde_json::to_string(&visibility).unwrap();
@@ -295,7 +295,7 @@ use webbook_core::FieldVisibility;
 
 #[test]
 fn test_field_visibility_nobody_serialization_snapshot() {
-use webbook_core::FieldVisibility;
+    use webbook_core::FieldVisibility;
 
     let visibility = FieldVisibility::Nobody;
     let serialized = serde_json::to_string(&visibility).unwrap();
@@ -305,8 +305,8 @@ use webbook_core::FieldVisibility;
 
 #[test]
 fn test_field_visibility_contacts_serialization_snapshot() {
-use std::collections::HashSet;
-use webbook_core::FieldVisibility;
+    use std::collections::HashSet;
+    use webbook_core::FieldVisibility;
 
     let mut contacts = HashSet::new();
     contacts.insert("contact-1".to_string());
@@ -323,7 +323,7 @@ use webbook_core::FieldVisibility;
 
 #[test]
 fn test_visibility_rules_serialization_snapshot() {
-use webbook_core::VisibilityRules;
+    use webbook_core::VisibilityRules;
 
     let mut rules = VisibilityRules::new();
     rules.set_everyone("email");
@@ -345,7 +345,7 @@ use webbook_core::VisibilityRules;
 
 #[test]
 fn test_social_network_serialization_snapshot() {
-use webbook_core::SocialNetwork;
+    use webbook_core::SocialNetwork;
 
     let network = SocialNetwork::new("github", "GitHub", "https://github.com/{username}");
     let serialized = serde_json::to_string(&network).unwrap();
@@ -367,7 +367,7 @@ use webbook_core::SocialNetwork;
 
 #[test]
 fn test_byte_array_32_serialization_format() {
-use webbook_core::crypto::ratchet::RatchetMessage;
+    use webbook_core::crypto::ratchet::RatchetMessage;
 
     // Create a message with known bytes
     let msg = RatchetMessage {
@@ -391,7 +391,7 @@ use webbook_core::crypto::ratchet::RatchetMessage;
 
 #[test]
 fn test_byte_vec_serialization_format() {
-use webbook_core::crypto::ratchet::RatchetMessage;
+    use webbook_core::crypto::ratchet::RatchetMessage;
 
     let msg = RatchetMessage {
         dh_public: [0u8; 32],

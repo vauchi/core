@@ -360,7 +360,7 @@ fn test_schema_tables_via_raw_connection() {
 
 #[test]
 fn test_own_card_persistence() {
-use webbook_core::ContactCard;
+    use webbook_core::ContactCard;
 
     let key = SymmetricKey::generate();
     let storage = Storage::in_memory(key).unwrap();
@@ -388,7 +388,7 @@ use webbook_core::ContactCard;
 
 #[test]
 fn test_pending_updates_persistence() {
-use webbook_core::storage::{PendingUpdate, UpdateStatus};
+    use webbook_core::storage::{PendingUpdate, UpdateStatus};
 
     let key = SymmetricKey::generate();
     let storage = Storage::in_memory(key).unwrap();
@@ -423,8 +423,8 @@ use webbook_core::storage::{PendingUpdate, UpdateStatus};
 
 #[test]
 fn test_contact_persistence_roundtrip() {
-use webbook_core::contact::Contact;
-use webbook_core::{ContactCard, ContactField, FieldType, SymmetricKey as CryptoKey};
+    use webbook_core::contact::Contact;
+    use webbook_core::{ContactCard, ContactField, FieldType, SymmetricKey as CryptoKey};
 
     let key = SymmetricKey::generate();
     let storage = Storage::in_memory(key).unwrap();
@@ -476,8 +476,8 @@ fn test_create_table_if_not_exists_is_idempotent() {
 
 #[test]
 fn test_nullable_columns_work() {
-use webbook_core::contact::Contact;
-use webbook_core::{ContactCard, SymmetricKey as CryptoKey};
+    use webbook_core::contact::Contact;
+    use webbook_core::{ContactCard, SymmetricKey as CryptoKey};
 
     let key = SymmetricKey::generate();
     let storage = Storage::in_memory(key).unwrap();
@@ -497,7 +497,7 @@ use webbook_core::{ContactCard, SymmetricKey as CryptoKey};
 
 #[test]
 fn test_default_column_values() {
-use webbook_core::storage::{PendingUpdate, UpdateStatus};
+    use webbook_core::storage::{PendingUpdate, UpdateStatus};
 
     let key = SymmetricKey::generate();
     let storage = Storage::in_memory(key).unwrap();

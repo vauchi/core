@@ -282,7 +282,7 @@ fn test_consecutive_messages_same_party() {
 /// Test: Ratchet state can be serialized and restored
 #[test]
 fn test_ratchet_state_serialization() {
-use webbook_core::{network::MockTransport, Contact, ContactCard, WebBook};
+    use webbook_core::{network::MockTransport, Contact, ContactCard, WebBook};
 
     let mut alice_wb: WebBook<MockTransport> = WebBook::in_memory().unwrap();
     let mut bob_wb: WebBook<MockTransport> = WebBook::in_memory().unwrap();

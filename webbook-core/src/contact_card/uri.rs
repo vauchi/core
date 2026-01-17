@@ -273,6 +273,7 @@ impl ContactField {
     }
 }
 
+// INLINE_TEST_REQUIRED: Tests private url_encode and normalize_social_username helper functions
 #[cfg(test)]
 mod tests {
     use super::*;

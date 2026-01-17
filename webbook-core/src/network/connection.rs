@@ -188,6 +188,7 @@ impl<T: Transport> ConnectionManager<T> {
     }
 }
 
+// INLINE_TEST_REQUIRED: Tests private reconnect_attempt field and internal state transitions
 #[cfg(test)]
 mod tests {
     use super::*;

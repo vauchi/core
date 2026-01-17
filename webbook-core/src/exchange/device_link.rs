@@ -736,6 +736,7 @@ impl DeviceLinkResponder {
     }
 }
 
+// INLINE_TEST_REQUIRED: Tests private DEVICE_LINK_VERSION, DEVICE_LINK_MAGIC, BASE64 constants and version field
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -112,10 +112,12 @@ impl EncryptedExchangeMessage {
         };
 
         // Serialize payload to JSON
-        let payload_bytes = serde_json::to_vec(&payload).map_err(|_| ExchangeError::SerializationFailed)?;
+        let payload_bytes =
+            serde_json::to_vec(&payload).map_err(|_| ExchangeError::SerializationFailed)?;
 
         // Encrypt with the shared secret
-        let ciphertext = encrypt(&shared_secret, &payload_bytes).map_err(|_| ExchangeError::CryptoError)?;
+        let ciphertext =
+            encrypt(&shared_secret, &payload_bytes).map_err(|_| ExchangeError::CryptoError)?;
 
         Ok((
             EncryptedExchangeMessage {
@@ -146,11 +148,12 @@ impl EncryptedExchangeMessage {
         let shared_secret = X3DH::respond(our_keys, &[0u8; 32], &self.ephemeral_public_key)?;
 
         // Decrypt the ciphertext
-        let payload_bytes = decrypt(&shared_secret, &self.ciphertext).map_err(|_| ExchangeError::CryptoError)?;
+        let payload_bytes =
+            decrypt(&shared_secret, &self.ciphertext).map_err(|_| ExchangeError::CryptoError)?;
 
         // Deserialize the payload
-        let payload: ExchangePayload =
-            serde_json::from_slice(&payload_bytes).map_err(|_| ExchangeError::SerializationFailed)?;
+        let payload: ExchangePayload = serde_json::from_slice(&payload_bytes)
+            .map_err(|_| ExchangeError::SerializationFailed)?;
 
         Ok((
             DecryptedExchangePayload {

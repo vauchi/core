@@ -249,6 +249,7 @@ impl Transport for WebSocketTransport {
     }
 }
 
+// INLINE_TEST_REQUIRED: Tests private parse_url function for URL parsing logic
 #[cfg(test)]
 mod tests {
     use super::*;

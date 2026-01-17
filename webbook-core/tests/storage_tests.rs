@@ -1,9 +1,9 @@
 //! Tests for storage
 //! Extracted from mod.rs
 
-use webbook_core::*;
 use webbook_core::contact::Contact;
 use webbook_core::contact_card::{ContactCard, ContactField, FieldType};
+use webbook_core::*;
 
 fn create_test_storage() -> Storage {
     let key = SymmetricKey::generate();
@@ -187,9 +187,9 @@ fn test_storage_update_status() {
 
 #[test]
 fn test_storage_save_load_ratchet_state() {
-use webbook_core::crypto::ratchet::DoubleRatchetState;
-use webbook_core::crypto::SymmetricKey;
-use webbook_core::exchange::X3DHKeyPair;
+    use webbook_core::crypto::ratchet::DoubleRatchetState;
+    use webbook_core::crypto::SymmetricKey;
+    use webbook_core::exchange::X3DHKeyPair;
 
     let storage = create_test_storage();
     let contact = create_test_contact("Alice");
@@ -198,8 +198,7 @@ use webbook_core::exchange::X3DHKeyPair;
     // Create ratchet state (as initiator)
     let shared_secret = SymmetricKey::generate();
     let their_dh = X3DHKeyPair::generate();
-    let ratchet =
-        DoubleRatchetState::initialize_initiator(&shared_secret, *their_dh.public_key());
+    let ratchet = DoubleRatchetState::initialize_initiator(&shared_secret, *their_dh.public_key());
 
     // Save ratchet state
     storage
@@ -216,9 +215,9 @@ use webbook_core::exchange::X3DHKeyPair;
 
 #[test]
 fn test_storage_ratchet_state_encryption() {
-use webbook_core::crypto::ratchet::DoubleRatchetState;
-use webbook_core::crypto::SymmetricKey;
-use webbook_core::exchange::X3DHKeyPair;
+    use webbook_core::crypto::ratchet::DoubleRatchetState;
+    use webbook_core::crypto::SymmetricKey;
+    use webbook_core::exchange::X3DHKeyPair;
 
     let storage = create_test_storage();
     let contact = create_test_contact("Alice");
@@ -245,9 +244,9 @@ use webbook_core::exchange::X3DHKeyPair;
 
 #[test]
 fn test_storage_ratchet_deleted_with_contact() {
-use webbook_core::crypto::ratchet::DoubleRatchetState;
-use webbook_core::crypto::SymmetricKey;
-use webbook_core::exchange::X3DHKeyPair;
+    use webbook_core::crypto::ratchet::DoubleRatchetState;
+    use webbook_core::crypto::SymmetricKey;
+    use webbook_core::exchange::X3DHKeyPair;
 
     let storage = create_test_storage();
     let contact = create_test_contact("Alice");
@@ -256,8 +255,7 @@ use webbook_core::exchange::X3DHKeyPair;
 
     let shared_secret = SymmetricKey::generate();
     let their_dh = X3DHKeyPair::generate();
-    let ratchet =
-        DoubleRatchetState::initialize_initiator(&shared_secret, *their_dh.public_key());
+    let ratchet = DoubleRatchetState::initialize_initiator(&shared_secret, *their_dh.public_key());
 
     storage
         .save_ratchet_state(&contact_id, &ratchet, true)
@@ -329,8 +327,8 @@ fn test_storage_device_info_update() {
 
 #[test]
 fn test_storage_save_load_device_registry() {
-use webbook_core::crypto::SigningKeyPair;
-use webbook_core::identity::device::{DeviceInfo, DeviceRegistry};
+    use webbook_core::crypto::SigningKeyPair;
+    use webbook_core::identity::device::{DeviceInfo, DeviceRegistry};
 
     let storage = create_test_storage();
     let master_seed = [0x42u8; 32];
@@ -357,8 +355,8 @@ use webbook_core::identity::device::{DeviceInfo, DeviceRegistry};
 
 #[test]
 fn test_storage_device_registry_roundtrip() {
-use webbook_core::crypto::SigningKeyPair;
-use webbook_core::identity::device::{DeviceInfo, DeviceRegistry};
+    use webbook_core::crypto::SigningKeyPair;
+    use webbook_core::identity::device::{DeviceInfo, DeviceRegistry};
 
     let storage = create_test_storage();
     let master_seed = [0x42u8; 32];
@@ -388,7 +386,7 @@ use webbook_core::identity::device::{DeviceInfo, DeviceRegistry};
 /// Need to persist pending sync items between app restarts
 #[test]
 fn test_storage_save_load_device_sync_state() {
-use webbook_core::sync::device_sync::{InterDeviceSyncState, SyncItem};
+    use webbook_core::sync::device_sync::{InterDeviceSyncState, SyncItem};
 
     let storage = create_test_storage();
     let device_id = [0x42u8; 32];
@@ -421,7 +419,7 @@ use webbook_core::sync::device_sync::{InterDeviceSyncState, SyncItem};
 /// Test that we can list all device sync states
 #[test]
 fn test_storage_list_device_sync_states() {
-use webbook_core::sync::device_sync::{InterDeviceSyncState, SyncItem};
+    use webbook_core::sync::device_sync::{InterDeviceSyncState, SyncItem};
 
     let storage = create_test_storage();
 
@@ -452,7 +450,7 @@ use webbook_core::sync::device_sync::{InterDeviceSyncState, SyncItem};
 /// Test version vector persistence for conflict detection
 #[test]
 fn test_storage_save_load_version_vector() {
-use webbook_core::sync::device_sync::VersionVector;
+    use webbook_core::sync::device_sync::VersionVector;
 
     let storage = create_test_storage();
 
@@ -477,7 +475,7 @@ use webbook_core::sync::device_sync::VersionVector;
 /// Test that version vector updates correctly
 #[test]
 fn test_storage_version_vector_update() {
-use webbook_core::sync::device_sync::VersionVector;
+    use webbook_core::sync::device_sync::VersionVector;
 
     let storage = create_test_storage();
 

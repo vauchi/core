@@ -79,6 +79,7 @@ pub fn create_envelope(payload: MessagePayload) -> MessageEnvelope {
     }
 }
 
+// INLINE_TEST_REQUIRED: Tests private read_frame_length function for wire protocol parsing
 #[cfg(test)]
 mod tests {
     use super::*;

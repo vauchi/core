@@ -249,6 +249,7 @@ impl ExchangeQR {
     }
 }
 
+// INLINE_TEST_REQUIRED: Tests private PROTOCOL_VERSION constant and version field
 #[cfg(test)]
 mod tests {
     use super::*;

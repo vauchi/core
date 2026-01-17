@@ -284,6 +284,7 @@ impl<'a> ContactManager<'a> {
     }
 }
 
+// INLINE_TEST_REQUIRED: Tests private compute_changed_fields function for change detection logic
 #[cfg(test)]
 mod tests {
     use super::*;

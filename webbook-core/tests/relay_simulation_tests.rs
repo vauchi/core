@@ -242,7 +242,7 @@ fn test_sync_state_pending_count() {
 /// Test: Complete update propagation flow
 #[test]
 fn test_full_update_propagation() {
-use webbook_core::network::MockTransport;
+    use webbook_core::network::MockTransport;
 
     // Set up Alice and Bob
     let mut alice_wb: WebBook<MockTransport> = WebBook::in_memory().unwrap();

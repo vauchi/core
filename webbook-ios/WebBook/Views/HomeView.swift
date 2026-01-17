@@ -105,6 +105,11 @@ struct HomeView: View {
             .refreshable {
                 await viewModel.sync()
             }
+            .alert(viewModel.alertTitle, isPresented: $viewModel.showAlert) {
+                Button("OK", role: .cancel) { }
+            } message: {
+                Text(viewModel.alertMessage)
+            }
         }
     }
 
@@ -113,7 +118,7 @@ struct HomeView: View {
             do {
                 try await viewModel.removeField(id: field.id)
             } catch {
-                // Error handling - could show alert
+                viewModel.showError("Failed to Delete", message: error.localizedDescription)
             }
         }
     }

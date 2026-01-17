@@ -164,8 +164,12 @@ struct ContactDetailView: View {
             Button("Cancel", role: .cancel) { }
             Button("Remove", role: .destructive) {
                 Task {
-                    try? await viewModel.removeContact(id: contact.id)
-                    dismiss()
+                    do {
+                        try await viewModel.removeContact(id: contact.id)
+                        dismiss()
+                    } catch {
+                        viewModel.showError("Failed to Remove", message: error.localizedDescription)
+                    }
                 }
             }
         } message: {
@@ -178,6 +182,11 @@ struct ContactDetailView: View {
             }
         } message: {
             Text("By verifying \(contact.displayName), you confirm that you have verified their identity in person (e.g., by comparing fingerprints).")
+        }
+        .alert(viewModel.alertTitle, isPresented: $viewModel.showAlert) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(viewModel.alertMessage)
         }
     }
 
@@ -221,6 +230,7 @@ struct ContactDetailView: View {
             } catch {
                 // Revert on error
                 fieldVisibility[field.label] = !visible
+                viewModel.showError("Visibility Update Failed", message: error.localizedDescription)
             }
         }
     }
@@ -231,8 +241,9 @@ struct ContactDetailView: View {
         Task {
             do {
                 try await viewModel.verifyContact(id: contact.id)
+                viewModel.showSuccess("Contact Verified", message: "\(contact.displayName) has been marked as verified.")
             } catch {
-                // Handle error
+                viewModel.showError("Verification Failed", message: error.localizedDescription)
             }
             isVerifying = false
         }

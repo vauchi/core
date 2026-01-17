@@ -77,6 +77,11 @@ struct ContactsView: View {
                 await viewModel.loadContacts()
                 await viewModel.sync()
             }
+            .alert(viewModel.alertTitle, isPresented: $viewModel.showAlert) {
+                Button("OK", role: .cancel) { }
+            } message: {
+                Text(viewModel.alertMessage)
+            }
         }
     }
 
@@ -97,7 +102,11 @@ struct ContactsView: View {
         let contactsToDelete = offsets.map { displayedContacts[$0] }
         for contact in contactsToDelete {
             Task {
-                try? await viewModel.removeContact(id: contact.id)
+                do {
+                    try await viewModel.removeContact(id: contact.id)
+                } catch {
+                    viewModel.showError("Failed to Delete", message: "Could not remove \(contact.displayName): \(error.localizedDescription)")
+                }
             }
         }
     }

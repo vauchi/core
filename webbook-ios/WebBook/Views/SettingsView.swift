@@ -8,8 +8,10 @@ struct SettingsView: View {
     @EnvironmentObject var viewModel: WebBookViewModel
     @State private var showExportSheet = false
     @State private var showImportSheet = false
-    @State private var relayUrl = "wss://relay.webbook.app"
+    @State private var relayUrl = SettingsService.shared.relayUrl
+    @State private var editingRelayUrl = ""
     @State private var showRelayEdit = false
+    @State private var showInvalidUrlAlert = false
 
     var body: some View {
         NavigationView {
@@ -58,7 +60,10 @@ struct SettingsView: View {
                             .lineLimit(1)
                             .truncationMode(.middle)
                     }
-                    .onTapGesture { showRelayEdit = true }
+                    .onTapGesture {
+                        editingRelayUrl = relayUrl
+                        showRelayEdit = true
+                    }
 
                     Button(action: { Task { await viewModel.sync() } }) {
                         HStack {
@@ -149,12 +154,34 @@ struct SettingsView: View {
                 ImportBackupSheet()
             }
             .alert("Edit Relay URL", isPresented: $showRelayEdit) {
-                TextField("Relay URL", text: $relayUrl)
+                TextField("Relay URL", text: $editingRelayUrl)
+                    .autocapitalization(.none)
+                    .keyboardType(.URL)
                 Button("Cancel", role: .cancel) { }
-                Button("Save") { }
+                Button("Save") {
+                    saveRelayUrl()
+                }
             } message: {
-                Text("Enter the WebSocket URL of your relay server.")
+                Text("Enter the WebSocket URL of your relay server (ws:// or wss://).")
             }
+            .alert("Invalid URL", isPresented: $showInvalidUrlAlert) {
+                Button("OK", role: .cancel) { }
+            } message: {
+                Text("Please enter a valid WebSocket URL starting with ws:// or wss://")
+            }
+            .onAppear {
+                relayUrl = SettingsService.shared.relayUrl
+            }
+        }
+    }
+
+    private func saveRelayUrl() {
+        let trimmed = editingRelayUrl.trimmingCharacters(in: .whitespacesAndNewlines)
+        if SettingsService.shared.isValidRelayUrl(trimmed) {
+            SettingsService.shared.relayUrl = trimmed
+            relayUrl = trimmed
+        } else {
+            showInvalidUrlAlert = true
         }
     }
 }

@@ -93,6 +93,25 @@ class WebBookViewModel: ObservableObject {
     @Published var lastSyncTime: Date?
     @Published var pendingUpdates: Int = 0
 
+    // User-facing alerts
+    @Published var showAlert = false
+    @Published var alertTitle = ""
+    @Published var alertMessage = ""
+
+    /// Shows an error alert to the user
+    func showError(_ title: String, message: String) {
+        alertTitle = title
+        alertMessage = message
+        showAlert = true
+    }
+
+    /// Shows a success alert to the user
+    func showSuccess(_ title: String, message: String) {
+        alertTitle = title
+        alertMessage = message
+        showAlert = true
+    }
+
     // MARK: - Private Properties
 
     private var repository: WebBookRepository?
@@ -100,12 +119,15 @@ class WebBookViewModel: ObservableObject {
     // MARK: - Initialization
 
     init() {
+        lastSyncTime = SettingsService.shared.lastSyncTime
         initializeRepository()
     }
 
     private func initializeRepository() {
         do {
-            repository = try WebBookRepository()
+            repository = try WebBookRepository(
+                relayUrl: SettingsService.shared.relayUrl
+            )
         } catch {
             errorMessage = "Failed to initialize: \(error.localizedDescription)"
         }
@@ -380,6 +402,7 @@ class WebBookViewModel: ObservableObject {
                 updatesSent: Int(result.updatesSent)
             )
             lastSyncTime = Date()
+            SettingsService.shared.lastSyncTime = lastSyncTime
             await loadContacts()
             await loadPendingUpdates()
         } catch {

@@ -1,12 +1,29 @@
 # Build stage
-FROM rust:1.75-bookworm AS builder
+FROM rust:1.78-bookworm AS builder
 
 WORKDIR /app
 
-# Copy the entire workspace (needed for workspace dependencies)
-COPY Cargo.toml ./
+# Copy workspace files
+COPY Cargo.toml Cargo.lock ./
+
+# Copy only needed crates for relay
 COPY webbook-core ./webbook-core
 COPY webbook-relay ./webbook-relay
+
+# Create stub Cargo.toml files for workspace members we don't need
+# This allows the workspace to resolve without copying all source code
+RUN mkdir -p webbook-cli/src && \
+    echo '[package]\nname = "webbook-cli"\nversion = "0.1.0"\nedition = "2021"\n\n[dependencies]' > webbook-cli/Cargo.toml && \
+    echo 'fn main() {}' > webbook-cli/src/main.rs && \
+    mkdir -p webbook-mobile/src && \
+    echo '[package]\nname = "webbook-mobile"\nversion = "0.1.0"\nedition = "2021"\n\n[lib]\ncrate-type = ["cdylib", "staticlib"]\n\n[dependencies]' > webbook-mobile/Cargo.toml && \
+    echo '' > webbook-mobile/src/lib.rs && \
+    mkdir -p webbook-tui/src && \
+    echo '[package]\nname = "webbook-tui"\nversion = "0.1.0"\nedition = "2021"\n\n[dependencies]' > webbook-tui/Cargo.toml && \
+    echo 'fn main() {}' > webbook-tui/src/main.rs && \
+    mkdir -p webbook-desktop/src-tauri/src && \
+    echo '[package]\nname = "webbook-desktop"\nversion = "0.1.0"\nedition = "2021"\n\n[lib]\nname = "webbook_desktop_lib"\ncrate-type = ["lib", "cdylib", "staticlib"]\n\n[dependencies]' > webbook-desktop/src-tauri/Cargo.toml && \
+    echo '' > webbook-desktop/src-tauri/src/lib.rs
 
 # Build release binary
 RUN cargo build --release -p webbook-relay
@@ -14,7 +31,7 @@ RUN cargo build --release -p webbook-relay
 # Runtime stage
 FROM debian:bookworm-slim
 
-# Install runtime dependencies (OpenSSL for TLS)
+# Install runtime dependencies
 RUN apt-get update && apt-get install -y \
     ca-certificates \
     libssl3 \
@@ -23,20 +40,33 @@ RUN apt-get update && apt-get install -y \
 # Copy binary from builder
 COPY --from=builder /app/target/release/webbook-relay /usr/local/bin/
 
-# Create non-root user
-RUN useradd -r -s /bin/false webbook
+# Create non-root user and data directory
+RUN useradd -r -s /bin/false webbook \
+    && mkdir -p /data \
+    && chown webbook:webbook /data
+
+# Switch to non-root user
 USER webbook
 
 # Expose default port
 EXPOSE 8080
 
+# Data volume for persistent storage
+VOLUME /data
+
 # Environment variables with defaults
 ENV RELAY_LISTEN_ADDR=0.0.0.0:8080
 ENV RELAY_MAX_CONNECTIONS=1000
 ENV RELAY_MAX_MESSAGE_SIZE=1048576
-ENV RELAY_BLOB_TTL_SECS=604800
+ENV RELAY_BLOB_TTL_SECS=7776000
 ENV RELAY_RATE_LIMIT=60
 ENV RELAY_CLEANUP_INTERVAL=3600
+ENV RELAY_STORAGE_BACKEND=sqlite
+ENV RELAY_DATA_DIR=/data
 ENV RUST_LOG=webbook_relay=info
+
+# Healthcheck - verify the WebSocket server port is accepting TCP connections
+HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
+    CMD timeout 2 bash -c '</dev/tcp/localhost/8080' || exit 1
 
 CMD ["webbook-relay"]

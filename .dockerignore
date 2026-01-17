@@ -1,0 +1,33 @@
+# Build artifacts
+target/
+**/target/
+
+# Git
+.git/
+.gitignore
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Documentation (not needed for build)
+docs/
+
+# Test files (keep webbook-core intact for relay build)
+webbook-relay/tests/
+
+# Crates not needed for relay (stubs created in Dockerfile)
+webbook-cli/
+webbook-desktop/
+webbook-ios/
+webbook-mobile/
+webbook-tui/
+webbook-android/
+features/
+
+# Misc
+*.md
+LICENSE
+.github/

@@ -80,7 +80,7 @@ See `docs/development/testing.md` for full strategy.
 | Contact recovery | High | High | ✅ Done |
 | SecureStorage integration | Medium | Low | ✅ Done |
 | Full iOS app integration | Medium | Medium | Todo |
-| Full Desktop app integration | Medium | Medium | Todo |
+| Full Desktop app integration | Medium | Medium | ✅ Done |
 
 ### Privacy & Security
 
@@ -103,7 +103,7 @@ See `docs/development/testing.md` for full strategy.
 | Task | Complexity | Risk | Status |
 |------|------------|------|--------|
 | Relay deployment | Medium | Medium | Todo |
-| Docker deployment | Low | Low | Todo |
+| Docker deployment | Low | Low | ✅ Done |
 | Relay federation | High | High | Todo |
 | Monitoring and health checks | Low | Low | Todo |
 | libp2p/DHT discovery | High | High | Todo |

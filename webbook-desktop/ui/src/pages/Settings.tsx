@@ -33,6 +33,9 @@ function Settings(props: SettingsProps) {
   const [importPassword, setImportPassword] = createSignal('')
   const [importError, setImportError] = createSignal('')
   const [importSuccess, setImportSuccess] = createSignal('')
+  const [editingName, setEditingName] = createSignal(false)
+  const [newName, setNewName] = createSignal('')
+  const [nameError, setNameError] = createSignal('')
 
   const checkPassword = async () => {
     const password = backupPassword()
@@ -128,6 +131,38 @@ function Settings(props: SettingsProps) {
     setImportSuccess('')
   }
 
+  const startEditingName = () => {
+    setNewName(identity()?.display_name || '')
+    setNameError('')
+    setEditingName(true)
+  }
+
+  const handleUpdateName = async () => {
+    setNameError('')
+    const name = newName().trim()
+    if (!name) {
+      setNameError('Display name cannot be empty')
+      return
+    }
+    if (name.length > 100) {
+      setNameError('Display name cannot exceed 100 characters')
+      return
+    }
+    try {
+      await invoke('update_display_name', { name })
+      setEditingName(false)
+      refetchIdentity()
+    } catch (e) {
+      setNameError(String(e))
+    }
+  }
+
+  const cancelEditingName = () => {
+    setEditingName(false)
+    setNewName('')
+    setNameError('')
+  }
+
   return (
     <div class="page settings">
       <header>
@@ -139,7 +174,28 @@ function Settings(props: SettingsProps) {
         <h2>Identity</h2>
         <div class="setting-item">
           <span class="setting-label">Display Name</span>
-          <span class="setting-value">{identity()?.display_name}</span>
+          <Show when={editingName()} fallback={
+            <div class="setting-value-row">
+              <span class="setting-value">{identity()?.display_name}</span>
+              <button class="small" onClick={startEditingName}>Edit</button>
+            </div>
+          }>
+            <div class="edit-name-form">
+              <input
+                type="text"
+                value={newName()}
+                onInput={(e) => setNewName(e.target.value)}
+                placeholder="Enter display name"
+              />
+              <div class="edit-actions">
+                <button class="small primary" onClick={handleUpdateName}>Save</button>
+                <button class="small secondary" onClick={cancelEditingName}>Cancel</button>
+              </div>
+              <Show when={nameError()}>
+                <p class="error small">{nameError()}</p>
+              </Show>
+            </div>
+          </Show>
         </div>
         <div class="setting-item">
           <span class="setting-label">Public ID</span>

@@ -162,4 +162,42 @@ impl AppState {
     pub fn public_id(&self) -> Option<String> {
         self.identity.as_ref().map(|i| i.public_id())
     }
+
+    /// Update the display name.
+    pub fn update_display_name(&mut self, new_name: &str) -> Result<()> {
+        let name = new_name.trim();
+        if name.is_empty() {
+            anyhow::bail!("Display name cannot be empty");
+        }
+        if name.len() > 100 {
+            anyhow::bail!("Display name cannot exceed 100 characters");
+        }
+
+        // Update identity
+        let identity = self
+            .identity
+            .as_mut()
+            .context("No identity to update")?;
+        identity.set_display_name(name);
+
+        // Update card if it exists
+        if let Some(mut card) = self.storage.load_own_card()? {
+            card.set_display_name(name)
+                .map_err(|e| anyhow::anyhow!("Failed to update card name: {}", e))?;
+            self.storage.save_own_card(&card)?;
+        }
+
+        // Update local display name
+        self.display_name = Some(name.to_string());
+
+        // Re-save identity backup
+        let backup = identity
+            .export_backup(LOCAL_STORAGE_PASSWORD)
+            .map_err(|e| anyhow::anyhow!("Failed to export backup: {:?}", e))?;
+        self.storage
+            .save_identity(backup.as_bytes(), name)
+            .context("Failed to save identity")?;
+
+        Ok(())
+    }
 }

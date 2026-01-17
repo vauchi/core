@@ -35,6 +35,7 @@ pub fn run() {
             commands::identity::has_identity,
             commands::identity::create_identity,
             commands::identity::get_identity_info,
+            commands::identity::update_display_name,
             commands::card::get_card,
             commands::card::add_field,
             commands::card::remove_field,

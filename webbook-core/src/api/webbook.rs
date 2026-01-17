@@ -166,6 +166,48 @@ impl<T: Transport> WebBook<T> {
         self.identity.is_some()
     }
 
+    /// Updates the user's display name.
+    ///
+    /// Updates both the identity and contact card display name.
+    /// Returns an error if:
+    /// - No identity is set
+    /// - The name is empty or whitespace-only
+    /// - The name exceeds 100 characters
+    pub fn update_display_name(&mut self, new_name: &str) -> WebBookResult<()> {
+        let name = new_name.trim();
+
+        if name.is_empty() {
+            return Err(WebBookError::InvalidState(
+                "Display name cannot be empty".into(),
+            ));
+        }
+        if name.len() > 100 {
+            return Err(WebBookError::InvalidState(
+                "Display name cannot exceed 100 characters".into(),
+            ));
+        }
+
+        // Get mutable reference to identity
+        let identity = self
+            .identity
+            .as_mut()
+            .ok_or(WebBookError::IdentityNotInitialized)?;
+
+        // Update identity display name
+        identity.set_display_name(name);
+
+        // Update contact card display name
+        let mut card = self
+            .storage
+            .load_own_card()?
+            .unwrap_or_else(|| ContactCard::new(name));
+        card.set_display_name(name)
+            .map_err(|e| WebBookError::InvalidState(e.to_string()))?;
+        self.storage.save_own_card(&card)?;
+
+        Ok(())
+    }
+
     // === Contact Card Operations ===
 
     /// Gets the user's own contact card.
@@ -973,6 +1015,60 @@ mod tests {
         let bob_contact = alice_wb.get_contact(&bob_id).unwrap().unwrap();
         let bob_card = bob_contact.card();
         assert!(bob_card.fields().iter().any(|f| f.label() == "work"));
+    }
+
+    #[test]
+    fn test_update_display_name() {
+        let mut wb = create_test_webbook();
+        wb.create_identity("Alice").unwrap();
+
+        // Verify initial name
+        assert_eq!(wb.identity().unwrap().display_name(), "Alice");
+        assert_eq!(wb.own_card().unwrap().unwrap().display_name(), "Alice");
+
+        // Update display name
+        wb.update_display_name("Alice Smith").unwrap();
+
+        // Verify both identity and card are updated
+        assert_eq!(wb.identity().unwrap().display_name(), "Alice Smith");
+        assert_eq!(
+            wb.own_card().unwrap().unwrap().display_name(),
+            "Alice Smith"
+        );
+    }
+
+    #[test]
+    fn test_update_display_name_empty_fails() {
+        let mut wb = create_test_webbook();
+        wb.create_identity("Alice").unwrap();
+
+        // Empty name should fail
+        let result = wb.update_display_name("");
+        assert!(result.is_err());
+
+        // Whitespace-only should fail
+        let result = wb.update_display_name("   ");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_update_display_name_too_long_fails() {
+        let mut wb = create_test_webbook();
+        wb.create_identity("Alice").unwrap();
+
+        // Name over 100 chars should fail
+        let long_name = "a".repeat(101);
+        let result = wb.update_display_name(&long_name);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_update_display_name_no_identity_fails() {
+        let mut wb = create_test_webbook();
+
+        // No identity yet
+        let result = wb.update_display_name("Alice");
+        assert!(matches!(result, Err(WebBookError::IdentityNotInitialized)));
     }
 
     #[test]

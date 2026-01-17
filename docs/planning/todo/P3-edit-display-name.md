@@ -10,10 +10,11 @@ Users cannot edit their display name after initial setup. This is a basic identi
 
 ## Success Criteria
 
-- [ ] Core API supports `update_display_name()`
-- [ ] Mobile bindings expose the method
-- [ ] All 5 frontends have edit capability
-- [ ] Changes propagate to contacts via sync
+- [x] Core API supports `update_display_name()`
+- [ ] Mobile bindings expose the method (deferred)
+- [x] Desktop has edit capability in Settings
+- [ ] CLI/TUI/Android/iOS frontends (deferred)
+- [ ] Changes propagate to contacts via sync (requires SyncController)
 
 ## Implementation
 

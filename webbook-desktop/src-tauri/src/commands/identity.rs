@@ -51,3 +51,21 @@ pub fn get_identity_info(state: State<'_, Mutex<AppState>>) -> Result<IdentityIn
         public_id: state.public_id().unwrap_or_default(),
     })
 }
+
+/// Update display name.
+#[tauri::command]
+pub fn update_display_name(
+    name: String,
+    state: State<'_, Mutex<AppState>>,
+) -> Result<IdentityInfo, String> {
+    let mut state = state.lock().unwrap();
+
+    state
+        .update_display_name(&name)
+        .map_err(|e| e.to_string())?;
+
+    Ok(IdentityInfo {
+        display_name: state.display_name().unwrap_or("").to_string(),
+        public_id: state.public_id().unwrap_or_default(),
+    })
+}

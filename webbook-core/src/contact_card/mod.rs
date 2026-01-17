@@ -3,9 +3,11 @@
 //! Handles contact card creation, fields, and validation.
 
 mod field;
+mod uri;
 mod validation;
 
 pub use field::{ContactField, FieldType};
+pub use uri::{is_allowed_scheme, ContactAction};
 pub use validation::ValidationError;
 
 use ring::rand::SystemRandom;

@@ -13,6 +13,7 @@ use crate::state::AppState;
 
 /// Recovery status for the frontend.
 #[derive(Serialize)]
+#[allow(dead_code)]
 pub struct RecoveryStatus {
     pub in_progress: bool,
     pub voucher_count: usize,
@@ -30,6 +31,7 @@ pub struct RecoverySettingsInfo {
 
 /// Voucher info for display.
 #[derive(Serialize)]
+#[allow(dead_code)]
 pub struct VoucherInfo {
     pub voucher_pk: String,
     pub timestamp: u64,
@@ -37,6 +39,7 @@ pub struct VoucherInfo {
 
 /// Verification result for display.
 #[derive(Serialize)]
+#[allow(dead_code)]
 pub struct VerificationInfo {
     pub confidence: String,
     pub mutual_vouchers: Vec<String>,

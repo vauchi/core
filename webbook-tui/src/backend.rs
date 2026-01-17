@@ -418,6 +418,7 @@ pub struct FieldVisibilityInfo {
 
 /// Device information for display.
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct DeviceInfo {
     pub device_index: u32,
     pub device_name: String,
@@ -428,6 +429,7 @@ pub struct DeviceInfo {
 
 /// Recovery status information.
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct RecoveryStatus {
     pub has_active_claim: bool,
     pub voucher_count: u32,

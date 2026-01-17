@@ -5,8 +5,10 @@ import Home from './pages/Home'
 import Contacts from './pages/Contacts'
 import Exchange from './pages/Exchange'
 import Settings from './pages/Settings'
+import Devices from './pages/Devices'
+import Recovery from './pages/Recovery'
 
-type Page = 'setup' | 'home' | 'contacts' | 'exchange' | 'settings'
+type Page = 'setup' | 'home' | 'contacts' | 'exchange' | 'settings' | 'devices' | 'recovery'
 
 async function checkIdentity(): Promise<boolean> {
   return await invoke('has_identity')
@@ -29,6 +31,10 @@ function App() {
         return <Exchange onNavigate={setPage} />
       case 'settings':
         return <Settings onNavigate={setPage} />
+      case 'devices':
+        return <Devices onNavigate={setPage} />
+      case 'recovery':
+        return <Recovery onNavigate={setPage} />
       default:
         return <Home onNavigate={setPage} />
     }

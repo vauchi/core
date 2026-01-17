@@ -50,6 +50,14 @@ pub fn run() {
             commands::visibility::set_field_visibility,
             commands::visibility::get_contacts_for_visibility,
             commands::visibility::get_field_viewers,
+            commands::devices::list_devices,
+            commands::devices::get_current_device,
+            commands::devices::generate_device_link,
+            commands::recovery::get_recovery_settings,
+            commands::recovery::create_recovery_claim,
+            commands::recovery::create_recovery_voucher,
+            commands::recovery::check_recovery_claim,
+            commands::recovery::parse_recovery_claim,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

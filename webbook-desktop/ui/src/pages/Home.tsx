@@ -30,7 +30,7 @@ interface VisibilityLevel {
 }
 
 interface HomeProps {
-  onNavigate: (page: 'home' | 'contacts' | 'exchange' | 'settings') => void
+  onNavigate: (page: 'home' | 'contacts' | 'exchange' | 'settings' | 'devices' | 'recovery') => void
 }
 
 async function fetchCard(): Promise<CardInfo> {

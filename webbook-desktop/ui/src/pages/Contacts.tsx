@@ -35,7 +35,7 @@ interface FieldVisibilityInfo {
 }
 
 interface ContactsProps {
-  onNavigate: (page: 'home' | 'contacts' | 'exchange' | 'settings') => void
+  onNavigate: (page: 'home' | 'contacts' | 'exchange' | 'settings' | 'devices' | 'recovery') => void
 }
 
 async function fetchContacts(): Promise<ContactInfo[]> {

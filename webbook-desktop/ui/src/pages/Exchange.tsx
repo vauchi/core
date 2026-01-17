@@ -16,7 +16,7 @@ interface ExchangeResult {
 }
 
 interface ExchangeProps {
-  onNavigate: (page: 'home' | 'contacts' | 'exchange' | 'settings') => void
+  onNavigate: (page: 'home' | 'contacts' | 'exchange' | 'settings' | 'devices' | 'recovery') => void
 }
 
 async function generateQR(): Promise<ExchangeQRResponse> {

@@ -13,7 +13,7 @@ interface BackupResult {
 }
 
 interface SettingsProps {
-  onNavigate: (page: 'home' | 'contacts' | 'exchange' | 'settings') => void
+  onNavigate: (page: 'home' | 'contacts' | 'exchange' | 'settings' | 'devices' | 'recovery') => void
 }
 
 async function fetchIdentity(): Promise<IdentityInfo> {
@@ -103,6 +103,18 @@ function Settings(props: SettingsProps) {
         <div class="setting-item">
           <span class="setting-label">Public ID</span>
           <span class="setting-value mono">{identity()?.public_id}</span>
+        </div>
+      </section>
+
+      <section class="settings-section">
+        <h2>Devices & Recovery</h2>
+        <div class="setting-buttons">
+          <button class="secondary" onClick={() => props.onNavigate('devices')}>
+            Manage Devices
+          </button>
+          <button class="secondary" onClick={() => props.onNavigate('recovery')}>
+            Recovery Options
+          </button>
         </div>
       </section>
 

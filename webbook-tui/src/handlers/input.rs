@@ -168,6 +168,30 @@ fn handle_contacts_keys(app: &mut App, key: KeyCode) {
 
 fn handle_contact_detail_keys(app: &mut App, key: KeyCode) {
     match key {
+        KeyCode::Char('j') | KeyCode::Down => {
+            // Navigate down through contact fields
+            if let Ok(fields) = app.backend.get_contact_fields(app.selected_contact) {
+                if app.selected_contact_field < fields.len().saturating_sub(1) {
+                    app.selected_contact_field += 1;
+                }
+            }
+        }
+        KeyCode::Char('k') | KeyCode::Up => {
+            // Navigate up through contact fields
+            if app.selected_contact_field > 0 {
+                app.selected_contact_field -= 1;
+            }
+        }
+        KeyCode::Enter | KeyCode::Char('o') => {
+            // Open the selected field in external app
+            match app
+                .backend
+                .open_contact_field(app.selected_contact, app.selected_contact_field)
+            {
+                Ok(msg) => app.set_status(msg),
+                Err(e) => app.set_status(format!("Error: {}", e)),
+            }
+        }
         KeyCode::Char('v') => {
             // Open visibility settings for this contact
             if let Ok(Some(contact)) = app.backend.get_contact_by_index(app.selected_contact) {

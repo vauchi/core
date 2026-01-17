@@ -364,3 +364,267 @@ fn test_unicode_in_address_encoded() {
     let uri_str = uri.unwrap();
     assert!(uri_str.contains('%') || uri_str.contains("東京")); // Either encoded or raw UTF-8
 }
+
+// ============================================================
+// Integration Tests: Contact Card with Actions
+// Reference: features/contact_actions.feature
+// ============================================================
+
+use webbook_core::contact_card::ContactCard;
+
+/// Integration test: Contact with multiple actionable fields
+/// Maps to: feature file "Background" scenario setup
+#[test]
+fn test_contact_with_multiple_actionable_fields() {
+    let mut card = ContactCard::new("Bob");
+    card.add_field(ContactField::new(
+        FieldType::Phone,
+        "Mobile",
+        "+1-555-123-4567",
+    ))
+    .unwrap();
+    card.add_field(ContactField::new(
+        FieldType::Email,
+        "Work",
+        "bob@company.com",
+    ))
+    .unwrap();
+    card.add_field(ContactField::new(
+        FieldType::Website,
+        "Personal",
+        "https://bobsmith.com",
+    ))
+    .unwrap();
+    card.add_field(ContactField::new(
+        FieldType::Address,
+        "Home",
+        "123 Main St, City",
+    ))
+    .unwrap();
+
+    // All fields should generate valid URIs
+    for field in card.fields() {
+        let uri = field.to_uri();
+        assert!(uri.is_some(), "Field {} should have a URI", field.label());
+    }
+}
+
+/// Integration test: All field types return appropriate ContactAction
+/// Maps to: Cross-Platform Consistency scenarios
+#[test]
+fn test_all_field_types_have_actions() {
+    let test_cases = vec![
+        (FieldType::Phone, "Mobile", "+1-555-123-4567", "Call"),
+        (FieldType::Email, "Work", "bob@example.com", "SendEmail"),
+        (FieldType::Website, "Blog", "https://example.com", "OpenUrl"),
+        (FieldType::Address, "Home", "123 Main St", "OpenMap"),
+        (FieldType::Social, "Twitter", "@bobsmith", "OpenUrl"),
+        (FieldType::Custom, "Notes", "Plain text", "CopyToClipboard"),
+    ];
+
+    for (field_type, label, value, expected_action) in test_cases {
+        let field = ContactField::new(field_type.clone(), label, value);
+        let action = field.to_action();
+        let action_str = format!("{:?}", action);
+        assert!(
+            action_str.contains(expected_action),
+            "Field {:?} '{}' should return {} action, got {:?}",
+            field_type,
+            label,
+            expected_action,
+            action
+        );
+    }
+}
+
+/// Integration test: Mastodon social handle parsing
+/// Maps to: Social media "@bob@mas.to" scenario
+#[test]
+fn test_social_mastodon_handle() {
+    // Mastodon uses format @user@instance
+    let field = ContactField::new(FieldType::Social, "Mastodon", "@bob@mastodon.social");
+    let uri = field.to_uri();
+    // Should generate a profile URL
+    assert!(uri.is_some());
+    let uri_str = uri.unwrap();
+    assert!(uri_str.contains("mastodon.social") || uri_str.contains("bob"));
+}
+
+/// Integration test: SMS action for phone numbers
+/// Maps to: "Send SMS to phone number" scenario
+#[test]
+fn test_phone_sms_uri() {
+    let field = ContactField::new(FieldType::Phone, "Mobile", "+1-555-123-4567");
+    // Generate SMS URI (sms: scheme)
+    let sms_uri = format!("sms:{}", field.value().replace(' ', ""));
+    assert!(sms_uri.starts_with("sms:"));
+    assert!(webbook_core::contact_card::is_allowed_scheme("sms"));
+}
+
+/// Integration test: Website with subdomain
+#[test]
+fn test_website_with_subdomain() {
+    let field = ContactField::new(FieldType::Website, "Blog", "blog.example.com");
+    let uri = field.to_uri();
+    assert_eq!(uri, Some("https://blog.example.com".to_string()));
+}
+
+/// Integration test: Website with path and query
+#[test]
+fn test_website_with_path_and_query() {
+    let field = ContactField::new(
+        FieldType::Website,
+        "Profile",
+        "https://example.com/user?id=123",
+    );
+    let uri = field.to_uri();
+    assert_eq!(uri, Some("https://example.com/user?id=123".to_string()));
+}
+
+/// Integration test: Custom field detected as URL
+#[test]
+fn test_custom_field_http_url_detected() {
+    let field = ContactField::new(FieldType::Custom, "Portfolio", "http://oldsite.example.com");
+    let detected = field.detect_value_type();
+    assert_eq!(detected, Some(FieldType::Website));
+    let uri = field.to_uri();
+    assert_eq!(uri, Some("http://oldsite.example.com".to_string()));
+}
+
+/// Integration test: International phone numbers
+/// Maps to: "Phone number with international format" scenario
+#[test]
+fn test_international_phone_formats() {
+    let phones = vec![
+        ("+44 20 7946 0958", "UK"),
+        ("+81 3-1234-5678", "Japan"),
+        ("+49 30 12345678", "Germany"),
+        ("+33 1 23 45 67 89", "France"),
+    ];
+
+    for (number, country) in phones {
+        let field = ContactField::new(FieldType::Phone, country, number);
+        let uri = field.to_uri();
+        assert!(uri.is_some(), "{} phone should generate URI", country);
+        assert!(
+            uri.unwrap().starts_with("tel:"),
+            "{} phone should use tel: scheme",
+            country
+        );
+    }
+}
+
+/// Integration test: Action icons mapping
+/// Maps to: Visual feedback scenarios
+#[test]
+fn test_action_type_categorization() {
+    // Verify action types for icon mapping
+    let phone = ContactField::new(FieldType::Phone, "Mobile", "+1-555-123-4567");
+    assert!(matches!(phone.to_action(), ContactAction::Call(_)));
+
+    let email = ContactField::new(FieldType::Email, "Work", "test@example.com");
+    assert!(matches!(email.to_action(), ContactAction::SendEmail(_)));
+
+    let website = ContactField::new(FieldType::Website, "Blog", "https://example.com");
+    assert!(matches!(website.to_action(), ContactAction::OpenUrl(_)));
+
+    let address = ContactField::new(FieldType::Address, "Home", "123 Main St");
+    assert!(matches!(address.to_action(), ContactAction::OpenMap(_)));
+}
+
+// ============================================================
+// Security Integration Tests
+// ============================================================
+
+/// Security test: XSS attempt in website field blocked
+/// Maps to: "URLs are validated before opening" scenario
+#[test]
+fn test_xss_in_website_blocked() {
+    let malicious_values = vec![
+        "javascript:alert('xss')",
+        "javascript:document.cookie",
+        "JAVASCRIPT:alert(1)",   // Case insensitive
+        "  javascript:alert(1)", // Leading space
+    ];
+
+    for value in malicious_values {
+        let field = ContactField::new(FieldType::Website, "Malicious", value);
+        let uri = field.to_uri();
+        assert!(uri.is_none(), "XSS attempt '{}' should be blocked", value);
+    }
+}
+
+/// Security test: Data URI scheme blocked
+/// Maps to: "Only safe URI schemes are allowed" scenario
+#[test]
+fn test_data_uri_blocked() {
+    let data_uris = vec![
+        "data:text/html,<script>alert(1)</script>",
+        "data:image/svg+xml,<svg onload=alert(1)>",
+        "DATA:text/html,test", // Case insensitive
+    ];
+
+    for value in data_uris {
+        let field = ContactField::new(FieldType::Website, "Data", value);
+        let uri = field.to_uri();
+        assert!(uri.is_none(), "Data URI '{}' should be blocked", value);
+    }
+}
+
+/// Security test: FTP scheme blocked
+#[test]
+fn test_ftp_scheme_blocked() {
+    let field = ContactField::new(FieldType::Website, "FTP", "ftp://files.example.com");
+    let uri = field.to_uri();
+    assert!(uri.is_none(), "FTP scheme should be blocked");
+}
+
+/// Security test: Custom field with malicious content
+#[test]
+fn test_custom_field_malicious_url_blocked() {
+    let field = ContactField::new(FieldType::Custom, "Link", "javascript:void(0)");
+    let uri = field.to_uri();
+    assert!(uri.is_none(), "Malicious custom field should be blocked");
+}
+
+// ============================================================
+// Edge Case Integration Tests
+// ============================================================
+
+/// Edge case: Very long URL
+#[test]
+fn test_very_long_url() {
+    let long_path = "a".repeat(500);
+    let url = format!("https://example.com/{}", long_path);
+    let field = ContactField::new(FieldType::Website, "Long", &url);
+    let uri = field.to_uri();
+    assert!(uri.is_some(), "Long URLs should still work");
+}
+
+/// Edge case: URL with unicode domain (IDN)
+#[test]
+fn test_unicode_domain_url() {
+    let field = ContactField::new(FieldType::Website, "IDN", "https://例え.jp");
+    let uri = field.to_uri();
+    // Should preserve or encode the unicode domain
+    assert!(uri.is_some());
+}
+
+/// Edge case: Email with dots in local part
+#[test]
+fn test_email_with_dots() {
+    let field = ContactField::new(FieldType::Email, "Gmail", "first.last@gmail.com");
+    let uri = field.to_uri();
+    assert_eq!(uri, Some("mailto:first.last@gmail.com".to_string()));
+}
+
+/// Edge case: Address with special characters
+#[test]
+fn test_address_special_characters() {
+    let field = ContactField::new(FieldType::Address, "Office", "123 O'Brien's Way, Suite #5");
+    let uri = field.to_uri();
+    assert!(uri.is_some());
+    // Special characters should be encoded
+    let uri_str = uri.unwrap();
+    assert!(uri_str.contains("geo:") || uri_str.contains("maps"));
+}

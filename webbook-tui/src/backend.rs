@@ -359,7 +359,6 @@ impl Backend {
     }
 
     /// Get fields for a contact by index.
-    #[allow(dead_code)]
     pub fn get_contact_fields(&self, contact_index: usize) -> Result<Vec<ContactFieldInfo>> {
         let contacts = self
             .storage
@@ -394,7 +393,6 @@ impl Backend {
     }
 
     /// Open a contact field in the system default app.
-    #[allow(dead_code)]
     pub fn open_contact_field(&self, contact_index: usize, field_index: usize) -> Result<String> {
         let fields = self.get_contact_fields(contact_index)?;
         let field = fields.get(field_index).context("Field not found")?;
@@ -512,10 +510,10 @@ pub struct FieldVisibilityInfo {
 
 /// Contact field information for display.
 #[derive(Debug, Clone)]
-#[allow(dead_code)]
 pub struct ContactFieldInfo {
     pub label: String,
     pub value: String,
+    #[allow(dead_code)]
     pub field_type: String,
     pub action_type: String,
     pub uri: Option<String>,

@@ -57,6 +57,8 @@ pub struct App {
     pub selected_contact: usize,
     /// Selected field index (for card fields)
     pub selected_field: usize,
+    /// Selected field index in contact detail view
+    pub selected_contact_field: usize,
     /// Text input buffer
     pub input_buffer: String,
     /// Add field state
@@ -132,6 +134,7 @@ impl App {
             status_message: None,
             selected_contact: 0,
             selected_field: 0,
+            selected_contact_field: 0,
             input_buffer: String::new(),
             add_field_state: AddFieldState::default(),
             visibility_state: VisibilityState::default(),

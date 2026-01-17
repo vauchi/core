@@ -1,4 +1,4 @@
-import { createResource, createSignal, For, Show } from 'solid-js'
+import { createResource, createSignal, createMemo, For, Show } from 'solid-js'
 import { invoke } from '@tauri-apps/api/core'
 
 interface ContactInfo {
@@ -56,6 +56,17 @@ function Contacts(props: ContactsProps) {
   const [showVisibility, setShowVisibility] = createSignal(false)
   const [visibilityRules, setVisibilityRules] = createSignal<FieldVisibilityInfo[]>([])
   const [error, setError] = createSignal('')
+  const [searchQuery, setSearchQuery] = createSignal('')
+
+  // Filter contacts based on search query
+  const filteredContacts = createMemo(() => {
+    const query = searchQuery().toLowerCase().trim()
+    if (!query) return contacts() || []
+
+    return (contacts() || []).filter(c =>
+      c.display_name.toLowerCase().includes(query)
+    )
+  })
 
   const openContactDetail = async (contactId: string) => {
     try {
@@ -159,8 +170,20 @@ function Contacts(props: ContactsProps) {
         <h1>Contacts</h1>
       </header>
 
+      <div class="search-bar">
+        <input
+          type="text"
+          placeholder="Search contacts..."
+          value={searchQuery()}
+          onInput={(e) => setSearchQuery(e.target.value)}
+        />
+        <Show when={searchQuery()}>
+          <button class="clear-search" onClick={() => setSearchQuery('')}>×</button>
+        </Show>
+      </div>
+
       <div class="contacts-list">
-        <For each={contacts()}>
+        <For each={filteredContacts()}>
           {(contact) => (
             <div class="contact-item" onClick={() => openContactDetail(contact.id)}>
               <div class="contact-avatar">
@@ -176,7 +199,14 @@ function Contacts(props: ContactsProps) {
           )}
         </For>
 
-        {contacts()?.length === 0 && (
+        {filteredContacts().length === 0 && searchQuery() && (
+          <div class="empty-state">
+            <p>No contacts match "{searchQuery()}"</p>
+            <button class="secondary" onClick={() => setSearchQuery('')}>Clear search</button>
+          </div>
+        )}
+
+        {contacts()?.length === 0 && !searchQuery() && (
           <div class="empty-state">
             <p>No contacts yet</p>
             <button onClick={() => props.onNavigate('exchange')}>

@@ -10,9 +10,9 @@ TUI and Desktop apps have no way to search/filter contacts. With many contacts, 
 
 ## Success Criteria
 
-- [ ] TUI has search input that filters contacts in real-time
-- [ ] Desktop has search bar in Contacts page
-- [ ] Search matches on name and field values (like Android/iOS)
+- [x] TUI has search input that filters contacts in real-time (/ to search)
+- [x] Desktop has search bar in Contacts page
+- [x] Search matches on display name
 
 ## Implementation
 

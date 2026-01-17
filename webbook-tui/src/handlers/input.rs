@@ -20,6 +20,12 @@ pub fn handle_key(app: &mut App, key: KeyCode) -> Action {
 }
 
 fn handle_normal_mode(app: &mut App, key: KeyCode) -> Action {
+    // Don't process global keys if in contact search mode
+    if app.contact_search_mode && app.screen == Screen::Contacts {
+        handle_contacts_keys(app, key);
+        return Action::Continue;
+    }
+
     // Global keys
     match key {
         KeyCode::Char('q') => return Action::Quit,
@@ -147,10 +153,48 @@ fn handle_home_keys(app: &mut App, key: KeyCode) {
 }
 
 fn handle_contacts_keys(app: &mut App, key: KeyCode) {
+    // Handle search mode
+    if app.contact_search_mode {
+        match key {
+            KeyCode::Esc => {
+                app.contact_search_mode = false;
+            }
+            KeyCode::Enter => {
+                app.contact_search_mode = false;
+            }
+            KeyCode::Backspace => {
+                app.contact_search_query.pop();
+                app.selected_contact = 0;
+            }
+            KeyCode::Char(c) => {
+                app.contact_search_query.push(c);
+                app.selected_contact = 0;
+            }
+            _ => {}
+        }
+        return;
+    }
+
+    // Normal navigation mode
     match key {
+        KeyCode::Char('/') => {
+            app.contact_search_mode = true;
+            app.contact_search_query.clear();
+            app.selected_contact = 0;
+        }
         KeyCode::Char('j') | KeyCode::Down => {
-            let count = app.backend.contact_count().unwrap_or(0);
-            if app.selected_contact < count.saturating_sub(1) {
+            // Count filtered contacts
+            let contacts = app.backend.list_contacts().unwrap_or_default();
+            let filtered_count = if app.contact_search_query.is_empty() {
+                contacts.len()
+            } else {
+                let query = app.contact_search_query.to_lowercase();
+                contacts
+                    .iter()
+                    .filter(|c| c.display_name.to_lowercase().contains(&query))
+                    .count()
+            };
+            if app.selected_contact < filtered_count.saturating_sub(1) {
                 app.selected_contact += 1;
             }
         }

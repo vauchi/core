@@ -69,6 +69,10 @@ pub struct App {
     pub backup_state: BackupState,
     /// Selected device index
     pub selected_device: usize,
+    /// Contact search query
+    pub contact_search_query: String,
+    /// Contact search mode active
+    pub contact_search_mode: bool,
 }
 
 /// State for the add field dialog.
@@ -140,6 +144,8 @@ impl App {
             visibility_state: VisibilityState::default(),
             backup_state: BackupState::default(),
             selected_device: 0,
+            contact_search_query: String::new(),
+            contact_search_mode: false,
         }
     }
 

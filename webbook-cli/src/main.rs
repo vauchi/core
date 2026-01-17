@@ -184,6 +184,14 @@ enum ContactCommands {
         /// Contact ID or name
         contact: String,
     },
+
+    /// Open a contact field in external app
+    Open {
+        /// Contact ID or name
+        contact: String,
+        /// Field label to open (optional - interactive if not specified)
+        field: Option<String>,
+    },
 }
 
 #[derive(Subcommand)]
@@ -349,6 +357,13 @@ async fn main() -> Result<()> {
             }
             ContactCommands::Visibility { contact } => {
                 commands::contacts::show_visibility(&config, &contact)?;
+            }
+            ContactCommands::Open { contact, field } => {
+                if let Some(field_label) = field {
+                    commands::contacts::open_field(&config, &contact, &field_label)?;
+                } else {
+                    commands::contacts::open_interactive(&config, &contact)?;
+                }
             }
         },
         Commands::Social(cmd) => match cmd {

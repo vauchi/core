@@ -5,6 +5,7 @@
 use std::fs;
 
 use anyhow::{bail, Result};
+use webbook_core::contact_card::ContactAction;
 use webbook_core::network::MockTransport;
 use webbook_core::{Identity, IdentityBackup, WebBook, WebBookConfig};
 
@@ -280,4 +281,105 @@ pub fn show_visibility(config: &CliConfig, contact_id_or_name: &str) -> Result<(
     println!();
 
     Ok(())
+}
+
+/// Opens a contact field in the system default application.
+pub fn open_field(config: &CliConfig, contact_id_or_name: &str, field_label: &str) -> Result<()> {
+    let wb = open_webbook(config)?;
+
+    // Find contact
+    let contact = find_contact(&wb, contact_id_or_name)?;
+    let contact_name = contact.display_name().to_string();
+
+    // Find the field by label
+    let field = contact
+        .card()
+        .fields()
+        .iter()
+        .find(|f| f.label().to_lowercase() == field_label.to_lowercase())
+        .ok_or_else(|| anyhow::anyhow!("Field '{}' not found for {}", field_label, contact_name))?;
+
+    // Get URI using webbook-core's secure URI builder
+    let uri = field.to_uri();
+    let action = field.to_action();
+
+    match uri {
+        Some(uri_str) => {
+            display::info(&format!(
+                "Opening {} for {}...",
+                field.label(),
+                contact_name
+            ));
+
+            match open::that(&uri_str) {
+                Ok(_) => {
+                    let action_desc = match action {
+                        ContactAction::Call(_) => "Opened dialer",
+                        ContactAction::SendSms(_) => "Opened messaging",
+                        ContactAction::SendEmail(_) => "Opened email client",
+                        ContactAction::OpenUrl(_) => "Opened browser",
+                        ContactAction::OpenMap(_) => "Opened maps",
+                        ContactAction::CopyToClipboard => "Copied to clipboard",
+                    };
+                    display::success(action_desc);
+                }
+                Err(e) => {
+                    display::error(&format!("Failed to open: {}", e));
+                    display::info(&format!("Value: {}", field.value()));
+                }
+            }
+        }
+        None => {
+            display::warning(&format!(
+                "Cannot open '{}' field - no action available",
+                field.label()
+            ));
+            display::info(&format!("Value: {}", field.value()));
+        }
+    }
+
+    Ok(())
+}
+
+/// Lists openable fields for a contact and lets user select one interactively.
+pub fn open_interactive(config: &CliConfig, contact_id_or_name: &str) -> Result<()> {
+    use dialoguer::Select;
+
+    let wb = open_webbook(config)?;
+
+    // Find contact
+    let contact = find_contact(&wb, contact_id_or_name)?;
+    let contact_name = contact.display_name().to_string();
+
+    let fields = contact.card().fields();
+    if fields.is_empty() {
+        display::warning(&format!("{} has no contact fields", contact_name));
+        return Ok(());
+    }
+
+    // Build selection items
+    let items: Vec<String> = fields
+        .iter()
+        .map(|f| {
+            let action = f.to_action();
+            let action_icon = match action {
+                ContactAction::Call(_) => "phone",
+                ContactAction::SendSms(_) => "sms",
+                ContactAction::SendEmail(_) => "mail",
+                ContactAction::OpenUrl(_) => "web",
+                ContactAction::OpenMap(_) => "map",
+                ContactAction::CopyToClipboard => "copy",
+            };
+            format!("[{}] {}: {}", action_icon, f.label(), f.value())
+        })
+        .collect();
+
+    let selection = Select::new()
+        .with_prompt(format!("Select field to open for {}", contact_name))
+        .items(&items)
+        .default(0)
+        .interact()?;
+
+    let selected_field = &fields[selection];
+    open_field(config, contact.id(), selected_field.label())
 }

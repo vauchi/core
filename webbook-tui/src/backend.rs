@@ -6,7 +6,8 @@ use anyhow::{Context, Result};
 #[cfg(feature = "secure-storage")]
 use webbook_core::storage::secure::{PlatformKeyring, SecureStorage};
 use webbook_core::{
-    ContactCard, ContactField, FieldType, Identity, IdentityBackup, Storage, SymmetricKey,
+    contact_card::ContactAction, ContactCard, ContactField, FieldType, Identity, IdentityBackup,
+    Storage, SymmetricKey,
 };
 
 #[cfg(not(feature = "secure-storage"))]
@@ -357,6 +358,55 @@ impl Backend {
         Ok(())
     }
 
+    /// Get fields for a contact by index.
+    #[allow(dead_code)]
+    pub fn get_contact_fields(&self, contact_index: usize) -> Result<Vec<ContactFieldInfo>> {
+        let contacts = self
+            .storage
+            .list_contacts()
+            .context("Failed to list contacts")?;
+
+        let contact = contacts.get(contact_index).context("Contact not found")?;
+
+        Ok(contact
+            .card()
+            .fields()
+            .iter()
+            .map(|f| {
+                let action = f.to_action();
+                let action_type = match &action {
+                    ContactAction::Call(_) => "call",
+                    ContactAction::SendSms(_) => "sms",
+                    ContactAction::SendEmail(_) => "email",
+                    ContactAction::OpenUrl(_) => "web",
+                    ContactAction::OpenMap(_) => "map",
+                    ContactAction::CopyToClipboard => "copy",
+                };
+                ContactFieldInfo {
+                    label: f.label().to_string(),
+                    value: f.value().to_string(),
+                    field_type: format!("{:?}", f.field_type()),
+                    action_type: action_type.to_string(),
+                    uri: f.to_uri(),
+                }
+            })
+            .collect())
+    }
+
+    /// Open a contact field in the system default app.
+    #[allow(dead_code)]
+    pub fn open_contact_field(&self, contact_index: usize, field_index: usize) -> Result<String> {
+        let fields = self.get_contact_fields(contact_index)?;
+        let field = fields.get(field_index).context("Field not found")?;
+
+        if let Some(ref uri) = field.uri {
+            open::that(uri).context("Failed to open URI")?;
+            Ok(format!("Opened {} in {}", field.label, field.action_type))
+        } else {
+            Ok(format!("No action available for {}", field.label))
+        }
+    }
+
     // ========== Device Management ==========
 
     /// List all linked devices.
@@ -458,6 +508,17 @@ impl Backend {
 pub struct FieldVisibilityInfo {
     pub field_label: String,
     pub can_see: bool,
+}
+
+/// Contact field information for display.
+#[derive(Debug, Clone)]
+#[allow(dead_code)]
+pub struct ContactFieldInfo {
+    pub label: String,
+    pub value: String,
+    pub field_type: String,
+    pub action_type: String,
+    pub uri: Option<String>,
 }
 
 /// Device information for display.

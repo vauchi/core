@@ -58,6 +58,9 @@ hex = "0.4"
 # Base64 encoding
 base64 = "0.21"
 
+# Open URLs in system browser/app
+open = "5"
+
 [features]
 default = []
 secure-storage = ["webbook-core/secure-storage"]

@@ -1,15 +1,19 @@
 package com.webbook.ui
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import com.webbook.util.ContactActions
 import uniffi.webbook_mobile.MobileContact
 import uniffi.webbook_mobile.MobileContactCard
 import uniffi.webbook_mobile.MobileContactField
@@ -159,25 +163,43 @@ fun ContactDetailScreen(
 
 @Composable
 fun ContactFieldItem(field: MobileContactField) {
+    val context = LocalContext.current
+
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { ContactActions.openField(context, field) },
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant
         )
     ) {
-        Column(
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(12.dp)
+                .padding(12.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = field.label,
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Text(
-                text = field.value,
-                style = MaterialTheme.typography.bodyLarge
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = field.label,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    text = field.value,
+                    style = MaterialTheme.typography.bodyLarge
+                )
+                Text(
+                    text = ContactActions.getActionDescription(field.fieldType),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+            Icon(
+                imageVector = Icons.Filled.ChevronRight,
+                contentDescription = "Open",
+                tint = MaterialTheme.colorScheme.primary
             )
         }
     }

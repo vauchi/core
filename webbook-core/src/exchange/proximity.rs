@@ -165,6 +165,20 @@ impl ManualConfirmationVerifier {
         }
     }
 
+    /// Creates a verifier that is already confirmed (for testing).
+    pub fn pre_confirmed() -> Self {
+        ManualConfirmationVerifier {
+            confirmed: std::sync::Mutex::new(true),
+        }
+    }
+
+    /// Creates a verifier with a specific initial state (for testing).
+    pub fn with_state(confirmed: bool) -> Self {
+        ManualConfirmationVerifier {
+            confirmed: std::sync::Mutex::new(confirmed),
+        }
+    }
+
     /// Call this when the user confirms proximity.
     pub fn confirm(&self) {
         *self.confirmed.lock().unwrap() = true;

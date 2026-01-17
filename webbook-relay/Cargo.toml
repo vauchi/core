@@ -27,6 +27,13 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 # SQLite for persistent storage
 rusqlite = { version = "0.32", features = ["bundled"] }
 
+# HTTP server for health/metrics endpoints
+axum = "0.7"
+
+# Prometheus metrics
+prometheus = "0.13"
+
 [dev-dependencies]
 tokio-test = "0.4"
 tempfile = "3.0"
+tower = { version = "0.5", features = ["util"] }

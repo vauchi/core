@@ -2,8 +2,19 @@
 //!
 //! Handles contact card creation, fields, and validation.
 
+#[cfg(feature = "testing")]
+pub mod field;
+#[cfg(not(feature = "testing"))]
 mod field;
+
+#[cfg(feature = "testing")]
+pub mod uri;
+#[cfg(not(feature = "testing"))]
 mod uri;
+
+#[cfg(feature = "testing")]
+pub mod validation;
+#[cfg(not(feature = "testing"))]
 mod validation;
 
 pub use field::{ContactField, FieldType};

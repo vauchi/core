@@ -3,6 +3,9 @@
 //! Represents contacts obtained through exchange, with shared encryption keys
 //! and visibility rules.
 
+#[cfg(feature = "testing")]
+pub mod visibility;
+#[cfg(not(feature = "testing"))]
 mod visibility;
 
 pub use visibility::{FieldVisibility, VisibilityRules};

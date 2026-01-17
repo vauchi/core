@@ -3,6 +3,9 @@
 //! Handles user identity creation, backup, and restoration.
 //! Each identity has a unique Ed25519 signing keypair and X25519 exchange keypair.
 
+#[cfg(feature = "testing")]
+pub mod backup;
+#[cfg(not(feature = "testing"))]
 mod backup;
 pub mod device;
 pub mod password;

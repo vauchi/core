@@ -5,6 +5,7 @@
 //! 2. Round-trip serialization works for randomly generated valid structures
 //! 3. Malformed inputs are rejected gracefully
 
+use std::collections::HashSet;
 use proptest::prelude::*;
 
 // =============================================================================

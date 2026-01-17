@@ -210,7 +210,7 @@ const SERIALIZED_RATCHET_STATE_V1: &str = r#"{
 
 #[test]
 fn test_ratchet_message_compatibility_v1() {
-    use webbook_core::crypto::ratchet::RatchetMessage;
+use webbook_core::crypto::ratchet::RatchetMessage;
 
     // Must deserialize correctly
     let msg: RatchetMessage = serde_json::from_str(RATCHET_MESSAGE_V1)
@@ -234,7 +234,7 @@ fn test_ratchet_message_compatibility_v1() {
 
 #[test]
 fn test_contact_card_compatibility_v1() {
-    use webbook_core::ContactCard;
+use webbook_core::ContactCard;
 
     // Must deserialize correctly
     let card: ContactCard = serde_json::from_str(CONTACT_CARD_V1)
@@ -266,7 +266,7 @@ fn test_contact_card_compatibility_v1() {
 
 #[test]
 fn test_field_type_variants_compatibility_v1() {
-    use webbook_core::ContactField;
+use webbook_core::ContactField;
 
     // Test each FieldType variant
     let phone: ContactField = serde_json::from_str(FIELD_TYPE_PHONE_V1).unwrap();
@@ -290,7 +290,7 @@ fn test_field_type_variants_compatibility_v1() {
 
 #[test]
 fn test_card_delta_added_compatibility_v1() {
-    use webbook_core::sync::CardDelta;
+use webbook_core::sync::CardDelta;
 
     let delta: CardDelta = serde_json::from_str(CARD_DELTA_ADDED_V1)
         .expect("Failed to deserialize CardDelta Added V1");
@@ -311,7 +311,7 @@ fn test_card_delta_added_compatibility_v1() {
 
 #[test]
 fn test_card_delta_modified_compatibility_v1() {
-    use webbook_core::sync::CardDelta;
+use webbook_core::sync::CardDelta;
 
     let delta: CardDelta = serde_json::from_str(CARD_DELTA_MODIFIED_V1)
         .expect("Failed to deserialize CardDelta Modified V1");
@@ -333,7 +333,7 @@ fn test_card_delta_modified_compatibility_v1() {
 
 #[test]
 fn test_card_delta_removed_compatibility_v1() {
-    use webbook_core::sync::CardDelta;
+use webbook_core::sync::CardDelta;
 
     let delta: CardDelta = serde_json::from_str(CARD_DELTA_REMOVED_V1)
         .expect("Failed to deserialize CardDelta Removed V1");
@@ -350,7 +350,7 @@ fn test_card_delta_removed_compatibility_v1() {
 
 #[test]
 fn test_card_delta_display_name_changed_compatibility_v1() {
-    use webbook_core::sync::CardDelta;
+use webbook_core::sync::CardDelta;
 
     let delta: CardDelta = serde_json::from_str(CARD_DELTA_NAME_CHANGED_V1)
         .expect("Failed to deserialize CardDelta DisplayNameChanged V1");
@@ -367,7 +367,7 @@ fn test_card_delta_display_name_changed_compatibility_v1() {
 
 #[test]
 fn test_device_registry_compatibility_v1() {
-    use webbook_core::identity::DeviceRegistry;
+use webbook_core::identity::DeviceRegistry;
 
     let registry: DeviceRegistry =
         serde_json::from_str(DEVICE_REGISTRY_V1).expect("Failed to deserialize DeviceRegistry V1");
@@ -395,7 +395,7 @@ fn test_device_registry_compatibility_v1() {
 
 #[test]
 fn test_registered_device_revoked_compatibility_v1() {
-    use webbook_core::identity::RegisteredDevice;
+use webbook_core::identity::RegisteredDevice;
 
     let device: RegisteredDevice = serde_json::from_str(REGISTERED_DEVICE_REVOKED_V1)
         .expect("Failed to deserialize RegisteredDevice revoked V1");
@@ -408,7 +408,7 @@ fn test_registered_device_revoked_compatibility_v1() {
 
 #[test]
 fn test_sync_item_card_updated_compatibility_v1() {
-    use webbook_core::sync::SyncItem;
+use webbook_core::sync::SyncItem;
 
     let item: SyncItem = serde_json::from_str(SYNC_ITEM_CARD_UPDATED_V1)
         .expect("Failed to deserialize SyncItem::CardUpdated V1");
@@ -432,7 +432,7 @@ fn test_sync_item_card_updated_compatibility_v1() {
 
 #[test]
 fn test_sync_item_contact_removed_compatibility_v1() {
-    use webbook_core::sync::SyncItem;
+use webbook_core::sync::SyncItem;
 
     let item: SyncItem = serde_json::from_str(SYNC_ITEM_CONTACT_REMOVED_V1)
         .expect("Failed to deserialize SyncItem::ContactRemoved V1");
@@ -451,7 +451,7 @@ fn test_sync_item_contact_removed_compatibility_v1() {
 
 #[test]
 fn test_sync_item_visibility_changed_compatibility_v1() {
-    use webbook_core::sync::SyncItem;
+use webbook_core::sync::SyncItem;
 
     let item: SyncItem = serde_json::from_str(SYNC_ITEM_VISIBILITY_CHANGED_V1)
         .expect("Failed to deserialize SyncItem::VisibilityChanged V1");
@@ -474,7 +474,7 @@ fn test_sync_item_visibility_changed_compatibility_v1() {
 
 #[test]
 fn test_serialized_ratchet_state_compatibility_v1() {
-    use webbook_core::crypto::ratchet::SerializedRatchetState;
+use webbook_core::crypto::ratchet::SerializedRatchetState;
 
     let state: SerializedRatchetState = serde_json::from_str(SERIALIZED_RATCHET_STATE_V1)
         .expect("Failed to deserialize SerializedRatchetState V1");
@@ -531,7 +531,7 @@ fn test_field_change_enum_variant_names() {
     let removed = r#"{"Removed":{"field_id":"x"}}"#;
     let name_changed = r#"{"DisplayNameChanged":{"new_name":"N"}}"#;
 
-    use webbook_core::sync::FieldChange;
+use webbook_core::sync::FieldChange;
 
     serde_json::from_str::<FieldChange>(added).expect("Added variant name changed");
     serde_json::from_str::<FieldChange>(modified).expect("Modified variant name changed");
@@ -542,7 +542,7 @@ fn test_field_change_enum_variant_names() {
 
 #[test]
 fn test_field_type_enum_variant_names() {
-    use webbook_core::FieldType;
+use webbook_core::FieldType;
 
     // These must match exactly
     let variants = [
@@ -568,7 +568,7 @@ fn test_sync_item_enum_variant_names() {
     let contact_removed = r#"{"ContactRemoved":{"contact_id":"x","timestamp":0}}"#;
     let visibility = r#"{"VisibilityChanged":{"contact_id":"x","field_label":"y","is_visible":true,"timestamp":0}}"#;
 
-    use webbook_core::sync::SyncItem;
+use webbook_core::sync::SyncItem;
 
     serde_json::from_str::<SyncItem>(card_updated).expect("CardUpdated variant name changed");
     serde_json::from_str::<SyncItem>(contact_removed).expect("ContactRemoved variant name changed");

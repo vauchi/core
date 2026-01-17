@@ -77,7 +77,7 @@ fn test_sequential_contact_operations() {
 
 #[test]
 fn test_sequential_pending_update_operations() {
-    use webbook_core::storage::{PendingUpdate, UpdateStatus};
+use webbook_core::storage::{PendingUpdate, UpdateStatus};
 
     let key = SymmetricKey::generate();
     let storage = Storage::in_memory(key).unwrap();

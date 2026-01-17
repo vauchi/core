@@ -165,7 +165,7 @@ fn test_decrypt_fails_with_corrupted_ciphertext() {
 /// Test: Delta signature verification rejects wrong signer
 #[test]
 fn test_delta_signature_rejects_wrong_signer() {
-    use webbook_core::identity::Identity;
+use webbook_core::identity::Identity;
 
     let alice = Identity::create("Alice");
     let eve = Identity::create("Eve"); // Attacker's identity
@@ -201,8 +201,8 @@ fn test_delta_signature_rejects_wrong_signer() {
 /// Test: Delta signature verification rejects tampered delta
 #[test]
 fn test_delta_signature_rejects_tampered_delta() {
-    use webbook_core::identity::Identity;
-    use webbook_core::sync::FieldChange;
+use webbook_core::identity::Identity;
+use webbook_core::sync::FieldChange;
 
     let alice = Identity::create("Alice");
 
@@ -360,7 +360,7 @@ fn test_mark_nonexistent_update_delivered() {
 /// Test: Wrong password fails backup import
 #[test]
 fn test_wrong_password_fails_backup_import() {
-    use webbook_core::identity::Identity;
+use webbook_core::identity::Identity;
 
     let identity = Identity::create("Test");
     let backup = identity.export_backup("SecureP@ssw0rd123!").unwrap();
@@ -372,7 +372,7 @@ fn test_wrong_password_fails_backup_import() {
 /// Test: Corrupted backup fails import
 #[test]
 fn test_corrupted_backup_fails_import() {
-    use webbook_core::identity::Identity;
+use webbook_core::identity::Identity;
 
     let identity = Identity::create("Test");
     let password = "SecureP@ssw0rd123!";
@@ -391,7 +391,7 @@ fn test_corrupted_backup_fails_import() {
 /// Test: Empty password is rejected
 #[test]
 fn test_empty_password_rejected_for_backup() {
-    use webbook_core::identity::Identity;
+use webbook_core::identity::Identity;
 
     let identity = Identity::create("Test");
     let result = identity.export_backup("");

@@ -3,14 +3,46 @@
 //! Handles peer-to-peer contact exchange via QR codes, audio proximity,
 //! and X3DH key agreement.
 
+#[cfg(feature = "testing")]
+pub mod audio;
+#[cfg(not(feature = "testing"))]
 mod audio;
+
+#[cfg(feature = "testing")]
+pub mod ble;
+#[cfg(not(feature = "testing"))]
 mod ble;
+
 pub mod device_link;
+
+#[cfg(feature = "testing")]
+pub mod encrypted_message;
+#[cfg(not(feature = "testing"))]
 mod encrypted_message;
+
+#[cfg(feature = "testing")]
+pub mod error;
+#[cfg(not(feature = "testing"))]
 mod error;
+
+#[cfg(feature = "testing")]
+pub mod proximity;
+#[cfg(not(feature = "testing"))]
 mod proximity;
+
+#[cfg(feature = "testing")]
+pub mod qr;
+#[cfg(not(feature = "testing"))]
 mod qr;
+
+#[cfg(feature = "testing")]
+pub mod session;
+#[cfg(not(feature = "testing"))]
 mod session;
+
+#[cfg(feature = "testing")]
+pub mod x3dh;
+#[cfg(not(feature = "testing"))]
 mod x3dh;
 
 pub use audio::{AudioBackend, AudioCapability, AudioConfig, MockAudioBackend, UltrasonicVerifier};

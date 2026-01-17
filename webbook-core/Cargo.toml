@@ -9,6 +9,8 @@ license = "MIT"
 default = ["network"]
 network = ["tungstenite", "native-tls"]
 secure-storage = ["keyring"]
+# Enable this feature to expose internal modules for integration tests
+testing = []
 
 [dependencies]
 # Cryptography (audited library)

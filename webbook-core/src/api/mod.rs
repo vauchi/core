@@ -42,11 +42,34 @@
 //! - [`sync_controller`] - Sync and network orchestration
 //! - [`webbook`] - Main WebBook orchestrator
 
+#[cfg(feature = "testing")]
+pub mod config;
+#[cfg(not(feature = "testing"))]
 mod config;
+
+#[cfg(feature = "testing")]
+pub mod contact_manager;
+#[cfg(not(feature = "testing"))]
 mod contact_manager;
+
+#[cfg(feature = "testing")]
+pub mod error;
+#[cfg(not(feature = "testing"))]
 mod error;
+
+#[cfg(feature = "testing")]
+pub mod events;
+#[cfg(not(feature = "testing"))]
 mod events;
+
+#[cfg(feature = "testing")]
+pub mod sync_controller;
+#[cfg(not(feature = "testing"))]
 mod sync_controller;
+
+#[cfg(feature = "testing")]
+pub mod webbook;
+#[cfg(not(feature = "testing"))]
 mod webbook;
 
 // Error types

@@ -61,7 +61,7 @@ fn test_x3dh_ephemeral_keys_unique_per_session() {
 /// Tests that shared secret can be used for encryption
 #[test]
 fn test_x3dh_shared_secret_usable_for_encryption() {
-    use webbook_core::crypto::{decrypt, encrypt};
+use webbook_core::crypto::{decrypt, encrypt};
 
     let alice = X3DHKeyPair::generate();
     let bob = X3DHKeyPair::generate();

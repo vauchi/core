@@ -446,10 +446,10 @@ proptest! {
 // ============================================================
 
 mod extended_property_tests {
-    use super::*;
-    use webbook_core::crypto::ratchet::DoubleRatchetState;
-    use webbook_core::exchange::X3DHKeyPair;
-    use webbook_core::sync::CardDelta;
+use super::*;
+use webbook_core::crypto::ratchet::DoubleRatchetState;
+use webbook_core::exchange::X3DHKeyPair;
+use webbook_core::sync::CardDelta;
 
     /// Strategy for generating message counts for stress tests.
     fn message_count_strategy() -> impl Strategy<Value = usize> {

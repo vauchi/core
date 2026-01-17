@@ -30,14 +30,46 @@
 //! let acked = client.process_incoming()?;
 //! ```
 
+#[cfg(feature = "testing")]
+pub mod connection;
+#[cfg(not(feature = "testing"))]
 mod connection;
+
+#[cfg(feature = "testing")]
+pub mod error;
+#[cfg(not(feature = "testing"))]
 mod error;
+
+#[cfg(feature = "testing")]
+pub mod message;
+#[cfg(not(feature = "testing"))]
 mod message;
+
+#[cfg(feature = "testing")]
+pub mod mock;
+#[cfg(not(feature = "testing"))]
 mod mock;
+
+#[cfg(feature = "testing")]
+pub mod protocol;
+#[cfg(not(feature = "testing"))]
 mod protocol;
+
+#[cfg(feature = "testing")]
+pub mod relay_client;
+#[cfg(not(feature = "testing"))]
 mod relay_client;
+
 pub mod simple_message;
+
+#[cfg(feature = "testing")]
+pub mod transport;
+#[cfg(not(feature = "testing"))]
 mod transport;
+
+#[cfg(feature = "testing")]
+pub mod websocket;
+#[cfg(not(feature = "testing"))]
 mod websocket;
 
 // Error types

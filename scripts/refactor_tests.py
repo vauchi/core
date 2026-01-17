@@ -66,9 +66,9 @@ def find_test_module_bounds(lines: list[str], start_idx: int) -> tuple[int, str]
                 brace_count -= 1
 
         if in_block and brace_count == 0:
-            return i, ''.join(content_lines)
+            return i, '\n'.join(content_lines)
 
-    return len(lines) - 1, ''.join(content_lines)
+    return len(lines) - 1, '\n'.join(content_lines)
 
 
 def extract_test_functions(content: str) -> list[str]:
@@ -166,14 +166,35 @@ def generate_integration_test(crate_name: str, module_name: str, module: InlineT
     crate_mod = crate_name.replace('-', '_')
     inner_content = extract_test_body(module.content)
 
-    # Transform super:: references to crate imports
-    if module_name and module_name != 'lib':
-        import_path = f"{crate_mod}::{module_name}"
-    else:
-        import_path = crate_mod
+    # For integration tests, we can't access private submodules.
+    # Replace `use super::*` with imports from the crate root (which re-exports public items)
+    # and the parent module path (for pub submodules).
 
-    inner_content = re.sub(r'use super::\*;', f'use {import_path}::*;', inner_content)
-    inner_content = re.sub(r'super::(\w+)', f'{import_path}::\\1', inner_content)
+    # Build module path - but use crate root for most imports since items are re-exported there
+    if module_name and module_name != 'lib':
+        # Get parent module (e.g., "exchange" from "exchange::qr")
+        parts = module_name.split('::')
+        if len(parts) > 1:
+            parent_path = f"{crate_mod}::{parts[0]}"
+        else:
+            parent_path = crate_mod
+    else:
+        parent_path = crate_mod
+
+    # Replace `use super::*` with proper imports from crate root and parent module
+    # Most types are re-exported at the crate root, so import from there
+    inner_content = re.sub(
+        r'use super::\*;',
+        f'use {crate_mod}::*;\nuse {parent_path}::*;' if parent_path != crate_mod else f'use {crate_mod}::*;',
+        inner_content
+    )
+
+    # Transform remaining super:: references
+    inner_content = re.sub(r'super::(\w+)', f'{crate_mod}::\\1', inner_content)
+
+    # Transform crate:: references to the actual crate name
+    inner_content = re.sub(r'use crate::', f'use {crate_mod}::', inner_content)
+    inner_content = re.sub(r'crate::(\w)', f'{crate_mod}::\\1', inner_content)
 
     # Remove leading indentation (usually 4 spaces from mod tests {})
     lines = inner_content.split('\n')

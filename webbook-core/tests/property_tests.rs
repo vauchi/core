@@ -440,3 +440,215 @@ proptest! {
         prop_assert_eq!(rules.get(&field_id).clone(), FieldVisibility::Everyone);
     }
 }
+
+// ============================================================
+// Extended Property Tests (Slow - run with --ignored)
+// ============================================================
+
+mod extended_property_tests {
+    use super::*;
+    use webbook_core::crypto::ratchet::DoubleRatchetState;
+    use webbook_core::exchange::X3DHKeyPair;
+    use webbook_core::sync::CardDelta;
+
+    /// Strategy for generating message counts for stress tests.
+    fn message_count_strategy() -> impl Strategy<Value = usize> {
+        100usize..500usize
+    }
+
+    /// Strategy for generating delta counts.
+    fn delta_count_strategy() -> impl Strategy<Value = usize> {
+        20usize..50usize
+    }
+
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(10))]
+
+        /// Property: Ratchet handles many consecutive messages correctly.
+        /// This is a slow test - run with: cargo test -- --ignored
+        #[test]
+        #[ignore]
+        fn prop_ratchet_many_messages_roundtrip(
+            seed in bytes32_strategy(),
+            message_count in message_count_strategy()
+        ) {
+            let shared_secret = SymmetricKey::from_bytes(seed);
+            let bob_dh = X3DHKeyPair::generate();
+
+            let mut alice_ratchet =
+                DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key());
+            let mut bob_ratchet = DoubleRatchetState::initialize_responder(&shared_secret, bob_dh);
+
+            for i in 0..message_count {
+                let plaintext = format!("Message number {}", i);
+                let encrypted = alice_ratchet.encrypt(plaintext.as_bytes()).unwrap();
+                let decrypted = bob_ratchet.decrypt(&encrypted).unwrap();
+                prop_assert_eq!(decrypted, plaintext.as_bytes());
+            }
+        }
+
+        /// Property: Many deltas applied in sequence produce consistent result.
+        /// This is a slow test - run with: cargo test -- --ignored
+        #[test]
+        #[ignore]
+        fn prop_sync_many_deltas_converge(
+            name in display_name_strategy(),
+            delta_count in delta_count_strategy()
+        ) {
+            let mut card = ContactCard::new(&name);
+
+            for i in 0..delta_count {
+                let old_card = card.clone();
+
+                // Add a field
+                let field = ContactField::new(
+                    FieldType::Custom,
+                    &format!("field_{}", i),
+                    &format!("value_{}", i),
+                );
+
+                // Only add if under limit
+                if card.fields().len() < 25 {
+                    let _ = card.add_field(field);
+                }
+
+                let delta = CardDelta::compute(&old_card, &card);
+
+                // Apply delta to a fresh copy
+                let mut verification_card = old_card.clone();
+                if !delta.is_empty() {
+                    delta.apply(&mut verification_card).unwrap();
+                }
+
+                // Cards should match after applying delta
+                prop_assert_eq!(card.display_name(), verification_card.display_name());
+                prop_assert_eq!(card.fields().len(), verification_card.fields().len());
+            }
+        }
+
+        /// Property: Field values at maximum length are handled correctly.
+        #[test]
+        fn prop_field_value_max_length(
+            name in display_name_strategy(),
+            label in field_label_strategy()
+        ) {
+            let mut card = ContactCard::new(&name);
+
+            // Create a field with a very long value (1000 chars)
+            let long_value: String = (0..1000).map(|i| char::from(b'A' + (i % 26) as u8)).collect();
+            let field = ContactField::new(FieldType::Custom, &label, &long_value);
+
+            let result = card.add_field(field);
+            prop_assert!(result.is_ok());
+
+            // Verify roundtrip
+            let json = serde_json::to_string(&card).unwrap();
+            let restored: ContactCard = serde_json::from_str(&json).unwrap();
+
+            let restored_field = restored.fields().iter().find(|f| f.label() == label);
+            prop_assert!(restored_field.is_some());
+            prop_assert_eq!(restored_field.unwrap().value(), long_value);
+        }
+
+        /// Property: Cards with maximum fields are handled correctly.
+        #[test]
+        fn prop_card_max_fields(
+            name in display_name_strategy()
+        ) {
+            let mut card = ContactCard::new(&name);
+
+            // Add maximum number of fields (25)
+            for i in 0..25 {
+                let field = ContactField::new(
+                    FieldType::Custom,
+                    &format!("field_{}", i),
+                    &format!("value_{}", i),
+                );
+                let result = card.add_field(field);
+                prop_assert!(result.is_ok(), "Should allow field {} of 25", i + 1);
+            }
+
+            prop_assert_eq!(card.fields().len(), 25);
+
+            // 26th field should fail
+            let extra_field = ContactField::new(FieldType::Custom, "extra", "value");
+            let result = card.add_field(extra_field);
+            prop_assert!(result.is_err(), "Should reject field 26");
+        }
+
+        /// Property: Bidirectional ratchet conversation maintains correctness.
+        #[test]
+        fn prop_ratchet_bidirectional(
+            seed in bytes32_strategy(),
+            exchanges in 1usize..20usize
+        ) {
+            let shared_secret = SymmetricKey::from_bytes(seed);
+            let bob_dh = X3DHKeyPair::generate();
+
+            let mut alice_ratchet =
+                DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key());
+            let mut bob_ratchet = DoubleRatchetState::initialize_responder(&shared_secret, bob_dh);
+
+            for i in 0..exchanges {
+                // Alice -> Bob
+                let alice_msg = format!("Alice message {}", i);
+                let enc_a = alice_ratchet.encrypt(alice_msg.as_bytes()).unwrap();
+                let dec_a = bob_ratchet.decrypt(&enc_a).unwrap();
+                prop_assert_eq!(dec_a, alice_msg.as_bytes());
+
+                // Bob -> Alice
+                let bob_msg = format!("Bob message {}", i);
+                let enc_b = bob_ratchet.encrypt(bob_msg.as_bytes()).unwrap();
+                let dec_b = alice_ratchet.decrypt(&enc_b).unwrap();
+                prop_assert_eq!(dec_b, bob_msg.as_bytes());
+            }
+        }
+
+        /// Property: Version vector with many devices maintains consistency.
+        #[test]
+        fn prop_version_vector_many_devices(
+            device_count in 5usize..20usize,
+            ops_per_device in 1usize..10usize
+        ) {
+            let mut vv = VersionVector::new();
+            let mut expected: std::collections::HashMap<[u8; 32], u64> = std::collections::HashMap::new();
+
+            for d in 0..device_count {
+                let mut device_id = [0u8; 32];
+                device_id[0] = d as u8;
+
+                for _ in 0..ops_per_device {
+                    vv.increment(&device_id);
+                    *expected.entry(device_id).or_insert(0) += 1;
+                }
+            }
+
+            // Verify all devices have correct counts
+            for (device_id, expected_count) in expected {
+                prop_assert_eq!(vv.get(&device_id), expected_count);
+            }
+        }
+
+        /// Property: Delta computation is deterministic.
+        #[test]
+        fn prop_delta_deterministic(
+            name in display_name_strategy(),
+            label in field_label_strategy(),
+            value1 in "[a-zA-Z0-9]{1,20}",
+            value2 in "[a-zA-Z0-9]{1,20}"
+        ) {
+            let mut card1 = ContactCard::new(&name);
+            card1.add_field(ContactField::new(FieldType::Custom, &label, &value1)).unwrap();
+
+            let mut card2 = ContactCard::new(&name);
+            card2.add_field(ContactField::new(FieldType::Custom, &label, &value2)).unwrap();
+
+            // Compute delta twice
+            let delta1 = CardDelta::compute(&card1, &card2);
+            let delta2 = CardDelta::compute(&card1, &card2);
+
+            // Should be identical
+            prop_assert_eq!(delta1.changes.len(), delta2.changes.len());
+        }
+    }
+}

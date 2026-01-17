@@ -14,6 +14,13 @@ interface FieldInfo {
   value: string
 }
 
+interface OpenResult {
+  success: boolean
+  action: string
+  uri: string | null
+  error: string | null
+}
+
 interface ContactDetails {
   id: string
   display_name: string
@@ -114,6 +121,37 @@ function Contacts(props: ContactsProps) {
     }
   }
 
+  const handleFieldClick = async (field: FieldInfo) => {
+    try {
+      const result = await invoke('open_contact_field', {
+        fieldType: field.field_type,
+        label: field.label,
+        value: field.value
+      }) as OpenResult
+
+      if (!result.success && result.error) {
+        // If opening failed, copy to clipboard as fallback
+        await navigator.clipboard.writeText(field.value)
+        setError(`${result.error} Value copied to clipboard.`)
+      }
+    } catch (e) {
+      // Fallback: copy to clipboard
+      await navigator.clipboard.writeText(field.value)
+      setError(`Could not open. Copied to clipboard.`)
+    }
+  }
+
+  const getFieldIcon = (fieldType: string): string => {
+    switch (fieldType.toLowerCase()) {
+      case 'phone': return '📞'
+      case 'email': return '✉️'
+      case 'website': return '🌐'
+      case 'address': return '📍'
+      case 'social': return '👤'
+      default: return '📋'
+    }
+  }
+
   return (
     <div class="page contacts">
       <header>
@@ -183,10 +221,17 @@ function Contacts(props: ContactsProps) {
                 </Show>
                 <For each={selectedContact()?.fields}>
                   {(field) => (
-                    <div class="field-item">
-                      <span class="field-label">{field.label}</span>
-                      <span class="field-value">{field.value}</span>
-                      <span class="field-type">{field.field_type}</span>
+                    <div
+                      class="field-item clickable"
+                      onClick={() => handleFieldClick(field)}
+                      title={`Click to open ${field.field_type.toLowerCase()}`}
+                    >
+                      <span class="field-icon">{getFieldIcon(field.field_type)}</span>
+                      <div class="field-content">
+                        <span class="field-label">{field.label}</span>
+                        <span class="field-value">{field.value}</span>
+                      </div>
+                      <span class="field-action">→</span>
                     </div>
                   )}
                 </For>

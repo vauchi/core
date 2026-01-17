@@ -419,3 +419,52 @@ button.icon-btn {
 .setup-container .form {
   text-align: left;
 }
+
+/* Clickable contact fields */
+.field-item.clickable {
+  cursor: pointer;
+  transition: background 0.2s, transform 0.1s;
+}
+
+.field-item.clickable:hover {
+  background: var(--bg-secondary);
+  transform: translateX(4px);
+}
+
+.field-item.clickable:active {
+  transform: translateX(2px);
+}
+
+.field-item .field-content {
+  flex: 1;
+}
+
+.field-item .field-action {
+  color: var(--accent);
+  font-size: 1.2rem;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.field-item.clickable:hover .field-action {
+  opacity: 1;
+}
+
+/* Contact detail fields */
+.contact-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin: 1rem 0;
+}
+
+.contact-fields .field-item {
+  padding: 0.75rem;
+}
+
+.empty-fields {
+  color: var(--text-secondary);
+  font-style: italic;
+  text-align: center;
+  padding: 1rem;
+}

@@ -17,6 +17,7 @@ use state::AppState;
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_opener::init())
         .setup(|app| {
             // Resolve data directory
             let data_dir = dirs::data_dir()
@@ -57,6 +58,8 @@ pub fn run() {
             commands::recovery::create_recovery_voucher,
             commands::recovery::check_recovery_claim,
             commands::recovery::parse_recovery_claim,
+            commands::actions::open_contact_field,
+            commands::actions::get_field_action,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -27,6 +27,8 @@ import com.webbook.ui.ContactsScreen
 import com.webbook.ui.ContactDetailScreen
 import com.webbook.ui.QrScannerScreen
 import com.webbook.ui.SettingsScreen
+import com.webbook.ui.DevicesScreen
+import com.webbook.ui.RecoveryScreen
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -64,7 +66,7 @@ class MainActivity : ComponentActivity() {
 }
 
 enum class Screen {
-    Home, Exchange, Contacts, ContactDetail, QrScanner, Settings
+    Home, Exchange, Contacts, ContactDetail, QrScanner, Settings, Devices, Recovery
 }
 
 @Composable
@@ -188,9 +190,27 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
                     relayUrl = viewModel.getRelayUrl(),
                     onRelayUrlChange = { viewModel.setRelayUrl(it) },
                     syncState = syncState,
-                    onSync = { viewModel.sync() }
+                    onSync = { viewModel.sync() },
+                    onDevices = { currentScreen = Screen.Devices },
+                    onRecovery = { currentScreen = Screen.Recovery }
                 )
             }
+        }
+        Screen.Devices -> {
+            val state = uiState
+            if (state is UiState.Ready) {
+                DevicesScreen(
+                    displayName = state.displayName,
+                    publicId = state.publicId,
+                    onBack = { currentScreen = Screen.Settings },
+                    onGenerateLink = { null } // TODO: implement device linking
+                )
+            }
+        }
+        Screen.Recovery -> {
+            RecoveryScreen(
+                onBack = { currentScreen = Screen.Settings }
+            )
         }
         }
 

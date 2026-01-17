@@ -27,7 +27,9 @@ fun SettingsScreen(
     relayUrl: String = "",
     onRelayUrlChange: (String) -> Unit = {},
     syncState: SyncState = SyncState.Idle,
-    onSync: () -> Unit = {}
+    onSync: () -> Unit = {},
+    onDevices: () -> Unit = {},
+    onRecovery: () -> Unit = {}
 ) {
     var showExportDialog by remember { mutableStateOf(false) }
     var showImportDialog by remember { mutableStateOf(false) }
@@ -192,6 +194,33 @@ fun SettingsScreen(
                     modifier = Modifier.weight(1f)
                 ) {
                     Text("Import Backup")
+                }
+            }
+
+            HorizontalDivider()
+
+            // Devices & Recovery Section
+            Text(
+                text = "Devices & Recovery",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.primary
+            )
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                OutlinedButton(
+                    onClick = onDevices,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text("Devices")
+                }
+                OutlinedButton(
+                    onClick = onRecovery,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text("Recovery")
                 }
             }
 

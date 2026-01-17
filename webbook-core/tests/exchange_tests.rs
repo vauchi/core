@@ -354,3 +354,147 @@ fn test_nfc_fallback_to_manual_confirmation() {
         .unwrap();
     assert!(!response.is_empty());
 }
+
+// =============================================================================
+// Encrypted Exchange Message Tests (Critical Security Fix)
+// Reference: features/contact_exchange.feature - exchange messages must be encrypted
+// =============================================================================
+
+use webbook_core::exchange::EncryptedExchangeMessage;
+
+/// Tests that exchange messages are properly encrypted with X3DH shared secret.
+/// This ensures the relay cannot see identity keys or display names.
+#[test]
+fn test_exchange_message_is_encrypted_not_plaintext() {
+    // Given Alice and Bob want to exchange contacts
+    let alice = X3DHKeyPair::generate();
+    let bob = X3DHKeyPair::generate();
+
+    // When Alice creates an encrypted exchange message
+    let alice_identity_key = [0x41u8; 32]; // Alice's signing key
+    let alice_display_name = "Alice Smith";
+
+    let (encrypted_msg, _shared_secret) = EncryptedExchangeMessage::create(
+        &alice,
+        bob.public_key(),
+        &alice_identity_key,
+        alice_display_name,
+    ).expect("Creating encrypted exchange message should succeed");
+
+    // Then the ciphertext should NOT contain the plaintext identity key or name
+    let ciphertext_str = String::from_utf8_lossy(&encrypted_msg.ciphertext);
+    assert!(!ciphertext_str.contains("Alice Smith"),
+        "Display name must not appear in plaintext");
+    assert!(!encrypted_msg.ciphertext.windows(32).any(|w| w == alice_identity_key),
+        "Identity key must not appear in plaintext");
+
+    // And the ephemeral public key should be included (needed for X3DH)
+    assert_ne!(encrypted_msg.ephemeral_public_key, [0u8; 32],
+        "Ephemeral key must be present");
+}
+
+/// Tests that the recipient can decrypt the exchange message using X3DH.
+#[test]
+fn test_exchange_message_recipient_can_decrypt() {
+    // Given Alice creates an encrypted exchange message for Bob
+    let alice = X3DHKeyPair::generate();
+    let bob = X3DHKeyPair::generate();
+
+    let alice_identity_key = [0x42u8; 32];
+    let alice_display_name = "Alice Johnson";
+
+    let (encrypted_msg, _alice_secret) = EncryptedExchangeMessage::create(
+        &alice,
+        bob.public_key(),
+        &alice_identity_key,
+        alice_display_name,
+    ).expect("Creating message should succeed");
+
+    // When Bob receives and decrypts the message
+    let (payload, _shared_secret) = encrypted_msg
+        .decrypt(&bob)
+        .expect("Bob should be able to decrypt");
+
+    // Then Bob should recover Alice's identity key, exchange key, and name
+    assert_eq!(payload.identity_key, alice_identity_key);
+    assert_eq!(payload.exchange_key, *alice.public_key());
+    assert_eq!(payload.display_name, alice_display_name);
+}
+
+/// Tests that wrong keys cannot decrypt the exchange message.
+#[test]
+fn test_exchange_message_wrong_key_fails_decrypt() {
+    // Given Alice creates an encrypted exchange message for Bob
+    let alice = X3DHKeyPair::generate();
+    let bob = X3DHKeyPair::generate();
+    let charlie = X3DHKeyPair::generate(); // Attacker
+
+    let alice_identity_key = [0x43u8; 32];
+    let alice_display_name = "Alice";
+
+    let (encrypted_msg, _) = EncryptedExchangeMessage::create(
+        &alice,
+        bob.public_key(),
+        &alice_identity_key,
+        alice_display_name,
+    ).expect("Creating message should succeed");
+
+    // When Charlie (attacker) tries to decrypt
+    let result = encrypted_msg.decrypt(&charlie);
+
+    // Then decryption should fail
+    assert!(result.is_err(), "Wrong key should fail to decrypt");
+}
+
+/// Tests that the relay cannot read exchange message contents.
+/// This is the critical security property - relay only sees opaque ciphertext.
+#[test]
+fn test_relay_cannot_read_exchange_message() {
+    let alice = X3DHKeyPair::generate();
+    let bob = X3DHKeyPair::generate();
+
+    let sensitive_name = "John Doe - CEO of SecretCorp";
+    let identity_key = [0x44u8; 32];
+
+    let (encrypted_msg, _) = EncryptedExchangeMessage::create(
+        &alice,
+        bob.public_key(),
+        &identity_key,
+        sensitive_name,
+    ).expect("Creating message should succeed");
+
+    // The relay only sees:
+    // 1. Ephemeral public key (random, unlinkable to identity)
+    // 2. Ciphertext (opaque bytes)
+
+    // Verify no sensitive data leaks in the wire format
+    let wire_bytes = encrypted_msg.to_bytes();
+    let wire_str = String::from_utf8_lossy(&wire_bytes);
+
+    assert!(!wire_str.contains("John Doe"), "Name must not leak to relay");
+    assert!(!wire_str.contains("SecretCorp"), "Name must not leak to relay");
+    assert!(!wire_bytes.windows(32).any(|w| w == identity_key),
+        "Identity key must not leak to relay");
+}
+
+/// Tests serialization roundtrip for encrypted exchange messages.
+#[test]
+fn test_encrypted_exchange_message_roundtrip() {
+    let alice = X3DHKeyPair::generate();
+    let bob = X3DHKeyPair::generate();
+
+    let (original, _) = EncryptedExchangeMessage::create(
+        &alice,
+        bob.public_key(),
+        &[0x45u8; 32],
+        "Test User",
+    ).expect("Creating message should succeed");
+
+    // Serialize and deserialize
+    let bytes = original.to_bytes();
+    let restored = EncryptedExchangeMessage::from_bytes(&bytes)
+        .expect("Deserialization should succeed");
+
+    assert_eq!(restored.ephemeral_public_key, original.ephemeral_public_key);
+    assert_eq!(restored.ciphertext, original.ciphertext);
+}

@@ -264,6 +264,10 @@ struct ContactFieldRow: View {
         }
     }
 
+    private var fieldType: WebBookFieldType {
+        WebBookFieldType(rawValue: field.fieldType) ?? .custom
+    }
+
     var body: some View {
         HStack(spacing: 12) {
             Image(systemName: icon(for: field.fieldType))
@@ -280,39 +284,91 @@ struct ContactFieldRow: View {
 
             Spacer()
 
-            // Quick action buttons
-            if field.fieldType.lowercased() == "email" {
+            // Quick action buttons using ContactActions
+            if fieldType == .email {
                 Button(action: {
-                    if let url = URL(string: "mailto:\(field.value)") {
-                        UIApplication.shared.open(url)
-                    }
+                    ContactActions.openField(value: field.value, type: .email)
                 }) {
                     Image(systemName: "envelope.circle")
                         .foregroundColor(.blue)
                 }
-            } else if field.fieldType.lowercased() == "phone" {
-                Button(action: {
-                    if let url = URL(string: "tel:\(field.value)") {
-                        UIApplication.shared.open(url)
+            } else if fieldType == .phone {
+                HStack(spacing: 8) {
+                    Button(action: {
+                        ContactActions.openField(value: field.value, type: .phone)
+                    }) {
+                        Image(systemName: "phone.circle")
+                            .foregroundColor(.green)
                     }
-                }) {
-                    Image(systemName: "phone.circle")
-                        .foregroundColor(.green)
+                    Button(action: {
+                        if let url = ContactActions.buildSmsUrl(for: field.value) {
+                            ContactActions.openUrl(url)
+                        }
+                    }) {
+                        Image(systemName: "message.circle")
+                            .foregroundColor(.blue)
+                    }
                 }
-            } else if field.fieldType.lowercased() == "website" {
+            } else if fieldType == .website {
                 Button(action: {
-                    if let url = URL(string: field.value) {
-                        UIApplication.shared.open(url)
-                    }
+                    ContactActions.openField(value: field.value, type: .website)
                 }) {
                     Image(systemName: "safari")
                         .foregroundColor(.blue)
+                }
+            } else if fieldType == .address {
+                Button(action: {
+                    ContactActions.openField(value: field.value, type: .address)
+                }) {
+                    Image(systemName: "map")
+                        .foregroundColor(.orange)
                 }
             }
         }
         .padding()
         .background(Color(.systemGray6))
         .cornerRadius(8)
+        .contextMenu {
+            // Context menu with all available actions
+            Button(action: {
+                ContactActions.copyToClipboard(field.value)
+            }) {
+                Label("Copy", systemImage: "doc.on.doc")
+            }
+
+            if fieldType == .phone {
+                Button(action: {
+                    ContactActions.openField(value: field.value, type: .phone)
+                }) {
+                    Label("Call", systemImage: "phone")
+                }
+                Button(action: {
+                    if let url = ContactActions.buildSmsUrl(for: field.value) {
+                        ContactActions.openUrl(url)
+                    }
+                }) {
+                    Label("Send SMS", systemImage: "message")
+                }
+            } else if fieldType == .email {
+                Button(action: {
+                    ContactActions.openField(value: field.value, type: .email)
+                }) {
+                    Label("Send Email", systemImage: "envelope")
+                }
+            } else if fieldType == .website {
+                Button(action: {
+                    ContactActions.openField(value: field.value, type: .website)
+                }) {
+                    Label("Open in Browser", systemImage: "safari")
+                }
+            } else if fieldType == .address {
+                Button(action: {
+                    ContactActions.openField(value: field.value, type: .address)
+                }) {
+                    Label("Open in Maps", systemImage: "map")
+                }
+            }
+        }
     }
 }
 

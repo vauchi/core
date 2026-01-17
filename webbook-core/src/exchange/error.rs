@@ -40,4 +40,7 @@ pub enum ExchangeError {
 
     #[error("Cryptographic operation failed")]
     CryptoError,
+
+    #[error("Serialization failed")]
+    SerializationFailed,
 }

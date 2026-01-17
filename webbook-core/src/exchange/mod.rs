@@ -6,6 +6,7 @@
 mod audio;
 mod ble;
 pub mod device_link;
+mod encrypted_message;
 mod error;
 mod proximity;
 mod qr;
@@ -17,6 +18,7 @@ pub use ble::{BLEDevice, BLEProximityVerifier, MockBLEVerifier};
 pub use device_link::{
     DeviceLinkInitiator, DeviceLinkQR, DeviceLinkRequest, DeviceLinkResponder, DeviceLinkResponse,
 };
+pub use encrypted_message::{DecryptedExchangePayload, EncryptedExchangeMessage};
 pub use error::ExchangeError;
 pub use proximity::{
     ManualConfirmationVerifier, MockProximityVerifier, ProximityError, ProximityVerifier,

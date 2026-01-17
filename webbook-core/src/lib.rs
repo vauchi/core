@@ -23,8 +23,8 @@ pub use contact::{Contact, FieldVisibility, VisibilityRules};
 pub use contact_card::{ContactCard, ContactField, FieldType, ValidationError};
 pub use crypto::{decrypt, encrypt, PublicKey, Signature, SigningKeyPair, SymmetricKey};
 pub use exchange::{
-    ExchangeError, ExchangeQR, ExchangeSession, MockProximityVerifier, ProximityError,
-    ProximityVerifier, X3DHKeyPair, X3DH,
+    EncryptedExchangeMessage, ExchangeError, ExchangeQR, ExchangeSession, MockProximityVerifier,
+    ProximityError, ProximityVerifier, X3DHKeyPair, X3DH,
 };
 pub use identity::{Identity, IdentityBackup};
 #[cfg(feature = "network")]

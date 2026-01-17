@@ -3,6 +3,7 @@
 
 import Foundation
 import SwiftUI
+import Combine
 
 /// Contact field for display
 struct FieldInfo: Identifiable, Equatable {
@@ -93,6 +94,9 @@ class WebBookViewModel: ObservableObject {
     @Published var lastSyncTime: Date?
     @Published var pendingUpdates: Int = 0
 
+    // Network state
+    @Published var isOnline = false
+
     // User-facing alerts
     @Published var showAlert = false
     @Published var alertTitle = ""
@@ -115,12 +119,14 @@ class WebBookViewModel: ObservableObject {
     // MARK: - Private Properties
 
     private var repository: WebBookRepository?
+    private var cancellables = Set<AnyCancellable>()
 
     // MARK: - Initialization
 
     init() {
         lastSyncTime = SettingsService.shared.lastSyncTime
         initializeRepository()
+        setupNetworkMonitoring()
     }
 
     private func initializeRepository() {
@@ -131,6 +137,26 @@ class WebBookViewModel: ObservableObject {
         } catch {
             errorMessage = "Failed to initialize: \(error.localizedDescription)"
         }
+    }
+
+    private func setupNetworkMonitoring() {
+        // Subscribe to network connectivity changes
+        NetworkMonitor.shared.$isConnected
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] isConnected in
+                self?.isOnline = isConnected
+
+                // Auto-sync when connection restored (if enabled and has identity)
+                if isConnected && SettingsService.shared.autoSyncEnabled && (self?.hasIdentity ?? false) {
+                    Task {
+                        await self?.sync()
+                    }
+                }
+            }
+            .store(in: &cancellables)
+
+        // Initialize with current state
+        isOnline = NetworkMonitor.shared.isConnected
     }
 
     // MARK: - State Management

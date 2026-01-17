@@ -12,7 +12,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use webbook_core::crypto::ratchet::DoubleRatchetState;
-use webbook_core::exchange::X3DH;
+use webbook_core::exchange::{EncryptedExchangeMessage, X3DH, X3DHKeyPair};
 use webbook_core::{
     Contact, ContactCard, ContactField, FieldType, Identity, IdentityBackup, SocialNetworkRegistry,
     Storage, SymmetricKey,
@@ -88,6 +88,7 @@ mod sync_protocol {
     }
 
     impl ExchangeMessage {
+        /// Check if data is a legacy plaintext exchange message (for backward compatibility).
         pub fn is_exchange(data: &[u8]) -> bool {
             if let Ok(msg) = serde_json::from_slice::<ExchangeMessage>(data) {
                 msg.msg_type == "exchange"
@@ -96,22 +97,9 @@ mod sync_protocol {
             }
         }
 
+        /// Parse from bytes (for backward compatibility with legacy plaintext format).
         pub fn from_bytes(data: &[u8]) -> Option<Self> {
             serde_json::from_slice(data).ok()
-        }
-
-        pub fn new_response(identity_key: &[u8; 32], exchange_key: &[u8; 32], name: &str) -> Self {
-            ExchangeMessage {
-                msg_type: "exchange".to_string(),
-                identity_public_key: hex::encode(identity_key),
-                ephemeral_public_key: hex::encode(exchange_key),
-                display_name: name.to_string(),
-                is_response: true,
-            }
-        }
-
-        pub fn to_bytes(&self) -> Vec<u8> {
-            serde_json::to_vec(self).unwrap_or_default()
         }
     }
 
@@ -413,11 +401,18 @@ impl WebBookMobile {
 
         // Receive and process pending messages
         let storage = self.open_storage()?;
-        let (exchange_messages, card_updates) = Self::receive_pending(&mut socket)?;
+        let (legacy_exchange, encrypted_exchange, card_updates) =
+            Self::receive_pending(&mut socket)?;
 
-        // Process exchange messages (creates new contacts)
-        let contacts_added =
-            self.process_exchange_messages(&identity, &storage, exchange_messages)?;
+        // Process legacy plaintext exchange messages (creates new contacts)
+        let legacy_added =
+            self.process_exchange_messages(&identity, &storage, legacy_exchange)?;
+
+        // Process encrypted exchange messages (creates new contacts)
+        let encrypted_added =
+            self.process_encrypted_exchange_messages(&identity, &storage, encrypted_exchange)?;
+
+        let contacts_added = legacy_added + encrypted_added;
 
         // Process card updates from existing contacts
         let cards_updated = Self::process_card_updates(&storage, card_updates)?;
@@ -455,13 +450,22 @@ impl WebBookMobile {
     }
 
     /// Receives pending messages from relay.
+    /// Returns: (legacy_exchange, encrypted_exchange, card_updates)
     #[allow(clippy::type_complexity)]
     fn receive_pending(
         socket: &mut WebSocket<MaybeTlsStream<TcpStream>>,
-    ) -> Result<(Vec<sync_protocol::ExchangeMessage>, Vec<(String, Vec<u8>)>), MobileError> {
+    ) -> Result<
+        (
+            Vec<sync_protocol::ExchangeMessage>,
+            Vec<Vec<u8>>,
+            Vec<(String, Vec<u8>)>,
+        ),
+        MobileError,
+    > {
         use sync_protocol::*;
 
-        let mut exchange_messages = Vec::new();
+        let mut legacy_exchange_messages = Vec::new();
+        let mut encrypted_exchange_messages = Vec::new();
         let mut card_updates = Vec::new();
 
         loop {
@@ -470,15 +474,22 @@ impl WebBookMobile {
                     match decode_message(&data) {
                         Ok(envelope) => {
                             if let MessagePayload::EncryptedUpdate(update) = envelope.payload {
-                                // Check if this is an exchange message
+                                // First try legacy plaintext exchange format
                                 if ExchangeMessage::is_exchange(&update.ciphertext) {
                                     if let Some(exchange) =
                                         ExchangeMessage::from_bytes(&update.ciphertext)
                                     {
-                                        exchange_messages.push(exchange);
+                                        legacy_exchange_messages.push(exchange);
                                     }
-                                } else {
-                                    // This is a card update
+                                }
+                                // Try encrypted exchange format (has "ephemeral_public_key" in JSON)
+                                else if EncryptedExchangeMessage::from_bytes(&update.ciphertext)
+                                    .is_ok()
+                                {
+                                    encrypted_exchange_messages.push(update.ciphertext);
+                                }
+                                // Otherwise it's a card update (ratchet encrypted)
+                                else {
                                     card_updates
                                         .push((update.sender_id.clone(), update.ciphertext));
                                 }
@@ -512,10 +523,15 @@ impl WebBookMobile {
             }
         }
 
-        Ok((exchange_messages, card_updates))
+        Ok((
+            legacy_exchange_messages,
+            encrypted_exchange_messages,
+            card_updates,
+        ))
     }
 
     /// Processes exchange messages and creates new contacts.
+    /// Supports both encrypted (EncryptedExchangeMessage) and legacy plaintext formats.
     fn process_exchange_messages(
         &self,
         identity: &Identity,
@@ -555,7 +571,7 @@ impl WebBookMobile {
                 continue;
             }
 
-            // Parse ephemeral key
+            // Parse ephemeral key (used for X3DH in legacy format)
             let ephemeral_key = match hex::decode(&exchange.ephemeral_public_key) {
                 Ok(bytes) if bytes.len() == 32 => {
                     let mut arr = [0u8; 32];
@@ -580,25 +596,87 @@ impl WebBookMobile {
             storage.save_contact(&contact)?;
 
             // Initialize ratchet as responder
-            let ratchet_dh =
-                webbook_core::exchange::X3DHKeyPair::from_bytes(our_x3dh.secret_bytes());
+            let ratchet_dh = X3DHKeyPair::from_bytes(our_x3dh.secret_bytes());
             let ratchet = DoubleRatchetState::initialize_responder(&shared_secret, ratchet_dh);
             let _ = storage.save_ratchet_state(&contact_id, &ratchet, true);
 
             added += 1;
 
-            // Send exchange response with our name
-            let _ = self.send_exchange_response(identity, &public_id);
+            // Send encrypted exchange response with our name
+            // Use the sender's ephemeral_key as their exchange key for the response
+            let _ = self.send_exchange_response(identity, &public_id, &ephemeral_key);
         }
 
         Ok(added)
     }
 
-    /// Sends exchange response with our name.
+    /// Processes encrypted exchange messages (new format with proper encryption).
+    fn process_encrypted_exchange_messages(
+        &self,
+        identity: &Identity,
+        storage: &Storage,
+        encrypted_data: Vec<Vec<u8>>,
+    ) -> Result<u32, MobileError> {
+        let mut added = 0u32;
+        let our_x3dh = identity.x3dh_keypair();
+
+        for data in encrypted_data {
+            // Try to parse as EncryptedExchangeMessage
+            let encrypted_msg = match EncryptedExchangeMessage::from_bytes(&data) {
+                Ok(msg) => msg,
+                Err(_) => continue,
+            };
+
+            // Decrypt to get sender's info
+            let (payload, shared_secret) = match encrypted_msg.decrypt(&our_x3dh) {
+                Ok(result) => result,
+                Err(_) => continue,
+            };
+
+            let public_id = hex::encode(payload.identity_key);
+
+            // Check if contact already exists
+            if storage.load_contact(&public_id)?.is_some() {
+                // Contact exists - this might be a response, update name if needed
+                if let Ok(Some(mut contact)) = storage.load_contact(&public_id) {
+                    if contact.display_name() != payload.display_name
+                        && contact.set_display_name(&payload.display_name).is_ok()
+                    {
+                        let _ = storage.save_contact(&contact);
+                    }
+                }
+                continue;
+            }
+
+            // Create new contact
+            let card = ContactCard::new(&payload.display_name);
+            let contact =
+                Contact::from_exchange(payload.identity_key, card, shared_secret.clone());
+            let contact_id = contact.id().to_string();
+
+            // Save contact
+            storage.save_contact(&contact)?;
+
+            // Initialize ratchet as responder
+            let ratchet_dh = X3DHKeyPair::from_bytes(our_x3dh.secret_bytes());
+            let ratchet = DoubleRatchetState::initialize_responder(&shared_secret, ratchet_dh);
+            let _ = storage.save_ratchet_state(&contact_id, &ratchet, false);
+
+            added += 1;
+
+            // Send encrypted exchange response using sender's exchange key
+            let _ = self.send_exchange_response(identity, &public_id, &payload.exchange_key);
+        }
+
+        Ok(added)
+    }
+
+    /// Sends encrypted exchange response with our identity and name.
     fn send_exchange_response(
         &self,
         identity: &Identity,
         recipient_id: &str,
+        recipient_exchange_key: &[u8; 32],
     ) -> Result<(), MobileError> {
         use sync_protocol::*;
 
@@ -608,21 +686,20 @@ impl WebBookMobile {
         let our_id = identity.public_id();
         Self::send_handshake(&mut socket, &our_id)?;
 
-        let exchange_key_slice = identity.exchange_public_key();
-        let exchange_key: [u8; 32] = exchange_key_slice
-            .try_into()
-            .map_err(|_| MobileError::CryptoError("Invalid key length".to_string()))?;
-
-        let exchange_msg = ExchangeMessage::new_response(
+        // Create encrypted exchange message using X3DH
+        let our_x3dh = identity.x3dh_keypair();
+        let (encrypted_msg, _shared_secret) = EncryptedExchangeMessage::create(
+            &our_x3dh,
+            recipient_exchange_key,
             identity.signing_public_key(),
-            &exchange_key,
             identity.display_name(),
-        );
+        )
+        .map_err(|e| MobileError::CryptoError(format!("Failed to encrypt exchange: {:?}", e)))?;
 
         let update = EncryptedUpdate {
             recipient_id: recipient_id.to_string(),
             sender_id: our_id,
-            ciphertext: exchange_msg.to_bytes(),
+            ciphertext: encrypted_msg.to_bytes(),
         };
 
         let envelope = create_envelope(MessagePayload::EncryptedUpdate(update));
@@ -727,7 +804,57 @@ impl WebBookMobile {
 
 #[uniffi::export]
 impl WebBookMobile {
-    /// Create a new WebBookMobile instance.
+    /// Create a new WebBookMobile instance with a platform-provided secure key.
+    ///
+    /// This is the recommended constructor. The platform (iOS/Android) should:
+    /// 1. Generate a 32-byte key if one doesn't exist in secure storage
+    /// 2. Store it in platform-specific secure storage (Keychain/KeyStore)
+    /// 3. Pass the key bytes to this constructor
+    ///
+    /// # Arguments
+    /// * `data_dir` - Directory for storing the database file
+    /// * `relay_url` - URL of the sync relay server
+    /// * `storage_key_bytes` - 32-byte encryption key from platform secure storage
+    #[uniffi::constructor]
+    pub fn new_with_secure_key(
+        data_dir: String,
+        relay_url: String,
+        storage_key_bytes: Vec<u8>,
+    ) -> Result<Arc<Self>, MobileError> {
+        let data_path = PathBuf::from(&data_dir);
+
+        // Ensure directory exists
+        std::fs::create_dir_all(&data_path)
+            .map_err(|e| MobileError::StorageError(e.to_string()))?;
+
+        let storage_path = data_path.join("webbook.db");
+
+        // Validate and create key from platform-provided bytes
+        let key_array: [u8; 32] = storage_key_bytes
+            .try_into()
+            .map_err(|_| MobileError::StorageError("Storage key must be exactly 32 bytes".to_string()))?;
+        let storage_key = SymmetricKey::from_bytes(key_array);
+
+        // Initialize storage to ensure database is created
+        let _storage = Storage::open(&storage_path, storage_key.clone())
+            .map_err(|e| MobileError::StorageError(e.to_string()))?;
+
+        Ok(Arc::new(WebBookMobile {
+            storage_path,
+            storage_key,
+            relay_url,
+            identity_data: Mutex::new(None),
+            social_registry: SocialNetworkRegistry::with_defaults(),
+            sync_status: Mutex::new(MobileSyncStatus::Idle),
+        }))
+    }
+
+    /// Create a new WebBookMobile instance (legacy constructor).
+    ///
+    /// WARNING: This constructor stores the encryption key in a plaintext file,
+    /// which is insecure. Use `new_with_secure_key` instead for production.
+    ///
+    /// This is kept for backward compatibility and migration scenarios.
     #[uniffi::constructor]
     pub fn new(data_dir: String, relay_url: String) -> Result<Arc<Self>, MobileError> {
         let data_path = PathBuf::from(&data_dir);
@@ -739,9 +866,9 @@ impl WebBookMobile {
         let storage_path = data_path.join("webbook.db");
         let key_path = data_path.join("storage.key");
 
-        // Load or generate storage key (must be consistent across sessions)
+        // Load or generate storage key (insecure file-based storage)
         let storage_key = if key_path.exists() {
-            // Load existing key
+            // Load existing key from file
             let key_bytes = std::fs::read(&key_path)
                 .map_err(|e| MobileError::StorageError(format!("Failed to read key: {}", e)))?;
             let key_array: [u8; 32] = key_bytes
@@ -749,7 +876,7 @@ impl WebBookMobile {
                 .map_err(|_| MobileError::StorageError("Invalid key length".to_string()))?;
             SymmetricKey::from_bytes(key_array)
         } else {
-            // Generate and save new key
+            // Generate and save new key to file (insecure)
             let key = SymmetricKey::generate();
             std::fs::write(&key_path, key.as_bytes())
                 .map_err(|e| MobileError::StorageError(format!("Failed to save key: {}", e)))?;
@@ -768,6 +895,25 @@ impl WebBookMobile {
             social_registry: SocialNetworkRegistry::with_defaults(),
             sync_status: Mutex::new(MobileSyncStatus::Idle),
         }))
+    }
+
+    /// Export the current storage key bytes for migration to secure storage.
+    ///
+    /// Call this once during app update to migrate from file-based key storage
+    /// to platform secure storage (Keychain/KeyStore). After migrating:
+    /// 1. Store these bytes in platform secure storage
+    /// 2. Delete the old storage.key file
+    /// 3. Use `new_with_secure_key` for future initializations
+    pub fn export_storage_key(&self) -> Vec<u8> {
+        self.storage_key.as_bytes().to_vec()
+    }
+
+    /// Generate a new random storage key.
+    ///
+    /// Use this when setting up a new installation with secure storage.
+    /// The returned bytes should be stored in platform secure storage.
+    pub fn generate_storage_key() -> Vec<u8> {
+        SymmetricKey::generate().as_bytes().to_vec()
     }
 
     // === Identity Operations ===
@@ -1111,9 +1257,14 @@ impl WebBookMobile {
     }
 
     /// Complete exchange with scanned QR data.
+    ///
+    /// After scanning the QR code:
+    /// 1. Performs X3DH key agreement
+    /// 2. Creates a placeholder contact
+    /// 3. Sends an encrypted exchange message with our identity to the QR displayer
     pub fn complete_exchange(&self, qr_data: String) -> Result<MobileExchangeResult, MobileError> {
         use webbook_core::crypto::ratchet::DoubleRatchetState;
-        use webbook_core::{Contact, ExchangeQR, X3DH};
+        use webbook_core::{Contact, ExchangeQR};
 
         let identity = self.get_identity()?;
         let storage = self.open_storage()?;
@@ -1140,10 +1291,15 @@ impl WebBookMobile {
             ));
         }
 
-        // Perform X3DH key agreement
+        // Create encrypted exchange message using X3DH (this performs key agreement internally)
         let our_x3dh = identity.x3dh_keypair();
-        let (shared_secret, _ephemeral_public) = X3DH::initiate(&our_x3dh, their_exchange_key)
-            .map_err(|e| MobileError::ExchangeFailed(format!("Key agreement failed: {:?}", e)))?;
+        let (encrypted_msg, shared_secret) = EncryptedExchangeMessage::create(
+            &our_x3dh,
+            their_exchange_key,
+            identity.signing_public_key(),
+            identity.display_name(),
+        )
+        .map_err(|e| MobileError::ExchangeFailed(format!("Key agreement failed: {:?}", e)))?;
 
         // Create placeholder contact (real name comes via sync)
         let their_card = webbook_core::ContactCard::new("New Contact");
@@ -1158,6 +1314,32 @@ impl WebBookMobile {
         // Initialize Double Ratchet as initiator
         let ratchet = DoubleRatchetState::initialize_initiator(&shared_secret, *their_exchange_key);
         storage.save_ratchet_state(&contact_id, &ratchet, true)?;
+
+        // Send encrypted exchange message to the QR displayer
+        {
+            use sync_protocol::*;
+
+            let (mut socket, _) =
+                connect(&self.relay_url).map_err(|e| MobileError::NetworkError(e.to_string()))?;
+
+            let our_id = identity.public_id();
+            Self::send_handshake(&mut socket, &our_id)?;
+
+            let update = EncryptedUpdate {
+                recipient_id: their_public_id.clone(),
+                sender_id: our_id,
+                ciphertext: encrypted_msg.to_bytes(),
+            };
+
+            let envelope = create_envelope(MessagePayload::EncryptedUpdate(update));
+            let data = encode_message(&envelope).map_err(MobileError::SyncFailed)?;
+            socket
+                .send(Message::Binary(data))
+                .map_err(|e| MobileError::NetworkError(e.to_string()))?;
+
+            std::thread::sleep(Duration::from_millis(100));
+            let _ = socket.close(None);
+        }
 
         Ok(MobileExchangeResult {
             contact_id,

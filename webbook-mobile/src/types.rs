@@ -143,3 +143,59 @@ pub struct MobileSocialNetwork {
     pub display_name: String,
     pub url_template: String,
 }
+
+// === Recovery Types ===
+
+/// Recovery claim data for mobile.
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct MobileRecoveryClaim {
+    /// Old identity's public key (hex).
+    pub old_public_key: String,
+    /// New identity's public key (hex).
+    pub new_public_key: String,
+    /// Base64-encoded claim data.
+    pub claim_data: String,
+    /// Whether the claim has expired.
+    pub is_expired: bool,
+}
+
+/// Recovery voucher data for mobile.
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct MobileRecoveryVoucher {
+    /// Voucher public key (hex) - identifies who vouched.
+    pub voucher_public_key: String,
+    /// Base64-encoded voucher data.
+    pub voucher_data: String,
+}
+
+/// Recovery progress status.
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct MobileRecoveryProgress {
+    /// Old identity's public key (hex).
+    pub old_public_key: String,
+    /// New identity's public key (hex).
+    pub new_public_key: String,
+    /// Number of vouchers collected.
+    pub vouchers_collected: u32,
+    /// Number of vouchers needed (threshold).
+    pub vouchers_needed: u32,
+    /// Whether recovery is complete.
+    pub is_complete: bool,
+}
+
+/// Recovery verification result.
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct MobileRecoveryVerification {
+    /// Old identity's public key (hex).
+    pub old_public_key: String,
+    /// New identity's public key (hex).
+    pub new_public_key: String,
+    /// Number of vouchers in the proof.
+    pub voucher_count: u32,
+    /// Number of vouchers from known contacts.
+    pub known_vouchers: u32,
+    /// Confidence level: "high", "medium", or "low".
+    pub confidence: String,
+    /// Recommendation for the user.
+    pub recommendation: String,
+}

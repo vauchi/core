@@ -68,3 +68,11 @@ criterion = "0.5"
 [[bench]]
 name = "crypto_benchmarks"
 harness = false
+
+[[test]]
+name = "e2e"
+path = "tests/e2e/mod.rs"
+
+[[test]]
+name = "integration"
+path = "tests/integration/mod.rs"

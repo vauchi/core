@@ -51,10 +51,13 @@ final class SettingsService {
     }
 
     /// Validates a relay URL
+    /// Only secure WebSocket (wss://) is allowed in production
     func isValidRelayUrl(_ url: String) -> Bool {
         guard let urlObj = URL(string: url) else { return false }
         let scheme = urlObj.scheme?.lowercased()
-        return scheme == "ws" || scheme == "wss"
+        // Security: Only allow secure WebSocket connections
+        // ws:// is blocked to prevent MITM attacks
+        return scheme == "wss"
     }
 
     // MARK: - Sync Settings

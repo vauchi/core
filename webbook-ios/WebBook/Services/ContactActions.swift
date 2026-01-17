@@ -249,8 +249,20 @@ enum ContactActions {
         openUrl(url)
     }
 
-    /// Copy a value to the clipboard
+    /// Copy a value to the clipboard with automatic expiration
+    /// For security, clipboard data expires after 30 seconds
+    @MainActor
     static func copyToClipboard(_ value: String) {
         UIPasteboard.general.string = value
+
+        // Clear clipboard after 30 seconds for security
+        // This prevents sensitive data from lingering
+        Task {
+            try? await Task.sleep(nanoseconds: 30_000_000_000) // 30 seconds
+            // Only clear if the value is still what we copied
+            if UIPasteboard.general.string == value {
+                UIPasteboard.general.string = ""
+            }
+        }
     }
 }

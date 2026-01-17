@@ -3,6 +3,7 @@
 
 import SwiftUI
 import UniformTypeIdentifiers
+import LocalAuthentication
 
 struct SettingsView: View {
     @EnvironmentObject var viewModel: WebBookViewModel
@@ -162,12 +163,12 @@ struct SettingsView: View {
                     saveRelayUrl()
                 }
             } message: {
-                Text("Enter the WebSocket URL of your relay server (ws:// or wss://).")
+                Text("Enter the secure WebSocket URL of your relay server (wss://).")
             }
             .alert("Invalid URL", isPresented: $showInvalidUrlAlert) {
                 Button("OK", role: .cancel) { }
             } message: {
-                Text("Please enter a valid WebSocket URL starting with ws:// or wss://")
+                Text("Please enter a valid secure WebSocket URL starting with wss://. Unencrypted connections (ws://) are not allowed for security.")
             }
             .onAppear {
                 relayUrl = SettingsService.shared.relayUrl
@@ -259,6 +260,7 @@ struct ExportBackupSheet: View {
     @State private var exportedData: String?
     @State private var errorMessage: String?
     @State private var showShareSheet = false
+    @State private var isAuthenticated = false
 
     var passwordsMatch: Bool {
         !password.isEmpty && password == confirmPassword
@@ -286,63 +288,144 @@ struct ExportBackupSheet: View {
 
     var body: some View {
         NavigationView {
-            Form {
-                Section {
-                    SecureField("Password", text: $password)
-                    SecureField("Confirm Password", text: $confirmPassword)
+            if !isAuthenticated {
+                // Biometric authentication required first
+                VStack(spacing: 20) {
+                    Image(systemName: "faceid")
+                        .font(.system(size: 60))
+                        .foregroundColor(.cyan)
 
-                    if !password.isEmpty {
-                        HStack {
-                            Text("Strength:")
-                            Text(passwordStrength)
-                                .foregroundColor(passwordStrengthColor)
-                        }
-                        .font(.caption)
+                    Text("Authentication Required")
+                        .font(.title2)
+
+                    Text("Exporting your backup requires Face ID or Touch ID authentication to protect your identity.")
+                        .multilineTextAlignment(.center)
+                        .foregroundColor(.secondary)
+                        .padding(.horizontal)
+
+                    Button(action: authenticateWithBiometrics) {
+                        Label("Authenticate", systemImage: "faceid")
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(Color.cyan)
+                            .foregroundColor(.white)
+                            .cornerRadius(10)
                     }
+                    .padding(.horizontal)
 
-                    if !password.isEmpty && !confirmPassword.isEmpty && !passwordsMatch {
-                        Text("Passwords don't match")
-                            .font(.caption)
-                            .foregroundColor(.red)
-                    }
-                } header: {
-                    Text("Encrypt Backup")
-                } footer: {
-                    Text("Your backup will be encrypted with this password. Store it safely - you'll need it to restore your identity.")
-                }
-
-                if let error = errorMessage {
-                    Section {
+                    if let error = errorMessage {
                         Text(error)
                             .foregroundColor(.red)
+                            .font(.caption)
                     }
                 }
+                .padding()
+                .navigationTitle("Export Backup")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Cancel") { dismiss() }
+                    }
+                }
+                .onAppear {
+                    authenticateWithBiometrics()
+                }
+            } else {
+                // Authenticated - show export form
+                Form {
+                    Section {
+                        SecureField("Password", text: $password)
+                        SecureField("Confirm Password", text: $confirmPassword)
 
-                Section {
-                    Button(action: exportBackup) {
-                        HStack {
-                            Spacer()
-                            if isExporting {
-                                ProgressView()
-                            } else {
-                                Text("Export")
+                        if !password.isEmpty {
+                            HStack {
+                                Text("Strength:")
+                                Text(passwordStrength)
+                                    .foregroundColor(passwordStrengthColor)
                             }
-                            Spacer()
+                            .font(.caption)
+                        }
+
+                        if !password.isEmpty && !confirmPassword.isEmpty && !passwordsMatch {
+                            Text("Passwords don't match")
+                                .font(.caption)
+                                .foregroundColor(.red)
+                        }
+                    } header: {
+                        Text("Encrypt Backup")
+                    } footer: {
+                        Text("Your backup will be encrypted with this password. Store it safely - you'll need it to restore your identity.")
+                    }
+
+                    if let error = errorMessage {
+                        Section {
+                            Text(error)
+                                .foregroundColor(.red)
                         }
                     }
-                    .disabled(!passwordsMatch || password.count < 8 || isExporting)
+
+                    Section {
+                        Button(action: exportBackup) {
+                            HStack {
+                                Spacer()
+                                if isExporting {
+                                    ProgressView()
+                                } else {
+                                    Text("Export")
+                                }
+                                Spacer()
+                            }
+                        }
+                        .disabled(!passwordsMatch || password.count < 8 || isExporting)
+                    }
+                }
+                .navigationTitle("Export Backup")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Cancel") { dismiss() }
+                    }
+                }
+                .sheet(isPresented: $showShareSheet) {
+                    if let data = exportedData {
+                        ShareSheet(items: [data])
+                    }
                 }
             }
-            .navigationTitle("Export Backup")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
+        }
+    }
+
+    private func authenticateWithBiometrics() {
+        let context = LAContext()
+        var error: NSError?
+
+        if context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &error) {
+            context.evaluatePolicy(
+                .deviceOwnerAuthenticationWithBiometrics,
+                localizedReason: "Authenticate to export your identity backup"
+            ) { success, authError in
+                DispatchQueue.main.async {
+                    if success {
+                        isAuthenticated = true
+                        errorMessage = nil
+                    } else {
+                        errorMessage = authError?.localizedDescription ?? "Authentication failed"
+                    }
                 }
             }
-            .sheet(isPresented: $showShareSheet) {
-                if let data = exportedData {
-                    ShareSheet(items: [data])
+        } else {
+            // Biometrics not available, fall back to device passcode
+            context.evaluatePolicy(
+                .deviceOwnerAuthentication,
+                localizedReason: "Authenticate to export your identity backup"
+            ) { success, authError in
+                DispatchQueue.main.async {
+                    if success {
+                        isAuthenticated = true
+                        errorMessage = nil
+                    } else {
+                        errorMessage = authError?.localizedDescription ?? "Authentication failed"
+                    }
                 }
             }
         }
@@ -384,68 +467,27 @@ struct ImportBackupSheet: View {
     @State private var isImporting = false
     @State private var errorMessage: String?
     @State private var showConfirmation = false
+    @State private var isAuthenticated = false
 
     var body: some View {
         NavigationView {
-            VStack(spacing: 20) {
-                Image(systemName: "doc.badge.arrow.up")
-                    .font(.system(size: 60))
-                    .foregroundColor(.cyan)
+            if !isAuthenticated {
+                // Biometric authentication required first
+                VStack(spacing: 20) {
+                    Image(systemName: "faceid")
+                        .font(.system(size: 60))
+                        .foregroundColor(.cyan)
 
-                Text("Import Backup")
-                    .font(.title)
+                    Text("Authentication Required")
+                        .font(.title2)
 
-                if viewModel.hasIdentity {
-                    Text("Warning: Importing a backup will replace your current identity!")
-                        .foregroundColor(.orange)
-                        .font(.caption)
+                    Text("Importing a backup requires Face ID or Touch ID authentication to protect your identity.")
                         .multilineTextAlignment(.center)
-                        .padding(.horizontal)
-                }
-
-                if backupData != nil {
-                    VStack(spacing: 16) {
-                        HStack {
-                            Image(systemName: "checkmark.circle.fill")
-                                .foregroundColor(.green)
-                            Text("Backup file loaded")
-                        }
-
-                        SecureField("Enter backup password", text: $password)
-                            .textFieldStyle(.roundedBorder)
-                            .padding(.horizontal)
-
-                        Button(action: {
-                            if viewModel.hasIdentity {
-                                showConfirmation = true
-                            } else {
-                                importBackup()
-                            }
-                        }) {
-                            HStack {
-                                if isImporting {
-                                    ProgressView()
-                                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                                } else {
-                                    Text("Restore Identity")
-                                }
-                            }
-                            .frame(maxWidth: .infinity)
-                            .padding()
-                            .background(password.isEmpty ? Color.gray : Color.cyan)
-                            .foregroundColor(.white)
-                            .cornerRadius(10)
-                        }
-                        .disabled(password.isEmpty || isImporting)
-                        .padding(.horizontal)
-                    }
-                } else {
-                    Text("Select a backup file to restore your identity")
                         .foregroundColor(.secondary)
-                        .multilineTextAlignment(.center)
+                        .padding(.horizontal)
 
-                    Button(action: { showFilePicker = true }) {
-                        Label("Choose File", systemImage: "folder")
+                    Button(action: authenticateWithBiometrics) {
+                        Label("Authenticate", systemImage: "faceid")
                             .frame(maxWidth: .infinity)
                             .padding()
                             .background(Color.cyan)
@@ -453,38 +495,160 @@ struct ImportBackupSheet: View {
                             .cornerRadius(10)
                     }
                     .padding(.horizontal)
-                }
 
-                if let error = errorMessage {
-                    Text(error)
-                        .foregroundColor(.red)
-                        .font(.caption)
+                    if let error = errorMessage {
+                        Text(error)
+                            .foregroundColor(.red)
+                            .font(.caption)
+                    }
+                }
+                .padding()
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Cancel") { dismiss() }
+                    }
+                }
+                .onAppear {
+                    authenticateWithBiometrics()
+                }
+            } else {
+                // Authenticated - show import UI
+                VStack(spacing: 20) {
+                    Image(systemName: "doc.badge.arrow.up")
+                        .font(.system(size: 60))
+                        .foregroundColor(.cyan)
+
+                    Text("Import Backup")
+                        .font(.title)
+
+                    if viewModel.hasIdentity {
+                        Text("Warning: Importing a backup will replace your current identity!")
+                            .foregroundColor(.orange)
+                            .font(.caption)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal)
+                    }
+
+                    if backupData != nil {
+                        VStack(spacing: 16) {
+                            HStack {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .foregroundColor(.green)
+                                Text("Backup file loaded")
+                            }
+
+                            SecureField("Enter backup password", text: $password)
+                                .textFieldStyle(.roundedBorder)
+                                .padding(.horizontal)
+
+                            Button(action: {
+                                if viewModel.hasIdentity {
+                                    showConfirmation = true
+                                } else {
+                                    importBackup()
+                                }
+                            }) {
+                                HStack {
+                                    if isImporting {
+                                        ProgressView()
+                                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                    } else {
+                                        Text("Restore Identity")
+                                    }
+                                }
+                                .frame(maxWidth: .infinity)
+                                .padding()
+                                .background(password.isEmpty ? Color.gray : Color.cyan)
+                                .foregroundColor(.white)
+                                .cornerRadius(10)
+                            }
+                            .disabled(password.isEmpty || isImporting)
+                            .padding(.horizontal)
+                        }
+                    } else {
+                        Text("Select a backup file to restore your identity")
+                            .foregroundColor(.secondary)
+                            .multilineTextAlignment(.center)
+
+                        Button(action: { showFilePicker = true }) {
+                            Label("Choose File", systemImage: "folder")
+                                .frame(maxWidth: .infinity)
+                                .padding()
+                                .background(Color.cyan)
+                                .foregroundColor(.white)
+                                .cornerRadius(10)
+                        }
                         .padding(.horizontal)
-                }
+                    }
 
-                Spacer()
-            }
-            .padding()
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
+                    if let error = errorMessage {
+                        Text(error)
+                            .foregroundColor(.red)
+                            .font(.caption)
+                            .padding(.horizontal)
+                    }
+
+                    Spacer()
+                }
+                .padding()
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Cancel") { dismiss() }
+                    }
+                }
+                .fileImporter(
+                    isPresented: $showFilePicker,
+                    allowedContentTypes: [.plainText, .data],
+                    allowsMultipleSelection: false
+                ) { result in
+                    handleFileSelection(result)
+                }
+                .alert("Replace Identity?", isPresented: $showConfirmation) {
+                    Button("Cancel", role: .cancel) { }
+                    Button("Replace", role: .destructive) {
+                        importBackup()
+                    }
+                } message: {
+                    Text("This will permanently replace your current identity. Make sure you have a backup of your current identity first.")
                 }
             }
-            .fileImporter(
-                isPresented: $showFilePicker,
-                allowedContentTypes: [.plainText, .data],
-                allowsMultipleSelection: false
-            ) { result in
-                handleFileSelection(result)
-            }
-            .alert("Replace Identity?", isPresented: $showConfirmation) {
-                Button("Cancel", role: .cancel) { }
-                Button("Replace", role: .destructive) {
-                    importBackup()
+        }
+    }
+
+    private func authenticateWithBiometrics() {
+        let context = LAContext()
+        var error: NSError?
+
+        if context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &error) {
+            context.evaluatePolicy(
+                .deviceOwnerAuthenticationWithBiometrics,
+                localizedReason: "Authenticate to import your identity backup"
+            ) { success, authError in
+                DispatchQueue.main.async {
+                    if success {
+                        isAuthenticated = true
+                        errorMessage = nil
+                    } else {
+                        errorMessage = authError?.localizedDescription ?? "Authentication failed"
+                    }
                 }
-            } message: {
-                Text("This will permanently replace your current identity. Make sure you have a backup of your current identity first.")
+            }
+        } else {
+            // Biometrics not available, fall back to device passcode
+            context.evaluatePolicy(
+                .deviceOwnerAuthentication,
+                localizedReason: "Authenticate to import your identity backup"
+            ) { success, authError in
+                DispatchQueue.main.async {
+                    if success {
+                        isAuthenticated = true
+                        errorMessage = nil
+                    } else {
+                        errorMessage = authError?.localizedDescription ?? "Authentication failed"
+                    }
+                }
             }
         }
     }

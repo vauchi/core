@@ -271,7 +271,7 @@ class WebBookRepository {
         }
 
         // Generate new key and store in Keychain
-        let newKeyBytes = WebBookMobile.generateStorageKey()
+        let newKeyBytes = generateStorageKey()
         let newKeyData = Data(newKeyBytes)
         try keychain.saveStorageKey(newKeyData)
 

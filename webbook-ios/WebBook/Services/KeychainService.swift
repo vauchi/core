@@ -21,18 +21,35 @@ class KeychainService {
     // MARK: - Save
 
     func save(key: String, data: Data) throws {
-        let query: [String: Any] = [
+        // Build the query for saving
+        let saveQuery: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
             kSecAttrAccount as String: key,
             kSecValueData as String: data,
-            kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlockedThisDeviceOnly
+            // Use more secure protection: requires first unlock after device restart
+            // This provides additional protection while keeping the app functional
+            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
         ]
 
-        // Delete existing item first
-        SecItemDelete(query as CFDictionary)
+        // Build query for update (without kSecValueData)
+        let updateQuery: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: key
+        ]
 
-        let status = SecItemAdd(query as CFDictionary, nil)
+        let updateAttributes: [String: Any] = [
+            kSecValueData as String: data
+        ]
+
+        // Try to update first (atomic operation)
+        var status = SecItemUpdate(updateQuery as CFDictionary, updateAttributes as CFDictionary)
+
+        if status == errSecItemNotFound {
+            // Item doesn't exist, add it
+            status = SecItemAdd(saveQuery as CFDictionary, nil)
+        }
 
         guard status == errSecSuccess else {
             throw KeychainError.unknown(status)

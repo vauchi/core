@@ -262,6 +262,177 @@ impl Backend {
             _ => FieldType::Custom,
         }
     }
+
+    // ========== Visibility Controls ==========
+
+    /// Get a contact by index.
+    pub fn get_contact_by_index(&self, index: usize) -> Result<Option<ContactInfo>> {
+        let contacts = self.list_contacts()?;
+        Ok(contacts.get(index).cloned())
+    }
+
+    /// Get visibility info for a contact (what fields they can see).
+    pub fn get_contact_visibility(&self, contact_id: &str) -> Result<Vec<FieldVisibilityInfo>> {
+        let contact = self.storage.load_contact(contact_id)
+            .context("Failed to get contact")?
+            .context("Contact not found")?;
+
+        let card = self.get_card()?.unwrap_or_else(|| {
+            ContactCard::new(self.display_name().unwrap_or("User"))
+        });
+
+        let rules = contact.visibility_rules();
+
+        Ok(card.fields().iter().map(|field| {
+            let can_see = rules.can_see(field.label(), contact_id);
+            FieldVisibilityInfo {
+                field_label: field.label().to_string(),
+                can_see,
+            }
+        }).collect())
+    }
+
+    /// Toggle visibility of a field for a contact.
+    pub fn toggle_field_visibility(&self, contact_id: &str, field_label: &str) -> Result<bool> {
+        let mut contact = self.storage.load_contact(contact_id)
+            .context("Failed to get contact")?
+            .context("Contact not found")?;
+
+        let current_can_see = contact.visibility_rules().can_see(field_label, contact_id);
+
+        // Toggle: if currently visible, set to nobody; if hidden, set to everyone
+        if current_can_see {
+            contact.visibility_rules_mut().set_nobody(field_label);
+        } else {
+            contact.visibility_rules_mut().set_everyone(field_label);
+        }
+
+        let new_can_see = !current_can_see;
+
+        self.storage.save_contact(&contact)
+            .context("Failed to save contact")?;
+
+        Ok(new_can_see)
+    }
+
+    /// Remove a contact by ID.
+    pub fn remove_contact(&self, contact_id: &str) -> Result<()> {
+        self.storage.delete_contact(contact_id)
+            .context("Failed to delete contact")?;
+        Ok(())
+    }
+
+    // ========== Device Management ==========
+
+    /// List all linked devices.
+    pub fn list_devices(&self) -> Result<Vec<DeviceInfo>> {
+        // Try to load device registry from storage
+        if let Ok(Some(registry)) = self.storage.load_device_registry() {
+            Ok(registry.all_devices().iter().enumerate().map(|(i, device)| {
+                DeviceInfo {
+                    device_index: i as u32,
+                    device_name: device.device_name.clone(),
+                    public_key_prefix: hex::encode(&device.device_id[..8]),
+                    is_current: i == 0, // First device is current for now
+                    is_active: !device.revoked,
+                }
+            }).collect())
+        } else {
+            // Return current device only
+            let identity = self.identity.as_ref().context("No identity")?;
+            Ok(vec![DeviceInfo {
+                device_index: 0,
+                device_name: "This Device".to_string(),
+                public_key_prefix: hex::encode(&identity.device_id()[..8]),
+                is_current: true,
+                is_active: true,
+            }])
+        }
+    }
+
+    /// Generate device link data.
+    pub fn generate_device_link(&self) -> Result<String> {
+        let identity = self.identity.as_ref().context("No identity")?;
+        // Generate a simplified link invitation
+        let public_id = identity.public_id();
+        Ok(format!("wb://link/{}", &public_id[..32.min(public_id.len())]))
+    }
+
+    // ========== Recovery ==========
+
+    /// Get recovery status.
+    pub fn get_recovery_status(&self) -> Result<RecoveryStatus> {
+        // For now, return a stub status
+        Ok(RecoveryStatus {
+            has_active_claim: false,
+            voucher_count: 0,
+            required_vouchers: 3,
+            claim_expires: None,
+        })
+    }
+
+    // ========== Backup/Restore ==========
+
+    /// Export identity backup with password.
+    pub fn export_backup(&self, password: &str) -> Result<String> {
+        let identity = self.identity.as_ref().context("No identity")?;
+        let backup = identity.export_backup(password)
+            .map_err(|e| anyhow::anyhow!("Export failed: {:?}", e))?;
+        Ok(hex::encode(backup.as_bytes()))
+    }
+
+    /// Import identity from backup with password.
+    pub fn import_backup(&mut self, backup_data: &str, password: &str) -> Result<()> {
+        let bytes = hex::decode(backup_data.trim())
+            .context("Invalid hex data")?;
+        let backup = IdentityBackup::new(bytes.clone());
+        let identity = Identity::import_backup(&backup, password)
+            .map_err(|e| anyhow::anyhow!("Import failed: {:?}", e))?;
+
+        let name = identity.display_name().to_string();
+        self.storage.save_identity(&bytes, &name)
+            .context("Failed to save identity")?;
+
+        self.identity = Some(identity);
+        self.backup_data = Some(bytes);
+        self.display_name = Some(name);
+        Ok(())
+    }
+
+    /// Perform sync (placeholder - actual sync requires async runtime).
+    pub fn sync_status(&self) -> &'static str {
+        if self.identity.is_some() {
+            "Ready to sync"
+        } else {
+            "No identity"
+        }
+    }
+}
+
+/// Field visibility information for display.
+#[derive(Debug, Clone)]
+pub struct FieldVisibilityInfo {
+    pub field_label: String,
+    pub can_see: bool,
+}
+
+/// Device information for display.
+#[derive(Debug, Clone)]
+pub struct DeviceInfo {
+    pub device_index: u32,
+    pub device_name: String,
+    pub public_key_prefix: String,
+    pub is_current: bool,
+    pub is_active: bool,
+}
+
+/// Recovery status information.
+#[derive(Debug, Clone)]
+pub struct RecoveryStatus {
+    pub has_active_claim: bool,
+    pub voucher_count: u32,
+    pub required_vouchers: u32,
+    pub claim_expires: Option<String>,
 }
 
 /// Available field types for selection.

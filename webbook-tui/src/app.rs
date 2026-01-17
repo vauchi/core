@@ -11,6 +11,8 @@ pub enum Screen {
     Contacts,
     /// Contact detail view
     ContactDetail,
+    /// Contact visibility settings
+    ContactVisibility,
     /// QR exchange screen
     Exchange,
     /// Settings screen
@@ -19,6 +21,14 @@ pub enum Screen {
     Help,
     /// Add field dialog
     AddField,
+    /// Device management screen
+    Devices,
+    /// Recovery screen
+    Recovery,
+    /// Sync status screen
+    Sync,
+    /// Backup/restore screen
+    Backup,
 }
 
 /// Input mode for text entry.
@@ -51,6 +61,12 @@ pub struct App {
     pub input_buffer: String,
     /// Add field state
     pub add_field_state: AddFieldState,
+    /// Visibility screen state
+    pub visibility_state: VisibilityState,
+    /// Backup screen state
+    pub backup_state: BackupState,
+    /// Selected device index
+    pub selected_device: usize,
 }
 
 /// State for the add field dialog.
@@ -70,6 +86,39 @@ pub enum AddFieldFocus {
     Value,
 }
 
+/// State for the visibility screen.
+#[derive(Debug, Default)]
+pub struct VisibilityState {
+    pub contact_id: Option<String>,
+    pub selected_field: usize,
+}
+
+/// State for the backup screen.
+#[derive(Debug, Default)]
+pub struct BackupState {
+    pub mode: BackupMode,
+    pub password: String,
+    pub confirm_password: String,
+    pub backup_data: String,
+    pub focus: BackupFocus,
+}
+
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub enum BackupMode {
+    #[default]
+    Menu,
+    Export,
+    Import,
+}
+
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub enum BackupFocus {
+    #[default]
+    Password,
+    Confirm,
+    Data,
+}
+
 impl App {
     /// Create a new application.
     pub fn new(backend: Backend) -> Self {
@@ -85,6 +134,9 @@ impl App {
             selected_field: 0,
             input_buffer: String::new(),
             add_field_state: AddFieldState::default(),
+            visibility_state: VisibilityState::default(),
+            backup_state: BackupState::default(),
+            selected_device: 0,
         }
     }
 
@@ -108,11 +160,16 @@ impl App {
     /// Go back to the previous screen.
     pub fn go_back(&mut self) {
         match self.screen {
-            Screen::Contacts | Screen::Exchange | Screen::Settings | Screen::Help => {
+            Screen::Contacts | Screen::Exchange | Screen::Settings | Screen::Help
+            | Screen::Devices | Screen::Recovery | Screen::Sync | Screen::Backup => {
                 self.screen = Screen::Home;
             }
             Screen::ContactDetail => {
                 self.screen = Screen::Contacts;
+            }
+            Screen::ContactVisibility => {
+                self.screen = Screen::ContactDetail;
+                self.visibility_state = VisibilityState::default();
             }
             Screen::AddField => {
                 self.screen = Screen::Home;

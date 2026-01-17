@@ -143,3 +143,40 @@ pub struct ContactOption {
     pub id: String,
     pub display_name: String,
 }
+
+/// Contact visibility status for a field.
+#[derive(Serialize)]
+pub struct ContactFieldVisibility {
+    pub contact_id: String,
+    pub display_name: String,
+    pub can_see: bool,
+}
+
+/// Get which contacts can see a specific field.
+#[tauri::command]
+pub fn get_field_viewers(
+    field_id: String,
+    state: State<'_, Mutex<AppState>>,
+) -> Result<Vec<ContactFieldVisibility>, String> {
+    let state = state.lock().unwrap();
+
+    let contacts = state
+        .storage
+        .list_contacts()
+        .map_err(|e| format!("Failed to list contacts: {:?}", e))?;
+
+    let mut result = Vec::new();
+    for contact in contacts {
+        let contact_id = contact.id().to_string();
+        let rules = contact.visibility_rules();
+        let can_see = rules.can_see(&field_id, &contact_id);
+
+        result.push(ContactFieldVisibility {
+            contact_id,
+            display_name: contact.display_name().to_string(),
+            can_see,
+        });
+    }
+
+    Ok(result)
+}

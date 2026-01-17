@@ -1,4 +1,4 @@
-import { createResource, For, createSignal } from 'solid-js'
+import { createResource, For, createSignal, Show } from 'solid-js'
 import { invoke } from '@tauri-apps/api/core'
 
 interface FieldInfo {
@@ -18,6 +18,17 @@ interface IdentityInfo {
   public_id: string
 }
 
+interface ContactFieldVisibility {
+  contact_id: string
+  display_name: string
+  can_see: boolean
+}
+
+interface VisibilityLevel {
+  type: 'everyone' | 'nobody' | 'contacts'
+  ids?: string[]
+}
+
 interface HomeProps {
   onNavigate: (page: 'home' | 'contacts' | 'exchange' | 'settings') => void
 }
@@ -34,6 +45,75 @@ function Home(props: HomeProps) {
   const [card, { refetch: refetchCard }] = createResource(fetchCard)
   const [identity] = createResource(fetchIdentity)
   const [showAddField, setShowAddField] = createSignal(false)
+  const [selectedFieldId, setSelectedFieldId] = createSignal<string | null>(null)
+  const [selectedFieldLabel, setSelectedFieldLabel] = createSignal('')
+  const [fieldViewers, setFieldViewers] = createSignal<ContactFieldVisibility[]>([])
+  const [visibilityError, setVisibilityError] = createSignal('')
+
+  const openVisibilityDialog = async (field: FieldInfo) => {
+    setSelectedFieldId(field.id)
+    setSelectedFieldLabel(field.label)
+    setVisibilityError('')
+    try {
+      const viewers = await invoke('get_field_viewers', { fieldId: field.id }) as ContactFieldVisibility[]
+      setFieldViewers(viewers)
+    } catch (e) {
+      setVisibilityError(String(e))
+    }
+  }
+
+  const closeVisibilityDialog = () => {
+    setSelectedFieldId(null)
+    setFieldViewers([])
+    setVisibilityError('')
+  }
+
+  const toggleContactVisibility = async (contactId: string, currentCanSee: boolean) => {
+    const fieldId = selectedFieldId()
+    if (!fieldId) return
+
+    try {
+      const newVisibility: VisibilityLevel = currentCanSee
+        ? { type: 'nobody' }
+        : { type: 'everyone' }
+
+      await invoke('set_field_visibility', {
+        contactId,
+        fieldId,
+        visibility: newVisibility
+      })
+
+      // Reload visibility status
+      const viewers = await invoke('get_field_viewers', { fieldId }) as ContactFieldVisibility[]
+      setFieldViewers(viewers)
+    } catch (e) {
+      setVisibilityError(String(e))
+    }
+  }
+
+  const setAllVisibility = async (canSee: boolean) => {
+    const fieldId = selectedFieldId()
+    if (!fieldId) return
+
+    const viewers = fieldViewers()
+    try {
+      const visibility: VisibilityLevel = canSee ? { type: 'everyone' } : { type: 'nobody' }
+
+      for (const viewer of viewers) {
+        await invoke('set_field_visibility', {
+          contactId: viewer.contact_id,
+          fieldId,
+          visibility
+        })
+      }
+
+      // Reload visibility status
+      const updatedViewers = await invoke('get_field_viewers', { fieldId }) as ContactFieldVisibility[]
+      setFieldViewers(updatedViewers)
+    } catch (e) {
+      setVisibilityError(String(e))
+    }
+  }
 
   const fieldIcon = (type: string) => {
     switch (type.toLowerCase()) {
@@ -68,6 +148,13 @@ function Home(props: HomeProps) {
                   <span class="field-label">{field.label}</span>
                   <span class="field-value">{field.value}</span>
                 </div>
+                <button
+                  class="visibility-btn"
+                  onClick={(e) => { e.stopPropagation(); openVisibilityDialog(field) }}
+                  title="Manage who can see this field"
+                >
+                  visibility
+                </button>
               </div>
             )}
           </For>
@@ -88,6 +175,53 @@ function Home(props: HomeProps) {
       {showAddField() && (
         <AddFieldDialog onClose={() => setShowAddField(false)} onAdd={() => { refetchCard(); setShowAddField(false) }} />
       )}
+
+      {/* Field Visibility Dialog */}
+      <Show when={selectedFieldId()}>
+        <div class="dialog-overlay" onClick={closeVisibilityDialog}>
+          <div class="dialog visibility-dialog" onClick={(e) => e.stopPropagation()}>
+            <h3>Who can see "{selectedFieldLabel()}"?</h3>
+
+            <Show when={visibilityError()}>
+              <p class="error">{visibilityError()}</p>
+            </Show>
+
+            <Show when={fieldViewers().length === 0}>
+              <p class="empty-state">No contacts yet. Add contacts to manage visibility.</p>
+            </Show>
+
+            <Show when={fieldViewers().length > 0}>
+              <div class="visibility-actions">
+                <button class="small" onClick={() => setAllVisibility(true)}>Show to all</button>
+                <button class="small secondary" onClick={() => setAllVisibility(false)}>Hide from all</button>
+              </div>
+
+              <div class="visibility-list">
+                <For each={fieldViewers()}>
+                  {(viewer) => (
+                    <div class="visibility-item">
+                      <div class="contact-avatar small">
+                        {viewer.display_name.charAt(0).toUpperCase()}
+                      </div>
+                      <span class="contact-name">{viewer.display_name}</span>
+                      <button
+                        class={viewer.can_see ? 'visible' : 'hidden'}
+                        onClick={() => toggleContactVisibility(viewer.contact_id, viewer.can_see)}
+                      >
+                        {viewer.can_see ? 'Visible' : 'Hidden'}
+                      </button>
+                    </div>
+                  )}
+                </For>
+              </div>
+            </Show>
+
+            <div class="dialog-actions">
+              <button class="secondary" onClick={closeVisibilityDialog}>Done</button>
+            </div>
+          </div>
+        </div>
+      </Show>
     </div>
   )
 }

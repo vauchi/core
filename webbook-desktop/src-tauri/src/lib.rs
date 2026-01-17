@@ -49,6 +49,7 @@ pub fn run() {
             commands::visibility::get_visibility_rules,
             commands::visibility::set_field_visibility,
             commands::visibility::get_contacts_for_visibility,
+            commands::visibility::get_field_viewers,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

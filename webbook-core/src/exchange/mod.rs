@@ -3,6 +3,7 @@
 //! Handles peer-to-peer contact exchange via QR codes, audio proximity,
 //! and X3DH key agreement.
 
+mod audio;
 mod ble;
 pub mod device_link;
 mod error;
@@ -11,6 +12,7 @@ mod qr;
 mod session;
 mod x3dh;
 
+pub use audio::{AudioBackend, AudioCapability, AudioConfig, MockAudioBackend, UltrasonicVerifier};
 pub use ble::{BLEDevice, BLEProximityVerifier, MockBLEVerifier};
 pub use device_link::{
     DeviceLinkInitiator, DeviceLinkQR, DeviceLinkRequest, DeviceLinkResponder, DeviceLinkResponse,

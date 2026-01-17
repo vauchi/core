@@ -54,7 +54,7 @@ pub use protocol::{
 };
 
 // Transport abstraction
-pub use transport::{ConnectionState, Transport, TransportConfig, TransportResult};
+pub use transport::{ConnectionState, ProxyConfig, Transport, TransportConfig, TransportResult};
 
 // Mock transport for testing
 pub use mock::MockTransport;

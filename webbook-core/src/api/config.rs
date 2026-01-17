@@ -5,7 +5,7 @@
 use std::path::PathBuf;
 
 use crate::crypto::SymmetricKey;
-use crate::network::{RelayClientConfig, TransportConfig};
+use crate::network::{ProxyConfig, RelayClientConfig, TransportConfig};
 
 /// Configuration for WebBook instance.
 #[derive(Debug, Clone)]
@@ -94,6 +94,9 @@ pub struct RelayConfig {
 
     /// Maximum message retries before giving up.
     pub max_retries: u32,
+
+    /// Proxy configuration (for Tor support).
+    pub proxy: ProxyConfig,
 }
 
 impl Default for RelayConfig {
@@ -107,11 +110,26 @@ impl Default for RelayConfig {
             max_pending_messages: 100,
             ack_timeout_ms: 30_000,
             max_retries: 5,
+            proxy: ProxyConfig::None,
         }
     }
 }
 
 impl RelayConfig {
+    /// Creates a relay config for Tor connections.
+    pub fn with_tor(server_url: &str) -> Self {
+        RelayConfig {
+            server_url: server_url.to_string(),
+            // Tor connections are slower
+            connect_timeout_ms: 60_000,
+            io_timeout_ms: 120_000,
+            max_reconnect_attempts: 3,
+            reconnect_base_delay_ms: 5_000,
+            proxy: ProxyConfig::tor_default(),
+            ..Default::default()
+        }
+    }
+
     /// Converts to TransportConfig for the network layer.
     pub fn to_transport_config(&self) -> TransportConfig {
         TransportConfig {
@@ -120,6 +138,7 @@ impl RelayConfig {
             io_timeout_ms: self.io_timeout_ms,
             max_reconnect_attempts: self.max_reconnect_attempts,
             reconnect_base_delay_ms: self.reconnect_base_delay_ms,
+            proxy: self.proxy.clone(),
         }
     }
 

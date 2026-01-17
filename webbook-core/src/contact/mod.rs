@@ -33,6 +33,12 @@ pub struct Contact {
     fingerprint_verified: bool,
     /// Our visibility rules for this contact (what they can see of our card)
     visibility_rules: VisibilityRules,
+    /// Whether this contact is hidden from the main contact list.
+    /// Hidden contacts are only visible via secret access (gesture/PIN).
+    hidden: bool,
+    /// Whether this contact is blocked.
+    /// Blocked contacts don't receive updates and their updates are ignored.
+    blocked: bool,
 }
 
 impl Contact {
@@ -58,6 +64,8 @@ impl Contact {
             exchange_timestamp,
             fingerprint_verified: false,
             visibility_rules: VisibilityRules::new(),
+            hidden: false,
+            blocked: false,
         }
     }
 
@@ -72,6 +80,30 @@ impl Contact {
         fingerprint_verified: bool,
         visibility_rules: VisibilityRules,
     ) -> Self {
+        Self::from_sync_data_full(
+            public_key,
+            card,
+            shared_key,
+            exchange_timestamp,
+            fingerprint_verified,
+            visibility_rules,
+            false, // hidden
+            false, // blocked
+        )
+    }
+
+    /// Creates a contact from device sync data with all fields.
+    #[allow(clippy::too_many_arguments)]
+    pub fn from_sync_data_full(
+        public_key: [u8; 32],
+        card: ContactCard,
+        shared_key: SymmetricKey,
+        exchange_timestamp: u64,
+        fingerprint_verified: bool,
+        visibility_rules: VisibilityRules,
+        hidden: bool,
+        blocked: bool,
+    ) -> Self {
         let id = hex::encode(public_key);
         let display_name = card.display_name().to_string();
 
@@ -84,6 +116,8 @@ impl Contact {
             exchange_timestamp,
             fingerprint_verified,
             visibility_rules,
+            hidden,
+            blocked,
         }
     }
 
@@ -193,6 +227,88 @@ impl Contact {
             .collect::<Vec<_>>()
             .join(" ")
             .to_uppercase()
+    }
+
+    // ========================================
+    // Hidden Contacts (Plausible Deniability)
+    // ========================================
+
+    /// Returns whether this contact is hidden from the main contact list.
+    ///
+    /// Hidden contacts provide plausible deniability - they only appear when
+    /// accessed via a secret gesture, PIN, or special settings navigation.
+    pub fn is_hidden(&self) -> bool {
+        self.hidden
+    }
+
+    /// Hides this contact from the main contact list.
+    ///
+    /// The contact will only be visible via secret access methods.
+    /// Updates from hidden contacts are still received but notifications
+    /// are suppressed.
+    pub fn hide(&mut self) {
+        self.hidden = true;
+    }
+
+    /// Unhides this contact, making it visible in the main contact list.
+    pub fn unhide(&mut self) {
+        self.hidden = false;
+    }
+
+    /// Sets the hidden status directly.
+    pub fn set_hidden(&mut self, hidden: bool) {
+        self.hidden = hidden;
+    }
+
+    // ========================================
+    // Blocked Contacts
+    // ========================================
+
+    /// Returns whether this contact is blocked.
+    ///
+    /// Blocked contacts:
+    /// - Don't receive updates from you
+    /// - Their updates to you are ignored
+    /// - Still appear in the contact list (unless also hidden)
+    pub fn is_blocked(&self) -> bool {
+        self.blocked
+    }
+
+    /// Blocks this contact.
+    pub fn block(&mut self) {
+        self.blocked = true;
+    }
+
+    /// Unblocks this contact.
+    pub fn unblock(&mut self) {
+        self.blocked = false;
+    }
+
+    /// Sets the blocked status directly.
+    pub fn set_blocked(&mut self, blocked: bool) {
+        self.blocked = blocked;
+    }
+
+    /// Returns true if this contact should be visible in the main contact list.
+    ///
+    /// A contact is visible if it's not hidden.
+    /// Blocked contacts can still be visible (to show they're blocked).
+    pub fn is_visible_in_main_list(&self) -> bool {
+        !self.hidden
+    }
+
+    /// Returns true if updates should be processed from this contact.
+    ///
+    /// Updates are ignored from blocked contacts.
+    pub fn should_process_updates(&self) -> bool {
+        !self.blocked
+    }
+
+    /// Returns true if updates should be sent to this contact.
+    ///
+    /// Updates are not sent to blocked contacts.
+    pub fn should_send_updates(&self) -> bool {
+        !self.blocked
     }
 }
 
@@ -367,5 +483,130 @@ mod tests {
         // Should have proper spacing
         let parts: Vec<&str> = fp.split(' ').collect();
         assert!(parts.iter().all(|p| p.len() == 4));
+    }
+
+    // ============================================================
+    // Hidden Contacts Tests
+    // ============================================================
+
+    #[test]
+    fn test_contact_hidden_default_false() {
+        let contact = create_test_contact();
+        assert!(!contact.is_hidden());
+        assert!(contact.is_visible_in_main_list());
+    }
+
+    #[test]
+    fn test_contact_hide_and_unhide() {
+        let mut contact = create_test_contact();
+
+        // Hide the contact
+        contact.hide();
+        assert!(contact.is_hidden());
+        assert!(!contact.is_visible_in_main_list());
+
+        // Unhide the contact
+        contact.unhide();
+        assert!(!contact.is_hidden());
+        assert!(contact.is_visible_in_main_list());
+    }
+
+    #[test]
+    fn test_contact_set_hidden() {
+        let mut contact = create_test_contact();
+
+        contact.set_hidden(true);
+        assert!(contact.is_hidden());
+
+        contact.set_hidden(false);
+        assert!(!contact.is_hidden());
+    }
+
+    // ============================================================
+    // Blocked Contacts Tests
+    // ============================================================
+
+    #[test]
+    fn test_contact_blocked_default_false() {
+        let contact = create_test_contact();
+        assert!(!contact.is_blocked());
+        assert!(contact.should_process_updates());
+        assert!(contact.should_send_updates());
+    }
+
+    #[test]
+    fn test_contact_block_and_unblock() {
+        let mut contact = create_test_contact();
+
+        // Block the contact
+        contact.block();
+        assert!(contact.is_blocked());
+        assert!(!contact.should_process_updates());
+        assert!(!contact.should_send_updates());
+
+        // Unblock the contact
+        contact.unblock();
+        assert!(!contact.is_blocked());
+        assert!(contact.should_process_updates());
+        assert!(contact.should_send_updates());
+    }
+
+    #[test]
+    fn test_contact_set_blocked() {
+        let mut contact = create_test_contact();
+
+        contact.set_blocked(true);
+        assert!(contact.is_blocked());
+
+        contact.set_blocked(false);
+        assert!(!contact.is_blocked());
+    }
+
+    #[test]
+    fn test_contact_hidden_and_blocked_independent() {
+        let mut contact = create_test_contact();
+
+        // Can be hidden but not blocked
+        contact.hide();
+        assert!(contact.is_hidden());
+        assert!(!contact.is_blocked());
+        assert!(contact.should_process_updates()); // Still processes updates
+
+        // Can be blocked but not hidden
+        contact.unhide();
+        contact.block();
+        assert!(!contact.is_hidden());
+        assert!(contact.is_blocked());
+        assert!(contact.is_visible_in_main_list()); // Still visible
+
+        // Can be both hidden and blocked
+        contact.hide();
+        assert!(contact.is_hidden());
+        assert!(contact.is_blocked());
+        assert!(!contact.is_visible_in_main_list());
+        assert!(!contact.should_process_updates());
+    }
+
+    #[test]
+    fn test_contact_from_sync_data_full() {
+        let public_key = [0x42u8; 32];
+        let card = ContactCard::new("Synced User");
+        let shared_key = SymmetricKey::generate();
+        let visibility_rules = VisibilityRules::new();
+
+        let contact = Contact::from_sync_data_full(
+            public_key,
+            card,
+            shared_key,
+            1234567890,
+            true,
+            visibility_rules,
+            true, // hidden
+            true, // blocked
+        );
+
+        assert!(contact.is_hidden());
+        assert!(contact.is_blocked());
+        assert!(contact.is_fingerprint_verified());
     }
 }

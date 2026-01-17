@@ -3,9 +3,26 @@
 //! Implements crowd-sourced validation of social profiles.
 //! Users can verify that a contact's social profile belongs to them,
 //! building trust through consensus.
+//!
+//! ## How It Works
+//!
+//! 1. Alice claims her Twitter handle is "@alice" in her contact card
+//! 2. Bob and Carol personally know Alice and verify this is correct
+//! 3. They each create a signed validation record
+//! 4. When Dave views Alice's card, he sees "Verified by Bob, Carol"
+//! 5. The trust level increases with more validations
+//!
+//! ## Trust Levels
+//!
+//! - **Unverified** (0 validations): Grey indicator
+//! - **Low Confidence** (1 validation): Yellow indicator
+//! - **Partial Confidence** (2-4 validations): Light green indicator
+//! - **High Confidence** (5+ validations): Green indicator
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
+
+use crate::Identity;
 
 /// A validation record for a social profile field.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -83,6 +100,55 @@ impl ProfileValidation {
         let pubkey = PublicKey::from_bytes(*public_key);
 
         pubkey.verify(&message, &signature)
+    }
+
+    /// Creates a signed validation record using the validator's identity.
+    ///
+    /// This is the primary way to create validations - the signature is
+    /// created using the validator's Ed25519 signing key.
+    pub fn create_signed(
+        identity: &Identity,
+        field_id: &str,
+        field_value: &str,
+        contact_id: &str,
+    ) -> Self {
+        let validator_id = hex::encode(identity.signing_public_key());
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+
+        // Full field ID includes contact_id prefix
+        let full_field_id = format!("{}:{}", contact_id, field_id);
+
+        // Create the message to sign (must match signable_bytes format)
+        let message = format!(
+            "WEBBOOK_VALIDATION:{}:{}:{}:{}",
+            full_field_id, field_value, validator_id, now
+        );
+
+        // Sign with the identity's signing key
+        let signature = identity.sign(message.as_bytes());
+
+        Self {
+            field_id: full_field_id,
+            field_value: field_value.to_string(),
+            validator_id,
+            validated_at: now,
+            signature: *signature.as_bytes(),
+        }
+    }
+
+    /// Returns the contact ID this validation is for.
+    ///
+    /// The field_id is formatted as "contact_id:field_name".
+    pub fn contact_id(&self) -> Option<&str> {
+        self.field_id.split(':').next()
+    }
+
+    /// Returns the field name being validated.
+    pub fn field_name(&self) -> Option<&str> {
+        self.field_id.split(':').nth(1)
     }
 }
 
@@ -348,5 +414,39 @@ mod tests {
 
         // Validation doesn't count because field value changed
         assert_eq!(status.count, 0);
+    }
+
+    #[test]
+    fn test_create_signed_validation() {
+        // Create an identity for the validator
+        let validator = Identity::create("Validator");
+
+        // Create a signed validation
+        let validation =
+            ProfileValidation::create_signed(&validator, "twitter", "@alice", "alice_contact_id");
+
+        // Verify the signature is valid
+        assert!(validation.verify(validator.signing_public_key()));
+
+        // Check field parsing
+        assert_eq!(validation.contact_id(), Some("alice_contact_id"));
+        assert_eq!(validation.field_name(), Some("twitter"));
+        assert_eq!(validation.field_value(), "@alice");
+    }
+
+    #[test]
+    fn test_validation_signature_prevents_tampering() {
+        let validator = Identity::create("Validator");
+        let attacker = Identity::create("Attacker");
+
+        // Create a valid validation
+        let validation =
+            ProfileValidation::create_signed(&validator, "twitter", "@alice", "alice_contact_id");
+
+        // Signature should verify with validator's key
+        assert!(validation.verify(validator.signing_public_key()));
+
+        // Signature should NOT verify with attacker's key
+        assert!(!validation.verify(attacker.signing_public_key()));
     }
 }

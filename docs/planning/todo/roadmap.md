@@ -122,7 +122,7 @@ See `docs/development/testing.md` for full strategy.
 
 | Task | Complexity | Risk | Status |
 |------|------------|------|--------|
-| Visibility labels | Low | Low | Todo |
+| Visibility labels | Low | Low | ✅ Done |
 | Social profile validation | Medium | Low | Todo |
 | UI/UX review | Low | Low | Todo |
 | Performance tuning | Low | Low | Todo |

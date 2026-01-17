@@ -21,6 +21,19 @@ interface ContactDetails {
   fields: FieldInfo[]
 }
 
+interface VisibilityLevel {
+  type: 'everyone' | 'nobody' | 'contacts'
+  ids?: string[]
+}
+
+interface FieldVisibilityInfo {
+  field_id: string
+  field_label: string
+  field_type: string
+  visibility: VisibilityLevel
+  can_see: boolean
+}
+
 interface ContactsProps {
   onNavigate: (page: 'home' | 'contacts' | 'exchange' | 'settings') => void
 }
@@ -33,6 +46,8 @@ function Contacts(props: ContactsProps) {
   const [contacts, { refetch }] = createResource(fetchContacts)
   const [selectedContact, setSelectedContact] = createSignal<ContactDetails | null>(null)
   const [showDeleteConfirm, setShowDeleteConfirm] = createSignal(false)
+  const [showVisibility, setShowVisibility] = createSignal(false)
+  const [visibilityRules, setVisibilityRules] = createSignal<FieldVisibilityInfo[]>([])
   const [error, setError] = createSignal('')
 
   const openContactDetail = async (contactId: string) => {
@@ -48,7 +63,41 @@ function Contacts(props: ContactsProps) {
   const closeDetail = () => {
     setSelectedContact(null)
     setShowDeleteConfirm(false)
+    setShowVisibility(false)
+    setVisibilityRules([])
     setError('')
+  }
+
+  const loadVisibilityRules = async (contactId: string) => {
+    try {
+      const rules = await invoke('get_visibility_rules', { contactId }) as FieldVisibilityInfo[]
+      setVisibilityRules(rules)
+      setShowVisibility(true)
+    } catch (e) {
+      setError(String(e))
+    }
+  }
+
+  const toggleFieldVisibility = async (fieldId: string, currentCanSee: boolean) => {
+    const contact = selectedContact()
+    if (!contact) return
+
+    try {
+      const newVisibility: VisibilityLevel = currentCanSee
+        ? { type: 'nobody' }
+        : { type: 'everyone' }
+
+      await invoke('set_field_visibility', {
+        contactId: contact.id,
+        fieldId,
+        visibility: newVisibility
+      })
+
+      // Reload visibility rules
+      await loadVisibilityRules(contact.id)
+    } catch (e) {
+      setError(String(e))
+    }
   }
 
   const handleDelete = async () => {
@@ -146,6 +195,38 @@ function Contacts(props: ContactsProps) {
               <div class="contact-id">
                 <span class="label">Contact ID</span>
                 <span class="mono">{selectedContact()?.id.substring(0, 16)}...</span>
+              </div>
+
+              {/* Visibility Section */}
+              <div class="visibility-section">
+                <Show when={!showVisibility()} fallback={
+                  <div class="visibility-list">
+                    <h4>What {selectedContact()?.display_name} can see:</h4>
+                    <Show when={visibilityRules().length === 0}>
+                      <p class="empty-fields">You haven't added any fields to your card yet.</p>
+                    </Show>
+                    <For each={visibilityRules()}>
+                      {(field) => (
+                        <div class="visibility-item">
+                          <span class="field-label">{field.field_label}</span>
+                          <button
+                            class={field.can_see ? 'visible' : 'hidden'}
+                            onClick={() => toggleFieldVisibility(field.field_id, field.can_see)}
+                          >
+                            {field.can_see ? 'Visible' : 'Hidden'}
+                          </button>
+                        </div>
+                      )}
+                    </For>
+                    <button class="secondary small" onClick={() => setShowVisibility(false)}>
+                      Hide visibility settings
+                    </button>
+                  </div>
+                }>
+                  <button class="secondary" onClick={() => loadVisibilityRules(selectedContact()!.id)}>
+                    Manage what they see
+                  </button>
+                </Show>
               </div>
 
               <div class="dialog-actions">

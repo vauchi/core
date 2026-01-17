@@ -46,6 +46,9 @@ pub fn run() {
             commands::backup::export_backup,
             commands::backup::import_backup,
             commands::backup::check_password_strength,
+            commands::visibility::get_visibility_rules,
+            commands::visibility::set_field_visibility,
+            commands::visibility::get_contacts_for_visibility,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

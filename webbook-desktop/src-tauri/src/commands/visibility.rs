@@ -2,22 +2,34 @@
 //!
 //! Commands for managing contact card field visibility.
 
-#![allow(dead_code)]
-
+use std::collections::HashSet;
 use std::sync::Mutex;
 
 use serde::{Deserialize, Serialize};
 use tauri::State;
+use webbook_core::contact::FieldVisibility;
 
 use crate::state::AppState;
 
-/// Visibility level for a field.
+/// Visibility level for a field (frontend-friendly).
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
+#[serde(tag = "type", rename_all = "lowercase")]
 pub enum VisibilityLevel {
     Everyone,
     Nobody,
-    Contacts(Vec<String>),
+    Contacts { ids: Vec<String> },
+}
+
+impl From<&FieldVisibility> for VisibilityLevel {
+    fn from(v: &FieldVisibility) -> Self {
+        match v {
+            FieldVisibility::Everyone => VisibilityLevel::Everyone,
+            FieldVisibility::Nobody => VisibilityLevel::Nobody,
+            FieldVisibility::Contacts(ids) => VisibilityLevel::Contacts {
+                ids: ids.iter().cloned().collect(),
+            },
+        }
+    }
 }
 
 /// Field visibility info for the frontend.
@@ -25,11 +37,12 @@ pub enum VisibilityLevel {
 pub struct FieldVisibilityInfo {
     pub field_id: String,
     pub field_label: String,
-    pub visibility: String,
-    pub visible_to: Vec<String>,
+    pub field_type: String,
+    pub visibility: VisibilityLevel,
+    pub can_see: bool,
 }
 
-/// Get visibility settings for a contact.
+/// Get visibility settings for what a contact can see.
 #[tauri::command]
 pub fn get_visibility_rules(
     contact_id: String,
@@ -37,14 +50,11 @@ pub fn get_visibility_rules(
 ) -> Result<Vec<FieldVisibilityInfo>, String> {
     let state = state.lock().unwrap();
 
-    let contacts = state
+    // Load the specific contact
+    let contact = state
         .storage
-        .list_contacts()
-        .map_err(|e| format!("Failed to list contacts: {:?}", e))?;
-
-    let contact = contacts
-        .iter()
-        .find(|c| c.id() == contact_id)
+        .load_contact(&contact_id)
+        .map_err(|e| format!("Failed to load contact: {:?}", e))?
         .ok_or_else(|| "Contact not found".to_string())?;
 
     let rules = contact.visibility_rules();
@@ -54,13 +64,15 @@ pub fn get_visibility_rules(
     if let Ok(Some(card)) = state.storage.load_own_card() {
         for field in card.fields() {
             let field_id = field.id().to_string();
+            let visibility = rules.get(&field_id);
             let can_see = rules.can_see(&field_id, &contact_id);
 
             result.push(FieldVisibilityInfo {
-                field_id: field_id.clone(),
+                field_id,
                 field_label: field.label().to_string(),
-                visibility: if can_see { "visible" } else { "hidden" }.to_string(),
-                visible_to: vec![], // TODO: implement detailed visibility
+                field_type: format!("{:?}", field.field_type()),
+                visibility: VisibilityLevel::from(visibility),
+                can_see,
             });
         }
     }
@@ -68,44 +80,66 @@ pub fn get_visibility_rules(
     Ok(result)
 }
 
-/// Set visibility for a field.
+/// Set visibility for a field for a specific contact.
 #[tauri::command]
 pub fn set_field_visibility(
     contact_id: String,
     field_id: String,
-    visible: bool,
+    visibility: VisibilityLevel,
     state: State<'_, Mutex<AppState>>,
-) -> Result<String, String> {
+) -> Result<(), String> {
     let state = state.lock().unwrap();
 
     // Load the contact
+    let mut contact = state
+        .storage
+        .load_contact(&contact_id)
+        .map_err(|e| format!("Failed to load contact: {:?}", e))?
+        .ok_or_else(|| "Contact not found".to_string())?;
+
+    // Update visibility rules
+    let rules = contact.visibility_rules_mut();
+    match visibility {
+        VisibilityLevel::Everyone => rules.set_everyone(&field_id),
+        VisibilityLevel::Nobody => rules.set_nobody(&field_id),
+        VisibilityLevel::Contacts { ids } => {
+            rules.set_contacts(&field_id, ids.into_iter().collect::<HashSet<_>>())
+        }
+    }
+
+    // Save the updated contact
+    state
+        .storage
+        .save_contact(&contact)
+        .map_err(|e| format!("Failed to save contact: {:?}", e))?;
+
+    Ok(())
+}
+
+/// Get all contacts for visibility selection UI.
+#[tauri::command]
+pub fn get_contacts_for_visibility(
+    state: State<'_, Mutex<AppState>>,
+) -> Result<Vec<ContactOption>, String> {
+    let state = state.lock().unwrap();
+
     let contacts = state
         .storage
         .list_contacts()
         .map_err(|e| format!("Failed to list contacts: {:?}", e))?;
 
-    let _contact = contacts
-        .iter()
-        .find(|c| c.id() == contact_id)
-        .ok_or_else(|| "Contact not found".to_string())?;
-
-    // TODO: Implement full visibility update
-    // This requires Storage::update_contact which doesn't exist yet
-    // For now, return success as placeholder
-    Ok(format!(
-        "Visibility for {} set to {}",
-        field_id,
-        if visible { "visible" } else { "hidden" }
-    ))
+    Ok(contacts
+        .into_iter()
+        .map(|c| ContactOption {
+            id: c.id().to_string(),
+            display_name: c.display_name().to_string(),
+        })
+        .collect())
 }
 
-/// Set default visibility for new contacts.
-#[tauri::command]
-pub fn set_default_visibility(
-    field_id: String,
-    _visibility: VisibilityLevel,
-) -> Result<String, String> {
-    // TODO: Store in settings
-    // For now, return success as placeholder
-    Ok(format!("Default visibility set for {}", field_id))
+/// Contact option for visibility selection.
+#[derive(Serialize)]
+pub struct ContactOption {
+    pub id: String,
+    pub display_name: String,
 }

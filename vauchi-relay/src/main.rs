@@ -174,6 +174,36 @@ async fn main() {
             // Keep the guard alive for the duration of the connection
             let _guard = connection_guard;
 
+            // Peek at the first bytes to detect HTTP health check vs WebSocket
+            let mut peek_buf = [0u8; 64];
+            match stream.peek(&mut peek_buf).await {
+                Ok(n) if n > 0 => {
+                    let peek_str = String::from_utf8_lossy(&peek_buf[..n]);
+
+                    // Check for HTTP GET /health or /up request (non-WebSocket)
+                    if (peek_str.starts_with("GET /health") || peek_str.starts_with("GET /up"))
+                        && !peek_str.contains("Upgrade:")
+                    {
+                        // Respond with health check JSON
+                        let uptime = start_time.elapsed().as_secs();
+                        let health_response = format!(
+                            r#"{{"status":"healthy","version":"{}","uptime_seconds":{}}}"#,
+                            env!("CARGO_PKG_VERSION"),
+                            uptime
+                        );
+                        let response = format!(
+                            "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+                            health_response.len(),
+                            health_response
+                        );
+                        let _ = stream.try_write(response.as_bytes());
+                        return;
+                    }
+                }
+                _ => {}
+            }
+
+            // Proceed with WebSocket handshake
             match accept_async(stream).await {
                 Ok(ws_stream) => {
                     info!("New connection from {}", addr);

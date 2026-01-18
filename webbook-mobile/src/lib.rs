@@ -40,6 +40,92 @@ pub use types::{
 
 uniffi::setup_scaffolding!();
 
+// === Password Strength ===
+
+/// Password strength level for display to users.
+#[derive(Debug, Clone, uniffi::Enum)]
+pub enum MobilePasswordStrength {
+    /// Score 0-1: Too weak to use
+    TooWeak,
+    /// Score 2: Fair but not recommended
+    Fair,
+    /// Score 3: Strong enough
+    Strong,
+    /// Score 4: Very strong
+    VeryStrong,
+}
+
+/// Result of password strength check.
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct MobilePasswordCheck {
+    /// The strength level
+    pub strength: MobilePasswordStrength,
+    /// Human-readable description
+    pub description: String,
+    /// Feedback/suggestions for improvement (empty if strong enough)
+    pub feedback: String,
+    /// Whether the password is acceptable for backup
+    pub is_acceptable: bool,
+}
+
+/// Check password strength for backup encryption.
+///
+/// Returns strength level, description, and feedback for improvement.
+#[uniffi::export]
+pub fn check_password_strength(password: String) -> MobilePasswordCheck {
+    use webbook_core::identity::password::{password_feedback, validate_password};
+
+    // Short passwords get immediate feedback
+    if password.len() < 8 {
+        return MobilePasswordCheck {
+            strength: MobilePasswordStrength::TooWeak,
+            description: "Too short".to_string(),
+            feedback: "Password must be at least 8 characters".to_string(),
+            is_acceptable: false,
+        };
+    }
+
+    // Check with zxcvbn via core
+    match validate_password(&password) {
+        Ok(strength) => {
+            use webbook_core::identity::password::PasswordStrength;
+            let (level, description) = match strength {
+                PasswordStrength::Strong => (MobilePasswordStrength::Strong, "Strong"),
+                PasswordStrength::VeryStrong => (MobilePasswordStrength::VeryStrong, "Very strong"),
+                _ => (MobilePasswordStrength::Fair, "Fair"),
+            };
+            MobilePasswordCheck {
+                strength: level,
+                description: description.to_string(),
+                feedback: String::new(),
+                is_acceptable: true,
+            }
+        }
+        Err(_) => {
+            // Get feedback for weak passwords
+            let feedback = password_feedback(&password);
+            let estimate = zxcvbn::zxcvbn(&password, &[]);
+            let (level, description) = match estimate.score() {
+                zxcvbn::Score::Zero | zxcvbn::Score::One => {
+                    (MobilePasswordStrength::TooWeak, "Too weak")
+                }
+                zxcvbn::Score::Two => (MobilePasswordStrength::Fair, "Fair"),
+                _ => (MobilePasswordStrength::Fair, "Fair"),
+            };
+            MobilePasswordCheck {
+                strength: level,
+                description: description.to_string(),
+                feedback: if feedback.is_empty() {
+                    "Add more words or use a passphrase".to_string()
+                } else {
+                    feedback
+                },
+                is_acceptable: false,
+            }
+        }
+    }
+}
+
 // === Thread-safe state ===
 
 /// Serializable identity data for thread-safe storage.

@@ -116,3 +116,36 @@ pub fn remove_field(field_id: String, state: State<'_, Mutex<AppState>>) -> Resu
 
     Ok(())
 }
+
+/// Update a field's value in the card.
+#[tauri::command]
+pub fn update_field(
+    field_id: String,
+    new_value: String,
+    state: State<'_, Mutex<AppState>>,
+) -> Result<(), String> {
+    let state = state.lock().unwrap();
+
+    let mut card = state
+        .storage
+        .load_own_card()
+        .map_err(|e| e.to_string())?
+        .ok_or("No card found")?;
+
+    // Find and update the field
+    let field = card
+        .fields_mut()
+        .iter_mut()
+        .find(|f| f.id() == field_id)
+        .ok_or("Field not found")?;
+
+    field.set_value(&new_value);
+
+    // Save the card
+    state
+        .storage
+        .save_own_card(&card)
+        .map_err(|e| e.to_string())?;
+
+    Ok(())
+}

@@ -1,4 +1,4 @@
-import { createResource, createSignal, Show } from 'solid-js'
+import { createResource, createSignal, Show, onMount } from 'solid-js'
 import { invoke } from '@tauri-apps/api/core'
 
 interface IdentityInfo {
@@ -9,6 +9,20 @@ interface IdentityInfo {
 interface BackupResult {
   success: boolean
   data: string | null
+  error: string | null
+}
+
+interface SyncStatus {
+  pending_updates: number
+  last_sync: number | null
+  is_syncing: boolean
+}
+
+interface SyncResult {
+  contacts_added: number
+  cards_updated: number
+  updates_sent: number
+  success: boolean
   error: string | null
 }
 
@@ -36,6 +50,47 @@ function Settings(props: SettingsProps) {
   const [editingName, setEditingName] = createSignal(false)
   const [newName, setNewName] = createSignal('')
   const [nameError, setNameError] = createSignal('')
+
+  // Sync state
+  const [syncStatus, setSyncStatus] = createSignal<SyncStatus | null>(null)
+  const [isSyncing, setIsSyncing] = createSignal(false)
+  const [syncMessage, setSyncMessage] = createSignal('')
+
+  // Load sync status on mount
+  onMount(async () => {
+    try {
+      const status = await invoke('get_sync_status') as SyncStatus
+      setSyncStatus(status)
+    } catch (e) {
+      console.error('Failed to get sync status:', e)
+    }
+  })
+
+  const handleSync = async () => {
+    setIsSyncing(true)
+    setSyncMessage('')
+
+    try {
+      const result = await invoke('sync') as SyncResult
+      if (result.success) {
+        if (result.error) {
+          setSyncMessage(result.error)
+        } else {
+          setSyncMessage(`Synced: ${result.cards_updated} cards updated, ${result.updates_sent} sent`)
+        }
+      } else {
+        setSyncMessage(result.error || 'Sync failed')
+      }
+
+      // Refresh status
+      const status = await invoke('get_sync_status') as SyncStatus
+      setSyncStatus(status)
+    } catch (e) {
+      setSyncMessage(String(e))
+    }
+
+    setIsSyncing(false)
+  }
 
   const checkPassword = async () => {
     const password = backupPassword()
@@ -211,6 +266,39 @@ function Settings(props: SettingsProps) {
           </button>
           <button class="secondary" onClick={() => props.onNavigate('recovery')}>
             Recovery Options
+          </button>
+        </div>
+      </section>
+
+      <section class="settings-section">
+        <h2>Sync</h2>
+        <p class="setting-description">
+          Synchronize your contact cards with the relay server.
+        </p>
+        <Show when={syncStatus()}>
+          <div class="setting-item">
+            <span class="setting-label">Pending Updates</span>
+            <span class="setting-value">{syncStatus()?.pending_updates || 0}</span>
+          </div>
+          <Show when={syncStatus()?.last_sync}>
+            <div class="setting-item">
+              <span class="setting-label">Last Sync</span>
+              <span class="setting-value">
+                {new Date((syncStatus()?.last_sync || 0) * 1000).toLocaleString()}
+              </span>
+            </div>
+          </Show>
+        </Show>
+        <Show when={syncMessage()}>
+          <p class="sync-message">{syncMessage()}</p>
+        </Show>
+        <div class="setting-buttons">
+          <button
+            class="primary"
+            onClick={handleSync}
+            disabled={isSyncing()}
+          >
+            {isSyncing() ? 'Syncing...' : 'Sync Now'}
           </button>
         </div>
       </section>

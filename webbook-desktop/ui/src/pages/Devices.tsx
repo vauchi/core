@@ -9,6 +9,12 @@ interface DeviceInfo {
   is_active: boolean
 }
 
+interface JoinDeviceResult {
+  success: boolean
+  device_name: string
+  message: string
+}
+
 interface DevicesProps {
   onNavigate: (page: 'home' | 'contacts' | 'exchange' | 'settings' | 'devices' | 'recovery') => void
 }
@@ -20,8 +26,14 @@ async function fetchDevices(): Promise<DeviceInfo[]> {
 function Devices(props: DevicesProps) {
   const [devices, { refetch }] = createResource(fetchDevices)
   const [showLinkDialog, setShowLinkDialog] = createSignal(false)
+  const [showJoinDialog, setShowJoinDialog] = createSignal(false)
+  const [showRevokeConfirm, setShowRevokeConfirm] = createSignal<DeviceInfo | null>(null)
   const [linkData, setLinkData] = createSignal('')
+  const [joinData, setJoinData] = createSignal('')
   const [error, setError] = createSignal('')
+  const [joinMessage, setJoinMessage] = createSignal('')
+  const [isJoining, setIsJoining] = createSignal(false)
+  const [isRevoking, setIsRevoking] = createSignal(false)
 
   const generateLink = async () => {
     try {
@@ -38,6 +50,48 @@ function Devices(props: DevicesProps) {
     navigator.clipboard.writeText(linkData())
   }
 
+  const handleJoinDevice = async () => {
+    if (!joinData().trim()) {
+      setJoinMessage('Please paste the device link data')
+      return
+    }
+
+    setIsJoining(true)
+    setJoinMessage('')
+
+    try {
+      const result = await invoke('join_device', { linkData: joinData() }) as JoinDeviceResult
+      setJoinMessage(result.message)
+      if (result.success) {
+        refetch()
+        setTimeout(() => {
+          setShowJoinDialog(false)
+          setJoinData('')
+          setJoinMessage('')
+        }, 2000)
+      }
+    } catch (e) {
+      setJoinMessage(String(e))
+    }
+
+    setIsJoining(false)
+  }
+
+  const handleRevokeDevice = async (device: DeviceInfo) => {
+    setIsRevoking(true)
+    setError('')
+
+    try {
+      await invoke('revoke_device', { deviceId: device.device_id })
+      refetch()
+      setShowRevokeConfirm(null)
+    } catch (e) {
+      setError(String(e))
+    }
+
+    setIsRevoking(false)
+  }
+
   return (
     <div class="page devices">
       <header>
@@ -52,7 +106,10 @@ function Devices(props: DevicesProps) {
       <section class="devices-section">
         <div class="section-header">
           <h2>Linked Devices</h2>
-          <button class="icon-btn" onClick={generateLink}>+ Link Device</button>
+          <div class="header-buttons">
+            <button class="small secondary" onClick={() => setShowJoinDialog(true)}>Join Another</button>
+            <button class="small primary" onClick={generateLink}>+ Link Device</button>
+          </div>
         </div>
 
         <div class="devices-list">
@@ -72,6 +129,14 @@ function Devices(props: DevicesProps) {
                     {device.is_active ? 'Active' : 'Revoked'}
                   </span>
                 </div>
+                <Show when={!device.is_current && device.is_active}>
+                  <button
+                    class="small danger"
+                    onClick={() => setShowRevokeConfirm(device)}
+                  >
+                    Revoke
+                  </button>
+                </Show>
               </div>
             )}
           </For>
@@ -104,6 +169,85 @@ function Devices(props: DevicesProps) {
 
             <div class="dialog-actions">
               <button class="secondary" onClick={() => setShowLinkDialog(false)}>Close</button>
+            </div>
+          </div>
+        </div>
+      </Show>
+
+      {/* Join Device Dialog */}
+      <Show when={showJoinDialog()}>
+        <div class="dialog-overlay" onClick={() => {
+          if (!isJoining()) {
+            setShowJoinDialog(false)
+            setJoinData('')
+            setJoinMessage('')
+          }
+        }}>
+          <div class="dialog" onClick={(e) => e.stopPropagation()}>
+            <h3>Join Another Device</h3>
+            <p>Paste the device link data from your other device:</p>
+
+            <textarea
+              value={joinData()}
+              onInput={(e) => setJoinData(e.target.value)}
+              placeholder="Paste device link data here..."
+              rows={4}
+              disabled={isJoining()}
+            />
+
+            <Show when={joinMessage()}>
+              <p class="info-message">{joinMessage()}</p>
+            </Show>
+
+            <div class="dialog-actions">
+              <button
+                class="primary"
+                onClick={handleJoinDevice}
+                disabled={isJoining() || !joinData().trim()}
+              >
+                {isJoining() ? 'Joining...' : 'Join'}
+              </button>
+              <button
+                class="secondary"
+                onClick={() => {
+                  setShowJoinDialog(false)
+                  setJoinData('')
+                  setJoinMessage('')
+                }}
+                disabled={isJoining()}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      </Show>
+
+      {/* Revoke Confirmation Dialog */}
+      <Show when={showRevokeConfirm()}>
+        <div class="dialog-overlay" onClick={() => {
+          if (!isRevoking()) setShowRevokeConfirm(null)
+        }}>
+          <div class="dialog" onClick={(e) => e.stopPropagation()}>
+            <h3>Revoke Device</h3>
+            <p>Are you sure you want to revoke <strong>{showRevokeConfirm()?.device_name}</strong>?</p>
+            <p class="warning">This device will no longer be able to sync with your account.</p>
+
+            <div class="dialog-actions">
+              <button
+                class="danger"
+                onClick={() => handleRevokeDevice(showRevokeConfirm()!)}
+                disabled={isRevoking()}
+              >
+                {isRevoking() ? 'Revoking...' : 'Revoke Device'}
+              </button>
+              <button
+                class="secondary"
+                onClick={() => setShowRevokeConfirm(null)}
+                disabled={isRevoking()}
+              >
+                Cancel
+              </button>
             </div>
           </div>
         </div>

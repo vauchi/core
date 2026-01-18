@@ -14,6 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.webbook.util.ContactActions
+import kotlinx.coroutines.launch
 import uniffi.webbook_mobile.MobileContact
 import uniffi.webbook_mobile.MobileContactCard
 import uniffi.webbook_mobile.MobileContactField
@@ -26,16 +27,23 @@ fun ContactDetailScreen(
     onGetContact: suspend (String) -> MobileContact?,
     onGetOwnCard: suspend () -> MobileContactCard?,
     onSetFieldVisibility: (String, String, Boolean) -> Unit,
-    onIsFieldVisible: suspend (String, String) -> Boolean
+    onIsFieldVisible: suspend (String, String) -> Boolean,
+    onVerifyContact: suspend (String) -> Boolean,
+    onGetOwnPublicKey: suspend () -> String?
 ) {
     var contact by remember { mutableStateOf<MobileContact?>(null) }
     var ownCard by remember { mutableStateOf<MobileContactCard?>(null) }
+    var ownPublicKey by remember { mutableStateOf<String?>(null) }
     var fieldVisibility by remember { mutableStateOf<Map<String, Boolean>>(emptyMap()) }
     var isLoading by remember { mutableStateOf(true) }
+    var showVerification by remember { mutableStateOf(false) }
+    var isVerifying by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
 
     LaunchedEffect(contactId) {
         contact = onGetContact(contactId)
         ownCard = onGetOwnCard()
+        ownPublicKey = onGetOwnPublicKey()
 
         // Load visibility for each of our fields
         ownCard?.let { card ->
@@ -110,6 +118,57 @@ fun ContactDetailScreen(
                             ContactFieldItem(field = field)
                         }
                     }
+
+                    // Verification status
+                    item {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(
+                                containerColor = if (c.isVerified)
+                                    MaterialTheme.colorScheme.primaryContainer
+                                else
+                                    MaterialTheme.colorScheme.surfaceVariant
+                            )
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column {
+                                    Text(
+                                        text = if (c.isVerified) "Verified" else "Not Verified",
+                                        style = MaterialTheme.typography.titleSmall,
+                                        color = if (c.isVerified)
+                                            MaterialTheme.colorScheme.onPrimaryContainer
+                                        else
+                                            MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    Text(
+                                        text = if (c.isVerified)
+                                            "You have verified this contact's identity"
+                                        else
+                                            "Verify fingerprints in person",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = if (c.isVerified)
+                                            MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+                                        else
+                                            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+                                    )
+                                }
+                                if (!c.isVerified) {
+                                    Button(
+                                        onClick = { showVerification = true }
+                                    ) {
+                                        Text("Verify")
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
 
                 // Divider
@@ -158,6 +217,103 @@ fun ContactDetailScreen(
                 }
             }
         }
+    }
+
+    // Verification Dialog
+    if (showVerification) {
+        AlertDialog(
+            onDismissRequest = { if (!isVerifying) showVerification = false },
+            title = { Text("Verify ${contact?.displayName}") },
+            text = {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text(
+                        text = "Compare these fingerprints with ${contact?.displayName} in person to verify their identity.",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+
+                    // Their fingerprint
+                    Card(
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant
+                        )
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Text(
+                                text = "Their Fingerprint",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                text = contact?.publicKey?.chunked(4)?.joinToString(" ")?.uppercase() ?: "",
+                                style = MaterialTheme.typography.bodySmall,
+                                maxLines = 3
+                            )
+                        }
+                    }
+
+                    // Our fingerprint
+                    Card(
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant
+                        )
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Text(
+                                text = "Your Fingerprint",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                text = ownPublicKey?.chunked(4)?.joinToString(" ")?.uppercase() ?: "",
+                                style = MaterialTheme.typography.bodySmall,
+                                maxLines = 3
+                            )
+                        }
+                    }
+
+                    Text(
+                        text = "Only mark as verified if the fingerprints match!",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        scope.launch {
+                            isVerifying = true
+                            val success = onVerifyContact(contactId)
+                            if (success) {
+                                contact = onGetContact(contactId)
+                                showVerification = false
+                            }
+                            isVerifying = false
+                        }
+                    },
+                    enabled = !isVerifying
+                ) {
+                    if (isVerifying) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(16.dp),
+                            strokeWidth = 2.dp
+                        )
+                    } else {
+                        Text("Mark as Verified")
+                    }
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { showVerification = false },
+                    enabled = !isVerifying
+                ) {
+                    Text("Cancel")
+                }
+            }
+        )
     }
 }
 

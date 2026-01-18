@@ -1,9 +1,10 @@
 //! Backup Screen UI
 
 use ratatui::prelude::*;
-use ratatui::widgets::{Block, Borders, Paragraph};
+use ratatui::widgets::{Block, Borders, Paragraph, Gauge};
 
 use crate::app::{App, BackupFocus, BackupMode};
+use webbook_core::identity::password::{validate_password, password_feedback, PasswordStrength};
 
 /// Draw the backup/restore screen.
 pub fn draw(f: &mut Frame, area: Rect, app: &App) {
@@ -54,6 +55,7 @@ fn draw_export(f: &mut Frame, area: Rect, app: &App) {
         .constraints([
             Constraint::Length(3), // Info
             Constraint::Length(3), // Password
+            Constraint::Length(3), // Strength indicator
             Constraint::Length(3), // Confirm
             Constraint::Length(3), // Instructions
             Constraint::Min(0),    // Spacer
@@ -80,6 +82,36 @@ fn draw_export(f: &mut Frame, area: Rect, app: &App) {
     .block(Block::default().borders(Borders::ALL));
     f.render_widget(password, chunks[1]);
 
+    // Password strength indicator
+    let (strength_label, strength_ratio, strength_color) = if app.backup_state.password.is_empty() {
+        ("", 0.0, Color::DarkGray)
+    } else {
+        match validate_password(&app.backup_state.password) {
+            Ok(strength) => match strength {
+                PasswordStrength::Strong => ("Strong", 0.75, Color::Green),
+                PasswordStrength::VeryStrong => ("Very Strong", 1.0, Color::Green),
+                _ => ("Acceptable", 0.6, Color::Yellow),
+            },
+            Err(_) => {
+                let feedback = password_feedback(&app.backup_state.password);
+                if app.backup_state.password.len() < 8 {
+                    ("Too short", 0.2, Color::Red)
+                } else if !feedback.is_empty() {
+                    ("Weak", 0.35, Color::Red)
+                } else {
+                    ("Too weak", 0.25, Color::Red)
+                }
+            }
+        }
+    };
+
+    let strength_gauge = Gauge::default()
+        .block(Block::default().borders(Borders::ALL).title("Strength"))
+        .gauge_style(Style::default().fg(strength_color))
+        .label(strength_label)
+        .ratio(strength_ratio);
+    f.render_widget(strength_gauge, chunks[2]);
+
     let confirm_style = if app.backup_state.focus == BackupFocus::Confirm {
         Style::default()
             .fg(Color::Yellow)
@@ -93,12 +125,23 @@ fn draw_export(f: &mut Frame, area: Rect, app: &App) {
     ))
     .style(confirm_style)
     .block(Block::default().borders(Borders::ALL));
-    f.render_widget(confirm, chunks[2]);
+    f.render_widget(confirm, chunks[3]);
 
-    let instructions = Paragraph::new("[Tab] switch fields  [Enter] export  [Esc] cancel")
+    // Show feedback for weak passwords
+    let mut instructions_text = "[Tab] switch fields  [Enter] export  [Esc] cancel".to_string();
+    if !app.backup_state.password.is_empty()
+        && validate_password(&app.backup_state.password).is_err()
+    {
+        let feedback = password_feedback(&app.backup_state.password);
+        if !feedback.is_empty() {
+            instructions_text = format!("Tip: {}  |  [Tab] [Enter] [Esc]", feedback);
+        }
+    }
+
+    let instructions = Paragraph::new(instructions_text)
         .style(Style::default().fg(Color::DarkGray))
         .block(Block::default().borders(Borders::TOP));
-    f.render_widget(instructions, chunks[3]);
+    f.render_widget(instructions, chunks[4]);
 }
 
 fn draw_import(f: &mut Frame, area: Rect, app: &App) {

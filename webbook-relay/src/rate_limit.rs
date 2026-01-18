@@ -117,6 +117,8 @@ impl RateLimiter {
     }
 
     /// Returns the number of client buckets currently tracked.
+    /// Reserved for future metrics/monitoring.
+    #[allow(dead_code)]
     pub fn client_count(&self) -> usize {
         let buckets = self.buckets.read().unwrap();
         buckets.len()

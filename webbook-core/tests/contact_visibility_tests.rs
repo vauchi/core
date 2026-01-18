@@ -2,9 +2,7 @@
 //! Extracted from visibility.rs
 
 use std::collections::HashSet;
-use webbook_core::contact::visibility::*;
-use webbook_core::contact::*;
-use webbook_core::*;
+use webbook_core::contact::{FieldVisibility, VisibilityRules};
 
 #[test]
 fn test_default_is_everyone() {

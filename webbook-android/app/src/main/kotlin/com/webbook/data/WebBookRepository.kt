@@ -155,6 +155,8 @@ class WebBookRepository(context: Context) {
         webbook.importBackup(backupData, password)
     }
 
+    fun checkPasswordStrength(password: String) = uniffi.webbook_mobile.checkPasswordStrength(password)
+
     // Social network operations
     fun listSocialNetworks() = webbook.listSocialNetworks()
 
@@ -162,4 +164,24 @@ class WebBookRepository(context: Context) {
 
     fun getProfileUrl(networkId: String, username: String): String? =
         webbook.getProfileUrl(networkId, username)
+
+    // Verification operations
+    fun verifyContact(id: String) = webbook.verifyContact(id)
+
+    fun getPublicKey(): String = webbook.getPublicKey()
+
+    // Recovery operations
+    fun createRecoveryClaim(oldPkHex: String) = webbook.createRecoveryClaim(oldPkHex)
+
+    fun parseRecoveryClaim(claimB64: String) = webbook.parseRecoveryClaim(claimB64)
+
+    fun createRecoveryVoucher(claimB64: String) = webbook.createRecoveryVoucher(claimB64)
+
+    fun addRecoveryVoucher(voucherB64: String) = webbook.addRecoveryVoucher(voucherB64)
+
+    fun getRecoveryStatus() = webbook.getRecoveryStatus()
+
+    fun getRecoveryProof(): String? = webbook.getRecoveryProof()
+
+    fun verifyRecoveryProof(proofB64: String) = webbook.verifyRecoveryProof(proofB64)
 }

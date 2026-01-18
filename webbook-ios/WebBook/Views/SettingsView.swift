@@ -118,6 +118,10 @@ struct SettingsView: View {
                     NavigationLink(destination: LinkedDevicesView()) {
                         Label("Linked Devices", systemImage: "laptopcomputer.and.iphone")
                     }
+
+                    NavigationLink(destination: RecoveryView()) {
+                        Label("Recovery", systemImage: "person.badge.key")
+                    }
                 }
 
                 // About section

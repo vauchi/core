@@ -49,6 +49,10 @@ function Home(props: HomeProps) {
   const [selectedFieldLabel, setSelectedFieldLabel] = createSignal('')
   const [fieldViewers, setFieldViewers] = createSignal<ContactFieldVisibility[]>([])
   const [visibilityError, setVisibilityError] = createSignal('')
+  const [editingField, setEditingField] = createSignal<FieldInfo | null>(null)
+  const [editValue, setEditValue] = createSignal('')
+  const [editError, setEditError] = createSignal('')
+  const [isEditSaving, setIsEditSaving] = createSignal(false)
 
   const openVisibilityDialog = async (field: FieldInfo) => {
     setSelectedFieldId(field.id)
@@ -125,6 +129,39 @@ function Home(props: HomeProps) {
     }
   }
 
+  const openEditDialog = (field: FieldInfo) => {
+    setEditingField(field)
+    setEditValue(field.value)
+    setEditError('')
+  }
+
+  const closeEditDialog = () => {
+    setEditingField(null)
+    setEditValue('')
+    setEditError('')
+  }
+
+  const handleSaveEdit = async () => {
+    const field = editingField()
+    if (!field) return
+
+    const newValue = editValue().trim()
+    if (!newValue) {
+      setEditError('Value cannot be empty')
+      return
+    }
+
+    setIsEditSaving(true)
+    try {
+      await invoke('update_field', { fieldId: field.id, newValue })
+      refetchCard()
+      closeEditDialog()
+    } catch (e) {
+      setEditError(String(e))
+    }
+    setIsEditSaving(false)
+  }
+
   const fieldIcon = (type: string) => {
     switch (type.toLowerCase()) {
       case 'email': return 'mail'
@@ -158,6 +195,13 @@ function Home(props: HomeProps) {
                   <span class="field-label">{field.label}</span>
                   <span class="field-value">{field.value}</span>
                 </div>
+                <button
+                  class="edit-btn"
+                  onClick={(e) => { e.stopPropagation(); openEditDialog(field) }}
+                  title="Edit this field"
+                >
+                  edit
+                </button>
                 <button
                   class="visibility-btn"
                   onClick={(e) => { e.stopPropagation(); openVisibilityDialog(field) }}
@@ -235,6 +279,50 @@ function Home(props: HomeProps) {
 
             <div class="dialog-actions">
               <button class="secondary" onClick={closeVisibilityDialog}>Done</button>
+            </div>
+          </div>
+        </div>
+      </Show>
+
+      {/* Edit Field Dialog */}
+      <Show when={editingField()}>
+        <div class="dialog-overlay" onClick={() => { if (!isEditSaving()) closeEditDialog() }}>
+          <div class="dialog" onClick={(e) => e.stopPropagation()}>
+            <h3>Edit {editingField()?.label}</h3>
+
+            <div class="form">
+              <label>Current Type</label>
+              <input type="text" value={editingField()?.field_type || ''} disabled />
+
+              <label>Value</label>
+              <input
+                type="text"
+                value={editValue()}
+                onInput={(e) => setEditValue(e.target.value)}
+                placeholder="Enter new value"
+                disabled={isEditSaving()}
+              />
+
+              <Show when={editError()}>
+                <p class="error">{editError()}</p>
+              </Show>
+
+              <div class="dialog-actions">
+                <button
+                  class="primary"
+                  onClick={handleSaveEdit}
+                  disabled={isEditSaving()}
+                >
+                  {isEditSaving() ? 'Saving...' : 'Save'}
+                </button>
+                <button
+                  class="secondary"
+                  onClick={closeEditDialog}
+                  disabled={isEditSaving()}
+                >
+                  Cancel
+                </button>
+              </div>
             </div>
           </div>
         </div>

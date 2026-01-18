@@ -6,20 +6,27 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.launch
+import com.webbook.util.ClipboardUtils
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RecoveryScreen(
+    viewModel: MainViewModel,
     onBack: () -> Unit
 ) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     var selectedTab by remember { mutableStateOf(0) }
 
     Scaffold(
@@ -57,17 +64,28 @@ fun RecoveryScreen(
             }
 
             when (selectedTab) {
-                0 -> RecoverIdentityContent()
-                1 -> HelpOthersContent()
+                0 -> RecoverIdentityContent(viewModel = viewModel, context = context, scope = scope)
+                1 -> HelpOthersContent(viewModel = viewModel, context = context, scope = scope)
             }
         }
     }
 }
 
 @Composable
-fun RecoverIdentityContent() {
+fun RecoverIdentityContent(
+    viewModel: MainViewModel,
+    context: Context,
+    scope: kotlinx.coroutines.CoroutineScope
+) {
     var oldPublicKey by remember { mutableStateOf("") }
     var showClaimDialog by remember { mutableStateOf(false) }
+    var isCreatingClaim by remember { mutableStateOf(false) }
+    var generatedClaimData by remember { mutableStateOf<String?>(null) }
+
+    fun copyToClipboard(text: String, label: String) {
+        // Auto-clear after 30 seconds for sensitive recovery data
+        ClipboardUtils.copyWithAutoClear(context, scope, text, label)
+    }
 
     Column(
         verticalArrangement = Arrangement.spacedBy(16.dp)
@@ -191,72 +209,112 @@ fun RecoverIdentityContent() {
         ) {
             Text("Start Recovery Process")
         }
-
-        // CLI note
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceVariant
-            )
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text(
-                    text = "CLI Commands",
-                    style = MaterialTheme.typography.titleSmall
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = "webbook recovery claim <old-pk>",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.outline
-                )
-                Text(
-                    text = "webbook recovery status",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.outline
-                )
-            }
-        }
     }
 
     if (showClaimDialog) {
         AlertDialog(
-            onDismissRequest = { showClaimDialog = false },
-            title = { Text("Create Recovery Claim") },
+            onDismissRequest = {
+                if (!isCreatingClaim) {
+                    showClaimDialog = false
+                    generatedClaimData = null
+                }
+            },
+            title = { Text(if (generatedClaimData != null) "Recovery Claim Created" else "Create Recovery Claim") },
             text = {
                 Column {
-                    Text(
-                        text = "Enter your OLD public key (from backup or previous device):",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    OutlinedTextField(
-                        value = oldPublicKey,
-                        onValueChange = { oldPublicKey = it },
-                        label = { Text("Old Public Key (hex)") },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = false,
-                        minLines = 2
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = "Note: Full recovery requires CLI. Use: webbook recovery claim <key>",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.outline
-                    )
+                    if (generatedClaimData != null) {
+                        Text(
+                            text = "Share this claim with your trusted contacts:",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceVariant
+                            )
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp)) {
+                                Text(
+                                    text = generatedClaimData!!.take(60) + "...",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                        OutlinedButton(
+                            onClick = {
+                                copyToClipboard(generatedClaimData!!, "Recovery Claim")
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(Icons.Default.ContentCopy, contentDescription = null)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Copy Claim Data")
+                        }
+                    } else {
+                        Text(
+                            text = "Enter your OLD public key (from backup or previous device):",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        OutlinedTextField(
+                            value = oldPublicKey,
+                            onValueChange = { oldPublicKey = it },
+                            label = { Text("Old Public Key (hex)") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = false,
+                            minLines = 2,
+                            enabled = !isCreatingClaim
+                        )
+                    }
                 }
             },
             confirmButton = {
-                TextButton(
-                    onClick = { showClaimDialog = false },
-                    enabled = oldPublicKey.length >= 64
-                ) {
-                    Text("Create Claim (CLI)")
+                if (generatedClaimData != null) {
+                    TextButton(
+                        onClick = {
+                            showClaimDialog = false
+                            generatedClaimData = null
+                            oldPublicKey = ""
+                        }
+                    ) {
+                        Text("Done")
+                    }
+                } else {
+                    TextButton(
+                        onClick = {
+                            scope.launch {
+                                isCreatingClaim = true
+                                val claim = viewModel.createRecoveryClaim(oldPublicKey.trim())
+                                if (claim != null) {
+                                    generatedClaimData = claim.claimData
+                                }
+                                isCreatingClaim = false
+                            }
+                        },
+                        enabled = oldPublicKey.length >= 64 && !isCreatingClaim
+                    ) {
+                        if (isCreatingClaim) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(16.dp),
+                                strokeWidth = 2.dp
+                            )
+                        } else {
+                            Text("Create Claim")
+                        }
+                    }
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showClaimDialog = false }) {
-                    Text("Cancel")
+                if (generatedClaimData == null) {
+                    TextButton(
+                        onClick = { showClaimDialog = false },
+                        enabled = !isCreatingClaim
+                    ) {
+                        Text("Cancel")
+                    }
                 }
             }
         )
@@ -264,9 +322,22 @@ fun RecoverIdentityContent() {
 }
 
 @Composable
-fun HelpOthersContent() {
+fun HelpOthersContent(
+    viewModel: MainViewModel,
+    context: Context,
+    scope: kotlinx.coroutines.CoroutineScope
+) {
     var claimData by remember { mutableStateOf("") }
     var showVouchDialog by remember { mutableStateOf(false) }
+    var isCreatingVoucher by remember { mutableStateOf(false) }
+    var isParsing by remember { mutableStateOf(false) }
+    var parsedClaimInfo by remember { mutableStateOf<uniffi.webbook_mobile.MobileRecoveryClaim?>(null) }
+    var generatedVoucherData by remember { mutableStateOf<String?>(null) }
+
+    fun copyToClipboard(text: String, label: String) {
+        // Auto-clear after 30 seconds for sensitive recovery data
+        ClipboardUtils.copyWithAutoClear(context, scope, text, label)
+    }
 
     Column(
         verticalArrangement = Arrangement.spacedBy(16.dp)
@@ -343,8 +414,8 @@ fun HelpOthersContent() {
 
         RecoveryStep(
             number = 2,
-            title = "Scan Their Claim",
-            description = "They will show you a QR code or give you claim data."
+            title = "Get Their Claim",
+            description = "They will share their claim data with you."
         )
 
         RecoveryStep(
@@ -371,73 +442,196 @@ fun HelpOthersContent() {
         ) {
             Text("Vouch for Someone")
         }
-
-        // CLI note
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceVariant
-            )
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text(
-                    text = "CLI Commands",
-                    style = MaterialTheme.typography.titleSmall
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = "webbook recovery vouch <claim-data>",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.outline
-                )
-            }
-        }
     }
 
     if (showVouchDialog) {
         AlertDialog(
-            onDismissRequest = { showVouchDialog = false },
-            title = { Text("Vouch for Recovery") },
+            onDismissRequest = {
+                if (!isCreatingVoucher && !isParsing) {
+                    showVouchDialog = false
+                    claimData = ""
+                    parsedClaimInfo = null
+                    generatedVoucherData = null
+                }
+            },
+            title = {
+                Text(
+                    when {
+                        generatedVoucherData != null -> "Voucher Created"
+                        parsedClaimInfo != null -> "Confirm Voucher"
+                        else -> "Vouch for Recovery"
+                    }
+                )
+            },
             text = {
                 Column {
-                    Text(
-                        text = "Paste the recovery claim data from your contact:",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    OutlinedTextField(
-                        value = claimData,
-                        onValueChange = { claimData = it },
-                        label = { Text("Claim Data (base64)") },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = false,
-                        minLines = 3
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = "Verify this person's identity IN PERSON before vouching!",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "Note: Full vouching requires CLI. Use: webbook recovery vouch <claim>",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.outline
-                    )
+                    when {
+                        generatedVoucherData != null -> {
+                            Text(
+                                text = "Give this voucher to your contact:",
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = MaterialTheme.colorScheme.surfaceVariant
+                                )
+                            ) {
+                                Column(modifier = Modifier.padding(12.dp)) {
+                                    Text(
+                                        text = generatedVoucherData!!.take(60) + "...",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(8.dp))
+                            OutlinedButton(
+                                onClick = {
+                                    copyToClipboard(generatedVoucherData!!, "Recovery Voucher")
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Icon(Icons.Default.ContentCopy, contentDescription = null)
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Copy Voucher Data")
+                            }
+                        }
+                        parsedClaimInfo != null -> {
+                            Text(
+                                text = "Claim Details:",
+                                style = MaterialTheme.typography.titleSmall
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = "Old ID: ${parsedClaimInfo!!.oldPublicKey.take(16)}...",
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                            Text(
+                                text = "New ID: ${parsedClaimInfo!!.newPublicKey.take(16)}...",
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                            if (parsedClaimInfo!!.isExpired) {
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    text = "This claim has EXPIRED!",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.error
+                                )
+                            } else {
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    text = "Verify this person's identity IN PERSON before vouching!",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.error
+                                )
+                            }
+                        }
+                        else -> {
+                            Text(
+                                text = "Paste the recovery claim data from your contact:",
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            OutlinedTextField(
+                                value = claimData,
+                                onValueChange = { claimData = it },
+                                label = { Text("Claim Data (base64)") },
+                                modifier = Modifier.fillMaxWidth(),
+                                singleLine = false,
+                                minLines = 3,
+                                enabled = !isParsing
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = "Verify this person's identity IN PERSON before vouching!",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.error
+                            )
+                        }
+                    }
                 }
             },
             confirmButton = {
-                TextButton(
-                    onClick = { showVouchDialog = false },
-                    enabled = claimData.length >= 20
-                ) {
-                    Text("Create Voucher (CLI)")
+                when {
+                    generatedVoucherData != null -> {
+                        TextButton(
+                            onClick = {
+                                showVouchDialog = false
+                                claimData = ""
+                                parsedClaimInfo = null
+                                generatedVoucherData = null
+                            }
+                        ) {
+                            Text("Done")
+                        }
+                    }
+                    parsedClaimInfo != null -> {
+                        TextButton(
+                            onClick = {
+                                scope.launch {
+                                    isCreatingVoucher = true
+                                    val voucher = viewModel.createRecoveryVoucher(claimData.trim())
+                                    if (voucher != null) {
+                                        generatedVoucherData = voucher.voucherData
+                                    }
+                                    isCreatingVoucher = false
+                                }
+                            },
+                            enabled = !parsedClaimInfo!!.isExpired && !isCreatingVoucher
+                        ) {
+                            if (isCreatingVoucher) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(16.dp),
+                                    strokeWidth = 2.dp
+                                )
+                            } else {
+                                Text("Create Voucher")
+                            }
+                        }
+                    }
+                    else -> {
+                        TextButton(
+                            onClick = {
+                                scope.launch {
+                                    isParsing = true
+                                    val claim = viewModel.parseRecoveryClaim(claimData.trim())
+                                    if (claim != null) {
+                                        parsedClaimInfo = claim
+                                    }
+                                    isParsing = false
+                                }
+                            },
+                            enabled = claimData.length >= 20 && !isParsing
+                        ) {
+                            if (isParsing) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(16.dp),
+                                    strokeWidth = 2.dp
+                                )
+                            } else {
+                                Text("Verify Claim")
+                            }
+                        }
+                    }
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showVouchDialog = false }) {
-                    Text("Cancel")
+                if (generatedVoucherData == null) {
+                    TextButton(
+                        onClick = {
+                            if (parsedClaimInfo != null) {
+                                parsedClaimInfo = null
+                            } else {
+                                showVouchDialog = false
+                                claimData = ""
+                            }
+                        },
+                        enabled = !isCreatingVoucher && !isParsing
+                    ) {
+                        Text(if (parsedClaimInfo != null) "Back" else "Cancel")
+                    }
                 }
             }
         )

@@ -10,4 +10,5 @@ pub mod devices;
 pub mod exchange;
 pub mod identity;
 pub mod recovery;
+pub mod sync;
 pub mod visibility;

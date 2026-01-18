@@ -4,6 +4,7 @@ use crossterm::event::KeyCode;
 
 use crate::app::{AddFieldFocus, App, BackupFocus, BackupMode, InputMode, Screen};
 use crate::backend::{Backend, FIELD_TYPES};
+use webbook_core::identity::password::validate_password;
 
 /// Action to take after handling input.
 pub enum Action {
@@ -455,21 +456,32 @@ fn handle_backup_keys(app: &mut App, key: KeyCode) {
                 app.input_mode = InputMode::Editing;
             }
             KeyCode::Enter => {
-                if app.backup_state.password == app.backup_state.confirm_password
-                    && app.backup_state.password.len() >= 8
-                {
-                    match app.backend.export_backup(&app.backup_state.password) {
-                        Ok(data) => {
-                            app.set_status(format!("Backup: {}...", &data[..50.min(data.len())]));
-                            app.backup_state.mode = BackupMode::Menu;
-                            app.backup_state = Default::default();
-                        }
-                        Err(e) => app.set_status(format!("Export error: {}", e)),
-                    }
-                } else if app.backup_state.password.len() < 8 {
-                    app.set_status("Password must be at least 8 characters");
-                } else {
+                // Check passwords match first
+                if app.backup_state.password != app.backup_state.confirm_password {
                     app.set_status("Passwords don't match");
+                    return;
+                }
+
+                // Validate password strength
+                match validate_password(&app.backup_state.password) {
+                    Ok(_) => {
+                        // Password is strong enough, proceed with export
+                        match app.backend.export_backup(&app.backup_state.password) {
+                            Ok(data) => {
+                                app.set_status(format!("Backup: {}...", &data[..50.min(data.len())]));
+                                app.backup_state.mode = BackupMode::Menu;
+                                app.backup_state = Default::default();
+                            }
+                            Err(e) => app.set_status(format!("Export error: {}", e)),
+                        }
+                    }
+                    Err(_) => {
+                        if app.backup_state.password.len() < 8 {
+                            app.set_status("Password must be at least 8 characters");
+                        } else {
+                            app.set_status("Password too weak. Use a stronger passphrase.");
+                        }
+                    }
                 }
             }
             KeyCode::Esc => {

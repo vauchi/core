@@ -1,8 +1,7 @@
 package com.webbook.ui
 
-import android.content.ClipData
-import android.content.ClipboardManager
 import android.content.Context
+import com.webbook.util.ClipboardUtils
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -29,7 +28,8 @@ fun SettingsScreen(
     syncState: SyncState = SyncState.Idle,
     onSync: () -> Unit = {},
     onDevices: () -> Unit = {},
-    onRecovery: () -> Unit = {}
+    onRecovery: () -> Unit = {},
+    onCheckPasswordStrength: (String) -> PasswordStrengthResult = { PasswordStrengthResult() }
 ) {
     var showExportDialog by remember { mutableStateOf(false) }
     var showImportDialog by remember { mutableStateOf(false) }
@@ -269,7 +269,8 @@ fun SettingsScreen(
             onResult = { success, message ->
                 snackbarMessage = message
                 if (success) showExportDialog = false
-            }
+            },
+            onCheckPasswordStrength = onCheckPasswordStrength
         )
     }
 
@@ -289,14 +290,25 @@ fun SettingsScreen(
 fun ExportBackupDialog(
     onDismiss: () -> Unit,
     onExport: suspend (String) -> String?,
-    onResult: (Boolean, String) -> Unit
+    onResult: (Boolean, String) -> Unit,
+    onCheckPasswordStrength: (String) -> PasswordStrengthResult = { PasswordStrengthResult() }
 ) {
     var password by remember { mutableStateOf("") }
     var confirmPassword by remember { mutableStateOf("") }
     var isLoading by remember { mutableStateOf(false) }
     var backupCode by remember { mutableStateOf<String?>(null) }
+    var passwordStrength by remember { mutableStateOf(PasswordStrengthResult()) }
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
+
+    // Check password strength as user types
+    LaunchedEffect(password) {
+        if (password.isNotEmpty()) {
+            passwordStrength = onCheckPasswordStrength(password)
+        } else {
+            passwordStrength = PasswordStrengthResult()
+        }
+    }
 
     AlertDialog(
         onDismissRequest = { if (!isLoading) onDismiss() },
@@ -317,6 +329,12 @@ fun ExportBackupDialog(
                         modifier = Modifier.fillMaxWidth(),
                         enabled = !isLoading
                     )
+
+                    // Password strength indicator
+                    if (password.isNotEmpty()) {
+                        PasswordStrengthIndicator(strength = passwordStrength)
+                    }
+
                     OutlinedTextField(
                         value = confirmPassword,
                         onValueChange = { confirmPassword = it },
@@ -356,16 +374,15 @@ fun ExportBackupDialog(
             if (backupCode == null) {
                 TextButton(
                     onClick = {
-                        if (password.length >= 8 && password == confirmPassword) {
+                        if (passwordStrength.isAcceptable && password == confirmPassword) {
                             isLoading = true
                             coroutineScope.launch {
                                 val result = onExport(password)
                                 if (result != null) {
-                                    // Copy to clipboard
-                                    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                                    clipboard.setPrimaryClip(ClipData.newPlainText("WebBook Backup", result))
+                                    // Copy to clipboard with auto-clear after 30 seconds
+                                    ClipboardUtils.copyWithAutoClear(context, coroutineScope, result, "WebBook Backup")
                                     backupCode = result
-                                    onResult(false, "Backup copied to clipboard")
+                                    onResult(false, "Backup copied to clipboard (auto-clears in 30s)")
                                 } else {
                                     onResult(false, "Failed to create backup")
                                 }
@@ -373,7 +390,7 @@ fun ExportBackupDialog(
                             }
                         }
                     },
-                    enabled = password.length >= 8 && password == confirmPassword && !isLoading
+                    enabled = passwordStrength.isAcceptable && password == confirmPassword && !isLoading
                 ) {
                     if (isLoading) {
                         CircularProgressIndicator(modifier = Modifier.size(16.dp))
@@ -467,4 +484,95 @@ fun ImportBackupDialog(
             }
         }
     )
+}
+
+// Password strength types and UI
+
+enum class PasswordStrengthLevel {
+    TooWeak,
+    Fair,
+    Strong,
+    VeryStrong
+}
+
+data class PasswordStrengthResult(
+    val level: PasswordStrengthLevel = PasswordStrengthLevel.TooWeak,
+    val description: String = "",
+    val feedback: String = "",
+    val isAcceptable: Boolean = false
+)
+
+@Composable
+fun PasswordStrengthIndicator(strength: PasswordStrengthResult) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        // Strength bar
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            val segmentCount = 4
+            val filledSegments = when (strength.level) {
+                PasswordStrengthLevel.TooWeak -> 1
+                PasswordStrengthLevel.Fair -> 2
+                PasswordStrengthLevel.Strong -> 3
+                PasswordStrengthLevel.VeryStrong -> 4
+            }
+            val color = when (strength.level) {
+                PasswordStrengthLevel.TooWeak -> MaterialTheme.colorScheme.error
+                PasswordStrengthLevel.Fair -> MaterialTheme.colorScheme.tertiary
+                PasswordStrengthLevel.Strong -> MaterialTheme.colorScheme.primary
+                PasswordStrengthLevel.VeryStrong -> MaterialTheme.colorScheme.primary
+            }
+
+            repeat(segmentCount) { index ->
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(4.dp)
+                        .padding(horizontal = 1.dp)
+                ) {
+                    Surface(
+                        modifier = Modifier.fillMaxSize(),
+                        color = if (index < filledSegments) color else color.copy(alpha = 0.2f),
+                        shape = MaterialTheme.shapes.small
+                    ) {}
+                }
+            }
+        }
+
+        // Strength description
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                text = strength.description,
+                style = MaterialTheme.typography.labelSmall,
+                color = when (strength.level) {
+                    PasswordStrengthLevel.TooWeak -> MaterialTheme.colorScheme.error
+                    PasswordStrengthLevel.Fair -> MaterialTheme.colorScheme.tertiary
+                    else -> MaterialTheme.colorScheme.primary
+                }
+            )
+            if (strength.isAcceptable) {
+                Text(
+                    text = "OK",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+        }
+
+        // Feedback for weak passwords
+        if (strength.feedback.isNotEmpty()) {
+            Text(
+                text = strength.feedback,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
 }

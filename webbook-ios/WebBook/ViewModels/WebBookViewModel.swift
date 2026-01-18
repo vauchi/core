@@ -509,4 +509,60 @@ class WebBookViewModel: ObservableObject {
 
         return repository.getProfileUrl(networkId: networkId, username: username)
     }
+
+    // MARK: - Recovery
+
+    /// Create a recovery claim for a lost identity
+    func createRecoveryClaim(oldPkHex: String) async throws -> WebBookRepository.RecoveryClaimInfo {
+        guard let repository = repository else {
+            throw WebBookRepositoryError.notInitialized
+        }
+
+        return try repository.createRecoveryClaim(oldPkHex: oldPkHex)
+    }
+
+    /// Parse a recovery claim from base64
+    func parseRecoveryClaim(claimB64: String) async throws -> WebBookRepository.RecoveryClaimInfo {
+        guard let repository = repository else {
+            throw WebBookRepositoryError.notInitialized
+        }
+
+        return try repository.parseRecoveryClaim(claimB64: claimB64)
+    }
+
+    /// Create a voucher for someone's recovery claim
+    func createRecoveryVoucher(claimB64: String) async throws -> WebBookRepository.RecoveryVoucherInfo {
+        guard let repository = repository else {
+            throw WebBookRepositoryError.notInitialized
+        }
+
+        return try repository.createRecoveryVoucher(claimB64: claimB64)
+    }
+
+    /// Add a voucher to current recovery
+    func addRecoveryVoucher(voucherB64: String) async throws -> WebBookRepository.RecoveryProgressInfo {
+        guard let repository = repository else {
+            throw WebBookRepositoryError.notInitialized
+        }
+
+        return try repository.addRecoveryVoucher(voucherB64: voucherB64)
+    }
+
+    /// Get current recovery status
+    func getRecoveryStatus() async throws -> WebBookRepository.RecoveryProgressInfo? {
+        guard let repository = repository else {
+            throw WebBookRepositoryError.notInitialized
+        }
+
+        return try repository.getRecoveryStatus()
+    }
+
+    /// Get completed recovery proof
+    func getRecoveryProof() async throws -> String? {
+        guard let repository = repository else {
+            throw WebBookRepositoryError.notInitialized
+        }
+
+        return try repository.getRecoveryProof()
+    }
 }

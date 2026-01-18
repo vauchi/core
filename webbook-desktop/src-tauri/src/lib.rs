@@ -39,9 +39,12 @@ pub fn run() {
             commands::card::get_card,
             commands::card::add_field,
             commands::card::remove_field,
+            commands::card::update_field,
             commands::contacts::list_contacts,
             commands::contacts::get_contact,
             commands::contacts::remove_contact,
+            commands::contacts::get_contact_fingerprint,
+            commands::contacts::verify_contact,
             commands::exchange::generate_qr,
             commands::exchange::complete_exchange,
             commands::backup::export_backup,
@@ -54,6 +57,8 @@ pub fn run() {
             commands::devices::list_devices,
             commands::devices::get_current_device,
             commands::devices::generate_device_link,
+            commands::devices::join_device,
+            commands::devices::revoke_device,
             commands::recovery::get_recovery_settings,
             commands::recovery::create_recovery_claim,
             commands::recovery::create_recovery_voucher,
@@ -61,6 +66,8 @@ pub fn run() {
             commands::recovery::parse_recovery_claim,
             commands::actions::open_contact_field,
             commands::actions::get_field_action,
+            commands::sync::sync,
+            commands::sync::get_sync_status,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

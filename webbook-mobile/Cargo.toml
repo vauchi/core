@@ -45,6 +45,9 @@ native-tls = "0.2"
 # URL parsing for certificate pinning
 url = "2.5"
 
+# Password strength checking
+zxcvbn = "3.0"
+
 [[bin]]
 name = "uniffi-bindgen"
 path = "uniffi-bindgen.rs"

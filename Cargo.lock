@@ -6350,6 +6350,7 @@ dependencies = [
  "url",
  "uuid",
  "webbook-core",
+ "zxcvbn",
 ]
 
 [[package]]

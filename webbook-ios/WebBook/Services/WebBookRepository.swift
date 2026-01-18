@@ -592,4 +592,115 @@ class WebBookRepository {
     func getProfileUrl(networkId: String, username: String) -> String? {
         return webbook.getProfileUrl(networkId: networkId, username: username)
     }
+
+    // MARK: - Recovery Operations
+
+    /// Recovery claim info
+    struct RecoveryClaimInfo {
+        let oldPublicKey: String
+        let newPublicKey: String
+        let claimData: String
+        let isExpired: Bool
+    }
+
+    /// Recovery voucher info
+    struct RecoveryVoucherInfo {
+        let voucherPublicKey: String
+        let voucherData: String
+    }
+
+    /// Recovery progress info
+    struct RecoveryProgressInfo {
+        let oldPublicKey: String
+        let newPublicKey: String
+        let vouchersCollected: UInt32
+        let vouchersNeeded: UInt32
+        let isComplete: Bool
+    }
+
+    /// Create a recovery claim for a lost identity
+    func createRecoveryClaim(oldPkHex: String) throws -> RecoveryClaimInfo {
+        do {
+            let claim = try webbook.createRecoveryClaim(oldPkHex: oldPkHex)
+            return RecoveryClaimInfo(
+                oldPublicKey: claim.oldPublicKey,
+                newPublicKey: claim.newPublicKey,
+                claimData: claim.claimData,
+                isExpired: claim.isExpired
+            )
+        } catch let error as MobileError {
+            throw WebBookRepositoryError.from(error)
+        }
+    }
+
+    /// Parse a recovery claim from base64
+    func parseRecoveryClaim(claimB64: String) throws -> RecoveryClaimInfo {
+        do {
+            let claim = try webbook.parseRecoveryClaim(claimB64: claimB64)
+            return RecoveryClaimInfo(
+                oldPublicKey: claim.oldPublicKey,
+                newPublicKey: claim.newPublicKey,
+                claimData: claim.claimData,
+                isExpired: claim.isExpired
+            )
+        } catch let error as MobileError {
+            throw WebBookRepositoryError.from(error)
+        }
+    }
+
+    /// Create a voucher for someone's recovery claim
+    func createRecoveryVoucher(claimB64: String) throws -> RecoveryVoucherInfo {
+        do {
+            let voucher = try webbook.createRecoveryVoucher(claimB64: claimB64)
+            return RecoveryVoucherInfo(
+                voucherPublicKey: voucher.voucherPublicKey,
+                voucherData: voucher.voucherData
+            )
+        } catch let error as MobileError {
+            throw WebBookRepositoryError.from(error)
+        }
+    }
+
+    /// Add a voucher to the current recovery claim
+    func addRecoveryVoucher(voucherB64: String) throws -> RecoveryProgressInfo {
+        do {
+            let progress = try webbook.addRecoveryVoucher(voucherB64: voucherB64)
+            return RecoveryProgressInfo(
+                oldPublicKey: progress.oldPublicKey,
+                newPublicKey: progress.newPublicKey,
+                vouchersCollected: progress.vouchersCollected,
+                vouchersNeeded: progress.vouchersNeeded,
+                isComplete: progress.isComplete
+            )
+        } catch let error as MobileError {
+            throw WebBookRepositoryError.from(error)
+        }
+    }
+
+    /// Get the current recovery progress
+    func getRecoveryStatus() throws -> RecoveryProgressInfo? {
+        do {
+            guard let progress = try webbook.getRecoveryStatus() else {
+                return nil
+            }
+            return RecoveryProgressInfo(
+                oldPublicKey: progress.oldPublicKey,
+                newPublicKey: progress.newPublicKey,
+                vouchersCollected: progress.vouchersCollected,
+                vouchersNeeded: progress.vouchersNeeded,
+                isComplete: progress.isComplete
+            )
+        } catch let error as MobileError {
+            throw WebBookRepositoryError.from(error)
+        }
+    }
+
+    /// Get the completed recovery proof as base64
+    func getRecoveryProof() throws -> String? {
+        do {
+            return try webbook.getRecoveryProof()
+        } catch let error as MobileError {
+            throw WebBookRepositoryError.from(error)
+        }
+    }
 }

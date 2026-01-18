@@ -41,6 +41,13 @@ interface FieldVisibilityInfo {
   can_see: boolean
 }
 
+interface FingerprintInfo {
+  their_fingerprint: string
+  our_fingerprint: string
+  formatted_their: string
+  formatted_our: string
+}
+
 interface ContactsProps {
   onNavigate: (page: 'home' | 'contacts' | 'exchange' | 'settings' | 'devices' | 'recovery') => void
 }
@@ -54,7 +61,10 @@ function Contacts(props: ContactsProps) {
   const [selectedContact, setSelectedContact] = createSignal<ContactDetails | null>(null)
   const [showDeleteConfirm, setShowDeleteConfirm] = createSignal(false)
   const [showVisibility, setShowVisibility] = createSignal(false)
+  const [showVerification, setShowVerification] = createSignal(false)
   const [visibilityRules, setVisibilityRules] = createSignal<FieldVisibilityInfo[]>([])
+  const [fingerprint, setFingerprint] = createSignal<FingerprintInfo | null>(null)
+  const [isVerifying, setIsVerifying] = createSignal(false)
   const [error, setError] = createSignal('')
   const [searchQuery, setSearchQuery] = createSignal('')
 
@@ -82,8 +92,39 @@ function Contacts(props: ContactsProps) {
     setSelectedContact(null)
     setShowDeleteConfirm(false)
     setShowVisibility(false)
+    setShowVerification(false)
     setVisibilityRules([])
+    setFingerprint(null)
     setError('')
+  }
+
+  const loadFingerprint = async (contactId: string) => {
+    try {
+      const fp = await invoke('get_contact_fingerprint', { id: contactId }) as FingerprintInfo
+      setFingerprint(fp)
+      setShowVerification(true)
+    } catch (e) {
+      setError(String(e))
+    }
+  }
+
+  const handleVerifyContact = async () => {
+    const contact = selectedContact()
+    if (!contact) return
+
+    setIsVerifying(true)
+    try {
+      await invoke('verify_contact', { id: contact.id })
+      // Refresh the contact details
+      const details = await invoke('get_contact', { id: contact.id }) as ContactDetails
+      setSelectedContact(details)
+      setShowVerification(false)
+      setFingerprint(null)
+      refetch()
+    } catch (e) {
+      setError(String(e))
+    }
+    setIsVerifying(false)
   }
 
   const loadVisibilityRules = async (contactId: string) => {
@@ -239,6 +280,14 @@ function Contacts(props: ContactsProps) {
                 <span class={selectedContact()?.verified ? 'verified' : 'not-verified'}>
                   {selectedContact()?.verified ? '✓ Verified' : 'Not verified'}
                 </span>
+                <Show when={!selectedContact()?.verified}>
+                  <button
+                    class="small primary"
+                    onClick={() => loadFingerprint(selectedContact()!.id)}
+                  >
+                    Verify Identity
+                  </button>
+                </Show>
               </div>
 
               <Show when={error()}>
@@ -271,6 +320,53 @@ function Contacts(props: ContactsProps) {
                 <span class="label">Contact ID</span>
                 <span class="mono">{selectedContact()?.id.substring(0, 16)}...</span>
               </div>
+
+              {/* Verification Section */}
+              <Show when={showVerification() && fingerprint()}>
+                <div class="verification-section">
+                  <h4>Verify {selectedContact()?.display_name}'s Identity</h4>
+                  <p class="verify-instructions">
+                    Compare these fingerprints with {selectedContact()?.display_name} in person
+                    to verify their identity.
+                  </p>
+
+                  <div class="fingerprint-comparison">
+                    <div class="fingerprint-block">
+                      <span class="fp-label">Their Fingerprint</span>
+                      <code class="fingerprint">{fingerprint()?.formatted_their}</code>
+                    </div>
+                    <div class="fingerprint-block">
+                      <span class="fp-label">Your Fingerprint</span>
+                      <code class="fingerprint">{fingerprint()?.formatted_our}</code>
+                    </div>
+                  </div>
+
+                  <p class="verify-warning">
+                    Only mark as verified if you have confirmed these fingerprints match
+                    the ones shown on their device.
+                  </p>
+
+                  <div class="verification-actions">
+                    <button
+                      class="primary"
+                      onClick={handleVerifyContact}
+                      disabled={isVerifying()}
+                    >
+                      {isVerifying() ? 'Verifying...' : 'Mark as Verified'}
+                    </button>
+                    <button
+                      class="secondary"
+                      onClick={() => {
+                        setShowVerification(false)
+                        setFingerprint(null)
+                      }}
+                      disabled={isVerifying()}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              </Show>
 
               {/* Visibility Section */}
               <div class="visibility-section">

@@ -39,6 +39,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.webbook.ui.MainViewModel
+import com.webbook.ui.PasswordStrengthResult
 import com.webbook.ui.SyncState
 import com.webbook.ui.UiState
 import com.webbook.ui.theme.WebBookTheme
@@ -175,7 +176,9 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
                     },
                     onIsFieldVisible = { cId, label ->
                         viewModel.isFieldVisibleToContact(cId, label)
-                    }
+                    },
+                    onVerifyContact = { viewModel.verifyContact(it) },
+                    onGetOwnPublicKey = { viewModel.getOwnPublicKey() }
                 )
             }
         }
@@ -192,7 +195,8 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
                     syncState = syncState,
                     onSync = { viewModel.sync() },
                     onDevices = { currentScreen = Screen.Devices },
-                    onRecovery = { currentScreen = Screen.Recovery }
+                    onRecovery = { currentScreen = Screen.Recovery },
+                    onCheckPasswordStrength = { viewModel.checkPasswordStrength(it) }
                 )
             }
         }
@@ -209,6 +213,7 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
         }
         Screen.Recovery -> {
             RecoveryScreen(
+                viewModel = viewModel,
                 onBack = { currentScreen = Screen.Settings }
             )
         }

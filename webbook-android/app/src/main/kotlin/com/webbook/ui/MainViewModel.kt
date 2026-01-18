@@ -18,6 +18,9 @@ import uniffi.webbook_mobile.MobileContactCard
 import uniffi.webbook_mobile.MobileExchangeData
 import uniffi.webbook_mobile.MobileExchangeResult
 import uniffi.webbook_mobile.MobileFieldType
+import uniffi.webbook_mobile.MobileRecoveryClaim
+import uniffi.webbook_mobile.MobileRecoveryProgress
+import uniffi.webbook_mobile.MobileRecoveryVoucher
 import uniffi.webbook_mobile.MobileSocialNetwork
 import uniffi.webbook_mobile.MobileSyncResult
 import java.time.Instant
@@ -269,6 +272,29 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    suspend fun verifyContact(id: String): Boolean {
+        return try {
+            withContext(Dispatchers.IO) {
+                repository.verifyContact(id)
+            }
+            showMessage("Contact verified successfully")
+            true
+        } catch (e: Exception) {
+            showMessage("Failed to verify contact: ${e.message}")
+            false
+        }
+    }
+
+    suspend fun getOwnPublicKey(): String? {
+        return try {
+            withContext(Dispatchers.IO) {
+                repository.getPublicKey()
+            }
+        } catch (e: Exception) {
+            null
+        }
+    }
+
     suspend fun getOwnCard(): MobileContactCard? {
         return try {
             withContext(Dispatchers.IO) {
@@ -328,6 +354,25 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun checkPasswordStrength(password: String): PasswordStrengthResult {
+        return try {
+            val check = repository.checkPasswordStrength(password)
+            PasswordStrengthResult(
+                level = when (check.strength) {
+                    uniffi.webbook_mobile.MobilePasswordStrength.TOO_WEAK -> PasswordStrengthLevel.TooWeak
+                    uniffi.webbook_mobile.MobilePasswordStrength.FAIR -> PasswordStrengthLevel.Fair
+                    uniffi.webbook_mobile.MobilePasswordStrength.STRONG -> PasswordStrengthLevel.Strong
+                    uniffi.webbook_mobile.MobilePasswordStrength.VERY_STRONG -> PasswordStrengthLevel.VeryStrong
+                },
+                description = check.description,
+                feedback = check.feedback,
+                isAcceptable = check.isAcceptable
+            )
+        } catch (e: Exception) {
+            PasswordStrengthResult()
+        }
+    }
+
     // Social network operations
     fun listSocialNetworks(): List<MobileSocialNetwork> {
         return try {
@@ -348,6 +393,71 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun getProfileUrl(networkId: String, username: String): String? {
         return try {
             repository.getProfileUrl(networkId, username)
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    // Recovery operations
+    suspend fun createRecoveryClaim(oldPkHex: String): MobileRecoveryClaim? {
+        return try {
+            withContext(Dispatchers.IO) {
+                repository.createRecoveryClaim(oldPkHex)
+            }
+        } catch (e: Exception) {
+            showMessage("Failed to create claim: ${e.message}")
+            null
+        }
+    }
+
+    suspend fun parseRecoveryClaim(claimB64: String): MobileRecoveryClaim? {
+        return try {
+            withContext(Dispatchers.IO) {
+                repository.parseRecoveryClaim(claimB64)
+            }
+        } catch (e: Exception) {
+            showMessage("Invalid claim data: ${e.message}")
+            null
+        }
+    }
+
+    suspend fun createRecoveryVoucher(claimB64: String): MobileRecoveryVoucher? {
+        return try {
+            withContext(Dispatchers.IO) {
+                repository.createRecoveryVoucher(claimB64)
+            }
+        } catch (e: Exception) {
+            showMessage("Failed to create voucher: ${e.message}")
+            null
+        }
+    }
+
+    suspend fun addRecoveryVoucher(voucherB64: String): MobileRecoveryProgress? {
+        return try {
+            withContext(Dispatchers.IO) {
+                repository.addRecoveryVoucher(voucherB64)
+            }
+        } catch (e: Exception) {
+            showMessage("Failed to add voucher: ${e.message}")
+            null
+        }
+    }
+
+    suspend fun getRecoveryStatus(): MobileRecoveryProgress? {
+        return try {
+            withContext(Dispatchers.IO) {
+                repository.getRecoveryStatus()
+            }
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    suspend fun getRecoveryProof(): String? {
+        return try {
+            withContext(Dispatchers.IO) {
+                repository.getRecoveryProof()
+            }
         } catch (e: Exception) {
             null
         }

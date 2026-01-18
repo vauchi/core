@@ -1,8 +1,7 @@
 package com.webbook.ui
 
-import android.content.ClipData
-import android.content.ClipboardManager
 import android.content.Context
+import com.webbook.util.ClipboardUtils
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -15,6 +14,7 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -40,6 +40,7 @@ fun DevicesScreen(
     var linkData by remember { mutableStateOf<String?>(null) }
     var joinCode by remember { mutableStateOf("") }
     val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
 
     // Device list with current device
     val devices = remember(publicId) {
@@ -205,9 +206,13 @@ fun DevicesScreen(
                         horizontalArrangement = Arrangement.Center
                     ) {
                         TextButton(onClick = {
-                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                            val clip = ClipData.newPlainText("Device Link", linkData ?: "wb://link/${publicId}")
-                            clipboard.setPrimaryClip(clip)
+                            // Auto-clear device link after 30 seconds for security
+                            ClipboardUtils.copyWithAutoClear(
+                                context,
+                                coroutineScope,
+                                linkData ?: "wb://link/${publicId}",
+                                "Device Link"
+                            )
                         }) {
                             Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(4.dp))

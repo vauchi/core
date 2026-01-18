@@ -26,3 +26,7 @@ dist/
 
 # Swift build artifacts
 .build/
+
+# Sibling repositories (separate git repos)
+/webbook-website/
+/webbook-market/

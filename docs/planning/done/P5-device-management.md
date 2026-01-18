@@ -25,7 +25,7 @@ Device linking is partially implemented in CLI but incomplete across all fronten
 
 ### What Exists
 
-**Core** (`webbook-core/src/exchange/device_link.rs`):
+**Core** (`vauchi-core/src/exchange/device_link.rs`):
 - `DeviceLinkQR::generate()` - Creates QR with link key
 - `DeviceLinkQR::from_data_string()` - Parses QR
 - `SeedTransfer` - Encrypted master seed transfer
@@ -49,18 +49,18 @@ Device linking is partially implemented in CLI but incomplete across all fronten
 
 **Task 1.1: Complete `device complete` command**
 
-**File**: `webbook-cli/src/commands/device.rs`
+**File**: `vauchi-cli/src/commands/device.rs`
 
 ```rust
 async fn execute_device_complete(request: &str) -> Result<()> {
-    let webbook = load_webbook()?;
+    let vauchi = load_vauchi()?;
 
     // Parse the link request from new device
     let request = DeviceLinkRequest::from_data_string(request)
         .context("Invalid link request")?;
 
     // Verify it matches our pending link QR
-    let pending_link = webbook.get_pending_device_link()
+    let pending_link = vauchi.get_pending_device_link()
         .context("No pending device link")?;
 
     if request.identity_public_key != pending_link.identity_public_key() {
@@ -69,7 +69,7 @@ async fn execute_device_complete(request: &str) -> Result<()> {
 
     // Create seed transfer encrypted with link key
     let seed_transfer = SeedTransfer::create(
-        webbook.identity(),
+        vauchi.identity(),
         pending_link.link_key(),
     )?;
 
@@ -79,8 +79,8 @@ async fn execute_device_complete(request: &str) -> Result<()> {
         request.device_name,
         request.device_type,
     );
-    webbook.device_registry().add_device(new_device)?;
-    webbook.save()?;
+    vauchi.device_registry().add_device(new_device)?;
+    vauchi.save()?;
 
     // Output the response for the new device
     let response = seed_transfer.to_data_string();
@@ -107,12 +107,12 @@ async fn execute_device_finish(response: &str) -> Result<()> {
     // Recreate identity from seed
     let identity = Identity::from_seed(&master_seed, &pending.device_info)?;
 
-    // Initialize webbook with this identity
-    let webbook = WebBook::new_with_identity(identity)?;
-    webbook.save()?;
+    // Initialize vauchi with this identity
+    let vauchi = Vauchi::new_with_identity(identity)?;
+    vauchi.save()?;
 
     println!("Device successfully linked!");
-    println!("Run 'webbook sync' to fetch your contacts.");
+    println!("Run 'vauchi sync' to fetch your contacts.");
 
     Ok(())
 }
@@ -122,21 +122,21 @@ async fn execute_device_finish(response: &str) -> Result<()> {
 
 ```rust
 async fn execute_device_revoke(device_id: &str) -> Result<()> {
-    let mut webbook = load_webbook()?;
+    let mut vauchi = load_vauchi()?;
 
     // Create revocation certificate
-    let cert = webbook.identity().create_revocation_certificate(device_id)?;
+    let cert = vauchi.identity().create_revocation_certificate(device_id)?;
 
     // Update local registry
-    webbook.device_registry().revoke_device(device_id, &cert)?;
+    vauchi.device_registry().revoke_device(device_id, &cert)?;
 
     // Queue registry update for broadcast to contacts
-    webbook.sync_manager().queue_registry_update()?;
+    vauchi.sync_manager().queue_registry_update()?;
 
-    webbook.save()?;
+    vauchi.save()?;
 
     println!("Device {} revoked.", device_id);
-    println!("Run 'webbook sync' to notify contacts.");
+    println!("Run 'vauchi sync' to notify contacts.");
 
     Ok(())
 }
@@ -146,10 +146,10 @@ async fn execute_device_revoke(device_id: &str) -> Result<()> {
 
 **Task 2.1: Add UniFFI bindings**
 
-**File**: `webbook-mobile/src/lib.rs`
+**File**: `vauchi-mobile/src/lib.rs`
 
 ```rust
-impl WebBookMobile {
+impl VauchiMobile {
     /// Parse a device link QR and prepare to join
     pub fn parse_device_link(&self, qr_data: String) -> Result<DeviceLinkInfo, MobileError> {
         let link = DeviceLinkQR::from_data_string(&qr_data)?;
@@ -176,7 +176,7 @@ impl WebBookMobile {
 
 **Task 2.2: Android UI**
 
-**File**: `webbook-android/.../ui/DevicesScreen.kt`
+**File**: `vauchi-android/.../ui/DevicesScreen.kt`
 
 - Add "Join Existing Identity" flow
 - QR scanner to scan link QR from another device
@@ -185,7 +185,7 @@ impl WebBookMobile {
 
 **Task 2.3: iOS UI**
 
-**File**: `webbook-ios/WebBook/Views/SettingsView.swift`
+**File**: `vauchi-ios/Vauchi/Views/SettingsView.swift`
 
 - Enable device linking section (currently disabled)
 - Add QR scanner for joining
@@ -195,7 +195,7 @@ impl WebBookMobile {
 
 **Task 3.1: Include device registry in sync protocol**
 
-**File**: `webbook-core/src/sync/mod.rs`
+**File**: `vauchi-core/src/sync/mod.rs`
 
 Add registry updates to sync payload:
 - Send registry when changed
@@ -204,7 +204,7 @@ Add registry updates to sync payload:
 
 ### Phase 4: Testing
 
-**File**: `webbook-core/tests/device_tests.rs`
+**File**: `vauchi-core/tests/device_tests.rs`
 
 ```rust
 #[test]

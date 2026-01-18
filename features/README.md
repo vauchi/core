@@ -1,6 +1,6 @@
 # Feature Scenarios
 
-Gherkin scenarios defining WebBook behavior. Each scenario should have corresponding tests.
+Gherkin scenarios defining Vauchi behavior. Each scenario should have corresponding tests.
 
 ## Status Overview
 
@@ -41,38 +41,38 @@ Gherkin scenarios defining WebBook behavior. Each scenario should have correspon
 **identity_management.feature**
 - Identity creation, backup, recovery
 - Master seed and key derivation
-- Code: `webbook-core/src/identity/`
+- Code: `vauchi-core/src/identity/`
 
 **contact_card_management.feature**
 - Create/edit own contact card
 - Field types: phone, email, social, address, website, custom
 - Social network registry (35+ networks)
-- Code: `webbook-core/src/contact_card/`
+- Code: `vauchi-core/src/contact_card/`
 
 **contact_exchange.feature**
 - QR code generation and scanning (implemented)
 - X3DH key exchange (implemented)
 - BLE proximity exchange (planned)
 - NFC tap exchange (planned)
-- Code: `webbook-core/src/exchange/`
+- Code: `vauchi-core/src/exchange/`
 
 **contacts_management.feature**
 - Contact list CRUD operations
 - Search, filter, favorites
 - Blocking and notes
-- Code: `webbook-core/src/contact/`
+- Code: `vauchi-core/src/contact/`
 
 **device_management.feature**
 - Multi-device linking via QR
 - Device registry with signatures
 - Device revocation
-- Code: `webbook-core/src/identity/device.rs`, `webbook-core/src/exchange/device_link.rs`
+- Code: `vauchi-core/src/identity/device.rs`, `vauchi-core/src/exchange/device_link.rs`
 
 **sync_updates.feature**
 - Card update propagation
 - Double Ratchet forward secrecy
 - Offline queuing and retry
-- Code: `webbook-core/src/sync/`, `webbook-core/src/network/`
+- Code: `vauchi-core/src/sync/`, `vauchi-core/src/network/`
 
 ### P1: Security Features
 
@@ -80,12 +80,12 @@ Gherkin scenarios defining WebBook behavior. Each scenario should have correspon
 - E2E encryption (XChaCha20-Poly1305)
 - Signature verification (Ed25519)
 - MITM detection, replay prevention
-- Code: `webbook-core/src/crypto/`
+- Code: `vauchi-core/src/crypto/`
 
 **visibility_control.feature**
 - Per-contact field visibility
 - View-as-contact preview
-- Code: `webbook-core/src/contact/visibility.rs`
+- Code: `vauchi-core/src/contact/visibility.rs`
 
 ### P2: Infrastructure
 
@@ -98,7 +98,7 @@ Gherkin scenarios defining WebBook behavior. Each scenario should have correspon
 - Store-and-forward relay
 - Rate limiting, blob expiration
 - Federation (planned)
-- Code: `webbook-relay/`
+- Code: `vauchi-relay/`
 
 **future/contact_recovery.feature**
 - Recover contacts after device loss via social vouching

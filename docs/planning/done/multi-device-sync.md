@@ -8,13 +8,13 @@ Users can link multiple devices to the same identity and keep them in sync.
 ## Implementation Status
 
 ### ✅ Completed
-- **Device module** (`webbook-core/src/device.rs`): DeviceInfo, DeviceRegistry types
-- **Device storage** (`webbook-core/src/storage/device.rs`): SQLite tables and operations
-- **Device linking protocol** (`webbook-core/src/device_link.rs`): QR-based secure pairing
-- **Contact sync** (`webbook-core/src/sync/device_sync.rs`): Device-to-device transfer
-- **Sync orchestration** (`webbook-core/src/sync/orchestrator.rs`): Version vectors, state management
-- **Revocation** (`webbook-core/src/identity.rs`): DeviceRevocationCertificate, RegistryBroadcast
-- **CLI commands** (`webbook-cli`): `device list`, `device link`, `device unlink`
+- **Device module** (`vauchi-core/src/device.rs`): DeviceInfo, DeviceRegistry types
+- **Device storage** (`vauchi-core/src/storage/device.rs`): SQLite tables and operations
+- **Device linking protocol** (`vauchi-core/src/device_link.rs`): QR-based secure pairing
+- **Contact sync** (`vauchi-core/src/sync/device_sync.rs`): Device-to-device transfer
+- **Sync orchestration** (`vauchi-core/src/sync/orchestrator.rs`): Version vectors, state management
+- **Revocation** (`vauchi-core/src/identity.rs`): DeviceRevocationCertificate, RegistryBroadcast
+- **CLI commands** (`vauchi-cli`): `device list`, `device link`, `device unlink`
 - **Architecture docs** (`docs/architecture/device-linking.md`): Full spec with 8 threat scenarios
 
 ### Key Decisions (Implemented)

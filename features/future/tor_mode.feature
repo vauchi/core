@@ -1,6 +1,6 @@
 @privacy @tor @network @opt-in
 Feature: Tor Mode
-  As a privacy-conscious WebBook user
+  As a privacy-conscious Vauchi user
   I want to route my relay connections through Tor
   So that my IP address is hidden from relay operators and network observers
 

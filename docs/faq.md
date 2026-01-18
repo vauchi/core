@@ -1,6 +1,6 @@
-# WebBook FAQ
+# Vauchi FAQ
 
-Frequently asked questions about WebBook.
+Frequently asked questions about Vauchi.
 
 ---
 
@@ -30,9 +30,9 @@ Only:
 - Encrypted message envelopes (deleted after delivery or 7 days)
 - Connection metadata for rate limiting (IP address, timestamps - deleted after 24 hours)
 
-### Is WebBook truly private?
+### Is Vauchi truly private?
 
-Yes. WebBook is designed with privacy as the core principle:
+Yes. Vauchi is designed with privacy as the core principle:
 - Local-first architecture (your data lives on your device)
 - End-to-end encryption (we can't read your data even if we wanted to)
 - No analytics or tracking
@@ -54,7 +54,7 @@ Exchanges use cryptographic protocols that prevent interception:
 
 You have several options:
 
-1. **Another linked device:** Continue using WebBook normally
+1. **Another linked device:** Continue using Vauchi normally
 2. **Backup:** Restore your identity from an encrypted backup
 3. **Social recovery:** Get vouchers from contacts who can verify your identity
 4. **Start fresh:** Create a new identity and re-exchange with contacts
@@ -137,10 +137,10 @@ You can also remove them entirely.
 
 ## Multi-Device
 
-### Can I use WebBook on multiple devices?
+### Can I use Vauchi on multiple devices?
 
-Yes! WebBook supports multi-device sync:
-1. Set up WebBook on your first device
+Yes! Vauchi supports multi-device sync:
+1. Set up Vauchi on your first device
 2. Go to Settings > Devices > Link New Device
 3. Follow the linking process on your second device
 4. Both devices now share the same identity
@@ -153,23 +153,23 @@ Up to 5 devices can be linked to one identity.
 
 **Method 1: Device Linking**
 1. On old phone: Settings > Devices > Link New Device
-2. On new phone: Install WebBook and join existing identity
+2. On new phone: Install Vauchi and join existing identity
 3. Once synced, you can uninstall from old phone
 
 **Method 2: Backup & Restore**
 1. On old phone: Create an encrypted backup
-2. On new phone: Install WebBook and restore from backup
+2. On new phone: Install Vauchi and restore from backup
 
 ### What if I lose access to all devices?
 
 Use social recovery:
-1. Install WebBook on a new device
+1. Install Vauchi on a new device
 2. Create a recovery claim with your old public ID
 3. Get vouchers from contacts
 4. Complete recovery
 
 Or, if you have a backup:
-1. Install WebBook
+1. Install Vauchi
 2. Restore from your backup code + password
 
 ---
@@ -179,7 +179,7 @@ Or, if you have a backup:
 ### How do backups work?
 
 1. You create a backup with a password you choose
-2. WebBook encrypts all your data using that password
+2. Vauchi encrypts all your data using that password
 3. You receive a backup code (Base64 encoded data)
 4. To restore: backup code + password = your identity
 
@@ -242,7 +242,7 @@ The relay server:
 
 Think of it like a post office that handles sealed envelopes.
 
-### Does WebBook work offline?
+### Does Vauchi work offline?
 
 Partially:
 - You can view all your data offline
@@ -250,7 +250,7 @@ Partially:
 - Changes sync when you're back online
 - You cannot exchange contacts offline (needs camera + network)
 
-### What encryption does WebBook use?
+### What encryption does Vauchi use?
 
 - **Signing:** Ed25519
 - **Key Exchange:** X25519 (Curve25519)
@@ -260,10 +260,10 @@ Partially:
 
 All cryptography uses the `ring` library (Rust) - the same used by major browsers and security software.
 
-### Is WebBook open source?
+### Is Vauchi open source?
 
 Yes! The complete source code is available at:
-https://github.com/anthropics/webbook
+https://github.com/anthropics/vauchi
 
 You can:
 - Inspect how your data is handled
@@ -337,6 +337,6 @@ Keys are encrypted using OS-level secure storage:
 
 ## Still Have Questions?
 
-- **GitHub Issues:** https://github.com/anthropics/webbook/issues
-- **Email:** support@webbook.app
+- **GitHub Issues:** https://github.com/anthropics/vauchi/issues
+- **Email:** support@vauchi.app
 - **Documentation:** See the full user guide at docs/user-guide.md

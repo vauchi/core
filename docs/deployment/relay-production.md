@@ -1,11 +1,11 @@
-# WebBook Relay Production Deployment Guide
+# Vauchi Relay Production Deployment Guide
 
-This guide covers deploying the WebBook Relay server in a production environment with TLS encryption.
+This guide covers deploying the Vauchi Relay server in a production environment with TLS encryption.
 
 ## Prerequisites
 
 - A server with a public IP address
-- A domain name pointed to your server (e.g., `relay.webbook.app`)
+- A domain name pointed to your server (e.g., `relay.vauchi.app`)
 - Docker installed (recommended) or Rust toolchain
 - A reverse proxy (nginx or Caddy) for TLS termination
 
@@ -13,7 +13,7 @@ This guide covers deploying the WebBook Relay server in a production environment
 
 ```
 ┌──────────────────┐     HTTPS/WSS     ┌─────────────────┐     HTTP/WS      ┌───────────────┐
-│  Mobile/Desktop  │ ──────────────────▶│  Reverse Proxy  │ ───────────────▶│ WebBook Relay │
+│  Mobile/Desktop  │ ──────────────────▶│  Reverse Proxy  │ ───────────────▶│ Vauchi Relay │
 │      Clients     │       :443         │  (nginx/Caddy)  │      :8080      │    Server     │
 └──────────────────┘                    └─────────────────┘                  └───────────────┘
 ```
@@ -28,22 +28,22 @@ The relay server does not handle TLS directly. A reverse proxy terminates TLS an
 
 ```bash
 # Pull or build the image
-docker build -t webbook-relay ./webbook-relay
+docker build -t vauchi-relay ./vauchi-relay
 
 # Create data volume
 docker volume create relay-data
 
 # Run the container
 docker run -d \
-  --name webbook-relay \
+  --name vauchi-relay \
   --restart unless-stopped \
   -p 127.0.0.1:8080:8080 \
   -p 127.0.0.1:8081:8081 \
   -v relay-data:/data \
   -e RELAY_STORAGE_BACKEND=sqlite \
   -e RELAY_MAX_CONNECTIONS=1000 \
-  -e RUST_LOG=webbook_relay=info \
-  webbook-relay
+  -e RUST_LOG=vauchi_relay=info \
+  vauchi-relay
 ```
 
 2. **Install and configure nginx:**
@@ -53,12 +53,12 @@ docker run -d \
 sudo apt install nginx
 
 # Copy the configuration
-sudo cp webbook-relay/deploy/nginx/webbook-relay.conf /etc/nginx/sites-available/
-sudo ln -s /etc/nginx/sites-available/webbook-relay.conf /etc/nginx/sites-enabled/
+sudo cp vauchi-relay/deploy/nginx/vauchi-relay.conf /etc/nginx/sites-available/
+sudo ln -s /etc/nginx/sites-available/vauchi-relay.conf /etc/nginx/sites-enabled/
 
 # Edit the config to set your domain
-sudo nano /etc/nginx/sites-available/webbook-relay.conf
-# Change: server_name relay.webbook.example.com
+sudo nano /etc/nginx/sites-available/vauchi-relay.conf
+# Change: server_name relay.vauchi.example.com
 # To: server_name your-domain.com
 
 # Test the configuration
@@ -90,11 +90,11 @@ Caddy handles TLS automatically with Let's Encrypt.
 
 ```bash
 docker run -d \
-  --name webbook-relay \
+  --name vauchi-relay \
   --restart unless-stopped \
   -p 127.0.0.1:8080:8080 \
   -v relay-data:/data \
-  webbook-relay
+  vauchi-relay
 ```
 
 2. **Install and configure Caddy:**
@@ -104,9 +104,9 @@ docker run -d \
 sudo apt install caddy
 
 # Copy and edit Caddyfile
-sudo cp webbook-relay/deploy/caddy/Caddyfile /etc/caddy/
+sudo cp vauchi-relay/deploy/caddy/Caddyfile /etc/caddy/
 sudo nano /etc/caddy/Caddyfile
-# Change relay.webbook.example.com to your domain
+# Change relay.vauchi.example.com to your domain
 
 # Restart Caddy (it will auto-obtain certificates)
 sudo systemctl restart caddy
@@ -114,13 +114,13 @@ sudo systemctl restart caddy
 
 ### Option 3: Kubernetes with Helm
 
-See `webbook-relay/deploy/helm/webbook-relay/` for the Helm chart.
+See `vauchi-relay/deploy/helm/vauchi-relay/` for the Helm chart.
 
 ```bash
-helm install webbook-relay ./webbook-relay/deploy/helm/webbook-relay \
+helm install vauchi-relay ./vauchi-relay/deploy/helm/vauchi-relay \
   --set ingress.enabled=true \
   --set ingress.hosts[0].host=relay.your-domain.com \
-  --set ingress.tls[0].secretName=webbook-relay-tls \
+  --set ingress.tls[0].secretName=vauchi-relay-tls \
   --set ingress.tls[0].hosts[0]=relay.your-domain.com
 ```
 
@@ -142,7 +142,7 @@ cp docs/deployment/.env.example .env
 | `RELAY_CLEANUP_INTERVAL` | `3600` | Cleanup interval (1 hour) |
 | `RELAY_STORAGE_BACKEND` | `sqlite` | `memory` or `sqlite` |
 | `RELAY_DATA_DIR` | `/data` | Data directory for SQLite |
-| `RUST_LOG` | `webbook_relay=info` | Log level |
+| `RUST_LOG` | `vauchi_relay=info` | Log level |
 
 ## Security Checklist
 
@@ -189,15 +189,15 @@ Example Prometheus alerting rules:
 
 ```yaml
 groups:
-  - name: webbook-relay
+  - name: vauchi-relay
     rules:
       - alert: RelayDown
-        expr: up{job="webbook-relay"} == 0
+        expr: up{job="vauchi-relay"} == 0
         for: 1m
         labels:
           severity: critical
         annotations:
-          summary: WebBook Relay is down
+          summary: Vauchi Relay is down
 
       - alert: HighErrorRate
         expr: rate(relay_connection_errors_total[5m]) > 0.1
@@ -222,14 +222,14 @@ groups:
 
 ```bash
 # Stop the relay (or use SQLite backup API)
-docker stop webbook-relay
+docker stop vauchi-relay
 
 # Backup the data volume
 docker run --rm -v relay-data:/data -v $(pwd):/backup alpine \
   tar czf /backup/relay-backup-$(date +%Y%m%d).tar.gz /data
 
 # Restart
-docker start webbook-relay
+docker start vauchi-relay
 ```
 
 ### Automated Backups
@@ -243,7 +243,7 @@ Add to crontab:
 
 ### Connection refused
 - Check if relay container is running: `docker ps`
-- Check relay logs: `docker logs webbook-relay`
+- Check relay logs: `docker logs vauchi-relay`
 - Verify port binding: `netstat -tlnp | grep 8080`
 
 ### TLS certificate errors
@@ -263,8 +263,8 @@ Add to crontab:
 
 ## Additional Resources
 
-- Detailed deployment options: `webbook-relay/deploy/DEPLOYMENT.md`
-- nginx configuration: `webbook-relay/deploy/nginx/webbook-relay.conf`
-- Caddy configuration: `webbook-relay/deploy/caddy/Caddyfile`
-- Helm chart: `webbook-relay/deploy/helm/webbook-relay/`
-- Docker Compose: `webbook-relay/docker-compose.yml`
+- Detailed deployment options: `vauchi-relay/deploy/DEPLOYMENT.md`
+- nginx configuration: `vauchi-relay/deploy/nginx/vauchi-relay.conf`
+- Caddy configuration: `vauchi-relay/deploy/caddy/Caddyfile`
+- Helm chart: `vauchi-relay/deploy/helm/vauchi-relay/`
+- Docker Compose: `vauchi-relay/docker-compose.yml`

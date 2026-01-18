@@ -25,7 +25,7 @@ The relay server has critical security and performance gaps that could cause ser
 
 ### Task 1: Enforce Connection Limit
 
-**File**: `webbook-relay/src/main.rs`
+**File**: `vauchi-relay/src/main.rs`
 
 ```rust
 // Add to accept loop (around line 133)
@@ -53,9 +53,9 @@ loop {
 ### Task 2: Add TLS Support (Option A: Native)
 
 **Files**:
-- `webbook-relay/Cargo.toml` - Add `tokio-rustls`
-- `webbook-relay/src/config.rs` - Add TLS config fields
-- `webbook-relay/src/main.rs` - Wrap acceptor in TLS
+- `vauchi-relay/Cargo.toml` - Add `tokio-rustls`
+- `vauchi-relay/src/config.rs` - Add TLS config fields
+- `vauchi-relay/src/main.rs` - Wrap acceptor in TLS
 
 ```rust
 // config.rs additions
@@ -67,7 +67,7 @@ pub tls_key_path: Option<PathBuf>,
 
 ### Task 3: SQLite WAL Mode
 
-**File**: `webbook-relay/src/storage/sqlite.rs`
+**File**: `vauchi-relay/src/storage/sqlite.rs`
 
 ```rust
 // In SqliteBlobStore::new() after connection open
@@ -82,7 +82,7 @@ conn.execute_batch("
 
 ### Task 4: Rate Limiter Cleanup
 
-**File**: `webbook-relay/src/rate_limit.rs`
+**File**: `vauchi-relay/src/rate_limit.rs`
 
 ```rust
 // Add last_access timestamp to TokenBucket
@@ -106,7 +106,7 @@ pub fn cleanup_inactive(&self, max_idle: Duration) {
 
 ### Task 5: Metrics Recording
 
-**File**: `webbook-relay/src/handler.rs`
+**File**: `vauchi-relay/src/handler.rs`
 
 Actually increment the metrics counters that are defined but unused:
 - `messages_received` on message receipt
@@ -117,7 +117,7 @@ Actually increment the metrics counters that are defined but unused:
 
 ```bash
 # Run tests
-cargo test -p webbook-relay
+cargo test -p vauchi-relay
 
 # Load test (requires wrk or similar)
 wrk -c 1000 -d 30s ws://localhost:8080

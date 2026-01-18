@@ -1,6 +1,6 @@
 @visibility @labels @privacy
 Feature: Visibility Labels
-  As a WebBook user
+  As a Vauchi user
   I want to organize my contacts into labels like "family", "friends", "professional"
   So that I can easily control what contact information different groups of people can see
 

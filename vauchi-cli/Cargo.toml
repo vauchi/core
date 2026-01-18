@@ -1,0 +1,69 @@
+[package]
+name = "vauchi-cli"
+version = "0.1.0"
+edition = "2021"
+description = "Command-line interface for Vauchi"
+license = "MIT"
+
+[[bin]]
+name = "vauchi"
+path = "src/main.rs"
+
+[dependencies]
+# Core library
+vauchi-core = { path = "../vauchi-core" }
+
+# CLI framework
+clap = { version = "4", features = ["derive"] }
+clap_complete = "4"
+
+# Async runtime
+tokio = { version = "1", features = ["full"] }
+
+# Interactive prompts
+dialoguer = "0.11"
+
+# Terminal styling
+console = "0.15"
+
+# Progress indicators
+indicatif = "0.17"
+
+# Table output
+tabled = "0.20"
+
+# Platform directories
+dirs = "5"
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Error handling
+anyhow = "1"
+
+# QR code generation (re-export from vauchi-core uses this)
+qrcode = "0.14"
+
+# WebSocket client
+tungstenite = "0.21"
+url = "2"
+
+# UUID generation
+uuid = { version = "1", features = ["v4"] }
+
+# Hex encoding
+hex = "0.4"
+
+# Base64 encoding
+base64 = "0.21"
+
+# Open URLs in system browser/app
+open = "5"
+
+[features]
+default = []
+secure-storage = ["vauchi-core/secure-storage"]
+
+[dev-dependencies]
+tempfile = "3"

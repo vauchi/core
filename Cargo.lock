@@ -6080,6 +6080,136 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ba73ea9cf16a25df0c8caa16c51acb937d5712a8429db78a3ee29d5dcacd3a65"
 
 [[package]]
+name = "vauchi-cli"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "base64 0.21.7",
+ "clap",
+ "clap_complete",
+ "console",
+ "dialoguer",
+ "dirs 5.0.1",
+ "hex",
+ "indicatif",
+ "open",
+ "qrcode",
+ "serde",
+ "serde_json",
+ "tabled",
+ "tempfile",
+ "tokio",
+ "tungstenite 0.21.0",
+ "url",
+ "uuid",
+ "vauchi-core",
+]
+
+[[package]]
+name = "vauchi-core"
+version = "0.1.0"
+dependencies = [
+ "base64 0.22.1",
+ "bincode",
+ "criterion",
+ "hex",
+ "keyring",
+ "native-tls",
+ "proptest",
+ "qrcode",
+ "quickcheck",
+ "quickcheck_macros",
+ "rand 0.8.5",
+ "ring",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "serde_with",
+ "tempfile",
+ "thiserror 2.0.17",
+ "tungstenite 0.24.0",
+ "uuid",
+ "x25519-dalek",
+ "zeroize",
+ "zxcvbn",
+]
+
+[[package]]
+name = "vauchi-desktop"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "base64 0.22.1",
+ "dirs 5.0.1",
+ "hex",
+ "qrcode",
+ "serde",
+ "serde_json",
+ "tauri",
+ "tauri-build",
+ "tauri-plugin-opener",
+ "tauri-plugin-shell",
+ "tokio",
+ "vauchi-core",
+]
+
+[[package]]
+name = "vauchi-mobile"
+version = "0.1.0"
+dependencies = [
+ "base64 0.22.1",
+ "hex",
+ "native-tls",
+ "once_cell",
+ "parking_lot",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror 2.0.17",
+ "tungstenite 0.24.0",
+ "uniffi",
+ "url",
+ "uuid",
+ "vauchi-core",
+ "zxcvbn",
+]
+
+[[package]]
+name = "vauchi-relay"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "futures-util",
+ "prometheus",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tokio",
+ "tokio-test",
+ "tokio-tungstenite",
+ "tower",
+ "tracing",
+ "tracing-subscriber",
+ "uuid",
+]
+
+[[package]]
+name = "vauchi-tui"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "crossterm",
+ "dirs 5.0.1",
+ "hex",
+ "open",
+ "qrcode",
+ "ratatui",
+ "tokio",
+ "vauchi-core",
+]
+
+[[package]]
 name = "vcpkg"
 version = "0.2.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6256,136 +6386,6 @@ checksum = "5a6580f308b1fad9207618087a65c04e7a10bc77e02c8e84e9b00dd4b12fa0bb"
 dependencies = [
  "js-sys",
  "wasm-bindgen",
-]
-
-[[package]]
-name = "webbook-cli"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "base64 0.21.7",
- "clap",
- "clap_complete",
- "console",
- "dialoguer",
- "dirs 5.0.1",
- "hex",
- "indicatif",
- "open",
- "qrcode",
- "serde",
- "serde_json",
- "tabled",
- "tempfile",
- "tokio",
- "tungstenite 0.21.0",
- "url",
- "uuid",
- "webbook-core",
-]
-
-[[package]]
-name = "webbook-core"
-version = "0.1.0"
-dependencies = [
- "base64 0.22.1",
- "bincode",
- "criterion",
- "hex",
- "keyring",
- "native-tls",
- "proptest",
- "qrcode",
- "quickcheck",
- "quickcheck_macros",
- "rand 0.8.5",
- "ring",
- "rusqlite",
- "serde",
- "serde_json",
- "serde_with",
- "tempfile",
- "thiserror 2.0.17",
- "tungstenite 0.24.0",
- "uuid",
- "x25519-dalek",
- "zeroize",
- "zxcvbn",
-]
-
-[[package]]
-name = "webbook-desktop"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "base64 0.22.1",
- "dirs 5.0.1",
- "hex",
- "qrcode",
- "serde",
- "serde_json",
- "tauri",
- "tauri-build",
- "tauri-plugin-opener",
- "tauri-plugin-shell",
- "tokio",
- "webbook-core",
-]
-
-[[package]]
-name = "webbook-mobile"
-version = "0.1.0"
-dependencies = [
- "base64 0.22.1",
- "hex",
- "native-tls",
- "once_cell",
- "parking_lot",
- "serde",
- "serde_json",
- "tempfile",
- "thiserror 2.0.17",
- "tungstenite 0.24.0",
- "uniffi",
- "url",
- "uuid",
- "webbook-core",
- "zxcvbn",
-]
-
-[[package]]
-name = "webbook-relay"
-version = "0.1.0"
-dependencies = [
- "axum",
- "futures-util",
- "prometheus",
- "rusqlite",
- "serde",
- "serde_json",
- "tempfile",
- "tokio",
- "tokio-test",
- "tokio-tungstenite",
- "tower",
- "tracing",
- "tracing-subscriber",
- "uuid",
-]
-
-[[package]]
-name = "webbook-tui"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "crossterm",
- "dirs 5.0.1",
- "hex",
- "open",
- "qrcode",
- "ratatui",
- "tokio",
- "webbook-core",
 ]
 
 [[package]]

@@ -1,6 +1,6 @@
 @privacy @hidden @plausible-deniability @opt-in
 Feature: Hidden Contacts
-  As a WebBook user in a sensitive situation
+  As a Vauchi user in a sensitive situation
   I want to hide certain contacts from casual view
   So that I have plausible deniability if someone looks at my phone
 

@@ -15,16 +15,16 @@ target/
 # Documentation (not needed for build)
 docs/
 
-# Test files (keep webbook-core intact for relay build)
-webbook-relay/tests/
+# Test files (keep vauchi-core intact for relay build)
+vauchi-relay/tests/
 
 # Crates not needed for relay (stubs created in Dockerfile)
-webbook-cli/
-webbook-desktop/
-webbook-ios/
-webbook-mobile/
-webbook-tui/
-webbook-android/
+vauchi-cli/
+vauchi-desktop/
+vauchi-ios/
+vauchi-mobile/
+vauchi-tui/
+vauchi-android/
 features/
 
 # Misc

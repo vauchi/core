@@ -24,7 +24,7 @@
 ### TUI App (Completed)
 - Ratatui terminal UI
 - 12 screens with keyboard navigation
-- Direct webbook-core integration
+- Direct vauchi-core integration
 
 ### Multi-Device Sync (Completed)
 - Device module with DeviceInfo and DeviceRegistry
@@ -56,24 +56,24 @@
 - See `docs/planning/done/security-hardening.md`
 
 ### Code Maintainability (Completed - Jan 2026)
-- Split webbook-mobile/lib.rs (1,747→891 lines)
-- Split webbook-core/storage (1,404 lines into 6 modules)
-- Consolidated wire protocol in webbook-core
+- Split vauchi-mobile/lib.rs (1,747→891 lines)
+- Split vauchi-core/storage (1,404 lines into 6 modules)
+- Consolidated wire protocol in vauchi-core
 
 ### Phase 2 Implementation Details
 
 **Password Strength Enforcement:**
 - Added zxcvbn dependency for entropy-based password validation
 - Requires minimum score of 3 (out of 4) for backup passwords
-- `webbook-core/src/identity/password.rs` - validation logic
-- Tests in `webbook-core/tests/identity_tests.rs`
+- `vauchi-core/src/identity/password.rs` - validation logic
+- Tests in `vauchi-core/tests/identity_tests.rs`
 
 **Secure Storage:**
 - Added `keyring` crate (optional) for platform keychain access
 - `SecureStorage` trait with platform implementations
 - `PlatformKeyring` - uses OS keychain (macOS/Linux/Windows)
 - `FileKeyStorage` - encrypted file fallback
-- `webbook-core/src/storage/secure.rs`
+- `vauchi-core/src/storage/secure.rs`
 
 **Security Audit Checklist:**
 - `docs/SECURITY_AUDIT.md` - comprehensive checklist for external auditors
@@ -95,13 +95,13 @@ See `docs/development/testing.md` for full strategy.
 | Property-based tests | High | Medium | ✅ Done |
 
 **Test Files:**
-- `webbook-core/tests/fuzz_tests.rs` - 1000+ fuzz test cases
-- `webbook-core/tests/concurrency_tests.rs` - Thread safety tests
-- `webbook-core/tests/protocol_compatibility_tests.rs` - Golden fixtures
-- `webbook-core/tests/migration_tests.rs` - Schema verification
-- `webbook-core/tests/snapshot_tests.rs` - Serialization snapshots
-- `webbook-core/benches/crypto_benchmarks.rs` - Criterion benchmarks
-- `webbook-core/tests/property_tests.rs` - Proptest properties
+- `vauchi-core/tests/fuzz_tests.rs` - 1000+ fuzz test cases
+- `vauchi-core/tests/concurrency_tests.rs` - Thread safety tests
+- `vauchi-core/tests/protocol_compatibility_tests.rs` - Golden fixtures
+- `vauchi-core/tests/migration_tests.rs` - Schema verification
+- `vauchi-core/tests/snapshot_tests.rs` - Serialization snapshots
+- `vauchi-core/benches/crypto_benchmarks.rs` - Criterion benchmarks
+- `vauchi-core/tests/property_tests.rs` - Proptest properties
 
 ## Phase 3: Launch
 
@@ -171,4 +171,4 @@ See `docs/development/testing.md` for full strategy.
 **SecureStorage Integration:**
 - Use `PlatformKeyring` in CLI/TUI/Desktop apps
 - Store encryption keys in OS keychain instead of files
-- Trait ready: `webbook-core/src/storage/secure.rs`
+- Trait ready: `vauchi-core/src/storage/secure.rs`

@@ -1,11 +1,11 @@
 # Security Audit Checklist
 
-This document provides a security checklist for external auditors reviewing WebBook.
+This document provides a security checklist for external auditors reviewing Vauchi.
 It maps security properties to their implementations in the codebase.
 
 ## Overview
 
-WebBook is a privacy-focused contact card exchange application. For detailed threat analysis,
+Vauchi is a privacy-focused contact card exchange application. For detailed threat analysis,
 see [THREAT_ANALYSIS.md](./THREAT_ANALYSIS.md).
 
 **Key Security Guarantees:**
@@ -23,15 +23,15 @@ see [THREAT_ANALYSIS.md](./THREAT_ANALYSIS.md).
 
 | Requirement | Status | Implementation |
 |-------------|--------|----------------|
-| All crypto uses `ring` crate (audited) | ✅ Verified | `webbook-core/Cargo.toml` |
+| All crypto uses `ring` crate (audited) | ✅ Verified | `vauchi-core/Cargo.toml` |
 | No custom cryptographic algorithms | ✅ Verified | All crypto in `src/crypto/` uses ring |
 | Random number generation uses SystemRandom | ✅ Verified | `src/crypto/mod.rs` |
 
 **Files to Review:**
-- `webbook-core/src/crypto/mod.rs` - Core crypto exports
-- `webbook-core/src/crypto/encryption.rs` - AES-256-GCM implementation
-- `webbook-core/src/crypto/signing.rs` - Ed25519 signatures
-- `webbook-core/src/crypto/kdf.rs` - HKDF-SHA256 key derivation
+- `vauchi-core/src/crypto/mod.rs` - Core crypto exports
+- `vauchi-core/src/crypto/encryption.rs` - AES-256-GCM implementation
+- `vauchi-core/src/crypto/signing.rs` - Ed25519 signatures
+- `vauchi-core/src/crypto/kdf.rs` - HKDF-SHA256 key derivation
 
 ### Audit Item 2: Key Zeroing
 
@@ -42,8 +42,8 @@ see [THREAT_ANALYSIS.md](./THREAT_ANALYSIS.md).
 | No copies of keys left in memory | ✅ Verified | Keys returned by reference |
 
 **Files to Review:**
-- `webbook-core/src/crypto/mod.rs:SymmetricKey` - Implements `Zeroize`
-- `webbook-core/src/identity/mod.rs:Identity` - Master seed zeroized on drop
+- `vauchi-core/src/crypto/mod.rs:SymmetricKey` - Implements `Zeroize`
+- `vauchi-core/src/identity/mod.rs:Identity` - Master seed zeroized on drop
 
 ### Audit Item 3: Algorithm Parameters
 
@@ -68,9 +68,9 @@ see [THREAT_ANALYSIS.md](./THREAT_ANALYSIS.md).
 | Backup encryption uses PBKDF2 | ✅ Verified | 100k iterations |
 
 **Files to Review:**
-- `webbook-core/src/identity/mod.rs:export_backup()` - PBKDF2 derivation
-- `webbook-core/src/identity/mod.rs:from_seed()` - Key derivation with HKDF
-- `webbook-core/src/crypto/kdf.rs` - HKDF implementation
+- `vauchi-core/src/identity/mod.rs:export_backup()` - PBKDF2 derivation
+- `vauchi-core/src/identity/mod.rs:from_seed()` - Key derivation with HKDF
+- `vauchi-core/src/crypto/kdf.rs` - HKDF implementation
 
 ### Audit Item 5: Password Strength Enforcement
 
@@ -81,8 +81,8 @@ see [THREAT_ANALYSIS.md](./THREAT_ANALYSIS.md).
 | Entropy-based validation | ✅ Verified | zxcvbn crate v3 |
 
 **Files to Review:**
-- `webbook-core/src/identity/password.rs` - Password validation with zxcvbn
-- Tests: `webbook-core/tests/identity_tests.rs` - Password strength tests
+- `vauchi-core/src/identity/password.rs` - Password validation with zxcvbn
+- Tests: `vauchi-core/tests/identity_tests.rs` - Password strength tests
 
 ### Audit Item 6: Platform Secure Storage
 
@@ -93,8 +93,8 @@ see [THREAT_ANALYSIS.md](./THREAT_ANALYSIS.md).
 | Encrypted file fallback | ✅ Verified | `FileKeyStorage` |
 
 **Files to Review:**
-- `webbook-core/src/storage/secure.rs` - SecureStorage trait and implementations
-- `webbook-core/Cargo.toml` - `secure-storage` feature flag
+- `vauchi-core/src/storage/secure.rs` - SecureStorage trait and implementations
+- `vauchi-core/Cargo.toml` - `secure-storage` feature flag
 
 ---
 
@@ -109,9 +109,9 @@ see [THREAT_ANALYSIS.md](./THREAT_ANALYSIS.md).
 | Ratchet state persisted for recovery | ✅ Verified | `storage.save_ratchet_state()` |
 
 **Files to Review:**
-- `webbook-core/src/crypto/ratchet.rs` - Double Ratchet implementation
-- `webbook-core/src/crypto/chain.rs` - Chain key ratcheting
-- Tests: `webbook-core/tests/crypto_tests.rs` - Ratchet tests
+- `vauchi-core/src/crypto/ratchet.rs` - Double Ratchet implementation
+- `vauchi-core/src/crypto/chain.rs` - Chain key ratcheting
+- Tests: `vauchi-core/tests/crypto_tests.rs` - Ratchet tests
 
 ### Audit Item 8: X3DH Key Agreement
 
@@ -122,8 +122,8 @@ see [THREAT_ANALYSIS.md](./THREAT_ANALYSIS.md).
 | Shared secret properly derived | ✅ Verified | HKDF with concatenated secrets |
 
 **Files to Review:**
-- `webbook-core/src/exchange/x3dh.rs` - X3DH implementation
-- `webbook-core/src/exchange/session.rs` - Session establishment
+- `vauchi-core/src/exchange/x3dh.rs` - X3DH implementation
+- `vauchi-core/src/exchange/session.rs` - Session establishment
 
 ---
 
@@ -138,8 +138,8 @@ see [THREAT_ANALYSIS.md](./THREAT_ANALYSIS.md).
 | QR data is versioned | ✅ Verified | Version byte in payload |
 
 **Files to Review:**
-- `webbook-core/src/exchange/qr.rs` - QR code generation/parsing
-- `webbook-core/src/exchange/mod.rs` - Exchange protocol
+- `vauchi-core/src/exchange/qr.rs` - QR code generation/parsing
+- `vauchi-core/src/exchange/mod.rs` - Exchange protocol
 
 ### Audit Item 10: Device Linking
 
@@ -150,8 +150,8 @@ see [THREAT_ANALYSIS.md](./THREAT_ANALYSIS.md).
 | Maximum device limit enforced | ✅ Verified | `MAX_DEVICES = 10` |
 
 **Files to Review:**
-- `webbook-core/src/identity/device.rs` - Device management
-- Tests: `webbook-core/tests/identity_tests.rs` - Device tests
+- `vauchi-core/src/identity/device.rs` - Device management
+- Tests: `vauchi-core/tests/identity_tests.rs` - Device tests
 
 ### Audit Item 11: Relay Communication
 
@@ -162,9 +162,9 @@ see [THREAT_ANALYSIS.md](./THREAT_ANALYSIS.md).
 | Relay cannot decrypt content | ✅ Verified | No key access |
 
 **Files to Review:**
-- `webbook-core/src/network/protocol.rs` - Protocol messages
-- `webbook-core/src/network/relay_client.rs` - Relay client
-- `webbook-relay/src/` - Relay server (verify no decryption)
+- `vauchi-core/src/network/protocol.rs` - Protocol messages
+- `vauchi-core/src/network/relay_client.rs` - Relay client
+- `vauchi-relay/src/` - Relay server (verify no decryption)
 
 ---
 
@@ -179,8 +179,8 @@ see [THREAT_ANALYSIS.md](./THREAT_ANALYSIS.md).
 | Shared secrets never logged | ✅ Verified | No logging of keys |
 
 **Files to Review:**
-- `webbook-core/src/storage/mod.rs` - Storage implementation
-- `webbook-core/src/contact/mod.rs` - Contact handling
+- `vauchi-core/src/storage/mod.rs` - Storage implementation
+- `vauchi-core/src/contact/mod.rs` - Contact handling
 
 ### Audit Item 13: Backup Security
 
@@ -191,8 +191,8 @@ see [THREAT_ANALYSIS.md](./THREAT_ANALYSIS.md).
 | Backup format is versioned | ✅ Verified | For future compatibility |
 
 **Files to Review:**
-- `webbook-core/src/identity/backup.rs` - Backup format
-- `webbook-core/src/identity/mod.rs` - export/import backup
+- `vauchi-core/src/identity/backup.rs` - Backup format
+- `vauchi-core/src/identity/mod.rs` - export/import backup
 
 ---
 
@@ -214,19 +214,19 @@ see [THREAT_ANALYSIS.md](./THREAT_ANALYSIS.md).
 
 ```bash
 # Run all security tests
-cargo test -p webbook-core
+cargo test -p vauchi-core
 
 # Run with secure-storage feature
-cargo test -p webbook-core --features secure-storage
+cargo test -p vauchi-core --features secure-storage
 
 # Run fuzz tests
-cargo test -p webbook-core fuzz
+cargo test -p vauchi-core fuzz
 
 # Run property tests
-cargo test -p webbook-core property
+cargo test -p vauchi-core property
 
 # Run benchmarks
-cargo bench -p webbook-core
+cargo bench -p vauchi-core
 ```
 
 ---
@@ -273,8 +273,8 @@ cargo outdated
 
 ### Security Contacts
 
-- Report vulnerabilities: security@webbook.app (planned)
-- GitHub security advisories: github.com/webbook/webbook-core/security
+- Report vulnerabilities: security@vauchi.app (planned)
+- GitHub security advisories: github.com/vauchi/vauchi-core/security
 
 ---
 

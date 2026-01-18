@@ -22,13 +22,13 @@ Desktop app is missing critical functionality that exists in other frontends:
 
 ### Task 1: Add Sync Command
 
-**File**: `webbook-desktop/src-tauri/src/lib.rs`
+**File**: `vauchi-desktop/src-tauri/src/lib.rs`
 
 ```rust
 #[tauri::command]
 async fn sync(state: State<'_, AppState>) -> Result<SyncResult, String> {
-    let webbook = state.webbook.lock().await;
-    webbook.sync().await.map_err(|e| e.to_string())
+    let vauchi = state.vauchi.lock().await;
+    vauchi.sync().await.map_err(|e| e.to_string())
 }
 
 // Add to invoke_handler
@@ -40,7 +40,7 @@ async fn sync(state: State<'_, AppState>) -> Result<SyncResult, String> {
 
 ### Task 2: Sync UI in Settings
 
-**File**: `webbook-desktop/ui/src/pages/Settings.tsx`
+**File**: `vauchi-desktop/ui/src/pages/Settings.tsx`
 
 ```tsx
 // Add state
@@ -71,7 +71,7 @@ const handleSync = async () => {
 
 ### Task 3: Import Backup UI
 
-**File**: `webbook-desktop/ui/src/pages/Settings.tsx`
+**File**: `vauchi-desktop/ui/src/pages/Settings.tsx`
 
 ```tsx
 // Add import state
@@ -118,7 +118,7 @@ const handleImport = async () => {
 
 ### Task 4: Field Deletion in Home
 
-**File**: `webbook-desktop/ui/src/pages/Home.tsx`
+**File**: `vauchi-desktop/ui/src/pages/Home.tsx`
 
 ```tsx
 // Add delete handler
@@ -151,7 +151,7 @@ const handleDeleteField = async (fieldId: string) => {
 
 ```bash
 # Build and test
-cd webbook-desktop
+cd vauchi-desktop
 npm run build  # Build UI
 cargo tauri dev  # Run app
 
@@ -163,6 +163,6 @@ cargo tauri dev  # Run app
 
 ## Files Modified
 
-- `webbook-desktop/src-tauri/src/lib.rs` (add sync command)
-- `webbook-desktop/ui/src/pages/Settings.tsx` (sync + import UI)
-- `webbook-desktop/ui/src/pages/Home.tsx` (field deletion)
+- `vauchi-desktop/src-tauri/src/lib.rs` (add sync command)
+- `vauchi-desktop/ui/src/pages/Settings.tsx` (sync + import UI)
+- `vauchi-desktop/ui/src/pages/Home.tsx` (field deletion)

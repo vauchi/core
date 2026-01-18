@@ -1,6 +1,6 @@
 @visibility @privacy
 Feature: Visibility Control
-  As a WebBook user
+  As a Vauchi user
   I want to control which contacts can see which of my contact fields
   So that I can share different information with different people
 

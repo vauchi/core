@@ -13,7 +13,7 @@ Comprehensive audit across 4 domains. Overall project health is **good** with mi
 
 ### Strengths
 - Clean module boundaries with feature flags (`network`, `secure-storage`)
-- Well-organized public API exports in `webbook-core/src/lib.rs`
+- Well-organized public API exports in `vauchi-core/src/lib.rs`
 - Proper separation: core → mobile bindings → platform apps
 - Cross-platform strategy (UniFFI) working well
 
@@ -59,7 +59,7 @@ Comprehensive audit across 4 domains. Overall project health is **good** with mi
 ## QA Audit
 
 ### Strengths
-- 409 unit tests passing in webbook-core
+- 409 unit tests passing in vauchi-core
 - Comprehensive test types: unit, integration, property-based, fuzz
 - iOS has 6 test files covering services and view models
 - Testing documentation exists (`docs/development/testing.md`)
@@ -120,8 +120,8 @@ Comprehensive audit across 4 domains. Overall project health is **good** with mi
 
 | Crate | Tests | Status |
 |-------|-------|--------|
-| webbook-core | 409 | ✅ Passing |
-| webbook-relay | Unit tests | ✅ Passing |
-| webbook-mobile | Integration | ✅ Passing |
-| webbook-ios | 6 test files | ✅ |
-| webbook-desktop | Requires UI build | ⚠️ |
+| vauchi-core | 409 | ✅ Passing |
+| vauchi-relay | Unit tests | ✅ Passing |
+| vauchi-mobile | Integration | ✅ Passing |
+| vauchi-ios | 6 test files | ✅ |
+| vauchi-desktop | Requires UI build | ⚠️ |

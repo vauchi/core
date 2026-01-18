@@ -20,18 +20,18 @@ Users cannot edit their display name after initial setup. This is a basic identi
 
 ### Task 1: Core API
 
-**File**: `webbook-core/src/api.rs`
+**File**: `vauchi-core/src/api.rs`
 
 ```rust
-impl WebBook {
+impl Vauchi {
     /// Update the user's display name
-    pub fn update_display_name(&mut self, new_name: &str) -> WebBookResult<()> {
+    pub fn update_display_name(&mut self, new_name: &str) -> VauchiResult<()> {
         let name = new_name.trim();
         if name.is_empty() {
-            return Err(WebBookError::ValidationError("Display name cannot be empty".into()));
+            return Err(VauchiError::ValidationError("Display name cannot be empty".into()));
         }
         if name.len() > 100 {
-            return Err(WebBookError::ValidationError("Display name too long".into()));
+            return Err(VauchiError::ValidationError("Display name too long".into()));
         }
 
         // Update identity
@@ -52,33 +52,33 @@ impl WebBook {
 }
 ```
 
-**Test**: `webbook-core/tests/api_tests.rs`
+**Test**: `vauchi-core/tests/api_tests.rs`
 ```rust
 #[test]
 fn test_update_display_name() {
-    let mut webbook = create_test_webbook();
-    webbook.update_display_name("New Name").unwrap();
-    assert_eq!(webbook.get_display_name(), "New Name");
+    let mut vauchi = create_test_vauchi();
+    vauchi.update_display_name("New Name").unwrap();
+    assert_eq!(vauchi.get_display_name(), "New Name");
 }
 ```
 
 ### Task 2: Mobile Bindings
 
-**File**: `webbook-mobile/src/lib.rs`
+**File**: `vauchi-mobile/src/lib.rs`
 
 ```rust
-impl WebBookMobile {
+impl VauchiMobile {
     pub fn update_display_name(&self, new_name: String) -> Result<(), MobileError> {
-        let mut webbook = self.inner.lock().map_err(|_| MobileError::LockError)?;
-        webbook.update_display_name(&new_name)?;
+        let mut vauchi = self.inner.lock().map_err(|_| MobileError::LockError)?;
+        vauchi.update_display_name(&new_name)?;
         Ok(())
     }
 }
 ```
 
-**File**: `webbook-mobile/src/webbook_mobile.udl`
+**File**: `vauchi-mobile/src/vauchi_mobile.udl`
 ```
-interface WebBookMobile {
+interface VauchiMobile {
     // ... existing
     [Throws=MobileError]
     void update_display_name(string new_name);
@@ -87,7 +87,7 @@ interface WebBookMobile {
 
 ### Task 3: CLI Implementation
 
-**File**: `webbook-cli/src/commands/init.rs`
+**File**: `vauchi-cli/src/commands/init.rs`
 
 Add `name edit` subcommand:
 ```rust
@@ -102,8 +102,8 @@ enum NameCommands {
 
 // In execute_name_edit:
 fn execute_name_edit(name: &str) -> Result<()> {
-    let mut webbook = load_webbook()?;
-    webbook.update_display_name(name)?;
+    let mut vauchi = load_vauchi()?;
+    vauchi.update_display_name(name)?;
     println!("Display name updated to: {}", name);
     Ok(())
 }
@@ -111,7 +111,7 @@ fn execute_name_edit(name: &str) -> Result<()> {
 
 ### Task 4: TUI Implementation
 
-**File**: `webbook-tui/src/ui/home.rs`
+**File**: `vauchi-tui/src/ui/home.rs`
 
 Add edit name dialog triggered by `e` on the name field:
 ```rust
@@ -124,7 +124,7 @@ if let Some(dialog) = &app.edit_name_dialog {
 }
 ```
 
-**File**: `webbook-tui/src/handlers/input.rs`
+**File**: `vauchi-tui/src/handlers/input.rs`
 ```rust
 KeyCode::Char('e') if on_name_field => {
     app.edit_name_dialog = Some(EditNameDialog::new(app.display_name.clone()));
@@ -133,16 +133,16 @@ KeyCode::Char('e') if on_name_field => {
 
 ### Task 5: Desktop Implementation
 
-**File**: `webbook-desktop/src-tauri/src/identity.rs`
+**File**: `vauchi-desktop/src-tauri/src/identity.rs`
 ```rust
 #[tauri::command]
 async fn update_display_name(name: String, state: State<'_, AppState>) -> Result<(), String> {
-    let mut webbook = state.webbook.lock().await;
-    webbook.update_display_name(&name).map_err(|e| e.to_string())
+    let mut vauchi = state.vauchi.lock().await;
+    vauchi.update_display_name(&name).map_err(|e| e.to_string())
 }
 ```
 
-**File**: `webbook-desktop/ui/src/pages/Settings.tsx`
+**File**: `vauchi-desktop/ui/src/pages/Settings.tsx`
 ```tsx
 const [editingName, setEditingName] = createSignal(false);
 const [newName, setNewName] = createSignal('');
@@ -165,7 +165,7 @@ const handleUpdateName = async () => {
 
 ### Task 6: Android Implementation
 
-**File**: `webbook-android/.../ui/MainViewModel.kt`
+**File**: `vauchi-android/.../ui/MainViewModel.kt`
 ```kotlin
 fun updateDisplayName(newName: String) {
     viewModelScope.launch {
@@ -182,12 +182,12 @@ fun updateDisplayName(newName: String) {
 }
 ```
 
-**File**: `webbook-android/.../MainActivity.kt` (Home screen)
+**File**: `vauchi-android/.../MainActivity.kt` (Home screen)
 Add edit button next to display name with dialog.
 
 ### Task 7: iOS Implementation
 
-**File**: `webbook-ios/WebBook/ViewModels/WebBookViewModel.swift`
+**File**: `vauchi-ios/Vauchi/ViewModels/VauchiViewModel.swift`
 ```swift
 func updateDisplayName(_ newName: String) async {
     do {
@@ -200,7 +200,7 @@ func updateDisplayName(_ newName: String) async {
 }
 ```
 
-**File**: `webbook-ios/WebBook/Views/SettingsView.swift`
+**File**: `vauchi-ios/Vauchi/Views/SettingsView.swift`
 Make display name editable with tap-to-edit pattern.
 
 ## Verification
@@ -213,10 +213,10 @@ Make display name editable with tap-to-edit pattern.
 
 | Crate/App | Files |
 |-----------|-------|
-| webbook-core | `src/api.rs`, `tests/api_tests.rs` |
-| webbook-mobile | `src/lib.rs`, `src/webbook_mobile.udl` |
-| webbook-cli | `src/commands/init.rs` or new `name.rs` |
-| webbook-tui | `src/ui/home.rs`, `src/handlers/input.rs` |
-| webbook-desktop | `src-tauri/src/identity.rs`, `ui/src/pages/Settings.tsx` |
-| webbook-android | `MainViewModel.kt`, `MainActivity.kt` |
-| webbook-ios | `WebBookViewModel.swift`, `SettingsView.swift` |
+| vauchi-core | `src/api.rs`, `tests/api_tests.rs` |
+| vauchi-mobile | `src/lib.rs`, `src/vauchi_mobile.udl` |
+| vauchi-cli | `src/commands/init.rs` or new `name.rs` |
+| vauchi-tui | `src/ui/home.rs`, `src/handlers/input.rs` |
+| vauchi-desktop | `src-tauri/src/identity.rs`, `ui/src/pages/Settings.tsx` |
+| vauchi-android | `MainViewModel.kt`, `MainActivity.kt` |
+| vauchi-ios | `VauchiViewModel.swift`, `SettingsView.swift` |

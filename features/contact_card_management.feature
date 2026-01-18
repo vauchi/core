@@ -1,12 +1,12 @@
 @contact-card
 Feature: Contact Card Management
-  As a WebBook user
+  As a Vauchi user
   I want to manage my contact card with various types of information
   So that I can share relevant contact details with others
 
   Background:
     Given I have an existing identity
-    And I am logged into WebBook
+    And I am logged into Vauchi
     And I have a contact card with display name "Alice Smith"
 
   # Adding Contact Fields

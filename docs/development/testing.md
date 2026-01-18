@@ -21,10 +21,10 @@
 ### Directory Structure
 
 ```
-webbook-core/tests/
+vauchi-core/tests/
 ├── common/                    # Shared test utilities
 │   ├── mod.rs                 # Module exports
-│   ├── helpers.rs             # Setup helpers (create_webbook_with_identity, etc.)
+│   ├── helpers.rs             # Setup helpers (create_vauchi_with_identity, etc.)
 │   ├── fixtures.rs            # Test data (sample cards, passwords, unicode)
 │   └── strategies.rs          # Proptest strategies (reusable)
 ├── e2e/                       # End-to-end tests
@@ -101,8 +101,8 @@ use common::fixtures::*;
 ### Helpers
 
 ```rust
-// Create a WebBook with identity
-let wb = create_webbook_with_identity("Alice");
+// Create a Vauchi with identity
+let wb = create_vauchi_with_identity("Alice");
 
 // Set up Alice and Bob with mutual contacts
 let (alice, bob, secret, bob_id, alice_id) = setup_alice_bob_exchange();
@@ -146,7 +146,7 @@ proptest! {
 cargo test --workspace
 
 # Core library only (fast)
-cargo test -p webbook-core --lib
+cargo test -p vauchi-core --lib
 
 # Specific test suite
 cargo test --test e2e                    # E2E tests

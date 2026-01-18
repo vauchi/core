@@ -1,6 +1,6 @@
 @privacy @duress @plausible-deniability @security @opt-in
 Feature: Duress Password
-  As a WebBook user who may be coerced to unlock my phone
+  As a Vauchi user who may be coerced to unlock my phone
   I want a secondary password that shows a fake contact list
   So that I can comply with demands while protecting sensitive contacts
 
@@ -115,7 +115,7 @@ Feature: Duress Password
       | Phone        | Optional phone number          |
       | Email        | Optional email                 |
     And the contact should be saved to the decoy profile
-    And it should not be a real WebBook contact
+    And it should not be a real Vauchi contact
 
   @decoy-profile
   Scenario: Decoy contacts are static

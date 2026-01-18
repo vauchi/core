@@ -1,10 +1,10 @@
 [workspace]
 resolver = "2"
 members = [
-    "webbook-core",
-    "webbook-relay",
-    "webbook-cli",
-    "webbook-mobile",
-    "webbook-tui",
-    "webbook-desktop/src-tauri",
+    "vauchi-core",
+    "vauchi-relay",
+    "vauchi-cli",
+    "vauchi-mobile",
+    "vauchi-tui",
+    "vauchi-desktop/src-tauri",
 ]

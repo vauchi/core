@@ -3,7 +3,7 @@
 ## Local Storage (Per Device)
 
 ```
-/webbook_data/
+/vauchi_data/
 ├── identity/
 │   ├── master_key.enc          # Encrypted with device key
 │   └── keypairs.enc            # Identity and exchange keys

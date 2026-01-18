@@ -2,7 +2,7 @@
 
 SQLite database with application-level encryption. Sensitive fields are encrypted with the user's storage key (derived from master seed).
 
-**Implementation**: `webbook-core/src/storage/mod.rs`
+**Implementation**: `vauchi-core/src/storage/mod.rs`
 
 ## Tables
 
@@ -171,7 +171,7 @@ Local version vector for causality tracking (single row).
 | ratchet_state_encrypted | AES-256-GCM | Storage key |
 | pending_updates.payload | Double Ratchet | Per-contact ratchet |
 
-**Storage key derivation**: `HKDF(master_seed, "WebBook_Storage")`
+**Storage key derivation**: `HKDF(master_seed, "Vauchi_Storage")`
 
 ## Schema Version
 

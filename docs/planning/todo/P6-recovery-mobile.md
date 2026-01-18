@@ -35,7 +35,7 @@ Recovery workflow is fully implemented in CLI but mobile apps only have informat
 
 ### Mobile Bindings
 
-**File**: `webbook-mobile/src/lib.rs`
+**File**: `vauchi-mobile/src/lib.rs`
 
 Currently exposed (verified in Desktop):
 - `create_recovery_claim(old_pk_hex)` ✅
@@ -52,20 +52,20 @@ Missing:
 
 ### Task 1: Complete Mobile Bindings
 
-**File**: `webbook-mobile/src/lib.rs`
+**File**: `vauchi-mobile/src/lib.rs`
 
 ```rust
-impl WebBookMobile {
+impl VauchiMobile {
     /// Add a voucher to the pending recovery claim
     pub fn add_voucher(&self, voucher_b64: String) -> Result<RecoveryProgress, MobileError> {
-        let mut webbook = self.inner.lock().map_err(|_| MobileError::LockError)?;
+        let mut vauchi = self.inner.lock().map_err(|_| MobileError::LockError)?;
 
         let voucher = RecoveryVoucher::from_base64(&voucher_b64)
             .map_err(|e| MobileError::InvalidData(e.to_string()))?;
 
-        webbook.recovery_manager().add_voucher(voucher)?;
+        vauchi.recovery_manager().add_voucher(voucher)?;
 
-        let status = webbook.recovery_manager().get_status()?;
+        let status = vauchi.recovery_manager().get_status()?;
         Ok(RecoveryProgress {
             vouchers_collected: status.vouchers.len() as u32,
             vouchers_needed: status.threshold,
@@ -75,9 +75,9 @@ impl WebBookMobile {
 
     /// Get current recovery status
     pub fn get_recovery_status(&self) -> Result<Option<RecoveryStatus>, MobileError> {
-        let webbook = self.inner.lock().map_err(|_| MobileError::LockError)?;
+        let vauchi = self.inner.lock().map_err(|_| MobileError::LockError)?;
 
-        match webbook.recovery_manager().get_status() {
+        match vauchi.recovery_manager().get_status() {
             Ok(status) => Ok(Some(RecoveryStatus {
                 old_public_key: hex::encode(&status.old_pk),
                 vouchers_collected: status.vouchers.len() as u32,
@@ -90,11 +90,11 @@ impl WebBookMobile {
 
     /// Get completed recovery proof
     pub fn get_recovery_proof(&self) -> Result<Option<String>, MobileError> {
-        let webbook = self.inner.lock().map_err(|_| MobileError::LockError)?;
+        let vauchi = self.inner.lock().map_err(|_| MobileError::LockError)?;
 
-        let status = webbook.recovery_manager().get_status()?;
+        let status = vauchi.recovery_manager().get_status()?;
         if status.vouchers.len() >= status.threshold as usize {
-            let proof = webbook.recovery_manager().create_proof()?;
+            let proof = vauchi.recovery_manager().create_proof()?;
             Ok(Some(proof.to_base64()))
         } else {
             Ok(None)
@@ -103,12 +103,12 @@ impl WebBookMobile {
 
     /// Verify a recovery proof from a contact
     pub fn verify_recovery_proof(&self, proof_b64: String) -> Result<RecoveryVerification, MobileError> {
-        let webbook = self.inner.lock().map_err(|_| MobileError::LockError)?;
+        let vauchi = self.inner.lock().map_err(|_| MobileError::LockError)?;
 
         let proof = RecoveryProof::from_base64(&proof_b64)
             .map_err(|e| MobileError::InvalidData(e.to_string()))?;
 
-        let result = webbook.recovery_manager().verify_proof(&proof)?;
+        let result = vauchi.recovery_manager().verify_proof(&proof)?;
 
         Ok(RecoveryVerification {
             old_public_key: hex::encode(&proof.old_pk),
@@ -126,7 +126,7 @@ impl WebBookMobile {
 }
 ```
 
-**File**: `webbook-mobile/src/webbook_mobile.udl`
+**File**: `vauchi-mobile/src/vauchi_mobile.udl`
 
 ```
 dictionary RecoveryProgress {
@@ -151,7 +151,7 @@ dictionary RecoveryVerification {
     string recommendation;
 };
 
-interface WebBookMobile {
+interface VauchiMobile {
     // ... existing
 
     [Throws=MobileError]
@@ -170,7 +170,7 @@ interface WebBookMobile {
 
 ### Task 2: Android Recovery UI
 
-**File**: `webbook-android/.../ui/RecoveryScreen.kt`
+**File**: `vauchi-android/.../ui/RecoveryScreen.kt`
 
 Replace informational UI with functional workflow:
 
@@ -247,13 +247,13 @@ fun RecoverIdentityTab(viewModel: MainViewModel, status: RecoveryStatus?) {
 
 ### Task 3: iOS Recovery UI
 
-**File**: `webbook-ios/WebBook/Views/RecoveryView.swift`
+**File**: `vauchi-ios/Vauchi/Views/RecoveryView.swift`
 
 Create new view (currently missing):
 
 ```swift
 struct RecoveryView: View {
-    @EnvironmentObject var viewModel: WebBookViewModel
+    @EnvironmentObject var viewModel: VauchiViewModel
     @State private var selectedTab = 0
     @State private var recoveryStatus: RecoveryStatus?
 
@@ -286,7 +286,7 @@ struct RecoverIdentityView: View {
     let status: RecoveryStatus?
     @State private var oldPk = ""
     @State private var voucherInput = ""
-    @EnvironmentObject var viewModel: WebBookViewModel
+    @EnvironmentObject var viewModel: VauchiViewModel
 
     var body: some View {
         if let status = status {
@@ -375,7 +375,7 @@ fun addVoucher(voucher: String) {
 }
 ```
 
-**iOS** (`WebBookViewModel.swift`):
+**iOS** (`VauchiViewModel.swift`):
 ```swift
 func getRecoveryStatus() async throws -> RecoveryStatus? {
     try await repository.getRecoveryStatus()
@@ -400,6 +400,6 @@ func addVoucher(_ voucher: String) async throws -> RecoveryProgress {
 
 | Component | Files |
 |-----------|-------|
-| Mobile bindings | `webbook-mobile/src/lib.rs`, `src/webbook_mobile.udl` |
+| Mobile bindings | `vauchi-mobile/src/lib.rs`, `src/vauchi_mobile.udl` |
 | Android | `RecoveryScreen.kt`, `MainViewModel.kt` |
-| iOS | New `RecoveryView.swift`, `WebBookViewModel.swift`, `ContentView.swift` |
+| iOS | New `RecoveryView.swift`, `VauchiViewModel.swift`, `ContentView.swift` |

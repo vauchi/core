@@ -12,7 +12,7 @@ Privacy-focused updatable contact card exchange via trusted in real life meeting
 
 **Crypto**: `ring` only. No custom crypto. No mocking crypto.
 
-**Coverage**: 90%+ for webbook-core.
+**Coverage**: 90%+ for vauchi-core.
 
 **Fail fast**: Riskiest first. Return errors immediately. Use `Result`/`Option`.
 
@@ -20,24 +20,24 @@ Privacy-focused updatable contact card exchange via trusted in real life meeting
 
 ```bash
 cargo test                        # all tests
-cargo test -p webbook-core        # specific crate
+cargo test -p vauchi-core        # specific crate
 cargo clippy -- -D warnings       # lint
 cargo fmt                         # format
-cargo run -p webbook-relay        # relay server
-cargo run -p webbook-cli -- help  # CLI
+cargo run -p vauchi-relay        # relay server
+cargo run -p vauchi-cli -- help  # CLI
 ```
 
 ## Structure
 
 ```
-webbook-core/     # core lib (crypto, storage, sync)
-webbook-relay/    # WebSocket relay
-webbook-cli/      # CLI
-webbook-tui/      # Terminal UI (ratatui)
-webbook-desktop/  # Desktop (Tauri + SolidJS)
-webbook-mobile/   # UniFFI bindings
-webbook-android/  # Android (Kotlin/Compose)
-webbook-ios/      # iOS (SwiftUI)
+vauchi-core/     # core lib (crypto, storage, sync)
+vauchi-relay/    # WebSocket relay
+vauchi-cli/      # CLI
+vauchi-tui/      # Terminal UI (ratatui)
+vauchi-desktop/  # Desktop (Tauri + SolidJS)
+vauchi-mobile/   # UniFFI bindings
+vauchi-android/  # Android (Kotlin/Compose)
+vauchi-ios/      # iOS (SwiftUI)
 features/         # Gherkin scenarios
 docs/             # Architecture, planning, docs
 scripts/          # Build/utility scripts

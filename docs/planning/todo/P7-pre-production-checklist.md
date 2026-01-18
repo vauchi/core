@@ -6,7 +6,7 @@
 
 ## Overview
 
-Comprehensive checklist of items to address before WebBook can be considered production-ready. Based on deep audit of codebase, user research, and community standards.
+Comprehensive checklist of items to address before Vauchi can be considered production-ready. Based on deep audit of codebase, user research, and community standards.
 
 ---
 
@@ -54,7 +54,7 @@ Based on research, users of privacy-focused apps most commonly ask about:
 **Action**: Add startup warning when not behind TLS proxy
 
 ```rust
-// webbook-relay/src/main.rs - Add at startup
+// vauchi-relay/src/main.rs - Add at startup
 if !is_behind_tls_proxy() {
     warn!("⚠️  WARNING: Relay is not configured for TLS!");
     warn!("⚠️  Deploy behind a TLS-terminating reverse proxy (nginx, caddy)");
@@ -67,7 +67,7 @@ if !is_behind_tls_proxy() {
 2. Environment variable `RELAY_TLS_VERIFIED=true`
 3. Check if bound to localhost only (safe for reverse proxy)
 
-**Files to modify**: `webbook-relay/src/main.rs`, `webbook-relay/src/config.rs`
+**Files to modify**: `vauchi-relay/src/main.rs`, `vauchi-relay/src/config.rs`
 
 ### 2.2 Third-Party Relay Accessibility
 **Current status**: Excellent - Docker, systemd, Helm all available
@@ -172,8 +172,8 @@ Workflows needed:
 
 ```yaml
 github: anthropics
-open_collective: webbook
-custom: ["https://webbook.app/donate"]
+open_collective: vauchi
+custom: ["https://vauchi.app/donate"]
 ```
 
 ---
@@ -185,25 +185,25 @@ custom: ["https://webbook.app/donate"]
 **Action**: Add help links to Settings screens
 
 **All platforms should link to**:
-- User Guide: `https://webbook.app/user-guide`
-- FAQ: `https://webbook.app/faq`
-- Report Issue: `https://github.com/anthropics/webbook/issues`
-- Privacy Policy: `https://webbook.app/privacy`
+- User Guide: `https://vauchi.app/user-guide`
+- FAQ: `https://vauchi.app/faq`
+- Report Issue: `https://github.com/anthropics/vauchi/issues`
+- Privacy Policy: `https://vauchi.app/privacy`
 
 **Files to modify**:
-- `webbook-android/.../SettingsScreen.kt`
-- `webbook-ios/.../SettingsView.swift`
-- `webbook-desktop/ui/src/pages/Settings.tsx`
-- `webbook-tui/src/ui/settings.rs`
+- `vauchi-android/.../SettingsScreen.kt`
+- `vauchi-ios/.../SettingsView.swift`
+- `vauchi-desktop/ui/src/pages/Settings.tsx`
+- `vauchi-tui/src/ui/settings.rs`
 
 ### 5.2 Contribute/Donate Links
 **Current**: None in app
 **Action**: Add to Settings or About screen
 
 **Links**:
-- Contribute: `https://webbook.app/contribute`
-- Donate: `https://webbook.app/donate`
-- Source Code: `https://github.com/anthropics/webbook`
+- Contribute: `https://vauchi.app/contribute`
+- Donate: `https://vauchi.app/donate`
+- Source Code: `https://github.com/anthropics/vauchi`
 
 ### 5.3 Version and Build Info
 **Current**: Not displayed
@@ -229,13 +229,13 @@ custom: ["https://webbook.app/donate"]
 **Current**: Only in docs/
 **Action**: Publish user-guide.md to website as HTML
 
-**Location**: `webbook-website/pages/user-guide.html`
+**Location**: `vauchi-website/pages/user-guide.html`
 
 ### 6.3 FAQ Web Version
 **Current**: Only in docs/
 **Action**: Publish faq.md to website as HTML
 
-**Location**: `webbook-website/pages/faq.html`
+**Location**: `vauchi-website/pages/faq.html`
 
 ---
 
@@ -265,18 +265,18 @@ custom: ["https://webbook.app/donate"]
 
 **Result structure**:
 ```
-WebBook/
-├── webbook-code/     # Main code (public)
-├── webbook-website/  # GitHub Pages (public)
-└── webbook-market/   # Marketing (private)
+Vauchi/
+├── vauchi-code/     # Main code (public)
+├── vauchi-website/  # GitHub Pages (public)
+└── vauchi-market/   # Marketing (private)
 ```
 
 ### 8.2 GitHub Repository Creation
 **Action**: Create GitHub repositories
 
-1. `webbook` → rename to `webbook-code` or keep as `webbook`
-2. `webbook-website` → new public repo, enable GitHub Pages
-3. `webbook-market` → new private repo
+1. `vauchi` → rename to `vauchi-code` or keep as `vauchi`
+2. `vauchi-website` → new public repo, enable GitHub Pages
+3. `vauchi-market` → new private repo
 
 ---
 
@@ -320,11 +320,11 @@ WebBook/
 - [ ] Configure alerting
 
 ### 10.2 Website Deployment
-**Action**: Deploy webbook-website to GitHub Pages
+**Action**: Deploy vauchi-website to GitHub Pages
 
-- [ ] Push webbook-website to GitHub
+- [ ] Push vauchi-website to GitHub
 - [ ] Enable GitHub Pages
-- [ ] Configure custom domain (webbook.app)
+- [ ] Configure custom domain (vauchi.app)
 - [ ] Verify SSL
 
 ### 10.3 App Store Preparation

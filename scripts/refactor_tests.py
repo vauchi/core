@@ -286,7 +286,7 @@ def find_crates(root: Path) -> list[Path]:
     """Find all Rust crates in the project."""
     crates = []
     for item in root.iterdir():
-        if item.is_dir() and item.name.startswith('webbook-'):
+        if item.is_dir() and item.name.startswith('vauchi-'):
             if (item / 'Cargo.toml').exists():
                 crates.append(item)
             for subdir in item.iterdir():
@@ -411,7 +411,7 @@ def cmd_extract(args, root: Path, crates: list[Path]):
     print("Extraction complete!")
     print()
     print("Next steps:")
-    print("  1. Run 'cargo test -p webbook-core -p webbook-relay' to check compilation")
+    print("  1. Run 'cargo test -p vauchi-core -p vauchi-relay' to check compilation")
     print("  2. If there are errors about private items, use ONE of these approaches:")
     print("     a) Add test-specific constructor (PREFERRED):")
     print("        #[doc(hidden)]")
@@ -429,7 +429,7 @@ def cmd_verify(args, root: Path, crates: list[Path]):
     print("Running cargo test to verify...\n")
 
     result = subprocess.run(
-        ['cargo', 'test', '-p', 'webbook-core', '-p', 'webbook-relay'],
+        ['cargo', 'test', '-p', 'vauchi-core', '-p', 'vauchi-relay'],
         cwd=root,
         capture_output=True,
         text=True
@@ -505,7 +505,7 @@ Examples:
     if args.crate:
         crate_path = root / args.crate
         if not crate_path.exists():
-            crate_path = root / f'webbook-{args.crate}'
+            crate_path = root / f'vauchi-{args.crate}'
         if not crate_path.exists():
             print(f"Crate not found: {args.crate}")
             return 1

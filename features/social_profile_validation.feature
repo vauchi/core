@@ -1,6 +1,6 @@
 @social @validation @trust
 Feature: Social Profile Validation
-  As a WebBook user
+  As a Vauchi user
   I want to verify that social profiles belong to my contacts
   So that I can trust the social links they share are authentic
 
@@ -228,7 +228,7 @@ Feature: Social Profile Validation
     When I tap "Verify with GitHub"
     Then I should be redirected to GitHub's OAuth consent screen
     And the app should request minimal permissions (read-only profile)
-    And my WebBook identity should NOT be shared with GitHub
+    And my Vauchi identity should NOT be shared with GitHub
 
   @oauth @low-priority
   Scenario: Complete OAuth verification successfully
@@ -260,7 +260,7 @@ Feature: Social Profile Validation
   @oauth @low-priority
   Scenario: OAuth verification is privacy-preserving
     Given I complete OAuth verification for Twitter
-    Then Twitter should NOT receive my WebBook identity
+    Then Twitter should NOT receive my Vauchi identity
     And Twitter should NOT receive my contact list
     And only my username confirmation should be stored
     And the OAuth token should be discarded after verification

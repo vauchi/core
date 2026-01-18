@@ -18,7 +18,7 @@ TUI and Desktop apps have no way to search/filter contacts. With many contacts, 
 
 ### Task 1: TUI Contact Search
 
-**File**: `webbook-tui/src/ui/contacts.rs`
+**File**: `vauchi-tui/src/ui/contacts.rs`
 
 ```rust
 // Add search state to contacts view
@@ -65,7 +65,7 @@ fn render(f: &mut Frame, area: Rect, view: &ContactsView) {
 }
 ```
 
-**File**: `webbook-tui/src/handlers/input.rs`
+**File**: `vauchi-tui/src/handlers/input.rs`
 
 ```rust
 // Add search mode handling
@@ -94,7 +94,7 @@ if app.contacts_view.search_mode {
 
 ### Task 2: Desktop Contact Search
 
-**File**: `webbook-desktop/ui/src/pages/Contacts.tsx`
+**File**: `vauchi-desktop/ui/src/pages/Contacts.tsx`
 
 ```tsx
 // Add search state
@@ -130,7 +130,7 @@ const filteredContacts = createMemo(() => {
 </For>
 ```
 
-**File**: `webbook-desktop/ui/src/pages/Contacts.css` (or styled-components)
+**File**: `vauchi-desktop/ui/src/pages/Contacts.css` (or styled-components)
 
 ```css
 .search-bar {
@@ -158,12 +158,12 @@ const filteredContacts = createMemo(() => {
 
 ```bash
 # TUI
-cargo run -p webbook-tui
+cargo run -p vauchi-tui
 # Press 'c' for contacts, then '/' to search
 # Type a name, verify filtering works
 
 # Desktop
-cd webbook-desktop
+cd vauchi-desktop
 npm run dev
 # Navigate to Contacts, use search bar
 ```

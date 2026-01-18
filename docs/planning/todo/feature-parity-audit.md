@@ -158,58 +158,58 @@ Legend: ✅ Complete | ⚠️ Partial | ❌ Missing | 📋 UI Only (delegates to
 ### Plan 1: Edit Display Name (All Frontends)
 **Impact**: HIGH | **Effort**: LOW
 **Files to modify**:
-- `webbook-core/src/api.rs` - Add `update_display_name()` method
-- `webbook-mobile/src/lib.rs` - Add UniFFI binding
-- CLI: `webbook-cli/src/commands/init.rs` - Add `name edit` subcommand
-- TUI: `webbook-tui/src/ui/home.rs` - Add edit dialog
-- Desktop: `webbook-desktop/ui/src/pages/Settings.tsx` - Make name editable
+- `vauchi-core/src/api.rs` - Add `update_display_name()` method
+- `vauchi-mobile/src/lib.rs` - Add UniFFI binding
+- CLI: `vauchi-cli/src/commands/init.rs` - Add `name edit` subcommand
+- TUI: `vauchi-tui/src/ui/home.rs` - Add edit dialog
+- Desktop: `vauchi-desktop/ui/src/pages/Settings.tsx` - Make name editable
 - Android: `MainActivity.kt` - Add edit button in Home
 - iOS: `SettingsView.swift` - Make name editable
 
 ### Plan 2: Field Edit/Remove for Desktop
 **Impact**: HIGH | **Effort**: LOW
 **Files to modify**:
-- `webbook-desktop/ui/src/pages/Home.tsx` - Add edit/delete buttons to field rows
-- `webbook-desktop/src-tauri/src/card.rs` - Already has `remove_field`, just wire UI
+- `vauchi-desktop/ui/src/pages/Home.tsx` - Add edit/delete buttons to field rows
+- `vauchi-desktop/src-tauri/src/card.rs` - Already has `remove_field`, just wire UI
 
 ### Plan 3: Contact Search (TUI + Desktop)
 **Impact**: MEDIUM | **Effort**: LOW
 **Files to modify**:
-- TUI: `webbook-tui/src/ui/contacts.rs` - Add search input field
-- TUI: `webbook-tui/src/handlers/input.rs` - Handle search input
-- Desktop: `webbook-desktop/ui/src/pages/Contacts.tsx` - Add search bar
+- TUI: `vauchi-tui/src/ui/contacts.rs` - Add search input field
+- TUI: `vauchi-tui/src/handlers/input.rs` - Handle search input
+- Desktop: `vauchi-desktop/ui/src/pages/Contacts.tsx` - Add search bar
 
 ### Plan 4: Contact Verification (Desktop + Android)
 **Impact**: MEDIUM | **Effort**: LOW
 **Files to modify**:
-- Desktop: `webbook-desktop/ui/src/pages/Contacts.tsx` - Add verify button
-- Desktop: `webbook-desktop/src-tauri/src/contacts.rs` - Add verify command
+- Desktop: `vauchi-desktop/ui/src/pages/Contacts.tsx` - Add verify button
+- Desktop: `vauchi-desktop/src-tauri/src/contacts.rs` - Add verify command
 - Android: `ContactDetailScreen.kt` - Add verify button and ViewModel method
 
 ### Plan 5: Sync UI for Desktop
 **Impact**: HIGH | **Effort**: MEDIUM
 **Files to modify**:
-- `webbook-desktop/src-tauri/src/lib.rs` - Add sync command
-- `webbook-desktop/ui/src/pages/Settings.tsx` - Add sync button and status
-- `webbook-desktop/ui/src/pages/Home.tsx` - Add sync status indicator
+- `vauchi-desktop/src-tauri/src/lib.rs` - Add sync command
+- `vauchi-desktop/ui/src/pages/Settings.tsx` - Add sync button and status
+- `vauchi-desktop/ui/src/pages/Home.tsx` - Add sync status indicator
 
 ### Plan 6: Import Backup UI for Desktop
 **Impact**: MEDIUM | **Effort**: LOW
 **Files to modify**:
-- `webbook-desktop/ui/src/pages/Settings.tsx` - Add import section with file picker
+- `vauchi-desktop/ui/src/pages/Settings.tsx` - Add import section with file picker
 - Backend `import_backup` command already exists
 
 ### Plan 7: QR Expiration Timer (TUI + Desktop)
 **Impact**: LOW | **Effort**: LOW
 **Files to modify**:
-- TUI: `webbook-tui/src/ui/exchange.rs` - Add countdown display
-- Desktop: `webbook-desktop/ui/src/pages/Exchange.tsx` - Add timer component
+- TUI: `vauchi-tui/src/ui/exchange.rs` - Add countdown display
+- Desktop: `vauchi-desktop/ui/src/pages/Exchange.tsx` - Add timer component
 
 ### Plan 8: Device Management Completion
 **Impact**: HIGH | **Effort**: HIGH
 **Scope**: Complete device linking across all frontends
 **Files to modify**:
-- Core: Verify `webbook-core/src/exchange/device_link.rs` is complete
+- Core: Verify `vauchi-core/src/exchange/device_link.rs` is complete
 - Mobile: Add UniFFI bindings for device operations
 - All frontends: Add device list, link, join, revoke UIs
 **Recommendation**: Start with CLI completion, then propagate to mobile
@@ -224,10 +224,10 @@ Legend: ✅ Complete | ⚠️ Partial | ❌ Missing | 📋 UI Only (delegates to
 ### Plan 10: Relay Server Hardening
 **Impact**: CRITICAL | **Effort**: MEDIUM
 **Priority fixes**:
-1. `webbook-relay/src/main.rs` - Enforce max_connections
+1. `vauchi-relay/src/main.rs` - Enforce max_connections
 2. Add TLS support or enforce proxy docs
-3. `webbook-relay/src/rate_limit.rs` - Add bucket cleanup
-4. `webbook-relay/src/storage/sqlite.rs` - Enable WAL mode
+3. `vauchi-relay/src/rate_limit.rs` - Add bucket cleanup
+4. `vauchi-relay/src/storage/sqlite.rs` - Enable WAL mode
 
 ---
 

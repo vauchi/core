@@ -134,8 +134,8 @@ Key technical decisions and their rationale. New decisions append to this file.
 - Well-understood security properties
 
 **Implementation**:
-- X3DH: `webbook-core/src/exchange/x3dh.rs`
-- Double Ratchet: `webbook-core/src/crypto/ratchet.rs`
+- X3DH: `vauchi-core/src/exchange/x3dh.rs`
+- Double Ratchet: `vauchi-core/src/crypto/ratchet.rs`
 
 ---
 
@@ -156,9 +156,9 @@ Key technical decisions and their rationale. New decisions append to this file.
 **Derivation Paths**:
 ```
 Master Seed
-├── "WebBook_Identity" → Ed25519 signing keypair
-├── "WebBook_Exchange_Seed" → X25519 exchange keypair
-└── "WebBook_Device_{index}" → Per-device keys
+├── "Vauchi_Identity" → Ed25519 signing keypair
+├── "Vauchi_Exchange_Seed" → X25519 exchange keypair
+└── "Vauchi_Device_{index}" → Per-device keys
 ```
 
 ---
@@ -178,7 +178,7 @@ Master Seed
 - Simple LWW resolution appropriate for contact cards
 - No need for complex CRDT merge logic
 
-**Implementation**: `webbook-core/src/sync/device_sync.rs:VersionVector`
+**Implementation**: `vauchi-core/src/sync/device_sync.rs:VersionVector`
 
 ---
 
@@ -219,7 +219,7 @@ Master Seed
 - Maintained by Mozilla, production-ready
 - Cleaner than manual JNI/C bindings
 
-**Implementation**: `webbook-mobile/` crate with UDL definitions.
+**Implementation**: `vauchi-mobile/` crate with UDL definitions.
 
 ---
 
@@ -235,14 +235,14 @@ Master Seed
 **Rationale**:
 - Decouples core logic from UI layers
 - Enables multiple listeners (logging, UI updates, analytics)
-- Type-safe event handling via `WebBookEvent` enum
+- Type-safe event handling via `VauchiEvent` enum
 - Thread-safe with `Send + Sync` requirements
 
 **Implementation**:
-- `WebBookEvent`: Enum of all possible events
+- `VauchiEvent`: Enum of all possible events
 - `EventHandler`: Trait for event consumers
 - `EventDispatcher`: Broadcasts events to registered handlers
-- Location: `webbook-core/src/api/events.rs`
+- Location: `vauchi-core/src/api/events.rs`
 
 ---
 
@@ -265,7 +265,7 @@ Master Seed
 - `FieldVisibility`: Enum (Everyone | Contacts(HashSet) | Nobody)
 - `VisibilityRules`: HashMap<field_id, FieldVisibility>
 - `can_see(field, contact)`: Fast visibility check
-- Location: `webbook-core/src/contact/visibility.rs`
+- Location: `vauchi-core/src/contact/visibility.rs`
 
 ---
 
@@ -276,7 +276,7 @@ Master Seed
 
 **Context**: Multiple crates have their own error types. API layer needs consistent error handling for consumers.
 
-**Decision**: Single `WebBookError` enum that wraps all domain-specific errors via `#[from]`.
+**Decision**: Single `VauchiError` enum that wraps all domain-specific errors via `#[from]`.
 
 **Rationale**:
 - Single error type for public API
@@ -285,10 +285,10 @@ Master Seed
 - Consistent error messages for UI display
 
 **Implementation**:
-- `WebBookError`: Top-level enum with variants for each domain
-- `WebBookResult<T>`: Type alias for `Result<T, WebBookError>`
+- `VauchiError`: Top-level enum with variants for each domain
+- `VauchiResult<T>`: Type alias for `Result<T, VauchiError>`
 - Variants: Validation, Exchange, Storage, Sync, Network, etc.
-- Location: `webbook-core/src/api/error.rs`
+- Location: `vauchi-core/src/api/error.rs`
 
 ---
 
@@ -311,7 +311,7 @@ Master Seed
 - `PendingUpdate`: Struct with id, contact_id, payload, retry_count, status
 - `UpdateStatus`: Enum (Pending | Sending | Failed)
 - Storage methods: `queue_update`, `get_pending_updates`, `mark_update_sent`
-- Location: `webbook-core/src/storage/mod.rs`
+- Location: `vauchi-core/src/storage/mod.rs`
 
 ---
 
@@ -336,7 +336,7 @@ Master Seed
 - `ratchet_state_encrypted`: Double Ratchet state
 - `backup_data_encrypted`: Identity backup
 
-**Implementation**: `webbook-core/src/storage/mod.rs`
+**Implementation**: `vauchi-core/src/storage/mod.rs`
 
 ---
 
@@ -359,7 +359,7 @@ Master Seed
 - `SocialNetwork`: Network definition with URL template
 - `SocialNetworkRegistry`: HashMap with search, URL generation
 - `networks.json`: Embedded data file
-- Location: `webbook-core/src/social/registry.rs`
+- Location: `vauchi-core/src/social/registry.rs`
 
 ---
 
@@ -385,7 +385,7 @@ Master Seed
 - Sync cycle execution (send pending, process acks)
 - Device sync integration
 
-**Implementation**: `webbook-core/src/api/sync_controller.rs`
+**Implementation**: `vauchi-core/src/api/sync_controller.rs`
 
 ---
 

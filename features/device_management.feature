@@ -1,7 +1,7 @@
 @device @multi-device
 Feature: Device Management
-  As a WebBook user
-  I want to use WebBook on multiple devices
+  As a Vauchi user
+  I want to use Vauchi on multiple devices
   So that I can access and manage my contacts from any device
 
   Background:
@@ -22,7 +22,7 @@ Feature: Device Management
   @link
   Scenario: Link new device via QR code
     Given Device A is showing a linking QR code
-    And I have WebBook installed on Device B (new)
+    And I have Vauchi installed on Device B (new)
     When I select "Link to Existing Identity" on Device B
     And I scan the QR code from Device A
     And Device A and B are in proximity
@@ -33,7 +33,7 @@ Feature: Device Management
   @link
   Scenario: Link new device via numeric code
     Given Device A is showing a linking code "123-456-789"
-    And I have WebBook on Device B without camera
+    And I have Vauchi on Device B without camera
     When I enter "123-456-789" on Device B
     And I confirm the device fingerprint on Device A
     Then Device B should be linked to my identity

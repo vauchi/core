@@ -1,10 +1,10 @@
-# WebBook Threat Analysis
+# Vauchi Threat Analysis
 
-This document analyzes potential threats to WebBook and the mitigations in place.
+This document analyzes potential threats to Vauchi and the mitigations in place.
 
 ## System Context
 
-WebBook is a **contact card exchange** system, not a messaging app:
+Vauchi is a **contact card exchange** system, not a messaging app:
 
 - **Traffic pattern**: Generated when users physically meet (QR exchange) or when a user updates their contact info (small update to all contacts)
 - **Data type**: Contact cards (name, phone, email, address, social handles)
@@ -522,7 +522,7 @@ WebBook is a **contact card exchange** system, not a messaging app:
 
 ## Comparison to Messaging Apps
 
-| Aspect | WebBook | Messaging Apps |
+| Aspect | Vauchi | Messaging Apps |
 |--------|---------|----------------|
 | Traffic volume | Very low (rare updates) | High (continuous) |
 | Message sensitivity | Contact info | Conversations |
@@ -532,7 +532,7 @@ WebBook is a **contact card exchange** system, not a messaging app:
 | Forward secrecy | Yes (Double Ratchet) | Varies |
 | Relay knowledge | Encrypted blobs only | Often plaintext |
 
-**Key insight**: WebBook's threat model benefits from infrequent, small updates. Traffic analysis yields less information than with messaging apps because there's less traffic to analyze.
+**Key insight**: Vauchi's threat model benefits from infrequent, small updates. Traffic analysis yields less information than with messaging apps because there's less traffic to analyze.
 
 ---
 
@@ -740,7 +740,7 @@ Contact recovery allows users who lost all devices to reconnect with contacts th
 
 ## Comparison to Messaging Apps
 
-| Aspect | WebBook | Messaging Apps |
+| Aspect | Vauchi | Messaging Apps |
 |--------|---------|----------------|
 | Traffic volume | Very low (rare updates) | High (continuous) |
 | Message sensitivity | Contact info | Conversations |
@@ -751,7 +751,7 @@ Contact recovery allows users who lost all devices to reconnect with contacts th
 | Relay knowledge | Encrypted blobs only | Often plaintext |
 | **Recovery model** | Social vouching (K contacts) | Phone number / cloud backup |
 
-**Key insight**: WebBook's threat model benefits from infrequent, small updates. Traffic analysis yields less information than with messaging apps because there's less traffic to analyze.
+**Key insight**: Vauchi's threat model benefits from infrequent, small updates. Traffic analysis yields less information than with messaging apps because there's less traffic to analyze.
 
 **Recovery comparison**: Unlike phone-number-based recovery (vulnerable to SIM swap) or cloud backup (vulnerable to account compromise), social vouching requires physical presence with multiple contacts.
 

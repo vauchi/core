@@ -1,6 +1,6 @@
 @sync @updates
 Feature: Sync and Updates
-  As a WebBook user
+  As a Vauchi user
   I want my contact card changes to automatically sync to my contacts
   And receive updates when my contacts change their information
   So that contact information stays current without manual effort
@@ -167,7 +167,7 @@ Feature: Sync and Updates
   Scenario: Sync survives device reboot
     Given I have pending updates to send
     When my device reboots
-    And I launch WebBook
+    And I launch Vauchi
     Then pending updates should still be queued
     And sync should resume
 

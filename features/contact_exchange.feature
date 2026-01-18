@@ -1,12 +1,12 @@
 @exchange @proximity
 Feature: Contact Card Exchange
-  As a WebBook user
+  As a Vauchi user
   I want to exchange contact cards with people I meet in person
   So that I can build my contact list through real-world interactions
 
   Background:
-    Given Alice has WebBook installed with identity "Alice"
-    And Bob has WebBook installed with identity "Bob"
+    Given Alice has Vauchi installed with identity "Alice"
+    And Bob has Vauchi installed with identity "Bob"
     And both devices are operational
 
   # QR Code Exchange
@@ -61,7 +61,7 @@ Feature: Contact Card Exchange
   # Bluetooth Low Energy (BLE) Exchange
 
   @ble @mobile
-  Scenario: Discover nearby WebBook users via BLE
+  Scenario: Discover nearby Vauchi users via BLE
     Given Alice has BLE enabled
     And Bob has BLE enabled and is within 2 meters
     When Alice opens the "Nearby" screen
@@ -172,10 +172,10 @@ Feature: Contact Card Exchange
     And no exchange should be attempted
 
   @exchange-error
-  Scenario: Handle non-WebBook QR code
+  Scenario: Handle non-Vauchi QR code
     Given Alice is scanning a QR code
-    When the QR code is not from WebBook
-    Then Alice should see "Not a WebBook contact code"
+    When the QR code is not from Vauchi
+    Then Alice should see "Not a Vauchi contact code"
     And no exchange should be attempted
 
   # Duplicate and Existing Contacts

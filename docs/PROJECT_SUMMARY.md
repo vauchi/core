@@ -1,4 +1,4 @@
-# WebBook Project Summary
+# Vauchi Project Summary
 
 Privacy-focused contact card exchange. Users exchange cards in-person via QR, control what each contact sees, and changes sync automatically.
 

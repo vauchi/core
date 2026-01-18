@@ -1,6 +1,6 @@
-# WebBook User Guide
+# Vauchi User Guide
 
-Welcome to WebBook, a privacy-focused contact card exchange app. This guide will help you get started and make the most of WebBook's features.
+Welcome to Vauchi, a privacy-focused contact card exchange app. This guide will help you get started and make the most of Vauchi's features.
 
 ---
 
@@ -20,10 +20,10 @@ Welcome to WebBook, a privacy-focused contact card exchange app. This guide will
 
 ### Creating Your Identity
 
-When you first open WebBook, you'll be asked to create your identity:
+When you first open Vauchi, you'll be asked to create your identity:
 
 1. **Enter your display name** - This is how contacts will see you
-2. **Tap "Create Identity"** - WebBook generates your unique cryptographic identity
+2. **Tap "Create Identity"** - Vauchi generates your unique cryptographic identity
 
 Your identity includes:
 - A unique public ID (like a fingerprint for your identity)
@@ -82,7 +82,7 @@ To remove a field:
 
 ### How Exchange Works
 
-WebBook uses QR codes for secure, in-person contact exchange. Both parties must be present and scan each other's codes.
+Vauchi uses QR codes for secure, in-person contact exchange. Both parties must be present and scan each other's codes.
 
 ### Starting an Exchange
 
@@ -149,12 +149,12 @@ On the home screen, tap the **visibility** button next to any field to:
 
 ### Linking a New Device
 
-Use the same WebBook identity across multiple devices:
+Use the same Vauchi identity across multiple devices:
 
 1. On your existing device, go to **Settings > Devices**
 2. Tap **Link New Device**
 3. A link code appears (valid for 10 minutes)
-4. On your new device, install WebBook
+4. On your new device, install Vauchi
 5. Choose **Join Existing Identity**
 6. Enter or scan the link code
 
@@ -207,7 +207,7 @@ Protect your identity with an encrypted backup:
 
 To restore on a new device:
 
-1. Install WebBook
+1. Install Vauchi
 2. Choose **Restore from Backup**
 3. Paste your backup code
 4. Enter your backup password
@@ -217,7 +217,7 @@ To restore on a new device:
 
 If you lose access to all devices and don't have a backup:
 
-1. Install WebBook on a new device
+1. Install Vauchi on a new device
 2. Create a new identity
 3. Go to **Settings > Recovery**
 4. Tap **Recover Old Identity**
@@ -343,8 +343,8 @@ Unfortunately, backup passwords cannot be recovered. The encryption is designed 
 
 - **GitHub Issues:** Report bugs or request features
 - **FAQ:** See frequently asked questions in docs/faq.md
-- **Source Code:** WebBook is open source - inspect how it works
+- **Source Code:** Vauchi is open source - inspect how it works
 
 ---
 
-*Thank you for using WebBook. Your privacy matters.*
+*Thank you for using Vauchi. Your privacy matters.*

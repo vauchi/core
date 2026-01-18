@@ -1,4 +1,0 @@
-module webbook_mobileFFI {
-    header "webbook_mobileFFI.h"
-    export *
-}

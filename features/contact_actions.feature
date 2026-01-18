@@ -1,12 +1,12 @@
 @contact-actions
 Feature: Open Contact Info in External Applications
-  As a WebBook user
+  As a Vauchi user
   I want to tap on contact information to open it in the appropriate app
   So that I can quickly call, email, or navigate to my contacts
 
   Background:
     Given I have an existing identity as "Alice"
-    And I am logged into WebBook
+    And I am logged into Vauchi
     And I have a contact "Bob" in my contacts list
 
   # ============================================================

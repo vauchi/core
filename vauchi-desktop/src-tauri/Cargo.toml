@@ -1,0 +1,49 @@
+[package]
+name = "vauchi-desktop"
+version = "0.1.0"
+edition = "2021"
+description = "Desktop app for Vauchi - privacy-focused contact card exchange"
+license = "MIT"
+
+[lib]
+name = "vauchi_desktop_lib"
+crate-type = ["lib", "cdylib", "staticlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+# Core library
+vauchi-core = { path = "../../vauchi-core" }
+
+# Tauri framework
+tauri = { version = "2", features = [] }
+tauri-plugin-shell = "2"
+tauri-plugin-opener = "2"
+
+# Async runtime
+tokio = { version = "1", features = ["full"] }
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Error handling
+anyhow = "1"
+
+# QR code generation
+qrcode = "0.14"
+
+# Base64 encoding for backups
+base64 = "0.22"
+
+# Platform directories
+dirs = "5"
+
+# Hex encoding for public keys
+hex = "0.4"
+
+[features]
+default = ["custom-protocol"]
+custom-protocol = ["tauri/custom-protocol"]
+secure-storage = ["vauchi-core/secure-storage"]

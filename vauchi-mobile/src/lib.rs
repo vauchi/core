@@ -1,0 +1,1247 @@
+//! Vauchi Mobile Bindings
+//!
+//! UniFFI bindings for Android and iOS platforms.
+//! Exposes a simplified, mobile-friendly API on top of vauchi-core.
+//!
+//! Note: Storage connections are created on-demand for thread safety,
+//! as rusqlite's Connection is not Sync.
+
+use std::net::TcpStream;
+use std::path::PathBuf;
+use std::sync::{Arc, Mutex};
+use std::time::Duration;
+
+use tungstenite::stream::MaybeTlsStream;
+use tungstenite::{Message, WebSocket};
+
+use vauchi_core::crypto::ratchet::DoubleRatchetState;
+use vauchi_core::exchange::EncryptedExchangeMessage;
+use vauchi_core::recovery::{RecoveryClaim, RecoveryProof, RecoveryVoucher};
+use vauchi_core::{
+    Contact, ContactCard, ContactField, Identity, IdentityBackup, SocialNetworkRegistry, Storage,
+    SymmetricKey,
+};
+
+// === Modules ===
+
+mod cert_pinning;
+mod error;
+mod protocol;
+mod sync;
+mod types;
+
+// Re-export public types
+pub use error::MobileError;
+pub use types::{
+    MobileContact, MobileContactCard, MobileContactField, MobileExchangeData, MobileExchangeResult,
+    MobileFieldType, MobileRecoveryClaim, MobileRecoveryProgress, MobileRecoveryVerification,
+    MobileRecoveryVoucher, MobileSocialNetwork, MobileSyncResult, MobileSyncStatus,
+};
+
+uniffi::setup_scaffolding!();
+
+// === Password Strength ===
+
+/// Password strength level for display to users.
+#[derive(Debug, Clone, uniffi::Enum)]
+pub enum MobilePasswordStrength {
+    /// Score 0-1: Too weak to use
+    TooWeak,
+    /// Score 2: Fair but not recommended
+    Fair,
+    /// Score 3: Strong enough
+    Strong,
+    /// Score 4: Very strong
+    VeryStrong,
+}
+
+/// Result of password strength check.
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct MobilePasswordCheck {
+    /// The strength level
+    pub strength: MobilePasswordStrength,
+    /// Human-readable description
+    pub description: String,
+    /// Feedback/suggestions for improvement (empty if strong enough)
+    pub feedback: String,
+    /// Whether the password is acceptable for backup
+    pub is_acceptable: bool,
+}
+
+/// Check password strength for backup encryption.
+///
+/// Returns strength level, description, and feedback for improvement.
+#[uniffi::export]
+pub fn check_password_strength(password: String) -> MobilePasswordCheck {
+    use vauchi_core::identity::password::{password_feedback, validate_password};
+
+    // Short passwords get immediate feedback
+    if password.len() < 8 {
+        return MobilePasswordCheck {
+            strength: MobilePasswordStrength::TooWeak,
+            description: "Too short".to_string(),
+            feedback: "Password must be at least 8 characters".to_string(),
+            is_acceptable: false,
+        };
+    }
+
+    // Check with zxcvbn via core
+    match validate_password(&password) {
+        Ok(strength) => {
+            use vauchi_core::identity::password::PasswordStrength;
+            let (level, description) = match strength {
+                PasswordStrength::Strong => (MobilePasswordStrength::Strong, "Strong"),
+                PasswordStrength::VeryStrong => (MobilePasswordStrength::VeryStrong, "Very strong"),
+                _ => (MobilePasswordStrength::Fair, "Fair"),
+            };
+            MobilePasswordCheck {
+                strength: level,
+                description: description.to_string(),
+                feedback: String::new(),
+                is_acceptable: true,
+            }
+        }
+        Err(_) => {
+            // Get feedback for weak passwords
+            let feedback = password_feedback(&password);
+            let estimate = zxcvbn::zxcvbn(&password, &[]);
+            let (level, description) = match estimate.score() {
+                zxcvbn::Score::Zero | zxcvbn::Score::One => {
+                    (MobilePasswordStrength::TooWeak, "Too weak")
+                }
+                zxcvbn::Score::Two => (MobilePasswordStrength::Fair, "Fair"),
+                _ => (MobilePasswordStrength::Fair, "Fair"),
+            };
+            MobilePasswordCheck {
+                strength: level,
+                description: description.to_string(),
+                feedback: if feedback.is_empty() {
+                    "Add more words or use a passphrase".to_string()
+                } else {
+                    feedback
+                },
+                is_acceptable: false,
+            }
+        }
+    }
+}
+
+// === Thread-safe state ===
+
+/// Serializable identity data for thread-safe storage.
+#[derive(Clone)]
+#[allow(dead_code)]
+struct IdentityData {
+    backup_data: Vec<u8>,
+    display_name: String, // Reserved for future use
+}
+
+/// Generate a new random storage key.
+///
+/// Use this when setting up a new installation with secure storage.
+/// The returned bytes should be stored in platform secure storage
+/// (iOS Keychain or Android KeyStore).
+#[uniffi::export]
+pub fn generate_storage_key() -> Vec<u8> {
+    SymmetricKey::generate().as_bytes().to_vec()
+}
+
+// === Main Interface ===
+
+/// Main Vauchi interface for mobile platforms.
+///
+/// Uses on-demand storage connections for thread safety.
+#[derive(uniffi::Object)]
+pub struct VauchiMobile {
+    storage_path: PathBuf,
+    storage_key: SymmetricKey,
+    relay_url: String,
+    /// Optional PEM-encoded certificate for TLS pinning.
+    pinned_cert_pem: Mutex<Option<String>>,
+    identity_data: Mutex<Option<IdentityData>>,
+    social_registry: SocialNetworkRegistry,
+    sync_status: Mutex<MobileSyncStatus>,
+}
+
+impl VauchiMobile {
+    /// Opens a storage connection.
+    fn open_storage(&self) -> Result<Storage, MobileError> {
+        Storage::open(&self.storage_path, self.storage_key.clone())
+            .map_err(|e| MobileError::StorageError(e.to_string()))
+    }
+
+    /// Connect to relay with optional certificate pinning.
+    fn connect_to_relay(&self) -> Result<WebSocket<MaybeTlsStream<TcpStream>>, MobileError> {
+        let pinned_cert = self.pinned_cert_pem.lock().unwrap();
+        let cert_pem = pinned_cert.as_deref();
+        cert_pinning::connect_with_pinning(&self.relay_url, cert_pem)
+            .map_err(MobileError::NetworkError)
+    }
+
+    /// Gets the identity from stored data.
+    fn get_identity(&self) -> Result<Identity, MobileError> {
+        let data = self.identity_data.lock().unwrap();
+        let identity_data = data.as_ref().ok_or(MobileError::IdentityNotFound)?;
+
+        let backup = IdentityBackup::new(identity_data.backup_data.clone());
+        Identity::import_backup(&backup, "__internal_storage_key__")
+            .map_err(|e| MobileError::CryptoError(e.to_string()))
+    }
+
+    /// Get pinned certificate if set.
+    fn get_pinned_cert(&self) -> Option<String> {
+        self.pinned_cert_pem.lock().unwrap().clone()
+    }
+
+    /// Get the path to the recovery proof file.
+    fn recovery_proof_path(&self) -> PathBuf {
+        self.storage_path.parent().unwrap_or(&self.storage_path).join(".recovery_proof")
+    }
+}
+
+#[uniffi::export]
+impl VauchiMobile {
+    /// Create a new VauchiMobile instance with a platform-provided secure key.
+    ///
+    /// This is the recommended constructor. The platform (iOS/Android) should:
+    /// 1. Generate a 32-byte key if one doesn't exist in secure storage
+    /// 2. Store it in platform-specific secure storage (Keychain/KeyStore)
+    /// 3. Pass the key bytes to this constructor
+    #[uniffi::constructor]
+    pub fn new_with_secure_key(
+        data_dir: String,
+        relay_url: String,
+        storage_key_bytes: Vec<u8>,
+    ) -> Result<Arc<Self>, MobileError> {
+        let data_path = PathBuf::from(&data_dir);
+
+        std::fs::create_dir_all(&data_path)
+            .map_err(|e| MobileError::StorageError(e.to_string()))?;
+
+        let storage_path = data_path.join("vauchi.db");
+
+        let key_array: [u8; 32] = storage_key_bytes.try_into().map_err(|_| {
+            MobileError::StorageError("Storage key must be exactly 32 bytes".to_string())
+        })?;
+        let storage_key = SymmetricKey::from_bytes(key_array);
+
+        let _storage = Storage::open(&storage_path, storage_key.clone())
+            .map_err(|e| MobileError::StorageError(e.to_string()))?;
+
+        Ok(Arc::new(VauchiMobile {
+            storage_path,
+            storage_key,
+            relay_url,
+            pinned_cert_pem: Mutex::new(None),
+            identity_data: Mutex::new(None),
+            social_registry: SocialNetworkRegistry::with_defaults(),
+            sync_status: Mutex::new(MobileSyncStatus::Idle),
+        }))
+    }
+
+    /// Create a new VauchiMobile instance (legacy constructor).
+    ///
+    /// WARNING: This constructor stores the encryption key in a plaintext file.
+    /// Use `new_with_secure_key` instead for production.
+    #[uniffi::constructor]
+    pub fn new(data_dir: String, relay_url: String) -> Result<Arc<Self>, MobileError> {
+        let data_path = PathBuf::from(&data_dir);
+
+        std::fs::create_dir_all(&data_path)
+            .map_err(|e| MobileError::StorageError(e.to_string()))?;
+
+        let storage_path = data_path.join("vauchi.db");
+        let key_path = data_path.join("storage.key");
+
+        let storage_key = if key_path.exists() {
+            let key_bytes = std::fs::read(&key_path)
+                .map_err(|e| MobileError::StorageError(format!("Failed to read key: {}", e)))?;
+            let key_array: [u8; 32] = key_bytes
+                .try_into()
+                .map_err(|_| MobileError::StorageError("Invalid key length".to_string()))?;
+            SymmetricKey::from_bytes(key_array)
+        } else {
+            let key = SymmetricKey::generate();
+            std::fs::write(&key_path, key.as_bytes())
+                .map_err(|e| MobileError::StorageError(format!("Failed to save key: {}", e)))?;
+            key
+        };
+
+        let _storage = Storage::open(&storage_path, storage_key.clone())
+            .map_err(|e| MobileError::StorageError(e.to_string()))?;
+
+        Ok(Arc::new(VauchiMobile {
+            storage_path,
+            storage_key,
+            relay_url,
+            pinned_cert_pem: Mutex::new(None),
+            identity_data: Mutex::new(None),
+            social_registry: SocialNetworkRegistry::with_defaults(),
+            sync_status: Mutex::new(MobileSyncStatus::Idle),
+        }))
+    }
+
+    /// Export the current storage key bytes for migration to secure storage.
+    pub fn export_storage_key(&self) -> Vec<u8> {
+        self.storage_key.as_bytes().to_vec()
+    }
+
+    /// Set the pinned certificate for relay TLS connections.
+    ///
+    /// The certificate should be in PEM format. Once set, only connections
+    /// to relay servers presenting this exact certificate will be allowed.
+    pub fn set_pinned_certificate(&self, cert_pem: String) {
+        let mut pinned = self.pinned_cert_pem.lock().unwrap();
+        if cert_pem.is_empty() {
+            *pinned = None;
+        } else {
+            *pinned = Some(cert_pem);
+        }
+    }
+
+    /// Check if certificate pinning is enabled.
+    pub fn is_certificate_pinning_enabled(&self) -> bool {
+        self.pinned_cert_pem.lock().unwrap().is_some()
+    }
+
+    // === Identity Operations ===
+
+    /// Check if identity exists.
+    pub fn has_identity(&self) -> bool {
+        {
+            let data = self.identity_data.lock().unwrap();
+            if data.is_some() {
+                return true;
+            }
+        }
+
+        if let Ok(storage) = self.open_storage() {
+            if let Ok(Some((backup_data, display_name))) = storage.load_identity() {
+                let identity_data = IdentityData {
+                    backup_data,
+                    display_name,
+                };
+                *self.identity_data.lock().unwrap() = Some(identity_data);
+                return true;
+            }
+        }
+
+        false
+    }
+
+    /// Create a new identity.
+    pub fn create_identity(&self, display_name: String) -> Result<(), MobileError> {
+        {
+            let data = self.identity_data.lock().unwrap();
+            if data.is_some() {
+                return Err(MobileError::AlreadyInitialized);
+            }
+        }
+
+        let identity = Identity::create(&display_name);
+
+        let backup = identity
+            .export_backup("__internal_storage_key__")
+            .map_err(|e| MobileError::CryptoError(e.to_string()))?;
+
+        let backup_data = backup.as_bytes().to_vec();
+
+        let storage = self.open_storage()?;
+        storage.save_identity(&backup_data, &display_name)?;
+
+        let identity_data = IdentityData {
+            backup_data,
+            display_name: display_name.clone(),
+        };
+        *self.identity_data.lock().unwrap() = Some(identity_data);
+
+        let card = ContactCard::new(&display_name);
+        storage.save_own_card(&card)?;
+
+        Ok(())
+    }
+
+    /// Get public ID.
+    pub fn get_public_id(&self) -> Result<String, MobileError> {
+        let identity = self.get_identity()?;
+        Ok(identity.public_id())
+    }
+
+    /// Get display name.
+    pub fn get_display_name(&self) -> Result<String, MobileError> {
+        let storage = self.open_storage()?;
+        let card = storage
+            .load_own_card()?
+            .ok_or(MobileError::IdentityNotFound)?;
+        Ok(card.display_name().to_string())
+    }
+
+    // === Contact Card Operations ===
+
+    /// Get own contact card.
+    pub fn get_own_card(&self) -> Result<MobileContactCard, MobileError> {
+        let storage = self.open_storage()?;
+        let card = storage
+            .load_own_card()?
+            .ok_or(MobileError::IdentityNotFound)?;
+        Ok(MobileContactCard::from(&card))
+    }
+
+    /// Add field to own card.
+    pub fn add_field(
+        &self,
+        field_type: MobileFieldType,
+        label: String,
+        value: String,
+    ) -> Result<(), MobileError> {
+        let storage = self.open_storage()?;
+
+        let mut card = storage
+            .load_own_card()?
+            .ok_or(MobileError::IdentityNotFound)?;
+
+        let field = ContactField::new(field_type.into(), &label, &value);
+        card.add_field(field)
+            .map_err(|e| MobileError::InvalidInput(e.to_string()))?;
+
+        storage.save_own_card(&card)?;
+        Ok(())
+    }
+
+    /// Update field value.
+    pub fn update_field(&self, label: String, new_value: String) -> Result<(), MobileError> {
+        let storage = self.open_storage()?;
+
+        let mut card = storage
+            .load_own_card()?
+            .ok_or(MobileError::IdentityNotFound)?;
+
+        let field_id = card
+            .fields()
+            .iter()
+            .find(|f| f.label() == label)
+            .ok_or_else(|| MobileError::InvalidInput(format!("Field '{}' not found", label)))?
+            .id()
+            .to_string();
+
+        card.update_field_value(&field_id, &new_value)
+            .map_err(|e| MobileError::InvalidInput(e.to_string()))?;
+
+        storage.save_own_card(&card)?;
+        Ok(())
+    }
+
+    /// Remove field from card.
+    pub fn remove_field(&self, label: String) -> Result<bool, MobileError> {
+        let storage = self.open_storage()?;
+
+        let mut card = storage
+            .load_own_card()?
+            .ok_or(MobileError::IdentityNotFound)?;
+
+        let field_id = match card.fields().iter().find(|f| f.label() == label) {
+            Some(f) => f.id().to_string(),
+            None => return Ok(false),
+        };
+
+        card.remove_field(&field_id)
+            .map_err(|e| MobileError::InvalidInput(e.to_string()))?;
+        storage.save_own_card(&card)?;
+
+        Ok(true)
+    }
+
+    /// Set display name.
+    pub fn set_display_name(&self, name: String) -> Result<(), MobileError> {
+        let storage = self.open_storage()?;
+
+        let mut card = storage
+            .load_own_card()?
+            .ok_or(MobileError::IdentityNotFound)?;
+
+        card.set_display_name(&name)
+            .map_err(|e| MobileError::InvalidInput(e.to_string()))?;
+        storage.save_own_card(&card)?;
+
+        Ok(())
+    }
+
+    // === Contact Operations ===
+
+    /// List all contacts.
+    pub fn list_contacts(&self) -> Result<Vec<MobileContact>, MobileError> {
+        let storage = self.open_storage()?;
+        let contacts = storage.list_contacts()?;
+        Ok(contacts.iter().map(MobileContact::from).collect())
+    }
+
+    /// Get single contact by ID.
+    pub fn get_contact(&self, id: String) -> Result<Option<MobileContact>, MobileError> {
+        let storage = self.open_storage()?;
+        let contact = storage.load_contact(&id)?;
+        Ok(contact.as_ref().map(MobileContact::from))
+    }
+
+    /// Search contacts.
+    pub fn search_contacts(&self, query: String) -> Result<Vec<MobileContact>, MobileError> {
+        let storage = self.open_storage()?;
+        let contacts = storage.list_contacts()?;
+        let query_lower = query.to_lowercase();
+
+        let results: Vec<MobileContact> = contacts
+            .iter()
+            .filter(|c| c.display_name().to_lowercase().contains(&query_lower))
+            .map(MobileContact::from)
+            .collect();
+
+        Ok(results)
+    }
+
+    /// Get contact count.
+    pub fn contact_count(&self) -> Result<u32, MobileError> {
+        let storage = self.open_storage()?;
+        let contacts = storage.list_contacts()?;
+        Ok(contacts.len() as u32)
+    }
+
+    /// Remove contact.
+    pub fn remove_contact(&self, id: String) -> Result<bool, MobileError> {
+        let storage = self.open_storage()?;
+        let removed = storage.delete_contact(&id)?;
+        Ok(removed)
+    }
+
+    /// Verify contact fingerprint.
+    pub fn verify_contact(&self, id: String) -> Result<(), MobileError> {
+        let storage = self.open_storage()?;
+
+        let mut contact = storage
+            .load_contact(&id)?
+            .ok_or_else(|| MobileError::ContactNotFound(id.clone()))?;
+
+        contact.mark_fingerprint_verified();
+        storage.save_contact(&contact)?;
+
+        Ok(())
+    }
+
+    // === Visibility Operations ===
+
+    /// Hide field from contact.
+    pub fn hide_field_from_contact(
+        &self,
+        contact_id: String,
+        field_label: String,
+    ) -> Result<(), MobileError> {
+        let storage = self.open_storage()?;
+
+        let mut contact = storage
+            .load_contact(&contact_id)?
+            .ok_or_else(|| MobileError::ContactNotFound(contact_id.clone()))?;
+
+        let card = storage
+            .load_own_card()?
+            .ok_or(MobileError::IdentityNotFound)?;
+        let field = card
+            .fields()
+            .iter()
+            .find(|f| f.label() == field_label)
+            .ok_or_else(|| {
+                MobileError::InvalidInput(format!("Field not found: {}", field_label))
+            })?;
+
+        contact.visibility_rules_mut().set_nobody(field.id());
+        storage.save_contact(&contact)?;
+
+        Ok(())
+    }
+
+    /// Show field to contact.
+    pub fn show_field_to_contact(
+        &self,
+        contact_id: String,
+        field_label: String,
+    ) -> Result<(), MobileError> {
+        let storage = self.open_storage()?;
+
+        let mut contact = storage
+            .load_contact(&contact_id)?
+            .ok_or_else(|| MobileError::ContactNotFound(contact_id.clone()))?;
+
+        let card = storage
+            .load_own_card()?
+            .ok_or(MobileError::IdentityNotFound)?;
+        let field = card
+            .fields()
+            .iter()
+            .find(|f| f.label() == field_label)
+            .ok_or_else(|| {
+                MobileError::InvalidInput(format!("Field not found: {}", field_label))
+            })?;
+
+        contact.visibility_rules_mut().set_everyone(field.id());
+        storage.save_contact(&contact)?;
+
+        Ok(())
+    }
+
+    /// Check if field is visible to contact.
+    pub fn is_field_visible_to_contact(
+        &self,
+        contact_id: String,
+        field_label: String,
+    ) -> Result<bool, MobileError> {
+        let storage = self.open_storage()?;
+
+        let contact = storage
+            .load_contact(&contact_id)?
+            .ok_or_else(|| MobileError::ContactNotFound(contact_id.clone()))?;
+
+        let card = storage
+            .load_own_card()?
+            .ok_or(MobileError::IdentityNotFound)?;
+        let field = card
+            .fields()
+            .iter()
+            .find(|f| f.label() == field_label)
+            .ok_or_else(|| {
+                MobileError::InvalidInput(format!("Field not found: {}", field_label))
+            })?;
+
+        Ok(contact.visibility_rules().can_see(field.id(), &contact_id))
+    }
+
+    // === Exchange Operations ===
+
+    /// Generate exchange QR data.
+    pub fn generate_exchange_qr(&self) -> Result<MobileExchangeData, MobileError> {
+        let identity = self.get_identity()?;
+
+        let qr = vauchi_core::ExchangeQR::generate(&identity);
+        let qr_data = format!("wb://{}", qr.to_data_string());
+
+        let expires_at = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs()
+            + 300;
+
+        Ok(MobileExchangeData {
+            qr_data,
+            public_id: identity.public_id(),
+            expires_at,
+        })
+    }
+
+    /// Complete exchange with scanned QR data.
+    pub fn complete_exchange(&self, qr_data: String) -> Result<MobileExchangeResult, MobileError> {
+        use vauchi_core::ExchangeQR;
+
+        let identity = self.get_identity()?;
+        let storage = self.open_storage()?;
+
+        let data_str = qr_data.strip_prefix("wb://").unwrap_or(&qr_data);
+        let their_qr =
+            ExchangeQR::from_data_string(data_str).map_err(|_| MobileError::InvalidQrCode)?;
+
+        if their_qr.is_expired() {
+            return Err(MobileError::ExchangeFailed("QR code expired".to_string()));
+        }
+
+        let their_signing_key = their_qr.public_key();
+        let their_exchange_key = their_qr.exchange_key();
+        let their_public_id = hex::encode(their_signing_key);
+
+        if storage.load_contact(&their_public_id)?.is_some() {
+            return Err(MobileError::ExchangeFailed(
+                "Contact already exists".to_string(),
+            ));
+        }
+
+        let our_x3dh = identity.x3dh_keypair();
+        let (encrypted_msg, shared_secret) = EncryptedExchangeMessage::create(
+            &our_x3dh,
+            their_exchange_key,
+            identity.signing_public_key(),
+            identity.display_name(),
+        )
+        .map_err(|e| MobileError::ExchangeFailed(format!("Key agreement failed: {:?}", e)))?;
+
+        let their_card = ContactCard::new("New Contact");
+        let contact = Contact::from_exchange(*their_signing_key, their_card, shared_secret.clone());
+
+        let contact_id = contact.id().to_string();
+        let contact_name = contact.display_name().to_string();
+
+        storage.save_contact(&contact)?;
+
+        let ratchet = DoubleRatchetState::initialize_initiator(&shared_secret, *their_exchange_key);
+        storage.save_ratchet_state(&contact_id, &ratchet, true)?;
+
+        // Send encrypted exchange message
+        {
+            let mut socket = self.connect_to_relay()?;
+
+            let our_id = identity.public_id();
+            sync::send_handshake(&mut socket, &our_id)?;
+
+            let update = protocol::EncryptedUpdate {
+                recipient_id: their_public_id.clone(),
+                sender_id: our_id,
+                ciphertext: encrypted_msg.to_bytes(),
+            };
+
+            let envelope =
+                protocol::create_envelope(protocol::MessagePayload::EncryptedUpdate(update));
+            let data = protocol::encode_message(&envelope).map_err(MobileError::SyncFailed)?;
+            socket
+                .send(Message::Binary(data))
+                .map_err(|e| MobileError::NetworkError(e.to_string()))?;
+
+            std::thread::sleep(Duration::from_millis(100));
+            let _ = socket.close(None);
+        }
+
+        Ok(MobileExchangeResult {
+            contact_id,
+            contact_name,
+            success: true,
+            error_message: None,
+        })
+    }
+
+    // === Sync Operations ===
+
+    /// Sync with relay server.
+    pub fn sync(&self) -> Result<MobileSyncResult, MobileError> {
+        *self.sync_status.lock().unwrap() = MobileSyncStatus::Syncing;
+
+        let identity = self.get_identity()?;
+        let storage = self.open_storage()?;
+        let pinned_cert = self.get_pinned_cert();
+
+        let result = sync::do_sync(&identity, &storage, &self.relay_url, pinned_cert.as_deref());
+
+        match &result {
+            Ok(_) => *self.sync_status.lock().unwrap() = MobileSyncStatus::Idle,
+            Err(_) => *self.sync_status.lock().unwrap() = MobileSyncStatus::Error,
+        }
+
+        result
+    }
+
+    /// Get sync status.
+    pub fn get_sync_status(&self) -> MobileSyncStatus {
+        *self.sync_status.lock().unwrap()
+    }
+
+    /// Get pending update count.
+    pub fn pending_update_count(&self) -> Result<u32, MobileError> {
+        let storage = self.open_storage()?;
+        let contacts = storage.list_contacts()?;
+        let mut total = 0u32;
+        for contact in contacts {
+            let pending = storage.get_pending_updates(contact.id())?;
+            total += pending.len() as u32;
+        }
+        Ok(total)
+    }
+
+    // === Backup Operations ===
+
+    /// Export encrypted backup.
+    pub fn export_backup(&self, password: String) -> Result<String, MobileError> {
+        let identity = self.get_identity()?;
+
+        let backup = identity
+            .export_backup(&password)
+            .map_err(|e| MobileError::CryptoError(e.to_string()))?;
+
+        use base64::Engine;
+        let encoded = base64::engine::general_purpose::STANDARD.encode(backup.as_bytes());
+
+        Ok(encoded)
+    }
+
+    /// Import backup.
+    pub fn import_backup(&self, backup_data: String, password: String) -> Result<(), MobileError> {
+        {
+            let data = self.identity_data.lock().unwrap();
+            if data.is_some() {
+                return Err(MobileError::AlreadyInitialized);
+            }
+        }
+
+        use base64::Engine;
+        let bytes = base64::engine::general_purpose::STANDARD
+            .decode(&backup_data)
+            .map_err(|_| MobileError::InvalidInput("Invalid base64".to_string()))?;
+
+        let backup = IdentityBackup::new(bytes);
+        let identity = Identity::import_backup(&backup, &password)
+            .map_err(|e| MobileError::CryptoError(e.to_string()))?;
+
+        let internal_backup = identity
+            .export_backup("__internal_storage_key__")
+            .map_err(|e| MobileError::CryptoError(e.to_string()))?;
+
+        let internal_backup_data = internal_backup.as_bytes().to_vec();
+        let display_name = identity.display_name().to_string();
+
+        let storage = self.open_storage()?;
+        storage.save_identity(&internal_backup_data, &display_name)?;
+
+        let identity_data = IdentityData {
+            backup_data: internal_backup_data,
+            display_name: display_name.clone(),
+        };
+        *self.identity_data.lock().unwrap() = Some(identity_data);
+
+        if storage.load_own_card()?.is_none() {
+            let card = ContactCard::new(&display_name);
+            storage.save_own_card(&card)?;
+        }
+
+        Ok(())
+    }
+
+    // === Social Networks ===
+
+    /// List available social networks.
+    pub fn list_social_networks(&self) -> Vec<MobileSocialNetwork> {
+        self.social_registry
+            .all()
+            .iter()
+            .map(|sn| MobileSocialNetwork {
+                id: sn.id().to_string(),
+                display_name: sn.display_name().to_string(),
+                url_template: sn.profile_url_template().to_string(),
+            })
+            .collect()
+    }
+
+    /// Search social networks.
+    pub fn search_social_networks(&self, query: String) -> Vec<MobileSocialNetwork> {
+        self.social_registry
+            .search(&query)
+            .iter()
+            .map(|sn| MobileSocialNetwork {
+                id: sn.id().to_string(),
+                display_name: sn.display_name().to_string(),
+                url_template: sn.profile_url_template().to_string(),
+            })
+            .collect()
+    }
+
+    /// Get profile URL for a social field.
+    pub fn get_profile_url(&self, network_id: String, username: String) -> Option<String> {
+        self.social_registry.profile_url(&network_id, &username)
+    }
+
+    // === Recovery ===
+
+    /// Create a recovery claim for a lost identity.
+    ///
+    /// The old_pk_hex is the hex-encoded public key of the lost identity.
+    /// This starts the recovery process by creating a claim that contacts
+    /// can vouch for.
+    pub fn create_recovery_claim(
+        &self,
+        old_pk_hex: String,
+    ) -> Result<MobileRecoveryClaim, MobileError> {
+        use base64::Engine;
+        let identity = self.get_identity()?;
+
+        // Parse old public key
+        let old_pk_bytes = hex::decode(&old_pk_hex)
+            .map_err(|e| MobileError::InvalidInput(format!("Invalid hex: {}", e)))?;
+        let old_pk: [u8; 32] = old_pk_bytes
+            .try_into()
+            .map_err(|_| MobileError::InvalidInput("Public key must be 32 bytes".to_string()))?;
+
+        // Create claim
+        let new_pk = *identity.signing_public_key();
+        let claim = RecoveryClaim::new(&old_pk, &new_pk);
+
+        // Create proof to store vouchers and save to file
+        let proof = RecoveryProof::new(&old_pk, &new_pk, 3); // Default threshold of 3
+        std::fs::write(self.recovery_proof_path(), proof.to_bytes())
+            .map_err(|e| MobileError::StorageError(e.to_string()))?;
+
+        // Encode claim for sharing
+        let claim_data = base64::engine::general_purpose::STANDARD.encode(claim.to_bytes());
+
+        Ok(MobileRecoveryClaim {
+            old_public_key: old_pk_hex,
+            new_public_key: hex::encode(new_pk),
+            claim_data,
+            is_expired: claim.is_expired(),
+        })
+    }
+
+    /// Parse a recovery claim from base64.
+    ///
+    /// Used to inspect a claim before vouching for it.
+    pub fn parse_recovery_claim(
+        &self,
+        claim_b64: String,
+    ) -> Result<MobileRecoveryClaim, MobileError> {
+        use base64::Engine;
+        let claim_bytes = base64::engine::general_purpose::STANDARD.decode(&claim_b64)
+            .map_err(|e| MobileError::InvalidInput(format!("Invalid base64: {}", e)))?;
+
+        let claim = RecoveryClaim::from_bytes(&claim_bytes)
+            .map_err(|e| MobileError::InvalidInput(format!("Invalid claim: {}", e)))?;
+
+        Ok(MobileRecoveryClaim {
+            old_public_key: hex::encode(claim.old_pk()),
+            new_public_key: hex::encode(claim.new_pk()),
+            claim_data: claim_b64,
+            is_expired: claim.is_expired(),
+        })
+    }
+
+    /// Create a voucher for someone's recovery claim.
+    ///
+    /// This vouches that you trust the person claiming to own the old identity
+    /// is the same person as the new identity.
+    pub fn create_recovery_voucher(
+        &self,
+        claim_b64: String,
+    ) -> Result<MobileRecoveryVoucher, MobileError> {
+        use base64::Engine;
+        let identity = self.get_identity()?;
+
+        let claim_bytes = base64::engine::general_purpose::STANDARD.decode(&claim_b64)
+            .map_err(|e| MobileError::InvalidInput(format!("Invalid base64: {}", e)))?;
+
+        let claim = RecoveryClaim::from_bytes(&claim_bytes)
+            .map_err(|e| MobileError::InvalidInput(format!("Invalid claim: {}", e)))?;
+
+        if claim.is_expired() {
+            return Err(MobileError::InvalidInput("Claim has expired".to_string()));
+        }
+
+        let voucher = RecoveryVoucher::create_from_claim(&claim, identity.signing_keypair())
+            .map_err(|e| MobileError::CryptoError(e.to_string()))?;
+
+        let voucher_data = base64::engine::general_purpose::STANDARD.encode(voucher.to_bytes());
+
+        Ok(MobileRecoveryVoucher {
+            voucher_public_key: hex::encode(voucher.voucher_pk()),
+            voucher_data,
+        })
+    }
+
+    /// Add a voucher to the current recovery claim.
+    ///
+    /// Returns the updated progress.
+    pub fn add_recovery_voucher(
+        &self,
+        voucher_b64: String,
+    ) -> Result<MobileRecoveryProgress, MobileError> {
+        use base64::Engine;
+        let voucher_bytes = base64::engine::general_purpose::STANDARD.decode(&voucher_b64)
+            .map_err(|e| MobileError::InvalidInput(format!("Invalid base64: {}", e)))?;
+
+        let voucher = RecoveryVoucher::from_bytes(&voucher_bytes)
+            .map_err(|e| MobileError::InvalidInput(format!("Invalid voucher: {}", e)))?;
+
+        if !voucher.verify() {
+            return Err(MobileError::InvalidInput("Invalid voucher signature".to_string()));
+        }
+
+        // Load current proof from file
+        let proof_path = self.recovery_proof_path();
+        let mut proof = if proof_path.exists() {
+            let proof_bytes = std::fs::read(&proof_path)
+                .map_err(|e| MobileError::StorageError(e.to_string()))?;
+            RecoveryProof::from_bytes(&proof_bytes)
+                .map_err(|e| MobileError::InvalidInput(format!("Invalid proof: {}", e)))?
+        } else {
+            return Err(MobileError::InvalidInput("No recovery in progress".to_string()));
+        };
+
+        // Add voucher
+        proof
+            .add_voucher(voucher)
+            .map_err(|e| MobileError::InvalidInput(format!("Cannot add voucher: {}", e)))?;
+
+        // Save updated proof
+        std::fs::write(&proof_path, proof.to_bytes())
+            .map_err(|e| MobileError::StorageError(e.to_string()))?;
+
+        let is_complete = proof.voucher_count() >= proof.threshold() as usize;
+
+        Ok(MobileRecoveryProgress {
+            old_public_key: hex::encode(proof.old_pk()),
+            new_public_key: hex::encode(proof.new_pk()),
+            vouchers_collected: proof.voucher_count() as u32,
+            vouchers_needed: proof.threshold(),
+            is_complete,
+        })
+    }
+
+    /// Get the current recovery progress.
+    ///
+    /// Returns None if no recovery is in progress.
+    pub fn get_recovery_status(&self) -> Result<Option<MobileRecoveryProgress>, MobileError> {
+        let proof_path = self.recovery_proof_path();
+
+        if !proof_path.exists() {
+            return Ok(None);
+        }
+
+        let proof_bytes = std::fs::read(&proof_path)
+            .map_err(|e| MobileError::StorageError(e.to_string()))?;
+
+        let proof = RecoveryProof::from_bytes(&proof_bytes)
+            .map_err(|e| MobileError::InvalidInput(format!("Invalid proof: {}", e)))?;
+
+        let is_complete = proof.voucher_count() >= proof.threshold() as usize;
+
+        Ok(Some(MobileRecoveryProgress {
+            old_public_key: hex::encode(proof.old_pk()),
+            new_public_key: hex::encode(proof.new_pk()),
+            vouchers_collected: proof.voucher_count() as u32,
+            vouchers_needed: proof.threshold(),
+            is_complete,
+        }))
+    }
+
+    /// Get the completed recovery proof as base64.
+    ///
+    /// Returns None if recovery is not complete.
+    pub fn get_recovery_proof(&self) -> Result<Option<String>, MobileError> {
+        use base64::Engine;
+        let proof_path = self.recovery_proof_path();
+
+        if !proof_path.exists() {
+            return Ok(None);
+        }
+
+        let proof_bytes = std::fs::read(&proof_path)
+            .map_err(|e| MobileError::StorageError(e.to_string()))?;
+
+        let proof = RecoveryProof::from_bytes(&proof_bytes)
+            .map_err(|e| MobileError::InvalidInput(format!("Invalid proof: {}", e)))?;
+
+        if proof.voucher_count() >= proof.threshold() as usize {
+            let proof_data = base64::engine::general_purpose::STANDARD.encode(proof.to_bytes());
+            Ok(Some(proof_data))
+        } else {
+            Ok(None)
+        }
+    }
+
+    /// Verify a recovery proof from a contact.
+    ///
+    /// This checks if the proof is valid and provides a recommendation
+    /// on whether to accept the recovered identity.
+    pub fn verify_recovery_proof(
+        &self,
+        proof_b64: String,
+    ) -> Result<MobileRecoveryVerification, MobileError> {
+        use base64::Engine;
+        let storage = self.open_storage()?;
+
+        let proof_bytes = base64::engine::general_purpose::STANDARD.decode(&proof_b64)
+            .map_err(|e| MobileError::InvalidInput(format!("Invalid base64: {}", e)))?;
+
+        let proof = RecoveryProof::from_bytes(&proof_bytes)
+            .map_err(|e| MobileError::InvalidInput(format!("Invalid proof: {}", e)))?;
+
+        // Validate the proof
+        proof
+            .validate()
+            .map_err(|e| MobileError::InvalidInput(format!("Proof validation failed: {}", e)))?;
+
+        // Count known vouchers (vouchers from our contacts)
+        let contacts = storage
+            .list_contacts()
+            .map_err(|e| MobileError::StorageError(e.to_string()))?;
+
+        let contact_pks: std::collections::HashSet<[u8; 32]> =
+            contacts.iter().map(|c| *c.public_key()).collect();
+
+        let known_voucher_count = proof
+            .vouchers()
+            .iter()
+            .filter(|v| contact_pks.contains(v.voucher_pk()))
+            .count();
+
+        // Determine confidence
+        let (confidence, recommendation) = if known_voucher_count >= 2 {
+            (
+                "high".to_string(),
+                "Multiple contacts you know have vouched. Safe to accept.".to_string(),
+            )
+        } else if known_voucher_count == 1 {
+            (
+                "medium".to_string(),
+                "One contact you know has vouched. Consider verifying in person.".to_string(),
+            )
+        } else {
+            (
+                "low".to_string(),
+                "No known contacts have vouched. Verify identity carefully before accepting."
+                    .to_string(),
+            )
+        };
+
+        Ok(MobileRecoveryVerification {
+            old_public_key: hex::encode(proof.old_pk()),
+            new_public_key: hex::encode(proof.new_pk()),
+            voucher_count: proof.voucher_count() as u32,
+            known_vouchers: known_voucher_count as u32,
+            confidence,
+            recommendation,
+        })
+    }
+}
+
+// INLINE_TEST_REQUIRED: Tests require tempfile for VauchiMobile instance creation
+// and access to internal Arc<VauchiMobile> which cannot be accessed from external tests.
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::TempDir;
+
+    fn create_test_instance() -> (Arc<VauchiMobile>, TempDir) {
+        let dir = TempDir::new().unwrap();
+        let wb = VauchiMobile::new(
+            dir.path().to_string_lossy().to_string(),
+            "ws://localhost:8080".to_string(),
+        )
+        .unwrap();
+        (wb, dir)
+    }
+
+    #[test]
+    fn test_create_identity() {
+        let (wb, _dir) = create_test_instance();
+        assert!(!wb.has_identity());
+
+        wb.create_identity("Alice".to_string()).unwrap();
+        assert!(wb.has_identity());
+
+        let name = wb.get_display_name().unwrap();
+        assert_eq!(name, "Alice");
+    }
+
+    #[test]
+    fn test_add_field() {
+        let (wb, _dir) = create_test_instance();
+        wb.create_identity("Alice".to_string()).unwrap();
+
+        wb.add_field(
+            MobileFieldType::Email,
+            "work".to_string(),
+            "alice@company.com".to_string(),
+        )
+        .unwrap();
+
+        let card = wb.get_own_card().unwrap();
+        assert_eq!(card.fields.len(), 1);
+        assert_eq!(card.fields[0].label, "work");
+        assert_eq!(card.fields[0].value, "alice@company.com");
+    }
+
+    #[test]
+    fn test_update_field() {
+        let (wb, _dir) = create_test_instance();
+        wb.create_identity("Alice".to_string()).unwrap();
+
+        wb.add_field(
+            MobileFieldType::Phone,
+            "mobile".to_string(),
+            "+1234567890".to_string(),
+        )
+        .unwrap();
+
+        wb.update_field("mobile".to_string(), "+0987654321".to_string())
+            .unwrap();
+
+        let card = wb.get_own_card().unwrap();
+        assert_eq!(card.fields[0].value, "+0987654321");
+    }
+
+    #[test]
+    fn test_remove_field() {
+        let (wb, _dir) = create_test_instance();
+        wb.create_identity("Alice".to_string()).unwrap();
+
+        wb.add_field(
+            MobileFieldType::Email,
+            "work".to_string(),
+            "alice@company.com".to_string(),
+        )
+        .unwrap();
+
+        let removed = wb.remove_field("work".to_string()).unwrap();
+        assert!(removed);
+
+        let card = wb.get_own_card().unwrap();
+        assert!(card.fields.is_empty());
+    }
+
+    #[test]
+    fn test_social_networks() {
+        let (wb, _dir) = create_test_instance();
+
+        let networks = wb.list_social_networks();
+        assert!(!networks.is_empty());
+
+        let github = networks.iter().find(|n| n.id == "github");
+        assert!(github.is_some());
+
+        let url = wb.get_profile_url("github".to_string(), "octocat".to_string());
+        assert_eq!(url, Some("https://github.com/octocat".to_string()));
+    }
+
+    #[test]
+    fn test_exchange_qr_generation() {
+        let (wb, _dir) = create_test_instance();
+        wb.create_identity("Alice".to_string()).unwrap();
+
+        let exchange_data = wb.generate_exchange_qr().unwrap();
+        assert!(
+            exchange_data.qr_data.starts_with("wb://"),
+            "QR data should start with wb://"
+        );
+        assert!(!exchange_data.public_id.is_empty());
+        assert!(exchange_data.expires_at > 0);
+    }
+
+    #[test]
+    fn test_backup_restore() {
+        let (wb, _dir) = create_test_instance();
+        wb.create_identity("Alice".to_string()).unwrap();
+
+        wb.add_field(
+            MobileFieldType::Email,
+            "work".to_string(),
+            "alice@company.com".to_string(),
+        )
+        .unwrap();
+
+        let backup = wb
+            .export_backup("correct-horse-battery-staple".to_string())
+            .unwrap();
+        assert!(!backup.is_empty());
+
+        let dir2 = TempDir::new().unwrap();
+        let wb2 = VauchiMobile::new(
+            dir2.path().to_string_lossy().to_string(),
+            "ws://localhost:8080".to_string(),
+        )
+        .unwrap();
+
+        wb2.import_backup(backup, "correct-horse-battery-staple".to_string())
+            .unwrap();
+
+        assert!(wb2.has_identity());
+        let name = wb2.get_display_name().unwrap();
+        assert_eq!(name, "Alice");
+    }
+}

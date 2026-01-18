@@ -29,7 +29,7 @@ Comprehensive security hardening across iOS/Android and code maintainability imp
 
 ## Code Maintainability
 
-### webbook-mobile Refactoring
+### vauchi-mobile Refactoring
 Split `lib.rs` from 1,747 to 891 lines:
 - `sync.rs` (468 LOC) - Relay sync operations
 - `protocol.rs` (172→55 LOC) - Re-exports from core
@@ -37,7 +37,7 @@ Split `lib.rs` from 1,747 to 891 lines:
 - `cert_pinning.rs` (85 LOC) - TLS pinning
 - `error.rs` (50 LOC) - Error types
 
-### webbook-core/storage Refactoring
+### vauchi-core/storage Refactoring
 Split `mod.rs` from 1,404 lines:
 - `contacts.rs` (215 LOC) - Contact operations
 - `device.rs` (229 LOC) - Device operations
@@ -47,12 +47,12 @@ Split `mod.rs` from 1,404 lines:
 - `error.rs` (42 LOC) - Error types
 
 ### Protocol Consolidation
-Created `webbook-core/src/network/simple_message.rs`:
+Created `vauchi-core/src/network/simple_message.rs`:
 - Single source of truth for wire protocol
 - Eliminated duplication across mobile/CLI/relay
 - Full test coverage for encode/decode
 
 ## Commits
 - `c6b0001` - Security hardening and mobile module refactoring
-- `6855b8f` - Consolidate wire protocol into webbook-core
-- `8c0013e` - Split webbook-core storage module into focused submodules
+- `6855b8f` - Consolidate wire protocol into vauchi-core
+- `8c0013e` - Split vauchi-core storage module into focused submodules

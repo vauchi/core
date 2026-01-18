@@ -6,11 +6,11 @@
 
 | Component | Status |
 |-----------|--------|
-| webbook-core | ✅ 420+ tests |
-| webbook-relay | ✅ 20 tests |
-| webbook-cli | ✅ Complete |
-| webbook-mobile | ✅ UniFFI bindings |
-| webbook-android | ✅ Complete |
+| vauchi-core | ✅ 420+ tests |
+| vauchi-relay | ✅ 20 tests |
+| vauchi-cli | ✅ Complete |
+| vauchi-mobile | ✅ UniFFI bindings |
+| vauchi-android | ✅ Complete |
 | Multi-device sync | ✅ Complete |
 
 ## Documents

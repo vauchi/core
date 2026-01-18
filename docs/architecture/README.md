@@ -1,6 +1,6 @@
-# WebBook Architecture
+# Vauchi Architecture
 
-WebBook is a privacy-focused, decentralized contact card exchange application that allows users to share and update contact information with people they meet in the physical world.
+Vauchi is a privacy-focused, decentralized contact card exchange application that allows users to share and update contact information with people they meet in the physical world.
 
 ## Core Principles
 

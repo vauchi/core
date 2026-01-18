@@ -42,7 +42,7 @@ Examples:
 
 **Gherkin** - Every scenario in `features/` must have a test.
 
-**Coverage** - 90% minimum for webbook-core.
+**Coverage** - 90% minimum for vauchi-core.
 
 ## Forbidden
 

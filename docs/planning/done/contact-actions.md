@@ -14,13 +14,13 @@ When users tap on contact info (phone, email, website, social, address), open it
 
 ## Implementation Phases
 
-### Phase 1: Core URI Builder (webbook-core)
+### Phase 1: Core URI Builder (vauchi-core)
 
 **Goal**: Shared logic for generating URIs from contact fields.
 
 **Files to Create/Modify**:
-- `webbook-core/src/contact_card/uri.rs` - URI generation logic
-- `webbook-core/src/contact_card/mod.rs` - Export new module
+- `vauchi-core/src/contact_card/uri.rs` - URI generation logic
+- `vauchi-core/src/contact_card/mod.rs` - Export new module
 
 **Functionality**:
 ```rust
@@ -44,7 +44,7 @@ pub fn detect_field_type(value: &str) -> Option<FieldType>; // Heuristic for Cus
 - Validate/sanitize values before URI encoding
 
 **Tests** (TDD - write first):
-- `webbook-core/tests/uri_builder_tests.rs`
+- `vauchi-core/tests/uri_builder_tests.rs`
 - Test each field type → URI mapping
 - Test heuristic detection for custom fields
 - Test security: blocked schemes, XSS prevention
@@ -67,10 +67,10 @@ tauri-plugin-opener = "2.2"
 ```
 
 **Files to Create/Modify**:
-- `webbook-desktop/src-tauri/src/commands/actions.rs` - Tauri command
-- `webbook-desktop/src-tauri/src/lib.rs` - Register plugin + command
-- `webbook-desktop/src/components/ContactField.tsx` - Click handler
-- `webbook-desktop/src/lib/actions.ts` - TypeScript bindings
+- `vauchi-desktop/src-tauri/src/commands/actions.rs` - Tauri command
+- `vauchi-desktop/src-tauri/src/lib.rs` - Register plugin + command
+- `vauchi-desktop/src/components/ContactField.tsx` - Click handler
+- `vauchi-desktop/src/lib/actions.ts` - TypeScript bindings
 
 **Tauri Command**:
 ```rust
@@ -91,8 +91,8 @@ import { open } from '@tauri-apps/plugin-opener';
 **Goal**: Implement using Android Intent system.
 
 **Files to Create/Modify**:
-- `webbook-android/app/src/main/java/com/example/webbook/util/ContactActions.kt`
-- `webbook-android/app/src/main/java/com/example/webbook/ui/contacts/ContactDetailScreen.kt`
+- `vauchi-android/app/src/main/java/com/example/vauchi/util/ContactActions.kt`
+- `vauchi-android/app/src/main/java/com/example/vauchi/ui/contacts/ContactDetailScreen.kt`
 
 **Implementation**:
 ```kotlin
@@ -124,8 +124,8 @@ fun openContactField(context: Context, fieldType: FieldType, value: String) {
 **Goal**: Implement using SwiftUI openURL.
 
 **Files to Create/Modify**:
-- `webbook-ios/WebBook/Utilities/ContactActions.swift`
-- `webbook-ios/WebBook/Views/ContactDetailView.swift`
+- `vauchi-ios/Vauchi/Utilities/ContactActions.swift`
+- `vauchi-ios/Vauchi/Views/ContactDetailView.swift`
 
 **Implementation**:
 ```swift
@@ -157,13 +157,13 @@ func urlForField(_ field: ContactField) -> URL? {
 
 **Dependencies**:
 ```toml
-# webbook-cli/Cargo.toml and webbook-tui/Cargo.toml
+# vauchi-cli/Cargo.toml and vauchi-tui/Cargo.toml
 open = "5"
 ```
 
 **Files to Create/Modify**:
-- `webbook-cli/src/actions.rs`
-- `webbook-tui/src/actions.rs`
+- `vauchi-cli/src/actions.rs`
+- `vauchi-tui/src/actions.rs`
 
 **Implementation**:
 ```rust
@@ -184,7 +184,7 @@ pub fn open_contact_field(field: &ContactField) -> Result<(), Error> {
 
 ## Test Strategy (TDD)
 
-### Unit Tests (webbook-core)
+### Unit Tests (vauchi-core)
 1. URI generation for each field type
 2. Phone number normalization
 3. URL validation and sanitization
@@ -222,7 +222,7 @@ pub fn open_contact_field(field: &ContactField) -> Result<(), Error> {
 
 | Risk | Mitigation |
 |------|------------|
-| Platform fragmentation | Core URI logic in webbook-core, thin platform wrappers |
+| Platform fragmentation | Core URI logic in vauchi-core, thin platform wrappers |
 | No handler installed | Always offer copy-to-clipboard fallback |
 | URI injection attacks | Strict whitelist, value sanitization |
 | Social URL templates change | Fetch from registry, cache locally |

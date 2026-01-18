@@ -1,18 +1,18 @@
 @identity @security
 Feature: Identity Management
-  As a WebBook user
+  As a Vauchi user
   I want to manage my cryptographic identity
   So that I can securely exchange and update contact information
 
   Background:
-    Given the WebBook application is installed
+    Given the Vauchi application is installed
     And the device has secure storage available
 
   # First Launch & Identity Creation
 
   @first-launch
   Scenario: Create new identity on first launch
-    Given I am launching WebBook for the first time
+    Given I am launching Vauchi for the first time
     When the application initializes
     Then a new Ed25519 keypair should be generated
     And an X25519 exchange keypair should be derived
@@ -71,7 +71,7 @@ Feature: Identity Management
 
   @recovery
   Scenario: Restore identity from backup
-    Given I am launching WebBook for the first time
+    Given I am launching Vauchi for the first time
     And I have a valid backup file
     When I select "Restore from Backup"
     And I provide the backup file
@@ -134,7 +134,7 @@ Feature: Identity Management
   Scenario: Link second device successfully
     Given I have an existing identity on Device A
     And Device A is displaying a device linking QR code
-    And I have WebBook installed on Device B
+    And I have Vauchi installed on Device B
     When I scan the QR code with Device B
     And proximity is verified between devices
     Then Device B should receive my identity

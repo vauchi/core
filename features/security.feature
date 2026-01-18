@@ -1,6 +1,6 @@
 @security
 Feature: Security
-  As a WebBook user
+  As a Vauchi user
   I want my sensitive data to be protected
   So that attackers cannot access my information
 
@@ -182,7 +182,7 @@ Feature: Security
   @access
   Scenario: App lock with biometrics
     Given I have enabled app lock
-    When I open WebBook
+    When I open Vauchi
     Then I should be prompted for biometric authentication
     And only successful authentication should grant access
     And data should remain encrypted until authenticated
@@ -190,7 +190,7 @@ Feature: Security
   @access
   Scenario: App lock with PIN
     Given I have enabled PIN lock
-    When I open WebBook
+    When I open Vauchi
     Then I should be prompted for my PIN
     And incorrect PIN should deny access
     And multiple failures should trigger lockout
@@ -204,7 +204,7 @@ Feature: Security
 
   @access
   Scenario: Screen capture prevention
-    Given WebBook is displaying sensitive data
+    Given Vauchi is displaying sensitive data
     Then screenshots should be blocked
     And screen recording should be blocked
     And the app should appear blank in app switcher

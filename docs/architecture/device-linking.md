@@ -1,6 +1,6 @@
 # Device Linking
 
-Device linking enables users to use the same WebBook identity across multiple devices with full sync of contacts, cards, and settings.
+Device linking enables users to use the same Vauchi identity across multiple devices with full sync of contacts, cards, and settings.
 
 ## Goals
 
@@ -37,8 +37,8 @@ Device linking enables users to use the same WebBook identity across multiple de
 Each device derives its unique keys from the master seed:
 
 ```
-device_id[n]       = HKDF(master_seed, n, "WebBook_Device_ID")
-exchange_key[n]    = HKDF(master_seed, n, "WebBook_Device_Exchange")
+device_id[n]       = HKDF(master_seed, n, "Vauchi_Device_ID")
+exchange_key[n]    = HKDF(master_seed, n, "Vauchi_Device_Exchange")
 ```
 
 This ensures:
@@ -114,7 +114,7 @@ The device link QR contains:
 
 | Field | Size | Description |
 |-------|------|-------------|
-| Magic | 4 bytes | `WBDL` (WebBook Device Link) |
+| Magic | 4 bytes | `WBDL` (Vauchi Device Link) |
 | Version | 1 byte | Protocol version (1) |
 | Identity Key | 32 bytes | Ed25519 public key |
 | Link Key | 32 bytes | Random encryption key |
@@ -201,6 +201,6 @@ Conflict resolution: Last-write-wins with version numbers.
 
 | File | Description |
 |------|-------------|
-| `webbook-core/src/identity/device.rs` | DeviceInfo, DeviceRegistry, key derivation |
-| `webbook-core/src/exchange/device_link.rs` | Device linking protocol |
-| `webbook-core/src/storage/mod.rs` | Device storage tables |
+| `vauchi-core/src/identity/device.rs` | DeviceInfo, DeviceRegistry, key derivation |
+| `vauchi-core/src/exchange/device_link.rs` | Device linking protocol |
+| `vauchi-core/src/storage/mod.rs` | Device storage tables |

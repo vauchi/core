@@ -26,7 +26,7 @@ Master Seed (256-bit)
 
 ## Implementation
 
-WebBook uses the `ring` crate (audited, production-ready) for all cryptographic operations:
+Vauchi uses the `ring` crate (audited, production-ready) for all cryptographic operations:
 
 - **Signing**: Ed25519 for identity and message signatures
 - **Encryption**: AES-256-GCM with random nonces

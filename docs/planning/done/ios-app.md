@@ -19,7 +19,7 @@ Native iOS app with near feature parity to Android, using SwiftUI and UniFFI bin
 - **SetupView**: Identity creation onboarding
 
 ### Services (6 core services)
-- **WebBookRepository**: UniFFI bindings wrapper
+- **VauchiRepository**: UniFFI bindings wrapper
 - **KeychainService**: iOS Keychain integration
 - **SettingsService**: UserDefaults persistence
 - **BackgroundSyncService**: BGTaskScheduler (15-min interval)
@@ -34,7 +34,7 @@ Native iOS app with near feature parity to Android, using SwiftUI and UniFFI bin
 - Dangerous URL scheme blocking
 
 ## Testing
-- 6 test files in WebBookTests/
+- 6 test files in VauchiTests/
 - Repository, ViewModel, Services coverage
 
 ## Remaining Work (~15%)
@@ -45,11 +45,11 @@ Native iOS app with near feature parity to Android, using SwiftUI and UniFFI bin
 
 ## Files Created
 ```
-webbook-ios/
-├── WebBook/
+vauchi-ios/
+├── Vauchi/
 │   ├── Views/           # 7 SwiftUI views
 │   ├── Services/        # 6 service classes
-│   ├── ViewModels/      # WebBookViewModel
+│   ├── ViewModels/      # VauchiViewModel
 │   └── Generated/       # UniFFI bindings
-└── WebBookTests/        # 6 test files
+└── VauchiTests/        # 6 test files
 ```

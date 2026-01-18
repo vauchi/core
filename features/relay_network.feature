@@ -1,6 +1,6 @@
 @relay @infrastructure
 Feature: Relay Network
-  As a WebBook user or contributor
+  As a Vauchi user or contributor
   I want a decentralized relay network for message delivery
   So that updates can be delivered even when direct P2P connection fails
 

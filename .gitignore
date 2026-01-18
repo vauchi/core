@@ -28,5 +28,5 @@ dist/
 .build/
 
 # Sibling repositories (separate git repos)
-/webbook-website/
-/webbook-market/
+/vauchi-website/
+/vauchi-market/

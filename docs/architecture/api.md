@@ -39,10 +39,10 @@ pub fn unlink_device(device_id: &DeviceId) -> Result<(), Error>;
 
 The mobile API wraps the core library for iOS/Android:
 
-- `MobileWebBook` - Main entry point
+- `MobileVauchi` - Main entry point
 - `MobileContact` - Contact with card
 - `MobileContactCard` - Card with fields
 - `MobileExchangeData` - QR exchange data
 - `MobileSyncResult` - Sync operation result
 
-See [webbook-mobile/README.md](../../webbook-mobile/README.md) for details.
+See [vauchi-mobile/README.md](../../vauchi-mobile/README.md) for details.

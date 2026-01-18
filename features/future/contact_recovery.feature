@@ -4,7 +4,7 @@ Feature: Contact Recovery
   So that I can reconnect with my contacts without pre-designated recovery contacts
 
   Background:
-    Given the WebBook app is installed
+    Given the Vauchi app is installed
     And the user has an identity
 
   # ============================================================

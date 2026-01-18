@@ -45,7 +45,7 @@ interface VisibilityRule {
 
 ## Social Network Registry
 
-WebBook includes a registry of 35+ social networks with URL templates:
+Vauchi includes a registry of 35+ social networks with URL templates:
 
 - Twitter, GitHub, LinkedIn, Instagram, TikTok, etc.
 - Profile URLs are generated from usernames automatically

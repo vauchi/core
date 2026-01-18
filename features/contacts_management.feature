@@ -1,12 +1,12 @@
 @contacts
 Feature: Contacts Management
-  As a WebBook user
+  As a Vauchi user
   I want to manage my contacts list
   So that I can organize and interact with people I've exchanged cards with
 
   Background:
     Given I have an existing identity as "Alice"
-    And I am logged into WebBook
+    And I am logged into Vauchi
 
   # Viewing Contacts
 

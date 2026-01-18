@@ -27,12 +27,12 @@
 - Sync status chip in TopAppBar
 
 ## Phase 6: Infrastructure ✅
-- Relay server (webbook-relay)
+- Relay server (vauchi-relay)
 - SQLite persistent storage
 - Rate limiting
 
 ## Phase 7: CLI Tool ✅
-- Full CLI (webbook-cli)
+- Full CLI (vauchi-cli)
 - Identity, card, contact management
 - End-to-end exchange via relay
 
@@ -53,7 +53,7 @@
 
 ## Phase 10: iOS App ✅
 - 7 SwiftUI screens (Home, Contacts, ContactDetail, Exchange, QRScanner, Settings, Setup)
-- UniFFI bindings integration with webbook-mobile
+- UniFFI bindings integration with vauchi-mobile
 - Keychain secure storage with biometric auth
 - Background sync via BGTaskScheduler
 - Security hardening (wss://, clipboard expiration)
@@ -66,9 +66,9 @@
 - Clipboard auto-clear after 30 seconds
 
 ## Phase 12: Code Maintainability ✅
-- Split webbook-mobile/lib.rs (1,747→891 lines, 6 modules)
-- Split webbook-core/storage (1,404 lines into 6 modules)
-- Consolidated wire protocol in webbook-core/src/network/simple_message.rs
+- Split vauchi-mobile/lib.rs (1,747→891 lines, 6 modules)
+- Split vauchi-core/storage (1,404 lines into 6 modules)
+- Consolidated wire protocol in vauchi-core/src/network/simple_message.rs
 
 ## Additional
 - Social Network Registry (35+ networks, embedded JSON)

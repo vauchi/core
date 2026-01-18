@@ -1,10 +1,10 @@
-# WebBook Privacy Policy
+# Vauchi Privacy Policy
 
 **Last Updated:** January 2026
 
 ## Overview
 
-WebBook is a privacy-focused contact card exchange application. This privacy policy explains how we handle your data. The short version: **your data stays on your device, encrypted, and under your control.**
+Vauchi is a privacy-focused contact card exchange application. This privacy policy explains how we handle your data. The short version: **your data stays on your device, encrypted, and under your control.**
 
 ## Data Collection
 
@@ -108,11 +108,11 @@ You can export an encrypted backup of all your data at any time from Settings > 
 
 ### Data Portability
 
-Encrypted backups can be imported on any device where you install WebBook.
+Encrypted backups can be imported on any device where you install Vauchi.
 
 ## Account Recovery
 
-WebBook uses a social recovery system instead of traditional account recovery:
+Vauchi uses a social recovery system instead of traditional account recovery:
 
 - There is no "forgot password" because there is no central account
 - Recovery requires vouchers from contacts you've previously exchanged with
@@ -120,22 +120,22 @@ WebBook uses a social recovery system instead of traditional account recovery:
 
 ## Children's Privacy
 
-WebBook is not intended for children under 13. We do not knowingly collect data from children under 13. If you believe a child has provided us with data, please contact us.
+Vauchi is not intended for children under 13. We do not knowingly collect data from children under 13. If you believe a child has provided us with data, please contact us.
 
 ## Changes to This Policy
 
-We may update this privacy policy from time to time. We will notify you of significant changes through the app or our website. Continued use of WebBook after changes constitutes acceptance of the updated policy.
+We may update this privacy policy from time to time. We will notify you of significant changes through the app or our website. Continued use of Vauchi after changes constitutes acceptance of the updated policy.
 
 ## Open Source
 
-WebBook is open source software. You can inspect exactly how your data is handled by reviewing our source code at: https://github.com/anthropics/webbook
+Vauchi is open source software. You can inspect exactly how your data is handled by reviewing our source code at: https://github.com/anthropics/vauchi
 
 ## Contact Us
 
 For privacy-related questions or concerns:
 
-- Email: privacy@webbook.app
-- GitHub Issues: https://github.com/anthropics/webbook/issues
+- Email: privacy@vauchi.app
+- GitHub Issues: https://github.com/anthropics/vauchi/issues
 
 ---
 

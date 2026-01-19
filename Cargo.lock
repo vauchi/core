@@ -6142,6 +6142,7 @@ dependencies = [
  "base64 0.22.1",
  "dirs 5.0.1",
  "hex",
+ "native-tls",
  "qrcode",
  "serde",
  "serde_json",
@@ -6150,6 +6151,7 @@ dependencies = [
  "tauri-plugin-opener",
  "tauri-plugin-shell",
  "tokio",
+ "tungstenite 0.24.0",
  "url",
  "vauchi-core",
 ]

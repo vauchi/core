@@ -221,27 +221,43 @@ async fn main() {
             // Keep the guard alive for the duration of the connection
             let _guard = connection_guard;
 
-            // Peek at the first bytes to detect HTTP health check vs WebSocket
-            let mut peek_buf = [0u8; 64];
+            // Peek at the first bytes to detect HTTP request vs WebSocket upgrade
+            // Buffer needs to be large enough to capture Upgrade header (typically ~200 bytes)
+            let mut peek_buf = [0u8; 512];
             match stream.peek(&mut peek_buf).await {
                 Ok(n) if n > 0 => {
                     let peek_str = String::from_utf8_lossy(&peek_buf[..n]);
 
-                    // Check for HTTP GET /health or /up request (non-WebSocket)
-                    if (peek_str.starts_with("GET /health") || peek_str.starts_with("GET /up"))
-                        && !peek_str.contains("Upgrade:")
-                    {
-                        // Respond with health check JSON
-                        let uptime = start_time.elapsed().as_secs();
-                        let health_response = format!(
-                            r#"{{"status":"healthy","version":"{}","uptime_seconds":{}}}"#,
-                            env!("CARGO_PKG_VERSION"),
-                            uptime
-                        );
+                    // Check if this is an HTTP request without WebSocket upgrade
+                    // Use case-insensitive check since HTTP headers are case-insensitive
+                    let peek_lower = peek_str.to_ascii_lowercase();
+                    let is_http_get = peek_str.starts_with("GET ");
+                    let is_websocket_upgrade = peek_lower.contains("upgrade:");
+
+                    if is_http_get && !is_websocket_upgrade {
+                        // Health check endpoints
+                        if peek_str.starts_with("GET /health") || peek_str.starts_with("GET /up") {
+                            let uptime = start_time.elapsed().as_secs();
+                            let health_response = format!(
+                                r#"{{"status":"healthy","version":"{}","uptime_seconds":{}}}"#,
+                                env!("CARGO_PKG_VERSION"),
+                                uptime
+                            );
+                            let response = format!(
+                                "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+                                health_response.len(),
+                                health_response
+                            );
+                            let _ = stream.try_write(response.as_bytes());
+                            return;
+                        }
+
+                        // Any other HTTP request - return helpful error
+                        let error_response = r#"{"error":"This is a WebSocket relay endpoint","relay":"wss://relay.vauchi.app","website":"https://vauchi.app"}"#;
                         let response = format!(
-                            "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
-                            health_response.len(),
-                            health_response
+                            "HTTP/1.1 400 Bad Request\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+                            error_response.len(),
+                            error_response
                         );
                         let _ = stream.try_write(response.as_bytes());
                         return;

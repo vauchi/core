@@ -20,56 +20,97 @@ Vauchi lets you exchange "living" contact cards. When you update your informatio
 - **End-to-End Encrypted** - No server can read your data
 - **Decentralized** - Relay servers only pass encrypted blobs; they have zero knowledge
 
-## Project Structure
+## Repository Structure
+
+This is the main Rust monorepo containing all core components:
 
 ```
-Vauchi/
-├── vauchi-core/     # Core Rust library (cryptography, protocols, data models)
-├── vauchi-relay/    # WebSocket relay server for message forwarding
-└── vauchi-cli/      # Command-line interface for testing
+vauchi-core/     # Core library (cryptography, protocols, data models)
+vauchi-relay/    # WebSocket relay server for message forwarding
+vauchi-cli/      # Command-line interface for testing
+vauchi-tui/      # Terminal UI (ratatui)
+vauchi-desktop/  # Desktop app (Tauri + SolidJS)
+vauchi-mobile/   # UniFFI bindings for iOS/Android
+features/        # Gherkin BDD scenarios
+scripts/         # Build and utility scripts
 ```
 
-### vauchi-core
+## Related Repositories
 
-The core library implements all cryptographic protocols (X3DH, Double Ratchet), identity management, contact cards, and sync protocol. Platform-independent, ready for mobile integration via FFI.
-
-See [vauchi-core/README.md](vauchi-core/README.md) for details.
-
-### vauchi-relay
-
-Lightweight WebSocket relay server that stores and forwards encrypted blobs between clients. Zero-knowledge design - the server only sees encrypted data it cannot decrypt.
-
-See [vauchi-relay/README.md](vauchi-relay/README.md) for details.
-
-### vauchi-cli
-
-Command-line interface for testing and demonstration. Supports identity creation, contact card management, QR-based contact exchange, and synchronization via the relay server.
-
-See [vauchi-cli/README.md](vauchi-cli/README.md) for details.
+| Repository | Description |
+|------------|-------------|
+| [vauchi/android](https://gitlab.com/vauchi/android) | Android app (Kotlin/Compose) - consumes UniFFI bindings |
+| [vauchi/ios](https://gitlab.com/vauchi/ios) | iOS app (SwiftUI) - consumes UniFFI bindings |
+| [vauchi/website](https://gitlab.com/vauchi/website) | Landing page at vauchi.app |
+| [vauchi/docs](https://gitlab.com/vauchi/docs) | User & developer documentation |
+| [vauchi/assets](https://gitlab.com/vauchi/assets) | Brand assets, logos, screenshots |
+| [vauchi/strategy](https://gitlab.com/vauchi/strategy) | Development, go-live, and community strategy |
+| [vauchi/infra](https://gitlab.com/vauchi/infra) | Deployment configs (private) |
+| [vauchi/dev-tools](https://gitlab.com/vauchi/dev-tools) | Workspace setup and helper scripts |
 
 ## Quick Start
 
 ```bash
-cargo run -p vauchi-relay     # Start relay server (terminal 1)
-cargo run -p vauchi-cli -- init "Alice"  # Create identity (terminal 2)
-cargo run -p vauchi-cli -- sync          # Sync with relay
+# Run tests
+cargo test --workspace
+
+# Start relay server
+cargo run -p vauchi-relay
+
+# CLI commands
+cargo run -p vauchi-cli -- init "Alice"
+cargo run -p vauchi-cli -- sync
 ```
 
-For full build commands and development workflow, see [CLAUDE.md](CLAUDE.md).
+## Development
+
+### Prerequisites
+
+- Rust 1.78+ (see `rust-toolchain.toml`)
+- For mobile: UniFFI, Swift/Xcode (iOS), Kotlin/Gradle (Android)
+- For desktop: Node.js, pnpm, Tauri prerequisites
+
+### Commands
+
+```bash
+cargo test                        # All tests
+cargo test -p vauchi-core         # Core only
+cargo clippy -- -D warnings       # Lint
+cargo fmt                         # Format
+```
+
+### TDD Workflow
+
+This project uses strict Test-Driven Development:
+
+1. Write failing test (Red)
+2. Write minimal code to pass (Green)
+3. Refactor
+4. Tests trace to `features/*.feature` Gherkin scenarios
+
+See [CLAUDE.md](CLAUDE.md) for detailed rules and project conventions.
+
+## Documentation
+
+- **Architecture**: [vauchi/docs](https://gitlab.com/vauchi/docs) repository
+- **API Reference**: Generated from code comments
+- **BDD Scenarios**: `features/` directory in this repo
+
+## Mobile Development
+
+The `vauchi-mobile` crate produces UniFFI bindings consumed by:
+
+- **Android**: Clone [vauchi/android](https://gitlab.com/vauchi/android), run `./gradlew build`
+- **iOS**: Clone [vauchi/ios](https://gitlab.com/vauchi/ios), open in Xcode
+
+See each platform repo for detailed setup instructions.
 
 ## Contributing
 
-This project uses strict Test-Driven Development. Before contributing:
-
 1. Read [CLAUDE.md](CLAUDE.md) for project structure and commit rules
-2. Read [docs/TDD_RULES.md](docs/TDD_RULES.md) for the TDD workflow
-3. Read [docs/architecture/](docs/architecture/) for technical design
-
-## Planned Components
-
-- **iOS App** - Native Swift app using vauchi-core via FFI
-- **Android App** - Native Kotlin app using vauchi-core via FFI
-- **Desktop Apps** - Cross-platform GUI for macOS, Windows, Linux
+2. Check [vauchi/docs](https://gitlab.com/vauchi/docs) for architecture decisions
+3. Follow TDD workflow strictly
+4. Ensure `cargo test --workspace` passes before submitting
 
 ## License
 

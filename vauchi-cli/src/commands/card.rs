@@ -152,3 +152,27 @@ pub fn edit(config: &CliConfig, label: &str, value: &str) -> Result<()> {
 
     Ok(())
 }
+
+/// Edits the display name.
+pub fn edit_name(config: &CliConfig, name: &str) -> Result<()> {
+    let mut wb = open_vauchi(config)?;
+
+    // Get old card for delta propagation
+    let old_card = wb
+        .own_card()?
+        .ok_or_else(|| anyhow::anyhow!("No contact card found"))?;
+
+    // Update display name
+    wb.update_display_name(name)?;
+
+    display::success(&format!("Display name updated to '{}'", name));
+
+    // Propagate update to contacts
+    let new_card = wb.own_card()?.unwrap();
+    let queued = wb.propagate_card_update(&old_card, &new_card)?;
+    if queued > 0 {
+        display::info(&format!("Update queued to {} contact(s)", queued));
+    }
+
+    Ok(())
+}

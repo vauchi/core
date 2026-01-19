@@ -29,7 +29,7 @@ struct Cli {
     data_dir: Option<PathBuf>,
 
     /// Relay server URL
-    #[arg(long, global = true, default_value = "ws://localhost:8080")]
+    #[arg(long, global = true, default_value = "wss://relay.vauchi.app")]
     relay: String,
 }
 
@@ -119,6 +119,12 @@ enum CardCommands {
 
         /// New value
         value: String,
+    },
+
+    /// Edit your display name
+    EditName {
+        /// New display name
+        name: String,
     },
 }
 
@@ -335,6 +341,9 @@ async fn main() -> Result<()> {
             }
             CardCommands::Edit { label, value } => {
                 commands::card::edit(&config, &label, &value)?;
+            }
+            CardCommands::EditName { name } => {
+                commands::card::edit_name(&config, &name)?;
             }
         },
         Commands::Exchange(cmd) => match cmd {

@@ -27,6 +27,8 @@ pub struct RelayConfig {
     pub storage_backend: StorageBackend,
     /// Data directory for persistent storage.
     pub data_dir: PathBuf,
+    /// Idle timeout in seconds (for slowloris protection).
+    pub idle_timeout_secs: u64,
 }
 
 impl Default for RelayConfig {
@@ -40,6 +42,7 @@ impl Default for RelayConfig {
             cleanup_interval_secs: 3600,             // 1 hour
             storage_backend: StorageBackend::Sqlite, // Persistent by default
             data_dir: PathBuf::from("./data"),
+            idle_timeout_secs: 300,                  // 5 minutes (slowloris protection)
         }
     }
 }
@@ -96,7 +99,18 @@ impl RelayConfig {
             config.data_dir = PathBuf::from(val);
         }
 
+        if let Ok(val) = std::env::var("RELAY_IDLE_TIMEOUT") {
+            if let Ok(parsed) = val.parse() {
+                config.idle_timeout_secs = parsed;
+            }
+        }
+
         config
+    }
+
+    /// Returns the idle timeout as a Duration.
+    pub fn idle_timeout(&self) -> Duration {
+        Duration::from_secs(self.idle_timeout_secs)
     }
 
     /// Returns the blob TTL as a Duration.

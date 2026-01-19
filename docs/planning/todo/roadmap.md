@@ -134,11 +134,17 @@ See `docs/development/testing.md` for full strategy.
 
 | Task | Complexity | Risk | Status |
 |------|------------|------|--------|
-| Relay deployment | Medium | Medium | Todo |
+| Relay deployment | Medium | Medium | ✅ Config Ready |
 | Docker deployment | Low | Low | ✅ Done |
 | Relay federation | High | High | Todo |
 | Monitoring and health checks | Low | Low | Todo |
 | libp2p/DHT discovery | High | High | Todo |
+
+**Relay Deployment Notes (2026-01-19)**:
+- Kamal config created at `infra/hosts/bold-hopper/deploy.yml`
+- DNS already configured: relay.vauchi.app → 87.106.25.46
+- Server provisioned via Ansible (kamal-ready role)
+- Deploy with: `cd infra/hosts/bold-hopper && kamal deploy`
 
 ### Distribution
 

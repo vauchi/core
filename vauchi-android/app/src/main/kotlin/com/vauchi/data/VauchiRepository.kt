@@ -23,7 +23,7 @@ class VauchiRepository(context: Context) {
         private const val PREFS_NAME = "vauchi_settings"
         private const val KEY_RELAY_URL = "relay_url"
         private const val KEY_ENCRYPTED_STORAGE_KEY = "encrypted_storage_key"
-        private const val DEFAULT_RELAY_URL = "ws://localhost:8080"
+        private const val DEFAULT_RELAY_URL = "wss://relay.vauchi.app"
         private const val LEGACY_KEY_FILENAME = "storage.key"
     }
 

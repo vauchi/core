@@ -2,7 +2,7 @@
 
 use crossterm::event::KeyCode;
 
-use crate::app::{AddFieldFocus, App, BackupFocus, BackupMode, InputMode, Screen};
+use crate::app::{AddFieldFocus, App, BackupFocus, BackupMode, EditFieldState, EditNameState, EditRelayUrlState, InputMode, Screen};
 use crate::backend::{Backend, FIELD_TYPES};
 use vauchi_core::identity::password::validate_password;
 
@@ -51,6 +51,9 @@ fn handle_normal_mode(app: &mut App, key: KeyCode) -> Action {
         Screen::Settings => handle_settings_keys(app, key),
         Screen::Help => handle_help_keys(app, key),
         Screen::AddField => handle_add_field_keys(app, key),
+        Screen::EditField => handle_edit_field_keys(app, key),
+        Screen::EditName => handle_edit_name_keys(app, key),
+        Screen::EditRelayUrl => handle_edit_relay_url_keys(app, key),
         Screen::Devices => handle_devices_keys(app, key),
         Screen::Recovery => handle_recovery_keys(app, key),
         Screen::Sync => handle_sync_keys(app, key),
@@ -79,6 +82,15 @@ fn handle_editing_mode(app: &mut App, key: KeyCode) -> Action {
                 }
                 _ => {}
             },
+            Screen::EditField => {
+                app.edit_field_state.new_value.pop();
+            }
+            Screen::EditName => {
+                app.edit_name_state.new_name.pop();
+            }
+            Screen::EditRelayUrl => {
+                app.edit_relay_url_state.new_url.pop();
+            }
             Screen::Backup => match app.backup_state.focus {
                 BackupFocus::Password => {
                     app.backup_state.password.pop();
@@ -100,6 +112,9 @@ fn handle_editing_mode(app: &mut App, key: KeyCode) -> Action {
                 AddFieldFocus::Value => app.add_field_state.value.push(c),
                 _ => {}
             },
+            Screen::EditField => app.edit_field_state.new_value.push(c),
+            Screen::EditName => app.edit_name_state.new_name.push(c),
+            Screen::EditRelayUrl => app.edit_relay_url_state.new_url.push(c),
             Screen::Backup => match app.backup_state.focus {
                 BackupFocus::Password => app.backup_state.password.push(c),
                 BackupFocus::Confirm => app.backup_state.confirm_password.push(c),
@@ -114,7 +129,6 @@ fn handle_editing_mode(app: &mut App, key: KeyCode) -> Action {
 
 fn handle_home_keys(app: &mut App, key: KeyCode) {
     match key {
-        KeyCode::Char('e') => app.goto(Screen::Exchange),
         KeyCode::Char('c') => app.goto(Screen::Contacts),
         KeyCode::Char('s') => app.goto(Screen::Settings),
         KeyCode::Char('d') => app.goto(Screen::Devices),
@@ -124,6 +138,23 @@ fn handle_home_keys(app: &mut App, key: KeyCode) {
         KeyCode::Char('a') => {
             app.add_field_state = Default::default();
             app.goto(Screen::AddField);
+        }
+        KeyCode::Char('e') | KeyCode::Enter => {
+            // Edit selected field
+            if let Ok(fields) = app.backend.get_card_fields() {
+                if let Some(field) = fields.get(app.selected_field) {
+                    app.edit_field_state = EditFieldState {
+                        field_label: field.label.clone(),
+                        field_type: field.field_type.clone(),
+                        new_value: field.value.clone(),
+                    };
+                    app.goto(Screen::EditField);
+                    app.input_mode = InputMode::Editing;
+                } else {
+                    // No fields, open Exchange
+                    app.goto(Screen::Exchange);
+                }
+            }
         }
         KeyCode::Char('j') | KeyCode::Down => {
             let fields = app.backend.get_card_fields().unwrap_or_default();
@@ -303,12 +334,38 @@ fn handle_visibility_keys(app: &mut App, key: KeyCode) {
     }
 }
 
-fn handle_exchange_keys(_app: &mut App, _key: KeyCode) {
-    // Exchange specific keys
+fn handle_exchange_keys(app: &mut App, key: KeyCode) {
+    use crate::ui::exchange::regenerate_qr;
+    if let KeyCode::Char('r') = key {
+        regenerate_qr(app);
+    }
 }
 
-fn handle_settings_keys(_app: &mut App, _key: KeyCode) {
-    // Settings specific keys
+fn handle_settings_keys(app: &mut App, key: KeyCode) {
+    match key {
+        KeyCode::Char('n') | KeyCode::Enter => {
+            // Edit display name
+            let current_name = app.backend.display_name().unwrap_or("").to_string();
+            app.edit_name_state = EditNameState {
+                new_name: current_name,
+            };
+            app.goto(Screen::EditName);
+            app.input_mode = InputMode::Editing;
+        }
+        KeyCode::Char('u') => {
+            // Edit relay URL
+            let current_url = app.backend.relay_url().to_string();
+            app.edit_relay_url_state = EditRelayUrlState {
+                new_url: current_url,
+            };
+            app.goto(Screen::EditRelayUrl);
+            app.input_mode = InputMode::Editing;
+        }
+        KeyCode::Char('b') => app.goto(Screen::Backup),
+        KeyCode::Char('d') => app.goto(Screen::Devices),
+        KeyCode::Char('r') => app.goto(Screen::Recovery),
+        _ => {}
+    }
 }
 
 fn handle_help_keys(app: &mut App, key: KeyCode) {
@@ -371,6 +428,79 @@ fn handle_add_field_keys(app: &mut App, key: KeyCode) {
             if app.add_field_state.field_type_index < FIELD_TYPES.len() - 1 {
                 app.add_field_state.field_type_index += 1;
             }
+        }
+        _ => {}
+    }
+}
+
+fn handle_edit_field_keys(app: &mut App, key: KeyCode) {
+    match key {
+        KeyCode::Enter => {
+            // Save the edited field
+            let label = app.edit_field_state.field_label.clone();
+            let new_value = app.edit_field_state.new_value.trim().to_string();
+            if new_value.is_empty() {
+                app.set_status("Value cannot be empty");
+            } else {
+                match app.backend.update_field(&label, &new_value) {
+                    Ok(()) => {
+                        app.set_status("Field updated");
+                        app.go_back();
+                    }
+                    Err(e) => app.set_status(format!("Error: {}", e)),
+                }
+            }
+        }
+        KeyCode::Esc => {
+            app.go_back();
+        }
+        _ => {}
+    }
+}
+
+fn handle_edit_name_keys(app: &mut App, key: KeyCode) {
+    match key {
+        KeyCode::Enter => {
+            // Save the new display name
+            let new_name = app.edit_name_state.new_name.trim().to_string();
+            if new_name.is_empty() {
+                app.set_status("Name cannot be empty");
+            } else {
+                match app.backend.update_display_name(&new_name) {
+                    Ok(()) => {
+                        app.set_status("Display name updated");
+                        app.go_back();
+                    }
+                    Err(e) => app.set_status(format!("Error: {}", e)),
+                }
+            }
+        }
+        KeyCode::Esc => {
+            app.go_back();
+        }
+        _ => {}
+    }
+}
+
+fn handle_edit_relay_url_keys(app: &mut App, key: KeyCode) {
+    match key {
+        KeyCode::Enter => {
+            // Save the new relay URL
+            let new_url = app.edit_relay_url_state.new_url.trim().to_string();
+            if new_url.is_empty() {
+                app.set_status("URL cannot be empty");
+            } else {
+                match app.backend.set_relay_url(&new_url) {
+                    Ok(()) => {
+                        app.set_status("Relay URL updated");
+                        app.go_back();
+                    }
+                    Err(e) => app.set_status(format!("Error: {}", e)),
+                }
+            }
+        }
+        KeyCode::Esc => {
+            app.go_back();
         }
         _ => {}
     }

@@ -6,8 +6,8 @@ use anyhow::{Context, Result};
 #[cfg(feature = "secure-storage")]
 use vauchi_core::storage::secure::{PlatformKeyring, SecureStorage};
 use vauchi_core::{
-    contact_card::ContactAction, ContactCard, ContactField, FieldType, Identity, IdentityBackup,
-    Storage, SymmetricKey,
+    contact_card::ContactAction, ContactCard, ContactField, ExchangeQR, FieldType, Identity,
+    IdentityBackup, Storage, SymmetricKey,
 };
 
 #[cfg(not(feature = "secure-storage"))]
@@ -17,12 +17,17 @@ use vauchi_core::storage::secure::{FileKeyStorage, SecureStorage};
 /// This is not for security - just for TUI persistence.
 const LOCAL_STORAGE_PASSWORD: &str = "vauchi-local-storage";
 
+/// Default relay URL.
+const DEFAULT_RELAY_URL: &str = "wss://relay.vauchi.app";
+
 /// Backend for Vauchi operations.
 pub struct Backend {
     storage: Storage,
     identity: Option<Identity>,
     backup_data: Option<Vec<u8>>,
     display_name: Option<String>,
+    relay_url: String,
+    data_dir: std::path::PathBuf,
 }
 
 /// Contact card field information for display.
@@ -39,6 +44,36 @@ pub struct ContactInfo {
     pub id: String,
     pub display_name: String,
     pub verified: bool,
+}
+
+/// QR code data with expiration info.
+#[derive(Debug, Clone)]
+pub struct QRData {
+    /// The QR code data string.
+    pub data: String,
+    /// Unix timestamp when the QR was generated.
+    pub generated_at: u64,
+    /// QR expiration time in seconds.
+    pub expires_in_secs: u64,
+}
+
+impl QRData {
+    /// Calculate remaining seconds until expiration.
+    pub fn remaining_secs(&self) -> u64 {
+        use std::time::{SystemTime, UNIX_EPOCH};
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("Time went backwards")
+            .as_secs();
+        let expires_at = self.generated_at + self.expires_in_secs;
+        expires_at.saturating_sub(now)
+    }
+
+    /// Check if the QR code has expired.
+    #[allow(dead_code)]
+    pub fn is_expired(&self) -> bool {
+        self.remaining_secs() == 0
+    }
 }
 
 impl Backend {
@@ -137,11 +172,21 @@ impl Backend {
                 (None, None, None)
             };
 
+        // Load relay URL from config file or use default
+        let relay_config_path = data_dir.join("relay_url.txt");
+        let relay_url = std::fs::read_to_string(&relay_config_path)
+            .ok()
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
+            .unwrap_or_else(|| DEFAULT_RELAY_URL.to_string());
+
         Ok(Backend {
             storage,
             identity,
             backup_data,
             display_name,
+            relay_url,
+            data_dir: data_dir.to_path_buf(),
         })
     }
 
@@ -183,6 +228,29 @@ impl Backend {
             let full = i.public_id();
             format!("{}...", &full[..16.min(full.len())])
         })
+    }
+
+    /// Get the relay URL.
+    pub fn relay_url(&self) -> &str {
+        &self.relay_url
+    }
+
+    /// Set the relay URL.
+    pub fn set_relay_url(&mut self, url: &str) -> Result<()> {
+        let url = url.trim();
+        if url.is_empty() {
+            anyhow::bail!("Relay URL cannot be empty");
+        }
+        if !url.starts_with("wss://") && !url.starts_with("ws://") {
+            anyhow::bail!("Relay URL must start with wss:// or ws://");
+        }
+
+        // Save to config file
+        let relay_config_path = self.data_dir.join("relay_url.txt");
+        std::fs::write(&relay_config_path, url).context("Failed to save relay URL")?;
+
+        self.relay_url = url.to_string();
+        Ok(())
     }
 
     /// Get the own contact card.
@@ -237,6 +305,66 @@ impl Backend {
         Ok(())
     }
 
+    /// Update the display name.
+    pub fn update_display_name(&mut self, name: &str) -> Result<()> {
+        let name = name.trim();
+        if name.is_empty() {
+            anyhow::bail!("Display name cannot be empty");
+        }
+        if name.len() > 100 {
+            anyhow::bail!("Display name cannot exceed 100 characters");
+        }
+
+        // Update identity
+        if let Some(ref mut identity) = self.identity {
+            identity.set_display_name(name);
+
+            // Re-export backup with updated identity
+            let backup = identity
+                .export_backup(LOCAL_STORAGE_PASSWORD)
+                .map_err(|e| anyhow::anyhow!("Failed to create backup: {:?}", e))?;
+            let backup_data = backup.as_bytes().to_vec();
+            self.storage.save_identity(&backup_data, name)?;
+            self.backup_data = Some(backup_data);
+        }
+
+        // Update card display name
+        let mut card = self
+            .get_card()?
+            .unwrap_or_else(|| ContactCard::new(name));
+        card.set_display_name(name)
+            .map_err(|e| anyhow::anyhow!("{}", e))?;
+        self.storage.save_own_card(&card)?;
+
+        self.display_name = Some(name.to_string());
+        Ok(())
+    }
+
+    /// Update a field's value.
+    pub fn update_field(&self, field_label: &str, new_value: &str) -> Result<()> {
+        let mut card = self.get_card()?.context("No card found")?;
+
+        // Find the field by label
+        let field = card
+            .fields()
+            .iter()
+            .find(|f| f.label() == field_label)
+            .map(|f| (f.field_type(), f.label().to_string()));
+
+        if let Some((field_type, label)) = field {
+            // Remove old field and add new one with updated value
+            card.remove_field(&label)
+                .map_err(|e| anyhow::anyhow!("{}", e))?;
+            let new_field = ContactField::new(field_type, &label, new_value);
+            card.add_field(new_field)
+                .map_err(|e| anyhow::anyhow!("{}", e))?;
+            self.storage.save_own_card(&card)?;
+            Ok(())
+        } else {
+            anyhow::bail!("Field not found: {}", field_label)
+        }
+    }
+
     /// List all contacts.
     pub fn list_contacts(&self) -> Result<Vec<ContactInfo>> {
         let contacts = self
@@ -263,18 +391,18 @@ impl Backend {
         Ok(contacts.len())
     }
 
-    /// Generate exchange QR data.
-    pub fn generate_exchange_qr(&self) -> Result<String> {
+    /// Generate exchange QR data with expiration info.
+    pub fn generate_exchange_qr(&self) -> Result<QRData> {
         let identity = self.identity.as_ref().context("No identity")?;
-        let card = self
-            .get_card()?
-            .unwrap_or_else(|| ContactCard::new(identity.display_name()));
 
-        // Generate QR data (simplified - actual implementation uses X3DH)
-        let public_id = identity.public_id();
-        let display_name = card.display_name();
+        // Generate actual exchange QR with X3DH
+        let qr = ExchangeQR::generate(identity);
 
-        Ok(format!("wb://{}?name={}", public_id, display_name))
+        Ok(QRData {
+            data: qr.to_data_string(),
+            generated_at: qr.timestamp(),
+            expires_in_secs: 300, // 5 minutes, matching QR_EXPIRY_SECONDS in vauchi-core
+        })
     }
 
     /// Parse a field type string.

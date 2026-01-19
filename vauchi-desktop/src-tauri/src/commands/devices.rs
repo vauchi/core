@@ -116,7 +116,7 @@ pub fn join_device(
 ) -> Result<JoinDeviceResult, String> {
     use vauchi_core::exchange::DeviceLinkQR;
 
-    let mut state = state.lock().unwrap();
+    let state = state.lock().unwrap();
 
     // Check if we already have an identity
     if state.identity.is_some() {

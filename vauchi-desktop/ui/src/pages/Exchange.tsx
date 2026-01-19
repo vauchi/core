@@ -1,6 +1,9 @@
-import { createResource, createSignal, Show, createEffect, onMount } from 'solid-js'
+import { createResource, createSignal, Show, createEffect, onCleanup } from 'solid-js'
 import { invoke } from '@tauri-apps/api/core'
 import QRCode from 'qrcode'
+
+// QR code expires after 5 minutes (300 seconds)
+const QR_EXPIRATION_SECONDS = 300
 
 interface ExchangeQRResponse {
   data: string
@@ -24,11 +27,57 @@ async function generateQR(): Promise<ExchangeQRResponse> {
 }
 
 function Exchange(props: ExchangeProps) {
-  const [qrData] = createResource(generateQR)
+  const [qrData, { refetch: refetchQR }] = createResource(generateQR)
   const [scanData, setScanData] = createSignal('')
   const [result, setResult] = createSignal<ExchangeResult | null>(null)
   const [error, setError] = createSignal('')
   const [qrImageUrl, setQrImageUrl] = createSignal('')
+  const [timeRemaining, setTimeRemaining] = createSignal(QR_EXPIRATION_SECONDS)
+  const [isExpired, setIsExpired] = createSignal(false)
+
+  // Timer for QR expiration
+  let timerInterval: number | undefined
+
+  const startTimer = () => {
+    setTimeRemaining(QR_EXPIRATION_SECONDS)
+    setIsExpired(false)
+
+    if (timerInterval) clearInterval(timerInterval)
+
+    timerInterval = setInterval(() => {
+      setTimeRemaining(prev => {
+        if (prev <= 1) {
+          setIsExpired(true)
+          if (timerInterval) clearInterval(timerInterval)
+          return 0
+        }
+        return prev - 1
+      })
+    }, 1000) as unknown as number
+  }
+
+  const refreshQR = async () => {
+    await refetchQR()
+    startTimer()
+  }
+
+  const formatTime = (seconds: number): string => {
+    const mins = Math.floor(seconds / 60)
+    const secs = seconds % 60
+    return `${mins}:${secs.toString().padStart(2, '0')}`
+  }
+
+  // Start timer when QR data loads
+  createEffect(() => {
+    if (qrData()) {
+      startTimer()
+    }
+  })
+
+  // Cleanup timer on unmount
+  onCleanup(() => {
+    if (timerInterval) clearInterval(timerInterval)
+  })
 
   // Generate QR code image when data is available
   createEffect(async () => {
@@ -87,12 +136,26 @@ function Exchange(props: ExchangeProps) {
 
         <Show when={qrData()} fallback={<div class="loading">Generating QR...</div>}>
           <div class="qr-container">
-            <Show when={qrImageUrl()} fallback={
-              <pre class="qr-ascii">{qrData()?.qr_ascii}</pre>
+            <Show when={!isExpired()} fallback={
+              <div class="qr-expired">
+                <p>QR Code Expired</p>
+                <button onClick={refreshQR}>Generate New QR</button>
+              </div>
             }>
-              <img src={qrImageUrl()} alt="Exchange QR Code" class="qr-image" />
+              <Show when={qrImageUrl()} fallback={
+                <pre class="qr-ascii">{qrData()?.qr_ascii}</pre>
+              }>
+                <img src={qrImageUrl()} alt="Exchange QR Code" class="qr-image" />
+              </Show>
             </Show>
             <p class="display-name">{qrData()?.display_name}</p>
+
+            <div class={`qr-timer ${timeRemaining() <= 30 ? 'warning' : ''} ${isExpired() ? 'expired' : ''}`}>
+              <Show when={!isExpired()} fallback={<span>Expired</span>}>
+                <span>Expires in {formatTime(timeRemaining())}</span>
+              </Show>
+              <button class="refresh-btn small" onClick={refreshQR} title="Refresh QR">↻</button>
+            </div>
           </div>
         </Show>
 

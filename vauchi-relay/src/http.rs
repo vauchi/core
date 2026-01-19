@@ -7,7 +7,8 @@ use std::time::Instant;
 
 use axum::{
     extract::State,
-    http::StatusCode,
+    http::{header, Request, StatusCode},
+    middleware::{self, Next},
     response::{IntoResponse, Response},
     routing::get,
     Json, Router,
@@ -23,6 +24,7 @@ pub struct HttpState {
     pub metrics: RelayMetrics,
     pub storage: Arc<dyn BlobStore>,
     pub start_time: Instant,
+    pub metrics_token: Option<String>,
 }
 
 /// Health check response.
@@ -41,6 +43,40 @@ pub struct ReadyResponse {
     pub blob_count: usize,
 }
 
+/// Middleware to check bearer token for metrics endpoint.
+async fn metrics_auth_middleware(
+    State(state): State<HttpState>,
+    request: Request<axum::body::Body>,
+    next: Next,
+) -> Response {
+    // Only check auth for /metrics endpoint
+    if request.uri().path() == "/metrics" {
+        if let Some(ref expected_token) = state.metrics_token {
+            // Check Authorization header
+            let auth_header = request.headers().get(header::AUTHORIZATION);
+            let is_authorized = auth_header.is_some_and(|h| {
+                h.to_str()
+                    .map(|s| {
+                        s.strip_prefix("Bearer ")
+                            .is_some_and(|token| token == expected_token)
+                    })
+                    .unwrap_or(false)
+            });
+
+            if !is_authorized {
+                return (
+                    StatusCode::UNAUTHORIZED,
+                    [(header::WWW_AUTHENTICATE, "Bearer")],
+                    "Unauthorized",
+                )
+                    .into_response();
+            }
+        }
+    }
+
+    next.run(request).await
+}
+
 /// Creates the HTTP router with health and metrics endpoints.
 pub fn create_router(state: HttpState) -> Router {
     Router::new()
@@ -48,6 +84,10 @@ pub fn create_router(state: HttpState) -> Router {
         .route("/ready", get(ready_handler))
         .route("/metrics", get(metrics_handler))
         .route("/", get(root_handler))
+        .layer(middleware::from_fn_with_state(
+            state.clone(),
+            metrics_auth_middleware,
+        ))
         .with_state(state)
 }
 
@@ -120,6 +160,7 @@ mod tests {
             metrics: RelayMetrics::new(),
             storage: Arc::new(MemoryBlobStore::new()),
             start_time: Instant::now(),
+            metrics_token: None,
         }
     }
 

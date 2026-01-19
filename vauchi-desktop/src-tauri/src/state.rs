@@ -16,6 +16,9 @@ use vauchi_core::storage::secure::{FileKeyStorage, SecureStorage};
 /// Internal password for local identity storage.
 const LOCAL_STORAGE_PASSWORD: &str = "vauchi-local-storage";
 
+/// Default relay URL.
+const DEFAULT_RELAY_URL: &str = "wss://relay.vauchi.app";
+
 /// Application state containing Vauchi storage.
 pub struct AppState {
     /// Storage instance
@@ -26,6 +29,10 @@ pub struct AppState {
     backup_data: Option<Vec<u8>>,
     /// Display name
     display_name: Option<String>,
+    /// Relay server URL
+    relay_url: String,
+    /// Data directory for config files
+    data_dir: std::path::PathBuf,
 }
 
 impl AppState {
@@ -119,11 +126,21 @@ impl AppState {
                 (None, None, None)
             };
 
+        // Load relay URL from config file or use default
+        let relay_config_path = data_dir.join("relay_url.txt");
+        let relay_url = std::fs::read_to_string(&relay_config_path)
+            .ok()
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
+            .unwrap_or_else(|| DEFAULT_RELAY_URL.to_string());
+
         Ok(AppState {
             storage,
             identity,
             backup_data,
             display_name,
+            relay_url,
+            data_dir: data_dir.to_path_buf(),
         })
     }
 
@@ -161,6 +178,32 @@ impl AppState {
     /// Get the public ID.
     pub fn public_id(&self) -> Option<String> {
         self.identity.as_ref().map(|i| i.public_id())
+    }
+
+    /// Get the relay URL.
+    pub fn relay_url(&self) -> &str {
+        &self.relay_url
+    }
+
+    /// Set the relay URL.
+    pub fn set_relay_url(&mut self, url: &str) -> Result<()> {
+        let url = url.trim();
+        if url.is_empty() {
+            anyhow::bail!("Relay URL cannot be empty");
+        }
+        if !url.starts_with("wss://") && !url.starts_with("ws://") {
+            anyhow::bail!("Relay URL must start with wss:// or ws://");
+        }
+
+        // Validate URL format
+        url::Url::parse(url).context("Invalid URL format")?;
+
+        // Save to config file
+        let relay_config_path = self.data_dir.join("relay_url.txt");
+        std::fs::write(&relay_config_path, url).context("Failed to save relay URL")?;
+
+        self.relay_url = url.to_string();
+        Ok(())
     }
 
     /// Update the display name.

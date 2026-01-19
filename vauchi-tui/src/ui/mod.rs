@@ -3,7 +3,7 @@
 mod backup;
 mod contacts;
 mod devices;
-mod exchange;
+pub mod exchange;
 mod help;
 mod home;
 mod recovery;
@@ -18,7 +18,7 @@ use ratatui::widgets::{Block, Borders, Paragraph};
 use crate::app::{App, Screen};
 
 /// Draw the application.
-pub fn draw(f: &mut Frame, app: &App) {
+pub fn draw(f: &mut Frame, app: &mut App) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
@@ -41,6 +41,9 @@ pub fn draw(f: &mut Frame, app: &App) {
         Screen::Settings => settings::draw(f, chunks[1], app),
         Screen::Help => help::draw(f, chunks[1], app),
         Screen::AddField => home::draw_add_field(f, chunks[1], app),
+        Screen::EditField => home::draw_edit_field(f, chunks[1], app),
+        Screen::EditName => settings::draw_edit_name(f, chunks[1], app),
+        Screen::EditRelayUrl => settings::draw_edit_relay_url(f, chunks[1], app),
         Screen::Devices => devices::draw(f, chunks[1], app),
         Screen::Recovery => recovery::draw(f, chunks[1], app),
         Screen::Sync => sync::draw(f, chunks[1], app),
@@ -61,6 +64,9 @@ fn draw_header(f: &mut Frame, area: Rect, app: &App) {
         Screen::Settings => "Settings",
         Screen::Help => "Help",
         Screen::AddField => "Add Field",
+        Screen::EditField => "Edit Field",
+        Screen::EditName => "Edit Display Name",
+        Screen::EditRelayUrl => "Edit Relay URL",
         Screen::Devices => "Devices",
         Screen::Recovery => "Recovery",
         Screen::Sync => "Sync",
@@ -80,14 +86,17 @@ fn draw_header(f: &mut Frame, area: Rect, app: &App) {
 
 fn draw_footer(f: &mut Frame, area: Rect, app: &App) {
     let help_text = match app.screen {
-        Screen::Home => "[e]xchange  [c]ontacts  [s]ettings  [d]evices  [r]ecovery  sy[n]c  [b]ackup  [a]dd  [x]del  [?]help  [q]uit",
+        Screen::Home => "[c]ontacts  [s]ettings  [d]evices  [r]ecovery  sy[n]c  [b]ackup  [a]dd  [e]dit  [x]del  [?]help  [q]uit",
         Screen::Contacts => "[j/k] navigate  [enter] view  [d]elete  [v]erify  [esc] back  [?]help",
         Screen::ContactDetail => "[v]isibility  [x]delete  [esc] back  [?]help",
         Screen::ContactVisibility => "[j/k] navigate  [enter/space] toggle  [esc] back",
-        Screen::Exchange => "[esc] back  [?]help",
-        Screen::Settings => "[esc] back  [?]help",
+        Screen::Exchange => "[r]efresh  [esc] back  [?]help",
+        Screen::Settings => "[n]ame  [b]ackup  [d]evices  [r]ecovery  [esc] back  [?]help",
         Screen::Help => "[esc/q] close",
         Screen::AddField => "[tab] next  [enter] submit  [esc] cancel",
+        Screen::EditField => "[enter] save  [esc] cancel",
+        Screen::EditName => "[enter] save  [esc] cancel",
+        Screen::EditRelayUrl => "[enter] save  [esc] cancel",
         Screen::Devices => "[j/k] navigate  [l]ink new device  [esc] back  [?]help",
         Screen::Recovery => "[c]laim  [v]ouch  [s]tatus  [esc] back  [?]help",
         Screen::Sync => "[s]ync now  [esc] back  [?]help",

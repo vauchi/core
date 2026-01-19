@@ -1,6 +1,6 @@
 //! Application State
 
-use crate::backend::Backend;
+use crate::backend::{Backend, QRData};
 
 /// Current screen in the application.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -21,6 +21,12 @@ pub enum Screen {
     Help,
     /// Add field dialog
     AddField,
+    /// Edit field dialog
+    EditField,
+    /// Edit display name dialog
+    EditName,
+    /// Edit relay URL dialog
+    EditRelayUrl,
     /// Device management screen
     Devices,
     /// Recovery screen
@@ -63,6 +69,12 @@ pub struct App {
     pub input_buffer: String,
     /// Add field state
     pub add_field_state: AddFieldState,
+    /// Edit field state
+    pub edit_field_state: EditFieldState,
+    /// Edit name state
+    pub edit_name_state: EditNameState,
+    /// Edit relay URL state
+    pub edit_relay_url_state: EditRelayUrlState,
     /// Visibility screen state
     pub visibility_state: VisibilityState,
     /// Backup screen state
@@ -73,6 +85,8 @@ pub struct App {
     pub contact_search_query: String,
     /// Contact search mode active
     pub contact_search_mode: bool,
+    /// Current exchange QR data (for expiration tracking)
+    pub current_qr: Option<QRData>,
 }
 
 /// State for the add field dialog.
@@ -90,6 +104,26 @@ pub enum AddFieldFocus {
     Type,
     Label,
     Value,
+}
+
+/// State for the edit field dialog.
+#[derive(Debug, Default)]
+pub struct EditFieldState {
+    pub field_label: String,
+    pub field_type: String,
+    pub new_value: String,
+}
+
+/// State for the edit name dialog.
+#[derive(Debug, Default)]
+pub struct EditNameState {
+    pub new_name: String,
+}
+
+/// State for the edit relay URL dialog.
+#[derive(Debug, Default)]
+pub struct EditRelayUrlState {
+    pub new_url: String,
 }
 
 /// State for the visibility screen.
@@ -141,11 +175,15 @@ impl App {
             selected_contact_field: 0,
             input_buffer: String::new(),
             add_field_state: AddFieldState::default(),
+            edit_field_state: EditFieldState::default(),
+            edit_name_state: EditNameState::default(),
+            edit_relay_url_state: EditRelayUrlState::default(),
             visibility_state: VisibilityState::default(),
             backup_state: BackupState::default(),
             selected_device: 0,
             contact_search_query: String::new(),
             contact_search_mode: false,
+            current_qr: None,
         }
     }
 
@@ -189,6 +227,18 @@ impl App {
             Screen::AddField => {
                 self.screen = Screen::Home;
                 self.add_field_state = AddFieldState::default();
+            }
+            Screen::EditField => {
+                self.screen = Screen::Home;
+                self.edit_field_state = EditFieldState::default();
+            }
+            Screen::EditName => {
+                self.screen = Screen::Settings;
+                self.edit_name_state = EditNameState::default();
+            }
+            Screen::EditRelayUrl => {
+                self.screen = Screen::Settings;
+                self.edit_relay_url_state = EditRelayUrlState::default();
             }
             _ => {}
         }

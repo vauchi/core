@@ -3,9 +3,11 @@
 //! Handles individual client connections.
 
 use std::sync::Arc;
+use std::time::Duration;
 
 use futures_util::{SinkExt, StreamExt};
 use tokio::net::TcpStream;
+use tokio::time::timeout;
 use tokio_tungstenite::tungstenite::Message;
 use tokio_tungstenite::WebSocketStream;
 use tracing::{debug, error, warn};
@@ -13,6 +15,11 @@ use tracing::{debug, error, warn};
 use crate::rate_limit::RateLimiter;
 use crate::recovery_storage::{RecoveryProofStore, StoredRecoveryProof};
 use crate::storage::{BlobStore, StoredBlob};
+
+/// Validates a client ID format (must be 64 hex characters = 32 bytes public key).
+fn validate_client_id(id: &str) -> bool {
+    id.len() == 64 && id.chars().all(|c| c.is_ascii_hexdigit())
+}
 
 /// Converts a hex string to a 32-byte hash.
 fn hex_to_hash(hex: &str) -> Result<[u8; 32], String> {
@@ -219,14 +226,20 @@ pub async fn handle_connection(
     recovery_storage: Arc<dyn RecoveryProofStore>,
     rate_limiter: Arc<RateLimiter>,
     max_message_size: usize,
+    idle_timeout: Duration,
 ) {
     let (mut write, mut read) = ws_stream.split();
 
-    // Wait for handshake to get client ID
-    let client_id = match read.next().await {
-        Some(Ok(Message::Binary(data))) => match protocol::decode_message(&data) {
+    // Wait for handshake to get client ID (with timeout)
+    let client_id = match timeout(idle_timeout, read.next()).await {
+        Ok(Some(Ok(Message::Binary(data)))) => match protocol::decode_message(&data) {
             Ok(envelope) => {
                 if let protocol::MessagePayload::Handshake(hs) = envelope.payload {
+                    // Validate client_id format
+                    if !validate_client_id(&hs.client_id) {
+                        warn!("Invalid client_id format: {}", &hs.client_id.get(..16).unwrap_or(""));
+                        return;
+                    }
                     hs.client_id
                 } else {
                     warn!("Expected Handshake, got {:?}", envelope.payload);
@@ -238,16 +251,20 @@ pub async fn handle_connection(
                 return;
             }
         },
-        Some(Ok(_)) => {
+        Ok(Some(Ok(_))) => {
             warn!("Expected binary message for handshake");
             return;
         }
-        Some(Err(e)) => {
+        Ok(Some(Err(e))) => {
             warn!("Error reading handshake: {}", e);
             return;
         }
-        None => {
+        Ok(None) => {
             debug!("Connection closed before handshake");
+            return;
+        }
+        Err(_) => {
+            warn!("Handshake timeout (slowloris protection)");
             return;
         }
     };
@@ -272,8 +289,20 @@ pub async fn handle_connection(
         }
     }
 
-    // Process incoming messages
-    while let Some(msg) = read.next().await {
+    // Process incoming messages with idle timeout
+    loop {
+        let msg = match timeout(idle_timeout, read.next()).await {
+            Ok(Some(msg)) => msg,
+            Ok(None) => {
+                debug!("Client {} disconnected", client_id);
+                break;
+            }
+            Err(_) => {
+                warn!("Idle timeout for client {} (slowloris protection)", client_id);
+                break;
+            }
+        };
+
         match msg {
             Ok(Message::Binary(data)) => {
                 // Check message size

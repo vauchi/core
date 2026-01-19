@@ -71,9 +71,9 @@ Legend: ✅ Complete | ⚠️ Partial | ❌ Missing | 📋 UI Only (delegates to
 
 | Feature | CLI | TUI | Desktop | Android | iOS |
 |---------|-----|-----|---------|---------|-----|
-| Manual sync | ✅ | ⚠️ | ❌ | ✅ | ✅ |
-| Sync status display | ✅ | ⚠️ | ❌ | ✅ | ✅ |
-| Configure relay URL | ✅ | ❌ | ❌ | ✅ | ✅ |
+| Manual sync | ✅ | ⚠️ | ✅ | ✅ | ✅ |
+| Sync status display | ✅ | ⚠️ | ✅ | ✅ | ✅ |
+| Configure relay URL | ✅ | ❌ | ✅ | ✅ | ✅ |
 | Background sync | N/A | N/A | ❌ | ✅ | ⚠️ |
 | Offline indicator | N/A | ❌ | ❌ | ✅ | ✅ |
 
@@ -125,7 +125,7 @@ Legend: ✅ Complete | ⚠️ Partial | ❌ Missing | 📋 UI Only (delegates to
 3. **Remove field from Desktop** - Can add but not delete
 4. **Search contacts** - Missing in TUI and Desktop
 5. **Contact verification** - Missing in Desktop and Android
-6. **Sync UI in Desktop** - No sync trigger or status
+6. ~~**Sync UI in Desktop**~~ - ✅ DONE (2026-01-19) - Full WebSocket sync implemented
 7. **Import backup in Desktop** - Backend exists, no UI
 8. **Device management** - Incomplete everywhere except partial CLI
 9. **Recovery workflow** - Only CLI has full implementation
@@ -186,12 +186,18 @@ Legend: ✅ Complete | ⚠️ Partial | ❌ Missing | 📋 UI Only (delegates to
 - Desktop: `vauchi-desktop/src-tauri/src/contacts.rs` - Add verify command
 - Android: `ContactDetailScreen.kt` - Add verify button and ViewModel method
 
-### Plan 5: Sync UI for Desktop
+### Plan 5: Sync UI for Desktop ✅ COMPLETED (2026-01-19)
 **Impact**: HIGH | **Effort**: MEDIUM
-**Files to modify**:
-- `vauchi-desktop/src-tauri/src/lib.rs` - Add sync command
-- `vauchi-desktop/ui/src/pages/Settings.tsx` - Add sync button and status
-- `vauchi-desktop/ui/src/pages/Home.tsx` - Add sync status indicator
+**Status**: DONE - Full WebSocket sync implemented with tungstenite
+**Files modified**:
+- `vauchi-desktop/src-tauri/Cargo.toml` - Added tungstenite dependency
+- `vauchi-desktop/src-tauri/src/commands/sync.rs` - Full sync implementation
+  - WebSocket connection to relay
+  - Handshake protocol
+  - Exchange message processing (legacy + encrypted)
+  - Card update processing with Double Ratchet
+  - Pending update transmission
+  - Acknowledgment handling
 
 ### Plan 6: Import Backup UI for Desktop
 **Impact**: MEDIUM | **Effort**: LOW

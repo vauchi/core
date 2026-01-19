@@ -23,6 +23,7 @@ fun SettingsScreen(
     onBack: () -> Unit,
     onExportBackup: suspend (String) -> String?,
     onImportBackup: suspend (String, String) -> Boolean,
+    onUpdateDisplayName: suspend (String) -> Boolean = { true },
     relayUrl: String = "",
     onRelayUrlChange: (String) -> Unit = {},
     syncState: SyncState = SyncState.Idle,
@@ -33,6 +34,7 @@ fun SettingsScreen(
 ) {
     var showExportDialog by remember { mutableStateOf(false) }
     var showImportDialog by remember { mutableStateOf(false) }
+    var showEditNameDialog by remember { mutableStateOf(false) }
     var snackbarMessage by remember { mutableStateOf<String?>(null) }
     val snackbarHostState = remember { SnackbarHostState() }
     var editableRelayUrl by remember(relayUrl) { mutableStateOf(relayUrl) }
@@ -76,19 +78,31 @@ fun SettingsScreen(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.surfaceVariant
-                )
+                ),
+                onClick = { showEditNameDialog = true }
             ) {
-                Column(
-                    modifier = Modifier.padding(16.dp)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
+                    Column {
+                        Text(
+                            text = "Display Name",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            text = displayName,
+                            style = MaterialTheme.typography.bodyLarge
+                        )
+                    }
                     Text(
-                        text = "Display Name",
+                        text = "Edit",
                         style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Text(
-                        text = displayName,
-                        style = MaterialTheme.typography.bodyLarge
+                        color = MaterialTheme.colorScheme.primary
                     )
                 }
             }
@@ -284,6 +298,18 @@ fun SettingsScreen(
             }
         )
     }
+
+    if (showEditNameDialog) {
+        EditDisplayNameDialog(
+            currentName = displayName,
+            onDismiss = { showEditNameDialog = false },
+            onUpdateName = onUpdateDisplayName,
+            onResult = { success, message ->
+                snackbarMessage = message
+                if (success) showEditNameDialog = false
+            }
+        )
+    }
 }
 
 @Composable
@@ -475,6 +501,78 @@ fun ImportBackupDialog(
                     CircularProgressIndicator(modifier = Modifier.size(16.dp))
                 } else {
                     Text("Import")
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss, enabled = !isLoading) {
+                Text("Cancel")
+            }
+        }
+    )
+}
+
+@Composable
+fun EditDisplayNameDialog(
+    currentName: String,
+    onDismiss: () -> Unit,
+    onUpdateName: suspend (String) -> Boolean,
+    onResult: (Boolean, String) -> Unit
+) {
+    var newName by remember { mutableStateOf(currentName) }
+    var isLoading by remember { mutableStateOf(false) }
+    val coroutineScope = rememberCoroutineScope()
+
+    AlertDialog(
+        onDismissRequest = { if (!isLoading) onDismiss() },
+        title = { Text("Edit Display Name") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                Text(
+                    text = "Enter your new display name. This is how contacts will see you.",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+                OutlinedTextField(
+                    value = newName,
+                    onValueChange = { newName = it },
+                    label = { Text("Display Name") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !isLoading
+                )
+                if (newName.isBlank()) {
+                    Text(
+                        text = "Name cannot be empty",
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    if (newName.isNotBlank() && newName != currentName) {
+                        isLoading = true
+                        coroutineScope.launch {
+                            val success = onUpdateName(newName.trim())
+                            if (success) {
+                                onResult(true, "Display name updated")
+                            } else {
+                                onResult(false, "Failed to update display name")
+                            }
+                            isLoading = false
+                        }
+                    } else if (newName == currentName) {
+                        onDismiss()
+                    }
+                },
+                enabled = newName.isNotBlank() && !isLoading
+            ) {
+                if (isLoading) {
+                    CircularProgressIndicator(modifier = Modifier.size(16.dp))
+                } else {
+                    Text("Save")
                 }
             }
         },

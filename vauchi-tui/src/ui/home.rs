@@ -156,3 +156,35 @@ pub fn draw_add_field(f: &mut Frame, area: Rect, app: &App) {
         .block(Block::default().title("Value").borders(Borders::ALL));
     f.render_widget(value_para, chunks[2]);
 }
+
+pub fn draw_edit_field(f: &mut Frame, area: Rect, app: &App) {
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(3), // Field info
+            Constraint::Length(3), // Value input
+            Constraint::Min(0),    // Spacer
+        ])
+        .margin(2)
+        .split(area);
+
+    let state = &app.edit_field_state;
+
+    // Field info (read-only)
+    let info_text = format!("{} ({})", state.field_label, state.field_type);
+    let info_para = Paragraph::new(info_text)
+        .style(Style::default().fg(Color::DarkGray))
+        .block(Block::default().title("Field").borders(Borders::ALL));
+    f.render_widget(info_para, chunks[0]);
+
+    // Value input
+    let value_text = if app.input_mode == InputMode::Editing {
+        format!("{}|", state.new_value)
+    } else {
+        state.new_value.clone()
+    };
+    let value_para = Paragraph::new(value_text)
+        .style(Style::default().fg(Color::Yellow))
+        .block(Block::default().title("New Value").borders(Borders::ALL));
+    f.render_widget(value_para, chunks[1]);
+}

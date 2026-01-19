@@ -43,6 +43,13 @@ dirs = "5"
 # Hex encoding for public keys
 hex = "0.4"
 
+# URL validation
+url = "2"
+
+# WebSocket for relay sync
+tungstenite = { version = "0.24", features = ["native-tls"] }
+native-tls = "0.2"
+
 [features]
 default = ["custom-protocol"]
 custom-protocol = ["tauri/custom-protocol"]

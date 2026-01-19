@@ -43,13 +43,46 @@ async fn main() {
 
     // Load configuration
     let config = RelayConfig::from_env();
+
+    // TLS enforcement: refuse to start if not localhost and TLS not confirmed
+    let is_localhost = config.listen_addr.ip().is_loopback();
+    let tls_verified = std::env::var("RELAY_TLS_VERIFIED")
+        .map(|v| v == "true" || v == "1")
+        .unwrap_or(false);
+
+    if !is_localhost && !tls_verified {
+        error!("=======================================================================");
+        error!("SECURITY ERROR: Relay MUST run behind a TLS proxy in production!");
+        error!("=======================================================================");
+        error!("");
+        error!("The relay server is configured to listen on a non-localhost address");
+        error!("({}) but TLS verification has not been confirmed.", config.listen_addr);
+        error!("");
+        error!("To fix this, either:");
+        error!("  1. Run behind a TLS-terminating proxy (nginx, Caddy, etc.) and set");
+        error!("     RELAY_TLS_VERIFIED=true to confirm TLS is handled externally");
+        error!("");
+        error!("  2. Bind to localhost (127.0.0.1) for local development:");
+        error!("     RELAY_LISTEN_ADDR=127.0.0.1:8080");
+        error!("");
+        error!("Never expose the relay directly to the internet without TLS!");
+        error!("=======================================================================");
+        std::process::exit(1);
+    }
+
     info!(
         "Starting Vauchi Relay Server v{}",
         env!("CARGO_PKG_VERSION")
     );
     info!("WebSocket: {}", config.listen_addr);
+    if tls_verified {
+        info!("TLS: Verified (handled by external proxy)");
+    } else {
+        info!("TLS: Local development mode (localhost only)");
+    }
     info!("HTTP (health/metrics): {}:8081", config.listen_addr.ip());
     info!("Storage backend: {:?}", config.storage_backend);
+    info!("Idle timeout: {}s", config.idle_timeout_secs);
 
     // Initialize metrics
     let metrics = RelayMetrics::new();
@@ -76,16 +109,29 @@ async fn main() {
     let connection_limiter = ConnectionLimiter::new(config.max_connections);
     let start_time = Instant::now();
 
+    // Parse HTTP listen address for health/metrics endpoints
+    // By default, bind to localhost for security (metrics contain internal info)
+    // Use RELAY_METRICS_ADDR to expose on other interfaces if needed
+    let http_addr = std::env::var("RELAY_METRICS_ADDR")
+        .unwrap_or_else(|_| "127.0.0.1:8081".to_string());
+
+    // Check for metrics auth token (optional additional protection)
+    let metrics_token = std::env::var("RELAY_METRICS_TOKEN").ok();
+    if metrics_token.is_some() {
+        info!("Metrics endpoint protected with bearer token");
+    } else if !http_addr.starts_with("127.0.0.1") && !http_addr.starts_with("localhost") {
+        info!("WARNING: Metrics exposed on non-localhost without auth token");
+        info!("Consider setting RELAY_METRICS_TOKEN for production use");
+    }
+
     // Start HTTP server for health/metrics
     let http_state = HttpState {
         metrics: metrics.clone(),
         storage: storage.clone(),
         start_time,
+        metrics_token,
     };
     let http_router = create_router(http_state);
-
-    // Parse HTTP listen address (same host, port 8081)
-    let http_addr = format!("{}:8081", config.listen_addr.ip());
 
     let http_listener = TcpListener::bind(&http_addr)
         .await
@@ -169,6 +215,7 @@ async fn main() {
         let rate_limiter = rate_limiter.clone();
         let metrics = metrics.clone();
         let max_message_size = config.max_message_size;
+        let idle_timeout = config.idle_timeout();
 
         tokio::spawn(async move {
             // Keep the guard alive for the duration of the connection
@@ -216,6 +263,7 @@ async fn main() {
                         recovery_storage,
                         rate_limiter,
                         max_message_size,
+                        idle_timeout,
                     )
                     .await;
 

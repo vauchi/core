@@ -56,13 +56,26 @@ function Settings(props: SettingsProps) {
   const [isSyncing, setIsSyncing] = createSignal(false)
   const [syncMessage, setSyncMessage] = createSignal('')
 
-  // Load sync status on mount
+  // Relay URL state
+  const [relayUrl, setRelayUrl] = createSignal('')
+  const [editingRelay, setEditingRelay] = createSignal(false)
+  const [newRelayUrl, setNewRelayUrl] = createSignal('')
+  const [relayError, setRelayError] = createSignal('')
+
+  // Load sync status and relay URL on mount
   onMount(async () => {
     try {
       const status = await invoke('get_sync_status') as SyncStatus
       setSyncStatus(status)
     } catch (e) {
       console.error('Failed to get sync status:', e)
+    }
+
+    try {
+      const url = await invoke('get_relay_url') as string
+      setRelayUrl(url)
+    } catch (e) {
+      console.error('Failed to get relay URL:', e)
     }
   })
 
@@ -218,6 +231,44 @@ function Settings(props: SettingsProps) {
     setNameError('')
   }
 
+  const startEditingRelay = () => {
+    setNewRelayUrl(relayUrl())
+    setRelayError('')
+    setEditingRelay(true)
+  }
+
+  const handleUpdateRelay = async () => {
+    setRelayError('')
+    const url = newRelayUrl().trim()
+
+    // Validate URL format
+    if (!url.startsWith('wss://') && !url.startsWith('ws://')) {
+      setRelayError('URL must start with wss:// (or ws:// for local dev)')
+      return
+    }
+
+    try {
+      new URL(url) // Validate URL format
+    } catch {
+      setRelayError('Invalid URL format')
+      return
+    }
+
+    try {
+      await invoke('set_relay_url', { url })
+      setRelayUrl(url)
+      setEditingRelay(false)
+    } catch (e) {
+      setRelayError(String(e))
+    }
+  }
+
+  const cancelEditingRelay = () => {
+    setEditingRelay(false)
+    setNewRelayUrl('')
+    setRelayError('')
+  }
+
   return (
     <div class="page settings">
       <header>
@@ -275,6 +326,33 @@ function Settings(props: SettingsProps) {
         <p class="setting-description">
           Synchronize your contact cards with the relay server.
         </p>
+
+        <div class="setting-item">
+          <span class="setting-label">Relay Server</span>
+          <Show when={editingRelay()} fallback={
+            <div class="setting-value-row">
+              <span class="setting-value mono small">{relayUrl() || 'Not configured'}</span>
+              <button class="small" onClick={startEditingRelay}>Edit</button>
+            </div>
+          }>
+            <div class="edit-relay-form">
+              <input
+                type="text"
+                value={newRelayUrl()}
+                onInput={(e) => setNewRelayUrl(e.target.value)}
+                placeholder="wss://relay.example.com"
+              />
+              <div class="edit-actions">
+                <button class="small primary" onClick={handleUpdateRelay}>Save</button>
+                <button class="small secondary" onClick={cancelEditingRelay}>Cancel</button>
+              </div>
+              <Show when={relayError()}>
+                <p class="error small">{relayError()}</p>
+              </Show>
+            </div>
+          </Show>
+        </div>
+
         <Show when={syncStatus()}>
           <div class="setting-item">
             <span class="setting-label">Pending Updates</span>

@@ -74,6 +74,14 @@ The API is designed for mobile environments where UI and background threads inte
 - Identity data cached in memory with mutex protection
 - Storage encryption key persisted across sessions
 
+## ⚠️ Mandatory Development Rules
+
+**TDD**: Red→Green→Refactor. Test FIRST or delete code and restart.
+
+**Structure**: `src/` = production code only. `tests/` = tests only. Siblings, not nested.
+
+See [CLAUDE.md](../../CLAUDE.md) for additional mandatory rules.
+
 ## License
 
 MIT

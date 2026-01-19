@@ -2,6 +2,8 @@
 
 Privacy-focused updatable contact card exchange via trusted in real life meetings. Users control what each contact sees.
 
+See [README.md](README.md) for project overview, structure, commands, and quick start.
+
 ## ⚠️ MANDATORY — STOP IF VIOLATED
 
 **TDD**: Red→Green→Refactor. Test FIRST or delete code and restart. See `docs/TDD_RULES.md`. Tests trace to `features/*.feature`.
@@ -15,36 +17,6 @@ Privacy-focused updatable contact card exchange via trusted in real life meeting
 **Coverage**: 90%+ for vauchi-core.
 
 **Fail fast**: Riskiest first. Return errors immediately. Use `Result`/`Option`.
-
-## Commands
-
-```bash
-cargo test                        # all tests
-cargo test -p vauchi-core        # specific crate
-cargo clippy -- -D warnings       # lint
-cargo fmt                         # format
-cargo run -p vauchi-relay        # relay server
-cargo run -p vauchi-cli -- help  # CLI
-```
-
-## Structure
-
-```
-vauchi-core/     # core lib (crypto, storage, sync)
-vauchi-relay/    # WebSocket relay
-vauchi-cli/      # CLI
-vauchi-tui/      # Terminal UI (ratatui)
-vauchi-desktop/  # Desktop (Tauri + SolidJS)
-vauchi-mobile/   # UniFFI bindings (consumed by android/ios repos)
-features/        # Gherkin scenarios
-scripts/         # Build/utility scripts
-```
-
-**Separate repositories:**
-- `vauchi/android` - Android app (Kotlin/Compose)
-- `vauchi/ios` - iOS app (SwiftUI)
-- `vauchi/docs` - Documentation
-- `vauchi/assets` - Brand assets
 
 ## Commits
 

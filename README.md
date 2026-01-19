@@ -79,16 +79,18 @@ cargo clippy -- -D warnings       # Lint
 cargo fmt                         # Format
 ```
 
-### TDD Workflow
+### ⚠️ Mandatory Development Rules
 
-This project uses strict Test-Driven Development:
+**TDD**: Red→Green→Refactor. Test FIRST or delete code and restart.
 
 1. Write failing test (Red)
 2. Write minimal code to pass (Green)
 3. Refactor
 4. Tests trace to `features/*.feature` Gherkin scenarios
 
-See [CLAUDE.md](CLAUDE.md) for detailed rules and project conventions.
+**Structure**: `src/` = production code only. `tests/` = tests only. Siblings, not nested.
+
+See [CLAUDE.md](../CLAUDE.md) for additional mandatory rules (crypto, coverage, planning docs).
 
 ## Documentation
 

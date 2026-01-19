@@ -135,6 +135,14 @@ vauchi-cli/
 │   └── protocol.rs      # Wire protocol for relay
 ```
 
+## ⚠️ Mandatory Development Rules
+
+**TDD**: Red→Green→Refactor. Test FIRST or delete code and restart.
+
+**Structure**: `src/` = production code only. `tests/` = tests only. Siblings, not nested.
+
+See [CLAUDE.md](../../CLAUDE.md) for additional mandatory rules.
+
 ## License
 
 MIT

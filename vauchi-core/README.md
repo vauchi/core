@@ -22,6 +22,14 @@ The core library is feature-complete with 267 tests passing. Ready for platform 
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for technical design and [STRUCTURE.md](STRUCTURE.md) for code organization.
 
+## ⚠️ Mandatory Development Rules
+
+**TDD**: Red→Green→Refactor. Test FIRST or delete code and restart.
+
+**Structure**: `src/` = production code only. `tests/` = tests only. Siblings, not nested.
+
+See [CLAUDE.md](../../CLAUDE.md) for additional mandatory rules.
+
 ## License
 
 MIT

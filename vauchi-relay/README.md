@@ -180,6 +180,14 @@ The default 90-day TTL enables users who rarely open the app to still receive co
 - Monitor disk usage with long TTLs
 - Consider backup strategy for the SQLite database
 
+## ⚠️ Mandatory Development Rules
+
+**TDD**: Red→Green→Refactor. Test FIRST or delete code and restart.
+
+**Structure**: `src/` = production code only. `tests/` = tests only. Siblings, not nested.
+
+See [CLAUDE.md](../../CLAUDE.md) for additional mandatory rules.
+
 ## License
 
 MIT

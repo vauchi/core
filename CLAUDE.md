@@ -35,18 +35,21 @@ vauchi-relay/    # WebSocket relay
 vauchi-cli/      # CLI
 vauchi-tui/      # Terminal UI (ratatui)
 vauchi-desktop/  # Desktop (Tauri + SolidJS)
-vauchi-mobile/   # UniFFI bindings
-vauchi-android/  # Android (Kotlin/Compose)
-vauchi-ios/      # iOS (SwiftUI)
-features/         # Gherkin scenarios
-docs/             # Architecture, planning, docs
-scripts/          # Build/utility scripts
+vauchi-mobile/   # UniFFI bindings (consumed by android/ios repos)
+features/        # Gherkin scenarios
+scripts/         # Build/utility scripts
 ```
+
+**Separate repositories:**
+- `vauchi/android` - Android app (Kotlin/Compose)
+- `vauchi/ios` - iOS app (SwiftUI)
+- `vauchi/docs` - Documentation
+- `vauchi/assets` - Brand assets
 
 ## Commits
 
-All tests green. Update: `features/` for features, `docs/architecture/` for arch, crate README for API.
+All tests green. Update: `features/` for features, crate README for API changes.
 
 ## Docs
 
-`docs/architecture/`, `docs/planning/{done,todo}/`, `docs/TDD_RULES.md`, `docs/THREAT_ANALYSIS.md`
+See `vauchi/docs` repository for architecture, planning, TDD rules, and threat analysis.

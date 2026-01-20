@@ -62,5 +62,5 @@ pub use proximity::{
     ManualConfirmationVerifier, MockProximityVerifier, ProximityError, ProximityVerifier,
 };
 pub use qr::ExchangeQR;
-pub use session::{DuplicateAction, ExchangeRole, ExchangeSession, ExchangeState};
+pub use session::{DuplicateAction, ExchangeEvent, ExchangeRole, ExchangeSession, ExchangeState};
 pub use x3dh::{X3DHKeyPair, X3DH};

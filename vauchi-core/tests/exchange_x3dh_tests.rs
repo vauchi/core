@@ -2,7 +2,6 @@
 //! Extracted from x3dh.rs
 
 use vauchi_core::exchange::*;
-use vauchi_core::*;
 
 #[test]
 fn test_keypair_generation() {

@@ -2,7 +2,6 @@
 //! Extracted from registry.rs
 
 use vauchi_core::social::*;
-use vauchi_core::*;
 
 #[test]
 fn test_social_network_creation() {

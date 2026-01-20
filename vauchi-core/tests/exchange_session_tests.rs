@@ -15,7 +15,8 @@ fn test_initiator_generates_qr() {
 
     assert!(matches!(session.state(), ExchangeState::Idle));
 
-    let qr = session.generate_qr().unwrap();
+    session.apply(ExchangeEvent::GenerateQR).unwrap();
+    let qr = session.qr().expect("Expected QR code");
     assert!(!qr.is_expired());
 
     assert!(matches!(
@@ -37,7 +38,9 @@ fn test_responder_processes_qr() {
     let proximity = MockProximityVerifier::success();
     let mut bob_session = ExchangeSession::new_responder(bob_identity, bob_card, proximity);
 
-    bob_session.process_scanned_qr(alice_qr).unwrap();
+    bob_session
+        .apply(ExchangeEvent::ProcessQR(alice_qr))
+        .unwrap();
 
     assert!(matches!(
         bob_session.state(),
@@ -62,7 +65,7 @@ fn test_expired_qr_rejected() {
     let proximity = MockProximityVerifier::success();
     let mut session = ExchangeSession::new_responder(bob_identity, bob_card, proximity);
 
-    let result = session.process_scanned_qr(old_qr);
+    let result = session.apply(ExchangeEvent::ProcessQR(old_qr));
     assert!(matches!(result, Err(ExchangeError::QRExpired)));
 }
 
@@ -117,7 +120,9 @@ fn test_detect_duplicate_contact() {
     let proximity = MockProximityVerifier::success();
     let mut bob_session = ExchangeSession::new_responder(bob_identity, bob_card, proximity);
 
-    bob_session.process_scanned_qr(alice_qr).unwrap();
+    bob_session
+        .apply(ExchangeEvent::ProcessQR(alice_qr))
+        .unwrap();
 
     // Should detect Alice as duplicate
     let duplicate = bob_session.check_duplicate(&contacts);
@@ -149,7 +154,9 @@ fn test_no_duplicate_for_new_contact() {
     let proximity = MockProximityVerifier::success();
     let mut bob_session = ExchangeSession::new_responder(bob_identity, bob_card, proximity);
 
-    bob_session.process_scanned_qr(alice_qr).unwrap();
+    bob_session
+        .apply(ExchangeEvent::ProcessQR(alice_qr))
+        .unwrap();
 
     // Should NOT detect a duplicate
     let duplicate = bob_session.check_duplicate(&contacts);

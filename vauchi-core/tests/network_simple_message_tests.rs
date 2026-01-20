@@ -2,8 +2,6 @@
 //! Extracted from simple_message.rs
 
 use vauchi_core::network::simple_message::*;
-use vauchi_core::network::*;
-use vauchi_core::*;
 
 #[test]
 fn test_encode_decode_roundtrip() {

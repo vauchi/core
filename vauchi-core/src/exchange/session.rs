@@ -41,6 +41,23 @@ pub enum ExchangeState {
     Failed { error: ExchangeError },
 }
 
+/// Events that drive the exchange state machine.
+#[derive(Debug)]
+pub enum ExchangeEvent {
+    /// Initiator generates a QR code to be scanned.
+    GenerateQR,
+    /// Responder processes a scanned QR code.
+    ProcessQR(ExchangeQR),
+    /// Start or confirm proximity verification.
+    VerifyProximity,
+    /// Perform cryptographic key agreement.
+    PerformKeyAgreement,
+    /// Exchange contact cards and complete the session.
+    CompleteExchange(ContactCard),
+    /// Explicitly fail the session.
+    Fail(ExchangeError),
+}
+
 /// Role in the exchange.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ExchangeRole {
@@ -104,6 +121,14 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
         &self.state
     }
 
+    /// Returns the QR code if in AwaitingScan state.
+    pub fn qr(&self) -> Option<&ExchangeQR> {
+        match &self.state {
+            ExchangeState::AwaitingScan { qr } => Some(qr),
+            _ => None,
+        }
+    }
+
     /// Returns our role in the exchange.
     pub fn role(&self) -> ExchangeRole {
         self.role
@@ -124,28 +149,51 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
         self.interrupted = true;
     }
 
-    /// Generates a QR code for the exchange (initiator only).
-    pub fn generate_qr(&mut self) -> Result<&ExchangeQR, ExchangeError> {
+    /// Processes an event and transitions the state machine.
+    pub fn apply(&mut self, event: ExchangeEvent) -> Result<(), ExchangeError> {
+        match event {
+            ExchangeEvent::GenerateQR => self.handle_generate_qr(),
+            ExchangeEvent::ProcessQR(qr) => self.handle_process_qr(qr),
+            ExchangeEvent::VerifyProximity => self.handle_verify_proximity(),
+            ExchangeEvent::PerformKeyAgreement => self.handle_perform_key_agreement(),
+            ExchangeEvent::CompleteExchange(card) => {
+                self.handle_complete_exchange(card).map(|_| ())
+            }
+            ExchangeEvent::Fail(err) => {
+                self.fail(err);
+                Ok(())
+            }
+        }
+    }
+
+    fn handle_generate_qr(&mut self) -> Result<(), ExchangeError> {
         if self.role != ExchangeRole::Initiator {
             return Err(ExchangeError::InvalidState(
                 "Only initiator can generate QR".into(),
             ));
         }
 
+        if !matches!(self.state, ExchangeState::Idle) {
+            return Err(ExchangeError::InvalidState(
+                "Can only generate QR from Idle state".into(),
+            ));
+        }
+
         let qr = ExchangeQR::generate(&self.identity);
         self.state = ExchangeState::AwaitingScan { qr };
-
-        match &self.state {
-            ExchangeState::AwaitingScan { qr } => Ok(qr),
-            _ => unreachable!(),
-        }
+        Ok(())
     }
 
-    /// Processes a scanned QR code (responder only).
-    pub fn process_scanned_qr(&mut self, qr: ExchangeQR) -> Result<(), ExchangeError> {
+    fn handle_process_qr(&mut self, qr: ExchangeQR) -> Result<(), ExchangeError> {
         if self.role != ExchangeRole::Responder {
             return Err(ExchangeError::InvalidState(
                 "Only responder can process QR".into(),
+            ));
+        }
+
+        if !matches!(self.state, ExchangeState::Idle) {
+            return Err(ExchangeError::InvalidState(
+                "Can only process QR from Idle state".into(),
             ));
         }
 
@@ -168,8 +216,7 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
         Ok(())
     }
 
-    /// Performs proximity verification.
-    pub fn verify_proximity(&mut self) -> Result<(), ExchangeError> {
+    fn handle_verify_proximity(&mut self) -> Result<(), ExchangeError> {
         let (their_public_key, challenge) = match &self.state {
             ExchangeState::AwaitingProximity {
                 their_public_key,
@@ -194,8 +241,7 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
         Ok(())
     }
 
-    /// Performs X3DH key agreement.
-    pub fn perform_key_agreement(&mut self) -> Result<(), ExchangeError> {
+    fn handle_perform_key_agreement(&mut self) -> Result<(), ExchangeError> {
         let their_public_key = match &self.state {
             ExchangeState::AwaitingKeyAgreement { their_public_key } => *their_public_key,
             _ => {
@@ -226,8 +272,10 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
         Ok(())
     }
 
-    /// Completes the exchange by exchanging cards.
-    pub fn complete_exchange(&mut self, their_card: ContactCard) -> Result<Contact, ExchangeError> {
+    fn handle_complete_exchange(
+        &mut self,
+        their_card: ContactCard,
+    ) -> Result<Contact, ExchangeError> {
         let (their_public_key, shared_key) =
             match std::mem::replace(&mut self.state, ExchangeState::Idle) {
                 ExchangeState::AwaitingCardExchange {

@@ -2,7 +2,6 @@
 //! Extracted from field.rs
 
 use vauchi_core::contact_card::*;
-use vauchi_core::*;
 
 #[test]
 fn test_create_field() {

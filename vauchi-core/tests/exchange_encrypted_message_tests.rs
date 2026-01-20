@@ -2,7 +2,6 @@
 //! Extracted from encrypted_message.rs
 
 use vauchi_core::exchange::*;
-use vauchi_core::*;
 
 #[test]
 fn test_encrypted_message_basic_roundtrip() {

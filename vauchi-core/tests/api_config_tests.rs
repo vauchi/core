@@ -3,7 +3,6 @@
 
 use std::path::PathBuf;
 use vauchi_core::api::*;
-use vauchi_core::*;
 
 #[test]
 fn test_vauchi_config_default() {

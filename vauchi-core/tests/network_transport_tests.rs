@@ -2,7 +2,6 @@
 //! Extracted from transport.rs
 
 use vauchi_core::network::*;
-use vauchi_core::*;
 
 #[test]
 fn test_transport_config_defaults() {

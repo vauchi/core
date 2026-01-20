@@ -6,7 +6,6 @@
 //! 3. Malformed inputs are rejected gracefully
 
 use proptest::prelude::*;
-use std::collections::HashSet;
 
 // =============================================================================
 // ARBITRARY GENERATORS

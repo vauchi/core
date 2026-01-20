@@ -2,7 +2,6 @@
 //! Extracted from error.rs
 
 use vauchi_core::network::*;
-use vauchi_core::*;
 
 #[test]
 fn test_error_display_messages() {

@@ -3,7 +3,6 @@
 
 use std::time::Duration;
 use vauchi_core::exchange::*;
-use vauchi_core::*;
 
 #[test]
 fn test_ble_discover_nearby_devices() {

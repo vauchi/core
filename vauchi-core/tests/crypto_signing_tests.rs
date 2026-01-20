@@ -2,7 +2,6 @@
 //! Extracted from signing.rs
 
 use vauchi_core::crypto::*;
-use vauchi_core::*;
 
 #[test]
 fn test_keypair_generation() {

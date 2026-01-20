@@ -2,7 +2,6 @@
 //! Extracted from kdf.rs
 
 use vauchi_core::crypto::*;
-use vauchi_core::*;
 
 // RFC 5869 Test Vectors for HKDF-SHA256
 

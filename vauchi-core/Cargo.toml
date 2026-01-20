@@ -11,6 +11,8 @@ network = ["network-native-tls"]
 network-native-tls = ["tungstenite", "tungstenite/handshake", "tungstenite/native-tls", "native-tls"]
 network-rustls = ["tungstenite", "tungstenite/handshake", "tungstenite/rustls-tls-native-roots", "rustls", "webpki-roots"]
 secure-storage = ["keyring"]
+# Real audio proximity verification using CPAL (desktop only)
+audio-cpal = ["cpal"]
 # Enable this feature to expose internal modules for integration tests
 testing = []
 
@@ -62,6 +64,9 @@ webpki-roots = { version = "0.26", optional = true }
 
 # Platform keychain access (optional, for desktop apps)
 keyring = { version = "3", optional = true }
+
+# Cross-platform audio for ultrasonic proximity verification (desktop only)
+cpal = { version = "0.15", optional = true }
 
 [dev-dependencies]
 # Temporary directories for storage tests

@@ -8,6 +8,9 @@ pub mod audio;
 #[cfg(not(feature = "testing"))]
 mod audio;
 
+#[cfg(feature = "audio-cpal")]
+pub mod audio_cpal;
+
 #[cfg(feature = "testing")]
 pub mod ble;
 #[cfg(not(feature = "testing"))]
@@ -46,6 +49,8 @@ pub mod x3dh;
 mod x3dh;
 
 pub use audio::{AudioBackend, AudioCapability, AudioConfig, MockAudioBackend, UltrasonicVerifier};
+#[cfg(feature = "audio-cpal")]
+pub use audio_cpal::CpalAudioBackend;
 pub use ble::{BLEDevice, BLEProximityVerifier, MockBLEVerifier};
 pub use device_link::{
     DeviceLinkInitiator, DeviceLinkInitiatorRestored, DeviceLinkQR, DeviceLinkRequest,

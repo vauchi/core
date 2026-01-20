@@ -24,6 +24,7 @@ use vauchi_core::{
 
 // === Modules ===
 
+mod audio;
 mod cert_pinning;
 mod error;
 mod protocol;
@@ -31,6 +32,7 @@ mod sync;
 mod types;
 
 // Re-export public types
+pub use audio::{MobileProximityResult, MobileProximityVerifier, PlatformAudioHandler};
 pub use error::MobileError;
 pub use types::{
     MobileContact, MobileContactCard, MobileContactField, MobileExchangeData, MobileExchangeResult,

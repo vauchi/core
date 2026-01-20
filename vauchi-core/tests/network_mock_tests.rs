@@ -1,9 +1,7 @@
 //! Tests for network::mock
 //! Extracted from mock.rs
 
-use vauchi_core::network::message::{PresenceStatus, PresenceUpdate};
 use vauchi_core::network::*;
-use vauchi_core::*;
 
 fn create_test_message() -> MessageEnvelope {
     MessageEnvelope {

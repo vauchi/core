@@ -6150,6 +6150,7 @@ dependencies = [
  "tauri-build",
  "tauri-plugin-opener",
  "tauri-plugin-shell",
+ "tempfile",
  "tokio",
  "tungstenite 0.24.0",
  "url",
@@ -6208,7 +6209,11 @@ dependencies = [
  "open",
  "qrcode",
  "ratatui",
+ "serde",
+ "serde_json",
+ "tempfile",
  "tokio",
+ "tungstenite 0.24.0",
  "vauchi-core",
 ]
 

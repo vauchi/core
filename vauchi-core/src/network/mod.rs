@@ -77,8 +77,8 @@ pub use error::NetworkError;
 
 // Message types
 pub use message::{
-    AckStatus, Acknowledgment, EncryptedUpdate, Handshake, MessageEnvelope, MessageId,
-    MessagePayload, PresenceStatus, PresenceUpdate, RatchetHeader, PROTOCOL_VERSION,
+    AckStatus, Acknowledgment, DeviceSyncMessage, EncryptedUpdate, Handshake, MessageEnvelope,
+    MessageId, MessagePayload, PresenceStatus, PresenceUpdate, RatchetHeader, PROTOCOL_VERSION,
 };
 
 // Protocol utilities

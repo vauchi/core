@@ -1,12 +1,9 @@
 //! Tests for network::relay_client
 //! Extracted from relay_client.rs
 
-use std::time::Duration;
 use vauchi_core::crypto::{DoubleRatchetState, SymmetricKey};
 use vauchi_core::exchange::X3DHKeyPair;
-use vauchi_core::network::mock::MockTransport;
 use vauchi_core::network::*;
-use vauchi_core::*;
 
 fn create_test_config() -> RelayClientConfig {
     RelayClientConfig {

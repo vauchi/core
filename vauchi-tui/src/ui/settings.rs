@@ -39,7 +39,7 @@ pub fn draw(f: &mut Frame, area: Rect, app: &App) {
         .block(Block::default().title("Sync Server").borders(Borders::ALL));
     f.render_widget(relay_para, chunks[2]);
 
-    // Options
+    // Options and Help Links
     let options = "\
 Options:
   [n] Edit display name
@@ -48,8 +48,16 @@ Options:
   [d] Device management
   [r] Recovery settings
 
+Help & Support:
+  User Guide:     https://vauchi.app/user-guide
+  FAQ:            https://vauchi.app/faq
+  Report Issue:   https://github.com/vauchi/issues
+  Privacy Policy: https://vauchi.app/privacy
+
 Settings are automatically saved.
 Your identity is stored locally and encrypted.
+
+Version 1.0.0
 ";
 
     let help_para = Paragraph::new(options)

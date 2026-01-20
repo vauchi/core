@@ -3,11 +3,14 @@
 //! Represents contacts obtained through exchange, with shared encryption keys
 //! and visibility rules.
 
+pub mod labels;
+
 #[cfg(feature = "testing")]
 pub mod visibility;
 #[cfg(not(feature = "testing"))]
 mod visibility;
 
+pub use labels::{LabelError, LabelManager, VisibilityLabel, MAX_LABELS, SUGGESTED_LABELS};
 pub use visibility::{FieldVisibility, VisibilityRules};
 
 use std::time::{SystemTime, UNIX_EPOCH};

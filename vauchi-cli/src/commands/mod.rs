@@ -6,5 +6,6 @@ pub mod contacts;
 pub mod device;
 pub mod exchange;
 pub mod init;
+pub mod labels;
 pub mod recovery;
 pub mod sync;

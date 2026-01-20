@@ -104,7 +104,8 @@ cd vauchi-market
 ## Links
 
 - Website: https://vauchi.app
-- GitHub: https://github.com/anthropics/vauchi
+- GitLab: https://gitlab.com/vauchi
+- GitHub: https://github.com/vauchi
 - Documentation: vauchi-code/docs/
 EOF
 

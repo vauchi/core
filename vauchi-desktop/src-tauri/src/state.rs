@@ -33,6 +33,10 @@ pub struct AppState {
     relay_url: String,
     /// Data directory for config files
     data_dir: std::path::PathBuf,
+    /// Pending device join state (JSON serialized).
+    pub pending_device_join: Option<String>,
+    /// Pending device link QR data for completing link requests.
+    pub pending_device_link_qr: Option<String>,
 }
 
 impl AppState {
@@ -141,6 +145,8 @@ impl AppState {
             display_name,
             relay_url,
             data_dir: data_dir.to_path_buf(),
+            pending_device_join: None,
+            pending_device_link_qr: None,
         })
     }
 
@@ -242,5 +248,205 @@ impl AppState {
             .context("Failed to save identity")?;
 
         Ok(())
+    }
+}
+
+// ===========================================================================
+// AppState Tests
+// Trace: features/identity_management.feature, contact_card_management.feature
+// ===========================================================================
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::TempDir;
+
+    /// Create a test app state with isolated data directory.
+    fn create_test_state() -> (AppState, TempDir) {
+        let temp_dir = TempDir::new().expect("Failed to create temp dir");
+        let state = AppState::new(temp_dir.path()).expect("Failed to create state");
+        (state, temp_dir)
+    }
+
+    // === Identity Management Tests ===
+    // Trace: identity_management.feature
+
+    /// Trace: identity_management.feature - New state has no identity
+    #[test]
+    fn test_new_state_has_no_identity() {
+        let (state, _temp) = create_test_state();
+        assert!(!state.has_identity());
+        assert!(state.display_name().is_none());
+        assert!(state.public_id().is_none());
+    }
+
+    /// Trace: identity_management.feature - Create new identity
+    #[test]
+    fn test_create_identity() {
+        let (mut state, _temp) = create_test_state();
+
+        state.create_identity("Alice Smith").expect("Failed to create identity");
+
+        assert!(state.has_identity());
+        assert_eq!(state.display_name(), Some("Alice Smith"));
+        assert!(state.public_id().is_some());
+    }
+
+    /// Trace: identity_management.feature - Identity persists across state instances
+    #[test]
+    fn test_identity_persistence() {
+        let temp_dir = TempDir::new().expect("Failed to create temp dir");
+
+        // Create identity in first state
+        {
+            let mut state = AppState::new(temp_dir.path()).expect("Failed to create state");
+            state.create_identity("Alice Smith").expect("Failed to create identity");
+        }
+
+        // Load in second state
+        {
+            let state = AppState::new(temp_dir.path()).expect("Failed to load state");
+            assert!(state.has_identity());
+            assert_eq!(state.display_name(), Some("Alice Smith"));
+        }
+    }
+
+    // === Settings Tests ===
+
+    /// Test default relay URL
+    #[test]
+    fn test_relay_url_default() {
+        let (state, _temp) = create_test_state();
+        assert_eq!(state.relay_url(), "wss://relay.vauchi.app");
+    }
+
+    /// Test setting relay URL
+    #[test]
+    fn test_set_relay_url() {
+        let (mut state, _temp) = create_test_state();
+
+        state
+            .set_relay_url("wss://custom.relay.example.com")
+            .expect("Failed to set relay URL");
+
+        assert_eq!(state.relay_url(), "wss://custom.relay.example.com");
+    }
+
+    /// Test relay URL persistence
+    #[test]
+    fn test_relay_url_persistence() {
+        let temp_dir = TempDir::new().expect("Failed to create temp dir");
+
+        // Set relay URL in first state
+        {
+            let mut state = AppState::new(temp_dir.path()).expect("Failed to create state");
+            state
+                .set_relay_url("wss://custom.relay.example.com")
+                .expect("Failed to set relay URL");
+        }
+
+        // Load in second state
+        {
+            let state = AppState::new(temp_dir.path()).expect("Failed to load state");
+            assert_eq!(state.relay_url(), "wss://custom.relay.example.com");
+        }
+    }
+
+    /// Test invalid relay URL rejected
+    #[test]
+    fn test_invalid_relay_url_rejected() {
+        let (mut state, _temp) = create_test_state();
+
+        let result = state.set_relay_url("invalid-url");
+        assert!(result.is_err());
+    }
+
+    /// Test empty relay URL rejected
+    #[test]
+    fn test_empty_relay_url_rejected() {
+        let (mut state, _temp) = create_test_state();
+
+        let result = state.set_relay_url("");
+        assert!(result.is_err());
+    }
+
+    /// Test http URL rejected (must be ws or wss)
+    #[test]
+    fn test_http_relay_url_rejected() {
+        let (mut state, _temp) = create_test_state();
+
+        let result = state.set_relay_url("https://relay.example.com");
+        assert!(result.is_err());
+    }
+
+    // === Display Name Tests ===
+    // Trace: contact_card_management.feature
+
+    /// Trace: contact_card_management.feature - Update display name
+    #[test]
+    fn test_update_display_name() {
+        let (mut state, _temp) = create_test_state();
+        state.create_identity("Alice Smith").expect("Failed to create identity");
+
+        state
+            .update_display_name("Alice S.")
+            .expect("Failed to update name");
+
+        assert_eq!(state.display_name(), Some("Alice S."));
+    }
+
+    /// Trace: contact_card_management.feature - Empty display name rejected
+    #[test]
+    fn test_empty_display_name_rejected() {
+        let (mut state, _temp) = create_test_state();
+        state.create_identity("Alice Smith").expect("Failed to create identity");
+
+        let result = state.update_display_name("");
+        assert!(result.is_err());
+        assert_eq!(state.display_name(), Some("Alice Smith"));
+    }
+
+    /// Trace: contact_card_management.feature - Display name too long rejected
+    #[test]
+    fn test_long_display_name_rejected() {
+        let (mut state, _temp) = create_test_state();
+        state.create_identity("Alice Smith").expect("Failed to create identity");
+
+        let long_name = "A".repeat(101);
+        let result = state.update_display_name(&long_name);
+        assert!(result.is_err());
+    }
+
+    /// Trace: contact_card_management.feature - Whitespace-only display name rejected
+    #[test]
+    fn test_whitespace_display_name_rejected() {
+        let (mut state, _temp) = create_test_state();
+        state.create_identity("Alice Smith").expect("Failed to create identity");
+
+        let result = state.update_display_name("   ");
+        assert!(result.is_err());
+    }
+
+    /// Test display name with leading/trailing whitespace is trimmed
+    #[test]
+    fn test_display_name_trimmed() {
+        let (mut state, _temp) = create_test_state();
+        state.create_identity("Alice Smith").expect("Failed to create identity");
+
+        state
+            .update_display_name("  Alice S.  ")
+            .expect("Failed to update name");
+
+        assert_eq!(state.display_name(), Some("Alice S."));
+    }
+
+    // === Update without identity fails ===
+
+    #[test]
+    fn test_update_display_name_without_identity_fails() {
+        let (mut state, _temp) = create_test_state();
+
+        let result = state.update_display_name("New Name");
+        assert!(result.is_err());
     }
 }

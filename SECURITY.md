@@ -99,4 +99,4 @@ For details on Vauchi's security architecture, see:
 
 - Security issues: security@vauchi.app
 - General questions: hello@vauchi.app
-- Project: https://github.com/anthropics/vauchi
+- Project: https://github.com/vauchi

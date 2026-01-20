@@ -46,6 +46,21 @@ pub enum InputMode {
     Editing,
 }
 
+/// Sync status for the UI.
+#[derive(Debug, Clone, Default)]
+pub struct SyncState {
+    /// Whether currently connected to the relay.
+    pub connected: bool,
+    /// Whether a sync operation is in progress.
+    pub is_syncing: bool,
+    /// Number of pending outbound updates.
+    pub pending_updates: u32,
+    /// Last sync result message.
+    pub last_result: Option<String>,
+    /// Log of sync operations.
+    pub sync_log: Vec<String>,
+}
+
 /// Application state.
 #[allow(dead_code)]
 pub struct App {
@@ -87,6 +102,8 @@ pub struct App {
     pub contact_search_mode: bool,
     /// Current exchange QR data (for expiration tracking)
     pub current_qr: Option<QRData>,
+    /// Sync state
+    pub sync_state: SyncState,
 }
 
 /// State for the add field dialog.
@@ -184,6 +201,7 @@ impl App {
             contact_search_query: String::new(),
             contact_search_mode: false,
             current_qr: None,
+            sync_state: SyncState::default(),
         }
     }
 

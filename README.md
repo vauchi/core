@@ -96,7 +96,7 @@ See [CLAUDE.md](../CLAUDE.md) for additional mandatory rules (crypto, coverage, 
 
 - **Architecture**: [vauchi/docs](https://gitlab.com/vauchi/docs) repository
 - **API Reference**: Generated from code comments
-- **BDD Scenarios**: `features/` directory in this repo
+- **BDD Scenarios**: `../features/` (separate repo)
 
 ## Mobile Development
 

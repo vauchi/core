@@ -19,7 +19,10 @@ pub mod sync;
 
 #[cfg(feature = "network")]
 pub use api::{Vauchi, VauchiBuilder, VauchiConfig, VauchiError, VauchiEvent, VauchiResult};
-pub use contact::{Contact, FieldVisibility, VisibilityRules};
+pub use contact::{
+    Contact, FieldVisibility, LabelError, LabelManager, VisibilityLabel, VisibilityRules,
+    MAX_LABELS, SUGGESTED_LABELS,
+};
 pub use contact_card::{ContactCard, ContactField, FieldType, ValidationError};
 pub use crypto::{decrypt, encrypt, PublicKey, Signature, SigningKeyPair, SymmetricKey};
 pub use exchange::{
@@ -30,7 +33,7 @@ pub use identity::{Identity, IdentityBackup};
 #[cfg(feature = "network")]
 pub use network::{
     ConnectionState, MessageEnvelope, MockTransport, NetworkError, RelayClient, RelayClientConfig,
-    Transport,
+    Transport, WebSocketTransport,
 };
 pub use recovery::{
     ConflictingClaim, RecoveryClaim, RecoveryConflict, RecoveryError, RecoveryProof,

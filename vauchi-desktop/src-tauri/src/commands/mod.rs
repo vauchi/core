@@ -9,6 +9,7 @@ pub mod contacts;
 pub mod devices;
 pub mod exchange;
 pub mod identity;
+pub mod labels;
 pub mod recovery;
 pub mod sync;
 pub mod visibility;

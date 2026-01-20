@@ -10,7 +10,7 @@ use indicatif::{ProgressBar, ProgressStyle};
 use tungstenite::stream::MaybeTlsStream;
 use tungstenite::{connect, Message, WebSocket};
 use vauchi_core::exchange::X3DH;
-use vauchi_core::network::MockTransport;
+use vauchi_core::network::WebSocketTransport;
 use vauchi_core::{Contact, Identity, IdentityBackup, Vauchi, VauchiConfig};
 
 use crate::config::CliConfig;
@@ -24,7 +24,7 @@ use crate::protocol::{
 const LOCAL_STORAGE_PASSWORD: &str = "vauchi-local-storage";
 
 /// Opens Vauchi from the config and loads the identity.
-fn open_vauchi(config: &CliConfig) -> Result<Vauchi<MockTransport>> {
+fn open_vauchi(config: &CliConfig) -> Result<Vauchi<WebSocketTransport>> {
     if !config.is_initialized() {
         bail!("Vauchi not initialized. Run 'vauchi init <name>' first.");
     }
@@ -33,7 +33,7 @@ fn open_vauchi(config: &CliConfig) -> Result<Vauchi<MockTransport>> {
         .with_relay_url(&config.relay_url)
         .with_storage_key(config.storage_key()?);
 
-    let mut wb = Vauchi::new(wb_config)?;
+    let mut wb = Vauchi::with_transport_factory(wb_config, WebSocketTransport::new)?;
 
     // Load identity from file
     let backup_data = fs::read(config.identity_path())?;
@@ -109,7 +109,7 @@ fn send_exchange_response(
 #[allow(clippy::type_complexity)]
 fn receive_pending(
     socket: &mut WebSocket<MaybeTlsStream<TcpStream>>,
-    _wb: &Vauchi<MockTransport>,
+    _wb: &Vauchi<WebSocketTransport>,
 ) -> Result<(usize, Vec<ExchangeMessage>, Vec<(String, Vec<u8>)>)> {
     let mut received = 0;
     let mut exchange_messages = Vec::new();
@@ -196,7 +196,7 @@ fn receive_pending(
 
 /// Processes exchange messages and creates contacts.
 fn process_exchange_messages(
-    wb: &Vauchi<MockTransport>,
+    wb: &Vauchi<WebSocketTransport>,
     messages: Vec<ExchangeMessage>,
     config: &CliConfig,
 ) -> Result<(usize, usize)> {
@@ -324,7 +324,7 @@ fn process_exchange_messages(
 
 /// Processes encrypted card updates from contacts.
 fn process_card_updates(
-    wb: &Vauchi<MockTransport>,
+    wb: &Vauchi<WebSocketTransport>,
     updates: Vec<(String, Vec<u8>)>, // (sender_id, ciphertext)
 ) -> Result<usize> {
     let mut processed = 0;
@@ -370,7 +370,7 @@ fn process_card_updates(
 
 /// Sends pending card updates to contacts via relay.
 fn send_pending_updates(
-    wb: &Vauchi<MockTransport>,
+    wb: &Vauchi<WebSocketTransport>,
     socket: &mut WebSocket<MaybeTlsStream<TcpStream>>,
     our_id: &str,
 ) -> Result<usize> {

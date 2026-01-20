@@ -54,3 +54,6 @@ native-tls = "0.2"
 default = ["custom-protocol"]
 custom-protocol = ["tauri/custom-protocol"]
 secure-storage = ["vauchi-core/secure-storage"]
+
+[dev-dependencies]
+tempfile = "3"

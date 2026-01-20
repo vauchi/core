@@ -9,7 +9,7 @@ Vauchi uses established cryptographic protocols to ensure privacy:
 - **Ed25519** - Digital signatures for identity verification
 - **AES-256-GCM** - Authenticated encryption for all stored and transmitted data
 
-All cryptographic operations use the audited `ring` crate.
+All cryptographic operations use the audited `ring` crate. See [docs/architecture/cryptography.md](../../docs/architecture/cryptography.md) for full specification.
 
 ## Data Flow
 

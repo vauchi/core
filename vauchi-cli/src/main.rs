@@ -61,6 +61,10 @@ enum Commands {
     #[command(subcommand)]
     Device(DeviceCommands),
 
+    /// Manage visibility labels
+    #[command(subcommand)]
+    Labels(LabelCommands),
+
     /// Contact recovery via social vouching
     #[command(subcommand)]
     Recovery(RecoveryCommands),
@@ -254,6 +258,70 @@ enum DeviceCommands {
 }
 
 #[derive(Subcommand)]
+enum LabelCommands {
+    /// List all labels
+    List,
+
+    /// Create a new label
+    Create {
+        /// Label name
+        name: String,
+    },
+
+    /// Show label details
+    Show {
+        /// Label name or ID prefix
+        label: String,
+    },
+
+    /// Rename a label
+    Rename {
+        /// Label name or ID prefix
+        label: String,
+        /// New name
+        new_name: String,
+    },
+
+    /// Delete a label
+    Delete {
+        /// Label name or ID prefix
+        label: String,
+    },
+
+    /// Add a contact to a label
+    AddContact {
+        /// Label name or ID prefix
+        label: String,
+        /// Contact name or ID prefix
+        contact: String,
+    },
+
+    /// Remove a contact from a label
+    RemoveContact {
+        /// Label name or ID prefix
+        label: String,
+        /// Contact name or ID prefix
+        contact: String,
+    },
+
+    /// Show a field to contacts in a label
+    ShowField {
+        /// Label name or ID prefix
+        label: String,
+        /// Field label
+        field: String,
+    },
+
+    /// Hide a field from contacts in a label
+    HideField {
+        /// Label name or ID prefix
+        label: String,
+        /// Field label
+        field: String,
+    },
+}
+
+#[derive(Subcommand)]
 enum RecoveryCommands {
     /// Create a recovery claim for a lost identity
     Claim {
@@ -399,6 +467,27 @@ async fn main() -> Result<()> {
             DeviceCommands::Complete { request } => commands::device::complete(&config, &request)?,
             DeviceCommands::Finish { response } => commands::device::finish(&config, &response)?,
             DeviceCommands::Revoke { device_id } => commands::device::revoke(&config, &device_id)?,
+        },
+        Commands::Labels(cmd) => match cmd {
+            LabelCommands::List => commands::labels::list(&config)?,
+            LabelCommands::Create { name } => commands::labels::create(&config, &name)?,
+            LabelCommands::Show { label } => commands::labels::show(&config, &label)?,
+            LabelCommands::Rename { label, new_name } => {
+                commands::labels::rename(&config, &label, &new_name)?
+            }
+            LabelCommands::Delete { label } => commands::labels::delete(&config, &label)?,
+            LabelCommands::AddContact { label, contact } => {
+                commands::labels::add_contact(&config, &label, &contact)?
+            }
+            LabelCommands::RemoveContact { label, contact } => {
+                commands::labels::remove_contact(&config, &label, &contact)?
+            }
+            LabelCommands::ShowField { label, field } => {
+                commands::labels::show_field(&config, &label, &field)?
+            }
+            LabelCommands::HideField { label, field } => {
+                commands::labels::hide_field(&config, &label, &field)?
+            }
         },
         Commands::Recovery(cmd) => match cmd {
             RecoveryCommands::Claim { old_pk } => commands::recovery::claim(&config, &old_pk)?,

@@ -1,13 +1,26 @@
 //! Backend wrapper for vauchi-core
 
+use std::net::TcpStream;
 use std::path::Path;
+use std::time::Duration;
 
 use anyhow::{Context, Result};
+use tungstenite::stream::MaybeTlsStream;
+use tungstenite::{Message, WebSocket};
+
 #[cfg(feature = "secure-storage")]
 use vauchi_core::storage::secure::{PlatformKeyring, SecureStorage};
 use vauchi_core::{
-    contact_card::ContactAction, ContactCard, ContactField, ExchangeQR, FieldType, Identity,
-    IdentityBackup, Storage, SymmetricKey,
+    contact_card::ContactAction,
+    crypto::ratchet::DoubleRatchetState,
+    exchange::{EncryptedExchangeMessage, X3DHKeyPair},
+    network::simple_message::{
+        create_simple_ack, create_simple_envelope, decode_simple_message, encode_simple_message,
+        LegacyExchangeMessage, SimpleAckStatus, SimpleEncryptedUpdate, SimpleHandshake,
+        SimplePayload,
+    },
+    Contact, ContactCard, ContactField, ExchangeQR, FieldType, Identity, IdentityBackup, Storage,
+    SymmetricKey,
 };
 
 #[cfg(not(feature = "secure-storage"))]
@@ -344,16 +357,16 @@ impl Backend {
     pub fn update_field(&self, field_label: &str, new_value: &str) -> Result<()> {
         let mut card = self.get_card()?.context("No card found")?;
 
-        // Find the field by label
+        // Find the field by label and get both ID and type
         let field = card
             .fields()
             .iter()
             .find(|f| f.label() == field_label)
-            .map(|f| (f.field_type(), f.label().to_string()));
+            .map(|f| (f.id().to_string(), f.field_type(), f.label().to_string()));
 
-        if let Some((field_type, label)) = field {
-            // Remove old field and add new one with updated value
-            card.remove_field(&label)
+        if let Some((field_id, field_type, label)) = field {
+            // Remove old field by ID and add new one with updated value
+            card.remove_field(&field_id)
                 .map_err(|e| anyhow::anyhow!("{}", e))?;
             let new_field = ContactField::new(field_type, &label, new_value);
             card.add_field(new_field)
@@ -619,13 +632,463 @@ impl Backend {
         Ok(())
     }
 
-    /// Perform sync (placeholder - actual sync requires async runtime).
+    /// Get sync status string for display.
     pub fn sync_status(&self) -> &'static str {
         if self.identity.is_some() {
             "Ready to sync"
         } else {
             "No identity"
         }
+    }
+
+    /// Get count of pending outbound updates.
+    pub fn pending_update_count(&self) -> Result<u32> {
+        let contacts = self
+            .storage
+            .list_contacts()
+            .context("Failed to list contacts")?;
+
+        let mut total = 0u32;
+        for contact in &contacts {
+            let pending = self
+                .storage
+                .get_pending_updates(contact.id())
+                .unwrap_or_default();
+            total += pending.len() as u32;
+        }
+        Ok(total)
+    }
+
+    /// Perform a full sync with the relay server.
+    ///
+    /// This connects to the relay, receives pending messages, processes them,
+    /// and sends any pending outbound updates.
+    pub fn sync(&self) -> SyncResult {
+        let identity = match &self.identity {
+            Some(id) => id,
+            None => return SyncResult::error("No identity found. Create an identity first."),
+        };
+
+        let relay_url = &self.relay_url;
+        let client_id = identity.public_id();
+
+        // Connect to relay
+        let mut socket = match Self::connect_to_relay(relay_url) {
+            Ok(s) => s,
+            Err(e) => return SyncResult::error(format!("Connection failed: {}", e)),
+        };
+
+        // Send handshake
+        if let Err(e) = Self::send_handshake(&mut socket, &client_id) {
+            return SyncResult::error(format!("Handshake failed: {}", e));
+        }
+
+        // Wait for server to send pending messages
+        std::thread::sleep(Duration::from_millis(500));
+
+        // Receive pending messages
+        let received = match Self::receive_pending(&mut socket) {
+            Ok(msgs) => msgs,
+            Err(e) => return SyncResult::error(format!("Receive failed: {}", e)),
+        };
+
+        // Process legacy exchange messages
+        let legacy_added = match self.process_legacy_exchanges(identity, received.legacy_exchange) {
+            Ok(count) => count,
+            Err(e) => return SyncResult::error(format!("Legacy exchange failed: {}", e)),
+        };
+
+        // Process encrypted exchange messages
+        let encrypted_added =
+            match self.process_encrypted_exchanges(identity, received.encrypted_exchange) {
+                Ok(count) => count,
+                Err(e) => return SyncResult::error(format!("Encrypted exchange failed: {}", e)),
+            };
+
+        let contacts_added = legacy_added + encrypted_added;
+
+        // Process card updates
+        let cards_updated = match self.process_card_updates(received.card_updates) {
+            Ok(count) => count,
+            Err(e) => return SyncResult::error(format!("Card update failed: {}", e)),
+        };
+
+        // Send pending outbound updates
+        let updates_sent = match self.send_pending_updates(identity, &mut socket) {
+            Ok(count) => count,
+            Err(e) => return SyncResult::error(format!("Send updates failed: {}", e)),
+        };
+
+        // Close connection
+        let _ = socket.close(None);
+
+        SyncResult::success(contacts_added, cards_updated, updates_sent)
+    }
+
+    /// Connect to relay server via WebSocket.
+    fn connect_to_relay(relay_url: &str) -> Result<WebSocket<MaybeTlsStream<TcpStream>>, String> {
+        let (socket, _response) = tungstenite::connect(relay_url)
+            .map_err(|e| format!("Failed to connect: {}", e))?;
+        Ok(socket)
+    }
+
+    /// Send handshake to relay.
+    fn send_handshake(
+        socket: &mut WebSocket<MaybeTlsStream<TcpStream>>,
+        client_id: &str,
+    ) -> Result<(), String> {
+        let handshake = SimpleHandshake {
+            client_id: client_id.to_string(),
+        };
+        let envelope = create_simple_envelope(SimplePayload::Handshake(handshake));
+        let data = encode_simple_message(&envelope).map_err(|e| format!("Encode error: {}", e))?;
+        socket
+            .send(Message::Binary(data.into()))
+            .map_err(|e| format!("Send error: {}", e))?;
+        Ok(())
+    }
+
+    /// Receive pending messages from relay.
+    fn receive_pending(
+        socket: &mut WebSocket<MaybeTlsStream<TcpStream>>,
+    ) -> Result<ReceivedMessages, String> {
+        let mut legacy_exchange = Vec::new();
+        let mut encrypted_exchange = Vec::new();
+        let mut card_updates = Vec::new();
+
+        // Set read timeout
+        if let MaybeTlsStream::Plain(ref stream) = socket.get_ref() {
+            let _ = stream.set_read_timeout(Some(Duration::from_millis(1000)));
+        }
+
+        loop {
+            match socket.read() {
+                Ok(Message::Binary(data)) => {
+                    if let Ok(envelope) = decode_simple_message(&data) {
+                        if let SimplePayload::EncryptedUpdate(update) = envelope.payload {
+                            // Classify the message
+                            if LegacyExchangeMessage::is_exchange(&update.ciphertext) {
+                                if let Some(exchange) =
+                                    LegacyExchangeMessage::from_bytes(&update.ciphertext)
+                                {
+                                    legacy_exchange.push(exchange);
+                                }
+                            } else if EncryptedExchangeMessage::from_bytes(&update.ciphertext)
+                                .is_ok()
+                            {
+                                encrypted_exchange.push(update.ciphertext);
+                            } else {
+                                card_updates.push((update.sender_id, update.ciphertext));
+                            }
+
+                            // Send acknowledgment
+                            let ack = create_simple_ack(
+                                &envelope.message_id,
+                                SimpleAckStatus::ReceivedByRecipient,
+                            );
+                            if let Ok(ack_data) = encode_simple_message(&ack) {
+                                let _ = socket.send(Message::Binary(ack_data.into()));
+                            }
+                        }
+                    }
+                }
+                Ok(Message::Ping(data)) => {
+                    let _ = socket.send(Message::Pong(data));
+                }
+                Ok(Message::Close(_)) => break,
+                Ok(_) => { /* Ignore other message types */ }
+                Err(tungstenite::Error::Io(ref e))
+                    if e.kind() == std::io::ErrorKind::WouldBlock
+                        || e.kind() == std::io::ErrorKind::TimedOut =>
+                {
+                    break;
+                }
+                Err(_) => break,
+            }
+        }
+
+        Ok(ReceivedMessages {
+            legacy_exchange,
+            encrypted_exchange,
+            card_updates,
+        })
+    }
+
+    /// Parse a hex-encoded 32-byte key.
+    fn parse_hex_key(hex_str: &str) -> Option<[u8; 32]> {
+        let bytes = hex::decode(hex_str).ok()?;
+        if bytes.len() != 32 {
+            return None;
+        }
+        let mut arr = [0u8; 32];
+        arr.copy_from_slice(&bytes);
+        Some(arr)
+    }
+
+    /// Process legacy plaintext exchange messages.
+    fn process_legacy_exchanges(
+        &self,
+        identity: &Identity,
+        messages: Vec<LegacyExchangeMessage>,
+    ) -> Result<u32, String> {
+        let mut added = 0u32;
+        let our_x3dh = identity.x3dh_keypair();
+
+        for exchange in messages {
+            let identity_key = match Self::parse_hex_key(&exchange.identity_public_key) {
+                Some(key) => key,
+                None => continue,
+            };
+
+            let public_id = hex::encode(identity_key);
+
+            // Handle response (update contact name)
+            if exchange.is_response {
+                if let Ok(Some(mut contact)) = self.storage.load_contact(&public_id) {
+                    if contact.display_name() != exchange.display_name {
+                        if contact.set_display_name(&exchange.display_name).is_ok() {
+                            let _ = self.storage.save_contact(&contact);
+                        }
+                    }
+                }
+                continue;
+            }
+
+            // Check if contact exists
+            if self
+                .storage
+                .load_contact(&public_id)
+                .map_err(|e| e.to_string())?
+                .is_some()
+            {
+                continue;
+            }
+
+            let ephemeral_key = match Self::parse_hex_key(&exchange.ephemeral_public_key) {
+                Some(key) => key,
+                None => continue,
+            };
+
+            // Perform X3DH
+            let shared_secret = match vauchi_core::exchange::X3DH::respond(
+                &our_x3dh,
+                &identity_key,
+                &ephemeral_key,
+            ) {
+                Ok(secret) => secret,
+                Err(_) => continue,
+            };
+
+            // Create contact
+            let card = ContactCard::new(&exchange.display_name);
+            let contact = Contact::from_exchange(identity_key, card, shared_secret.clone());
+            let contact_id = contact.id().to_string();
+            self.storage
+                .save_contact(&contact)
+                .map_err(|e| e.to_string())?;
+
+            // Initialize ratchet
+            let ratchet_dh = X3DHKeyPair::from_bytes(our_x3dh.secret_bytes());
+            let ratchet = DoubleRatchetState::initialize_responder(&shared_secret, ratchet_dh);
+            let _ = self.storage.save_ratchet_state(&contact_id, &ratchet, true);
+
+            added += 1;
+
+            // Send response
+            let _ = self.send_exchange_response(identity, &public_id, &ephemeral_key);
+        }
+
+        Ok(added)
+    }
+
+    /// Process encrypted exchange messages.
+    fn process_encrypted_exchanges(
+        &self,
+        identity: &Identity,
+        encrypted_data: Vec<Vec<u8>>,
+    ) -> Result<u32, String> {
+        let mut added = 0u32;
+        let our_x3dh = identity.x3dh_keypair();
+
+        for data in encrypted_data {
+            let encrypted_msg = match EncryptedExchangeMessage::from_bytes(&data) {
+                Ok(msg) => msg,
+                Err(_) => continue,
+            };
+
+            let (payload, shared_secret) = match encrypted_msg.decrypt(&our_x3dh) {
+                Ok(result) => result,
+                Err(_) => continue,
+            };
+
+            let public_id = hex::encode(payload.identity_key);
+
+            // Check if contact exists
+            if self
+                .storage
+                .load_contact(&public_id)
+                .map_err(|e| e.to_string())?
+                .is_some()
+            {
+                continue;
+            }
+
+            // Create contact
+            let card = ContactCard::new(&payload.display_name);
+            let contact = Contact::from_exchange(payload.identity_key, card, shared_secret.clone());
+            let contact_id = contact.id().to_string();
+            self.storage
+                .save_contact(&contact)
+                .map_err(|e| e.to_string())?;
+
+            // Initialize ratchet
+            let ratchet_dh = X3DHKeyPair::from_bytes(our_x3dh.secret_bytes());
+            let ratchet = DoubleRatchetState::initialize_responder(&shared_secret, ratchet_dh);
+            let _ = self.storage.save_ratchet_state(&contact_id, &ratchet, false);
+
+            added += 1;
+
+            // Send response
+            let _ = self.send_exchange_response(identity, &public_id, &payload.exchange_key);
+        }
+
+        Ok(added)
+    }
+
+    /// Send exchange response.
+    fn send_exchange_response(
+        &self,
+        identity: &Identity,
+        recipient_id: &str,
+        recipient_exchange_key: &[u8; 32],
+    ) -> Result<(), String> {
+        let mut socket = Self::connect_to_relay(&self.relay_url)?;
+
+        let our_id = identity.public_id();
+        Self::send_handshake(&mut socket, &our_id)?;
+
+        let our_x3dh = identity.x3dh_keypair();
+        let (encrypted_msg, _) = EncryptedExchangeMessage::create(
+            &our_x3dh,
+            recipient_exchange_key,
+            identity.signing_public_key(),
+            identity.display_name(),
+        )
+        .map_err(|e| format!("Failed to encrypt exchange: {:?}", e))?;
+
+        let update = SimpleEncryptedUpdate {
+            recipient_id: recipient_id.to_string(),
+            sender_id: our_id,
+            ciphertext: encrypted_msg.to_bytes(),
+        };
+
+        let envelope = create_simple_envelope(SimplePayload::EncryptedUpdate(update));
+        let data = encode_simple_message(&envelope).map_err(|e| e.to_string())?;
+        socket
+            .send(Message::Binary(data.into()))
+            .map_err(|e| e.to_string())?;
+
+        std::thread::sleep(Duration::from_millis(100));
+        let _ = socket.close(None);
+
+        Ok(())
+    }
+
+    /// Process incoming card updates.
+    fn process_card_updates(&self, updates: Vec<(String, Vec<u8>)>) -> Result<u32, String> {
+        let mut processed = 0u32;
+
+        for (sender_id, ciphertext) in updates {
+            let mut contact = match self
+                .storage
+                .load_contact(&sender_id)
+                .map_err(|e| e.to_string())?
+            {
+                Some(c) => c,
+                None => continue,
+            };
+
+            let (mut ratchet, _) = match self
+                .storage
+                .load_ratchet_state(&sender_id)
+                .map_err(|e| e.to_string())?
+            {
+                Some(state) => state,
+                None => continue,
+            };
+
+            let ratchet_msg: vauchi_core::crypto::ratchet::RatchetMessage =
+                match serde_json::from_slice(&ciphertext) {
+                    Ok(msg) => msg,
+                    Err(_) => continue,
+                };
+
+            let plaintext = match ratchet.decrypt(&ratchet_msg) {
+                Ok(pt) => pt,
+                Err(_) => continue,
+            };
+
+            if let Ok(delta) = serde_json::from_slice::<vauchi_core::sync::CardDelta>(&plaintext) {
+                let mut card = contact.card().clone();
+                if delta.apply(&mut card).is_ok() {
+                    contact.update_card(card);
+                    self.storage
+                        .save_contact(&contact)
+                        .map_err(|e| e.to_string())?;
+                    processed += 1;
+                }
+            }
+
+            let _ = self.storage.save_ratchet_state(&sender_id, &ratchet, false);
+        }
+
+        Ok(processed)
+    }
+
+    /// Send pending outbound updates.
+    fn send_pending_updates(
+        &self,
+        identity: &Identity,
+        socket: &mut WebSocket<MaybeTlsStream<TcpStream>>,
+    ) -> Result<u32, String> {
+        let contacts = self.storage.list_contacts().map_err(|e| e.to_string())?;
+        let our_id = identity.public_id();
+        let mut sent = 0u32;
+
+        for contact in contacts {
+            let pending = self
+                .storage
+                .get_pending_updates(contact.id())
+                .map_err(|e| e.to_string())?;
+
+            for update in pending {
+                let msg = SimpleEncryptedUpdate {
+                    recipient_id: contact.id().to_string(),
+                    sender_id: our_id.clone(),
+                    ciphertext: update.payload,
+                };
+
+                let envelope = create_simple_envelope(SimplePayload::EncryptedUpdate(msg));
+                if let Ok(data) = encode_simple_message(&envelope) {
+                    if socket.send(Message::Binary(data.into())).is_ok() {
+                        let _ = self.storage.delete_pending_update(&update.id);
+                        sent += 1;
+                    }
+                }
+            }
+        }
+
+        Ok(sent)
+    }
+
+    /// Test connection to the relay server.
+    pub fn test_relay_connection(&self) -> Result<bool> {
+        let mut socket = Self::connect_to_relay(&self.relay_url)
+            .map_err(|e| anyhow::anyhow!("Connection failed: {}", e))?;
+
+        // Close the connection gracefully
+        let _ = socket.close(None);
+        Ok(true)
     }
 }
 
@@ -670,3 +1133,547 @@ pub struct RecoveryStatus {
 
 /// Available field types for selection.
 pub const FIELD_TYPES: &[&str] = &["Email", "Phone", "Website", "Address", "Social", "Custom"];
+
+/// Result of a sync operation.
+#[derive(Debug, Clone)]
+pub struct SyncResult {
+    /// Number of new contacts added from exchange messages.
+    pub contacts_added: u32,
+    /// Number of contact cards updated.
+    pub cards_updated: u32,
+    /// Number of outbound updates sent.
+    pub updates_sent: u32,
+    /// Whether sync completed successfully.
+    pub success: bool,
+    /// Error message if sync failed.
+    pub error: Option<String>,
+}
+
+impl SyncResult {
+    /// Create a success result.
+    pub fn success(contacts_added: u32, cards_updated: u32, updates_sent: u32) -> Self {
+        Self {
+            contacts_added,
+            cards_updated,
+            updates_sent,
+            success: true,
+            error: None,
+        }
+    }
+
+    /// Create an error result.
+    pub fn error(msg: impl Into<String>) -> Self {
+        Self {
+            contacts_added: 0,
+            cards_updated: 0,
+            updates_sent: 0,
+            success: false,
+            error: Some(msg.into()),
+        }
+    }
+}
+
+/// Messages received from the relay during sync.
+struct ReceivedMessages {
+    legacy_exchange: Vec<LegacyExchangeMessage>,
+    encrypted_exchange: Vec<Vec<u8>>,
+    card_updates: Vec<(String, Vec<u8>)>,
+}
+
+// ===========================================================================
+// Backend Tests
+// Trace: features/identity_management.feature, contact_card_management.feature
+// ===========================================================================
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::TempDir;
+
+    /// Create a test backend with isolated data directory.
+    fn create_test_backend() -> (Backend, TempDir) {
+        let temp_dir = TempDir::new().expect("Failed to create temp dir");
+        let backend = Backend::new(temp_dir.path()).expect("Failed to create backend");
+        (backend, temp_dir)
+    }
+
+    // === Identity Management Tests ===
+    // Trace: identity_management.feature
+
+    /// Trace: identity_management.feature - New backend has no identity
+    #[test]
+    fn test_new_backend_has_no_identity() {
+        let (backend, _temp) = create_test_backend();
+        assert!(!backend.has_identity());
+        assert!(backend.display_name().is_none());
+        assert!(backend.public_id().is_none());
+    }
+
+    /// Trace: identity_management.feature - Create new identity
+    #[test]
+    fn test_create_identity() {
+        let (mut backend, _temp) = create_test_backend();
+
+        backend.create_identity("Alice Smith").expect("Failed to create identity");
+
+        assert!(backend.has_identity());
+        assert_eq!(backend.display_name(), Some("Alice Smith"));
+        assert!(backend.public_id().is_some());
+    }
+
+    /// Trace: identity_management.feature - Identity persists across backend instances
+    #[test]
+    fn test_identity_persistence() {
+        let temp_dir = TempDir::new().expect("Failed to create temp dir");
+
+        // Create identity in first backend
+        {
+            let mut backend = Backend::new(temp_dir.path()).expect("Failed to create backend");
+            backend.create_identity("Alice Smith").expect("Failed to create identity");
+        }
+
+        // Load in second backend
+        {
+            let backend = Backend::new(temp_dir.path()).expect("Failed to load backend");
+            assert!(backend.has_identity());
+            assert_eq!(backend.display_name(), Some("Alice Smith"));
+        }
+    }
+
+    // === Contact Card Management Tests ===
+    // Trace: contact_card_management.feature
+
+    /// Trace: contact_card_management.feature - New identity has empty card
+    #[test]
+    fn test_new_identity_empty_card() {
+        let (mut backend, _temp) = create_test_backend();
+        backend.create_identity("Alice Smith").expect("Failed to create identity");
+
+        let fields = backend.get_card_fields().expect("Failed to get fields");
+        assert!(fields.is_empty());
+    }
+
+    /// Trace: contact_card_management.feature - Add phone field
+    #[test]
+    fn test_add_phone_field() {
+        let (mut backend, _temp) = create_test_backend();
+        backend.create_identity("Alice Smith").expect("Failed to create identity");
+
+        backend
+            .add_field(FieldType::Phone, "Mobile", "+1-555-123-4567")
+            .expect("Failed to add field");
+
+        let fields = backend.get_card_fields().expect("Failed to get fields");
+        assert_eq!(fields.len(), 1);
+        assert_eq!(fields[0].label, "Mobile");
+        assert_eq!(fields[0].value, "+1-555-123-4567");
+    }
+
+    /// Trace: contact_card_management.feature - Add email field
+    #[test]
+    fn test_add_email_field() {
+        let (mut backend, _temp) = create_test_backend();
+        backend.create_identity("Alice Smith").expect("Failed to create identity");
+
+        backend
+            .add_field(FieldType::Email, "Work", "alice@company.com")
+            .expect("Failed to add field");
+
+        let fields = backend.get_card_fields().expect("Failed to get fields");
+        assert_eq!(fields.len(), 1);
+        assert_eq!(fields[0].label, "Work");
+        assert_eq!(fields[0].value, "alice@company.com");
+    }
+
+    /// Trace: contact_card_management.feature - Add multiple fields
+    #[test]
+    fn test_add_multiple_fields() {
+        let (mut backend, _temp) = create_test_backend();
+        backend.create_identity("Alice Smith").expect("Failed to create identity");
+
+        backend
+            .add_field(FieldType::Phone, "Mobile", "+1-555-123-4567")
+            .expect("Failed to add field");
+        backend
+            .add_field(FieldType::Email, "Work", "alice@company.com")
+            .expect("Failed to add field");
+        backend
+            .add_field(FieldType::Website, "Personal", "https://alice.example.com")
+            .expect("Failed to add field");
+
+        let fields = backend.get_card_fields().expect("Failed to get fields");
+        assert_eq!(fields.len(), 3);
+    }
+
+    /// Trace: contact_card_management.feature - Remove field
+    /// Note: Backend.remove_field takes field_id (unique ID), not label
+    #[test]
+    fn test_remove_field() {
+        let (mut backend, _temp) = create_test_backend();
+        backend.create_identity("Alice Smith").expect("Failed to create identity");
+
+        backend
+            .add_field(FieldType::Phone, "Mobile", "+1-555-123-4567")
+            .expect("Failed to add field");
+
+        // Get the card directly and get the field's unique ID
+        let card = backend.get_card().expect("get card").unwrap();
+        let field_id = card.fields()[0].id().to_string();
+        backend
+            .remove_field(&field_id)
+            .expect("Failed to remove field");
+
+        let fields = backend.get_card_fields().expect("Failed to get fields");
+        assert!(fields.is_empty());
+    }
+
+    /// Trace: contact_card_management.feature - Update field value
+    /// Note: Backend.update_field takes field label (finds field by label, then modifies)
+    #[test]
+    fn test_update_field() {
+        let (mut backend, _temp) = create_test_backend();
+        backend.create_identity("Alice Smith").expect("Failed to create identity");
+
+        backend
+            .add_field(FieldType::Phone, "Mobile", "+1-555-123-4567")
+            .expect("Failed to add field");
+
+        // update_field uses label to find and update the field
+        backend
+            .update_field("Mobile", "+1-555-999-8888")
+            .expect("Failed to update field");
+
+        let fields = backend.get_card_fields().expect("Failed to get fields");
+        assert_eq!(fields[0].value, "+1-555-999-8888");
+    }
+
+    /// Trace: contact_card_management.feature - Update display name
+    #[test]
+    fn test_update_display_name() {
+        let (mut backend, _temp) = create_test_backend();
+        backend.create_identity("Alice Smith").expect("Failed to create identity");
+
+        backend
+            .update_display_name("Alice S.")
+            .expect("Failed to update name");
+
+        assert_eq!(backend.display_name(), Some("Alice S."));
+    }
+
+    /// Trace: contact_card_management.feature - Empty display name rejected
+    #[test]
+    fn test_empty_display_name_rejected() {
+        let (mut backend, _temp) = create_test_backend();
+        backend.create_identity("Alice Smith").expect("Failed to create identity");
+
+        let result = backend.update_display_name("");
+        assert!(result.is_err());
+        assert_eq!(backend.display_name(), Some("Alice Smith"));
+    }
+
+    /// Trace: contact_card_management.feature - Display name too long rejected
+    #[test]
+    fn test_long_display_name_rejected() {
+        let (mut backend, _temp) = create_test_backend();
+        backend.create_identity("Alice Smith").expect("Failed to create identity");
+
+        let long_name = "A".repeat(101);
+        let result = backend.update_display_name(&long_name);
+        assert!(result.is_err());
+    }
+
+    // === Field Type Parsing Tests ===
+
+    #[test]
+    fn test_parse_field_type_email() {
+        assert!(matches!(Backend::parse_field_type("email"), FieldType::Email));
+        assert!(matches!(Backend::parse_field_type("EMAIL"), FieldType::Email));
+    }
+
+    #[test]
+    fn test_parse_field_type_phone() {
+        assert!(matches!(Backend::parse_field_type("phone"), FieldType::Phone));
+    }
+
+    #[test]
+    fn test_parse_field_type_website() {
+        assert!(matches!(Backend::parse_field_type("website"), FieldType::Website));
+    }
+
+    #[test]
+    fn test_parse_field_type_address() {
+        assert!(matches!(Backend::parse_field_type("address"), FieldType::Address));
+    }
+
+    #[test]
+    fn test_parse_field_type_social() {
+        assert!(matches!(Backend::parse_field_type("social"), FieldType::Social));
+    }
+
+    #[test]
+    fn test_parse_field_type_custom() {
+        assert!(matches!(Backend::parse_field_type("other"), FieldType::Custom));
+        assert!(matches!(Backend::parse_field_type("unknown"), FieldType::Custom));
+    }
+
+    // === Contacts Tests ===
+    // Trace: contacts_management.feature
+
+    /// Trace: contacts_management.feature - New identity has no contacts
+    #[test]
+    fn test_new_identity_no_contacts() {
+        let (mut backend, _temp) = create_test_backend();
+        backend.create_identity("Alice Smith").expect("Failed to create identity");
+
+        let contacts = backend.list_contacts().expect("Failed to list contacts");
+        assert!(contacts.is_empty());
+        assert_eq!(backend.contact_count().unwrap(), 0);
+    }
+
+    // === Settings Tests ===
+
+    /// Test relay URL configuration
+    #[test]
+    fn test_relay_url_default() {
+        let (backend, _temp) = create_test_backend();
+        assert_eq!(backend.relay_url(), "wss://relay.vauchi.app");
+    }
+
+    /// Test setting relay URL
+    #[test]
+    fn test_set_relay_url() {
+        let (mut backend, _temp) = create_test_backend();
+
+        backend
+            .set_relay_url("wss://custom.relay.example.com")
+            .expect("Failed to set relay URL");
+
+        assert_eq!(backend.relay_url(), "wss://custom.relay.example.com");
+    }
+
+    /// Test relay URL persistence
+    #[test]
+    fn test_relay_url_persistence() {
+        let temp_dir = TempDir::new().expect("Failed to create temp dir");
+
+        // Set relay URL in first backend
+        {
+            let mut backend = Backend::new(temp_dir.path()).expect("Failed to create backend");
+            backend
+                .set_relay_url("wss://custom.relay.example.com")
+                .expect("Failed to set relay URL");
+        }
+
+        // Load in second backend
+        {
+            let backend = Backend::new(temp_dir.path()).expect("Failed to load backend");
+            assert_eq!(backend.relay_url(), "wss://custom.relay.example.com");
+        }
+    }
+
+    /// Test invalid relay URL rejected
+    #[test]
+    fn test_invalid_relay_url_rejected() {
+        let (mut backend, _temp) = create_test_backend();
+
+        let result = backend.set_relay_url("invalid-url");
+        assert!(result.is_err());
+    }
+
+    /// Test empty relay URL rejected
+    #[test]
+    fn test_empty_relay_url_rejected() {
+        let (mut backend, _temp) = create_test_backend();
+
+        let result = backend.set_relay_url("");
+        assert!(result.is_err());
+    }
+
+    // === Backup Tests ===
+    // Trace: identity_management.feature - backup/restore
+
+    /// Trace: identity_management.feature - Export backup
+    #[test]
+    fn test_export_backup() {
+        let (mut backend, _temp) = create_test_backend();
+        backend.create_identity("Alice Smith").expect("Failed to create identity");
+
+        // Use a strong password that meets requirements
+        let backup = backend.export_backup("Str0ng!P@ssw0rd#2024").expect("Failed to export backup");
+
+        // Backup should be hex-encoded
+        assert!(hex::decode(&backup).is_ok());
+        assert!(!backup.is_empty());
+    }
+
+    /// Trace: identity_management.feature - Import backup
+    #[test]
+    fn test_import_backup() {
+        let backup_data;
+        let password = "Str0ng!P@ssw0rd#2024";
+
+        // Create identity and export backup
+        {
+            let (mut backend1, _temp1) = create_test_backend();
+            backend1.create_identity("Alice Smith").expect("Failed to create identity");
+            backend1
+                .add_field(FieldType::Email, "Work", "alice@work.com")
+                .expect("Failed to add field");
+            backup_data = backend1.export_backup(password).expect("Failed to export backup");
+        }
+
+        // Import backup into new backend
+        let (mut backend2, _temp2) = create_test_backend();
+        backend2
+            .import_backup(&backup_data, password)
+            .expect("Failed to import backup");
+
+        assert!(backend2.has_identity());
+        assert_eq!(backend2.display_name(), Some("Alice Smith"));
+    }
+
+    /// Trace: identity_management.feature - Import with wrong password fails
+    #[test]
+    fn test_import_backup_wrong_password() {
+        let (mut backend1, _temp1) = create_test_backend();
+        backend1.create_identity("Alice Smith").expect("Failed to create identity");
+        let backup_data = backend1.export_backup("C0rrect!P@ssw0rd#2024").expect("Failed to export backup");
+
+        let (mut backend2, _temp2) = create_test_backend();
+        let result = backend2.import_backup(&backup_data, "Wr0ng!P@ssw0rd#2024");
+
+        assert!(result.is_err());
+    }
+
+    // === Exchange Tests ===
+    // Trace: contact_exchange.feature
+
+    /// Trace: contact_exchange.feature - Generate exchange QR
+    #[test]
+    fn test_generate_exchange_qr() {
+        let (mut backend, _temp) = create_test_backend();
+        backend.create_identity("Alice Smith").expect("Failed to create identity");
+
+        let qr = backend.generate_exchange_qr().expect("Failed to generate QR");
+
+        assert!(!qr.data.is_empty());
+        assert!(qr.expires_in_secs > 0);
+        assert!(qr.remaining_secs() <= qr.expires_in_secs);
+    }
+
+    // === Device Tests ===
+    // Trace: device_management.feature
+
+    /// Trace: device_management.feature - List devices shows current device
+    #[test]
+    fn test_list_devices() {
+        let (mut backend, _temp) = create_test_backend();
+        backend.create_identity("Alice Smith").expect("Failed to create identity");
+
+        let devices = backend.list_devices().expect("Failed to list devices");
+
+        assert_eq!(devices.len(), 1);
+        assert!(devices[0].is_current);
+        assert!(devices[0].is_active);
+    }
+
+    /// Trace: device_management.feature - Generate device link
+    #[test]
+    fn test_generate_device_link() {
+        let (mut backend, _temp) = create_test_backend();
+        backend.create_identity("Alice Smith").expect("Failed to create identity");
+
+        let link = backend.generate_device_link().expect("Failed to generate link");
+
+        assert!(link.starts_with("wb://link/"));
+    }
+
+    // === Sync Tests ===
+    // Trace: sync_updates.feature
+
+    /// Trace: sync_updates.feature - Sync status without identity
+    #[test]
+    fn test_sync_status_no_identity() {
+        let (backend, _temp) = create_test_backend();
+        assert_eq!(backend.sync_status(), "No identity");
+    }
+
+    /// Trace: sync_updates.feature - Sync status with identity
+    #[test]
+    fn test_sync_status_with_identity() {
+        let (mut backend, _temp) = create_test_backend();
+        backend.create_identity("Alice Smith").expect("Failed to create identity");
+        assert_eq!(backend.sync_status(), "Ready to sync");
+    }
+
+    /// Trace: sync_updates.feature - Pending update count starts at zero
+    #[test]
+    fn test_pending_update_count_zero() {
+        let (mut backend, _temp) = create_test_backend();
+        backend.create_identity("Alice Smith").expect("Failed to create identity");
+
+        let count = backend.pending_update_count().expect("Failed to get count");
+        assert_eq!(count, 0);
+    }
+
+    // === QRData Tests ===
+
+    #[test]
+    fn test_qr_data_remaining_secs() {
+        use std::time::{SystemTime, UNIX_EPOCH};
+
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+
+        let qr = QRData {
+            data: "test".to_string(),
+            generated_at: now,
+            expires_in_secs: 300,
+        };
+
+        // Should have close to 300 seconds remaining
+        assert!(qr.remaining_secs() <= 300);
+        assert!(qr.remaining_secs() >= 299);
+    }
+
+    #[test]
+    fn test_qr_data_expired() {
+        use std::time::{SystemTime, UNIX_EPOCH};
+
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+
+        let qr = QRData {
+            data: "test".to_string(),
+            generated_at: now - 400, // 400 seconds ago
+            expires_in_secs: 300,    // Expires after 300
+        };
+
+        assert_eq!(qr.remaining_secs(), 0);
+        assert!(qr.is_expired());
+    }
+
+    // === SyncResult Tests ===
+
+    #[test]
+    fn test_sync_result_success() {
+        let result = SyncResult::success(2, 3, 1);
+        assert!(result.success);
+        assert_eq!(result.contacts_added, 2);
+        assert_eq!(result.cards_updated, 3);
+        assert_eq!(result.updates_sent, 1);
+        assert!(result.error.is_none());
+    }
+
+    #[test]
+    fn test_sync_result_error() {
+        let result = SyncResult::error("Connection failed");
+        assert!(!result.success);
+        assert_eq!(result.contacts_added, 0);
+        assert_eq!(result.error, Some("Connection failed".to_string()));
+    }
+}

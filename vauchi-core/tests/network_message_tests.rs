@@ -1,9 +1,7 @@
 //! Tests for network::message
 //! Extracted from message.rs
 
-use vauchi_core::network::message::DeviceSyncMessage;
 use vauchi_core::network::*;
-use vauchi_core::*;
 
 #[test]
 fn test_message_envelope_serialize_roundtrip() {

@@ -520,6 +520,149 @@ impl<T: Transport> Vauchi<T> {
     pub fn events(&self) -> &Arc<EventDispatcher> {
         &self.events
     }
+
+    // === Visibility Labels ===
+
+    /// Lists all visibility labels.
+    pub fn list_labels(
+        &self,
+    ) -> VauchiResult<Vec<crate::contact::VisibilityLabel>> {
+        Ok(self.storage.load_all_labels()?)
+    }
+
+    /// Creates a new visibility label.
+    pub fn create_label(
+        &self,
+        name: &str,
+    ) -> VauchiResult<crate::contact::VisibilityLabel> {
+        Ok(self.storage.create_label(name)?)
+    }
+
+    /// Renames a visibility label.
+    pub fn rename_label(&self, label_id: &str, new_name: &str) -> VauchiResult<()> {
+        Ok(self.storage.rename_label(label_id, new_name)?)
+    }
+
+    /// Deletes a visibility label.
+    ///
+    /// Contacts in the label remain in the contact list; they just lose
+    /// their label membership.
+    pub fn delete_label(&self, label_id: &str) -> VauchiResult<()> {
+        Ok(self.storage.delete_label(label_id)?)
+    }
+
+    /// Gets a visibility label by ID.
+    pub fn get_label(
+        &self,
+        label_id: &str,
+    ) -> VauchiResult<crate::contact::VisibilityLabel> {
+        Ok(self.storage.load_label(label_id)?)
+    }
+
+    /// Adds a contact to a visibility label.
+    pub fn add_contact_to_label(
+        &self,
+        label_id: &str,
+        contact_id: &str,
+    ) -> VauchiResult<()> {
+        Ok(self.storage.add_contact_to_label(label_id, contact_id)?)
+    }
+
+    /// Removes a contact from a visibility label.
+    pub fn remove_contact_from_label(
+        &self,
+        label_id: &str,
+        contact_id: &str,
+    ) -> VauchiResult<()> {
+        Ok(self.storage.remove_contact_from_label(label_id, contact_id)?)
+    }
+
+    /// Gets all labels that contain a specific contact.
+    pub fn get_labels_for_contact(
+        &self,
+        contact_id: &str,
+    ) -> VauchiResult<Vec<crate::contact::VisibilityLabel>> {
+        Ok(self.storage.get_labels_for_contact(contact_id)?)
+    }
+
+    /// Sets field visibility for a label.
+    ///
+    /// When `is_visible` is true, contacts in this label will see the field.
+    /// When false, the field is hidden from contacts in this label.
+    pub fn set_label_field_visibility(
+        &self,
+        label_id: &str,
+        field_id: &str,
+        is_visible: bool,
+    ) -> VauchiResult<()> {
+        Ok(self.storage.set_label_field_visibility(label_id, field_id, is_visible)?)
+    }
+
+    /// Sets a per-contact visibility override for a field.
+    ///
+    /// Per-contact overrides take precedence over label-based visibility.
+    pub fn set_contact_visibility_override(
+        &self,
+        contact_id: &str,
+        field_id: &str,
+        is_visible: bool,
+    ) -> VauchiResult<()> {
+        Ok(self.storage.save_contact_override(contact_id, field_id, is_visible)?)
+    }
+
+    /// Removes a per-contact visibility override.
+    pub fn remove_contact_visibility_override(
+        &self,
+        contact_id: &str,
+        field_id: &str,
+    ) -> VauchiResult<()> {
+        Ok(self.storage.delete_contact_override(contact_id, field_id)?)
+    }
+
+    /// Gets all per-contact visibility overrides for a contact.
+    pub fn get_contact_visibility_overrides(
+        &self,
+        contact_id: &str,
+    ) -> VauchiResult<std::collections::HashMap<String, bool>> {
+        Ok(self.storage.load_contact_overrides(contact_id)?)
+    }
+
+    /// Determines the effective visibility of a field for a contact.
+    ///
+    /// Returns visibility determined by (in priority order):
+    /// 1. Per-contact override (if set)
+    /// 2. Label membership (visible if contact is in any label that shows this field)
+    /// 3. Contact's VisibilityRules (the default field visibility)
+    pub fn get_effective_field_visibility(
+        &self,
+        contact_id: &str,
+        field_id: &str,
+    ) -> VauchiResult<bool> {
+        // Load the contact's visibility rules as fallback
+        let contact = self
+            .storage
+            .load_contact(contact_id)?
+            .ok_or_else(|| VauchiError::NotFound(format!("contact: {}", contact_id)))?;
+
+        // Check per-contact override first
+        let overrides = self.storage.load_contact_overrides(contact_id)?;
+        if let Some(&is_visible) = overrides.get(field_id) {
+            return Ok(is_visible);
+        }
+
+        // Check if any label containing this contact shows this field
+        let labels = self.storage.get_labels_for_contact(contact_id)?;
+        for label in labels {
+            if label.is_field_visible(field_id) {
+                return Ok(true);
+            }
+        }
+
+        // Fall back to contact's default visibility rules
+        // Note: The visibility rules determine what this contact can see of *our* card
+        // We use their contact_id to check if they're in the allowed list
+        Ok(contact.visibility_rules().can_see(field_id, contact_id))
+    }
 }
 
 /// Builder for creating Vauchi instances.

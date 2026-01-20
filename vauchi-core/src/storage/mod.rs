@@ -24,6 +24,11 @@ pub mod identity;
 mod identity;
 
 #[cfg(feature = "testing")]
+pub mod labels;
+#[cfg(not(feature = "testing"))]
+mod labels;
+
+#[cfg(feature = "testing")]
 pub mod pending;
 #[cfg(not(feature = "testing"))]
 mod pending;
@@ -169,9 +174,28 @@ impl Storage {
                 updated_at INTEGER NOT NULL
             );
 
+            -- Visibility labels
+            CREATE TABLE IF NOT EXISTS visibility_labels (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL UNIQUE,
+                contacts_json TEXT NOT NULL DEFAULT '[]',
+                visible_fields_json TEXT NOT NULL DEFAULT '[]',
+                created_at INTEGER NOT NULL,
+                modified_at INTEGER NOT NULL
+            );
+
+            -- Per-contact visibility overrides
+            CREATE TABLE IF NOT EXISTS contact_visibility_overrides (
+                contact_id TEXT NOT NULL,
+                field_id TEXT NOT NULL,
+                is_visible INTEGER NOT NULL,
+                PRIMARY KEY (contact_id, field_id)
+            );
+
             -- Create indexes
             CREATE INDEX IF NOT EXISTS idx_pending_contact ON pending_updates(contact_id);
             CREATE INDEX IF NOT EXISTS idx_pending_status ON pending_updates(status);
+            CREATE INDEX IF NOT EXISTS idx_label_name ON visibility_labels(name);
             ",
         )?;
         Ok(())

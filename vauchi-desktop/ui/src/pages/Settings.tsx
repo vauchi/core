@@ -1,5 +1,6 @@
 import { createResource, createSignal, Show, onMount } from 'solid-js'
 import { invoke } from '@tauri-apps/api/core'
+import { open } from '@tauri-apps/plugin-shell'
 
 interface IdentityInfo {
   display_name: string
@@ -393,10 +394,28 @@ function Settings(props: SettingsProps) {
       </section>
 
       <section class="settings-section">
+        <h2>Help & Support</h2>
+        <div class="setting-buttons help-links">
+          <button class="secondary link-btn" onClick={() => open('https://vauchi.app/user-guide')}>
+            User Guide
+          </button>
+          <button class="secondary link-btn" onClick={() => open('https://vauchi.app/faq')}>
+            FAQ
+          </button>
+          <button class="secondary link-btn" onClick={() => open('https://github.com/vauchi/issues')}>
+            Report Issue
+          </button>
+          <button class="secondary link-btn" onClick={() => open('https://vauchi.app/privacy')}>
+            Privacy Policy
+          </button>
+        </div>
+      </section>
+
+      <section class="settings-section">
         <h2>About</h2>
         <div class="setting-item">
           <span class="setting-label">Version</span>
-          <span class="setting-value">0.1.0</span>
+          <span class="setting-value">1.0.0 (build 1)</span>
         </div>
         <div class="setting-item">
           <span class="setting-label">Vauchi</span>

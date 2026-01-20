@@ -154,7 +154,11 @@ mod identity_management {
         let ctx2 = CliTestContext::new();
         let output = ctx2.run_success(&["import", backup_path.to_str().unwrap()]);
 
-        assert!(output.contains("imported") || output.contains("restored") || output.contains("Identity"));
+        assert!(
+            output.contains("imported")
+                || output.contains("restored")
+                || output.contains("Identity")
+        );
 
         // Verify name was restored
         let card_output = ctx2.run_success(&["card", "show"]);
@@ -218,7 +222,13 @@ mod contact_card_management {
         let ctx = CliTestContext::new();
         ctx.init("Alice Smith");
 
-        ctx.run_success(&["card", "add", "website", "Personal", "https://alice.example.com"]);
+        ctx.run_success(&[
+            "card",
+            "add",
+            "website",
+            "Personal",
+            "https://alice.example.com",
+        ]);
 
         let card = ctx.run_success(&["card", "show"]);
         assert!(card.contains("Personal"));
@@ -325,7 +335,12 @@ mod contact_exchange {
         alice.run_success(&["card", "add", "email", "Work", "alice@work.com"]);
 
         let alice_exchange = alice.run_success(&["exchange", "start"]);
-        let alice_data: String = alice_exchange.lines().last().unwrap_or("").trim().to_string();
+        let alice_data: String = alice_exchange
+            .lines()
+            .last()
+            .unwrap_or("")
+            .trim()
+            .to_string();
 
         // Bob completes exchange with Alice's data
         let bob = CliTestContext::new();
@@ -357,7 +372,10 @@ mod contact_exchange {
 
         let stderr = ctx.run_failure(&["exchange", "complete", "not-valid-exchange-data"]);
         assert!(
-            stderr.contains("invalid") || stderr.contains("Invalid") || stderr.contains("failed") || stderr.contains("error"),
+            stderr.contains("invalid")
+                || stderr.contains("Invalid")
+                || stderr.contains("failed")
+                || stderr.contains("error"),
             "Expected error for invalid data, got: {}",
             stderr
         );
@@ -380,7 +398,10 @@ mod contacts_management {
 
         let output = ctx.run_success(&["contacts", "list"]);
         assert!(
-            output.contains("No contacts") || output.contains("empty") || output.is_empty() || output.contains("0"),
+            output.contains("No contacts")
+                || output.contains("empty")
+                || output.is_empty()
+                || output.contains("0"),
             "Expected no contacts, got: {}",
             output
         );
@@ -395,7 +416,10 @@ mod contacts_management {
         let output = ctx.run_success(&["contacts", "search", "Bob"]);
         // With no contacts, should return empty or "not found"
         assert!(
-            output.contains("No") || output.contains("not found") || output.is_empty() || output.contains("0"),
+            output.contains("No")
+                || output.contains("not found")
+                || output.is_empty()
+                || output.contains("0"),
             "Unexpected search result: {}",
             output
         );
@@ -553,7 +577,10 @@ mod recovery {
 
         let output = ctx.run_success(&["recovery", "settings", "show"]);
         assert!(
-            output.contains("recovery") || output.contains("Recovery") || output.contains("threshold") || output.contains("voucher"),
+            output.contains("recovery")
+                || output.contains("Recovery")
+                || output.contains("threshold")
+                || output.contains("voucher"),
             "Expected recovery settings, got: {}",
             output
         );
@@ -565,7 +592,15 @@ mod recovery {
         let ctx = CliTestContext::new();
         ctx.init("Alice Smith");
 
-        let output = ctx.run_success(&["recovery", "settings", "set", "--recovery", "3", "--verification", "2"]);
+        let output = ctx.run_success(&[
+            "recovery",
+            "settings",
+            "set",
+            "--recovery",
+            "3",
+            "--verification",
+            "2",
+        ]);
         assert!(
             output.contains("updated") || output.contains("set") || output.contains("3"),
             "Expected settings update confirmation, got: {}",
@@ -581,7 +616,10 @@ mod recovery {
 
         let output = ctx.run_success(&["recovery", "status"]);
         assert!(
-            output.contains("No") || output.contains("none") || output.contains("active") || output.contains("claim"),
+            output.contains("No")
+                || output.contains("none")
+                || output.contains("active")
+                || output.contains("claim"),
             "Expected no active recovery, got: {}",
             output
         );
@@ -602,7 +640,12 @@ mod social {
         let ctx = CliTestContext::new();
 
         let output = ctx.run_success(&["social", "list"]);
-        assert!(output.contains("twitter") || output.contains("Twitter") || output.contains("github") || output.contains("GitHub"));
+        assert!(
+            output.contains("twitter")
+                || output.contains("Twitter")
+                || output.contains("github")
+                || output.contains("GitHub")
+        );
     }
 
     /// Trace: contact_card_management.feature - "Generate profile URL"
@@ -620,7 +663,12 @@ mod social {
         let ctx = CliTestContext::new();
 
         let output = ctx.run_success(&["social", "list", "git"]);
-        assert!(output.contains("GitHub") || output.contains("github") || output.contains("GitLab") || output.contains("gitlab"));
+        assert!(
+            output.contains("GitHub")
+                || output.contains("github")
+                || output.contains("GitLab")
+                || output.contains("gitlab")
+        );
     }
 }
 
@@ -646,11 +694,16 @@ mod sync {
 
         // Should either succeed or fail with connection error
         assert!(
-            combined.contains("sync") || combined.contains("Sync") ||
-            combined.contains("connect") || combined.contains("Connect") ||
-            combined.contains("relay") || combined.contains("Relay") ||
-            combined.contains("error") || combined.contains("Error") ||
-            combined.contains("success") || combined.contains("Success"),
+            combined.contains("sync")
+                || combined.contains("Sync")
+                || combined.contains("connect")
+                || combined.contains("Connect")
+                || combined.contains("relay")
+                || combined.contains("Relay")
+                || combined.contains("error")
+                || combined.contains("Error")
+                || combined.contains("success")
+                || combined.contains("Success"),
             "Sync command should run, got: {}",
             combined
         );

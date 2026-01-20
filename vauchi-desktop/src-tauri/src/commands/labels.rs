@@ -56,10 +56,7 @@ pub fn list_labels(state: State<'_, Mutex<AppState>>) -> Result<Vec<LabelInfo>, 
 
 /// Create a new visibility label.
 #[tauri::command]
-pub fn create_label(
-    name: String,
-    state: State<'_, Mutex<AppState>>,
-) -> Result<LabelInfo, String> {
+pub fn create_label(name: String, state: State<'_, Mutex<AppState>>) -> Result<LabelInfo, String> {
     let state = state.lock().unwrap();
 
     let label = state

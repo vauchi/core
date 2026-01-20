@@ -524,17 +524,12 @@ impl<T: Transport> Vauchi<T> {
     // === Visibility Labels ===
 
     /// Lists all visibility labels.
-    pub fn list_labels(
-        &self,
-    ) -> VauchiResult<Vec<crate::contact::VisibilityLabel>> {
+    pub fn list_labels(&self) -> VauchiResult<Vec<crate::contact::VisibilityLabel>> {
         Ok(self.storage.load_all_labels()?)
     }
 
     /// Creates a new visibility label.
-    pub fn create_label(
-        &self,
-        name: &str,
-    ) -> VauchiResult<crate::contact::VisibilityLabel> {
+    pub fn create_label(&self, name: &str) -> VauchiResult<crate::contact::VisibilityLabel> {
         Ok(self.storage.create_label(name)?)
     }
 
@@ -552,29 +547,20 @@ impl<T: Transport> Vauchi<T> {
     }
 
     /// Gets a visibility label by ID.
-    pub fn get_label(
-        &self,
-        label_id: &str,
-    ) -> VauchiResult<crate::contact::VisibilityLabel> {
+    pub fn get_label(&self, label_id: &str) -> VauchiResult<crate::contact::VisibilityLabel> {
         Ok(self.storage.load_label(label_id)?)
     }
 
     /// Adds a contact to a visibility label.
-    pub fn add_contact_to_label(
-        &self,
-        label_id: &str,
-        contact_id: &str,
-    ) -> VauchiResult<()> {
+    pub fn add_contact_to_label(&self, label_id: &str, contact_id: &str) -> VauchiResult<()> {
         Ok(self.storage.add_contact_to_label(label_id, contact_id)?)
     }
 
     /// Removes a contact from a visibility label.
-    pub fn remove_contact_from_label(
-        &self,
-        label_id: &str,
-        contact_id: &str,
-    ) -> VauchiResult<()> {
-        Ok(self.storage.remove_contact_from_label(label_id, contact_id)?)
+    pub fn remove_contact_from_label(&self, label_id: &str, contact_id: &str) -> VauchiResult<()> {
+        Ok(self
+            .storage
+            .remove_contact_from_label(label_id, contact_id)?)
     }
 
     /// Gets all labels that contain a specific contact.
@@ -595,7 +581,9 @@ impl<T: Transport> Vauchi<T> {
         field_id: &str,
         is_visible: bool,
     ) -> VauchiResult<()> {
-        Ok(self.storage.set_label_field_visibility(label_id, field_id, is_visible)?)
+        Ok(self
+            .storage
+            .set_label_field_visibility(label_id, field_id, is_visible)?)
     }
 
     /// Sets a per-contact visibility override for a field.
@@ -607,7 +595,9 @@ impl<T: Transport> Vauchi<T> {
         field_id: &str,
         is_visible: bool,
     ) -> VauchiResult<()> {
-        Ok(self.storage.save_contact_override(contact_id, field_id, is_visible)?)
+        Ok(self
+            .storage
+            .save_contact_override(contact_id, field_id, is_visible)?)
     }
 
     /// Removes a per-contact visibility override.

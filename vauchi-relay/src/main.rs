@@ -56,7 +56,10 @@ async fn main() {
         error!("=======================================================================");
         error!("");
         error!("The relay server is configured to listen on a non-localhost address");
-        error!("({}) but TLS verification has not been confirmed.", config.listen_addr);
+        error!(
+            "({}) but TLS verification has not been confirmed.",
+            config.listen_addr
+        );
         error!("");
         error!("To fix this, either:");
         error!("  1. Run behind a TLS-terminating proxy (nginx, Caddy, etc.) and set");
@@ -112,8 +115,8 @@ async fn main() {
     // Parse HTTP listen address for health/metrics endpoints
     // By default, bind to localhost for security (metrics contain internal info)
     // Use RELAY_METRICS_ADDR to expose on other interfaces if needed
-    let http_addr = std::env::var("RELAY_METRICS_ADDR")
-        .unwrap_or_else(|_| "127.0.0.1:8081".to_string());
+    let http_addr =
+        std::env::var("RELAY_METRICS_ADDR").unwrap_or_else(|_| "127.0.0.1:8081".to_string());
 
     // Check for metrics auth token (optional additional protection)
     let metrics_token = std::env::var("RELAY_METRICS_TOKEN").ok();
@@ -177,7 +180,8 @@ async fn main() {
         loop {
             // Clean up every 10 minutes, removing clients idle for 30 minutes
             tokio::time::sleep(std::time::Duration::from_secs(600)).await;
-            let removed = cleanup_rate_limiter.cleanup_inactive(std::time::Duration::from_secs(1800));
+            let removed =
+                cleanup_rate_limiter.cleanup_inactive(std::time::Duration::from_secs(1800));
             if removed > 0 {
                 info!("Cleaned up {} stale rate limiter entries", removed);
             }

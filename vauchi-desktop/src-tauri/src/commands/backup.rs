@@ -93,9 +93,7 @@ pub fn import_backup(
 /// Check password strength before backup.
 #[tauri::command]
 pub fn check_password_strength(password: String) -> Result<String, String> {
-    use vauchi_core::identity::password::{
-        password_feedback, validate_password, PasswordStrength,
-    };
+    use vauchi_core::identity::password::{password_feedback, validate_password, PasswordStrength};
 
     match validate_password(&password) {
         Ok(strength) => {

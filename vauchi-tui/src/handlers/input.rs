@@ -2,7 +2,10 @@
 
 use crossterm::event::KeyCode;
 
-use crate::app::{AddFieldFocus, App, BackupFocus, BackupMode, EditFieldState, EditNameState, EditRelayUrlState, InputMode, Screen};
+use crate::app::{
+    AddFieldFocus, App, BackupFocus, BackupMode, EditFieldState, EditNameState, EditRelayUrlState,
+    InputMode, Screen,
+};
 use crate::backend::{Backend, FIELD_TYPES};
 use vauchi_core::identity::password::validate_password;
 
@@ -561,9 +564,7 @@ fn handle_sync_keys(app: &mut App, key: KeyCode) {
 
             // Mark as syncing
             app.sync_state.is_syncing = true;
-            app.sync_state
-                .sync_log
-                .push("Starting sync...".to_string());
+            app.sync_state.sync_log.push("Starting sync...".to_string());
 
             // Perform sync
             let result = app.backend.sync();
@@ -584,8 +585,7 @@ fn handle_sync_keys(app: &mut App, key: KeyCode) {
                 app.set_status(format!("Sync complete: {}", summary));
 
                 // Update pending count
-                app.sync_state.pending_updates =
-                    app.backend.pending_update_count().unwrap_or(0);
+                app.sync_state.pending_updates = app.backend.pending_update_count().unwrap_or(0);
             } else {
                 app.sync_state.connected = false;
                 let error_msg = result.error.unwrap_or_else(|| "Unknown error".to_string());
@@ -602,12 +602,16 @@ fn handle_sync_keys(app: &mut App, key: KeyCode) {
             match app.backend.test_relay_connection() {
                 Ok(true) => {
                     app.sync_state.connected = true;
-                    app.sync_state.sync_log.push("Relay connection test: OK".to_string());
+                    app.sync_state
+                        .sync_log
+                        .push("Relay connection test: OK".to_string());
                     app.set_status("Relay connection successful!");
                 }
                 Ok(false) | Err(_) => {
                     app.sync_state.connected = false;
-                    app.sync_state.sync_log.push("Relay connection test: FAILED".to_string());
+                    app.sync_state
+                        .sync_log
+                        .push("Relay connection test: FAILED".to_string());
                     app.set_status("Relay connection failed");
                 }
             }
@@ -665,7 +669,10 @@ fn handle_backup_keys(app: &mut App, key: KeyCode) {
                         // Password is strong enough, proceed with export
                         match app.backend.export_backup(&app.backup_state.password) {
                             Ok(data) => {
-                                app.set_status(format!("Backup: {}...", &data[..50.min(data.len())]));
+                                app.set_status(format!(
+                                    "Backup: {}...",
+                                    &data[..50.min(data.len())]
+                                ));
                                 app.backup_state.mode = BackupMode::Menu;
                                 app.backup_state = Default::default();
                             }

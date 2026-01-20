@@ -6,7 +6,7 @@
 use std::net::TcpStream;
 use std::time::Duration;
 
-#[cfg(feature = "network-native-tls")]
+#[cfg(all(feature = "network-native-tls", not(feature = "network-rustls")))]
 use native_tls::TlsConnector;
 
 #[cfg(feature = "network-rustls")]
@@ -115,9 +115,9 @@ impl WebSocketTransport {
             .with_root_certificates(root_store)
             .with_no_client_auth();
 
-        let server_name: ServerName<'_> = host
-            .try_into()
-            .map_err(|_| NetworkError::ConnectionFailed(format!("Invalid server name: {}", host)))?;
+        let server_name: ServerName<'_> = host.try_into().map_err(|_| {
+            NetworkError::ConnectionFailed(format!("Invalid server name: {}", host))
+        })?;
 
         let tls_conn = rustls::ClientConnection::new(Arc::new(config), server_name.to_owned())
             .map_err(|e| NetworkError::ConnectionFailed(format!("TLS setup failed: {}", e)))?;
@@ -160,9 +160,8 @@ impl Transport for WebSocketTransport {
 
         // Wrap in TLS if needed
         let stream: MaybeTlsStream<TcpStream> = if is_tls {
-            Self::create_tls_stream(&host, tcp_stream).map_err(|e| {
+            Self::create_tls_stream(&host, tcp_stream).inspect_err(|_| {
                 self.state = ConnectionState::Disconnected;
-                e
             })?
         } else {
             MaybeTlsStream::Plain(tcp_stream)

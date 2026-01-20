@@ -155,7 +155,10 @@ mod tests {
     #[test]
     fn test_zero_max_connections() {
         let limiter = ConnectionLimiter::new(0);
-        assert!(limiter.try_acquire().is_none(), "Zero limit should reject all");
+        assert!(
+            limiter.try_acquire().is_none(),
+            "Zero limit should reject all"
+        );
     }
 
     #[test]

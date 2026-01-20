@@ -196,7 +196,10 @@ impl VauchiMobile {
 
     /// Get the path to the recovery proof file.
     fn recovery_proof_path(&self) -> PathBuf {
-        self.storage_path.parent().unwrap_or(&self.storage_path).join(".recovery_proof")
+        self.storage_path
+            .parent()
+            .unwrap_or(&self.storage_path)
+            .join(".recovery_proof")
     }
 }
 
@@ -1039,7 +1042,8 @@ impl VauchiMobile {
         claim_b64: String,
     ) -> Result<MobileRecoveryClaim, MobileError> {
         use base64::Engine;
-        let claim_bytes = base64::engine::general_purpose::STANDARD.decode(&claim_b64)
+        let claim_bytes = base64::engine::general_purpose::STANDARD
+            .decode(&claim_b64)
             .map_err(|e| MobileError::InvalidInput(format!("Invalid base64: {}", e)))?;
 
         let claim = RecoveryClaim::from_bytes(&claim_bytes)
@@ -1064,7 +1068,8 @@ impl VauchiMobile {
         use base64::Engine;
         let identity = self.get_identity()?;
 
-        let claim_bytes = base64::engine::general_purpose::STANDARD.decode(&claim_b64)
+        let claim_bytes = base64::engine::general_purpose::STANDARD
+            .decode(&claim_b64)
             .map_err(|e| MobileError::InvalidInput(format!("Invalid base64: {}", e)))?;
 
         let claim = RecoveryClaim::from_bytes(&claim_bytes)
@@ -1093,25 +1098,30 @@ impl VauchiMobile {
         voucher_b64: String,
     ) -> Result<MobileRecoveryProgress, MobileError> {
         use base64::Engine;
-        let voucher_bytes = base64::engine::general_purpose::STANDARD.decode(&voucher_b64)
+        let voucher_bytes = base64::engine::general_purpose::STANDARD
+            .decode(&voucher_b64)
             .map_err(|e| MobileError::InvalidInput(format!("Invalid base64: {}", e)))?;
 
         let voucher = RecoveryVoucher::from_bytes(&voucher_bytes)
             .map_err(|e| MobileError::InvalidInput(format!("Invalid voucher: {}", e)))?;
 
         if !voucher.verify() {
-            return Err(MobileError::InvalidInput("Invalid voucher signature".to_string()));
+            return Err(MobileError::InvalidInput(
+                "Invalid voucher signature".to_string(),
+            ));
         }
 
         // Load current proof from file
         let proof_path = self.recovery_proof_path();
         let mut proof = if proof_path.exists() {
-            let proof_bytes = std::fs::read(&proof_path)
-                .map_err(|e| MobileError::StorageError(e.to_string()))?;
+            let proof_bytes =
+                std::fs::read(&proof_path).map_err(|e| MobileError::StorageError(e.to_string()))?;
             RecoveryProof::from_bytes(&proof_bytes)
                 .map_err(|e| MobileError::InvalidInput(format!("Invalid proof: {}", e)))?
         } else {
-            return Err(MobileError::InvalidInput("No recovery in progress".to_string()));
+            return Err(MobileError::InvalidInput(
+                "No recovery in progress".to_string(),
+            ));
         };
 
         // Add voucher
@@ -1144,8 +1154,8 @@ impl VauchiMobile {
             return Ok(None);
         }
 
-        let proof_bytes = std::fs::read(&proof_path)
-            .map_err(|e| MobileError::StorageError(e.to_string()))?;
+        let proof_bytes =
+            std::fs::read(&proof_path).map_err(|e| MobileError::StorageError(e.to_string()))?;
 
         let proof = RecoveryProof::from_bytes(&proof_bytes)
             .map_err(|e| MobileError::InvalidInput(format!("Invalid proof: {}", e)))?;
@@ -1172,8 +1182,8 @@ impl VauchiMobile {
             return Ok(None);
         }
 
-        let proof_bytes = std::fs::read(&proof_path)
-            .map_err(|e| MobileError::StorageError(e.to_string()))?;
+        let proof_bytes =
+            std::fs::read(&proof_path).map_err(|e| MobileError::StorageError(e.to_string()))?;
 
         let proof = RecoveryProof::from_bytes(&proof_bytes)
             .map_err(|e| MobileError::InvalidInput(format!("Invalid proof: {}", e)))?;
@@ -1197,7 +1207,8 @@ impl VauchiMobile {
         use base64::Engine;
         let storage = self.open_storage()?;
 
-        let proof_bytes = base64::engine::general_purpose::STANDARD.decode(&proof_b64)
+        let proof_bytes = base64::engine::general_purpose::STANDARD
+            .decode(&proof_b64)
             .map_err(|e| MobileError::InvalidInput(format!("Invalid base64: {}", e)))?;
 
         let proof = RecoveryProof::from_bytes(&proof_bytes)

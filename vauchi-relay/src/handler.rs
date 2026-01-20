@@ -237,7 +237,10 @@ pub async fn handle_connection(
                 if let protocol::MessagePayload::Handshake(hs) = envelope.payload {
                     // Validate client_id format
                     if !validate_client_id(&hs.client_id) {
-                        warn!("Invalid client_id format: {}", &hs.client_id.get(..16).unwrap_or(""));
+                        warn!(
+                            "Invalid client_id format: {}",
+                            &hs.client_id.get(..16).unwrap_or("")
+                        );
                         return;
                     }
                     hs.client_id
@@ -298,7 +301,10 @@ pub async fn handle_connection(
                 break;
             }
             Err(_) => {
-                warn!("Idle timeout for client {} (slowloris protection)", client_id);
+                warn!(
+                    "Idle timeout for client {} (slowloris protection)",
+                    client_id
+                );
                 break;
             }
         };

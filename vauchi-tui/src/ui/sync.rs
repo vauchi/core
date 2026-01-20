@@ -129,7 +129,7 @@ pub fn draw(f: &mut Frame, area: Rect, app: &App) {
         )));
     }
 
-    let log_list = List::new(log_items)
-        .block(Block::default().borders(Borders::ALL).title("Sync Info"));
+    let log_list =
+        List::new(log_items).block(Block::default().borders(Borders::ALL).title("Sync Info"));
     f.render_widget(log_list, chunks[2]);
 }

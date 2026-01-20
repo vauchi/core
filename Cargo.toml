@@ -8,3 +8,22 @@ members = [
     "vauchi-tui",
     "vauchi-desktop/src-tauri",
 ]
+
+# Release profile: optimized for size (mobile binaries)
+[profile.release]
+opt-level = "z"      # Optimize for size
+lto = true           # Link-time optimization
+codegen-units = 1    # Better optimization (slower compile)
+panic = "abort"      # Smaller binary, no unwinding
+strip = true         # Strip symbols
+
+# Development profile: fast compilation, good debugging
+[profile.dev]
+opt-level = 0        # No optimization
+debug = true         # Full debug info
+
+# Release with debug info (for profiling)
+[profile.release-with-debug]
+inherits = "release"
+debug = true
+strip = false

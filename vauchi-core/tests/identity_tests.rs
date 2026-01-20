@@ -29,12 +29,8 @@ fn test_identity_has_device_info() {
 fn test_backup_restore_preserves_device_info() {
     // Create identity with custom device info using public from_device_link
     let master_seed = [0x42u8; 32];
-    let original = Identity::from_device_link(
-        master_seed,
-        "Alice".to_string(),
-        3,
-        "My Phone".to_string(),
-    );
+    let original =
+        Identity::from_device_link(master_seed, "Alice".to_string(), 3, "My Phone".to_string());
 
     let password = "correct-horse-battery-staple";
     let backup = original.export_backup(password).unwrap();

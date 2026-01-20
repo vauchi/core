@@ -137,9 +137,7 @@ pub fn link(config: &CliConfig) -> Result<()> {
     display::info("Scan this QR code with your new device using 'vauchi device join'");
     println!();
 
-    display::info(
-        "After scanning, run 'vauchi device complete <request_data>' to finish linking.",
-    );
+    display::info("After scanning, run 'vauchi device complete <request_data>' to finish linking.");
 
     Ok(())
 }
@@ -286,7 +284,8 @@ pub fn finish(config: &CliConfig, response_data: &str) -> Result<()> {
 
     // Read the saved QR data and device name
     let qr_data = fs::read_to_string(&link_key_path)?;
-    let device_name = fs::read_to_string(&device_name_path).unwrap_or_else(|_| "New Device".to_string());
+    let device_name =
+        fs::read_to_string(&device_name_path).unwrap_or_else(|_| "New Device".to_string());
     let qr = DeviceLinkQR::from_data_string(&qr_data)?;
 
     // Decode the response
@@ -388,7 +387,10 @@ pub fn revoke(config: &CliConfig, device_id_prefix: &str) -> Result<()> {
     // Save the updated registry
     wb.storage().save_device_registry(&updated_registry)?;
 
-    display::success(&format!("Device '{}' has been revoked.", device.device_name));
+    display::success(&format!(
+        "Device '{}' has been revoked.",
+        device.device_name
+    ));
     display::info("The revocation will be propagated to contacts on next sync.");
 
     Ok(())

@@ -1,10 +1,10 @@
 //! Backup Screen UI
 
 use ratatui::prelude::*;
-use ratatui::widgets::{Block, Borders, Paragraph, Gauge};
+use ratatui::widgets::{Block, Borders, Gauge, Paragraph};
 
 use crate::app::{App, BackupFocus, BackupMode};
-use vauchi_core::identity::password::{validate_password, password_feedback, PasswordStrength};
+use vauchi_core::identity::password::{password_feedback, validate_password, PasswordStrength};
 
 /// Draw the backup/restore screen.
 pub fn draw(f: &mut Frame, area: Rect, app: &App) {

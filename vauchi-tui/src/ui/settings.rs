@@ -94,7 +94,11 @@ pub fn draw_edit_name(f: &mut Frame, area: Rect, app: &App) {
     };
     let name_para = Paragraph::new(name_text)
         .style(Style::default().fg(Color::Yellow))
-        .block(Block::default().title("New Display Name").borders(Borders::ALL));
+        .block(
+            Block::default()
+                .title("New Display Name")
+                .borders(Borders::ALL),
+        );
     f.render_widget(name_para, chunks[1]);
 }
 
@@ -127,7 +131,11 @@ pub fn draw_edit_relay_url(f: &mut Frame, area: Rect, app: &App) {
     };
     let url_para = Paragraph::new(url_text)
         .style(Style::default().fg(Color::Cyan))
-        .block(Block::default().title("New Relay URL").borders(Borders::ALL));
+        .block(
+            Block::default()
+                .title("New Relay URL")
+                .borders(Borders::ALL),
+        );
     f.render_widget(url_para, chunks[1]);
 
     // Help text

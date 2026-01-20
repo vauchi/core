@@ -109,9 +109,7 @@ impl RateLimiter {
         let now = Instant::now();
         let initial_count = buckets.len();
 
-        buckets.retain(|_, bucket| {
-            now.duration_since(bucket.last_update) < max_idle
-        });
+        buckets.retain(|_, bucket| now.duration_since(bucket.last_update) < max_idle);
 
         initial_count - buckets.len()
     }

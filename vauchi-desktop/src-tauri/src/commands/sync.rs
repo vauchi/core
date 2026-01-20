@@ -109,8 +109,10 @@ fn receive_pending(
                         }
 
                         // Send acknowledgment
-                        let ack =
-                            create_simple_ack(&envelope.message_id, SimpleAckStatus::ReceivedByRecipient);
+                        let ack = create_simple_ack(
+                            &envelope.message_id,
+                            SimpleAckStatus::ReceivedByRecipient,
+                        );
                         if let Ok(ack_data) = encode_simple_message(&ack) {
                             let _ = socket.send(Message::Binary(ack_data));
                         }
@@ -171,10 +173,10 @@ fn process_legacy_exchanges(
         // Handle response (update contact name)
         if exchange.is_response {
             if let Ok(Some(mut contact)) = storage.load_contact(&public_id) {
-                if contact.display_name() != exchange.display_name {
-                    if contact.set_display_name(&exchange.display_name).is_ok() {
-                        let _ = storage.save_contact(&contact);
-                    }
+                if contact.display_name() != exchange.display_name
+                    && contact.set_display_name(&exchange.display_name).is_ok()
+                {
+                    let _ = storage.save_contact(&contact);
                 }
             }
             continue;
@@ -317,7 +319,10 @@ fn process_card_updates(storage: &Storage, updates: Vec<(String, Vec<u8>)>) -> R
     let mut processed = 0u32;
 
     for (sender_id, ciphertext) in updates {
-        let mut contact = match storage.load_contact(&sender_id).map_err(|e| e.to_string())? {
+        let mut contact = match storage
+            .load_contact(&sender_id)
+            .map_err(|e| e.to_string())?
+        {
             Some(c) => c,
             None => continue,
         };
@@ -419,8 +424,12 @@ pub fn sync(state: State<'_, Mutex<AppState>>) -> Result<SyncResult, String> {
     let received = receive_pending(&mut socket)?;
 
     // Process legacy exchange messages
-    let legacy_added =
-        process_legacy_exchanges(identity, &state.storage, received.legacy_exchange, relay_url)?;
+    let legacy_added = process_legacy_exchanges(
+        identity,
+        &state.storage,
+        received.legacy_exchange,
+        relay_url,
+    )?;
 
     // Process encrypted exchange messages
     let encrypted_added = process_encrypted_exchanges(

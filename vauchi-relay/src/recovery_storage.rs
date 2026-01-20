@@ -437,10 +437,7 @@ mod tests {
     fn test_sqlite_wal_mode_on_file() {
         // Test with actual file to verify WAL mode
         let temp_dir = std::env::temp_dir();
-        let db_path = temp_dir.join(format!(
-            "test_recovery_wal_{}.db",
-            std::process::id()
-        ));
+        let db_path = temp_dir.join(format!("test_recovery_wal_{}.db", std::process::id()));
 
         // Clean up if exists from previous failed test
         let _ = std::fs::remove_file(&db_path);

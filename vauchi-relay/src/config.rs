@@ -42,7 +42,7 @@ impl Default for RelayConfig {
             cleanup_interval_secs: 3600,             // 1 hour
             storage_backend: StorageBackend::Sqlite, // Persistent by default
             data_dir: PathBuf::from("./data"),
-            idle_timeout_secs: 300,                  // 5 minutes (slowloris protection)
+            idle_timeout_secs: 300, // 5 minutes (slowloris protection)
         }
     }
 }

@@ -7,6 +7,7 @@
 use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
 use ring::rand::SystemRandom;
 use std::time::{SystemTime, UNIX_EPOCH};
+use zeroize::Zeroize;
 
 use super::ExchangeError;
 use crate::crypto::{decrypt, encrypt, PublicKey, Signature, SymmetricKey};
@@ -200,6 +201,12 @@ impl DeviceLinkQR {
             .dark_color('█')
             .quiet_zone(false)
             .build()
+    }
+}
+
+impl Drop for DeviceLinkQR {
+    fn drop(&mut self) {
+        self.link_key.zeroize();
     }
 }
 
@@ -486,6 +493,12 @@ impl DeviceLinkResponse {
     }
 }
 
+impl Drop for DeviceLinkResponse {
+    fn drop(&mut self) {
+        self.master_seed.zeroize();
+    }
+}
+
 /// State machine for device linking from the existing device's perspective.
 pub struct DeviceLinkInitiator {
     /// The identity on this device (reserved for future verification)
@@ -615,6 +628,12 @@ impl DeviceLinkInitiator {
     }
 }
 
+impl Drop for DeviceLinkInitiator {
+    fn drop(&mut self) {
+        self.master_seed.zeroize();
+    }
+}
+
 /// State machine for device linking from the existing device's perspective (restored from saved QR).
 ///
 /// Used when the QR was generated earlier and saved to disk, then restored
@@ -693,6 +712,12 @@ impl DeviceLinkInitiatorRestored {
         let new_device = DeviceInfo::derive(&self.master_seed, device_index, request.device_name);
 
         Ok((encrypted_response, updated_registry, new_device))
+    }
+}
+
+impl Drop for DeviceLinkInitiatorRestored {
+    fn drop(&mut self) {
+        self.master_seed.zeroize();
     }
 }
 
@@ -1232,8 +1257,9 @@ mod tests {
         let encrypted_request = responder.create_request().unwrap();
 
         // Device A processes request using restored initiator
-        let (encrypted_response, updated_registry, new_device) =
-            restored_initiator.process_request(&encrypted_request).unwrap();
+        let (encrypted_response, updated_registry, new_device) = restored_initiator
+            .process_request(&encrypted_request)
+            .unwrap();
 
         // Device B processes response
         let response = responder.process_response(&encrypted_response).unwrap();
@@ -1258,7 +1284,10 @@ mod tests {
         // Test create_device_link_initiator
         let initiator = identity.create_device_link_initiator(registry.clone());
         assert!(!initiator.qr().is_expired());
-        assert_eq!(initiator.qr().identity_public_key(), identity.signing_public_key());
+        assert_eq!(
+            initiator.qr().identity_public_key(),
+            identity.signing_public_key()
+        );
 
         // Test restore_device_link_initiator
         let qr_string = initiator.qr().to_data_string();

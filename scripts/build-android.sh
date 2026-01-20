@@ -67,42 +67,62 @@ fi
 
 cd "$PROJECT_ROOT"
 
-# Build for ARM64 (real devices)
+# Parse arguments
+BUILD_TYPE="${1:-release}"
+if [[ "$BUILD_TYPE" == "debug" ]]; then
+    CARGO_FLAG=""
+    BUILD_DIR="debug"
+    echo -e "${YELLOW}Building DEBUG version${NC}"
+else
+    CARGO_FLAG="--release"
+    BUILD_DIR="release"
+    echo -e "${YELLOW}Building RELEASE version (size-optimized)${NC}"
+fi
+
+# Build for ARM64 (modern devices - 90%+ of market)
 echo -e "${YELLOW}Building for aarch64-linux-android (ARM64)...${NC}"
-export CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER="$NDK_TOOLCHAIN/aarch64-linux-android24-clang"
-export CC_aarch64_linux_android="$NDK_TOOLCHAIN/aarch64-linux-android24-clang"
+export CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER="$NDK_TOOLCHAIN/aarch64-linux-android26-clang"
+export CC_aarch64_linux_android="$NDK_TOOLCHAIN/aarch64-linux-android26-clang"
 export AR_aarch64_linux_android="$NDK_TOOLCHAIN/llvm-ar"
-cargo build -p vauchi-mobile --target aarch64-linux-android --release
+# 16 KB page alignment required for Android 15+ (API 35)
+export CARGO_TARGET_AARCH64_LINUX_ANDROID_RUSTFLAGS="-C link-arg=-z -C link-arg=max-page-size=16384"
+cargo build -p vauchi-mobile --target aarch64-linux-android $CARGO_FLAG
 echo -e "${GREEN}ARM64 build complete${NC}"
 
-# Build for x86_64 (emulator)
-echo -e "${YELLOW}Building for x86_64-linux-android (emulator)...${NC}"
-export CARGO_TARGET_X86_64_LINUX_ANDROID_LINKER="$NDK_TOOLCHAIN/x86_64-linux-android24-clang"
-export CC_x86_64_linux_android="$NDK_TOOLCHAIN/x86_64-linux-android24-clang"
-export AR_x86_64_linux_android="$NDK_TOOLCHAIN/llvm-ar"
-cargo build -p vauchi-mobile --target x86_64-linux-android --release
-echo -e "${GREEN}x86_64 build complete${NC}"
+# Build for ARMv7 (older 32-bit devices - ~10% of market)
+echo -e "${YELLOW}Building for armv7-linux-androideabi (ARM32)...${NC}"
+export CARGO_TARGET_ARMV7_LINUX_ANDROIDEABI_LINKER="$NDK_TOOLCHAIN/armv7a-linux-androideabi26-clang"
+export CC_armv7_linux_androideabi="$NDK_TOOLCHAIN/armv7a-linux-androideabi26-clang"
+export AR_armv7_linux_androideabi="$NDK_TOOLCHAIN/llvm-ar"
+cargo build -p vauchi-mobile --target armv7-linux-androideabi $CARGO_FLAG
+echo -e "${GREEN}ARM32 build complete${NC}"
 
-# Copy native libraries
+# Copy native libraries (production ABIs only: arm64-v8a, armeabi-v7a)
 echo -e "${YELLOW}Copying native libraries...${NC}"
 mkdir -p "$JNI_LIBS_DIR/arm64-v8a"
-mkdir -p "$JNI_LIBS_DIR/x86_64"
-cp target/aarch64-linux-android/release/libvauchi_mobile.so "$JNI_LIBS_DIR/arm64-v8a/"
-cp target/x86_64-linux-android/release/libvauchi_mobile.so "$JNI_LIBS_DIR/x86_64/"
+mkdir -p "$JNI_LIBS_DIR/armeabi-v7a"
+cp target/aarch64-linux-android/$BUILD_DIR/libvauchi_mobile.so "$JNI_LIBS_DIR/arm64-v8a/"
+cp target/armv7-linux-androideabi/$BUILD_DIR/libvauchi_mobile.so "$JNI_LIBS_DIR/armeabi-v7a/"
 echo -e "${GREEN}Libraries copied${NC}"
 
 # Generate Kotlin bindings
 echo -e "${YELLOW}Generating Kotlin bindings...${NC}"
-cargo run -p vauchi-mobile --bin uniffi-bindgen -- generate \
-    --library target/aarch64-linux-android/release/libvauchi_mobile.so \
+cargo run -p vauchi-mobile --bin uniffi-bindgen $CARGO_FLAG -- generate \
+    --library target/aarch64-linux-android/$BUILD_DIR/libvauchi_mobile.so \
     --language kotlin \
     --out-dir "$KOTLIN_OUT_DIR"
 echo -e "${GREEN}Kotlin bindings generated${NC}"
 
 echo ""
 echo -e "${GREEN}=== Build Complete ===${NC}"
+echo "Build type:       $BUILD_TYPE"
 echo "Native libraries: $JNI_LIBS_DIR/"
 echo "Kotlin bindings:  $KOTLIN_OUT_DIR/uniffi/vauchi_mobile/"
 echo ""
 echo "Library sizes:"
 ls -lh "$JNI_LIBS_DIR"/*/libvauchi_mobile.so
+echo ""
+echo "Usage:"
+echo "  $0          # Release build (size-optimized)"
+echo "  $0 release  # Release build (size-optimized)"
+echo "  $0 debug    # Debug build (fast compile, symbols)"

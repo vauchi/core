@@ -165,8 +165,7 @@ impl Identity {
     pub fn x3dh_keypair(&self) -> X3DHKeyPair {
         // Derive X25519 secret from master_seed using HKDF
         // Uses same derivation as exchange_public_key for consistency
-        let x25519_secret =
-            HKDF::derive_key(Some(&self.master_seed), &[], b"Vauchi_Exchange_Seed");
+        let x25519_secret = HKDF::derive_key(Some(&self.master_seed), &[], b"Vauchi_Exchange_Seed");
         X3DHKeyPair::from_bytes(x25519_secret)
     }
 
@@ -255,6 +254,7 @@ impl Identity {
             &mut key_bytes,
         );
         let encryption_key = SymmetricKey::from_bytes(key_bytes);
+        key_bytes.zeroize();
 
         // Prepare backup data:
         // display_name_len (4 bytes) || display_name || master_seed (32 bytes)
@@ -310,6 +310,7 @@ impl Identity {
             &mut key_bytes,
         );
         let decryption_key = SymmetricKey::from_bytes(key_bytes);
+        key_bytes.zeroize();
 
         // Decrypt the data
         let plaintext =

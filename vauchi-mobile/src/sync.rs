@@ -192,7 +192,8 @@ pub fn process_legacy_exchange_messages(
         added += 1;
 
         // Send encrypted exchange response
-        let _ = send_exchange_response(identity, &public_id, &ephemeral_key, relay_url, pinned_cert);
+        let _ =
+            send_exchange_response(identity, &public_id, &ephemeral_key, relay_url, pinned_cert);
     }
 
     Ok(added)
@@ -265,8 +266,8 @@ pub fn send_exchange_response(
     relay_url: &str,
     pinned_cert: Option<&str>,
 ) -> Result<(), MobileError> {
-    let mut socket =
-        cert_pinning::connect_with_pinning(relay_url, pinned_cert).map_err(MobileError::NetworkError)?;
+    let mut socket = cert_pinning::connect_with_pinning(relay_url, pinned_cert)
+        .map_err(MobileError::NetworkError)?;
 
     let our_id = identity.public_id();
     send_handshake(&mut socket, &our_id)?;
@@ -392,8 +393,8 @@ pub fn do_sync(
     let client_id = identity.public_id();
 
     // Connect to relay
-    let mut socket =
-        cert_pinning::connect_with_pinning(relay_url, pinned_cert).map_err(MobileError::NetworkError)?;
+    let mut socket = cert_pinning::connect_with_pinning(relay_url, pinned_cert)
+        .map_err(MobileError::NetworkError)?;
 
     // Set read timeout for non-blocking receive
     if let MaybeTlsStream::Plain(ref stream) = socket.get_ref() {

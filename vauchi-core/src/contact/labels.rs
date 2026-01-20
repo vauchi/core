@@ -582,7 +582,9 @@ mod tests {
         let friends_id = friends.id().to_string();
 
         // Add Carol to both labels
-        manager.add_contact_to_label(&family_id, "carol-id").unwrap();
+        manager
+            .add_contact_to_label(&family_id, "carol-id")
+            .unwrap();
         manager
             .add_contact_to_label(&friends_id, "carol-id")
             .unwrap();

@@ -342,9 +342,7 @@ impl Backend {
         }
 
         // Update card display name
-        let mut card = self
-            .get_card()?
-            .unwrap_or_else(|| ContactCard::new(name));
+        let mut card = self.get_card()?.unwrap_or_else(|| ContactCard::new(name));
         card.set_display_name(name)
             .map_err(|e| anyhow::anyhow!("{}", e))?;
         self.storage.save_own_card(&card)?;
@@ -633,6 +631,7 @@ impl Backend {
     }
 
     /// Get sync status string for display.
+    #[allow(dead_code)]
     pub fn sync_status(&self) -> &'static str {
         if self.identity.is_some() {
             "Ready to sync"
@@ -727,8 +726,8 @@ impl Backend {
 
     /// Connect to relay server via WebSocket.
     fn connect_to_relay(relay_url: &str) -> Result<WebSocket<MaybeTlsStream<TcpStream>>, String> {
-        let (socket, _response) = tungstenite::connect(relay_url)
-            .map_err(|e| format!("Failed to connect: {}", e))?;
+        let (socket, _response) =
+            tungstenite::connect(relay_url).map_err(|e| format!("Failed to connect: {}", e))?;
         Ok(socket)
     }
 
@@ -743,7 +742,7 @@ impl Backend {
         let envelope = create_simple_envelope(SimplePayload::Handshake(handshake));
         let data = encode_simple_message(&envelope).map_err(|e| format!("Encode error: {}", e))?;
         socket
-            .send(Message::Binary(data.into()))
+            .send(Message::Binary(data))
             .map_err(|e| format!("Send error: {}", e))?;
         Ok(())
     }
@@ -787,7 +786,7 @@ impl Backend {
                                 SimpleAckStatus::ReceivedByRecipient,
                             );
                             if let Ok(ack_data) = encode_simple_message(&ack) {
-                                let _ = socket.send(Message::Binary(ack_data.into()));
+                                let _ = socket.send(Message::Binary(ack_data));
                             }
                         }
                     }
@@ -845,10 +844,10 @@ impl Backend {
             // Handle response (update contact name)
             if exchange.is_response {
                 if let Ok(Some(mut contact)) = self.storage.load_contact(&public_id) {
-                    if contact.display_name() != exchange.display_name {
-                        if contact.set_display_name(&exchange.display_name).is_ok() {
-                            let _ = self.storage.save_contact(&contact);
-                        }
+                    if contact.display_name() != exchange.display_name
+                        && contact.set_display_name(&exchange.display_name).is_ok()
+                    {
+                        let _ = self.storage.save_contact(&contact);
                     }
                 }
                 continue;
@@ -944,7 +943,9 @@ impl Backend {
             // Initialize ratchet
             let ratchet_dh = X3DHKeyPair::from_bytes(our_x3dh.secret_bytes());
             let ratchet = DoubleRatchetState::initialize_responder(&shared_secret, ratchet_dh);
-            let _ = self.storage.save_ratchet_state(&contact_id, &ratchet, false);
+            let _ = self
+                .storage
+                .save_ratchet_state(&contact_id, &ratchet, false);
 
             added += 1;
 
@@ -985,7 +986,7 @@ impl Backend {
         let envelope = create_simple_envelope(SimplePayload::EncryptedUpdate(update));
         let data = encode_simple_message(&envelope).map_err(|e| e.to_string())?;
         socket
-            .send(Message::Binary(data.into()))
+            .send(Message::Binary(data))
             .map_err(|e| e.to_string())?;
 
         std::thread::sleep(Duration::from_millis(100));
@@ -1070,7 +1071,7 @@ impl Backend {
 
                 let envelope = create_simple_envelope(SimplePayload::EncryptedUpdate(msg));
                 if let Ok(data) = encode_simple_message(&envelope) {
-                    if socket.send(Message::Binary(data.into())).is_ok() {
+                    if socket.send(Message::Binary(data)).is_ok() {
                         let _ = self.storage.delete_pending_update(&update.id);
                         sent += 1;
                     }
@@ -1214,7 +1215,9 @@ mod tests {
     fn test_create_identity() {
         let (mut backend, _temp) = create_test_backend();
 
-        backend.create_identity("Alice Smith").expect("Failed to create identity");
+        backend
+            .create_identity("Alice Smith")
+            .expect("Failed to create identity");
 
         assert!(backend.has_identity());
         assert_eq!(backend.display_name(), Some("Alice Smith"));
@@ -1229,7 +1232,9 @@ mod tests {
         // Create identity in first backend
         {
             let mut backend = Backend::new(temp_dir.path()).expect("Failed to create backend");
-            backend.create_identity("Alice Smith").expect("Failed to create identity");
+            backend
+                .create_identity("Alice Smith")
+                .expect("Failed to create identity");
         }
 
         // Load in second backend
@@ -1247,7 +1252,9 @@ mod tests {
     #[test]
     fn test_new_identity_empty_card() {
         let (mut backend, _temp) = create_test_backend();
-        backend.create_identity("Alice Smith").expect("Failed to create identity");
+        backend
+            .create_identity("Alice Smith")
+            .expect("Failed to create identity");
 
         let fields = backend.get_card_fields().expect("Failed to get fields");
         assert!(fields.is_empty());
@@ -1257,7 +1264,9 @@ mod tests {
     #[test]
     fn test_add_phone_field() {
         let (mut backend, _temp) = create_test_backend();
-        backend.create_identity("Alice Smith").expect("Failed to create identity");
+        backend
+            .create_identity("Alice Smith")
+            .expect("Failed to create identity");
 
         backend
             .add_field(FieldType::Phone, "Mobile", "+1-555-123-4567")
@@ -1273,7 +1282,9 @@ mod tests {
     #[test]
     fn test_add_email_field() {
         let (mut backend, _temp) = create_test_backend();
-        backend.create_identity("Alice Smith").expect("Failed to create identity");
+        backend
+            .create_identity("Alice Smith")
+            .expect("Failed to create identity");
 
         backend
             .add_field(FieldType::Email, "Work", "alice@company.com")
@@ -1289,7 +1300,9 @@ mod tests {
     #[test]
     fn test_add_multiple_fields() {
         let (mut backend, _temp) = create_test_backend();
-        backend.create_identity("Alice Smith").expect("Failed to create identity");
+        backend
+            .create_identity("Alice Smith")
+            .expect("Failed to create identity");
 
         backend
             .add_field(FieldType::Phone, "Mobile", "+1-555-123-4567")
@@ -1310,7 +1323,9 @@ mod tests {
     #[test]
     fn test_remove_field() {
         let (mut backend, _temp) = create_test_backend();
-        backend.create_identity("Alice Smith").expect("Failed to create identity");
+        backend
+            .create_identity("Alice Smith")
+            .expect("Failed to create identity");
 
         backend
             .add_field(FieldType::Phone, "Mobile", "+1-555-123-4567")
@@ -1332,7 +1347,9 @@ mod tests {
     #[test]
     fn test_update_field() {
         let (mut backend, _temp) = create_test_backend();
-        backend.create_identity("Alice Smith").expect("Failed to create identity");
+        backend
+            .create_identity("Alice Smith")
+            .expect("Failed to create identity");
 
         backend
             .add_field(FieldType::Phone, "Mobile", "+1-555-123-4567")
@@ -1351,7 +1368,9 @@ mod tests {
     #[test]
     fn test_update_display_name() {
         let (mut backend, _temp) = create_test_backend();
-        backend.create_identity("Alice Smith").expect("Failed to create identity");
+        backend
+            .create_identity("Alice Smith")
+            .expect("Failed to create identity");
 
         backend
             .update_display_name("Alice S.")
@@ -1364,7 +1383,9 @@ mod tests {
     #[test]
     fn test_empty_display_name_rejected() {
         let (mut backend, _temp) = create_test_backend();
-        backend.create_identity("Alice Smith").expect("Failed to create identity");
+        backend
+            .create_identity("Alice Smith")
+            .expect("Failed to create identity");
 
         let result = backend.update_display_name("");
         assert!(result.is_err());
@@ -1375,7 +1396,9 @@ mod tests {
     #[test]
     fn test_long_display_name_rejected() {
         let (mut backend, _temp) = create_test_backend();
-        backend.create_identity("Alice Smith").expect("Failed to create identity");
+        backend
+            .create_identity("Alice Smith")
+            .expect("Failed to create identity");
 
         let long_name = "A".repeat(101);
         let result = backend.update_display_name(&long_name);
@@ -1386,34 +1409,58 @@ mod tests {
 
     #[test]
     fn test_parse_field_type_email() {
-        assert!(matches!(Backend::parse_field_type("email"), FieldType::Email));
-        assert!(matches!(Backend::parse_field_type("EMAIL"), FieldType::Email));
+        assert!(matches!(
+            Backend::parse_field_type("email"),
+            FieldType::Email
+        ));
+        assert!(matches!(
+            Backend::parse_field_type("EMAIL"),
+            FieldType::Email
+        ));
     }
 
     #[test]
     fn test_parse_field_type_phone() {
-        assert!(matches!(Backend::parse_field_type("phone"), FieldType::Phone));
+        assert!(matches!(
+            Backend::parse_field_type("phone"),
+            FieldType::Phone
+        ));
     }
 
     #[test]
     fn test_parse_field_type_website() {
-        assert!(matches!(Backend::parse_field_type("website"), FieldType::Website));
+        assert!(matches!(
+            Backend::parse_field_type("website"),
+            FieldType::Website
+        ));
     }
 
     #[test]
     fn test_parse_field_type_address() {
-        assert!(matches!(Backend::parse_field_type("address"), FieldType::Address));
+        assert!(matches!(
+            Backend::parse_field_type("address"),
+            FieldType::Address
+        ));
     }
 
     #[test]
     fn test_parse_field_type_social() {
-        assert!(matches!(Backend::parse_field_type("social"), FieldType::Social));
+        assert!(matches!(
+            Backend::parse_field_type("social"),
+            FieldType::Social
+        ));
     }
 
     #[test]
     fn test_parse_field_type_custom() {
-        assert!(matches!(Backend::parse_field_type("other"), FieldType::Custom));
-        assert!(matches!(Backend::parse_field_type("unknown"), FieldType::Custom));
+        assert!(matches!(
+            Backend::parse_field_type("other"),
+            FieldType::Custom
+        ));
+        assert!(matches!(
+            Backend::parse_field_type("unknown"),
+            FieldType::Custom
+        ));
     }
 
     // === Contacts Tests ===
@@ -1423,7 +1470,9 @@ mod tests {
     #[test]
     fn test_new_identity_no_contacts() {
         let (mut backend, _temp) = create_test_backend();
-        backend.create_identity("Alice Smith").expect("Failed to create identity");
+        backend
+            .create_identity("Alice Smith")
+            .expect("Failed to create identity");
 
         let contacts = backend.list_contacts().expect("Failed to list contacts");
         assert!(contacts.is_empty());
@@ -1496,10 +1545,14 @@ mod tests {
     #[test]
     fn test_export_backup() {
         let (mut backend, _temp) = create_test_backend();
-        backend.create_identity("Alice Smith").expect("Failed to create identity");
+        backend
+            .create_identity("Alice Smith")
+            .expect("Failed to create identity");
 
         // Use a strong password that meets requirements
-        let backup = backend.export_backup("Str0ng!P@ssw0rd#2024").expect("Failed to export backup");
+        let backup = backend
+            .export_backup("Str0ng!P@ssw0rd#2024")
+            .expect("Failed to export backup");
 
         // Backup should be hex-encoded
         assert!(hex::decode(&backup).is_ok());
@@ -1515,11 +1568,15 @@ mod tests {
         // Create identity and export backup
         {
             let (mut backend1, _temp1) = create_test_backend();
-            backend1.create_identity("Alice Smith").expect("Failed to create identity");
+            backend1
+                .create_identity("Alice Smith")
+                .expect("Failed to create identity");
             backend1
                 .add_field(FieldType::Email, "Work", "alice@work.com")
                 .expect("Failed to add field");
-            backup_data = backend1.export_backup(password).expect("Failed to export backup");
+            backup_data = backend1
+                .export_backup(password)
+                .expect("Failed to export backup");
         }
 
         // Import backup into new backend
@@ -1536,8 +1593,12 @@ mod tests {
     #[test]
     fn test_import_backup_wrong_password() {
         let (mut backend1, _temp1) = create_test_backend();
-        backend1.create_identity("Alice Smith").expect("Failed to create identity");
-        let backup_data = backend1.export_backup("C0rrect!P@ssw0rd#2024").expect("Failed to export backup");
+        backend1
+            .create_identity("Alice Smith")
+            .expect("Failed to create identity");
+        let backup_data = backend1
+            .export_backup("C0rrect!P@ssw0rd#2024")
+            .expect("Failed to export backup");
 
         let (mut backend2, _temp2) = create_test_backend();
         let result = backend2.import_backup(&backup_data, "Wr0ng!P@ssw0rd#2024");
@@ -1552,9 +1613,13 @@ mod tests {
     #[test]
     fn test_generate_exchange_qr() {
         let (mut backend, _temp) = create_test_backend();
-        backend.create_identity("Alice Smith").expect("Failed to create identity");
+        backend
+            .create_identity("Alice Smith")
+            .expect("Failed to create identity");
 
-        let qr = backend.generate_exchange_qr().expect("Failed to generate QR");
+        let qr = backend
+            .generate_exchange_qr()
+            .expect("Failed to generate QR");
 
         assert!(!qr.data.is_empty());
         assert!(qr.expires_in_secs > 0);
@@ -1568,7 +1633,9 @@ mod tests {
     #[test]
     fn test_list_devices() {
         let (mut backend, _temp) = create_test_backend();
-        backend.create_identity("Alice Smith").expect("Failed to create identity");
+        backend
+            .create_identity("Alice Smith")
+            .expect("Failed to create identity");
 
         let devices = backend.list_devices().expect("Failed to list devices");
 
@@ -1581,9 +1648,13 @@ mod tests {
     #[test]
     fn test_generate_device_link() {
         let (mut backend, _temp) = create_test_backend();
-        backend.create_identity("Alice Smith").expect("Failed to create identity");
+        backend
+            .create_identity("Alice Smith")
+            .expect("Failed to create identity");
 
-        let link = backend.generate_device_link().expect("Failed to generate link");
+        let link = backend
+            .generate_device_link()
+            .expect("Failed to generate link");
 
         assert!(link.starts_with("wb://link/"));
     }
@@ -1602,7 +1673,9 @@ mod tests {
     #[test]
     fn test_sync_status_with_identity() {
         let (mut backend, _temp) = create_test_backend();
-        backend.create_identity("Alice Smith").expect("Failed to create identity");
+        backend
+            .create_identity("Alice Smith")
+            .expect("Failed to create identity");
         assert_eq!(backend.sync_status(), "Ready to sync");
     }
 
@@ -1610,7 +1683,9 @@ mod tests {
     #[test]
     fn test_pending_update_count_zero() {
         let (mut backend, _temp) = create_test_backend();
-        backend.create_identity("Alice Smith").expect("Failed to create identity");
+        backend
+            .create_identity("Alice Smith")
+            .expect("Failed to create identity");
 
         let count = backend.pending_update_count().expect("Failed to get count");
         assert_eq!(count, 0);

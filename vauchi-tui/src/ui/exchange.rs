@@ -15,9 +15,11 @@ pub fn draw(f: &mut Frame, area: Rect, app: &mut App) {
         ])
         .split(area);
 
-    let instructions = Paragraph::new("Share this QR code with others to exchange contact cards. Press 'r' to refresh.")
-        .style(Style::default().fg(Color::DarkGray))
-        .block(Block::default().borders(Borders::NONE));
+    let instructions = Paragraph::new(
+        "Share this QR code with others to exchange contact cards. Press 'r' to refresh.",
+    )
+    .style(Style::default().fg(Color::DarkGray))
+    .block(Block::default().borders(Borders::NONE));
     f.render_widget(instructions, chunks[0]);
 
     // Ensure we have a QR code generated
@@ -31,7 +33,10 @@ pub fn draw(f: &mut Frame, area: Rect, app: &mut App) {
     if let Some(ref qr_data) = app.current_qr {
         let remaining = qr_data.remaining_secs();
         let (timer_text, timer_style) = if remaining == 0 {
-            ("QR expired! Press 'r' to generate a new one".to_string(), Style::default().fg(Color::Red))
+            (
+                "QR expired! Press 'r' to generate a new one".to_string(),
+                Style::default().fg(Color::Red),
+            )
         } else {
             let mins = remaining / 60;
             let secs = remaining % 60;

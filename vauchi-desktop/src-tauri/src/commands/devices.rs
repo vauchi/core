@@ -334,10 +334,7 @@ pub fn complete_device_link(
 ///
 /// This removes a device from the device registry, preventing it from syncing.
 #[tauri::command]
-pub fn revoke_device(
-    device_id: String,
-    state: State<'_, Mutex<AppState>>,
-) -> Result<bool, String> {
+pub fn revoke_device(device_id: String, state: State<'_, Mutex<AppState>>) -> Result<bool, String> {
     let state = state.lock().unwrap();
 
     let identity = state
@@ -348,7 +345,10 @@ pub fn revoke_device(
     // Get current device ID to prevent self-revocation
     let current_device_id = hex::encode(identity.device_info().device_id());
     if device_id == current_device_id {
-        return Err("Cannot revoke the current device. Use a different device to revoke this one.".to_string());
+        return Err(
+            "Cannot revoke the current device. Use a different device to revoke this one."
+                .to_string(),
+        );
     }
 
     // Load device registry
@@ -359,8 +359,8 @@ pub fn revoke_device(
         .ok_or_else(|| "No device registry found".to_string())?;
 
     // Find and revoke the device
-    let device_id_bytes = hex::decode(&device_id)
-        .map_err(|_| "Invalid device ID format".to_string())?;
+    let device_id_bytes =
+        hex::decode(&device_id).map_err(|_| "Invalid device ID format".to_string())?;
 
     if device_id_bytes.len() != 32 {
         return Err("Device ID must be 32 bytes".to_string());

@@ -223,10 +223,7 @@ impl AppState {
         }
 
         // Update identity
-        let identity = self
-            .identity
-            .as_mut()
-            .context("No identity to update")?;
+        let identity = self.identity.as_mut().context("No identity to update")?;
         identity.set_display_name(name);
 
         // Update card if it exists
@@ -285,7 +282,9 @@ mod tests {
     fn test_create_identity() {
         let (mut state, _temp) = create_test_state();
 
-        state.create_identity("Alice Smith").expect("Failed to create identity");
+        state
+            .create_identity("Alice Smith")
+            .expect("Failed to create identity");
 
         assert!(state.has_identity());
         assert_eq!(state.display_name(), Some("Alice Smith"));
@@ -300,7 +299,9 @@ mod tests {
         // Create identity in first state
         {
             let mut state = AppState::new(temp_dir.path()).expect("Failed to create state");
-            state.create_identity("Alice Smith").expect("Failed to create identity");
+            state
+                .create_identity("Alice Smith")
+                .expect("Failed to create identity");
         }
 
         // Load in second state
@@ -386,7 +387,9 @@ mod tests {
     #[test]
     fn test_update_display_name() {
         let (mut state, _temp) = create_test_state();
-        state.create_identity("Alice Smith").expect("Failed to create identity");
+        state
+            .create_identity("Alice Smith")
+            .expect("Failed to create identity");
 
         state
             .update_display_name("Alice S.")
@@ -399,7 +402,9 @@ mod tests {
     #[test]
     fn test_empty_display_name_rejected() {
         let (mut state, _temp) = create_test_state();
-        state.create_identity("Alice Smith").expect("Failed to create identity");
+        state
+            .create_identity("Alice Smith")
+            .expect("Failed to create identity");
 
         let result = state.update_display_name("");
         assert!(result.is_err());
@@ -410,7 +415,9 @@ mod tests {
     #[test]
     fn test_long_display_name_rejected() {
         let (mut state, _temp) = create_test_state();
-        state.create_identity("Alice Smith").expect("Failed to create identity");
+        state
+            .create_identity("Alice Smith")
+            .expect("Failed to create identity");
 
         let long_name = "A".repeat(101);
         let result = state.update_display_name(&long_name);
@@ -421,7 +428,9 @@ mod tests {
     #[test]
     fn test_whitespace_display_name_rejected() {
         let (mut state, _temp) = create_test_state();
-        state.create_identity("Alice Smith").expect("Failed to create identity");
+        state
+            .create_identity("Alice Smith")
+            .expect("Failed to create identity");
 
         let result = state.update_display_name("   ");
         assert!(result.is_err());
@@ -431,7 +440,9 @@ mod tests {
     #[test]
     fn test_display_name_trimmed() {
         let (mut state, _temp) = create_test_state();
-        state.create_identity("Alice Smith").expect("Failed to create identity");
+        state
+            .create_identity("Alice Smith")
+            .expect("Failed to create identity");
 
         state
             .update_display_name("  Alice S.  ")

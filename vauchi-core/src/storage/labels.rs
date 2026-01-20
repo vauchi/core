@@ -11,8 +11,8 @@ use super::{Storage, StorageError};
 impl Storage {
     /// Saves a visibility label to storage.
     pub fn save_label(&self, label: &VisibilityLabel) -> Result<(), StorageError> {
-        let contacts_json =
-            serde_json::to_string(label.contacts()).map_err(|e| StorageError::Serialization(e.to_string()))?;
+        let contacts_json = serde_json::to_string(label.contacts())
+            .map_err(|e| StorageError::Serialization(e.to_string()))?;
         let fields_json = serde_json::to_string(label.visible_fields())
             .map_err(|e| StorageError::Serialization(e.to_string()))?;
 
@@ -48,7 +48,14 @@ impl Storage {
             let created_at: i64 = row.get(4)?;
             let modified_at: i64 = row.get(5)?;
 
-            Ok((id, name, contacts_json, fields_json, created_at, modified_at))
+            Ok((
+                id,
+                name,
+                contacts_json,
+                fields_json,
+                created_at,
+                modified_at,
+            ))
         })?;
 
         let contacts: HashSet<String> = serde_json::from_str(&label.2)
@@ -81,7 +88,14 @@ impl Storage {
             let created_at: i64 = row.get(4)?;
             let modified_at: i64 = row.get(5)?;
 
-            Ok((id, name, contacts_json, fields_json, created_at, modified_at))
+            Ok((
+                id,
+                name,
+                contacts_json,
+                fields_json,
+                created_at,
+                modified_at,
+            ))
         })?;
 
         let mut labels = Vec::new();
@@ -179,9 +193,9 @@ impl Storage {
     pub fn load_all_contact_overrides(
         &self,
     ) -> Result<HashMap<String, HashMap<String, bool>>, StorageError> {
-        let mut stmt = self.conn.prepare(
-            "SELECT contact_id, field_id, is_visible FROM contact_visibility_overrides",
-        )?;
+        let mut stmt = self
+            .conn
+            .prepare("SELECT contact_id, field_id, is_visible FROM contact_visibility_overrides")?;
 
         let rows = stmt.query_map([], |row| {
             let contact_id: String = row.get(0)?;
@@ -297,11 +311,11 @@ impl Storage {
         }
 
         // Check max labels
-        let count = self.conn.query_row(
-            "SELECT COUNT(*) FROM visibility_labels",
-            [],
-            |row| row.get::<_, i32>(0),
-        )?;
+        let count = self
+            .conn
+            .query_row("SELECT COUNT(*) FROM visibility_labels", [], |row| {
+                row.get::<_, i32>(0)
+            })?;
 
         if count >= crate::contact::MAX_LABELS as i32 {
             return Err(StorageError::Serialization(format!(
@@ -613,7 +627,9 @@ mod tests {
         let storage = test_storage();
 
         let label = storage.create_label("Test").unwrap();
-        storage.add_contact_to_label(label.id(), "alice-id").unwrap();
+        storage
+            .add_contact_to_label(label.id(), "alice-id")
+            .unwrap();
 
         let loaded = storage.load_label(label.id()).unwrap();
         assert!(loaded.contains_contact("alice-id"));

@@ -53,7 +53,11 @@ pub fn create(config: &CliConfig, name: &str) -> Result<()> {
     let storage = open_storage(config)?;
     let label = storage.create_label(name)?;
 
-    display::success(&format!("Created label '{}' (ID: {})", label.name(), label.id()));
+    display::success(&format!(
+        "Created label '{}' (ID: {})",
+        label.name(),
+        label.id()
+    ));
     Ok(())
 }
 

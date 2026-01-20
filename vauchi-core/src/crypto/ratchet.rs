@@ -45,6 +45,7 @@ pub enum RatchetError {
 /// Serializable representation of DoubleRatchetState.
 ///
 /// This struct captures all necessary state to persist and restore a ratchet session.
+/// Contains sensitive cryptographic material that is zeroized on drop.
 #[derive(Serialize, Deserialize)]
 pub struct SerializedRatchetState {
     /// Root key for deriving new chain keys
@@ -67,6 +68,25 @@ pub struct SerializedRatchetState {
     pub previous_send_chain_length: u32,
     /// Skipped message keys: (dh_gen, msg_index) -> key_bytes
     pub skipped_keys: Vec<((u32, u32), [u8; 32])>,
+}
+
+impl Drop for SerializedRatchetState {
+    fn drop(&mut self) {
+        self.root_key.zeroize();
+        self.our_dh_secret.zeroize();
+        if let Some(ref mut key) = self.their_dh {
+            key.zeroize();
+        }
+        if let Some((ref mut key, _)) = self.send_chain {
+            key.zeroize();
+        }
+        if let Some((ref mut key, _)) = self.recv_chain {
+            key.zeroize();
+        }
+        for (_, ref mut key) in self.skipped_keys.iter_mut() {
+            key.zeroize();
+        }
+    }
 }
 
 /// KDF info constants for domain separation.
@@ -364,26 +384,29 @@ impl DoubleRatchetState {
     }
 
     /// Deserializes a ratchet state from its serialized form.
-    pub fn deserialize(s: SerializedRatchetState) -> Result<Self, RatchetError> {
-        let our_dh = X3DHKeyPair::from_bytes(s.our_dh_secret);
+    pub fn deserialize(mut s: SerializedRatchetState) -> Result<Self, RatchetError> {
+        // Use std::mem::take to extract values, leaving zeros behind for Drop
+        let root_key = std::mem::take(&mut s.root_key);
+        let our_dh_secret = std::mem::take(&mut s.our_dh_secret);
+        let their_dh = s.their_dh.take();
+        let send_chain_data = s.send_chain.take();
+        let recv_chain_data = s.recv_chain.take();
+        let skipped_keys_data = std::mem::take(&mut s.skipped_keys);
 
-        let send_chain = s
-            .send_chain
-            .map(|(key, gen)| ChainKey::with_generation(key, gen));
-        let recv_chain = s
-            .recv_chain
-            .map(|(key, gen)| ChainKey::with_generation(key, gen));
+        let our_dh = X3DHKeyPair::from_bytes(our_dh_secret);
 
-        let skipped_keys = s
-            .skipped_keys
+        let send_chain = send_chain_data.map(|(key, gen)| ChainKey::with_generation(key, gen));
+        let recv_chain = recv_chain_data.map(|(key, gen)| ChainKey::with_generation(key, gen));
+
+        let skipped_keys = skipped_keys_data
             .into_iter()
             .map(|(k, v)| (k, MessageKey::from_bytes(v)))
             .collect();
 
         Ok(DoubleRatchetState {
-            root_key: s.root_key,
+            root_key,
             our_dh,
-            their_dh: s.their_dh,
+            their_dh,
             send_chain,
             recv_chain,
             dh_generation: s.dh_generation,

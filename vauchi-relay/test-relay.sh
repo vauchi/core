@@ -28,37 +28,72 @@ echo "────────────────────────�
 # 1. Health endpoint
 health=$(curl -s --connect-timeout 5 "https://$HOST/health" 2>&1 || echo "CURL_FAILED")
 check "Health endpoint" "$health" '"status":"healthy"'
+check "Health includes blob_count" "$health" '"blob_count":'
 
-# 2. Root returns helpful JSON (not WebSocket)
-root=$(curl -s --connect-timeout 5 "https://$HOST/" 2>&1 || echo "CURL_FAILED")
-check "HTTP error response" "$root" '"error":'
+# 1b. Ready endpoint
+ready=$(curl -s --connect-timeout 5 "https://$HOST/ready" 2>&1 || echo "CURL_FAILED")
+check "Ready endpoint" "$ready" '"status":"healthy"'
+
+# 2. Check if we're hitting the relay, not the landing page
+root=$(curl -s -i --connect-timeout 5 "https://$HOST/" 2>&1 || echo "CURL_FAILED")
+if echo "$root" | grep -qi "Content-Type: text/html"; then
+    echo "✗ Routing error: Received HTML instead of JSON"
+    echo "  This usually means kamal-proxy is routing to the landing page instead of the relay."
+    FAIL=$((FAIL + 1))
+else
+    check "Relay identity check (now returns 200)" "$root" "HTTP/1.1 200 OK"
+    check "Relay identity check (JSON content)" "$root" '"error":"This is a WebSocket relay endpoint"'
+fi
 
 # 3. HTTP redirects to HTTPS
+# We expect a 301 from the proxy if accessing via HTTP
 redirect=$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 5 "http://$HOST/" 2>&1 || echo "000")
 check "HTTP→HTTPS redirect" "$redirect" "301"
 
-# 4. WebSocket connection
+# 4. WebSocket Upgrade (The core test)
+echo "Testing WebSocket upgrade on ..."
+# We use curl with -i to see headers, and look for 101 Switching Protocols
+ws_headers=$(curl -s -i --connect-timeout 5 \
+    -H "Upgrade: websocket" \
+    -H "Connection: Upgrade" \
+    -H "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==" \
+    -H "Sec-WebSocket-Version: 13" \
+    "https://$HOST" 2>&1 || echo "CURL_FAILED")
+
+if echo "$ws_headers" | grep -q "HTTP/1.1 101"; then
+    echo "✓ WebSocket upgrade (101 Switching Protocols)"
+    PASS=$((PASS + 1))
+elif echo "$ws_headers" | grep -q "HTTP/1.1 400"; then
+    echo "✗ WebSocket upgrade failed (400 Bad Request)"
+    echo "  The relay is reachable but rejected the upgrade."
+    echo "  Check if 'Upgrade: websocket' and 'Connection: Upgrade' headers are being stripped by proxy."
+    FAIL=$((FAIL + 1))
+elif echo "$ws_headers" | grep -q "HTTP/1.1 404"; then
+    echo "✗ WebSocket upgrade failed (404 Not Found)"
+    echo "  The relay is reachable but rejected the path."
+    FAIL=$((FAIL + 1))
+else
+    echo "✗ WebSocket upgrade failed"
+    echo "  Expected HTTP 101, but got something else."
+    echo "  Response snippet:"
+    echo "$ws_headers" | head -n 5
+    FAIL=$((FAIL + 1))
+fi
+
+# 5. Check that root DOES NOT upgrade (REMOVED: root SHOULD upgrade)
+# echo "Checking that root path does NOT upgrade..."
+# ... (removed)
+
+# 6. Full WebSocket connection (if websocat is available)
 if command -v websocat &>/dev/null; then
-    ws=$(timeout 3 websocat -v "wss://$HOST" 2>&1 || true)
-    if [[ "$ws" == *"Connected to ws"* ]]; then
-        echo "✓ WebSocket upgrade"
+    ws_conn=$(timeout 3 websocat -v "wss://$HOST" </dev/null 2>&1 || true)
+    if [[ "$ws_conn" == *"Connected to ws"* ]]; then
+        echo "✓ Full WebSocket handshake"
         PASS=$((PASS + 1))
     else
-        echo "✗ WebSocket upgrade"
-        echo "  Got: $ws"
+        echo "✗ Full WebSocket handshake failed"
         FAIL=$((FAIL + 1))
     fi
-else
-    # Fallback: check for 101 upgrade with curl
-    ws_status=$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 5 \
-        -H "Upgrade: websocket" -H "Connection: Upgrade" \
-        -H "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==" \
-        -H "Sec-WebSocket-Version: 13" \
-        "https://$HOST/" 2>&1 || echo "000")
-    # Note: curl can't complete WS handshake, so 400 means relay detected upgrade attempt
-    # A working relay returns 101 to real WS clients; curl gets 400 because it can't finish
-    check "WebSocket headers detected" "$ws_status" "400"
-    echo "  (Install websocat for full WS test: cargo install websocat)"
 fi
 
 echo "─────────────────────────────"

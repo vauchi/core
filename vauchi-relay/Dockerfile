@@ -4,11 +4,11 @@ FROM rust:1.78-bookworm AS builder
 WORKDIR /app
 
 # Copy workspace files
-COPY Cargo.toml Cargo.lock ./
+COPY code/Cargo.toml code/Cargo.lock ./
 
 # Copy only needed crates for relay
-COPY vauchi-core ./vauchi-core
-COPY vauchi-relay ./vauchi-relay
+COPY code/vauchi-core ./vauchi-core
+COPY code/vauchi-relay ./vauchi-relay
 
 # Create stub Cargo.toml files for workspace members we don't need
 # This allows the workspace to resolve without copying all source code
@@ -48,6 +48,8 @@ RUN useradd -r -s /bin/false vauchi \
 # Switch to non-root user
 USER vauchi
 
+LABEL service="vauchi-relay"
+
 # Expose default port
 EXPOSE 8080
 
@@ -65,8 +67,8 @@ ENV RELAY_STORAGE_BACKEND=sqlite
 ENV RELAY_DATA_DIR=/data
 ENV RUST_LOG=vauchi_relay=info
 
-# Healthcheck - verify the WebSocket server port is accepting TCP connections
+# Healthcheck - verify the health endpoint returns 200 OK
 HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
-    CMD timeout 2 bash -c '</dev/tcp/localhost/8080' || exit 1
+    CMD bash -c 'printf "GET /health HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n" > /dev/tcp/localhost/8080 && head -n 1 < /dev/tcp/localhost/8080 | grep -q "200 OK"' || exit 1
 
 CMD ["vauchi-relay"]

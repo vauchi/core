@@ -73,6 +73,16 @@ async fn main() {
         std::process::exit(1);
     }
 
+    let rate_limiter = Arc::new(RateLimiter::new(config.rate_limit_per_min));
+    let connection_limiter = ConnectionLimiter::new(config.max_connections);
+    let start_time = Instant::now();
+
+    // Parse HTTP listen address for health/metrics endpoints
+    // By default, bind to localhost for security (metrics contain internal info)
+    // Use RELAY_METRICS_ADDR to expose on other interfaces if needed
+    let http_addr =
+        std::env::var("RELAY_METRICS_ADDR").unwrap_or_else(|_| "127.0.0.1:8081".to_string());
+
     info!(
         "Starting Vauchi Relay Server v{}",
         env!("CARGO_PKG_VERSION")
@@ -83,7 +93,8 @@ async fn main() {
     } else {
         info!("TLS: Local development mode (localhost only)");
     }
-    info!("HTTP (health/metrics): {}:8081", config.listen_addr.ip());
+    info!("Health check (main port): {}", config.listen_addr);
+    info!("Metrics endpoint: {}", http_addr);
     info!("Storage backend: {:?}", config.storage_backend);
     info!("Idle timeout: {}s", config.idle_timeout_secs);
 
@@ -108,16 +119,6 @@ async fn main() {
         }
     };
 
-    let rate_limiter = Arc::new(RateLimiter::new(config.rate_limit_per_min));
-    let connection_limiter = ConnectionLimiter::new(config.max_connections);
-    let start_time = Instant::now();
-
-    // Parse HTTP listen address for health/metrics endpoints
-    // By default, bind to localhost for security (metrics contain internal info)
-    // Use RELAY_METRICS_ADDR to expose on other interfaces if needed
-    let http_addr =
-        std::env::var("RELAY_METRICS_ADDR").unwrap_or_else(|_| "127.0.0.1:8081".to_string());
-
     // Check for metrics auth token (optional additional protection)
     let metrics_token = std::env::var("RELAY_METRICS_TOKEN").ok();
     if metrics_token.is_some() {
@@ -130,8 +131,6 @@ async fn main() {
     // Start HTTP server for health/metrics
     let http_state = HttpState {
         metrics: metrics.clone(),
-        storage: storage.clone(),
-        start_time,
         metrics_token,
     };
     let http_router = create_router(http_state);
@@ -235,36 +234,63 @@ async fn main() {
                     // Check if this is an HTTP request without WebSocket upgrade
                     // Use case-insensitive check since HTTP headers are case-insensitive
                     let peek_lower = peek_str.to_ascii_lowercase();
-                    let is_http_get = peek_str.starts_with("GET ");
-                    let is_websocket_upgrade = peek_lower.contains("upgrade:");
+                    info!("Peek from {}: {}", addr, peek_lower);
 
-                    if is_http_get && !is_websocket_upgrade {
-                        // Health check endpoints
-                        if peek_str.starts_with("GET /health") || peek_str.starts_with("GET /up") {
-                            let uptime = start_time.elapsed().as_secs();
-                            let health_response = format!(
-                                r#"{{"status":"healthy","version":"{}","uptime_seconds":{}}}"#,
-                                env!("CARGO_PKG_VERSION"),
-                                uptime
-                            );
+                    let is_websocket_upgrade = peek_lower.contains("upgrade: websocket")
+                        && peek_lower.contains("connection:")
+                        && peek_lower.contains("upgrade");
+
+                    // 1. WebSocket upgrade MUST be handled first
+                    if is_websocket_upgrade {
+                        info!("Handling WebSocket upgrade from {}", addr);
+                        // We break out of the peek block and proceed to accept_async
+                    } else {
+                        let is_http_get = peek_lower.starts_with("get ");
+
+                        if is_http_get {
+                            // Update storage metrics before encoding
+                            metrics.blobs_stored.set(storage.blob_count() as i64);
+
+                            let path = if peek_lower.contains("get /health") {
+                                Some("/health")
+                            } else if peek_lower.contains("get /up") {
+                                Some("/up")
+                            } else if peek_lower.contains("get /ready") {
+                                Some("/ready")
+                            } else {
+                                None
+                            };
+
+                            if let Some(path) = path {
+                                let uptime = start_time.elapsed().as_secs();
+                                let blob_count = storage.blob_count();
+                                let health_response = format!(
+                                    r#"{{"status":"healthy","version":"{}","uptime_seconds":{},"blob_count":{}}}"#,
+                                    env!("CARGO_PKG_VERSION"),
+                                    uptime,
+                                    blob_count
+                                );
+                                let response = format!(
+                                    "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+                                    health_response.len(),
+                                    health_response
+                                );
+                                let _ = stream.try_write(response.as_bytes());
+                                info!("Handled HTTP {} from {}", path, addr);
+                                return;
+                            }
+
+                            // Root or other paths - return info/error
+                            let body = r#"{"error":"This is a WebSocket relay endpoint"}"#;
                             let response = format!(
                                 "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
-                                health_response.len(),
-                                health_response
+                                body.len(),
+                                body
                             );
                             let _ = stream.try_write(response.as_bytes());
+                            info!("Handled HTTP root/other from {}", addr);
                             return;
                         }
-
-                        // Any other HTTP request - return helpful error
-                        let error_response = r#"{"error":"This is a WebSocket relay endpoint","relay":"wss://relay.vauchi.app","website":"https://vauchi.app"}"#;
-                        let response = format!(
-                            "HTTP/1.1 400 Bad Request\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
-                            error_response.len(),
-                            error_response
-                        );
-                        let _ = stream.try_write(response.as_bytes());
-                        return;
                     }
                 }
                 _ => {}

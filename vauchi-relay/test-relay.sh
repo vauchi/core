@@ -41,7 +41,15 @@ if echo "$root" | grep -qi "Content-Type: text/html"; then
     echo "  This usually means kamal-proxy is routing to the landing page instead of the relay."
     FAIL=$((FAIL + 1))
 else
-    check "Relay identity check (now returns 200)" "$root" "HTTP/1.1 200 OK"
+    # Accept both HTTP/1.1 and HTTP/2 responses
+    if echo "$root" | grep -qE "HTTP/(1.1|2) 200"; then
+        echo "✓ Relay identity check (HTTP 200)"
+        PASS=$((PASS + 1))
+    else
+        echo "✗ Relay identity check (expected HTTP 200)"
+        echo "  Got: $(echo "$root" | head -n 1)"
+        FAIL=$((FAIL + 1))
+    fi
     check "Relay identity check (JSON content)" "$root" '"error":"This is a WebSocket relay endpoint"'
 fi
 
@@ -51,24 +59,25 @@ redirect=$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 5 "http://$H
 check "HTTP→HTTPS redirect" "$redirect" "301"
 
 # 4. WebSocket Upgrade (The core test)
-echo "Testing WebSocket upgrade on ..."
-# We use curl with -i to see headers, and look for 101 Switching Protocols
-ws_headers=$(curl -s -i --connect-timeout 5 \
+echo "Testing WebSocket upgrade..."
+# Force HTTP/1.1 since WebSocket upgrade (101) is an HTTP/1.1 mechanism
+# Use --max-time to prevent hanging if upgrade succeeds (curl waits for data)
+ws_headers=$(curl -s -i --http1.1 --connect-timeout 5 --max-time 3 \
     -H "Upgrade: websocket" \
     -H "Connection: Upgrade" \
     -H "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==" \
     -H "Sec-WebSocket-Version: 13" \
     "https://$HOST" 2>&1 || echo "CURL_FAILED")
 
-if echo "$ws_headers" | grep -q "HTTP/1.1 101"; then
+if echo "$ws_headers" | grep -qE "HTTP/1\.[01] 101"; then
     echo "✓ WebSocket upgrade (101 Switching Protocols)"
     PASS=$((PASS + 1))
-elif echo "$ws_headers" | grep -q "HTTP/1.1 400"; then
+elif echo "$ws_headers" | grep -qE "HTTP/1\.[01] 400"; then
     echo "✗ WebSocket upgrade failed (400 Bad Request)"
     echo "  The relay is reachable but rejected the upgrade."
     echo "  Check if 'Upgrade: websocket' and 'Connection: Upgrade' headers are being stripped by proxy."
     FAIL=$((FAIL + 1))
-elif echo "$ws_headers" | grep -q "HTTP/1.1 404"; then
+elif echo "$ws_headers" | grep -qE "HTTP/1\.[01] 404"; then
     echo "✗ WebSocket upgrade failed (404 Not Found)"
     echo "  The relay is reachable but rejected the path."
     FAIL=$((FAIL + 1))

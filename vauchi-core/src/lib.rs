@@ -23,7 +23,10 @@ pub use contact::{
     Contact, FieldVisibility, LabelError, LabelManager, VisibilityLabel, VisibilityRules,
     MAX_LABELS, SUGGESTED_LABELS,
 };
-pub use contact_card::{ContactCard, ContactField, FieldType, ValidationError};
+pub use contact_card::{
+    is_allowed_scheme, is_blocked_scheme, is_safe_url, ContactCard, ContactField, FieldType,
+    ValidationError,
+};
 pub use crypto::{decrypt, encrypt, PublicKey, Signature, SigningKeyPair, SymmetricKey};
 pub use exchange::{
     EncryptedExchangeMessage, ExchangeError, ExchangeEvent, ExchangeQR, ExchangeSession,

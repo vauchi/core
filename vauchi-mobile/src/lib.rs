@@ -149,6 +149,33 @@ pub fn generate_storage_key() -> Vec<u8> {
     SymmetricKey::generate().as_bytes().to_vec()
 }
 
+/// Check if a URL is safe to open in an external application.
+///
+/// Returns `true` for allowed schemes: http, https, tel, mailto, sms, geo.
+/// Returns `false` for blocked schemes (javascript, data, file, etc.) or unknown schemes.
+///
+/// Use this to validate URLs before opening them to prevent security issues.
+#[uniffi::export]
+pub fn is_safe_url(url: String) -> bool {
+    vauchi_core::is_safe_url(&url)
+}
+
+/// Check if a URL scheme is in the allowed list.
+///
+/// Allowed schemes: tel, mailto, sms, https, http, geo.
+#[uniffi::export]
+pub fn is_allowed_scheme(scheme: String) -> bool {
+    vauchi_core::is_allowed_scheme(&scheme)
+}
+
+/// Check if a URL scheme is explicitly blocked.
+///
+/// Blocked schemes: javascript, vbscript, data, file, ftp, blob.
+#[uniffi::export]
+pub fn is_blocked_scheme(scheme: String) -> bool {
+    vauchi_core::is_blocked_scheme(&scheme)
+}
+
 // === Main Interface ===
 
 /// Main Vauchi interface for mobile platforms.

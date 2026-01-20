@@ -35,9 +35,53 @@ pub fn is_allowed_scheme(scheme: &str) -> bool {
 }
 
 /// Check if a URI scheme is explicitly blocked.
-fn is_blocked_scheme(scheme: &str) -> bool {
+pub fn is_blocked_scheme(scheme: &str) -> bool {
     let lower = scheme.to_lowercase();
     BLOCKED_SCHEMES.contains(&lower.as_str())
+}
+
+/// Check if a URL string is safe to open.
+///
+/// Returns `true` if the URL uses an allowed scheme (http, https, tel, mailto, sms, geo).
+/// Returns `false` if:
+/// - The URL uses a blocked scheme (javascript, vbscript, data, file, etc.)
+/// - The URL uses an unknown scheme
+/// - The URL is malformed
+///
+/// # Examples
+///
+/// ```
+/// use vauchi_core::contact_card::is_safe_url;
+///
+/// assert!(is_safe_url("https://example.com"));
+/// assert!(is_safe_url("tel:+1234567890"));
+/// assert!(!is_safe_url("javascript:alert(1)"));
+/// assert!(!is_safe_url("data:text/html,<script>"));
+/// ```
+pub fn is_safe_url(url: &str) -> bool {
+    let url = url.trim();
+    if url.is_empty() {
+        return false;
+    }
+
+    // Extract scheme
+    if let Some(scheme) = extract_scheme(url) {
+        // Must have :// or : after scheme for it to be valid
+        if !url.contains(':') {
+            return false;
+        }
+
+        // Check if blocked first (explicit deny list)
+        if is_blocked_scheme(scheme) {
+            return false;
+        }
+
+        // Must be in allowed list
+        is_allowed_scheme(scheme)
+    } else {
+        // No scheme found - not a valid URL
+        false
+    }
 }
 
 /// Extract scheme from a URI string.
@@ -295,5 +339,54 @@ mod tests {
     fn test_normalize_social_username() {
         assert_eq!(normalize_social_username("@bobsmith"), "bobsmith");
         assert_eq!(normalize_social_username("bobsmith"), "bobsmith");
+    }
+
+    #[test]
+    fn test_is_safe_url_allowed_schemes() {
+        // Allowed schemes should pass
+        assert!(is_safe_url("https://example.com"));
+        assert!(is_safe_url("http://example.com"));
+        assert!(is_safe_url("tel:+1234567890"));
+        assert!(is_safe_url("mailto:test@example.com"));
+        assert!(is_safe_url("sms:+1234567890"));
+        assert!(is_safe_url("geo:0,0?q=address"));
+    }
+
+    #[test]
+    fn test_is_safe_url_blocked_schemes() {
+        // Blocked schemes should fail
+        assert!(!is_safe_url("javascript:alert(1)"));
+        assert!(!is_safe_url("vbscript:msgbox(1)"));
+        assert!(!is_safe_url("data:text/html,<script>alert(1)</script>"));
+        assert!(!is_safe_url("file:///etc/passwd"));
+        assert!(!is_safe_url("ftp://example.com"));
+        assert!(!is_safe_url("blob:http://example.com/uuid"));
+    }
+
+    #[test]
+    fn test_is_safe_url_unknown_schemes() {
+        // Unknown schemes should fail (not in allowlist)
+        assert!(!is_safe_url("custom://something"));
+        assert!(!is_safe_url("myapp://deeplink"));
+    }
+
+    #[test]
+    fn test_is_safe_url_edge_cases() {
+        // Empty/whitespace should fail
+        assert!(!is_safe_url(""));
+        assert!(!is_safe_url("   "));
+        
+        // No scheme should fail
+        assert!(!is_safe_url("example.com"));
+        assert!(!is_safe_url("just some text"));
+    }
+
+    #[test]
+    fn test_is_blocked_scheme() {
+        assert!(is_blocked_scheme("javascript"));
+        assert!(is_blocked_scheme("JAVASCRIPT")); // Case insensitive
+        assert!(is_blocked_scheme("data"));
+        assert!(!is_blocked_scheme("https"));
+        assert!(!is_blocked_scheme("tel"));
     }
 }

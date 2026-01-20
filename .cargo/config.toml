@@ -1,26 +1,14 @@
+# Rust-analyzer proc-macro support
+[build]
+rustflags = ["--cfg", "rust_analyzer"]
+
 # Android NDK configuration for cross-compilation
-# NDK r29 at /opt/android-ndk
+# NOTE: Linker paths are set via environment variables in build-android.sh
+# to support different NDK locations (Android Studio SDK vs standalone NDK)
 
-[target.aarch64-linux-android]
-linker = "/opt/android-ndk/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android24-clang"
-ar = "/opt/android-ndk/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ar"
+# If you have a standalone NDK, you can hardcode paths here.
+# Otherwise, the build script will set the linker via CARGO_TARGET_*_LINKER env vars.
 
-[target.aarch64-linux-android.env]
-CC = "/opt/android-ndk/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android24-clang"
-CXX = "/opt/android-ndk/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android24-clang++"
-AR = "/opt/android-ndk/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ar"
-
-[target.x86_64-linux-android]
-linker = "/opt/android-ndk/toolchains/llvm/prebuilt/linux-x86_64/bin/x86_64-linux-android24-clang"
-ar = "/opt/android-ndk/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ar"
-
-[target.x86_64-linux-android.env]
-CC = "/opt/android-ndk/toolchains/llvm/prebuilt/linux-x86_64/bin/x86_64-linux-android24-clang"
-CXX = "/opt/android-ndk/toolchains/llvm/prebuilt/linux-x86_64/bin/x86_64-linux-android24-clang++"
-AR = "/opt/android-ndk/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ar"
-
-[target.armv7-linux-androideabi]
-linker = "/opt/android-ndk/toolchains/llvm/prebuilt/linux-x86_64/bin/armv7a-linux-androideabi24-clang"
-
-[target.i686-linux-android]
-linker = "/opt/android-ndk/toolchains/llvm/prebuilt/linux-x86_64/bin/i686-linux-android24-clang"
+# Example for standalone NDK at /opt/android-ndk:
+# [target.aarch64-linux-android]
+# linker = "/opt/android-ndk/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android24-clang"

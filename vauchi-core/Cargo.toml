@@ -7,7 +7,9 @@ license = "MIT"
 
 [features]
 default = ["network"]
-network = ["tungstenite", "native-tls"]
+network = ["network-native-tls"]
+network-native-tls = ["tungstenite", "tungstenite/handshake", "tungstenite/native-tls", "native-tls"]
+network-rustls = ["tungstenite", "tungstenite/handshake", "tungstenite/rustls-tls-native-roots", "rustls", "webpki-roots"]
 secure-storage = ["keyring"]
 # Enable this feature to expose internal modules for integration tests
 testing = []
@@ -51,8 +53,12 @@ rusqlite = { version = "0.32", features = ["bundled"] }
 uuid = { version = "1.0", features = ["v4"] }
 
 # WebSocket transport (optional, not needed for mobile)
-tungstenite = { version = "0.24", features = ["native-tls"], optional = true }
+tungstenite = { version = "0.24", default-features = false, optional = true }
 native-tls = { version = "0.2", optional = true }
+
+# TLS for rustls feature (pure Rust with ring backend - works on Android/iOS)
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"], optional = true }
+webpki-roots = { version = "0.26", optional = true }
 
 # Platform keychain access (optional, for desktop apps)
 keyring = { version = "3", optional = true }

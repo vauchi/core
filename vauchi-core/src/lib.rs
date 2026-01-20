@@ -3,21 +3,21 @@
 //! Privacy-focused contact card exchange library.
 //! All cryptographic operations use the audited `ring` crate.
 
-#[cfg(feature = "network")]
+#[cfg(any(feature = "network-native-tls", feature = "network-rustls"))]
 pub mod api;
 pub mod contact;
 pub mod contact_card;
 pub mod crypto;
 pub mod exchange;
 pub mod identity;
-#[cfg(feature = "network")]
+#[cfg(any(feature = "network-native-tls", feature = "network-rustls"))]
 pub mod network;
 pub mod recovery;
 pub mod social;
 pub mod storage;
 pub mod sync;
 
-#[cfg(feature = "network")]
+#[cfg(any(feature = "network-native-tls", feature = "network-rustls"))]
 pub use api::{Vauchi, VauchiBuilder, VauchiConfig, VauchiError, VauchiEvent, VauchiResult};
 pub use contact::{
     Contact, FieldVisibility, LabelError, LabelManager, VisibilityLabel, VisibilityRules,
@@ -30,7 +30,7 @@ pub use exchange::{
     ProximityError, ProximityVerifier, X3DHKeyPair, X3DH,
 };
 pub use identity::{Identity, IdentityBackup};
-#[cfg(feature = "network")]
+#[cfg(any(feature = "network-native-tls", feature = "network-rustls"))]
 pub use network::{
     ConnectionState, MessageEnvelope, MockTransport, NetworkError, RelayClient, RelayClientConfig,
     Transport, WebSocketTransport,

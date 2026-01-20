@@ -10,8 +10,8 @@ crate-type = ["cdylib", "staticlib", "lib"]
 name = "vauchi_mobile"
 
 [dependencies]
-# Core Vauchi library (with network features for sync)
-vauchi-core = { path = "../vauchi-core" }
+# Core Vauchi library (with rustls for Android/iOS - no OpenSSL dependency)
+vauchi-core = { path = "../vauchi-core", default-features = false, features = ["network-rustls"] }
 
 # UniFFI for cross-language bindings
 uniffi = { version = "0.28", features = ["cli"] }
@@ -36,11 +36,13 @@ hex = "0.4"
 # UUID for message IDs
 uuid = { version = "1.0", features = ["v4"] }
 
-# WebSocket for sync
-tungstenite = { version = "0.24", features = ["native-tls"] }
+# WebSocket for sync (rustls for Android/iOS cross-compilation)
+tungstenite = { version = "0.24", default-features = false, features = ["handshake", "rustls-tls-native-roots"] }
 
-# TLS for certificate pinning
-native-tls = "0.2"
+# TLS for certificate pinning (rustls with ring backend - no C compilation needed)
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
+rustls-pki-types = "1.11"
+webpki-roots = "0.26"
 
 # URL parsing for certificate pinning
 url = "2.5"

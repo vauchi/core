@@ -1,11 +1,19 @@
 //! WebSocket Transport
 //!
 //! Real transport implementation using tungstenite for WebSocket connections.
+//! Supports both native-tls and rustls TLS backends.
 
 use std::net::TcpStream;
 use std::time::Duration;
 
+#[cfg(feature = "network-native-tls")]
 use native_tls::TlsConnector;
+
+#[cfg(feature = "network-rustls")]
+use rustls::pki_types::ServerName;
+#[cfg(feature = "network-rustls")]
+use std::sync::Arc;
+
 use tungstenite::stream::MaybeTlsStream;
 use tungstenite::{Message, WebSocket};
 
@@ -78,6 +86,45 @@ impl WebSocketTransport {
 
         Ok((host, port, is_tls))
     }
+
+    /// Create a TLS stream using native-tls
+    #[cfg(all(feature = "network-native-tls", not(feature = "network-rustls")))]
+    fn create_tls_stream(
+        host: &str,
+        tcp_stream: TcpStream,
+    ) -> Result<MaybeTlsStream<TcpStream>, NetworkError> {
+        let connector = TlsConnector::new()
+            .map_err(|e| NetworkError::ConnectionFailed(format!("TLS error: {}", e)))?;
+        let tls_stream = connector
+            .connect(host, tcp_stream)
+            .map_err(|e| NetworkError::ConnectionFailed(format!("TLS handshake failed: {}", e)))?;
+        Ok(MaybeTlsStream::NativeTls(tls_stream))
+    }
+
+    /// Create a TLS stream using rustls
+    #[cfg(feature = "network-rustls")]
+    fn create_tls_stream(
+        host: &str,
+        tcp_stream: TcpStream,
+    ) -> Result<MaybeTlsStream<TcpStream>, NetworkError> {
+        // Create root certificate store from webpki roots
+        let mut root_store = rustls::RootCertStore::empty();
+        root_store.extend(webpki_roots::TLS_SERVER_ROOTS.iter().cloned());
+
+        let config = rustls::ClientConfig::builder()
+            .with_root_certificates(root_store)
+            .with_no_client_auth();
+
+        let server_name: ServerName<'_> = host
+            .try_into()
+            .map_err(|_| NetworkError::ConnectionFailed(format!("Invalid server name: {}", host)))?;
+
+        let tls_conn = rustls::ClientConnection::new(Arc::new(config), server_name.to_owned())
+            .map_err(|e| NetworkError::ConnectionFailed(format!("TLS setup failed: {}", e)))?;
+
+        let tls_stream = rustls::StreamOwned::new(tls_conn, tcp_stream);
+        Ok(MaybeTlsStream::Rustls(tls_stream))
+    }
 }
 
 impl Default for WebSocketTransport {
@@ -113,15 +160,10 @@ impl Transport for WebSocketTransport {
 
         // Wrap in TLS if needed
         let stream: MaybeTlsStream<TcpStream> = if is_tls {
-            let connector = TlsConnector::new().map_err(|e| {
+            Self::create_tls_stream(&host, tcp_stream).map_err(|e| {
                 self.state = ConnectionState::Disconnected;
-                NetworkError::ConnectionFailed(format!("TLS error: {}", e))
-            })?;
-            let tls_stream = connector.connect(&host, tcp_stream).map_err(|e| {
-                self.state = ConnectionState::Disconnected;
-                NetworkError::ConnectionFailed(format!("TLS handshake failed: {}", e))
-            })?;
-            MaybeTlsStream::NativeTls(tls_stream)
+                e
+            })?
         } else {
             MaybeTlsStream::Plain(tcp_stream)
         };

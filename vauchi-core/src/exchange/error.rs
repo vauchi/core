@@ -43,4 +43,13 @@ pub enum ExchangeError {
 
     #[error("Serialization failed")]
     SerializationFailed,
+
+    #[error("Cannot exchange with yourself")]
+    SelfExchange,
+
+    #[error("QR code already used")]
+    QRAlreadyUsed,
+
+    #[error("Network disconnected during exchange")]
+    NetworkDisconnected,
 }

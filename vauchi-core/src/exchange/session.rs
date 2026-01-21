@@ -208,6 +208,11 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
 
         let their_public_key = *qr.public_key();
 
+        // Check for self-exchange (scanning own QR code)
+        if their_public_key == *self.identity.signing_public_key() {
+            return Err(ExchangeError::SelfExchange);
+        }
+
         self.state = ExchangeState::AwaitingProximity {
             their_public_key,
             their_qr: qr,

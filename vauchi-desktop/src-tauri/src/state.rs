@@ -130,12 +130,20 @@ impl AppState {
                 (None, None, None)
             };
 
-        // Load relay URL from config file or use default
+        // Load relay URL with fallback hierarchy:
+        // 1. User-configured URL (stored in config file)
+        // 2. VAUCHI_RELAY_URL environment variable
+        // 3. Default: wss://relay.vauchi.app
         let relay_config_path = data_dir.join("relay_url.txt");
         let relay_url = std::fs::read_to_string(&relay_config_path)
             .ok()
             .map(|s| s.trim().to_string())
             .filter(|s| !s.is_empty())
+            .or_else(|| {
+                std::env::var("VAUCHI_RELAY_URL")
+                    .ok()
+                    .filter(|s| !s.is_empty())
+            })
             .unwrap_or_else(|| DEFAULT_RELAY_URL.to_string());
 
         Ok(AppState {
@@ -256,7 +264,11 @@ impl AppState {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::Mutex;
     use tempfile::TempDir;
+
+    // Mutex to serialize tests that modify VAUCHI_RELAY_URL env var
+    static ENV_VAR_MUTEX: Mutex<()> = Mutex::new(());
 
     /// Create a test app state with isolated data directory.
     fn create_test_state() -> (AppState, TempDir) {
@@ -317,8 +329,24 @@ mod tests {
     /// Test default relay URL
     #[test]
     fn test_relay_url_default() {
-        let (state, _temp) = create_test_state();
-        assert_eq!(state.relay_url(), "wss://relay.vauchi.app");
+        let _lock = ENV_VAR_MUTEX.lock().unwrap();
+
+        // Save existing env var value
+        let saved_env = std::env::var("VAUCHI_RELAY_URL").ok();
+        // Remove env var for this test
+        std::env::remove_var("VAUCHI_RELAY_URL");
+
+        // Create temp dir and state AFTER removing env var
+        let temp_dir = TempDir::new().expect("Failed to create temp dir");
+        let state = AppState::new(temp_dir.path()).expect("Failed to create state");
+        let relay_url = state.relay_url().to_string();
+
+        // Restore env var
+        if let Some(val) = saved_env {
+            std::env::set_var("VAUCHI_RELAY_URL", val);
+        }
+
+        assert_eq!(relay_url, "wss://relay.vauchi.app");
     }
 
     /// Test setting relay URL
@@ -378,6 +406,62 @@ mod tests {
 
         let result = state.set_relay_url("https://relay.example.com");
         assert!(result.is_err());
+    }
+
+    /// Test VAUCHI_RELAY_URL env var is used when no config file exists
+    #[test]
+    fn test_relay_url_from_env_var() {
+        let _lock = ENV_VAR_MUTEX.lock().unwrap();
+
+        // Save existing env var value
+        let saved_env = std::env::var("VAUCHI_RELAY_URL").ok();
+
+        let temp_dir = TempDir::new().expect("Failed to create temp dir");
+
+        // Set env var before creating state
+        std::env::set_var("VAUCHI_RELAY_URL", "wss://env.relay.example.com");
+
+        let state = AppState::new(temp_dir.path()).expect("Failed to create state");
+        let relay_url = state.relay_url().to_string();
+
+        // Restore or remove env var
+        match saved_env {
+            Some(val) => std::env::set_var("VAUCHI_RELAY_URL", val),
+            None => std::env::remove_var("VAUCHI_RELAY_URL"),
+        }
+
+        assert_eq!(relay_url, "wss://env.relay.example.com");
+    }
+
+    /// Test config file takes precedence over env var
+    #[test]
+    fn test_config_file_precedence_over_env_var() {
+        let _lock = ENV_VAR_MUTEX.lock().unwrap();
+
+        // Save existing env var value
+        let saved_env = std::env::var("VAUCHI_RELAY_URL").ok();
+
+        let temp_dir = TempDir::new().expect("Failed to create temp dir");
+
+        // Write config file
+        let relay_config_path = temp_dir.path().join("relay_url.txt");
+        std::fs::write(&relay_config_path, "wss://config.relay.example.com")
+            .expect("Failed to write config");
+
+        // Set env var
+        std::env::set_var("VAUCHI_RELAY_URL", "wss://env.relay.example.com");
+
+        let state = AppState::new(temp_dir.path()).expect("Failed to create state");
+        let relay_url = state.relay_url().to_string();
+
+        // Restore or remove env var
+        match saved_env {
+            Some(val) => std::env::set_var("VAUCHI_RELAY_URL", val),
+            None => std::env::remove_var("VAUCHI_RELAY_URL"),
+        }
+
+        // Config file should take precedence
+        assert_eq!(relay_url, "wss://config.relay.example.com");
     }
 
     // === Display Name Tests ===

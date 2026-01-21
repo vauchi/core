@@ -258,3 +258,61 @@ impl From<&vauchi_core::VisibilityLabel> for MobileVisibilityLabelDetail {
         }
     }
 }
+
+// === Device Linking Types ===
+
+/// Device link QR data for display on existing device.
+#[allow(dead_code)]
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct MobileDeviceLinkData {
+    /// QR code content (base64-encoded link data).
+    pub qr_data: String,
+    /// Identity public key (hex).
+    pub identity_public_key: String,
+    /// Unix timestamp when QR was generated.
+    pub timestamp: u64,
+    /// Unix timestamp when QR expires.
+    pub expires_at: u64,
+}
+
+/// Device link info parsed from QR code.
+#[allow(dead_code)]
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct MobileDeviceLinkInfo {
+    /// Identity public key (hex).
+    pub identity_public_key: String,
+    /// Unix timestamp when QR was generated.
+    pub timestamp: u64,
+    /// Whether the QR code has expired.
+    pub is_expired: bool,
+}
+
+/// Result of completing device link (for existing device).
+#[allow(dead_code)]
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct MobileDeviceLinkResult {
+    /// Whether linking was successful.
+    pub success: bool,
+    /// New device's name.
+    pub device_name: String,
+    /// New device's index.
+    pub device_index: u32,
+    /// Error message if failed.
+    pub error_message: Option<String>,
+}
+
+/// Device info for display.
+#[allow(dead_code)]
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct MobileDeviceInfo {
+    /// Device index (0 = primary device).
+    pub device_index: u32,
+    /// Device name.
+    pub device_name: String,
+    /// Whether this is the current device.
+    pub is_current: bool,
+    /// Whether the device is active (not revoked).
+    pub is_active: bool,
+    /// Public key prefix (hex, first 16 chars).
+    pub public_key_prefix: String,
+}

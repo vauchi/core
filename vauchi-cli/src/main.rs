@@ -29,7 +29,12 @@ struct Cli {
     data_dir: Option<PathBuf>,
 
     /// Relay server URL
-    #[arg(long, global = true, default_value = "wss://relay.vauchi.app")]
+    #[arg(
+        long,
+        global = true,
+        env = "VAUCHI_RELAY_URL",
+        default_value = "wss://relay.vauchi.app"
+    )]
     relay: String,
 }
 

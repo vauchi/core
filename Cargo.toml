@@ -2,12 +2,7 @@
 resolver = "2"
 members = [
     "vauchi-core",
-    "vauchi-relay",
-    "vauchi-cli",
     "vauchi-mobile",
-    "vauchi-tui",
-    "vauchi-desktop/src-tauri",
-    "vauchi-e2e-tests",
 ]
 
 # Release profile: optimized for size (mobile binaries)

@@ -1,6 +1,6 @@
 # CLAUDE.md - Build Scripts
 
-Build and test scripts tightly coupled to the Rust workspace.
+Build and test scripts for vauchi-core and vauchi-mobile.
 
 ## Rules
 
@@ -8,18 +8,17 @@ Build and test scripts tightly coupled to the Rust workspace.
 - Use `#!/bin/bash` or `#!/usr/bin/env bash`
 - Include usage comments at top of script
 - Exit on error: `set -e` (or `set -euo pipefail`)
-- Run from `code/` directory
+- Run from `core/` directory
 
 ## Key Scripts
 
 | Script | Purpose |
 |--------|---------|
-| `build-bindings.sh` | Generate UniFFI bindings for mobile |
+| `build-bindings.sh` | Generate UniFFI bindings for iOS/Android |
 | `build-android.sh` | Build Android native libs |
-| `test-all.sh` | Run full test suite |
-| `relay-test.sh` | Integration tests with relay |
-| `test-desktop-e2e.sh` | Desktop E2E tests |
+| `validate-bindings.sh` | Verify generated bindings are complete |
+| `test-all.sh` | Run core + mobile test suite |
 
 ## See Also
 
-General dev tools (hooks, feature audit, dev helpers) are in `dev-tools/`.
+General dev tools (hooks, feature audit, dev helpers) are in `../dev-tools/`.

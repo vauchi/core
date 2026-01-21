@@ -1,12 +1,11 @@
 #!/bin/bash
-# Run all tests across the Vauchi project
+# Run all tests for vauchi-core and vauchi-mobile
 #
 # This script runs:
-# 1. Rust workspace tests (vauchi-core, vauchi-relay, vauchi-cli, vauchi-tui, vauchi-desktop)
-# 2. Desktop Playwright E2E tests
-# 3. Android unit + instrumented tests
-# 4. iOS unit + UI tests
-# 5. Coverage report generation
+# 1. Rust workspace tests (vauchi-core, vauchi-mobile)
+# 2. Android unit + instrumented tests
+# 3. iOS unit + UI tests
+# 4. Coverage report generation
 
 set -e
 
@@ -51,7 +50,7 @@ run_test() {
 }
 
 echo -e "${YELLOW}╔════════════════════════════════════════╗${NC}"
-echo -e "${YELLOW}║        Vauchi Test Suite               ║${NC}"
+echo -e "${YELLOW}║     Vauchi Core Test Suite             ║${NC}"
 echo -e "${YELLOW}╚════════════════════════════════════════╝${NC}"
 echo ""
 echo "Project root: $PROJECT_ROOT"
@@ -65,30 +64,6 @@ run_test "Rust Workspace Tests" "cargo test --workspace"
 run_test "Rust Clippy Lint" "cargo clippy --workspace -- -D warnings"
 
 run_test "Rust Format Check" "cargo fmt --all -- --check"
-
-# --- TUI Tests (ratatui-testlib) ---
-if cargo test -p vauchi-tui --no-run 2>/dev/null; then
-    run_test "TUI Tests" "cargo test -p vauchi-tui"
-else
-    echo -e "${YELLOW}SKIPPED: vauchi-tui has no tests yet${NC}"
-    ((SKIPPED++))
-fi
-
-# --- Desktop Tauri Rust Tests ---
-if cargo test -p vauchi-desktop --no-run 2>/dev/null; then
-    run_test "Desktop Tauri Tests" "cargo test -p vauchi-desktop"
-else
-    echo -e "${YELLOW}SKIPPED: vauchi-desktop has no tests yet${NC}"
-    ((SKIPPED++))
-fi
-
-# --- Desktop Playwright E2E ---
-if [[ -f "$SCRIPT_DIR/test-desktop-e2e.sh" ]]; then
-    run_test "Desktop Playwright E2E" "$SCRIPT_DIR/test-desktop-e2e.sh"
-else
-    echo -e "${YELLOW}SKIPPED: test-desktop-e2e.sh not found${NC}"
-    ((SKIPPED++))
-fi
 
 # --- Android Tests ---
 ANDROID_DIR="$WORKSPACE_ROOT/android"

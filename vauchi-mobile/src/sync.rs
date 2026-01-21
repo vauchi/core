@@ -11,7 +11,7 @@ use tungstenite::{Message, WebSocket};
 
 use vauchi_core::crypto::ratchet::DoubleRatchetState;
 use vauchi_core::exchange::{EncryptedExchangeMessage, X3DHKeyPair};
-use vauchi_core::sync::{DeviceSyncOrchestrator, SyncItem};
+use vauchi_core::sync::{ContactSyncData, DeviceSyncOrchestrator, SyncItem};
 use vauchi_core::{Contact, ContactCard, Identity, Storage};
 
 use crate::cert_pinning;
@@ -207,6 +207,9 @@ pub fn process_legacy_exchange_messages(
         let contact_id = contact.id().to_string();
         storage.save_contact(&contact)?;
 
+        // Record for inter-device sync
+        let _ = record_contact_for_device_sync(identity, storage, &contact);
+
         // Initialize ratchet as responder
         let ratchet_dh = X3DHKeyPair::from_bytes(our_x3dh.secret_bytes());
         let ratchet = DoubleRatchetState::initialize_responder(&shared_secret, ratchet_dh);
@@ -260,6 +263,9 @@ pub fn process_encrypted_exchange_messages(
         let contact = Contact::from_exchange(payload.identity_key, card, shared_secret.clone());
         let contact_id = contact.id().to_string();
         storage.save_contact(&contact)?;
+
+        // Record for inter-device sync
+        let _ = record_contact_for_device_sync(identity, storage, &contact);
 
         // Initialize ratchet as responder
         let ratchet_dh = X3DHKeyPair::from_bytes(our_x3dh.secret_bytes());
@@ -530,8 +536,14 @@ pub fn send_device_sync(
         _ => return Ok(0),
     };
 
-    let orchestrator =
-        DeviceSyncOrchestrator::new(storage, identity.create_device_info(), registry.clone());
+    let orchestrator = match DeviceSyncOrchestrator::load(
+        storage,
+        identity.create_device_info(),
+        registry.clone(),
+    ) {
+        Ok(o) => o,
+        Err(_) => return Ok(0),
+    };
 
     let identity_id = identity.public_id();
     let sender_device_id = hex::encode(identity.device_id());
@@ -673,4 +685,39 @@ fn update_contact_name_if_needed(storage: &Storage, contact_id: &str, new_name: 
             let _ = storage.save_contact(&contact);
         }
     }
+}
+
+/// Records a contact addition for inter-device sync.
+fn record_contact_for_device_sync(
+    identity: &Identity,
+    storage: &Storage,
+    contact: &Contact,
+) -> Result<(), MobileError> {
+    // Try to load device registry - if none exists or only one device, skip
+    let registry = match storage.load_device_registry()? {
+        Some(r) if r.device_count() > 1 => r,
+        _ => return Ok(()), // No other devices to sync to
+    };
+
+    // Create orchestrator
+    let mut orchestrator =
+        DeviceSyncOrchestrator::new(storage, identity.create_device_info(), registry);
+
+    // Create ContactSyncData from the contact
+    let contact_data = ContactSyncData::from_contact(contact);
+
+    // Record the sync item
+    let item = SyncItem::ContactAdded {
+        contact_data,
+        timestamp: std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs(),
+    };
+
+    orchestrator
+        .record_local_change(item)
+        .map_err(|e| MobileError::SyncFailed(format!("Failed to record device sync: {:?}", e)))?;
+
+    Ok(())
 }

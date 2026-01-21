@@ -375,7 +375,7 @@ mod tests {
         // Empty/whitespace should fail
         assert!(!is_safe_url(""));
         assert!(!is_safe_url("   "));
-        
+
         // No scheme should fail
         assert!(!is_safe_url("example.com"));
         assert!(!is_safe_url("just some text"));

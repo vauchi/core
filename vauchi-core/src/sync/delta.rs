@@ -108,8 +108,8 @@ impl CardDelta {
 
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
 
         CardDelta {
             version: 1, // Will be set properly during signing

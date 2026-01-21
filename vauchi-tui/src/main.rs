@@ -2,11 +2,6 @@
 //!
 //! Interactive terminal application for Vauchi using Ratatui.
 
-mod app;
-mod backend;
-mod handlers;
-mod ui;
-
 use std::io;
 use std::path::PathBuf;
 use std::time::Duration;
@@ -19,8 +14,10 @@ use crossterm::{
 };
 use ratatui::prelude::*;
 
-use app::App;
-use backend::Backend;
+use vauchi_tui::app::App;
+use vauchi_tui::backend::Backend;
+use vauchi_tui::handlers;
+use vauchi_tui::ui;
 
 fn main() -> Result<()> {
     // Setup terminal

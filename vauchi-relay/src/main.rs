@@ -7,15 +7,6 @@
 //! - Rate limiting and abuse prevention
 //! - Recovery proof storage for contact recovery
 
-mod config;
-mod connection_limit;
-mod handler;
-mod http;
-mod metrics;
-mod rate_limit;
-mod recovery_storage;
-mod storage;
-
 use std::sync::Arc;
 use std::time::Instant;
 
@@ -23,13 +14,16 @@ use tokio::net::TcpListener;
 use tokio_tungstenite::accept_async;
 use tracing::{error, info};
 
-use config::RelayConfig;
-use connection_limit::ConnectionLimiter;
-use http::{create_router, HttpState};
-use metrics::RelayMetrics;
-use rate_limit::RateLimiter;
-use recovery_storage::{MemoryRecoveryProofStore, RecoveryProofStore, SqliteRecoveryProofStore};
-use storage::{create_blob_store, BlobStore, StorageBackend};
+use vauchi_relay::config::RelayConfig;
+use vauchi_relay::connection_limit::ConnectionLimiter;
+use vauchi_relay::handler;
+use vauchi_relay::http::{create_router, HttpState};
+use vauchi_relay::metrics::RelayMetrics;
+use vauchi_relay::rate_limit::RateLimiter;
+use vauchi_relay::recovery_storage::{
+    MemoryRecoveryProofStore, RecoveryProofStore, SqliteRecoveryProofStore,
+};
+use vauchi_relay::storage::{create_blob_store, BlobStore, StorageBackend};
 
 #[tokio::main]
 async fn main() {

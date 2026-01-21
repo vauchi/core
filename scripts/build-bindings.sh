@@ -211,11 +211,17 @@ if $BUILD_ANDROID; then
     cp target/x86_64-linux-android/release/libvauchi_mobile.so "$ANDROID_JNI_DIR/x86_64/"
 
     # Generate Kotlin bindings
+    # Note: uniffi-bindgen can't read metadata from cross-compiled libraries,
+    # so we build a native library first and use that for binding generation
     echo -e "${YELLOW}Generating Kotlin bindings...${NC}"
     mkdir -p "$ANDROID_KOTLIN_DIR"
 
-    cargo run -p vauchi-mobile --bin uniffi-bindgen -- generate \
-        --library target/aarch64-linux-android/release/libvauchi_mobile.so \
+    # Build native library for binding generation
+    cargo build -p vauchi-mobile --release
+    
+    cargo run -p vauchi-mobile --bin uniffi-bindgen --release -- generate \
+        vauchi-mobile/src/vauchi_mobile.udl \
+        --lib-file target/release/libvauchi_mobile.so \
         --language kotlin \
         --out-dir "$ANDROID_KOTLIN_DIR"
 

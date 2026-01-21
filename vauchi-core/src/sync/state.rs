@@ -11,6 +11,15 @@ use super::delta::CardDelta;
 use crate::contact_card::ContactCard;
 use crate::storage::{PendingUpdate, Storage, StorageError, UpdateStatus};
 
+/// Returns the current Unix timestamp in seconds.
+/// Falls back to 0 if the system clock is before UNIX_EPOCH (should never happen).
+fn current_timestamp() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0)
+}
+
 /// Sync error types.
 #[derive(Error, Debug)]
 pub enum SyncError {
@@ -92,10 +101,7 @@ impl<'a> SyncManager<'a> {
         let payload =
             serde_json::to_vec(&delta).map_err(|e| SyncError::Serialization(e.to_string()))?;
 
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = current_timestamp();
 
         let update_id = Uuid::new_v4().to_string();
 
@@ -123,10 +129,7 @@ impl<'a> SyncManager<'a> {
         let payload = serde_json::to_vec(&visible_fields)
             .map_err(|e| SyncError::Serialization(e.to_string()))?;
 
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = current_timestamp();
 
         let update_id = Uuid::new_v4().to_string();
 
@@ -171,10 +174,7 @@ impl<'a> SyncManager<'a> {
         let base_delay_secs = 30u64;
         let delay = base_delay_secs * (1 << retry_count.min(6));
 
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = current_timestamp();
 
         let retry_at = now + delay;
 
@@ -292,10 +292,7 @@ impl<'a> SyncManager<'a> {
         }
 
         // Create merged delta
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = current_timestamp();
 
         let merged_delta = CardDelta {
             version: highest_version,
@@ -329,10 +326,7 @@ impl<'a> SyncManager<'a> {
 
     /// Gets updates that are ready for retry (past their retry_at time).
     pub fn get_ready_for_retry(&self) -> Result<Vec<PendingUpdate>, SyncError> {
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = current_timestamp();
 
         let all_pending = self.storage.get_all_pending_updates()?;
 

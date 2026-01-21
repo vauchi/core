@@ -212,16 +212,18 @@ if $BUILD_ANDROID; then
 
     # Generate Kotlin bindings
     # Note: uniffi-bindgen can't read metadata from cross-compiled libraries,
-    # so we build a native library first and use that for binding generation
+    # so we build a native library first and use that for binding generation.
+    # We use --library mode to extract types from proc macros, matching iOS approach.
+    # IMPORTANT: Build without symbol stripping to preserve UniFFI metadata!
     echo -e "${YELLOW}Generating Kotlin bindings...${NC}"
     mkdir -p "$ANDROID_KOTLIN_DIR"
 
-    # Build native library for binding generation
-    cargo build -p vauchi-mobile --release
-    
+    # Build native library for binding generation (without stripping to preserve metadata)
+    echo -e "${YELLOW}Building native library for metadata extraction...${NC}"
+    RUSTFLAGS="-Cstrip=none" cargo build -p vauchi-mobile --release
+
     cargo run -p vauchi-mobile --bin uniffi-bindgen --release -- generate \
-        vauchi-mobile/src/vauchi_mobile.udl \
-        --lib-file target/release/libvauchi_mobile.so \
+        --library target/release/libvauchi_mobile.so \
         --language kotlin \
         --out-dir "$ANDROID_KOTLIN_DIR"
 

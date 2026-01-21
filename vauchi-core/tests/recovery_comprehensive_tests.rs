@@ -142,11 +142,15 @@ fn test_create_voucher_from_claim() {
     let voucher_keypair = SigningKeyPair::generate();
 
     let claim = RecoveryClaim::new(&old_pk, &new_pk);
-    let voucher = vauchi_core::RecoveryVoucher::create_from_claim(&claim, &voucher_keypair).unwrap();
+    let voucher =
+        vauchi_core::RecoveryVoucher::create_from_claim(&claim, &voucher_keypair).unwrap();
 
     assert_eq!(voucher.old_pk(), &old_pk);
     assert_eq!(voucher.new_pk(), &new_pk);
-    assert_eq!(voucher.voucher_pk(), voucher_keypair.public_key().as_bytes());
+    assert_eq!(
+        voucher.voucher_pk(),
+        voucher_keypair.public_key().as_bytes()
+    );
     assert!(voucher.verify());
 }
 
@@ -164,8 +168,7 @@ fn test_cannot_vouch_for_expired_claim() {
     let old_timestamp = now - (49 * 60 * 60); // 49 hours ago
 
     let expired_claim = RecoveryClaim::new_with_timestamp(&old_pk, &new_pk, old_timestamp);
-    let result =
-        vauchi_core::RecoveryVoucher::create_from_claim(&expired_claim, &voucher_keypair);
+    let result = vauchi_core::RecoveryVoucher::create_from_claim(&expired_claim, &voucher_keypair);
 
     assert!(matches!(result, Err(RecoveryError::ClaimExpired)));
 }
@@ -285,7 +288,10 @@ fn test_reject_insufficient_vouchers() {
     }
 
     let result = proof.validate();
-    assert!(matches!(result, Err(RecoveryError::InsufficientVouchers(3))));
+    assert!(matches!(
+        result,
+        Err(RecoveryError::InsufficientVouchers(3))
+    ));
 }
 
 /// Scenario: Reject duplicate vouchers
@@ -561,13 +567,17 @@ fn test_detect_conflicting_claims() {
     for _ in 0..2 {
         let kp = SigningKeyPair::generate();
         proof1
-            .add_voucher(vauchi_core::RecoveryVoucher::create(&old_pk, &new_pk_1, &kp))
+            .add_voucher(vauchi_core::RecoveryVoucher::create(
+                &old_pk, &new_pk_1, &kp,
+            ))
             .unwrap();
     }
     for _ in 0..2 {
         let kp = SigningKeyPair::generate();
         proof2
-            .add_voucher(vauchi_core::RecoveryVoucher::create(&old_pk, &new_pk_2, &kp))
+            .add_voucher(vauchi_core::RecoveryVoucher::create(
+                &old_pk, &new_pk_2, &kp,
+            ))
             .unwrap();
     }
 

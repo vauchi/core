@@ -199,6 +199,19 @@ impl Identity {
         self.device_info.device_id()
     }
 
+    /// Creates a fresh DeviceInfo for this device.
+    ///
+    /// This is useful when you need to pass DeviceInfo by value (e.g., to
+    /// DeviceSyncOrchestrator) since DeviceInfo doesn't implement Clone
+    /// for security reasons.
+    pub fn create_device_info(&self) -> DeviceInfo {
+        DeviceInfo::derive(
+            &self.master_seed,
+            self.device_info.device_index(),
+            self.device_info.device_name().to_string(),
+        )
+    }
+
     /// Creates the initial device registry containing only this device.
     pub fn initial_device_registry(&self) -> DeviceRegistry {
         DeviceRegistry::new(

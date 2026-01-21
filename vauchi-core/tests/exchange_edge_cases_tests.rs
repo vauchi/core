@@ -101,8 +101,7 @@ fn test_qr_expiration() {
     let alice = Identity::create("Alice");
 
     let prox = proximity(true);
-    let mut initiator =
-        ExchangeSession::new_initiator(alice, ContactCard::new("Alice"), prox);
+    let mut initiator = ExchangeSession::new_initiator(alice, ContactCard::new("Alice"), prox);
     initiator.apply(ExchangeEvent::GenerateQR).unwrap();
 
     let qr = initiator.qr().unwrap();
@@ -195,13 +194,11 @@ fn test_initiator_cannot_process_qr() {
     let prox1 = proximity(true);
 
     // Alice as initiator
-    let mut initiator =
-        ExchangeSession::new_initiator(alice, ContactCard::new("Alice"), prox1);
+    let mut initiator = ExchangeSession::new_initiator(alice, ContactCard::new("Alice"), prox1);
 
     // Generate a QR from Bob
     let bob_prox = proximity(true);
-    let mut bob_session =
-        ExchangeSession::new_initiator(bob, ContactCard::new("Bob"), bob_prox);
+    let mut bob_session = ExchangeSession::new_initiator(bob, ContactCard::new("Bob"), bob_prox);
     bob_session.apply(ExchangeEvent::GenerateQR).unwrap();
     let bob_qr = bob_session.qr().unwrap().clone();
 
@@ -216,8 +213,7 @@ fn test_responder_cannot_generate_qr() {
     let alice = Identity::create("Alice");
     let proximity = proximity(true);
 
-    let mut responder =
-        ExchangeSession::new_responder(alice, ContactCard::new("Alice"), proximity);
+    let mut responder = ExchangeSession::new_responder(alice, ContactCard::new("Alice"), proximity);
 
     let result = responder.apply(ExchangeEvent::GenerateQR);
     assert!(matches!(result, Err(ExchangeError::InvalidState(_))));
@@ -229,8 +225,7 @@ fn test_cannot_verify_proximity_from_idle() {
     let alice = Identity::create("Alice");
     let proximity = proximity(true);
 
-    let mut session =
-        ExchangeSession::new_responder(alice, ContactCard::new("Alice"), proximity);
+    let mut session = ExchangeSession::new_responder(alice, ContactCard::new("Alice"), proximity);
 
     // Try to verify proximity from Idle state
     let result = session.apply(ExchangeEvent::VerifyProximity);
@@ -250,10 +245,16 @@ fn test_session_role_assignment() {
     let initiator_prox = proximity(true);
     let responder_prox = proximity(true);
 
-    let initiator =
-        ExchangeSession::new_initiator(alice_for_initiator, ContactCard::new("Alice"), initiator_prox);
-    let responder =
-        ExchangeSession::new_responder(alice_for_responder, ContactCard::new("Alice"), responder_prox);
+    let initiator = ExchangeSession::new_initiator(
+        alice_for_initiator,
+        ContactCard::new("Alice"),
+        initiator_prox,
+    );
+    let responder = ExchangeSession::new_responder(
+        alice_for_responder,
+        ContactCard::new("Alice"),
+        responder_prox,
+    );
 
     assert_eq!(initiator.role(), ExchangeRole::Initiator);
     assert_eq!(responder.role(), ExchangeRole::Responder);
@@ -287,8 +288,7 @@ fn test_invalid_signature_rejected() {
     let alice = Identity::create("Alice");
     let proximity = proximity(true);
 
-    let mut session =
-        ExchangeSession::new_initiator(alice, ContactCard::new("Alice"), proximity);
+    let mut session = ExchangeSession::new_initiator(alice, ContactCard::new("Alice"), proximity);
     session.apply(ExchangeEvent::GenerateQR).unwrap();
 
     let qr = session.qr().unwrap();

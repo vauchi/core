@@ -713,6 +713,53 @@ impl DeviceLinkInitiatorRestored {
 
         Ok((encrypted_response, updated_registry, new_device))
     }
+
+    /// Processes a link request with sync payload and creates a response.
+    ///
+    /// This variant includes the sync payload in the response so the new device
+    /// receives all existing contacts during initial linking.
+    pub fn process_request_with_sync(
+        &self,
+        encrypted_request: &[u8],
+        sync_payload_json: &str,
+    ) -> Result<(Vec<u8>, DeviceRegistry, DeviceInfo), ExchangeError> {
+        // Decrypt the request
+        let request = DeviceLinkRequest::decrypt(encrypted_request, self.qr.link_key())?;
+
+        // Validate device name
+        if request.device_name.is_empty() {
+            return Err(ExchangeError::InvalidQRFormat);
+        }
+
+        // Determine next device index
+        let device_index = self.registry.next_device_index();
+
+        // Create device info for the new device
+        let new_device_info =
+            DeviceInfo::derive(&self.master_seed, device_index, request.device_name.clone());
+
+        // Create updated registry with new device
+        let mut updated_registry = self.registry.clone();
+        updated_registry
+            .add_device_unsigned(new_device_info.to_registered(&self.master_seed))
+            .map_err(|_| ExchangeError::CryptoError)?;
+
+        // Create and encrypt response with sync payload
+        let response = DeviceLinkResponse::with_sync_payload(
+            self.master_seed,
+            self.display_name.clone(),
+            device_index,
+            updated_registry.clone(),
+            sync_payload_json.to_string(),
+        );
+
+        let encrypted_response = response.encrypt(self.qr.link_key())?;
+
+        // Create the new device's DeviceInfo for the caller to store
+        let new_device = DeviceInfo::derive(&self.master_seed, device_index, request.device_name);
+
+        Ok((encrypted_response, updated_registry, new_device))
+    }
 }
 
 impl Drop for DeviceLinkInitiatorRestored {

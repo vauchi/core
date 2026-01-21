@@ -11,12 +11,14 @@ use tungstenite::{Message, WebSocket};
 
 use vauchi_core::crypto::ratchet::DoubleRatchetState;
 use vauchi_core::exchange::{EncryptedExchangeMessage, X3DHKeyPair};
+use vauchi_core::sync::{DeviceSyncOrchestrator, SyncItem};
 use vauchi_core::{Contact, ContactCard, Identity, Storage};
 
 use crate::cert_pinning;
 use crate::error::MobileError;
 use crate::protocol::{
-    self, AckStatus, EncryptedUpdate, ExchangeMessage, Handshake, MessagePayload,
+    self, create_device_sync_ack, create_device_sync_message, AckStatus, DeviceSyncMessage,
+    EncryptedUpdate, ExchangeMessage, Handshake, MessagePayload,
 };
 use crate::types::MobileSyncResult;
 
@@ -28,15 +30,19 @@ pub struct ReceivedMessages {
     pub encrypted_exchange: Vec<Vec<u8>>,
     /// Card updates from existing contacts: (sender_id, ciphertext).
     pub card_updates: Vec<(String, Vec<u8>)>,
+    /// Device sync messages (inter-device synchronization).
+    pub device_sync_messages: Vec<DeviceSyncMessage>,
 }
 
 /// Sends handshake to relay.
 pub fn send_handshake(
     socket: &mut WebSocket<MaybeTlsStream<TcpStream>>,
     client_id: &str,
+    device_id: Option<&str>,
 ) -> Result<(), MobileError> {
     let handshake = Handshake {
         client_id: client_id.to_string(),
+        device_id: device_id.map(|s| s.to_string()),
     };
     let envelope = protocol::create_envelope(MessagePayload::Handshake(handshake));
     let data = protocol::encode_message(&envelope)
@@ -53,6 +59,7 @@ pub fn send_handshake(
 /// - Legacy plaintext exchange messages
 /// - Encrypted exchange messages
 /// - Card updates (ratchet-encrypted)
+/// - Device sync messages (inter-device synchronization)
 #[allow(clippy::type_complexity)]
 pub fn receive_pending(
     socket: &mut WebSocket<MaybeTlsStream<TcpStream>>,
@@ -60,21 +67,36 @@ pub fn receive_pending(
     let mut legacy_exchange_messages = Vec::new();
     let mut encrypted_exchange_messages = Vec::new();
     let mut card_updates = Vec::new();
+    let mut device_sync_messages = Vec::new();
 
     loop {
         match socket.read() {
             Ok(Message::Binary(data)) => {
                 if let Ok(envelope) = protocol::decode_message(&data) {
-                    if let MessagePayload::EncryptedUpdate(update) = envelope.payload {
-                        classify_and_store_message(
-                            update,
-                            &mut legacy_exchange_messages,
-                            &mut encrypted_exchange_messages,
-                            &mut card_updates,
-                        );
+                    match envelope.payload {
+                        MessagePayload::EncryptedUpdate(update) => {
+                            classify_and_store_message(
+                                update,
+                                &mut legacy_exchange_messages,
+                                &mut encrypted_exchange_messages,
+                                &mut card_updates,
+                            );
 
-                        // Send acknowledgment
-                        send_ack(socket, &envelope.message_id);
+                            // Send acknowledgment
+                            send_ack(socket, &envelope.message_id);
+                        }
+                        MessagePayload::DeviceSyncMessage(msg) => {
+                            // Get version before moving msg
+                            let version = msg.version;
+                            device_sync_messages.push(msg);
+
+                            // Send device sync ack
+                            let ack = create_device_sync_ack(&envelope.message_id, version);
+                            if let Ok(ack_data) = protocol::encode_message(&ack) {
+                                let _ = socket.send(Message::Binary(ack_data));
+                            }
+                        }
+                        _ => {}
                     }
                 }
             }
@@ -98,6 +120,7 @@ pub fn receive_pending(
         legacy_exchange: legacy_exchange_messages,
         encrypted_exchange: encrypted_exchange_messages,
         card_updates,
+        device_sync_messages,
     })
 }
 
@@ -270,7 +293,7 @@ pub fn send_exchange_response(
         .map_err(MobileError::NetworkError)?;
 
     let our_id = identity.public_id();
-    send_handshake(&mut socket, &our_id)?;
+    send_handshake(&mut socket, &our_id, None)?;
 
     // Create encrypted exchange message using X3DH
     let our_x3dh = identity.x3dh_keypair();
@@ -383,6 +406,182 @@ pub fn send_pending_updates(
     Ok(sent)
 }
 
+/// Processes incoming device sync messages from other devices.
+pub fn process_device_sync_messages(
+    identity: &Identity,
+    storage: &Storage,
+    messages: Vec<DeviceSyncMessage>,
+) -> Result<u32, MobileError> {
+    if messages.is_empty() {
+        return Ok(0);
+    }
+
+    // Try to load device registry - if none exists, skip
+    let registry = match storage.load_device_registry()? {
+        Some(r) if r.device_count() > 1 => r,
+        _ => return Ok(0),
+    };
+
+    let mut orchestrator =
+        DeviceSyncOrchestrator::new(storage, identity.create_device_info(), registry.clone());
+
+    let mut processed = 0u32;
+
+    for msg in messages {
+        // Parse sender device ID
+        let sender_device_id: [u8; 32] = match hex::decode(&msg.sender_device_id) {
+            Ok(bytes) if bytes.len() == 32 => {
+                let mut arr = [0u8; 32];
+                arr.copy_from_slice(&bytes);
+                arr
+            }
+            _ => continue,
+        };
+
+        // Find sender in registry
+        let sender_device = match registry.find_device(&sender_device_id) {
+            Some(d) => d,
+            None => continue,
+        };
+
+        // Decrypt payload
+        let plaintext = match orchestrator
+            .decrypt_from_device(&sender_device.exchange_public_key, &msg.encrypted_payload)
+        {
+            Ok(pt) => pt,
+            Err(_) => continue,
+        };
+
+        // Parse SyncItems
+        let items: Vec<SyncItem> = match serde_json::from_slice(&plaintext) {
+            Ok(items) => items,
+            Err(_) => continue,
+        };
+
+        // Process items with conflict resolution
+        let applied = match orchestrator.process_incoming(items) {
+            Ok(applied) => applied,
+            Err(_) => continue,
+        };
+
+        // Apply the items
+        for item in &applied {
+            let _ = apply_sync_item(storage, item);
+        }
+
+        if !applied.is_empty() {
+            processed += 1;
+        }
+    }
+
+    Ok(processed)
+}
+
+/// Applies a single sync item to local storage.
+fn apply_sync_item(storage: &Storage, item: &SyncItem) -> Result<(), MobileError> {
+    match item {
+        SyncItem::ContactAdded { contact_data, .. } => {
+            if let Ok(contact) = contact_data.to_contact() {
+                storage.save_contact(&contact)?;
+            }
+        }
+        SyncItem::ContactRemoved { contact_id, .. } => {
+            storage.delete_contact(contact_id)?;
+        }
+        SyncItem::CardUpdated {
+            field_label,
+            new_value,
+            ..
+        } => {
+            if let Ok(Some(mut card)) = storage.load_own_card() {
+                if card.update_field_value(field_label, new_value).is_ok() {
+                    storage.save_own_card(&card)?;
+                }
+            }
+        }
+        SyncItem::VisibilityChanged {
+            contact_id,
+            field_label,
+            is_visible,
+            ..
+        } => {
+            if let Some(mut contact) = storage.load_contact(contact_id)? {
+                if *is_visible {
+                    contact.visibility_rules_mut().set_everyone(field_label);
+                } else {
+                    contact.visibility_rules_mut().set_nobody(field_label);
+                }
+                storage.save_contact(&contact)?;
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Sends pending device sync items to other devices.
+pub fn send_device_sync(
+    identity: &Identity,
+    storage: &Storage,
+    socket: &mut WebSocket<MaybeTlsStream<TcpStream>>,
+) -> Result<u32, MobileError> {
+    // Try to load device registry - if none exists, skip
+    let registry = match storage.load_device_registry()? {
+        Some(r) if r.device_count() > 1 => r,
+        _ => return Ok(0),
+    };
+
+    let orchestrator =
+        DeviceSyncOrchestrator::new(storage, identity.create_device_info(), registry.clone());
+
+    let identity_id = identity.public_id();
+    let sender_device_id = hex::encode(identity.device_id());
+    let mut sent = 0u32;
+
+    for device in registry.active_devices() {
+        // Skip self
+        if device.device_id == *identity.device_id() {
+            continue;
+        }
+
+        let pending = orchestrator.pending_for_device(&device.device_id);
+        if pending.is_empty() {
+            continue;
+        }
+
+        // Serialize and encrypt
+        let payload = match serde_json::to_vec(pending) {
+            Ok(p) => p,
+            Err(_) => continue,
+        };
+
+        let encrypted =
+            match orchestrator.encrypt_for_device(&device.exchange_public_key, &payload) {
+                Ok(ct) => ct,
+                Err(_) => continue,
+            };
+
+        // Create and send device sync message
+        let target_device_id = hex::encode(device.device_id);
+        let version = orchestrator.version_vector().get(identity.device_id());
+
+        let envelope = create_device_sync_message(
+            &identity_id,
+            &target_device_id,
+            &sender_device_id,
+            encrypted,
+            version,
+        );
+
+        if let Ok(data) = protocol::encode_message(&envelope) {
+            if socket.send(Message::Binary(data)).is_ok() {
+                sent += 1;
+            }
+        }
+    }
+
+    Ok(sent)
+}
+
 /// Performs a complete sync operation.
 pub fn do_sync(
     identity: &Identity,
@@ -391,6 +590,7 @@ pub fn do_sync(
     pinned_cert: Option<&str>,
 ) -> Result<MobileSyncResult, MobileError> {
     let client_id = identity.public_id();
+    let device_id_hex = hex::encode(identity.device_id());
 
     // Connect to relay
     let mut socket = cert_pinning::connect_with_pinning(relay_url, pinned_cert)
@@ -401,8 +601,8 @@ pub fn do_sync(
         let _ = stream.set_read_timeout(Some(Duration::from_millis(1000)));
     }
 
-    // Send handshake
-    send_handshake(&mut socket, &client_id)?;
+    // Send handshake with device_id for inter-device sync
+    send_handshake(&mut socket, &client_id, Some(&device_id_hex))?;
 
     // Wait briefly for server to send pending messages
     std::thread::sleep(Duration::from_millis(500));
@@ -433,6 +633,13 @@ pub fn do_sync(
     // Process card updates
     let cards_updated = process_card_updates(storage, received.card_updates)?;
 
+    // Process device sync messages (inter-device synchronization)
+    let device_synced =
+        process_device_sync_messages(identity, storage, received.device_sync_messages)?;
+
+    // Send pending device sync items to other devices
+    let device_sync_sent = send_device_sync(identity, storage, &mut socket)?;
+
     // Send pending outbound updates
     let updates_sent = send_pending_updates(identity, storage, &mut socket)?;
 
@@ -441,8 +648,8 @@ pub fn do_sync(
 
     Ok(MobileSyncResult {
         contacts_added,
-        cards_updated,
-        updates_sent,
+        cards_updated: cards_updated + device_synced,
+        updates_sent: updates_sent + device_sync_sent,
     })
 }
 

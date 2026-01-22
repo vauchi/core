@@ -14,6 +14,7 @@ use rustls::pki_types::ServerName;
 #[cfg(feature = "network-rustls")]
 use std::sync::Arc;
 
+use tungstenite::client::IntoClientRequest;
 use tungstenite::stream::MaybeTlsStream;
 use tungstenite::{Message, WebSocket};
 
@@ -167,8 +168,17 @@ impl Transport for WebSocketTransport {
             MaybeTlsStream::Plain(tcp_stream)
         };
 
-        // WebSocket handshake
-        let (socket, _response) = tungstenite::client(&config.server_url, stream).map_err(|e| {
+        // WebSocket handshake - use IntoClientRequest for proper HTTP/1.1 request
+        let request = config
+            .server_url
+            .as_str()
+            .into_client_request()
+            .map_err(|e| {
+                self.state = ConnectionState::Disconnected;
+                NetworkError::ConnectionFailed(format!("Invalid WebSocket request: {}", e))
+            })?;
+
+        let (socket, _response) = tungstenite::client(request, stream).map_err(|e| {
             self.state = ConnectionState::Disconnected;
             NetworkError::ConnectionFailed(format!("WebSocket handshake failed: {}", e))
         })?;

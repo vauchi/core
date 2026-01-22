@@ -117,6 +117,19 @@ impl Storage {
         )?;
         Ok(count as usize)
     }
+
+    /// Updates the next retry time for an entry (for manual retry).
+    pub fn update_retry_next_time(
+        &self,
+        message_id: &str,
+        next_retry: u64,
+    ) -> Result<bool, StorageError> {
+        let rows_affected = self.conn.execute(
+            "UPDATE retry_entries SET next_retry = ?1 WHERE message_id = ?2",
+            params![next_retry as i64, message_id],
+        )?;
+        Ok(rows_affected > 0)
+    }
 }
 
 /// Converts database row to RetryEntry.

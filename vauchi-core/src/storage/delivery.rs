@@ -63,6 +63,19 @@ impl Storage {
             .map_err(StorageError::Database)
     }
 
+    /// Gets all delivery records.
+    pub fn get_all_delivery_records(&self) -> Result<Vec<DeliveryRecord>, StorageError> {
+        let mut stmt = self.conn.prepare(
+            "SELECT message_id, recipient_id, status, status_reason, created_at, updated_at, expires_at
+             FROM delivery_records ORDER BY created_at DESC",
+        )?;
+
+        let rows = stmt.query_map([], |row| row_to_delivery_record(row))?;
+
+        rows.collect::<Result<Vec<_>, _>>()
+            .map_err(StorageError::Database)
+    }
+
     /// Gets all delivery records with a specific status.
     pub fn get_delivery_records_by_status(
         &self,

@@ -945,14 +945,53 @@ impl VauchiMobile {
         Ok(record.as_ref().map(MobileDeliveryRecord::from))
     }
 
+    /// Get all delivery records.
+    pub fn get_all_delivery_records(&self) -> Result<Vec<MobileDeliveryRecord>, MobileError> {
+        let storage = self.open_storage()?;
+        let records = storage.get_all_delivery_records()?;
+        Ok(records.iter().map(MobileDeliveryRecord::from).collect())
+    }
+
     /// Get all delivery records for a recipient.
     pub fn get_delivery_records_for_contact(
         &self,
-        contact_id: String,
+        recipient_id: String,
     ) -> Result<Vec<MobileDeliveryRecord>, MobileError> {
         let storage = self.open_storage()?;
-        let records = storage.get_delivery_records_for_recipient(&contact_id)?;
+        let records = storage.get_delivery_records_for_recipient(&recipient_id)?;
         Ok(records.iter().map(MobileDeliveryRecord::from).collect())
+    }
+
+    /// Count failed deliveries.
+    pub fn count_failed_deliveries(&self) -> Result<u32, MobileError> {
+        use vauchi_core::storage::DeliveryStatus;
+        let storage = self.open_storage()?;
+        let count = storage.count_deliveries_by_status(&DeliveryStatus::Failed {
+            reason: String::new(),
+        })?;
+        Ok(count as u32)
+    }
+
+    /// Manually retry a failed delivery.
+    ///
+    /// Returns true if the retry entry was found and rescheduled.
+    pub fn manual_retry(&self, message_id: String) -> Result<bool, MobileError> {
+        let storage = self.open_storage()?;
+
+        // Check if there's a retry entry for this message
+        let entry = storage.get_retry_entry(&message_id)?;
+        if entry.is_none() {
+            return Ok(false);
+        }
+
+        // Reschedule for immediate retry
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+
+        storage.update_retry_next_time(&message_id, now)?;
+        Ok(true)
     }
 
     /// Get all pending (non-terminal) deliveries.

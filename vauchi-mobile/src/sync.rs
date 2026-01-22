@@ -566,11 +566,11 @@ pub fn send_device_sync(
             Err(_) => continue,
         };
 
-        let encrypted =
-            match orchestrator.encrypt_for_device(&device.exchange_public_key, &payload) {
-                Ok(ct) => ct,
-                Err(_) => continue,
-            };
+        let encrypted = match orchestrator.encrypt_for_device(&device.exchange_public_key, &payload)
+        {
+            Ok(ct) => ct,
+            Err(_) => continue,
+        };
 
         // Create and send device sync message
         let target_device_id = hex::encode(device.device_id);

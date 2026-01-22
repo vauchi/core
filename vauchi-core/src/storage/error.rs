@@ -134,3 +134,57 @@ impl RetryQueue {
         current_time + self.backoff_seconds(attempt)
     }
 }
+
+/// Offline queue configuration and helpers.
+#[derive(Debug, Clone)]
+pub struct OfflineQueue {
+    /// Maximum number of pending updates to queue.
+    max_queue_size: usize,
+}
+
+impl Default for OfflineQueue {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl OfflineQueue {
+    /// Default maximum queue size.
+    pub const DEFAULT_MAX_SIZE: usize = 1000;
+
+    /// Creates a new offline queue with default settings.
+    pub fn new() -> Self {
+        OfflineQueue {
+            max_queue_size: Self::DEFAULT_MAX_SIZE,
+        }
+    }
+
+    /// Creates a new offline queue with custom max size.
+    pub fn with_max_size(max_size: usize) -> Self {
+        OfflineQueue {
+            max_queue_size: max_size,
+        }
+    }
+
+    /// Returns the maximum queue size.
+    pub fn max_queue_size(&self) -> usize {
+        self.max_queue_size
+    }
+
+    /// Checks if the queue is full.
+    pub fn is_full(&self, storage: &super::Storage) -> Result<bool, super::StorageError> {
+        let count = storage.count_all_pending_updates()?;
+        Ok(count >= self.max_queue_size)
+    }
+
+    /// Checks if there's room to queue more updates.
+    pub fn can_queue(&self, storage: &super::Storage) -> Result<bool, super::StorageError> {
+        Ok(!self.is_full(storage)?)
+    }
+
+    /// Returns the remaining capacity in the queue.
+    pub fn remaining_capacity(&self, storage: &super::Storage) -> Result<usize, super::StorageError> {
+        let count = storage.count_all_pending_updates()?;
+        Ok(self.max_queue_size.saturating_sub(count))
+    }
+}

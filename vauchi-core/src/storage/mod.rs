@@ -51,8 +51,8 @@ mod ratchet;
 pub mod secure;
 
 pub use error::{
-    DeliveryRecord, DeliveryStatus, PendingUpdate, RetryEntry, RetryQueue, StorageError,
-    UpdateStatus,
+    DeliveryRecord, DeliveryStatus, OfflineQueue, PendingUpdate, RetryEntry, RetryQueue,
+    StorageError, UpdateStatus,
 };
 pub use secure::{FileKeyStorage, SecureStorage};
 

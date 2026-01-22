@@ -165,4 +165,73 @@ impl Storage {
             .execute("DELETE FROM pending_updates WHERE id = ?1", params![id])?;
         Ok(rows_affected > 0)
     }
+
+    /// Counts all pending updates across all contacts.
+    pub fn count_all_pending_updates(&self) -> Result<usize, StorageError> {
+        let count: i64 = self.conn.query_row(
+            "SELECT COUNT(*) FROM pending_updates",
+            [],
+            |row| row.get(0),
+        )?;
+        Ok(count as usize)
+    }
+
+    /// Deletes all pending updates for a contact.
+    ///
+    /// Returns the number of deleted updates.
+    pub fn delete_pending_updates_for_contact(&self, contact_id: &str) -> Result<usize, StorageError> {
+        let rows_affected = self.conn.execute(
+            "DELETE FROM pending_updates WHERE contact_id = ?1",
+            params![contact_id],
+        )?;
+        Ok(rows_affected)
+    }
+
+    /// Clears all pending updates.
+    ///
+    /// Returns the number of deleted updates.
+    pub fn clear_all_pending_updates(&self) -> Result<usize, StorageError> {
+        let rows_affected = self.conn.execute("DELETE FROM pending_updates", [])?;
+        Ok(rows_affected)
+    }
+
+    /// Gets pending updates by status.
+    pub fn get_pending_updates_by_status(
+        &self,
+        status: &str,
+    ) -> Result<Vec<PendingUpdate>, StorageError> {
+        let mut stmt = self.conn.prepare(
+            "SELECT id, contact_id, update_type, payload, created_at, retry_count, status, error_message, retry_at
+             FROM pending_updates WHERE status = ?1 ORDER BY created_at"
+        )?;
+
+        let rows = stmt.query_map(params![status], |row| {
+            let status_str: String = row.get(6)?;
+            let error_msg: Option<String> = row.get(7)?;
+            let retry_at: Option<i64> = row.get(8)?;
+
+            let status = match status_str.as_str() {
+                "pending" => UpdateStatus::Pending,
+                "sending" => UpdateStatus::Sending,
+                "failed" => UpdateStatus::Failed {
+                    error: error_msg.unwrap_or_default(),
+                    retry_at: retry_at.unwrap_or(0) as u64,
+                },
+                _ => UpdateStatus::Pending,
+            };
+
+            Ok(PendingUpdate {
+                id: row.get(0)?,
+                contact_id: row.get(1)?,
+                update_type: row.get(2)?,
+                payload: row.get(3)?,
+                created_at: row.get::<_, i64>(4)? as u64,
+                retry_count: row.get::<_, i32>(5)? as u32,
+                status,
+            })
+        })?;
+
+        rows.collect::<Result<Vec<_>, _>>()
+            .map_err(StorageError::Database)
+    }
 }

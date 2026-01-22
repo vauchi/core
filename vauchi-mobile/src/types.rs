@@ -387,3 +387,38 @@ impl From<&vauchi_core::storage::DeliveryRecord> for MobileDeliveryRecord {
         }
     }
 }
+
+// === Retry Queue Types ===
+
+/// A retry queue entry for failed message deliveries.
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct MobileRetryEntry {
+    /// Unique message ID.
+    pub message_id: String,
+    /// Recipient's contact ID.
+    pub recipient_id: String,
+    /// Current retry attempt (0 = first attempt).
+    pub attempt: u32,
+    /// Unix timestamp for next retry.
+    pub next_retry: u64,
+    /// When the entry was created (Unix timestamp).
+    pub created_at: u64,
+    /// Maximum number of retry attempts.
+    pub max_attempts: u32,
+    /// Whether max attempts have been exceeded.
+    pub is_max_exceeded: bool,
+}
+
+impl From<&vauchi_core::storage::RetryEntry> for MobileRetryEntry {
+    fn from(entry: &vauchi_core::storage::RetryEntry) -> Self {
+        MobileRetryEntry {
+            message_id: entry.message_id.clone(),
+            recipient_id: entry.recipient_id.clone(),
+            attempt: entry.attempt,
+            next_retry: entry.next_retry,
+            created_at: entry.created_at,
+            max_attempts: entry.max_attempts,
+            is_max_exceeded: entry.is_max_attempts_exceeded(),
+        }
+    }
+}

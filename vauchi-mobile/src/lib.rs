@@ -38,8 +38,8 @@ pub use types::{
     MobileContact, MobileContactCard, MobileContactField, MobileDeliveryRecord,
     MobileDeliveryStatus, MobileExchangeData, MobileExchangeResult, MobileFieldType,
     MobileRecoveryClaim, MobileRecoveryProgress, MobileRecoveryVerification, MobileRecoveryVoucher,
-    MobileSocialNetwork, MobileSyncResult, MobileSyncStatus, MobileVisibilityLabel,
-    MobileVisibilityLabelDetail,
+    MobileRetryEntry, MobileSocialNetwork, MobileSyncResult, MobileSyncStatus,
+    MobileVisibilityLabel, MobileVisibilityLabelDetail,
 };
 
 uniffi::setup_scaffolding!();
@@ -980,6 +980,52 @@ impl VauchiMobile {
         let storage = self.open_storage()?;
         let count = storage.count_deliveries_by_status(&core_status)?;
         Ok(count as u32)
+    }
+
+    // === Retry Queue Operations ===
+
+    /// Get all retry entries that are due for retry.
+    pub fn get_due_retries(&self) -> Result<Vec<MobileRetryEntry>, MobileError> {
+        let storage = self.open_storage()?;
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+        let entries = storage.get_due_retries(now)?;
+        Ok(entries.iter().map(MobileRetryEntry::from).collect())
+    }
+
+    /// Get all retry entries for a contact.
+    pub fn get_retries_for_contact(
+        &self,
+        contact_id: String,
+    ) -> Result<Vec<MobileRetryEntry>, MobileError> {
+        let storage = self.open_storage()?;
+        let entries = storage.get_retry_entries_for_recipient(&contact_id)?;
+        Ok(entries.iter().map(MobileRetryEntry::from).collect())
+    }
+
+    /// Get the total count of retry entries.
+    pub fn get_retry_count(&self) -> Result<u32, MobileError> {
+        let storage = self.open_storage()?;
+        let count = storage.count_retry_entries()?;
+        Ok(count as u32)
+    }
+
+    /// Delete a retry entry (after successful delivery or max attempts).
+    pub fn delete_retry(&self, message_id: String) -> Result<bool, MobileError> {
+        let storage = self.open_storage()?;
+        let deleted = storage.delete_retry_entry(&message_id)?;
+        Ok(deleted)
+    }
+
+    /// Calculate the backoff time for a given retry attempt.
+    ///
+    /// Returns seconds until next retry: 2^attempt, max 3600 (1 hour).
+    pub fn calculate_retry_backoff(&self, attempt: u32) -> u64 {
+        use vauchi_core::storage::RetryQueue;
+        let queue = RetryQueue::new();
+        queue.backoff_seconds(attempt)
     }
 
     // === Backup Operations ===

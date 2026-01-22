@@ -34,13 +34,18 @@ pub mod pending;
 mod pending;
 
 #[cfg(feature = "testing")]
+pub mod delivery;
+#[cfg(not(feature = "testing"))]
+mod delivery;
+
+#[cfg(feature = "testing")]
 pub mod ratchet;
 #[cfg(not(feature = "testing"))]
 mod ratchet;
 
 pub mod secure;
 
-pub use error::{PendingUpdate, StorageError, UpdateStatus};
+pub use error::{DeliveryRecord, DeliveryStatus, PendingUpdate, StorageError, UpdateStatus};
 pub use secure::{FileKeyStorage, SecureStorage};
 
 #[cfg(feature = "secure-storage")]
@@ -192,10 +197,23 @@ impl Storage {
                 PRIMARY KEY (contact_id, field_id)
             );
 
+            -- Delivery records (outbound message delivery tracking)
+            CREATE TABLE IF NOT EXISTS delivery_records (
+                message_id TEXT PRIMARY KEY,
+                recipient_id TEXT NOT NULL,
+                status TEXT NOT NULL,
+                status_reason TEXT,
+                created_at INTEGER NOT NULL,
+                updated_at INTEGER NOT NULL,
+                expires_at INTEGER
+            );
+
             -- Create indexes
             CREATE INDEX IF NOT EXISTS idx_pending_contact ON pending_updates(contact_id);
             CREATE INDEX IF NOT EXISTS idx_pending_status ON pending_updates(status);
             CREATE INDEX IF NOT EXISTS idx_label_name ON visibility_labels(name);
+            CREATE INDEX IF NOT EXISTS idx_delivery_recipient ON delivery_records(recipient_id);
+            CREATE INDEX IF NOT EXISTS idx_delivery_status ON delivery_records(status);
             ",
         )?;
         Ok(())

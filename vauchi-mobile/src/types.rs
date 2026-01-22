@@ -316,3 +316,74 @@ pub struct MobileDeviceInfo {
     /// Public key prefix (hex, first 16 chars).
     pub public_key_prefix: String,
 }
+
+// === Delivery Status Types ===
+
+/// Delivery status for tracking message delivery progression.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
+pub enum MobileDeliveryStatus {
+    /// Message queued locally, not yet sent.
+    Queued,
+    /// Message sent to relay.
+    Sent,
+    /// Relay confirmed storage.
+    Stored,
+    /// Recipient confirmed receipt.
+    Delivered,
+    /// Message expired without delivery.
+    Expired,
+    /// Delivery failed.
+    Failed,
+}
+
+impl From<&vauchi_core::storage::DeliveryStatus> for MobileDeliveryStatus {
+    fn from(status: &vauchi_core::storage::DeliveryStatus) -> Self {
+        use vauchi_core::storage::DeliveryStatus;
+        match status {
+            DeliveryStatus::Queued => MobileDeliveryStatus::Queued,
+            DeliveryStatus::Sent => MobileDeliveryStatus::Sent,
+            DeliveryStatus::Stored => MobileDeliveryStatus::Stored,
+            DeliveryStatus::Delivered => MobileDeliveryStatus::Delivered,
+            DeliveryStatus::Expired => MobileDeliveryStatus::Expired,
+            DeliveryStatus::Failed { .. } => MobileDeliveryStatus::Failed,
+        }
+    }
+}
+
+/// A record tracking delivery status of an outbound message.
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct MobileDeliveryRecord {
+    /// Unique message ID.
+    pub message_id: String,
+    /// Recipient's contact ID.
+    pub recipient_id: String,
+    /// Current delivery status.
+    pub status: MobileDeliveryStatus,
+    /// Error reason if failed.
+    pub error_reason: Option<String>,
+    /// When the message was created (Unix timestamp).
+    pub created_at: u64,
+    /// When the status was last updated (Unix timestamp).
+    pub updated_at: u64,
+    /// When the message expires (Unix timestamp, optional).
+    pub expires_at: Option<u64>,
+}
+
+impl From<&vauchi_core::storage::DeliveryRecord> for MobileDeliveryRecord {
+    fn from(record: &vauchi_core::storage::DeliveryRecord) -> Self {
+        use vauchi_core::storage::DeliveryStatus;
+        let error_reason = match &record.status {
+            DeliveryStatus::Failed { reason } => Some(reason.clone()),
+            _ => None,
+        };
+        MobileDeliveryRecord {
+            message_id: record.message_id.clone(),
+            recipient_id: record.recipient_id.clone(),
+            status: MobileDeliveryStatus::from(&record.status),
+            error_reason,
+            created_at: record.created_at,
+            updated_at: record.updated_at,
+            expires_at: record.expires_at,
+        }
+    }
+}

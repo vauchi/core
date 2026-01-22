@@ -35,10 +35,11 @@ mod types;
 pub use audio::{MobileProximityResult, MobileProximityVerifier, PlatformAudioHandler};
 pub use error::MobileError;
 pub use types::{
-    MobileContact, MobileContactCard, MobileContactField, MobileExchangeData, MobileExchangeResult,
-    MobileFieldType, MobileRecoveryClaim, MobileRecoveryProgress, MobileRecoveryVerification,
-    MobileRecoveryVoucher, MobileSocialNetwork, MobileSyncResult, MobileSyncStatus,
-    MobileVisibilityLabel, MobileVisibilityLabelDetail,
+    MobileContact, MobileContactCard, MobileContactField, MobileDeliveryRecord,
+    MobileDeliveryStatus, MobileExchangeData, MobileExchangeResult, MobileFieldType,
+    MobileRecoveryClaim, MobileRecoveryProgress, MobileRecoveryVerification, MobileRecoveryVoucher,
+    MobileSocialNetwork, MobileSyncResult, MobileSyncStatus, MobileVisibilityLabel,
+    MobileVisibilityLabelDetail,
 };
 
 uniffi::setup_scaffolding!();
@@ -929,6 +930,56 @@ impl VauchiMobile {
             total += pending.len() as u32;
         }
         Ok(total)
+    }
+
+    // === Delivery Status Operations ===
+
+    /// Get delivery record for a message.
+    pub fn get_delivery_record(
+        &self,
+        message_id: String,
+    ) -> Result<Option<MobileDeliveryRecord>, MobileError> {
+        let storage = self.open_storage()?;
+        let record = storage.get_delivery_record(&message_id)?;
+        Ok(record.as_ref().map(MobileDeliveryRecord::from))
+    }
+
+    /// Get all delivery records for a recipient.
+    pub fn get_delivery_records_for_contact(
+        &self,
+        contact_id: String,
+    ) -> Result<Vec<MobileDeliveryRecord>, MobileError> {
+        let storage = self.open_storage()?;
+        let records = storage.get_delivery_records_for_recipient(&contact_id)?;
+        Ok(records.iter().map(MobileDeliveryRecord::from).collect())
+    }
+
+    /// Get all pending (non-terminal) deliveries.
+    pub fn get_pending_deliveries(&self) -> Result<Vec<MobileDeliveryRecord>, MobileError> {
+        let storage = self.open_storage()?;
+        let records = storage.get_pending_deliveries()?;
+        Ok(records.iter().map(MobileDeliveryRecord::from).collect())
+    }
+
+    /// Get delivery count by status.
+    pub fn get_delivery_count_by_status(
+        &self,
+        status: MobileDeliveryStatus,
+    ) -> Result<u32, MobileError> {
+        use vauchi_core::storage::DeliveryStatus;
+        let core_status = match status {
+            MobileDeliveryStatus::Queued => DeliveryStatus::Queued,
+            MobileDeliveryStatus::Sent => DeliveryStatus::Sent,
+            MobileDeliveryStatus::Stored => DeliveryStatus::Stored,
+            MobileDeliveryStatus::Delivered => DeliveryStatus::Delivered,
+            MobileDeliveryStatus::Expired => DeliveryStatus::Expired,
+            MobileDeliveryStatus::Failed => DeliveryStatus::Failed {
+                reason: String::new(),
+            },
+        };
+        let storage = self.open_storage()?;
+        let count = storage.count_deliveries_by_status(&core_status)?;
+        Ok(count as u32)
     }
 
     // === Backup Operations ===

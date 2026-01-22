@@ -78,12 +78,14 @@ pub struct Acknowledgment {
     pub error: Option<String>,
 }
 
-/// Acknowledgment status.
+/// Acknowledgment status for message delivery tracking.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 pub enum AckStatus {
-    /// Message delivered to relay successfully.
+    /// Message stored by relay (persisted, awaiting recipient).
+    Stored,
+    /// Message delivered to recipient (recipient came online).
     Delivered,
-    /// Message delivered to recipient (end-to-end ack).
+    /// Message received and acknowledged by recipient (end-to-end confirmation).
     ReceivedByRecipient,
     /// Delivery failed.
     Failed,

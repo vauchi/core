@@ -186,7 +186,8 @@ impl<T: Transport> RelayClient<T> {
             match envelope.payload {
                 MessagePayload::Acknowledgment(ack) => {
                     if let Some(in_flight) = self.in_flight.remove(&ack.message_id) {
-                        if ack.status == AckStatus::Delivered
+                        if ack.status == AckStatus::Stored
+                            || ack.status == AckStatus::Delivered
                             || ack.status == AckStatus::ReceivedByRecipient
                         {
                             acknowledged.push(in_flight.update_id);

@@ -40,3 +40,37 @@ pub struct PendingUpdate {
     pub retry_count: u32,
     pub status: UpdateStatus,
 }
+
+/// Delivery status for tracking message delivery progression.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum DeliveryStatus {
+    /// Message queued locally, not yet sent.
+    Queued,
+    /// Message sent to relay.
+    Sent,
+    /// Relay confirmed storage.
+    Stored,
+    /// Recipient confirmed receipt.
+    Delivered,
+    /// Message expired without delivery.
+    Expired,
+    /// Delivery failed.
+    Failed { reason: String },
+}
+
+/// A record tracking delivery status of an outbound message.
+#[derive(Debug, Clone)]
+pub struct DeliveryRecord {
+    /// Unique message ID (UUID).
+    pub message_id: String,
+    /// Recipient's contact ID.
+    pub recipient_id: String,
+    /// Current delivery status.
+    pub status: DeliveryStatus,
+    /// When the message was created.
+    pub created_at: u64,
+    /// When the status was last updated.
+    pub updated_at: u64,
+    /// When the message expires (optional).
+    pub expires_at: Option<u64>,
+}

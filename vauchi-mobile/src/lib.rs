@@ -1028,6 +1028,44 @@ impl VauchiMobile {
         queue.backoff_seconds(attempt)
     }
 
+    // === Offline Queue Operations ===
+
+    /// Get total count of all pending updates across all contacts.
+    pub fn get_total_pending_count(&self) -> Result<u32, MobileError> {
+        let storage = self.open_storage()?;
+        let count = storage.count_all_pending_updates()?;
+        Ok(count as u32)
+    }
+
+    /// Check if the offline queue is full.
+    ///
+    /// Default max size is 1000 updates.
+    pub fn is_offline_queue_full(&self) -> Result<bool, MobileError> {
+        use vauchi_core::storage::OfflineQueue;
+        let storage = self.open_storage()?;
+        let queue = OfflineQueue::new();
+        queue.is_full(&storage).map_err(|e| MobileError::StorageError(e.to_string()))
+    }
+
+    /// Get remaining capacity in the offline queue.
+    pub fn get_offline_queue_capacity(&self) -> Result<u32, MobileError> {
+        use vauchi_core::storage::OfflineQueue;
+        let storage = self.open_storage()?;
+        let queue = OfflineQueue::new();
+        let remaining = queue.remaining_capacity(&storage)
+            .map_err(|e| MobileError::StorageError(e.to_string()))?;
+        Ok(remaining as u32)
+    }
+
+    /// Clear all pending updates for a contact.
+    ///
+    /// Returns the number of cleared updates.
+    pub fn clear_pending_updates_for_contact(&self, contact_id: String) -> Result<u32, MobileError> {
+        let storage = self.open_storage()?;
+        let count = storage.delete_pending_updates_for_contact(&contact_id)?;
+        Ok(count as u32)
+    }
+
     // === Backup Operations ===
 
     /// Export encrypted backup.

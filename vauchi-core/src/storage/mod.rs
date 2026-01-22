@@ -44,6 +44,11 @@ pub mod retry;
 mod retry;
 
 #[cfg(feature = "testing")]
+pub mod device_delivery;
+#[cfg(not(feature = "testing"))]
+mod device_delivery;
+
+#[cfg(feature = "testing")]
 pub mod ratchet;
 #[cfg(not(feature = "testing"))]
 mod ratchet;
@@ -51,8 +56,8 @@ mod ratchet;
 pub mod secure;
 
 pub use error::{
-    DeliveryRecord, DeliveryStatus, OfflineQueue, PendingUpdate, RetryEntry, RetryQueue,
-    StorageError, UpdateStatus,
+    DeliveryRecord, DeliverySummary, DeliveryStatus, DeviceDeliveryRecord, DeviceDeliveryStatus,
+    OfflineQueue, PendingUpdate, RetryEntry, RetryQueue, StorageError, UpdateStatus,
 };
 pub use secure::{FileKeyStorage, SecureStorage};
 
@@ -227,6 +232,16 @@ impl Storage {
                 max_attempts INTEGER NOT NULL DEFAULT 10
             );
 
+            -- Per-device delivery tracking
+            CREATE TABLE IF NOT EXISTS device_deliveries (
+                message_id TEXT NOT NULL,
+                device_id TEXT NOT NULL,
+                recipient_id TEXT NOT NULL,
+                status TEXT NOT NULL,
+                updated_at INTEGER NOT NULL,
+                PRIMARY KEY (message_id, device_id)
+            );
+
             -- Create indexes
             CREATE INDEX IF NOT EXISTS idx_pending_contact ON pending_updates(contact_id);
             CREATE INDEX IF NOT EXISTS idx_pending_status ON pending_updates(status);
@@ -235,6 +250,8 @@ impl Storage {
             CREATE INDEX IF NOT EXISTS idx_delivery_status ON delivery_records(status);
             CREATE INDEX IF NOT EXISTS idx_retry_next ON retry_entries(next_retry);
             CREATE INDEX IF NOT EXISTS idx_retry_recipient ON retry_entries(recipient_id);
+            CREATE INDEX IF NOT EXISTS idx_device_delivery_message ON device_deliveries(message_id);
+            CREATE INDEX IF NOT EXISTS idx_device_delivery_status ON device_deliveries(status);
             ",
         )?;
         Ok(())

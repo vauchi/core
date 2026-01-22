@@ -39,13 +39,21 @@ pub mod delivery;
 mod delivery;
 
 #[cfg(feature = "testing")]
+pub mod retry;
+#[cfg(not(feature = "testing"))]
+mod retry;
+
+#[cfg(feature = "testing")]
 pub mod ratchet;
 #[cfg(not(feature = "testing"))]
 mod ratchet;
 
 pub mod secure;
 
-pub use error::{DeliveryRecord, DeliveryStatus, PendingUpdate, StorageError, UpdateStatus};
+pub use error::{
+    DeliveryRecord, DeliveryStatus, PendingUpdate, RetryEntry, RetryQueue, StorageError,
+    UpdateStatus,
+};
 pub use secure::{FileKeyStorage, SecureStorage};
 
 #[cfg(feature = "secure-storage")]
@@ -208,12 +216,25 @@ impl Storage {
                 expires_at INTEGER
             );
 
+            -- Retry queue (failed deliveries awaiting retry)
+            CREATE TABLE IF NOT EXISTS retry_entries (
+                message_id TEXT PRIMARY KEY,
+                recipient_id TEXT NOT NULL,
+                payload BLOB NOT NULL,
+                attempt INTEGER NOT NULL DEFAULT 0,
+                next_retry INTEGER NOT NULL,
+                created_at INTEGER NOT NULL,
+                max_attempts INTEGER NOT NULL DEFAULT 10
+            );
+
             -- Create indexes
             CREATE INDEX IF NOT EXISTS idx_pending_contact ON pending_updates(contact_id);
             CREATE INDEX IF NOT EXISTS idx_pending_status ON pending_updates(status);
             CREATE INDEX IF NOT EXISTS idx_label_name ON visibility_labels(name);
             CREATE INDEX IF NOT EXISTS idx_delivery_recipient ON delivery_records(recipient_id);
             CREATE INDEX IF NOT EXISTS idx_delivery_status ON delivery_records(status);
+            CREATE INDEX IF NOT EXISTS idx_retry_next ON retry_entries(next_retry);
+            CREATE INDEX IF NOT EXISTS idx_retry_recipient ON retry_entries(recipient_id);
             ",
         )?;
         Ok(())

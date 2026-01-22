@@ -74,3 +74,63 @@ pub struct DeliveryRecord {
     /// When the message expires (optional).
     pub expires_at: Option<u64>,
 }
+
+/// An entry in the retry queue for failed message deliveries.
+#[derive(Debug, Clone)]
+pub struct RetryEntry {
+    /// Unique message ID.
+    pub message_id: String,
+    /// Recipient's contact ID.
+    pub recipient_id: String,
+    /// The message payload to retry.
+    pub payload: Vec<u8>,
+    /// Current retry attempt (0 = first attempt).
+    pub attempt: u32,
+    /// Unix timestamp for next retry.
+    pub next_retry: u64,
+    /// When the entry was created.
+    pub created_at: u64,
+    /// Maximum number of retry attempts.
+    pub max_attempts: u32,
+}
+
+impl RetryEntry {
+    /// Returns true if the maximum retry attempts have been exceeded.
+    pub fn is_max_attempts_exceeded(&self) -> bool {
+        self.attempt >= self.max_attempts
+    }
+}
+
+/// Retry queue with exponential backoff calculation.
+#[derive(Debug, Clone, Default)]
+pub struct RetryQueue {
+    /// Maximum backoff in seconds (default: 1 hour).
+    max_backoff_secs: u64,
+}
+
+impl RetryQueue {
+    /// Creates a new retry queue with default settings.
+    pub fn new() -> Self {
+        RetryQueue {
+            max_backoff_secs: 3600, // 1 hour
+        }
+    }
+
+    /// Creates a new retry queue with custom max backoff.
+    pub fn with_max_backoff(max_backoff_secs: u64) -> Self {
+        RetryQueue { max_backoff_secs }
+    }
+
+    /// Calculates the backoff time in seconds for a given attempt.
+    ///
+    /// Uses exponential backoff: 2^attempt seconds, capped at max_backoff_secs.
+    pub fn backoff_seconds(&self, attempt: u32) -> u64 {
+        let backoff = 2u64.saturating_pow(attempt);
+        backoff.min(self.max_backoff_secs)
+    }
+
+    /// Calculates the next retry timestamp.
+    pub fn next_retry_time(&self, current_time: u64, attempt: u32) -> u64 {
+        current_time + self.backoff_seconds(attempt)
+    }
+}

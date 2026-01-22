@@ -422,3 +422,90 @@ impl From<&vauchi_core::storage::RetryEntry> for MobileRetryEntry {
         }
     }
 }
+
+// === Multi-Device Delivery Types ===
+
+/// Delivery status for a specific device.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
+pub enum MobileDeviceDeliveryStatus {
+    /// Message pending delivery to this device.
+    Pending,
+    /// Message stored at relay for this device.
+    Stored,
+    /// Message delivered to this device.
+    Delivered,
+    /// Delivery to this device failed.
+    Failed,
+}
+
+impl From<&vauchi_core::storage::DeviceDeliveryStatus> for MobileDeviceDeliveryStatus {
+    fn from(status: &vauchi_core::storage::DeviceDeliveryStatus) -> Self {
+        use vauchi_core::storage::DeviceDeliveryStatus;
+        match status {
+            DeviceDeliveryStatus::Pending => MobileDeviceDeliveryStatus::Pending,
+            DeviceDeliveryStatus::Stored => MobileDeviceDeliveryStatus::Stored,
+            DeviceDeliveryStatus::Delivered => MobileDeviceDeliveryStatus::Delivered,
+            DeviceDeliveryStatus::Failed => MobileDeviceDeliveryStatus::Failed,
+        }
+    }
+}
+
+/// Per-device delivery tracking record.
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct MobileDeviceDeliveryRecord {
+    /// Message ID being tracked.
+    pub message_id: String,
+    /// Recipient's contact ID.
+    pub recipient_id: String,
+    /// Target device ID.
+    pub device_id: String,
+    /// Delivery status for this device.
+    pub status: MobileDeviceDeliveryStatus,
+    /// When the status was last updated (Unix timestamp).
+    pub updated_at: u64,
+}
+
+impl From<&vauchi_core::storage::DeviceDeliveryRecord> for MobileDeviceDeliveryRecord {
+    fn from(record: &vauchi_core::storage::DeviceDeliveryRecord) -> Self {
+        MobileDeviceDeliveryRecord {
+            message_id: record.message_id.clone(),
+            recipient_id: record.recipient_id.clone(),
+            device_id: record.device_id.clone(),
+            status: MobileDeviceDeliveryStatus::from(&record.status),
+            updated_at: record.updated_at,
+        }
+    }
+}
+
+/// Summary of delivery status across all devices.
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct MobileDeliverySummary {
+    /// Message ID.
+    pub message_id: String,
+    /// Total number of target devices.
+    pub total_devices: u32,
+    /// Number of devices that received the message.
+    pub delivered_devices: u32,
+    /// Number of devices still pending.
+    pub pending_devices: u32,
+    /// Number of devices where delivery failed.
+    pub failed_devices: u32,
+    /// Whether all devices have received the message.
+    pub is_fully_delivered: bool,
+    /// Progress as percentage (0-100).
+    pub progress_percent: u32,
+}
+
+impl From<&vauchi_core::storage::DeliverySummary> for MobileDeliverySummary {
+    fn from(summary: &vauchi_core::storage::DeliverySummary) -> Self {
+        MobileDeliverySummary {
+            message_id: summary.message_id.clone(),
+            total_devices: summary.total_devices as u32,
+            delivered_devices: summary.delivered_devices as u32,
+            pending_devices: summary.pending_devices as u32,
+            failed_devices: summary.failed_devices as u32,
+            is_fully_delivered: summary.is_fully_delivered(),
+            progress_percent: (summary.progress() * 100.0) as u32,
+        }
+    }
+}

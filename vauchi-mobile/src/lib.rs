@@ -36,7 +36,8 @@ pub use audio::{MobileProximityResult, MobileProximityVerifier, PlatformAudioHan
 pub use error::MobileError;
 pub use types::{
     MobileContact, MobileContactCard, MobileContactField, MobileDeliveryRecord,
-    MobileDeliveryStatus, MobileExchangeData, MobileExchangeResult, MobileFieldType,
+    MobileDeliverySummary, MobileDeliveryStatus, MobileDeviceDeliveryRecord,
+    MobileDeviceDeliveryStatus, MobileExchangeData, MobileExchangeResult, MobileFieldType,
     MobileRecoveryClaim, MobileRecoveryProgress, MobileRecoveryVerification, MobileRecoveryVoucher,
     MobileRetryEntry, MobileSocialNetwork, MobileSyncResult, MobileSyncStatus,
     MobileVisibilityLabel, MobileVisibilityLabelDetail,
@@ -1064,6 +1065,37 @@ impl VauchiMobile {
         let storage = self.open_storage()?;
         let count = storage.delete_pending_updates_for_contact(&contact_id)?;
         Ok(count as u32)
+    }
+
+    // === Multi-Device Delivery Operations ===
+
+    /// Get delivery summary for a message (X of Y devices delivered).
+    pub fn get_delivery_summary(
+        &self,
+        message_id: String,
+    ) -> Result<MobileDeliverySummary, MobileError> {
+        let storage = self.open_storage()?;
+        let summary = storage.get_delivery_summary(&message_id)?;
+        Ok(MobileDeliverySummary::from(&summary))
+    }
+
+    /// Get all device delivery records for a message.
+    pub fn get_device_deliveries(
+        &self,
+        message_id: String,
+    ) -> Result<Vec<MobileDeviceDeliveryRecord>, MobileError> {
+        let storage = self.open_storage()?;
+        let records = storage.get_device_deliveries_for_message(&message_id)?;
+        Ok(records.iter().map(MobileDeviceDeliveryRecord::from).collect())
+    }
+
+    /// Get all pending device deliveries.
+    pub fn get_pending_device_deliveries(
+        &self,
+    ) -> Result<Vec<MobileDeviceDeliveryRecord>, MobileError> {
+        let storage = self.open_storage()?;
+        let records = storage.get_pending_device_deliveries()?;
+        Ok(records.iter().map(MobileDeviceDeliveryRecord::from).collect())
     }
 
     // === Backup Operations ===

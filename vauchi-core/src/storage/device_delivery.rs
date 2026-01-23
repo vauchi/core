@@ -9,7 +9,10 @@ impl Storage {
     // === Device Delivery Operations ===
 
     /// Creates a new device delivery record.
-    pub fn create_device_delivery(&self, record: &DeviceDeliveryRecord) -> Result<(), StorageError> {
+    pub fn create_device_delivery(
+        &self,
+        record: &DeviceDeliveryRecord,
+    ) -> Result<(), StorageError> {
         let status_str = status_to_str(&record.status);
 
         self.conn.execute(
@@ -56,7 +59,7 @@ impl Storage {
              FROM device_deliveries WHERE message_id = ?1 ORDER BY device_id",
         )?;
 
-        let rows = stmt.query_map(params![message_id], |row| row_to_device_delivery(row))?;
+        let rows = stmt.query_map(params![message_id], row_to_device_delivery)?;
 
         rows.collect::<Result<Vec<_>, _>>()
             .map_err(StorageError::Database)
@@ -131,7 +134,7 @@ impl Storage {
              ORDER BY updated_at",
         )?;
 
-        let rows = stmt.query_map([], |row| row_to_device_delivery(row))?;
+        let rows = stmt.query_map([], row_to_device_delivery)?;
 
         rows.collect::<Result<Vec<_>, _>>()
             .map_err(StorageError::Database)

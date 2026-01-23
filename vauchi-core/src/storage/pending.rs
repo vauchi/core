@@ -168,18 +168,19 @@ impl Storage {
 
     /// Counts all pending updates across all contacts.
     pub fn count_all_pending_updates(&self) -> Result<usize, StorageError> {
-        let count: i64 = self.conn.query_row(
-            "SELECT COUNT(*) FROM pending_updates",
-            [],
-            |row| row.get(0),
-        )?;
+        let count: i64 =
+            self.conn
+                .query_row("SELECT COUNT(*) FROM pending_updates", [], |row| row.get(0))?;
         Ok(count as usize)
     }
 
     /// Deletes all pending updates for a contact.
     ///
     /// Returns the number of deleted updates.
-    pub fn delete_pending_updates_for_contact(&self, contact_id: &str) -> Result<usize, StorageError> {
+    pub fn delete_pending_updates_for_contact(
+        &self,
+        contact_id: &str,
+    ) -> Result<usize, StorageError> {
         let rows_affected = self.conn.execute(
             "DELETE FROM pending_updates WHERE contact_id = ?1",
             params![contact_id],

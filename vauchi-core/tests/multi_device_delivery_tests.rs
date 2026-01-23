@@ -35,9 +35,7 @@ fn test_create_device_delivery_record() {
 
     storage.create_device_delivery(&record).unwrap();
 
-    let retrieved = storage
-        .get_device_delivery("msg-001", "device-1")
-        .unwrap();
+    let retrieved = storage.get_device_delivery("msg-001", "device-1").unwrap();
     assert!(retrieved.is_some());
 
     let retrieved = retrieved.unwrap();
@@ -66,7 +64,9 @@ fn test_track_multiple_devices_for_message() {
     }
 
     // Get all device records for message
-    let records = storage.get_device_deliveries_for_message("msg-001").unwrap();
+    let records = storage
+        .get_device_deliveries_for_message("msg-001")
+        .unwrap();
     assert_eq!(records.len(), 3);
 }
 

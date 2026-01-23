@@ -261,7 +261,7 @@ impl Identity {
         let mut key_bytes = [0u8; 32];
         pbkdf2::derive(
             pbkdf2::PBKDF2_HMAC_SHA256,
-            NonZeroU32::new(PBKDF2_ITERATIONS).unwrap(),
+            NonZeroU32::new(PBKDF2_ITERATIONS).expect("PBKDF2_ITERATIONS is non-zero"),
             &salt,
             password.as_bytes(),
             &mut key_bytes,
@@ -317,7 +317,7 @@ impl Identity {
         let mut key_bytes = [0u8; 32];
         pbkdf2::derive(
             pbkdf2::PBKDF2_HMAC_SHA256,
-            NonZeroU32::new(PBKDF2_ITERATIONS).unwrap(),
+            NonZeroU32::new(PBKDF2_ITERATIONS).expect("PBKDF2_ITERATIONS is non-zero"),
             &salt,
             password.as_bytes(),
             &mut key_bytes,

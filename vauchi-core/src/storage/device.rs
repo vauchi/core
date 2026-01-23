@@ -81,7 +81,7 @@ impl Storage {
 
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
+            .expect("system time before UNIX epoch")
             .as_secs();
 
         self.conn.execute(
@@ -128,7 +128,7 @@ impl Storage {
         let state_json = state.to_json();
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
+            .expect("system time before UNIX epoch")
             .as_secs();
 
         self.conn.execute(
@@ -197,7 +197,7 @@ impl Storage {
         let vector_json = vector.to_json();
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
+            .expect("system time before UNIX epoch")
             .as_secs();
 
         self.conn.execute(

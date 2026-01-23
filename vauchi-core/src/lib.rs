@@ -3,11 +3,13 @@
 //! Privacy-focused contact card exchange library.
 //! All cryptographic operations use the audited `ring` crate.
 
+pub mod aha_moments;
 #[cfg(any(feature = "network-native-tls", feature = "network-rustls"))]
 pub mod api;
 pub mod contact;
 pub mod contact_card;
 pub mod crypto;
+pub mod demo_contact;
 pub mod exchange;
 pub mod identity;
 #[cfg(any(feature = "network-native-tls", feature = "network-rustls"))]
@@ -17,6 +19,7 @@ pub mod social;
 pub mod storage;
 pub mod sync;
 
+pub use aha_moments::{AhaMoment, AhaMomentTracker, AhaMomentType};
 #[cfg(any(feature = "network-native-tls", feature = "network-rustls"))]
 pub use api::{Vauchi, VauchiBuilder, VauchiConfig, VauchiError, VauchiEvent, VauchiResult};
 pub use contact::{
@@ -28,6 +31,10 @@ pub use contact_card::{
     ValidationError,
 };
 pub use crypto::{decrypt, encrypt, PublicKey, Signature, SigningKeyPair, SymmetricKey};
+pub use demo_contact::{
+    generate_demo_contact_card, get_demo_tips, DemoContactCard, DemoContactState, DemoTip,
+    DemoTipCategory, DEMO_CONTACT_ID, DEMO_CONTACT_NAME,
+};
 pub use exchange::{
     EncryptedExchangeMessage, ExchangeError, ExchangeEvent, ExchangeQR, ExchangeSession,
     MockProximityVerifier, ProximityError, ProximityVerifier, X3DHKeyPair, X3DH,

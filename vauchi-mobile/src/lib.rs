@@ -43,12 +43,13 @@ pub use content::{
 };
 pub use error::MobileError;
 pub use types::{
-    MobileContact, MobileContactCard, MobileContactField, MobileDeliveryRecord,
-    MobileDeliveryStatus, MobileDeliverySummary, MobileDeviceDeliveryRecord,
-    MobileDeviceDeliveryStatus, MobileExchangeData, MobileExchangeResult, MobileFieldType,
-    MobileRecoveryClaim, MobileRecoveryProgress, MobileRecoveryVerification, MobileRecoveryVoucher,
-    MobileRetryEntry, MobileSocialNetwork, MobileSyncResult, MobileSyncStatus,
-    MobileVisibilityLabel, MobileVisibilityLabelDetail,
+    MobileAhaMoment, MobileAhaMomentType, MobileContact, MobileContactCard, MobileContactField,
+    MobileDeliveryRecord, MobileDeliveryStatus, MobileDeliverySummary, MobileDemoContact,
+    MobileDemoContactState, MobileDeviceDeliveryRecord, MobileDeviceDeliveryStatus,
+    MobileExchangeData, MobileExchangeResult, MobileFieldType, MobileRecoveryClaim,
+    MobileRecoveryProgress, MobileRecoveryVerification, MobileRecoveryVoucher, MobileRetryEntry,
+    MobileSocialNetwork, MobileSyncResult, MobileSyncStatus, MobileVisibilityLabel,
+    MobileVisibilityLabelDetail,
 };
 
 uniffi::setup_scaffolding!();
@@ -239,6 +240,66 @@ impl VauchiMobile {
             .parent()
             .unwrap_or(&self.storage_path)
             .join(".recovery_proof")
+    }
+
+    // === Aha Moments (internal helpers) ===
+
+    /// Get the path to the aha moments state file.
+    fn aha_moments_path(&self) -> PathBuf {
+        self.storage_path
+            .parent()
+            .unwrap_or(&self.storage_path)
+            .join(".aha_moments")
+    }
+
+    /// Load the aha moments tracker from storage.
+    fn load_aha_tracker(&self) -> vauchi_core::AhaMomentTracker {
+        let path = self.aha_moments_path();
+        if let Ok(data) = std::fs::read_to_string(&path) {
+            vauchi_core::AhaMomentTracker::from_json(&data).unwrap_or_default()
+        } else {
+            vauchi_core::AhaMomentTracker::new()
+        }
+    }
+
+    /// Save the aha moments tracker to storage.
+    fn save_aha_tracker(&self, tracker: &vauchi_core::AhaMomentTracker) -> Result<(), MobileError> {
+        let path = self.aha_moments_path();
+        let data = tracker
+            .to_json()
+            .map_err(|e| MobileError::StorageError(e.to_string()))?;
+        std::fs::write(&path, data).map_err(|e| MobileError::StorageError(e.to_string()))?;
+        Ok(())
+    }
+
+    // === Demo Contact (internal helpers) ===
+
+    /// Get the path to the demo contact state file.
+    fn demo_contact_path(&self) -> PathBuf {
+        self.storage_path
+            .parent()
+            .unwrap_or(&self.storage_path)
+            .join(".demo_contact")
+    }
+
+    /// Load the demo contact state from storage.
+    fn load_demo_state(&self) -> vauchi_core::DemoContactState {
+        let path = self.demo_contact_path();
+        if let Ok(data) = std::fs::read_to_string(&path) {
+            vauchi_core::DemoContactState::from_json(&data).unwrap_or_default()
+        } else {
+            vauchi_core::DemoContactState::default()
+        }
+    }
+
+    /// Save the demo contact state to storage.
+    fn save_demo_state(&self, state: &vauchi_core::DemoContactState) -> Result<(), MobileError> {
+        let path = self.demo_contact_path();
+        let data = state
+            .to_json()
+            .map_err(|e| MobileError::StorageError(e.to_string()))?;
+        std::fs::write(&path, data).map_err(|e| MobileError::StorageError(e.to_string()))?;
+        Ok(())
     }
 }
 
@@ -1571,6 +1632,196 @@ impl VauchiMobile {
         // For now, we return the current list which uses compile-time defaults
         // or cached content if ContentManager is used at construction
         self.list_social_networks()
+    }
+
+    // === Aha Moments (public API) ===
+
+    /// Check if an aha moment has been seen.
+    pub fn has_seen_aha_moment(&self, moment_type: MobileAhaMomentType) -> bool {
+        let tracker = self.load_aha_tracker();
+        tracker.has_seen(moment_type.into())
+    }
+
+    /// Try to trigger an aha moment. Returns the moment if not yet seen, None otherwise.
+    pub fn try_trigger_aha_moment(
+        &self,
+        moment_type: MobileAhaMomentType,
+    ) -> Result<Option<MobileAhaMoment>, MobileError> {
+        let mut tracker = self.load_aha_tracker();
+        let core_type: vauchi_core::AhaMomentType = moment_type.into();
+
+        if let Some(moment) = tracker.try_trigger(core_type) {
+            self.save_aha_tracker(&tracker)?;
+            Ok(Some(MobileAhaMoment {
+                moment_type,
+                title: moment.title().to_string(),
+                message: moment.message(),
+                has_animation: moment.has_animation(),
+            }))
+        } else {
+            Ok(None)
+        }
+    }
+
+    /// Try to trigger an aha moment with context (e.g., contact name).
+    pub fn try_trigger_aha_moment_with_context(
+        &self,
+        moment_type: MobileAhaMomentType,
+        context: String,
+    ) -> Result<Option<MobileAhaMoment>, MobileError> {
+        let mut tracker = self.load_aha_tracker();
+        let core_type: vauchi_core::AhaMomentType = moment_type.into();
+
+        if let Some(moment) = tracker.try_trigger_with_context(core_type, context) {
+            self.save_aha_tracker(&tracker)?;
+            Ok(Some(MobileAhaMoment {
+                moment_type,
+                title: moment.title().to_string(),
+                message: moment.message(),
+                has_animation: moment.has_animation(),
+            }))
+        } else {
+            Ok(None)
+        }
+    }
+
+    /// Get the count of seen aha moments.
+    pub fn aha_moments_seen_count(&self) -> u32 {
+        let tracker = self.load_aha_tracker();
+        tracker.seen_count() as u32
+    }
+
+    /// Get the total count of aha moments.
+    pub fn aha_moments_total_count(&self) -> u32 {
+        let tracker = self.load_aha_tracker();
+        tracker.total_count() as u32
+    }
+
+    /// Reset all aha moments (for testing/debugging).
+    pub fn reset_aha_moments(&self) -> Result<(), MobileError> {
+        let mut tracker = self.load_aha_tracker();
+        tracker.reset();
+        self.save_aha_tracker(&tracker)
+    }
+
+    // === Demo Contact (public API) ===
+
+    /// Initialize the demo contact if user has no real contacts.
+    /// Call this after onboarding completes.
+    pub fn init_demo_contact_if_needed(&self) -> Result<Option<MobileDemoContact>, MobileError> {
+        // Check if user has any real contacts
+        let storage = self.open_storage()?;
+        let contacts = storage
+            .list_contacts()
+            .map_err(|e| MobileError::StorageError(e.to_string()))?;
+
+        if !contacts.is_empty() {
+            // User has contacts, don't show demo
+            return Ok(None);
+        }
+
+        // Check current state
+        let mut state = self.load_demo_state();
+        if state.was_dismissed || state.auto_removed {
+            // User dismissed or it was auto-removed
+            return Ok(None);
+        }
+
+        // Activate demo contact if not already
+        if !state.is_active {
+            state = vauchi_core::DemoContactState::new_active();
+            self.save_demo_state(&state)?;
+        }
+
+        // Get current demo card
+        if let Some(tip) = state.current_tip() {
+            let card = vauchi_core::generate_demo_contact_card(&tip);
+            Ok(Some(card.into()))
+        } else {
+            Ok(None)
+        }
+    }
+
+    /// Get the current demo contact if active.
+    pub fn get_demo_contact(&self) -> Result<Option<MobileDemoContact>, MobileError> {
+        let state = self.load_demo_state();
+        if !state.is_active {
+            return Ok(None);
+        }
+
+        if let Some(tip) = state.current_tip() {
+            let card = vauchi_core::generate_demo_contact_card(&tip);
+            Ok(Some(card.into()))
+        } else {
+            Ok(None)
+        }
+    }
+
+    /// Get the demo contact state.
+    pub fn get_demo_contact_state(&self) -> MobileDemoContactState {
+        let state = self.load_demo_state();
+        MobileDemoContactState {
+            is_active: state.is_active,
+            was_dismissed: state.was_dismissed,
+            auto_removed: state.auto_removed,
+            update_count: state.update_count,
+        }
+    }
+
+    /// Check if a demo update is available.
+    pub fn is_demo_update_available(&self) -> bool {
+        let state = self.load_demo_state();
+        state.is_update_due()
+    }
+
+    /// Trigger a demo update and get the new content.
+    pub fn trigger_demo_update(&self) -> Result<Option<MobileDemoContact>, MobileError> {
+        let mut state = self.load_demo_state();
+        if !state.is_active {
+            return Ok(None);
+        }
+
+        if let Some(tip) = state.advance_to_next_tip() {
+            self.save_demo_state(&state)?;
+            let card = vauchi_core::generate_demo_contact_card(&tip);
+            Ok(Some(card.into()))
+        } else {
+            Ok(None)
+        }
+    }
+
+    /// Dismiss the demo contact.
+    pub fn dismiss_demo_contact(&self) -> Result<(), MobileError> {
+        let mut state = self.load_demo_state();
+        state.dismiss();
+        self.save_demo_state(&state)
+    }
+
+    /// Auto-remove demo contact after first real exchange.
+    /// Call this after a successful contact exchange.
+    pub fn auto_remove_demo_contact(&self) -> Result<bool, MobileError> {
+        let mut state = self.load_demo_state();
+        if state.is_active {
+            state.auto_remove();
+            self.save_demo_state(&state)?;
+            Ok(true)
+        } else {
+            Ok(false)
+        }
+    }
+
+    /// Restore the demo contact from Settings.
+    pub fn restore_demo_contact(&self) -> Result<Option<MobileDemoContact>, MobileError> {
+        let mut state = self.load_demo_state();
+        state.restore();
+        self.save_demo_state(&state)?;
+
+        if let Some(tip) = state.current_tip() {
+            let card = vauchi_core::generate_demo_contact_card(&tip);
+            Ok(Some(card.into()))
+        } else {
+            Ok(None)
+        }
     }
 }
 

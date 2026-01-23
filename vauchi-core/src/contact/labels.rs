@@ -283,7 +283,7 @@ impl LabelManager {
         let id = label.id.clone();
         self.labels.insert(id.clone(), label);
 
-        Ok(self.labels.get(&id).unwrap())
+        Ok(self.labels.get(&id).expect("just inserted"))
     }
 
     /// Renames a label.

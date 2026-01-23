@@ -73,7 +73,7 @@ pub fn create_envelope(payload: MessagePayload) -> MessageEnvelope {
         message_id: uuid::Uuid::new_v4().to_string(),
         timestamp: std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
+            .expect("system time before UNIX epoch")
             .as_secs(),
         payload,
     }

@@ -168,7 +168,7 @@ impl<T: Transport> ConnectionManager<T> {
 
         let timestamp = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
+            .expect("system time before UNIX epoch")
             .as_secs();
 
         // Sign (nonce || timestamp)

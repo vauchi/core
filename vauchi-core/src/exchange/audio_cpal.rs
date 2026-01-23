@@ -273,8 +273,8 @@ impl AudioBackend for CpalAudioBackend {
                         return;
                     }
 
-                    let samples_guard = samples_clone.lock().unwrap();
-                    let mut idx = sample_idx_clone.lock().unwrap();
+                    let samples_guard = samples_clone.lock().expect("mutex poisoned");
+                    let mut idx = sample_idx_clone.lock().expect("mutex poisoned");
 
                     for sample in output.iter_mut() {
                         if *idx < samples_guard.len() {
@@ -298,7 +298,7 @@ impl AudioBackend for CpalAudioBackend {
             .map_err(|e| ProximityError::HardwareError(format!("Play error: {}", e)))?;
 
         // Wait for playback to complete
-        let samples_len = samples.lock().unwrap().len();
+        let samples_len = samples.lock().expect("mutex poisoned").len();
         let duration_ms = (samples_len as f32 / config.sample_rate as f32 * 1000.0) as u64 + 100;
 
         let start = std::time::Instant::now();
@@ -345,7 +345,7 @@ impl AudioBackend for CpalAudioBackend {
                 &supported_config.into(),
                 move |input: &[f32], _: &cpal::InputCallbackInfo| {
                     if !stop_signal.load(Ordering::SeqCst) {
-                        recorded_clone.lock().unwrap().extend_from_slice(input);
+                        recorded_clone.lock().expect("mutex poisoned").extend_from_slice(input);
                     }
                 },
                 |err| {
@@ -367,7 +367,7 @@ impl AudioBackend for CpalAudioBackend {
             std::thread::sleep(check_interval);
 
             // Check if we have enough data and can decode
-            let samples = recorded.lock().unwrap();
+            let samples = recorded.lock().expect("mutex poisoned");
             if samples.len() > (config.sample_rate as usize / 2) {
                 // Try to decode - if successful, we're done
                 if let Ok(data) = Self::decode_fsk_samples(&samples, config) {
@@ -385,7 +385,7 @@ impl AudioBackend for CpalAudioBackend {
         self.is_active.store(false, Ordering::SeqCst);
 
         // Final decode attempt
-        let samples = recorded.lock().unwrap();
+        let samples = recorded.lock().expect("mutex poisoned");
         Self::decode_fsk_samples(&samples, config)
     }
 

@@ -45,7 +45,7 @@ impl ProfileValidation {
     pub fn new(field_id: &str, field_value: &str, validator_id: &str, signature: [u8; 64]) -> Self {
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
+            .expect("system time before UNIX epoch")
             .as_secs();
 
         Self {
@@ -115,7 +115,7 @@ impl ProfileValidation {
         let validator_id = hex::encode(identity.signing_public_key());
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
+            .expect("system time before UNIX epoch")
             .as_secs();
 
         // Full field ID includes contact_id prefix

@@ -109,13 +109,13 @@ impl MockProximityVerifier {
 
     /// Returns the challenges that were emitted (for test assertions).
     pub fn emitted_challenges(&self) -> Vec<[u8; 16]> {
-        self.challenges.lock().unwrap().clone()
+        self.challenges.lock().expect("mutex poisoned").clone()
     }
 }
 
 impl ProximityVerifier for MockProximityVerifier {
     fn emit_challenge(&self, challenge: &[u8; 16]) -> Result<(), ProximityError> {
-        self.challenges.lock().unwrap().push(*challenge);
+        self.challenges.lock().expect("mutex poisoned").push(*challenge);
         Ok(())
     }
 
@@ -128,7 +128,7 @@ impl ProximityVerifier for MockProximityVerifier {
             // Return a valid response (echo the challenge with a marker)
             let mut response = Vec::with_capacity(17);
             response.push(0x01); // Success marker
-            if let Some(challenge) = self.challenges.lock().unwrap().last() {
+            if let Some(challenge) = self.challenges.lock().expect("mutex poisoned").last() {
                 response.extend_from_slice(challenge);
             }
             Ok(response)
@@ -181,12 +181,12 @@ impl ManualConfirmationVerifier {
 
     /// Call this when the user confirms proximity.
     pub fn confirm(&self) {
-        *self.confirmed.lock().unwrap() = true;
+        *self.confirmed.lock().expect("mutex poisoned") = true;
     }
 
     /// Check if the user has confirmed.
     pub fn is_confirmed(&self) -> bool {
-        *self.confirmed.lock().unwrap()
+        *self.confirmed.lock().expect("mutex poisoned")
     }
 }
 

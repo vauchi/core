@@ -509,3 +509,114 @@ impl From<&vauchi_core::storage::DeliverySummary> for MobileDeliverySummary {
         }
     }
 }
+
+// === Aha Moment Types ===
+
+/// Type of aha moment milestone.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
+pub enum MobileAhaMomentType {
+    /// Shown when card creation completes
+    CardCreationComplete,
+    /// Shown on first edit (before having contacts)
+    FirstEdit,
+    /// Shown when first contact is added
+    FirstContactAdded,
+    /// Shown when receiving first update from a contact
+    FirstUpdateReceived,
+    /// Shown when first outbound update is delivered
+    FirstOutboundDelivered,
+}
+
+impl From<vauchi_core::AhaMomentType> for MobileAhaMomentType {
+    fn from(t: vauchi_core::AhaMomentType) -> Self {
+        match t {
+            vauchi_core::AhaMomentType::CardCreationComplete => {
+                MobileAhaMomentType::CardCreationComplete
+            }
+            vauchi_core::AhaMomentType::FirstEdit => MobileAhaMomentType::FirstEdit,
+            vauchi_core::AhaMomentType::FirstContactAdded => MobileAhaMomentType::FirstContactAdded,
+            vauchi_core::AhaMomentType::FirstUpdateReceived => {
+                MobileAhaMomentType::FirstUpdateReceived
+            }
+            vauchi_core::AhaMomentType::FirstOutboundDelivered => {
+                MobileAhaMomentType::FirstOutboundDelivered
+            }
+        }
+    }
+}
+
+impl From<MobileAhaMomentType> for vauchi_core::AhaMomentType {
+    fn from(t: MobileAhaMomentType) -> Self {
+        match t {
+            MobileAhaMomentType::CardCreationComplete => {
+                vauchi_core::AhaMomentType::CardCreationComplete
+            }
+            MobileAhaMomentType::FirstEdit => vauchi_core::AhaMomentType::FirstEdit,
+            MobileAhaMomentType::FirstContactAdded => vauchi_core::AhaMomentType::FirstContactAdded,
+            MobileAhaMomentType::FirstUpdateReceived => {
+                vauchi_core::AhaMomentType::FirstUpdateReceived
+            }
+            MobileAhaMomentType::FirstOutboundDelivered => {
+                vauchi_core::AhaMomentType::FirstOutboundDelivered
+            }
+        }
+    }
+}
+
+/// An aha moment to display to the user.
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct MobileAhaMoment {
+    /// The type of milestone
+    pub moment_type: MobileAhaMomentType,
+    /// Title to display
+    pub title: String,
+    /// Message to display
+    pub message: String,
+    /// Whether to show animation
+    pub has_animation: bool,
+}
+
+// === Demo Contact Types ===
+
+/// Demo contact card representation for display.
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct MobileDemoContact {
+    /// Contact ID
+    pub id: String,
+    /// Display name
+    pub display_name: String,
+    /// Flag indicating this is a demo
+    pub is_demo: bool,
+    /// Current tip title
+    pub tip_title: String,
+    /// Current tip content
+    pub tip_content: String,
+    /// Tip category
+    pub tip_category: String,
+}
+
+impl From<vauchi_core::DemoContactCard> for MobileDemoContact {
+    fn from(card: vauchi_core::DemoContactCard) -> Self {
+        MobileDemoContact {
+            id: card.id,
+            display_name: card.display_name,
+            is_demo: card.is_demo,
+            tip_title: card.tip_title,
+            tip_content: card.tip_content,
+            tip_category: card.tip_category,
+        }
+    }
+}
+
+/// Demo contact state for persistence.
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct MobileDemoContactState {
+    /// Whether the demo contact is active
+    pub is_active: bool,
+    /// Whether it was manually dismissed
+    pub was_dismissed: bool,
+    /// Whether it was auto-removed after first real exchange
+    pub auto_removed: bool,
+    /// Number of updates sent
+    pub update_count: u32,
+}

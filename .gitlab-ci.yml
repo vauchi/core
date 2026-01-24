@@ -53,7 +53,6 @@ variables:
     paths:
       - .cargo/registry/index/
       - .cargo/registry/cache/
-      - .cargo/git/db/
       - .sccache/
       - target/
     policy: pull-push

@@ -9,9 +9,17 @@ description = "Mobile bindings for Vauchi - UniFFI wrapper for Android/iOS"
 crate-type = ["cdylib", "staticlib", "lib"]
 name = "vauchi_mobile"
 
+[features]
+default = []
+# Enable remote content updates (networks, locales, themes)
+content-updates = ["vauchi-core/content-updates", "tokio"]
+
 [dependencies]
 # Core Vauchi library (with rustls for Android/iOS - no OpenSSL dependency)
 vauchi-core = { path = "../vauchi-core", default-features = false, features = ["network-rustls"] }
+
+# Async runtime for content updates (optional)
+tokio = { version = "1.0", features = ["rt-multi-thread"], optional = true }
 
 # UniFFI for cross-language bindings
 uniffi = { version = "0.28", features = ["cli"] }

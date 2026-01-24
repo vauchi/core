@@ -162,6 +162,13 @@ impl Storage {
                 retry_at INTEGER
             );
 
+            -- Contact sync timestamps (independent of contacts table)
+            -- Tracks last successful sync time per contact
+            CREATE TABLE IF NOT EXISTS contact_sync_timestamps (
+                contact_id TEXT PRIMARY KEY,
+                last_sync_at INTEGER NOT NULL
+            );
+
             -- Double Ratchet state for each contact
             CREATE TABLE IF NOT EXISTS contact_ratchets (
                 contact_id TEXT PRIMARY KEY REFERENCES contacts(id),

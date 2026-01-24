@@ -159,8 +159,26 @@ impl<'a> SyncManager<'a> {
     }
 
     /// Marks an update as successfully delivered.
+    ///
+    /// Also updates the contact's last sync timestamp.
     pub fn mark_delivered(&self, update_id: &str) -> Result<bool, SyncError> {
-        Ok(self.storage.mark_update_sent(update_id)?)
+        // Get the update first to find the contact_id
+        if let Some(update) = self.storage.get_pending_update(update_id)? {
+            let contact_id = update.contact_id.clone();
+
+            // Delete the update
+            let deleted = self.storage.mark_update_sent(update_id)?;
+
+            if deleted {
+                // Update the contact's last sync timestamp
+                let now = current_timestamp();
+                self.storage.set_contact_last_sync(&contact_id, now)?;
+            }
+
+            Ok(deleted)
+        } else {
+            Ok(false)
+        }
     }
 
     /// Marks an update as failed with retry scheduling.
@@ -193,9 +211,12 @@ impl<'a> SyncManager<'a> {
         let pending = self.storage.get_pending_updates(contact_id)?;
 
         if pending.is_empty() {
-            // Check last sync time from contact
-            // For now, return a default synced state
-            return Ok(SyncState::Synced { last_sync: 0 });
+            // Get actual last sync time from storage
+            let last_sync = self
+                .storage
+                .get_contact_last_sync(contact_id)?
+                .unwrap_or(0);
+            return Ok(SyncState::Synced { last_sync });
         }
 
         // Check if any update is currently being sent

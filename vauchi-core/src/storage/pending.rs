@@ -124,6 +124,46 @@ impl Storage {
         Ok(rows_affected > 0)
     }
 
+    /// Gets a single pending update by ID.
+    pub fn get_pending_update(&self, update_id: &str) -> Result<Option<PendingUpdate>, StorageError> {
+        let result = self.conn.query_row(
+            "SELECT id, contact_id, update_type, payload, created_at, retry_count, status, error_message, retry_at
+             FROM pending_updates WHERE id = ?1",
+            params![update_id],
+            |row| {
+                let status_str: String = row.get(6)?;
+                let error_msg: Option<String> = row.get(7)?;
+                let retry_at: Option<i64> = row.get(8)?;
+
+                let status = match status_str.as_str() {
+                    "pending" => UpdateStatus::Pending,
+                    "sending" => UpdateStatus::Sending,
+                    "failed" => UpdateStatus::Failed {
+                        error: error_msg.unwrap_or_default(),
+                        retry_at: retry_at.unwrap_or(0) as u64,
+                    },
+                    _ => UpdateStatus::Pending,
+                };
+
+                Ok(PendingUpdate {
+                    id: row.get(0)?,
+                    contact_id: row.get(1)?,
+                    update_type: row.get(2)?,
+                    payload: row.get(3)?,
+                    created_at: row.get::<_, i64>(4)? as u64,
+                    retry_count: row.get::<_, i32>(5)? as u32,
+                    status,
+                })
+            },
+        );
+
+        match result {
+            Ok(update) => Ok(Some(update)),
+            Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+            Err(e) => Err(StorageError::Database(e)),
+        }
+    }
+
     /// Updates the status of a pending update.
     pub fn update_pending_status(
         &self,

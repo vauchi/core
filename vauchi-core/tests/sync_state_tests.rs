@@ -262,3 +262,55 @@ fn test_sync_status_multiple_contacts() {
     assert!(status.contains_key("contact-1"));
     assert!(status.contains_key("contact-2"));
 }
+
+/// Test: last_sync timestamp is properly tracked after update delivery
+#[test]
+fn test_sync_state_tracks_last_sync_timestamp() {
+    let storage = create_test_storage();
+    let manager = SyncManager::new(&storage);
+
+    let mut old_card = ContactCard::new("Alice");
+    let _ = old_card.add_field(ContactField::new(
+        FieldType::Email,
+        "email",
+        "old@example.com",
+    ));
+
+    let mut new_card = ContactCard::new("Alice");
+    let _ = new_card.add_field(ContactField::new(
+        FieldType::Email,
+        "email",
+        "new@example.com",
+    ));
+
+    // Get current timestamp before the update
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+
+    // Queue and deliver an update
+    let update_id = manager
+        .queue_card_update("contact-1", &old_card, &new_card)
+        .unwrap();
+    manager.mark_delivered(&update_id).unwrap();
+
+    // Get sync state - should have a non-zero last_sync that's recent
+    let state = manager.get_sync_state("contact-1").unwrap();
+
+    match state {
+        SyncState::Synced { last_sync } => {
+            // last_sync should be non-zero (not the placeholder value)
+            assert!(last_sync > 0, "last_sync should be non-zero after delivery");
+
+            // last_sync should be within the last minute (reasonable test window)
+            assert!(
+                last_sync >= now - 60 && last_sync <= now + 60,
+                "last_sync should be a recent timestamp, got {} (expected around {})",
+                last_sync,
+                now
+            );
+        }
+        other => panic!("Expected SyncState::Synced, got {:?}", other),
+    }
+}

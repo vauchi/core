@@ -212,4 +212,41 @@ impl Storage {
             Err(e) => Err(StorageError::Database(e)),
         }
     }
+
+    // === Sync Timestamp Operations ===
+
+    /// Sets the last sync timestamp for a contact.
+    ///
+    /// This is used to track when the last successful sync occurred.
+    /// Uses a separate table from contacts to allow tracking sync timestamps
+    /// independently of whether the contact exists in the contacts table.
+    pub fn set_contact_last_sync(
+        &self,
+        contact_id: &str,
+        timestamp: u64,
+    ) -> Result<(), StorageError> {
+        self.conn.execute(
+            "INSERT OR REPLACE INTO contact_sync_timestamps (contact_id, last_sync_at)
+             VALUES (?1, ?2)",
+            params![contact_id, timestamp as i64],
+        )?;
+        Ok(())
+    }
+
+    /// Gets the last sync timestamp for a contact.
+    ///
+    /// Returns None if the contact hasn't been synced yet.
+    pub fn get_contact_last_sync(&self, contact_id: &str) -> Result<Option<u64>, StorageError> {
+        let result = self.conn.query_row(
+            "SELECT last_sync_at FROM contact_sync_timestamps WHERE contact_id = ?1",
+            params![contact_id],
+            |row| row.get::<_, i64>(0),
+        );
+
+        match result {
+            Ok(timestamp) => Ok(Some(timestamp as u64)),
+            Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+            Err(e) => Err(StorageError::Database(e)),
+        }
+    }
 }

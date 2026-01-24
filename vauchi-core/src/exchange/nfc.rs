@@ -737,6 +737,14 @@ impl Introduction {
     }
 
     /// Decrypt the introduction (called by tag owner)
+    ///
+    /// **Deprecated**: This method is fundamentally broken and will not work.
+    /// Use `decrypt_with_exchange_key` instead, which takes the X25519 keypair
+    /// from `create_nfc_tag`.
+    #[deprecated(
+        since = "0.2.0",
+        note = "This method is broken. Use decrypt_with_exchange_key instead."
+    )]
     pub fn decrypt(
         &self,
         _owner_keypair: &SigningKeyPair,

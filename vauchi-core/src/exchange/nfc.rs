@@ -144,6 +144,34 @@ pub enum NfcTagMode {
     Protected { password: String },
 }
 
+/// Result of creating an NFC tag.
+///
+/// Contains both the payload (to write to the tag) and the exchange keypair
+/// (which must be stored securely by the tag owner for decryption).
+pub struct NfcTagCreationResult {
+    /// The payload to write to the NFC tag
+    payload: ParsedNfcPayload,
+    /// The exchange keypair (private key needed for decryption)
+    exchange_keypair: X3DHKeyPair,
+}
+
+impl NfcTagCreationResult {
+    /// Get the payload to write to the NFC tag.
+    pub fn payload(&self) -> &ParsedNfcPayload {
+        &self.payload
+    }
+
+    /// Get the exchange keypair (must be stored securely for decryption).
+    pub fn exchange_keypair(&self) -> &X3DHKeyPair {
+        &self.exchange_keypair
+    }
+
+    /// Consume and return both parts.
+    pub fn into_parts(self) -> (ParsedNfcPayload, X3DHKeyPair) {
+        (self.payload, self.exchange_keypair)
+    }
+}
+
 /// Open NFC tag payload (magic: "VBMB")
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NfcTagPayload {
@@ -274,6 +302,14 @@ impl ParsedNfcPayload {
         }
     }
 
+    /// Get the password salt (only for protected tags).
+    pub fn password_salt(&self) -> Option<&[u8; 16]> {
+        match self {
+            ParsedNfcPayload::Open(_) => None,
+            ParsedNfcPayload::Protected(p) => Some(&p.password_salt),
+        }
+    }
+
     /// Serialize to bytes
     pub fn to_bytes(&self) -> Vec<u8> {
         let mut bytes = Vec::new();
@@ -359,7 +395,92 @@ impl ParsedNfcPayload {
 /// High enough to be slow for brute force, fast enough for UX
 const PBKDF2_ITERATIONS: u32 = 100_000;
 
-/// Create an NFC tag payload
+/// Create an NFC tag with payload and exchange keypair.
+///
+/// Returns both the payload (to write to the NFC tag) and the exchange keypair
+/// (which must be stored securely by the tag owner for decrypting introductions).
+///
+/// # Example
+///
+/// ```ignore
+/// let result = create_nfc_tag(&keypair, "wss://relay.app", &mailbox_id, NfcTagMode::Open)?;
+///
+/// // Write payload to NFC tag
+/// write_to_tag(result.payload().to_bytes());
+///
+/// // Store exchange keypair securely for later decryption
+/// store_securely(result.exchange_keypair().secret_bytes());
+/// ```
+pub fn create_nfc_tag(
+    keypair: &SigningKeyPair,
+    relay_url: &str,
+    mailbox_id: &[u8; 32],
+    mode: NfcTagMode,
+) -> Result<NfcTagCreationResult, NfcError> {
+    let rng = SystemRandom::new();
+
+    // Generate exchange keypair for X3DH
+    let exchange_keypair = X3DHKeyPair::generate();
+
+    let payload = match mode {
+        NfcTagMode::Open => {
+            let mut payload = NfcTagPayload {
+                signing_key: *keypair.public_key().as_bytes(),
+                exchange_key: *exchange_keypair.public_key(),
+                relay_url: relay_url.to_string(),
+                mailbox_id: *mailbox_id,
+                signature: [0u8; 64],
+            };
+
+            let signable = create_signable_bytes_open(&payload);
+            let signature = keypair.sign(&signable);
+            payload.signature = *signature.as_bytes();
+
+            ParsedNfcPayload::Open(payload)
+        }
+        NfcTagMode::Protected { password } => {
+            let mut salt = [0u8; 16];
+            rng.fill(&mut salt)
+                .map_err(|_| NfcError::CryptoError("Failed to generate salt".into()))?;
+
+            let mut verifier = [0u8; 32];
+            pbkdf2::derive(
+                pbkdf2::PBKDF2_HMAC_SHA256,
+                NonZeroU32::new(PBKDF2_ITERATIONS).unwrap(),
+                &salt,
+                password.as_bytes(),
+                &mut verifier,
+            );
+
+            let mut payload = ProtectedNfcTagPayload {
+                signing_key: *keypair.public_key().as_bytes(),
+                exchange_key: *exchange_keypair.public_key(),
+                relay_url: relay_url.to_string(),
+                mailbox_id: *mailbox_id,
+                password_salt: salt,
+                password_verifier: verifier,
+                signature: [0u8; 64],
+            };
+
+            let signable = create_signable_bytes_protected(&payload);
+            let signature = keypair.sign(&signable);
+            payload.signature = *signature.as_bytes();
+
+            ParsedNfcPayload::Protected(payload)
+        }
+    };
+
+    Ok(NfcTagCreationResult {
+        payload,
+        exchange_keypair,
+    })
+}
+
+/// Create an NFC tag payload (legacy API - does not return exchange keypair).
+///
+/// **Deprecated**: Use `create_nfc_tag` instead, which returns both the payload
+/// and the exchange keypair needed for decryption.
+#[deprecated(since = "0.2.0", note = "Use create_nfc_tag instead")]
 pub fn create_nfc_payload(
     keypair: &SigningKeyPair,
     relay_url: &str,
@@ -724,6 +845,88 @@ impl Introduction {
                     pbkdf2::PBKDF2_HMAC_SHA256,
                     NonZeroU32::new(PBKDF2_ITERATIONS).unwrap(),
                     &salt,
+                    pwd.as_bytes(),
+                    &mut pwd_derived,
+                );
+                pwd_derived.to_vec()
+            }
+            None => vec![0u8; 32],
+        };
+
+        let salt = Salt::new(HKDF_SHA256, &salt_bytes);
+        let prk = salt.extract(&shared_secret);
+        let okm = prk
+            .expand(&[b"Vauchi_NFC_Intro"], HKDF_SHA256)
+            .map_err(|_| NfcError::CryptoError("HKDF expand failed".into()))?;
+
+        let mut key_bytes = [0u8; 32];
+        okm.fill(&mut key_bytes)
+            .map_err(|_| NfcError::CryptoError("HKDF fill failed".into()))?;
+
+        // Decrypt
+        let unbound_key = UnboundKey::new(&AES_256_GCM, &key_bytes)
+            .map_err(|_| NfcError::DecryptionError("Invalid key".into()))?;
+        let key = LessSafeKey::new(unbound_key);
+        let nonce = Nonce::assume_unique_for_key(self.nonce);
+
+        let mut plaintext = self.ciphertext.clone();
+        key.open_in_place(nonce, Aad::empty(), &mut plaintext)
+            .map_err(|_| NfcError::DecryptionError("Decryption failed".into()))?;
+
+        // Remove auth tag
+        plaintext.truncate(plaintext.len() - 16);
+
+        Ok(plaintext)
+    }
+
+    /// Decrypt the introduction using the tag owner's exchange keypair.
+    ///
+    /// This is the proper decryption method that uses the X25519 keypair
+    /// that was generated when creating the NFC tag.
+    ///
+    /// # Arguments
+    ///
+    /// * `exchange_keypair` - The X25519 keypair from `create_nfc_tag`
+    /// * `password_with_salt` - Optional (password, salt) tuple for protected tags.
+    ///   The salt comes from the stored `ParsedNfcPayload::Protected.password_salt`.
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// let tag_result = create_nfc_tag(&keypair, url, &mailbox_id, NfcTagMode::Open)?;
+    /// // ... tag_result.exchange_keypair() and tag_result.payload() are stored securely ...
+    ///
+    /// // Later, when receiving an introduction (open tag):
+    /// let plaintext = intro.decrypt_with_exchange_key(&stored_exchange_keypair, None)?;
+    ///
+    /// // For protected tags:
+    /// if let ParsedNfcPayload::Protected(p) = &stored_payload {
+    ///     let plaintext = intro.decrypt_with_exchange_key(
+    ///         &stored_exchange_keypair,
+    ///         Some(("password", &p.password_salt))
+    ///     )?;
+    /// }
+    /// ```
+    pub fn decrypt_with_exchange_key(
+        &self,
+        exchange_keypair: &X3DHKeyPair,
+        password_with_salt: Option<(&str, &[u8; 16])>,
+    ) -> Result<Vec<u8>, NfcError> {
+        use ring::aead::{Aad, LessSafeKey, Nonce, UnboundKey, AES_256_GCM};
+        use ring::hkdf::{Salt, HKDF_SHA256};
+
+        // Perform X25519 key agreement: our_static_secret * their_ephemeral_public
+        let shared_secret = exchange_keypair.diffie_hellman(&self.ephemeral_key);
+
+        // Derive decryption key using HKDF
+        let salt_bytes = match password_with_salt {
+            Some((pwd, salt)) => {
+                // Include password in key derivation with the stored salt
+                let mut pwd_derived = [0u8; 32];
+                pbkdf2::derive(
+                    pbkdf2::PBKDF2_HMAC_SHA256,
+                    NonZeroU32::new(PBKDF2_ITERATIONS).unwrap(),
+                    salt,
                     pwd.as_bytes(),
                     &mut pwd_derived,
                 );

@@ -152,10 +152,10 @@ test:
 # Security Stage (MR/main only)
 # ============================================================
 
-# GitLab templates need Docker runners - restrict to docker tag
+# GitLab security templates run on shared runners (SaaS)
+# Self-hosted runners have HTTP git access disabled
 sast:
   stage: security
-  tags: [docker]
   allow_failure: true
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
@@ -163,7 +163,6 @@ sast:
 
 dependency_scanning:
   stage: security
-  tags: [docker]
   allow_failure: true
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
@@ -171,7 +170,6 @@ dependency_scanning:
 
 secret_detection:
   stage: security
-  tags: [docker]
   allow_failure: true
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"

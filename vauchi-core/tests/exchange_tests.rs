@@ -267,10 +267,7 @@ fn test_ble_rssi_to_distance_estimation() {
         .unwrap();
 
     assert!(close_dist < 1.0, "Close device should be < 1m");
-    assert!(
-        (1.0..=3.0).contains(&medium_dist),
-        "Medium should be 1-3m"
-    );
+    assert!((1.0..=3.0).contains(&medium_dist), "Medium should be 1-3m");
     assert!(far_dist > 3.0, "Far device should be > 3m");
 }
 

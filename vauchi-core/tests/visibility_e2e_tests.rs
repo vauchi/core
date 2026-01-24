@@ -1,7 +1,4 @@
-use vauchi_core::{
-    api::Vauchi,
-    contact::LabelManager,
-};
+use vauchi_core::{api::Vauchi, contact::LabelManager};
 
 #[cfg(test)]
 mod visibility_e2e_tests {

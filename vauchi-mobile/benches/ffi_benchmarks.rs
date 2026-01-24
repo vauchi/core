@@ -31,17 +31,12 @@ fn bench_identity_creation(c: &mut Criterion) {
     let mut group = c.benchmark_group("identity");
 
     group.bench_function("create", |b| {
-        b.iter_with_setup(
-            create_test_instance,
-            |(instance, _dir)| {
-                let _: () = instance
+        b.iter_with_setup(create_test_instance, |(instance, _dir)| {
+            let _: () = instance
                 .create_identity("Benchmark User".to_string())
                 .unwrap();
-                black_box(
-                    (),
-                );
-            },
-        )
+            black_box(());
+        })
     });
 
     group.bench_function("has_identity_cold", |b| {
@@ -86,15 +81,13 @@ fn bench_card_operations(c: &mut Criterion) {
             || create_instance_with_identity("Test User"),
             |(instance, _dir)| {
                 let _: () = instance
-                .add_field(
-                    vauchi_mobile::MobileFieldType::Email,
-                    "work".to_string(),
-                    "test@example.com".to_string(),
-                )
-                .unwrap();
-                black_box(
-                    (),
-                );
+                    .add_field(
+                        vauchi_mobile::MobileFieldType::Email,
+                        "work".to_string(),
+                        "test@example.com".to_string(),
+                    )
+                    .unwrap();
+                black_box(());
             },
         )
     });
@@ -114,11 +107,9 @@ fn bench_card_operations(c: &mut Criterion) {
             },
             |(instance, _dir)| {
                 let _: () = instance
-                .update_field("work".to_string(), "new@example.com".to_string())
-                .unwrap();
-                black_box(
-                    (),
-                );
+                    .update_field("work".to_string(), "new@example.com".to_string())
+                    .unwrap();
+                black_box(());
             },
         )
     });
@@ -201,17 +192,12 @@ fn bench_backup(c: &mut Criterion) {
             .export_backup("correct-horse-battery-staple".to_string())
             .unwrap();
 
-        b.iter_with_setup(
-            create_test_instance,
-            |(new_instance, _dir)| {
-                let _: () = new_instance
+        b.iter_with_setup(create_test_instance, |(new_instance, _dir)| {
+            let _: () = new_instance
                 .import_backup(backup.clone(), "correct-horse-battery-staple".to_string())
                 .unwrap();
-                black_box(
-                    (),
-                );
-            },
-        )
+            black_box(());
+        })
     });
 
     group.finish();

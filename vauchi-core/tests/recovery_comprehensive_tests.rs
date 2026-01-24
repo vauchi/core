@@ -5,8 +5,8 @@
 
 use std::time::{SystemTime, UNIX_EPOCH};
 use vauchi_core::recovery::{
-    RecoveryClaim, RecoveryConflict, RecoveryError, RecoveryProof,
-    RecoveryReminder, RecoveryRevocation, RecoverySettings, VerificationResult,
+    RecoveryClaim, RecoveryConflict, RecoveryError, RecoveryProof, RecoveryReminder,
+    RecoveryRevocation, RecoverySettings, VerificationResult,
 };
 use vauchi_core::{Contact, ContactCard, SigningKeyPair, SymmetricKey};
 

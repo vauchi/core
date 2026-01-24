@@ -8,7 +8,8 @@ use std::time::Instant;
 use super::connection::ConnectionManager;
 use super::error::NetworkError;
 use super::message::{
-    AckStatus, EncryptedUpdate, MessageEnvelope, MessageId, MessagePayload, RatchetHeader,
+    AckStatus, DeviceSyncMessage, EncryptedUpdate, MessageEnvelope, MessageId, MessagePayload,
+    RatchetHeader,
 };
 use super::protocol::create_envelope;
 use super::transport::{Transport, TransportConfig};
@@ -172,6 +173,34 @@ impl<T: Transport> RelayClient<T> {
                 retry_count: 0,
             },
         );
+
+        Ok(message_id)
+    }
+
+    /// Sends a device sync message to another device.
+    ///
+    /// Used for syncing data between devices belonging to the same identity.
+    /// The ciphertext should already be encrypted for the target device.
+    pub fn send_device_sync_message(
+        &mut self,
+        sender_device_id: &[u8; 32],
+        target_device_id: &[u8; 32],
+        ciphertext: Vec<u8>,
+        nonce: [u8; 12],
+        sync_version: u64,
+    ) -> Result<MessageId, NetworkError> {
+        let sync_msg = DeviceSyncMessage {
+            target_device_id: *target_device_id,
+            sender_device_id: *sender_device_id,
+            ciphertext,
+            nonce,
+            sync_version,
+        };
+
+        let envelope = create_envelope(MessagePayload::DeviceSync(sync_msg));
+        let message_id = envelope.message_id.clone();
+
+        self.connection.send(&envelope)?;
 
         Ok(message_id)
     }

@@ -309,7 +309,7 @@ impl<'a, T: Transport> SyncController<'a, T> {
     ///
     /// Creates an encrypted sync message and sends it via the relay.
     pub fn send_device_sync(
-        &self,
+        &mut self,
         orchestrator: &DeviceSyncOrchestrator<'_>,
         target_device_id: &[u8; 32],
         target_public_key: &[u8; 32],
@@ -325,13 +325,38 @@ impl<'a, T: Transport> SyncController<'a, T> {
             VauchiError::InvalidState(format!("Failed to serialize sync items: {}", e))
         })?;
 
-        // Encrypt for target device
-        let _ciphertext = orchestrator
+        // Encrypt for target device (returns nonce || ciphertext || tag)
+        let encrypted = orchestrator
             .encrypt_for_device(target_public_key, &payload)
             .map_err(VauchiError::DeviceSync)?;
 
-        // TODO: Send via relay when DeviceSyncMessage routing is implemented
-        // For now, the encryption/preparation is what we're testing
+        // Split encrypted data into nonce (first 12 bytes) and ciphertext (rest)
+        const NONCE_SIZE: usize = 12;
+        if encrypted.len() < NONCE_SIZE {
+            return Err(VauchiError::InvalidState(
+                "Encrypted data too short".to_string(),
+            ));
+        }
+
+        let nonce: [u8; 12] = encrypted[..NONCE_SIZE]
+            .try_into()
+            .expect("nonce slice should be 12 bytes");
+        let ciphertext = encrypted[NONCE_SIZE..].to_vec();
+
+        // Get sync version from orchestrator
+        let sync_version = orchestrator
+            .version_vector()
+            .get(orchestrator.current_device().device_id());
+
+        // Send via relay
+        let sender_device_id = orchestrator.current_device().device_id();
+        self.relay.send_device_sync_message(
+            sender_device_id,
+            target_device_id,
+            ciphertext,
+            nonce,
+            sync_version,
+        )?;
 
         Ok(())
     }

@@ -6,9 +6,7 @@
 //! Feature file: features/contact_exchange.feature @nfc @e2e
 
 use vauchi_core::crypto::SigningKeyPair;
-use vauchi_core::exchange::{
-    create_nfc_tag, Introduction, NfcTagMode, ParsedNfcPayload,
-};
+use vauchi_core::exchange::{create_nfc_tag, Introduction, NfcTagMode};
 
 // ============================================================
 // Full Roundtrip Tests

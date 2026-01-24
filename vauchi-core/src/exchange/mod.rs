@@ -71,9 +71,8 @@ pub use proximity::{
 };
 pub use qr::ExchangeQR;
 pub use session::{DuplicateAction, ExchangeEvent, ExchangeRole, ExchangeSession, ExchangeState};
-#[allow(deprecated)]
 pub use nfc::{
-    create_nfc_payload, create_nfc_tag, parse_nfc_payload, Introduction, NfcError, NfcTagCreationResult,
+    create_nfc_tag, parse_nfc_payload, Introduction, NfcError, NfcTagCreationResult,
     NfcTagMode, NfcTagPayload, ParsedNfcPayload, ProtectedNfcTagPayload,
 };
 pub use x3dh::{X3DHKeyPair, X3DH};

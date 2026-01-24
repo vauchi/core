@@ -476,75 +476,6 @@ pub fn create_nfc_tag(
     })
 }
 
-/// Create an NFC tag payload (legacy API - does not return exchange keypair).
-///
-/// **Deprecated**: Use `create_nfc_tag` instead, which returns both the payload
-/// and the exchange keypair needed for decryption.
-#[deprecated(since = "0.2.0", note = "Use create_nfc_tag instead")]
-pub fn create_nfc_payload(
-    keypair: &SigningKeyPair,
-    relay_url: &str,
-    mailbox_id: &[u8; 32],
-    mode: NfcTagMode,
-) -> Result<ParsedNfcPayload, NfcError> {
-    let rng = SystemRandom::new();
-
-    // Generate exchange keypair for X3DH
-    let exchange_keypair = X3DHKeyPair::generate();
-
-    match mode {
-        NfcTagMode::Open => {
-            let mut payload = NfcTagPayload {
-                signing_key: *keypair.public_key().as_bytes(),
-                exchange_key: *exchange_keypair.public_key(),
-                relay_url: relay_url.to_string(),
-                mailbox_id: *mailbox_id,
-                signature: [0u8; 64],
-            };
-
-            // Create signable bytes and sign
-            let signable = create_signable_bytes_open(&payload);
-            let signature = keypair.sign(&signable);
-            payload.signature = *signature.as_bytes();
-
-            Ok(ParsedNfcPayload::Open(payload))
-        }
-        NfcTagMode::Protected { password } => {
-            // Generate salt
-            let mut salt = [0u8; 16];
-            rng.fill(&mut salt)
-                .map_err(|_| NfcError::CryptoError("Failed to generate salt".into()))?;
-
-            // Derive password verifier
-            let mut verifier = [0u8; 32];
-            pbkdf2::derive(
-                pbkdf2::PBKDF2_HMAC_SHA256,
-                NonZeroU32::new(PBKDF2_ITERATIONS).unwrap(),
-                &salt,
-                password.as_bytes(),
-                &mut verifier,
-            );
-
-            let mut payload = ProtectedNfcTagPayload {
-                signing_key: *keypair.public_key().as_bytes(),
-                exchange_key: *exchange_keypair.public_key(),
-                relay_url: relay_url.to_string(),
-                mailbox_id: *mailbox_id,
-                password_salt: salt,
-                password_verifier: verifier,
-                signature: [0u8; 64],
-            };
-
-            // Create signable bytes and sign
-            let signable = create_signable_bytes_protected(&payload);
-            let signature = keypair.sign(&signable);
-            payload.signature = *signature.as_bytes();
-
-            Ok(ParsedNfcPayload::Protected(payload))
-        }
-    }
-}
-
 /// Parse NFC tag payload from bytes
 pub fn parse_nfc_payload(bytes: &[u8]) -> Result<ParsedNfcPayload, NfcError> {
     if bytes.len() < 5 {
@@ -971,16 +902,18 @@ mod tests {
         let keypair = SigningKeyPair::generate();
         let mailbox_id = [1u8; 32];
 
-        let payload = create_nfc_payload(
-            &keypair,
-            "wss://relay.test",
-            &mailbox_id,
-            NfcTagMode::Open,
-        )
-        .unwrap();
+        let tag_result =
+            create_nfc_tag(&keypair, "wss://relay.test", &mailbox_id, NfcTagMode::Open).unwrap();
 
+        let payload = tag_result.payload();
         assert!(!payload.is_password_protected());
         assert_eq!(payload.relay_url(), "wss://relay.test");
+
+        // Exchange keypair should match payload's exchange key
+        assert_eq!(
+            tag_result.exchange_keypair().public_key(),
+            payload.exchange_key()
+        );
     }
 
     #[test]
@@ -988,7 +921,7 @@ mod tests {
         let keypair = SigningKeyPair::generate();
         let mailbox_id = [1u8; 32];
 
-        let payload = create_nfc_payload(
+        let tag_result = create_nfc_tag(
             &keypair,
             "wss://relay.test",
             &mailbox_id,
@@ -998,6 +931,7 @@ mod tests {
         )
         .unwrap();
 
+        let payload = tag_result.payload();
         assert!(payload.is_password_protected());
         assert!(payload.verify_password("test"));
         assert!(!payload.verify_password("wrong"));
@@ -1008,7 +942,7 @@ mod tests {
         let keypair = SigningKeyPair::generate();
         let mailbox_id = [42u8; 32];
 
-        let original = create_nfc_payload(
+        let tag_result = create_nfc_tag(
             &keypair,
             "wss://relay.example.com",
             &mailbox_id,
@@ -1016,7 +950,7 @@ mod tests {
         )
         .unwrap();
 
-        let bytes = original.to_bytes();
+        let bytes = tag_result.payload().to_bytes();
         let parsed = parse_nfc_payload(&bytes).unwrap();
 
         assert_eq!(parsed.relay_url(), "wss://relay.example.com");

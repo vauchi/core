@@ -10,10 +10,10 @@
 //! - Mailbox-based async exchange
 
 use std::time::Duration;
-use vauchi_core::exchange::{
-    create_nfc_payload, parse_nfc_payload, Introduction, NfcError, NfcTagMode,
-};
 use vauchi_core::crypto::SigningKeyPair;
+use vauchi_core::exchange::{
+    create_nfc_tag, parse_nfc_payload, Introduction, NfcError, NfcTagMode,
+};
 
 // ============================================================
 // NFC Tag Payload Creation
@@ -27,17 +27,20 @@ fn test_create_open_nfc_tag() {
     let relay_url = "wss://relay.vauchi.app";
     let mailbox_id = [0u8; 32];
 
-    let payload = create_nfc_payload(
-        &keypair,
-        relay_url,
-        &mailbox_id,
-        NfcTagMode::Open,
-    ).expect("Should create payload");
+    let tag_result =
+        create_nfc_tag(&keypair, relay_url, &mailbox_id, NfcTagMode::Open).expect("Should create tag");
 
+    let payload = tag_result.payload();
     assert_eq!(payload.magic(), b"VBMB");
     assert_eq!(payload.version(), 1);
     assert!(!payload.is_password_protected());
     assert!(payload.verify_signature(&keypair.public_key()));
+
+    // Exchange keypair should be available for storage
+    assert_eq!(
+        tag_result.exchange_keypair().public_key(),
+        payload.exchange_key()
+    );
 }
 
 /// Test: Create password-protected NFC tag payload
@@ -48,13 +51,17 @@ fn test_create_protected_nfc_tag() {
     let mailbox_id = [0u8; 32];
     let password = "meetup";
 
-    let payload = create_nfc_payload(
+    let tag_result = create_nfc_tag(
         &keypair,
         relay_url,
         &mailbox_id,
-        NfcTagMode::Protected { password: password.to_string() },
-    ).expect("Should create protected payload");
+        NfcTagMode::Protected {
+            password: password.to_string(),
+        },
+    )
+    .expect("Should create protected tag");
 
+    let payload = tag_result.payload();
     assert_eq!(payload.magic(), b"VBNP");
     assert!(payload.is_password_protected());
     assert!(payload.verify_password(password));
@@ -68,23 +75,27 @@ fn test_nfc_payload_size() {
     let relay_url = "wss://relay.vauchi.app";
     let mailbox_id = [0u8; 32];
 
-    let open_payload = create_nfc_payload(
-        &keypair,
-        relay_url,
-        &mailbox_id,
-        NfcTagMode::Open,
-    ).unwrap();
+    let open_tag = create_nfc_tag(&keypair, relay_url, &mailbox_id, NfcTagMode::Open).unwrap();
 
-    let protected_payload = create_nfc_payload(
+    let protected_tag = create_nfc_tag(
         &keypair,
         relay_url,
         &mailbox_id,
-        NfcTagMode::Protected { password: "test".to_string() },
-    ).unwrap();
+        NfcTagMode::Protected {
+            password: "test".to_string(),
+        },
+    )
+    .unwrap();
 
     // NTAG213 has 144 bytes, NTAG215 has 504 bytes
-    assert!(open_payload.to_bytes().len() <= 200, "Open payload should fit in small tags");
-    assert!(protected_payload.to_bytes().len() <= 250, "Protected payload should fit in medium tags");
+    assert!(
+        open_tag.payload().to_bytes().len() <= 200,
+        "Open payload should fit in small tags"
+    );
+    assert!(
+        protected_tag.payload().to_bytes().len() <= 250,
+        "Protected payload should fit in medium tags"
+    );
 }
 
 // ============================================================
@@ -99,14 +110,9 @@ fn test_parse_open_nfc_payload() {
     let relay_url = "wss://relay.vauchi.app";
     let mailbox_id = [42u8; 32];
 
-    let original = create_nfc_payload(
-        &keypair,
-        relay_url,
-        &mailbox_id,
-        NfcTagMode::Open,
-    ).unwrap();
+    let tag_result = create_nfc_tag(&keypair, relay_url, &mailbox_id, NfcTagMode::Open).unwrap();
 
-    let bytes = original.to_bytes();
+    let bytes = tag_result.payload().to_bytes();
     let parsed = parse_nfc_payload(&bytes).expect("Should parse");
 
     assert_eq!(parsed.relay_url(), relay_url);
@@ -121,14 +127,17 @@ fn test_parse_protected_requires_password() {
     let relay_url = "wss://relay.vauchi.app";
     let mailbox_id = [0u8; 32];
 
-    let payload = create_nfc_payload(
+    let tag_result = create_nfc_tag(
         &keypair,
         relay_url,
         &mailbox_id,
-        NfcTagMode::Protected { password: "secret".to_string() },
-    ).unwrap();
+        NfcTagMode::Protected {
+            password: "secret".to_string(),
+        },
+    )
+    .unwrap();
 
-    let bytes = payload.to_bytes();
+    let bytes = tag_result.payload().to_bytes();
     let parsed = parse_nfc_payload(&bytes).expect("Should parse");
 
     assert!(parsed.is_password_protected());
@@ -158,14 +167,9 @@ fn test_invalid_signature_rejected() {
     let relay_url = "wss://relay.vauchi.app";
     let mailbox_id = [0u8; 32];
 
-    let payload = create_nfc_payload(
-        &keypair,
-        relay_url,
-        &mailbox_id,
-        NfcTagMode::Open,
-    ).unwrap();
+    let tag_result = create_nfc_tag(&keypair, relay_url, &mailbox_id, NfcTagMode::Open).unwrap();
 
-    let mut bytes = payload.to_bytes();
+    let mut bytes = tag_result.payload().to_bytes();
     // Corrupt the signature
     let len = bytes.len();
     bytes[len - 1] ^= 0xFF;
@@ -188,25 +192,21 @@ fn test_create_introduction() {
     let relay_url = "wss://relay.vauchi.app";
     let mailbox_id = [0u8; 32];
 
-    let tag_payload = create_nfc_payload(
-        &tag_owner_keypair,
-        relay_url,
-        &mailbox_id,
-        NfcTagMode::Open,
-    ).unwrap();
+    let tag_result =
+        create_nfc_tag(&tag_owner_keypair, relay_url, &mailbox_id, NfcTagMode::Open).unwrap();
 
     let intro = Introduction::create(
         &scanner_keypair,
-        &tag_payload,
+        tag_result.payload(),
         "Bob's contact card data".as_bytes(),
-    ).expect("Should create introduction");
+    )
+    .expect("Should create introduction");
 
     assert!(!intro.ciphertext().is_empty());
     assert!(intro.sender_signing_key().is_some());
 }
 
-/// Test: Introduction with password creates encrypted message
-/// Note: Full decryption requires stored X25519 private key (not implemented in test)
+/// Test: Introduction with password creates encrypted message and can be decrypted
 #[test]
 fn test_introduction_with_password() {
     let scanner_keypair = SigningKeyPair::generate();
@@ -214,28 +214,40 @@ fn test_introduction_with_password() {
     let relay_url = "wss://relay.vauchi.app";
     let mailbox_id = [0u8; 32];
     let password = "meetup";
+    let contact_data = b"Bob's card";
 
-    let tag_payload = create_nfc_payload(
+    let tag_result = create_nfc_tag(
         &tag_owner_keypair,
         relay_url,
         &mailbox_id,
-        NfcTagMode::Protected { password: password.to_string() },
-    ).unwrap();
+        NfcTagMode::Protected {
+            password: password.to_string(),
+        },
+    )
+    .unwrap();
 
     let intro = Introduction::create_with_password(
         &scanner_keypair,
-        &tag_payload,
-        "Bob's card".as_bytes(),
+        tag_result.payload(),
+        contact_data,
         password,
-    ).expect("Should create introduction with password");
+    )
+    .expect("Should create introduction with password");
 
     // Verify introduction was created with encrypted data
     assert!(!intro.ciphertext().is_empty());
-    assert!(intro.ciphertext().len() > "Bob's card".len()); // Includes auth tag
+    assert!(intro.ciphertext().len() > contact_data.len()); // Includes auth tag
 
-    // Note: Decryption requires the tag owner's X25519 private key
-    // which would be stored alongside the tag metadata in a real implementation.
-    // The test verifies encryption works, decryption is tested in e2e tests.
+    // Decrypt using stored exchange keypair and salt
+    let salt = tag_result
+        .payload()
+        .password_salt()
+        .expect("Should have salt");
+    let decrypted = intro
+        .decrypt_with_exchange_key(tag_result.exchange_keypair(), Some((password, salt)))
+        .expect("Should decrypt");
+
+    assert_eq!(decrypted, contact_data);
 }
 
 /// Test: Introduction decryption fails with wrong password
@@ -246,22 +258,28 @@ fn test_introduction_wrong_password_fails() {
     let relay_url = "wss://relay.vauchi.app";
     let mailbox_id = [0u8; 32];
 
-    let tag_payload = create_nfc_payload(
+    let tag_result = create_nfc_tag(
         &tag_owner_keypair,
         relay_url,
         &mailbox_id,
-        NfcTagMode::Protected { password: "correct".to_string() },
-    ).unwrap();
+        NfcTagMode::Protected {
+            password: "correct".to_string(),
+        },
+    )
+    .unwrap();
 
     let intro = Introduction::create_with_password(
         &scanner_keypair,
-        &tag_payload,
+        tag_result.payload(),
         "data".as_bytes(),
         "correct",
-    ).unwrap();
+    )
+    .unwrap();
 
-    let result = intro.decrypt(&tag_owner_keypair, Some("wrong"));
-    assert!(result.is_err());
+    // Try to decrypt with wrong password
+    let salt = tag_result.payload().password_salt().unwrap();
+    let result = intro.decrypt_with_exchange_key(tag_result.exchange_keypair(), Some(("wrong", salt)));
+    assert!(result.is_err(), "Wrong password should fail decryption");
 }
 
 // ============================================================
@@ -277,12 +295,17 @@ fn test_password_verifier_pbkdf2() {
     let mailbox_id = [0u8; 32];
     let password = "test123";
 
-    let payload = create_nfc_payload(
+    let tag_result = create_nfc_tag(
         &keypair,
         relay_url,
         &mailbox_id,
-        NfcTagMode::Protected { password: password.to_string() },
-    ).unwrap();
+        NfcTagMode::Protected {
+            password: password.to_string(),
+        },
+    )
+    .unwrap();
+
+    let payload = tag_result.payload();
 
     // Same password should always verify
     assert!(payload.verify_password(password));
@@ -301,21 +324,26 @@ fn test_password_verification_is_slow() {
     let relay_url = "wss://relay.vauchi.app";
     let mailbox_id = [0u8; 32];
 
-    let payload = create_nfc_payload(
+    let tag_result = create_nfc_tag(
         &keypair,
         relay_url,
         &mailbox_id,
-        NfcTagMode::Protected { password: "test".to_string() },
-    ).unwrap();
+        NfcTagMode::Protected {
+            password: "test".to_string(),
+        },
+    )
+    .unwrap();
 
     // PBKDF2 with 100k iterations should take measurable time
     let start = std::time::Instant::now();
-    payload.verify_password("wrong");
+    tag_result.payload().verify_password("wrong");
     let elapsed = start.elapsed();
 
     // Should take at least 10ms (actually ~50-200ms with 100k iterations)
-    assert!(elapsed >= Duration::from_millis(10),
-        "Password verification should be slow to prevent brute force");
+    assert!(
+        elapsed >= Duration::from_millis(10),
+        "Password verification should be slow to prevent brute force"
+    );
 }
 
 // ============================================================
@@ -329,17 +357,12 @@ fn test_payload_serialization() {
     let relay_url = "wss://relay.vauchi.app";
     let mailbox_id = [123u8; 32];
 
-    let original = create_nfc_payload(
-        &keypair,
-        relay_url,
-        &mailbox_id,
-        NfcTagMode::Open,
-    ).unwrap();
+    let tag_result = create_nfc_tag(&keypair, relay_url, &mailbox_id, NfcTagMode::Open).unwrap();
 
-    let bytes = original.to_bytes();
+    let bytes = tag_result.payload().to_bytes();
     let parsed = parse_nfc_payload(&bytes).unwrap();
 
-    assert_eq!(original.to_bytes(), parsed.to_bytes());
+    assert_eq!(tag_result.payload().to_bytes(), parsed.to_bytes());
 }
 
 /// Test: Introduction serialization for relay
@@ -350,18 +373,11 @@ fn test_introduction_serialization() {
     let relay_url = "wss://relay.vauchi.app";
     let mailbox_id = [0u8; 32];
 
-    let tag_payload = create_nfc_payload(
-        &tag_owner_keypair,
-        relay_url,
-        &mailbox_id,
-        NfcTagMode::Open,
-    ).unwrap();
+    let tag_result =
+        create_nfc_tag(&tag_owner_keypair, relay_url, &mailbox_id, NfcTagMode::Open).unwrap();
 
-    let intro = Introduction::create(
-        &scanner_keypair,
-        &tag_payload,
-        "test data".as_bytes(),
-    ).unwrap();
+    let intro = Introduction::create(&scanner_keypair, tag_result.payload(), "test data".as_bytes())
+        .unwrap();
 
     let json = serde_json::to_string(&intro).expect("Should serialize");
     let restored: Introduction = serde_json::from_str(&json).expect("Should deserialize");

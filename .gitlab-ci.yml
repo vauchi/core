@@ -1,11 +1,17 @@
 # GitLab CI for vauchi-core
 #
-# Optimized pipeline for mobile bindings:
-#   - MR/main: lint, test+coverage, security (validate code)
-#   - Tags (v*): build, package, publish ONLY (code already validated)
+# Pipeline strategy:
+#   - MR: Full validation (lint, test+coverage, security, licenses)
+#   - Main: No pipeline (code already validated via MR, enforced by branch protection)
+#   - Tags (v*): Build, package, publish ONLY (code already validated)
+#
+# Security checks (all run on MR):
+#   - cargo audit: Rust security advisories
+#   - cargo deny: License compliance
+#   - Semgrep SAST: Static analysis
+#   - Secret detection: Credential leaks
 #
 # Performance optimizations:
-#   - Tags skip lint/test (redundant - code tested on MR/main)
 #   - Test and coverage combined in single pass
 #   - Parallel build jobs (iOS + Android)
 #   - sccache for shared compilation cache (30-50% faster rebuilds)
@@ -13,7 +19,7 @@
 #   - Cargo.lock-based cache keys (smarter invalidation)
 #   - Optimized cache paths (registry/index, registry/cache, git/db)
 
-# GitLab Ultimate Templates (security scanning on MR/main only)
+# GitLab Ultimate Templates (security scanning on MR only)
 include:
   - template: Security/SAST.gitlab-ci.yml
   - template: Security/Dependency-Scanning.gitlab-ci.yml
@@ -94,19 +100,19 @@ variables:
     - self-hosted
   <<: *rust-cache
 
-# Run on MR and main only (NOT tags - code already tested)
+# Run on MR only (main is validated via MR pipeline)
+# This eliminates redundant pipeline runs on merge
 .validation-only:
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-    - if: $CI_COMMIT_BRANCH == "main"
 
-# Run on tags only (releases)
+# Run on tags only (releases) - tags must be on main branch
 .release-only:
   rules:
     - if: $CI_COMMIT_TAG =~ /^v/
 
 # ============================================================
-# Lint Stage (MR/main only)
+# Lint Stage (MR only)
 # ============================================================
 
 lint:format:
@@ -124,7 +130,7 @@ lint:clippy:
     - cargo clippy --all-targets -- -D warnings
 
 # ============================================================
-# Test Stage (MR/main only - combined test + coverage)
+# Test Stage (MR only - combined test + coverage)
 # ============================================================
 
 test:
@@ -149,7 +155,7 @@ test:
     expire_in: 1 week
 
 # ============================================================
-# Security Stage (MR/main only)
+# Security Stage (MR only)
 # ============================================================
 
 # GitLab security templates configuration
@@ -167,7 +173,6 @@ semgrep-sast:
   tags: [docker]
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-    - if: $CI_COMMIT_BRANCH == "main"
 
 # Disable Gemnasium dependency scanning (not useful for Rust, use cargo-audit)
 gemnasium-dependency_scanning:
@@ -179,30 +184,49 @@ secret_detection:
   tags: [docker]
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-    - if: $CI_COMMIT_BRANCH == "main"
 
-# Rust-specific security (runs on self-hosted)
+# Rust-specific security audit (runs on self-hosted)
 security:audit:
-  extends: [.linux-runner]
+  extends: [.linux-runner, .validation-only]
   stage: security
   script:
     - cargo install cargo-audit || true
     - cargo audit
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-      changes:
-        - "**/Cargo.toml"
-        - "**/Cargo.lock"
-    - if: $CI_COMMIT_BRANCH == "main"
-  allow_failure: true
+
+# License compliance via cargo-deny (Rust-native license checker)
+# Note: GitLab's License-Scanning template was removed in 17.0
+# For Rust projects, cargo-deny is the standard tool
+security:licenses:
+  extends: [.linux-runner, .validation-only]
+  stage: security
+  script:
+    - cargo install cargo-deny || true
+    - cargo deny check licenses
 
 # ============================================================
 # Build Stage (Tags only - parallel iOS + Android)
 # ============================================================
 
+# Verify tag is on main branch before proceeding with release
+release:verify:
+  extends: [.linux-runner, .release-only]
+  stage: build
+  script:
+    - |
+      echo "Verifying tag $CI_COMMIT_TAG is on main branch..."
+      git fetch origin main --depth=100
+      if git merge-base --is-ancestor "$CI_COMMIT_SHA" origin/main; then
+        echo "✓ Tag $CI_COMMIT_TAG is on main branch"
+      else
+        echo "✗ ERROR: Tag $CI_COMMIT_TAG is NOT on main branch!"
+        echo "  Tags must only be created on commits that are on main."
+        exit 1
+      fi
+
 build:ios:
   extends: [.macos-runner, .release-only]
   stage: build
+  needs: [release:verify]
   script:
     - ./scripts/build-bindings.sh --ios
   artifacts:
@@ -212,42 +236,34 @@ build:ios:
     expire_in: 1 day
 
 build:android:
-  image: ghcr.io/mozilla/uniffi-rs:latest
-  tags:
-    - docker
+  extends: [.linux-runner, .release-only]
   stage: build
-  rules:
-    - if: $CI_COMMIT_TAG =~ /^v/
+  needs: [release:verify]
   variables:
-    ANDROID_NDK_HOME: /opt/android-ndk
-    CARGO_HOME: ${CI_PROJECT_DIR}/.cargo
-    RUST_BACKTRACE: "1"
-    RUSTC_WRAPPER: sccache
-    SCCACHE_DIR: ${CI_PROJECT_DIR}/.sccache
-  cache:
-    key:
-      files:
-        - Cargo.lock
-      prefix: rust-android
-    paths:
-      - .cargo/registry/index/
-      - .cargo/registry/cache/
-      - .sccache/
-      - target/
-    policy: pull-push
+    ANDROID_NDK_HOME: /opt/android-sdk/ndk/26.1.10909125
   before_script:
+    - !reference [.self-hosted, before_script]
     - rustup target add aarch64-linux-android x86_64-linux-android
-    - command -v sccache >/dev/null || cargo install sccache --locked
-    - sccache --start-server || true
   script:
     - ./scripts/build-bindings.sh --android
-  after_script:
-    - sccache --show-stats || true
   artifacts:
     paths:
       - ../android/app/src/main/jniLibs/
       - ../android/app/src/main/kotlin/
     expire_in: 1 day
+
+# Validate generated bindings have all expected types
+build:validate-bindings:
+  extends: [.linux-runner, .release-only]
+  stage: build
+  needs:
+    - job: build:ios
+      artifacts: true
+    - job: build:android
+      artifacts: true
+  script:
+    - ./scripts/validate-bindings.sh
+  allow_failure: false
 
 # ============================================================
 # Package Stage (Tags only)
@@ -256,7 +272,7 @@ build:android:
 package:xcframework:
   extends: [.macos-runner, .release-only]
   stage: package
-  needs: [build:ios]
+  needs: [build:ios, build:validate-bindings]
   script:
     - ./scripts/package-xcframework.sh "$CI_COMMIT_TAG"
   artifacts:
@@ -269,7 +285,7 @@ package:xcframework:
 package:android:
   extends: [.linux-runner, .release-only]
   stage: package
-  needs: [build:android]
+  needs: [build:android, build:validate-bindings]
   script:
     - ./scripts/package-android.sh "$CI_COMMIT_TAG"
   artifacts:
@@ -289,22 +305,69 @@ publish:packages:
   script:
     - ./scripts/publish-packages.sh "$CI_COMMIT_TAG"
 
+# Publish vauchi-core crate to GitLab package registry
+publish:core:
+  extends: [.linux-runner, .release-only]
+  stage: publish
+  needs: [release:verify]
+  script:
+    - |
+      VERSION="${CI_COMMIT_TAG#v}"
+      echo "Publishing vauchi-core $VERSION to GitLab package registry..."
+
+      # Package the crate
+      cargo package -p vauchi-core --allow-dirty
+
+      # Upload to GitLab generic packages registry
+      CRATE_FILE="target/package/vauchi-core-${VERSION}.crate"
+      curl --header "JOB-TOKEN: ${CI_JOB_TOKEN}" \
+           --upload-file "$CRATE_FILE" \
+           "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/vauchi-core/${VERSION}/vauchi-core-${VERSION}.crate"
+
+      echo "✓ Published vauchi-core $VERSION"
+
+# Publish vauchi-mobile crate to GitLab package registry
+publish:mobile:
+  extends: [.linux-runner, .release-only]
+  stage: publish
+  needs: [release:verify]
+  script:
+    - |
+      VERSION="${CI_COMMIT_TAG#v}"
+      echo "Publishing vauchi-mobile $VERSION to GitLab package registry..."
+
+      # Package the crate
+      cargo package -p vauchi-mobile --allow-dirty
+
+      # Upload to GitLab generic packages registry
+      CRATE_FILE="target/package/vauchi-mobile-${VERSION}.crate"
+      curl --header "JOB-TOKEN: ${CI_JOB_TOKEN}" \
+           --upload-file "$CRATE_FILE" \
+           "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/vauchi-mobile/${VERSION}/vauchi-mobile-${VERSION}.crate"
+
+      echo "✓ Published vauchi-mobile $VERSION"
+
 release:create:
   extends: .release-only
   stage: publish
   image: registry.gitlab.com/gitlab-org/release-cli:latest
   tags:
     - docker
-  needs: [publish:packages]
+  needs: [publish:packages, publish:core, publish:mobile]
   script:
     - echo "Creating release $CI_COMMIT_TAG"
   release:
     tag_name: $CI_COMMIT_TAG
     name: "Release $CI_COMMIT_TAG"
     description: |
-      ## VauchiMobile $CI_COMMIT_TAG
+      ## Vauchi $CI_COMMIT_TAG
 
-      ### Downloads
+      ### Rust Crates
+
+      - [vauchi-core](${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/vauchi-core/${CI_COMMIT_TAG#v}/vauchi-core-${CI_COMMIT_TAG#v}.crate)
+      - [vauchi-mobile](${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/vauchi-mobile/${CI_COMMIT_TAG#v}/vauchi-mobile-${CI_COMMIT_TAG#v}.crate)
+
+      ### Mobile Bindings
 
       - [iOS XCFramework](${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/vauchi-mobile/${CI_COMMIT_TAG}/VauchiMobileFFI.xcframework.zip)
       - [Android](${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/vauchi-mobile/${CI_COMMIT_TAG}/vauchi-mobile-android-${CI_COMMIT_TAG}.zip)
@@ -329,40 +392,20 @@ trigger:downstream:
 # ============================================================
 
 build:dev:
-  image: ghcr.io/mozilla/uniffi-rs:latest
-  tags:
-    - docker
+  extends: .linux-runner
   stage: build
   rules:
     - if: $CI_PIPELINE_SOURCE == "web"
       when: manual
   variables:
     DEV_VERSION: "dev-${CI_COMMIT_SHORT_SHA}"
-    ANDROID_NDK_HOME: /opt/android-ndk
-    CARGO_HOME: ${CI_PROJECT_DIR}/.cargo
-    RUST_BACKTRACE: "1"
-    RUSTC_WRAPPER: sccache
-    SCCACHE_DIR: ${CI_PROJECT_DIR}/.sccache
-  cache:
-    key:
-      files:
-        - Cargo.lock
-      prefix: rust-android
-    paths:
-      - .cargo/registry/index/
-      - .cargo/registry/cache/
-      - .sccache/
-      - target/
-    policy: pull-push
+    ANDROID_NDK_HOME: /opt/android-sdk/ndk/26.1.10909125
   before_script:
+    - !reference [.self-hosted, before_script]
     - rustup target add aarch64-linux-android x86_64-linux-android
-    - command -v sccache >/dev/null || cargo install sccache --locked
-    - sccache --start-server || true
   script:
     - ./scripts/build-bindings.sh --android
     - ./scripts/package-android.sh "$DEV_VERSION"
-  after_script:
-    - sccache --show-stats || true
   artifacts:
     paths:
       - dist/

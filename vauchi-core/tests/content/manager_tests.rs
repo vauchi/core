@@ -48,7 +48,7 @@ fn test_manager_returns_cached_networks_over_bundled() {
     // Pre-populate cache with custom networks
     let cache = ContentCache::new(temp.path()).unwrap();
     let custom_networks = r#"[
-        {"id": "custom", "name": "Custom Network", "url_template": "https://custom.example.com/{handle}"}
+        {"id": "custom", "name": "Custom Network", "url": "https://custom.example.com/{username}"}
     ]"#;
     let checksum = compute_checksum(custom_networks.as_bytes());
     cache

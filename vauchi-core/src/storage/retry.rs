@@ -49,7 +49,7 @@ impl Storage {
              FROM retry_entries WHERE next_retry <= ?1 ORDER BY next_retry",
         )?;
 
-        let rows = stmt.query_map(params![now as i64], |row| row_to_retry_entry(row))?;
+        let rows = stmt.query_map(params![now as i64], row_to_retry_entry)?;
 
         rows.collect::<Result<Vec<_>, _>>()
             .map_err(StorageError::Database)
@@ -65,7 +65,7 @@ impl Storage {
              FROM retry_entries WHERE recipient_id = ?1 ORDER BY created_at",
         )?;
 
-        let rows = stmt.query_map(params![recipient_id], |row| row_to_retry_entry(row))?;
+        let rows = stmt.query_map(params![recipient_id], row_to_retry_entry)?;
 
         rows.collect::<Result<Vec<_>, _>>()
             .map_err(StorageError::Database)
@@ -78,7 +78,7 @@ impl Storage {
              FROM retry_entries ORDER BY next_retry",
         )?;
 
-        let rows = stmt.query_map([], |row| row_to_retry_entry(row))?;
+        let rows = stmt.query_map([], row_to_retry_entry)?;
 
         rows.collect::<Result<Vec<_>, _>>()
             .map_err(StorageError::Database)

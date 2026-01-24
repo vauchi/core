@@ -57,7 +57,7 @@ impl Storage {
              FROM delivery_records WHERE recipient_id = ?1 ORDER BY created_at DESC",
         )?;
 
-        let rows = stmt.query_map(params![recipient_id], |row| row_to_delivery_record(row))?;
+        let rows = stmt.query_map(params![recipient_id], row_to_delivery_record)?;
 
         rows.collect::<Result<Vec<_>, _>>()
             .map_err(StorageError::Database)
@@ -70,7 +70,7 @@ impl Storage {
              FROM delivery_records ORDER BY created_at DESC",
         )?;
 
-        let rows = stmt.query_map([], |row| row_to_delivery_record(row))?;
+        let rows = stmt.query_map([], row_to_delivery_record)?;
 
         rows.collect::<Result<Vec<_>, _>>()
             .map_err(StorageError::Database)
@@ -88,7 +88,7 @@ impl Storage {
              FROM delivery_records WHERE status = ?1 ORDER BY created_at",
         )?;
 
-        let rows = stmt.query_map(params![status_str], |row| row_to_delivery_record(row))?;
+        let rows = stmt.query_map(params![status_str], row_to_delivery_record)?;
 
         rows.collect::<Result<Vec<_>, _>>()
             .map_err(StorageError::Database)
@@ -130,7 +130,7 @@ impl Storage {
              ORDER BY created_at",
         )?;
 
-        let rows = stmt.query_map([], |row| row_to_delivery_record(row))?;
+        let rows = stmt.query_map([], row_to_delivery_record)?;
 
         rows.collect::<Result<Vec<_>, _>>()
             .map_err(StorageError::Database)

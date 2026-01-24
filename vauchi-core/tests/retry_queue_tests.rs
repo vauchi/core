@@ -25,10 +25,10 @@ fn test_exponential_backoff_calculation() {
     // Backoff: 1s, 2s, 4s, 8s, 16s, 32s, 64s, 128s, 256s, 512s... max 3600s (1h)
     let queue = RetryQueue::new();
 
-    assert_eq!(queue.backoff_seconds(0), 1);    // 2^0 = 1
-    assert_eq!(queue.backoff_seconds(1), 2);    // 2^1 = 2
-    assert_eq!(queue.backoff_seconds(2), 4);    // 2^2 = 4
-    assert_eq!(queue.backoff_seconds(3), 8);    // 2^3 = 8
+    assert_eq!(queue.backoff_seconds(0), 1); // 2^0 = 1
+    assert_eq!(queue.backoff_seconds(1), 2); // 2^1 = 2
+    assert_eq!(queue.backoff_seconds(2), 4); // 2^2 = 4
+    assert_eq!(queue.backoff_seconds(3), 8); // 2^3 = 8
     assert_eq!(queue.backoff_seconds(10), 1024); // 2^10 = 1024
     assert_eq!(queue.backoff_seconds(12), 3600); // 2^12 = 4096 > 3600, capped at 3600
     assert_eq!(queue.backoff_seconds(20), 3600); // Always capped at 1 hour
@@ -86,8 +86,8 @@ fn test_get_due_retries() {
 
     // Create entries: 2 due, 1 not due
     let entries = vec![
-        ("msg-1", now_ts - 10), // Due (past)
-        ("msg-2", now_ts - 5),  // Due (past)
+        ("msg-1", now_ts - 10),  // Due (past)
+        ("msg-2", now_ts - 5),   // Due (past)
         ("msg-3", now_ts + 100), // Not due (future)
     ];
 

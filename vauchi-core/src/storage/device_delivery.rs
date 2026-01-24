@@ -9,7 +9,10 @@ impl Storage {
     // === Device Delivery Operations ===
 
     /// Creates a new device delivery record.
-    pub fn create_device_delivery(&self, record: &DeviceDeliveryRecord) -> Result<(), StorageError> {
+    pub fn create_device_delivery(
+        &self,
+        record: &DeviceDeliveryRecord,
+    ) -> Result<(), StorageError> {
         let status_str = status_to_str(&record.status);
 
         self.conn.execute(

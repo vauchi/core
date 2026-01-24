@@ -110,11 +110,9 @@ impl Storage {
 
     /// Counts the total number of retry entries.
     pub fn count_retry_entries(&self) -> Result<usize, StorageError> {
-        let count: i64 = self.conn.query_row(
-            "SELECT COUNT(*) FROM retry_entries",
-            [],
-            |row| row.get(0),
-        )?;
+        let count: i64 = self
+            .conn
+            .query_row("SELECT COUNT(*) FROM retry_entries", [], |row| row.get(0))?;
         Ok(count as usize)
     }
 

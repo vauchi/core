@@ -154,9 +154,7 @@ fn test_get_delivery_records_for_recipient() {
         storage.create_delivery_record(&record).unwrap();
     }
 
-    let alice_records = storage
-        .get_delivery_records_for_recipient("alice")
-        .unwrap();
+    let alice_records = storage.get_delivery_records_for_recipient("alice").unwrap();
     assert_eq!(alice_records.len(), 3);
 
     let bob_records = storage.get_delivery_records_for_recipient("bob").unwrap();
@@ -281,9 +279,9 @@ fn test_expire_old_deliveries() {
 
     // Create records: one expired, one not expired, one no expiry
     let records = vec![
-        ("expired", past, Some(past)), // Already expired
+        ("expired", past, Some(past)),    // Already expired
         ("active", now_ts, Some(future)), // Not yet expired
-        ("no-expiry", now_ts, None),   // No expiry set
+        ("no-expiry", now_ts, None),      // No expiry set
     ];
 
     for (id, created, expires) in records {

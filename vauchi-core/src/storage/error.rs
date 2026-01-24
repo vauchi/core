@@ -241,7 +241,10 @@ impl OfflineQueue {
     }
 
     /// Returns the remaining capacity in the queue.
-    pub fn remaining_capacity(&self, storage: &super::Storage) -> Result<usize, super::StorageError> {
+    pub fn remaining_capacity(
+        &self,
+        storage: &super::Storage,
+    ) -> Result<usize, super::StorageError> {
         let count = storage.count_all_pending_updates()?;
         Ok(self.max_queue_size.saturating_sub(count))
     }

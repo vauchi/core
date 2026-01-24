@@ -36,7 +36,7 @@ pub use audio::{MobileProximityResult, MobileProximityVerifier, PlatformAudioHan
 pub use error::MobileError;
 pub use types::{
     MobileContact, MobileContactCard, MobileContactField, MobileDeliveryRecord,
-    MobileDeliverySummary, MobileDeliveryStatus, MobileDeviceDeliveryRecord,
+    MobileDeliveryStatus, MobileDeliverySummary, MobileDeviceDeliveryRecord,
     MobileDeviceDeliveryStatus, MobileExchangeData, MobileExchangeResult, MobileFieldType,
     MobileRecoveryClaim, MobileRecoveryProgress, MobileRecoveryVerification, MobileRecoveryVoucher,
     MobileRetryEntry, MobileSocialNetwork, MobileSyncResult, MobileSyncStatus,
@@ -1084,7 +1084,9 @@ impl VauchiMobile {
         use vauchi_core::storage::OfflineQueue;
         let storage = self.open_storage()?;
         let queue = OfflineQueue::new();
-        queue.is_full(&storage).map_err(|e| MobileError::StorageError(e.to_string()))
+        queue
+            .is_full(&storage)
+            .map_err(|e| MobileError::StorageError(e.to_string()))
     }
 
     /// Get remaining capacity in the offline queue.
@@ -1092,7 +1094,8 @@ impl VauchiMobile {
         use vauchi_core::storage::OfflineQueue;
         let storage = self.open_storage()?;
         let queue = OfflineQueue::new();
-        let remaining = queue.remaining_capacity(&storage)
+        let remaining = queue
+            .remaining_capacity(&storage)
             .map_err(|e| MobileError::StorageError(e.to_string()))?;
         Ok(remaining as u32)
     }
@@ -1100,7 +1103,10 @@ impl VauchiMobile {
     /// Clear all pending updates for a contact.
     ///
     /// Returns the number of cleared updates.
-    pub fn clear_pending_updates_for_contact(&self, contact_id: String) -> Result<u32, MobileError> {
+    pub fn clear_pending_updates_for_contact(
+        &self,
+        contact_id: String,
+    ) -> Result<u32, MobileError> {
         let storage = self.open_storage()?;
         let count = storage.delete_pending_updates_for_contact(&contact_id)?;
         Ok(count as u32)
@@ -1125,7 +1131,10 @@ impl VauchiMobile {
     ) -> Result<Vec<MobileDeviceDeliveryRecord>, MobileError> {
         let storage = self.open_storage()?;
         let records = storage.get_device_deliveries_for_message(&message_id)?;
-        Ok(records.iter().map(MobileDeviceDeliveryRecord::from).collect())
+        Ok(records
+            .iter()
+            .map(MobileDeviceDeliveryRecord::from)
+            .collect())
     }
 
     /// Get all pending device deliveries.
@@ -1134,7 +1143,10 @@ impl VauchiMobile {
     ) -> Result<Vec<MobileDeviceDeliveryRecord>, MobileError> {
         let storage = self.open_storage()?;
         let records = storage.get_pending_device_deliveries()?;
-        Ok(records.iter().map(MobileDeviceDeliveryRecord::from).collect())
+        Ok(records
+            .iter()
+            .map(MobileDeviceDeliveryRecord::from)
+            .collect())
     }
 
     // === Backup Operations ===

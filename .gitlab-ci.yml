@@ -152,27 +152,31 @@ test:
 # Security Stage (MR/main only)
 # ============================================================
 
-# GitLab security templates - run on local Docker runner
-sast:
-  stage: security
+# GitLab security templates configuration
+#
+# Note: Do NOT override the base sast/dependency_scanning jobs with custom rules,
+# as they are "configuration only" parents. Override child analyzer jobs instead.
+#
+# For Rust projects:
+# - SAST (Semgrep): Limited Rust support, but still catches some issues
+# - Dependency scanning: Gemnasium doesn't support Cargo.lock (use cargo-audit instead)
+# - Secret detection: Works well, detects secrets in any file type
+
+# Semgrep SAST analyzer (child job) - add tags for self-hosted Docker runner
+semgrep-sast:
   tags: [docker]
-  allow_failure: true
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
     - if: $CI_COMMIT_BRANCH == "main"
 
-dependency_scanning:
-  stage: security
-  tags: [docker]
-  allow_failure: true
+# Disable Gemnasium dependency scanning (not useful for Rust, use cargo-audit)
+gemnasium-dependency_scanning:
   rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-    - if: $CI_COMMIT_BRANCH == "main"
+    - when: never
 
+# Secret detection analyzer - add tags for self-hosted Docker runner
 secret_detection:
-  stage: security
   tags: [docker]
-  allow_failure: true
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
     - if: $CI_COMMIT_BRANCH == "main"

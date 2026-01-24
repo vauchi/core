@@ -46,10 +46,10 @@ pub use types::{
     MobileAhaMoment, MobileAhaMomentType, MobileContact, MobileContactCard, MobileContactField,
     MobileDeliveryRecord, MobileDeliveryStatus, MobileDeliverySummary, MobileDemoContact,
     MobileDemoContactState, MobileDeviceDeliveryRecord, MobileDeviceDeliveryStatus,
-    MobileExchangeData, MobileExchangeResult, MobileFieldType, MobileRecoveryClaim,
-    MobileRecoveryProgress, MobileRecoveryVerification, MobileRecoveryVoucher, MobileRetryEntry,
-    MobileSocialNetwork, MobileSyncResult, MobileSyncStatus, MobileVisibilityLabel,
-    MobileVisibilityLabelDetail,
+    MobileExchangeData, MobileExchangeResult, MobileFieldType, MobileFieldValidation,
+    MobileRecoveryClaim, MobileRecoveryProgress, MobileRecoveryVerification, MobileRecoveryVoucher,
+    MobileRetryEntry, MobileSocialNetwork, MobileSyncResult, MobileSyncStatus, MobileTrustLevel,
+    MobileValidationStatus, MobileVisibilityLabel, MobileVisibilityLabelDetail,
 };
 
 uniffi::setup_scaffolding!();
@@ -1632,6 +1632,149 @@ impl VauchiMobile {
         // For now, we return the current list which uses compile-time defaults
         // or cached content if ContentManager is used at construction
         self.list_social_networks()
+    }
+
+    // === Field Validation Operations ===
+
+    /// Validate a contact's field.
+    ///
+    /// Creates a cryptographically signed validation record attesting
+    /// that you believe this field value belongs to this contact.
+    /// Returns the created validation.
+    pub fn validate_field(
+        &self,
+        contact_id: String,
+        field_id: String,
+        field_value: String,
+    ) -> Result<MobileFieldValidation, MobileError> {
+        let identity = self.get_identity()?;
+        let storage = self.open_storage()?;
+
+        // Check we're not validating our own field
+        let my_id = hex::encode(identity.signing_public_key());
+        if contact_id == my_id {
+            return Err(MobileError::InvalidInput(
+                "Cannot validate your own field".to_string(),
+            ));
+        }
+
+        // Check we haven't already validated this field
+        let validator_id = hex::encode(identity.signing_public_key());
+        if storage.has_validated(&contact_id, &field_id, &validator_id)? {
+            return Err(MobileError::InvalidInput(
+                "You have already validated this field".to_string(),
+            ));
+        }
+
+        // Create signed validation
+        let validation = vauchi_core::social::ProfileValidation::create_signed(
+            &identity,
+            &field_id,
+            &field_value,
+            &contact_id,
+        );
+
+        // Store it
+        storage.save_validation(&validation)?;
+
+        Ok(MobileFieldValidation::from(&validation))
+    }
+
+    /// Get validation status for a contact's field.
+    ///
+    /// Returns aggregated validation information including count, trust level,
+    /// and whether you have validated this field.
+    pub fn get_field_validation_status(
+        &self,
+        contact_id: String,
+        field_id: String,
+        field_value: String,
+    ) -> Result<MobileValidationStatus, MobileError> {
+        let storage = self.open_storage()?;
+        let validations = storage.load_validations_for_field(&contact_id, &field_id)?;
+
+        // Get current user's ID if available
+        let my_id = {
+            let data = self.identity_data.lock().unwrap();
+            if data.is_some() {
+                match self.get_identity() {
+                    Ok(identity) => Some(hex::encode(identity.signing_public_key())),
+                    Err(_) => None,
+                }
+            } else {
+                None
+            }
+        };
+
+        let blocked = std::collections::HashSet::new();
+        let status = vauchi_core::social::ValidationStatus::from_validations(
+            &validations,
+            &field_value,
+            my_id.as_deref(),
+            &blocked,
+        );
+
+        Ok(MobileValidationStatus::from(&status))
+    }
+
+    /// Revoke your validation of a contact's field.
+    ///
+    /// Returns true if a validation was revoked, false if you hadn't validated.
+    pub fn revoke_field_validation(
+        &self,
+        contact_id: String,
+        field_id: String,
+    ) -> Result<bool, MobileError> {
+        let identity = self.get_identity()?;
+        let storage = self.open_storage()?;
+
+        let validator_id = hex::encode(identity.signing_public_key());
+        let deleted = storage.delete_validation(&contact_id, &field_id, &validator_id)?;
+
+        Ok(deleted)
+    }
+
+    /// List all validations you have made.
+    ///
+    /// Returns a list of all fields you have validated, sorted by
+    /// validation timestamp (most recent first).
+    pub fn list_my_validations(&self) -> Result<Vec<MobileFieldValidation>, MobileError> {
+        let identity = self.get_identity()?;
+        let storage = self.open_storage()?;
+
+        let validator_id = hex::encode(identity.signing_public_key());
+        let validations = storage.load_validations_by_validator(&validator_id)?;
+
+        Ok(validations
+            .iter()
+            .map(MobileFieldValidation::from)
+            .collect())
+    }
+
+    /// Check if you have validated a specific field.
+    pub fn has_validated_field(
+        &self,
+        contact_id: String,
+        field_id: String,
+    ) -> Result<bool, MobileError> {
+        let identity = self.get_identity()?;
+        let storage = self.open_storage()?;
+
+        let validator_id = hex::encode(identity.signing_public_key());
+        let validated = storage.has_validated(&contact_id, &field_id, &validator_id)?;
+
+        Ok(validated)
+    }
+
+    /// Get the validation count for a field (quick check without full status).
+    pub fn get_field_validation_count(
+        &self,
+        contact_id: String,
+        field_id: String,
+    ) -> Result<u32, MobileError> {
+        let storage = self.open_storage()?;
+        let count = storage.count_validations_for_field(&contact_id, &field_id)?;
+        Ok(count as u32)
     }
 
     // === Aha Moments (public API) ===

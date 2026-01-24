@@ -19,6 +19,9 @@ pub enum StorageError {
 
     #[error("Already exists: {0}")]
     AlreadyExists(String),
+
+    #[error("Invalid data: {0}")]
+    InvalidData(String),
 }
 
 /// Pending update status.

@@ -1,16 +1,26 @@
-//! Social Profile Validation
+//! Field Validation
 //!
-//! Implements crowd-sourced validation of social profiles.
-//! Users can verify that a contact's social profile belongs to them,
+//! Implements crowd-sourced validation of contact fields.
+//! Users can verify that any field (email, phone, social profiles,
+//! websites, addresses, custom fields) belongs to who they claim,
 //! building trust through consensus.
 //!
 //! ## How It Works
 //!
-//! 1. Alice claims her Twitter handle is "@alice" in her contact card
+//! 1. Alice claims her email is "alice@example.com" in her contact card
 //! 2. Bob and Carol personally know Alice and verify this is correct
 //! 3. They each create a signed validation record
 //! 4. When Dave views Alice's card, he sees "Verified by Bob, Carol"
 //! 5. The trust level increases with more validations
+//!
+//! ## Supported Field Types
+//!
+//! - **Social** (twitter, github, etc.)
+//! - **Email** (work, personal, etc.)
+//! - **Phone** (mobile, home, etc.)
+//! - **Website** (blog, portfolio, etc.)
+//! - **Address** (home, office, etc.)
+//! - **Custom** (any user-defined field)
 //!
 //! ## Trust Levels
 //!
@@ -149,6 +159,25 @@ impl ProfileValidation {
     /// Returns the field name being validated.
     pub fn field_name(&self) -> Option<&str> {
         self.field_id.split(':').nth(1)
+    }
+
+    /// Creates a validation from stored data.
+    ///
+    /// Used when loading validations from the database.
+    pub fn from_stored(
+        field_id: &str,
+        field_value: &str,
+        validator_id: &str,
+        validated_at: u64,
+        signature: [u8; 64],
+    ) -> Self {
+        Self {
+            field_id: field_id.to_string(),
+            field_value: field_value.to_string(),
+            validator_id: validator_id.to_string(),
+            validated_at,
+            signature,
+        }
     }
 }
 

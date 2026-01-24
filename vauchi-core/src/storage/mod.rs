@@ -53,6 +53,11 @@ pub mod ratchet;
 #[cfg(not(feature = "testing"))]
 mod ratchet;
 
+#[cfg(feature = "testing")]
+pub mod validation;
+#[cfg(not(feature = "testing"))]
+mod validation;
+
 pub mod secure;
 
 pub use error::{
@@ -242,6 +247,18 @@ impl Storage {
                 PRIMARY KEY (message_id, device_id)
             );
 
+            -- Field validations (crowd-sourced verification)
+            CREATE TABLE IF NOT EXISTS field_validations (
+                id TEXT PRIMARY KEY,
+                contact_id TEXT NOT NULL,
+                field_id TEXT NOT NULL,
+                field_value TEXT NOT NULL,
+                validator_id TEXT NOT NULL,
+                validated_at INTEGER NOT NULL,
+                signature BLOB NOT NULL,
+                UNIQUE(contact_id, field_id, validator_id)
+            );
+
             -- Create indexes
             CREATE INDEX IF NOT EXISTS idx_pending_contact ON pending_updates(contact_id);
             CREATE INDEX IF NOT EXISTS idx_pending_status ON pending_updates(status);
@@ -252,6 +269,9 @@ impl Storage {
             CREATE INDEX IF NOT EXISTS idx_retry_recipient ON retry_entries(recipient_id);
             CREATE INDEX IF NOT EXISTS idx_device_delivery_message ON device_deliveries(message_id);
             CREATE INDEX IF NOT EXISTS idx_device_delivery_status ON device_deliveries(status);
+            CREATE INDEX IF NOT EXISTS idx_validation_contact ON field_validations(contact_id);
+            CREATE INDEX IF NOT EXISTS idx_validation_field ON field_validations(contact_id, field_id);
+            CREATE INDEX IF NOT EXISTS idx_validation_validator ON field_validations(validator_id);
             ",
         )?;
         Ok(())

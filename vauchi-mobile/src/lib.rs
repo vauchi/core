@@ -1592,12 +1592,20 @@ impl VauchiMobile {
 
         let manager = match ContentManager::new(config) {
             Ok(m) => m,
-            Err(e) => return MobileUpdateStatus::CheckFailed { error: e.to_string() },
+            Err(e) => {
+                return MobileUpdateStatus::CheckFailed {
+                    error: e.to_string(),
+                }
+            }
         };
 
         let rt: tokio::runtime::Runtime = match tokio::runtime::Runtime::new() {
             Ok(rt) => rt,
-            Err(e) => return MobileUpdateStatus::CheckFailed { error: e.to_string() },
+            Err(e) => {
+                return MobileUpdateStatus::CheckFailed {
+                    error: e.to_string(),
+                }
+            }
         };
 
         rt.block_on(async { manager.check_for_updates().await.into() })
@@ -1618,12 +1626,20 @@ impl VauchiMobile {
 
         let manager = match ContentManager::new(config) {
             Ok(m) => m,
-            Err(e) => return MobileApplyResult::Error { error: e.to_string() },
+            Err(e) => {
+                return MobileApplyResult::Error {
+                    error: e.to_string(),
+                }
+            }
         };
 
         let rt: tokio::runtime::Runtime = match tokio::runtime::Runtime::new() {
             Ok(rt) => rt,
-            Err(e) => return MobileApplyResult::Error { error: e.to_string() },
+            Err(e) => {
+                return MobileApplyResult::Error {
+                    error: e.to_string(),
+                }
+            }
         };
 
         rt.block_on(async {
@@ -1644,7 +1660,9 @@ impl VauchiMobile {
                         }
                     }
                 },
-                Err(e) => MobileApplyResult::Error { error: e.to_string() },
+                Err(e) => MobileApplyResult::Error {
+                    error: e.to_string(),
+                },
             }
         })
     }

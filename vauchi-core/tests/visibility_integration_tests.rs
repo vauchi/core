@@ -1,5 +1,5 @@
 use vauchi_core::{
-    contact::{LabelManager, VisibilityLabel},
+    contact::LabelManager,
     contact_card::{ContactCard, ContactField, FieldType},
 };
 

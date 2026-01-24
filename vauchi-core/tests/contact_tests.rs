@@ -49,13 +49,13 @@ fn test_visibility_rules() {
     // Initially no specific rules
     assert!(contact
         .visibility_rules()
-        .can_see("any_field", &contact.id()));
+        .can_see("any_field", contact.id()));
 
     // Set a field as private
     contact.visibility_rules_mut().set_nobody("private_field");
     assert!(!contact
         .visibility_rules()
-        .can_see("private_field", &contact.id()));
+        .can_see("private_field", contact.id()));
 }
 
 // ============================================================

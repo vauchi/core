@@ -5,7 +5,7 @@
 
 use std::time::{SystemTime, UNIX_EPOCH};
 use vauchi_core::recovery::{
-    ConflictingClaim, RecoveryClaim, RecoveryConflict, RecoveryError, RecoveryProof,
+    RecoveryClaim, RecoveryConflict, RecoveryError, RecoveryProof,
     RecoveryReminder, RecoveryRevocation, RecoverySettings, VerificationResult,
 };
 use vauchi_core::{Contact, ContactCard, SigningKeyPair, SymmetricKey};
@@ -262,7 +262,7 @@ fn test_collect_multiple_vouchers() {
     let mut proof = RecoveryProof::new(&old_pk, &new_pk, 3);
 
     // Add 3 vouchers from different contacts
-    for i in 0..3 {
+    for _i in 0..3 {
         let voucher_keypair = SigningKeyPair::generate();
         let voucher = vauchi_core::RecoveryVoucher::create(&old_pk, &new_pk, &voucher_keypair);
         proof.add_voucher(voucher).unwrap();
@@ -336,7 +336,7 @@ fn test_reject_invalid_signature() {
     let old_pk = [0x01u8; 32];
     let new_pk = [0x02u8; 32];
 
-    let mut proof = RecoveryProof::new(&old_pk, &new_pk, 3);
+    let _proof = RecoveryProof::new(&old_pk, &new_pk, 3);
     let voucher_keypair = SigningKeyPair::generate();
 
     let mut voucher = vauchi_core::RecoveryVoucher::create(&old_pk, &new_pk, &voucher_keypair);

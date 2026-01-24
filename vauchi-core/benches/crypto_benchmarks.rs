@@ -60,11 +60,11 @@ fn bench_key_generation(c: &mut Criterion) {
 
     let mut group = c.benchmark_group("key_generation");
 
-    group.bench_function("symmetric_key", |b| b.iter(|| SymmetricKey::generate()));
+    group.bench_function("symmetric_key", |b| b.iter(SymmetricKey::generate));
 
-    group.bench_function("signing_keypair", |b| b.iter(|| SigningKeyPair::generate()));
+    group.bench_function("signing_keypair", |b| b.iter(SigningKeyPair::generate));
 
-    group.bench_function("x3dh_keypair", |b| b.iter(|| X3DHKeyPair::generate()));
+    group.bench_function("x3dh_keypair", |b| b.iter(X3DHKeyPair::generate));
 
     group.finish();
 }

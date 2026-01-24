@@ -1,7 +1,6 @@
 use vauchi_core::{
-    api::{Vauchi, VauchiConfig},
-    contact::{Contact, LabelManager},
-    contact_card::{ContactCard, ContactField, FieldType},
+    api::Vauchi,
+    contact::LabelManager,
 };
 
 #[cfg(test)]
@@ -32,7 +31,7 @@ mod visibility_e2e_tests {
 
     #[test]
     fn test_visibility_logic_e2e() {
-        let (_vauchi, work_id, personal_id) = setup_vauchi_with_labels();
+        let (_vauchi, _work_id, _personal_id) = setup_vauchi_with_labels();
         let mut label_manager = LabelManager::new();
         label_manager.create_label("Work").unwrap();
         label_manager.create_label("Personal").unwrap();

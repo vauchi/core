@@ -181,14 +181,14 @@ fn test_extreme_clock_skew() {
     let device_b = [0x02u8; 32];
 
     // Device A: far future timestamp (year 2100)
-    let item_a = SyncItem::CardUpdated {
+    let _item_a = SyncItem::CardUpdated {
         field_label: "phone".to_string(),
         new_value: "555-1111".to_string(),
         timestamp: 4102444800, // Year 2100
     };
 
     // Device B: current timestamp
-    let item_b = SyncItem::CardUpdated {
+    let _item_b = SyncItem::CardUpdated {
         field_label: "phone".to_string(),
         new_value: "555-2222".to_string(),
         timestamp: 1706000000, // Year 2024

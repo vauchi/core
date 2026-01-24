@@ -67,8 +67,8 @@ fn test_ratchet_handles_message_skip() {
 
     // Result depends on implementation - may succeed or fail
     // Signal protocol allows skipping up to MAX_SKIP messages
-    if dec3_result.is_ok() {
-        assert_eq!(dec3_result.unwrap(), msg3);
+    if let Ok(decrypted) = dec3_result {
+        assert_eq!(decrypted, msg3);
     }
 }
 
@@ -265,7 +265,7 @@ fn test_consecutive_messages_same_party() {
 
     let encrypted: Vec<_> = messages
         .iter()
-        .map(|m| alice_ratchet.encrypt(*m).unwrap())
+        .map(|m| alice_ratchet.encrypt(m).unwrap())
         .collect();
 
     // Bob decrypts all

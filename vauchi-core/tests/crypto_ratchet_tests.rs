@@ -175,8 +175,8 @@ fn test_dr_skipped_message_limit() {
     assert_eq!(bob.skipped_keys_count(), 99);
 
     // Now we can decrypt the skipped messages
-    for i in 0..99 {
-        let dec = bob.decrypt(&messages[i]).unwrap();
+    for (i, msg) in messages.iter().enumerate().take(99) {
+        let dec = bob.decrypt(msg).unwrap();
         assert_eq!(format!("Msg {}", i).as_bytes(), dec.as_slice());
     }
 

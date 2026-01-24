@@ -32,12 +32,13 @@ fn bench_identity_creation(c: &mut Criterion) {
 
     group.bench_function("create", |b| {
         b.iter_with_setup(
-            || create_test_instance(),
+            create_test_instance,
             |(instance, _dir)| {
+                let _: () = instance
+                .create_identity("Benchmark User".to_string())
+                .unwrap();
                 black_box(
-                    instance
-                        .create_identity("Benchmark User".to_string())
-                        .unwrap(),
+                    (),
                 );
             },
         )
@@ -84,14 +85,15 @@ fn bench_card_operations(c: &mut Criterion) {
         b.iter_with_setup(
             || create_instance_with_identity("Test User"),
             |(instance, _dir)| {
+                let _: () = instance
+                .add_field(
+                    vauchi_mobile::MobileFieldType::Email,
+                    "work".to_string(),
+                    "test@example.com".to_string(),
+                )
+                .unwrap();
                 black_box(
-                    instance
-                        .add_field(
-                            vauchi_mobile::MobileFieldType::Email,
-                            "work".to_string(),
-                            "test@example.com".to_string(),
-                        )
-                        .unwrap(),
+                    (),
                 );
             },
         )
@@ -111,10 +113,11 @@ fn bench_card_operations(c: &mut Criterion) {
                 (instance, dir)
             },
             |(instance, _dir)| {
+                let _: () = instance
+                .update_field("work".to_string(), "new@example.com".to_string())
+                .unwrap();
                 black_box(
-                    instance
-                        .update_field("work".to_string(), "new@example.com".to_string())
-                        .unwrap(),
+                    (),
                 );
             },
         )
@@ -199,12 +202,13 @@ fn bench_backup(c: &mut Criterion) {
             .unwrap();
 
         b.iter_with_setup(
-            || create_test_instance(),
+            create_test_instance,
             |(new_instance, _dir)| {
+                let _: () = new_instance
+                .import_backup(backup.clone(), "correct-horse-battery-staple".to_string())
+                .unwrap();
                 black_box(
-                    new_instance
-                        .import_backup(backup.clone(), "correct-horse-battery-staple".to_string())
-                        .unwrap(),
+                    (),
                 );
             },
         )

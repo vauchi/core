@@ -182,6 +182,13 @@ pub struct MemoryKeyStorage {
 }
 
 #[cfg(test)]
+impl Default for MemoryKeyStorage {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[cfg(test)]
 impl MemoryKeyStorage {
     pub fn new() -> Self {
         Self {

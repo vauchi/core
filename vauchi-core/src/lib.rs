@@ -7,6 +7,7 @@
 pub mod api;
 pub mod contact;
 pub mod contact_card;
+pub mod content;
 pub mod crypto;
 pub mod exchange;
 pub mod identity;

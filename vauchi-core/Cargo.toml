@@ -15,6 +15,8 @@ secure-storage = ["keyring"]
 audio-cpal = ["cpal"]
 # Enable this feature to expose internal modules for integration tests
 testing = []
+# Remote content updates (requires HTTP client)
+content-updates = ["reqwest", "tokio"]
 
 [dependencies]
 # Cryptography (audited library)
@@ -68,6 +70,12 @@ keyring = { version = "3", optional = true }
 # Cross-platform audio for ultrasonic proximity verification (desktop only)
 cpal = { version = "0.15", optional = true }
 
+# HTTP client for remote content updates (optional)
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json", "socks"], optional = true }
+
+# Async runtime for content fetching
+tokio = { version = "1.0", features = ["rt"], optional = true }
+
 [dev-dependencies]
 # Temporary directories for storage tests
 tempfile = "3.0"
@@ -81,6 +89,10 @@ criterion = "0.5"
 [[bench]]
 name = "crypto_benchmarks"
 harness = false
+
+[[test]]
+name = "content"
+path = "tests/content/mod.rs"
 
 [[test]]
 name = "e2e"

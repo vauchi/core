@@ -229,3 +229,134 @@ fn test_selector_serialization() {
     let restored: RelaySelector = serde_json::from_str(&json).unwrap();
     assert_eq!(selector, restored);
 }
+
+// ============================================================
+// MultiRelayClient
+// Feature: relay_network.feature @multi-relay @client
+// ============================================================
+
+use vauchi_core::network::MultiRelayClient;
+
+/// Test: Create multi-relay client
+#[test]
+fn test_multi_relay_client_creation() {
+    let config = MultiRelayConfig::builder()
+        .add_relay("wss://relay1.vauchi.app")
+        .add_relay("wss://relay2.vauchi.app")
+        .build()
+        .unwrap();
+
+    let client = MultiRelayClient::new(config, "test-identity".to_string());
+    assert_eq!(client.relay_count(), 2);
+    assert!(!client.is_connected());
+}
+
+/// Test: Connect to primary relay
+#[test]
+fn test_connect_to_primary() {
+    let config = MultiRelayConfig::builder()
+        .primary_relay("wss://primary.vauchi.app")
+        .add_relay("wss://backup.vauchi.app")
+        .selection_strategy(RelaySelector::PrimaryFirst)
+        .build()
+        .unwrap();
+
+    let mut client = MultiRelayClient::with_mock_transports(config, "test-identity".to_string());
+
+    let result = client.connect();
+    assert!(result.is_ok());
+    assert!(client.is_connected());
+    assert_eq!(client.active_relay(), Some("wss://primary.vauchi.app".to_string()));
+}
+
+/// Test: Failover to backup on primary failure
+#[test]
+fn test_failover_to_backup() {
+    let config = MultiRelayConfig::builder()
+        .primary_relay("wss://primary.vauchi.app")
+        .add_relay("wss://backup.vauchi.app")
+        .selection_strategy(RelaySelector::PrimaryFirst)
+        .build()
+        .unwrap();
+
+    let mut client = MultiRelayClient::with_mock_transports(config, "test-identity".to_string());
+
+    // Simulate primary failure
+    client.simulate_relay_failure("wss://primary.vauchi.app");
+
+    let result = client.connect();
+    assert!(result.is_ok());
+    assert_eq!(client.active_relay(), Some("wss://backup.vauchi.app".to_string()));
+}
+
+/// Test: Reconnect after disconnect
+#[test]
+fn test_reconnect_after_disconnect() {
+    let config = MultiRelayConfig::builder()
+        .add_relay("wss://relay.vauchi.app")
+        .build()
+        .unwrap();
+
+    let mut client = MultiRelayClient::with_mock_transports(config, "test-identity".to_string());
+
+    client.connect().unwrap();
+    assert!(client.is_connected());
+
+    client.disconnect().unwrap();
+    assert!(!client.is_connected());
+
+    client.connect().unwrap();
+    assert!(client.is_connected());
+}
+
+/// Test: Send message through active relay
+#[test]
+fn test_send_message() {
+    let config = MultiRelayConfig::builder()
+        .add_relay("wss://relay.vauchi.app")
+        .build()
+        .unwrap();
+
+    let mut client = MultiRelayClient::with_mock_transports(config, "test-identity".to_string());
+    client.connect().unwrap();
+
+    let result = client.send_raw("recipient-id", b"test message");
+    assert!(result.is_ok());
+}
+
+/// Test: Receive pending messages
+#[test]
+fn test_receive_messages() {
+    let config = MultiRelayConfig::builder()
+        .add_relay("wss://relay.vauchi.app")
+        .build()
+        .unwrap();
+
+    let mut client = MultiRelayClient::with_mock_transports(config, "test-identity".to_string());
+    client.connect().unwrap();
+
+    // Queue a message on the mock transport
+    client.queue_incoming_message(b"incoming message");
+
+    let messages = client.receive_pending().unwrap();
+    assert_eq!(messages.len(), 1);
+}
+
+/// Test: All relays down returns error
+#[test]
+fn test_all_relays_down() {
+    let config = MultiRelayConfig::builder()
+        .add_relay("wss://relay1.vauchi.app")
+        .add_relay("wss://relay2.vauchi.app")
+        .build()
+        .unwrap();
+
+    let mut client = MultiRelayClient::with_mock_transports(config, "test-identity".to_string());
+
+    // Simulate all relays failing
+    client.simulate_relay_failure("wss://relay1.vauchi.app");
+    client.simulate_relay_failure("wss://relay2.vauchi.app");
+
+    let result = client.connect();
+    assert!(result.is_err());
+}

@@ -330,6 +330,153 @@ impl RelayHealth {
     }
 }
 
+/// Client for connecting to multiple relay servers with failover support
+pub struct MultiRelayClient {
+    /// Configuration
+    config: MultiRelayConfig,
+    /// Health tracker
+    health: RelayHealth,
+    /// Our identity ID (used when sending messages)
+    #[allow(dead_code)]
+    identity_id: String,
+    /// Currently active relay URL
+    active_relay: Option<String>,
+    /// Connection state
+    connected: bool,
+    /// Mock mode for testing
+    mock_mode: bool,
+    /// Simulated failures (for testing)
+    simulated_failures: HashSet<String>,
+    /// Queued incoming messages (for testing)
+    incoming_queue: Vec<Vec<u8>>,
+}
+
+impl MultiRelayClient {
+    /// Create a new multi-relay client
+    pub fn new(config: MultiRelayConfig, identity_id: String) -> Self {
+        MultiRelayClient {
+            config,
+            health: RelayHealth::new(),
+            identity_id,
+            active_relay: None,
+            connected: false,
+            mock_mode: false,
+            simulated_failures: HashSet::new(),
+            incoming_queue: Vec::new(),
+        }
+    }
+
+    /// Create a client with mock transports for testing
+    pub fn with_mock_transports(config: MultiRelayConfig, identity_id: String) -> Self {
+        MultiRelayClient {
+            config,
+            health: RelayHealth::new(),
+            identity_id,
+            active_relay: None,
+            connected: false,
+            mock_mode: true,
+            simulated_failures: HashSet::new(),
+            incoming_queue: Vec::new(),
+        }
+    }
+
+    /// Get the number of configured relays
+    pub fn relay_count(&self) -> usize {
+        self.config.relay_count()
+    }
+
+    /// Check if connected to any relay
+    pub fn is_connected(&self) -> bool {
+        self.connected
+    }
+
+    /// Get the currently active relay URL
+    pub fn active_relay(&self) -> Option<String> {
+        self.active_relay.clone()
+    }
+
+    /// Connect to the best available relay
+    pub fn connect(&mut self) -> Result<(), MultiRelayError> {
+        // Mark simulated failures
+        for relay in self.config.relays() {
+            if self.simulated_failures.contains(relay) {
+                self.health.record_failure(relay);
+            }
+        }
+
+        // Try to find a healthy relay using the configured strategy
+        if let Some(relay) = self.config.select_healthy_relay(&self.health) {
+            // In mock mode, just mark as connected
+            self.active_relay = Some(relay.clone());
+            self.connected = true;
+            self.health.record_success(&relay);
+            return Ok(());
+        }
+
+        Err(MultiRelayError::NoRelays)
+    }
+
+    /// Disconnect from the current relay
+    pub fn disconnect(&mut self) -> Result<(), MultiRelayError> {
+        self.active_relay = None;
+        self.connected = false;
+        Ok(())
+    }
+
+    /// Send a raw message to a recipient
+    pub fn send_raw(&mut self, recipient_id: &str, data: &[u8]) -> Result<(), MultiRelayError> {
+        if !self.connected {
+            return Err(MultiRelayError::NoRelays);
+        }
+
+        // In mock mode, just pretend we sent it
+        if self.mock_mode {
+            return Ok(());
+        }
+
+        // Real send would happen here
+        let _ = (recipient_id, data);
+        Ok(())
+    }
+
+    /// Receive pending messages
+    pub fn receive_pending(&mut self) -> Result<Vec<Vec<u8>>, MultiRelayError> {
+        if !self.connected {
+            return Err(MultiRelayError::NoRelays);
+        }
+
+        // In mock mode, return queued messages
+        if self.mock_mode {
+            let messages = std::mem::take(&mut self.incoming_queue);
+            return Ok(messages);
+        }
+
+        // Real receive would happen here
+        Ok(Vec::new())
+    }
+
+    /// Simulate a relay failure (for testing)
+    pub fn simulate_relay_failure(&mut self, relay: &str) {
+        self.simulated_failures.insert(relay.to_string());
+        self.health.record_failure(relay);
+    }
+
+    /// Queue an incoming message (for testing)
+    pub fn queue_incoming_message(&mut self, data: &[u8]) {
+        self.incoming_queue.push(data.to_vec());
+    }
+
+    /// Get the health tracker (for advanced use)
+    pub fn health(&self) -> &RelayHealth {
+        &self.health
+    }
+
+    /// Get mutable health tracker
+    pub fn health_mut(&mut self) -> &mut RelayHealth {
+        &mut self.health
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

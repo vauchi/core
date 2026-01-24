@@ -43,7 +43,7 @@ mod hex_array_16 {
     }
 }
 
-mod hex_array_32 {
+pub mod hex_array_32 {
     use serde::{Deserialize, Deserializer, Serializer};
     pub fn serialize<S>(bytes: &[u8; 32], serializer: S) -> Result<S::Ok, S::Error>
     where S: Serializer {

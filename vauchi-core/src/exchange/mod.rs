@@ -56,7 +56,10 @@ mod x3dh;
 pub use audio::{AudioBackend, AudioCapability, AudioConfig, MockAudioBackend, UltrasonicVerifier};
 #[cfg(feature = "audio-cpal")]
 pub use audio_cpal::CpalAudioBackend;
-pub use ble::{BLEDevice, BLEProximityVerifier, MockBLEVerifier};
+pub use ble::{
+    BLEAdvertisement, BLEDevice, BLEError, BLEExchangeSession, BLEExchangeState,
+    BLEProximityVerifier, MockBLEVerifier, VAUCHI_BLE_SERVICE_UUID,
+};
 pub use device_link::{
     DeviceLinkInitiator, DeviceLinkInitiatorRestored, DeviceLinkQR, DeviceLinkRequest,
     DeviceLinkResponder, DeviceLinkResponse,

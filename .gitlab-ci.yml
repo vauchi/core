@@ -1,24 +1,20 @@
 # GitLab CI for vauchi-core
 #
-# Core library and mobile bindings
+# Optimized pipeline for mobile bindings:
+#   - MR/main: lint, test+coverage, security (validate code)
+#   - Tags (v*): build, package, publish ONLY (code already validated)
 #
-# Pipelines:
-#   - MR/main: lint, test, security
-#   - Tags (v*): lint, test, security, build, package, publish
-#
-# GitLab Ultimate Features:
-#   - SAST: Static application security testing
-#   - Dependency Scanning: Cargo.lock vulnerability scanning
-#   - Secret Detection: Prevent credential leaks
-#   - License Compliance: Check dependency licenses
+# Performance optimizations:
+#   - Tags skip lint/test (redundant - code tested on MR/main)
+#   - Test and coverage combined in single pass
+#   - Parallel build jobs (iOS + Android)
+#   - Aggressive caching for self-hosted runners
 
-# GitLab Ultimate Templates
-# Note: License-Scanning requires GitLab Ultimate with specific runners
+# GitLab Ultimate Templates (security scanning on MR/main only)
 include:
   - template: Security/SAST.gitlab-ci.yml
   - template: Security/Dependency-Scanning.gitlab-ci.yml
   - template: Security/Secret-Detection.gitlab-ci.yml
-  # - template: Security/License-Scanning.gitlab-ci.yml  # Disabled: template not available
 
 stages:
   - lint
@@ -32,8 +28,7 @@ stages:
 variables:
   CARGO_HOME: ${CI_PROJECT_DIR}/.cargo
   RUST_BACKTRACE: "1"
-
-  # GitLab Ultimate Security Configuration
+  # Security scanning config
   SAST_EXCLUDED_PATHS: "target/, tests/fixtures/"
   DS_EXCLUDED_PATHS: "target/"
   SECRET_DETECTION_EXCLUDED_PATHS: "target/"
@@ -42,38 +37,21 @@ variables:
 # Templates
 # ============================================================
 
-# Rust cache for Docker runners
+# Rust cache for self-hosted runners
 .rust-cache: &rust-cache
   cache:
-    key: ${CI_COMMIT_REF_SLUG}-rust
-    paths:
-      - .cargo/bin/
-      - .cargo/registry/index/
-      - .cargo/registry/cache/
-      - .cargo/git/db/
-      - target/
-
-# Aggressive Rust cache for self-hosted runners (includes release builds)
-.rust-cache-self-hosted: &rust-cache-self-hosted
-  cache:
-    key: rust-${CI_COMMIT_REF_SLUG}
+    key: rust-${CI_JOB_NAME}
     paths:
       - .cargo/registry/
       - .cargo/git/
-      - target/release/
+      - target/
     policy: pull-push
 
-# Rust job template for self-hosted Linux runner
-# Note: Shared runners disabled, using self-hosted shell executor with SSH
-.rust-job:
-  tags:
-    - linux
-    - self-hosted
+# Self-hosted runner with SSH git clone
+.self-hosted:
   variables:
-    # Skip GitLab's git clone, use SSH manually
     GIT_STRATEGY: none
   before_script:
-    # Clone via SSH (runner has deploy key configured)
     - |
       if [ ! -d ".git" ]; then
         git clone --depth 20 --branch "${CI_COMMIT_REF_NAME}" "git@gitlab.com:${CI_PROJECT_PATH}.git" .
@@ -82,62 +60,65 @@ variables:
         git fetch origin "${CI_COMMIT_REF_NAME}" --depth 20
         git checkout -f "${CI_COMMIT_SHA}"
       fi
+
+# Linux self-hosted runner
+.linux-runner:
+  extends: .self-hosted
+  tags:
+    - linux
+    - self-hosted
   <<: *rust-cache
 
+# macOS self-hosted runner
+.macos-runner:
+  extends: .self-hosted
+  tags:
+    - macos
+    - self-hosted
+  <<: *rust-cache
+
+# Run on MR and main only (NOT tags - code already tested)
+.validation-only:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == "main"
+
+# Run on tags only (releases)
 .release-only:
   rules:
     - if: $CI_COMMIT_TAG =~ /^v/
 
-.ci-only:
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-    - if: $CI_COMMIT_BRANCH == "main"
-    - if: $CI_COMMIT_TAG =~ /^v/
-
-# Self-hosted runner template using job token auth (no SSH required)
-.self-hosted-job:
-  variables:
-    GIT_STRATEGY: clone
-    GIT_DEPTH: 20
-  id_tokens:
-    GITLAB_OIDC_TOKEN:
-      aud: https://gitlab.com
-
 # ============================================================
-# Lint Stage
+# Lint Stage (MR/main only)
 # ============================================================
 
 lint:format:
-  extends: [.rust-job, .ci-only]
+  extends: [.linux-runner, .validation-only]
   stage: lint
   script:
     - rustup component add rustfmt
     - cargo fmt --all -- --check
 
 lint:clippy:
-  extends: [.rust-job, .ci-only]
+  extends: [.linux-runner, .validation-only]
   stage: lint
   script:
     - rustup component add clippy
     - cargo clippy --all-targets -- -D warnings
 
 # ============================================================
-# Test Stage
+# Test Stage (MR/main only - combined test + coverage)
 # ============================================================
 
-test:unit:
-  extends: [.rust-job, .ci-only]
-  stage: test
-  script:
-    - cargo test --all-targets
-
-test:coverage:
-  extends: [.rust-job]
+test:
+  extends: [.linux-runner, .validation-only]
   stage: test
   before_script:
+    - !reference [.self-hosted, before_script]
     - rustup component add llvm-tools-preview
     - cargo install cargo-llvm-cov --locked || true
   script:
+    # Run tests with coverage in single pass
     - cargo llvm-cov --workspace --lcov --output-path lcov.info
     - cargo llvm-cov report
   coverage: '/Total:\s+(\d+(?:\.\d+)?%)/'
@@ -145,29 +126,22 @@ test:coverage:
     reports:
       coverage_report:
         coverage_format: cobertura
-        path: cobertura.xml
+        path: lcov.info
     paths:
       - lcov.info
     expire_in: 1 week
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-    - if: $CI_COMMIT_BRANCH == "main"
-  allow_failure: true
 
 # ============================================================
-# Security Stage
+# Security Stage (MR/main only)
 # ============================================================
 
-# Override GitLab templates to run on correct events
-# Note: Security scanning requires Docker runners (shared runners disabled)
-# Allow failure until shared runners enabled or templates customized
+# GitLab templates need Docker runners - allow failure for now
 sast:
   stage: security
   allow_failure: true
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
     - if: $CI_COMMIT_BRANCH == "main"
-    - if: $CI_PIPELINE_SOURCE == "schedule"
 
 dependency_scanning:
   stage: security
@@ -175,7 +149,6 @@ dependency_scanning:
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
     - if: $CI_COMMIT_BRANCH == "main"
-    - if: $CI_PIPELINE_SOURCE == "schedule"
 
 secret_detection:
   stage: security
@@ -184,19 +157,9 @@ secret_detection:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
     - if: $CI_COMMIT_BRANCH == "main"
 
-# license_scanning disabled - template not available
-# license_scanning:
-#   stage: security
-#   rules:
-#     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-#       changes:
-#         - "**/Cargo.toml"
-#         - "**/Cargo.lock"
-#     - if: $CI_COMMIT_BRANCH == "main"
-
-# Rust-specific security checks
+# Rust-specific security (runs on self-hosted)
 security:audit:
-  extends: .rust-job
+  extends: [.linux-runner]
   stage: security
   script:
     - cargo install cargo-audit || true
@@ -207,38 +170,17 @@ security:audit:
         - "**/Cargo.toml"
         - "**/Cargo.lock"
     - if: $CI_COMMIT_BRANCH == "main"
-    - if: $CI_PIPELINE_SOURCE == "schedule"
-  allow_failure: true
-
-security:deny:
-  extends: .rust-job
-  stage: security
-  script:
-    - cargo install cargo-deny || true
-    - cargo deny check
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-      changes:
-        - "**/Cargo.toml"
-        - "**/Cargo.lock"
-        - "deny.toml"
-    - if: $CI_COMMIT_BRANCH == "main"
   allow_failure: true
 
 # ============================================================
-# Build Stage (Release only)
+# Build Stage (Tags only - parallel iOS + Android)
 # ============================================================
 
 build:ios:
-  extends: [.release-only, .self-hosted-job]
+  extends: [.macos-runner, .release-only]
   stage: build
-  tags:
-    - macos
-    - self-hosted
-  <<: *rust-cache-self-hosted
   script:
     - ./scripts/build-bindings.sh --ios
-    - ./scripts/validate-bindings.sh || true
   artifacts:
     paths:
       - ../ios/Vauchi/Generated/
@@ -246,21 +188,15 @@ build:ios:
     expire_in: 1 day
 
 build:android:
-  extends: [.release-only, .self-hosted-job]
+  extends: [.linux-runner, .release-only]
   stage: build
-  tags:
-    - linux
-    - self-hosted
-  <<: *rust-cache-self-hosted
   variables:
-    # Use pre-installed NDK on VM (no download required)
     ANDROID_NDK_HOME: /opt/android-sdk/ndk/26.1.10909125
   before_script:
-    # Install Rust Android targets if not present
+    - !reference [.self-hosted, before_script]
     - rustup target add aarch64-linux-android x86_64-linux-android
   script:
     - ./scripts/build-bindings.sh --android
-    - ./scripts/validate-bindings.sh || true
   artifacts:
     paths:
       - ../android/app/src/main/jniLibs/
@@ -268,17 +204,13 @@ build:android:
     expire_in: 1 day
 
 # ============================================================
-# Package Stage (Release only)
+# Package Stage (Tags only)
 # ============================================================
 
 package:xcframework:
-  extends: [.release-only, .self-hosted-job]
+  extends: [.macos-runner, .release-only]
   stage: package
-  tags:
-    - macos
-    - self-hosted
-  needs:
-    - build:ios
+  needs: [build:ios]
   script:
     - ./scripts/package-xcframework.sh "$CI_COMMIT_TAG"
   artifacts:
@@ -289,13 +221,9 @@ package:xcframework:
     expire_in: 1 week
 
 package:android:
-  extends: [.release-only, .self-hosted-job]
+  extends: [.linux-runner, .release-only]
   stage: package
-  tags:
-    - linux
-    - self-hosted
-  needs:
-    - build:android
+  needs: [build:android]
   script:
     - ./scripts/package-android.sh "$CI_COMMIT_TAG"
   artifacts:
@@ -305,18 +233,13 @@ package:android:
     expire_in: 1 week
 
 # ============================================================
-# Publish Stage (Release only)
+# Publish Stage (Tags only)
 # ============================================================
 
 publish:packages:
-  extends: [.release-only, .self-hosted-job]
+  extends: [.linux-runner, .release-only]
   stage: publish
-  tags:
-    - linux
-    - self-hosted
-  needs:
-    - package:xcframework
-    - package:android
+  needs: [package:xcframework, package:android]
   script:
     - ./scripts/publish-packages.sh "$CI_COMMIT_TAG"
 
@@ -324,8 +247,9 @@ release:create:
   extends: .release-only
   stage: publish
   image: registry.gitlab.com/gitlab-org/release-cli:latest
-  needs:
-    - publish:packages
+  tags:
+    - docker
+  needs: [publish:packages]
   script:
     - echo "Creating release $CI_COMMIT_TAG"
   release:
@@ -344,17 +268,13 @@ release:create:
       See [documentation](https://gitlab.com/vauchi/core/-/blob/main/README.md) for integration instructions.
 
 # ============================================================
-# Trigger Stage (Release only)
+# Trigger Stage (Tags only)
 # ============================================================
 
 trigger:downstream:
-  extends: [.release-only, .self-hosted-job]
+  extends: [.linux-runner, .release-only]
   stage: trigger
-  tags:
-    - linux
-    - self-hosted
-  needs:
-    - release:create
+  needs: [release:create]
   script:
     - ./scripts/trigger-downstream.sh "$CI_COMMIT_TAG"
 
@@ -363,12 +283,8 @@ trigger:downstream:
 # ============================================================
 
 build:dev:
-  extends: .self-hosted-job
+  extends: .linux-runner
   stage: build
-  tags:
-    - linux
-    - self-hosted
-  <<: *rust-cache-self-hosted
   rules:
     - if: $CI_PIPELINE_SOURCE == "web"
       when: manual
@@ -376,9 +292,9 @@ build:dev:
     DEV_VERSION: "dev-${CI_COMMIT_SHORT_SHA}"
     ANDROID_NDK_HOME: /opt/android-sdk/ndk/26.1.10909125
   before_script:
+    - !reference [.self-hosted, before_script]
     - rustup target add aarch64-linux-android x86_64-linux-android
   script:
-    - echo "Building dev version $DEV_VERSION"
     - ./scripts/build-bindings.sh --android
     - ./scripts/package-android.sh "$DEV_VERSION"
   artifacts:

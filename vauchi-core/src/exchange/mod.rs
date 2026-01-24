@@ -66,13 +66,13 @@ pub use device_link::{
 };
 pub use encrypted_message::{DecryptedExchangePayload, EncryptedExchangeMessage};
 pub use error::ExchangeError;
+pub use nfc::{
+    create_nfc_tag, parse_nfc_payload, Introduction, NfcError, NfcTagCreationResult, NfcTagMode,
+    NfcTagPayload, ParsedNfcPayload, ProtectedNfcTagPayload,
+};
 pub use proximity::{
     ManualConfirmationVerifier, MockProximityVerifier, ProximityError, ProximityVerifier,
 };
 pub use qr::ExchangeQR;
 pub use session::{DuplicateAction, ExchangeEvent, ExchangeRole, ExchangeSession, ExchangeState};
-pub use nfc::{
-    create_nfc_tag, parse_nfc_payload, Introduction, NfcError, NfcTagCreationResult,
-    NfcTagMode, NfcTagPayload, ParsedNfcPayload, ProtectedNfcTagPayload,
-};
 pub use x3dh::{X3DHKeyPair, X3DH};

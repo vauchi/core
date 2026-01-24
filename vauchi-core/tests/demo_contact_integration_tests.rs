@@ -92,7 +92,10 @@ fn test_demo_tips_advance() {
 
     let next_tip = state.advance_to_next_tip();
     assert!(next_tip.is_some());
-    assert_ne!(state.current_tip_index, initial_index, "Index should advance");
+    assert_ne!(
+        state.current_tip_index, initial_index,
+        "Index should advance"
+    );
     assert_eq!(state.update_count, 1, "Update count should increment");
 }
 
@@ -103,7 +106,10 @@ fn test_demo_update_due_check() {
     let state = DemoContactState::new_active();
 
     // Just created, update not due yet
-    assert!(!state.is_update_due(), "Update should not be due immediately");
+    assert!(
+        !state.is_update_due(),
+        "Update should not be due immediately"
+    );
 }
 
 // ============================================================
@@ -311,7 +317,10 @@ fn test_update_history_persists() {
     let restored = DemoContactState::from_json(&json).unwrap();
 
     assert_eq!(restored.update_count, 3, "Update count should persist");
-    assert!(!restored.shown_tip_ids.is_empty(), "Shown tips should persist");
+    assert!(
+        !restored.shown_tip_ids.is_empty(),
+        "Shown tips should persist"
+    );
 }
 
 // ============================================================

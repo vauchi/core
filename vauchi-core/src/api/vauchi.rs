@@ -853,9 +853,7 @@ impl<T: Transport> Vauchi<T> {
     // === Demo Contact Operations ===
 
     /// Gets the current demo contact state.
-    pub fn demo_contact_state(
-        &self,
-    ) -> VauchiResult<crate::demo_contact::DemoContactState> {
+    pub fn demo_contact_state(&self) -> VauchiResult<crate::demo_contact::DemoContactState> {
         Ok(self.storage.load_or_create_demo_contact_state()?)
     }
 
@@ -865,9 +863,7 @@ impl<T: Transport> Vauchi<T> {
     }
 
     /// Gets the current demo contact card (if active).
-    pub fn demo_contact_card(
-        &self,
-    ) -> VauchiResult<Option<crate::demo_contact::DemoContactCard>> {
+    pub fn demo_contact_card(&self) -> VauchiResult<Option<crate::demo_contact::DemoContactCard>> {
         let state = self.storage.load_or_create_demo_contact_state()?;
         if !state.is_active {
             return Ok(None);
@@ -881,9 +877,7 @@ impl<T: Transport> Vauchi<T> {
     /// Advances the demo contact to the next tip.
     ///
     /// Returns the new tip if successful.
-    pub fn advance_demo_contact(
-        &self,
-    ) -> VauchiResult<Option<crate::demo_contact::DemoTip>> {
+    pub fn advance_demo_contact(&self) -> VauchiResult<Option<crate::demo_contact::DemoTip>> {
         let mut state = self.storage.load_or_create_demo_contact_state()?;
         if !state.is_active {
             return Ok(None);

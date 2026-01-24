@@ -10,11 +10,11 @@
 //! - Proximity verification
 
 use std::time::Duration;
-use vauchi_core::exchange::{
-    BLEAdvertisement, BLEDevice, BLEExchangeSession, BLEExchangeState,
-    BLEProximityVerifier, MockBLEVerifier, ProximityError, ProximityVerifier,
-};
 use vauchi_core::crypto::SigningKeyPair;
+use vauchi_core::exchange::{
+    BLEAdvertisement, BLEDevice, BLEExchangeSession, BLEExchangeState, BLEProximityVerifier,
+    MockBLEVerifier, ProximityError, ProximityVerifier,
+};
 
 // ============================================================
 // BLE Advertisement
@@ -57,7 +57,10 @@ fn test_advertisement_payload_size() {
 
     // BLE advertisement data max is 31 bytes for legacy, 254 for extended
     // We use scan response for additional data, total ~62 bytes legacy
-    assert!(payload.len() <= 200, "Payload should fit in extended advertisement");
+    assert!(
+        payload.len() <= 200,
+        "Payload should fit in extended advertisement"
+    );
 }
 
 /// Test: Parse advertisement from bytes
@@ -97,14 +100,14 @@ fn test_discover_nearby_devices() {
 #[test]
 fn test_filter_devices_with_exchange_token() {
     let token = [42u8; 32];
-    let device_with_token = BLEDevice::new("device-1", -50)
-        .with_exchange_token(token);
+    let device_with_token = BLEDevice::new("device-1", -50).with_exchange_token(token);
     let device_without = BLEDevice::new("device-2", -60);
 
     let mock = MockBLEVerifier::new(vec![device_with_token, device_without], 1.0);
     let devices = mock.discover_nearby(Duration::from_secs(5)).unwrap();
 
-    let vauchi_devices: Vec<_> = devices.iter()
+    let vauchi_devices: Vec<_> = devices
+        .iter()
         .filter(|d| d.exchange_token.is_some())
         .collect();
 
@@ -155,7 +158,9 @@ fn test_start_advertising() {
     let keypair = SigningKeyPair::generate();
     let mut session = BLEExchangeSession::new(&keypair);
 
-    session.start_advertising().expect("Should start advertising");
+    session
+        .start_advertising()
+        .expect("Should start advertising");
 
     assert!(matches!(session.state(), BLEExchangeState::Advertising));
 }
@@ -177,13 +182,15 @@ fn test_connect_to_device() {
     let keypair = SigningKeyPair::generate();
     let mut session = BLEExchangeSession::new(&keypair);
 
-    let device = BLEDevice::new("peer-device", -50)
-        .with_exchange_token([1u8; 32]);
+    let device = BLEDevice::new("peer-device", -50).with_exchange_token([1u8; 32]);
 
     session.start_scanning().unwrap();
     session.connect_to_device(&device).expect("Should connect");
 
-    assert!(matches!(session.state(), BLEExchangeState::Connected { .. }));
+    assert!(matches!(
+        session.state(),
+        BLEExchangeState::Connected { .. }
+    ));
 }
 
 /// Test: Exchange contact data
@@ -272,7 +279,8 @@ fn test_proximity_challenge_response() {
 
     verifier.emit_challenge(&challenge).expect("Should emit");
 
-    let response = verifier.listen_for_response(Duration::from_secs(5))
+    let response = verifier
+        .listen_for_response(Duration::from_secs(5))
         .expect("Should receive response");
 
     assert!(verifier.verify_response(&challenge, &response));
@@ -326,7 +334,10 @@ fn test_cannot_exchange_without_connection() {
 
     let result = session.get_peer_contact_data();
 
-    assert!(result.is_none(), "Should not have peer data without connection");
+    assert!(
+        result.is_none(),
+        "Should not have peer data without connection"
+    );
 }
 
 // ============================================================

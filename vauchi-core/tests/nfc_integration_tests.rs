@@ -27,8 +27,8 @@ fn test_create_open_nfc_tag() {
     let relay_url = "wss://relay.vauchi.app";
     let mailbox_id = [0u8; 32];
 
-    let tag_result =
-        create_nfc_tag(&keypair, relay_url, &mailbox_id, NfcTagMode::Open).expect("Should create tag");
+    let tag_result = create_nfc_tag(&keypair, relay_url, &mailbox_id, NfcTagMode::Open)
+        .expect("Should create tag");
 
     let payload = tag_result.payload();
     assert_eq!(payload.magic(), b"VBMB");
@@ -278,7 +278,8 @@ fn test_introduction_wrong_password_fails() {
 
     // Try to decrypt with wrong password
     let salt = tag_result.payload().password_salt().unwrap();
-    let result = intro.decrypt_with_exchange_key(tag_result.exchange_keypair(), Some(("wrong", salt)));
+    let result =
+        intro.decrypt_with_exchange_key(tag_result.exchange_keypair(), Some(("wrong", salt)));
     assert!(result.is_err(), "Wrong password should fail decryption");
 }
 
@@ -376,8 +377,12 @@ fn test_introduction_serialization() {
     let tag_result =
         create_nfc_tag(&tag_owner_keypair, relay_url, &mailbox_id, NfcTagMode::Open).unwrap();
 
-    let intro = Introduction::create(&scanner_keypair, tag_result.payload(), "test data".as_bytes())
-        .unwrap();
+    let intro = Introduction::create(
+        &scanner_keypair,
+        tag_result.payload(),
+        "test data".as_bytes(),
+    )
+    .unwrap();
 
     let json = serde_json::to_string(&intro).expect("Should serialize");
     let restored: Introduction = serde_json::from_str(&json).expect("Should deserialize");

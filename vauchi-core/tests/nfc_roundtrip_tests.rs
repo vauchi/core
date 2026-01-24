@@ -23,25 +23,16 @@ fn test_open_tag_full_roundtrip() {
     let contact_data = b"Scanner's contact card data";
 
     // 1. Tag owner creates NFC tag (returns payload + private key for storage)
-    let tag_result = create_nfc_tag(
-        &tag_owner_keypair,
-        relay_url,
-        &mailbox_id,
-        NfcTagMode::Open,
-    )
-    .expect("Should create tag");
+    let tag_result = create_nfc_tag(&tag_owner_keypair, relay_url, &mailbox_id, NfcTagMode::Open)
+        .expect("Should create tag");
 
     // Verify payload is valid
     assert!(!tag_result.payload().is_password_protected());
     assert_eq!(tag_result.payload().relay_url(), relay_url);
 
     // 2. Scanner creates introduction encrypted to tag's exchange key
-    let intro = Introduction::create(
-        &scanner_keypair,
-        tag_result.payload(),
-        contact_data,
-    )
-    .expect("Should create introduction");
+    let intro = Introduction::create(&scanner_keypair, tag_result.payload(), contact_data)
+        .expect("Should create introduction");
 
     assert!(!intro.ciphertext().is_empty());
 
@@ -89,7 +80,10 @@ fn test_protected_tag_full_roundtrip() {
     .expect("Should create introduction");
 
     // 3. Tag owner decrypts with stored key, password, and salt from payload
-    let salt = tag_result.payload().password_salt().expect("Protected tag should have salt");
+    let salt = tag_result
+        .payload()
+        .password_salt()
+        .expect("Protected tag should have salt");
     let decrypted = intro
         .decrypt_with_exchange_key(tag_result.exchange_keypair(), Some((password, salt)))
         .expect("Should decrypt introduction");
@@ -129,7 +123,8 @@ fn test_wrong_password_fails_decryption() {
 
     // Decryption with wrong password should fail
     let salt = tag_result.payload().password_salt().unwrap();
-    let result = intro.decrypt_with_exchange_key(tag_result.exchange_keypair(), Some((wrong_password, salt)));
+    let result = intro
+        .decrypt_with_exchange_key(tag_result.exchange_keypair(), Some((wrong_password, salt)));
     assert!(result.is_err(), "Wrong password should fail decryption");
 }
 
@@ -142,13 +137,8 @@ fn test_wrong_exchange_key_fails_decryption() {
     let mailbox_id = [0u8; 32];
 
     // Create tag
-    let tag_result = create_nfc_tag(
-        &tag_owner_keypair,
-        relay_url,
-        &mailbox_id,
-        NfcTagMode::Open,
-    )
-    .unwrap();
+    let tag_result =
+        create_nfc_tag(&tag_owner_keypair, relay_url, &mailbox_id, NfcTagMode::Open).unwrap();
 
     // Create introduction
     let intro = Introduction::create(&scanner_keypair, tag_result.payload(), b"data").unwrap();

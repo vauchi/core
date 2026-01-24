@@ -131,11 +131,7 @@ fn test_missing_key_handling() {
 /// Test: String interpolation with arguments
 #[test]
 fn test_string_interpolation() {
-    let result = get_string_with_args(
-        Locale::English,
-        "contacts.count",
-        &[("count", "5")],
-    );
+    let result = get_string_with_args(Locale::English, "contacts.count", &[("count", "5")]);
     assert!(result.contains("5"), "Should interpolate count");
 }
 
@@ -169,12 +165,7 @@ fn test_interpolation_across_locales() {
 /// Test: Navigation strings exist
 #[test]
 fn test_navigation_strings() {
-    let keys = [
-        "nav.home",
-        "nav.contacts",
-        "nav.exchange",
-        "nav.settings",
-    ];
+    let keys = ["nav.home", "nav.contacts", "nav.exchange", "nav.settings"];
 
     for key in keys {
         let en = get_string(Locale::English, key);
@@ -210,11 +201,7 @@ fn test_action_strings() {
 /// Test: Error strings exist
 #[test]
 fn test_error_strings() {
-    let keys = [
-        "error.generic",
-        "error.network",
-        "error.validation",
-    ];
+    let keys = ["error.generic", "error.network", "error.validation"];
 
     for key in keys {
         let en = get_string(Locale::English, key);

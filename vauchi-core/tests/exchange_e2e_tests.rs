@@ -6,8 +6,8 @@
 //! Feature file: features/contact_exchange.feature @e2e
 
 use vauchi_core::exchange::{
-    ExchangeEvent, ExchangeQR, ExchangeRole, ExchangeSession, ExchangeState,
-    MockProximityVerifier, X3DH, X3DHKeyPair,
+    ExchangeEvent, ExchangeQR, ExchangeRole, ExchangeSession, ExchangeState, MockProximityVerifier,
+    X3DHKeyPair, X3DH,
 };
 use vauchi_core::{ContactCard, Identity};
 
@@ -178,7 +178,8 @@ fn test_wrong_ephemeral_produces_different_key() {
     let bob_keys = X3DHKeyPair::generate();
 
     // Bob initiates
-    let (bob_secret, _correct_ephemeral) = X3DH::initiate(&bob_keys, alice_keys.public_key()).unwrap();
+    let (bob_secret, _correct_ephemeral) =
+        X3DH::initiate(&bob_keys, alice_keys.public_key()).unwrap();
 
     // Alice responds with WRONG ephemeral (simulating attack/bug)
     let wrong_ephemeral = [0u8; 32];

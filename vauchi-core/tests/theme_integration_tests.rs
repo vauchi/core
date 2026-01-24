@@ -75,8 +75,14 @@ fn test_theme_colors_complete() {
 fn test_theme_modes() {
     let themes = get_bundled_themes();
 
-    let dark_themes: Vec<_> = themes.iter().filter(|t| t.mode == ThemeMode::Dark).collect();
-    let light_themes: Vec<_> = themes.iter().filter(|t| t.mode == ThemeMode::Light).collect();
+    let dark_themes: Vec<_> = themes
+        .iter()
+        .filter(|t| t.mode == ThemeMode::Dark)
+        .collect();
+    let light_themes: Vec<_> = themes
+        .iter()
+        .filter(|t| t.mode == ThemeMode::Light)
+        .collect();
 
     assert!(!dark_themes.is_empty(), "Should have dark themes");
     assert!(!light_themes.is_empty(), "Should have light themes");

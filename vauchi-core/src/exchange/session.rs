@@ -260,7 +260,11 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
                 their_public_key,
                 their_exchange_key,
                 their_qr,
-            } => (*their_public_key, *their_exchange_key, *their_qr.audio_challenge()),
+            } => (
+                *their_public_key,
+                *their_exchange_key,
+                *their_qr.audio_challenge(),
+            ),
             ExchangeState::AwaitingScan { qr } => {
                 // Initiator waits for proximity challenge from responder
                 // Initiator doesn't have their exchange key yet - will receive ephemeral
@@ -372,7 +376,9 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
             ExchangeState::AwaitingProximity {
                 their_public_key, ..
             }
-            | ExchangeState::AwaitingKeyAgreement { their_public_key, .. }
+            | ExchangeState::AwaitingKeyAgreement {
+                their_public_key, ..
+            }
             | ExchangeState::AwaitingCardExchange {
                 their_public_key, ..
             } => Some(their_public_key),

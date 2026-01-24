@@ -212,10 +212,7 @@ impl<'a> SyncManager<'a> {
 
         if pending.is_empty() {
             // Get actual last sync time from storage
-            let last_sync = self
-                .storage
-                .get_contact_last_sync(contact_id)?
-                .unwrap_or(0);
+            let last_sync = self.storage.get_contact_last_sync(contact_id)?.unwrap_or(0);
             return Ok(SyncState::Synced { last_sync });
         }
 

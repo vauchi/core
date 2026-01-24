@@ -149,9 +149,7 @@ impl Storage {
     }
 
     /// Loads both aha tracker and demo contact state.
-    pub fn load_ux_state(
-        &self,
-    ) -> Result<(AhaMomentTracker, DemoContactState), StorageError> {
+    pub fn load_ux_state(&self) -> Result<(AhaMomentTracker, DemoContactState), StorageError> {
         let aha_tracker = self.load_or_create_aha_tracker()?;
         let demo_state = self.load_or_create_demo_contact_state()?;
         Ok((aha_tracker, demo_state))

@@ -86,7 +86,12 @@ pub fn get_locale_info(locale: Locale) -> LocaleInfo {
 
 /// Get all available locales
 pub fn get_available_locales() -> Vec<Locale> {
-    vec![Locale::English, Locale::German, Locale::French, Locale::Spanish]
+    vec![
+        Locale::English,
+        Locale::German,
+        Locale::French,
+        Locale::Spanish,
+    ]
 }
 
 /// Get a localized string by key
@@ -141,7 +146,10 @@ fn english_strings() -> HashMap<String, String> {
 
     // Welcome
     m.insert("welcome.title".into(), "Welcome to Vauchi".into());
-    m.insert("welcome.subtitle".into(), "Privacy-focused contact cards that update automatically".into());
+    m.insert(
+        "welcome.subtitle".into(),
+        "Privacy-focused contact cards that update automatically".into(),
+    );
 
     // Navigation
     m.insert("nav.home".into(), "Home".into());
@@ -160,7 +168,10 @@ fn english_strings() -> HashMap<String, String> {
     m.insert("exchange.title".into(), "Exchange".into());
     m.insert("exchange.scan".into(), "Scan QR Code".into());
     m.insert("exchange.show".into(), "Show My QR Code".into());
-    m.insert("exchange.instruction".into(), "Scan a contact's QR code to exchange cards".into());
+    m.insert(
+        "exchange.instruction".into(),
+        "Scan a contact's QR code to exchange cards".into(),
+    );
 
     // Settings
     m.insert("settings.title".into(), "Settings".into());
@@ -192,12 +203,21 @@ fn english_strings() -> HashMap<String, String> {
 
     // Errors
     m.insert("error.generic".into(), "Something went wrong".into());
-    m.insert("error.network".into(), "Network error. Please check your connection.".into());
+    m.insert(
+        "error.network".into(),
+        "Network error. Please check your connection.".into(),
+    );
     m.insert("error.validation".into(), "Please check your input".into());
 
     // Updates
-    m.insert("update.sent".into(), "Update sent to {count} contacts".into());
-    m.insert("update.received".into(), "Update received from {name}".into());
+    m.insert(
+        "update.sent".into(),
+        "Update sent to {count} contacts".into(),
+    );
+    m.insert(
+        "update.received".into(),
+        "Update received from {name}".into(),
+    );
 
     // Card
     m.insert("card.title".into(), "My Card".into());
@@ -216,11 +236,17 @@ fn german_strings() -> HashMap<String, String> {
 
     // App
     m.insert("app.name".into(), "Vauchi".into());
-    m.insert("app.tagline".into(), "Datenschutzfreundliche Kontaktkarten".into());
+    m.insert(
+        "app.tagline".into(),
+        "Datenschutzfreundliche Kontaktkarten".into(),
+    );
 
     // Welcome
     m.insert("welcome.title".into(), "Willkommen bei Vauchi".into());
-    m.insert("welcome.subtitle".into(), "Datenschutzfreundliche Kontaktkarten, die sich automatisch aktualisieren".into());
+    m.insert(
+        "welcome.subtitle".into(),
+        "Datenschutzfreundliche Kontaktkarten, die sich automatisch aktualisieren".into(),
+    );
 
     // Navigation
     m.insert("nav.home".into(), "Start".into());
@@ -239,7 +265,10 @@ fn german_strings() -> HashMap<String, String> {
     m.insert("exchange.title".into(), "Austausch".into());
     m.insert("exchange.scan".into(), "QR-Code scannen".into());
     m.insert("exchange.show".into(), "Meinen QR-Code zeigen".into());
-    m.insert("exchange.instruction".into(), "Scannen Sie den QR-Code eines Kontakts, um Karten auszutauschen".into());
+    m.insert(
+        "exchange.instruction".into(),
+        "Scannen Sie den QR-Code eines Kontakts, um Karten auszutauschen".into(),
+    );
 
     // Settings
     m.insert("settings.title".into(), "Einstellungen".into());
@@ -271,12 +300,24 @@ fn german_strings() -> HashMap<String, String> {
 
     // Errors
     m.insert("error.generic".into(), "Etwas ist schiefgelaufen".into());
-    m.insert("error.network".into(), "Netzwerkfehler. Bitte prüfen Sie Ihre Verbindung.".into());
-    m.insert("error.validation".into(), "Bitte überprüfen Sie Ihre Eingabe".into());
+    m.insert(
+        "error.network".into(),
+        "Netzwerkfehler. Bitte prüfen Sie Ihre Verbindung.".into(),
+    );
+    m.insert(
+        "error.validation".into(),
+        "Bitte überprüfen Sie Ihre Eingabe".into(),
+    );
 
     // Updates
-    m.insert("update.sent".into(), "Update an {count} Kontakte gesendet".into());
-    m.insert("update.received".into(), "Update von {name} erhalten".into());
+    m.insert(
+        "update.sent".into(),
+        "Update an {count} Kontakte gesendet".into(),
+    );
+    m.insert(
+        "update.received".into(),
+        "Update von {name} erhalten".into(),
+    );
 
     // Card
     m.insert("card.title".into(), "Meine Karte".into());
@@ -295,11 +336,17 @@ fn french_strings() -> HashMap<String, String> {
 
     // App
     m.insert("app.name".into(), "Vauchi".into());
-    m.insert("app.tagline".into(), "Cartes de contact axées sur la confidentialité".into());
+    m.insert(
+        "app.tagline".into(),
+        "Cartes de contact axées sur la confidentialité".into(),
+    );
 
     // Welcome
     m.insert("welcome.title".into(), "Bienvenue sur Vauchi".into());
-    m.insert("welcome.subtitle".into(), "Cartes de contact confidentielles qui se mettent à jour automatiquement".into());
+    m.insert(
+        "welcome.subtitle".into(),
+        "Cartes de contact confidentielles qui se mettent à jour automatiquement".into(),
+    );
 
     // Navigation
     m.insert("nav.home".into(), "Accueil".into());
@@ -318,7 +365,10 @@ fn french_strings() -> HashMap<String, String> {
     m.insert("exchange.title".into(), "Échange".into());
     m.insert("exchange.scan".into(), "Scanner le code QR".into());
     m.insert("exchange.show".into(), "Afficher mon code QR".into());
-    m.insert("exchange.instruction".into(), "Scannez le code QR d'un contact pour échanger des cartes".into());
+    m.insert(
+        "exchange.instruction".into(),
+        "Scannez le code QR d'un contact pour échanger des cartes".into(),
+    );
 
     // Settings
     m.insert("settings.title".into(), "Paramètres".into());
@@ -350,12 +400,24 @@ fn french_strings() -> HashMap<String, String> {
 
     // Errors
     m.insert("error.generic".into(), "Une erreur s'est produite".into());
-    m.insert("error.network".into(), "Erreur réseau. Veuillez vérifier votre connexion.".into());
-    m.insert("error.validation".into(), "Veuillez vérifier votre saisie".into());
+    m.insert(
+        "error.network".into(),
+        "Erreur réseau. Veuillez vérifier votre connexion.".into(),
+    );
+    m.insert(
+        "error.validation".into(),
+        "Veuillez vérifier votre saisie".into(),
+    );
 
     // Updates
-    m.insert("update.sent".into(), "Mise à jour envoyée à {count} contacts".into());
-    m.insert("update.received".into(), "Mise à jour reçue de {name}".into());
+    m.insert(
+        "update.sent".into(),
+        "Mise à jour envoyée à {count} contacts".into(),
+    );
+    m.insert(
+        "update.received".into(),
+        "Mise à jour reçue de {name}".into(),
+    );
 
     // Card
     m.insert("card.title".into(), "Ma carte".into());
@@ -374,11 +436,17 @@ fn spanish_strings() -> HashMap<String, String> {
 
     // App
     m.insert("app.name".into(), "Vauchi".into());
-    m.insert("app.tagline".into(), "Tarjetas de contacto centradas en la privacidad".into());
+    m.insert(
+        "app.tagline".into(),
+        "Tarjetas de contacto centradas en la privacidad".into(),
+    );
 
     // Welcome
     m.insert("welcome.title".into(), "Bienvenido a Vauchi".into());
-    m.insert("welcome.subtitle".into(), "Tarjetas de contacto con privacidad que se actualizan automáticamente".into());
+    m.insert(
+        "welcome.subtitle".into(),
+        "Tarjetas de contacto con privacidad que se actualizan automáticamente".into(),
+    );
 
     // Navigation
     m.insert("nav.home".into(), "Inicio".into());
@@ -397,7 +465,10 @@ fn spanish_strings() -> HashMap<String, String> {
     m.insert("exchange.title".into(), "Intercambio".into());
     m.insert("exchange.scan".into(), "Escanear código QR".into());
     m.insert("exchange.show".into(), "Mostrar mi código QR".into());
-    m.insert("exchange.instruction".into(), "Escanea el código QR de un contacto para intercambiar tarjetas".into());
+    m.insert(
+        "exchange.instruction".into(),
+        "Escanea el código QR de un contacto para intercambiar tarjetas".into(),
+    );
 
     // Settings
     m.insert("settings.title".into(), "Ajustes".into());
@@ -429,12 +500,24 @@ fn spanish_strings() -> HashMap<String, String> {
 
     // Errors
     m.insert("error.generic".into(), "Algo salió mal".into());
-    m.insert("error.network".into(), "Error de red. Por favor, comprueba tu conexión.".into());
-    m.insert("error.validation".into(), "Por favor, revisa tu entrada".into());
+    m.insert(
+        "error.network".into(),
+        "Error de red. Por favor, comprueba tu conexión.".into(),
+    );
+    m.insert(
+        "error.validation".into(),
+        "Por favor, revisa tu entrada".into(),
+    );
 
     // Updates
-    m.insert("update.sent".into(), "Actualización enviada a {count} contactos".into());
-    m.insert("update.received".into(), "Actualización recibida de {name}".into());
+    m.insert(
+        "update.sent".into(),
+        "Actualización enviada a {count} contactos".into(),
+    );
+    m.insert(
+        "update.received".into(),
+        "Actualización recibida de {name}".into(),
+    );
 
     // Card
     m.insert("card.title".into(), "Mi tarjeta".into());

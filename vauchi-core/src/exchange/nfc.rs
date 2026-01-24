@@ -18,75 +18,105 @@ use crate::exchange::X3DHKeyPair;
 mod hex_array_12 {
     use serde::{Deserialize, Deserializer, Serializer};
     pub fn serialize<S>(bytes: &[u8; 12], serializer: S) -> Result<S::Ok, S::Error>
-    where S: Serializer {
+    where
+        S: Serializer,
+    {
         serializer.serialize_str(&hex::encode(bytes))
     }
     pub fn deserialize<'de, D>(deserializer: D) -> Result<[u8; 12], D::Error>
-    where D: Deserializer<'de> {
+    where
+        D: Deserializer<'de>,
+    {
         let s = String::deserialize(deserializer)?;
         let bytes = hex::decode(&s).map_err(serde::de::Error::custom)?;
-        bytes.try_into().map_err(|_| serde::de::Error::custom("invalid length"))
+        bytes
+            .try_into()
+            .map_err(|_| serde::de::Error::custom("invalid length"))
     }
 }
 
 mod hex_array_16 {
     use serde::{Deserialize, Deserializer, Serializer};
     pub fn serialize<S>(bytes: &[u8; 16], serializer: S) -> Result<S::Ok, S::Error>
-    where S: Serializer {
+    where
+        S: Serializer,
+    {
         serializer.serialize_str(&hex::encode(bytes))
     }
     pub fn deserialize<'de, D>(deserializer: D) -> Result<[u8; 16], D::Error>
-    where D: Deserializer<'de> {
+    where
+        D: Deserializer<'de>,
+    {
         let s = String::deserialize(deserializer)?;
         let bytes = hex::decode(&s).map_err(serde::de::Error::custom)?;
-        bytes.try_into().map_err(|_| serde::de::Error::custom("invalid length"))
+        bytes
+            .try_into()
+            .map_err(|_| serde::de::Error::custom("invalid length"))
     }
 }
 
 pub mod hex_array_32 {
     use serde::{Deserialize, Deserializer, Serializer};
     pub fn serialize<S>(bytes: &[u8; 32], serializer: S) -> Result<S::Ok, S::Error>
-    where S: Serializer {
+    where
+        S: Serializer,
+    {
         serializer.serialize_str(&hex::encode(bytes))
     }
     pub fn deserialize<'de, D>(deserializer: D) -> Result<[u8; 32], D::Error>
-    where D: Deserializer<'de> {
+    where
+        D: Deserializer<'de>,
+    {
         let s = String::deserialize(deserializer)?;
         let bytes = hex::decode(&s).map_err(serde::de::Error::custom)?;
-        bytes.try_into().map_err(|_| serde::de::Error::custom("invalid length"))
+        bytes
+            .try_into()
+            .map_err(|_| serde::de::Error::custom("invalid length"))
     }
 }
 
 mod hex_array_64 {
     use serde::{Deserialize, Deserializer, Serializer};
     pub fn serialize<S>(bytes: &[u8; 64], serializer: S) -> Result<S::Ok, S::Error>
-    where S: Serializer {
+    where
+        S: Serializer,
+    {
         serializer.serialize_str(&hex::encode(bytes))
     }
     pub fn deserialize<'de, D>(deserializer: D) -> Result<[u8; 64], D::Error>
-    where D: Deserializer<'de> {
+    where
+        D: Deserializer<'de>,
+    {
         let s = String::deserialize(deserializer)?;
         let bytes = hex::decode(&s).map_err(serde::de::Error::custom)?;
-        bytes.try_into().map_err(|_| serde::de::Error::custom("invalid length"))
+        bytes
+            .try_into()
+            .map_err(|_| serde::de::Error::custom("invalid length"))
     }
 }
 
 mod option_hex_array_32 {
     use serde::{Deserialize, Deserializer, Serializer};
     pub fn serialize<S>(bytes: &Option<[u8; 32]>, serializer: S) -> Result<S::Ok, S::Error>
-    where S: Serializer {
+    where
+        S: Serializer,
+    {
         match bytes {
             Some(b) => serializer.serialize_some(&hex::encode(b)),
             None => serializer.serialize_none(),
         }
     }
     pub fn deserialize<'de, D>(deserializer: D) -> Result<Option<[u8; 32]>, D::Error>
-    where D: Deserializer<'de> {
+    where
+        D: Deserializer<'de>,
+    {
         let opt: Option<String> = Option::deserialize(deserializer)?;
         match opt {
             Some(s) => {
                 let bytes = hex::decode(&s).map_err(serde::de::Error::custom)?;
-                let arr: [u8; 32] = bytes.try_into().map_err(|_| serde::de::Error::custom("invalid length"))?;
+                let arr: [u8; 32] = bytes
+                    .try_into()
+                    .map_err(|_| serde::de::Error::custom("invalid length"))?;
                 Ok(Some(arr))
             }
             None => Ok(None),
@@ -97,11 +127,15 @@ mod option_hex_array_32 {
 mod hex_vec {
     use serde::{Deserialize, Deserializer, Serializer};
     pub fn serialize<S>(bytes: &[u8], serializer: S) -> Result<S::Ok, S::Error>
-    where S: Serializer {
+    where
+        S: Serializer,
+    {
         serializer.serialize_str(&hex::encode(bytes))
     }
     pub fn deserialize<'de, D>(deserializer: D) -> Result<Vec<u8>, D::Error>
-    where D: Deserializer<'de> {
+    where
+        D: Deserializer<'de>,
+    {
         let s = String::deserialize(deserializer)?;
         hex::decode(&s).map_err(serde::de::Error::custom)
     }
@@ -513,8 +547,8 @@ fn parse_open_payload(bytes: &[u8]) -> Result<ParsedNfcPayload, NfcError> {
         return Err(NfcError::InvalidLength);
     }
 
-    let relay_url = String::from_utf8(bytes[66..66 + url_len].to_vec())
-        .map_err(|_| NfcError::InvalidLength)?;
+    let relay_url =
+        String::from_utf8(bytes[66..66 + url_len].to_vec()).map_err(|_| NfcError::InvalidLength)?;
 
     let offset = 66 + url_len;
     let mut mailbox_id = [0u8; 32];
@@ -549,8 +583,8 @@ fn parse_protected_payload(bytes: &[u8]) -> Result<ParsedNfcPayload, NfcError> {
         return Err(NfcError::InvalidLength);
     }
 
-    let relay_url = String::from_utf8(bytes[66..66 + url_len].to_vec())
-        .map_err(|_| NfcError::InvalidLength)?;
+    let relay_url =
+        String::from_utf8(bytes[66..66 + url_len].to_vec()).map_err(|_| NfcError::InvalidLength)?;
 
     let offset = 66 + url_len;
     let mut mailbox_id = [0u8; 32];
@@ -638,7 +672,12 @@ impl Introduction {
         contact_card_data: &[u8],
         password: &str,
     ) -> Result<Self, NfcError> {
-        Self::create_internal(sender_keypair, tag_payload, contact_card_data, Some(password))
+        Self::create_internal(
+            sender_keypair,
+            tag_payload,
+            contact_card_data,
+            Some(password),
+        )
     }
 
     fn create_internal(

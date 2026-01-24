@@ -10,9 +10,7 @@
 //! - Failover behavior
 
 use std::time::Duration;
-use vauchi_core::network::{
-    MultiRelayConfig, RelayHealth, RelaySelector,
-};
+use vauchi_core::network::{MultiRelayConfig, RelayHealth, RelaySelector};
 
 // ============================================================
 // Multi-Relay Configuration
@@ -30,7 +28,10 @@ fn test_multi_relay_config_creation() {
         .expect("Should create config");
 
     assert_eq!(config.relay_count(), 3);
-    assert!(config.relays().iter().any(|r| r == "wss://relay1.vauchi.app"));
+    assert!(config
+        .relays()
+        .iter()
+        .any(|r| r == "wss://relay1.vauchi.app"));
 }
 
 /// Test: At least one relay required
@@ -266,7 +267,10 @@ fn test_connect_to_primary() {
     let result = client.connect();
     assert!(result.is_ok());
     assert!(client.is_connected());
-    assert_eq!(client.active_relay(), Some("wss://primary.vauchi.app".to_string()));
+    assert_eq!(
+        client.active_relay(),
+        Some("wss://primary.vauchi.app".to_string())
+    );
 }
 
 /// Test: Failover to backup on primary failure
@@ -286,7 +290,10 @@ fn test_failover_to_backup() {
 
     let result = client.connect();
     assert!(result.is_ok());
-    assert_eq!(client.active_relay(), Some("wss://backup.vauchi.app".to_string()));
+    assert_eq!(
+        client.active_relay(),
+        Some("wss://backup.vauchi.app".to_string())
+    );
 }
 
 /// Test: Reconnect after disconnect

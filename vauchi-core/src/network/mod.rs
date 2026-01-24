@@ -107,4 +107,7 @@ pub use connection::ConnectionManager;
 pub use relay_client::{ProcessResult, RelayClient, RelayClientConfig};
 
 // Multi-relay support
-pub use multi_relay::{MultiRelayClient, MultiRelayConfig, MultiRelayConfigBuilder, MultiRelayError, RelayHealth, RelaySelector};
+pub use multi_relay::{
+    MultiRelayClient, MultiRelayConfig, MultiRelayConfigBuilder, MultiRelayError, RelayHealth,
+    RelaySelector,
+};

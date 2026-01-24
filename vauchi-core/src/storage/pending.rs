@@ -125,7 +125,10 @@ impl Storage {
     }
 
     /// Gets a single pending update by ID.
-    pub fn get_pending_update(&self, update_id: &str) -> Result<Option<PendingUpdate>, StorageError> {
+    pub fn get_pending_update(
+        &self,
+        update_id: &str,
+    ) -> Result<Option<PendingUpdate>, StorageError> {
         let result = self.conn.query_row(
             "SELECT id, contact_id, update_type, payload, created_at, retry_count, status, error_message, retry_at
              FROM pending_updates WHERE id = ?1",

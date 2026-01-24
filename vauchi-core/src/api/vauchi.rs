@@ -653,6 +653,145 @@ impl<T: Transport> Vauchi<T> {
         // We use their contact_id to check if they're in the allowed list
         Ok(contact.visibility_rules().can_see(field_id, contact_id))
     }
+
+    // === Field Validation Operations ===
+
+    /// Validates a contact's field.
+    ///
+    /// Creates a cryptographically signed validation record that attests
+    /// the current user believes the field value belongs to the contact.
+    ///
+    /// # Arguments
+    /// * `contact_id` - The contact whose field is being validated
+    /// * `field_id` - The field name (e.g., "twitter", "email")
+    /// * `field_value` - The current value of the field
+    ///
+    /// # Returns
+    /// The created validation record
+    pub fn validate_field(
+        &self,
+        contact_id: &str,
+        field_id: &str,
+        field_value: &str,
+    ) -> VauchiResult<crate::social::ProfileValidation> {
+        let identity = self
+            .identity
+            .as_ref()
+            .ok_or(VauchiError::IdentityNotInitialized)?;
+
+        // Check we're not validating our own field
+        let my_id = hex::encode(identity.signing_public_key());
+        if contact_id == my_id {
+            return Err(VauchiError::InvalidState(
+                "Cannot validate your own field".into(),
+            ));
+        }
+
+        // Check we haven't already validated this field
+        let validator_id = hex::encode(identity.signing_public_key());
+        if self
+            .storage
+            .has_validated(contact_id, field_id, &validator_id)?
+        {
+            return Err(VauchiError::InvalidState(
+                "You have already validated this field".into(),
+            ));
+        }
+
+        // Create signed validation
+        let validation = crate::social::ProfileValidation::create_signed(
+            identity,
+            field_id,
+            field_value,
+            contact_id,
+        );
+
+        // Store it
+        self.storage.save_validation(&validation)?;
+
+        Ok(validation)
+    }
+
+    /// Gets the validation status for a contact's field.
+    ///
+    /// Returns aggregated validation information including count, trust level,
+    /// and whether the current user has validated this field.
+    pub fn get_field_validation_status(
+        &self,
+        contact_id: &str,
+        field_id: &str,
+        field_value: &str,
+    ) -> VauchiResult<crate::social::ValidationStatus> {
+        let validations = self
+            .storage
+            .load_validations_for_field(contact_id, field_id)?;
+
+        // Get current user's ID if available
+        let my_id = self
+            .identity
+            .as_ref()
+            .map(|id| hex::encode(id.signing_public_key()));
+
+        // Get blocked contacts (empty for now, could be extended)
+        let blocked = std::collections::HashSet::new();
+
+        let status = crate::social::ValidationStatus::from_validations(
+            &validations,
+            field_value,
+            my_id.as_deref(),
+            &blocked,
+        );
+
+        Ok(status)
+    }
+
+    /// Revokes the current user's validation of a field.
+    ///
+    /// Returns true if a validation was revoked, false if none existed.
+    pub fn revoke_field_validation(&self, contact_id: &str, field_id: &str) -> VauchiResult<bool> {
+        let identity = self
+            .identity
+            .as_ref()
+            .ok_or(VauchiError::IdentityNotInitialized)?;
+
+        let validator_id = hex::encode(identity.signing_public_key());
+        let deleted = self
+            .storage
+            .delete_validation(contact_id, field_id, &validator_id)?;
+
+        Ok(deleted)
+    }
+
+    /// Lists all validations made by the current user.
+    ///
+    /// Returns a list of all fields the user has validated, sorted by
+    /// validation timestamp (most recent first).
+    pub fn list_my_validations(&self) -> VauchiResult<Vec<crate::social::ProfileValidation>> {
+        let identity = self
+            .identity
+            .as_ref()
+            .ok_or(VauchiError::IdentityNotInitialized)?;
+
+        let validator_id = hex::encode(identity.signing_public_key());
+        let validations = self.storage.load_validations_by_validator(&validator_id)?;
+
+        Ok(validations)
+    }
+
+    /// Checks if the current user has validated a specific field.
+    pub fn has_validated_field(&self, contact_id: &str, field_id: &str) -> VauchiResult<bool> {
+        let identity = self
+            .identity
+            .as_ref()
+            .ok_or(VauchiError::IdentityNotInitialized)?;
+
+        let validator_id = hex::encode(identity.signing_public_key());
+        let validated = self
+            .storage
+            .has_validated(contact_id, field_id, &validator_id)?;
+
+        Ok(validated)
+    }
 }
 
 /// Builder for creating Vauchi instances.

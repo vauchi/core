@@ -6,8 +6,8 @@
 //! Feature file: features/contact_exchange.feature @e2e
 
 use vauchi_core::exchange::{
-    ExchangeEvent, ExchangeQR, ExchangeRole, ExchangeSession, ExchangeState, MockProximityVerifier,
-    X3DHKeyPair, X3DH,
+    ExchangeEvent, ExchangeQR, ExchangeSession, ExchangeState, MockProximityVerifier, X3DHKeyPair,
+    X3DH,
 };
 use vauchi_core::{ContactCard, Identity};
 
@@ -73,10 +73,10 @@ fn test_full_exchange_produces_matching_shared_keys() {
         .unwrap();
 
     // Step 5: Complete exchange
-    let alice_contact = alice_session
+    let _alice_contact = alice_session
         .apply(ExchangeEvent::CompleteExchange(bob_card.clone()))
         .ok();
-    let bob_contact = bob_session
+    let _bob_contact = bob_session
         .apply(ExchangeEvent::CompleteExchange(alice_card.clone()))
         .ok();
 

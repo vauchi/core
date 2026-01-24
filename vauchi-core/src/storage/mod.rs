@@ -58,6 +58,11 @@ pub mod validation;
 #[cfg(not(feature = "testing"))]
 mod validation;
 
+#[cfg(feature = "testing")]
+pub mod ux;
+#[cfg(not(feature = "testing"))]
+mod ux;
+
 pub mod secure;
 
 pub use error::{
@@ -257,6 +262,14 @@ impl Storage {
                 validated_at INTEGER NOT NULL,
                 signature BLOB NOT NULL,
                 UNIQUE(contact_id, field_id, validator_id)
+            );
+
+            -- User experience state (aha moments, demo contact)
+            CREATE TABLE IF NOT EXISTS ux_state (
+                id INTEGER PRIMARY KEY CHECK (id = 1),
+                aha_tracker_json TEXT,
+                demo_contact_json TEXT,
+                updated_at INTEGER NOT NULL
             );
 
             -- Create indexes

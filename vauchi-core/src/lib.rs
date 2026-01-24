@@ -12,6 +12,7 @@ pub mod content;
 pub mod crypto;
 pub mod demo_contact;
 pub mod exchange;
+pub mod help;
 pub mod identity;
 #[cfg(any(feature = "network-native-tls", feature = "network-rustls"))]
 pub mod network;
@@ -40,6 +41,7 @@ pub use exchange::{
     EncryptedExchangeMessage, ExchangeError, ExchangeEvent, ExchangeQR, ExchangeSession,
     MockProximityVerifier, ProximityError, ProximityVerifier, X3DHKeyPair, X3DH,
 };
+pub use help::{get_faq_by_id, get_faqs, get_faqs_by_category, search_faqs, FaqItem, HelpCategory};
 pub use identity::{Identity, IdentityBackup};
 #[cfg(any(feature = "network-native-tls", feature = "network-rustls"))]
 pub use network::{

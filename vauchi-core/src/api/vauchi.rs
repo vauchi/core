@@ -792,6 +792,144 @@ impl<T: Transport> Vauchi<T> {
 
         Ok(validated)
     }
+
+    // === Aha Moments Operations ===
+
+    /// Tries to trigger an aha moment of the given type.
+    ///
+    /// Returns the moment if it should be shown (not yet seen).
+    /// Automatically persists the "seen" state.
+    pub fn try_trigger_aha_moment(
+        &self,
+        moment_type: crate::aha_moments::AhaMomentType,
+    ) -> VauchiResult<Option<crate::aha_moments::AhaMoment>> {
+        let mut tracker = self.storage.load_or_create_aha_tracker()?;
+        let moment = tracker.try_trigger(moment_type);
+        if moment.is_some() {
+            self.storage.save_aha_tracker(&tracker)?;
+        }
+        Ok(moment)
+    }
+
+    /// Tries to trigger an aha moment with context.
+    ///
+    /// Context is used for personalized messages (e.g., contact name).
+    pub fn try_trigger_aha_moment_with_context(
+        &self,
+        moment_type: crate::aha_moments::AhaMomentType,
+        context: String,
+    ) -> VauchiResult<Option<crate::aha_moments::AhaMoment>> {
+        let mut tracker = self.storage.load_or_create_aha_tracker()?;
+        let moment = tracker.try_trigger_with_context(moment_type, context);
+        if moment.is_some() {
+            self.storage.save_aha_tracker(&tracker)?;
+        }
+        Ok(moment)
+    }
+
+    /// Checks if an aha moment has been seen.
+    pub fn has_seen_aha_moment(
+        &self,
+        moment_type: crate::aha_moments::AhaMomentType,
+    ) -> VauchiResult<bool> {
+        let tracker = self.storage.load_or_create_aha_tracker()?;
+        Ok(tracker.has_seen(moment_type))
+    }
+
+    /// Gets the number of aha moments seen.
+    pub fn aha_moments_seen_count(&self) -> VauchiResult<usize> {
+        let tracker = self.storage.load_or_create_aha_tracker()?;
+        Ok(tracker.seen_count())
+    }
+
+    /// Resets all aha moments (for testing or demo replay).
+    pub fn reset_aha_moments(&self) -> VauchiResult<()> {
+        let mut tracker = self.storage.load_or_create_aha_tracker()?;
+        tracker.reset();
+        self.storage.save_aha_tracker(&tracker)?;
+        Ok(())
+    }
+
+    // === Demo Contact Operations ===
+
+    /// Gets the current demo contact state.
+    pub fn demo_contact_state(
+        &self,
+    ) -> VauchiResult<crate::demo_contact::DemoContactState> {
+        Ok(self.storage.load_or_create_demo_contact_state()?)
+    }
+
+    /// Checks if the demo contact is active.
+    pub fn is_demo_contact_active(&self) -> VauchiResult<bool> {
+        Ok(self.storage.is_demo_contact_active()?)
+    }
+
+    /// Gets the current demo contact card (if active).
+    pub fn demo_contact_card(
+        &self,
+    ) -> VauchiResult<Option<crate::demo_contact::DemoContactCard>> {
+        let state = self.storage.load_or_create_demo_contact_state()?;
+        if !state.is_active {
+            return Ok(None);
+        }
+        match state.current_tip() {
+            Some(tip) => Ok(Some(crate::demo_contact::generate_demo_contact_card(&tip))),
+            None => Ok(None),
+        }
+    }
+
+    /// Advances the demo contact to the next tip.
+    ///
+    /// Returns the new tip if successful.
+    pub fn advance_demo_contact(
+        &self,
+    ) -> VauchiResult<Option<crate::demo_contact::DemoTip>> {
+        let mut state = self.storage.load_or_create_demo_contact_state()?;
+        if !state.is_active {
+            return Ok(None);
+        }
+        let tip = state.advance_to_next_tip();
+        self.storage.save_demo_contact_state(&state)?;
+        Ok(tip)
+    }
+
+    /// Dismisses the demo contact (user-initiated).
+    pub fn dismiss_demo_contact(&self) -> VauchiResult<()> {
+        let mut state = self.storage.load_or_create_demo_contact_state()?;
+        state.dismiss();
+        self.storage.save_demo_contact_state(&state)?;
+        Ok(())
+    }
+
+    /// Auto-removes the demo contact (after first real exchange).
+    pub fn auto_remove_demo_contact(&self) -> VauchiResult<()> {
+        let mut state = self.storage.load_or_create_demo_contact_state()?;
+        state.auto_remove();
+        self.storage.save_demo_contact_state(&state)?;
+        Ok(())
+    }
+
+    /// Restores the demo contact from settings.
+    pub fn restore_demo_contact(&self) -> VauchiResult<()> {
+        let mut state = self.storage.load_or_create_demo_contact_state()?;
+        state.restore();
+        self.storage.save_demo_contact_state(&state)?;
+        Ok(())
+    }
+
+    /// Initializes the demo contact for a new user.
+    ///
+    /// Should be called after identity creation if user has no contacts.
+    pub fn initialize_demo_contact(&self) -> VauchiResult<()> {
+        // Only initialize if user has no real contacts
+        if self.contact_count()? > 0 {
+            return Ok(());
+        }
+
+        let state = crate::demo_contact::DemoContactState::new_active();
+        self.storage.save_demo_contact_state(&state)?;
+        Ok(())
+    }
 }
 
 /// Builder for creating Vauchi instances.

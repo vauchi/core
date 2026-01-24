@@ -107,7 +107,6 @@ DEVICE_DIR="$BUILD_DIR/ios-arm64"
 mkdir -p "$DEVICE_DIR/VauchiMobileFFI.framework"
 cp "$IOS_LIBS_DIR/libvauchi_mobile_device.a" "$DEVICE_DIR/VauchiMobileFFI.framework/VauchiMobileFFI"
 cp -r "$HEADERS_DIR" "$DEVICE_DIR/VauchiMobileFFI.framework/Headers"
-cp "$HEADERS_DIR/module.modulemap" "$DEVICE_DIR/VauchiMobileFFI.framework/Modules/"
 mkdir -p "$DEVICE_DIR/VauchiMobileFFI.framework/Modules"
 cp "$HEADERS_DIR/module.modulemap" "$DEVICE_DIR/VauchiMobileFFI.framework/Modules/"
 

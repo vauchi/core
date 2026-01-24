@@ -100,16 +100,16 @@ build:android:
     - linux
     - self-hosted
   variables:
-    ANDROID_NDK_HOME: /opt/android-ndk
+    ANDROID_NDK_HOME: $CI_PROJECT_DIR/.android-ndk
   before_script:
-    # Install Android NDK if not present
+    # Install Android NDK if not present (to project dir for permissions)
     - |
       if [[ ! -d "$ANDROID_NDK_HOME" ]]; then
         echo "Installing Android NDK..."
-        apt-get update && apt-get install -y wget unzip
         wget -q https://dl.google.com/android/repository/android-ndk-r26b-linux.zip
-        unzip -q android-ndk-r26b-linux.zip -d /opt
-        mv /opt/android-ndk-r26b /opt/android-ndk
+        unzip -q android-ndk-r26b-linux.zip
+        mv android-ndk-r26b "$ANDROID_NDK_HOME"
+        rm -f android-ndk-r26b-linux.zip
       fi
     # Install Rust Android targets
     - rustup target add aarch64-linux-android x86_64-linux-android

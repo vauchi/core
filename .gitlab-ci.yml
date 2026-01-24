@@ -63,10 +63,25 @@ variables:
       - target/release/
     policy: pull-push
 
+# Rust job template for self-hosted Linux runner
+# Note: Shared runners disabled, using self-hosted shell executor with SSH
 .rust-job:
-  image: rust:latest
   tags:
-    - docker
+    - linux
+    - self-hosted
+  variables:
+    # Skip GitLab's git clone, use SSH manually
+    GIT_STRATEGY: none
+  before_script:
+    # Clone via SSH (runner has deploy key configured)
+    - |
+      if [ ! -d ".git" ]; then
+        git clone --depth 20 --branch "${CI_COMMIT_REF_NAME}" "git@gitlab.com:${CI_PROJECT_PATH}.git" .
+      else
+        git remote set-url origin "git@gitlab.com:${CI_PROJECT_PATH}.git"
+        git fetch origin "${CI_COMMIT_REF_NAME}" --depth 20
+        git checkout -f "${CI_COMMIT_SHA}"
+      fi
   <<: *rust-cache
 
 .release-only:
@@ -124,7 +139,7 @@ test:coverage:
     - cargo install cargo-llvm-cov --locked || true
   script:
     - cargo llvm-cov --workspace --lcov --output-path lcov.info
-    - cargo llvm-cov report --workspace
+    - cargo llvm-cov report
   coverage: '/Total:\s+(\d+(?:\.\d+)?%)/'
   artifacts:
     reports:
@@ -144,8 +159,11 @@ test:coverage:
 # ============================================================
 
 # Override GitLab templates to run on correct events
+# Note: Security scanning requires Docker runners (shared runners disabled)
+# Allow failure until shared runners enabled or templates customized
 sast:
   stage: security
+  allow_failure: true
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
     - if: $CI_COMMIT_BRANCH == "main"
@@ -153,6 +171,7 @@ sast:
 
 dependency_scanning:
   stage: security
+  allow_failure: true
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
     - if: $CI_COMMIT_BRANCH == "main"
@@ -160,6 +179,7 @@ dependency_scanning:
 
 secret_detection:
   stage: security
+  allow_failure: true
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
     - if: $CI_COMMIT_BRANCH == "main"

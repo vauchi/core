@@ -36,6 +36,8 @@ variables:
 
 .rust-job:
   image: rust:latest
+  tags:
+    - docker
   <<: *rust-cache
 
 .release-only:

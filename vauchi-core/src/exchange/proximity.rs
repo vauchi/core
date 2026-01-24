@@ -115,7 +115,10 @@ impl MockProximityVerifier {
 
 impl ProximityVerifier for MockProximityVerifier {
     fn emit_challenge(&self, challenge: &[u8; 16]) -> Result<(), ProximityError> {
-        self.challenges.lock().expect("mutex poisoned").push(*challenge);
+        self.challenges
+            .lock()
+            .expect("mutex poisoned")
+            .push(*challenge);
         Ok(())
     }
 

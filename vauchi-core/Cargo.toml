@@ -1,9 +1,9 @@
 [package]
 name = "vauchi-core"
-version = "0.1.0"
-edition = "2021"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
 description = "Core library for Vauchi - privacy-focused contact card exchange"
-license = "MIT"
 
 [features]
 default = ["network"]

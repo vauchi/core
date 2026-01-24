@@ -2,22 +2,24 @@
 #
 # Core library and mobile bindings
 #
-# REMEDIATION PLAN (allow_failure jobs):
-# 1. lint:format - Run `cargo fmt --all` locally to fix formatting
-# 2. lint:clippy - Fix redundant closures in:
-#    - vauchi-core/src/storage/retry.rs:52,68,81
-#    - vauchi-core/src/storage/device_delivery.rs:59,134
-#    Replace `|row| row_to_fn(row)` with just `row_to_fn`
-# 3. test:unit - Ensure all tests pass with `cargo test --all-targets`
-# Once fixed, remove `allow_failure: true` from each job
+# Pipelines:
+#   - MR/main: lint, test
+#   - Tags (v*): lint, test, build, package, publish
 
 stages:
   - lint
   - test
+  - build
+  - package
+  - publish
 
 variables:
   CARGO_HOME: ${CI_PROJECT_DIR}/.cargo
   RUST_BACKTRACE: "1"
+
+# ============================================================
+# Templates
+# ============================================================
 
 .rust-cache: &rust-cache
   cache:
@@ -29,37 +31,190 @@ variables:
       - .cargo/git/db/
       - target/
 
-lint:format:
-  stage: lint
+.rust-job:
   image: rust:latest
   <<: *rust-cache
+
+.release-only:
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^v/
+
+.ci-only:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == "main"
+    - if: $CI_COMMIT_TAG =~ /^v/
+
+# ============================================================
+# Lint Stage
+# ============================================================
+
+lint:format:
+  extends: [.rust-job, .ci-only]
+  stage: lint
   script:
     - rustup component add rustfmt
     - cargo fmt --all -- --check
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-    - if: $CI_COMMIT_BRANCH == "main"
-  allow_failure: true  # Advisory until codebase is formatted
 
 lint:clippy:
+  extends: [.rust-job, .ci-only]
   stage: lint
-  image: rust:latest
-  <<: *rust-cache
   script:
     - rustup component add clippy
     - cargo clippy --all-targets -- -D warnings
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-    - if: $CI_COMMIT_BRANCH == "main"
-  allow_failure: true  # Advisory until clippy warnings are fixed
+
+# ============================================================
+# Test Stage
+# ============================================================
 
 test:unit:
+  extends: [.rust-job, .ci-only]
   stage: test
-  image: rust:latest
-  <<: *rust-cache
   script:
     - cargo test --all-targets
+
+# ============================================================
+# Build Stage (Release only)
+# ============================================================
+
+build:ios:
+  extends: .release-only
+  stage: build
+  tags:
+    - macos
+    - self-hosted
+  script:
+    - ./scripts/build-bindings.sh --ios
+    - ./scripts/validate-bindings.sh || true
+  artifacts:
+    paths:
+      - ../ios/Vauchi/Generated/
+      - ../ios/Vauchi/Libs/
+    expire_in: 1 day
+
+build:android:
+  extends: .release-only
+  stage: build
+  tags:
+    - linux
+    - self-hosted
+  variables:
+    ANDROID_NDK_HOME: /opt/android-ndk
+  before_script:
+    # Install Android NDK if not present
+    - |
+      if [[ ! -d "$ANDROID_NDK_HOME" ]]; then
+        echo "Installing Android NDK..."
+        apt-get update && apt-get install -y wget unzip
+        wget -q https://dl.google.com/android/repository/android-ndk-r26b-linux.zip
+        unzip -q android-ndk-r26b-linux.zip -d /opt
+        mv /opt/android-ndk-r26b /opt/android-ndk
+      fi
+    # Install Rust Android targets
+    - rustup target add aarch64-linux-android x86_64-linux-android
+  script:
+    - ./scripts/build-bindings.sh --android
+    - ./scripts/validate-bindings.sh || true
+  artifacts:
+    paths:
+      - ../android/app/src/main/jniLibs/
+      - ../android/app/src/main/kotlin/
+    expire_in: 1 day
+
+# ============================================================
+# Package Stage (Release only)
+# ============================================================
+
+package:xcframework:
+  extends: .release-only
+  stage: package
+  tags:
+    - macos
+    - self-hosted
+  needs:
+    - build:ios
+  script:
+    - ./scripts/package-xcframework.sh "$CI_COMMIT_TAG"
+  artifacts:
+    paths:
+      - dist/VauchiMobileFFI.xcframework.zip
+      - dist/VauchiMobileFFI.xcframework.zip.sha256
+      - dist/VauchiMobile-*.zip
+    expire_in: 1 week
+
+package:android:
+  extends: .release-only
+  stage: package
+  tags:
+    - linux
+    - self-hosted
+  needs:
+    - build:android
+  script:
+    - ./scripts/package-android.sh "$CI_COMMIT_TAG"
+  artifacts:
+    paths:
+      - dist/vauchi-mobile-android-*.zip
+      - dist/vauchi-mobile-android-*.zip.sha256
+    expire_in: 1 week
+
+# ============================================================
+# Publish Stage (Release only)
+# ============================================================
+
+publish:packages:
+  extends: .release-only
+  stage: publish
+  tags:
+    - linux
+  needs:
+    - package:xcframework
+    - package:android
+  script:
+    - ./scripts/publish-packages.sh "$CI_COMMIT_TAG"
+
+release:create:
+  extends: .release-only
+  stage: publish
+  image: registry.gitlab.com/gitlab-org/release-cli:latest
+  needs:
+    - publish:packages
+  script:
+    - echo "Creating release $CI_COMMIT_TAG"
+  release:
+    tag_name: $CI_COMMIT_TAG
+    name: "Release $CI_COMMIT_TAG"
+    description: |
+      ## VauchiMobile $CI_COMMIT_TAG
+
+      ### Downloads
+
+      - [iOS XCFramework](${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/vauchi-mobile/${CI_COMMIT_TAG}/VauchiMobileFFI.xcframework.zip)
+      - [Android](${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/vauchi-mobile/${CI_COMMIT_TAG}/vauchi-mobile-android-${CI_COMMIT_TAG}.zip)
+
+      ### Integration
+
+      See [documentation](https://gitlab.com/vauchi/core/-/blob/main/README.md) for integration instructions.
+
+# ============================================================
+# Manual Dev Build (on-demand)
+# ============================================================
+
+build:dev:
+  stage: build
+  tags:
+    - linux
+    - self-hosted
   rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-    - if: $CI_COMMIT_BRANCH == "main"
-  allow_failure: true  # Advisory until all tests pass
+    - if: $CI_PIPELINE_SOURCE == "web"
+      when: manual
+  variables:
+    DEV_VERSION: "dev-${CI_COMMIT_SHORT_SHA}"
+  script:
+    - echo "Building dev version $DEV_VERSION"
+    - ./scripts/build-bindings.sh --android
+    - ./scripts/package-android.sh "$DEV_VERSION"
+  artifacts:
+    paths:
+      - dist/
+    expire_in: 3 days

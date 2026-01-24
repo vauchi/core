@@ -5,6 +5,13 @@ members = [
     "vauchi-mobile",
 ]
 
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+repository = "https://gitlab.com/vauchi/core"
+authors = ["Vauchi Contributors"]
+
 # Release profile: optimized for size (mobile binaries)
 [profile.release]
 opt-level = "z"      # Optimize for size

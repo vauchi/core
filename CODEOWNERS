@@ -1,0 +1,15 @@
+# GitLab CODEOWNERS for vauchi-core
+# https://docs.gitlab.com/ee/user/project/codeowners/
+
+# Default owner
+* @megloff1
+
+# Crypto implementation - requires careful review
+/vauchi-core/src/crypto/ @megloff1
+
+# Security-sensitive configuration
+/.gitlab-ci.yml @megloff1
+/deny.toml @megloff1
+
+# Mobile bindings - affects all platforms
+/vauchi-mobile/ @megloff1

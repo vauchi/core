@@ -17,6 +17,8 @@ stages:
 variables:
   CARGO_HOME: ${CI_PROJECT_DIR}/.cargo
   RUST_BACKTRACE: "1"
+  # Use SSH for git operations on self-hosted runners
+  GIT_CLONE_PATH: ${CI_BUILDS_DIR}/${CI_PROJECT_PATH}
 
 # ============================================================
 # Templates
@@ -45,6 +47,18 @@ variables:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
     - if: $CI_COMMIT_BRANCH == "main"
     - if: $CI_COMMIT_TAG =~ /^v/
+
+.self-hosted-ssh:
+  variables:
+    GIT_STRATEGY: none
+  before_script:
+    - |
+      if [ ! -d ".git" ]; then
+        git clone --depth 20 --branch ${CI_COMMIT_REF_NAME} git@gitlab.com:${CI_PROJECT_PATH}.git .
+      else
+        git fetch origin ${CI_COMMIT_REF_NAME}
+        git checkout ${CI_COMMIT_SHA}
+      fi
 
 # ============================================================
 # Lint Stage
@@ -127,7 +141,7 @@ build:android:
 # ============================================================
 
 package:xcframework:
-  extends: .release-only
+  extends: [.release-only, .self-hosted-ssh]
   stage: package
   tags:
     - macos
@@ -144,7 +158,7 @@ package:xcframework:
     expire_in: 1 week
 
 package:android:
-  extends: .release-only
+  extends: [.release-only, .self-hosted-ssh]
   stage: package
   tags:
     - linux

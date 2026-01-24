@@ -3,12 +3,26 @@
 # Core library and mobile bindings
 #
 # Pipelines:
-#   - MR/main: lint, test
-#   - Tags (v*): lint, test, build, package, publish
+#   - MR/main: lint, test, security
+#   - Tags (v*): lint, test, security, build, package, publish
+#
+# GitLab Ultimate Features:
+#   - SAST: Static application security testing
+#   - Dependency Scanning: Cargo.lock vulnerability scanning
+#   - Secret Detection: Prevent credential leaks
+#   - License Compliance: Check dependency licenses
+
+# GitLab Ultimate Templates
+include:
+  - template: Security/SAST.gitlab-ci.yml
+  - template: Security/Dependency-Scanning.gitlab-ci.yml
+  - template: Security/Secret-Detection.gitlab-ci.yml
+  - template: Security/License-Scanning.gitlab-ci.yml
 
 stages:
   - lint
   - test
+  - security
   - build
   - package
   - publish
@@ -17,13 +31,17 @@ stages:
 variables:
   CARGO_HOME: ${CI_PROJECT_DIR}/.cargo
   RUST_BACKTRACE: "1"
-  # Use SSH for git operations on self-hosted runners
-  GIT_CLONE_PATH: ${CI_BUILDS_DIR}/${CI_PROJECT_PATH}
+
+  # GitLab Ultimate Security Configuration
+  SAST_EXCLUDED_PATHS: "target/, tests/fixtures/"
+  DS_EXCLUDED_PATHS: "target/"
+  SECRET_DETECTION_EXCLUDED_PATHS: "target/"
 
 # ============================================================
 # Templates
 # ============================================================
 
+# Rust cache for Docker runners
 .rust-cache: &rust-cache
   cache:
     key: ${CI_COMMIT_REF_SLUG}-rust
@@ -33,6 +51,16 @@ variables:
       - .cargo/registry/cache/
       - .cargo/git/db/
       - target/
+
+# Aggressive Rust cache for self-hosted runners (includes release builds)
+.rust-cache-self-hosted: &rust-cache-self-hosted
+  cache:
+    key: rust-${CI_COMMIT_REF_SLUG}
+    paths:
+      - .cargo/registry/
+      - .cargo/git/
+      - target/release/
+    policy: pull-push
 
 .rust-job:
   image: rust:latest
@@ -50,17 +78,14 @@ variables:
     - if: $CI_COMMIT_BRANCH == "main"
     - if: $CI_COMMIT_TAG =~ /^v/
 
-.self-hosted-ssh:
+# Self-hosted runner template using job token auth (no SSH required)
+.self-hosted-job:
   variables:
-    GIT_STRATEGY: none
-  before_script:
-    - |
-      if [ ! -d ".git" ]; then
-        git clone --depth 20 --branch ${CI_COMMIT_REF_NAME} git@gitlab.com:${CI_PROJECT_PATH}.git .
-      else
-        git fetch origin ${CI_COMMIT_REF_NAME}
-        git checkout ${CI_COMMIT_SHA}
-      fi
+    GIT_STRATEGY: clone
+    GIT_DEPTH: 20
+  id_tokens:
+    GITLAB_OIDC_TOKEN:
+      aud: https://gitlab.com
 
 # ============================================================
 # Lint Stage
@@ -90,16 +115,105 @@ test:unit:
   script:
     - cargo test --all-targets
 
+test:coverage:
+  extends: [.rust-job]
+  stage: test
+  before_script:
+    - rustup component add llvm-tools-preview
+    - cargo install cargo-llvm-cov --locked || true
+  script:
+    - cargo llvm-cov --workspace --lcov --output-path lcov.info
+    - cargo llvm-cov report --workspace
+  coverage: '/Total:\s+(\d+(?:\.\d+)?%)/'
+  artifacts:
+    reports:
+      coverage_report:
+        coverage_format: cobertura
+        path: cobertura.xml
+    paths:
+      - lcov.info
+    expire_in: 1 week
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == "main"
+  allow_failure: true
+
+# ============================================================
+# Security Stage
+# ============================================================
+
+# Override GitLab templates to run on correct events
+sast:
+  stage: security
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == "main"
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+
+dependency_scanning:
+  stage: security
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == "main"
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+
+secret_detection:
+  stage: security
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == "main"
+
+license_scanning:
+  stage: security
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes:
+        - "**/Cargo.toml"
+        - "**/Cargo.lock"
+    - if: $CI_COMMIT_BRANCH == "main"
+
+# Rust-specific security checks
+security:audit:
+  extends: .rust-job
+  stage: security
+  script:
+    - cargo install cargo-audit || true
+    - cargo audit
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes:
+        - "**/Cargo.toml"
+        - "**/Cargo.lock"
+    - if: $CI_COMMIT_BRANCH == "main"
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+  allow_failure: true
+
+security:deny:
+  extends: .rust-job
+  stage: security
+  script:
+    - cargo install cargo-deny || true
+    - cargo deny check
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes:
+        - "**/Cargo.toml"
+        - "**/Cargo.lock"
+        - "deny.toml"
+    - if: $CI_COMMIT_BRANCH == "main"
+  allow_failure: true
+
 # ============================================================
 # Build Stage (Release only)
 # ============================================================
 
 build:ios:
-  extends: .release-only
+  extends: [.release-only, .self-hosted-job]
   stage: build
   tags:
     - macos
     - self-hosted
+  <<: *rust-cache-self-hosted
   script:
     - ./scripts/build-bindings.sh --ios
     - ./scripts/validate-bindings.sh || true
@@ -110,24 +224,17 @@ build:ios:
     expire_in: 1 day
 
 build:android:
-  extends: .release-only
+  extends: [.release-only, .self-hosted-job]
   stage: build
   tags:
     - linux
     - self-hosted
+  <<: *rust-cache-self-hosted
   variables:
-    ANDROID_NDK_HOME: $CI_PROJECT_DIR/.android-ndk
+    # Use pre-installed NDK on VM (no download required)
+    ANDROID_NDK_HOME: /opt/android-sdk/ndk/26.1.10909125
   before_script:
-    # Install Android NDK if not present (to project dir for permissions)
-    - |
-      if [[ ! -d "$ANDROID_NDK_HOME" ]]; then
-        echo "Installing Android NDK..."
-        wget -q https://dl.google.com/android/repository/android-ndk-r26b-linux.zip
-        unzip -q android-ndk-r26b-linux.zip
-        mv android-ndk-r26b "$ANDROID_NDK_HOME"
-        rm -f android-ndk-r26b-linux.zip
-      fi
-    # Install Rust Android targets
+    # Install Rust Android targets if not present
     - rustup target add aarch64-linux-android x86_64-linux-android
   script:
     - ./scripts/build-bindings.sh --android
@@ -143,7 +250,7 @@ build:android:
 # ============================================================
 
 package:xcframework:
-  extends: [.release-only, .self-hosted-ssh]
+  extends: [.release-only, .self-hosted-job]
   stage: package
   tags:
     - macos
@@ -160,7 +267,7 @@ package:xcframework:
     expire_in: 1 week
 
 package:android:
-  extends: [.release-only, .self-hosted-ssh]
+  extends: [.release-only, .self-hosted-job]
   stage: package
   tags:
     - linux
@@ -180,10 +287,11 @@ package:android:
 # ============================================================
 
 publish:packages:
-  extends: .release-only
+  extends: [.release-only, .self-hosted-job]
   stage: publish
   tags:
     - linux
+    - self-hosted
   needs:
     - package:xcframework
     - package:android
@@ -218,8 +326,11 @@ release:create:
 # ============================================================
 
 trigger:downstream:
-  extends: .release-only
+  extends: [.release-only, .self-hosted-job]
   stage: trigger
+  tags:
+    - linux
+    - self-hosted
   needs:
     - release:create
   script:
@@ -230,15 +341,20 @@ trigger:downstream:
 # ============================================================
 
 build:dev:
+  extends: .self-hosted-job
   stage: build
   tags:
     - linux
     - self-hosted
+  <<: *rust-cache-self-hosted
   rules:
     - if: $CI_PIPELINE_SOURCE == "web"
       when: manual
   variables:
     DEV_VERSION: "dev-${CI_COMMIT_SHORT_SHA}"
+    ANDROID_NDK_HOME: /opt/android-sdk/ndk/26.1.10909125
+  before_script:
+    - rustup target add aarch64-linux-android x86_64-linux-android
   script:
     - echo "Building dev version $DEV_VERSION"
     - ./scripts/build-bindings.sh --android

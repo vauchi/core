@@ -68,6 +68,11 @@ pub mod transport;
 mod transport;
 
 #[cfg(feature = "testing")]
+pub mod multi_relay;
+#[cfg(not(feature = "testing"))]
+mod multi_relay;
+
+#[cfg(feature = "testing")]
 pub mod websocket;
 #[cfg(not(feature = "testing"))]
 mod websocket;
@@ -100,3 +105,6 @@ pub use connection::ConnectionManager;
 
 // Relay client
 pub use relay_client::{ProcessResult, RelayClient, RelayClientConfig};
+
+// Multi-relay support
+pub use multi_relay::{MultiRelayConfig, MultiRelayConfigBuilder, MultiRelayError, RelayHealth, RelaySelector};

@@ -44,6 +44,11 @@ pub mod session;
 mod session;
 
 #[cfg(feature = "testing")]
+pub mod nfc;
+#[cfg(not(feature = "testing"))]
+mod nfc;
+
+#[cfg(feature = "testing")]
 pub mod x3dh;
 #[cfg(not(feature = "testing"))]
 mod x3dh;
@@ -63,4 +68,8 @@ pub use proximity::{
 };
 pub use qr::ExchangeQR;
 pub use session::{DuplicateAction, ExchangeEvent, ExchangeRole, ExchangeSession, ExchangeState};
+pub use nfc::{
+    create_nfc_payload, parse_nfc_payload, Introduction, NfcError, NfcTagMode, NfcTagPayload,
+    ParsedNfcPayload, ProtectedNfcTagPayload,
+};
 pub use x3dh::{X3DHKeyPair, X3DH};

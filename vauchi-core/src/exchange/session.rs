@@ -26,10 +26,14 @@ pub enum ExchangeState {
     /// QR scanned by other party, waiting for proximity verification
     AwaitingProximity {
         their_public_key: [u8; 32],
+        their_exchange_key: [u8; 32],
         their_qr: ExchangeQR,
     },
     /// Proximity verified, performing key agreement
-    AwaitingKeyAgreement { their_public_key: [u8; 32] },
+    AwaitingKeyAgreement {
+        their_public_key: [u8; 32],
+        their_exchange_key: [u8; 32],
+    },
     /// Key agreement complete, exchanging cards
     AwaitingCardExchange {
         their_public_key: [u8; 32],
@@ -85,34 +89,47 @@ pub struct ExchangeSession<P: ProximityVerifier> {
     started_at: Instant,
     /// Whether the session was interrupted
     interrupted: bool,
+    /// Our ephemeral public key (set when we're the scanner/X3DH initiator)
+    our_ephemeral: Option<[u8; 32]>,
+    /// Their ephemeral public key (received when we're the displayer/X3DH responder)
+    their_ephemeral: Option<[u8; 32]>,
 }
 
 impl<P: ProximityVerifier> ExchangeSession<P> {
     /// Creates a new session as the initiator (displaying QR).
     pub fn new_initiator(identity: Identity, our_card: ContactCard, proximity: P) -> Self {
+        // Use identity's X3DH keypair so our exchange key matches QR
+        let our_x3dh = identity.x3dh_keypair();
         ExchangeSession {
             state: ExchangeState::Idle,
             role: ExchangeRole::Initiator,
             identity,
             our_card,
-            our_x3dh: X3DHKeyPair::generate(),
+            our_x3dh,
             proximity,
             started_at: Instant::now(),
             interrupted: false,
+            our_ephemeral: None,
+            their_ephemeral: None,
         }
     }
 
     /// Creates a new session as the responder (scanning QR).
     pub fn new_responder(identity: Identity, our_card: ContactCard, proximity: P) -> Self {
+        // Responder (scanner) generates ephemeral, doesn't need identity's X3DH
+        // but we keep it for consistency
+        let our_x3dh = identity.x3dh_keypair();
         ExchangeSession {
             state: ExchangeState::Idle,
             role: ExchangeRole::Responder,
             identity,
             our_card,
-            our_x3dh: X3DHKeyPair::generate(),
+            our_x3dh,
             proximity,
             started_at: Instant::now(),
             interrupted: false,
+            our_ephemeral: None,
+            their_ephemeral: None,
         }
     }
 
@@ -132,6 +149,20 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
     /// Returns our role in the exchange.
     pub fn role(&self) -> ExchangeRole {
         self.role
+    }
+
+    /// Returns our ephemeral public key (if we're the scanner/X3DH initiator).
+    ///
+    /// This should be sent to the QR displayer after key agreement.
+    pub fn ephemeral_public(&self) -> Option<[u8; 32]> {
+        self.our_ephemeral
+    }
+
+    /// Sets their ephemeral public key (if we're the displayer/X3DH responder).
+    ///
+    /// This must be called before key agreement when we're the QR displayer.
+    pub fn set_their_ephemeral(&mut self, ephemeral: [u8; 32]) {
+        self.their_ephemeral = Some(ephemeral);
     }
 
     /// Checks if the session has timed out.
@@ -207,6 +238,7 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
         }
 
         let their_public_key = *qr.public_key();
+        let their_exchange_key = *qr.exchange_key();
 
         // Check for self-exchange (scanning own QR code)
         if their_public_key == *self.identity.signing_public_key() {
@@ -215,6 +247,7 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
 
         self.state = ExchangeState::AwaitingProximity {
             their_public_key,
+            their_exchange_key,
             their_qr: qr,
         };
 
@@ -222,14 +255,16 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
     }
 
     fn handle_verify_proximity(&mut self) -> Result<(), ExchangeError> {
-        let (their_public_key, challenge) = match &self.state {
+        let (their_public_key, their_exchange_key, challenge) = match &self.state {
             ExchangeState::AwaitingProximity {
                 their_public_key,
+                their_exchange_key,
                 their_qr,
-            } => (*their_public_key, *their_qr.audio_challenge()),
+            } => (*their_public_key, *their_exchange_key, *their_qr.audio_challenge()),
             ExchangeState::AwaitingScan { qr } => {
                 // Initiator waits for proximity challenge from responder
-                (*qr.public_key(), *qr.audio_challenge())
+                // Initiator doesn't have their exchange key yet - will receive ephemeral
+                (*qr.public_key(), [0u8; 32], *qr.audio_challenge())
             }
             _ => {
                 return Err(ExchangeError::InvalidState(
@@ -242,13 +277,19 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
             .verify_proximity(&challenge, PROXIMITY_TIMEOUT)
             .map_err(|_| ExchangeError::ProximityFailed)?;
 
-        self.state = ExchangeState::AwaitingKeyAgreement { their_public_key };
+        self.state = ExchangeState::AwaitingKeyAgreement {
+            their_public_key,
+            their_exchange_key,
+        };
         Ok(())
     }
 
     fn handle_perform_key_agreement(&mut self) -> Result<(), ExchangeError> {
-        let their_public_key = match &self.state {
-            ExchangeState::AwaitingKeyAgreement { their_public_key } => *their_public_key,
+        let (their_public_key, their_exchange_key) = match &self.state {
+            ExchangeState::AwaitingKeyAgreement {
+                their_public_key,
+                their_exchange_key,
+            } => (*their_public_key, *their_exchange_key),
             _ => {
                 return Err(ExchangeError::InvalidState(
                     "Not in key agreement state".into(),
@@ -257,15 +298,24 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
         };
 
         let shared_key = match self.role {
-            ExchangeRole::Initiator => {
-                // Initiator generates ephemeral and sends to responder
-                let (shared, _ephemeral) = X3DH::initiate(&self.our_x3dh, &their_public_key)?;
+            ExchangeRole::Responder => {
+                // Responder (QR scanner) is the X3DH INITIATOR:
+                // - Has their exchange key from the QR
+                // - Generates ephemeral, stores it for transfer to displayer
+                let (shared, ephemeral) = X3DH::initiate(&self.our_x3dh, &their_exchange_key)?;
+                self.our_ephemeral = Some(ephemeral);
                 shared
             }
-            ExchangeRole::Responder => {
-                // Responder uses initiator's ephemeral to derive same key
-                // In real implementation, would receive ephemeral from initiator
-                X3DH::respond(&self.our_x3dh, &[0u8; 32], &their_public_key)?
+            ExchangeRole::Initiator => {
+                // Initiator (QR displayer) is the X3DH RESPONDER:
+                // - Needs the scanner's ephemeral (received via their_ephemeral)
+                // - Uses own X3DH keys to derive shared secret
+                let their_ephemeral = self.their_ephemeral.ok_or_else(|| {
+                    ExchangeError::InvalidState(
+                        "Missing ephemeral from scanner - call set_their_ephemeral first".into(),
+                    )
+                })?;
+                X3DH::respond(&self.our_x3dh, &[0u8; 32], &their_ephemeral)?
             }
         };
 
@@ -322,7 +372,7 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
             ExchangeState::AwaitingProximity {
                 their_public_key, ..
             }
-            | ExchangeState::AwaitingKeyAgreement { their_public_key }
+            | ExchangeState::AwaitingKeyAgreement { their_public_key, .. }
             | ExchangeState::AwaitingCardExchange {
                 their_public_key, ..
             } => Some(their_public_key),

@@ -3,6 +3,7 @@
 //! Provides a registry of known social networks with profile URL templates.
 //! This enables generating clickable profile links from usernames.
 
+use crate::content::ContentManager;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -146,6 +147,18 @@ impl SocialNetworkRegistry {
         let mut registry = Self::new();
         let networks: Vec<NetworkData> =
             serde_json::from_str(NETWORKS_JSON).expect("Invalid embedded networks.json");
+        for n in networks {
+            registry.add(SocialNetwork::new(&n.id, &n.name, &n.url).with_icon(&n.id));
+        }
+        registry
+    }
+
+    /// Creates a registry from ContentManager (cached → bundled fallback).
+    ///
+    /// This allows networks to be updated remotely without app updates.
+    pub fn from_content_manager(content: &ContentManager) -> Self {
+        let mut registry = Self::new();
+        let networks = content.networks();
         for n in networks {
             registry.add(SocialNetwork::new(&n.id, &n.name, &n.url).with_icon(&n.id));
         }

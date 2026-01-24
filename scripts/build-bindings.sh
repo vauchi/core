@@ -193,6 +193,7 @@ if $BUILD_ANDROID; then
     echo -e "${YELLOW}Building for aarch64-linux-android (ARM64)...${NC}"
     export CC_aarch64_linux_android="$NDK_TOOLCHAIN/aarch64-linux-android24-clang"
     export AR_aarch64_linux_android="$NDK_TOOLCHAIN/llvm-ar"
+    export CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER="$NDK_TOOLCHAIN/aarch64-linux-android24-clang"
     cargo build -p vauchi-mobile --target aarch64-linux-android --release
     echo -e "${GREEN}ARM64 build complete${NC}"
 
@@ -200,6 +201,7 @@ if $BUILD_ANDROID; then
     echo -e "${YELLOW}Building for x86_64-linux-android (emulator)...${NC}"
     export CC_x86_64_linux_android="$NDK_TOOLCHAIN/x86_64-linux-android24-clang"
     export AR_x86_64_linux_android="$NDK_TOOLCHAIN/llvm-ar"
+    export CARGO_TARGET_X86_64_LINUX_ANDROID_LINKER="$NDK_TOOLCHAIN/x86_64-linux-android24-clang"
     cargo build -p vauchi-mobile --target x86_64-linux-android --release
     echo -e "${GREEN}x86_64 build complete${NC}"
 

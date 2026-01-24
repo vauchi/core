@@ -12,6 +12,7 @@ stages:
   - build
   - package
   - publish
+  - trigger
 
 variables:
   CARGO_HOME: ${CI_PROJECT_DIR}/.cargo
@@ -195,6 +196,18 @@ release:create:
       ### Integration
 
       See [documentation](https://gitlab.com/vauchi/core/-/blob/main/README.md) for integration instructions.
+
+# ============================================================
+# Trigger Stage (Release only)
+# ============================================================
+
+trigger:downstream:
+  extends: .release-only
+  stage: trigger
+  needs:
+    - release:create
+  script:
+    - ./scripts/trigger-downstream.sh "$CI_COMMIT_TAG"
 
 # ============================================================
 # Manual Dev Build (on-demand)

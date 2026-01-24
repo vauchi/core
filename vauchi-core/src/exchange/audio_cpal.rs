@@ -345,7 +345,10 @@ impl AudioBackend for CpalAudioBackend {
                 &supported_config.into(),
                 move |input: &[f32], _: &cpal::InputCallbackInfo| {
                     if !stop_signal.load(Ordering::SeqCst) {
-                        recorded_clone.lock().expect("mutex poisoned").extend_from_slice(input);
+                        recorded_clone
+                            .lock()
+                            .expect("mutex poisoned")
+                            .extend_from_slice(input);
                     }
                 },
                 |err| {

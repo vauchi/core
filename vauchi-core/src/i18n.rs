@@ -9,9 +9,10 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 /// Supported locales
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 pub enum Locale {
     #[serde(rename = "en")]
+    #[default]
     English,
     #[serde(rename = "de")]
     German,
@@ -19,12 +20,6 @@ pub enum Locale {
     French,
     #[serde(rename = "es")]
     Spanish,
-}
-
-impl Default for Locale {
-    fn default() -> Self {
-        Locale::English
-    }
 }
 
 impl Locale {

@@ -21,7 +21,7 @@ pub enum MultiRelayError {
 }
 
 /// Relay selection strategy
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum RelaySelector {
     /// Cycle through relays in order
@@ -29,13 +29,8 @@ pub enum RelaySelector {
     /// Select randomly
     Random,
     /// Always use primary unless unhealthy
+    #[default]
     PrimaryFirst,
-}
-
-impl Default for RelaySelector {
-    fn default() -> Self {
-        RelaySelector::PrimaryFirst
-    }
 }
 
 /// Configuration for multiple relay servers
@@ -198,7 +193,7 @@ impl MultiRelayConfigBuilder {
 }
 
 /// Health state for a single relay
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 struct RelayHealthState {
     /// Number of consecutive failures
     failure_count: u32,
@@ -206,16 +201,6 @@ struct RelayHealthState {
     last_failure: Option<Instant>,
     /// Last success time
     last_success: Option<Instant>,
-}
-
-impl Default for RelayHealthState {
-    fn default() -> Self {
-        RelayHealthState {
-            failure_count: 0,
-            last_failure: None,
-            last_success: None,
-        }
-    }
 }
 
 /// Tracks health status of relay servers

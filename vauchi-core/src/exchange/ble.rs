@@ -320,8 +320,6 @@ impl std::error::Error for BLEError {}
 pub struct BLEExchangeSession {
     /// Our exchange token
     exchange_token: [u8; 32],
-    /// Our keypair for signing
-    keypair_public: [u8; 32],
     /// Current state
     state: BLEExchangeState,
     /// Session timeout
@@ -336,7 +334,7 @@ pub struct BLEExchangeSession {
 
 impl BLEExchangeSession {
     /// Create a new exchange session.
-    pub fn new(keypair: &SigningKeyPair) -> Self {
+    pub fn new(_keypair: &SigningKeyPair) -> Self {
         use ring::rand::{SecureRandom, SystemRandom};
         let rng = SystemRandom::new();
         let mut exchange_token = [0u8; 32];
@@ -344,7 +342,6 @@ impl BLEExchangeSession {
 
         BLEExchangeSession {
             exchange_token,
-            keypair_public: *keypair.public_key().as_bytes(),
             state: BLEExchangeState::Idle,
             timeout: Duration::from_secs(60),
             started_at: None,

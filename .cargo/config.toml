@@ -2,6 +2,12 @@
 [build]
 rustflags = ["--cfg", "rust_analyzer"]
 
+# Use mold linker on Linux for faster linking (2-5x speedup)
+# Install: apt install mold OR cargo install mold
+[target.x86_64-unknown-linux-gnu]
+linker = "clang"
+rustflags = ["-C", "link-arg=-fuse-ld=mold", "--cfg", "rust_analyzer"]
+
 # Android NDK configuration for cross-compilation
 # NOTE: Linker paths are set via environment variables in build-android.sh
 # to support different NDK locations (Android Studio SDK vs standalone NDK)

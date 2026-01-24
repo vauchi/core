@@ -30,3 +30,10 @@ debug = true         # Full debug info
 inherits = "release"
 debug = true
 strip = false
+
+# CI profile: faster builds with reasonable optimization
+[profile.ci]
+inherits = "release"
+lto = "thin"          # Faster than full LTO, still good optimization
+codegen-units = 16    # More parallelism during compilation
+incremental = false   # CI builds are fresh, no benefit from incremental

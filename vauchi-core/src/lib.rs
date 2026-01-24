@@ -13,6 +13,7 @@ pub mod crypto;
 pub mod demo_contact;
 pub mod exchange;
 pub mod help;
+pub mod i18n;
 pub mod identity;
 #[cfg(any(feature = "network-native-tls", feature = "network-rustls"))]
 pub mod network;
@@ -20,6 +21,7 @@ pub mod recovery;
 pub mod social;
 pub mod storage;
 pub mod sync;
+pub mod theme;
 
 pub use aha_moments::{AhaMoment, AhaMomentTracker, AhaMomentType};
 #[cfg(any(feature = "network-native-tls", feature = "network-rustls"))]
@@ -57,3 +59,10 @@ pub use social::{
 };
 pub use storage::{PendingUpdate, Storage, StorageError, UpdateStatus};
 pub use sync::{CardDelta, DeltaError, FieldChange, SyncError, SyncManager, SyncState};
+pub use i18n::{
+    get_available_locales, get_locale_info, get_string, get_string_with_args, Locale, LocaleInfo,
+};
+pub use theme::{
+    get_bundled_themes, get_theme_by_id, validate_hex_color, Theme, ThemeColors, ThemeError,
+    ThemeMode,
+};

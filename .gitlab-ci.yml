@@ -17,8 +17,6 @@ stages:
 variables:
   CARGO_HOME: ${CI_PROJECT_DIR}/.cargo
   RUST_BACKTRACE: "1"
-  # Use SSH for git operations on self-hosted runners
-  GIT_CLONE_PATH: ${CI_BUILDS_DIR}/${CI_PROJECT_PATH}
 
 # ============================================================
 # Templates
@@ -35,7 +33,10 @@ variables:
       - target/
 
 .rust-job:
-  image: rust:latest
+  extends: .self-hosted-ssh
+  tags:
+    - linux
+    - self-hosted
   <<: *rust-cache
 
 .release-only:

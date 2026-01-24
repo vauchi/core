@@ -357,7 +357,7 @@ impl ContentManager {
                 )?;
             }
             ContentType::Help => {
-                // Help content not yet implemented
+                // TODO: Implement help content caching when help system is defined
             }
         }
 

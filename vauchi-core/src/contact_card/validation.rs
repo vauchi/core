@@ -1,6 +1,7 @@
 //! Field Validation
 //!
-//! TDD: Stub implementation - tests will drive full implementation.
+//! TODO: Add validation functions for phone, email, and other field types.
+//! Currently only defines error types - validators will be added as needed.
 
 use thiserror::Error;
 

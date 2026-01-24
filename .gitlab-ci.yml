@@ -65,12 +65,14 @@ variables:
   before_script:
     - |
       if [ ! -d ".git" ]; then
-        git clone --depth 20 --branch "${CI_COMMIT_REF_NAME}" "git@gitlab.com:${CI_PROJECT_PATH}.git" .
+        # Initialize git repo (handles cached files in directory)
+        git init
+        git remote add origin "git@gitlab.com:${CI_PROJECT_PATH}.git"
       else
         git remote set-url origin "git@gitlab.com:${CI_PROJECT_PATH}.git"
-        git fetch origin "${CI_COMMIT_REF_NAME}" --depth 20
-        git checkout -f "${CI_COMMIT_SHA}"
       fi
+      git fetch origin "${CI_COMMIT_REF_NAME}" --depth 20
+      git checkout -f "${CI_COMMIT_SHA}"
     # Ensure sccache is available (install once, cached)
     - command -v sccache >/dev/null || cargo install sccache --locked
     - sccache --start-server || true

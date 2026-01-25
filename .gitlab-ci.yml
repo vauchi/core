@@ -5,11 +5,7 @@
 #   - Main: No pipeline (code already validated via MR, enforced by branch protection)
 #   - Tags (v*): Build, package, publish ONLY (code already validated)
 #
-# Security checks (all run on MR):
-#   - cargo audit: Rust security advisories
-#   - cargo deny: License compliance
-#   - Semgrep SAST: Static analysis
-#   - Secret detection: Credential leaks
+# Uses shared templates from vauchi/scripts for consistency.
 #
 # Performance optimizations:
 #   - Test and coverage combined in single pass
@@ -17,13 +13,17 @@
 #   - sccache for shared compilation cache (30-50% faster rebuilds)
 #   - mold linker on Linux (2-5x faster linking)
 #   - Cargo.lock-based cache keys (smarter invalidation)
-#   - Optimized cache paths (registry/index, registry/cache, git/db)
 
-# GitLab Ultimate Templates (security scanning on MR only)
+# Include shared templates
 include:
-  - template: Security/SAST.gitlab-ci.yml
-  - template: Security/Dependency-Scanning.gitlab-ci.yml
-  - template: Security/Secret-Detection.gitlab-ci.yml
+  - project: 'vauchi/scripts'
+    ref: main
+    file:
+      - '/ci-templates/rust-base.yml'
+      - '/ci-templates/security.yml'
+      - '/ci-templates/mr-rules.yml'
+      - '/ci-templates/release.yml'
+      - '/ci-templates/downstream.yml'
 
 stages:
   - lint
@@ -33,83 +33,6 @@ stages:
   - package
   - publish
   - trigger
-
-variables:
-  CARGO_HOME: ${CI_PROJECT_DIR}/.cargo
-  RUST_BACKTRACE: "1"
-  # sccache for shared compilation cache (30-50% faster rebuilds)
-  RUSTC_WRAPPER: sccache
-  SCCACHE_DIR: ${CI_PROJECT_DIR}/.sccache
-  # Security scanning config
-  SAST_EXCLUDED_PATHS: "target/, tests/fixtures/"
-  DS_EXCLUDED_PATHS: "target/"
-  SECRET_DETECTION_EXCLUDED_PATHS: "target/"
-
-# ============================================================
-# Templates
-# ============================================================
-
-# Rust cache for self-hosted runners (optimized)
-.rust-cache: &rust-cache
-  cache:
-    key:
-      files:
-        - Cargo.lock
-      prefix: rust-${CI_JOB_NAME}
-    paths:
-      - .cargo/registry/index/
-      - .cargo/registry/cache/
-      - .sccache/
-      - target/
-    policy: pull-push
-
-# Self-hosted runner with SSH git clone
-.self-hosted:
-  variables:
-    GIT_STRATEGY: none
-  before_script:
-    - |
-      if [ ! -d ".git" ]; then
-        # Initialize git repo (handles cached files in directory)
-        git init
-        git remote add origin "git@gitlab.com:${CI_PROJECT_PATH}.git"
-      else
-        git remote set-url origin "git@gitlab.com:${CI_PROJECT_PATH}.git"
-      fi
-      git fetch origin "${CI_COMMIT_REF_NAME}" --depth 20
-      git checkout -f "${CI_COMMIT_SHA}"
-    # Ensure sccache is available (install once, cached)
-    - command -v sccache >/dev/null || cargo install sccache --locked
-    - sccache --start-server || true
-  after_script:
-    - sccache --show-stats || true
-
-# Linux self-hosted runner
-.linux-runner:
-  extends: .self-hosted
-  tags:
-    - linux
-    - self-hosted
-  <<: *rust-cache
-
-# macOS self-hosted runner
-.macos-runner:
-  extends: .self-hosted
-  tags:
-    - macos
-    - self-hosted
-  <<: *rust-cache
-
-# Run on MR only (main is validated via MR pipeline)
-# This eliminates redundant pipeline runs on merge
-.validation-only:
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-
-# Run on tags only (releases) - tags must be on main branch
-.release-only:
-  rules:
-    - if: $CI_COMMIT_TAG =~ /^v/
 
 # ============================================================
 # Lint Stage (MR only)
@@ -158,33 +81,6 @@ test:
 # Security Stage (MR only)
 # ============================================================
 
-# GitLab security templates configuration
-#
-# Note: Do NOT override the base sast/dependency_scanning jobs with custom rules,
-# as they are "configuration only" parents. Override child analyzer jobs instead.
-#
-# For Rust projects:
-# - SAST (Semgrep): Limited Rust support, but still catches some issues
-# - Dependency scanning: Gemnasium doesn't support Cargo.lock (use cargo-audit instead)
-# - Secret detection: Works well, detects secrets in any file type
-
-# Semgrep SAST analyzer (child job) - add tags for self-hosted Docker runner
-semgrep-sast:
-  tags: [docker]
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-
-# Disable Gemnasium dependency scanning (not useful for Rust, use cargo-audit)
-gemnasium-dependency_scanning:
-  rules:
-    - when: never
-
-# Secret detection analyzer - add tags for self-hosted Docker runner
-secret_detection:
-  tags: [docker]
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-
 # Rust-specific security audit (runs on self-hosted)
 security:audit:
   extends: [.linux-runner, .validation-only]
@@ -193,9 +89,7 @@ security:audit:
     - cargo install cargo-audit || true
     - cargo audit
 
-# License compliance via cargo-deny (Rust-native license checker)
-# Note: GitLab's License-Scanning template was removed in 17.0
-# For Rust projects, cargo-deny is the standard tool
+# License compliance via cargo-deny
 security:licenses:
   extends: [.linux-runner, .validation-only]
   stage: security
@@ -397,6 +291,31 @@ trigger:downstream:
   needs: [release:create]
   script:
     - ./scripts/trigger-downstream.sh "$CI_COMMIT_TAG"
+
+# Trigger mobile distribution repos on merge to main
+trigger:swift-package:
+  stage: trigger
+  trigger:
+    project: vauchi/vauchi-mobile-swift
+    strategy: depend
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      changes:
+        - "src/mobile/**/*"
+        - "vauchi-mobile/**/*"
+    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+/
+
+trigger:android-package:
+  stage: trigger
+  trigger:
+    project: vauchi/vauchi-mobile-android
+    strategy: depend
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      changes:
+        - "src/mobile/**/*"
+        - "vauchi-mobile/**/*"
+    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+/
 
 # ============================================================
 # Manual Dev Build (on-demand)

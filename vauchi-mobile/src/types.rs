@@ -3,6 +3,7 @@
 //! These types are wrappers around vauchi-core types that are compatible
 //! with UniFFI for cross-language bindings.
 
+use std::collections::HashMap;
 use vauchi_core::{Contact, ContactCard, ContactField, FieldType};
 
 /// Mobile-friendly field type enum.
@@ -700,4 +701,269 @@ impl From<&vauchi_core::social::ProfileValidation> for MobileFieldValidation {
             validated_at: validation.validated_at(),
         }
     }
+}
+
+// ============================================================
+// Theme Types
+// ============================================================
+
+/// Theme mode (light or dark)
+#[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
+pub enum MobileThemeMode {
+    Light,
+    Dark,
+}
+
+impl From<vauchi_core::theme::ThemeMode> for MobileThemeMode {
+    fn from(mode: vauchi_core::theme::ThemeMode) -> Self {
+        match mode {
+            vauchi_core::theme::ThemeMode::Light => MobileThemeMode::Light,
+            vauchi_core::theme::ThemeMode::Dark => MobileThemeMode::Dark,
+        }
+    }
+}
+
+impl From<MobileThemeMode> for vauchi_core::theme::ThemeMode {
+    fn from(mode: MobileThemeMode) -> Self {
+        match mode {
+            MobileThemeMode::Light => vauchi_core::theme::ThemeMode::Light,
+            MobileThemeMode::Dark => vauchi_core::theme::ThemeMode::Dark,
+        }
+    }
+}
+
+/// Theme colors for UI styling.
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct MobileThemeColors {
+    /// Primary background color (hex).
+    pub bg_primary: String,
+    /// Secondary background color (hex).
+    pub bg_secondary: String,
+    /// Tertiary background color (hex).
+    pub bg_tertiary: String,
+    /// Primary text color (hex).
+    pub text_primary: String,
+    /// Secondary text color (hex).
+    pub text_secondary: String,
+    /// Accent color (hex).
+    pub accent: String,
+    /// Dark accent color (hex).
+    pub accent_dark: String,
+    /// Success color (hex).
+    pub success: String,
+    /// Error color (hex).
+    pub error: String,
+    /// Warning color (hex).
+    pub warning: String,
+    /// Border color (hex).
+    pub border: String,
+}
+
+impl From<&vauchi_core::theme::ThemeColors> for MobileThemeColors {
+    fn from(colors: &vauchi_core::theme::ThemeColors) -> Self {
+        MobileThemeColors {
+            bg_primary: colors.bg_primary.clone(),
+            bg_secondary: colors.bg_secondary.clone(),
+            bg_tertiary: colors.bg_tertiary.clone(),
+            text_primary: colors.text_primary.clone(),
+            text_secondary: colors.text_secondary.clone(),
+            accent: colors.accent.clone(),
+            accent_dark: colors.accent_dark.clone(),
+            success: colors.success.clone(),
+            error: colors.error.clone(),
+            warning: colors.warning.clone(),
+            border: colors.border.clone(),
+        }
+    }
+}
+
+/// A complete theme definition.
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct MobileTheme {
+    /// Theme identifier.
+    pub id: String,
+    /// Theme display name.
+    pub name: String,
+    /// Theme version.
+    pub version: String,
+    /// Theme author (optional).
+    pub author: Option<String>,
+    /// Theme license (optional).
+    pub license: Option<String>,
+    /// Theme source URL (optional).
+    pub source: Option<String>,
+    /// Theme mode (light or dark).
+    pub mode: MobileThemeMode,
+    /// Theme colors.
+    pub colors: MobileThemeColors,
+}
+
+impl From<&vauchi_core::theme::Theme> for MobileTheme {
+    fn from(theme: &vauchi_core::theme::Theme) -> Self {
+        MobileTheme {
+            id: theme.id.clone(),
+            name: theme.name.clone(),
+            version: theme.version.clone(),
+            author: theme.author.clone(),
+            license: theme.license.clone(),
+            source: theme.source.clone(),
+            mode: theme.mode.into(),
+            colors: MobileThemeColors::from(&theme.colors),
+        }
+    }
+}
+
+// ============================================================
+// i18n Types
+// ============================================================
+
+/// Supported locales for the app.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
+pub enum MobileLocale {
+    English,
+    German,
+    French,
+    Spanish,
+}
+
+impl From<vauchi_core::i18n::Locale> for MobileLocale {
+    fn from(locale: vauchi_core::i18n::Locale) -> Self {
+        match locale {
+            vauchi_core::i18n::Locale::English => MobileLocale::English,
+            vauchi_core::i18n::Locale::German => MobileLocale::German,
+            vauchi_core::i18n::Locale::French => MobileLocale::French,
+            vauchi_core::i18n::Locale::Spanish => MobileLocale::Spanish,
+        }
+    }
+}
+
+impl From<MobileLocale> for vauchi_core::i18n::Locale {
+    fn from(locale: MobileLocale) -> Self {
+        match locale {
+            MobileLocale::English => vauchi_core::i18n::Locale::English,
+            MobileLocale::German => vauchi_core::i18n::Locale::German,
+            MobileLocale::French => vauchi_core::i18n::Locale::French,
+            MobileLocale::Spanish => vauchi_core::i18n::Locale::Spanish,
+        }
+    }
+}
+
+/// Information about a locale.
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct MobileLocaleInfo {
+    /// ISO 639-1 language code.
+    pub code: String,
+    /// Native name of the language.
+    pub name: String,
+    /// English name of the language.
+    pub english_name: String,
+    /// Whether the language is right-to-left.
+    pub is_rtl: bool,
+}
+
+impl From<vauchi_core::i18n::LocaleInfo> for MobileLocaleInfo {
+    fn from(info: vauchi_core::i18n::LocaleInfo) -> Self {
+        MobileLocaleInfo {
+            code: info.code.to_string(),
+            name: info.name.to_string(),
+            english_name: info.english_name.to_string(),
+            is_rtl: info.is_rtl,
+        }
+    }
+}
+
+// ============================================================
+// Help Types
+// ============================================================
+
+/// Categories of help content.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
+pub enum MobileHelpCategory {
+    GettingStarted,
+    Privacy,
+    Recovery,
+    Contacts,
+    Updates,
+    Features,
+}
+
+impl From<vauchi_core::help::HelpCategory> for MobileHelpCategory {
+    fn from(category: vauchi_core::help::HelpCategory) -> Self {
+        match category {
+            vauchi_core::help::HelpCategory::GettingStarted => MobileHelpCategory::GettingStarted,
+            vauchi_core::help::HelpCategory::Privacy => MobileHelpCategory::Privacy,
+            vauchi_core::help::HelpCategory::Recovery => MobileHelpCategory::Recovery,
+            vauchi_core::help::HelpCategory::Contacts => MobileHelpCategory::Contacts,
+            vauchi_core::help::HelpCategory::Updates => MobileHelpCategory::Updates,
+            vauchi_core::help::HelpCategory::Features => MobileHelpCategory::Features,
+        }
+    }
+}
+
+impl From<MobileHelpCategory> for vauchi_core::help::HelpCategory {
+    fn from(category: MobileHelpCategory) -> Self {
+        match category {
+            MobileHelpCategory::GettingStarted => vauchi_core::help::HelpCategory::GettingStarted,
+            MobileHelpCategory::Privacy => vauchi_core::help::HelpCategory::Privacy,
+            MobileHelpCategory::Recovery => vauchi_core::help::HelpCategory::Recovery,
+            MobileHelpCategory::Contacts => vauchi_core::help::HelpCategory::Contacts,
+            MobileHelpCategory::Updates => vauchi_core::help::HelpCategory::Updates,
+            MobileHelpCategory::Features => vauchi_core::help::HelpCategory::Features,
+        }
+    }
+}
+
+/// Help category with display name.
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct MobileHelpCategoryInfo {
+    /// Category identifier.
+    pub category: MobileHelpCategory,
+    /// Display name for the category.
+    pub display_name: String,
+}
+
+/// A frequently asked question with answer.
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct MobileFaqItem {
+    /// Unique identifier.
+    pub id: String,
+    /// Category this FAQ belongs to.
+    pub category: MobileHelpCategory,
+    /// The question.
+    pub question: String,
+    /// The answer (may contain markdown).
+    pub answer: String,
+    /// Related FAQ IDs.
+    pub related: Vec<String>,
+}
+
+impl From<&vauchi_core::help::FaqItem> for MobileFaqItem {
+    fn from(faq: &vauchi_core::help::FaqItem) -> Self {
+        MobileFaqItem {
+            id: faq.id.clone(),
+            category: faq.category.into(),
+            question: faq.question.clone(),
+            answer: faq.answer.clone(),
+            related: faq.related.clone(),
+        }
+    }
+}
+
+// ============================================================
+// i18n Helper Functions (for types module)
+// ============================================================
+
+/// Get a localized string by key.
+pub fn mobile_get_string(locale: MobileLocale, key: String) -> String {
+    vauchi_core::i18n::get_string(locale.into(), &key)
+}
+
+/// Get a localized string with argument interpolation.
+pub fn mobile_get_string_with_args(
+    locale: MobileLocale,
+    key: String,
+    args: HashMap<String, String>,
+) -> String {
+    let args_vec: Vec<(&str, &str)> = args.iter().map(|(k, v)| (k.as_str(), v.as_str())).collect();
+    vauchi_core::i18n::get_string_with_args(locale.into(), &key, &args_vec)
 }

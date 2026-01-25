@@ -47,9 +47,11 @@ pub use types::{
     MobileDeliveryRecord, MobileDeliveryStatus, MobileDeliverySummary, MobileDemoContact,
     MobileDemoContactState, MobileDeviceDeliveryRecord, MobileDeviceDeliveryStatus,
     MobileDeviceInfo, MobileDeviceLinkData, MobileDeviceLinkInfo, MobileDeviceLinkResult,
-    MobileExchangeData, MobileExchangeResult, MobileFieldType, MobileFieldValidation,
-    MobileRecoveryClaim, MobileRecoveryProgress, MobileRecoveryVerification, MobileRecoveryVoucher,
-    MobileRetryEntry, MobileSocialNetwork, MobileSyncResult, MobileSyncStatus, MobileTrustLevel,
+    MobileExchangeData, MobileExchangeResult, MobileFaqItem, MobileFieldType,
+    MobileFieldValidation, MobileHelpCategory, MobileHelpCategoryInfo, MobileLocale,
+    MobileLocaleInfo, MobileRecoveryClaim, MobileRecoveryProgress, MobileRecoveryVerification,
+    MobileRecoveryVoucher, MobileRetryEntry, MobileSocialNetwork, MobileSyncResult,
+    MobileSyncStatus, MobileTheme, MobileThemeColors, MobileThemeMode, MobileTrustLevel,
     MobileValidationStatus, MobileVisibilityLabel, MobileVisibilityLabelDetail,
 };
 
@@ -186,6 +188,141 @@ pub fn is_allowed_scheme(scheme: String) -> bool {
 #[uniffi::export]
 pub fn is_blocked_scheme(scheme: String) -> bool {
     vauchi_core::is_blocked_scheme(&scheme)
+}
+
+// ============================================================
+// Theme Functions
+// ============================================================
+
+/// Get all available bundled themes.
+#[uniffi::export]
+pub fn get_available_themes() -> Vec<MobileTheme> {
+    vauchi_core::theme::get_bundled_themes()
+        .iter()
+        .map(MobileTheme::from)
+        .collect()
+}
+
+/// Get a specific theme by ID.
+///
+/// Returns None if the theme is not found.
+#[uniffi::export]
+pub fn get_theme(theme_id: String) -> Option<MobileTheme> {
+    vauchi_core::theme::get_theme_by_id(&theme_id).map(|t| MobileTheme::from(&t))
+}
+
+/// Get the default theme ID based on system preference.
+///
+/// Returns "default-dark" for dark mode, "default-light" for light mode.
+#[uniffi::export]
+pub fn get_default_theme_id(prefer_dark: bool) -> String {
+    if prefer_dark {
+        "default-dark".to_string()
+    } else {
+        "default-light".to_string()
+    }
+}
+
+// ============================================================
+// i18n Functions
+// ============================================================
+
+/// Get all available locales.
+#[uniffi::export]
+pub fn get_available_locales() -> Vec<MobileLocaleInfo> {
+    vauchi_core::i18n::get_available_locales()
+        .into_iter()
+        .map(|l| MobileLocaleInfo::from(vauchi_core::i18n::get_locale_info(l)))
+        .collect()
+}
+
+/// Get information about a specific locale.
+#[uniffi::export]
+pub fn get_locale_info(locale: MobileLocale) -> MobileLocaleInfo {
+    MobileLocaleInfo::from(vauchi_core::i18n::get_locale_info(locale.into()))
+}
+
+/// Get a localized string by key.
+///
+/// Falls back to English if the key is not found in the requested locale.
+#[uniffi::export]
+pub fn get_string(locale: MobileLocale, key: String) -> String {
+    types::mobile_get_string(locale, key)
+}
+
+/// Get a localized string with argument interpolation.
+///
+/// Arguments are replaced in the string using {placeholder} syntax.
+/// Falls back to English if the key is not found in the requested locale.
+#[uniffi::export]
+pub fn get_string_with_args(
+    locale: MobileLocale,
+    key: String,
+    args: std::collections::HashMap<String, String>,
+) -> String {
+    types::mobile_get_string_with_args(locale, key, args)
+}
+
+/// Parse a locale code to MobileLocale.
+///
+/// Supports codes like "en", "en-US", "de-DE", etc.
+/// Returns None if the code is not recognized.
+#[uniffi::export]
+pub fn parse_locale_code(code: String) -> Option<MobileLocale> {
+    vauchi_core::i18n::Locale::from_code(&code).map(MobileLocale::from)
+}
+
+// ============================================================
+// Help Functions
+// ============================================================
+
+/// Get all help categories with their display names.
+#[uniffi::export]
+pub fn get_help_categories() -> Vec<MobileHelpCategoryInfo> {
+    vauchi_core::help::HelpCategory::all()
+        .iter()
+        .map(|c| MobileHelpCategoryInfo {
+            category: (*c).into(),
+            display_name: c.display_name().to_string(),
+        })
+        .collect()
+}
+
+/// Get all FAQ items.
+#[uniffi::export]
+pub fn get_faqs() -> Vec<MobileFaqItem> {
+    vauchi_core::help::get_faqs()
+        .iter()
+        .map(MobileFaqItem::from)
+        .collect()
+}
+
+/// Get FAQ items for a specific category.
+#[uniffi::export]
+pub fn get_faqs_by_category(category: MobileHelpCategory) -> Vec<MobileFaqItem> {
+    vauchi_core::help::get_faqs_by_category(category.into())
+        .iter()
+        .map(MobileFaqItem::from)
+        .collect()
+}
+
+/// Get a specific FAQ item by ID.
+///
+/// Returns None if the FAQ is not found.
+#[uniffi::export]
+pub fn get_faq_by_id(id: String) -> Option<MobileFaqItem> {
+    vauchi_core::help::get_faq_by_id(&id).map(|f| MobileFaqItem::from(&f))
+}
+
+/// Search FAQs by query text.
+///
+/// Searches in both questions and answers (case-insensitive).
+#[uniffi::export]
+pub fn search_faqs(query: String) -> Vec<MobileFaqItem> {
+    vauchi_core::help::search_faqs(&query)
+        .iter()
+        .map(MobileFaqItem::from)
+        .collect()
 }
 
 // === Main Interface ===

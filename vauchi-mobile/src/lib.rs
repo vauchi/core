@@ -15,7 +15,7 @@ use tungstenite::stream::MaybeTlsStream;
 use tungstenite::{Message, WebSocket};
 
 use vauchi_core::crypto::ratchet::DoubleRatchetState;
-use vauchi_core::exchange::EncryptedExchangeMessage;
+use vauchi_core::exchange::{DeviceLinkQR, EncryptedExchangeMessage};
 use vauchi_core::recovery::{RecoveryClaim, RecoveryProof, RecoveryVoucher};
 use vauchi_core::{
     Contact, ContactCard, ContactField, Identity, IdentityBackup, SocialNetworkRegistry, Storage,
@@ -46,6 +46,7 @@ pub use types::{
     MobileAhaMoment, MobileAhaMomentType, MobileContact, MobileContactCard, MobileContactField,
     MobileDeliveryRecord, MobileDeliveryStatus, MobileDeliverySummary, MobileDemoContact,
     MobileDemoContactState, MobileDeviceDeliveryRecord, MobileDeviceDeliveryStatus,
+    MobileDeviceInfo, MobileDeviceLinkData, MobileDeviceLinkInfo, MobileDeviceLinkResult,
     MobileExchangeData, MobileExchangeResult, MobileFieldType, MobileFieldValidation,
     MobileRecoveryClaim, MobileRecoveryProgress, MobileRecoveryVerification, MobileRecoveryVoucher,
     MobileRetryEntry, MobileSocialNetwork, MobileSyncResult, MobileSyncStatus, MobileTrustLevel,
@@ -1966,6 +1967,159 @@ impl VauchiMobile {
             Ok(None)
         }
     }
+
+    // === Device Linking Operations ===
+
+    /// Get list of linked devices.
+    ///
+    /// Returns information about all devices linked to this identity.
+    /// The first device (index 0) is the primary device.
+    pub fn get_devices(&self) -> Result<Vec<MobileDeviceInfo>, MobileError> {
+        let storage = self.open_storage()?;
+        let identity = self.get_identity()?;
+
+        // Load device registry from storage
+        let registry = match storage.load_device_registry()? {
+            Some(r) => r,
+            None => {
+                // Return just the current device if no registry exists
+                let device_info = identity.device_info();
+                return Ok(vec![MobileDeviceInfo {
+                    device_index: device_info.device_index(),
+                    device_name: device_info.device_name().to_string(),
+                    is_current: true,
+                    is_active: true,
+                    public_key_prefix: hex::encode(&device_info.device_id()[..8]),
+                    created_at: device_info.created_at(),
+                }]);
+            }
+        };
+
+        let current_device_id = identity.device_info().device_id();
+        let devices = registry
+            .all_devices()
+            .iter()
+            .enumerate()
+            .map(
+                |(idx, d): (usize, &vauchi_core::identity::RegisteredDevice)| MobileDeviceInfo {
+                    device_index: idx as u32,
+                    device_name: d.device_name.clone(),
+                    is_current: d.device_id == *current_device_id,
+                    is_active: d.is_active(),
+                    public_key_prefix: hex::encode(&d.device_id[..8]),
+                    created_at: d.created_at,
+                },
+            )
+            .collect();
+
+        Ok(devices)
+    }
+
+    /// Generate a device link QR code.
+    ///
+    /// Display this QR code on the existing device for a new device to scan.
+    /// The QR expires after 10 minutes.
+    pub fn generate_device_link_qr(&self) -> Result<MobileDeviceLinkData, MobileError> {
+        let identity = self.get_identity()?;
+
+        let qr = DeviceLinkQR::generate(&identity);
+        let qr_data = qr.to_data_string();
+
+        let timestamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+
+        let expires_at = timestamp + 600; // 10 minutes
+
+        Ok(MobileDeviceLinkData {
+            qr_data,
+            identity_public_key: hex::encode(identity.signing_public_key()),
+            timestamp,
+            expires_at,
+        })
+    }
+
+    /// Parse a device link QR code.
+    ///
+    /// Call this on the new device after scanning the QR code displayed
+    /// on an existing device. Returns information about the identity
+    /// to link with.
+    pub fn parse_device_link_qr(
+        &self,
+        qr_data: String,
+    ) -> Result<MobileDeviceLinkInfo, MobileError> {
+        let qr =
+            DeviceLinkQR::from_data_string(&qr_data).map_err(|_| MobileError::InvalidQrCode)?;
+
+        Ok(MobileDeviceLinkInfo {
+            identity_public_key: hex::encode(qr.identity_public_key()),
+            timestamp: qr.timestamp(),
+            is_expired: qr.is_expired(),
+        })
+    }
+
+    /// Get the device count.
+    ///
+    /// Returns the number of devices linked to this identity.
+    pub fn device_count(&self) -> Result<u32, MobileError> {
+        let storage = self.open_storage()?;
+
+        match storage.load_device_registry()? {
+            Some(r) => Ok(r.device_count() as u32),
+            None => Ok(1), // Just this device
+        }
+    }
+
+    /// Unlink a device from this identity.
+    ///
+    /// This marks the device as revoked. It will no longer receive updates
+    /// and its keys will be rotated out. Returns true if the device was
+    /// found and unlinked.
+    ///
+    /// Note: Cannot unlink the current device (use account deletion instead).
+    /// The device_index is the position in the devices list (0-based).
+    pub fn unlink_device(&self, device_index: u32) -> Result<bool, MobileError> {
+        let storage = self.open_storage()?;
+        let identity = self.get_identity()?;
+
+        // Load registry
+        let mut registry = match storage.load_device_registry()? {
+            Some(r) => r,
+            None => return Ok(false), // No registry means no other devices
+        };
+
+        // Get device at index
+        let devices = registry.all_devices();
+        if device_index as usize >= devices.len() {
+            return Ok(false);
+        }
+
+        let device_id = devices[device_index as usize].device_id;
+        let current_device_id = identity.device_info().device_id();
+
+        // Cannot unlink current device
+        if device_id == *current_device_id {
+            return Err(MobileError::InvalidInput(
+                "Cannot unlink the current device".to_string(),
+            ));
+        }
+
+        // Try to revoke the device
+        match registry.revoke_device(&device_id, identity.signing_keypair()) {
+            Ok(()) => {
+                storage.save_device_registry(&registry)?;
+                Ok(true)
+            }
+            Err(_) => Ok(false),
+        }
+    }
+
+    /// Check if this device is the primary device (index 0).
+    pub fn is_primary_device(&self) -> Result<bool, MobileError> {
+        let identity = self.get_identity()?;
+        Ok(identity.device_info().device_index() == 0)
+    }
 }
 
 // Internal implementation methods for content updates (feature-gated)
@@ -2205,5 +2359,78 @@ mod tests {
         assert!(wb2.has_identity());
         let name = wb2.get_display_name().unwrap();
         assert_eq!(name, "Alice");
+    }
+
+    #[test]
+    fn test_get_devices_no_registry() {
+        let (wb, _dir) = create_test_instance();
+        wb.create_identity("Alice".to_string()).unwrap();
+
+        // Without a registry, should return just the current device
+        let devices = wb.get_devices().unwrap();
+        assert_eq!(devices.len(), 1);
+        assert!(devices[0].is_current);
+        assert!(devices[0].is_active);
+        assert_eq!(devices[0].device_index, 0);
+    }
+
+    #[test]
+    fn test_generate_device_link_qr() {
+        let (wb, _dir) = create_test_instance();
+        wb.create_identity("Alice".to_string()).unwrap();
+
+        let link_data = wb.generate_device_link_qr().unwrap();
+        assert!(!link_data.qr_data.is_empty());
+        assert!(!link_data.identity_public_key.is_empty());
+        assert!(link_data.expires_at > link_data.timestamp);
+    }
+
+    #[test]
+    fn test_parse_device_link_qr() {
+        let (wb, _dir) = create_test_instance();
+        wb.create_identity("Alice".to_string()).unwrap();
+
+        let link_data = wb.generate_device_link_qr().unwrap();
+        let parsed = wb.parse_device_link_qr(link_data.qr_data).unwrap();
+
+        assert_eq!(parsed.identity_public_key, link_data.identity_public_key);
+        assert!(!parsed.is_expired);
+    }
+
+    #[test]
+    fn test_parse_device_link_qr_invalid() {
+        let (wb, _dir) = create_test_instance();
+        wb.create_identity("Alice".to_string()).unwrap();
+
+        let result = wb.parse_device_link_qr("invalid_qr_data".to_string());
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_device_count() {
+        let (wb, _dir) = create_test_instance();
+        wb.create_identity("Alice".to_string()).unwrap();
+
+        let count = wb.device_count().unwrap();
+        assert_eq!(count, 1);
+    }
+
+    #[test]
+    fn test_is_primary_device() {
+        let (wb, _dir) = create_test_instance();
+        wb.create_identity("Alice".to_string()).unwrap();
+
+        let is_primary = wb.is_primary_device().unwrap();
+        assert!(is_primary);
+    }
+
+    #[test]
+    fn test_unlink_device_no_registry() {
+        let (wb, _dir) = create_test_instance();
+        wb.create_identity("Alice".to_string()).unwrap();
+
+        // No registry means no devices to unlink
+        let result = wb.unlink_device(1).unwrap();
+        assert!(!result);
     }
 }

@@ -262,7 +262,6 @@ impl From<&vauchi_core::VisibilityLabel> for MobileVisibilityLabelDetail {
 // === Device Linking Types ===
 
 /// Device link QR data for display on existing device.
-#[allow(dead_code)]
 #[derive(Debug, Clone, uniffi::Record)]
 pub struct MobileDeviceLinkData {
     /// QR code content (base64-encoded link data).
@@ -276,7 +275,6 @@ pub struct MobileDeviceLinkData {
 }
 
 /// Device link info parsed from QR code.
-#[allow(dead_code)]
 #[derive(Debug, Clone, uniffi::Record)]
 pub struct MobileDeviceLinkInfo {
     /// Identity public key (hex).
@@ -288,7 +286,6 @@ pub struct MobileDeviceLinkInfo {
 }
 
 /// Result of completing device link (for existing device).
-#[allow(dead_code)]
 #[derive(Debug, Clone, uniffi::Record)]
 pub struct MobileDeviceLinkResult {
     /// Whether linking was successful.
@@ -302,7 +299,6 @@ pub struct MobileDeviceLinkResult {
 }
 
 /// Device info for display.
-#[allow(dead_code)]
 #[derive(Debug, Clone, uniffi::Record)]
 pub struct MobileDeviceInfo {
     /// Device index (0 = primary device).
@@ -315,6 +311,8 @@ pub struct MobileDeviceInfo {
     pub is_active: bool,
     /// Public key prefix (hex, first 16 chars).
     pub public_key_prefix: String,
+    /// Unix timestamp when the device was created.
+    pub created_at: u64,
 }
 
 // === Delivery Status Types ===

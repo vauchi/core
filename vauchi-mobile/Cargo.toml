@@ -16,7 +16,8 @@ content-updates = ["vauchi-core/content-updates", "tokio"]
 
 [dependencies]
 # Core Vauchi library (with rustls for Android/iOS - no OpenSSL dependency)
-vauchi-core = { path = "../vauchi-core", default-features = false, features = ["network-rustls"] }
+# Note: version required for `cargo package` (path used for local dev, version for published crate)
+vauchi-core = { path = "../vauchi-core", version = "0.1.0", default-features = false, features = ["network-rustls"] }
 
 # Async runtime for content updates (optional)
 tokio = { version = "1.0", features = ["rt-multi-thread"], optional = true }

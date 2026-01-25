@@ -239,10 +239,21 @@ build:android:
   extends: [.linux-runner, .release-only]
   stage: build
   needs: [release:verify]
-  variables:
-    ANDROID_NDK_HOME: /opt/android-sdk/ndk/26.1.10909125
   before_script:
     - !reference [.self-hosted, before_script]
+    # Find Android NDK - check common locations
+    - |
+      for ndk_path in /opt/android-sdk/ndk/* /opt/android-ndk $HOME/Android/Sdk/ndk/*; do
+        if [ -d "$ndk_path" ]; then
+          export ANDROID_NDK_HOME="$ndk_path"
+          echo "Found Android NDK at: $ANDROID_NDK_HOME"
+          break
+        fi
+      done
+      if [ -z "$ANDROID_NDK_HOME" ]; then
+        echo "ERROR: Android NDK not found. Please install it or set ANDROID_NDK_HOME."
+        exit 1
+      fi
     - rustup target add aarch64-linux-android x86_64-linux-android
   script:
     - ./scripts/build-bindings.sh --android
@@ -399,9 +410,21 @@ build:dev:
       when: manual
   variables:
     DEV_VERSION: "dev-${CI_COMMIT_SHORT_SHA}"
-    ANDROID_NDK_HOME: /opt/android-sdk/ndk/26.1.10909125
   before_script:
     - !reference [.self-hosted, before_script]
+    # Find Android NDK - check common locations
+    - |
+      for ndk_path in /opt/android-sdk/ndk/* /opt/android-ndk $HOME/Android/Sdk/ndk/*; do
+        if [ -d "$ndk_path" ]; then
+          export ANDROID_NDK_HOME="$ndk_path"
+          echo "Found Android NDK at: $ANDROID_NDK_HOME"
+          break
+        fi
+      done
+      if [ -z "$ANDROID_NDK_HOME" ]; then
+        echo "ERROR: Android NDK not found. Please install it or set ANDROID_NDK_HOME."
+        exit 1
+      fi
     - rustup target add aarch64-linux-android x86_64-linux-android
   script:
     - ./scripts/build-bindings.sh --android

@@ -24,48 +24,6 @@ Vauchi lets you exchange "living" contact cards. When you update your informatio
 - **End-to-End Encrypted** - No server can read your data
 - **Decentralized** - Relay servers only pass encrypted blobs; they have zero knowledge
 
-## Repository Structure
-
-This is the main Rust monorepo containing all core components:
-
-```
-vauchi-core/     # Core library (cryptography, protocols, data models)
-vauchi-relay/    # WebSocket relay server for message forwarding
-vauchi-cli/      # Command-line interface for testing
-vauchi-tui/      # Terminal UI (ratatui)
-vauchi-desktop/  # Desktop app (Tauri + SolidJS)
-vauchi-mobile/   # UniFFI bindings for iOS/Android
-features/        # Gherkin BDD scenarios
-scripts/         # Build and utility scripts
-```
-
-## Related Repositories
-
-| Repository | Description |
-|------------|-------------|
-| [vauchi/android](https://gitlab.com/vauchi/android) | Android app (Kotlin/Compose) - consumes UniFFI bindings |
-| [vauchi/ios](https://gitlab.com/vauchi/ios) | iOS app (SwiftUI) - consumes UniFFI bindings |
-| [vauchi/website](https://gitlab.com/vauchi/website) | Landing page at vauchi.app |
-| [vauchi/docs](https://gitlab.com/vauchi/docs) | User & developer documentation |
-| [vauchi/assets](https://gitlab.com/vauchi/assets) | Brand assets, logos, screenshots |
-| [vauchi/strategy](https://gitlab.com/vauchi/strategy) | Development, go-live, and community strategy |
-| [vauchi/infra](https://gitlab.com/vauchi/infra) | Deployment configs (private) |
-| [vauchi/dev-tools](https://gitlab.com/vauchi/dev-tools) | Workspace setup and helper scripts |
-
-## Quick Start
-
-```bash
-# Run tests
-cargo test --workspace
-
-# Start relay server
-cargo run -p vauchi-relay
-
-# CLI commands
-cargo run -p vauchi-cli -- init "Alice"
-cargo run -p vauchi-cli -- sync
-```
-
 ## Development
 
 ### Prerequisites

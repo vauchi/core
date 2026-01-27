@@ -108,8 +108,6 @@ security:licenses:
 build:ios:main:
   extends: [.macos-runner, .main-only]
   stage: build
-  before_script:
-    - rustup target add aarch64-apple-ios x86_64-apple-ios
   script:
     - ./scripts/build-bindings.sh --ios
   artifacts:

@@ -91,12 +91,11 @@ if $BUILD_IOS; then
         echo -e "${YELLOW}SKIPPED: iOS build requires macOS${NC}"
     else
         # Check for required iOS targets
-        if ! rustup target list --installed | grep -q "aarch64-apple-ios"; then
-            echo "Installing iOS targets..."
-            rustup target add aarch64-apple-ios
-            rustup target add aarch64-apple-ios-sim
-            rustup target add x86_64-apple-ios
-        fi
+        echo "Installing iOS targets..."
+        rustup target add aarch64-apple-ios
+        rustup target add aarch64-apple-ios-sim
+        rustup target add x86_64-apple-ios
+        
 
         # Build for iOS device (ARM64)
         echo -e "${YELLOW}Building for aarch64-apple-ios (device)...${NC}"

@@ -30,3 +30,7 @@ dist/
 # Sibling repositories (separate git repos)
 /vauchi-website/
 /vauchi-market/
+
+
+.sccache/
+.claude/

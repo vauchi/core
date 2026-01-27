@@ -92,20 +92,23 @@ if $BUILD_IOS; then
     else
         # Check for required iOS targets
         echo "Installing iOS targets..."
-        rustup target add aarch64-apple-ios
-        rustup target add aarch64-apple-ios-sim
-        rustup target add x86_64-apple-ios
         
-
+        rustup target add aarch64-apple-ios
+        cargo build --target aarch64-apple-ios
         # Build for iOS device (ARM64)
         echo -e "${YELLOW}Building for aarch64-apple-ios (device)...${NC}"
         cargo build -p vauchi-mobile --target aarch64-apple-ios --release
         echo -e "${GREEN}iOS device build complete${NC}"
 
+        rustup target add aarch64-apple-ios-sim
+        cargo build --target aarch64-apple-ios-sim
         # Build for iOS simulator (ARM64 - Apple Silicon)
         echo -e "${YELLOW}Building for aarch64-apple-ios-sim (simulator ARM64)...${NC}"
         cargo build -p vauchi-mobile --target aarch64-apple-ios-sim --release
         echo -e "${GREEN}iOS simulator ARM64 build complete${NC}"
+
+        rustup target add x86_64-apple-ios
+        cargo build --target x86_64-apple-ios
 
         # Build for iOS simulator (x86_64 - Intel)
         echo -e "${YELLOW}Building for x86_64-apple-ios (simulator x86_64)...${NC}"

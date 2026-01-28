@@ -48,21 +48,25 @@ stages:
 # ============================================================
 
 lint:format:
-  extends: [.linux-runner, .validation-rust]
+  extends: [.linux-runner, .validation-rust, .timeout-quick]
   stage: lint
+  cache:
+    policy: pull  # Read-only cache - lint doesn't need to update
   script:
     - rustup component add rustfmt
     - cargo fmt --all -- --check
 
 lint:clippy:
-  extends: [.linux-runner, .validation-rust]
+  extends: [.linux-runner, .validation-rust, .timeout-quick]
   stage: lint
+  cache:
+    policy: pull  # Read-only cache - lint doesn't need to update
   script:
     - rustup component add clippy
     - cargo clippy --all-targets -- -D warnings
 
 lint:reuse:
-  extends: .validation-reuse
+  extends: [.validation-reuse, .timeout-quick]
   image:
     name: fsfe/reuse:latest
     entrypoint: [""]
@@ -76,7 +80,7 @@ lint:reuse:
 # ============================================================
 
 test:
-  extends: [.linux-runner, .validation-rust]
+  extends: [.linux-runner, .validation-rust, .timeout-standard]
   stage: test
   before_script:
     - !reference [.self-hosted, before_script]
@@ -102,16 +106,20 @@ test:
 
 # Rust-specific security audit (runs on dependency changes)
 security:audit:
-  extends: [.linux-runner, .validation-deps]
+  extends: [.linux-runner, .validation-deps, .timeout-quick]
   stage: security
+  cache:
+    policy: pull  # Read-only cache
   script:
     - cargo install cargo-audit || true
     - cargo audit
 
 # License compliance via cargo-deny (runs on dependency or deny.toml changes)
 security:licenses:
-  extends: [.linux-runner, .validation-licenses]
+  extends: [.linux-runner, .validation-licenses, .timeout-quick]
   stage: security
+  cache:
+    policy: pull  # Read-only cache
   script:
     - cargo install cargo-deny || true
     - cargo deny check licenses
@@ -125,7 +133,7 @@ security:licenses:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
 
 build:ios:main:
-  extends: [.macos-runner, .main-only]
+  extends: [.macos-runner, .main-only, .timeout-extended]
   stage: build
   script:
     - ./scripts/build-bindings.sh --ios
@@ -135,7 +143,7 @@ build:ios:main:
     expire_in: 1 week
 
 build:android:main:
-  extends: [.linux-runner, .main-only]
+  extends: [.linux-runner, .main-only, .timeout-long]
   stage: build
   before_script:
     - !reference [.self-hosted, before_script]
@@ -180,7 +188,7 @@ release:verify:
       fi
 
 build:ios:
-  extends: [.macos-runner, .release-only]
+  extends: [.macos-runner, .release-only, .timeout-extended]
   stage: build
   needs: [release:verify]
   script:
@@ -191,7 +199,7 @@ build:ios:
     expire_in: 1 day
 
 build:android:
-  extends: [.linux-runner, .release-only]
+  extends: [.linux-runner, .release-only, .timeout-long]
   stage: build
   needs: [release:verify]
   before_script:
@@ -395,3 +403,16 @@ build:dev:
     paths:
       - dist/
     expire_in: 3 days
+
+# ============================================================
+# Cleanup Stage (scheduled or manual)
+# ============================================================
+# Runs periodically to clean up runner disk space
+
+cleanup:runner:
+  extends: .cleanup-runner
+  # Run weekly via scheduled pipeline or manually
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+    - when: manual
+      allow_failure: true

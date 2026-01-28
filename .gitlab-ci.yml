@@ -57,7 +57,9 @@ lint:clippy:
     - cargo clippy --all-targets -- -D warnings
 
 lint:reuse:
-  image: fsfe/reuse:latest
+  image:
+    name: fsfe/reuse:latest
+    entrypoint: [""]
   stage: lint
   script:
     - reuse lint

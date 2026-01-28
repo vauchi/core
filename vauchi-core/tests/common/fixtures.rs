@@ -124,11 +124,9 @@ pub mod edge_cases {
     /// String with special characters.
     pub const SPECIAL_CHARS: &str = "!@#$%^&*()[]{}|;':\",./<>?`~";
     /// String with newlines.
-    pub const WITH_NEWLINES: &str = "line1
-line2
-line3";
+    pub const WITH_NEWLINES: &str = "line1\nline2\nline3";
     /// String with tabs.
-    pub const WITH_TABS: &str = "col1	col2	col3";
+    pub const WITH_TABS: &str = "col1\tcol2\tcol3";
 }
 
 /// Sample hex-encoded public keys for testing.

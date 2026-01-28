@@ -972,7 +972,7 @@ mod tests {
 
     #[test]
     fn test_device_link_qr_wrong_magic() {
-        let data = BASE64.encode(b"XXXX01   ");
+        let data = BASE64.encode(b"XXXX01\x00\x00\x00");
         let result = DeviceLinkQR::from_data_string(&data);
         assert!(matches!(result, Err(ExchangeError::InvalidQRFormat)));
     }
@@ -1080,7 +1080,7 @@ mod tests {
     #[test]
     fn test_device_link_qr_truncated_data() {
         // Data too short
-        let data = BASE64.encode(b"WBDLshort");
+        let data = BASE64.encode(b"WBDL\x01short");
         let result = DeviceLinkQR::from_data_string(&data);
 
         assert!(matches!(result, Err(ExchangeError::InvalidQRFormat)));

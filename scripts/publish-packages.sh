@@ -39,10 +39,10 @@ TOKEN="${CI_JOB_TOKEN:-${GITLAB_TOKEN:-}}"
 PACKAGE_NAME="vauchi-mobile"
 
 # Colors
-RED='[0;31m'
-GREEN='[0;32m'
-YELLOW='[1;33m'
-NC='[0m'
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m'
 
 echo -e "${YELLOW}╔════════════════════════════════════════╗${NC}"
 echo -e "${YELLOW}║     Publish Packages v$VERSION            ${NC}"
@@ -96,8 +96,7 @@ upload_file() {
     echo -e "${YELLOW}Uploading $filename...${NC}"
 
     local response
-    response=$(curl -s -w "
-%{http_code}" \
+    response=$(curl -s -w "\n%{http_code}" \
         --header "$AUTH_HEADER" \
         --upload-file "$file" \
         "$PACKAGE_URL/$filename")

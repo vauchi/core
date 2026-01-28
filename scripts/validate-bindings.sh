@@ -14,10 +14,10 @@ PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 WORKSPACE_ROOT="$(dirname "$PROJECT_ROOT")"
 
 # Colors
-RED='[0;31m'
-GREEN='[0;32m'
-YELLOW='[1;33m'
-NC='[0m'
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m'
 
 # Expected types that must be present in bindings
 # Update this list when adding new UniFFI-exported types

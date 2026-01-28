@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+//
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Device Linking Protocol
 //!
 //! Enables linking multiple devices to the same identity via QR code scanning.
@@ -968,7 +972,7 @@ mod tests {
 
     #[test]
     fn test_device_link_qr_wrong_magic() {
-        let data = BASE64.encode(b"XXXX01\x00\x00\x00");
+        let data = BASE64.encode(b"XXXX01   ");
         let result = DeviceLinkQR::from_data_string(&data);
         assert!(matches!(result, Err(ExchangeError::InvalidQRFormat)));
     }
@@ -1076,7 +1080,7 @@ mod tests {
     #[test]
     fn test_device_link_qr_truncated_data() {
         // Data too short
-        let data = BASE64.encode(b"WBDL\x01short");
+        let data = BASE64.encode(b"WBDLshort");
         let result = DeviceLinkQR::from_data_string(&data);
 
         assert!(matches!(result, Err(ExchangeError::InvalidQRFormat)));

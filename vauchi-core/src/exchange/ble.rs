@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+//
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! BLE Exchange Module
 //!
 //! Bluetooth Low Energy proximity verification and contact exchange for mobile platforms.

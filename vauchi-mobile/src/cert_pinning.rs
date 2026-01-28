@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+//
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Certificate pinning for TLS connections.
 //!
 //! This module provides TLS certificate pinning support for relay connections,

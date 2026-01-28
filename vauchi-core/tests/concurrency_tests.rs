@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+//
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Concurrency Tests for SQLite Storage
 //!
 //! These tests verify thread safety and concurrent access patterns for the

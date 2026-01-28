@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+//
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Storage operations for visibility labels.
 //!
 //! Provides CRUD operations for persisting labels and per-contact overrides.

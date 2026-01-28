@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+//
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Identity Workflow Integration Tests
 //!
 //! Tests for identity creation, multi-device linking, and device registry operations.

@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+//
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Test Fixtures
 //!
 //! Pre-defined test data for common scenarios.
@@ -120,9 +124,11 @@ pub mod edge_cases {
     /// String with special characters.
     pub const SPECIAL_CHARS: &str = "!@#$%^&*()[]{}|;':\",./<>?`~";
     /// String with newlines.
-    pub const WITH_NEWLINES: &str = "line1\nline2\nline3";
+    pub const WITH_NEWLINES: &str = "line1
+line2
+line3";
     /// String with tabs.
-    pub const WITH_TABS: &str = "col1\tcol2\tcol3";
+    pub const WITH_TABS: &str = "col1	col2	col3";
 }
 
 /// Sample hex-encoded public keys for testing.

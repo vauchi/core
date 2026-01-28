@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+//
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Delta Encoding for Contact Card Updates
 //!
 //! Provides efficient delta-based updates that only transmit changed fields

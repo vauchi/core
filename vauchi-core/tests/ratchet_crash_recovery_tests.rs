@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+//
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Ratchet Crash Recovery Tests
 //!
 //! Tests for ratchet state persistence and recovery after crashes.

@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+//
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! X3DH Key Agreement Protocol
 //!
 //! Implements a simplified X3DH-style key agreement for contact exchange.

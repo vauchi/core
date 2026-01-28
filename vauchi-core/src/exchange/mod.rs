@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+//
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Contact Exchange Module
 //!
 //! Handles peer-to-peer contact exchange via QR codes, audio proximity,

@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 # GitLab CI for vauchi-core
 #
 # Pipeline strategy:
@@ -51,6 +55,15 @@ lint:clippy:
   script:
     - rustup component add clippy
     - cargo clippy --all-targets -- -D warnings
+
+lint:reuse:
+  image: fsfe/reuse:latest
+  stage: lint
+  script:
+    - reuse lint
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == "main"
 
 # ============================================================
 # Test Stage (MR only - combined test + coverage)

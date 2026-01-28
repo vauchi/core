@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+//
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Demo Contact Integration Tests
 //!
 //! Integration tests verifying demo contact feature against Gherkin scenarios.

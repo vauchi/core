@@ -1,0 +1,37 @@
+# SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+version = 1
+SPDX-PackageName = "vauchi-core"
+SPDX-PackageSupplier = "Mattia Egloff <mattia.egloff@pm.me>"
+
+# License files
+[[annotations]]
+path = ["LICENSES/**"]
+SPDX-FileCopyrightText = "Free Software Foundation"
+SPDX-License-Identifier = "GPL-3.0-or-later"
+
+# Lock files
+[[annotations]]
+path = ["**/Cargo.lock", "**/*.lock"]
+SPDX-FileCopyrightText = "2026 Mattia Egloff <mattia.egloff@pm.me>"
+SPDX-License-Identifier = "GPL-3.0-or-later"
+
+# Git and editor config files
+[[annotations]]
+path = [".gitignore", "**/.gitignore", ".DS_Store", "**/.gitkeep", ".dockerignore"]
+SPDX-FileCopyrightText = "2026 Mattia Egloff <mattia.egloff@pm.me>"
+SPDX-License-Identifier = "GPL-3.0-or-later"
+
+# JSON data files (can't have comments)
+[[annotations]]
+path = ["**/*.json"]
+SPDX-FileCopyrightText = "2026 Mattia Egloff <mattia.egloff@pm.me>"
+SPDX-License-Identifier = "GPL-3.0-or-later"
+
+# Cargo config
+[[annotations]]
+path = [".cargo/**"]
+SPDX-FileCopyrightText = "2026 Mattia Egloff <mattia.egloff@pm.me>"
+SPDX-License-Identifier = "GPL-3.0-or-later"

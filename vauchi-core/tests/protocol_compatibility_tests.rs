@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+//
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Protocol Compatibility Tests
 //!
 //! These tests use "golden" fixtures - known-good serialized JSON that current

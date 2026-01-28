@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+//
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Symmetric Encryption (AES-256-GCM)
 //!
 //! Provides authenticated encryption using AES-256-GCM via the audited `ring` library.

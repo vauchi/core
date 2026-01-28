@@ -60,6 +60,7 @@ lint:reuse:
   image:
     name: fsfe/reuse:latest
     entrypoint: [""]
+  tags: [docker]
   stage: lint
   script:
     - reuse lint

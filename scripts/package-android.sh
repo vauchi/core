@@ -161,8 +161,12 @@ ZIP_PATH="$DIST_DIR/vauchi-mobile-android-$VERSION.zip"
 cd "$BUILD_DIR"
 zip -r "$ZIP_PATH" "vauchi-mobile-android-$VERSION"
 
-# Calculate checksum
-CHECKSUM=$(shasum -a 256 "$ZIP_PATH" | cut -d' ' -f1)
+# Calculate checksum (cross-platform: shasum on macOS, sha256sum on Linux)
+if command -v sha256sum >/dev/null 2>&1; then
+    CHECKSUM=$(sha256sum "$ZIP_PATH" | cut -d' ' -f1)
+else
+    CHECKSUM=$(shasum -a 256 "$ZIP_PATH" | cut -d' ' -f1)
+fi
 
 echo ""
 echo -e "${GREEN}╔════════════════════════════════════════╗${NC}"

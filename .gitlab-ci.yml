@@ -5,13 +5,18 @@
 # GitLab CI for vauchi-core
 #
 # Pipeline strategy:
-#   - MR: Full validation (lint, test+coverage, security, licenses)
+#   - MR: Validation (lint, test+coverage, security) - runs only on relevant changes
 #   - Main: Build mobile bindings (iOS + Android) for downstream repos
 #   - Tags (v*): Build, package, publish releases
 #
 # Uses shared templates from vauchi/scripts for consistency.
 #
 # Performance optimizations:
+#   - Change-based rules: Jobs run only when relevant files change
+#     - Rust lint/test: *.rs, Cargo.toml, Cargo.lock
+#     - REUSE lint: LICENSES/, REUSE.toml, LICENSE*
+#     - Security audit: Cargo.toml, Cargo.lock (dependencies)
+#     - License check: Cargo.*, deny.toml
 #   - Test and coverage combined in single pass
 #   - Parallel build jobs (iOS + Android)
 #   - sccache for shared compilation cache (30-50% faster rebuilds)
@@ -39,24 +44,25 @@ stages:
   - trigger
 
 # ============================================================
-# Lint Stage (MR only)
+# Lint Stage (MR only, change-based)
 # ============================================================
 
 lint:format:
-  extends: [.linux-runner, .validation-only]
+  extends: [.linux-runner, .validation-rust]
   stage: lint
   script:
     - rustup component add rustfmt
     - cargo fmt --all -- --check
 
 lint:clippy:
-  extends: [.linux-runner, .validation-only]
+  extends: [.linux-runner, .validation-rust]
   stage: lint
   script:
     - rustup component add clippy
     - cargo clippy --all-targets -- -D warnings
 
 lint:reuse:
+  extends: .validation-reuse
   image:
     name: fsfe/reuse:latest
     entrypoint: [""]
@@ -64,16 +70,13 @@ lint:reuse:
   stage: lint
   script:
     - reuse lint
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-    - if: $CI_COMMIT_BRANCH == "main"
 
 # ============================================================
-# Test Stage (MR only - combined test + coverage)
+# Test Stage (MR only, runs on Rust code changes)
 # ============================================================
 
 test:
-  extends: [.linux-runner, .validation-only]
+  extends: [.linux-runner, .validation-rust]
   stage: test
   before_script:
     - !reference [.self-hosted, before_script]
@@ -94,20 +97,20 @@ test:
     expire_in: 1 week
 
 # ============================================================
-# Security Stage (MR only)
+# Security Stage (MR only, change-based)
 # ============================================================
 
-# Rust-specific security audit (runs on self-hosted)
+# Rust-specific security audit (runs on dependency changes)
 security:audit:
-  extends: [.linux-runner, .validation-only]
+  extends: [.linux-runner, .validation-deps]
   stage: security
   script:
     - cargo install cargo-audit || true
     - cargo audit
 
-# License compliance via cargo-deny
+# License compliance via cargo-deny (runs on dependency or deny.toml changes)
 security:licenses:
-  extends: [.linux-runner, .validation-only]
+  extends: [.linux-runner, .validation-licenses]
   stage: security
   script:
     - cargo install cargo-deny || true

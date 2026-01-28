@@ -51,11 +51,12 @@ if [[ -z "$TOKEN" ]]; then
     exit 1
 fi
 
-# Determine auth header
+# Determine which API endpoint and auth to use:
+#   - CI: /trigger/pipeline with token as form param (CI_JOB_TOKEN)
+#   - Local: /pipeline with PRIVATE-TOKEN header
+USE_TRIGGER_API=false
 if [[ -n "${CI_JOB_TOKEN:-}" ]]; then
-    AUTH_HEADER="JOB-TOKEN: $TOKEN"
-else
-    AUTH_HEADER="PRIVATE-TOKEN: $TOKEN"
+    USE_TRIGGER_API=true
 fi
 
 trigger_pipeline() {
@@ -65,12 +66,23 @@ trigger_pipeline() {
     echo -e "${YELLOW}Triggering $project_name...${NC}"
 
     local response
-    response=$(curl -s -w "\n%{http_code}" \
-        --request POST \
-        --header "$AUTH_HEADER" \
-        --form "ref=main" \
-        --form "variables[UPSTREAM_VERSION]=$VERSION" \
-        "$GITLAB_URL/api/v4/projects/$project_id/trigger/pipeline")
+    if $USE_TRIGGER_API; then
+        # CI: use /trigger/pipeline with token as form parameter
+        response=$(curl -s -w "\n%{http_code}" \
+            --request POST \
+            --form "token=$TOKEN" \
+            --form "ref=main" \
+            --form "variables[UPSTREAM_VERSION]=$VERSION" \
+            "$GITLAB_URL/api/v4/projects/$project_id/trigger/pipeline")
+    else
+        # Local: use /pipeline with PRIVATE-TOKEN header
+        response=$(curl -s -w "\n%{http_code}" \
+            --request POST \
+            --header "PRIVATE-TOKEN: $TOKEN" \
+            --header "Content-Type: application/json" \
+            --data "{\"ref\":\"main\",\"variables\":[{\"key\":\"UPSTREAM_VERSION\",\"value\":\"$VERSION\"}]}" \
+            "$GITLAB_URL/api/v4/projects/$project_id/pipeline")
+    fi
 
     local http_code=$(echo "$response" | tail -n1)
     local body=$(echo "$response" | head -n -1)

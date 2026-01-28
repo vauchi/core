@@ -112,10 +112,7 @@ build:ios:main:
     - ./scripts/build-bindings.sh --ios
   artifacts:
     paths:
-      - target/aarch64-apple-ios/release/libvauchi_mobile.a
-      - target/aarch64-apple-ios-sim/release/libvauchi_mobile.a
-      - target/x86_64-apple-ios/release/libvauchi_mobile.a
-      - vauchi-mobile/bindings/swift/
+      - target/bindings/ios/
     expire_in: 1 week
 
 build:android:main:
@@ -140,9 +137,7 @@ build:android:main:
     - ./scripts/build-bindings.sh --android
   artifacts:
     paths:
-      - target/aarch64-linux-android/release/libvauchi_mobile.so
-      - target/x86_64-linux-android/release/libvauchi_mobile.so
-      - vauchi-mobile/bindings/kotlin/
+      - target/bindings/android/
     expire_in: 1 week
 
 # ============================================================
@@ -173,8 +168,7 @@ build:ios:
     - ./scripts/build-bindings.sh --ios
   artifacts:
     paths:
-      - ../ios/Vauchi/Generated/
-      - ../ios/Vauchi/Libs/
+      - target/bindings/ios/
     expire_in: 1 day
 
 build:android:
@@ -201,8 +195,7 @@ build:android:
     - ./scripts/build-bindings.sh --android
   artifacts:
     paths:
-      - ../android/app/src/main/jniLibs/
-      - ../android/app/src/main/kotlin/
+      - target/bindings/android/
     expire_in: 1 day
 
 # Validate generated bindings have all expected types
@@ -322,8 +315,8 @@ release:create:
 
       ### Mobile Bindings
 
-      - [iOS XCFramework](${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/vauchi-mobile/${CI_COMMIT_TAG}/VauchiMobileFFI.xcframework.zip)
-      - [Android](${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/vauchi-mobile/${CI_COMMIT_TAG}/vauchi-mobile-android-${CI_COMMIT_TAG}.zip)
+      - [iOS XCFramework](${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/vauchi-mobile/${CI_COMMIT_TAG#v}/VauchiMobileFFI.xcframework.zip)
+      - [Android](${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/vauchi-mobile/${CI_COMMIT_TAG#v}/vauchi-mobile-android-${CI_COMMIT_TAG#v}.zip)
 
       ### Integration
 
@@ -340,30 +333,13 @@ trigger:downstream:
   script:
     - ./scripts/trigger-downstream.sh "$CI_COMMIT_TAG"
 
-# Trigger mobile distribution repos on merge to main
-trigger:swift-package:
-  stage: trigger
-  trigger:
-    project: vauchi/vauchi-mobile-swift
-    strategy: depend
-  rules:
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-      changes:
-        - "src/mobile/**/*"
-        - "vauchi-mobile/**/*"
-    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+/
-
-trigger:android-package:
-  stage: trigger
-  trigger:
-    project: vauchi/vauchi-mobile-android
-    strategy: depend
-  rules:
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-      changes:
-        - "src/mobile/**/*"
-        - "vauchi-mobile/**/*"
-    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+/
+# NOTE: Downstream triggers are handled by trigger:downstream above
+# (via trigger-downstream.sh) which uses the Pipeline Trigger API to
+# pass UPSTREAM_VERSION to distribution repos. This only runs on tags.
+# The trigger:swift-package and trigger:android-package jobs from the
+# downstream.yml template are disabled here — they used GitLab's trigger:
+# keyword which doesn't pass variables and sets a different pipeline
+# source type than what distribution repos expect.
 
 # ============================================================
 # Manual Dev Build (on-demand)

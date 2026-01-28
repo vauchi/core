@@ -25,8 +25,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 DIST_DIR="$PROJECT_ROOT/dist"
 
-# Version from argument or Cargo.toml
-VERSION="${1:-$(grep -m1 'version = ' "$PROJECT_ROOT/Cargo.toml" | sed 's/.*"\(.*\)".*/\1/')}"
+# Version from argument or Cargo.toml (strip v prefix from tags like v0.1.0)
+RAW_VERSION="${1:-$(grep -m1 'version = ' "$PROJECT_ROOT/Cargo.toml" | sed 's/.*"\(.*\)".*/\1/')}"
+VERSION="${RAW_VERSION#v}"
 
 # GitLab configuration
 GITLAB_URL="${CI_SERVER_URL:-https://gitlab.com}"

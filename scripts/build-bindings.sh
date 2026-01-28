@@ -21,17 +21,16 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-# Platform directories
-IOS_DIR="$WORKSPACE_ROOT/ios"
-ANDROID_DIR="$WORKSPACE_ROOT/android"
+# Primary output: always within core/ (works in CI and locally)
+BINDINGS_DIR="$PROJECT_ROOT/target/bindings"
+IOS_GENERATED_DIR="$BINDINGS_DIR/ios/generated"
+IOS_LIBS_DIR="$BINDINGS_DIR/ios/libs"
+ANDROID_JNI_DIR="$BINDINGS_DIR/android/jniLibs"
+ANDROID_KOTLIN_DIR="$BINDINGS_DIR/android/kotlin"
 
-# iOS output directories
-IOS_GENERATED_DIR="$IOS_DIR/Vauchi/Generated"
-IOS_LIBS_DIR="$IOS_DIR/Vauchi/Libs"
-
-# Android output directories
-ANDROID_JNI_DIR="$ANDROID_DIR/app/src/main/jniLibs"
-ANDROID_KOTLIN_DIR="$ANDROID_DIR/app/src/main/kotlin"
+# Optional local install directories (sibling repos for local dev)
+LOCAL_IOS_DIR="$WORKSPACE_ROOT/ios"
+LOCAL_ANDROID_DIR="$WORKSPACE_ROOT/android"
 
 # NDK paths (for Android)
 NDK_HOME="${ANDROID_NDK_HOME:-$HOME/Library/Android/sdk/ndk/26.1.10909125}"
@@ -41,6 +40,7 @@ echo -e "${YELLOW}║     Vauchi UniFFI Bindings Build       ║${NC}"
 echo -e "${YELLOW}╚════════════════════════════════════════╝${NC}"
 echo ""
 echo "Project root: $PROJECT_ROOT"
+echo "Bindings output: $BINDINGS_DIR"
 
 cd "$PROJECT_ROOT"
 
@@ -254,4 +254,28 @@ if $BUILD_ANDROID; then
     echo -e "${GREEN}Android:${NC}"
     echo "  Kotlin bindings: $ANDROID_KOTLIN_DIR/"
     echo "  JNI libraries:   $ANDROID_JNI_DIR/"
+fi
+
+# === Local Install (copy to sibling repos for local development) ===
+if [[ -z "${CI:-}" ]]; then
+    echo ""
+    echo -e "${BLUE}=== Local Install ===${NC}"
+
+    if $BUILD_IOS && [[ -d "$LOCAL_IOS_DIR" ]]; then
+        echo -e "${YELLOW}Copying iOS bindings to $LOCAL_IOS_DIR/...${NC}"
+        mkdir -p "$LOCAL_IOS_DIR/Vauchi/Generated"
+        mkdir -p "$LOCAL_IOS_DIR/Vauchi/Libs"
+        cp -r "$IOS_GENERATED_DIR/"* "$LOCAL_IOS_DIR/Vauchi/Generated/" 2>/dev/null || true
+        cp -r "$IOS_LIBS_DIR/"* "$LOCAL_IOS_DIR/Vauchi/Libs/" 2>/dev/null || true
+        echo -e "${GREEN}  Installed to $LOCAL_IOS_DIR/Vauchi/${NC}"
+    fi
+
+    if $BUILD_ANDROID && [[ -d "$LOCAL_ANDROID_DIR" ]]; then
+        echo -e "${YELLOW}Copying Android bindings to $LOCAL_ANDROID_DIR/...${NC}"
+        mkdir -p "$LOCAL_ANDROID_DIR/app/src/main/jniLibs"
+        mkdir -p "$LOCAL_ANDROID_DIR/app/src/main/kotlin"
+        cp -r "$ANDROID_JNI_DIR/"* "$LOCAL_ANDROID_DIR/app/src/main/jniLibs/" 2>/dev/null || true
+        cp -r "$ANDROID_KOTLIN_DIR/"* "$LOCAL_ANDROID_DIR/app/src/main/kotlin/" 2>/dev/null || true
+        echo -e "${GREEN}  Installed to $LOCAL_ANDROID_DIR/app/src/main/${NC}"
+    fi
 fi

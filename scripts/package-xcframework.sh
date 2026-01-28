@@ -22,13 +22,14 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 WORKSPACE_ROOT="$(dirname "$PROJECT_ROOT")"
 
-# Version from argument or Cargo.toml
-VERSION="${1:-$(grep -m1 'version = ' "$PROJECT_ROOT/Cargo.toml" | sed 's/.*"\(.*\)".*/\1/')}"
+# Version from argument or Cargo.toml (strip v prefix from tags like v0.1.0)
+RAW_VERSION="${1:-$(grep -m1 'version = ' "$PROJECT_ROOT/Cargo.toml" | sed 's/.*"\(.*\)".*/\1/')}"
+VERSION="${RAW_VERSION#v}"
 
-# Paths
-IOS_DIR="$WORKSPACE_ROOT/ios"
-IOS_LIBS_DIR="$IOS_DIR/Vauchi/Libs"
-IOS_GENERATED_DIR="$IOS_DIR/Vauchi/Generated"
+# Paths — read from target/bindings/ (output of build-bindings.sh)
+BINDINGS_DIR="$PROJECT_ROOT/target/bindings"
+IOS_LIBS_DIR="$BINDINGS_DIR/ios/libs"
+IOS_GENERATED_DIR="$BINDINGS_DIR/ios/generated"
 DIST_DIR="$PROJECT_ROOT/dist"
 BUILD_DIR="$PROJECT_ROOT/target/xcframework-build"
 

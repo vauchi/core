@@ -21,13 +21,14 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 WORKSPACE_ROOT="$(dirname "$PROJECT_ROOT")"
 
-# Version from argument or Cargo.toml
-VERSION="${1:-$(grep -m1 'version = ' "$PROJECT_ROOT/Cargo.toml" | sed 's/.*"\(.*\)".*/\1/')}"
+# Version from argument or Cargo.toml (strip v prefix from tags like v0.1.0)
+RAW_VERSION="${1:-$(grep -m1 'version = ' "$PROJECT_ROOT/Cargo.toml" | sed 's/.*"\(.*\)".*/\1/')}"
+VERSION="${RAW_VERSION#v}"
 
-# Paths
-ANDROID_DIR="$WORKSPACE_ROOT/android"
-ANDROID_JNI_DIR="$ANDROID_DIR/app/src/main/jniLibs"
-ANDROID_KOTLIN_DIR="$ANDROID_DIR/app/src/main/kotlin"
+# Paths — read from target/bindings/ (output of build-bindings.sh)
+BINDINGS_DIR="$PROJECT_ROOT/target/bindings"
+ANDROID_JNI_DIR="$BINDINGS_DIR/android/jniLibs"
+ANDROID_KOTLIN_DIR="$BINDINGS_DIR/android/kotlin"
 DIST_DIR="$PROJECT_ROOT/dist"
 BUILD_DIR="$PROJECT_ROOT/target/android-build"
 

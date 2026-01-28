@@ -47,8 +47,18 @@ EXPECTED_TYPES=(
 MIN_SWIFT_LINES=3500
 MIN_KOTLIN_LINES=5000
 
-IOS_BINDINGS="$WORKSPACE_ROOT/ios/Vauchi/Generated/vauchi_mobile.swift"
-ANDROID_BINDINGS="$WORKSPACE_ROOT/android/app/src/main/kotlin/uniffi/vauchi_mobile/vauchi_mobile.kt"
+# Primary: check target/bindings/ (CI and local build output)
+BINDINGS_DIR="$PROJECT_ROOT/target/bindings"
+IOS_BINDINGS="$BINDINGS_DIR/ios/generated/vauchi_mobile.swift"
+ANDROID_BINDINGS="$BINDINGS_DIR/android/kotlin/uniffi/vauchi_mobile/vauchi_mobile.kt"
+
+# Fallback: check sibling repos (legacy local dev paths)
+if [[ ! -f "$IOS_BINDINGS" && -f "$WORKSPACE_ROOT/ios/Vauchi/Generated/vauchi_mobile.swift" ]]; then
+    IOS_BINDINGS="$WORKSPACE_ROOT/ios/Vauchi/Generated/vauchi_mobile.swift"
+fi
+if [[ ! -f "$ANDROID_BINDINGS" && -f "$WORKSPACE_ROOT/android/app/src/main/kotlin/uniffi/vauchi_mobile/vauchi_mobile.kt" ]]; then
+    ANDROID_BINDINGS="$WORKSPACE_ROOT/android/app/src/main/kotlin/uniffi/vauchi_mobile/vauchi_mobile.kt"
+fi
 
 echo -e "${YELLOW}╔════════════════════════════════════════╗${NC}"
 echo -e "${YELLOW}║     Vauchi Bindings Validation         ║${NC}"

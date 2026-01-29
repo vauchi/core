@@ -93,9 +93,22 @@ if $BUILD_IOS; then
     if [[ "$(uname)" != "Darwin" ]]; then
         echo -e "${YELLOW}SKIPPED: iOS build requires macOS${NC}"
     else
+        # Disable sccache for iOS cross-compilation (causes issues with target discovery)
+        unset RUSTC_WRAPPER
+
+        # Show toolchain info for debugging
+        echo "Active Rust toolchain:"
+        rustup show active-toolchain
+        echo ""
+
         # Check for required iOS targets
         echo "Installing iOS targets..."
         rustup target add aarch64-apple-ios aarch64-apple-ios-sim x86_64-apple-ios
+
+        # Verify targets are installed
+        echo "Installed iOS targets:"
+        rustup target list --installed | grep -E "ios|iOS" || echo "WARNING: No iOS targets found!"
+        echo ""
 
         # Build for iOS device (ARM64)
         echo -e "${YELLOW}Building for aarch64-apple-ios (device)...${NC}"

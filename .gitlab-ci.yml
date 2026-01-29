@@ -303,17 +303,31 @@ publish:core:
 publish:mobile:
   extends: [.linux-runner, .release-only]
   stage: publish
-  needs: [release:verify]
+  needs: [publish:core]
   script:
     - |
       VERSION="${CI_COMMIT_TAG#v}"
       echo "Publishing vauchi-mobile $VERSION to GitLab package registry..."
 
-      # Package the crate (--no-verify since vauchi-core isn't on crates.io)
-      cargo package -p vauchi-mobile --allow-dirty --no-verify
+      # Create tarball manually (cargo package requires vauchi-core on crates.io)
+      # Use temp directory to get correct archive structure
+      TMPDIR=$(mktemp -d)
+      PKG_DIR="$TMPDIR/vauchi-mobile-${VERSION}"
+      mkdir -p "$PKG_DIR"
+
+      cp vauchi-mobile/Cargo.toml "$PKG_DIR/"
+      cp vauchi-mobile/uniffi-bindgen.rs "$PKG_DIR/"
+      cp vauchi-mobile/README.md "$PKG_DIR/"
+      cp -r vauchi-mobile/src "$PKG_DIR/"
+      cp -r vauchi-mobile/benches "$PKG_DIR/"
+      cp -r LICENSES "$PKG_DIR/"
+
+      mkdir -p target/package
+      CRATE_FILE="target/package/vauchi-mobile-${VERSION}.crate"
+      tar czf "$CRATE_FILE" -C "$TMPDIR" "vauchi-mobile-${VERSION}"
+      rm -rf "$TMPDIR"
 
       # Upload to GitLab generic packages registry
-      CRATE_FILE="target/package/vauchi-mobile-${VERSION}.crate"
       curl --header "JOB-TOKEN: ${CI_JOB_TOKEN}" \
            --upload-file "$CRATE_FILE" \
            "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/vauchi-mobile/${VERSION}/vauchi-mobile-${VERSION}.crate"

@@ -6,7 +6,6 @@
 #
 # Pipeline strategy:
 #   - MR: Validation (lint, test+coverage, security) - runs only on relevant changes
-#   - Main: Build mobile bindings (iOS + Android) for downstream repos
 #   - Tags (v*): Build, package, publish releases
 #
 # Uses shared templates from vauchi/scripts for consistency.
@@ -123,49 +122,6 @@ security:licenses:
   script:
     - cargo install cargo-deny || true
     - cargo deny check licenses
-
-# ============================================================
-# Build Stage - Main Branch (build bindings for downstream)
-# ============================================================
-
-.main-only:
-  rules:
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-
-build:ios:main:
-  extends: [.macos-runner, .main-only, .timeout-extended]
-  stage: build
-  script:
-    - ./scripts/build-bindings.sh --ios
-  artifacts:
-    paths:
-      - target/bindings/ios/
-    expire_in: 1 week
-
-build:android:main:
-  extends: [.linux-runner, .main-only, .timeout-long]
-  stage: build
-  before_script:
-    - !reference [.self-hosted, before_script]
-    - |
-      for ndk_path in /opt/android-sdk/ndk/* /opt/android-ndk $HOME/Android/Sdk/ndk/*; do
-        if [ -d "$ndk_path" ]; then
-          export ANDROID_NDK_HOME="$ndk_path"
-          echo "Found Android NDK at: $ANDROID_NDK_HOME"
-          break
-        fi
-      done
-      if [ -z "$ANDROID_NDK_HOME" ]; then
-        echo "ERROR: Android NDK not found"
-        exit 1
-      fi
-    - rustup target add aarch64-linux-android x86_64-linux-android
-  script:
-    - ./scripts/build-bindings.sh --android
-  artifacts:
-    paths:
-      - target/bindings/android/
-    expire_in: 1 week
 
 # ============================================================
 # Build Stage - Tags (release builds)

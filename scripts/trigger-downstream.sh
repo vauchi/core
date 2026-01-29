@@ -29,11 +29,14 @@ fi
 
 # GitLab configuration
 GITLAB_URL="${CI_SERVER_URL:-https://gitlab.com}"
-TOKEN="${CI_JOB_TOKEN:-${GITLAB_TOKEN:-}}"
 
-# Project IDs
+# Project IDs and their trigger tokens
+# In CI: use dedicated trigger tokens (can set variables)
+# Locally: use GITLAB_TOKEN with pipeline API
 SWIFT_PROJECT_ID="77955316"   # vauchi/vauchi-mobile-swift
 ANDROID_PROJECT_ID="77955319" # vauchi/vauchi-mobile-android
+SWIFT_TOKEN="${SWIFT_TRIGGER_TOKEN:-${GITLAB_TOKEN:-}}"
+ANDROID_TOKEN="${ANDROID_TRIGGER_TOKEN:-${GITLAB_TOKEN:-}}"
 
 # Colors
 RED='\033[0;31m'
@@ -48,32 +51,32 @@ echo ""
 echo "Version: $VERSION"
 echo ""
 
-if [[ -z "$TOKEN" ]]; then
-    echo -e "${RED}Error: No authentication token found${NC}"
-    echo "Set CI_JOB_TOKEN (in CI) or GITLAB_TOKEN (local) environment variable"
-    exit 1
-fi
-
 # Determine which API endpoint and auth to use:
-#   - CI: /trigger/pipeline with token as form param (CI_JOB_TOKEN)
+#   - CI: /trigger/pipeline with dedicated trigger tokens (can set variables)
 #   - Local: /pipeline with PRIVATE-TOKEN header
 USE_TRIGGER_API=false
-if [[ -n "${CI_JOB_TOKEN:-}" ]]; then
+if [[ -n "${SWIFT_TRIGGER_TOKEN:-}" && -n "${ANDROID_TRIGGER_TOKEN:-}" ]]; then
     USE_TRIGGER_API=true
+elif [[ -z "${GITLAB_TOKEN:-}" ]]; then
+    echo -e "${RED}Error: No authentication token found${NC}"
+    echo "In CI: Set SWIFT_TRIGGER_TOKEN and ANDROID_TRIGGER_TOKEN"
+    echo "Locally: Set GITLAB_TOKEN environment variable"
+    exit 1
 fi
 
 trigger_pipeline() {
     local project_id="$1"
     local project_name="$2"
+    local token="$3"
 
     echo -e "${YELLOW}Triggering $project_name...${NC}"
 
     local response
     if $USE_TRIGGER_API; then
-        # CI: use /trigger/pipeline with token as form parameter
+        # CI: use /trigger/pipeline with dedicated trigger token
         response=$(curl -s -w "\n%{http_code}" \
             --request POST \
-            --form "token=$TOKEN" \
+            --form "token=$token" \
             --form "ref=main" \
             --form "variables[UPSTREAM_VERSION]=$VERSION" \
             "$GITLAB_URL/api/v4/projects/$project_id/trigger/pipeline")
@@ -81,7 +84,7 @@ trigger_pipeline() {
         # Local: use /pipeline with PRIVATE-TOKEN header
         response=$(curl -s -w "\n%{http_code}" \
             --request POST \
-            --header "PRIVATE-TOKEN: $TOKEN" \
+            --header "PRIVATE-TOKEN: $token" \
             --header "Content-Type: application/json" \
             --data "{\"ref\":\"main\",\"variables\":[{\"key\":\"UPSTREAM_VERSION\",\"value\":\"$VERSION\"}]}" \
             "$GITLAB_URL/api/v4/projects/$project_id/pipeline")
@@ -104,8 +107,8 @@ trigger_pipeline() {
 # Trigger both repos
 FAILED=false
 
-trigger_pipeline "$SWIFT_PROJECT_ID" "vauchi-mobile-swift" || FAILED=true
-trigger_pipeline "$ANDROID_PROJECT_ID" "vauchi-mobile-android" || FAILED=true
+trigger_pipeline "$SWIFT_PROJECT_ID" "vauchi-mobile-swift" "$SWIFT_TOKEN" || FAILED=true
+trigger_pipeline "$ANDROID_PROJECT_ID" "vauchi-mobile-android" "$ANDROID_TOKEN" || FAILED=true
 
 echo ""
 

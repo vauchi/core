@@ -101,13 +101,18 @@ if $BUILD_IOS; then
         rustup show active-toolchain
         echo ""
 
-        # Check for required iOS targets
-        echo "Installing iOS targets..."
+        # Force reinstall iOS targets (runner may have corrupted installation)
+        echo "Reinstalling iOS targets (force)..."
+        rustup target remove aarch64-apple-ios aarch64-apple-ios-sim x86_64-apple-ios 2>/dev/null || true
         rustup target add aarch64-apple-ios aarch64-apple-ios-sim x86_64-apple-ios
 
-        # Verify targets are installed
+        # Verify targets are installed and show sysroot
         echo "Installed iOS targets:"
         rustup target list --installed | grep -E "ios|iOS" || echo "WARNING: No iOS targets found!"
+        echo ""
+        echo "Checking iOS sysroot exists:"
+        SYSROOT=$(rustc --print sysroot)
+        ls -la "$SYSROOT/lib/rustlib/" | grep -E "ios" || echo "WARNING: iOS libs not found in sysroot!"
         echo ""
 
         # Build for iOS device (ARM64)

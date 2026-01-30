@@ -53,8 +53,6 @@ lint:format:
   extends: [.linux-runner, .validation-rust, .timeout-quick]
   stage: lint
   needs: []
-  cache:
-    policy: pull  # Read-only cache - lint doesn't need to update
   script:
     - rustup component add rustfmt
     - cargo fmt --all -- --check
@@ -63,8 +61,6 @@ lint:clippy:
   extends: [.linux-runner, .validation-rust, .timeout-quick]
   stage: lint
   needs: []
-  cache:
-    policy: pull  # Read-only cache - lint doesn't need to update
   script:
     - rustup component add clippy
     - cargo clippy --all-targets -- -D warnings
@@ -135,10 +131,8 @@ security:audit:
   extends: [.linux-runner, .validation-deps, .timeout-quick]
   stage: security
   needs: []
-  cache:
-    policy: pull  # Read-only cache
   script:
-    - cargo binstall cargo-audit --no-confirm 2>/dev/null || cargo install cargo-audit || true
+    - cargo binstall cargo-audit --no-confirm 2>/dev/null || RUSTC_WRAPPER= cargo install cargo-audit || true
     - cargo audit
 
 # License compliance via cargo-deny (runs on dependency or deny.toml changes)
@@ -146,10 +140,8 @@ security:licenses:
   extends: [.linux-runner, .validation-licenses, .timeout-quick]
   stage: security
   needs: []
-  cache:
-    policy: pull  # Read-only cache
   script:
-    - cargo binstall cargo-deny --no-confirm 2>/dev/null || cargo install cargo-deny || true
+    - cargo binstall cargo-deny --no-confirm 2>/dev/null || RUSTC_WRAPPER= cargo install cargo-deny || true
     - cargo deny check licenses
 
 # ============================================================

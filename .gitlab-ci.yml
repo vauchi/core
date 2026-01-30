@@ -128,9 +128,15 @@ security:licenses:
 # ============================================================
 
 # Verify tag is on main branch before proceeding with release
+# Overrides .self-hosted SSH clone — tag pipelines need HTTPS checkout
+# since the runner may not have gitlab.com in known_hosts
 release:verify:
   extends: [.linux-runner, .release-only]
   stage: build
+  variables:
+    GIT_STRATEGY: clone
+    GIT_DEPTH: "100"
+  before_script: []
   script:
     - |
       echo "Verifying tag $CI_COMMIT_TAG is on main branch..."

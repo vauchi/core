@@ -410,6 +410,8 @@ trigger:downstream:
   stage: trigger
   interruptible: false
   needs: [release:create]
+  # Non-blocking: downstream tokens may not be configured yet
+  allow_failure: true
   # Override .linux-runner/.self-hosted Rust setup — this job only needs
   # curl/jq to call the GitLab API, not sccache/mold/rustup.
   variables:

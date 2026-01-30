@@ -17,7 +17,10 @@
 #     - Security audit: Cargo.toml, Cargo.lock (dependencies)
 #     - License check: Cargo.*, deny.toml
 #   - Test and coverage combined in single pass
+#   - DAG execution: lint/security/test jobs start immediately (needs: [])
 #   - Parallel build jobs (iOS + Android)
+#   - Parallel test jobs (core + mobile)
+#   - Parallel publish jobs (core + mobile)
 #   - sccache for shared compilation cache (30-50% faster rebuilds)
 #   - mold linker on Linux (2-5x faster linking)
 #   - Cargo.lock-based cache keys (smarter invalidation)
@@ -49,6 +52,7 @@ stages:
 lint:format:
   extends: [.linux-runner, .validation-rust, .timeout-quick]
   stage: lint
+  needs: []
   cache:
     policy: pull  # Read-only cache - lint doesn't need to update
   script:
@@ -58,6 +62,7 @@ lint:format:
 lint:clippy:
   extends: [.linux-runner, .validation-rust, .timeout-quick]
   stage: lint
+  needs: []
   cache:
     policy: pull  # Read-only cache - lint doesn't need to update
   script:
@@ -71,6 +76,7 @@ lint:reuse:
     entrypoint: [""]
   tags: [docker]
   stage: lint
+  needs: []
   script:
     - reuse lint
 
@@ -78,25 +84,46 @@ lint:reuse:
 # Test Stage (MR only, runs on Rust code changes)
 # ============================================================
 
-test:
+test:core:
   extends: [.linux-runner, .validation-rust, .timeout-standard]
   stage: test
+  needs: []
   before_script:
     - !reference [.self-hosted, before_script]
     - rustup component add llvm-tools-preview
-    - cargo install cargo-llvm-cov --locked || true
+    - cargo binstall cargo-llvm-cov --no-confirm 2>/dev/null || cargo install cargo-llvm-cov --locked || true
   script:
-    # Run tests with coverage in single pass
-    - cargo llvm-cov --workspace --lcov --output-path lcov.info
-    - cargo llvm-cov report
+    - cargo llvm-cov -p vauchi-core --lcov --output-path lcov-core.info
+    - cargo llvm-cov report -p vauchi-core
   coverage: '/Total:\s+(\d+(?:\.\d+)?%)/'
   artifacts:
     reports:
       coverage_report:
         coverage_format: cobertura
-        path: lcov.info
+        path: lcov-core.info
     paths:
-      - lcov.info
+      - lcov-core.info
+    expire_in: 1 week
+
+test:mobile:
+  extends: [.linux-runner, .validation-mobile, .timeout-standard]
+  stage: test
+  needs: []
+  before_script:
+    - !reference [.self-hosted, before_script]
+    - rustup component add llvm-tools-preview
+    - cargo binstall cargo-llvm-cov --no-confirm 2>/dev/null || cargo install cargo-llvm-cov --locked || true
+  script:
+    - cargo llvm-cov -p vauchi-mobile --lcov --output-path lcov-mobile.info
+    - cargo llvm-cov report -p vauchi-mobile
+  coverage: '/Total:\s+(\d+(?:\.\d+)?%)/'
+  artifacts:
+    reports:
+      coverage_report:
+        coverage_format: cobertura
+        path: lcov-mobile.info
+    paths:
+      - lcov-mobile.info
     expire_in: 1 week
 
 # ============================================================
@@ -107,20 +134,22 @@ test:
 security:audit:
   extends: [.linux-runner, .validation-deps, .timeout-quick]
   stage: security
+  needs: []
   cache:
     policy: pull  # Read-only cache
   script:
-    - cargo install cargo-audit || true
+    - cargo binstall cargo-audit --no-confirm 2>/dev/null || cargo install cargo-audit || true
     - cargo audit
 
 # License compliance via cargo-deny (runs on dependency or deny.toml changes)
 security:licenses:
   extends: [.linux-runner, .validation-licenses, .timeout-quick]
   stage: security
+  needs: []
   cache:
     policy: pull  # Read-only cache
   script:
-    - cargo install cargo-deny || true
+    - cargo binstall cargo-deny --no-confirm 2>/dev/null || cargo install cargo-deny || true
     - cargo deny check licenses
 
 # ============================================================
@@ -302,7 +331,7 @@ publish:core:
 publish:mobile:
   extends: [.linux-runner, .release-only]
   stage: publish
-  needs: [publish:core]
+  needs: [release:verify]
   script:
     - |
       VERSION="${CI_COMMIT_TAG#v}"

@@ -162,6 +162,8 @@ security:licenses:
 release:verify:
   extends: [.linux-runner, .release-only]
   stage: build
+  needs: []
+  interruptible: false
   variables:
     GIT_STRATEGY: clone
     GIT_DEPTH: "100"
@@ -274,6 +276,8 @@ publish:core:
   extends: [.linux-runner, .release-only]
   stage: publish
   needs: [release:verify]
+  interruptible: false
+  resource_group: release-publish
   script:
     - |
       VERSION="${CI_COMMIT_TAG#v}"
@@ -332,6 +336,8 @@ publish:mobile:
   extends: [.linux-runner, .release-only]
   stage: publish
   needs: [release:verify]
+  interruptible: false
+  resource_group: release-publish
   script:
     - |
       VERSION="${CI_COMMIT_TAG#v}"
@@ -380,6 +386,8 @@ release:create:
   image: registry.gitlab.com/gitlab-org/release-cli:latest
   tags:
     - docker
+  interruptible: false
+  resource_group: release-publish
   needs: [publish:packages, publish:core, publish:mobile]
   script:
     - echo "Creating release $CI_COMMIT_TAG"
@@ -410,7 +418,14 @@ release:create:
 trigger:downstream:
   extends: [.linux-runner, .release-only]
   stage: trigger
+  interruptible: false
   needs: [release:create]
+  # Override .linux-runner/.self-hosted Rust setup — this job only needs
+  # curl/jq to call the GitLab API, not sccache/mold/rustup.
+  variables:
+    GIT_STRATEGY: clone
+    GIT_DEPTH: "1"
+  before_script: []
   script:
     - ./scripts/trigger-downstream.sh "$CI_COMMIT_TAG"
 

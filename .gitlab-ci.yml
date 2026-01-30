@@ -277,7 +277,6 @@ publish:core:
   stage: publish
   needs: [release:verify]
   interruptible: false
-  resource_group: release-publish
   script:
     - |
       VERSION="${CI_COMMIT_TAG#v}"
@@ -337,7 +336,6 @@ publish:mobile:
   stage: publish
   needs: [release:verify]
   interruptible: false
-  resource_group: release-publish
   script:
     - |
       VERSION="${CI_COMMIT_TAG#v}"

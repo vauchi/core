@@ -115,6 +115,49 @@ check_bindings() {
     echo ""
 }
 
+# Function to validate XCFramework structure
+check_xcframework() {
+    local xcfw_path="$1"
+
+    echo -e "${YELLOW}Checking XCFramework: $xcfw_path${NC}"
+
+    if [[ ! -d "$xcfw_path" ]]; then
+        echo -e "${YELLOW}  XCFramework not found (skipping — may not be packaged yet)${NC}"
+        echo ""
+        return 0
+    fi
+
+    local slice_count=0
+    local valid_count=0
+    while IFS= read -r plist; do
+        slice_count=$((slice_count + 1))
+        local exec_name
+        exec_name=$(/usr/libexec/PlistBuddy -c "Print :CFBundleExecutable" "$plist" 2>/dev/null || true)
+        if [[ -z "$exec_name" ]]; then
+            echo -e "${RED}  ERROR: Missing CFBundleExecutable in: $plist${NC}"
+            ERRORS=$((ERRORS + 1))
+        else
+            local fw_dir
+            fw_dir=$(dirname "$plist")
+            if [[ -f "$fw_dir/$exec_name" ]]; then
+                valid_count=$((valid_count + 1))
+            else
+                echo -e "${RED}  ERROR: CFBundleExecutable '$exec_name' not found in $fw_dir${NC}"
+                ERRORS=$((ERRORS + 1))
+            fi
+        fi
+    done < <(find "$xcfw_path" -name "Info.plist" -path "*.framework/Info.plist")
+
+    if [[ $slice_count -eq 0 ]]; then
+        echo -e "${RED}  ERROR: No framework slices found in XCFramework${NC}"
+        ERRORS=$((ERRORS + 1))
+    elif [[ $valid_count -eq $slice_count ]]; then
+        echo -e "${GREEN}  All $slice_count framework slices valid (CFBundleExecutable present)${NC}"
+    fi
+
+    echo ""
+}
+
 # Check iOS bindings
 if [[ -f "$IOS_BINDINGS" ]]; then
     check_bindings "$IOS_BINDINGS" "iOS (Swift)" "$MIN_SWIFT_LINES"
@@ -141,6 +184,12 @@ if [[ -f "target/release/libvauchi_mobile.so" ]]; then
     fi
 else
     echo -e "${YELLOW}  Native library not found (run cargo build first)${NC}"
+fi
+
+# Check XCFramework structure (if packaged)
+XCFRAMEWORK_PATH="$PROJECT_ROOT/target/xcframework-build/VauchiMobileFFI.xcframework"
+if [[ -d "$XCFRAMEWORK_PATH" ]]; then
+    check_xcframework "$XCFRAMEWORK_PATH"
 fi
 
 echo ""

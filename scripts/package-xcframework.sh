@@ -157,6 +157,20 @@ xcodebuild -create-xcframework \
 
 echo -e "${GREEN}XCFramework created at: $XCFRAMEWORK_PATH${NC}"
 
+# Post-process: Re-inject CFBundleExecutable into framework slice plists
+# xcodebuild -create-xcframework regenerates Info.plists and strips
+# CFBundleExecutable for static-library frameworks. iOS requires this key.
+echo -e "${YELLOW}Post-processing: Ensuring CFBundleExecutable in framework slices...${NC}"
+while IFS= read -r plist; do
+    if ! /usr/libexec/PlistBuddy -c "Print :CFBundleExecutable" "$plist" 2>/dev/null; then
+        echo "  Adding CFBundleExecutable to: $plist"
+        /usr/libexec/PlistBuddy -c "Add :CFBundleExecutable string VauchiMobileFFI" "$plist"
+    else
+        echo "  CFBundleExecutable already present in: $plist"
+    fi
+done < <(find "$XCFRAMEWORK_PATH" -name "Info.plist" -path "*/VauchiMobileFFI.framework/*")
+echo -e "${GREEN}Post-processing complete${NC}"
+
 # Create distribution package
 echo -e "${YELLOW}Creating distribution package...${NC}"
 PACKAGE_DIR="$BUILD_DIR/VauchiMobile-$VERSION"

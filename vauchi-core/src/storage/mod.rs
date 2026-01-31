@@ -8,6 +8,11 @@
 //! Uses SQLite with application-level encryption for sensitive data.
 
 #[cfg(feature = "testing")]
+pub mod consent;
+#[cfg(not(feature = "testing"))]
+mod consent;
+
+#[cfg(feature = "testing")]
 pub mod contacts;
 #[cfg(not(feature = "testing"))]
 mod contacts;
@@ -67,6 +72,7 @@ pub mod ux;
 #[cfg(not(feature = "testing"))]
 mod ux;
 
+pub mod migration;
 pub mod secure;
 
 pub use error::{
@@ -104,7 +110,7 @@ impl Storage {
             conn,
             encryption_key,
         };
-        storage.initialize_schema()?;
+        storage.run_migrations()?;
         Ok(storage)
     }
 
@@ -115,189 +121,18 @@ impl Storage {
             conn,
             encryption_key,
         };
-        storage.initialize_schema()?;
+        storage.run_migrations()?;
         Ok(storage)
     }
 
-    /// Initializes the database schema.
-    fn initialize_schema(&self) -> Result<(), StorageError> {
-        self.conn.execute_batch(
-            "
-            -- Contacts table
-            CREATE TABLE IF NOT EXISTS contacts (
-                id TEXT PRIMARY KEY,
-                public_key BLOB NOT NULL,
-                display_name TEXT NOT NULL,
-                card_encrypted BLOB NOT NULL,
-                shared_key_encrypted BLOB NOT NULL,
-                visibility_rules_json TEXT,
-                exchange_timestamp INTEGER NOT NULL,
-                fingerprint_verified INTEGER DEFAULT 0,
-                last_sync_at INTEGER
-            );
+    /// Runs all pending schema migrations.
+    fn run_migrations(&self) -> Result<(), StorageError> {
+        let migrations = migration::all_migrations();
+        migration::MigrationRunner::run(&self.conn, &self.encryption_key, &migrations)
+    }
 
-            -- Own contact card
-            CREATE TABLE IF NOT EXISTS own_card (
-                id INTEGER PRIMARY KEY CHECK (id = 1),
-                card_json TEXT NOT NULL,
-                updated_at INTEGER NOT NULL
-            );
-
-            -- Identity (encrypted backup data)
-            CREATE TABLE IF NOT EXISTS identity (
-                id INTEGER PRIMARY KEY CHECK (id = 1),
-                backup_data_encrypted BLOB NOT NULL,
-                display_name TEXT NOT NULL,
-                created_at INTEGER NOT NULL
-            );
-
-            -- Pending sync updates
-            -- Note: No foreign key constraint on contact_id to allow queuing
-            -- updates even before contact is fully established
-            CREATE TABLE IF NOT EXISTS pending_updates (
-                id TEXT PRIMARY KEY,
-                contact_id TEXT NOT NULL,
-                update_type TEXT NOT NULL,
-                payload BLOB NOT NULL,
-                created_at INTEGER NOT NULL,
-                retry_count INTEGER DEFAULT 0,
-                status TEXT DEFAULT 'pending',
-                error_message TEXT,
-                retry_at INTEGER
-            );
-
-            -- Contact sync timestamps (independent of contacts table)
-            -- Tracks last successful sync time per contact
-            CREATE TABLE IF NOT EXISTS contact_sync_timestamps (
-                contact_id TEXT PRIMARY KEY,
-                last_sync_at INTEGER NOT NULL
-            );
-
-            -- Double Ratchet state for each contact
-            CREATE TABLE IF NOT EXISTS contact_ratchets (
-                contact_id TEXT PRIMARY KEY REFERENCES contacts(id),
-                ratchet_state_encrypted BLOB NOT NULL,
-                is_initiator INTEGER NOT NULL,
-                updated_at INTEGER NOT NULL
-            );
-
-            -- Device info (current device)
-            CREATE TABLE IF NOT EXISTS device_info (
-                id INTEGER PRIMARY KEY CHECK (id = 1),
-                device_id BLOB NOT NULL,
-                device_index INTEGER NOT NULL,
-                device_name TEXT NOT NULL,
-                created_at INTEGER NOT NULL
-            );
-
-            -- Device registry (all linked devices)
-            CREATE TABLE IF NOT EXISTS device_registry (
-                id INTEGER PRIMARY KEY CHECK (id = 1),
-                registry_json TEXT NOT NULL,
-                version INTEGER NOT NULL,
-                updated_at INTEGER NOT NULL
-            );
-
-            -- Inter-device sync state (pending items per device)
-            CREATE TABLE IF NOT EXISTS device_sync_state (
-                device_id BLOB PRIMARY KEY,
-                state_json TEXT NOT NULL,
-                last_sync_version INTEGER NOT NULL,
-                updated_at INTEGER NOT NULL
-            );
-
-            -- Local version vector for causality tracking
-            CREATE TABLE IF NOT EXISTS version_vector (
-                id INTEGER PRIMARY KEY CHECK (id = 1),
-                vector_json TEXT NOT NULL,
-                updated_at INTEGER NOT NULL
-            );
-
-            -- Visibility labels
-            CREATE TABLE IF NOT EXISTS visibility_labels (
-                id TEXT PRIMARY KEY,
-                name TEXT NOT NULL UNIQUE,
-                contacts_json TEXT NOT NULL DEFAULT '[]',
-                visible_fields_json TEXT NOT NULL DEFAULT '[]',
-                created_at INTEGER NOT NULL,
-                modified_at INTEGER NOT NULL
-            );
-
-            -- Per-contact visibility overrides
-            CREATE TABLE IF NOT EXISTS contact_visibility_overrides (
-                contact_id TEXT NOT NULL,
-                field_id TEXT NOT NULL,
-                is_visible INTEGER NOT NULL,
-                PRIMARY KEY (contact_id, field_id)
-            );
-
-            -- Delivery records (outbound message delivery tracking)
-            CREATE TABLE IF NOT EXISTS delivery_records (
-                message_id TEXT PRIMARY KEY,
-                recipient_id TEXT NOT NULL,
-                status TEXT NOT NULL,
-                status_reason TEXT,
-                created_at INTEGER NOT NULL,
-                updated_at INTEGER NOT NULL,
-                expires_at INTEGER
-            );
-
-            -- Retry queue (failed deliveries awaiting retry)
-            CREATE TABLE IF NOT EXISTS retry_entries (
-                message_id TEXT PRIMARY KEY,
-                recipient_id TEXT NOT NULL,
-                payload BLOB NOT NULL,
-                attempt INTEGER NOT NULL DEFAULT 0,
-                next_retry INTEGER NOT NULL,
-                created_at INTEGER NOT NULL,
-                max_attempts INTEGER NOT NULL DEFAULT 10
-            );
-
-            -- Per-device delivery tracking
-            CREATE TABLE IF NOT EXISTS device_deliveries (
-                message_id TEXT NOT NULL,
-                device_id TEXT NOT NULL,
-                recipient_id TEXT NOT NULL,
-                status TEXT NOT NULL,
-                updated_at INTEGER NOT NULL,
-                PRIMARY KEY (message_id, device_id)
-            );
-
-            -- Field validations (crowd-sourced verification)
-            CREATE TABLE IF NOT EXISTS field_validations (
-                id TEXT PRIMARY KEY,
-                contact_id TEXT NOT NULL,
-                field_id TEXT NOT NULL,
-                field_value TEXT NOT NULL,
-                validator_id TEXT NOT NULL,
-                validated_at INTEGER NOT NULL,
-                signature BLOB NOT NULL,
-                UNIQUE(contact_id, field_id, validator_id)
-            );
-
-            -- User experience state (aha moments, demo contact)
-            CREATE TABLE IF NOT EXISTS ux_state (
-                id INTEGER PRIMARY KEY CHECK (id = 1),
-                aha_tracker_json TEXT,
-                demo_contact_json TEXT,
-                updated_at INTEGER NOT NULL
-            );
-
-            -- Create indexes
-            CREATE INDEX IF NOT EXISTS idx_pending_contact ON pending_updates(contact_id);
-            CREATE INDEX IF NOT EXISTS idx_pending_status ON pending_updates(status);
-            CREATE INDEX IF NOT EXISTS idx_label_name ON visibility_labels(name);
-            CREATE INDEX IF NOT EXISTS idx_delivery_recipient ON delivery_records(recipient_id);
-            CREATE INDEX IF NOT EXISTS idx_delivery_status ON delivery_records(status);
-            CREATE INDEX IF NOT EXISTS idx_retry_next ON retry_entries(next_retry);
-            CREATE INDEX IF NOT EXISTS idx_retry_recipient ON retry_entries(recipient_id);
-            CREATE INDEX IF NOT EXISTS idx_device_delivery_message ON device_deliveries(message_id);
-            CREATE INDEX IF NOT EXISTS idx_device_delivery_status ON device_deliveries(status);
-            CREATE INDEX IF NOT EXISTS idx_validation_contact ON field_validations(contact_id);
-            CREATE INDEX IF NOT EXISTS idx_validation_field ON field_validations(contact_id, field_id);
-            CREATE INDEX IF NOT EXISTS idx_validation_validator ON field_validations(validator_id);
-            ",
-        )?;
-        Ok(())
+    /// Returns the current schema version.
+    pub fn schema_version(&self) -> Result<u32, StorageError> {
+        migration::MigrationRunner::current_version(&self.conn)
     }
 }

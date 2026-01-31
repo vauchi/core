@@ -21,6 +21,8 @@ pub mod validation;
 #[cfg(not(feature = "testing"))]
 mod validation;
 
+pub mod vcard;
+
 pub use field::{ContactField, FieldType};
 pub use uri::{is_allowed_scheme, is_blocked_scheme, is_safe_url, ContactAction};
 pub use validation::ValidationError;

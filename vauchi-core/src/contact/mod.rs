@@ -8,6 +8,7 @@
 //! and visibility rules.
 
 pub mod labels;
+pub mod merge;
 
 #[cfg(feature = "testing")]
 pub mod visibility;

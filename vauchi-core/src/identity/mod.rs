@@ -6,6 +6,10 @@
 //!
 //! Handles user identity creation, backup, and restoration.
 //! Each identity has a unique Ed25519 signing keypair and X25519 exchange keypair.
+//!
+//! Backup format versions:
+//! - v2 (current): Argon2id KDF + XChaCha20-Poly1305 encryption
+//! - v1 / legacy: PBKDF2 KDF + AES-256-GCM encryption
 
 #[cfg(feature = "testing")]
 pub mod backup;
@@ -20,11 +24,9 @@ pub use device::{
     RegisteredDevice, RegistryBroadcast, MAX_DEVICES,
 };
 
-use crate::crypto::{decrypt, encrypt, Signature, SigningKeyPair, SymmetricKey, HKDF};
+use crate::crypto::{decrypt, derive_key_argon2id, derive_key_pbkdf2, encrypt, Signature, SigningKeyPair, HKDF};
 use crate::exchange::X3DHKeyPair;
-use ring::pbkdf2;
 use ring::rand::SystemRandom;
-use std::num::NonZeroU32;
 use thiserror::Error;
 use zeroize::Zeroize;
 
@@ -41,7 +43,10 @@ pub enum IdentityError {
     RestoreFailed,
 }
 
-/// PBKDF2 iterations for key derivation from password.
+/// Backup format version byte for Argon2id + XChaCha20.
+const BACKUP_VERSION_V2: u8 = 0x02;
+
+/// PBKDF2 iterations for legacy key derivation.
 const PBKDF2_ITERATIONS: u32 = 100_000;
 
 /// User identity containing cryptographic keys and metadata.
@@ -247,10 +252,12 @@ impl Identity {
         crate::exchange::DeviceLinkInitiatorRestored::new(self.master_seed, self, registry, qr)
     }
 
-    /// Exports identity as encrypted backup.
+    /// Exports identity as encrypted backup (v2: Argon2id + XChaCha20-Poly1305).
     ///
     /// The backup contains the master seed encrypted with a key derived from the password.
     /// Requires a strong password (zxcvbn score >= 3).
+    ///
+    /// Backup format: `version_byte (0x02) || salt (16 bytes) || ciphertext`
     pub fn export_backup(&self, password: &str) -> Result<IdentityBackup, IdentityError> {
         // Validate password strength using zxcvbn
         password::validate_password(password)?;
@@ -261,17 +268,9 @@ impl Identity {
             .map_err(|_| IdentityError::BackupFailed)?
             .expose();
 
-        // Derive encryption key from password using PBKDF2
-        let mut key_bytes = [0u8; 32];
-        pbkdf2::derive(
-            pbkdf2::PBKDF2_HMAC_SHA256,
-            NonZeroU32::new(PBKDF2_ITERATIONS).expect("PBKDF2_ITERATIONS is non-zero"),
-            &salt,
-            password.as_bytes(),
-            &mut key_bytes,
-        );
-        let encryption_key = SymmetricKey::from_bytes(key_bytes);
-        key_bytes.zeroize();
+        // Derive encryption key from password using Argon2id
+        let encryption_key = derive_key_argon2id(password.as_bytes(), &salt)
+            .map_err(|_| IdentityError::BackupFailed)?;
 
         // Prepare backup data:
         // display_name_len (4 bytes) || display_name || master_seed (32 bytes)
@@ -291,12 +290,13 @@ impl Identity {
         plaintext.extend_from_slice(&device_name_len);
         plaintext.extend_from_slice(device_name_bytes);
 
-        // Encrypt the data
+        // Encrypt the data (uses XChaCha20-Poly1305)
         let ciphertext =
             encrypt(&encryption_key, &plaintext).map_err(|_| IdentityError::BackupFailed)?;
 
-        // Backup format: salt (16 bytes) || ciphertext
-        let mut backup_data = Vec::with_capacity(16 + ciphertext.len());
+        // Backup format: version_byte || salt (16 bytes) || ciphertext
+        let mut backup_data = Vec::with_capacity(1 + 16 + ciphertext.len());
+        backup_data.push(BACKUP_VERSION_V2);
         backup_data.extend_from_slice(&salt);
         backup_data.extend_from_slice(&ciphertext);
 
@@ -304,36 +304,73 @@ impl Identity {
     }
 
     /// Imports identity from encrypted backup.
+    ///
+    /// Auto-detects backup version:
+    /// - v2 (0x02): Argon2id + XChaCha20-Poly1305
+    /// - v1/legacy: PBKDF2 + AES-256-GCM (tagged or untagged)
     pub fn import_backup(backup: &IdentityBackup, password: &str) -> Result<Self, IdentityError> {
         let data = backup.as_bytes();
 
+        if data.is_empty() {
+            return Err(IdentityError::RestoreFailed);
+        }
+
+        match data[0] {
+            BACKUP_VERSION_V2 => Self::import_backup_v2(&data[1..], password),
+            _ => Self::import_backup_legacy(data, password),
+        }
+    }
+
+    /// Imports v2 backup (Argon2id + XChaCha20-Poly1305).
+    ///
+    /// Data format: `salt (16 bytes) || ciphertext`
+    fn import_backup_v2(data: &[u8], password: &str) -> Result<Self, IdentityError> {
+        // salt (16) + at least some ciphertext
+        if data.len() < 16 + 1 + 24 + 16 + 4 + 32 {
+            return Err(IdentityError::RestoreFailed);
+        }
+
+        let salt: [u8; 16] = data[..16]
+            .try_into()
+            .map_err(|_| IdentityError::RestoreFailed)?;
+
+        // Derive decryption key using Argon2id
+        let decryption_key = derive_key_argon2id(password.as_bytes(), &salt)
+            .map_err(|_| IdentityError::RestoreFailed)?;
+
+        // Decrypt (auto-detects tagged XChaCha20-Poly1305)
+        let plaintext =
+            decrypt(&decryption_key, &data[16..]).map_err(|_| IdentityError::RestoreFailed)?;
+
+        Self::parse_backup_plaintext(&plaintext)
+    }
+
+    /// Imports legacy backup (PBKDF2 + AES-256-GCM).
+    ///
+    /// Data format: `salt (16 bytes) || ciphertext`
+    fn import_backup_legacy(data: &[u8], password: &str) -> Result<Self, IdentityError> {
         // Minimum size: salt (16) + nonce (12) + tag (16) + min data
         if data.len() < 16 + 12 + 16 + 4 + 32 {
             return Err(IdentityError::RestoreFailed);
         }
 
-        // Extract salt
         let salt: [u8; 16] = data[..16]
             .try_into()
             .map_err(|_| IdentityError::RestoreFailed)?;
 
-        // Derive decryption key from password
-        let mut key_bytes = [0u8; 32];
-        pbkdf2::derive(
-            pbkdf2::PBKDF2_HMAC_SHA256,
-            NonZeroU32::new(PBKDF2_ITERATIONS).expect("PBKDF2_ITERATIONS is non-zero"),
-            &salt,
-            password.as_bytes(),
-            &mut key_bytes,
-        );
-        let decryption_key = SymmetricKey::from_bytes(key_bytes);
-        key_bytes.zeroize();
+        // Derive decryption key using PBKDF2
+        let decryption_key = derive_key_pbkdf2(password.as_bytes(), &salt, PBKDF2_ITERATIONS)
+            .map_err(|_| IdentityError::RestoreFailed)?;
 
-        // Decrypt the data
+        // Decrypt (auto-detects tagged or untagged AES-256-GCM)
         let plaintext =
             decrypt(&decryption_key, &data[16..]).map_err(|_| IdentityError::RestoreFailed)?;
 
-        // Parse the plaintext
+        Self::parse_backup_plaintext(&plaintext)
+    }
+
+    /// Parses the decrypted backup plaintext into an Identity.
+    fn parse_backup_plaintext(plaintext: &[u8]) -> Result<Self, IdentityError> {
         if plaintext.len() < 4 + 32 {
             return Err(IdentityError::RestoreFailed);
         }

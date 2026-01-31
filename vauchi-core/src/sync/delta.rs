@@ -8,6 +8,7 @@
 //! rather than the entire contact card. Includes signature verification
 //! to ensure authenticity of updates.
 
+use ring::rand::SecureRandom;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -39,6 +40,10 @@ pub struct CardDelta {
     pub timestamp: u64,
     /// List of field changes.
     pub changes: Vec<FieldChange>,
+    /// Random nonce for replay attack detection (32 bytes).
+    /// Defaults to all zeros when deserializing legacy deltas without a nonce.
+    #[serde(default = "default_nonce", with = "nonce_serde")]
+    pub nonce: [u8; 32],
     /// Ed25519 signature of the delta (64 bytes).
     #[serde(with = "signature_serde")]
     pub signature: [u8; 64],
@@ -55,6 +60,11 @@ pub enum FieldChange {
     Removed { field_id: String },
     /// The display name was changed.
     DisplayNameChanged { new_name: String },
+}
+
+/// Returns a zero nonce for deserializing legacy deltas without a nonce field.
+fn default_nonce() -> [u8; 32] {
+    [0u8; 32]
 }
 
 impl CardDelta {
@@ -115,10 +125,17 @@ impl CardDelta {
             .map(|d| d.as_secs())
             .unwrap_or(0);
 
+        // Generate random nonce for replay detection
+        let mut nonce = [0u8; 32];
+        ring::rand::SystemRandom::new()
+            .fill(&mut nonce)
+            .expect("System RNG should not fail");
+
         CardDelta {
             version: 1, // Will be set properly during signing
             timestamp: now,
             changes,
+            nonce,
             signature: [0u8; 64], // Will be set during signing
         }
     }
@@ -229,6 +246,7 @@ impl CardDelta {
             version: self.version,
             timestamp: self.timestamp,
             changes: filtered_changes,
+            nonce: self.nonce,
             signature: self.signature,
         }
     }
@@ -240,6 +258,7 @@ impl CardDelta {
             version: self.version,
             timestamp: self.timestamp,
             changes: &self.changes,
+            nonce: &self.nonce,
         };
         serde_json::to_vec(&signable).unwrap_or_default()
     }
@@ -251,6 +270,34 @@ struct SignableDelta<'a> {
     version: u32,
     timestamp: u64,
     changes: &'a Vec<FieldChange>,
+    nonce: &'a [u8; 32],
+}
+
+/// Custom serde for 32-byte nonce arrays.
+mod nonce_serde {
+    use serde::{Deserialize, Deserializer, Serializer};
+
+    pub fn serialize<S>(bytes: &[u8; 32], serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_str(&base64::Engine::encode(
+            &base64::engine::general_purpose::STANDARD,
+            bytes,
+        ))
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<[u8; 32], D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        let bytes = base64::Engine::decode(&base64::engine::general_purpose::STANDARD, &s)
+            .map_err(serde::de::Error::custom)?;
+        bytes
+            .try_into()
+            .map_err(|_| serde::de::Error::custom("invalid nonce length"))
+    }
 }
 
 /// Custom serde for fixed-size signature arrays.

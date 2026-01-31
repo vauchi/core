@@ -34,6 +34,8 @@
 //! let acked = client.process_incoming()?;
 //! ```
 
+pub mod anonymous;
+
 #[cfg(feature = "testing")]
 pub mod connection;
 #[cfg(not(feature = "testing"))]
@@ -115,3 +117,6 @@ pub use multi_relay::{
     MultiRelayClient, MultiRelayConfig, MultiRelayConfigBuilder, MultiRelayError, RelayHealth,
     RelaySelector,
 };
+
+// Anonymous sender identifiers
+pub use anonymous::{AnonymousSender, compute_anonymous_id, current_epoch, resolve_sender};

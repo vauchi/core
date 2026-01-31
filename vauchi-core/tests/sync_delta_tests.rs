@@ -100,6 +100,7 @@ fn test_delta_apply_display_name() {
         changes: vec![FieldChange::DisplayNameChanged {
             new_name: "Alice Smith".to_string(),
         }],
+        nonce: [0u8; 32],
         signature: [0u8; 64],
     };
 
@@ -117,6 +118,7 @@ fn test_delta_apply_add_field() {
         version: 1,
         timestamp: 12345,
         changes: vec![FieldChange::Added { field: new_field }],
+        nonce: [0u8; 32],
         signature: [0u8; 64],
     };
 
@@ -137,6 +139,7 @@ fn test_delta_apply_remove_field() {
         version: 1,
         timestamp: 12345,
         changes: vec![FieldChange::Removed { field_id }],
+        nonce: [0u8; 32],
         signature: [0u8; 64],
     };
 

@@ -47,9 +47,19 @@
 //! - [`vauchi`] - Main Vauchi orchestrator
 
 #[cfg(feature = "testing")]
+pub mod account;
+#[cfg(not(feature = "testing"))]
+mod account;
+
+#[cfg(feature = "testing")]
 pub mod config;
 #[cfg(not(feature = "testing"))]
 mod config;
+
+#[cfg(feature = "testing")]
+pub mod consent;
+#[cfg(not(feature = "testing"))]
+mod consent;
 
 #[cfg(feature = "testing")]
 pub mod contact_manager;
@@ -65,6 +75,11 @@ mod error;
 pub mod events;
 #[cfg(not(feature = "testing"))]
 mod events;
+
+#[cfg(feature = "testing")]
+pub mod gdpr;
+#[cfg(not(feature = "testing"))]
+mod gdpr;
 
 #[cfg(feature = "testing")]
 pub mod sync_controller;

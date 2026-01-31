@@ -26,6 +26,9 @@ pub enum StorageError {
 
     #[error("Invalid data: {0}")]
     InvalidData(String),
+
+    #[error("Migration error: {0}")]
+    Migration(String),
 }
 
 /// Pending update status.

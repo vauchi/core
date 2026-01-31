@@ -27,6 +27,15 @@ content-updates = ["reqwest", "tokio"]
 ring = "0.17"
 x25519-dalek = { version = "2.0", features = ["static_secrets"] }
 
+# XChaCha20-Poly1305 (spec-mandated cipher, documented exception to ring-only rule)
+chacha20poly1305 = "0.10"
+
+# Argon2id password KDF (spec-mandated, documented exception to ring-only rule)
+argon2 = "0.5"
+
+# Compression for delta payloads
+flate2 = "1.0"
+
 # QR code generation
 qrcode = "0.14"
 

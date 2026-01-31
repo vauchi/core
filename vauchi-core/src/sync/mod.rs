@@ -18,4 +18,4 @@ pub use device_sync::{
     ContactSyncData, DeviceSyncError, DeviceSyncPayload, InterDeviceSyncState, SyncItem,
     VersionVector,
 };
-pub use state::{SyncError, SyncManager, SyncState};
+pub use state::{ReplayDetector, SyncError, SyncManager, SyncState};

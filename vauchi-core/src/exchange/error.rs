@@ -56,4 +56,34 @@ pub enum ExchangeError {
 
     #[error("Network disconnected during exchange")]
     NetworkDisconnected,
+
+    #[error("Contact is blocked")]
+    ContactBlocked,
+
+    #[error("Exchange consent denied by other party")]
+    ConsentDenied,
+
+    #[error("Identity mismatch: signing key does not match QR public key")]
+    IdentityMismatch,
+
+    #[error("Stale prekey, retrying")]
+    StalePrekey,
+
+    #[error("Clock drift detected: {0}s")]
+    ClockDrift(i64),
+
+    #[error("Device link QR has expired")]
+    DeviceLinkQRExpired,
+
+    #[error("Low battery: exchange may fail")]
+    LowBattery,
+
+    #[error("Insufficient storage space")]
+    InsufficientStorage,
+
+    #[error("Numeric code mismatch")]
+    NumericCodeMismatch,
+
+    #[error("Fingerprint verification required")]
+    FingerprintRequired,
 }

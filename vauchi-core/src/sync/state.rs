@@ -7,7 +7,8 @@
 //! Manages the synchronization state for each contact and coordinates
 //! update delivery with offline queuing and retry logic.
 
-use std::collections::HashMap;
+use ring::rand::SecureRandom;
+use std::collections::{HashMap, HashSet};
 use thiserror::Error;
 use uuid::Uuid;
 
@@ -192,9 +193,9 @@ impl<'a> SyncManager<'a> {
         error: &str,
         retry_count: u32,
     ) -> Result<bool, SyncError> {
-        // Exponential backoff: 30s, 1m, 2m, 4m, 8m, ...
-        let base_delay_secs = 30u64;
-        let delay = base_delay_secs * (1 << retry_count.min(6));
+        // Exponential backoff: 2s, 4s, 8s, 16s, 32s, ..., max 300s
+        let base_delay_secs = 2u64;
+        let delay = (base_delay_secs * (1 << retry_count.min(10))).min(300);
 
         let now = current_timestamp();
 
@@ -316,10 +317,17 @@ impl<'a> SyncManager<'a> {
         // Create merged delta
         let now = current_timestamp();
 
+        // Generate random nonce for replay detection
+        let mut nonce = [0u8; 32];
+        ring::rand::SystemRandom::new()
+            .fill(&mut nonce)
+            .expect("System RNG should not fail");
+
         let merged_delta = CardDelta {
             version: highest_version,
             timestamp: now,
             changes: merged_changes,
+            nonce,
             signature: [0u8; 64], // Will be signed before transmission
         };
 
@@ -392,6 +400,87 @@ impl<'a> SyncManager<'a> {
         SyncState::Pending {
             queued_count: updates.len(),
             last_attempt: None,
+        }
+    }
+}
+
+/// Detects replay attacks by tracking per-contact nonces and timestamps.
+///
+/// Each incoming delta includes a random nonce. The detector rejects:
+/// 1. Duplicate nonces (exact replay)
+/// 2. Deltas with timestamps older than the last accepted timestamp minus a tolerance window
+pub struct ReplayDetector {
+    /// Set of (contact_id, nonce) pairs already seen.
+    seen_nonces: HashSet<(String, [u8; 32])>,
+    /// Last accepted timestamp per contact.
+    last_timestamps: HashMap<String, u64>,
+    /// Maximum acceptable clock skew in seconds.
+    max_clock_skew_secs: u64,
+}
+
+impl ReplayDetector {
+    /// Creates a new replay detector with the given clock skew tolerance.
+    pub fn new(max_clock_skew_secs: u64) -> Self {
+        ReplayDetector {
+            seen_nonces: HashSet::new(),
+            last_timestamps: HashMap::new(),
+            max_clock_skew_secs,
+        }
+    }
+
+    /// Creates a replay detector with the default 60-second clock skew tolerance.
+    pub fn default_tolerance() -> Self {
+        Self::new(60)
+    }
+
+    /// Checks whether a delta should be accepted or rejected as a replay.
+    ///
+    /// Returns `true` if the delta is fresh (not a replay), `false` if it
+    /// should be rejected.
+    ///
+    /// On acceptance, records the nonce and updates the last timestamp.
+    pub fn check_replay(
+        &mut self,
+        contact_id: &str,
+        nonce: &[u8; 32],
+        timestamp: u64,
+    ) -> bool {
+        let key = (contact_id.to_string(), *nonce);
+
+        // Check for duplicate nonce
+        if self.seen_nonces.contains(&key) {
+            return false;
+        }
+
+        // Check for timestamp regression
+        if let Some(&last_ts) = self.last_timestamps.get(contact_id) {
+            if timestamp + self.max_clock_skew_secs < last_ts {
+                return false;
+            }
+        }
+
+        // Accept: record nonce and update timestamp
+        self.seen_nonces.insert(key);
+        let entry = self.last_timestamps.entry(contact_id.to_string()).or_insert(0);
+        if timestamp > *entry {
+            *entry = timestamp;
+        }
+        true
+    }
+
+    /// Prunes old nonces to prevent unbounded memory growth.
+    ///
+    /// Removes all nonces for entries whose timestamp is older than `cutoff`.
+    pub fn prune_before(&mut self, cutoff: u64) {
+        let stale_contacts: Vec<String> = self.last_timestamps
+            .iter()
+            .filter(|(_, &ts)| ts < cutoff)
+            .map(|(id, _)| id.clone())
+            .collect();
+
+        for contact_id in &stale_contacts {
+            self.seen_nonces.retain(|(id, _)| id != contact_id);
+            self.last_timestamps.remove(contact_id);
         }
     }
 }

@@ -3099,7 +3099,7 @@ dependencies = [
 
 [[package]]
 name = "vauchi-core"
-version = "0.1.0"
+version = "0.1.2"
 dependencies = [
  "base64",
  "bincode",
@@ -3133,7 +3133,7 @@ dependencies = [
 
 [[package]]
 name = "vauchi-mobile"
-version = "0.1.0"
+version = "0.1.2"
 dependencies = [
  "base64",
  "criterion",

@@ -73,15 +73,55 @@ pub enum SyncState {
 /// Manages synchronization operations for all contacts.
 ///
 /// The SyncManager coordinates update delivery, handles offline queuing,
-/// and tracks sync state per contact.
+/// and tracks sync state per contact. Also tracks the last applied delta
+/// version per contact for downgrade detection.
 pub struct SyncManager<'a> {
     storage: &'a Storage,
+    /// Tracks the last applied delta version per contact ID.
+    /// Used to detect downgrades (receiving an older version than expected).
+    last_applied_versions: HashMap<String, u32>,
 }
 
 impl<'a> SyncManager<'a> {
     /// Creates a new SyncManager with the given storage backend.
     pub fn new(storage: &'a Storage) -> Self {
-        SyncManager { storage }
+        SyncManager {
+            storage,
+            last_applied_versions: HashMap::new(),
+        }
+    }
+
+    /// Checks if a delta version represents a downgrade for a contact.
+    ///
+    /// Returns `true` if the `delta_version` is less than the last applied
+    /// version for the given contact, indicating a potential downgrade attack
+    /// or stale update. Returns `false` if the version is acceptable (equal
+    /// or newer) or if no version has been recorded for the contact.
+    pub fn check_downgrade(&self, contact_id: &str, delta_version: u32) -> bool {
+        if let Some(&last_version) = self.last_applied_versions.get(contact_id) {
+            delta_version < last_version
+        } else {
+            false
+        }
+    }
+
+    /// Records that a delta version was applied for a contact.
+    ///
+    /// Updates the last applied version tracker. Only updates if the new
+    /// version is greater than or equal to the currently tracked version.
+    pub fn record_applied_version(&mut self, contact_id: &str, version: u32) {
+        let entry = self
+            .last_applied_versions
+            .entry(contact_id.to_string())
+            .or_insert(0);
+        if version >= *entry {
+            *entry = version;
+        }
+    }
+
+    /// Returns the last applied version for a contact, if any.
+    pub fn last_applied_version(&self, contact_id: &str) -> Option<u32> {
+        self.last_applied_versions.get(contact_id).copied()
     }
 
     /// Queues a card update for a specific contact.
@@ -439,12 +479,7 @@ impl ReplayDetector {
     /// should be rejected.
     ///
     /// On acceptance, records the nonce and updates the last timestamp.
-    pub fn check_replay(
-        &mut self,
-        contact_id: &str,
-        nonce: &[u8; 32],
-        timestamp: u64,
-    ) -> bool {
+    pub fn check_replay(&mut self, contact_id: &str, nonce: &[u8; 32], timestamp: u64) -> bool {
         let key = (contact_id.to_string(), *nonce);
 
         // Check for duplicate nonce
@@ -461,7 +496,10 @@ impl ReplayDetector {
 
         // Accept: record nonce and update timestamp
         self.seen_nonces.insert(key);
-        let entry = self.last_timestamps.entry(contact_id.to_string()).or_insert(0);
+        let entry = self
+            .last_timestamps
+            .entry(contact_id.to_string())
+            .or_insert(0);
         if timestamp > *entry {
             *entry = timestamp;
         }
@@ -472,7 +510,8 @@ impl ReplayDetector {
     ///
     /// Removes all nonces for entries whose timestamp is older than `cutoff`.
     pub fn prune_before(&mut self, cutoff: u64) {
-        let stale_contacts: Vec<String> = self.last_timestamps
+        let stale_contacts: Vec<String> = self
+            .last_timestamps
             .iter()
             .filter(|(_, &ts)| ts < cutoff)
             .map(|(id, _)| id.clone())

@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 //! GDPR Data Export
+#![allow(dead_code)]
 //!
 //! Provides full data export for GDPR compliance (right to data portability).
 
@@ -96,9 +97,9 @@ pub fn export_all_data(storage: &Storage) -> Result<GdprExport, crate::storage::
         .collect();
 
     // Export own card
-    let own_card = storage.load_own_card()?.map(|card| {
-        serde_json::to_value(&card).unwrap_or(serde_json::Value::Null)
-    });
+    let own_card = storage
+        .load_own_card()?
+        .map(|card| serde_json::to_value(&card).unwrap_or(serde_json::Value::Null));
 
     Ok(GdprExport {
         version: 1,

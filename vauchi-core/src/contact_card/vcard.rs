@@ -82,11 +82,19 @@ pub fn import_vcard(vcard: &str) -> Result<ContactCard, VCardError> {
             let (label, value) = parse_typed_field(line, "EMAIL");
             fields.push((FieldType::Email, label, value));
         } else if let Some(value) = line.strip_prefix("URL:") {
-            fields.push((FieldType::Website, "Website".to_string(), unescape_vcard(value)));
+            fields.push((
+                FieldType::Website,
+                "Website".to_string(),
+                unescape_vcard(value),
+            ));
         } else if line.starts_with("ADR") {
             let (label, value) = parse_typed_field(line, "ADR");
             // ADR format: ;;street;;;;
-            let addr = value.replace(";;", "").replace(";;;;", "").trim().to_string();
+            let addr = value
+                .replace(";;", "")
+                .replace(";;;;", "")
+                .trim()
+                .to_string();
             if !addr.is_empty() {
                 fields.push((FieldType::Address, label, addr));
             }

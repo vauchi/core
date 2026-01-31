@@ -37,7 +37,11 @@ pub fn find_duplicates(contacts: &[Contact]) -> Vec<DuplicatePair> {
         }
     }
 
-    duplicates.sort_by(|a, b| b.similarity.partial_cmp(&a.similarity).unwrap_or(std::cmp::Ordering::Equal));
+    duplicates.sort_by(|a, b| {
+        b.similarity
+            .partial_cmp(&a.similarity)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
     duplicates
 }
 

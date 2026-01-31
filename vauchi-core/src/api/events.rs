@@ -76,6 +76,38 @@ pub enum VauchiEvent {
         error: String,
     },
 
+    /// Delivery status update for a specific message.
+    DeliveryStatusUpdate {
+        /// The message ID.
+        message_id: String,
+        /// The new delivery status.
+        status: String,
+    },
+
+    /// Warning that a message is about to expire.
+    PreExpiryWarning {
+        /// The message ID that is expiring.
+        message_id: String,
+        /// Unix timestamp when the message expires.
+        expires_at: u64,
+    },
+
+    /// Label sync completed across devices.
+    LabelSyncCompleted {
+        /// The label ID that was synced.
+        label_id: String,
+    },
+
+    /// A downgrade (older version) was detected for a contact's delta.
+    DowngradeDetected {
+        /// The contact ID.
+        contact_id: String,
+        /// The expected (last applied) version.
+        expected_version: u32,
+        /// The version that was received.
+        received_version: u32,
+    },
+
     /// Error event for async operations.
     Error {
         /// Error description.

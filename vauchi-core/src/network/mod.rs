@@ -83,13 +83,16 @@ pub mod websocket;
 #[cfg(not(feature = "testing"))]
 mod websocket;
 
+pub mod pinning;
+
 // Error types
 pub use error::NetworkError;
 
 // Message types
 pub use message::{
-    AckStatus, Acknowledgment, DeviceSyncMessage, EncryptedUpdate, Handshake, MessageEnvelope,
-    MessageId, MessagePayload, PresenceStatus, PresenceUpdate, RatchetHeader, PROTOCOL_VERSION,
+    negotiate_version, AckStatus, Acknowledgment, DeviceSyncMessage, EncryptedUpdate, Handshake,
+    MessageEnvelope, MessageId, MessagePayload, PresenceStatus, PresenceUpdate, RatchetHeader,
+    VersionNegotiation, PROTOCOL_VERSION,
 };
 
 // Protocol utilities
@@ -119,4 +122,7 @@ pub use multi_relay::{
 };
 
 // Anonymous sender identifiers
-pub use anonymous::{AnonymousSender, compute_anonymous_id, current_epoch, resolve_sender};
+pub use anonymous::{compute_anonymous_id, current_epoch, resolve_sender, AnonymousSender};
+
+// Certificate pinning
+pub use pinning::{verify_pin, PinnedCertificate};

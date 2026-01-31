@@ -66,6 +66,109 @@ pub enum RecoveryError {
 
     #[error("Cannot vouch for your own recovery (self-vouching not allowed)")]
     SelfVouching,
+
+    #[error("Rate limit exceeded: too many recovery claims in the current window")]
+    RateLimitExceeded,
+}
+
+// =============================================================================
+// Recovery Response
+// =============================================================================
+
+/// Response to a recovery claim from another user.
+///
+/// When a contact presents a recovery claim, the user can:
+/// - Accept: acknowledge and update the contact's identity
+/// - Reject: refuse the claim (potential impostor)
+/// - RemindMeLater: defer the decision for later review
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum RecoveryResponse {
+    /// Accept the recovery claim and update contact identity.
+    Accept,
+    /// Reject the recovery claim.
+    Reject,
+    /// Defer the decision until the specified timestamp (Unix seconds).
+    RemindMeLater {
+        /// Unix timestamp when the user should be reminded.
+        remind_at: u64,
+    },
+}
+
+impl RecoveryResponse {
+    /// Returns a string representation suitable for storage.
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            RecoveryResponse::Accept => "accept",
+            RecoveryResponse::Reject => "reject",
+            RecoveryResponse::RemindMeLater { .. } => "remind_me_later",
+        }
+    }
+
+    /// Returns the remind_at timestamp if this is a RemindMeLater response.
+    pub fn remind_at(&self) -> Option<u64> {
+        match self {
+            RecoveryResponse::RemindMeLater { remind_at } => Some(*remind_at),
+            _ => None,
+        }
+    }
+}
+
+// =============================================================================
+// Recovery Rate Limiter
+// =============================================================================
+
+/// Rate limiter for recovery claims to prevent abuse.
+///
+/// Limits the number of recovery claims that can be made within a
+/// rolling time window. This prevents Sybil attacks where an attacker
+/// floods the system with fraudulent recovery claims.
+#[derive(Debug, Clone)]
+pub struct RecoveryRateLimiter {
+    /// Maximum number of claims allowed per hour.
+    pub max_claims_per_hour: u32,
+}
+
+impl Default for RecoveryRateLimiter {
+    fn default() -> Self {
+        Self {
+            max_claims_per_hour: 5,
+        }
+    }
+}
+
+impl RecoveryRateLimiter {
+    /// Creates a new rate limiter with the specified max claims per hour.
+    pub fn new(max_claims_per_hour: u32) -> Self {
+        Self {
+            max_claims_per_hour,
+        }
+    }
+
+    /// Checks if a new claim is within the rate limit.
+    ///
+    /// Returns `true` if the claim is allowed, `false` if the rate limit
+    /// would be exceeded.
+    ///
+    /// # Arguments
+    /// * `claim_count` - Number of claims already made in the current window
+    /// * `window_start` - Unix timestamp when the current window started
+    pub fn check_rate_limit(&self, claim_count: u32, window_start: u64) -> bool {
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("Time went backwards")
+            .as_secs();
+
+        // If the window has expired (older than 1 hour), reset
+        let window_expired = now.saturating_sub(window_start) >= 3600;
+
+        if window_expired {
+            // Window expired, new claim is always allowed
+            true
+        } else {
+            // Within the window, check count
+            claim_count < self.max_claims_per_hour
+        }
+    }
 }
 
 /// Recovery claim shown as QR code.

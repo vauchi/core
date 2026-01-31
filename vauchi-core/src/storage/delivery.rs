@@ -151,6 +151,23 @@ impl Storage {
         Ok(rows_affected)
     }
 
+    /// Extends the TTL of a delivery record by adding additional seconds to `expires_at`.
+    ///
+    /// Returns `true` if the record was found and updated, `false` if the
+    /// message ID was not found or has no expiry set.
+    pub fn extend_delivery_ttl(
+        &self,
+        message_id: &str,
+        additional_secs: u64,
+    ) -> Result<bool, StorageError> {
+        let rows_affected = self.conn.execute(
+            "UPDATE delivery_records SET expires_at = expires_at + ?1
+             WHERE message_id = ?2 AND expires_at IS NOT NULL",
+            params![additional_secs as i64, message_id],
+        )?;
+        Ok(rows_affected > 0)
+    }
+
     /// Counts delivery records by status.
     pub fn count_deliveries_by_status(
         &self,

@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 //! Consent Management
+#![allow(dead_code)]
 //!
 //! Tracks user consent for data processing activities (GDPR Article 7).
 
@@ -75,7 +76,8 @@ impl<'a> ConsentManager<'a> {
             .map(|d| d.as_secs())
             .unwrap_or(0);
 
-        self.storage.execute_consent_upsert(&id, consent_type.as_str(), true, now)
+        self.storage
+            .execute_consent_upsert(&id, consent_type.as_str(), true, now)
     }
 
     /// Revokes consent for a specific type.
@@ -86,7 +88,8 @@ impl<'a> ConsentManager<'a> {
             .map(|d| d.as_secs())
             .unwrap_or(0);
 
-        self.storage.execute_consent_upsert(&id, consent_type.as_str(), false, now)
+        self.storage
+            .execute_consent_upsert(&id, consent_type.as_str(), false, now)
     }
 
     /// Checks whether consent is currently granted for a type.

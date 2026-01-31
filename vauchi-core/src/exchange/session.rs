@@ -22,18 +22,13 @@ const SESSION_TIMEOUT: Duration = Duration::from_secs(60);
 const PROXIMITY_TIMEOUT: Duration = Duration::from_secs(30);
 
 /// Mode of the exchange session.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum ExchangeMode {
     /// Both parties exchange contact cards (default).
+    #[default]
     Mutual,
     /// Only the initiator sends their card; the responder does not share.
     ShareOnly,
-}
-
-impl Default for ExchangeMode {
-    fn default() -> Self {
-        ExchangeMode::Mutual
-    }
 }
 
 /// State of an exchange session.

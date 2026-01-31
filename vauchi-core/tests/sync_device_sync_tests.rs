@@ -128,7 +128,9 @@ fn test_conflict_resolution_last_write_wins() {
     };
 
     // Resolve conflict - later timestamp wins
-    let resolved = SyncItem::resolve_conflict(&item_a, &item_b);
+    let device_a_id = [0xAA; 32];
+    let device_b_id = [0xBB; 32];
+    let resolved = SyncItem::resolve_conflict(&item_a, &item_b, &device_a_id, &device_b_id);
 
     // Device B's change should win
     if let SyncItem::CardUpdated { new_value, .. } = resolved {

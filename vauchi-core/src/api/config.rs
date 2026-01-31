@@ -8,6 +8,8 @@
 
 use std::path::PathBuf;
 
+use serde::{Deserialize, Serialize};
+
 use crate::crypto::SymmetricKey;
 use crate::network::{ProxyConfig, RelayClientConfig, TransportConfig};
 
@@ -29,6 +31,12 @@ pub struct VauchiConfig {
     /// Storage encryption key.
     /// If None, a random key will be generated (not persistent across sessions).
     pub storage_key: Option<SymmetricKey>,
+
+    /// Whether to send delivery receipts for received messages.
+    pub delivery_receipts_enabled: bool,
+
+    /// Recovery configuration for social key recovery.
+    pub recovery: RecoveryConfig,
 }
 
 impl Default for VauchiConfig {
@@ -39,6 +47,8 @@ impl Default for VauchiConfig {
             sync: SyncConfig::default(),
             auto_save: true,
             storage_key: None,
+            delivery_receipts_enabled: true,
+            recovery: RecoveryConfig::default(),
         }
     }
 }
@@ -176,6 +186,32 @@ impl Default for SyncConfig {
             auto_sync: true,
             sync_interval_ms: 60_000, // 1 minute
             max_pending_updates: 50,
+        }
+    }
+}
+
+/// Configuration for social key recovery.
+///
+/// Controls how many vouchers (trusted contacts) are needed
+/// to recover an identity and whether automatic reminders are sent.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RecoveryConfig {
+    /// Number of vouchers needed to recover an identity.
+    pub threshold: u32,
+
+    /// Whether to automatically send reminders to vouchers.
+    pub auto_remind: bool,
+
+    /// Number of days between reminder messages.
+    pub remind_interval_days: u32,
+}
+
+impl Default for RecoveryConfig {
+    fn default() -> Self {
+        RecoveryConfig {
+            threshold: 3,
+            auto_remind: true,
+            remind_interval_days: 7,
         }
     }
 }

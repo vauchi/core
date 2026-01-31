@@ -340,6 +340,7 @@ impl<'a> DeviceSyncOrchestrator<'a> {
             SyncItem::ContactRemoved { contact_id, .. } => format!("contact:{}", contact_id),
             SyncItem::CardUpdated { field_label, .. } => format!("field:{}", field_label),
             SyncItem::VisibilityChanged { contact_id, .. } => format!("visibility:{}", contact_id),
+            SyncItem::LabelChange { label_id, .. } => format!("label:{}", label_id),
         }
     }
 
@@ -362,6 +363,49 @@ impl<'a> DeviceSyncOrchestrator<'a> {
             version,
             sender_device_id: *self.current_device.device_id(),
         })
+    }
+
+    // ============================================================
+    // Sync Checkpoints (Phase 7)
+    // ============================================================
+
+    /// Saves a sync checkpoint before sending items to a target device.
+    ///
+    /// This allows resuming an interrupted sync from the last sent item
+    /// rather than starting over. Call before beginning to send items.
+    pub fn save_checkpoint(
+        &self,
+        target_device_id: &[u8; 32],
+        items: &[SyncItem],
+        sent_count: usize,
+    ) -> Result<(), DeviceSyncError> {
+        self.storage
+            .save_sync_checkpoint(target_device_id, items, sent_count)
+            .map_err(|e| DeviceSyncError::Serialization(e.to_string()))
+    }
+
+    /// Loads a sync checkpoint for a target device.
+    ///
+    /// Returns the stored items and how many were already sent,
+    /// or `None` if no checkpoint exists. Use this when reconnecting
+    /// to resume an interrupted sync.
+    pub fn load_checkpoint(
+        &self,
+        target_device_id: &[u8; 32],
+    ) -> Result<Option<(Vec<SyncItem>, usize)>, DeviceSyncError> {
+        self.storage
+            .load_sync_checkpoint(target_device_id)
+            .map_err(|e| DeviceSyncError::Deserialization(e.to_string()))
+    }
+
+    /// Clears a sync checkpoint after successful completion.
+    ///
+    /// Call this after all items have been successfully sent to the
+    /// target device.
+    pub fn clear_checkpoint(&self, target_device_id: &[u8; 32]) -> Result<(), DeviceSyncError> {
+        self.storage
+            .clear_sync_checkpoint(target_device_id)
+            .map_err(|e| DeviceSyncError::Serialization(e.to_string()))
     }
 }
 

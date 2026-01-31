@@ -230,4 +230,89 @@ impl Storage {
             Err(e) => Err(StorageError::Database(e)),
         }
     }
+
+    // === Device Data Wipe ===
+
+    /// Wipes all device-specific data from storage.
+    ///
+    /// Deletes rows from: `device_info`, `device_sync_state`, and
+    /// `device_sync_checkpoints`. This is used during account deletion
+    /// or device unlinking to ensure no device-specific data remains.
+    pub fn wipe_device_data(&self) -> Result<(), StorageError> {
+        self.conn.execute("DELETE FROM device_info", [])?;
+        self.conn.execute("DELETE FROM device_sync_state", [])?;
+        self.conn
+            .execute("DELETE FROM device_sync_checkpoints", [])?;
+        Ok(())
+    }
+
+    // === Sync Checkpoint Operations ===
+
+    /// Saves a sync checkpoint for a target device.
+    ///
+    /// Stores the list of sync items and how many have been sent so far,
+    /// allowing sync to resume from the last checkpoint after interruption.
+    pub fn save_sync_checkpoint(
+        &self,
+        target_device_id: &[u8; 32],
+        items: &[crate::sync::device_sync::SyncItem],
+        sent_count: usize,
+    ) -> Result<(), StorageError> {
+        let items_json =
+            serde_json::to_string(items).map_err(|e| StorageError::Serialization(e.to_string()))?;
+
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("system time before UNIX epoch")
+            .as_secs();
+
+        self.conn.execute(
+            "INSERT OR REPLACE INTO device_sync_checkpoints (target_device_id, items_json, sent_count, updated_at)
+             VALUES (?1, ?2, ?3, ?4)",
+            params![
+                target_device_id.as_slice(),
+                items_json,
+                sent_count as i64,
+                now as i64,
+            ],
+        )?;
+        Ok(())
+    }
+
+    /// Loads a sync checkpoint for a target device.
+    ///
+    /// Returns the list of sync items and the number already sent,
+    /// or `None` if no checkpoint exists for this device.
+    pub fn load_sync_checkpoint(
+        &self,
+        target_device_id: &[u8; 32],
+    ) -> Result<Option<(Vec<crate::sync::device_sync::SyncItem>, usize)>, StorageError> {
+        let result = self.conn.query_row(
+            "SELECT items_json, sent_count FROM device_sync_checkpoints WHERE target_device_id = ?1",
+            params![target_device_id.as_slice()],
+            |row| Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?)),
+        );
+
+        match result {
+            Ok((items_json, sent_count)) => {
+                let items: Vec<crate::sync::device_sync::SyncItem> =
+                    serde_json::from_str(&items_json)
+                        .map_err(|e| StorageError::Serialization(e.to_string()))?;
+                Ok(Some((items, sent_count as usize)))
+            }
+            Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+            Err(e) => Err(StorageError::Database(e)),
+        }
+    }
+
+    /// Clears a sync checkpoint for a target device.
+    ///
+    /// Called after sync completes successfully to remove the checkpoint.
+    pub fn clear_sync_checkpoint(&self, target_device_id: &[u8; 32]) -> Result<(), StorageError> {
+        self.conn.execute(
+            "DELETE FROM device_sync_checkpoints WHERE target_device_id = ?1",
+            params![target_device_id.as_slice()],
+        )?;
+        Ok(())
+    }
 }

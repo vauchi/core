@@ -188,9 +188,8 @@ impl ContactCard {
 
     /// Validates that the serialized card size is within the maximum limit.
     pub fn validate_size(&self) -> Result<(), ContactCardError> {
-        let json = serde_json::to_vec(self).map_err(|e| {
-            ContactCardError::Serialization(e.to_string())
-        })?;
+        let json =
+            serde_json::to_vec(self).map_err(|e| ContactCardError::Serialization(e.to_string()))?;
         let size = json.len();
         if size > MAX_CARD_SIZE_BYTES {
             return Err(ContactCardError::CardTooLarge {

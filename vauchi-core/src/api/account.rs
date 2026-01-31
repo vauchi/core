@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 //! Account Management
+#![allow(dead_code)]
 //!
 //! Provides account deletion with secure data wipe.
 

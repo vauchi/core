@@ -157,7 +157,10 @@ fn test_conflict_resolution_clock_independent() {
     };
 
     // Using timestamps alone: B would win (unfairly, if A was actually later)
-    let winner_by_timestamp = SyncItem::resolve_conflict(&item_a, &item_b);
+    let device_a_id = [0xAA; 32];
+    let device_b_id = [0xBB; 32];
+    let winner_by_timestamp =
+        SyncItem::resolve_conflict(&item_a, &item_b, &device_a_id, &device_b_id);
     assert_eq!(winner_by_timestamp.timestamp(), 2000);
 
     // With version vectors, we can detect this is actually concurrent
@@ -326,7 +329,9 @@ fn test_last_write_wins_sequential() {
         timestamp: 2000,
     };
 
-    let winner = SyncItem::resolve_conflict(&item1, &item2);
+    let device_1_id = [0x01; 32];
+    let device_2_id = [0x02; 32];
+    let winner = SyncItem::resolve_conflict(&item1, &item2, &device_1_id, &device_2_id);
     match winner {
         SyncItem::CardUpdated { new_value, .. } => {
             assert_eq!(new_value, "New Name");
@@ -350,10 +355,11 @@ fn test_timestamp_tie_resolution() {
         timestamp: 1000, // Same timestamp!
     };
 
-    // Current implementation: first one wins on tie (>= comparison)
-    let winner = SyncItem::resolve_conflict(&item1, &item2);
+    // Deterministic tie-breaker: device_id lexicographic comparison
+    let device_1_id = [0x01; 32];
+    let device_2_id = [0x02; 32];
+    let winner = SyncItem::resolve_conflict(&item1, &item2, &device_1_id, &device_2_id);
     assert_eq!(winner.timestamp(), 1000);
 
-    // For true determinism, we should use additional criteria
-    // (e.g., hash of content, device ID, etc.)
+    // With the deterministic tie-breaker, the higher device_id wins
 }

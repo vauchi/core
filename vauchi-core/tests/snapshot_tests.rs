@@ -68,8 +68,7 @@ fn test_field_type_serialization_snapshot() {
 fn test_contact_field_serialization_snapshot() {
     use vauchi_core::ContactField;
 
-    let field_json =
-        r#"{"id":"test-field","field_type":"Email","label":"Personal","value":"me@example.com","updated_at":0}"#;
+    let field_json = r#"{"id":"test-field","field_type":"Email","label":"Personal","value":"me@example.com","updated_at":0}"#;
 
     let field: ContactField = serde_json::from_str(field_json).unwrap();
     let reserialized = serde_json::to_string(&field).unwrap();
@@ -214,6 +213,7 @@ fn test_registered_device_serialization_snapshot() {
         created_at: 1700000000,
         revoked: false,
         revoked_at: None,
+        last_sync_at: None,
     };
 
     let serialized = serde_json::to_string(&device).unwrap();
@@ -243,6 +243,7 @@ fn test_registered_device_revoked_serialization_snapshot() {
         created_at: 1699000000,
         revoked: true,
         revoked_at: Some(1700000000),
+        last_sync_at: None,
     };
 
     let serialized = serde_json::to_string(&device).unwrap();

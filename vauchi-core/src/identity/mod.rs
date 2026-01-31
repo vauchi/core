@@ -20,11 +20,13 @@ pub mod password;
 
 pub use backup::IdentityBackup;
 pub use device::{
-    BroadcastDevice, DeviceError, DeviceInfo, DeviceRegistry, DeviceRevocationCertificate,
-    RegisteredDevice, RegistryBroadcast, MAX_DEVICES,
+    check_identity_collision, BroadcastDevice, DeviceError, DeviceInfo, DeviceRegistry,
+    DeviceRevocationCertificate, RegisteredDevice, RegistryBroadcast, MAX_DEVICES,
 };
 
-use crate::crypto::{decrypt, derive_key_argon2id, derive_key_pbkdf2, encrypt, Signature, SigningKeyPair, HKDF};
+use crate::crypto::{
+    decrypt, derive_key_argon2id, derive_key_pbkdf2, encrypt, Signature, SigningKeyPair, HKDF,
+};
 use crate::exchange::X3DHKeyPair;
 use ring::rand::SystemRandom;
 use thiserror::Error;

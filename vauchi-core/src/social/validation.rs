@@ -333,6 +333,103 @@ impl ValidationStatus {
     }
 }
 
+// =============================================================================
+// Blocked Contact Filtering
+// =============================================================================
+
+/// Filters out validations from blocked contacts.
+///
+/// Returns a new vector containing only validations from contacts
+/// that are not in the blocked set.
+///
+/// # Arguments
+/// * `validations` - The list of validations to filter
+/// * `blocked` - Set of blocked contact IDs (validator_id format)
+pub fn filter_blocked_validations(
+    validations: &[ProfileValidation],
+    blocked: &HashSet<String>,
+) -> Vec<ProfileValidation> {
+    validations
+        .iter()
+        .filter(|v| !blocked.contains(&v.validator_id))
+        .cloned()
+        .collect()
+}
+
+// =============================================================================
+// Sybil Resistance
+// =============================================================================
+
+/// Checks if a validation would be a duplicate (Sybil resistance).
+///
+/// Returns `false` if this validator has already validated this field
+/// for this contact, preventing one person from inflating trust scores.
+///
+/// # Arguments
+/// * `contact_id` - The contact whose field is being validated
+/// * `field_id` - The field being validated
+/// * `validator_id` - The validator attempting to validate
+/// * `existing_validations` - All existing validations for this field
+///
+/// # Returns
+/// `true` if the validation is allowed (no duplicate), `false` if
+/// this validator has already validated this field for this contact.
+pub fn check_sybil_resistance(
+    contact_id: &str,
+    field_id: &str,
+    validator_id: &str,
+    existing_validations: &[ProfileValidation],
+) -> bool {
+    let full_field_id = format!("{}:{}", contact_id, field_id);
+    !existing_validations
+        .iter()
+        .any(|v| v.validator_id() == validator_id && v.field_id() == full_field_id)
+}
+
+// =============================================================================
+// Validator Weighting
+// =============================================================================
+
+/// Calculates a trust weight for a validator based on contact age and verification.
+///
+/// The weight is a value between 0.0 and 1.0 that can be used to give
+/// more credibility to validations from well-established contacts.
+///
+/// # Weighting Rules
+/// - Fingerprint-verified contacts get a base weight of 0.8
+/// - Non-verified contacts get a base weight of 0.3
+/// - Contacts older than 30 days get full weight (1.0 for verified, 0.5 for non-verified)
+/// - Contact age linearly scales from 0 to the base weight over 30 days
+///
+/// # Arguments
+/// * `validator_contact_age_days` - How many days the validator has been a contact
+/// * `is_fingerprint_verified` - Whether the contact's fingerprint has been verified in-person
+///
+/// # Returns
+/// A weight between 0.0 and 1.0
+pub fn calculate_trust_weight(
+    validator_contact_age_days: u64,
+    is_fingerprint_verified: bool,
+) -> f32 {
+    const MATURITY_DAYS: u64 = 30;
+
+    // Base weights
+    let (max_weight, min_weight) = if is_fingerprint_verified {
+        (1.0_f32, 0.8_f32)
+    } else {
+        (0.5_f32, 0.3_f32)
+    };
+
+    if validator_contact_age_days >= MATURITY_DAYS {
+        // Mature contact: full weight
+        max_weight
+    } else {
+        // Scale linearly from min_weight to max_weight over MATURITY_DAYS
+        let progress = validator_contact_age_days as f32 / MATURITY_DAYS as f32;
+        min_weight + (max_weight - min_weight) * progress
+    }
+}
+
 /// Custom serde for fixed-size signature arrays.
 mod signature_serde {
     use serde::{Deserialize, Deserializer, Serializer};

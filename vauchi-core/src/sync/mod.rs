@@ -10,12 +10,14 @@
 pub mod delta;
 pub mod device_orchestrator;
 pub mod device_sync;
+pub mod merkle;
 pub mod state;
 
 pub use delta::{CardDelta, DeltaError, FieldChange};
 pub use device_orchestrator::DeviceSyncOrchestrator;
 pub use device_sync::{
-    ContactSyncData, DeviceSyncError, DeviceSyncPayload, InterDeviceSyncState, SyncItem,
-    VersionVector,
+    validate_timestamp, ContactSyncData, DeviceSyncError, DeviceSyncPayload, InterDeviceSyncState,
+    SyncItem, VersionVector,
 };
+pub use merkle::MerkleTree;
 pub use state::{ReplayDetector, SyncError, SyncManager, SyncState};

@@ -35,6 +35,8 @@ pub enum DeviceError {
     InvalidRegistrySignature,
     #[error("Device name cannot be empty")]
     EmptyDeviceName,
+    #[error("Cannot transfer primary: target device is revoked")]
+    CannotTransferToRevoked,
 }
 
 /// Device-specific cryptographic material and metadata.
@@ -128,6 +130,7 @@ impl DeviceInfo {
             created_at: self.created_at,
             revoked: false,
             revoked_at: None,
+            last_sync_at: None,
         }
     }
 }
@@ -147,6 +150,9 @@ pub struct RegisteredDevice {
     pub revoked: bool,
     /// Revocation timestamp (if revoked).
     pub revoked_at: Option<u64>,
+    /// Timestamp of the last successful sync (if any).
+    #[serde(default)]
+    pub last_sync_at: Option<u64>,
 }
 
 impl RegisteredDevice {
@@ -382,6 +388,58 @@ impl DeviceRegistry {
 
         Ok(())
     }
+
+    /// Transfers primary status to a device with the given device_id.
+    ///
+    /// The primary device is the first device in the registry's device list.
+    /// This method moves the target device to position 0, demoting the
+    /// current primary. The target device must exist and be active (not revoked).
+    /// Signs the registry after modification.
+    pub fn transfer_primary(
+        &mut self,
+        new_primary_id: &[u8; 32],
+        signing_key: &crate::crypto::SigningKeyPair,
+    ) -> Result<(), DeviceError> {
+        // Find the target device index
+        let target_idx = self
+            .devices
+            .iter()
+            .position(|d| &d.device_id == new_primary_id)
+            .ok_or(DeviceError::DeviceNotFound)?;
+
+        // Ensure the target device is not revoked
+        if self.devices[target_idx].revoked {
+            return Err(DeviceError::CannotTransferToRevoked);
+        }
+
+        // If already primary (index 0), nothing to do
+        if target_idx == 0 {
+            return Ok(());
+        }
+
+        // Move target device to position 0 (making it primary)
+        let target_device = self.devices.remove(target_idx);
+        self.devices.insert(0, target_device);
+
+        self.version += 1;
+        self.sign(signing_key);
+        Ok(())
+    }
+
+    /// Returns the primary device (first device in the registry).
+    ///
+    /// The primary device is the device at index 0.
+    pub fn primary_device(&self) -> Option<&RegisteredDevice> {
+        self.devices.first()
+    }
+}
+
+/// Checks if two public keys collide (are identical).
+///
+/// Returns true if the public keys are byte-for-byte identical,
+/// indicating an identity collision that must be rejected.
+pub fn check_identity_collision(our_pk: &[u8; 32], other_pk: &[u8; 32]) -> bool {
+    our_pk == other_pk
 }
 
 // ============================================================

@@ -59,10 +59,12 @@ pub use network::{
 };
 pub use recovery::{
     ConflictingClaim, RecoveryClaim, RecoveryConflict, RecoveryError, RecoveryProof,
-    RecoveryReminder, RecoveryRevocation, RecoverySettings, RecoveryVoucher, VerificationResult,
+    RecoveryRateLimiter, RecoveryReminder, RecoveryResponse, RecoveryRevocation, RecoverySettings,
+    RecoveryVoucher, VerificationResult,
 };
 pub use social::{
-    ProfileValidation, SocialNetwork, SocialNetworkRegistry, TrustLevel, ValidationStatus,
+    calculate_trust_weight, check_sybil_resistance, filter_blocked_validations, ProfileValidation,
+    SocialNetwork, SocialNetworkRegistry, TrustLevel, ValidationStatus,
 };
 pub use storage::{PendingUpdate, Storage, StorageError, UpdateStatus};
 pub use sync::{CardDelta, DeltaError, FieldChange, SyncError, SyncManager, SyncState};

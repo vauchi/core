@@ -196,6 +196,22 @@ pub enum SyncItem {
         /// Timestamp of change.
         timestamp: u64,
     },
+
+    /// A visibility label was created, updated, or deleted.
+    LabelChange {
+        /// The label's unique ID.
+        label_id: String,
+        /// The label's display name.
+        label_name: String,
+        /// Contact IDs assigned to this label.
+        contacts: Vec<String>,
+        /// Field IDs visible to contacts in this label.
+        visible_fields: Vec<String>,
+        /// Whether the label was deleted.
+        is_deleted: bool,
+        /// Timestamp of the change.
+        timestamp: u64,
+    },
 }
 
 impl SyncItem {
@@ -206,17 +222,38 @@ impl SyncItem {
             SyncItem::ContactRemoved { timestamp, .. } => *timestamp,
             SyncItem::CardUpdated { timestamp, .. } => *timestamp,
             SyncItem::VisibilityChanged { timestamp, .. } => *timestamp,
+            SyncItem::LabelChange { timestamp, .. } => *timestamp,
         }
     }
 
     /// Resolves conflict between two sync items using last-write-wins.
     ///
-    /// The item with the later timestamp wins.
-    pub fn resolve_conflict(a: &SyncItem, b: &SyncItem) -> SyncItem {
-        if a.timestamp() >= b.timestamp() {
-            a.clone()
+    /// The item with the later timestamp wins. When timestamps are equal,
+    /// the device_id is used as a deterministic tie-breaker via lexicographic
+    /// comparison — the item from the device with the higher device_id wins.
+    /// This ensures all devices converge to the same result regardless of
+    /// the order they process conflicting items.
+    pub fn resolve_conflict(
+        a: &SyncItem,
+        b: &SyncItem,
+        a_device_id: &[u8; 32],
+        b_device_id: &[u8; 32],
+    ) -> SyncItem {
+        if a.timestamp() != b.timestamp() {
+            // Different timestamps: later wins
+            if a.timestamp() > b.timestamp() {
+                a.clone()
+            } else {
+                b.clone()
+            }
         } else {
-            b.clone()
+            // Equal timestamps: use device_id as deterministic tie-breaker
+            // Higher device_id (lexicographic) wins
+            if a_device_id >= b_device_id {
+                a.clone()
+            } else {
+                b.clone()
+            }
         }
     }
 
@@ -386,6 +423,35 @@ impl VersionVector {
     pub fn from_json(json: &str) -> Result<Self, DeviceSyncError> {
         serde_json::from_str(json).map_err(|e| DeviceSyncError::Deserialization(e.to_string()))
     }
+}
+
+// ============================================================
+// Phase 7: Timestamp Validation
+// ============================================================
+
+/// Maximum allowed clock drift into the future (5 minutes in seconds).
+const MAX_FUTURE_DRIFT_SECS: u64 = 300;
+
+/// Validates that a timestamp is reasonable.
+///
+/// A timestamp is valid if:
+/// - It is not zero (zero indicates uninitialized or invalid data)
+/// - It is not in the far future (more than 5 minutes ahead of current time)
+///
+/// This prevents accepting sync items with clearly bogus timestamps
+/// that could arise from clock skew, replay attacks, or data corruption.
+pub fn validate_timestamp(timestamp: u64) -> bool {
+    if timestamp == 0 {
+        return false;
+    }
+
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs();
+
+    // Reject timestamps more than MAX_FUTURE_DRIFT_SECS in the future
+    timestamp <= now + MAX_FUTURE_DRIFT_SECS
 }
 
 /// Serde helper for 32-byte arrays.

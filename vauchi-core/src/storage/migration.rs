@@ -129,23 +129,20 @@ impl MigrationRunner {
     /// Returns the current schema version, or 0 if no migrations have been applied.
     pub fn current_version(conn: &Connection) -> Result<u32, StorageError> {
         // Check if schema_version table exists
-        let table_exists: bool = conn
-            .query_row(
-                "SELECT COUNT(*) > 0 FROM sqlite_master WHERE type='table' AND name='schema_version'",
-                [],
-                |row| row.get(0),
-            )?;
+        let table_exists: bool = conn.query_row(
+            "SELECT COUNT(*) > 0 FROM sqlite_master WHERE type='table' AND name='schema_version'",
+            [],
+            |row| row.get(0),
+        )?;
 
         if !table_exists {
             return Ok(0);
         }
 
         let version: Option<u32> = conn
-            .query_row(
-                "SELECT MAX(version) FROM schema_version",
-                [],
-                |row| row.get(0),
-            )
+            .query_row("SELECT MAX(version) FROM schema_version", [], |row| {
+                row.get(0)
+            })
             .unwrap_or(None);
 
         Ok(version.unwrap_or(0))
@@ -215,9 +212,7 @@ fn migrate_v2_re_encrypt(conn: &Connection, key: &SymmetricKey) -> Result<(), St
             .map_err(|e| StorageError::Migration(format!("Failed to read contacts: {}", e)))?;
 
         let rows: Vec<(String, Vec<u8>, Vec<u8>)> = stmt
-            .query_map([], |row| {
-                Ok((row.get(0)?, row.get(1)?, row.get(2)?))
-            })
+            .query_map([], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)))
             .map_err(|e| StorageError::Migration(format!("Failed to query contacts: {}", e)))?
             .collect::<Result<Vec<_>, _>>()
             .map_err(|e| StorageError::Migration(format!("Failed to collect contacts: {}", e)))?;
@@ -226,18 +221,17 @@ fn migrate_v2_re_encrypt(conn: &Connection, key: &SymmetricKey) -> Result<(), St
             // Decrypt with legacy format (handled by decrypt's auto-detect)
             let card_plain = decrypt(key, card_enc)
                 .map_err(|e| StorageError::Migration(format!("Decrypt card for {}: {}", id, e)))?;
-            let key_plain = decrypt(key, key_enc)
-                .map_err(|e| {
-                    StorageError::Migration(format!("Decrypt shared_key for {}: {}", id, e))
-                })?;
+            let key_plain = decrypt(key, key_enc).map_err(|e| {
+                StorageError::Migration(format!("Decrypt shared_key for {}: {}", id, e))
+            })?;
 
             // Re-encrypt with XChaCha20-Poly1305
-            let card_new = encrypt(key, &card_plain)
-                .map_err(|e| StorageError::Migration(format!("Re-encrypt card for {}: {}", id, e)))?;
-            let key_new = encrypt(key, &key_plain)
-                .map_err(|e| {
-                    StorageError::Migration(format!("Re-encrypt shared_key for {}: {}", id, e))
-                })?;
+            let card_new = encrypt(key, &card_plain).map_err(|e| {
+                StorageError::Migration(format!("Re-encrypt card for {}: {}", id, e))
+            })?;
+            let key_new = encrypt(key, &key_plain).map_err(|e| {
+                StorageError::Migration(format!("Re-encrypt shared_key for {}: {}", id, e))
+            })?;
 
             conn.execute(
                 "UPDATE contacts SET card_encrypted = ?1, shared_key_encrypted = ?2 WHERE id = ?3",

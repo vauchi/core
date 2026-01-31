@@ -181,10 +181,7 @@ impl Storage {
     /// Loads encrypted personal notes for a contact.
     ///
     /// Returns `None` if the contact has no personal notes stored.
-    pub fn load_personal_notes(
-        &self,
-        contact_id: &str,
-    ) -> Result<Option<Vec<u8>>, StorageError> {
+    pub fn load_personal_notes(&self, contact_id: &str) -> Result<Option<Vec<u8>>, StorageError> {
         let result = self.conn.query_row(
             "SELECT personal_notes_encrypted FROM contacts WHERE id = ?1",
             params![contact_id],
@@ -230,10 +227,7 @@ impl Storage {
     /// Loads an encrypted avatar for a contact.
     ///
     /// Returns `None` if the contact has no avatar stored.
-    pub fn load_avatar(
-        &self,
-        contact_id: &str,
-    ) -> Result<Option<Vec<u8>>, StorageError> {
+    pub fn load_avatar(&self, contact_id: &str) -> Result<Option<Vec<u8>>, StorageError> {
         let result = self.conn.query_row(
             "SELECT avatar_encrypted FROM contacts WHERE id = ?1",
             params![contact_id],
@@ -254,11 +248,9 @@ impl Storage {
 
     /// Counts the total number of contacts in storage.
     pub fn count_contacts(&self) -> Result<usize, StorageError> {
-        let count: i64 = self.conn.query_row(
-            "SELECT COUNT(*) FROM contacts",
-            [],
-            |row| row.get(0),
-        )?;
+        let count: i64 = self
+            .conn
+            .query_row("SELECT COUNT(*) FROM contacts", [], |row| row.get(0))?;
         Ok(count as usize)
     }
 
@@ -305,8 +297,7 @@ impl Storage {
 
         // Parse visibility rules
         let visibility_rules = if let Some(json) = row.visibility_rules_json {
-            serde_json::from_str(&json)
-                .map_err(|e| StorageError::Serialization(e.to_string()))?
+            serde_json::from_str(&json).map_err(|e| StorageError::Serialization(e.to_string()))?
         } else {
             crate::contact::VisibilityRules::new()
         };

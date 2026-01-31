@@ -147,6 +147,41 @@ pub struct DeviceSyncMessage {
     pub sync_version: u64,
 }
 
+/// Version negotiation message for protocol compatibility.
+///
+/// Sent during connection establishment to agree on a common protocol version.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VersionNegotiation {
+    /// List of protocol versions this peer supports.
+    pub supported_versions: Vec<u32>,
+    /// The version this peer prefers to use.
+    pub preferred_version: u32,
+}
+
+/// Negotiates the highest mutually supported protocol version.
+///
+/// Returns the highest version that both peers support, or `None` if
+/// there is no common version.
+///
+/// The preferred version fields are used as tiebreakers: if both peers
+/// share a common preferred version, it is selected. Otherwise, the
+/// highest mutually supported version wins.
+pub fn negotiate_version(local: &VersionNegotiation, remote: &VersionNegotiation) -> Option<u32> {
+    let mut common: Vec<u32> = local
+        .supported_versions
+        .iter()
+        .filter(|v| remote.supported_versions.contains(v))
+        .copied()
+        .collect();
+
+    if common.is_empty() {
+        return None;
+    }
+
+    common.sort_unstable();
+    Some(*common.last().unwrap())
+}
+
 /// Serde helper for 32-byte arrays.
 mod bytes_array_32 {
     use base64::Engine;
@@ -222,5 +257,109 @@ mod bytes_array_12 {
         bytes
             .try_into()
             .map_err(|_| serde::de::Error::custom("invalid length for 12-byte array"))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_version_negotiation_common_version() {
+        let local = VersionNegotiation {
+            supported_versions: vec![1, 2, 3],
+            preferred_version: 3,
+        };
+        let remote = VersionNegotiation {
+            supported_versions: vec![2, 3, 4],
+            preferred_version: 4,
+        };
+
+        assert_eq!(negotiate_version(&local, &remote), Some(3));
+    }
+
+    #[test]
+    fn test_version_negotiation_no_common_version() {
+        let local = VersionNegotiation {
+            supported_versions: vec![1, 2],
+            preferred_version: 2,
+        };
+        let remote = VersionNegotiation {
+            supported_versions: vec![3, 4],
+            preferred_version: 3,
+        };
+
+        assert_eq!(negotiate_version(&local, &remote), None);
+    }
+
+    #[test]
+    fn test_version_negotiation_single_common() {
+        let local = VersionNegotiation {
+            supported_versions: vec![1],
+            preferred_version: 1,
+        };
+        let remote = VersionNegotiation {
+            supported_versions: vec![1],
+            preferred_version: 1,
+        };
+
+        assert_eq!(negotiate_version(&local, &remote), Some(1));
+    }
+
+    #[test]
+    fn test_version_negotiation_highest_wins() {
+        let local = VersionNegotiation {
+            supported_versions: vec![1, 2, 5],
+            preferred_version: 2,
+        };
+        let remote = VersionNegotiation {
+            supported_versions: vec![1, 5, 6],
+            preferred_version: 6,
+        };
+
+        // Highest common version is 5
+        assert_eq!(negotiate_version(&local, &remote), Some(5));
+    }
+
+    #[test]
+    fn test_version_negotiation_empty_local() {
+        let local = VersionNegotiation {
+            supported_versions: vec![],
+            preferred_version: 0,
+        };
+        let remote = VersionNegotiation {
+            supported_versions: vec![1, 2],
+            preferred_version: 1,
+        };
+
+        assert_eq!(negotiate_version(&local, &remote), None);
+    }
+
+    #[test]
+    fn test_version_negotiation_empty_remote() {
+        let local = VersionNegotiation {
+            supported_versions: vec![1, 2],
+            preferred_version: 1,
+        };
+        let remote = VersionNegotiation {
+            supported_versions: vec![],
+            preferred_version: 0,
+        };
+
+        assert_eq!(negotiate_version(&local, &remote), None);
+    }
+
+    #[test]
+    fn test_version_negotiation_serde_roundtrip() {
+        let vn = VersionNegotiation {
+            supported_versions: vec![1, 2, 3],
+            preferred_version: 2,
+        };
+
+        let json = serde_json::to_string(&vn).unwrap();
+        let deserialized: VersionNegotiation = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(deserialized.supported_versions, vec![1, 2, 3]);
+        assert_eq!(deserialized.preferred_version, 2);
     }
 }

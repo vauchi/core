@@ -27,7 +27,10 @@ impl AnonymousSender {
     /// Computes an anonymous sender ID from a shared key and the current epoch.
     pub fn compute(shared_key: &[u8; 32], epoch: u64) -> Self {
         let anonymous_id = compute_anonymous_id(shared_key, epoch);
-        AnonymousSender { anonymous_id, epoch }
+        AnonymousSender {
+            anonymous_id,
+            epoch,
+        }
     }
 
     /// Computes an anonymous sender ID for the current epoch.

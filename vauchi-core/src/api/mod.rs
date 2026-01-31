@@ -95,7 +95,7 @@ mod vauchi;
 pub use error::{VauchiError, VauchiResult};
 
 // Configuration
-pub use config::{RelayConfig, SyncConfig, VauchiConfig};
+pub use config::{RecoveryConfig, RelayConfig, SyncConfig, VauchiConfig};
 
 // Events
 pub use events::{CallbackHandler, EventDispatcher, EventHandler, VauchiEvent};

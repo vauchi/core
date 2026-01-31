@@ -68,6 +68,11 @@ pub mod validation;
 mod validation;
 
 #[cfg(feature = "testing")]
+pub mod recovery;
+#[cfg(not(feature = "testing"))]
+mod recovery;
+
+#[cfg(feature = "testing")]
 pub mod ux;
 #[cfg(not(feature = "testing"))]
 mod ux;

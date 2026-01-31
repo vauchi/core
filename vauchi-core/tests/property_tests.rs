@@ -330,11 +330,16 @@ proptest! {
             timestamp: ts_b,
         };
 
-        let resolved = SyncItem::resolve_conflict(&item_a, &item_b);
+        let device_a_id = [0xAA; 32];
+        let device_b_id = [0xBB; 32];
+        let resolved = SyncItem::resolve_conflict(&item_a, &item_b, &device_a_id, &device_b_id);
 
-        if ts_a >= ts_b {
+        if ts_a > ts_b {
             prop_assert_eq!(resolved.timestamp(), ts_a);
+        } else if ts_b > ts_a {
+            prop_assert_eq!(resolved.timestamp(), ts_b);
         } else {
+            // Equal timestamps: device_b_id [0xBB] > device_a_id [0xAA], so b wins
             prop_assert_eq!(resolved.timestamp(), ts_b);
         }
     }

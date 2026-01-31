@@ -29,6 +29,9 @@ pub enum DeltaError {
 
     #[error("Cannot apply change: {0}")]
     ApplyError(String),
+
+    #[error("Compression error: {0}")]
+    CompressionError(String),
 }
 
 /// A delta update containing only changed fields.
@@ -249,6 +252,36 @@ impl CardDelta {
             nonce: self.nonce,
             signature: self.signature,
         }
+    }
+
+    /// Compresses a payload using DEFLATE compression.
+    ///
+    /// Useful for reducing the size of delta payloads before transmission.
+    pub fn compress_payload(payload: &[u8]) -> Vec<u8> {
+        use flate2::write::DeflateEncoder;
+        use flate2::Compression;
+        use std::io::Write;
+
+        let mut encoder = DeflateEncoder::new(Vec::new(), Compression::default());
+        encoder
+            .write_all(payload)
+            .expect("Writing to Vec should not fail");
+        encoder.finish().expect("Finishing deflate should not fail")
+    }
+
+    /// Decompresses a DEFLATE-compressed payload.
+    ///
+    /// Returns the decompressed bytes, or an error if the data is malformed.
+    pub fn decompress_payload(compressed: &[u8]) -> Result<Vec<u8>, DeltaError> {
+        use flate2::read::DeflateDecoder;
+        use std::io::Read;
+
+        let mut decoder = DeflateDecoder::new(compressed);
+        let mut decompressed = Vec::new();
+        decoder
+            .read_to_end(&mut decompressed)
+            .map_err(|e| DeltaError::CompressionError(e.to_string()))?;
+        Ok(decompressed)
     }
 
     /// Returns the bytes to be signed/verified.

@@ -65,8 +65,8 @@ pub use ble::{
     BLEProximityVerifier, MockBLEVerifier, VAUCHI_BLE_SERVICE_UUID,
 };
 pub use device_link::{
-    DeviceLinkInitiator, DeviceLinkInitiatorRestored, DeviceLinkQR, DeviceLinkRequest,
-    DeviceLinkResponder, DeviceLinkResponse,
+    generate_numeric_code, DeviceLinkInitiator, DeviceLinkInitiatorRestored, DeviceLinkQR,
+    DeviceLinkRequest, DeviceLinkResponder, DeviceLinkResponse,
 };
 pub use encrypted_message::{DecryptedExchangePayload, EncryptedExchangeMessage};
 pub use error::ExchangeError;
@@ -77,6 +77,9 @@ pub use nfc::{
 pub use proximity::{
     ManualConfirmationVerifier, MockProximityVerifier, ProximityError, ProximityVerifier,
 };
-pub use qr::ExchangeQR;
-pub use session::{DuplicateAction, ExchangeEvent, ExchangeRole, ExchangeSession, ExchangeState};
+pub use qr::{check_clock_drift, ExchangeQR};
+pub use session::{
+    DefaultPlatformCallbacks, DuplicateAction, ExchangeEvent, ExchangeMode,
+    ExchangePlatformCallbacks, ExchangeRole, ExchangeSession, ExchangeState,
+};
 pub use x3dh::{X3DHKeyPair, X3DH};

@@ -28,6 +28,14 @@ pub enum FieldType {
     Custom,
 }
 
+/// Returns the current Unix timestamp in seconds.
+fn now_timestamp() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("System clock before UNIX epoch")
+        .as_secs()
+}
+
 /// A single contact field (phone, email, etc.).
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct ContactField {
@@ -39,6 +47,9 @@ pub struct ContactField {
     label: String,
     /// The actual value (phone number, email address, etc.).
     value: String,
+    /// Timestamp of the last update (Unix seconds). Defaults to 0 for backward compatibility.
+    #[serde(default)]
+    updated_at: u64,
 }
 
 impl ContactField {
@@ -57,6 +68,7 @@ impl ContactField {
             field_type,
             label: label.to_string(),
             value: value.to_string(),
+            updated_at: now_timestamp(),
         }
     }
 
@@ -85,9 +97,15 @@ impl ContactField {
         &self.value
     }
 
-    /// Sets the field value.
+    /// Returns the timestamp of the last update (Unix seconds).
+    pub fn updated_at(&self) -> u64 {
+        self.updated_at
+    }
+
+    /// Sets the field value and updates the timestamp.
     pub fn set_value(&mut self, value: &str) {
         self.value = value.to_string();
+        self.updated_at = now_timestamp();
     }
 
     /// Validates the field value based on its type.

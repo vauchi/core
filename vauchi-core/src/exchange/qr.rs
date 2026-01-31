@@ -253,6 +253,30 @@ impl ExchangeQR {
     }
 }
 
+/// Maximum allowed clock drift in seconds between local time and QR timestamp.
+const MAX_CLOCK_DRIFT_SECONDS: u64 = 30;
+
+/// Checks whether the local clock and the QR timestamp are within an
+/// acceptable drift window.
+///
+/// Returns `Ok(())` if the absolute difference is at most
+/// [`MAX_CLOCK_DRIFT_SECONDS`] (30 seconds). Otherwise returns
+/// `ExchangeError::ClockDrift` with the signed delta.
+pub fn check_clock_drift(qr_timestamp: u64) -> Result<(), ExchangeError> {
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("Time went backwards")
+        .as_secs();
+
+    let drift = (now as i64) - (qr_timestamp as i64);
+
+    if drift.unsigned_abs() > MAX_CLOCK_DRIFT_SECONDS {
+        return Err(ExchangeError::ClockDrift(drift));
+    }
+
+    Ok(())
+}
+
 // INLINE_TEST_REQUIRED: Tests private PROTOCOL_VERSION constant and version field
 #[cfg(test)]
 mod tests {

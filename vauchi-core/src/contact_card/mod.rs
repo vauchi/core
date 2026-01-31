@@ -37,6 +37,12 @@ pub const MAX_FIELDS: usize = 25;
 /// Maximum display name length.
 pub const MAX_DISPLAY_NAME_LENGTH: usize = 100;
 
+/// Maximum serialized card size in bytes (64 KB).
+pub const MAX_CARD_SIZE_BYTES: usize = 65536;
+
+/// Maximum avatar data size in bytes (256 KB).
+pub const MAX_AVATAR_SIZE: usize = 262144;
+
 /// Contact card errors.
 #[derive(Error, Debug)]
 pub enum ContactCardError {
@@ -48,6 +54,12 @@ pub enum ContactCardError {
     MaxFieldsReached,
     #[error("Field not found")]
     FieldNotFound,
+    #[error("Avatar too large (max {max} bytes, got {size} bytes)")]
+    AvatarTooLarge { max: usize, size: usize },
+    #[error("Card too large (max {max} bytes, got {size} bytes)")]
+    CardTooLarge { max: usize, size: usize },
+    #[error("Serialization error: {0}")]
+    Serialization(String),
     #[error("Validation error: {0}")]
     Validation(#[from] ValidationError),
 }
@@ -61,6 +73,10 @@ pub struct ContactCard {
     display_name: String,
     /// Contact information fields.
     fields: Vec<ContactField>,
+    /// Optional avatar image data (max 256 KB).
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    avatar: Option<Vec<u8>>,
 }
 
 impl ContactCard {
@@ -76,6 +92,7 @@ impl ContactCard {
             id,
             display_name: display_name.to_string(),
             fields: Vec::new(),
+            avatar: None,
         }
     }
 
@@ -167,5 +184,73 @@ impl ContactCard {
 
         self.fields.remove(index);
         Ok(())
+    }
+
+    /// Validates that the serialized card size is within the maximum limit.
+    pub fn validate_size(&self) -> Result<(), ContactCardError> {
+        let json = serde_json::to_vec(self).map_err(|e| {
+            ContactCardError::Serialization(e.to_string())
+        })?;
+        let size = json.len();
+        if size > MAX_CARD_SIZE_BYTES {
+            return Err(ContactCardError::CardTooLarge {
+                max: MAX_CARD_SIZE_BYTES,
+                size,
+            });
+        }
+        Ok(())
+    }
+
+    /// Reorders fields according to the given ID order.
+    ///
+    /// Fields whose IDs appear in `field_ids` are placed first, in the given order.
+    /// Fields not in the list are appended at the end in their original order.
+    /// Returns an error if any ID in `field_ids` does not match an existing field.
+    pub fn reorder_fields(&mut self, field_ids: &[&str]) -> Result<(), ContactCardError> {
+        // Validate that all provided IDs exist
+        for &id in field_ids {
+            if !self.fields.iter().any(|f| f.id() == id) {
+                return Err(ContactCardError::FieldNotFound);
+            }
+        }
+
+        let mut reordered: Vec<ContactField> = Vec::with_capacity(self.fields.len());
+
+        // First, add fields in the specified order
+        for &id in field_ids {
+            if let Some(pos) = self.fields.iter().position(|f| f.id() == id) {
+                reordered.push(self.fields.remove(pos));
+            }
+        }
+
+        // Then append remaining fields in their original order
+        reordered.append(&mut self.fields);
+
+        self.fields = reordered;
+        Ok(())
+    }
+
+    /// Sets the avatar image data.
+    ///
+    /// Returns an error if the data exceeds the maximum avatar size (256 KB).
+    pub fn set_avatar(&mut self, data: Vec<u8>) -> Result<(), ContactCardError> {
+        if data.len() > MAX_AVATAR_SIZE {
+            return Err(ContactCardError::AvatarTooLarge {
+                max: MAX_AVATAR_SIZE,
+                size: data.len(),
+            });
+        }
+        self.avatar = Some(data);
+        Ok(())
+    }
+
+    /// Returns the avatar image data, if set.
+    pub fn avatar(&self) -> Option<&[u8]> {
+        self.avatar.as_deref()
+    }
+
+    /// Clears the avatar image data.
+    pub fn clear_avatar(&mut self) {
+        self.avatar = None;
     }
 }

@@ -20,7 +20,7 @@ fn test_contact_card_serialization_snapshot() {
     use vauchi_core::ContactCard;
 
     // Create a card with known ID (normally random)
-    let card_json = r#"{"id":"snapshot-card-001","display_name":"Snapshot User","fields":[{"id":"field-001","field_type":"Email","label":"Work","value":"work@example.com"},{"id":"field-002","field_type":"Phone","label":"Mobile","value":"+1234567890"}]}"#;
+    let card_json = r#"{"id":"snapshot-card-001","display_name":"Snapshot User","fields":[{"id":"field-001","field_type":"Email","label":"Work","value":"work@example.com","updated_at":0},{"id":"field-002","field_type":"Phone","label":"Mobile","value":"+1234567890","updated_at":0}]}"#;
 
     // Deserialize and re-serialize to verify format stability
     let card: ContactCard = serde_json::from_str(card_json).unwrap();
@@ -69,7 +69,7 @@ fn test_contact_field_serialization_snapshot() {
     use vauchi_core::ContactField;
 
     let field_json =
-        r#"{"id":"test-field","field_type":"Email","label":"Personal","value":"me@example.com"}"#;
+        r#"{"id":"test-field","field_type":"Email","label":"Personal","value":"me@example.com","updated_at":0}"#;
 
     let field: ContactField = serde_json::from_str(field_json).unwrap();
     let reserialized = serde_json::to_string(&field).unwrap();

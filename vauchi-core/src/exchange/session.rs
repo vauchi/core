@@ -7,6 +7,7 @@
 //! Manages the state of a contact exchange from QR generation through
 //! key agreement and card exchange.
 
+use std::collections::HashSet;
 use std::time::{Duration, Instant};
 
 use super::{ExchangeError, ExchangeQR, ProximityVerifier, X3DHKeyPair, X3DH};
@@ -19,6 +20,21 @@ const SESSION_TIMEOUT: Duration = Duration::from_secs(60);
 
 /// Default proximity verification timeout.
 const PROXIMITY_TIMEOUT: Duration = Duration::from_secs(30);
+
+/// Mode of the exchange session.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ExchangeMode {
+    /// Both parties exchange contact cards (default).
+    Mutual,
+    /// Only the initiator sends their card; the responder does not share.
+    ShareOnly,
+}
+
+impl Default for ExchangeMode {
+    fn default() -> Self {
+        ExchangeMode::Mutual
+    }
+}
 
 /// State of an exchange session.
 #[derive(Debug)]
@@ -81,6 +97,8 @@ pub struct ExchangeSession<P: ProximityVerifier> {
     state: ExchangeState,
     /// Our role in the exchange
     role: ExchangeRole,
+    /// Exchange mode (Mutual or ShareOnly)
+    mode: ExchangeMode,
     /// Our identity
     identity: Identity,
     /// Our contact card to share
@@ -97,6 +115,8 @@ pub struct ExchangeSession<P: ProximityVerifier> {
     our_ephemeral: Option<[u8; 32]>,
     /// Their ephemeral public key (received when we're the displayer/X3DH responder)
     their_ephemeral: Option<[u8; 32]>,
+    /// Hashes of QR codes that have already been consumed (prevents reuse).
+    used_qrs: HashSet<[u8; 32]>,
 }
 
 impl<P: ProximityVerifier> ExchangeSession<P> {
@@ -107,6 +127,7 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
         ExchangeSession {
             state: ExchangeState::Idle,
             role: ExchangeRole::Initiator,
+            mode: ExchangeMode::default(),
             identity,
             our_card,
             our_x3dh,
@@ -115,6 +136,7 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
             interrupted: false,
             our_ephemeral: None,
             their_ephemeral: None,
+            used_qrs: HashSet::new(),
         }
     }
 
@@ -126,6 +148,7 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
         ExchangeSession {
             state: ExchangeState::Idle,
             role: ExchangeRole::Responder,
+            mode: ExchangeMode::default(),
             identity,
             our_card,
             our_x3dh,
@@ -134,6 +157,7 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
             interrupted: false,
             our_ephemeral: None,
             their_ephemeral: None,
+            used_qrs: HashSet::new(),
         }
     }
 
@@ -167,6 +191,27 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
     /// This must be called before key agreement when we're the QR displayer.
     pub fn set_their_ephemeral(&mut self, ephemeral: [u8; 32]) {
         self.their_ephemeral = Some(ephemeral);
+    }
+
+    /// Returns the exchange mode.
+    pub fn mode(&self) -> ExchangeMode {
+        self.mode
+    }
+
+    /// Sets the exchange mode.
+    pub fn set_mode(&mut self, mode: ExchangeMode) {
+        self.mode = mode;
+    }
+
+    /// Checks whether a QR code hash has already been consumed.
+    ///
+    /// If the hash is new, it is recorded and `Ok(())` is returned.
+    /// If the hash was already seen, returns `ExchangeError::QRAlreadyUsed`.
+    pub fn check_qr_reuse(&mut self, qr_hash: &[u8; 32]) -> Result<(), ExchangeError> {
+        if !self.used_qrs.insert(*qr_hash) {
+            return Err(ExchangeError::QRAlreadyUsed);
+        }
+        Ok(())
     }
 
     /// Checks if the session has timed out.
@@ -390,6 +435,34 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
         };
 
         their_key.and_then(|key| contacts.iter().find(|c| c.public_key() == key))
+    }
+}
+
+/// Platform-specific callbacks for pre-exchange checks.
+///
+/// Mobile and desktop platforms can implement this trait to perform
+/// device-level checks (battery, storage) before starting an exchange.
+pub trait ExchangePlatformCallbacks: Send + Sync {
+    /// Check whether the device battery level is sufficient for an exchange.
+    fn check_battery_level(&self) -> Result<(), ExchangeError>;
+
+    /// Check whether the device has enough free storage for an exchange.
+    fn check_storage_available(&self) -> Result<(), ExchangeError>;
+}
+
+/// Default no-op implementation of platform callbacks.
+///
+/// Always succeeds, suitable for platforms where battery/storage
+/// checks are not applicable (e.g., CLI, tests).
+pub struct DefaultPlatformCallbacks;
+
+impl ExchangePlatformCallbacks for DefaultPlatformCallbacks {
+    fn check_battery_level(&self) -> Result<(), ExchangeError> {
+        Ok(())
+    }
+
+    fn check_storage_available(&self) -> Result<(), ExchangeError> {
+        Ok(())
     }
 }
 

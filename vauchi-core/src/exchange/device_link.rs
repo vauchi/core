@@ -23,8 +23,8 @@ const DEVICE_LINK_MAGIC: &[u8; 4] = b"WBDL";
 /// Protocol version for device linking.
 const DEVICE_LINK_VERSION: u8 = 1;
 
-/// Link QR expiration time in seconds (10 minutes).
-const LINK_QR_EXPIRY_SECONDS: u64 = 600;
+/// Link QR expiration time in seconds (5 minutes).
+const LINK_QR_EXPIRY_SECONDS: u64 = 300;
 
 /// Device link QR code data structure.
 ///
@@ -810,6 +810,22 @@ impl DeviceLinkResponder {
     pub fn identity_public_key(&self) -> &[u8; 32] {
         self.qr.identity_public_key()
     }
+}
+
+/// Generates a 6-digit numeric code from cryptographically random bytes.
+///
+/// This serves as a fallback pairing mechanism when QR code scanning is not
+/// available (e.g., accessibility needs, camera failure). The code is derived
+/// by taking 4 random bytes, interpreting them as a `u32`, and reducing
+/// modulo 1_000_000 to produce a zero-padded 6-digit string.
+pub fn generate_numeric_code() -> String {
+    let rng = SystemRandom::new();
+    let random_bytes = ring::rand::generate::<[u8; 4]>(&rng)
+        .expect("RNG should not fail")
+        .expose();
+
+    let value = u32::from_le_bytes(random_bytes) % 1_000_000;
+    format!("{value:06}")
 }
 
 // INLINE_TEST_REQUIRED: Tests private DEVICE_LINK_VERSION, DEVICE_LINK_MAGIC, BASE64 constants and version field

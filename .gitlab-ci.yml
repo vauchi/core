@@ -63,6 +63,8 @@ lint:clippy:
   needs: []
   script:
     - rustup component add clippy
+    # Ensure sccache dir is writable (GitLab CI can't expand shell $HOME in variables)
+    - export SCCACHE_DIR="${HOME}/.sccache" && mkdir -p "$SCCACHE_DIR" && sccache --stop-server 2>/dev/null; sccache --start-server || true
     - cargo clippy --all-targets -- -D warnings
 
 lint:reuse:

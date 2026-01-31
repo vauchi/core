@@ -524,6 +524,9 @@ fn apply_sync_item(storage: &Storage, item: &SyncItem) -> Result<(), MobileError
                 storage.save_contact(&contact)?;
             }
         }
+        SyncItem::LabelChange { .. } => {
+            // Label changes are handled by the label manager during full sync
+        }
     }
     Ok(())
 }

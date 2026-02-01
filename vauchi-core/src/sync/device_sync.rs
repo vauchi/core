@@ -38,6 +38,9 @@ pub struct ContactSyncData {
     pub fingerprint_verified: bool,
     /// Visibility rules as JSON.
     pub visibility_rules_json: String,
+    /// Whether this contact is trusted for recovery.
+    #[serde(default)]
+    pub recovery_trusted: bool,
 }
 
 impl ContactSyncData {
@@ -57,6 +60,7 @@ impl ContactSyncData {
             exchange_timestamp: contact.exchange_timestamp(),
             fingerprint_verified: contact.is_fingerprint_verified(),
             visibility_rules_json,
+            recovery_trusted: contact.is_recovery_trusted(),
         }
     }
 
@@ -70,14 +74,16 @@ impl ContactSyncData {
 
         let shared_key = SymmetricKey::from_bytes(self.shared_key);
 
-        Ok(Contact::from_sync_data(
+        let mut contact = Contact::from_sync_data(
             self.public_key,
             card,
             shared_key,
             self.exchange_timestamp,
             self.fingerprint_verified,
             visibility_rules,
-        ))
+        );
+        contact.set_recovery_trusted(self.recovery_trusted);
+        Ok(contact)
     }
 }
 
@@ -212,6 +218,16 @@ pub enum SyncItem {
         /// Timestamp of the change.
         timestamp: u64,
     },
+
+    /// A contact's recovery trust status changed.
+    ContactTrustChanged {
+        /// Contact ID whose trust status changed.
+        contact_id: String,
+        /// New recovery trust state.
+        recovery_trusted: bool,
+        /// Timestamp of change.
+        timestamp: u64,
+    },
 }
 
 impl SyncItem {
@@ -223,6 +239,7 @@ impl SyncItem {
             SyncItem::CardUpdated { timestamp, .. } => *timestamp,
             SyncItem::VisibilityChanged { timestamp, .. } => *timestamp,
             SyncItem::LabelChange { timestamp, .. } => *timestamp,
+            SyncItem::ContactTrustChanged { timestamp, .. } => *timestamp,
         }
     }
 

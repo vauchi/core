@@ -8,6 +8,7 @@
 //! Based on: features/contact_recovery.feature
 
 use std::time::{SystemTime, UNIX_EPOCH};
+use std::collections::HashSet;
 use vauchi_core::recovery::{
     RecoveryClaim, RecoveryConflict, RecoveryError, RecoveryProof, RecoveryReminder,
     RecoveryRevocation, RecoverySettings, VerificationResult,
@@ -789,4 +790,171 @@ fn test_voucher_timestamp() {
 
     assert!(voucher.timestamp() >= before);
     assert!(voucher.timestamp() <= after);
+}
+
+// =============================================================================
+// Trusted Contacts for Recovery Tests
+// =============================================================================
+
+/// Scenario: Only trusted contacts can vouch for recovery
+/// Feature: contact_recovery.feature @recovery @trust
+#[test]
+fn test_trusted_voucher_accepted() {
+    let old_pk = [0x01u8; 32];
+    let new_pk = [0x02u8; 32];
+
+    let trusted_kp = SigningKeyPair::generate();
+    let trusted_pk = *trusted_kp.public_key().as_bytes();
+
+    let mut trusted_pks = HashSet::new();
+    trusted_pks.insert(trusted_pk);
+
+    let mut proof = RecoveryProof::new(&old_pk, &new_pk, 1);
+    let voucher = vauchi_core::RecoveryVoucher::create(&old_pk, &new_pk, &trusted_kp);
+
+    assert!(proof.add_voucher_trusted(voucher, &trusted_pks).is_ok());
+    assert_eq!(proof.voucher_count(), 1);
+}
+
+/// Scenario: Untrusted voucher is rejected during proof building
+#[test]
+fn test_untrusted_voucher_rejected() {
+    let old_pk = [0x01u8; 32];
+    let new_pk = [0x02u8; 32];
+
+    let untrusted_kp = SigningKeyPair::generate();
+    let trusted_pks: HashSet<[u8; 32]> = HashSet::new(); // empty — nobody trusted
+
+    let mut proof = RecoveryProof::new(&old_pk, &new_pk, 1);
+    let voucher = vauchi_core::RecoveryVoucher::create(&old_pk, &new_pk, &untrusted_kp);
+
+    let result = proof.add_voucher_trusted(voucher, &trusted_pks);
+    assert!(matches!(result, Err(RecoveryError::UntrustedVoucher)));
+    assert_eq!(proof.voucher_count(), 0);
+}
+
+/// Scenario: Recovery threshold only counts trusted contacts
+#[test]
+fn test_threshold_only_counts_trusted_vouchers() {
+    let old_pk = [0x01u8; 32];
+    let new_pk = [0x02u8; 32];
+
+    let kp1 = SigningKeyPair::generate();
+    let kp2 = SigningKeyPair::generate();
+    let kp3_untrusted = SigningKeyPair::generate();
+
+    let mut trusted_pks = HashSet::new();
+    trusted_pks.insert(*kp1.public_key().as_bytes());
+    trusted_pks.insert(*kp2.public_key().as_bytes());
+    // kp3 is NOT trusted
+
+    let mut proof = RecoveryProof::new(&old_pk, &new_pk, 3);
+
+    // Add two trusted vouchers
+    let v1 = vauchi_core::RecoveryVoucher::create(&old_pk, &new_pk, &kp1);
+    let v2 = vauchi_core::RecoveryVoucher::create(&old_pk, &new_pk, &kp2);
+    assert!(proof.add_voucher_trusted(v1, &trusted_pks).is_ok());
+    assert!(proof.add_voucher_trusted(v2, &trusted_pks).is_ok());
+
+    // Untrusted voucher should be rejected
+    let v3 = vauchi_core::RecoveryVoucher::create(&old_pk, &new_pk, &kp3_untrusted);
+    assert!(matches!(
+        proof.add_voucher_trusted(v3, &trusted_pks),
+        Err(RecoveryError::UntrustedVoucher)
+    ));
+
+    // Only 2 vouchers — below threshold of 3
+    assert_eq!(proof.voucher_count(), 2);
+    assert!(proof.validate().is_err());
+}
+
+/// Scenario: Mixed trust-checked and unchecked voucher addition
+/// Verifies backward compat — add_voucher still works without trust check
+#[test]
+fn test_add_voucher_still_works_without_trust_check() {
+    let old_pk = [0x01u8; 32];
+    let new_pk = [0x02u8; 32];
+
+    let kp = SigningKeyPair::generate();
+    let mut proof = RecoveryProof::new(&old_pk, &new_pk, 1);
+    let voucher = vauchi_core::RecoveryVoucher::create(&old_pk, &new_pk, &kp);
+
+    // Old method — no trust check
+    assert!(proof.add_voucher(voucher).is_ok());
+    assert_eq!(proof.voucher_count(), 1);
+}
+
+/// Scenario: Trust check still validates signature and keys
+#[test]
+fn test_trusted_voucher_still_validates_signature() {
+    let old_pk = [0x01u8; 32];
+    let new_pk = [0x02u8; 32];
+
+    let kp = SigningKeyPair::generate();
+    let trusted_pk = *kp.public_key().as_bytes();
+    let mut trusted_pks = HashSet::new();
+    trusted_pks.insert(trusted_pk);
+
+    let mut proof = RecoveryProof::new(&old_pk, &new_pk, 1);
+
+    // Create a voucher and tamper with it
+    let mut voucher = vauchi_core::RecoveryVoucher::create(&old_pk, &new_pk, &kp);
+    let tampered_new_pk = [0x99u8; 32];
+    voucher.set_new_pk_for_testing(&tampered_new_pk);
+
+    // Should fail with MismatchedKeys (keys checked before signature)
+    let result = proof.add_voucher_trusted(voucher, &trusted_pks);
+    assert!(result.is_err());
+    assert_eq!(proof.voucher_count(), 0);
+}
+
+/// Scenario: Duplicate trusted voucher still rejected
+#[test]
+fn test_duplicate_trusted_voucher_rejected() {
+    let old_pk = [0x01u8; 32];
+    let new_pk = [0x02u8; 32];
+
+    let kp = SigningKeyPair::generate();
+    let trusted_pk = *kp.public_key().as_bytes();
+    let mut trusted_pks = HashSet::new();
+    trusted_pks.insert(trusted_pk);
+
+    let mut proof = RecoveryProof::new(&old_pk, &new_pk, 2);
+
+    let v1 = vauchi_core::RecoveryVoucher::create(&old_pk, &new_pk, &kp);
+    let v2 = vauchi_core::RecoveryVoucher::create(&old_pk, &new_pk, &kp);
+
+    assert!(proof.add_voucher_trusted(v1, &trusted_pks).is_ok());
+    assert!(matches!(
+        proof.add_voucher_trusted(v2, &trusted_pks),
+        Err(RecoveryError::DuplicateVoucher)
+    ));
+}
+
+/// Scenario: Full trusted recovery flow — threshold met with trusted contacts only
+#[test]
+fn test_full_trusted_recovery_flow() {
+    let old_pk = [0x01u8; 32];
+    let new_pk = [0x02u8; 32];
+
+    // Generate 3 trusted keypairs
+    let kp1 = SigningKeyPair::generate();
+    let kp2 = SigningKeyPair::generate();
+    let kp3 = SigningKeyPair::generate();
+
+    let mut trusted_pks = HashSet::new();
+    trusted_pks.insert(*kp1.public_key().as_bytes());
+    trusted_pks.insert(*kp2.public_key().as_bytes());
+    trusted_pks.insert(*kp3.public_key().as_bytes());
+
+    let mut proof = RecoveryProof::new(&old_pk, &new_pk, 3);
+
+    // Add 3 trusted vouchers
+    for kp in [&kp1, &kp2, &kp3] {
+        let voucher = vauchi_core::RecoveryVoucher::create(&old_pk, &new_pk, kp);
+        proof.add_voucher_trusted(voucher, &trusted_pks).unwrap();
+    }
+
+    assert_eq!(proof.voucher_count(), 3);
+    assert!(proof.validate().is_ok());
 }

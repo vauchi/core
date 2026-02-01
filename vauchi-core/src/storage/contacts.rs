@@ -25,6 +25,7 @@ pub(super) struct ContactRow {
     pub blocked: i32,
     pub hidden: i32,
     pub favorite: i32,
+    pub recovery_trusted: i32,
 }
 
 impl Storage {
@@ -51,8 +52,8 @@ impl Storage {
             "INSERT OR REPLACE INTO contacts
              (id, public_key, display_name, card_encrypted, shared_key_encrypted,
               visibility_rules_json, exchange_timestamp, fingerprint_verified, last_sync_at,
-              blocked, hidden, favorite)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
+              blocked, hidden, favorite, recovery_trusted)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)",
             params![
                 contact.id(),
                 contact.public_key().as_slice(),
@@ -66,6 +67,7 @@ impl Storage {
                 contact.is_blocked() as i32,
                 contact.is_hidden() as i32,
                 0i32, // favorite: not yet on Contact struct, default to false
+                contact.is_recovery_trusted() as i32,
             ],
         )?;
 
@@ -77,7 +79,7 @@ impl Storage {
         let mut stmt = self.conn.prepare(
             "SELECT id, public_key, display_name, card_encrypted, shared_key_encrypted,
                     visibility_rules_json, exchange_timestamp, fingerprint_verified,
-                    blocked, hidden, favorite
+                    blocked, hidden, favorite, recovery_trusted
              FROM contacts WHERE id = ?1",
         )?;
 
@@ -94,6 +96,7 @@ impl Storage {
                 blocked: row.get(8)?,
                 hidden: row.get(9)?,
                 favorite: row.get(10)?,
+                recovery_trusted: row.get(11)?,
             })
         });
 
@@ -109,7 +112,7 @@ impl Storage {
         let mut stmt = self.conn.prepare(
             "SELECT id, public_key, display_name, card_encrypted, shared_key_encrypted,
                     visibility_rules_json, exchange_timestamp, fingerprint_verified,
-                    blocked, hidden, favorite
+                    blocked, hidden, favorite, recovery_trusted
              FROM contacts ORDER BY display_name",
         )?;
 
@@ -126,6 +129,7 @@ impl Storage {
                 blocked: row.get(8)?,
                 hidden: row.get(9)?,
                 favorite: row.get(10)?,
+                recovery_trusted: row.get(11)?,
             })
         })?;
 
@@ -312,6 +316,7 @@ impl Storage {
             visibility_rules,
             row.hidden != 0,
             row.blocked != 0,
+            row.recovery_trusted != 0,
         );
 
         Ok(contact)

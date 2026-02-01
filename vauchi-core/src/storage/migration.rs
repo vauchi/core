@@ -195,6 +195,11 @@ pub fn all_migrations() -> Vec<Migration> {
             name: "recovery_tables",
             action: MigrationAction::Sql(MIGRATION_V8_RECOVERY),
         },
+        Migration {
+            version: 9,
+            name: "recovery_trust",
+            action: MigrationAction::Sql(MIGRATION_V9_RECOVERY_TRUST),
+        },
     ]
 }
 
@@ -553,4 +558,12 @@ const MIGRATION_V8_RECOVERY: &str = "
         claim_count INTEGER NOT NULL DEFAULT 0,
         window_start INTEGER NOT NULL
     );
+";
+
+/// Migration v9: Add recovery_trusted column to contacts.
+///
+/// Existing contacts default to not trusted — users must explicitly
+/// opt in to mark contacts as trusted for recovery.
+const MIGRATION_V9_RECOVERY_TRUST: &str = "
+    ALTER TABLE contacts ADD COLUMN recovery_trusted INTEGER DEFAULT 0;
 ";

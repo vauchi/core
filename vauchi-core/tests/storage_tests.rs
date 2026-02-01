@@ -499,3 +499,39 @@ fn test_storage_version_vector_update() {
     let loaded = storage.load_version_vector().unwrap().unwrap();
     assert_eq!(loaded.get(&device_a), 3);
 }
+
+/// Test that recovery_trusted flag persists through save/load
+#[test]
+fn test_storage_recovery_trusted_persistence() {
+    let storage = create_test_storage();
+
+    let pk = [0xAAu8; 32];
+    let card = ContactCard::new("Trusted Friend");
+    let shared_key = SymmetricKey::generate();
+    let visibility_rules = vauchi_core::contact::VisibilityRules::new();
+
+    let mut contact = Contact::from_sync_data_full(
+        pk,
+        card,
+        shared_key,
+        1234567890,
+        false,
+        visibility_rules,
+        false, // hidden
+        false, // blocked
+        true,  // recovery_trusted
+    );
+
+    let contact_id = contact.id().to_string();
+    storage.save_contact(&contact).unwrap();
+
+    let loaded = storage.load_contact(&contact_id).unwrap().unwrap();
+    assert!(loaded.is_recovery_trusted());
+
+    // Now untrust and save again
+    contact.untrust_for_recovery();
+    storage.save_contact(&contact).unwrap();
+
+    let loaded = storage.load_contact(&contact_id).unwrap().unwrap();
+    assert!(!loaded.is_recovery_trusted());
+}

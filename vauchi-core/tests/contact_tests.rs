@@ -293,11 +293,99 @@ fn test_contact_from_sync_data_full() {
         1234567890,
         true,
         visibility_rules,
-        true, // hidden
-        true, // blocked
+        true,  // hidden
+        true,  // blocked
+        false, // recovery_trusted
     );
 
     assert!(contact.is_hidden());
     assert!(contact.is_blocked());
     assert!(contact.is_fingerprint_verified());
+    assert!(!contact.is_recovery_trusted());
+}
+
+// ========================================
+// Recovery Trust Tests
+// ========================================
+
+#[test]
+fn test_contact_default_not_recovery_trusted() {
+    let contact = create_test_contact();
+    assert!(!contact.is_recovery_trusted());
+}
+
+#[test]
+fn test_contact_trust_for_recovery() {
+    let mut contact = create_test_contact();
+    assert!(!contact.is_recovery_trusted());
+
+    contact.trust_for_recovery();
+    assert!(contact.is_recovery_trusted());
+}
+
+#[test]
+fn test_contact_untrust_for_recovery() {
+    let mut contact = create_test_contact();
+    contact.trust_for_recovery();
+    assert!(contact.is_recovery_trusted());
+
+    contact.untrust_for_recovery();
+    assert!(!contact.is_recovery_trusted());
+}
+
+#[test]
+fn test_contact_set_recovery_trusted() {
+    let mut contact = create_test_contact();
+
+    contact.set_recovery_trusted(true);
+    assert!(contact.is_recovery_trusted());
+
+    contact.set_recovery_trusted(false);
+    assert!(!contact.is_recovery_trusted());
+}
+
+#[test]
+fn test_contact_from_sync_data_full_with_recovery_trusted() {
+    let public_key = [0x42u8; 32];
+    let card = ContactCard::new("Trusted User");
+    let shared_key = SymmetricKey::generate();
+    let visibility_rules = VisibilityRules::new();
+
+    let contact = Contact::from_sync_data_full(
+        public_key,
+        card,
+        shared_key,
+        1234567890,
+        false,
+        visibility_rules,
+        false, // hidden
+        false, // blocked
+        true,  // recovery_trusted
+    );
+
+    assert!(contact.is_recovery_trusted());
+    assert!(!contact.is_hidden());
+    assert!(!contact.is_blocked());
+}
+
+#[test]
+fn test_recovery_trust_independent_of_blocked_hidden() {
+    let mut contact = create_test_contact();
+
+    // Trust + block
+    contact.trust_for_recovery();
+    contact.block();
+    assert!(contact.is_recovery_trusted());
+    assert!(contact.is_blocked());
+
+    // Trust + hide
+    contact.unblock();
+    contact.hide();
+    assert!(contact.is_recovery_trusted());
+    assert!(contact.is_hidden());
+
+    // Untrust doesn't affect other flags
+    contact.untrust_for_recovery();
+    assert!(!contact.is_recovery_trusted());
+    assert!(contact.is_hidden());
 }

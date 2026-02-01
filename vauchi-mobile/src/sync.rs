@@ -527,6 +527,16 @@ fn apply_sync_item(storage: &Storage, item: &SyncItem) -> Result<(), MobileError
         SyncItem::LabelChange { .. } => {
             // Label changes are handled by the label manager during full sync
         }
+        SyncItem::ContactTrustChanged {
+            contact_id,
+            recovery_trusted,
+            ..
+        } => {
+            if let Some(mut contact) = storage.load_contact(contact_id)? {
+                contact.set_recovery_trusted(*recovery_trusted);
+                storage.save_contact(&contact)?;
+            }
+        }
     }
     Ok(())
 }

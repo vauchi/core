@@ -341,6 +341,9 @@ impl<'a> DeviceSyncOrchestrator<'a> {
             SyncItem::CardUpdated { field_label, .. } => format!("field:{}", field_label),
             SyncItem::VisibilityChanged { contact_id, .. } => format!("visibility:{}", contact_id),
             SyncItem::LabelChange { label_id, .. } => format!("label:{}", label_id),
+            SyncItem::ContactTrustChanged { contact_id, .. } => {
+                format!("trust:{}", contact_id)
+            }
         }
     }
 

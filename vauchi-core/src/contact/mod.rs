@@ -50,6 +50,10 @@ pub struct Contact {
     /// Whether this contact is blocked.
     /// Blocked contacts don't receive updates and their updates are ignored.
     blocked: bool,
+    /// Whether this contact is trusted for recovery purposes.
+    /// Only trusted contacts can vouch during social recovery.
+    /// This is private — the contact is never told their trust status.
+    recovery_trusted: bool,
 }
 
 impl Contact {
@@ -77,6 +81,7 @@ impl Contact {
             visibility_rules: VisibilityRules::new(),
             hidden: false,
             blocked: false,
+            recovery_trusted: false,
         }
     }
 
@@ -100,6 +105,7 @@ impl Contact {
             visibility_rules,
             false, // hidden
             false, // blocked
+            false, // recovery_trusted
         )
     }
 
@@ -114,6 +120,7 @@ impl Contact {
         visibility_rules: VisibilityRules,
         hidden: bool,
         blocked: bool,
+        recovery_trusted: bool,
     ) -> Self {
         let id = hex::encode(public_key);
         let display_name = card.display_name().to_string();
@@ -129,6 +136,7 @@ impl Contact {
             visibility_rules,
             hidden,
             blocked,
+            recovery_trusted,
         }
     }
 
@@ -298,6 +306,33 @@ impl Contact {
     /// Sets the blocked status directly.
     pub fn set_blocked(&mut self, blocked: bool) {
         self.blocked = blocked;
+    }
+
+    // ========================================
+    // Recovery Trust
+    // ========================================
+
+    /// Returns whether this contact is trusted for recovery purposes.
+    ///
+    /// Only recovery-trusted contacts can vouch during social recovery.
+    /// Trust status is private and never shared with the contact.
+    pub fn is_recovery_trusted(&self) -> bool {
+        self.recovery_trusted
+    }
+
+    /// Marks this contact as trusted for recovery.
+    pub fn trust_for_recovery(&mut self) {
+        self.recovery_trusted = true;
+    }
+
+    /// Removes recovery trust from this contact.
+    pub fn untrust_for_recovery(&mut self) {
+        self.recovery_trusted = false;
+    }
+
+    /// Sets the recovery trust status directly.
+    pub fn set_recovery_trusted(&mut self, trusted: bool) {
+        self.recovery_trusted = trusted;
     }
 
     /// Returns true if this contact should be visible in the main contact list.

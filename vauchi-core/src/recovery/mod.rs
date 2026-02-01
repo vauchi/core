@@ -69,6 +69,9 @@ pub enum RecoveryError {
 
     #[error("Rate limit exceeded: too many recovery claims in the current window")]
     RateLimitExceeded,
+
+    #[error("Voucher is from an untrusted contact")]
+    UntrustedVoucher,
 }
 
 // =============================================================================
@@ -543,6 +546,25 @@ impl RecoveryProof {
 
         self.vouchers.push(voucher);
         Ok(())
+    }
+
+    /// Adds a voucher to the proof, checking that the voucher comes from a trusted contact.
+    ///
+    /// This is the trust-enforcing variant of `add_voucher`. It performs all the same
+    /// validations plus checks that the voucher's public key is in the trusted set.
+    ///
+    /// # Errors
+    /// - `UntrustedVoucher` if voucher_pk is not in `trusted_pks`
+    /// - All errors from `add_voucher`
+    pub fn add_voucher_trusted(
+        &mut self,
+        voucher: RecoveryVoucher,
+        trusted_pks: &HashSet<[u8; 32]>,
+    ) -> Result<(), RecoveryError> {
+        if !trusted_pks.contains(voucher.voucher_pk()) {
+            return Err(RecoveryError::UntrustedVoucher);
+        }
+        self.add_voucher(voucher)
     }
 
     /// Validates the proof has sufficient valid vouchers.

@@ -7,8 +7,8 @@
 //! Tests for contact recovery via social vouching.
 //! Based on: features/contact_recovery.feature
 
-use std::time::{SystemTime, UNIX_EPOCH};
 use std::collections::HashSet;
+use std::time::{SystemTime, UNIX_EPOCH};
 use vauchi_core::recovery::{
     RecoveryClaim, RecoveryConflict, RecoveryError, RecoveryProof, RecoveryReminder,
     RecoveryRevocation, RecoverySettings, VerificationResult,

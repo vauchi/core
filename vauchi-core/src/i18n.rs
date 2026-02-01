@@ -121,6 +121,13 @@ pub fn get_string(locale: Locale, key: &str) -> String {
 }
 
 /// Get a localized string with argument interpolation
+/// Get all localized strings for a locale as a key-value map.
+/// Returns English strings with overrides from the specified locale.
+pub fn get_all_strings(locale: Locale) -> HashMap<String, String> {
+    let strings = get_strings_for_locale(locale);
+    strings.clone()
+}
+
 pub fn get_string_with_args(locale: Locale, key: &str, args: &[(&str, &str)]) -> String {
     let mut result = get_string(locale, key);
 

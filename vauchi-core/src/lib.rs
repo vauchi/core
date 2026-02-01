@@ -49,7 +49,8 @@ pub use exchange::{
 };
 pub use help::{get_faq_by_id, get_faqs, get_faqs_by_category, search_faqs, FaqItem, HelpCategory};
 pub use i18n::{
-    get_available_locales, get_locale_info, get_string, get_string_with_args, Locale, LocaleInfo,
+    get_all_strings, get_available_locales, get_locale_info, get_string, get_string_with_args,
+    Locale, LocaleInfo,
 };
 pub use identity::{Identity, IdentityBackup};
 #[cfg(any(feature = "network-native-tls", feature = "network-rustls"))]

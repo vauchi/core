@@ -1,0 +1,66 @@
+{
+  "_meta": {
+    "locale": "es",
+    "name": "Español",
+    "english_name": "Spanish",
+    "is_rtl": false
+  },
+
+  "app.name": "Vauchi",
+  "app.tagline": "Tarjetas de contacto centradas en la privacidad",
+
+  "welcome.title": "Bienvenido a Vauchi",
+  "welcome.subtitle": "Tarjetas de contacto con privacidad que se actualizan automáticamente",
+
+  "nav.home": "Inicio",
+  "nav.contacts": "Contactos",
+  "nav.exchange": "Intercambio",
+  "nav.settings": "Ajustes",
+
+  "contacts.title": "Contactos",
+  "contacts.empty": "Aún no hay contactos",
+  "contacts.count": "{count} contactos",
+  "contacts.search": "Buscar contactos",
+  "contacts.add": "Añadir contacto",
+
+  "exchange.title": "Intercambio",
+  "exchange.scan": "Escanear código QR",
+  "exchange.show": "Mostrar mi código QR",
+  "exchange.instruction": "Escanea el código QR de un contacto para intercambiar tarjetas",
+
+  "settings.title": "Ajustes",
+  "settings.account": "Cuenta",
+  "settings.appearance": "Apariencia",
+  "settings.privacy": "Privacidad",
+  "settings.about": "Acerca de",
+  "settings.help": "Ayuda",
+  "settings.language": "Idioma",
+  "settings.theme": "Tema",
+
+  "help.title": "Ayuda",
+  "help.faq": "Preguntas frecuentes",
+  "help.privacy": "Info de privacidad",
+  "help.contact": "Contactar soporte",
+
+  "action.save": "Guardar",
+  "action.cancel": "Cancelar",
+  "action.delete": "Eliminar",
+  "action.edit": "Editar",
+  "action.share": "Compartir",
+  "action.done": "Hecho",
+  "action.next": "Siguiente",
+  "action.back": "Atrás",
+  "action.confirm": "Confirmar",
+  "action.retry": "Reintentar",
+
+  "error.generic": "Algo salió mal",
+  "error.network": "Error de red. Por favor, comprueba tu conexión.",
+  "error.validation": "Por favor, revisa tu entrada",
+
+  "update.sent": "Actualización enviada a {count} contactos",
+  "update.received": "Actualización recibida de {name}",
+
+  "card.title": "Mi tarjeta",
+  "card.edit": "Editar tarjeta",
+  "card.share": "Compartir tarjeta"
+}

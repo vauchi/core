@@ -1,0 +1,66 @@
+{
+  "_meta": {
+    "locale": "de",
+    "name": "Deutsch",
+    "english_name": "German",
+    "is_rtl": false
+  },
+
+  "app.name": "Vauchi",
+  "app.tagline": "Datenschutzfreundliche Kontaktkarten",
+
+  "welcome.title": "Willkommen bei Vauchi",
+  "welcome.subtitle": "Datenschutzfreundliche Kontaktkarten, die sich automatisch aktualisieren",
+
+  "nav.home": "Start",
+  "nav.contacts": "Kontakte",
+  "nav.exchange": "Austausch",
+  "nav.settings": "Einstellungen",
+
+  "contacts.title": "Kontakte",
+  "contacts.empty": "Noch keine Kontakte",
+  "contacts.count": "{count} Kontakte",
+  "contacts.search": "Kontakte suchen",
+  "contacts.add": "Kontakt hinzufügen",
+
+  "exchange.title": "Austausch",
+  "exchange.scan": "QR-Code scannen",
+  "exchange.show": "Meinen QR-Code zeigen",
+  "exchange.instruction": "Scannen Sie den QR-Code eines Kontakts, um Karten auszutauschen",
+
+  "settings.title": "Einstellungen",
+  "settings.account": "Konto",
+  "settings.appearance": "Erscheinungsbild",
+  "settings.privacy": "Datenschutz",
+  "settings.about": "Über",
+  "settings.help": "Hilfe",
+  "settings.language": "Sprache",
+  "settings.theme": "Design",
+
+  "help.title": "Hilfe",
+  "help.faq": "FAQ",
+  "help.privacy": "Datenschutz-Info",
+  "help.contact": "Support kontaktieren",
+
+  "action.save": "Speichern",
+  "action.cancel": "Abbrechen",
+  "action.delete": "Löschen",
+  "action.edit": "Bearbeiten",
+  "action.share": "Teilen",
+  "action.done": "Fertig",
+  "action.next": "Weiter",
+  "action.back": "Zurück",
+  "action.confirm": "Bestätigen",
+  "action.retry": "Erneut versuchen",
+
+  "error.generic": "Etwas ist schiefgelaufen",
+  "error.network": "Netzwerkfehler. Bitte prüfen Sie Ihre Verbindung.",
+  "error.validation": "Bitte überprüfen Sie Ihre Eingabe",
+
+  "update.sent": "Update an {count} Kontakte gesendet",
+  "update.received": "Update von {name} erhalten",
+
+  "card.title": "Meine Karte",
+  "card.edit": "Karte bearbeiten",
+  "card.share": "Karte teilen"
+}

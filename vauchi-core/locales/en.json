@@ -1,0 +1,66 @@
+{
+  "_meta": {
+    "locale": "en",
+    "name": "English",
+    "english_name": "English",
+    "is_rtl": false
+  },
+
+  "app.name": "Vauchi",
+  "app.tagline": "Privacy-focused contact cards",
+
+  "welcome.title": "Welcome to Vauchi",
+  "welcome.subtitle": "Privacy-focused contact cards that update automatically",
+
+  "nav.home": "Home",
+  "nav.contacts": "Contacts",
+  "nav.exchange": "Exchange",
+  "nav.settings": "Settings",
+
+  "contacts.title": "Contacts",
+  "contacts.empty": "No contacts yet",
+  "contacts.count": "{count} contacts",
+  "contacts.search": "Search contacts",
+  "contacts.add": "Add contact",
+
+  "exchange.title": "Exchange",
+  "exchange.scan": "Scan QR Code",
+  "exchange.show": "Show My QR Code",
+  "exchange.instruction": "Scan a contact's QR code to exchange cards",
+
+  "settings.title": "Settings",
+  "settings.account": "Account",
+  "settings.appearance": "Appearance",
+  "settings.privacy": "Privacy",
+  "settings.about": "About",
+  "settings.help": "Help",
+  "settings.language": "Language",
+  "settings.theme": "Theme",
+
+  "help.title": "Help",
+  "help.faq": "FAQ",
+  "help.privacy": "Privacy Info",
+  "help.contact": "Contact Support",
+
+  "action.save": "Save",
+  "action.cancel": "Cancel",
+  "action.delete": "Delete",
+  "action.edit": "Edit",
+  "action.share": "Share",
+  "action.done": "Done",
+  "action.next": "Next",
+  "action.back": "Back",
+  "action.confirm": "Confirm",
+  "action.retry": "Retry",
+
+  "error.generic": "Something went wrong",
+  "error.network": "Network error. Please check your connection.",
+  "error.validation": "Please check your input",
+
+  "update.sent": "Update sent to {count} contacts",
+  "update.received": "Update received from {name}",
+
+  "card.title": "My Card",
+  "card.edit": "Edit Card",
+  "card.share": "Share Card"
+}

@@ -1,0 +1,66 @@
+{
+  "_meta": {
+    "locale": "fr",
+    "name": "Français",
+    "english_name": "French",
+    "is_rtl": false
+  },
+
+  "app.name": "Vauchi",
+  "app.tagline": "Cartes de contact axées sur la confidentialité",
+
+  "welcome.title": "Bienvenue sur Vauchi",
+  "welcome.subtitle": "Cartes de contact confidentielles qui se mettent à jour automatiquement",
+
+  "nav.home": "Accueil",
+  "nav.contacts": "Contacts",
+  "nav.exchange": "Échange",
+  "nav.settings": "Paramètres",
+
+  "contacts.title": "Contacts",
+  "contacts.empty": "Pas encore de contacts",
+  "contacts.count": "{count} contacts",
+  "contacts.search": "Rechercher des contacts",
+  "contacts.add": "Ajouter un contact",
+
+  "exchange.title": "Échange",
+  "exchange.scan": "Scanner le code QR",
+  "exchange.show": "Afficher mon code QR",
+  "exchange.instruction": "Scannez le code QR d'un contact pour échanger des cartes",
+
+  "settings.title": "Paramètres",
+  "settings.account": "Compte",
+  "settings.appearance": "Apparence",
+  "settings.privacy": "Confidentialité",
+  "settings.about": "À propos",
+  "settings.help": "Aide",
+  "settings.language": "Langue",
+  "settings.theme": "Thème",
+
+  "help.title": "Aide",
+  "help.faq": "FAQ",
+  "help.privacy": "Info confidentialité",
+  "help.contact": "Contacter le support",
+
+  "action.save": "Enregistrer",
+  "action.cancel": "Annuler",
+  "action.delete": "Supprimer",
+  "action.edit": "Modifier",
+  "action.share": "Partager",
+  "action.done": "Terminé",
+  "action.next": "Suivant",
+  "action.back": "Retour",
+  "action.confirm": "Confirmer",
+  "action.retry": "Réessayer",
+
+  "error.generic": "Une erreur s'est produite",
+  "error.network": "Erreur réseau. Veuillez vérifier votre connexion.",
+  "error.validation": "Veuillez vérifier votre saisie",
+
+  "update.sent": "Mise à jour envoyée à {count} contacts",
+  "update.received": "Mise à jour reçue de {name}",
+
+  "card.title": "Ma carte",
+  "card.edit": "Modifier la carte",
+  "card.share": "Partager la carte"
+}

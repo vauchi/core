@@ -33,7 +33,7 @@ impl ConsentType {
     }
 
     /// Parses a consent type from its string representation.
-    pub fn from_str(s: &str) -> Option<Self> {
+    pub fn parse(s: &str) -> Option<Self> {
         match s {
             "data_processing" => Some(ConsentType::DataProcessing),
             "contact_sharing" => Some(ConsentType::ContactSharing),
@@ -55,6 +55,9 @@ pub struct ConsentRecord {
     pub granted: bool,
     /// Unix timestamp of the decision.
     pub timestamp: u64,
+    /// Privacy policy version at time of consent.
+    #[serde(default)]
+    pub policy_version: Option<String>,
 }
 
 /// Manages consent records in storage.
@@ -97,17 +100,59 @@ impl<'a> ConsentManager<'a> {
         self.storage.check_consent(consent_type.as_str())
     }
 
+    /// Grants consent with a specific policy version.
+    pub fn grant_with_version(
+        &self,
+        consent_type: ConsentType,
+        policy_version: &str,
+    ) -> Result<(), crate::storage::StorageError> {
+        let id = uuid::Uuid::new_v4().to_string();
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+
+        self.storage.execute_consent_upsert_with_version(
+            &id,
+            consent_type.as_str(),
+            true,
+            now,
+            policy_version,
+        )
+    }
+
     /// Exports all consent records.
     pub fn export_consent_log(&self) -> Result<Vec<ConsentRecord>, crate::storage::StorageError> {
         let rows = self.storage.list_consent_records()?;
         let records = rows
             .into_iter()
             .filter_map(|(id, ct_str, granted, ts)| {
-                ConsentType::from_str(&ct_str).map(|ct| ConsentRecord {
+                ConsentType::parse(&ct_str).map(|ct| ConsentRecord {
                     id,
                     consent_type: ct,
                     granted,
                     timestamp: ts,
+                    policy_version: None,
+                })
+            })
+            .collect();
+        Ok(records)
+    }
+
+    /// Exports all consent records including policy version.
+    pub fn export_consent_log_with_version(
+        &self,
+    ) -> Result<Vec<ConsentRecord>, crate::storage::StorageError> {
+        let rows = self.storage.list_consent_records_with_version()?;
+        let records = rows
+            .into_iter()
+            .filter_map(|(id, ct_str, granted, ts, pv)| {
+                ConsentType::parse(&ct_str).map(|ct| ConsentRecord {
+                    id,
+                    consent_type: ct,
+                    granted,
+                    timestamp: ts,
+                    policy_version: pv,
                 })
             })
             .collect();

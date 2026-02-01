@@ -4,7 +4,27 @@
 
 //! Storage error types.
 
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
+
+/// State of account deletion (stored in the database).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum DeletionState {
+    /// No deletion scheduled.
+    None,
+    /// Deletion scheduled with a grace period.
+    Scheduled {
+        /// When deletion was scheduled (Unix timestamp).
+        scheduled_at: u64,
+        /// When deletion can be executed (Unix timestamp).
+        execute_at: u64,
+    },
+    /// Deletion has been executed.
+    Executed {
+        /// When deletion was executed (Unix timestamp).
+        executed_at: u64,
+    },
+}
 
 /// Storage error types.
 #[derive(Error, Debug)]

@@ -77,6 +77,99 @@ impl Storage {
         Ok(records)
     }
 
+    /// Saves a consent record with policy version.
+    pub fn execute_consent_upsert_with_version(
+        &self,
+        id: &str,
+        consent_type: &str,
+        granted: bool,
+        timestamp: u64,
+        policy_version: &str,
+    ) -> Result<(), StorageError> {
+        self.conn.execute(
+            "INSERT OR REPLACE INTO consent_records (id, consent_type, granted, timestamp, policy_version)
+             VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![id, consent_type, granted as i32, timestamp as i64, policy_version],
+        )?;
+        Ok(())
+    }
+
+    /// Lists all consent records including policy version.
+    ///
+    /// Returns tuples of (id, consent_type, granted, timestamp, policy_version).
+    #[allow(clippy::type_complexity)]
+    pub fn list_consent_records_with_version(
+        &self,
+    ) -> Result<Vec<(String, String, bool, u64, Option<String>)>, StorageError> {
+        let table_exists: bool = self.conn.query_row(
+            "SELECT COUNT(*) > 0 FROM sqlite_master WHERE type='table' AND name='consent_records'",
+            [],
+            |row| row.get(0),
+        )?;
+
+        if !table_exists {
+            return Ok(Vec::new());
+        }
+
+        let mut stmt = self.conn.prepare(
+            "SELECT id, consent_type, granted, timestamp, policy_version
+             FROM consent_records ORDER BY timestamp",
+        )?;
+
+        let records = stmt
+            .query_map([], |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, i32>(2)?,
+                    row.get::<_, i64>(3)?,
+                    row.get::<_, Option<String>>(4)?,
+                ))
+            })?
+            .filter_map(|r| r.ok())
+            .map(|(id, ct_str, granted, ts, pv)| (id, ct_str, granted != 0, ts as u64, pv))
+            .collect();
+
+        Ok(records)
+    }
+
+    // === Deletion State Operations ===
+
+    /// Saves the deletion state.
+    pub fn save_deletion_state(&self, state: &super::DeletionState) -> Result<(), StorageError> {
+        let json =
+            serde_json::to_string(state).map_err(|e| StorageError::Serialization(e.to_string()))?;
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+
+        self.conn.execute(
+            "INSERT OR REPLACE INTO deletion_state (id, state_json, updated_at) VALUES (1, ?1, ?2)",
+            params![json, now as i64],
+        )?;
+        Ok(())
+    }
+
+    /// Loads the deletion state.
+    pub fn load_deletion_state(&self) -> Result<super::DeletionState, StorageError> {
+        let result = self.conn.query_row(
+            "SELECT state_json FROM deletion_state WHERE id = 1",
+            [],
+            |row| row.get::<_, String>(0),
+        );
+
+        match result {
+            Ok(json) => {
+                let state = serde_json::from_str(&json)
+                    .map_err(|e| StorageError::Serialization(e.to_string()))?;
+                Ok(state)
+            }
+            Err(rusqlite::Error::QueryReturnedNoRows) => Ok(super::DeletionState::None),
+            Err(e) => Err(StorageError::Database(e)),
+        }
+    }
+
     /// Logs an audit event.
     pub fn log_audit_event(
         &self,

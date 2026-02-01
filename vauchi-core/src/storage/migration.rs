@@ -200,6 +200,21 @@ pub fn all_migrations() -> Vec<Migration> {
             name: "recovery_trust",
             action: MigrationAction::Sql(MIGRATION_V9_RECOVERY_TRUST),
         },
+        Migration {
+            version: 10,
+            name: "gdpr_deletion_consent_versioning",
+            action: MigrationAction::Sql(MIGRATION_V10_GDPR_ENHANCEMENTS),
+        },
+        Migration {
+            version: 11,
+            name: "nfc_inbox_and_mailbox",
+            action: MigrationAction::Sql(MIGRATION_V11_NFC_INBOX_MAILBOX),
+        },
+        Migration {
+            version: 12,
+            name: "sync_checkpoints_atomic",
+            action: MigrationAction::Sql(MIGRATION_V12_SYNC_CHECKPOINTS),
+        },
     ]
 }
 
@@ -566,4 +581,58 @@ const MIGRATION_V8_RECOVERY: &str = "
 /// opt in to mark contacts as trusted for recovery.
 const MIGRATION_V9_RECOVERY_TRUST: &str = "
     ALTER TABLE contacts ADD COLUMN recovery_trusted INTEGER DEFAULT 0;
+";
+
+/// Migration v10: GDPR enhancements — deletion state table, consent versioning.
+const MIGRATION_V10_GDPR_ENHANCEMENTS: &str = "
+    CREATE TABLE IF NOT EXISTS deletion_state (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        state_json TEXT NOT NULL,
+        updated_at INTEGER NOT NULL
+    );
+
+    -- Add policy_version column to consent_records (nullable for backward compat)
+    ALTER TABLE consent_records ADD COLUMN policy_version TEXT;
+";
+
+/// Migration v11: NFC introduction inbox and mailbox management tables.
+const MIGRATION_V11_NFC_INBOX_MAILBOX: &str = "
+    CREATE TABLE IF NOT EXISTS nfc_introductions (
+        id TEXT PRIMARY KEY,
+        sender_signing_key BLOB NOT NULL,
+        sender_display_name TEXT NOT NULL,
+        introduction_data BLOB NOT NULL,
+        mailbox_id BLOB NOT NULL,
+        received_at INTEGER NOT NULL,
+        processed INTEGER DEFAULT 0
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_intro_mailbox ON nfc_introductions(mailbox_id);
+    CREATE INDEX IF NOT EXISTS idx_intro_sender ON nfc_introductions(sender_signing_key);
+    CREATE INDEX IF NOT EXISTS idx_intro_processed ON nfc_introductions(processed);
+
+    CREATE TABLE IF NOT EXISTS nfc_tags (
+        mailbox_id BLOB PRIMARY KEY,
+        tag_name TEXT NOT NULL,
+        relay_url TEXT NOT NULL,
+        exchange_keypair_encrypted BLOB NOT NULL,
+        is_open INTEGER DEFAULT 1,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+    );
+";
+
+/// Migration v12: Atomic sync checkpoints for crash recovery.
+const MIGRATION_V12_SYNC_CHECKPOINTS: &str = "
+    CREATE TABLE IF NOT EXISTS sync_checkpoints (
+        checkpoint_id TEXT PRIMARY KEY,
+        batch_id TEXT NOT NULL,
+        total_items INTEGER NOT NULL,
+        processed_items INTEGER NOT NULL,
+        state_json TEXT NOT NULL,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_checkpoint_batch ON sync_checkpoints(batch_id);
 ";

@@ -26,6 +26,10 @@ pub struct GdprExport {
     pub own_card: Option<serde_json::Value>,
     /// Settings and preferences.
     pub settings: GdprSettings,
+    /// Linked devices.
+    pub devices: Option<Vec<GdprDevice>>,
+    /// Recovery configuration.
+    pub recovery_config: Option<GdprRecoveryConfig>,
 }
 
 /// Identity data for GDPR export (no raw keys).
@@ -58,6 +62,21 @@ pub struct GdprField {
 #[derive(Debug, Serialize)]
 pub struct GdprSettings {
     pub consent_records: Vec<serde_json::Value>,
+}
+
+/// Device data for GDPR export.
+#[derive(Debug, Serialize)]
+pub struct GdprDevice {
+    pub device_name: String,
+    pub device_index: u32,
+    pub created_at: u64,
+}
+
+/// Recovery configuration for GDPR export.
+#[derive(Debug, Serialize)]
+pub struct GdprRecoveryConfig {
+    pub trusted_contacts_count: usize,
+    pub threshold: Option<u32>,
 }
 
 /// Exports all user data for GDPR compliance.
@@ -101,14 +120,72 @@ pub fn export_all_data(storage: &Storage) -> Result<GdprExport, crate::storage::
         .load_own_card()?
         .map(|card| serde_json::to_value(&card).unwrap_or(serde_json::Value::Null));
 
+    // Export consent records
+    let consent_records = storage
+        .list_consent_records_with_version()?
+        .into_iter()
+        .map(|(id, ct, granted, ts, pv)| {
+            serde_json::json!({
+                "id": id,
+                "consent_type": ct,
+                "granted": granted,
+                "timestamp": ts,
+                "policy_version": pv,
+            })
+        })
+        .collect();
+
+    // Export devices (best effort — device info may not be configured)
+    let devices = export_devices(storage);
+
+    // Export recovery config (count of trusted contacts)
+    let trusted_count = contacts.iter().filter(|c| c.is_recovery_trusted()).count();
+    let recovery_config = Some(GdprRecoveryConfig {
+        trusted_contacts_count: trusted_count,
+        threshold: None, // Set by caller who has RecoverySettings access
+    });
+
     Ok(GdprExport {
-        version: 1,
+        version: 2,
         exported_at: now,
         identity: None, // Set by caller who has Identity access
         contacts: gdpr_contacts,
         own_card,
-        settings: GdprSettings {
-            consent_records: Vec::new(),
-        },
+        settings: GdprSettings { consent_records },
+        devices,
+        recovery_config,
     })
+}
+
+/// Exports device information (best effort).
+fn export_devices(storage: &Storage) -> Option<Vec<GdprDevice>> {
+    // Try to load device registry from storage
+    // Returns empty list if no devices registered
+    match storage.load_device_registry_json() {
+        Ok(Some(json)) => {
+            // Parse device registry JSON
+            if let Ok(registry) = serde_json::from_str::<serde_json::Value>(&json) {
+                if let Some(devices) = registry.get("devices").and_then(|d| d.as_array()) {
+                    let gdpr_devices: Vec<GdprDevice> = devices
+                        .iter()
+                        .map(|d| GdprDevice {
+                            device_name: d
+                                .get("device_name")
+                                .and_then(|n| n.as_str())
+                                .unwrap_or("Unknown")
+                                .to_string(),
+                            device_index: d
+                                .get("device_index")
+                                .and_then(|i| i.as_u64())
+                                .unwrap_or(0) as u32,
+                            created_at: d.get("created_at").and_then(|t| t.as_u64()).unwrap_or(0),
+                        })
+                        .collect();
+                    return Some(gdpr_devices);
+                }
+            }
+            Some(Vec::new())
+        }
+        _ => Some(Vec::new()),
+    }
 }

@@ -79,6 +79,14 @@ See each platform repo for detailed setup instructions.
 3. Follow TDD workflow strictly
 4. Ensure `cargo test --workspace` passes before submitting
 
+## Support the Project
+
+Vauchi is open source and community-funded — no VC money, no data harvesting.
+
+- [GitHub Sponsors](https://github.com/sponsors/vauchi)
+- [Liberapay](https://liberapay.com/Vauchi/donate)
+- [SUPPORTERS.md](https://gitlab.com/vauchi/vauchi/-/blob/main/SUPPORTERS.md) for sponsorship tiers
+
 ## License
 
 MIT

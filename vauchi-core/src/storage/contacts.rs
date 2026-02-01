@@ -142,6 +142,95 @@ impl Storage {
         Ok(contacts)
     }
 
+    /// Lists contacts with pagination support.
+    ///
+    /// Returns contacts ordered by display_name, starting from `offset`
+    /// and returning at most `limit` results.
+    pub fn list_contacts_paginated(
+        &self,
+        offset: usize,
+        limit: usize,
+    ) -> Result<Vec<Contact>, StorageError> {
+        if limit == 0 {
+            return Ok(Vec::new());
+        }
+
+        let mut stmt = self.conn.prepare(
+            "SELECT id, public_key, display_name, card_encrypted, shared_key_encrypted,
+                    visibility_rules_json, exchange_timestamp, fingerprint_verified,
+                    blocked, hidden, favorite, recovery_trusted
+             FROM contacts ORDER BY display_name
+             LIMIT ?1 OFFSET ?2",
+        )?;
+
+        let rows = stmt.query_map(params![limit as i64, offset as i64], |row| {
+            Ok(ContactRow {
+                id: row.get(0)?,
+                public_key: row.get(1)?,
+                display_name: row.get(2)?,
+                card_encrypted: row.get(3)?,
+                shared_key_encrypted: row.get(4)?,
+                visibility_rules_json: row.get(5)?,
+                exchange_timestamp: row.get(6)?,
+                fingerprint_verified: row.get(7)?,
+                blocked: row.get(8)?,
+                hidden: row.get(9)?,
+                favorite: row.get(10)?,
+                recovery_trusted: row.get(11)?,
+            })
+        })?;
+
+        let mut contacts = Vec::new();
+        for row_result in rows {
+            let row = row_result?;
+            contacts.push(self.row_to_contact(row)?);
+        }
+
+        Ok(contacts)
+    }
+
+    /// Searches contacts by display name using case-insensitive matching.
+    ///
+    /// Returns all contacts whose display_name contains the query string.
+    /// An empty query returns all contacts.
+    pub fn search_contacts(&self, query: &str) -> Result<Vec<Contact>, StorageError> {
+        let pattern = format!("%{}%", query);
+
+        let mut stmt = self.conn.prepare(
+            "SELECT id, public_key, display_name, card_encrypted, shared_key_encrypted,
+                    visibility_rules_json, exchange_timestamp, fingerprint_verified,
+                    blocked, hidden, favorite, recovery_trusted
+             FROM contacts
+             WHERE display_name LIKE ?1 COLLATE NOCASE
+             ORDER BY display_name",
+        )?;
+
+        let rows = stmt.query_map(params![pattern], |row| {
+            Ok(ContactRow {
+                id: row.get(0)?,
+                public_key: row.get(1)?,
+                display_name: row.get(2)?,
+                card_encrypted: row.get(3)?,
+                shared_key_encrypted: row.get(4)?,
+                visibility_rules_json: row.get(5)?,
+                exchange_timestamp: row.get(6)?,
+                fingerprint_verified: row.get(7)?,
+                blocked: row.get(8)?,
+                hidden: row.get(9)?,
+                favorite: row.get(10)?,
+                recovery_trusted: row.get(11)?,
+            })
+        })?;
+
+        let mut contacts = Vec::new();
+        for row_result in rows {
+            let row = row_result?;
+            contacts.push(self.row_to_contact(row)?);
+        }
+
+        Ok(contacts)
+    }
+
     /// Deletes a contact by ID.
     pub fn delete_contact(&self, id: &str) -> Result<bool, StorageError> {
         // Also delete associated ratchet state

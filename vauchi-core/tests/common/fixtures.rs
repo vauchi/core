@@ -70,24 +70,16 @@ pub fn diverse_fields_card(name: &str) -> ContactCard {
         "+15551234567",
     ))
     .unwrap();
-    card.add_field(ContactField::new(
-        FieldType::Phone,
-        "home",
-        "+15559876543",
-    ))
-    .unwrap();
+    card.add_field(ContactField::new(FieldType::Phone, "home", "+15559876543"))
+        .unwrap();
     card.add_field(ContactField::new(
         FieldType::Website,
         "blog",
         "https://example.com",
     ))
     .unwrap();
-    card.add_field(ContactField::new(
-        FieldType::Social,
-        "twitter",
-        "@username",
-    ))
-    .unwrap();
+    card.add_field(ContactField::new(FieldType::Social, "twitter", "@username"))
+        .unwrap();
     card.add_field(ContactField::new(
         FieldType::Address,
         "home",

@@ -43,8 +43,7 @@ pub fn phone_strategy() -> impl Strategy<Value = String> {
 
 /// Strategy for generating URLs.
 pub fn url_strategy() -> impl Strategy<Value = String> {
-    ("[a-z]{3,10}", "[a-z]{2,4}")
-        .prop_map(|(domain, tld)| format!("https://{}.{}", domain, tld))
+    ("[a-z]{3,10}", "[a-z]{2,4}").prop_map(|(domain, tld)| format!("https://{}.{}", domain, tld))
 }
 
 /// Strategy for generating hex-encoded contact IDs (64 chars).
@@ -68,7 +67,11 @@ pub fn bytes32_strategy() -> impl Strategy<Value = [u8; 32]> {
 
 /// Strategy for generating 64-byte arrays (signatures).
 pub fn bytes64_strategy() -> impl Strategy<Value = [u8; 64]> {
-    prop::array::uniform64(any::<u8>())
+    prop::collection::vec(any::<u8>(), 64).prop_map(|v| {
+        let mut arr = [0u8; 64];
+        arr.copy_from_slice(&v);
+        arr
+    })
 }
 
 /// Strategy for generating variable-length byte vectors.

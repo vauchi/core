@@ -7,10 +7,8 @@
 //! Common helper functions for setting up test scenarios.
 
 use vauchi_core::{
-    crypto::ratchet::DoubleRatchetState,
-    exchange::X3DHKeyPair,
-    network::MockTransport,
-    Contact, ContactCard, ContactField, FieldType, SymmetricKey, Vauchi,
+    crypto::ratchet::DoubleRatchetState, exchange::X3DHKeyPair, network::MockTransport, Contact,
+    ContactCard, ContactField, FieldType, SymmetricKey, Vauchi,
 };
 
 /// Create an in-memory Vauchi with an identity.
@@ -51,12 +49,16 @@ pub fn setup_alice_bob_exchange() -> (
     let shared_secret = SymmetricKey::generate();
 
     // Alice adds Bob as contact
-    let bob_contact = Contact::from_exchange(bob_pk, ContactCard::new("Bob"), shared_secret.clone());
+    let bob_contact =
+        Contact::from_exchange(bob_pk, ContactCard::new("Bob"), shared_secret.clone());
     let bob_contact_id = bob_contact.id().to_string();
     alice_wb.add_contact(bob_contact).unwrap();
 
     // Bob adds Alice as contact
-    let alice_card = alice_wb.own_card().unwrap().unwrap_or_else(|| ContactCard::new("Alice"));
+    let alice_card = alice_wb
+        .own_card()
+        .unwrap()
+        .unwrap_or_else(|| ContactCard::new("Alice"));
     let alice_contact = Contact::from_exchange(alice_pk, alice_card, shared_secret.clone());
     let alice_contact_id = alice_contact.id().to_string();
     bob_wb.add_contact(alice_contact).unwrap();

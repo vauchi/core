@@ -382,6 +382,70 @@ fn bench_serialization(c: &mut Criterion) {
 }
 
 // =============================================================================
+// PAGINATION & SEARCH SCALING BENCHMARKS
+// =============================================================================
+
+fn bench_pagination(c: &mut Criterion) {
+    use vauchi_core::contact::Contact;
+    use vauchi_core::crypto::SymmetricKey;
+    use vauchi_core::storage::Storage;
+    use vauchi_core::{ContactCard, ContactField, FieldType};
+
+    fn create_contact_n(n: usize) -> Contact {
+        let mut card = ContactCard::new(&format!("Contact {:04}", n));
+        card.add_field(ContactField::new(
+            FieldType::Email,
+            "Work",
+            &format!("c{}@example.com", n),
+        ))
+        .unwrap();
+        let mut pk = [0u8; 32];
+        pk[..8].copy_from_slice(&(n as u64).to_be_bytes());
+        Contact::from_exchange(pk, card, SymmetricKey::generate())
+    }
+
+    let mut group = c.benchmark_group("pagination");
+
+    // Benchmark paginated listing at different scales
+    for &count in &[100, 500, 1000] {
+        group.bench_function(&format!("list_paginated_{}_page50", count), |b| {
+            b.iter_batched(
+                || {
+                    let key = SymmetricKey::generate();
+                    let storage = Storage::in_memory(key).unwrap();
+                    for i in 0..count {
+                        storage.save_contact(&create_contact_n(i)).unwrap();
+                    }
+                    storage
+                },
+                |storage| storage.list_contacts_paginated(black_box(0), black_box(50)),
+                criterion::BatchSize::SmallInput,
+            )
+        });
+    }
+
+    // Benchmark search at different scales
+    for &count in &[100, 500, 1000] {
+        group.bench_function(&format!("search_{}_contacts", count), |b| {
+            b.iter_batched(
+                || {
+                    let key = SymmetricKey::generate();
+                    let storage = Storage::in_memory(key).unwrap();
+                    for i in 0..count {
+                        storage.save_contact(&create_contact_n(i)).unwrap();
+                    }
+                    storage
+                },
+                |storage| storage.search_contacts(black_box("Contact 05")),
+                criterion::BatchSize::SmallInput,
+            )
+        });
+    }
+
+    group.finish();
+}
+
+// =============================================================================
 // MAIN
 // =============================================================================
 
@@ -395,6 +459,7 @@ criterion_group!(
     bench_x3dh,
     bench_storage,
     bench_serialization,
+    bench_pagination,
 );
 
 criterion_main!(benches);

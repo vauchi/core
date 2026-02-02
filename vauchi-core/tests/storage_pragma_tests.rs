@@ -54,11 +54,7 @@ fn test_cache_size_configured() {
 
     // Negative values mean KiB pages, positive mean page count.
     // We set 10000 (pages).
-    assert_eq!(
-        cache, 10000,
-        "Expected cache_size=10000, got {}",
-        cache
-    );
+    assert_eq!(cache, 10000, "Expected cache_size=10000, got {}", cache);
 }
 
 /// In-memory storage should not crash when PRAGMAs are applied.

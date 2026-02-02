@@ -112,7 +112,10 @@ fn test_sync_progress_total_matches_ready_updates() {
 
     // Last event should have processed == total
     if let VauchiEvent::SyncProgress { processed, .. } = events.last().unwrap() {
-        assert_eq!(*processed, total, "Last event should have processed == total");
+        assert_eq!(
+            *processed, total,
+            "Last event should have processed == total"
+        );
     }
 }
 

@@ -114,3 +114,15 @@ path = "tests/e2e/mod.rs"
 [[test]]
 name = "integration"
 path = "tests/integration/mod.rs"
+
+[[test]]
+name = "storage_pragma_tests"
+required-features = ["testing"]
+
+[[test]]
+name = "performance_threshold_tests"
+required-features = ["testing"]
+
+[[test]]
+name = "sync_progress_tests"
+required-features = ["testing"]

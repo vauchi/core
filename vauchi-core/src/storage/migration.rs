@@ -210,6 +210,11 @@ pub fn all_migrations() -> Vec<Migration> {
             name: "sync_checkpoints_atomic",
             action: MigrationAction::Sql(MIGRATION_V11_SYNC_CHECKPOINTS),
         },
+        Migration {
+            version: 12,
+            name: "contacts_display_name_index",
+            action: MigrationAction::Sql(MIGRATION_V12_CONTACTS_INDEX),
+        },
     ]
 }
 
@@ -613,4 +618,10 @@ const MIGRATION_V11_SYNC_CHECKPOINTS: &str = "
     );
 
     CREATE INDEX IF NOT EXISTS idx_checkpoint_batch ON sync_checkpoints(batch_id);
+";
+
+/// Migration v12: Case-insensitive index on contacts.display_name for search performance.
+const MIGRATION_V12_CONTACTS_INDEX: &str = "
+    CREATE INDEX IF NOT EXISTS idx_contacts_display_name
+        ON contacts(display_name COLLATE NOCASE);
 ";

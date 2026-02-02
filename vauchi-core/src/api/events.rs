@@ -108,6 +108,16 @@ pub enum VauchiEvent {
         received_version: u32,
     },
 
+    /// Sync progress update — emitted for each update processed in a sync cycle.
+    SyncProgress {
+        /// Total number of updates to process in this cycle.
+        total: usize,
+        /// Number of updates processed so far (1-indexed).
+        processed: usize,
+        /// The contact ID of the update just processed.
+        contact_id: String,
+    },
+
     /// Error event for async operations.
     Error {
         /// Error description.

@@ -161,7 +161,8 @@ impl<'a, T: Transport> SyncController<'a, T> {
         };
 
         // Send each ready update
-        for update in ready_updates {
+        let total = ready_updates.len();
+        for (idx, update) in ready_updates.into_iter().enumerate() {
             // Skip if no ratchet for this contact
             let ratchet = match self.ratchets.get_mut(&update.contact_id) {
                 Some(r) => r,
@@ -194,11 +195,17 @@ impl<'a, T: Transport> SyncController<'a, T> {
                         .errors
                         .push((update.contact_id.clone(), e.to_string()));
                     self.events.dispatch(VauchiEvent::MessageFailed {
-                        contact_id: update.contact_id,
+                        contact_id: update.contact_id.clone(),
                         error: e.to_string(),
                     });
                 }
             }
+
+            self.events.dispatch(VauchiEvent::SyncProgress {
+                total,
+                processed: idx + 1,
+                contact_id: update.contact_id,
+            });
         }
 
         Ok(result)

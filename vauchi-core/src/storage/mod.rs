@@ -112,6 +112,7 @@ impl Storage {
         encryption_key: SymmetricKey,
     ) -> Result<Self, StorageError> {
         let conn = Connection::open(path)?;
+        Self::configure_pragmas(&conn)?;
         let storage = Storage {
             conn,
             encryption_key,
@@ -123,12 +124,27 @@ impl Storage {
     /// Creates an in-memory storage (for testing).
     pub fn in_memory(encryption_key: SymmetricKey) -> Result<Self, StorageError> {
         let conn = Connection::open_in_memory()?;
+        Self::configure_pragmas(&conn)?;
         let storage = Storage {
             conn,
             encryption_key,
         };
         storage.run_migrations()?;
         Ok(storage)
+    }
+
+    /// Configures SQLite PRAGMAs for performance.
+    ///
+    /// - WAL mode: enables concurrent reads during writes
+    /// - synchronous=NORMAL: safe with WAL, better write throughput
+    /// - cache_size=10000: larger page cache for query performance
+    fn configure_pragmas(conn: &Connection) -> Result<(), StorageError> {
+        conn.execute_batch(
+            "PRAGMA journal_mode=WAL;
+             PRAGMA synchronous=NORMAL;
+             PRAGMA cache_size=10000;",
+        )?;
+        Ok(())
     }
 
     /// Runs all pending schema migrations.
@@ -140,5 +156,11 @@ impl Storage {
     /// Returns the current schema version.
     pub fn schema_version(&self) -> Result<u32, StorageError> {
         migration::MigrationRunner::current_version(&self.conn)
+    }
+
+    /// Returns a reference to the underlying connection (testing only).
+    #[cfg(feature = "testing")]
+    pub fn connection(&self) -> &Connection {
+        &self.conn
     }
 }

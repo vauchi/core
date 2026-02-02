@@ -130,6 +130,6 @@ fn test_export_version_and_timestamp() {
 
     let export = export_all_data(&storage).unwrap();
 
-    assert!(export.version >= 1, "Export version should be at least 1");
+    assert_eq!(export.version, 2, "Export version should be 2");
     assert!(export.exported_at > 0, "Export timestamp should be set");
 }

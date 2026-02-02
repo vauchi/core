@@ -84,15 +84,16 @@ pub mod websocket;
 mod websocket;
 
 pub mod pinning;
+pub mod revocation;
 
 // Error types
 pub use error::NetworkError;
 
 // Message types
 pub use message::{
-    negotiate_version, AckStatus, Acknowledgment, DeviceSyncMessage, EncryptedUpdate, Handshake,
-    MessageEnvelope, MessageId, MessagePayload, PresenceStatus, PresenceUpdate, RatchetHeader,
-    VersionNegotiation, PROTOCOL_VERSION,
+    negotiate_version, AccountRevoked, AckStatus, Acknowledgment, DeviceSyncMessage,
+    EncryptedUpdate, Handshake, MessageEnvelope, MessageId, MessagePayload, PresenceStatus,
+    PresenceUpdate, RatchetHeader, VersionNegotiation, PROTOCOL_VERSION,
 };
 
 // Protocol utilities

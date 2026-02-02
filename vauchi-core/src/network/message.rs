@@ -40,6 +40,26 @@ pub enum MessagePayload {
     Presence(PresenceUpdate),
     /// Device-to-device sync message (between own devices).
     DeviceSync(DeviceSyncMessage),
+    /// Account revocation signal (sent when card owner deletes account).
+    AccountRevoked(AccountRevoked),
+}
+
+/// Account revocation signal sent to contacts when the card owner deletes their account.
+///
+/// NOT Double Ratchet encrypted — signed only — so it can be processed even if
+/// the ratchet state is corrupted or missing. The signature is Ed25519 over a
+/// canonical byte string (see [`crate::network::revocation::canonical_revocation_bytes`]).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AccountRevoked {
+    /// Owner's public key fingerprint (hex-encoded signing public key).
+    pub sender_id: String,
+    /// Contact's public key fingerprint (hex-encoded).
+    pub recipient_id: String,
+    /// Unix timestamp of revocation.
+    pub timestamp: u64,
+    /// Ed25519 signature over canonical revocation bytes (64 bytes).
+    #[serde(with = "bytes_array_64")]
+    pub signature: [u8; 64],
 }
 
 /// An encrypted update destined for a specific recipient.
@@ -180,6 +200,59 @@ pub fn negotiate_version(local: &VersionNegotiation, remote: &VersionNegotiation
 
     common.sort_unstable();
     Some(*common.last().unwrap())
+}
+
+impl AccountRevoked {
+    /// Creates and signs a revocation message.
+    pub fn create(
+        identity: &crate::identity::Identity,
+        recipient_id: &str,
+        timestamp: u64,
+    ) -> Self {
+        let sender_id = identity.public_id();
+
+        // Decode hex IDs to raw bytes for canonical signature
+        let sender_bytes: [u8; 32] = *identity.signing_public_key();
+        let recipient_bytes: [u8; 32] = {
+            let decoded = hex::decode(recipient_id).unwrap_or_else(|_| vec![0u8; 32]);
+            let mut arr = [0u8; 32];
+            let len = decoded.len().min(32);
+            arr[..len].copy_from_slice(&decoded[..len]);
+            arr
+        };
+
+        let canonical = super::revocation::canonical_revocation_bytes(
+            &sender_bytes,
+            &recipient_bytes,
+            timestamp,
+        );
+        let signature = identity.sign(&canonical);
+
+        AccountRevoked {
+            sender_id,
+            recipient_id: recipient_id.to_string(),
+            timestamp,
+            signature: *signature.as_bytes(),
+        }
+    }
+
+    /// Verifies the revocation signature against the given public key.
+    pub fn verify(&self, public_key: &[u8; 32]) -> bool {
+        let recipient_bytes: [u8; 32] = {
+            let decoded = hex::decode(&self.recipient_id).unwrap_or_else(|_| vec![0u8; 32]);
+            let mut arr = [0u8; 32];
+            let len = decoded.len().min(32);
+            arr[..len].copy_from_slice(&decoded[..len]);
+            arr
+        };
+
+        let canonical =
+            super::revocation::canonical_revocation_bytes(public_key, &recipient_bytes, self.timestamp);
+
+        let pubkey = crate::crypto::PublicKey::from_bytes(*public_key);
+        let signature = crate::crypto::Signature::from_bytes(self.signature);
+        pubkey.verify(&canonical, &signature)
+    }
 }
 
 /// Serde helper for 32-byte arrays.

@@ -228,6 +228,25 @@ pub enum SyncItem {
         /// Timestamp of change.
         timestamp: u64,
     },
+
+    /// Account deletion has been scheduled on another device.
+    ///
+    /// Propagated via device sync so all linked devices can show the
+    /// deletion countdown and execute at the same time.
+    DeletionScheduled {
+        /// When the deletion was scheduled.
+        scheduled_at: u64,
+        /// When the deletion should execute (after grace period).
+        execute_at: u64,
+        /// Timestamp of this sync event.
+        timestamp: u64,
+    },
+
+    /// Account deletion has been cancelled on another device.
+    DeletionCancelled {
+        /// Timestamp of this sync event.
+        timestamp: u64,
+    },
 }
 
 impl SyncItem {
@@ -240,6 +259,8 @@ impl SyncItem {
             SyncItem::VisibilityChanged { timestamp, .. } => *timestamp,
             SyncItem::LabelChange { timestamp, .. } => *timestamp,
             SyncItem::ContactTrustChanged { timestamp, .. } => *timestamp,
+            SyncItem::DeletionScheduled { timestamp, .. } => *timestamp,
+            SyncItem::DeletionCancelled { timestamp, .. } => *timestamp,
         }
     }
 

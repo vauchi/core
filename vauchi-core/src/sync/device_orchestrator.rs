@@ -344,6 +344,8 @@ impl<'a> DeviceSyncOrchestrator<'a> {
             SyncItem::ContactTrustChanged { contact_id, .. } => {
                 format!("trust:{}", contact_id)
             }
+            SyncItem::DeletionScheduled { .. } => "deletion:scheduled".to_string(),
+            SyncItem::DeletionCancelled { .. } => "deletion:cancelled".to_string(),
         }
     }
 

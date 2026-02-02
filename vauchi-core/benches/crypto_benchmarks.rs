@@ -408,7 +408,7 @@ fn bench_pagination(c: &mut Criterion) {
 
     // Benchmark paginated listing at different scales
     for &count in &[100, 500, 1000] {
-        group.bench_function(&format!("list_paginated_{}_page50", count), |b| {
+        group.bench_function(format!("list_paginated_{}_page50", count), |b| {
             b.iter_batched(
                 || {
                     let key = SymmetricKey::generate();
@@ -426,7 +426,7 @@ fn bench_pagination(c: &mut Criterion) {
 
     // Benchmark search at different scales
     for &count in &[100, 500, 1000] {
-        group.bench_function(&format!("search_{}_contacts", count), |b| {
+        group.bench_function(format!("search_{}_contacts", count), |b| {
             b.iter_batched(
                 || {
                     let key = SymmetricKey::generate();

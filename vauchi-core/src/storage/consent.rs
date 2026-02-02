@@ -70,7 +70,8 @@ impl Storage {
                     row.get::<_, i64>(3)?,
                 ))
             })?
-            .filter_map(|r| r.ok())
+            .collect::<Result<Vec<_>, _>>()?
+            .into_iter()
             .map(|(id, ct_str, granted, ts)| (id, ct_str, granted != 0, ts as u64))
             .collect();
 
@@ -126,7 +127,8 @@ impl Storage {
                     row.get::<_, Option<String>>(4)?,
                 ))
             })?
-            .filter_map(|r| r.ok())
+            .collect::<Result<Vec<_>, _>>()?
+            .into_iter()
             .map(|(id, ct_str, granted, ts, pv)| (id, ct_str, granted != 0, ts as u64, pv))
             .collect();
 

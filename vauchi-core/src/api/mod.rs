@@ -92,7 +92,7 @@ pub mod vauchi;
 mod vauchi;
 
 // Account
-pub use account::{delete_account_data, AccountError, DeletionManager};
+pub use account::{delete_account_data, AccountError, DeletionManager, DeletionResult};
 
 // Consent
 pub use consent::{ConsentManager, ConsentRecord, ConsentType};

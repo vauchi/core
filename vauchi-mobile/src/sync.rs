@@ -537,6 +537,22 @@ fn apply_sync_item(storage: &Storage, item: &SyncItem) -> Result<(), MobileError
                 storage.save_contact(&contact)?;
             }
         }
+        SyncItem::DeletionScheduled {
+            scheduled_at,
+            execute_at,
+            ..
+        } => {
+            // Propagate deletion schedule from another device
+            let state = vauchi_core::storage::DeletionState::Scheduled {
+                scheduled_at: *scheduled_at,
+                execute_at: *execute_at,
+            };
+            storage.save_deletion_state(&state)?;
+        }
+        SyncItem::DeletionCancelled { .. } => {
+            // Cancel deletion propagated from another device
+            storage.save_deletion_state(&vauchi_core::storage::DeletionState::None)?;
+        }
     }
     Ok(())
 }

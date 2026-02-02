@@ -141,3 +141,7 @@ required-features = ["testing"]
 
 [[test]]
 name = "deletion_sync_tests"
+
+[[test]]
+name = "deletion_manager_tests"
+required-features = ["testing"]

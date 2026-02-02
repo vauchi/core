@@ -9,6 +9,8 @@
 
 use std::path::Path;
 
+use crate::identity::Identity;
+use crate::network::AccountRevoked;
 use crate::storage::{DeletionState, Storage, StorageError};
 
 /// Duration of deletion grace period in seconds (7 days).
@@ -67,6 +69,16 @@ pub enum AccountError {
     Storage(#[from] StorageError),
 }
 
+/// Result from executing account deletion.
+///
+/// Contains the revocation messages that must be sent to contacts via relay.
+/// The caller is responsible for relay delivery and subsequent database file deletion.
+#[derive(Debug, Clone)]
+pub struct DeletionResult {
+    /// `AccountRevoked` messages to send to contacts via relay.
+    pub revocations: Vec<AccountRevoked>,
+}
+
 /// Manages account deletion with a 7-day grace period.
 ///
 /// Supports schedule/cancel/execute flow per GDPR requirements.
@@ -123,7 +135,20 @@ impl<'a> DeletionManager<'a> {
     }
 
     /// Executes the deletion if the grace period has elapsed.
-    pub fn execute_deletion(&self) -> Result<(), AccountError> {
+    ///
+    /// This performs the GDPR-compliant deletion protocol:
+    /// 1. Verifies the grace period has elapsed
+    /// 2. Loads all contacts
+    /// 3. For each contact: generates an `AccountRevoked` message and shreds the CEK
+    /// 4. Marks the deletion state as `Executed`
+    ///
+    /// Returns a `DeletionResult` containing the revocation messages that the caller
+    /// must send to contacts via the relay. After sending, the caller should invoke
+    /// `delete_account_data()` to remove the database files.
+    ///
+    /// CEKs are destroyed before the state is marked as Executed, so even if the
+    /// process is interrupted, card data is already unreadable.
+    pub fn execute_deletion(&self, identity: &Identity) -> Result<DeletionResult, AccountError> {
         let current = self.storage.load_deletion_state()?;
         match current {
             DeletionState::Scheduled { execute_at, .. } => {
@@ -131,9 +156,33 @@ impl<'a> DeletionManager<'a> {
                 if now < execute_at {
                     return Err(AccountError::GracePeriodNotElapsed);
                 }
+
+                // Load all contacts
+                let contacts = self
+                    .storage
+                    .list_contacts()
+                    .map_err(|e| AccountError::DeletionFailed(e.to_string()))?;
+
+                let mut revocations = Vec::with_capacity(contacts.len());
+
+                for contact in &contacts {
+                    // Generate signed AccountRevoked message
+                    let revoked =
+                        AccountRevoked::create(identity, contact.id(), now);
+                    revocations.push(revoked);
+
+                    // Crypto-shred: delete CEK (card becomes permanently unreadable)
+                    // This runs BEFORE state is marked Executed for crash safety
+                    self.storage
+                        .delete_contact_cek(contact.id())
+                        .map_err(|e| AccountError::DeletionFailed(e.to_string()))?;
+                }
+
+                // Mark state as executed
                 let state = DeletionState::Executed { executed_at: now };
                 self.storage.save_deletion_state(&state)?;
-                Ok(())
+
+                Ok(DeletionResult { revocations })
             }
             _ => Err(AccountError::DeletionFailed(
                 "No deletion scheduled".to_string(),

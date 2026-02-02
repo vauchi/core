@@ -1453,13 +1453,18 @@ impl VauchiMobile {
     }
 
     /// Execute account deletion (only after grace period).
-    pub fn execute_account_deletion(&self) -> Result<(), MobileError> {
+    ///
+    /// Generates revocation messages for all contacts and shreds CEKs.
+    /// Returns the number of revocation messages generated (caller should
+    /// arrange relay delivery).
+    pub fn execute_account_deletion(&self) -> Result<u32, MobileError> {
         let storage = self.open_storage()?;
+        let identity = self.get_identity()?;
         let manager = vauchi_core::api::DeletionManager::new(&storage);
-        manager
-            .execute_deletion()
+        let result = manager
+            .execute_deletion(&identity)
             .map_err(|e| MobileError::DeletionNotAllowed(e.to_string()))?;
-        Ok(())
+        Ok(result.revocations.len() as u32)
     }
 
     /// Get current deletion state.

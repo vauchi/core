@@ -11,6 +11,7 @@ mod common;
 
 use vauchi_core::api::DeletionManager;
 use vauchi_core::crypto::SymmetricKey;
+use vauchi_core::identity::Identity;
 use vauchi_core::storage::DeletionState;
 use vauchi_core::storage::Storage;
 
@@ -69,7 +70,8 @@ fn test_execute_deletion_fails_before_grace_period() {
     manager.schedule_deletion().unwrap();
 
     // Execute should fail because grace period hasn't elapsed
-    let result = manager.execute_deletion();
+    let identity = Identity::create("Test");
+    let result = manager.execute_deletion(&identity);
     assert!(result.is_err(), "Execution before grace period should fail");
 }
 
@@ -84,7 +86,8 @@ fn test_execute_deletion_succeeds_after_grace_period() {
         .unwrap();
 
     // Now execute should succeed
-    let result = manager.execute_deletion();
+    let identity = Identity::create("Test");
+    let result = manager.execute_deletion(&identity);
     assert!(
         result.is_ok(),
         "Execution after grace period should succeed"

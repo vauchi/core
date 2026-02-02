@@ -482,8 +482,6 @@ mod tests {
 
     #[test]
     fn test_file_storage_secure_delete_overwrites_before_removal() {
-        use std::io::Read;
-
         let temp_dir = TempDir::new().unwrap();
         let encryption_key = SymmetricKey::generate();
         let storage = FileKeyStorage::new(temp_dir.path().to_path_buf(), encryption_key);

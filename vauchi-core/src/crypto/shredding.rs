@@ -177,7 +177,11 @@ mod tests {
         // Exchange key uses HKDF with "Vauchi_Exchange_Seed"
         let exchange_key = HKDF::derive_key(Some(&seed), &[], b"Vauchi_Exchange_Seed");
 
-        assert_ne!(smk.as_bytes(), &seed, "SMK must differ from raw master_seed");
+        assert_ne!(
+            smk.as_bytes(),
+            &seed,
+            "SMK must differ from raw master_seed"
+        );
         assert_ne!(
             smk.as_bytes(),
             &exchange_key,

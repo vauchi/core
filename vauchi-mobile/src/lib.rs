@@ -47,16 +47,18 @@ pub use content::{
 };
 pub use error::MobileError;
 pub use types::{
-    MobileAhaMoment, MobileAhaMomentType, MobileContact, MobileContactCard, MobileContactField,
-    MobileDeliveryRecord, MobileDeliveryStatus, MobileDeliverySummary, MobileDemoContact,
-    MobileDemoContactState, MobileDeviceDeliveryRecord, MobileDeviceDeliveryStatus,
-    MobileDeviceInfo, MobileDeviceLinkData, MobileDeviceLinkInfo, MobileDeviceLinkResult,
-    MobileExchangeData, MobileExchangeResult, MobileFaqItem, MobileFieldType,
-    MobileFieldValidation, MobileHelpCategory, MobileHelpCategoryInfo, MobileLocale,
-    MobileLocaleInfo, MobileRecoveryClaim, MobileRecoveryProgress, MobileRecoveryVerification,
-    MobileRecoveryVoucher, MobileRetryEntry, MobileSocialNetwork, MobileSyncResult,
-    MobileSyncStatus, MobileTheme, MobileThemeColors, MobileThemeMode, MobileTrustLevel,
-    MobileValidationStatus, MobileVisibilityLabel, MobileVisibilityLabelDetail,
+    MobileAhaMoment, MobileAhaMomentType, MobileConsentRecord, MobileConsentType,
+    MobileContact, MobileContactCard, MobileContactField, MobileDeletionInfo,
+    MobileDeletionState, MobileDeliveryRecord, MobileDeliveryStatus, MobileDeliverySummary,
+    MobileDemoContact, MobileDemoContactState, MobileDeviceDeliveryRecord,
+    MobileDeviceDeliveryStatus, MobileDeviceInfo, MobileDeviceLinkData, MobileDeviceLinkInfo,
+    MobileDeviceLinkResult, MobileExchangeData, MobileExchangeResult, MobileFaqItem,
+    MobileFieldType, MobileFieldValidation, MobileGdprExport, MobileHelpCategory,
+    MobileHelpCategoryInfo, MobileLocale, MobileLocaleInfo, MobileRecoveryClaim,
+    MobileRecoveryProgress, MobileRecoveryVerification, MobileRecoveryVoucher, MobileRetryEntry,
+    MobileSocialNetwork, MobileSyncResult, MobileSyncStatus, MobileTheme, MobileThemeColors,
+    MobileThemeMode, MobileTrustLevel, MobileValidationStatus, MobileVisibilityLabel,
+    MobileVisibilityLabelDetail,
 };
 
 uniffi::setup_scaffolding!();
@@ -728,19 +730,11 @@ impl VauchiMobile {
         Ok(contact.as_ref().map(MobileContact::from))
     }
 
-    /// Search contacts.
+    /// Search contacts using SQL-level search.
     pub fn search_contacts(&self, query: String) -> Result<Vec<MobileContact>, MobileError> {
         let storage = self.open_storage()?;
-        let contacts = storage.list_contacts()?;
-        let query_lower = query.to_lowercase();
-
-        let results: Vec<MobileContact> = contacts
-            .iter()
-            .filter(|c| c.display_name().to_lowercase().contains(&query_lower))
-            .map(MobileContact::from)
-            .collect();
-
-        Ok(results)
+        let contacts = storage.search_contacts(&query)?;
+        Ok(contacts.iter().map(MobileContact::from).collect())
     }
 
     /// Get contact count.
@@ -1416,6 +1410,114 @@ impl VauchiMobile {
         }
 
         Ok(())
+    }
+
+    // === GDPR Operations ===
+
+    /// Export all user data for GDPR compliance.
+    pub fn export_gdpr_data(&self) -> Result<MobileGdprExport, MobileError> {
+        let storage = self.open_storage()?;
+        let export = vauchi_core::api::export_all_data(&storage)?;
+
+        let json_data = serde_json::to_string_pretty(&export)
+            .map_err(|e| MobileError::GdprError(e.to_string()))?;
+
+        Ok(MobileGdprExport {
+            json_data,
+            exported_at: export.exported_at,
+            version: export.version,
+        })
+    }
+
+    /// Schedule account deletion with 7-day grace period.
+    pub fn schedule_account_deletion(&self) -> Result<MobileDeletionInfo, MobileError> {
+        let storage = self.open_storage()?;
+        let mut manager = vauchi_core::api::DeletionManager::new(&storage);
+        manager
+            .schedule_deletion()
+            .map_err(|e| MobileError::DeletionNotAllowed(e.to_string()))?;
+
+        let state = manager
+            .deletion_state()
+            .map_err(|e| MobileError::GdprError(e.to_string()))?;
+        Ok(MobileDeletionInfo::from(&state))
+    }
+
+    /// Cancel a scheduled account deletion.
+    pub fn cancel_account_deletion(&self) -> Result<(), MobileError> {
+        let storage = self.open_storage()?;
+        let mut manager = vauchi_core::api::DeletionManager::new(&storage);
+        manager
+            .cancel_deletion()
+            .map_err(|e| MobileError::GdprError(e.to_string()))?;
+        Ok(())
+    }
+
+    /// Execute account deletion (only after grace period).
+    pub fn execute_account_deletion(&self) -> Result<(), MobileError> {
+        let storage = self.open_storage()?;
+        let mut manager = vauchi_core::api::DeletionManager::new(&storage);
+        manager
+            .execute_deletion()
+            .map_err(|e| MobileError::DeletionNotAllowed(e.to_string()))?;
+        Ok(())
+    }
+
+    /// Get current deletion state.
+    pub fn get_deletion_state(&self) -> Result<MobileDeletionInfo, MobileError> {
+        let storage = self.open_storage()?;
+        let manager = vauchi_core::api::DeletionManager::new(&storage);
+        let state = manager
+            .deletion_state()
+            .map_err(|e| MobileError::GdprError(e.to_string()))?;
+        Ok(MobileDeletionInfo::from(&state))
+    }
+
+    /// Grant consent for a specific type.
+    pub fn grant_consent(&self, consent_type: MobileConsentType) -> Result<(), MobileError> {
+        let storage = self.open_storage()?;
+        let manager = vauchi_core::api::ConsentManager::new(&storage);
+        manager.grant(vauchi_core::api::ConsentType::from(consent_type))?;
+        Ok(())
+    }
+
+    /// Revoke consent for a specific type.
+    pub fn revoke_consent(&self, consent_type: MobileConsentType) -> Result<(), MobileError> {
+        let storage = self.open_storage()?;
+        let manager = vauchi_core::api::ConsentManager::new(&storage);
+        manager.revoke(vauchi_core::api::ConsentType::from(consent_type))?;
+        Ok(())
+    }
+
+    /// Check whether consent is currently granted for a type.
+    pub fn check_consent(&self, consent_type: MobileConsentType) -> Result<bool, MobileError> {
+        let storage = self.open_storage()?;
+        let manager = vauchi_core::api::ConsentManager::new(&storage);
+        let granted =
+            manager.check(&vauchi_core::api::ConsentType::from(consent_type))?;
+        Ok(granted)
+    }
+
+    /// Get all consent records.
+    pub fn get_consent_records(&self) -> Result<Vec<MobileConsentRecord>, MobileError> {
+        let storage = self.open_storage()?;
+        let manager = vauchi_core::api::ConsentManager::new(&storage);
+        let records = manager
+            .export_consent_log_with_version()
+            .map_err(|e| MobileError::GdprError(e.to_string()))?;
+        Ok(records.iter().map(MobileConsentRecord::from).collect())
+    }
+
+    /// List contacts with pagination.
+    pub fn list_contacts_paginated(
+        &self,
+        offset: u32,
+        limit: u32,
+    ) -> Result<Vec<MobileContact>, MobileError> {
+        let storage = self.open_storage()?;
+        let contacts =
+            storage.list_contacts_paginated(offset as usize, limit as usize)?;
+        Ok(contacts.iter().map(MobileContact::from).collect())
     }
 
     // === Social Networks ===
@@ -2573,5 +2675,97 @@ mod tests {
         // No registry means no devices to unlink
         let result = wb.unlink_device(1).unwrap();
         assert!(!result);
+    }
+
+    // === GDPR Tests ===
+
+    #[test]
+    fn test_export_gdpr_data() {
+        let (wb, _dir) = create_test_instance();
+        wb.create_identity("Alice".to_string()).unwrap();
+
+        wb.add_field(
+            MobileFieldType::Email,
+            "work".to_string(),
+            "alice@company.com".to_string(),
+        )
+        .unwrap();
+
+        let export = wb.export_gdpr_data().unwrap();
+        assert_eq!(export.version, 2);
+        assert!(export.exported_at > 0);
+
+        // Verify JSON is parseable and contains expected fields
+        let parsed: serde_json::Value = serde_json::from_str(&export.json_data).unwrap();
+        assert_eq!(parsed["version"], 2);
+        assert!(parsed["contacts"].is_array());
+        assert!(parsed["settings"].is_object());
+    }
+
+    #[test]
+    fn test_schedule_cancel_deletion() {
+        let (wb, _dir) = create_test_instance();
+        wb.create_identity("Alice".to_string()).unwrap();
+
+        // Initially no deletion
+        let info = wb.get_deletion_state().unwrap();
+        assert_eq!(info.state, MobileDeletionState::None);
+
+        // Schedule deletion
+        let info = wb.schedule_account_deletion().unwrap();
+        assert_eq!(info.state, MobileDeletionState::Scheduled);
+        assert!(info.scheduled_at > 0);
+        assert!(info.execute_at > info.scheduled_at);
+
+        // Cancel deletion
+        wb.cancel_account_deletion().unwrap();
+        let info = wb.get_deletion_state().unwrap();
+        assert_eq!(info.state, MobileDeletionState::None);
+    }
+
+    #[test]
+    fn test_consent_grant_revoke() {
+        let (wb, _dir) = create_test_instance();
+        wb.create_identity("Alice".to_string()).unwrap();
+
+        // Initially not granted
+        let granted = wb.check_consent(MobileConsentType::Analytics).unwrap();
+        assert!(!granted);
+
+        // Grant consent
+        wb.grant_consent(MobileConsentType::Analytics).unwrap();
+        let granted = wb.check_consent(MobileConsentType::Analytics).unwrap();
+        assert!(granted);
+
+        // Sleep to ensure different timestamp (consent check orders by timestamp)
+        std::thread::sleep(std::time::Duration::from_secs(1));
+
+        // Revoke consent
+        wb.revoke_consent(MobileConsentType::Analytics).unwrap();
+        let granted = wb.check_consent(MobileConsentType::Analytics).unwrap();
+        assert!(!granted);
+    }
+
+    #[test]
+    fn test_consent_records_list() {
+        let (wb, _dir) = create_test_instance();
+        wb.create_identity("Alice".to_string()).unwrap();
+
+        wb.grant_consent(MobileConsentType::DataProcessing).unwrap();
+        wb.grant_consent(MobileConsentType::ContactSharing).unwrap();
+        wb.grant_consent(MobileConsentType::Analytics).unwrap();
+
+        let records = wb.get_consent_records().unwrap();
+        assert!(records.len() >= 3);
+    }
+
+    #[test]
+    fn test_list_contacts_paginated() {
+        let (wb, _dir) = create_test_instance();
+        wb.create_identity("Alice".to_string()).unwrap();
+
+        // Paginate with 0 contacts should return empty
+        let page = wb.list_contacts_paginated(0, 3).unwrap();
+        assert!(page.is_empty());
     }
 }

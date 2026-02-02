@@ -43,6 +43,12 @@ pub enum MobileError {
     #[error("Invalid input: {0}")]
     InvalidInput(String),
 
+    #[error("GDPR error: {0}")]
+    GdprError(String),
+
+    #[error("Deletion not allowed: {0}")]
+    DeletionNotAllowed(String),
+
     #[error("Internal error: {0}")]
     Internal(String),
 }

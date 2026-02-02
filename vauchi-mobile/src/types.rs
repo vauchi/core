@@ -957,6 +957,153 @@ impl From<&vauchi_core::help::FaqItem> for MobileFaqItem {
 // i18n Helper Functions (for types module)
 // ============================================================
 
+// ============================================================
+// GDPR Types
+// ============================================================
+
+/// Deletion state for mobile.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
+pub enum MobileDeletionState {
+    /// No deletion scheduled.
+    None,
+    /// Deletion scheduled with grace period.
+    Scheduled,
+    /// Deletion has been executed.
+    Executed,
+}
+
+impl From<&vauchi_core::storage::DeletionState> for MobileDeletionState {
+    fn from(state: &vauchi_core::storage::DeletionState) -> Self {
+        match state {
+            vauchi_core::storage::DeletionState::None => MobileDeletionState::None,
+            vauchi_core::storage::DeletionState::Scheduled { .. } => MobileDeletionState::Scheduled,
+            vauchi_core::storage::DeletionState::Executed { .. } => MobileDeletionState::Executed,
+        }
+    }
+}
+
+/// Deletion info with timing details.
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct MobileDeletionInfo {
+    /// Current deletion state.
+    pub state: MobileDeletionState,
+    /// When deletion was scheduled (0 if not scheduled).
+    pub scheduled_at: u64,
+    /// When deletion can be executed (0 if not scheduled).
+    pub execute_at: u64,
+    /// Days remaining in grace period (0 if not scheduled).
+    pub days_remaining: u32,
+}
+
+impl From<&vauchi_core::storage::DeletionState> for MobileDeletionInfo {
+    fn from(state: &vauchi_core::storage::DeletionState) -> Self {
+        match state {
+            vauchi_core::storage::DeletionState::None => MobileDeletionInfo {
+                state: MobileDeletionState::None,
+                scheduled_at: 0,
+                execute_at: 0,
+                days_remaining: 0,
+            },
+            vauchi_core::storage::DeletionState::Scheduled {
+                scheduled_at,
+                execute_at,
+            } => {
+                let now = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map(|d| d.as_secs())
+                    .unwrap_or(0);
+                let remaining_secs = execute_at.saturating_sub(now);
+                let days_remaining = (remaining_secs / 86400) as u32;
+                MobileDeletionInfo {
+                    state: MobileDeletionState::Scheduled,
+                    scheduled_at: *scheduled_at,
+                    execute_at: *execute_at,
+                    days_remaining,
+                }
+            }
+            vauchi_core::storage::DeletionState::Executed { .. } => MobileDeletionInfo {
+                state: MobileDeletionState::Executed,
+                scheduled_at: 0,
+                execute_at: 0,
+                days_remaining: 0,
+            },
+        }
+    }
+}
+
+/// GDPR data export result.
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct MobileGdprExport {
+    /// Exported data as JSON string.
+    pub json_data: String,
+    /// When the export was created (Unix timestamp).
+    pub exported_at: u64,
+    /// Export format version.
+    pub version: u32,
+}
+
+/// Types of consent that can be granted or revoked.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
+pub enum MobileConsentType {
+    /// Consent for local data processing.
+    DataProcessing,
+    /// Consent for sharing contact information.
+    ContactSharing,
+    /// Consent for anonymous usage analytics.
+    Analytics,
+    /// Consent to participate in recovery vouching.
+    RecoveryVouching,
+}
+
+impl From<MobileConsentType> for vauchi_core::api::ConsentType {
+    fn from(ct: MobileConsentType) -> Self {
+        match ct {
+            MobileConsentType::DataProcessing => vauchi_core::api::ConsentType::DataProcessing,
+            MobileConsentType::ContactSharing => vauchi_core::api::ConsentType::ContactSharing,
+            MobileConsentType::Analytics => vauchi_core::api::ConsentType::Analytics,
+            MobileConsentType::RecoveryVouching => vauchi_core::api::ConsentType::RecoveryVouching,
+        }
+    }
+}
+
+impl From<&vauchi_core::api::ConsentType> for MobileConsentType {
+    fn from(ct: &vauchi_core::api::ConsentType) -> Self {
+        match ct {
+            vauchi_core::api::ConsentType::DataProcessing => MobileConsentType::DataProcessing,
+            vauchi_core::api::ConsentType::ContactSharing => MobileConsentType::ContactSharing,
+            vauchi_core::api::ConsentType::Analytics => MobileConsentType::Analytics,
+            vauchi_core::api::ConsentType::RecoveryVouching => MobileConsentType::RecoveryVouching,
+        }
+    }
+}
+
+/// A recorded consent decision.
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct MobileConsentRecord {
+    /// Unique record ID.
+    pub id: String,
+    /// Type of consent.
+    pub consent_type: MobileConsentType,
+    /// Whether consent was granted.
+    pub granted: bool,
+    /// Unix timestamp of the decision.
+    pub timestamp: u64,
+    /// Privacy policy version at time of consent.
+    pub policy_version: Option<String>,
+}
+
+impl From<&vauchi_core::api::ConsentRecord> for MobileConsentRecord {
+    fn from(record: &vauchi_core::api::ConsentRecord) -> Self {
+        MobileConsentRecord {
+            id: record.id.clone(),
+            consent_type: MobileConsentType::from(&record.consent_type),
+            granted: record.granted,
+            timestamp: record.timestamp,
+            policy_version: record.policy_version.clone(),
+        }
+    }
+}
+
 /// Get a localized string by key.
 pub fn mobile_get_string(locale: MobileLocale, key: String) -> String {
     vauchi_core::i18n::get_string(locale.into(), &key)

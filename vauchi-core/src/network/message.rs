@@ -40,6 +40,8 @@ pub enum MessagePayload {
     Presence(PresenceUpdate),
     /// Device-to-device sync message (between own devices).
     DeviceSync(DeviceSyncMessage),
+    /// Account deletion notification sent to contacts.
+    AccountDeletionNotice(AccountDeletionNotice),
 }
 
 /// An encrypted update destined for a specific recipient.
@@ -145,6 +147,36 @@ pub struct DeviceSyncMessage {
     pub nonce: [u8; 12],
     /// Sync version number for ordering/deduplication.
     pub sync_version: u64,
+}
+
+/// Account deletion notification sent to contacts.
+///
+/// Informs contacts that the sender is deleting their account.
+/// Cryptographically signed by the sender's identity key so contacts
+/// can verify the notice is authentic (not spoofed).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AccountDeletionNotice {
+    /// Current deletion stage.
+    pub stage: DeletionStage,
+    /// Sender's public signing key (for signature verification).
+    #[serde(with = "bytes_array_32")]
+    pub public_key: [u8; 32],
+    /// Unix timestamp when the notice was created.
+    pub timestamp: u64,
+    /// Ed25519 signature over (public_key || stage || timestamp).
+    #[serde(with = "bytes_array_64")]
+    pub signature: [u8; 64],
+}
+
+/// Stages of account deletion.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+pub enum DeletionStage {
+    /// Deletion scheduled, grace period active. Can still be cancelled.
+    Pending,
+    /// Deletion confirmed and executed. Account is irrecoverably destroyed.
+    Confirmed,
+    /// Deletion cancelled during grace period.
+    Cancelled,
 }
 
 /// Version negotiation message for protocol compatibility.
@@ -347,6 +379,86 @@ mod tests {
         };
 
         assert_eq!(negotiate_version(&local, &remote), None);
+    }
+
+    #[test]
+    fn test_account_deletion_notice_serde_roundtrip() {
+        let notice = AccountDeletionNotice {
+            stage: DeletionStage::Pending,
+            public_key: [0x42; 32],
+            timestamp: 1700000000,
+            signature: [0xAB; 64],
+        };
+
+        let json = serde_json::to_string(&notice).unwrap();
+        let deserialized: AccountDeletionNotice = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(deserialized.stage, DeletionStage::Pending);
+        assert_eq!(deserialized.public_key, [0x42; 32]);
+        assert_eq!(deserialized.timestamp, 1700000000);
+        assert_eq!(deserialized.signature, [0xAB; 64]);
+    }
+
+    #[test]
+    fn test_deletion_stage_all_variants_serialize() {
+        for stage in [
+            DeletionStage::Pending,
+            DeletionStage::Confirmed,
+            DeletionStage::Cancelled,
+        ] {
+            let json = serde_json::to_string(&stage).unwrap();
+            let deserialized: DeletionStage = serde_json::from_str(&json).unwrap();
+            assert_eq!(deserialized, stage);
+        }
+    }
+
+    #[test]
+    fn test_account_deletion_notice_in_payload() {
+        let notice = AccountDeletionNotice {
+            stage: DeletionStage::Confirmed,
+            public_key: [0x01; 32],
+            timestamp: 1700000000,
+            signature: [0x02; 64],
+        };
+
+        let payload = MessagePayload::AccountDeletionNotice(notice);
+        let json = serde_json::to_string(&payload).unwrap();
+        let deserialized: MessagePayload = serde_json::from_str(&json).unwrap();
+
+        match deserialized {
+            MessagePayload::AccountDeletionNotice(n) => {
+                assert_eq!(n.stage, DeletionStage::Confirmed);
+                assert_eq!(n.public_key, [0x01; 32]);
+            }
+            _ => panic!("Expected AccountDeletionNotice variant"),
+        }
+    }
+
+    #[test]
+    fn test_account_deletion_notice_in_envelope() {
+        let envelope = MessageEnvelope {
+            version: PROTOCOL_VERSION,
+            message_id: "test-id-123".to_string(),
+            timestamp: 1700000000,
+            payload: MessagePayload::AccountDeletionNotice(AccountDeletionNotice {
+                stage: DeletionStage::Pending,
+                public_key: [0xFF; 32],
+                timestamp: 1700000000,
+                signature: [0xEE; 64],
+            }),
+        };
+
+        let json = serde_json::to_string(&envelope).unwrap();
+        let deserialized: MessageEnvelope = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(deserialized.version, PROTOCOL_VERSION);
+        assert_eq!(deserialized.message_id, "test-id-123");
+        match deserialized.payload {
+            MessagePayload::AccountDeletionNotice(n) => {
+                assert_eq!(n.stage, DeletionStage::Pending);
+            }
+            _ => panic!("Expected AccountDeletionNotice"),
+        }
     }
 
     #[test]

@@ -143,7 +143,18 @@ impl SecureStorage for FileKeyStorage {
         // Write to file
         let file_path = self.key_file_path(name);
         std::fs::write(&file_path, &encrypted)
-            .map_err(|e| StorageError::Encryption(format!("Failed to write key file: {}", e)))
+            .map_err(|e| StorageError::Encryption(format!("Failed to write key file: {}", e)))?;
+
+        // Restrict file permissions to owner-only on Unix
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let perms = std::fs::Permissions::from_mode(0o600);
+            std::fs::set_permissions(&file_path, perms)
+                .map_err(|e| StorageError::Encryption(format!("Failed to set file permissions: {}", e)))?;
+        }
+
+        Ok(())
     }
 
     fn load_key(&self, name: &str) -> Result<Option<Vec<u8>>, StorageError> {
@@ -348,6 +359,23 @@ mod tests {
         // Try to load with key2 - should fail
         let result = storage2.load_key("test");
         assert!(result.is_err());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_file_storage_permissions_are_restricted() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let temp_dir = TempDir::new().unwrap();
+        let encryption_key = SymmetricKey::generate();
+        let storage = FileKeyStorage::new(temp_dir.path().to_path_buf(), encryption_key);
+
+        storage.save_key("secret_key", &[0x42; 32]).unwrap();
+
+        let file_path = temp_dir.path().join("secret_key.key");
+        let metadata = std::fs::metadata(&file_path).unwrap();
+        let mode = metadata.permissions().mode() & 0o777;
+        assert_eq!(mode, 0o600, "Key file must have 0600 permissions, got {:o}", mode);
     }
 
     #[test]

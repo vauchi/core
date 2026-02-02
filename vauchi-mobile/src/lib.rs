@@ -47,18 +47,17 @@ pub use content::{
 };
 pub use error::MobileError;
 pub use types::{
-    MobileAhaMoment, MobileAhaMomentType, MobileConsentRecord, MobileConsentType,
-    MobileContact, MobileContactCard, MobileContactField, MobileDeletionInfo,
-    MobileDeletionState, MobileDeliveryRecord, MobileDeliveryStatus, MobileDeliverySummary,
-    MobileDemoContact, MobileDemoContactState, MobileDeviceDeliveryRecord,
-    MobileDeviceDeliveryStatus, MobileDeviceInfo, MobileDeviceLinkData, MobileDeviceLinkInfo,
-    MobileDeviceLinkResult, MobileExchangeData, MobileExchangeResult, MobileFaqItem,
-    MobileFieldType, MobileFieldValidation, MobileGdprExport, MobileHelpCategory,
-    MobileHelpCategoryInfo, MobileLocale, MobileLocaleInfo, MobileRecoveryClaim,
-    MobileRecoveryProgress, MobileRecoveryVerification, MobileRecoveryVoucher, MobileRetryEntry,
-    MobileSocialNetwork, MobileSyncResult, MobileSyncStatus, MobileTheme, MobileThemeColors,
-    MobileThemeMode, MobileTrustLevel, MobileValidationStatus, MobileVisibilityLabel,
-    MobileVisibilityLabelDetail,
+    MobileAhaMoment, MobileAhaMomentType, MobileConsentRecord, MobileConsentType, MobileContact,
+    MobileContactCard, MobileContactField, MobileDeletionInfo, MobileDeletionState,
+    MobileDeliveryRecord, MobileDeliveryStatus, MobileDeliverySummary, MobileDemoContact,
+    MobileDemoContactState, MobileDeviceDeliveryRecord, MobileDeviceDeliveryStatus,
+    MobileDeviceInfo, MobileDeviceLinkData, MobileDeviceLinkInfo, MobileDeviceLinkResult,
+    MobileExchangeData, MobileExchangeResult, MobileFaqItem, MobileFieldType,
+    MobileFieldValidation, MobileGdprExport, MobileHelpCategory, MobileHelpCategoryInfo,
+    MobileLocale, MobileLocaleInfo, MobileRecoveryClaim, MobileRecoveryProgress,
+    MobileRecoveryVerification, MobileRecoveryVoucher, MobileRetryEntry, MobileSocialNetwork,
+    MobileSyncResult, MobileSyncStatus, MobileTheme, MobileThemeColors, MobileThemeMode,
+    MobileTrustLevel, MobileValidationStatus, MobileVisibilityLabel, MobileVisibilityLabelDetail,
 };
 
 uniffi::setup_scaffolding!();
@@ -1493,8 +1492,7 @@ impl VauchiMobile {
     pub fn check_consent(&self, consent_type: MobileConsentType) -> Result<bool, MobileError> {
         let storage = self.open_storage()?;
         let manager = vauchi_core::api::ConsentManager::new(&storage);
-        let granted =
-            manager.check(&vauchi_core::api::ConsentType::from(consent_type))?;
+        let granted = manager.check(&vauchi_core::api::ConsentType::from(consent_type))?;
         Ok(granted)
     }
 
@@ -1515,8 +1513,7 @@ impl VauchiMobile {
         limit: u32,
     ) -> Result<Vec<MobileContact>, MobileError> {
         let storage = self.open_storage()?;
-        let contacts =
-            storage.list_contacts_paginated(offset as usize, limit as usize)?;
+        let contacts = storage.list_contacts_paginated(offset as usize, limit as usize)?;
         Ok(contacts.iter().map(MobileContact::from).collect())
     }
 

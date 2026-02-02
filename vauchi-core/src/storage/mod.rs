@@ -163,4 +163,10 @@ impl Storage {
     pub fn connection(&self) -> &Connection {
         &self.conn
     }
+
+    /// Returns a reference to the storage encryption key (testing only).
+    #[cfg(feature = "testing")]
+    pub fn key(&self) -> &SymmetricKey {
+        &self.encryption_key
+    }
 }

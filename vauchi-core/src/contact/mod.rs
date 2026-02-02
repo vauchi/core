@@ -21,6 +21,7 @@ pub use visibility::{FieldVisibility, VisibilityRules};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::contact_card::ContactCard;
+use crate::crypto::cek::ContentEncryptionKey;
 use crate::crypto::SymmetricKey;
 
 /// A contact obtained through exchange.
@@ -54,6 +55,10 @@ pub struct Contact {
     /// Only trusted contacts can vouch during social recovery.
     /// This is private — the contact is never told their trust status.
     recovery_trusted: bool,
+    /// Optional Content Encryption Key for crypto-shredding.
+    /// When present, the card is encrypted at rest with this CEK (not the storage key).
+    /// Destroying this key renders the card permanently unreadable.
+    cek: Option<ContentEncryptionKey>,
 }
 
 impl Contact {
@@ -82,6 +87,7 @@ impl Contact {
             hidden: false,
             blocked: false,
             recovery_trusted: false,
+            cek: None,
         }
     }
 
@@ -137,6 +143,7 @@ impl Contact {
             hidden,
             blocked,
             recovery_trusted,
+            cek: None,
         }
     }
 
@@ -333,6 +340,26 @@ impl Contact {
     /// Sets the recovery trust status directly.
     pub fn set_recovery_trusted(&mut self, trusted: bool) {
         self.recovery_trusted = trusted;
+    }
+
+    // ========================================
+    // Content Encryption Key (CEK)
+    // ========================================
+
+    /// Returns the CEK if present. CEK-protected contacts have their card
+    /// encrypted at rest with this key instead of the storage master key.
+    pub fn cek(&self) -> Option<&ContentEncryptionKey> {
+        self.cek.as_ref()
+    }
+
+    /// Sets the CEK for this contact, enabling crypto-shredding.
+    pub fn set_cek(&mut self, cek: ContentEncryptionKey) {
+        self.cek = Some(cek);
+    }
+
+    /// Clears the CEK (used after crypto-shredding / CEK deletion).
+    pub fn clear_cek(&mut self) {
+        self.cek = None;
     }
 
     /// Returns true if this contact should be visible in the main contact list.

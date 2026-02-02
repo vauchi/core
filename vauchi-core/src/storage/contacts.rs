@@ -27,18 +27,50 @@ pub(super) struct ContactRow {
     pub hidden: i32,
     pub favorite: i32,
     pub recovery_trusted: i32,
+    pub cek_encrypted: Option<Vec<u8>>,
 }
 
 impl Storage {
     // === Contact Operations ===
 
     /// Saves a contact to storage.
+    ///
+    /// If the contact has a CEK, the card is encrypted with the CEK (not the
+    /// storage key) and the `display_name` column is set to NULL. The CEK itself
+    /// is encrypted with the storage key and stored in `cek_encrypted`.
+    ///
+    /// Legacy contacts (no CEK) use storage-key encryption with plaintext
+    /// display_name (existing behavior).
     pub fn save_contact(&self, contact: &Contact) -> Result<(), StorageError> {
-        // Serialize and encrypt the contact card
+        // Serialize the contact card
         let card_json = serde_json::to_vec(contact.card())
             .map_err(|e| StorageError::Serialization(e.to_string()))?;
-        let card_encrypted = crate::crypto::encrypt(&self.encryption_key, &card_json)
-            .map_err(|e| StorageError::Encryption(e.to_string()))?;
+
+        // CEK-aware encryption: use CEK if present, otherwise storage key
+        let (card_encrypted, display_name_db, cek_encrypted_param) =
+            if let Some(cek) = contact.cek() {
+                // CEK path: encrypt card with CEK, empty display_name (no plaintext
+                // personal data in DB), persist CEK encrypted with storage key
+                let card_ct = cek
+                    .encrypt(&card_json)
+                    .map_err(|e| StorageError::Encryption(e.to_string()))?;
+                let cek_ct =
+                    crate::crypto::encrypt(&self.encryption_key, &cek.to_bytes())
+                        .map_err(|e| StorageError::Encryption(e.to_string()))?;
+                // Empty string instead of NULL because column is NOT NULL.
+                // No personal data leaks — the display name is only inside the
+                // CEK-encrypted card content.
+                (card_ct, String::new(), Some(cek_ct))
+            } else {
+                // Legacy path: encrypt card with storage key, plaintext display_name
+                let card_ct = crate::crypto::encrypt(&self.encryption_key, &card_json)
+                    .map_err(|e| StorageError::Encryption(e.to_string()))?;
+                (
+                    card_ct,
+                    contact.display_name().to_string(),
+                    None::<Vec<u8>>,
+                )
+            };
 
         // Encrypt the shared key
         let shared_key_encrypted =
@@ -53,12 +85,12 @@ impl Storage {
             "INSERT OR REPLACE INTO contacts
              (id, public_key, display_name, card_encrypted, shared_key_encrypted,
               visibility_rules_json, exchange_timestamp, fingerprint_verified, last_sync_at,
-              blocked, hidden, favorite, recovery_trusted)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)",
+              blocked, hidden, favorite, recovery_trusted, cek_encrypted)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)",
             params![
                 contact.id(),
                 contact.public_key().as_slice(),
-                contact.display_name(),
+                display_name_db,
                 card_encrypted,
                 shared_key_encrypted,
                 visibility_json,
@@ -69,6 +101,7 @@ impl Storage {
                 contact.is_hidden() as i32,
                 0i32, // favorite: not yet on Contact struct, default to false
                 contact.is_recovery_trusted() as i32,
+                cek_encrypted_param,
             ],
         )?;
 
@@ -80,7 +113,7 @@ impl Storage {
         let mut stmt = self.conn.prepare(
             "SELECT id, public_key, display_name, card_encrypted, shared_key_encrypted,
                     visibility_rules_json, exchange_timestamp, fingerprint_verified,
-                    blocked, hidden, favorite, recovery_trusted
+                    blocked, hidden, favorite, recovery_trusted, cek_encrypted
              FROM contacts WHERE id = ?1",
         )?;
 
@@ -98,6 +131,7 @@ impl Storage {
                 hidden: row.get(9)?,
                 favorite: row.get(10)?,
                 recovery_trusted: row.get(11)?,
+                cek_encrypted: row.get(12)?,
             })
         });
 
@@ -113,7 +147,7 @@ impl Storage {
         let mut stmt = self.conn.prepare(
             "SELECT id, public_key, display_name, card_encrypted, shared_key_encrypted,
                     visibility_rules_json, exchange_timestamp, fingerprint_verified,
-                    blocked, hidden, favorite, recovery_trusted
+                    blocked, hidden, favorite, recovery_trusted, cek_encrypted
              FROM contacts ORDER BY display_name",
         )?;
 
@@ -131,6 +165,7 @@ impl Storage {
                 hidden: row.get(9)?,
                 favorite: row.get(10)?,
                 recovery_trusted: row.get(11)?,
+                cek_encrypted: row.get(12)?,
             })
         })?;
 
@@ -159,7 +194,7 @@ impl Storage {
         let mut stmt = self.conn.prepare(
             "SELECT id, public_key, display_name, card_encrypted, shared_key_encrypted,
                     visibility_rules_json, exchange_timestamp, fingerprint_verified,
-                    blocked, hidden, favorite, recovery_trusted
+                    blocked, hidden, favorite, recovery_trusted, cek_encrypted
              FROM contacts ORDER BY display_name
              LIMIT ?1 OFFSET ?2",
         )?;
@@ -178,6 +213,7 @@ impl Storage {
                 hidden: row.get(9)?,
                 favorite: row.get(10)?,
                 recovery_trusted: row.get(11)?,
+                cek_encrypted: row.get(12)?,
             })
         })?;
 
@@ -194,15 +230,26 @@ impl Storage {
     ///
     /// Returns all contacts whose display_name contains the query string.
     /// An empty query returns all contacts.
+    ///
+    /// Hybrid approach for performance:
+    /// - Legacy contacts (non-empty display_name in DB): searched via SQL LIKE
+    /// - CEK-protected contacts (empty display_name in DB): loaded, decrypted,
+    ///   and filtered in memory
     pub fn search_contacts(&self, query: &str) -> Result<Vec<Contact>, StorageError> {
-        let pattern = format!("%{}%", query);
+        if query.is_empty() {
+            return self.list_contacts();
+        }
 
+        let pattern = format!("%{}%", query);
+        let query_lower = query.to_lowercase();
+
+        // Part 1: SQL search for legacy contacts (non-empty display_name)
         let mut stmt = self.conn.prepare(
             "SELECT id, public_key, display_name, card_encrypted, shared_key_encrypted,
                     visibility_rules_json, exchange_timestamp, fingerprint_verified,
-                    blocked, hidden, favorite, recovery_trusted
+                    blocked, hidden, favorite, recovery_trusted, cek_encrypted
              FROM contacts
-             WHERE display_name LIKE ?1 COLLATE NOCASE
+             WHERE display_name != '' AND display_name LIKE ?1 COLLATE NOCASE
              ORDER BY display_name",
         )?;
 
@@ -220,6 +267,7 @@ impl Storage {
                 hidden: row.get(9)?,
                 favorite: row.get(10)?,
                 recovery_trusted: row.get(11)?,
+                cek_encrypted: row.get(12)?,
             })
         })?;
 
@@ -228,6 +276,52 @@ impl Storage {
             let row = row_result?;
             contacts.push(self.row_to_contact(row)?);
         }
+
+        // Part 2: In-memory search for CEK-protected contacts (empty display_name)
+        let mut cek_stmt = self.conn.prepare(
+            "SELECT id, public_key, display_name, card_encrypted, shared_key_encrypted,
+                    visibility_rules_json, exchange_timestamp, fingerprint_verified,
+                    blocked, hidden, favorite, recovery_trusted, cek_encrypted
+             FROM contacts
+             WHERE display_name = ''",
+        )?;
+
+        let cek_rows = cek_stmt.query_map([], |row| {
+            Ok(ContactRow {
+                id: row.get(0)?,
+                public_key: row.get(1)?,
+                display_name: row.get(2)?,
+                card_encrypted: row.get(3)?,
+                shared_key_encrypted: row.get(4)?,
+                visibility_rules_json: row.get(5)?,
+                exchange_timestamp: row.get(6)?,
+                fingerprint_verified: row.get(7)?,
+                blocked: row.get(8)?,
+                hidden: row.get(9)?,
+                favorite: row.get(10)?,
+                recovery_trusted: row.get(11)?,
+                cek_encrypted: row.get(12)?,
+            })
+        })?;
+
+        for row_result in cek_rows {
+            let row = row_result?;
+            let contact = self.row_to_contact(row)?;
+            if contact
+                .display_name()
+                .to_lowercase()
+                .contains(&query_lower)
+            {
+                contacts.push(contact);
+            }
+        }
+
+        // Sort combined results by display_name
+        contacts.sort_by(|a, b| {
+            a.display_name()
+                .to_lowercase()
+                .cmp(&b.display_name().to_lowercase())
+        });
 
         Ok(contacts)
     }
@@ -367,12 +461,35 @@ impl Storage {
     }
 
     /// Converts a database row to a Contact.
+    ///
+    /// CEK-aware: if `cek_encrypted` is present, decrypts the CEK with the
+    /// storage key, then decrypts the card with the CEK. Otherwise, decrypts
+    /// the card with the storage key (legacy path).
     pub(super) fn row_to_contact(&self, row: ContactRow) -> Result<Contact, StorageError> {
-        // Decrypt card
-        let card_json = crate::crypto::decrypt(&self.encryption_key, &row.card_encrypted)
-            .map_err(|e| StorageError::Encryption(e.to_string()))?;
-        let card: ContactCard = serde_json::from_slice(&card_json)
-            .map_err(|e| StorageError::Serialization(e.to_string()))?;
+        // Decrypt card — CEK path or legacy path
+        let (card, cek) = if let Some(ref cek_encrypted) = row.cek_encrypted {
+            // CEK path: decrypt CEK with storage key, then card with CEK
+            let cek_bytes = crate::crypto::decrypt(&self.encryption_key, cek_encrypted)
+                .map_err(|e| StorageError::Encryption(e.to_string()))?;
+            let cek_array: [u8; 32] = cek_bytes
+                .try_into()
+                .map_err(|_| StorageError::Encryption("Invalid CEK length".into()))?;
+            let cek = ContentEncryptionKey::from_bytes(cek_array);
+
+            let card_json = cek
+                .decrypt(&row.card_encrypted)
+                .map_err(|e| StorageError::Encryption(e.to_string()))?;
+            let card: ContactCard = serde_json::from_slice(&card_json)
+                .map_err(|e| StorageError::Serialization(e.to_string()))?;
+            (card, Some(cek))
+        } else {
+            // Legacy path: decrypt card with storage key
+            let card_json = crate::crypto::decrypt(&self.encryption_key, &row.card_encrypted)
+                .map_err(|e| StorageError::Encryption(e.to_string()))?;
+            let card: ContactCard = serde_json::from_slice(&card_json)
+                .map_err(|e| StorageError::Serialization(e.to_string()))?;
+            (card, None)
+        };
 
         // Decrypt shared key
         let shared_key_bytes =
@@ -397,7 +514,7 @@ impl Storage {
         };
 
         // Create contact with all persisted fields
-        let contact = Contact::from_sync_data_full(
+        let mut contact = Contact::from_sync_data_full(
             public_key,
             card,
             shared_key,
@@ -408,6 +525,11 @@ impl Storage {
             row.blocked != 0,
             row.recovery_trusted != 0,
         );
+
+        // Attach CEK if this contact is CEK-protected
+        if let Some(cek) = cek {
+            contact.set_cek(cek);
+        }
 
         Ok(contact)
     }

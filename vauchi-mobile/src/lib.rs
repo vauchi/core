@@ -1431,7 +1431,7 @@ impl VauchiMobile {
     /// Schedule account deletion with 7-day grace period.
     pub fn schedule_account_deletion(&self) -> Result<MobileDeletionInfo, MobileError> {
         let storage = self.open_storage()?;
-        let mut manager = vauchi_core::api::DeletionManager::new(&storage);
+        let manager = vauchi_core::api::DeletionManager::new(&storage);
         manager
             .schedule_deletion()
             .map_err(|e| MobileError::DeletionNotAllowed(e.to_string()))?;
@@ -1445,7 +1445,7 @@ impl VauchiMobile {
     /// Cancel a scheduled account deletion.
     pub fn cancel_account_deletion(&self) -> Result<(), MobileError> {
         let storage = self.open_storage()?;
-        let mut manager = vauchi_core::api::DeletionManager::new(&storage);
+        let manager = vauchi_core::api::DeletionManager::new(&storage);
         manager
             .cancel_deletion()
             .map_err(|e| MobileError::GdprError(e.to_string()))?;
@@ -1455,7 +1455,7 @@ impl VauchiMobile {
     /// Execute account deletion (only after grace period).
     pub fn execute_account_deletion(&self) -> Result<(), MobileError> {
         let storage = self.open_storage()?;
-        let mut manager = vauchi_core::api::DeletionManager::new(&storage);
+        let manager = vauchi_core::api::DeletionManager::new(&storage);
         manager
             .execute_deletion()
             .map_err(|e| MobileError::DeletionNotAllowed(e.to_string()))?;

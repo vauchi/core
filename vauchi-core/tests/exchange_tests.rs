@@ -298,52 +298,46 @@ fn test_ble_discovery_failure() {
 }
 
 // =============================================================================
-// NFC Exchange Tests (from contact_exchange.feature @nfc scenarios)
+// Manual Proximity Exchange Tests (manual confirmation verifier)
 // =============================================================================
 
 use vauchi_core::exchange::{ManualConfirmationVerifier, ProximityVerifier};
 
-/// Feature: Contact Card Exchange
-/// Scenario: NFC contact exchange
-/// Tests NFC exchange initiates when devices tap together
+/// Tests manual confirmation exchange initiates when both parties confirm
 #[test]
-fn test_nfc_exchange_initiation() {
-    // Given Alice and Bob have NFC-capable devices
-    // And both have NFC enabled
-    // NFC is essentially manual confirmation with physical tap
+fn test_manual_proximity_exchange_initiation() {
+    // Given Alice and Bob are physically present
+    // And both confirm the exchange manually
 
     let verifier = ManualConfirmationVerifier::pre_confirmed();
 
-    // When Alice and Bob tap their devices together
-    // The proximity is verified by the physical tap itself
+    // When both parties confirm proximity
     let challenge = [1u8; 16];
     let emit_result = verifier.emit_challenge(&challenge);
     assert!(emit_result.is_ok());
 
-    // And public keys should be exchanged (via NFC data transfer)
+    // And public keys should be exchanged
     let response_result = verifier.listen_for_response(Duration::from_secs(5));
     assert!(response_result.is_ok());
 }
 
-/// Feature: Contact Card Exchange
-/// Scenario: NFC exchange timeout
-/// Tests NFC mode times out after 30 seconds without contact
+/// Tests manual confirmation exchange times out without confirmation
 #[test]
-fn test_nfc_exchange_timeout() {
-    // Given Alice has initiated NFC mode
+fn test_manual_proximity_exchange_timeout() {
+    // Given Alice has initiated manual confirmation mode
     let verifier = ManualConfirmationVerifier::with_state(false); // No confirmation
 
-    // When 30 seconds pass without NFC contact
+    // When no confirmation is received within the timeout
     let result = verifier.listen_for_response(Duration::from_secs(1));
 
-    // Then NFC mode should timeout (no response without confirmation)
+    // Then the exchange should timeout (no response without confirmation)
     assert!(matches!(result, Err(ProximityError::NoResponse)));
 }
 
-/// Tests NFC requires manual confirmation when device lacks NFC hardware
+/// Tests manual confirmation succeeds when user confirms
 #[test]
-fn test_nfc_fallback_to_manual_confirmation() {
-    // When a device doesn't support NFC, manual confirmation is the fallback
+fn test_manual_confirmation_verifier() {
+    // Manual confirmation is the fallback when hardware proximity isn't available
     let verifier = ManualConfirmationVerifier::pre_confirmed();
 
     let challenge = [2u8; 16];

@@ -374,6 +374,13 @@ proptest! {
         prop_assert_ne!(device_a.exchange_public_key(), device_b.exchange_public_key());
     }
 
+}
+
+// Backup/restore uses Argon2id (m=64MB, t=3, p=4) — ~300ms per KDF call,
+// 2 calls per case. 5 cases is sufficient to cover name-length variation.
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(5))]
+
     /// Property: Identity backup/restore preserves public keys
     #[test]
     fn prop_identity_backup_restore(

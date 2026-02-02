@@ -7,6 +7,9 @@
 //! Shared helpers, fixtures, and utilities used across test modules.
 //! This module provides reusable test infrastructure to reduce duplication.
 
+#[allow(dead_code)]
 pub mod fixtures;
+#[allow(dead_code)]
 pub mod helpers;
+#[allow(dead_code)]
 pub mod strategies;

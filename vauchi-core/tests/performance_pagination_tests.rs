@@ -219,6 +219,6 @@ fn test_count_contacts_for_pagination() {
 
     // Calculate total pages with page size 50
     let page_size = 50usize;
-    let total_pages = (total + page_size - 1) / page_size;
+    let total_pages = total.div_ceil(page_size);
     assert_eq!(total_pages, 3);
 }

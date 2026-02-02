@@ -23,7 +23,7 @@ pub fn create_vauchi_with_card(
     name: &str,
     fields: Vec<(FieldType, &str, &str)>,
 ) -> Vauchi<MockTransport> {
-    let mut wb = create_vauchi_with_identity(name);
+    let wb = create_vauchi_with_identity(name);
     for (field_type, label, value) in fields {
         wb.add_own_field(ContactField::new(field_type, label, value))
             .unwrap();
@@ -40,8 +40,8 @@ pub fn setup_alice_bob_exchange() -> (
     String,
     String,
 ) {
-    let mut alice_wb = create_vauchi_with_identity("Alice");
-    let mut bob_wb = create_vauchi_with_identity("Bob");
+    let alice_wb = create_vauchi_with_identity("Alice");
+    let bob_wb = create_vauchi_with_identity("Bob");
 
     let alice_pk = *alice_wb.identity().unwrap().signing_public_key();
     let bob_pk = *bob_wb.identity().unwrap().signing_public_key();
@@ -84,15 +84,16 @@ pub fn setup_ratchets(shared_secret: &SymmetricKey) -> (DoubleRatchetState, Doub
 
 /// Set up three users with mutual contacts.
 /// Returns (alice, bob, carol, secrets_map)
+#[allow(clippy::type_complexity)]
 pub fn setup_three_users() -> (
     Vauchi<MockTransport>,
     Vauchi<MockTransport>,
     Vauchi<MockTransport>,
     std::collections::HashMap<(String, String), SymmetricKey>,
 ) {
-    let mut alice = create_vauchi_with_identity("Alice");
-    let mut bob = create_vauchi_with_identity("Bob");
-    let mut carol = create_vauchi_with_identity("Carol");
+    let alice = create_vauchi_with_identity("Alice");
+    let bob = create_vauchi_with_identity("Bob");
+    let carol = create_vauchi_with_identity("Carol");
 
     let alice_pk = *alice.identity().unwrap().signing_public_key();
     let bob_pk = *bob.identity().unwrap().signing_public_key();

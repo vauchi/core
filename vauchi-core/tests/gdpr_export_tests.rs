@@ -9,7 +9,7 @@
 
 mod common;
 
-use vauchi_core::api::{export_all_data, GdprExport};
+use vauchi_core::api::export_all_data;
 use vauchi_core::contact::Contact;
 use vauchi_core::contact_card::{ContactCard, ContactField, FieldType};
 use vauchi_core::crypto::SymmetricKey;

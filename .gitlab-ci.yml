@@ -29,7 +29,7 @@
 # Include shared templates
 include:
   - project: 'vauchi/scripts'
-    ref: refactor/ci-pipeline-optimization  # TODO: revert to main after scripts MR merges
+    ref: main
     file:
       - '/ci-templates/rust-base.yml'
       - '/ci-templates/security.yml'

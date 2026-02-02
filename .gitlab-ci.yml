@@ -21,14 +21,15 @@
 #   - Parallel build jobs (iOS + Android)
 #   - Parallel test jobs (core + mobile)
 #   - Parallel publish jobs (core + mobile)
-#   - sccache for shared compilation cache (30-50% faster rebuilds)
+#   - CARGO_INCREMENTAL=0 to reduce target/ size and cache overhead
+#   - No-cache/read-only cache for lint/security jobs (skip expensive upload)
 #   - mold linker on Linux (2-5x faster linking)
 #   - Cargo.lock-based cache keys (smarter invalidation)
 
 # Include shared templates
 include:
   - project: 'vauchi/scripts'
-    ref: main
+    ref: refactor/ci-pipeline-optimization  # TODO: revert to main after scripts MR merges
     file:
       - '/ci-templates/rust-base.yml'
       - '/ci-templates/security.yml'
@@ -51,7 +52,7 @@ stages:
 # ============================================================
 
 lint:format:
-  extends: [.linux-runner, .validation-rust, .timeout-quick]
+  extends: [.linux-runner-nocache, .validation-rust, .timeout-quick]
   stage: lint
   needs: []
   script:
@@ -59,13 +60,11 @@ lint:format:
     - cargo fmt --all -- --check
 
 lint:clippy:
-  extends: [.linux-runner, .validation-rust, .timeout-quick]
+  extends: [.linux-runner-readonly, .validation-rust, .timeout-quick]
   stage: lint
   needs: []
   script:
     - rustup component add clippy
-    # Ensure sccache dir is writable (GitLab CI can't expand shell $HOME in variables)
-    - export SCCACHE_DIR="${HOME}/.sccache" && mkdir -p "$SCCACHE_DIR" && sccache --stop-server 2>/dev/null; sccache --start-server || true
     - cargo clippy --all-targets -- -D warnings
 
 # REUSE compliance provided by vauchi/scripts ci-templates/reuse.yml
@@ -122,20 +121,20 @@ test:mobile:
 
 # Rust-specific security audit (runs on dependency changes)
 security:audit:
-  extends: [.linux-runner, .validation-deps, .timeout-quick]
+  extends: [.linux-runner-readonly, .validation-deps, .timeout-quick]
   stage: security
   needs: []
   script:
-    - cargo binstall cargo-audit --no-confirm 2>/dev/null || RUSTC_WRAPPER= cargo install cargo-audit || true
+    - cargo binstall cargo-audit --no-confirm 2>/dev/null || cargo install cargo-audit || true
     - cargo audit
 
 # License compliance via cargo-deny (runs on dependency or deny.toml changes)
 security:licenses:
-  extends: [.linux-runner, .validation-licenses, .timeout-quick]
+  extends: [.linux-runner-readonly, .validation-licenses, .timeout-quick]
   stage: security
   needs: []
   script:
-    - cargo binstall cargo-deny --no-confirm 2>/dev/null || RUSTC_WRAPPER= cargo install cargo-deny || true
+    - cargo binstall cargo-deny --no-confirm 2>/dev/null || cargo install cargo-deny || true
     - cargo deny check licenses
 
 # ============================================================

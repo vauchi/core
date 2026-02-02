@@ -251,6 +251,16 @@ impl<T: Transport> Vauchi<T> {
         manager.list_contacts()
     }
 
+    /// Lists contacts with pagination.
+    pub fn list_contacts_paginated(
+        &self,
+        offset: usize,
+        limit: usize,
+    ) -> VauchiResult<Vec<Contact>> {
+        let manager = ContactManager::new(&self.storage, self.events.clone());
+        manager.list_contacts_paginated(offset, limit)
+    }
+
     /// Searches contacts by display name.
     pub fn search_contacts(&self, query: &str) -> VauchiResult<Vec<Contact>> {
         let manager = ContactManager::new(&self.storage, self.events.clone());

@@ -131,6 +131,15 @@ impl<'a> ContactManager<'a> {
         Ok(self.storage.list_contacts()?)
     }
 
+    /// Lists contacts with pagination.
+    pub fn list_contacts_paginated(
+        &self,
+        offset: usize,
+        limit: usize,
+    ) -> VauchiResult<Vec<Contact>> {
+        Ok(self.storage.list_contacts_paginated(offset, limit)?)
+    }
+
     /// Searches contacts by display name (case-insensitive).
     pub fn search_contacts(&self, query: &str) -> VauchiResult<Vec<Contact>> {
         let query_lower = query.to_lowercase();

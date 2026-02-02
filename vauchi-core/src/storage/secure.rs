@@ -150,8 +150,9 @@ impl SecureStorage for FileKeyStorage {
         {
             use std::os::unix::fs::PermissionsExt;
             let perms = std::fs::Permissions::from_mode(0o600);
-            std::fs::set_permissions(&file_path, perms)
-                .map_err(|e| StorageError::Encryption(format!("Failed to set file permissions: {}", e)))?;
+            std::fs::set_permissions(&file_path, perms).map_err(|e| {
+                StorageError::Encryption(format!("Failed to set file permissions: {}", e))
+            })?;
         }
 
         Ok(())
@@ -375,7 +376,11 @@ mod tests {
         let file_path = temp_dir.path().join("secret_key.key");
         let metadata = std::fs::metadata(&file_path).unwrap();
         let mode = metadata.permissions().mode() & 0o777;
-        assert_eq!(mode, 0o600, "Key file must have 0600 permissions, got {:o}", mode);
+        assert_eq!(
+            mode, 0o600,
+            "Key file must have 0600 permissions, got {:o}",
+            mode
+        );
     }
 
     #[test]

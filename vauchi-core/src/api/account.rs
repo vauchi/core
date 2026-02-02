@@ -86,7 +86,7 @@ impl<'a> DeletionManager<'a> {
     }
 
     /// Schedules account deletion with a 7-day grace period.
-    pub fn schedule_deletion(&mut self) -> Result<(), AccountError> {
+    pub fn schedule_deletion(&self) -> Result<(), AccountError> {
         let current = self.storage.load_deletion_state()?;
         if matches!(current, DeletionState::Scheduled { .. }) {
             return Err(AccountError::AlreadyScheduled);
@@ -104,7 +104,7 @@ impl<'a> DeletionManager<'a> {
 
     /// Schedules deletion with explicit timestamps (for testing).
     pub fn schedule_deletion_with_execute_at(
-        &mut self,
+        &self,
         scheduled_at: u64,
         execute_at: u64,
     ) -> Result<(), AccountError> {
@@ -117,13 +117,13 @@ impl<'a> DeletionManager<'a> {
     }
 
     /// Cancels a scheduled deletion during the grace period.
-    pub fn cancel_deletion(&mut self) -> Result<(), AccountError> {
+    pub fn cancel_deletion(&self) -> Result<(), AccountError> {
         self.storage.save_deletion_state(&DeletionState::None)?;
         Ok(())
     }
 
     /// Executes the deletion if the grace period has elapsed.
-    pub fn execute_deletion(&mut self) -> Result<(), AccountError> {
+    pub fn execute_deletion(&self) -> Result<(), AccountError> {
         let current = self.storage.load_deletion_state()?;
         match current {
             DeletionState::Scheduled { execute_at, .. } => {

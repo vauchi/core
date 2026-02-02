@@ -21,7 +21,7 @@ use vauchi_core::storage::Storage;
 #[test]
 fn test_schedule_deletion_sets_grace_period() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
-    let mut manager = DeletionManager::new(&storage);
+    let manager = DeletionManager::new(&storage);
 
     let result = manager.schedule_deletion();
     assert!(result.is_ok(), "Scheduling deletion should succeed");
@@ -43,7 +43,7 @@ fn test_schedule_deletion_sets_grace_period() {
 #[test]
 fn test_cancel_deletion_within_grace_period() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
-    let mut manager = DeletionManager::new(&storage);
+    let manager = DeletionManager::new(&storage);
 
     manager.schedule_deletion().unwrap();
 
@@ -64,7 +64,7 @@ fn test_cancel_deletion_within_grace_period() {
 #[test]
 fn test_execute_deletion_fails_before_grace_period() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
-    let mut manager = DeletionManager::new(&storage);
+    let manager = DeletionManager::new(&storage);
 
     manager.schedule_deletion().unwrap();
 
@@ -76,7 +76,7 @@ fn test_execute_deletion_fails_before_grace_period() {
 #[test]
 fn test_execute_deletion_succeeds_after_grace_period() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
-    let mut manager = DeletionManager::new(&storage);
+    let manager = DeletionManager::new(&storage);
 
     // Schedule with a past execute_at time (simulate elapsed grace period)
     manager
@@ -102,7 +102,7 @@ fn test_deletion_state_persisted_across_manager_instances() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
 
     {
-        let mut manager = DeletionManager::new(&storage);
+        let manager = DeletionManager::new(&storage);
         manager.schedule_deletion().unwrap();
     }
 
@@ -118,7 +118,7 @@ fn test_deletion_state_persisted_across_manager_instances() {
 #[test]
 fn test_cancel_deletion_when_not_scheduled() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
-    let mut manager = DeletionManager::new(&storage);
+    let manager = DeletionManager::new(&storage);
 
     // Should be a no-op or return Ok
     let result = manager.cancel_deletion();
@@ -128,7 +128,7 @@ fn test_cancel_deletion_when_not_scheduled() {
 #[test]
 fn test_schedule_deletion_when_already_scheduled() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
-    let mut manager = DeletionManager::new(&storage);
+    let manager = DeletionManager::new(&storage);
 
     manager.schedule_deletion().unwrap();
 

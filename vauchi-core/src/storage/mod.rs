@@ -133,16 +133,32 @@ impl Storage {
         Ok(storage)
     }
 
-    /// Configures SQLite PRAGMAs for performance.
+    /// Configures SQLite PRAGMAs for performance and security.
     ///
+    /// Performance:
     /// - WAL mode: enables concurrent reads during writes
     /// - synchronous=NORMAL: safe with WAL, better write throughput
     /// - cache_size=10000: larger page cache for query performance
+    ///
+    /// Security (defense-in-depth for crypto-shredding):
+    /// - secure_delete=ON: overwrites deleted content with zeros
+    /// - auto_vacuum=FULL: reclaims and overwrites freed pages on delete
+    /// - temp_store=MEMORY: keeps temporary tables in RAM, not on disk
+    ///
+    /// Note: secure_delete is partially negated by WAL mode (pre-modification
+    /// data persists in WAL file). The primary protection is the SMK encryption
+    /// layer; these PRAGMAs are secondary defense-in-depth.
     fn configure_pragmas(conn: &Connection) -> Result<(), StorageError> {
+        // auto_vacuum must be set before any tables are created (before first
+        // page write), so it comes first — before journal_mode=WAL which writes
+        // the database header.
         conn.execute_batch(
-            "PRAGMA journal_mode=WAL;
+            "PRAGMA auto_vacuum=FULL;
+             PRAGMA journal_mode=WAL;
              PRAGMA synchronous=NORMAL;
-             PRAGMA cache_size=10000;",
+             PRAGMA cache_size=10000;
+             PRAGMA secure_delete=ON;
+             PRAGMA temp_store=MEMORY;",
         )?;
         Ok(())
     }

@@ -537,7 +537,12 @@ const MIGRATION_V5_GDPR_CONSENT: &str = "
     CREATE INDEX IF NOT EXISTS idx_audit_event_type ON audit_log(event_type);
 ";
 
-/// Migration v6: Device sync checkpoints for interrupted sync resume.
+/// Migration v6: Per-device sync checkpoints for interrupted sync resume.
+///
+/// Tracks sync progress per target device — stores a serialized list of SyncItems
+/// and a sent_count so sync can resume from the last sent item after interruption.
+/// Keyed by `target_device_id`. See also V11 (`sync_checkpoints`) which tracks
+/// batch-level progress for crash recovery across all sync operations.
 const MIGRATION_V6_DEVICE_CHECKPOINTS: &str = "
     CREATE TABLE IF NOT EXISTS device_sync_checkpoints (
         target_device_id BLOB PRIMARY KEY,
@@ -590,7 +595,12 @@ const MIGRATION_V10_GDPR_ENHANCEMENTS: &str = "
     ALTER TABLE consent_records ADD COLUMN policy_version TEXT;
 ";
 
-/// Migration v11: Atomic sync checkpoints for crash recovery.
+/// Migration v11: Batch-level sync checkpoints for crash recovery.
+///
+/// Tracks progress of multi-item sync batches (total_items, processed_items)
+/// so a batch can be resumed after a crash. Keyed by `checkpoint_id` with a
+/// `batch_id` index. Distinct from V6 (`device_sync_checkpoints`) which tracks
+/// per-device sync progress with serialized SyncItem lists.
 const MIGRATION_V11_SYNC_CHECKPOINTS: &str = "
     CREATE TABLE IF NOT EXISTS sync_checkpoints (
         checkpoint_id TEXT PRIMARY KEY,

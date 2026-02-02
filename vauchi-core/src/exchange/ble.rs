@@ -13,6 +13,26 @@ use crate::crypto::{PublicKey, SigningKeyPair};
 use serde::{Deserialize, Serialize};
 use std::time::{Duration, Instant};
 
+mod hex_array_32 {
+    use serde::{Deserialize, Deserializer, Serializer};
+    pub fn serialize<S>(bytes: &[u8; 32], serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_str(&hex::encode(bytes))
+    }
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<[u8; 32], D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        let bytes = hex::decode(&s).map_err(serde::de::Error::custom)?;
+        bytes
+            .try_into()
+            .map_err(|_| serde::de::Error::custom("invalid length"))
+    }
+}
+
 /// A discovered BLE device.
 #[derive(Debug, Clone)]
 pub struct BLEDevice {
@@ -266,7 +286,7 @@ pub enum BLEExchangeState {
     /// Connected to a peer.
     Connected {
         /// Peer's exchange token
-        #[serde(with = "crate::exchange::nfc::hex_array_32")]
+        #[serde(with = "hex_array_32")]
         peer_token: [u8; 32],
         /// Peer's device ID
         peer_device_id: String,

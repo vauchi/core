@@ -207,13 +207,8 @@ pub fn all_migrations() -> Vec<Migration> {
         },
         Migration {
             version: 11,
-            name: "nfc_inbox_and_mailbox",
-            action: MigrationAction::Sql(MIGRATION_V11_NFC_INBOX_MAILBOX),
-        },
-        Migration {
-            version: 12,
             name: "sync_checkpoints_atomic",
-            action: MigrationAction::Sql(MIGRATION_V12_SYNC_CHECKPOINTS),
+            action: MigrationAction::Sql(MIGRATION_V11_SYNC_CHECKPOINTS),
         },
     ]
 }
@@ -595,35 +590,8 @@ const MIGRATION_V10_GDPR_ENHANCEMENTS: &str = "
     ALTER TABLE consent_records ADD COLUMN policy_version TEXT;
 ";
 
-/// Migration v11: NFC introduction inbox and mailbox management tables.
-const MIGRATION_V11_NFC_INBOX_MAILBOX: &str = "
-    CREATE TABLE IF NOT EXISTS nfc_introductions (
-        id TEXT PRIMARY KEY,
-        sender_signing_key BLOB NOT NULL,
-        sender_display_name TEXT NOT NULL,
-        introduction_data BLOB NOT NULL,
-        mailbox_id BLOB NOT NULL,
-        received_at INTEGER NOT NULL,
-        processed INTEGER DEFAULT 0
-    );
-
-    CREATE INDEX IF NOT EXISTS idx_intro_mailbox ON nfc_introductions(mailbox_id);
-    CREATE INDEX IF NOT EXISTS idx_intro_sender ON nfc_introductions(sender_signing_key);
-    CREATE INDEX IF NOT EXISTS idx_intro_processed ON nfc_introductions(processed);
-
-    CREATE TABLE IF NOT EXISTS nfc_tags (
-        mailbox_id BLOB PRIMARY KEY,
-        tag_name TEXT NOT NULL,
-        relay_url TEXT NOT NULL,
-        exchange_keypair_encrypted BLOB NOT NULL,
-        is_open INTEGER DEFAULT 1,
-        created_at INTEGER NOT NULL,
-        updated_at INTEGER NOT NULL
-    );
-";
-
-/// Migration v12: Atomic sync checkpoints for crash recovery.
-const MIGRATION_V12_SYNC_CHECKPOINTS: &str = "
+/// Migration v11: Atomic sync checkpoints for crash recovery.
+const MIGRATION_V11_SYNC_CHECKPOINTS: &str = "
     CREATE TABLE IF NOT EXISTS sync_checkpoints (
         checkpoint_id TEXT PRIMARY KEY,
         batch_id TEXT NOT NULL,

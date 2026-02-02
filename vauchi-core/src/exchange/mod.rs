@@ -48,11 +48,6 @@ pub mod session;
 mod session;
 
 #[cfg(feature = "testing")]
-pub mod nfc;
-#[cfg(not(feature = "testing"))]
-mod nfc;
-
-#[cfg(feature = "testing")]
 pub mod x3dh;
 #[cfg(not(feature = "testing"))]
 mod x3dh;
@@ -70,10 +65,6 @@ pub use device_link::{
 };
 pub use encrypted_message::{DecryptedExchangePayload, EncryptedExchangeMessage};
 pub use error::ExchangeError;
-pub use nfc::{
-    create_nfc_tag, parse_nfc_payload, Introduction, NfcError, NfcTagCreationResult, NfcTagMode,
-    NfcTagPayload, ParsedNfcPayload, ProtectedNfcTagPayload,
-};
 pub use proximity::{
     ManualConfirmationVerifier, MockProximityVerifier, ProximityError, ProximityVerifier,
 };

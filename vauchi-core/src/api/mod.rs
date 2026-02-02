@@ -91,6 +91,15 @@ pub mod vauchi;
 #[cfg(not(feature = "testing"))]
 mod vauchi;
 
+// Account
+pub use account::{delete_account_data, AccountError, DeletionManager};
+
+// Consent
+pub use consent::{ConsentManager, ConsentRecord, ConsentType};
+
+// GDPR
+pub use gdpr::{export_all_data, GdprExport};
+
 // Error types
 pub use error::{VauchiError, VauchiResult};
 

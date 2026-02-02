@@ -9,7 +9,7 @@
 
 mod common;
 
-use vauchi_core::api::account::DeletionManager;
+use vauchi_core::api::DeletionManager;
 use vauchi_core::crypto::SymmetricKey;
 use vauchi_core::storage::DeletionState;
 use vauchi_core::storage::Storage;

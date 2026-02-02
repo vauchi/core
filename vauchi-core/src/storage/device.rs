@@ -352,7 +352,7 @@ impl Storage {
             .expect("system time before UNIX epoch")
             .as_secs();
 
-        let checkpoint_id = format!("{}_{}", batch_id, now);
+        let checkpoint_id = uuid::Uuid::new_v4().to_string();
 
         self.conn.execute(
             "INSERT OR REPLACE INTO sync_checkpoints

@@ -5,7 +5,7 @@
 //! Proximity Verification
 //!
 //! Trait-based proximity verification to prevent remote QR code scanning attacks.
-//! Implementations can use ultrasonic audio, BLE, NFC, or other mechanisms.
+//! Implementations can use ultrasonic audio, BLE, or other mechanisms.
 
 use std::time::Duration;
 use thiserror::Error;

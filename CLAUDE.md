@@ -36,11 +36,12 @@ cargo fmt                       # Format
 ## Downstream Repos
 
 These depend on vauchi-core via git dependency:
-- `relay/` - WebSocket relay server
 - `cli/` - Command-line interface
 - `tui/` - Terminal UI
 - `desktop/` - Tauri + SolidJS desktop app
 - `e2e/` - End-to-end tests
+
+Note: `relay/` is standalone and does **not** depend on vauchi-core.
 
 ## Commits
 

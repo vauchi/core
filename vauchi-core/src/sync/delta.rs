@@ -7,6 +7,12 @@
 //! Provides efficient delta-based updates that only transmit changed fields
 //! rather than the entire contact card. Includes signature verification
 //! to ensure authenticity of updates.
+//!
+//! ## Version-Tagged Payloads
+//!
+//! The inner payload (before Double Ratchet encryption) uses a version byte prefix:
+//! - `0x01`: Legacy `CardDelta` (raw serialized bytes)
+//! - `0x02`: CEK-wrapped payload (`CekWrappedPayload`)
 
 use ring::rand::SecureRandom;
 use serde::{Deserialize, Serialize};
@@ -14,6 +20,12 @@ use thiserror::Error;
 
 use crate::contact_card::{ContactCard, ContactField};
 use crate::identity::Identity;
+
+/// Version byte for legacy CardDelta payloads (raw serialized JSON).
+pub const PAYLOAD_VERSION_LEGACY: u8 = 0x01;
+
+/// Version byte for CEK-wrapped payloads (crypto-shredding enabled).
+pub const PAYLOAD_VERSION_CEK: u8 = 0x02;
 
 /// Delta encoding error types.
 #[derive(Error, Debug)]
@@ -32,6 +44,15 @@ pub enum DeltaError {
 
     #[error("Compression error: {0}")]
     CompressionError(String),
+
+    #[error("Unknown payload version: 0x{0:02X}")]
+    UnknownPayloadVersion(u8),
+
+    #[error("Payload too short")]
+    PayloadTooShort,
+
+    #[error("CEK payload decode error: {0}")]
+    CekDecodeError(String),
 }
 
 /// A delta update containing only changed fields.
@@ -304,6 +325,138 @@ struct SignableDelta<'a> {
     timestamp: u64,
     changes: &'a Vec<FieldChange>,
     nonce: &'a [u8; 32],
+}
+
+// =============================================================================
+// CEK-Wrapped Payload (Version 0x02)
+// =============================================================================
+
+/// Payload encrypted by Double Ratchet, containing CEK + CEK-encrypted card delta.
+///
+/// The CEK (Content Encryption Key) is rotated with each card update.
+/// The recipient stores the CEK to control at-rest readability of the card.
+/// Destroying the CEK renders the card permanently unreadable (crypto-shredding).
+#[derive(Debug, Clone)]
+pub struct CekWrappedPayload {
+    /// Current CEK for this relationship (rotated each update). 32 raw bytes.
+    pub cek: [u8; 32],
+    /// Card delta encrypted with the CEK (XChaCha20-Poly1305).
+    pub cek_ciphertext: Vec<u8>,
+    /// Ed25519 signature over the plaintext delta.
+    pub signature: [u8; 64],
+    /// Nonce for replay detection.
+    pub nonce: [u8; 32],
+}
+
+impl CekWrappedPayload {
+    /// Encode this payload to bytes (without version prefix).
+    ///
+    /// Wire format: `cek(32) || signature(64) || nonce(32) || cek_ciphertext_len(4 BE) || cek_ciphertext`
+    pub fn encode(&self) -> Vec<u8> {
+        let ct_len = (self.cek_ciphertext.len() as u32).to_be_bytes();
+        let mut buf = Vec::with_capacity(32 + 64 + 32 + 4 + self.cek_ciphertext.len());
+        buf.extend_from_slice(&self.cek);
+        buf.extend_from_slice(&self.signature);
+        buf.extend_from_slice(&self.nonce);
+        buf.extend_from_slice(&ct_len);
+        buf.extend_from_slice(&self.cek_ciphertext);
+        buf
+    }
+
+    /// Decode from bytes (without version prefix).
+    pub fn decode(data: &[u8]) -> Result<Self, DeltaError> {
+        // Minimum: 32 (cek) + 64 (sig) + 32 (nonce) + 4 (len) = 132 bytes
+        if data.len() < 132 {
+            return Err(DeltaError::CekDecodeError(format!(
+                "payload too short: {} bytes, need at least 132",
+                data.len()
+            )));
+        }
+
+        let cek: [u8; 32] = data[0..32]
+            .try_into()
+            .map_err(|_| DeltaError::CekDecodeError("invalid CEK length".into()))?;
+        let signature: [u8; 64] = data[32..96]
+            .try_into()
+            .map_err(|_| DeltaError::CekDecodeError("invalid signature length".into()))?;
+        let nonce: [u8; 32] = data[96..128]
+            .try_into()
+            .map_err(|_| DeltaError::CekDecodeError("invalid nonce length".into()))?;
+
+        let ct_len =
+            u32::from_be_bytes(data[128..132].try_into().map_err(|_| {
+                DeltaError::CekDecodeError("invalid ciphertext length field".into())
+            })?) as usize;
+
+        if data.len() < 132 + ct_len {
+            return Err(DeltaError::CekDecodeError(format!(
+                "ciphertext truncated: expected {} bytes, have {}",
+                ct_len,
+                data.len() - 132
+            )));
+        }
+
+        let cek_ciphertext = data[132..132 + ct_len].to_vec();
+
+        Ok(CekWrappedPayload {
+            cek,
+            cek_ciphertext,
+            signature,
+            nonce,
+        })
+    }
+}
+
+// =============================================================================
+// Version-Tagged Payload Envelope
+// =============================================================================
+
+/// Version-tagged payload decoded from the inner Double Ratchet plaintext.
+///
+/// The first byte determines the format:
+/// - `0x01`: Legacy `CardDelta` (remaining bytes are serialized JSON)
+/// - `0x02`: CEK-wrapped payload (remaining bytes are `CekWrappedPayload`)
+#[derive(Debug)]
+pub enum VersionedPayload {
+    /// Legacy format: raw CardDelta bytes (version 0x01).
+    Legacy(Vec<u8>),
+    /// CEK-wrapped format: contains rotated CEK + CEK-encrypted delta (version 0x02).
+    CekWrapped(CekWrappedPayload),
+}
+
+impl VersionedPayload {
+    /// Encode a legacy CardDelta with version prefix.
+    pub fn encode_legacy(delta_bytes: &[u8]) -> Vec<u8> {
+        let mut buf = Vec::with_capacity(1 + delta_bytes.len());
+        buf.push(PAYLOAD_VERSION_LEGACY);
+        buf.extend_from_slice(delta_bytes);
+        buf
+    }
+
+    /// Encode a CEK-wrapped payload with version prefix.
+    pub fn encode_cek(payload: &CekWrappedPayload) -> Vec<u8> {
+        let inner = payload.encode();
+        let mut buf = Vec::with_capacity(1 + inner.len());
+        buf.push(PAYLOAD_VERSION_CEK);
+        buf.extend_from_slice(&inner);
+        buf
+    }
+
+    /// Decode a version-tagged payload.
+    pub fn decode(data: &[u8]) -> Result<Self, DeltaError> {
+        if data.is_empty() {
+            return Err(DeltaError::PayloadTooShort);
+        }
+
+        match data[0] {
+            PAYLOAD_VERSION_LEGACY => Ok(VersionedPayload::Legacy(data[1..].to_vec())),
+            PAYLOAD_VERSION_CEK => {
+                let payload = CekWrappedPayload::decode(&data[1..])?;
+                Ok(VersionedPayload::CekWrapped(payload))
+            }
+            v => Err(DeltaError::UnknownPayloadVersion(v)),
+        }
+    }
 }
 
 /// Custom serde for 32-byte nonce arrays.

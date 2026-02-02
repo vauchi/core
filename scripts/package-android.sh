@@ -183,3 +183,14 @@ echo "  $CHECKSUM"
 
 # Write checksum to file for CI
 echo "$CHECKSUM" > "$DIST_DIR/vauchi-mobile-android-$VERSION.zip.sha256"
+
+# Sign checksum with cosign if COSIGN_KEY is available
+if [[ -n "${COSIGN_KEY:-}" ]]; then
+    echo -e "${YELLOW}Signing checksum with cosign...${NC}"
+    cosign sign-blob --yes --key "$COSIGN_KEY" \
+        --output-signature "$DIST_DIR/vauchi-mobile-android-$VERSION.zip.sha256.sig" \
+        "$DIST_DIR/vauchi-mobile-android-$VERSION.zip.sha256"
+    echo -e "${GREEN}Checksum signed${NC}"
+else
+    echo -e "${YELLOW}COSIGN_KEY not set — skipping checksum signing${NC}"
+fi

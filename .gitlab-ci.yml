@@ -230,6 +230,7 @@ package:xcframework:
     paths:
       - dist/VauchiMobileFFI.xcframework.zip
       - dist/VauchiMobileFFI.xcframework.zip.sha256
+      - dist/VauchiMobileFFI.xcframework.zip.sha256.sig
       - dist/VauchiMobile-*.zip
     expire_in: 1 week
 
@@ -243,6 +244,7 @@ package:android:
     paths:
       - dist/vauchi-mobile-android-*.zip
       - dist/vauchi-mobile-android-*.zip.sha256
+      - dist/vauchi-mobile-android-*.zip.sha256.sig
     expire_in: 1 week
 
 # ============================================================

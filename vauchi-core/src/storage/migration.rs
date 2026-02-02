@@ -215,6 +215,11 @@ pub fn all_migrations() -> Vec<Migration> {
             name: "contacts_display_name_index",
             action: MigrationAction::Sql(MIGRATION_V12_CONTACTS_INDEX),
         },
+        Migration {
+            version: 13,
+            name: "crypto_shredding",
+            action: MigrationAction::Sql(MIGRATION_V13_CRYPTO_SHREDDING),
+        },
     ]
 }
 
@@ -624,4 +629,24 @@ const MIGRATION_V11_SYNC_CHECKPOINTS: &str = "
 const MIGRATION_V12_CONTACTS_INDEX: &str = "
     CREATE INDEX IF NOT EXISTS idx_contacts_display_name
         ON contacts(display_name COLLATE NOCASE);
+";
+
+/// Migration v13: Crypto-shredding support.
+///
+/// Adds per-contact Content Encryption Key (CEK) column and revoked_senders
+/// tombstone table. Existing contacts have `cek_encrypted = NULL` (legacy mode)
+/// until the card owner sends an update carrying a CEK.
+const MIGRATION_V13_CRYPTO_SHREDDING: &str = "
+    -- Per-contact CEK, encrypted with the storage master key.
+    -- NULL for legacy contacts (pre-CEK). Non-NULL for CEK-protected contacts.
+    ALTER TABLE contacts ADD COLUMN cek_encrypted BLOB;
+
+    -- Revocation tombstones: prevents processing updates from revoked senders.
+    -- Persists indefinitely to prevent re-establishment attacks.
+    CREATE TABLE IF NOT EXISTS revoked_senders (
+        sender_id TEXT PRIMARY KEY,
+        revoked_at INTEGER NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_revoked_at ON revoked_senders(revoked_at);
 ";

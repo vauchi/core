@@ -126,3 +126,7 @@ required-features = ["testing"]
 [[test]]
 name = "sync_progress_tests"
 required-features = ["testing"]
+
+[[test]]
+name = "crypto_shredding_storage_tests"
+required-features = ["testing"]

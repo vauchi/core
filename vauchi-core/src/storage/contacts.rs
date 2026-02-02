@@ -9,6 +9,7 @@ use rusqlite::params;
 use super::{Storage, StorageError};
 use crate::contact::Contact;
 use crate::contact_card::ContactCard;
+use crate::crypto::cek::ContentEncryptionKey;
 use crate::crypto::SymmetricKey;
 
 /// Internal struct for database row data.
@@ -483,6 +484,107 @@ impl Storage {
         match result {
             Ok(timestamp) => Ok(Some(timestamp as u64)),
             Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+            Err(e) => Err(StorageError::Database(e)),
+        }
+    }
+
+    // === Content Encryption Key (CEK) Operations ===
+
+    /// Saves a CEK for a contact, encrypted with the storage master key.
+    ///
+    /// The CEK controls at-rest readability of the contact card (crypto-shredding).
+    pub fn save_contact_cek(
+        &self,
+        contact_id: &str,
+        cek: &ContentEncryptionKey,
+    ) -> Result<(), StorageError> {
+        let cek_encrypted = crate::crypto::encrypt(&self.encryption_key, &cek.to_bytes())
+            .map_err(|e| StorageError::Encryption(e.to_string()))?;
+
+        let rows_affected = self.conn.execute(
+            "UPDATE contacts SET cek_encrypted = ?1 WHERE id = ?2",
+            params![cek_encrypted, contact_id],
+        )?;
+
+        if rows_affected == 0 {
+            return Err(StorageError::NotFound(format!(
+                "Contact not found: {}",
+                contact_id
+            )));
+        }
+
+        Ok(())
+    }
+
+    /// Loads the CEK for a contact. Returns None for legacy contacts (pre-CEK).
+    pub fn load_contact_cek(
+        &self,
+        contact_id: &str,
+    ) -> Result<Option<ContentEncryptionKey>, StorageError> {
+        let result = self.conn.query_row(
+            "SELECT cek_encrypted FROM contacts WHERE id = ?1",
+            params![contact_id],
+            |row| row.get::<_, Option<Vec<u8>>>(0),
+        );
+
+        match result {
+            Ok(Some(cek_encrypted)) => {
+                let cek_bytes = crate::crypto::decrypt(&self.encryption_key, &cek_encrypted)
+                    .map_err(|e| StorageError::Encryption(e.to_string()))?;
+                let cek_array: [u8; 32] = cek_bytes
+                    .try_into()
+                    .map_err(|_| StorageError::Encryption("Invalid CEK length".into()))?;
+                Ok(Some(ContentEncryptionKey::from_bytes(cek_array)))
+            }
+            Ok(None) => Ok(None),
+            Err(rusqlite::Error::QueryReturnedNoRows) => Err(StorageError::NotFound(format!(
+                "Contact not found: {}",
+                contact_id
+            ))),
+            Err(e) => Err(StorageError::Database(e)),
+        }
+    }
+
+    /// Deletes the CEK for a contact (crypto-shredding).
+    ///
+    /// Sets `cek_encrypted` to NULL, rendering the card permanently unreadable
+    /// if it was encrypted with the CEK.
+    pub fn delete_contact_cek(&self, contact_id: &str) -> Result<(), StorageError> {
+        self.conn.execute(
+            "UPDATE contacts SET cek_encrypted = NULL WHERE id = ?1",
+            params![contact_id],
+        )?;
+        Ok(())
+    }
+
+    // === Revoked Senders Operations ===
+
+    /// Records a revoked sender in the tombstone table.
+    ///
+    /// Prevents future updates from this sender from being processed,
+    /// even if the contact row has been deleted.
+    pub fn record_revoked_sender(
+        &self,
+        sender_id: &str,
+        revoked_at: u64,
+    ) -> Result<(), StorageError> {
+        self.conn.execute(
+            "INSERT OR REPLACE INTO revoked_senders (sender_id, revoked_at) VALUES (?1, ?2)",
+            params![sender_id, revoked_at as i64],
+        )?;
+        Ok(())
+    }
+
+    /// Checks if a sender has been revoked.
+    pub fn is_sender_revoked(&self, sender_id: &str) -> Result<bool, StorageError> {
+        let result = self.conn.query_row(
+            "SELECT COUNT(*) > 0 FROM revoked_senders WHERE sender_id = ?1",
+            params![sender_id],
+            |row| row.get::<_, bool>(0),
+        );
+
+        match result {
+            Ok(revoked) => Ok(revoked),
             Err(e) => Err(StorageError::Database(e)),
         }
     }

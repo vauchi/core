@@ -230,6 +230,11 @@ pub fn all_migrations() -> Vec<Migration> {
             name: "encrypt_medium_priority_tables",
             action: MigrationAction::Callback(migrate_v14_encrypt_medium_priority),
         },
+        Migration {
+            version: 15,
+            name: "encrypt_low_priority_tables",
+            action: MigrationAction::Callback(migrate_v15_encrypt_low_priority),
+        },
     ]
 }
 
@@ -1031,6 +1036,128 @@ fn migrate_v14_encrypt_medium_priority(
                 rusqlite::params![encrypted, checkpoint_id],
             )
             .map_err(|e| StorageError::Migration(format!("Update sync_checkpoints: {}", e)))?;
+        }
+    }
+
+    Ok(())
+}
+
+/// Migration v15: Add encrypted columns for low-priority plaintext tables.
+///
+/// Tables encrypted: field_validations (field_value, signature),
+/// ux_state (aha_tracker_json, demo_contact_json), audit_log (details).
+///
+/// Tables skipped:
+/// - replay_nonces: contains only random nonces + timestamps, no personal data
+/// - consent_records: consent decisions aren't personal data; needed for queries
+fn migrate_v15_encrypt_low_priority(
+    conn: &Connection,
+    key: &SymmetricKey,
+) -> Result<(), StorageError> {
+    use crate::crypto::encrypt;
+
+    // Step 1: Add encrypted columns
+    conn.execute_batch(
+        "ALTER TABLE field_validations ADD COLUMN field_value_encrypted BLOB;
+         ALTER TABLE field_validations ADD COLUMN signature_encrypted BLOB;
+         ALTER TABLE ux_state ADD COLUMN aha_tracker_json_encrypted BLOB;
+         ALTER TABLE ux_state ADD COLUMN demo_contact_json_encrypted BLOB;
+         ALTER TABLE audit_log ADD COLUMN details_encrypted BLOB;",
+    )
+    .map_err(|e| StorageError::Migration(format!("Add v15 columns: {}", e)))?;
+
+    // Step 2: Encrypt existing field_validations data
+    {
+        let mut stmt = conn
+            .prepare("SELECT id, field_value, signature FROM field_validations")
+            .map_err(|e| StorageError::Migration(format!("Read field_validations: {}", e)))?;
+        let rows: Vec<(String, String, Vec<u8>)> = stmt
+            .query_map([], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)))
+            .map_err(|e| StorageError::Migration(format!("Query field_validations: {}", e)))?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| StorageError::Migration(format!("Collect field_validations: {}", e)))?;
+
+        for (id, field_value, signature) in &rows {
+            let fv_encrypted = encrypt(key, field_value.as_bytes()).map_err(|e| {
+                StorageError::Migration(format!("Encrypt field_value: {}", e))
+            })?;
+            let sig_encrypted = encrypt(key, signature).map_err(|e| {
+                StorageError::Migration(format!("Encrypt signature: {}", e))
+            })?;
+            conn.execute(
+                "UPDATE field_validations SET field_value_encrypted = ?1, field_value = '', signature_encrypted = ?2, signature = X'' WHERE id = ?3",
+                rusqlite::params![fv_encrypted, sig_encrypted, id],
+            )
+            .map_err(|e| StorageError::Migration(format!("Update field_validations: {}", e)))?;
+        }
+    }
+
+    // Step 3: Encrypt existing ux_state data
+    {
+        let result = conn.query_row(
+            "SELECT id, aha_tracker_json, demo_contact_json FROM ux_state WHERE id = 1",
+            [],
+            |row| {
+                let id: i64 = row.get(0)?;
+                let aha: Option<String> = row.get(1)?;
+                let demo: Option<String> = row.get(2)?;
+                Ok((id, aha, demo))
+            },
+        );
+
+        if let Ok((id, aha_json, demo_json)) = result {
+            let aha_encrypted = if let Some(ref json) = aha_json {
+                if !json.is_empty() {
+                    Some(encrypt(key, json.as_bytes()).map_err(|e| {
+                        StorageError::Migration(format!("Encrypt aha_tracker: {}", e))
+                    })?)
+                } else {
+                    None
+                }
+            } else {
+                None
+            };
+
+            let demo_encrypted = if let Some(ref json) = demo_json {
+                if !json.is_empty() {
+                    Some(encrypt(key, json.as_bytes()).map_err(|e| {
+                        StorageError::Migration(format!("Encrypt demo_contact: {}", e))
+                    })?)
+                } else {
+                    None
+                }
+            } else {
+                None
+            };
+
+            conn.execute(
+                "UPDATE ux_state SET aha_tracker_json_encrypted = ?1, aha_tracker_json = '', demo_contact_json_encrypted = ?2, demo_contact_json = '' WHERE id = ?3",
+                rusqlite::params![aha_encrypted, demo_encrypted, id],
+            )
+            .map_err(|e| StorageError::Migration(format!("Update ux_state: {}", e)))?;
+        }
+    }
+
+    // Step 4: Encrypt existing audit_log details
+    {
+        let mut stmt = conn
+            .prepare("SELECT id, details FROM audit_log WHERE details IS NOT NULL AND details != ''")
+            .map_err(|e| StorageError::Migration(format!("Read audit_log: {}", e)))?;
+        let rows: Vec<(i64, String)> = stmt
+            .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))
+            .map_err(|e| StorageError::Migration(format!("Query audit_log: {}", e)))?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| StorageError::Migration(format!("Collect audit_log: {}", e)))?;
+
+        for (id, details) in &rows {
+            let encrypted = encrypt(key, details.as_bytes()).map_err(|e| {
+                StorageError::Migration(format!("Encrypt audit_log details: {}", e))
+            })?;
+            conn.execute(
+                "UPDATE audit_log SET details_encrypted = ?1, details = '' WHERE id = ?2",
+                rusqlite::params![encrypted, id],
+            )
+            .map_err(|e| StorageError::Migration(format!("Update audit_log: {}", e)))?;
         }
     }
 

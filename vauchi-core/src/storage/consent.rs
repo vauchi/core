@@ -191,7 +191,7 @@ impl Storage {
         }
     }
 
-    /// Logs an audit event.
+    /// Logs an audit event (details encrypted if present).
     pub fn log_audit_event(
         &self,
         event_type: &str,
@@ -202,9 +202,18 @@ impl Storage {
             .map(|d| d.as_secs())
             .unwrap_or(0);
 
+        let details_encrypted = if let Some(d) = details {
+            Some(
+                crate::crypto::encrypt(&self.encryption_key, d.as_bytes())
+                    .map_err(|e| StorageError::Encryption(e.to_string()))?,
+            )
+        } else {
+            None
+        };
+
         self.conn.execute(
-            "INSERT INTO audit_log (event_type, details, timestamp) VALUES (?1, ?2, ?3)",
-            params![event_type, details, now as i64],
+            "INSERT INTO audit_log (event_type, details, details_encrypted, timestamp) VALUES (?1, '', ?2, ?3)",
+            params![event_type, details_encrypted, now as i64],
         )?;
         Ok(())
     }

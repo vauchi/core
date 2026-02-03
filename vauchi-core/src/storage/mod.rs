@@ -647,6 +647,112 @@ impl Storage {
                 }
             }
 
+            // Re-encrypt field_validations: field_value_encrypted, signature_encrypted
+            {
+                let mut stmt = self.conn
+                    .prepare("SELECT id, field_value_encrypted, signature_encrypted FROM field_validations")
+                    .map_err(|e| StorageError::Migration(format!("Read field_validations for rekey: {}", e)))?;
+                #[allow(clippy::type_complexity)]
+                let rows: Vec<(String, Option<Vec<u8>>, Option<Vec<u8>>)> = stmt
+                    .query_map([], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)))
+                    .map_err(|e| StorageError::Migration(format!("Query field_validations: {}", e)))?
+                    .collect::<Result<Vec<_>, _>>()
+                    .map_err(|e| StorageError::Migration(format!("Collect field_validations: {}", e)))?;
+
+                for (id, fv_enc, sig_enc) in &rows {
+                    if let Some(enc) = fv_enc {
+                        if !enc.is_empty() {
+                            let plain = decrypt(old_key, enc)
+                                .map_err(|e| StorageError::Migration(format!("Decrypt field_value {}: {}", id, e)))?;
+                            let new_enc = encrypt(&new_key, &plain)
+                                .map_err(|e| StorageError::Migration(format!("Encrypt field_value {}: {}", id, e)))?;
+                            self.conn.execute(
+                                "UPDATE field_validations SET field_value_encrypted = ?1 WHERE id = ?2",
+                                params![new_enc, id],
+                            ).map_err(|e| StorageError::Migration(format!("Update field_value {}: {}", id, e)))?;
+                        }
+                    }
+                    if let Some(enc) = sig_enc {
+                        if !enc.is_empty() {
+                            let plain = decrypt(old_key, enc)
+                                .map_err(|e| StorageError::Migration(format!("Decrypt signature {}: {}", id, e)))?;
+                            let new_enc = encrypt(&new_key, &plain)
+                                .map_err(|e| StorageError::Migration(format!("Encrypt signature {}: {}", id, e)))?;
+                            self.conn.execute(
+                                "UPDATE field_validations SET signature_encrypted = ?1 WHERE id = ?2",
+                                params![new_enc, id],
+                            ).map_err(|e| StorageError::Migration(format!("Update signature {}: {}", id, e)))?;
+                        }
+                    }
+                }
+            }
+
+            // Re-encrypt ux_state: aha_tracker_json_encrypted, demo_contact_json_encrypted
+            {
+                let result = self.conn.query_row(
+                    "SELECT id, aha_tracker_json_encrypted, demo_contact_json_encrypted FROM ux_state WHERE id = 1",
+                    [],
+                    |row| {
+                        let id: i64 = row.get(0)?;
+                        let aha: Option<Vec<u8>> = row.get(1)?;
+                        let demo: Option<Vec<u8>> = row.get(2)?;
+                        Ok((id, aha, demo))
+                    },
+                );
+
+                if let Ok((id, aha_enc, demo_enc)) = result {
+                    if let Some(enc) = aha_enc {
+                        if !enc.is_empty() {
+                            let plain = decrypt(old_key, &enc)
+                                .map_err(|e| StorageError::Migration(format!("Decrypt aha_tracker: {}", e)))?;
+                            let new_enc = encrypt(&new_key, &plain)
+                                .map_err(|e| StorageError::Migration(format!("Encrypt aha_tracker: {}", e)))?;
+                            self.conn.execute(
+                                "UPDATE ux_state SET aha_tracker_json_encrypted = ?1 WHERE id = ?2",
+                                params![new_enc, id],
+                            ).map_err(|e| StorageError::Migration(format!("Update aha_tracker: {}", e)))?;
+                        }
+                    }
+                    if let Some(enc) = demo_enc {
+                        if !enc.is_empty() {
+                            let plain = decrypt(old_key, &enc)
+                                .map_err(|e| StorageError::Migration(format!("Decrypt demo_contact: {}", e)))?;
+                            let new_enc = encrypt(&new_key, &plain)
+                                .map_err(|e| StorageError::Migration(format!("Encrypt demo_contact: {}", e)))?;
+                            self.conn.execute(
+                                "UPDATE ux_state SET demo_contact_json_encrypted = ?1 WHERE id = ?2",
+                                params![new_enc, id],
+                            ).map_err(|e| StorageError::Migration(format!("Update demo_contact: {}", e)))?;
+                        }
+                    }
+                }
+            }
+
+            // Re-encrypt audit_log: details_encrypted
+            {
+                let mut stmt = self.conn
+                    .prepare("SELECT id, details_encrypted FROM audit_log WHERE details_encrypted IS NOT NULL")
+                    .map_err(|e| StorageError::Migration(format!("Read audit_log for rekey: {}", e)))?;
+                let rows: Vec<(i64, Vec<u8>)> = stmt
+                    .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))
+                    .map_err(|e| StorageError::Migration(format!("Query audit_log: {}", e)))?
+                    .collect::<Result<Vec<_>, _>>()
+                    .map_err(|e| StorageError::Migration(format!("Collect audit_log: {}", e)))?;
+
+                for (id, enc) in &rows {
+                    if !enc.is_empty() {
+                        let plain = decrypt(old_key, enc)
+                            .map_err(|e| StorageError::Migration(format!("Decrypt audit_log {}: {}", id, e)))?;
+                        let new_enc = encrypt(&new_key, &plain)
+                            .map_err(|e| StorageError::Migration(format!("Encrypt audit_log {}: {}", id, e)))?;
+                        self.conn.execute(
+                            "UPDATE audit_log SET details_encrypted = ?1 WHERE id = ?2",
+                            params![new_enc, id],
+                        ).map_err(|e| StorageError::Migration(format!("Update audit_log {}: {}", id, e)))?;
+                    }
+                }
+            }
+
             Ok(())
         })();
 

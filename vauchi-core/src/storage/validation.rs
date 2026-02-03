@@ -9,8 +9,79 @@ use rusqlite::params;
 use super::{Storage, StorageError};
 use crate::social::ProfileValidation;
 
+/// SQL columns selected for validation queries (with encrypted fields).
+const VALIDATION_SELECT: &str =
+    "field_id, field_value_encrypted, field_value, validator_id, validated_at, signature_encrypted, signature";
+
+/// Intermediate row before field decryption.
+struct ValidationRow {
+    field_id: String,
+    field_value_encrypted: Option<Vec<u8>>,
+    field_value_plaintext: String,
+    validator_id: String,
+    validated_at: i64,
+    signature_encrypted: Option<Vec<u8>>,
+    signature_plaintext: Vec<u8>,
+}
+
+fn row_to_validation_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<ValidationRow> {
+    Ok(ValidationRow {
+        field_id: row.get(0)?,
+        field_value_encrypted: row.get(1)?,
+        field_value_plaintext: row.get(2)?,
+        validator_id: row.get(3)?,
+        validated_at: row.get(4)?,
+        signature_encrypted: row.get(5)?,
+        signature_plaintext: row.get(6)?,
+    })
+}
+
 impl Storage {
-    /// Saves a field validation to storage.
+    /// Decrypts a ValidationRow and converts to ProfileValidation.
+    fn decrypt_validation_row(
+        &self,
+        row: ValidationRow,
+    ) -> Result<ProfileValidation, StorageError> {
+        // Decrypt field_value
+        let field_value = if let Some(enc) = row.field_value_encrypted {
+            if !enc.is_empty() {
+                let decrypted = crate::crypto::decrypt(&self.encryption_key, &enc)
+                    .map_err(|e| StorageError::Encryption(e.to_string()))?;
+                String::from_utf8(decrypted)
+                    .map_err(|e| StorageError::Serialization(e.to_string()))?
+            } else {
+                row.field_value_plaintext
+            }
+        } else {
+            row.field_value_plaintext
+        };
+
+        // Decrypt signature
+        let signature_bytes = if let Some(enc) = row.signature_encrypted {
+            if !enc.is_empty() {
+                crate::crypto::decrypt(&self.encryption_key, &enc)
+                    .map_err(|e| StorageError::Encryption(e.to_string()))?
+            } else {
+                row.signature_plaintext
+            }
+        } else {
+            row.signature_plaintext
+        };
+
+        let signature: [u8; 64] = signature_bytes
+            .try_into()
+            .map_err(|_| StorageError::InvalidData("invalid signature length".into()))?;
+
+        Ok(ProfileValidation::from_stored(
+            &row.field_id,
+            &field_value,
+            &row.validator_id,
+            row.validated_at as u64,
+            signature,
+        ))
+    }
+
+    /// Saves a field validation to storage (encrypted).
     ///
     /// The validation is stored with a unique constraint on
     /// (contact_id, field_id, validator_id) to prevent duplicate validations.
@@ -26,18 +97,25 @@ impl Storage {
             validation.validator_id()
         );
 
+        let field_value_encrypted =
+            crate::crypto::encrypt(&self.encryption_key, validation.field_value().as_bytes())
+                .map_err(|e| StorageError::Encryption(e.to_string()))?;
+        let signature_encrypted =
+            crate::crypto::encrypt(&self.encryption_key, validation.signature().as_slice())
+                .map_err(|e| StorageError::Encryption(e.to_string()))?;
+
         self.conn.execute(
             "INSERT OR REPLACE INTO field_validations
-             (id, contact_id, field_id, field_value, validator_id, validated_at, signature)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+             (id, contact_id, field_id, field_value, field_value_encrypted, validator_id, validated_at, signature, signature_encrypted)
+             VALUES (?1, ?2, ?3, '', ?4, ?5, ?6, X'', ?7)",
             params![
                 id,
                 contact_id,
                 validation.field_id(),
-                validation.field_value(),
+                field_value_encrypted,
                 validation.validator_id(),
                 validation.validated_at() as i64,
-                validation.signature().as_slice(),
+                signature_encrypted,
             ],
         )?;
 
@@ -50,52 +128,22 @@ impl Storage {
         contact_id: &str,
         field_id: &str,
     ) -> Result<Vec<ProfileValidation>, StorageError> {
-        // The field_id in the validation is formatted as "contact_id:field_name"
         let full_field_id = format!("{}:{}", contact_id, field_id);
 
-        let mut stmt = self.conn.prepare(
-            "SELECT field_id, field_value, validator_id, validated_at, signature
-             FROM field_validations
-             WHERE contact_id = ?1 AND field_id = ?2",
-        )?;
+        let sql = format!(
+            "SELECT {} FROM field_validations WHERE contact_id = ?1 AND field_id = ?2",
+            VALIDATION_SELECT
+        );
+        let mut stmt = self.conn.prepare(&sql)?;
 
-        let rows = stmt.query_map(params![contact_id, full_field_id], |row| {
-            let field_id: String = row.get(0)?;
-            let field_value: String = row.get(1)?;
-            let validator_id: String = row.get(2)?;
-            let validated_at: i64 = row.get(3)?;
-            let signature_bytes: Vec<u8> = row.get(4)?;
+        let rows: Vec<ValidationRow> = stmt
+            .query_map(params![contact_id, full_field_id], row_to_validation_row)?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(StorageError::Database)?;
 
-            Ok((
-                field_id,
-                field_value,
-                validator_id,
-                validated_at,
-                signature_bytes,
-            ))
-        })?;
-
-        let mut validations = Vec::new();
-        for row_result in rows {
-            let (field_id, field_value, validator_id, validated_at, signature_bytes) = row_result?;
-
-            let signature: [u8; 64] = signature_bytes
-                .try_into()
-                .map_err(|_| StorageError::InvalidData("invalid signature length".into()))?;
-
-            // Use the internal constructor that accepts all fields
-            let validation = ProfileValidation::from_stored(
-                &field_id,
-                &field_value,
-                &validator_id,
-                validated_at as u64,
-                signature,
-            );
-
-            validations.push(validation);
-        }
-
-        Ok(validations)
+        rows.into_iter()
+            .map(|r| self.decrypt_validation_row(r))
+            .collect()
     }
 
     /// Loads all validations made by a specific validator (for listing my validations).
@@ -103,49 +151,20 @@ impl Storage {
         &self,
         validator_id: &str,
     ) -> Result<Vec<ProfileValidation>, StorageError> {
-        let mut stmt = self.conn.prepare(
-            "SELECT field_id, field_value, validator_id, validated_at, signature
-             FROM field_validations
-             WHERE validator_id = ?1
-             ORDER BY validated_at DESC",
-        )?;
+        let sql = format!(
+            "SELECT {} FROM field_validations WHERE validator_id = ?1 ORDER BY validated_at DESC",
+            VALIDATION_SELECT
+        );
+        let mut stmt = self.conn.prepare(&sql)?;
 
-        let rows = stmt.query_map(params![validator_id], |row| {
-            let field_id: String = row.get(0)?;
-            let field_value: String = row.get(1)?;
-            let validator_id: String = row.get(2)?;
-            let validated_at: i64 = row.get(3)?;
-            let signature_bytes: Vec<u8> = row.get(4)?;
+        let rows: Vec<ValidationRow> = stmt
+            .query_map(params![validator_id], row_to_validation_row)?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(StorageError::Database)?;
 
-            Ok((
-                field_id,
-                field_value,
-                validator_id,
-                validated_at,
-                signature_bytes,
-            ))
-        })?;
-
-        let mut validations = Vec::new();
-        for row_result in rows {
-            let (field_id, field_value, validator_id, validated_at, signature_bytes) = row_result?;
-
-            let signature: [u8; 64] = signature_bytes
-                .try_into()
-                .map_err(|_| StorageError::InvalidData("invalid signature length".into()))?;
-
-            let validation = ProfileValidation::from_stored(
-                &field_id,
-                &field_value,
-                &validator_id,
-                validated_at as u64,
-                signature,
-            );
-
-            validations.push(validation);
-        }
-
-        Ok(validations)
+        rows.into_iter()
+            .map(|r| self.decrypt_validation_row(r))
+            .collect()
     }
 
     /// Deletes a validation (revokes my validation of a field).

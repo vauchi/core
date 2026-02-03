@@ -15,11 +15,14 @@ use crate::demo_contact::DemoContactState;
 impl Storage {
     // === Aha Moments Operations ===
 
-    /// Saves the aha moments tracker state.
+    /// Saves the aha moments tracker state (encrypted).
     pub fn save_aha_tracker(&self, tracker: &AhaMomentTracker) -> Result<(), StorageError> {
         let json = tracker
             .to_json()
             .map_err(|e| StorageError::Serialization(e.to_string()))?;
+
+        let encrypted = crate::crypto::encrypt(&self.encryption_key, json.as_bytes())
+            .map_err(|e| StorageError::Encryption(e.to_string()))?;
 
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -27,30 +30,43 @@ impl Storage {
             .as_secs();
 
         self.conn.execute(
-            "INSERT OR REPLACE INTO ux_state (id, aha_tracker_json, updated_at)
-             VALUES (1, ?1, ?2)
-             ON CONFLICT(id) DO UPDATE SET aha_tracker_json = ?1, updated_at = ?2",
-            params![json, now as i64],
+            "INSERT OR REPLACE INTO ux_state (id, aha_tracker_json, aha_tracker_json_encrypted, updated_at)
+             VALUES (1, '', ?1, ?2)
+             ON CONFLICT(id) DO UPDATE SET aha_tracker_json = '', aha_tracker_json_encrypted = ?1, updated_at = ?2",
+            params![encrypted, now as i64],
         )?;
 
         Ok(())
     }
 
-    /// Loads the aha moments tracker state.
+    /// Loads the aha moments tracker state (decrypted).
     pub fn load_aha_tracker(&self) -> Result<Option<AhaMomentTracker>, StorageError> {
         let result = self.conn.query_row(
-            "SELECT aha_tracker_json FROM ux_state WHERE id = 1",
+            "SELECT aha_tracker_json_encrypted, aha_tracker_json FROM ux_state WHERE id = 1",
             [],
-            |row| row.get::<_, Option<String>>(0),
+            |row| {
+                let encrypted: Option<Vec<u8>> = row.get(0)?;
+                let plaintext: Option<String> = row.get(1)?;
+                Ok((encrypted, plaintext))
+            },
         );
 
         match result {
-            Ok(Some(json)) => {
+            Ok((Some(encrypted), _)) if !encrypted.is_empty() => {
+                let decrypted = crate::crypto::decrypt(&self.encryption_key, &encrypted)
+                    .map_err(|e| StorageError::Encryption(e.to_string()))?;
+                let json = String::from_utf8(decrypted)
+                    .map_err(|e| StorageError::Serialization(e.to_string()))?;
                 let tracker = AhaMomentTracker::from_json(&json)
                     .map_err(|e| StorageError::Serialization(e.to_string()))?;
                 Ok(Some(tracker))
             }
-            Ok(None) => Ok(None),
+            Ok((_, Some(json))) if !json.is_empty() => {
+                let tracker = AhaMomentTracker::from_json(&json)
+                    .map_err(|e| StorageError::Serialization(e.to_string()))?;
+                Ok(Some(tracker))
+            }
+            Ok(_) => Ok(None),
             Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
             Err(e) => Err(StorageError::Database(e)),
         }
@@ -66,11 +82,14 @@ impl Storage {
 
     // === Demo Contact Operations ===
 
-    /// Saves the demo contact state.
+    /// Saves the demo contact state (encrypted).
     pub fn save_demo_contact_state(&self, state: &DemoContactState) -> Result<(), StorageError> {
         let json = state
             .to_json()
             .map_err(|e| StorageError::Serialization(e.to_string()))?;
+
+        let encrypted = crate::crypto::encrypt(&self.encryption_key, json.as_bytes())
+            .map_err(|e| StorageError::Encryption(e.to_string()))?;
 
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -78,30 +97,43 @@ impl Storage {
             .as_secs();
 
         self.conn.execute(
-            "INSERT OR REPLACE INTO ux_state (id, demo_contact_json, updated_at)
-             VALUES (1, ?1, ?2)
-             ON CONFLICT(id) DO UPDATE SET demo_contact_json = ?1, updated_at = ?2",
-            params![json, now as i64],
+            "INSERT OR REPLACE INTO ux_state (id, demo_contact_json, demo_contact_json_encrypted, updated_at)
+             VALUES (1, '', ?1, ?2)
+             ON CONFLICT(id) DO UPDATE SET demo_contact_json = '', demo_contact_json_encrypted = ?1, updated_at = ?2",
+            params![encrypted, now as i64],
         )?;
 
         Ok(())
     }
 
-    /// Loads the demo contact state.
+    /// Loads the demo contact state (decrypted).
     pub fn load_demo_contact_state(&self) -> Result<Option<DemoContactState>, StorageError> {
         let result = self.conn.query_row(
-            "SELECT demo_contact_json FROM ux_state WHERE id = 1",
+            "SELECT demo_contact_json_encrypted, demo_contact_json FROM ux_state WHERE id = 1",
             [],
-            |row| row.get::<_, Option<String>>(0),
+            |row| {
+                let encrypted: Option<Vec<u8>> = row.get(0)?;
+                let plaintext: Option<String> = row.get(1)?;
+                Ok((encrypted, plaintext))
+            },
         );
 
         match result {
-            Ok(Some(json)) => {
+            Ok((Some(encrypted), _)) if !encrypted.is_empty() => {
+                let decrypted = crate::crypto::decrypt(&self.encryption_key, &encrypted)
+                    .map_err(|e| StorageError::Encryption(e.to_string()))?;
+                let json = String::from_utf8(decrypted)
+                    .map_err(|e| StorageError::Serialization(e.to_string()))?;
                 let state = DemoContactState::from_json(&json)
                     .map_err(|e| StorageError::Serialization(e.to_string()))?;
                 Ok(Some(state))
             }
-            Ok(None) => Ok(None),
+            Ok((_, Some(json))) if !json.is_empty() => {
+                let state = DemoContactState::from_json(&json)
+                    .map_err(|e| StorageError::Serialization(e.to_string()))?;
+                Ok(Some(state))
+            }
+            Ok(_) => Ok(None),
             Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
             Err(e) => Err(StorageError::Database(e)),
         }
@@ -125,7 +157,7 @@ impl Storage {
 
     // === Combined UX State Operations ===
 
-    /// Saves both aha tracker and demo contact state atomically.
+    /// Saves both aha tracker and demo contact state atomically (encrypted).
     pub fn save_ux_state(
         &self,
         aha_tracker: &AhaMomentTracker,
@@ -138,15 +170,20 @@ impl Storage {
             .to_json()
             .map_err(|e| StorageError::Serialization(e.to_string()))?;
 
+        let aha_encrypted = crate::crypto::encrypt(&self.encryption_key, aha_json.as_bytes())
+            .map_err(|e| StorageError::Encryption(e.to_string()))?;
+        let demo_encrypted = crate::crypto::encrypt(&self.encryption_key, demo_json.as_bytes())
+            .map_err(|e| StorageError::Encryption(e.to_string()))?;
+
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .expect("system time before UNIX epoch")
             .as_secs();
 
         self.conn.execute(
-            "INSERT OR REPLACE INTO ux_state (id, aha_tracker_json, demo_contact_json, updated_at)
-             VALUES (1, ?1, ?2, ?3)",
-            params![aha_json, demo_json, now as i64],
+            "INSERT OR REPLACE INTO ux_state (id, aha_tracker_json, aha_tracker_json_encrypted, demo_contact_json, demo_contact_json_encrypted, updated_at)
+             VALUES (1, '', ?1, '', ?2, ?3)",
+            params![aha_encrypted, demo_encrypted, now as i64],
         )?;
 
         Ok(())

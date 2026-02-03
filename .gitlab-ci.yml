@@ -76,6 +76,16 @@ auto-tag:version:
       fi
 
       echo "Tag ${TAG} does not exist — creating it..."
+
+      git config user.name "vauchi-gitlab-runner"
+      git config user.email "noreply@vauchi.app"
+
+      # Use project access token for push — CI_JOB_TOKEN cannot be used here
+      # because pushes via CI_JOB_TOKEN do not trigger new pipelines, and the
+      # tag push must trigger the release pipeline (build/package/publish stages).
+      # PROJECT_ACCESS_TOKEN is set at group level in Settings > CI/CD > Variables.
+      git remote set-url origin "https://vauchi-gitlab-runner:${PROJECT_ACCESS_TOKEN}@gitlab.com/${CI_PROJECT_PATH}.git"
+
       git tag -a "${TAG}" -m "Release ${TAG}"
       git push origin "${TAG}"
       echo "✓ Created and pushed tag ${TAG}"

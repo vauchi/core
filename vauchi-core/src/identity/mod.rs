@@ -223,6 +223,14 @@ impl Identity {
         )
     }
 
+    /// Derives the Shredding Master Key (SMK) from this identity's master seed.
+    ///
+    /// Called once during identity creation or migration to SMK-based encryption.
+    /// The returned SMK should be immediately stored in SecureStorage.
+    pub fn derive_smk(&self) -> crate::crypto::ShreddingMasterKey {
+        crate::crypto::ShreddingMasterKey::derive_from_seed(&self.master_seed)
+    }
+
     /// Creates the initial device registry containing only this device.
     pub fn initial_device_registry(&self) -> DeviceRegistry {
         DeviceRegistry::new(

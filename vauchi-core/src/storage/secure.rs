@@ -272,19 +272,19 @@ impl SecureStorage for FileKeyStorage {
 
 // INLINE_TEST_REQUIRED: MemoryKeyStorage is a test-only implementation used for unit testing SecureStorage trait
 /// In-memory storage for testing.
-#[cfg(test)]
+#[cfg(any(test, feature = "testing"))]
 pub struct MemoryKeyStorage {
     keys: std::sync::Mutex<std::collections::HashMap<String, Vec<u8>>>,
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "testing"))]
 impl Default for MemoryKeyStorage {
     fn default() -> Self {
         Self::new()
     }
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "testing"))]
 impl MemoryKeyStorage {
     pub fn new() -> Self {
         Self {
@@ -293,7 +293,7 @@ impl MemoryKeyStorage {
     }
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "testing"))]
 impl SecureStorage for MemoryKeyStorage {
     fn save_key(&self, name: &str, key: &[u8]) -> Result<(), StorageError> {
         self.keys

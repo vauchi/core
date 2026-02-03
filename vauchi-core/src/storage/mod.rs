@@ -87,6 +87,9 @@ pub use error::{
 };
 pub use secure::{FileKeyStorage, SecureStorage};
 
+#[cfg(any(test, feature = "testing"))]
+pub use secure::MemoryKeyStorage;
+
 #[cfg(feature = "secure-storage")]
 pub use secure::PlatformKeyring;
 

@@ -11,10 +11,10 @@ use std::sync::Arc;
 use crate::contact::Contact;
 use crate::contact_card::{ContactCard, ContactField};
 use crate::crypto::ratchet::DoubleRatchetState;
-use crate::crypto::SymmetricKey;
+use crate::crypto::{ShreddingMasterKey, SymmetricKey};
 use crate::identity::Identity;
 use crate::network::{MockTransport, Transport};
-use crate::storage::Storage;
+use crate::storage::{SecureStorage, Storage};
 
 use super::config::VauchiConfig;
 use super::contact_manager::ContactManager;
@@ -54,11 +54,15 @@ use super::events::{EventDispatcher, EventHandler, VauchiEvent};
 /// wb.connect()?;
 /// wb.sync()?;
 /// ```
+/// Key name used to store SMK in SecureStorage.
+const SMK_KEY_NAME: &str = "smk";
+
 pub struct Vauchi<T: Transport = MockTransport> {
     config: VauchiConfig,
     identity: Option<Identity>,
     storage: Storage,
     events: Arc<EventDispatcher>,
+    secure_storage: Option<Arc<dyn SecureStorage>>,
     _phantom: std::marker::PhantomData<T>,
 }
 
@@ -67,22 +71,45 @@ impl Vauchi<MockTransport> {
     pub fn new(config: VauchiConfig) -> VauchiResult<Self> {
         Self::with_transport_factory(config, MockTransport::new)
     }
+
+    /// Creates a new Vauchi instance using SMK from SecureStorage for encryption.
+    ///
+    /// Boot flow (DP-1): Load SMK from SecureStorage → derive SEK → open Storage.
+    /// Falls back to `config.storage_key` if SMK is not found in SecureStorage.
+    pub fn with_secure_storage(
+        config: VauchiConfig,
+        secure_storage: Arc<dyn SecureStorage>,
+    ) -> VauchiResult<Self> {
+        Self::with_transport_and_secure_storage(config, MockTransport::new, Some(secure_storage))
+    }
 }
 
 impl<T: Transport> Vauchi<T> {
     /// Creates a new Vauchi instance with a custom transport factory.
     pub fn with_transport_factory<F>(
         config: VauchiConfig,
-        _transport_factory: F,
+        transport_factory: F,
     ) -> VauchiResult<Self>
     where
         F: FnOnce() -> T,
     {
-        // Use provided storage key or generate a new one
-        let storage_key = config
-            .storage_key
-            .clone()
-            .unwrap_or_else(SymmetricKey::generate);
+        Self::with_transport_and_secure_storage(config, transport_factory, None)
+    }
+
+    /// Creates a new Vauchi instance with transport factory and optional SecureStorage.
+    ///
+    /// If SecureStorage is provided and contains an SMK, the SEK is derived from it.
+    /// Otherwise, falls back to `config.storage_key` or generates a random key.
+    pub fn with_transport_and_secure_storage<F>(
+        config: VauchiConfig,
+        _transport_factory: F,
+        secure_storage: Option<Arc<dyn SecureStorage>>,
+    ) -> VauchiResult<Self>
+    where
+        F: FnOnce() -> T,
+    {
+        // Determine the storage encryption key
+        let storage_key = Self::resolve_storage_key(&config, secure_storage.as_deref())?;
 
         // Open or create storage
         let storage = if config.storage_path.exists() {
@@ -103,8 +130,39 @@ impl<T: Transport> Vauchi<T> {
             identity: None,
             storage,
             events,
+            secure_storage,
             _phantom: std::marker::PhantomData,
         })
+    }
+
+    /// Resolves the storage encryption key from available sources.
+    ///
+    /// Priority:
+    /// 1. SMK from SecureStorage → derive SEK
+    /// 2. Explicit storage_key from config
+    /// 3. Generate random key (ephemeral, not persistent)
+    fn resolve_storage_key(
+        config: &VauchiConfig,
+        secure_storage: Option<&dyn SecureStorage>,
+    ) -> VauchiResult<SymmetricKey> {
+        // Try loading SMK from SecureStorage
+        if let Some(ss) = secure_storage {
+            if let Some(smk_bytes) = ss.load_key(SMK_KEY_NAME).map_err(|e| {
+                VauchiError::Configuration(format!("Failed to load SMK from SecureStorage: {}", e))
+            })? {
+                let smk_array: [u8; 32] = smk_bytes.try_into().map_err(|_| {
+                    VauchiError::Configuration("SMK in SecureStorage has invalid length".into())
+                })?;
+                let smk = ShreddingMasterKey::from_bytes(smk_array);
+                return Ok(smk.derive_sek());
+            }
+        }
+
+        // Fall back to config storage key or generate random
+        Ok(config
+            .storage_key
+            .clone()
+            .unwrap_or_else(SymmetricKey::generate))
     }
 
     /// Creates a new Vauchi instance with in-memory storage (for testing).
@@ -121,13 +179,30 @@ impl<T: Transport> Vauchi<T> {
             identity: None,
             storage,
             events,
+            secure_storage: None,
             _phantom: std::marker::PhantomData,
         })
     }
 
     // === Identity Operations ===
 
+    /// Sets the SecureStorage backend for SMK persistence.
+    ///
+    /// Call this before `create_identity()` to enable SMK-based encryption,
+    /// or before `migrate_to_smk()` for upgrading existing installations.
+    pub fn set_secure_storage(&mut self, secure_storage: Arc<dyn SecureStorage>) {
+        self.secure_storage = Some(secure_storage);
+    }
+
+    /// Returns a reference to the SecureStorage, if set.
+    pub fn secure_storage(&self) -> Option<&dyn SecureStorage> {
+        self.secure_storage.as_deref()
+    }
+
     /// Creates a new identity with the given display name.
+    ///
+    /// If SecureStorage is set, derives SMK from the identity's master seed,
+    /// stores it in SecureStorage, and re-encrypts storage with the SMK-derived SEK.
     pub fn create_identity(&mut self, display_name: &str) -> VauchiResult<()> {
         if self.identity.is_some() {
             return Err(VauchiError::AlreadyInitialized);
@@ -139,7 +214,69 @@ impl<T: Transport> Vauchi<T> {
         let card = ContactCard::new(display_name);
         self.storage.save_own_card(&card)?;
 
+        // If SecureStorage is available, derive and store SMK, then rekey storage
+        if let Some(ref ss) = self.secure_storage {
+            let smk = identity.derive_smk();
+
+            // Store SMK in SecureStorage BEFORE rekey (safety: see DP-1 rationale)
+            ss.save_key(SMK_KEY_NAME, smk.as_bytes()).map_err(|e| {
+                VauchiError::Configuration(format!("Failed to store SMK: {}", e))
+            })?;
+
+            // Derive SEK and rekey storage
+            let sek = smk.derive_sek();
+            self.storage
+                .rekey(sek)
+                .map_err(|e| VauchiError::Configuration(format!("Failed to rekey storage: {}", e)))?;
+        }
+
         self.identity = Some(identity);
+        Ok(())
+    }
+
+    /// Migrates an existing installation from old storage_key to SMK-derived SEK.
+    ///
+    /// Requires:
+    /// - SecureStorage is set (`set_secure_storage()` called)
+    /// - Identity is loaded (via `set_identity()` or `load_identity()`)
+    /// - Storage is open with the old key
+    ///
+    /// Flow (see Phase 2a.3):
+    /// 1. Derive SMK from identity's master_seed
+    /// 2. Store SMK in SecureStorage (before rekey for safety)
+    /// 3. Derive SEK from SMK
+    /// 4. Rekey all encrypted columns to SEK
+    pub fn migrate_to_smk(&mut self) -> VauchiResult<()> {
+        let ss = self
+            .secure_storage
+            .as_ref()
+            .ok_or_else(|| VauchiError::Configuration("SecureStorage not set".into()))?;
+
+        // Check if already migrated
+        if ss.has_key(SMK_KEY_NAME).map_err(|e| {
+            VauchiError::Configuration(format!("Failed to check SMK: {}", e))
+        })? {
+            return Ok(()); // Already migrated
+        }
+
+        let identity = self
+            .identity
+            .as_ref()
+            .ok_or(VauchiError::IdentityNotInitialized)?;
+
+        let smk = identity.derive_smk();
+
+        // Store SMK in SecureStorage BEFORE rekey
+        ss.save_key(SMK_KEY_NAME, smk.as_bytes()).map_err(|e| {
+            VauchiError::Configuration(format!("Failed to store SMK: {}", e))
+        })?;
+
+        // Derive SEK and rekey storage
+        let sek = smk.derive_sek();
+        self.storage
+            .rekey(sek)
+            .map_err(|e| VauchiError::Configuration(format!("Failed to rekey storage: {}", e)))?;
+
         Ok(())
     }
 

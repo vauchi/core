@@ -87,6 +87,11 @@ pub mod pre_signed;
 mod pre_signed;
 
 #[cfg(feature = "testing")]
+pub mod shred;
+#[cfg(not(feature = "testing"))]
+mod shred;
+
+#[cfg(feature = "testing")]
 pub mod sync_controller;
 #[cfg(not(feature = "testing"))]
 mod sync_controller;
@@ -107,6 +112,9 @@ pub use gdpr::{export_all_data, GdprExport};
 
 // Pre-signed shred messages
 pub use pre_signed::{PreSignedError, PreSignedPurgeRequest, PreSignedShredMessages};
+
+// Shred Manager
+pub use shred::{ShredError, ShredManager, ShredReport, ShredToken, ShredVerification};
 
 // Error types
 pub use error::{VauchiError, VauchiResult};

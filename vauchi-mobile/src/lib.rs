@@ -2893,12 +2893,12 @@ mod tests {
         .unwrap();
 
         let export = wb.export_gdpr_data().unwrap();
-        assert_eq!(export.version, 2);
+        assert_eq!(export.version, 3);
         assert!(export.exported_at > 0);
 
         // Verify JSON is parseable and contains expected fields
         let parsed: serde_json::Value = serde_json::from_str(&export.json_data).unwrap();
-        assert_eq!(parsed["version"], 2);
+        assert_eq!(parsed["version"], 3);
         assert!(parsed["contacts"].is_array());
         assert!(parsed["settings"].is_object());
     }

@@ -1611,6 +1611,8 @@ impl VauchiMobile {
         let core_token = vauchi_core::api::ShredToken::from_created_at(token.created_at);
         let manager = vauchi_core::api::ShredManager::new(&storage, &bridge, &identity, &data_dir);
         let report = manager
+            // GDPR Gap 4 deferred: mobile has no relay client yet, so no purge sender.
+            // When mobile gains a relay connection, pass a PurgeSender here.
             .hard_shred(core_token, None)
             .map_err(|e| MobileError::ShredError(e.to_string()))?;
         Ok(MobileShredReport::from(&report))
@@ -1630,6 +1632,8 @@ impl VauchiMobile {
 
         let manager = vauchi_core::api::ShredManager::new(&storage, &bridge, &identity, &data_dir);
         let report = manager
+            // GDPR Gap 4 deferred: mobile has no relay client yet, so no purge sender.
+            // When mobile gains a relay connection, pass a PurgeSender here.
             .panic_shred(None)
             .map_err(|e| MobileError::ShredError(e.to_string()))?;
         Ok(MobileShredReport::from(&report))

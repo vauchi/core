@@ -39,6 +39,7 @@ include:
       - '/ci-templates/reuse.yml'
 
 stages:
+  - auto-tag
   - lint
   - test
   - security
@@ -46,6 +47,38 @@ stages:
   - package
   - publish
   - trigger
+
+# ============================================================
+# Auto-Tag Stage (main branch only)
+# ============================================================
+# When Cargo.toml version is bumped and merged to main,
+# automatically create a v{version} tag to trigger the release pipeline.
+
+auto-tag:version:
+  extends: [.linux-runner-nocache, .main-only]
+  stage: auto-tag
+  needs: []
+  variables:
+    GIT_STRATEGY: clone
+    GIT_DEPTH: "1"
+  before_script: []
+  script:
+    - |
+      VERSION=$(grep -A5 '^\[workspace\.package\]' Cargo.toml | grep '^version' | sed 's/.*"\(.*\)"/\1/')
+      TAG="v${VERSION}"
+      echo "Cargo.toml version: ${VERSION}"
+      echo "Expected tag: ${TAG}"
+
+      # Check if tag already exists
+      if git ls-remote --tags origin "refs/tags/${TAG}" | grep -q "${TAG}"; then
+        echo "✓ Tag ${TAG} already exists — nothing to do"
+        exit 0
+      fi
+
+      echo "Tag ${TAG} does not exist — creating it..."
+      git tag -a "${TAG}" -m "Release ${TAG}"
+      git push origin "${TAG}"
+      echo "✓ Created and pushed tag ${TAG}"
 
 # ============================================================
 # Lint Stage (MR only, change-based)

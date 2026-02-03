@@ -145,3 +145,7 @@ name = "deletion_sync_tests"
 [[test]]
 name = "deletion_manager_tests"
 required-features = ["testing"]
+
+[[test]]
+name = "storage_encryption_tests"
+required-features = ["testing"]

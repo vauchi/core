@@ -13,34 +13,41 @@ use crate::contact::{LabelManager, VisibilityLabel};
 use super::{Storage, StorageError};
 
 impl Storage {
-    /// Saves a visibility label to storage.
+    /// Saves a visibility label to storage (encrypted).
     pub fn save_label(&self, label: &VisibilityLabel) -> Result<(), StorageError> {
         let contacts_json = serde_json::to_string(label.contacts())
             .map_err(|e| StorageError::Serialization(e.to_string()))?;
         let fields_json = serde_json::to_string(label.visible_fields())
             .map_err(|e| StorageError::Serialization(e.to_string()))?;
 
+        let contacts_encrypted =
+            crate::crypto::encrypt(&self.encryption_key, contacts_json.as_bytes())
+                .map_err(|e| StorageError::Encryption(e.to_string()))?;
+        let fields_encrypted =
+            crate::crypto::encrypt(&self.encryption_key, fields_json.as_bytes())
+                .map_err(|e| StorageError::Encryption(e.to_string()))?;
+
         self.conn.execute(
             "INSERT OR REPLACE INTO visibility_labels
-             (id, name, contacts_json, visible_fields_json, created_at, modified_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-            (
+             (id, name, contacts_json, visible_fields_json, contacts_json_encrypted, visible_fields_json_encrypted, created_at, modified_at)
+             VALUES (?1, ?2, '[]', '[]', ?3, ?4, ?5, ?6)",
+            rusqlite::params![
                 label.id(),
                 label.name(),
-                &contacts_json,
-                &fields_json,
+                contacts_encrypted,
+                fields_encrypted,
                 label.created_at() as i64,
                 label.modified_at() as i64,
-            ),
+            ],
         )?;
 
         Ok(())
     }
 
-    /// Loads a visibility label by ID.
+    /// Loads a visibility label by ID (decrypted).
     pub fn load_label(&self, label_id: &str) -> Result<VisibilityLabel, StorageError> {
         let mut stmt = self.conn.prepare(
-            "SELECT id, name, contacts_json, visible_fields_json, created_at, modified_at
+            "SELECT id, name, contacts_json, visible_fields_json, created_at, modified_at, contacts_json_encrypted, visible_fields_json_encrypted
              FROM visibility_labels WHERE id = ?1",
         )?;
 
@@ -51,6 +58,8 @@ impl Storage {
             let fields_json: String = row.get(3)?;
             let created_at: i64 = row.get(4)?;
             let modified_at: i64 = row.get(5)?;
+            let contacts_encrypted: Option<Vec<u8>> = row.get(6)?;
+            let fields_encrypted: Option<Vec<u8>> = row.get(7)?;
 
             Ok((
                 id,
@@ -59,12 +68,17 @@ impl Storage {
                 fields_json,
                 created_at,
                 modified_at,
+                contacts_encrypted,
+                fields_encrypted,
             ))
         })?;
 
-        let contacts: HashSet<String> = serde_json::from_str(&label.2)
+        let contacts_json = self.decrypt_or_fallback(label.6.as_deref(), &label.2)?;
+        let fields_json = self.decrypt_or_fallback(label.7.as_deref(), &label.3)?;
+
+        let contacts: HashSet<String> = serde_json::from_str(&contacts_json)
             .map_err(|e| StorageError::Serialization(e.to_string()))?;
-        let visible_fields: HashSet<String> = serde_json::from_str(&label.3)
+        let visible_fields: HashSet<String> = serde_json::from_str(&fields_json)
             .map_err(|e| StorageError::Serialization(e.to_string()))?;
 
         Ok(VisibilityLabel::from_storage(
@@ -77,10 +91,10 @@ impl Storage {
         ))
     }
 
-    /// Loads all visibility labels.
+    /// Loads all visibility labels (decrypted).
     pub fn load_all_labels(&self) -> Result<Vec<VisibilityLabel>, StorageError> {
         let mut stmt = self.conn.prepare(
-            "SELECT id, name, contacts_json, visible_fields_json, created_at, modified_at
+            "SELECT id, name, contacts_json, visible_fields_json, created_at, modified_at, contacts_json_encrypted, visible_fields_json_encrypted
              FROM visibility_labels ORDER BY name",
         )?;
 
@@ -91,6 +105,8 @@ impl Storage {
             let fields_json: String = row.get(3)?;
             let created_at: i64 = row.get(4)?;
             let modified_at: i64 = row.get(5)?;
+            let contacts_encrypted: Option<Vec<u8>> = row.get(6)?;
+            let fields_encrypted: Option<Vec<u8>> = row.get(7)?;
 
             Ok((
                 id,
@@ -99,15 +115,20 @@ impl Storage {
                 fields_json,
                 created_at,
                 modified_at,
+                contacts_encrypted,
+                fields_encrypted,
             ))
         })?;
 
         let mut labels = Vec::new();
         for row_result in rows {
             let row = row_result?;
-            let contacts: HashSet<String> = serde_json::from_str(&row.2)
+            let contacts_json = self.decrypt_or_fallback(row.6.as_deref(), &row.2)?;
+            let fields_json = self.decrypt_or_fallback(row.7.as_deref(), &row.3)?;
+
+            let contacts: HashSet<String> = serde_json::from_str(&contacts_json)
                 .map_err(|e| StorageError::Serialization(e.to_string()))?;
-            let visible_fields: HashSet<String> = serde_json::from_str(&row.3)
+            let visible_fields: HashSet<String> = serde_json::from_str(&fields_json)
                 .map_err(|e| StorageError::Serialization(e.to_string()))?;
 
             labels.push(VisibilityLabel::from_storage(
@@ -121,6 +142,24 @@ impl Storage {
         }
 
         Ok(labels)
+    }
+
+    /// Decrypts an encrypted blob, falling back to plaintext if unavailable.
+    fn decrypt_or_fallback(
+        &self,
+        encrypted: Option<&[u8]>,
+        plaintext_fallback: &str,
+    ) -> Result<String, StorageError> {
+        if let Some(enc) = encrypted {
+            if !enc.is_empty() {
+                let decrypted =
+                    crate::crypto::decrypt(&self.encryption_key, enc)
+                        .map_err(|e| StorageError::Encryption(e.to_string()))?;
+                return String::from_utf8(decrypted)
+                    .map_err(|e| StorageError::Serialization(e.to_string()));
+            }
+        }
+        Ok(plaintext_fallback.to_string())
     }
 
     /// Deletes a visibility label.

@@ -220,6 +220,11 @@ pub fn all_migrations() -> Vec<Migration> {
             name: "crypto_shredding",
             action: MigrationAction::Sql(MIGRATION_V13_CRYPTO_SHREDDING),
         },
+        Migration {
+            version: 14,
+            name: "encrypt_high_priority_tables",
+            action: MigrationAction::Callback(migrate_v14_encrypt_high_priority),
+        },
     ]
 }
 
@@ -650,3 +655,133 @@ const MIGRATION_V13_CRYPTO_SHREDDING: &str = "
 
     CREATE INDEX IF NOT EXISTS idx_revoked_at ON revoked_senders(revoked_at);
 ";
+
+/// Migration v14: Add encrypted columns for high-priority plaintext tables.
+///
+/// Adds `_encrypted` BLOB columns to: own_card, device_registry, device_sync_state,
+/// and visibility_labels. Existing plaintext data is encrypted and stored in the
+/// new columns. The old plaintext columns are kept for backward compatibility but
+/// cleared to empty strings.
+fn migrate_v14_encrypt_high_priority(
+    conn: &Connection,
+    key: &SymmetricKey,
+) -> Result<(), StorageError> {
+    use crate::crypto::encrypt;
+
+    // Step 1: Add encrypted columns to each table
+    conn.execute_batch(
+        "ALTER TABLE own_card ADD COLUMN card_json_encrypted BLOB;
+         ALTER TABLE device_registry ADD COLUMN registry_json_encrypted BLOB;
+         ALTER TABLE device_sync_state ADD COLUMN state_json_encrypted BLOB;
+         ALTER TABLE visibility_labels ADD COLUMN contacts_json_encrypted BLOB;
+         ALTER TABLE visibility_labels ADD COLUMN visible_fields_json_encrypted BLOB;",
+    )
+    .map_err(|e| StorageError::Migration(format!("Failed to add encrypted columns: {}", e)))?;
+
+    // Step 2: Encrypt existing plaintext data in own_card
+    {
+        let result: Result<(String,), _> = conn.query_row(
+            "SELECT card_json FROM own_card WHERE id = 1",
+            [],
+            |row| Ok((row.get(0)?,)),
+        );
+
+        if let Ok((card_json,)) = result {
+            let encrypted = encrypt(key, card_json.as_bytes())
+                .map_err(|e| StorageError::Migration(format!("Encrypt own_card: {}", e)))?;
+            conn.execute(
+                "UPDATE own_card SET card_json_encrypted = ?1, card_json = '' WHERE id = 1",
+                rusqlite::params![encrypted],
+            )
+            .map_err(|e| StorageError::Migration(format!("Update own_card: {}", e)))?;
+        }
+    }
+
+    // Step 3: Encrypt existing plaintext data in device_registry
+    {
+        let result: Result<(String,), _> = conn.query_row(
+            "SELECT registry_json FROM device_registry WHERE id = 1",
+            [],
+            |row| Ok((row.get(0)?,)),
+        );
+
+        if let Ok((registry_json,)) = result {
+            let encrypted = encrypt(key, registry_json.as_bytes())
+                .map_err(|e| StorageError::Migration(format!("Encrypt device_registry: {}", e)))?;
+            conn.execute(
+                "UPDATE device_registry SET registry_json_encrypted = ?1, registry_json = '' WHERE id = 1",
+                rusqlite::params![encrypted],
+            )
+            .map_err(|e| StorageError::Migration(format!("Update device_registry: {}", e)))?;
+        }
+    }
+
+    // Step 4: Encrypt existing plaintext data in device_sync_state
+    {
+        let mut stmt = conn
+            .prepare("SELECT device_id, state_json FROM device_sync_state")
+            .map_err(|e| {
+                StorageError::Migration(format!("Failed to read device_sync_state: {}", e))
+            })?;
+
+        let rows: Vec<(Vec<u8>, String)> = stmt
+            .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))
+            .map_err(|e| {
+                StorageError::Migration(format!("Failed to query device_sync_state: {}", e))
+            })?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| {
+                StorageError::Migration(format!("Failed to collect device_sync_state: {}", e))
+            })?;
+
+        for (device_id, state_json) in &rows {
+            let encrypted = encrypt(key, state_json.as_bytes()).map_err(|e| {
+                StorageError::Migration(format!("Encrypt device_sync_state: {}", e))
+            })?;
+            conn.execute(
+                "UPDATE device_sync_state SET state_json_encrypted = ?1, state_json = '' WHERE device_id = ?2",
+                rusqlite::params![encrypted, device_id],
+            )
+            .map_err(|e| {
+                StorageError::Migration(format!("Update device_sync_state: {}", e))
+            })?;
+        }
+    }
+
+    // Step 5: Encrypt existing plaintext data in visibility_labels
+    {
+        let mut stmt = conn
+            .prepare("SELECT id, contacts_json, visible_fields_json FROM visibility_labels")
+            .map_err(|e| {
+                StorageError::Migration(format!("Failed to read visibility_labels: {}", e))
+            })?;
+
+        let rows: Vec<(String, String, String)> = stmt
+            .query_map([], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)))
+            .map_err(|e| {
+                StorageError::Migration(format!("Failed to query visibility_labels: {}", e))
+            })?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| {
+                StorageError::Migration(format!("Failed to collect visibility_labels: {}", e))
+            })?;
+
+        for (id, contacts_json, fields_json) in &rows {
+            let contacts_enc = encrypt(key, contacts_json.as_bytes()).map_err(|e| {
+                StorageError::Migration(format!("Encrypt visibility_labels contacts: {}", e))
+            })?;
+            let fields_enc = encrypt(key, fields_json.as_bytes()).map_err(|e| {
+                StorageError::Migration(format!("Encrypt visibility_labels fields: {}", e))
+            })?;
+            conn.execute(
+                "UPDATE visibility_labels SET contacts_json_encrypted = ?1, visible_fields_json_encrypted = ?2, contacts_json = '[]', visible_fields_json = '[]' WHERE id = ?3",
+                rusqlite::params![contacts_enc, fields_enc, id],
+            )
+            .map_err(|e| {
+                StorageError::Migration(format!("Update visibility_labels: {}", e))
+            })?;
+        }
+    }
+
+    Ok(())
+}

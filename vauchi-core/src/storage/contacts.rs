@@ -527,10 +527,13 @@ impl Storage {
 
     // === Own Contact Card Operations ===
 
-    /// Saves the user's own contact card.
+    /// Saves the user's own contact card (encrypted).
     pub fn save_own_card(&self, card: &ContactCard) -> Result<(), StorageError> {
         let card_json =
             serde_json::to_string(card).map_err(|e| StorageError::Serialization(e.to_string()))?;
+
+        let card_encrypted = crate::crypto::encrypt(&self.encryption_key, card_json.as_bytes())
+            .map_err(|e| StorageError::Encryption(e.to_string()))?;
 
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -538,27 +541,46 @@ impl Storage {
             .as_secs();
 
         self.conn.execute(
-            "INSERT OR REPLACE INTO own_card (id, card_json, updated_at) VALUES (1, ?1, ?2)",
-            params![card_json, now as i64],
+            "INSERT OR REPLACE INTO own_card (id, card_json, card_json_encrypted, updated_at) VALUES (1, '', ?1, ?2)",
+            params![card_encrypted, now as i64],
         )?;
 
         Ok(())
     }
 
-    /// Loads the user's own contact card.
+    /// Loads the user's own contact card (decrypted).
+    ///
+    /// Reads from encrypted column first; falls back to plaintext for
+    /// pre-v13 databases where migration hasn't populated the encrypted column.
     pub fn load_own_card(&self) -> Result<Option<ContactCard>, StorageError> {
-        let result =
-            self.conn
-                .query_row("SELECT card_json FROM own_card WHERE id = 1", [], |row| {
-                    row.get::<_, String>(0)
-                });
+        let result = self.conn.query_row(
+            "SELECT card_json_encrypted, card_json FROM own_card WHERE id = 1",
+            [],
+            |row| {
+                let encrypted: Option<Vec<u8>> = row.get(0)?;
+                let plaintext: String = row.get(1)?;
+                Ok((encrypted, plaintext))
+            },
+        );
 
         match result {
-            Ok(json) => {
+            Ok((Some(encrypted), _)) if !encrypted.is_empty() => {
+                let decrypted =
+                    crate::crypto::decrypt(&self.encryption_key, &encrypted)
+                        .map_err(|e| StorageError::Encryption(e.to_string()))?;
+                let json = String::from_utf8(decrypted)
+                    .map_err(|e| StorageError::Serialization(e.to_string()))?;
                 let card = serde_json::from_str(&json)
                     .map_err(|e| StorageError::Serialization(e.to_string()))?;
                 Ok(Some(card))
             }
+            Ok((_, plaintext)) if !plaintext.is_empty() => {
+                // Fallback: read from plaintext column (pre-v13 data)
+                let card = serde_json::from_str(&plaintext)
+                    .map_err(|e| StorageError::Serialization(e.to_string()))?;
+                Ok(Some(card))
+            }
+            Ok(_) => Ok(None),
             Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
             Err(e) => Err(StorageError::Database(e)),
         }

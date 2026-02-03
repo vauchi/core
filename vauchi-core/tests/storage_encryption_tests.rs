@@ -1,0 +1,344 @@
+// SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+//
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+//! Integration tests for Phase 2a.1: High-priority plaintext table encryption.
+//!
+//! Verifies that own_card, device_sync_state, device_registry, and
+//! visibility_labels store data encrypted and roundtrip correctly.
+
+use vauchi_core::contact::VisibilityLabel;
+use vauchi_core::contact_card::ContactCard;
+use vauchi_core::crypto::{SigningKeyPair, SymmetricKey};
+use vauchi_core::identity::{DeviceRegistry, RegisteredDevice};
+use vauchi_core::storage::Storage;
+use vauchi_core::sync::InterDeviceSyncState;
+
+fn open_storage() -> (tempfile::TempDir, Storage) {
+    let dir = tempfile::tempdir().unwrap();
+    let db_path = dir.path().join("vauchi.db");
+    let storage = Storage::open(&db_path, SymmetricKey::generate()).unwrap();
+    (dir, storage)
+}
+
+fn make_test_registry() -> DeviceRegistry {
+    let device = RegisteredDevice {
+        device_id: [0x42; 32],
+        exchange_public_key: [0x43; 32],
+        device_name: "Test Device".to_string(),
+        created_at: 1000,
+        revoked: false,
+        revoked_at: None,
+        last_sync_at: None,
+    };
+    let signing_key = SigningKeyPair::generate();
+    DeviceRegistry::new(device, &signing_key)
+}
+
+// === Own Card Encryption ===
+
+#[test]
+fn test_own_card_encrypted_roundtrip() {
+    let (_dir, storage) = open_storage();
+
+    let mut card = ContactCard::new("Alice");
+    let _ = card.add_field(vauchi_core::contact_card::ContactField::new(
+        vauchi_core::contact_card::FieldType::Email,
+        "email",
+        "alice@example.com",
+    ));
+
+    storage.save_own_card(&card).unwrap();
+    let loaded = storage.load_own_card().unwrap().expect("Card should exist");
+
+    assert_eq!(loaded.display_name(), card.display_name());
+    assert_eq!(loaded.fields().len(), card.fields().len());
+}
+
+#[test]
+fn test_own_card_stored_as_encrypted_blob() {
+    let (dir, storage) = open_storage();
+
+    let card = ContactCard::new("SecretName");
+    storage.save_own_card(&card).unwrap();
+
+    // Read the raw database to verify data is encrypted (not plaintext)
+    let db_path = dir.path().join("vauchi.db");
+    let raw_conn = rusqlite::Connection::open(&db_path).unwrap();
+
+    // The encrypted column should contain a BLOB, not readable JSON
+    let result: Option<Vec<u8>> = raw_conn
+        .query_row(
+            "SELECT card_json_encrypted FROM own_card WHERE id = 1",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap();
+
+    let blob = result.expect("Encrypted blob should exist");
+    assert!(!blob.is_empty(), "Encrypted blob should not be empty");
+
+    // The blob should NOT be valid JSON (it's encrypted)
+    let as_str = String::from_utf8(blob.clone());
+    if let Ok(s) = as_str {
+        assert!(
+            serde_json::from_str::<serde_json::Value>(&s).is_err(),
+            "Encrypted data should not be valid JSON"
+        );
+    }
+}
+
+// === Device Registry Encryption ===
+
+#[test]
+fn test_device_registry_encrypted_roundtrip() {
+    let (_dir, storage) = open_storage();
+
+    let registry = make_test_registry();
+    storage.save_device_registry(&registry).unwrap();
+
+    let loaded = storage
+        .load_device_registry()
+        .unwrap()
+        .expect("Registry should exist");
+    assert_eq!(loaded.version(), registry.version());
+}
+
+#[test]
+fn test_device_registry_stored_as_encrypted_blob() {
+    let (dir, storage) = open_storage();
+
+    let registry = make_test_registry();
+    storage.save_device_registry(&registry).unwrap();
+
+    let db_path = dir.path().join("vauchi.db");
+    let raw_conn = rusqlite::Connection::open(&db_path).unwrap();
+
+    let result: Option<Vec<u8>> = raw_conn
+        .query_row(
+            "SELECT registry_json_encrypted FROM device_registry WHERE id = 1",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap();
+
+    let blob = result.expect("Encrypted blob should exist");
+    assert!(!blob.is_empty());
+}
+
+// === Device Sync State Encryption ===
+
+#[test]
+fn test_device_sync_state_encrypted_roundtrip() {
+    let (_dir, storage) = open_storage();
+
+    let state = InterDeviceSyncState::new([0xAA; 32]);
+    storage.save_device_sync_state(&state).unwrap();
+
+    let loaded = storage
+        .load_device_sync_state(&[0xAA; 32])
+        .unwrap()
+        .expect("State should exist");
+    assert_eq!(loaded.device_id(), state.device_id());
+}
+
+#[test]
+fn test_device_sync_state_stored_as_encrypted_blob() {
+    let (dir, storage) = open_storage();
+
+    let device_id: [u8; 32] = [0xBB; 32];
+    let state = InterDeviceSyncState::new(device_id);
+    storage.save_device_sync_state(&state).unwrap();
+
+    let db_path = dir.path().join("vauchi.db");
+    let raw_conn = rusqlite::Connection::open(&db_path).unwrap();
+
+    let result: Option<Vec<u8>> = raw_conn
+        .query_row(
+            "SELECT state_json_encrypted FROM device_sync_state WHERE device_id = ?1",
+            rusqlite::params![device_id.as_slice()],
+            |row| row.get(0),
+        )
+        .unwrap();
+
+    let blob = result.expect("Encrypted blob should exist");
+    assert!(!blob.is_empty());
+}
+
+#[test]
+fn test_list_device_sync_states_encrypted() {
+    let (_dir, storage) = open_storage();
+
+    let state1 = InterDeviceSyncState::new([0x01; 32]);
+    let state2 = InterDeviceSyncState::new([0x02; 32]);
+
+    storage.save_device_sync_state(&state1).unwrap();
+    storage.save_device_sync_state(&state2).unwrap();
+
+    let all = storage.list_device_sync_states().unwrap();
+    assert_eq!(all.len(), 2);
+}
+
+// === Visibility Labels Encryption ===
+
+#[test]
+fn test_visibility_label_encrypted_roundtrip() {
+    let (_dir, storage) = open_storage();
+
+    let label = VisibilityLabel::new("Close Friends");
+    storage.save_label(&label).unwrap();
+
+    let loaded = storage.load_label(label.id()).unwrap();
+    assert_eq!(loaded.name(), "Close Friends");
+    assert_eq!(loaded.contacts(), label.contacts());
+}
+
+#[test]
+fn test_visibility_label_stored_as_encrypted_blob() {
+    let (dir, storage) = open_storage();
+
+    let label = VisibilityLabel::new("Work Colleagues");
+    storage.save_label(&label).unwrap();
+
+    let db_path = dir.path().join("vauchi.db");
+    let raw_conn = rusqlite::Connection::open(&db_path).unwrap();
+
+    let result: Option<Vec<u8>> = raw_conn
+        .query_row(
+            "SELECT contacts_json_encrypted FROM visibility_labels WHERE id = ?1",
+            [label.id()],
+            |row| row.get(0),
+        )
+        .unwrap();
+
+    let blob = result.expect("Encrypted contacts_json blob should exist");
+    assert!(!blob.is_empty());
+
+    let result2: Option<Vec<u8>> = raw_conn
+        .query_row(
+            "SELECT visible_fields_json_encrypted FROM visibility_labels WHERE id = ?1",
+            [label.id()],
+            |row| row.get(0),
+        )
+        .unwrap();
+
+    let blob2 = result2.expect("Encrypted visible_fields_json blob should exist");
+    assert!(!blob2.is_empty());
+}
+
+#[test]
+fn test_load_all_labels_encrypted() {
+    let (_dir, storage) = open_storage();
+
+    let label1 = VisibilityLabel::new("Group A");
+    let label2 = VisibilityLabel::new("Group B");
+
+    storage.save_label(&label1).unwrap();
+    storage.save_label(&label2).unwrap();
+
+    let all = storage.load_all_labels().unwrap();
+    assert_eq!(all.len(), 2);
+}
+
+// === Migration Tests ===
+
+#[test]
+fn test_migration_v13_adds_encrypted_columns() {
+    let (dir, _storage) = open_storage();
+
+    // Verify columns exist by querying the schema
+    let db_path = dir.path().join("vauchi.db");
+    let raw_conn = rusqlite::Connection::open(&db_path).unwrap();
+
+    // Check own_card has card_json_encrypted column
+    raw_conn
+        .prepare("SELECT card_json_encrypted FROM own_card LIMIT 0")
+        .expect("own_card.card_json_encrypted column should exist");
+
+    // Check device_registry has registry_json_encrypted column
+    raw_conn
+        .prepare("SELECT registry_json_encrypted FROM device_registry LIMIT 0")
+        .expect("device_registry.registry_json_encrypted column should exist");
+
+    // Check device_sync_state has state_json_encrypted column
+    raw_conn
+        .prepare("SELECT state_json_encrypted FROM device_sync_state LIMIT 0")
+        .expect("device_sync_state.state_json_encrypted column should exist");
+
+    // Check visibility_labels has encrypted columns
+    raw_conn
+        .prepare("SELECT contacts_json_encrypted, visible_fields_json_encrypted FROM visibility_labels LIMIT 0")
+        .expect("visibility_labels encrypted columns should exist");
+}
+
+#[test]
+fn test_migration_v13_schema_version() {
+    let (dir, _storage) = open_storage();
+
+    let db_path = dir.path().join("vauchi.db");
+    let raw_conn = rusqlite::Connection::open(&db_path).unwrap();
+
+    let version: u32 = raw_conn
+        .query_row("SELECT MAX(version) FROM schema_version", [], |row| {
+            row.get(0)
+        })
+        .unwrap();
+    assert!(
+        version >= 13,
+        "Schema version should be at least 13, got {}",
+        version
+    );
+}
+
+#[test]
+fn test_migration_v13_fallback_reads_plaintext() {
+    let dir = tempfile::tempdir().unwrap();
+    let db_path = dir.path().join("vauchi.db");
+    let key = SymmetricKey::generate();
+
+    // Step 1: Open storage (runs all migrations including v13)
+    {
+        let storage = Storage::open(&db_path, key.clone()).unwrap();
+
+        // Save a proper card first (to get valid JSON), then simulate pre-v13 state
+        let card = ContactCard::new("PreMigration");
+        let card_json = serde_json::to_string(&card).unwrap();
+
+        // Write plaintext JSON to the old column and null out encrypted
+        storage
+            .connection()
+            .execute(
+                "INSERT OR REPLACE INTO own_card (id, card_json, card_json_encrypted, updated_at) VALUES (1, ?1, NULL, ?2)",
+                rusqlite::params![card_json, 1000i64],
+            )
+            .unwrap();
+
+        drop(storage);
+    }
+
+    // Step 2: Re-open — should be able to read the card via plaintext fallback
+    {
+        let storage = Storage::open(&db_path, key).unwrap();
+        let card = storage.load_own_card().unwrap();
+        assert!(card.is_some(), "Should be able to load card via plaintext fallback");
+        assert_eq!(card.unwrap().display_name(), "PreMigration");
+    }
+}
+
+#[test]
+fn test_device_registry_json_export_with_encrypted_storage() {
+    let (_dir, storage) = open_storage();
+
+    let registry = make_test_registry();
+    storage.save_device_registry(&registry).unwrap();
+
+    // GDPR export uses load_device_registry_json — verify it still works
+    let json = storage
+        .load_device_registry_json()
+        .unwrap()
+        .expect("JSON export should work");
+    assert!(!json.is_empty());
+
+    // The JSON should be valid
+    let _: serde_json::Value = serde_json::from_str(&json).unwrap();
+}

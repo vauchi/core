@@ -78,10 +78,14 @@ impl Storage {
         Ok(count > 0)
     }
 
-    /// Saves the device registry.
+    /// Saves the device registry (encrypted).
     pub fn save_device_registry(&self, registry: &DeviceRegistry) -> Result<(), StorageError> {
         let registry_json = serde_json::to_string(registry)
             .map_err(|e| StorageError::Serialization(e.to_string()))?;
+
+        let registry_encrypted =
+            crate::crypto::encrypt(&self.encryption_key, registry_json.as_bytes())
+                .map_err(|e| StorageError::Encryption(e.to_string()))?;
 
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -89,27 +93,42 @@ impl Storage {
             .as_secs();
 
         self.conn.execute(
-            "INSERT OR REPLACE INTO device_registry (id, registry_json, version, updated_at)
-             VALUES (1, ?1, ?2, ?3)",
-            params![registry_json, registry.version() as i64, now as i64,],
+            "INSERT OR REPLACE INTO device_registry (id, registry_json, registry_json_encrypted, version, updated_at)
+             VALUES (1, '', ?1, ?2, ?3)",
+            params![registry_encrypted, registry.version() as i64, now as i64,],
         )?;
         Ok(())
     }
 
-    /// Loads the device registry.
+    /// Loads the device registry (decrypted).
     pub fn load_device_registry(&self) -> Result<Option<DeviceRegistry>, StorageError> {
         let result = self.conn.query_row(
-            "SELECT registry_json FROM device_registry WHERE id = 1",
+            "SELECT registry_json_encrypted, registry_json FROM device_registry WHERE id = 1",
             [],
-            |row| row.get::<_, String>(0),
+            |row| {
+                let encrypted: Option<Vec<u8>> = row.get(0)?;
+                let plaintext: String = row.get(1)?;
+                Ok((encrypted, plaintext))
+            },
         );
 
         match result {
-            Ok(json) => {
+            Ok((Some(encrypted), _)) if !encrypted.is_empty() => {
+                let decrypted =
+                    crate::crypto::decrypt(&self.encryption_key, &encrypted)
+                        .map_err(|e| StorageError::Encryption(e.to_string()))?;
+                let json = String::from_utf8(decrypted)
+                    .map_err(|e| StorageError::Serialization(e.to_string()))?;
                 let registry: DeviceRegistry = serde_json::from_str(&json)
                     .map_err(|e| StorageError::Serialization(e.to_string()))?;
                 Ok(Some(registry))
             }
+            Ok((_, plaintext)) if !plaintext.is_empty() => {
+                let registry: DeviceRegistry = serde_json::from_str(&plaintext)
+                    .map_err(|e| StorageError::Serialization(e.to_string()))?;
+                Ok(Some(registry))
+            }
+            Ok(_) => Ok(None),
             Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
             Err(e) => Err(StorageError::Database(e)),
         }
@@ -121,13 +140,26 @@ impl Storage {
     /// requiring knowledge of the DeviceRegistry struct.
     pub fn load_device_registry_json(&self) -> Result<Option<String>, StorageError> {
         let result = self.conn.query_row(
-            "SELECT registry_json FROM device_registry WHERE id = 1",
+            "SELECT registry_json_encrypted, registry_json FROM device_registry WHERE id = 1",
             [],
-            |row| row.get::<_, String>(0),
+            |row| {
+                let encrypted: Option<Vec<u8>> = row.get(0)?;
+                let plaintext: String = row.get(1)?;
+                Ok((encrypted, plaintext))
+            },
         );
 
         match result {
-            Ok(json) => Ok(Some(json)),
+            Ok((Some(encrypted), _)) if !encrypted.is_empty() => {
+                let decrypted =
+                    crate::crypto::decrypt(&self.encryption_key, &encrypted)
+                        .map_err(|e| StorageError::Encryption(e.to_string()))?;
+                let json = String::from_utf8(decrypted)
+                    .map_err(|e| StorageError::Serialization(e.to_string()))?;
+                Ok(Some(json))
+            }
+            Ok((_, plaintext)) if !plaintext.is_empty() => Ok(Some(plaintext)),
+            Ok(_) => Ok(None),
             Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
             Err(e) => Err(StorageError::Database(e)),
         }
@@ -145,20 +177,24 @@ impl Storage {
 
     // === Device Sync State Operations ===
 
-    /// Saves inter-device sync state for a specific device.
+    /// Saves inter-device sync state for a specific device (encrypted).
     pub fn save_device_sync_state(&self, state: &InterDeviceSyncState) -> Result<(), StorageError> {
         let state_json = state.to_json();
+        let state_encrypted =
+            crate::crypto::encrypt(&self.encryption_key, state_json.as_bytes())
+                .map_err(|e| StorageError::Encryption(e.to_string()))?;
+
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .expect("system time before UNIX epoch")
             .as_secs();
 
         self.conn.execute(
-            "INSERT OR REPLACE INTO device_sync_state (device_id, state_json, last_sync_version, updated_at)
-             VALUES (?1, ?2, ?3, ?4)",
+            "INSERT OR REPLACE INTO device_sync_state (device_id, state_json, state_json_encrypted, last_sync_version, updated_at)
+             VALUES (?1, '', ?2, ?3, ?4)",
             params![
                 state.device_id().as_slice(),
-                state_json,
+                state_encrypted,
                 state.last_sync_version() as i64,
                 now as i64,
             ],
@@ -166,39 +202,78 @@ impl Storage {
         Ok(())
     }
 
-    /// Loads inter-device sync state for a specific device.
+    /// Loads inter-device sync state for a specific device (decrypted).
     pub fn load_device_sync_state(
         &self,
         device_id: &[u8; 32],
     ) -> Result<Option<InterDeviceSyncState>, StorageError> {
         let result = self.conn.query_row(
-            "SELECT state_json FROM device_sync_state WHERE device_id = ?1",
+            "SELECT state_json_encrypted, state_json FROM device_sync_state WHERE device_id = ?1",
             params![device_id.as_slice()],
-            |row| row.get::<_, String>(0),
+            |row| {
+                let encrypted: Option<Vec<u8>> = row.get(0)?;
+                let plaintext: String = row.get(1)?;
+                Ok((encrypted, plaintext))
+            },
         );
 
         match result {
-            Ok(json) => {
+            Ok((Some(encrypted), _)) if !encrypted.is_empty() => {
+                let decrypted =
+                    crate::crypto::decrypt(&self.encryption_key, &encrypted)
+                        .map_err(|e| StorageError::Encryption(e.to_string()))?;
+                let json = String::from_utf8(decrypted)
+                    .map_err(|e| StorageError::Serialization(e.to_string()))?;
                 let state = InterDeviceSyncState::from_json(&json)
                     .map_err(|e| StorageError::Serialization(e.to_string()))?;
                 Ok(Some(state))
             }
+            Ok((_, plaintext)) if !plaintext.is_empty() => {
+                let state = InterDeviceSyncState::from_json(&plaintext)
+                    .map_err(|e| StorageError::Serialization(e.to_string()))?;
+                Ok(Some(state))
+            }
+            Ok(_) => Ok(None),
             Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
             Err(e) => Err(StorageError::Database(e)),
         }
     }
 
-    /// Lists all inter-device sync states.
+    /// Lists all inter-device sync states (decrypted).
     pub fn list_device_sync_states(&self) -> Result<Vec<InterDeviceSyncState>, StorageError> {
-        let mut stmt = self
-            .conn
-            .prepare("SELECT state_json FROM device_sync_state")?;
+        let mut stmt = self.conn.prepare(
+            "SELECT state_json_encrypted, state_json FROM device_sync_state",
+        )?;
 
-        let states = stmt
-            .query_map([], |row| row.get::<_, String>(0))?
-            .filter_map(|r| r.ok())
-            .filter_map(|json| InterDeviceSyncState::from_json(&json).ok())
-            .collect();
+        let rows = stmt
+            .query_map([], |row| {
+                let encrypted: Option<Vec<u8>> = row.get(0)?;
+                let plaintext: String = row.get(1)?;
+                Ok((encrypted, plaintext))
+            })?
+            .filter_map(|r| r.ok());
+
+        let mut states = Vec::new();
+        for (encrypted, plaintext) in rows {
+            let json = if let Some(enc) = encrypted {
+                if !enc.is_empty() {
+                    match crate::crypto::decrypt(&self.encryption_key, &enc) {
+                        Ok(decrypted) => String::from_utf8(decrypted).ok(),
+                        Err(_) => None,
+                    }
+                } else {
+                    None
+                }
+            } else {
+                None
+            };
+            let json = json.unwrap_or(plaintext);
+            if !json.is_empty() {
+                if let Ok(state) = InterDeviceSyncState::from_json(&json) {
+                    states.push(state);
+                }
+            }
+        }
 
         Ok(states)
     }

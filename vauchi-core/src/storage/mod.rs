@@ -425,6 +425,228 @@ impl Storage {
                 }
             }
 
+            // Re-encrypt device_info: device_info_encrypted
+            {
+                let result: Result<(Option<Vec<u8>>,), _> = self.conn.query_row(
+                    "SELECT device_info_encrypted FROM device_info WHERE id = 1",
+                    [],
+                    |row| Ok((row.get(0)?,)),
+                );
+
+                if let Ok((Some(enc),)) = result {
+                    if !enc.is_empty() {
+                        let plain = decrypt(old_key, &enc)
+                            .map_err(|e| StorageError::Migration(format!("Decrypt device_info: {}", e)))?;
+                        let new_enc = encrypt(&new_key, &plain)
+                            .map_err(|e| StorageError::Migration(format!("Encrypt device_info: {}", e)))?;
+                        self.conn.execute(
+                            "UPDATE device_info SET device_info_encrypted = ?1 WHERE id = 1",
+                            params![new_enc],
+                        ).map_err(|e| StorageError::Migration(format!("Update device_info: {}", e)))?;
+                    }
+                }
+            }
+
+            // Re-encrypt version_vector: vector_json_encrypted
+            {
+                let result: Result<(Option<Vec<u8>>,), _> = self.conn.query_row(
+                    "SELECT vector_json_encrypted FROM version_vector WHERE id = 1",
+                    [],
+                    |row| Ok((row.get(0)?,)),
+                );
+
+                if let Ok((Some(enc),)) = result {
+                    if !enc.is_empty() {
+                        let plain = decrypt(old_key, &enc)
+                            .map_err(|e| StorageError::Migration(format!("Decrypt version_vector: {}", e)))?;
+                        let new_enc = encrypt(&new_key, &plain)
+                            .map_err(|e| StorageError::Migration(format!("Encrypt version_vector: {}", e)))?;
+                        self.conn.execute(
+                            "UPDATE version_vector SET vector_json_encrypted = ?1 WHERE id = 1",
+                            params![new_enc],
+                        ).map_err(|e| StorageError::Migration(format!("Update version_vector: {}", e)))?;
+                    }
+                }
+            }
+
+            // Re-encrypt contact_sync_timestamps: last_sync_at_encrypted
+            {
+                let mut stmt = self.conn
+                    .prepare("SELECT contact_id, last_sync_at_encrypted FROM contact_sync_timestamps WHERE last_sync_at_encrypted IS NOT NULL")
+                    .map_err(|e| StorageError::Migration(format!("Read sync_timestamps: {}", e)))?;
+
+                let rows: Vec<(String, Vec<u8>)> = stmt
+                    .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))
+                    .map_err(|e| StorageError::Migration(format!("Query sync_timestamps: {}", e)))?
+                    .collect::<Result<Vec<_>, _>>()
+                    .map_err(|e| StorageError::Migration(format!("Collect sync_timestamps: {}", e)))?;
+
+                for (contact_id, enc) in &rows {
+                    if !enc.is_empty() {
+                        let plain = decrypt(old_key, enc)
+                            .map_err(|e| StorageError::Migration(format!("Decrypt sync_ts: {}", e)))?;
+                        let new_enc = encrypt(&new_key, &plain)
+                            .map_err(|e| StorageError::Migration(format!("Encrypt sync_ts: {}", e)))?;
+                        self.conn.execute(
+                            "UPDATE contact_sync_timestamps SET last_sync_at_encrypted = ?1 WHERE contact_id = ?2",
+                            params![new_enc, contact_id],
+                        ).map_err(|e| StorageError::Migration(format!("Update sync_ts: {}", e)))?;
+                    }
+                }
+            }
+
+            // Re-encrypt pending_updates: payload_encrypted
+            {
+                let mut stmt = self.conn
+                    .prepare("SELECT id, payload_encrypted FROM pending_updates WHERE payload_encrypted IS NOT NULL")
+                    .map_err(|e| StorageError::Migration(format!("Read pending: {}", e)))?;
+
+                let rows: Vec<(String, Vec<u8>)> = stmt
+                    .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))
+                    .map_err(|e| StorageError::Migration(format!("Query pending: {}", e)))?
+                    .collect::<Result<Vec<_>, _>>()
+                    .map_err(|e| StorageError::Migration(format!("Collect pending: {}", e)))?;
+
+                for (id, enc) in &rows {
+                    if !enc.is_empty() {
+                        let plain = decrypt(old_key, enc)
+                            .map_err(|e| StorageError::Migration(format!("Decrypt pending {}: {}", id, e)))?;
+                        let new_enc = encrypt(&new_key, &plain)
+                            .map_err(|e| StorageError::Migration(format!("Encrypt pending {}: {}", id, e)))?;
+                        self.conn.execute(
+                            "UPDATE pending_updates SET payload_encrypted = ?1 WHERE id = ?2",
+                            params![new_enc, id],
+                        ).map_err(|e| StorageError::Migration(format!("Update pending {}: {}", id, e)))?;
+                    }
+                }
+            }
+
+            // Re-encrypt retry_entries: payload_encrypted
+            {
+                let mut stmt = self.conn
+                    .prepare("SELECT message_id, payload_encrypted FROM retry_entries WHERE payload_encrypted IS NOT NULL")
+                    .map_err(|e| StorageError::Migration(format!("Read retry: {}", e)))?;
+
+                let rows: Vec<(String, Vec<u8>)> = stmt
+                    .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))
+                    .map_err(|e| StorageError::Migration(format!("Query retry: {}", e)))?
+                    .collect::<Result<Vec<_>, _>>()
+                    .map_err(|e| StorageError::Migration(format!("Collect retry: {}", e)))?;
+
+                for (id, enc) in &rows {
+                    if !enc.is_empty() {
+                        let plain = decrypt(old_key, enc)
+                            .map_err(|e| StorageError::Migration(format!("Decrypt retry {}: {}", id, e)))?;
+                        let new_enc = encrypt(&new_key, &plain)
+                            .map_err(|e| StorageError::Migration(format!("Encrypt retry {}: {}", id, e)))?;
+                        self.conn.execute(
+                            "UPDATE retry_entries SET payload_encrypted = ?1 WHERE message_id = ?2",
+                            params![new_enc, id],
+                        ).map_err(|e| StorageError::Migration(format!("Update retry {}: {}", id, e)))?;
+                    }
+                }
+            }
+
+            // Re-encrypt device_sync_checkpoints: items_json_encrypted
+            {
+                let mut stmt = self.conn
+                    .prepare("SELECT target_device_id, items_json_encrypted FROM device_sync_checkpoints WHERE items_json_encrypted IS NOT NULL")
+                    .map_err(|e| StorageError::Migration(format!("Read checkpoints: {}", e)))?;
+
+                let rows: Vec<(Vec<u8>, Vec<u8>)> = stmt
+                    .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))
+                    .map_err(|e| StorageError::Migration(format!("Query checkpoints: {}", e)))?
+                    .collect::<Result<Vec<_>, _>>()
+                    .map_err(|e| StorageError::Migration(format!("Collect checkpoints: {}", e)))?;
+
+                for (device_id, enc) in &rows {
+                    if !enc.is_empty() {
+                        let plain = decrypt(old_key, enc)
+                            .map_err(|e| StorageError::Migration(format!("Decrypt checkpoint: {}", e)))?;
+                        let new_enc = encrypt(&new_key, &plain)
+                            .map_err(|e| StorageError::Migration(format!("Encrypt checkpoint: {}", e)))?;
+                        self.conn.execute(
+                            "UPDATE device_sync_checkpoints SET items_json_encrypted = ?1 WHERE target_device_id = ?2",
+                            params![new_enc, device_id],
+                        ).map_err(|e| StorageError::Migration(format!("Update checkpoint: {}", e)))?;
+                    }
+                }
+            }
+
+            // Re-encrypt recovery_responses: response_encrypted
+            {
+                let mut stmt = self.conn
+                    .prepare("SELECT claim_id, response_encrypted FROM recovery_responses WHERE response_encrypted IS NOT NULL")
+                    .map_err(|e| StorageError::Migration(format!("Read recovery: {}", e)))?;
+
+                let rows: Vec<(String, Vec<u8>)> = stmt
+                    .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))
+                    .map_err(|e| StorageError::Migration(format!("Query recovery: {}", e)))?
+                    .collect::<Result<Vec<_>, _>>()
+                    .map_err(|e| StorageError::Migration(format!("Collect recovery: {}", e)))?;
+
+                for (id, enc) in &rows {
+                    if !enc.is_empty() {
+                        let plain = decrypt(old_key, enc)
+                            .map_err(|e| StorageError::Migration(format!("Decrypt recovery {}: {}", id, e)))?;
+                        let new_enc = encrypt(&new_key, &plain)
+                            .map_err(|e| StorageError::Migration(format!("Encrypt recovery {}: {}", id, e)))?;
+                        self.conn.execute(
+                            "UPDATE recovery_responses SET response_encrypted = ?1 WHERE claim_id = ?2",
+                            params![new_enc, id],
+                        ).map_err(|e| StorageError::Migration(format!("Update recovery {}: {}", id, e)))?;
+                    }
+                }
+            }
+
+            // Re-encrypt deletion_state: state_json_encrypted
+            {
+                let result: Result<(Option<Vec<u8>>,), _> = self.conn.query_row(
+                    "SELECT state_json_encrypted FROM deletion_state WHERE id = 1",
+                    [],
+                    |row| Ok((row.get(0)?,)),
+                );
+
+                if let Ok((Some(enc),)) = result {
+                    if !enc.is_empty() {
+                        let plain = decrypt(old_key, &enc)
+                            .map_err(|e| StorageError::Migration(format!("Decrypt deletion_state: {}", e)))?;
+                        let new_enc = encrypt(&new_key, &plain)
+                            .map_err(|e| StorageError::Migration(format!("Encrypt deletion_state: {}", e)))?;
+                        self.conn.execute(
+                            "UPDATE deletion_state SET state_json_encrypted = ?1 WHERE id = 1",
+                            params![new_enc],
+                        ).map_err(|e| StorageError::Migration(format!("Update deletion_state: {}", e)))?;
+                    }
+                }
+            }
+
+            // Re-encrypt sync_checkpoints: state_json_encrypted
+            {
+                let mut stmt = self.conn
+                    .prepare("SELECT checkpoint_id, state_json_encrypted FROM sync_checkpoints WHERE state_json_encrypted IS NOT NULL")
+                    .map_err(|e| StorageError::Migration(format!("Read batch_checkpoints: {}", e)))?;
+
+                let rows: Vec<(String, Vec<u8>)> = stmt
+                    .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))
+                    .map_err(|e| StorageError::Migration(format!("Query batch_checkpoints: {}", e)))?
+                    .collect::<Result<Vec<_>, _>>()
+                    .map_err(|e| StorageError::Migration(format!("Collect batch_checkpoints: {}", e)))?;
+
+                for (id, enc) in &rows {
+                    if !enc.is_empty() {
+                        let plain = decrypt(old_key, enc)
+                            .map_err(|e| StorageError::Migration(format!("Decrypt batch_checkpoint {}: {}", id, e)))?;
+                        let new_enc = encrypt(&new_key, &plain)
+                            .map_err(|e| StorageError::Migration(format!("Encrypt batch_checkpoint {}: {}", id, e)))?;
+                        self.conn.execute(
+                            "UPDATE sync_checkpoints SET state_json_encrypted = ?1 WHERE checkpoint_id = ?2",
+                            params![new_enc, id],
+                        ).map_err(|e| StorageError::Migration(format!("Update batch_checkpoint {}: {}", id, e)))?;
+                    }
+                }
+            }
+
             Ok(())
         })();
 

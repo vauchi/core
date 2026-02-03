@@ -137,36 +137,55 @@ impl Storage {
 
     // === Deletion State Operations ===
 
-    /// Saves the deletion state.
+    /// Saves the deletion state (encrypted).
     pub fn save_deletion_state(&self, state: &super::DeletionState) -> Result<(), StorageError> {
         let json =
             serde_json::to_string(state).map_err(|e| StorageError::Serialization(e.to_string()))?;
+        let encrypted =
+            crate::crypto::encrypt(&self.encryption_key, json.as_bytes())
+                .map_err(|e| StorageError::Encryption(e.to_string()))?;
+
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .map(|d| d.as_secs())
             .unwrap_or(0);
 
         self.conn.execute(
-            "INSERT OR REPLACE INTO deletion_state (id, state_json, updated_at) VALUES (1, ?1, ?2)",
-            params![json, now as i64],
+            "INSERT OR REPLACE INTO deletion_state (id, state_json, state_json_encrypted, updated_at) VALUES (1, '', ?1, ?2)",
+            params![encrypted, now as i64],
         )?;
         Ok(())
     }
 
-    /// Loads the deletion state.
+    /// Loads the deletion state (decrypted).
     pub fn load_deletion_state(&self) -> Result<super::DeletionState, StorageError> {
         let result = self.conn.query_row(
-            "SELECT state_json FROM deletion_state WHERE id = 1",
+            "SELECT state_json_encrypted, state_json FROM deletion_state WHERE id = 1",
             [],
-            |row| row.get::<_, String>(0),
+            |row| {
+                let encrypted: Option<Vec<u8>> = row.get(0)?;
+                let plaintext: String = row.get(1)?;
+                Ok((encrypted, plaintext))
+            },
         );
 
         match result {
-            Ok(json) => {
+            Ok((Some(encrypted), _)) if !encrypted.is_empty() => {
+                let decrypted =
+                    crate::crypto::decrypt(&self.encryption_key, &encrypted)
+                        .map_err(|e| StorageError::Encryption(e.to_string()))?;
+                let json = String::from_utf8(decrypted)
+                    .map_err(|e| StorageError::Serialization(e.to_string()))?;
                 let state = serde_json::from_str(&json)
                     .map_err(|e| StorageError::Serialization(e.to_string()))?;
                 Ok(state)
             }
+            Ok((_, plaintext)) if !plaintext.is_empty() => {
+                let state = serde_json::from_str(&plaintext)
+                    .map_err(|e| StorageError::Serialization(e.to_string()))?;
+                Ok(state)
+            }
+            Ok(_) => Ok(super::DeletionState::None),
             Err(rusqlite::Error::QueryReturnedNoRows) => Ok(super::DeletionState::None),
             Err(e) => Err(StorageError::Database(e)),
         }

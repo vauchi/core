@@ -13,7 +13,7 @@ use crate::sync::device_sync::{InterDeviceSyncState, VersionVector};
 impl Storage {
     // === Device Operations ===
 
-    /// Saves current device info.
+    /// Saves current device info (encrypted).
     pub fn save_device_info(
         &self,
         device_id: &[u8; 32],
@@ -21,38 +21,73 @@ impl Storage {
         device_name: &str,
         created_at: u64,
     ) -> Result<(), StorageError> {
+        let json = serde_json::json!({
+            "device_id": device_id.as_slice(),
+            "device_index": device_index,
+            "device_name": device_name,
+            "created_at": created_at,
+        });
+        let json_bytes = serde_json::to_vec(&json)
+            .map_err(|e| StorageError::Serialization(e.to_string()))?;
+        let encrypted =
+            crate::crypto::encrypt(&self.encryption_key, &json_bytes)
+                .map_err(|e| StorageError::Encryption(e.to_string()))?;
+
         self.conn.execute(
-            "INSERT OR REPLACE INTO device_info (id, device_id, device_index, device_name, created_at)
-             VALUES (1, ?1, ?2, ?3, ?4)",
+            "INSERT OR REPLACE INTO device_info (id, device_id, device_index, device_name, created_at, device_info_encrypted)
+             VALUES (1, ?1, ?2, '', ?3, ?4)",
             params![
                 device_id.as_slice(),
                 device_index as i32,
-                device_name,
                 created_at as i64,
+                encrypted,
             ],
         )?;
         Ok(())
     }
 
-    /// Loads current device info.
+    /// Loads current device info (decrypted).
     /// Returns (device_id, device_index, device_name, created_at) if found.
     #[allow(clippy::type_complexity)]
     pub fn load_device_info(&self) -> Result<Option<([u8; 32], u32, String, u64)>, StorageError> {
         let result = self.conn.query_row(
-            "SELECT device_id, device_index, device_name, created_at FROM device_info WHERE id = 1",
+            "SELECT device_info_encrypted, device_id, device_index, device_name, created_at FROM device_info WHERE id = 1",
             [],
             |row| {
                 Ok((
-                    row.get::<_, Vec<u8>>(0)?,
-                    row.get::<_, i32>(1)?,
-                    row.get::<_, String>(2)?,
-                    row.get::<_, i64>(3)?,
+                    row.get::<_, Option<Vec<u8>>>(0)?,
+                    row.get::<_, Vec<u8>>(1)?,
+                    row.get::<_, i32>(2)?,
+                    row.get::<_, String>(3)?,
+                    row.get::<_, i64>(4)?,
                 ))
             },
         );
 
         match result {
-            Ok((device_id_vec, device_index, device_name, created_at)) => {
+            Ok((Some(encrypted), _, _, _, _)) if !encrypted.is_empty() => {
+                let decrypted =
+                    crate::crypto::decrypt(&self.encryption_key, &encrypted)
+                        .map_err(|e| StorageError::Encryption(e.to_string()))?;
+                let json: serde_json::Value = serde_json::from_slice(&decrypted)
+                    .map_err(|e| StorageError::Serialization(e.to_string()))?;
+                let device_id_vec: Vec<u8> = serde_json::from_value(json["device_id"].clone())
+                    .map_err(|e| StorageError::Serialization(e.to_string()))?;
+                let device_id: [u8; 32] = device_id_vec
+                    .try_into()
+                    .map_err(|_| StorageError::Encryption("Invalid device ID length".into()))?;
+                let device_index = json["device_index"].as_u64().unwrap_or(0) as u32;
+                let device_name = json["device_name"]
+                    .as_str()
+                    .unwrap_or("")
+                    .to_string();
+                let created_at = json["created_at"].as_u64().unwrap_or(0);
+                Ok(Some((device_id, device_index, device_name, created_at)))
+            }
+            Ok((_, device_id_vec, device_index, device_name, created_at))
+                if !device_name.is_empty() =>
+            {
+                // Plaintext fallback for pre-v14 data
                 let device_id: [u8; 32] = device_id_vec
                     .try_into()
                     .map_err(|_| StorageError::Encryption("Invalid device ID length".into()))?;
@@ -63,6 +98,7 @@ impl Storage {
                     created_at as u64,
                 )))
             }
+            Ok(_) => Ok(None),
             Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
             Err(e) => Err(StorageError::Database(e)),
         }
@@ -289,36 +325,55 @@ impl Storage {
 
     // === Version Vector Operations ===
 
-    /// Saves the local version vector.
+    /// Saves the local version vector (encrypted).
     pub fn save_version_vector(&self, vector: &VersionVector) -> Result<(), StorageError> {
         let vector_json = vector.to_json();
+        let encrypted =
+            crate::crypto::encrypt(&self.encryption_key, vector_json.as_bytes())
+                .map_err(|e| StorageError::Encryption(e.to_string()))?;
+
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .expect("system time before UNIX epoch")
             .as_secs();
 
         self.conn.execute(
-            "INSERT OR REPLACE INTO version_vector (id, vector_json, updated_at)
-             VALUES (1, ?1, ?2)",
-            params![vector_json, now as i64,],
+            "INSERT OR REPLACE INTO version_vector (id, vector_json, vector_json_encrypted, updated_at)
+             VALUES (1, '', ?1, ?2)",
+            params![encrypted, now as i64],
         )?;
         Ok(())
     }
 
-    /// Loads the local version vector.
+    /// Loads the local version vector (decrypted).
     pub fn load_version_vector(&self) -> Result<Option<VersionVector>, StorageError> {
         let result = self.conn.query_row(
-            "SELECT vector_json FROM version_vector WHERE id = 1",
+            "SELECT vector_json_encrypted, vector_json FROM version_vector WHERE id = 1",
             [],
-            |row| row.get::<_, String>(0),
+            |row| {
+                let encrypted: Option<Vec<u8>> = row.get(0)?;
+                let plaintext: String = row.get(1)?;
+                Ok((encrypted, plaintext))
+            },
         );
 
         match result {
-            Ok(json) => {
+            Ok((Some(encrypted), _)) if !encrypted.is_empty() => {
+                let decrypted =
+                    crate::crypto::decrypt(&self.encryption_key, &encrypted)
+                        .map_err(|e| StorageError::Encryption(e.to_string()))?;
+                let json = String::from_utf8(decrypted)
+                    .map_err(|e| StorageError::Serialization(e.to_string()))?;
                 let vector = VersionVector::from_json(&json)
                     .map_err(|e| StorageError::Serialization(e.to_string()))?;
                 Ok(Some(vector))
             }
+            Ok((_, plaintext)) if !plaintext.is_empty() => {
+                let vector = VersionVector::from_json(&plaintext)
+                    .map_err(|e| StorageError::Serialization(e.to_string()))?;
+                Ok(Some(vector))
+            }
+            Ok(_) => Ok(None),
             Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
             Err(e) => Err(StorageError::Database(e)),
         }
@@ -341,7 +396,7 @@ impl Storage {
 
     // === Sync Checkpoint Operations ===
 
-    /// Saves a sync checkpoint for a target device.
+    /// Saves a sync checkpoint for a target device (encrypted).
     ///
     /// Stores the list of sync items and how many have been sent so far,
     /// allowing sync to resume from the last checkpoint after interruption.
@@ -353,6 +408,9 @@ impl Storage {
     ) -> Result<(), StorageError> {
         let items_json =
             serde_json::to_string(items).map_err(|e| StorageError::Serialization(e.to_string()))?;
+        let encrypted =
+            crate::crypto::encrypt(&self.encryption_key, items_json.as_bytes())
+                .map_err(|e| StorageError::Encryption(e.to_string()))?;
 
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -360,11 +418,11 @@ impl Storage {
             .as_secs();
 
         self.conn.execute(
-            "INSERT OR REPLACE INTO device_sync_checkpoints (target_device_id, items_json, sent_count, updated_at)
-             VALUES (?1, ?2, ?3, ?4)",
+            "INSERT OR REPLACE INTO device_sync_checkpoints (target_device_id, items_json, items_json_encrypted, sent_count, updated_at)
+             VALUES (?1, '', ?2, ?3, ?4)",
             params![
                 target_device_id.as_slice(),
-                items_json,
+                encrypted,
                 sent_count as i64,
                 now as i64,
             ],
@@ -372,7 +430,7 @@ impl Storage {
         Ok(())
     }
 
-    /// Loads a sync checkpoint for a target device.
+    /// Loads a sync checkpoint for a target device (decrypted).
     ///
     /// Returns the list of sync items and the number already sent,
     /// or `None` if no checkpoint exists for this device.
@@ -381,18 +439,30 @@ impl Storage {
         target_device_id: &[u8; 32],
     ) -> Result<Option<(Vec<crate::sync::device_sync::SyncItem>, usize)>, StorageError> {
         let result = self.conn.query_row(
-            "SELECT items_json, sent_count FROM device_sync_checkpoints WHERE target_device_id = ?1",
+            "SELECT items_json_encrypted, items_json, sent_count FROM device_sync_checkpoints WHERE target_device_id = ?1",
             params![target_device_id.as_slice()],
-            |row| Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?)),
+            |row| Ok((row.get::<_, Option<Vec<u8>>>(0)?, row.get::<_, String>(1)?, row.get::<_, i64>(2)?)),
         );
 
         match result {
-            Ok((items_json, sent_count)) => {
+            Ok((Some(encrypted), _, sent_count)) if !encrypted.is_empty() => {
+                let decrypted =
+                    crate::crypto::decrypt(&self.encryption_key, &encrypted)
+                        .map_err(|e| StorageError::Encryption(e.to_string()))?;
+                let json = String::from_utf8(decrypted)
+                    .map_err(|e| StorageError::Serialization(e.to_string()))?;
                 let items: Vec<crate::sync::device_sync::SyncItem> =
-                    serde_json::from_str(&items_json)
+                    serde_json::from_str(&json)
                         .map_err(|e| StorageError::Serialization(e.to_string()))?;
                 Ok(Some((items, sent_count as usize)))
             }
+            Ok((_, plaintext, sent_count)) if !plaintext.is_empty() => {
+                let items: Vec<crate::sync::device_sync::SyncItem> =
+                    serde_json::from_str(&plaintext)
+                        .map_err(|e| StorageError::Serialization(e.to_string()))?;
+                Ok(Some((items, sent_count as usize)))
+            }
+            Ok(_) => Ok(None),
             Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
             Err(e) => Err(StorageError::Database(e)),
         }
@@ -411,7 +481,7 @@ impl Storage {
 
     // === Batch Checkpoint Operations (V12 sync_checkpoints) ===
 
-    /// Saves a batch checkpoint for crash recovery.
+    /// Saves a batch checkpoint for crash recovery (encrypted).
     ///
     /// Tracks progress of a multi-item sync batch so it can be resumed
     /// after an interruption. Uses the batch_id as the logical grouping key.
@@ -422,6 +492,10 @@ impl Storage {
         processed_items: usize,
         state_json: &str,
     ) -> Result<(), StorageError> {
+        let encrypted =
+            crate::crypto::encrypt(&self.encryption_key, state_json.as_bytes())
+                .map_err(|e| StorageError::Encryption(e.to_string()))?;
+
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .expect("system time before UNIX epoch")
@@ -431,21 +505,21 @@ impl Storage {
 
         self.conn.execute(
             "INSERT OR REPLACE INTO sync_checkpoints
-             (checkpoint_id, batch_id, total_items, processed_items, state_json, created_at, updated_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?6)",
+             (checkpoint_id, batch_id, total_items, processed_items, state_json, state_json_encrypted, created_at, updated_at)
+             VALUES (?1, ?2, ?3, ?4, '', ?5, ?6, ?6)",
             params![
                 checkpoint_id,
                 batch_id,
                 total_items as i64,
                 processed_items as i64,
-                state_json,
+                encrypted,
                 now as i64,
             ],
         )?;
         Ok(())
     }
 
-    /// Loads the latest batch checkpoint for a batch.
+    /// Loads the latest batch checkpoint for a batch (decrypted).
     ///
     /// Returns (total_items, processed_items, state_json) or None if
     /// no checkpoint exists.
@@ -454,41 +528,57 @@ impl Storage {
         batch_id: &str,
     ) -> Result<Option<(usize, usize, String)>, StorageError> {
         let result = self.conn.query_row(
-            "SELECT total_items, processed_items, state_json FROM sync_checkpoints
+            "SELECT total_items, processed_items, state_json_encrypted, state_json FROM sync_checkpoints
              WHERE batch_id = ?1 ORDER BY updated_at DESC LIMIT 1",
             params![batch_id],
             |row| {
                 Ok((
                     row.get::<_, i64>(0)?,
                     row.get::<_, i64>(1)?,
-                    row.get::<_, String>(2)?,
+                    row.get::<_, Option<Vec<u8>>>(2)?,
+                    row.get::<_, String>(3)?,
                 ))
             },
         );
 
         match result {
-            Ok((total, processed, state)) => Ok(Some((total as usize, processed as usize, state))),
+            Ok((total, processed, Some(encrypted), _)) if !encrypted.is_empty() => {
+                let decrypted =
+                    crate::crypto::decrypt(&self.encryption_key, &encrypted)
+                        .map_err(|e| StorageError::Encryption(e.to_string()))?;
+                let state = String::from_utf8(decrypted)
+                    .map_err(|e| StorageError::Serialization(e.to_string()))?;
+                Ok(Some((total as usize, processed as usize, state)))
+            }
+            Ok((total, processed, _, plaintext)) if !plaintext.is_empty() => {
+                Ok(Some((total as usize, processed as usize, plaintext)))
+            }
+            Ok(_) => Ok(None),
             Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
             Err(e) => Err(StorageError::Database(e)),
         }
     }
 
-    /// Updates the progress of an existing batch checkpoint.
+    /// Updates the progress of an existing batch checkpoint (encrypted).
     pub fn update_batch_checkpoint(
         &self,
         batch_id: &str,
         processed_items: usize,
         state_json: &str,
     ) -> Result<(), StorageError> {
+        let encrypted =
+            crate::crypto::encrypt(&self.encryption_key, state_json.as_bytes())
+                .map_err(|e| StorageError::Encryption(e.to_string()))?;
+
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .expect("system time before UNIX epoch")
             .as_secs();
 
         self.conn.execute(
-            "UPDATE sync_checkpoints SET processed_items = ?1, state_json = ?2, updated_at = ?3
+            "UPDATE sync_checkpoints SET processed_items = ?1, state_json = '', state_json_encrypted = ?2, updated_at = ?3
              WHERE batch_id = ?4",
-            params![processed_items as i64, state_json, now as i64, batch_id],
+            params![processed_items as i64, encrypted, now as i64, batch_id],
         )?;
         Ok(())
     }

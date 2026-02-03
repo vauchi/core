@@ -225,6 +225,11 @@ pub fn all_migrations() -> Vec<Migration> {
             name: "encrypt_high_priority_tables",
             action: MigrationAction::Callback(migrate_v14_encrypt_high_priority),
         },
+        Migration {
+            version: 14,
+            name: "encrypt_medium_priority_tables",
+            action: MigrationAction::Callback(migrate_v14_encrypt_medium_priority),
+        },
     ]
 }
 
@@ -780,6 +785,252 @@ fn migrate_v14_encrypt_high_priority(
             .map_err(|e| {
                 StorageError::Migration(format!("Update visibility_labels: {}", e))
             })?;
+        }
+    }
+
+    Ok(())
+}
+
+/// Migration v14: Add encrypted columns for medium-priority plaintext tables.
+///
+/// Adds `_encrypted` BLOB columns to: device_info, version_vector,
+/// contact_sync_timestamps, pending_updates, retry_entries,
+/// device_sync_checkpoints, recovery_responses, deletion_state, and
+/// sync_checkpoints. Existing plaintext data is encrypted and stored
+/// in the new columns. Old plaintext columns are cleared.
+fn migrate_v14_encrypt_medium_priority(
+    conn: &Connection,
+    key: &SymmetricKey,
+) -> Result<(), StorageError> {
+    use crate::crypto::encrypt;
+
+    // Step 1: Add encrypted columns to each table
+    conn.execute_batch(
+        "ALTER TABLE device_info ADD COLUMN device_info_encrypted BLOB;
+         ALTER TABLE version_vector ADD COLUMN vector_json_encrypted BLOB;
+         ALTER TABLE contact_sync_timestamps ADD COLUMN last_sync_at_encrypted BLOB;
+         ALTER TABLE pending_updates ADD COLUMN payload_encrypted BLOB;
+         ALTER TABLE retry_entries ADD COLUMN payload_encrypted BLOB;
+         ALTER TABLE device_sync_checkpoints ADD COLUMN items_json_encrypted BLOB;
+         ALTER TABLE recovery_responses ADD COLUMN response_encrypted BLOB;
+         ALTER TABLE deletion_state ADD COLUMN state_json_encrypted BLOB;
+         ALTER TABLE sync_checkpoints ADD COLUMN state_json_encrypted BLOB;",
+    )
+    .map_err(|e| StorageError::Migration(format!("Failed to add v14 encrypted columns: {}", e)))?;
+
+    // Step 2: Encrypt existing data in device_info
+    {
+        let result: Result<(Vec<u8>, i32, String, i64), _> = conn.query_row(
+            "SELECT device_id, device_index, device_name, created_at FROM device_info WHERE id = 1",
+            [],
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+        );
+
+        if let Ok((device_id, device_index, device_name, created_at)) = result {
+            let json = serde_json::json!({
+                "device_id": device_id,
+                "device_index": device_index,
+                "device_name": device_name,
+                "created_at": created_at,
+            });
+            let json_bytes = serde_json::to_vec(&json)
+                .map_err(|e| StorageError::Migration(format!("Serialize device_info: {}", e)))?;
+            let encrypted = encrypt(key, &json_bytes)
+                .map_err(|e| StorageError::Migration(format!("Encrypt device_info: {}", e)))?;
+            conn.execute(
+                "UPDATE device_info SET device_info_encrypted = ?1, device_name = '' WHERE id = 1",
+                rusqlite::params![encrypted],
+            )
+            .map_err(|e| StorageError::Migration(format!("Update device_info: {}", e)))?;
+        }
+    }
+
+    // Step 3: Encrypt existing data in version_vector
+    {
+        let result: Result<(String,), _> = conn.query_row(
+            "SELECT vector_json FROM version_vector WHERE id = 1",
+            [],
+            |row| Ok((row.get(0)?,)),
+        );
+
+        if let Ok((vector_json,)) = result {
+            let encrypted = encrypt(key, vector_json.as_bytes())
+                .map_err(|e| StorageError::Migration(format!("Encrypt version_vector: {}", e)))?;
+            conn.execute(
+                "UPDATE version_vector SET vector_json_encrypted = ?1, vector_json = '' WHERE id = 1",
+                rusqlite::params![encrypted],
+            )
+            .map_err(|e| StorageError::Migration(format!("Update version_vector: {}", e)))?;
+        }
+    }
+
+    // Step 4: Encrypt existing data in contact_sync_timestamps
+    {
+        let mut stmt = conn
+            .prepare("SELECT contact_id, last_sync_at FROM contact_sync_timestamps")
+            .map_err(|e| StorageError::Migration(format!("Read contact_sync_timestamps: {}", e)))?;
+
+        let rows: Vec<(String, i64)> = stmt
+            .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))
+            .map_err(|e| StorageError::Migration(format!("Query contact_sync_timestamps: {}", e)))?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| {
+                StorageError::Migration(format!("Collect contact_sync_timestamps: {}", e))
+            })?;
+
+        for (contact_id, last_sync_at) in &rows {
+            let ts_bytes = last_sync_at.to_le_bytes();
+            let encrypted = encrypt(key, &ts_bytes).map_err(|e| {
+                StorageError::Migration(format!("Encrypt contact_sync_timestamps: {}", e))
+            })?;
+            conn.execute(
+                "UPDATE contact_sync_timestamps SET last_sync_at_encrypted = ?1 WHERE contact_id = ?2",
+                rusqlite::params![encrypted, contact_id],
+            )
+            .map_err(|e| StorageError::Migration(format!("Update contact_sync_timestamps: {}", e)))?;
+        }
+    }
+
+    // Step 5: Encrypt existing data in pending_updates
+    {
+        let mut stmt = conn
+            .prepare("SELECT id, payload FROM pending_updates")
+            .map_err(|e| StorageError::Migration(format!("Read pending_updates: {}", e)))?;
+
+        let rows: Vec<(String, Vec<u8>)> = stmt
+            .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))
+            .map_err(|e| StorageError::Migration(format!("Query pending_updates: {}", e)))?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| StorageError::Migration(format!("Collect pending_updates: {}", e)))?;
+
+        for (id, payload) in &rows {
+            let encrypted = encrypt(key, payload)
+                .map_err(|e| StorageError::Migration(format!("Encrypt pending_updates: {}", e)))?;
+            conn.execute(
+                "UPDATE pending_updates SET payload_encrypted = ?1, payload = X'' WHERE id = ?2",
+                rusqlite::params![encrypted, id],
+            )
+            .map_err(|e| StorageError::Migration(format!("Update pending_updates: {}", e)))?;
+        }
+    }
+
+    // Step 6: Encrypt existing data in retry_entries
+    {
+        let mut stmt = conn
+            .prepare("SELECT message_id, payload FROM retry_entries")
+            .map_err(|e| StorageError::Migration(format!("Read retry_entries: {}", e)))?;
+
+        let rows: Vec<(String, Vec<u8>)> = stmt
+            .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))
+            .map_err(|e| StorageError::Migration(format!("Query retry_entries: {}", e)))?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| StorageError::Migration(format!("Collect retry_entries: {}", e)))?;
+
+        for (message_id, payload) in &rows {
+            let encrypted = encrypt(key, payload)
+                .map_err(|e| StorageError::Migration(format!("Encrypt retry_entries: {}", e)))?;
+            conn.execute(
+                "UPDATE retry_entries SET payload_encrypted = ?1, payload = X'' WHERE message_id = ?2",
+                rusqlite::params![encrypted, message_id],
+            )
+            .map_err(|e| StorageError::Migration(format!("Update retry_entries: {}", e)))?;
+        }
+    }
+
+    // Step 7: Encrypt existing data in device_sync_checkpoints
+    {
+        let mut stmt = conn
+            .prepare("SELECT target_device_id, items_json FROM device_sync_checkpoints")
+            .map_err(|e| {
+                StorageError::Migration(format!("Read device_sync_checkpoints: {}", e))
+            })?;
+
+        let rows: Vec<(Vec<u8>, String)> = stmt
+            .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))
+            .map_err(|e| {
+                StorageError::Migration(format!("Query device_sync_checkpoints: {}", e))
+            })?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| {
+                StorageError::Migration(format!("Collect device_sync_checkpoints: {}", e))
+            })?;
+
+        for (target_device_id, items_json) in &rows {
+            let encrypted = encrypt(key, items_json.as_bytes()).map_err(|e| {
+                StorageError::Migration(format!("Encrypt device_sync_checkpoints: {}", e))
+            })?;
+            conn.execute(
+                "UPDATE device_sync_checkpoints SET items_json_encrypted = ?1, items_json = '' WHERE target_device_id = ?2",
+                rusqlite::params![encrypted, target_device_id],
+            )
+            .map_err(|e| StorageError::Migration(format!("Update device_sync_checkpoints: {}", e)))?;
+        }
+    }
+
+    // Step 8: Encrypt existing data in recovery_responses
+    {
+        let mut stmt = conn
+            .prepare("SELECT claim_id, response FROM recovery_responses")
+            .map_err(|e| StorageError::Migration(format!("Read recovery_responses: {}", e)))?;
+
+        let rows: Vec<(String, String)> = stmt
+            .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))
+            .map_err(|e| StorageError::Migration(format!("Query recovery_responses: {}", e)))?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| StorageError::Migration(format!("Collect recovery_responses: {}", e)))?;
+
+        for (claim_id, response) in &rows {
+            let encrypted = encrypt(key, response.as_bytes()).map_err(|e| {
+                StorageError::Migration(format!("Encrypt recovery_responses: {}", e))
+            })?;
+            conn.execute(
+                "UPDATE recovery_responses SET response_encrypted = ?1, response = '' WHERE claim_id = ?2",
+                rusqlite::params![encrypted, claim_id],
+            )
+            .map_err(|e| StorageError::Migration(format!("Update recovery_responses: {}", e)))?;
+        }
+    }
+
+    // Step 9: Encrypt existing data in deletion_state
+    {
+        let result: Result<(String,), _> = conn.query_row(
+            "SELECT state_json FROM deletion_state WHERE id = 1",
+            [],
+            |row| Ok((row.get(0)?,)),
+        );
+
+        if let Ok((state_json,)) = result {
+            let encrypted = encrypt(key, state_json.as_bytes())
+                .map_err(|e| StorageError::Migration(format!("Encrypt deletion_state: {}", e)))?;
+            conn.execute(
+                "UPDATE deletion_state SET state_json_encrypted = ?1, state_json = '' WHERE id = 1",
+                rusqlite::params![encrypted],
+            )
+            .map_err(|e| StorageError::Migration(format!("Update deletion_state: {}", e)))?;
+        }
+    }
+
+    // Step 10: Encrypt existing data in sync_checkpoints
+    {
+        let mut stmt = conn
+            .prepare("SELECT checkpoint_id, state_json FROM sync_checkpoints")
+            .map_err(|e| StorageError::Migration(format!("Read sync_checkpoints: {}", e)))?;
+
+        let rows: Vec<(String, String)> = stmt
+            .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))
+            .map_err(|e| StorageError::Migration(format!("Query sync_checkpoints: {}", e)))?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| StorageError::Migration(format!("Collect sync_checkpoints: {}", e)))?;
+
+        for (checkpoint_id, state_json) in &rows {
+            let encrypted = encrypt(key, state_json.as_bytes()).map_err(|e| {
+                StorageError::Migration(format!("Encrypt sync_checkpoints: {}", e))
+            })?;
+            conn.execute(
+                "UPDATE sync_checkpoints SET state_json_encrypted = ?1, state_json = '' WHERE checkpoint_id = ?2",
+                rusqlite::params![encrypted, checkpoint_id],
+            )
+            .map_err(|e| StorageError::Migration(format!("Update sync_checkpoints: {}", e)))?;
         }
     }
 

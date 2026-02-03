@@ -13,7 +13,7 @@ use super::{Storage, StorageError};
 impl Storage {
     // === Recovery Response Operations ===
 
-    /// Saves a recovery response to storage.
+    /// Saves a recovery response to storage (encrypted).
     ///
     /// Records the user's response (accept, reject, or remind_me_later) to
     /// a recovery claim. The response is stored with a unique constraint on
@@ -25,6 +25,10 @@ impl Storage {
         response: &str,
         remind_at: Option<u64>,
     ) -> Result<(), StorageError> {
+        let response_encrypted =
+            crate::crypto::encrypt(&self.encryption_key, response.as_bytes())
+                .map_err(|e| StorageError::Encryption(e.to_string()))?;
+
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .expect("system time before UNIX epoch")
@@ -32,12 +36,12 @@ impl Storage {
 
         self.conn.execute(
             "INSERT OR REPLACE INTO recovery_responses
-             (claim_id, contact_id, response, remind_at, created_at)
-             VALUES (?1, ?2, ?3, ?4, ?5)",
+             (claim_id, contact_id, response, response_encrypted, remind_at, created_at)
+             VALUES (?1, ?2, '', ?3, ?4, ?5)",
             params![
                 claim_id,
                 contact_id,
-                response,
+                response_encrypted,
                 remind_at.map(|t| t as i64),
                 now as i64,
             ],
@@ -46,7 +50,7 @@ impl Storage {
         Ok(())
     }
 
-    /// Retrieves a recovery response by claim ID.
+    /// Retrieves a recovery response by claim ID (decrypted).
     ///
     /// Returns `Ok(Some((contact_id, response, remind_at)))` if found,
     /// or `Ok(None)` if no response exists for the given claim.
@@ -55,20 +59,32 @@ impl Storage {
         claim_id: &str,
     ) -> Result<Option<(String, String, Option<u64>)>, StorageError> {
         let result = self.conn.query_row(
-            "SELECT contact_id, response, remind_at
+            "SELECT contact_id, response_encrypted, response, remind_at
              FROM recovery_responses
              WHERE claim_id = ?1",
             params![claim_id],
             |row| {
                 let contact_id: String = row.get(0)?;
-                let response: String = row.get(1)?;
-                let remind_at: Option<i64> = row.get(2)?;
-                Ok((contact_id, response, remind_at.map(|t| t as u64)))
+                let encrypted: Option<Vec<u8>> = row.get(1)?;
+                let plaintext: String = row.get(2)?;
+                let remind_at: Option<i64> = row.get(3)?;
+                Ok((contact_id, encrypted, plaintext, remind_at.map(|t| t as u64)))
             },
         );
 
         match result {
-            Ok(record) => Ok(Some(record)),
+            Ok((contact_id, Some(encrypted), _, remind_at)) if !encrypted.is_empty() => {
+                let decrypted =
+                    crate::crypto::decrypt(&self.encryption_key, &encrypted)
+                        .map_err(|e| StorageError::Encryption(e.to_string()))?;
+                let response = String::from_utf8(decrypted)
+                    .map_err(|e| StorageError::Serialization(e.to_string()))?;
+                Ok(Some((contact_id, response, remind_at)))
+            }
+            Ok((contact_id, _, plaintext, remind_at)) if !plaintext.is_empty() => {
+                Ok(Some((contact_id, plaintext, remind_at)))
+            }
+            Ok(_) => Ok(None),
             Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
             Err(e) => Err(StorageError::Database(e)),
         }

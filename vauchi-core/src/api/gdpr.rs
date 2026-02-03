@@ -30,6 +30,8 @@ pub struct GdprExport {
     pub devices: Option<Vec<GdprDevice>>,
     /// Recovery configuration.
     pub recovery_config: Option<GdprRecoveryConfig>,
+    /// Audit log entries.
+    pub audit_log: Vec<serde_json::Value>,
 }
 
 /// Identity data for GDPR export (no raw keys).
@@ -145,8 +147,24 @@ pub fn export_all_data(storage: &Storage) -> Result<GdprExport, crate::storage::
         threshold: None, // Set by caller who has RecoverySettings access
     });
 
+    // Export audit log (Art 15 — access to all personal data)
+    let audit_log = storage
+        .list_audit_log()?
+        .into_iter()
+        .map(|(event_type, details, timestamp)| {
+            serde_json::json!({
+                "event_type": event_type,
+                "details": details,
+                "timestamp": timestamp,
+            })
+        })
+        .collect();
+
+    // Log the export event itself
+    storage.log_audit_event("gdpr_data_export", None)?;
+
     Ok(GdprExport {
-        version: 2,
+        version: 3,
         exported_at: now,
         identity: None, // Set by caller who has Identity access
         contacts: gdpr_contacts,
@@ -154,6 +172,7 @@ pub fn export_all_data(storage: &Storage) -> Result<GdprExport, crate::storage::
         settings: GdprSettings { consent_records },
         devices,
         recovery_config,
+        audit_log,
     })
 }
 

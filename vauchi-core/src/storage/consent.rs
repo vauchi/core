@@ -189,6 +189,59 @@ impl Storage {
         }
     }
 
+    /// Lists all audit log entries, decrypting details where applicable.
+    ///
+    /// Returns tuples of (event_type, details, timestamp).
+    /// Encrypted details are decrypted with the storage key; falls back to
+    /// plaintext `details` column for pre-encryption entries.
+    pub fn list_audit_log(&self) -> Result<Vec<(String, Option<String>, u64)>, StorageError> {
+        let table_exists: bool = self.conn.query_row(
+            "SELECT COUNT(*) > 0 FROM sqlite_master WHERE type='table' AND name='audit_log'",
+            [],
+            |row| row.get(0),
+        )?;
+
+        if !table_exists {
+            return Ok(Vec::new());
+        }
+
+        let mut stmt = self.conn.prepare(
+            "SELECT event_type, details_encrypted, details, timestamp FROM audit_log ORDER BY timestamp",
+        )?;
+
+        let rows = stmt
+            .query_map([], |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, Option<Vec<u8>>>(1)?,
+                    row.get::<_, Option<String>>(2)?,
+                    row.get::<_, i64>(3)?,
+                ))
+            })?
+            .collect::<Result<Vec<_>, _>>()?;
+
+        let mut entries = Vec::with_capacity(rows.len());
+        for (event_type, details_encrypted, details_plain, ts) in rows {
+            let details = if let Some(encrypted) = details_encrypted {
+                if !encrypted.is_empty() {
+                    let decrypted = crate::crypto::decrypt(&self.encryption_key, &encrypted)
+                        .map_err(|e| StorageError::Encryption(e.to_string()))?;
+                    Some(
+                        String::from_utf8(decrypted)
+                            .map_err(|e| StorageError::Serialization(e.to_string()))?,
+                    )
+                } else {
+                    details_plain.filter(|s| !s.is_empty())
+                }
+            } else {
+                details_plain.filter(|s| !s.is_empty())
+            };
+            entries.push((event_type, details, ts as u64));
+        }
+
+        Ok(entries)
+    }
+
     /// Logs an audit event (details encrypted if present).
     pub fn log_audit_event(
         &self,

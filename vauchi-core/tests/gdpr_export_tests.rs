@@ -125,11 +125,84 @@ fn test_export_includes_recovery_config() {
 }
 
 #[test]
-fn test_export_version_and_timestamp() {
+fn test_export_version_bumped_to_3() {
     let storage = setup_storage_with_contacts();
 
     let export = export_all_data(&storage).unwrap();
 
-    assert_eq!(export.version, 2, "Export version should be 2");
+    assert_eq!(export.version, 3, "Export version should be 3");
     assert!(export.exported_at > 0, "Export timestamp should be set");
+}
+
+#[test]
+fn test_list_audit_log_empty() {
+    let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
+
+    let log = storage.list_audit_log().unwrap();
+    assert!(log.is_empty(), "Empty DB should return empty audit log");
+}
+
+#[test]
+fn test_list_audit_log_roundtrip() {
+    let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
+
+    storage.log_audit_event("consent_granted", None).unwrap();
+    storage
+        .log_audit_event("data_exported", Some("full export"))
+        .unwrap();
+
+    let log = storage.list_audit_log().unwrap();
+    assert_eq!(log.len(), 2);
+
+    assert_eq!(log[0].0, "consent_granted");
+    assert!(log[0].1.is_none());
+    assert!(log[0].2 > 0);
+
+    assert_eq!(log[1].0, "data_exported");
+    assert_eq!(log[1].1.as_deref(), Some("full export"));
+    assert!(log[1].2 > 0);
+}
+
+#[test]
+fn test_list_audit_log_decrypts_details() {
+    let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
+
+    storage
+        .log_audit_event("sensitive_op", Some("secret details"))
+        .unwrap();
+
+    let log = storage.list_audit_log().unwrap();
+    assert_eq!(log.len(), 1);
+    assert_eq!(
+        log[0].1.as_deref(),
+        Some("secret details"),
+        "Encrypted details should be decrypted on read"
+    );
+}
+
+#[test]
+fn test_export_includes_audit_log() {
+    let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
+
+    storage
+        .log_audit_event("consent_granted", Some("data_processing"))
+        .unwrap();
+    storage
+        .log_audit_event("contact_added", Some("alice"))
+        .unwrap();
+
+    let export = export_all_data(&storage).unwrap();
+
+    // The two events we logged should appear, plus the export event itself is logged
+    // but after the snapshot, so only our 2 events are in the export.
+    assert_eq!(
+        export.audit_log.len(),
+        2,
+        "Export should include the 2 audit events"
+    );
+
+    assert_eq!(export.audit_log[0]["event_type"], "consent_granted");
+    assert_eq!(export.audit_log[0]["details"], "data_processing");
+    assert_eq!(export.audit_log[1]["event_type"], "contact_added");
+    assert_eq!(export.audit_log[1]["details"], "alice");
 }

@@ -11,11 +11,12 @@
 //! Ciphertext format: `algorithm_tag (1 byte) || nonce || ciphertext || tag`
 //!   - Tag `0x01`: AES-256-GCM (12-byte nonce, 16-byte tag)
 //!   - Tag `0x02`: XChaCha20-Poly1305 (24-byte nonce, 16-byte tag)
+//!   - Tag `0x03`: XChaCha20-Poly1305 with associated data (24-byte nonce, 16-byte tag)
 //!
 //! Legacy (untagged) ciphertext: `nonce (12 bytes) || ciphertext || tag`
 //! is auto-detected when the first byte is NOT a known algorithm tag.
 
-use chacha20poly1305::aead::{Aead, KeyInit};
+use chacha20poly1305::aead::{Aead, KeyInit, Payload};
 use chacha20poly1305::XChaCha20Poly1305;
 use ring::aead::{Aad, LessSafeKey, Nonce, UnboundKey, AES_256_GCM};
 use ring::rand::{SecureRandom, SystemRandom};
@@ -37,6 +38,8 @@ pub enum EncryptionError {
 const ALG_TAG_AES_GCM: u8 = 0x01;
 /// Algorithm tag for XChaCha20-Poly1305.
 const ALG_TAG_XCHACHA20: u8 = 0x02;
+/// Algorithm tag for XChaCha20-Poly1305 with associated data binding.
+const ALG_TAG_XCHACHA20_AD: u8 = 0x03;
 
 /// Nonce size for AES-256-GCM (96 bits = 12 bytes).
 const AES_GCM_NONCE_SIZE: usize = 12;
@@ -114,24 +117,86 @@ pub fn encrypt(key: &SymmetricKey, plaintext: &[u8]) -> Result<Vec<u8>, Encrypti
     Ok(output)
 }
 
+/// Encrypts data using XChaCha20-Poly1305 with associated data binding.
+///
+/// The associated data (AD) is authenticated but not included in the output.
+/// Both parties must use the same AD for decryption to succeed. This binds
+/// the ciphertext to its context (e.g., message header fields), preventing
+/// header manipulation and message reuse attacks.
+///
+/// Output format: `0x03 || nonce (24 bytes) || ciphertext || tag (16 bytes)`
+pub fn encrypt_with_ad(
+    key: &SymmetricKey,
+    plaintext: &[u8],
+    ad: &[u8],
+) -> Result<Vec<u8>, EncryptionError> {
+    let rng = SystemRandom::new();
+
+    let mut nonce_bytes = [0u8; XCHACHA20_NONCE_SIZE];
+    rng.fill(&mut nonce_bytes)
+        .map_err(|_| EncryptionError::EncryptionFailed)?;
+
+    let cipher = XChaCha20Poly1305::new(key.as_bytes().into());
+    let nonce = chacha20poly1305::XNonce::from_slice(&nonce_bytes);
+
+    let payload = Payload {
+        msg: plaintext,
+        aad: ad,
+    };
+    let ciphertext = cipher
+        .encrypt(nonce, payload)
+        .map_err(|_| EncryptionError::EncryptionFailed)?;
+
+    let mut output = Vec::with_capacity(1 + XCHACHA20_NONCE_SIZE + ciphertext.len());
+    output.push(ALG_TAG_XCHACHA20_AD);
+    output.extend_from_slice(&nonce_bytes);
+    output.extend_from_slice(&ciphertext);
+
+    Ok(output)
+}
+
 /// Decrypts data, auto-detecting the algorithm from the ciphertext format.
 ///
 /// Supports:
 /// - Tagged XChaCha20-Poly1305 (tag `0x02`)
 /// - Tagged AES-256-GCM (tag `0x01`)
 /// - Legacy untagged AES-256-GCM (12-byte nonce prefix)
+///
+/// Note: Cannot decrypt tag `0x03` (AD-bound) — use `decrypt_with_ad` instead.
 pub fn decrypt(key: &SymmetricKey, ciphertext: &[u8]) -> Result<Vec<u8>, EncryptionError> {
     if ciphertext.is_empty() {
         return Err(EncryptionError::CiphertextTooShort);
     }
 
     match ciphertext[0] {
+        ALG_TAG_XCHACHA20_AD => Err(EncryptionError::DecryptionFailed), // Requires AD
         ALG_TAG_XCHACHA20 => decrypt_xchacha20(key, &ciphertext[1..]),
         ALG_TAG_AES_GCM => decrypt_aes_gcm(key, &ciphertext[1..]),
         _ => {
             // Legacy untagged AES-256-GCM: nonce (12) || ciphertext || tag (16)
             decrypt_aes_gcm(key, ciphertext)
         }
+    }
+}
+
+/// Decrypts data with associated data, auto-detecting the algorithm.
+///
+/// For tag `0x03` (AD-bound), the provided AD is used for authentication.
+/// For tags `0x01`/`0x02` and legacy, AD is ignored (backward compatibility).
+pub fn decrypt_with_ad(
+    key: &SymmetricKey,
+    ciphertext: &[u8],
+    ad: &[u8],
+) -> Result<Vec<u8>, EncryptionError> {
+    if ciphertext.is_empty() {
+        return Err(EncryptionError::CiphertextTooShort);
+    }
+
+    match ciphertext[0] {
+        ALG_TAG_XCHACHA20_AD => decrypt_xchacha20_ad(key, &ciphertext[1..], ad),
+        ALG_TAG_XCHACHA20 => decrypt_xchacha20(key, &ciphertext[1..]),
+        ALG_TAG_AES_GCM => decrypt_aes_gcm(key, &ciphertext[1..]),
+        _ => decrypt_aes_gcm(key, ciphertext),
     }
 }
 
@@ -149,6 +214,32 @@ fn decrypt_xchacha20(key: &SymmetricKey, data: &[u8]) -> Result<Vec<u8>, Encrypt
 
     cipher
         .decrypt(nonce, &data[XCHACHA20_NONCE_SIZE..])
+        .map_err(|_| EncryptionError::DecryptionFailed)
+}
+
+/// Decrypts XChaCha20-Poly1305 data with associated data.
+///
+/// Input format: `nonce (24 bytes) || ciphertext || tag (16 bytes)`
+fn decrypt_xchacha20_ad(
+    key: &SymmetricKey,
+    data: &[u8],
+    ad: &[u8],
+) -> Result<Vec<u8>, EncryptionError> {
+    let min_size = XCHACHA20_NONCE_SIZE + TAG_SIZE;
+    if data.len() < min_size {
+        return Err(EncryptionError::CiphertextTooShort);
+    }
+
+    let nonce = chacha20poly1305::XNonce::from_slice(&data[..XCHACHA20_NONCE_SIZE]);
+    let cipher = XChaCha20Poly1305::new(key.as_bytes().into());
+
+    let payload = Payload {
+        msg: &data[XCHACHA20_NONCE_SIZE..],
+        aad: ad,
+    };
+
+    cipher
+        .decrypt(nonce, payload)
         .map_err(|_| EncryptionError::DecryptionFailed)
 }
 

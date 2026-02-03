@@ -17,7 +17,7 @@ use thiserror::Error;
 use zeroize::Zeroize;
 
 use super::chain::{ChainError, ChainKey, MessageKey};
-use super::encryption::{decrypt, encrypt, EncryptionError, SymmetricKey};
+use super::encryption::{decrypt_with_ad, encrypt_with_ad, EncryptionError, SymmetricKey};
 use super::padding;
 use super::kdf::HKDF;
 use crate::exchange::X3DHKeyPair;
@@ -110,6 +110,23 @@ pub struct RatchetMessage {
     pub previous_chain_length: u32,
     /// The encrypted payload
     pub ciphertext: Vec<u8>,
+}
+
+impl RatchetMessage {
+    /// Constructs associated data from the message header for AEAD binding.
+    ///
+    /// AD = dh_public(32) || dh_generation(4 BE) || message_index(4 BE) || previous_chain_length(4 BE)
+    ///
+    /// Binding the header into the AEAD prevents header manipulation attacks
+    /// (e.g., changing message ordering or swapping sender DH keys).
+    fn associated_data(&self) -> [u8; 44] {
+        let mut ad = [0u8; 44];
+        ad[0..32].copy_from_slice(&self.dh_public);
+        ad[32..36].copy_from_slice(&self.dh_generation.to_be_bytes());
+        ad[36..40].copy_from_slice(&self.message_index.to_be_bytes());
+        ad[40..44].copy_from_slice(&self.previous_chain_length.to_be_bytes());
+        ad
+    }
 }
 
 /// The Double Ratchet state machine.
@@ -225,14 +242,21 @@ impl DoubleRatchetState {
 
         // Pad plaintext to fixed bucket size to prevent traffic analysis
         let padded = padding::pad(plaintext);
-        let ciphertext = encrypt(message_key.symmetric_key(), &padded)?;
 
-        let message = RatchetMessage {
+        // Construct header before encryption so we can bind it as AEAD associated data
+        let header = RatchetMessage {
             dh_public: self.our_public_key(),
             dh_generation: self.dh_generation,
             message_index: self.send_message_count,
             previous_chain_length: self.previous_send_chain_length,
+            ciphertext: Vec::new(),
+        };
+        let ad = header.associated_data();
+        let ciphertext = encrypt_with_ad(message_key.symmetric_key(), &padded, &ad)?;
+
+        let message = RatchetMessage {
             ciphertext,
+            ..header
         };
 
         self.send_message_count += 1;
@@ -244,10 +268,13 @@ impl DoubleRatchetState {
     ///
     /// Handles DH ratchet steps and out-of-order messages.
     pub fn decrypt(&mut self, message: &RatchetMessage) -> Result<Vec<u8>, RatchetError> {
+        // Build associated data from message header for AEAD verification
+        let ad = message.associated_data();
+
         // Try skipped keys first
         if let Some(key) = self.try_skipped_key(message) {
-            let padded =
-                decrypt(key.symmetric_key(), &message.ciphertext).map_err(RatchetError::from)?;
+            let padded = decrypt_with_ad(key.symmetric_key(), &message.ciphertext, &ad)
+                .map_err(RatchetError::from)?;
             return padding::unpad(&padded).ok_or_else(|| {
                 RatchetError::InvalidMessage("Failed to unpad decrypted message".into())
             });
@@ -287,9 +314,9 @@ impl DoubleRatchetState {
         self.recv_chain = Some(next_chain);
         self.recv_message_count = message.message_index + 1;
 
-        // Decrypt and unpad
-        let padded =
-            decrypt(message_key.symmetric_key(), &message.ciphertext).map_err(RatchetError::from)?;
+        // Decrypt with AEAD associated data and unpad
+        let padded = decrypt_with_ad(message_key.symmetric_key(), &message.ciphertext, &ad)
+            .map_err(RatchetError::from)?;
         padding::unpad(&padded)
             .ok_or_else(|| RatchetError::InvalidMessage("Failed to unpad decrypted message".into()))
     }

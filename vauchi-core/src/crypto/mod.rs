@@ -13,7 +13,7 @@ pub mod shredding;
 pub mod signing;
 
 pub use chain::{ChainError, ChainKey, MessageKey};
-pub use encryption::{decrypt, encrypt, SymmetricKey};
+pub use encryption::{decrypt, decrypt_with_ad, encrypt, encrypt_with_ad, SymmetricKey};
 pub use kdf::{KDFError, HKDF};
 pub use password_kdf::{derive_key_argon2id, derive_key_pbkdf2, PasswordKdfError};
 pub use ratchet::{DoubleRatchetState, RatchetError, RatchetMessage};

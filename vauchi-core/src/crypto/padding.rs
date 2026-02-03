@@ -99,7 +99,7 @@ fn select_bucket(size: usize) -> usize {
         BUCKET_LARGE
     } else {
         // Round up to next OVERFLOW_ALIGNMENT boundary
-        (size + OVERFLOW_ALIGNMENT - 1) / OVERFLOW_ALIGNMENT * OVERFLOW_ALIGNMENT
+        size.div_ceil(OVERFLOW_ALIGNMENT) * OVERFLOW_ALIGNMENT
     }
 }
 

@@ -5,7 +5,7 @@
 //! Additional encryption tests for coverage of AES-GCM and legacy paths
 
 use vauchi_core::crypto::encryption::{encrypt_aes_gcm, encrypt_legacy_untagged};
-use vauchi_core::crypto::{decrypt, encrypt, SymmetricKey};
+use vauchi_core::crypto::{decrypt, decrypt_with_ad, encrypt, encrypt_with_ad, SymmetricKey};
 
 #[test]
 fn test_aes_gcm_tagged_roundtrip() {
@@ -132,4 +132,69 @@ fn test_legacy_untagged_wrong_key() {
     let ciphertext = encrypt_legacy_untagged(&key1, b"test").unwrap();
     let result = decrypt(&key2, &ciphertext);
     assert!(result.is_err());
+}
+
+// --- AEAD associated data binding tests ---
+
+#[test]
+fn test_encrypt_with_ad_roundtrip() {
+    let key = SymmetricKey::generate();
+    let plaintext = b"message with associated data";
+    let ad = b"header-context-binding";
+    let ciphertext = encrypt_with_ad(&key, plaintext, ad).unwrap();
+    let decrypted = decrypt_with_ad(&key, &ciphertext, ad).unwrap();
+    assert_eq!(plaintext.to_vec(), decrypted);
+}
+
+#[test]
+fn test_encrypt_with_ad_tag_is_0x03() {
+    let key = SymmetricKey::generate();
+    let ciphertext = encrypt_with_ad(&key, b"test", b"ad").unwrap();
+    assert_eq!(ciphertext[0], 0x03); // ALG_TAG_XCHACHA20_AD
+}
+
+#[test]
+fn test_encrypt_with_ad_wrong_ad_fails() {
+    let key = SymmetricKey::generate();
+    let ciphertext = encrypt_with_ad(&key, b"secret", b"correct-ad").unwrap();
+    let result = decrypt_with_ad(&key, &ciphertext, b"wrong-ad");
+    assert!(result.is_err(), "Decryption with wrong AD must fail");
+}
+
+#[test]
+fn test_encrypt_with_ad_empty_ad_fails_against_non_empty() {
+    let key = SymmetricKey::generate();
+    let ciphertext = encrypt_with_ad(&key, b"data", b"some-ad").unwrap();
+    let result = decrypt_with_ad(&key, &ciphertext, b"");
+    assert!(result.is_err(), "Decryption with empty AD must fail when encrypted with non-empty AD");
+}
+
+#[test]
+fn test_encrypt_with_ad_cannot_decrypt_without_ad() {
+    let key = SymmetricKey::generate();
+    let ciphertext = encrypt_with_ad(&key, b"data", b"context").unwrap();
+    // Plain decrypt() should reject tag 0x03
+    let result = decrypt(&key, &ciphertext);
+    assert!(result.is_err(), "Plain decrypt must reject AD-bound ciphertext");
+}
+
+#[test]
+fn test_decrypt_with_ad_backward_compat_tag_0x02() {
+    let key = SymmetricKey::generate();
+    let plaintext = b"old message";
+    // Encrypt with tag 0x02 (no AD)
+    let ciphertext = encrypt(&key, plaintext).unwrap();
+    // decrypt_with_ad should handle tag 0x02 by ignoring AD
+    let decrypted = decrypt_with_ad(&key, &ciphertext, b"ignored-ad").unwrap();
+    assert_eq!(plaintext.to_vec(), decrypted);
+}
+
+#[test]
+fn test_decrypt_with_ad_backward_compat_tag_0x01() {
+    let key = SymmetricKey::generate();
+    let plaintext = b"aes message";
+    let ciphertext = encrypt_aes_gcm(&key, plaintext).unwrap();
+    // decrypt_with_ad should handle tag 0x01 by ignoring AD
+    let decrypted = decrypt_with_ad(&key, &ciphertext, b"ignored-ad").unwrap();
+    assert_eq!(plaintext.to_vec(), decrypted);
 }

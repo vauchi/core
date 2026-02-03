@@ -23,9 +23,8 @@ impl Storage {
         let contacts_encrypted =
             crate::crypto::encrypt(&self.encryption_key, contacts_json.as_bytes())
                 .map_err(|e| StorageError::Encryption(e.to_string()))?;
-        let fields_encrypted =
-            crate::crypto::encrypt(&self.encryption_key, fields_json.as_bytes())
-                .map_err(|e| StorageError::Encryption(e.to_string()))?;
+        let fields_encrypted = crate::crypto::encrypt(&self.encryption_key, fields_json.as_bytes())
+            .map_err(|e| StorageError::Encryption(e.to_string()))?;
 
         self.conn.execute(
             "INSERT OR REPLACE INTO visibility_labels
@@ -152,9 +151,8 @@ impl Storage {
     ) -> Result<String, StorageError> {
         if let Some(enc) = encrypted {
             if !enc.is_empty() {
-                let decrypted =
-                    crate::crypto::decrypt(&self.encryption_key, enc)
-                        .map_err(|e| StorageError::Encryption(e.to_string()))?;
+                let decrypted = crate::crypto::decrypt(&self.encryption_key, enc)
+                    .map_err(|e| StorageError::Encryption(e.to_string()))?;
                 return String::from_utf8(decrypted)
                     .map_err(|e| StorageError::Serialization(e.to_string()));
             }

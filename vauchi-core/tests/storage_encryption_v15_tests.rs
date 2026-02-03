@@ -48,7 +48,10 @@ fn test_migration_v15_adds_encrypted_columns() {
             |row| row.get(0),
         )
         .unwrap();
-    assert!(has_fv_encrypted, "field_validations should have field_value_encrypted column");
+    assert!(
+        has_fv_encrypted,
+        "field_validations should have field_value_encrypted column"
+    );
 
     let has_sig_encrypted: bool = raw_conn
         .query_row(
@@ -57,7 +60,10 @@ fn test_migration_v15_adds_encrypted_columns() {
             |row| row.get(0),
         )
         .unwrap();
-    assert!(has_sig_encrypted, "field_validations should have signature_encrypted column");
+    assert!(
+        has_sig_encrypted,
+        "field_validations should have signature_encrypted column"
+    );
 
     // ux_state: aha_tracker_json_encrypted, demo_contact_json_encrypted
     let has_aha_encrypted: bool = raw_conn
@@ -67,7 +73,10 @@ fn test_migration_v15_adds_encrypted_columns() {
             |row| row.get(0),
         )
         .unwrap();
-    assert!(has_aha_encrypted, "ux_state should have aha_tracker_json_encrypted column");
+    assert!(
+        has_aha_encrypted,
+        "ux_state should have aha_tracker_json_encrypted column"
+    );
 
     let has_demo_encrypted: bool = raw_conn
         .query_row(
@@ -76,7 +85,10 @@ fn test_migration_v15_adds_encrypted_columns() {
             |row| row.get(0),
         )
         .unwrap();
-    assert!(has_demo_encrypted, "ux_state should have demo_contact_json_encrypted column");
+    assert!(
+        has_demo_encrypted,
+        "ux_state should have demo_contact_json_encrypted column"
+    );
 
     // audit_log: details_encrypted
     let has_details_encrypted: bool = raw_conn
@@ -86,14 +98,21 @@ fn test_migration_v15_adds_encrypted_columns() {
             |row| row.get(0),
         )
         .unwrap();
-    assert!(has_details_encrypted, "audit_log should have details_encrypted column");
+    assert!(
+        has_details_encrypted,
+        "audit_log should have details_encrypted column"
+    );
 }
 
 #[test]
 fn test_schema_version_at_least_16() {
     let (_dir, storage) = open_storage();
     let version = storage.schema_version().unwrap();
-    assert!(version >= 16, "schema version should be at least 16, got {}", version);
+    assert!(
+        version >= 16,
+        "schema version should be at least 16, got {}",
+        version
+    );
 }
 
 // === field_validations roundtrip tests ===
@@ -118,7 +137,9 @@ fn test_field_validation_roundtrip() {
 
     storage.save_validation(&validation).unwrap();
 
-    let loaded = storage.load_validations_for_field(contact_id, "email").unwrap();
+    let loaded = storage
+        .load_validations_for_field(contact_id, "email")
+        .unwrap();
     assert_eq!(loaded.len(), 1);
     assert_eq!(loaded[0].field_value(), "test@example.com");
     assert_eq!(loaded[0].validator_id(), "validator-123");
@@ -158,10 +179,22 @@ fn test_field_validation_encrypted_in_db() {
         )
         .unwrap();
 
-    assert!(fv_plain.is_empty(), "plaintext field_value should be cleared");
-    assert!(fv_enc.is_some() && !fv_enc.unwrap().is_empty(), "field_value_encrypted should have data");
-    assert!(sig_plain.is_empty(), "plaintext signature should be cleared");
-    assert!(sig_enc.is_some() && !sig_enc.unwrap().is_empty(), "signature_encrypted should have data");
+    assert!(
+        fv_plain.is_empty(),
+        "plaintext field_value should be cleared"
+    );
+    assert!(
+        fv_enc.is_some() && !fv_enc.unwrap().is_empty(),
+        "field_value_encrypted should have data"
+    );
+    assert!(
+        sig_plain.is_empty(),
+        "plaintext signature should be cleared"
+    );
+    assert!(
+        sig_enc.is_some() && !sig_enc.unwrap().is_empty(),
+        "signature_encrypted should have data"
+    );
 }
 
 #[test]
@@ -183,7 +216,9 @@ fn test_field_validation_by_validator_roundtrip() {
 
     storage.save_validation(&validation).unwrap();
 
-    let loaded = storage.load_validations_by_validator("my-validator-id").unwrap();
+    let loaded = storage
+        .load_validations_by_validator("my-validator-id")
+        .unwrap();
     assert_eq!(loaded.len(), 1);
     assert_eq!(loaded[0].field_value(), "user@example.com");
 }
@@ -207,8 +242,12 @@ fn test_field_validation_has_validated_works() {
 
     storage.save_validation(&validation).unwrap();
 
-    assert!(storage.has_validated(contact_id, "email", "validator-xyz").unwrap());
-    assert!(!storage.has_validated(contact_id, "email", "other-validator").unwrap());
+    assert!(storage
+        .has_validated(contact_id, "email", "validator-xyz")
+        .unwrap());
+    assert!(!storage
+        .has_validated(contact_id, "email", "other-validator")
+        .unwrap());
 }
 
 // === ux_state roundtrip tests ===
@@ -315,7 +354,9 @@ fn test_ux_state_encrypted_in_db() {
 fn test_audit_log_roundtrip() {
     let (_dir, storage) = open_storage();
 
-    storage.log_audit_event("test_event", Some("detailed info here")).unwrap();
+    storage
+        .log_audit_event("test_event", Some("detailed info here"))
+        .unwrap();
     storage.log_audit_event("another_event", None).unwrap();
 
     // Audit log doesn't have a read-back API in the original code.
@@ -326,7 +367,9 @@ fn test_audit_log_roundtrip() {
 fn test_audit_log_encrypted_in_db() {
     let (dir, storage) = open_storage();
 
-    storage.log_audit_event("data_deleted", Some("Deleted contact John")).unwrap();
+    storage
+        .log_audit_event("data_deleted", Some("Deleted contact John"))
+        .unwrap();
     drop(storage);
 
     let db_path = dir.path().join("vauchi.db");
@@ -399,7 +442,9 @@ fn test_rekey_preserves_field_validations() {
     let new_key = SymmetricKey::generate();
     storage.rekey(new_key).unwrap();
 
-    let loaded = storage.load_validations_for_field(&contact_id, "email").unwrap();
+    let loaded = storage
+        .load_validations_for_field(&contact_id, "email")
+        .unwrap();
     assert_eq!(loaded.len(), 1);
     assert_eq!(loaded[0].field_value(), "rekey@example.com");
     assert_eq!(*loaded[0].signature(), [77u8; 64]);
@@ -427,7 +472,9 @@ fn test_rekey_preserves_ux_state() {
 fn test_rekey_preserves_audit_log() {
     let (dir, mut storage) = open_storage();
 
-    storage.log_audit_event("test_event", Some("sensitive details")).unwrap();
+    storage
+        .log_audit_event("test_event", Some("sensitive details"))
+        .unwrap();
 
     // Rekey
     let new_key = SymmetricKey::generate();

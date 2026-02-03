@@ -690,11 +690,10 @@ fn migrate_v14_encrypt_high_priority(
 
     // Step 2: Encrypt existing plaintext data in own_card
     {
-        let result: Result<(String,), _> = conn.query_row(
-            "SELECT card_json FROM own_card WHERE id = 1",
-            [],
-            |row| Ok((row.get(0)?,)),
-        );
+        let result: Result<(String,), _> =
+            conn.query_row("SELECT card_json FROM own_card WHERE id = 1", [], |row| {
+                Ok((row.get(0)?,))
+            });
 
         if let Ok((card_json,)) = result {
             let encrypted = encrypt(key, card_json.as_bytes())
@@ -946,15 +945,11 @@ fn migrate_v15_encrypt_medium_priority(
     {
         let mut stmt = conn
             .prepare("SELECT target_device_id, items_json FROM device_sync_checkpoints")
-            .map_err(|e| {
-                StorageError::Migration(format!("Read device_sync_checkpoints: {}", e))
-            })?;
+            .map_err(|e| StorageError::Migration(format!("Read device_sync_checkpoints: {}", e)))?;
 
         let rows: Vec<(Vec<u8>, String)> = stmt
             .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))
-            .map_err(|e| {
-                StorageError::Migration(format!("Query device_sync_checkpoints: {}", e))
-            })?
+            .map_err(|e| StorageError::Migration(format!("Query device_sync_checkpoints: {}", e)))?
             .collect::<Result<Vec<_>, _>>()
             .map_err(|e| {
                 StorageError::Migration(format!("Collect device_sync_checkpoints: {}", e))
@@ -1028,9 +1023,8 @@ fn migrate_v15_encrypt_medium_priority(
             .map_err(|e| StorageError::Migration(format!("Collect sync_checkpoints: {}", e)))?;
 
         for (checkpoint_id, state_json) in &rows {
-            let encrypted = encrypt(key, state_json.as_bytes()).map_err(|e| {
-                StorageError::Migration(format!("Encrypt sync_checkpoints: {}", e))
-            })?;
+            let encrypted = encrypt(key, state_json.as_bytes())
+                .map_err(|e| StorageError::Migration(format!("Encrypt sync_checkpoints: {}", e)))?;
             conn.execute(
                 "UPDATE sync_checkpoints SET state_json_encrypted = ?1, state_json = '' WHERE checkpoint_id = ?2",
                 rusqlite::params![encrypted, checkpoint_id],
@@ -1078,12 +1072,10 @@ fn migrate_v16_encrypt_low_priority(
             .map_err(|e| StorageError::Migration(format!("Collect field_validations: {}", e)))?;
 
         for (id, field_value, signature) in &rows {
-            let fv_encrypted = encrypt(key, field_value.as_bytes()).map_err(|e| {
-                StorageError::Migration(format!("Encrypt field_value: {}", e))
-            })?;
-            let sig_encrypted = encrypt(key, signature).map_err(|e| {
-                StorageError::Migration(format!("Encrypt signature: {}", e))
-            })?;
+            let fv_encrypted = encrypt(key, field_value.as_bytes())
+                .map_err(|e| StorageError::Migration(format!("Encrypt field_value: {}", e)))?;
+            let sig_encrypted = encrypt(key, signature)
+                .map_err(|e| StorageError::Migration(format!("Encrypt signature: {}", e)))?;
             conn.execute(
                 "UPDATE field_validations SET field_value_encrypted = ?1, field_value = '', signature_encrypted = ?2, signature = X'' WHERE id = ?3",
                 rusqlite::params![fv_encrypted, sig_encrypted, id],
@@ -1141,7 +1133,9 @@ fn migrate_v16_encrypt_low_priority(
     // Step 4: Encrypt existing audit_log details
     {
         let mut stmt = conn
-            .prepare("SELECT id, details FROM audit_log WHERE details IS NOT NULL AND details != ''")
+            .prepare(
+                "SELECT id, details FROM audit_log WHERE details IS NOT NULL AND details != ''",
+            )
             .map_err(|e| StorageError::Migration(format!("Read audit_log: {}", e)))?;
         let rows: Vec<(i64, String)> = stmt
             .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))

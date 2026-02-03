@@ -89,20 +89,13 @@ struct KeychainBridge {
 }
 
 impl vauchi_core::storage::SecureStorage for KeychainBridge {
-    fn save_key(
-        &self,
-        name: &str,
-        key: &[u8],
-    ) -> Result<(), vauchi_core::StorageError> {
+    fn save_key(&self, name: &str, key: &[u8]) -> Result<(), vauchi_core::StorageError> {
         self.callback
             .save_key(name.to_string(), key.to_vec())
             .map_err(vauchi_core::StorageError::Encryption)
     }
 
-    fn load_key(
-        &self,
-        name: &str,
-    ) -> Result<Option<Vec<u8>>, vauchi_core::StorageError> {
+    fn load_key(&self, name: &str) -> Result<Option<Vec<u8>>, vauchi_core::StorageError> {
         self.callback
             .load_key(name.to_string())
             .map_err(vauchi_core::StorageError::Encryption)
@@ -1580,8 +1573,7 @@ impl VauchiMobile {
         let bridge = self.get_keychain_bridge()?;
         let data_dir = self.data_dir();
 
-        let manager =
-            vauchi_core::api::ShredManager::new(&storage, &bridge, &identity, &data_dir);
+        let manager = vauchi_core::api::ShredManager::new(&storage, &bridge, &identity, &data_dir);
         let token = manager
             .soft_shred()
             .map_err(|e| MobileError::ShredError(e.to_string()))?;
@@ -1596,8 +1588,7 @@ impl VauchiMobile {
         let data_dir = self.data_dir();
 
         let core_token = vauchi_core::api::ShredToken::from_created_at(token.created_at);
-        let manager =
-            vauchi_core::api::ShredManager::new(&storage, &bridge, &identity, &data_dir);
+        let manager = vauchi_core::api::ShredManager::new(&storage, &bridge, &identity, &data_dir);
         manager
             .cancel_shred(core_token)
             .map_err(|e| MobileError::ShredError(e.to_string()))?;
@@ -1618,8 +1609,7 @@ impl VauchiMobile {
         let data_dir = self.data_dir();
 
         let core_token = vauchi_core::api::ShredToken::from_created_at(token.created_at);
-        let manager =
-            vauchi_core::api::ShredManager::new(&storage, &bridge, &identity, &data_dir);
+        let manager = vauchi_core::api::ShredManager::new(&storage, &bridge, &identity, &data_dir);
         let report = manager
             .hard_shred(core_token)
             .map_err(|e| MobileError::ShredError(e.to_string()))?;
@@ -1638,8 +1628,7 @@ impl VauchiMobile {
         let bridge = self.get_keychain_bridge()?;
         let data_dir = self.data_dir();
 
-        let manager =
-            vauchi_core::api::ShredManager::new(&storage, &bridge, &identity, &data_dir);
+        let manager = vauchi_core::api::ShredManager::new(&storage, &bridge, &identity, &data_dir);
         let report = manager
             .panic_shred()
             .map_err(|e| MobileError::ShredError(e.to_string()))?;
@@ -1655,8 +1644,7 @@ impl VauchiMobile {
         let bridge = self.get_keychain_bridge()?;
         let data_dir = self.data_dir();
 
-        let manager =
-            vauchi_core::api::ShredManager::new(&storage, &bridge, &identity, &data_dir);
+        let manager = vauchi_core::api::ShredManager::new(&storage, &bridge, &identity, &data_dir);
         let verification = manager.verify_shred();
         Ok(MobileShredVerification::from(&verification))
     }
@@ -1674,9 +1662,7 @@ impl VauchiMobile {
 
         match state {
             vauchi_core::storage::DeletionState::None => Ok(MobileShredStatus::None),
-            vauchi_core::storage::DeletionState::Scheduled {
-                execute_at, ..
-            } => {
+            vauchi_core::storage::DeletionState::Scheduled { execute_at, .. } => {
                 let now = std::time::SystemTime::now()
                     .duration_since(std::time::UNIX_EPOCH)
                     .map(|d| d.as_secs())
@@ -1686,9 +1672,7 @@ impl VauchiMobile {
                     remaining_secs: remaining,
                 })
             }
-            vauchi_core::storage::DeletionState::Executed { .. } => {
-                Ok(MobileShredStatus::Executed)
-            }
+            vauchi_core::storage::DeletionState::Executed { .. } => Ok(MobileShredStatus::Executed),
         }
     }
 

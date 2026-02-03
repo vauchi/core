@@ -25,9 +25,8 @@ impl Storage {
         response: &str,
         remind_at: Option<u64>,
     ) -> Result<(), StorageError> {
-        let response_encrypted =
-            crate::crypto::encrypt(&self.encryption_key, response.as_bytes())
-                .map_err(|e| StorageError::Encryption(e.to_string()))?;
+        let response_encrypted = crate::crypto::encrypt(&self.encryption_key, response.as_bytes())
+            .map_err(|e| StorageError::Encryption(e.to_string()))?;
 
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -68,15 +67,19 @@ impl Storage {
                 let encrypted: Option<Vec<u8>> = row.get(1)?;
                 let plaintext: String = row.get(2)?;
                 let remind_at: Option<i64> = row.get(3)?;
-                Ok((contact_id, encrypted, plaintext, remind_at.map(|t| t as u64)))
+                Ok((
+                    contact_id,
+                    encrypted,
+                    plaintext,
+                    remind_at.map(|t| t as u64),
+                ))
             },
         );
 
         match result {
             Ok((contact_id, Some(encrypted), _, remind_at)) if !encrypted.is_empty() => {
-                let decrypted =
-                    crate::crypto::decrypt(&self.encryption_key, &encrypted)
-                        .map_err(|e| StorageError::Encryption(e.to_string()))?;
+                let decrypted = crate::crypto::decrypt(&self.encryption_key, &encrypted)
+                    .map_err(|e| StorageError::Encryption(e.to_string()))?;
                 let response = String::from_utf8(decrypted)
                     .map_err(|e| StorageError::Serialization(e.to_string()))?;
                 Ok(Some((contact_id, response, remind_at)))

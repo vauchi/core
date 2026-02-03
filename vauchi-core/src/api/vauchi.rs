@@ -219,15 +219,14 @@ impl<T: Transport> Vauchi<T> {
             let smk = identity.derive_smk();
 
             // Store SMK in SecureStorage BEFORE rekey (safety: see DP-1 rationale)
-            ss.save_key(SMK_KEY_NAME, smk.as_bytes()).map_err(|e| {
-                VauchiError::Configuration(format!("Failed to store SMK: {}", e))
-            })?;
+            ss.save_key(SMK_KEY_NAME, smk.as_bytes())
+                .map_err(|e| VauchiError::Configuration(format!("Failed to store SMK: {}", e)))?;
 
             // Derive SEK and rekey storage
             let sek = smk.derive_sek();
-            self.storage
-                .rekey(sek)
-                .map_err(|e| VauchiError::Configuration(format!("Failed to rekey storage: {}", e)))?;
+            self.storage.rekey(sek).map_err(|e| {
+                VauchiError::Configuration(format!("Failed to rekey storage: {}", e))
+            })?;
         }
 
         self.identity = Some(identity);
@@ -253,9 +252,10 @@ impl<T: Transport> Vauchi<T> {
             .ok_or_else(|| VauchiError::Configuration("SecureStorage not set".into()))?;
 
         // Check if already migrated
-        if ss.has_key(SMK_KEY_NAME).map_err(|e| {
-            VauchiError::Configuration(format!("Failed to check SMK: {}", e))
-        })? {
+        if ss
+            .has_key(SMK_KEY_NAME)
+            .map_err(|e| VauchiError::Configuration(format!("Failed to check SMK: {}", e)))?
+        {
             return Ok(()); // Already migrated
         }
 
@@ -267,9 +267,8 @@ impl<T: Transport> Vauchi<T> {
         let smk = identity.derive_smk();
 
         // Store SMK in SecureStorage BEFORE rekey
-        ss.save_key(SMK_KEY_NAME, smk.as_bytes()).map_err(|e| {
-            VauchiError::Configuration(format!("Failed to store SMK: {}", e))
-        })?;
+        ss.save_key(SMK_KEY_NAME, smk.as_bytes())
+            .map_err(|e| VauchiError::Configuration(format!("Failed to store SMK: {}", e)))?;
 
         // Derive SEK and rekey storage
         let sek = smk.derive_sek();

@@ -67,9 +67,8 @@ impl Storage {
 
     /// Creates a new retry entry (payload encrypted).
     pub fn create_retry_entry(&self, entry: &RetryEntry) -> Result<(), StorageError> {
-        let payload_encrypted =
-            crate::crypto::encrypt(&self.encryption_key, &entry.payload)
-                .map_err(|e| StorageError::Encryption(e.to_string()))?;
+        let payload_encrypted = crate::crypto::encrypt(&self.encryption_key, &entry.payload)
+            .map_err(|e| StorageError::Encryption(e.to_string()))?;
 
         self.conn.execute(
             "INSERT INTO retry_entries
@@ -91,8 +90,13 @@ impl Storage {
 
     /// Gets a retry entry by message ID.
     pub fn get_retry_entry(&self, message_id: &str) -> Result<Option<RetryEntry>, StorageError> {
-        let sql = format!("SELECT {} FROM retry_entries WHERE message_id = ?1", RETRY_SELECT);
-        let result = self.conn.query_row(&sql, params![message_id], row_to_retry_row);
+        let sql = format!(
+            "SELECT {} FROM retry_entries WHERE message_id = ?1",
+            RETRY_SELECT
+        );
+        let result = self
+            .conn
+            .query_row(&sql, params![message_id], row_to_retry_row);
 
         match result {
             Ok(row) => Ok(Some(self.decrypt_retry_row(row)?)),

@@ -565,9 +565,8 @@ impl Storage {
 
         match result {
             Ok((Some(encrypted), _)) if !encrypted.is_empty() => {
-                let decrypted =
-                    crate::crypto::decrypt(&self.encryption_key, &encrypted)
-                        .map_err(|e| StorageError::Encryption(e.to_string()))?;
+                let decrypted = crate::crypto::decrypt(&self.encryption_key, &encrypted)
+                    .map_err(|e| StorageError::Encryption(e.to_string()))?;
                 let json = String::from_utf8(decrypted)
                     .map_err(|e| StorageError::Serialization(e.to_string()))?;
                 let card = serde_json::from_str(&json)
@@ -599,9 +598,8 @@ impl Storage {
         timestamp: u64,
     ) -> Result<(), StorageError> {
         let ts_bytes = (timestamp as i64).to_le_bytes();
-        let encrypted =
-            crate::crypto::encrypt(&self.encryption_key, &ts_bytes)
-                .map_err(|e| StorageError::Encryption(e.to_string()))?;
+        let encrypted = crate::crypto::encrypt(&self.encryption_key, &ts_bytes)
+            .map_err(|e| StorageError::Encryption(e.to_string()))?;
 
         self.conn.execute(
             "INSERT OR REPLACE INTO contact_sync_timestamps (contact_id, last_sync_at, last_sync_at_encrypted)
@@ -627,9 +625,8 @@ impl Storage {
 
         match result {
             Ok((Some(encrypted), _)) if !encrypted.is_empty() => {
-                let decrypted =
-                    crate::crypto::decrypt(&self.encryption_key, &encrypted)
-                        .map_err(|e| StorageError::Encryption(e.to_string()))?;
+                let decrypted = crate::crypto::decrypt(&self.encryption_key, &encrypted)
+                    .map_err(|e| StorageError::Encryption(e.to_string()))?;
                 if decrypted.len() == 8 {
                     let ts = i64::from_le_bytes(
                         decrypted

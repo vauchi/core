@@ -264,8 +264,7 @@ fn test_vauchi_boot_with_smk_from_secure_storage() {
     let secure = Arc::new(MemoryKeyStorage::new());
     let initial_key = SymmetricKey::generate();
     {
-        let config = VauchiConfig::with_storage_path(&db_path)
-            .with_storage_key(initial_key);
+        let config = VauchiConfig::with_storage_path(&db_path).with_storage_key(initial_key);
         let mut vauchi = Vauchi::new(config).unwrap();
         vauchi.set_secure_storage(secure.clone());
         vauchi.create_identity("Alice").unwrap();
@@ -305,8 +304,7 @@ fn test_vauchi_migrate_existing_to_smk() {
     let identity = Identity::create("MigrateMe");
     let secure = Arc::new(MemoryKeyStorage::new());
     {
-        let config = VauchiConfig::with_storage_path(&db_path)
-            .with_storage_key(old_key);
+        let config = VauchiConfig::with_storage_path(&db_path).with_storage_key(old_key);
         let mut vauchi = Vauchi::new(config).unwrap();
         vauchi.set_secure_storage(secure.clone());
         vauchi.set_identity(identity).unwrap();

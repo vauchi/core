@@ -89,9 +89,8 @@ impl Storage {
             }
         };
 
-        let payload_encrypted =
-            crate::crypto::encrypt(&self.encryption_key, &update.payload)
-                .map_err(|e| StorageError::Encryption(e.to_string()))?;
+        let payload_encrypted = crate::crypto::encrypt(&self.encryption_key, &update.payload)
+            .map_err(|e| StorageError::Encryption(e.to_string()))?;
 
         self.conn.execute(
             "INSERT OR REPLACE INTO pending_updates
@@ -170,7 +169,9 @@ impl Storage {
             "SELECT {} FROM pending_updates WHERE id = ?1",
             PENDING_SELECT
         );
-        let result = self.conn.query_row(&sql, params![update_id], row_to_pending_row);
+        let result = self
+            .conn
+            .query_row(&sql, params![update_id], row_to_pending_row);
 
         match result {
             Ok(row) => Ok(Some(self.decrypt_pending_row(row)?)),

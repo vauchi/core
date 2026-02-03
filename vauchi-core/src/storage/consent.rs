@@ -141,9 +141,8 @@ impl Storage {
     pub fn save_deletion_state(&self, state: &super::DeletionState) -> Result<(), StorageError> {
         let json =
             serde_json::to_string(state).map_err(|e| StorageError::Serialization(e.to_string()))?;
-        let encrypted =
-            crate::crypto::encrypt(&self.encryption_key, json.as_bytes())
-                .map_err(|e| StorageError::Encryption(e.to_string()))?;
+        let encrypted = crate::crypto::encrypt(&self.encryption_key, json.as_bytes())
+            .map_err(|e| StorageError::Encryption(e.to_string()))?;
 
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -171,9 +170,8 @@ impl Storage {
 
         match result {
             Ok((Some(encrypted), _)) if !encrypted.is_empty() => {
-                let decrypted =
-                    crate::crypto::decrypt(&self.encryption_key, &encrypted)
-                        .map_err(|e| StorageError::Encryption(e.to_string()))?;
+                let decrypted = crate::crypto::decrypt(&self.encryption_key, &encrypted)
+                    .map_err(|e| StorageError::Encryption(e.to_string()))?;
                 let json = String::from_utf8(decrypted)
                     .map_err(|e| StorageError::Serialization(e.to_string()))?;
                 let state = serde_json::from_str(&json)

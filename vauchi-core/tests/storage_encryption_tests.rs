@@ -320,7 +320,10 @@ fn test_migration_v13_fallback_reads_plaintext() {
     {
         let storage = Storage::open(&db_path, key).unwrap();
         let card = storage.load_own_card().unwrap();
-        assert!(card.is_some(), "Should be able to load card via plaintext fallback");
+        assert!(
+            card.is_some(),
+            "Should be able to load card via plaintext fallback"
+        );
         assert_eq!(card.unwrap().display_name(), "PreMigration");
     }
 }

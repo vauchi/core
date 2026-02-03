@@ -255,8 +255,7 @@ impl<'a> ShredManager<'a> {
 
         let database_absent = !self.data_dir.join("vauchi.db").exists();
         let data_dir_absent = !self.data_dir.exists();
-        let pre_signed_absent =
-            !PreSignedShredMessages::file_path(&self.data_dir).exists();
+        let pre_signed_absent = !PreSignedShredMessages::file_path(&self.data_dir).exists();
 
         let all_clear = smk_absent && database_absent && pre_signed_absent;
 
@@ -272,9 +271,7 @@ impl<'a> ShredManager<'a> {
     // ── Internal helpers ──
 
     fn destroy_smk(&self) -> bool {
-        self.secure_storage
-            .secure_delete_key(SMK_KEY_NAME)
-            .is_ok()
+        self.secure_storage.secure_delete_key(SMK_KEY_NAME).is_ok()
     }
 
     fn secure_delete_identity_file(&self) -> bool {
@@ -542,7 +539,10 @@ mod tests {
 
         let verification = manager.verify_shred();
         assert!(verification.smk_absent, "SMK should be absent");
-        assert!(verification.pre_signed_absent, "Pre-signed file should be absent");
+        assert!(
+            verification.pre_signed_absent,
+            "Pre-signed file should be absent"
+        );
     }
 
     #[test]

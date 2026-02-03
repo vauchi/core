@@ -27,11 +27,10 @@ impl Storage {
             "device_name": device_name,
             "created_at": created_at,
         });
-        let json_bytes = serde_json::to_vec(&json)
-            .map_err(|e| StorageError::Serialization(e.to_string()))?;
-        let encrypted =
-            crate::crypto::encrypt(&self.encryption_key, &json_bytes)
-                .map_err(|e| StorageError::Encryption(e.to_string()))?;
+        let json_bytes =
+            serde_json::to_vec(&json).map_err(|e| StorageError::Serialization(e.to_string()))?;
+        let encrypted = crate::crypto::encrypt(&self.encryption_key, &json_bytes)
+            .map_err(|e| StorageError::Encryption(e.to_string()))?;
 
         self.conn.execute(
             "INSERT OR REPLACE INTO device_info (id, device_id, device_index, device_name, created_at, device_info_encrypted)
@@ -66,9 +65,8 @@ impl Storage {
 
         match result {
             Ok((Some(encrypted), _, _, _, _)) if !encrypted.is_empty() => {
-                let decrypted =
-                    crate::crypto::decrypt(&self.encryption_key, &encrypted)
-                        .map_err(|e| StorageError::Encryption(e.to_string()))?;
+                let decrypted = crate::crypto::decrypt(&self.encryption_key, &encrypted)
+                    .map_err(|e| StorageError::Encryption(e.to_string()))?;
                 let json: serde_json::Value = serde_json::from_slice(&decrypted)
                     .map_err(|e| StorageError::Serialization(e.to_string()))?;
                 let device_id_vec: Vec<u8> = serde_json::from_value(json["device_id"].clone())
@@ -77,10 +75,7 @@ impl Storage {
                     .try_into()
                     .map_err(|_| StorageError::Encryption("Invalid device ID length".into()))?;
                 let device_index = json["device_index"].as_u64().unwrap_or(0) as u32;
-                let device_name = json["device_name"]
-                    .as_str()
-                    .unwrap_or("")
-                    .to_string();
+                let device_name = json["device_name"].as_str().unwrap_or("").to_string();
                 let created_at = json["created_at"].as_u64().unwrap_or(0);
                 Ok(Some((device_id, device_index, device_name, created_at)))
             }
@@ -150,9 +145,8 @@ impl Storage {
 
         match result {
             Ok((Some(encrypted), _)) if !encrypted.is_empty() => {
-                let decrypted =
-                    crate::crypto::decrypt(&self.encryption_key, &encrypted)
-                        .map_err(|e| StorageError::Encryption(e.to_string()))?;
+                let decrypted = crate::crypto::decrypt(&self.encryption_key, &encrypted)
+                    .map_err(|e| StorageError::Encryption(e.to_string()))?;
                 let json = String::from_utf8(decrypted)
                     .map_err(|e| StorageError::Serialization(e.to_string()))?;
                 let registry: DeviceRegistry = serde_json::from_str(&json)
@@ -187,9 +181,8 @@ impl Storage {
 
         match result {
             Ok((Some(encrypted), _)) if !encrypted.is_empty() => {
-                let decrypted =
-                    crate::crypto::decrypt(&self.encryption_key, &encrypted)
-                        .map_err(|e| StorageError::Encryption(e.to_string()))?;
+                let decrypted = crate::crypto::decrypt(&self.encryption_key, &encrypted)
+                    .map_err(|e| StorageError::Encryption(e.to_string()))?;
                 let json = String::from_utf8(decrypted)
                     .map_err(|e| StorageError::Serialization(e.to_string()))?;
                 Ok(Some(json))
@@ -216,9 +209,8 @@ impl Storage {
     /// Saves inter-device sync state for a specific device (encrypted).
     pub fn save_device_sync_state(&self, state: &InterDeviceSyncState) -> Result<(), StorageError> {
         let state_json = state.to_json();
-        let state_encrypted =
-            crate::crypto::encrypt(&self.encryption_key, state_json.as_bytes())
-                .map_err(|e| StorageError::Encryption(e.to_string()))?;
+        let state_encrypted = crate::crypto::encrypt(&self.encryption_key, state_json.as_bytes())
+            .map_err(|e| StorageError::Encryption(e.to_string()))?;
 
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -255,9 +247,8 @@ impl Storage {
 
         match result {
             Ok((Some(encrypted), _)) if !encrypted.is_empty() => {
-                let decrypted =
-                    crate::crypto::decrypt(&self.encryption_key, &encrypted)
-                        .map_err(|e| StorageError::Encryption(e.to_string()))?;
+                let decrypted = crate::crypto::decrypt(&self.encryption_key, &encrypted)
+                    .map_err(|e| StorageError::Encryption(e.to_string()))?;
                 let json = String::from_utf8(decrypted)
                     .map_err(|e| StorageError::Serialization(e.to_string()))?;
                 let state = InterDeviceSyncState::from_json(&json)
@@ -277,9 +268,9 @@ impl Storage {
 
     /// Lists all inter-device sync states (decrypted).
     pub fn list_device_sync_states(&self) -> Result<Vec<InterDeviceSyncState>, StorageError> {
-        let mut stmt = self.conn.prepare(
-            "SELECT state_json_encrypted, state_json FROM device_sync_state",
-        )?;
+        let mut stmt = self
+            .conn
+            .prepare("SELECT state_json_encrypted, state_json FROM device_sync_state")?;
 
         let rows = stmt
             .query_map([], |row| {
@@ -328,9 +319,8 @@ impl Storage {
     /// Saves the local version vector (encrypted).
     pub fn save_version_vector(&self, vector: &VersionVector) -> Result<(), StorageError> {
         let vector_json = vector.to_json();
-        let encrypted =
-            crate::crypto::encrypt(&self.encryption_key, vector_json.as_bytes())
-                .map_err(|e| StorageError::Encryption(e.to_string()))?;
+        let encrypted = crate::crypto::encrypt(&self.encryption_key, vector_json.as_bytes())
+            .map_err(|e| StorageError::Encryption(e.to_string()))?;
 
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -359,9 +349,8 @@ impl Storage {
 
         match result {
             Ok((Some(encrypted), _)) if !encrypted.is_empty() => {
-                let decrypted =
-                    crate::crypto::decrypt(&self.encryption_key, &encrypted)
-                        .map_err(|e| StorageError::Encryption(e.to_string()))?;
+                let decrypted = crate::crypto::decrypt(&self.encryption_key, &encrypted)
+                    .map_err(|e| StorageError::Encryption(e.to_string()))?;
                 let json = String::from_utf8(decrypted)
                     .map_err(|e| StorageError::Serialization(e.to_string()))?;
                 let vector = VersionVector::from_json(&json)
@@ -408,9 +397,8 @@ impl Storage {
     ) -> Result<(), StorageError> {
         let items_json =
             serde_json::to_string(items).map_err(|e| StorageError::Serialization(e.to_string()))?;
-        let encrypted =
-            crate::crypto::encrypt(&self.encryption_key, items_json.as_bytes())
-                .map_err(|e| StorageError::Encryption(e.to_string()))?;
+        let encrypted = crate::crypto::encrypt(&self.encryption_key, items_json.as_bytes())
+            .map_err(|e| StorageError::Encryption(e.to_string()))?;
 
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -446,14 +434,12 @@ impl Storage {
 
         match result {
             Ok((Some(encrypted), _, sent_count)) if !encrypted.is_empty() => {
-                let decrypted =
-                    crate::crypto::decrypt(&self.encryption_key, &encrypted)
-                        .map_err(|e| StorageError::Encryption(e.to_string()))?;
+                let decrypted = crate::crypto::decrypt(&self.encryption_key, &encrypted)
+                    .map_err(|e| StorageError::Encryption(e.to_string()))?;
                 let json = String::from_utf8(decrypted)
                     .map_err(|e| StorageError::Serialization(e.to_string()))?;
-                let items: Vec<crate::sync::device_sync::SyncItem> =
-                    serde_json::from_str(&json)
-                        .map_err(|e| StorageError::Serialization(e.to_string()))?;
+                let items: Vec<crate::sync::device_sync::SyncItem> = serde_json::from_str(&json)
+                    .map_err(|e| StorageError::Serialization(e.to_string()))?;
                 Ok(Some((items, sent_count as usize)))
             }
             Ok((_, plaintext, sent_count)) if !plaintext.is_empty() => {
@@ -492,9 +478,8 @@ impl Storage {
         processed_items: usize,
         state_json: &str,
     ) -> Result<(), StorageError> {
-        let encrypted =
-            crate::crypto::encrypt(&self.encryption_key, state_json.as_bytes())
-                .map_err(|e| StorageError::Encryption(e.to_string()))?;
+        let encrypted = crate::crypto::encrypt(&self.encryption_key, state_json.as_bytes())
+            .map_err(|e| StorageError::Encryption(e.to_string()))?;
 
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -543,9 +528,8 @@ impl Storage {
 
         match result {
             Ok((total, processed, Some(encrypted), _)) if !encrypted.is_empty() => {
-                let decrypted =
-                    crate::crypto::decrypt(&self.encryption_key, &encrypted)
-                        .map_err(|e| StorageError::Encryption(e.to_string()))?;
+                let decrypted = crate::crypto::decrypt(&self.encryption_key, &encrypted)
+                    .map_err(|e| StorageError::Encryption(e.to_string()))?;
                 let state = String::from_utf8(decrypted)
                     .map_err(|e| StorageError::Serialization(e.to_string()))?;
                 Ok(Some((total as usize, processed as usize, state)))
@@ -566,9 +550,8 @@ impl Storage {
         processed_items: usize,
         state_json: &str,
     ) -> Result<(), StorageError> {
-        let encrypted =
-            crate::crypto::encrypt(&self.encryption_key, state_json.as_bytes())
-                .map_err(|e| StorageError::Encryption(e.to_string()))?;
+        let encrypted = crate::crypto::encrypt(&self.encryption_key, state_json.as_bytes())
+            .map_err(|e| StorageError::Encryption(e.to_string()))?;
 
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)

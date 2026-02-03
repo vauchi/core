@@ -43,6 +43,11 @@ impl ShredToken {
     pub fn created_at(&self) -> u64 {
         self.created_at
     }
+
+    /// Reconstructs a token from a stored created_at timestamp.
+    pub fn from_created_at(created_at: u64) -> Self {
+        Self { created_at }
+    }
 }
 
 /// Report of shred operations performed.

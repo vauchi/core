@@ -55,12 +55,65 @@ pub use types::{
     MobileExchangeData, MobileExchangeResult, MobileFaqItem, MobileFieldType,
     MobileFieldValidation, MobileGdprExport, MobileHelpCategory, MobileHelpCategoryInfo,
     MobileLocale, MobileLocaleInfo, MobileRecoveryClaim, MobileRecoveryProgress,
-    MobileRecoveryVerification, MobileRecoveryVoucher, MobileRetryEntry, MobileSocialNetwork,
+    MobileRecoveryVerification, MobileRecoveryVoucher, MobileRetryEntry, MobileShredReport,
+    MobileShredStatus, MobileShredToken, MobileShredVerification, MobileSocialNetwork,
     MobileSyncResult, MobileSyncStatus, MobileTheme, MobileThemeColors, MobileThemeMode,
     MobileTrustLevel, MobileValidationStatus, MobileVisibilityLabel, MobileVisibilityLabelDetail,
 };
 
 uniffi::setup_scaffolding!();
+
+// === Platform Secure Storage Callback ===
+
+/// Callback interface for platform-specific secure key storage.
+///
+/// The mobile platform (iOS/Android) implements this interface to provide
+/// access to the native keychain (iOS Keychain, Android KeyStore).
+/// Used by shred operations to destroy the Shredding Master Key (SMK).
+#[uniffi::export(callback_interface)]
+pub trait MobilePlatformKeychain: Send + Sync {
+    /// Saves a key to the platform keychain.
+    fn save_key(&self, name: String, key: Vec<u8>) -> Result<(), String>;
+
+    /// Loads a key from the platform keychain.
+    /// Returns None if the key doesn't exist.
+    fn load_key(&self, name: String) -> Result<Option<Vec<u8>>, String>;
+
+    /// Deletes a key from the platform keychain.
+    fn delete_key(&self, name: String) -> Result<(), String>;
+}
+
+/// Bridge that adapts the UniFFI callback interface to vauchi-core's SecureStorage trait.
+struct KeychainBridge {
+    callback: Arc<dyn MobilePlatformKeychain>,
+}
+
+impl vauchi_core::storage::SecureStorage for KeychainBridge {
+    fn save_key(
+        &self,
+        name: &str,
+        key: &[u8],
+    ) -> Result<(), vauchi_core::StorageError> {
+        self.callback
+            .save_key(name.to_string(), key.to_vec())
+            .map_err(vauchi_core::StorageError::Encryption)
+    }
+
+    fn load_key(
+        &self,
+        name: &str,
+    ) -> Result<Option<Vec<u8>>, vauchi_core::StorageError> {
+        self.callback
+            .load_key(name.to_string())
+            .map_err(vauchi_core::StorageError::Encryption)
+    }
+
+    fn delete_key(&self, name: &str) -> Result<(), vauchi_core::StorageError> {
+        self.callback
+            .delete_key(name.to_string())
+            .map_err(vauchi_core::StorageError::Encryption)
+    }
+}
 
 // === Password Strength ===
 
@@ -345,6 +398,8 @@ pub struct VauchiMobile {
     identity_data: Mutex<Option<IdentityData>>,
     social_registry: SocialNetworkRegistry,
     sync_status: Mutex<MobileSyncStatus>,
+    /// Platform keychain for crypto-shredding operations.
+    platform_keychain: Mutex<Option<Arc<dyn MobilePlatformKeychain>>>,
 }
 
 impl VauchiMobile {
@@ -352,6 +407,28 @@ impl VauchiMobile {
     fn open_storage(&self) -> Result<Storage, MobileError> {
         Storage::open(&self.storage_path, self.storage_key.clone())
             .map_err(|e| MobileError::StorageError(e.to_string()))
+    }
+
+    /// Returns the data directory (parent of the database file).
+    fn data_dir(&self) -> PathBuf {
+        self.storage_path
+            .parent()
+            .unwrap_or(&self.storage_path)
+            .to_path_buf()
+    }
+
+    /// Gets the platform keychain bridge for shred operations.
+    fn get_keychain_bridge(&self) -> Result<KeychainBridge, MobileError> {
+        let lock = self.platform_keychain.lock().unwrap();
+        let callback = lock
+            .as_ref()
+            .ok_or_else(|| {
+                MobileError::ShredError(
+                    "Platform keychain not set. Call set_platform_keychain() first.".into(),
+                )
+            })?
+            .clone();
+        Ok(KeychainBridge { callback })
     }
 
     /// Connect to relay with optional certificate pinning.
@@ -483,6 +560,7 @@ impl VauchiMobile {
             identity_data: Mutex::new(None),
             social_registry: SocialNetworkRegistry::with_defaults(),
             sync_status: Mutex::new(MobileSyncStatus::Idle),
+            platform_keychain: Mutex::new(None),
         }))
     }
 
@@ -525,6 +603,7 @@ impl VauchiMobile {
             identity_data: Mutex::new(None),
             social_registry: SocialNetworkRegistry::with_defaults(),
             sync_status: Mutex::new(MobileSyncStatus::Idle),
+            platform_keychain: Mutex::new(None),
         }))
     }
 
@@ -1475,6 +1554,142 @@ impl VauchiMobile {
             .deletion_state()
             .map_err(|e| MobileError::GdprError(e.to_string()))?;
         Ok(MobileDeletionInfo::from(&state))
+    }
+
+    // === Crypto-Shredding Operations ===
+
+    /// Set the platform keychain for crypto-shredding operations.
+    ///
+    /// Must be called before any shred operation. The keychain provides
+    /// access to the platform's native secure storage (iOS Keychain,
+    /// Android KeyStore) for SMK management.
+    pub fn set_platform_keychain(&self, keychain: Box<dyn MobilePlatformKeychain>) {
+        let mut lock = self.platform_keychain.lock().unwrap();
+        *lock = Some(Arc::from(keychain));
+    }
+
+    /// Schedule crypto-shredding with 7-day grace period (Soft Shred).
+    ///
+    /// Returns a token that must be passed to `hard_shred()` after the grace period.
+    /// Also refreshes the pre-signed messages file for future panic shred.
+    ///
+    /// Requires `set_platform_keychain()` to be called first.
+    pub fn soft_shred(&self) -> Result<MobileShredToken, MobileError> {
+        let storage = self.open_storage()?;
+        let identity = self.get_identity()?;
+        let bridge = self.get_keychain_bridge()?;
+        let data_dir = self.data_dir();
+
+        let manager =
+            vauchi_core::api::ShredManager::new(&storage, &bridge, &identity, &data_dir);
+        let token = manager
+            .soft_shred()
+            .map_err(|e| MobileError::ShredError(e.to_string()))?;
+        Ok(MobileShredToken::from(&token))
+    }
+
+    /// Cancel a scheduled shred during the grace period.
+    pub fn cancel_shred(&self, token: MobileShredToken) -> Result<(), MobileError> {
+        let storage = self.open_storage()?;
+        let identity = self.get_identity()?;
+        let bridge = self.get_keychain_bridge()?;
+        let data_dir = self.data_dir();
+
+        let core_token = vauchi_core::api::ShredToken::from_created_at(token.created_at);
+        let manager =
+            vauchi_core::api::ShredManager::new(&storage, &bridge, &identity, &data_dir);
+        manager
+            .cancel_shred(core_token)
+            .map_err(|e| MobileError::ShredError(e.to_string()))?;
+        Ok(())
+    }
+
+    /// Execute irreversible crypto-shredding (Hard Shred).
+    ///
+    /// Requires the grace period to have elapsed. Destroys all key material,
+    /// secure-deletes the database, and removes all local data.
+    ///
+    /// **WARNING**: This operation is irreversible. All account data will be
+    /// permanently destroyed.
+    pub fn hard_shred(&self, token: MobileShredToken) -> Result<MobileShredReport, MobileError> {
+        let storage = self.open_storage()?;
+        let identity = self.get_identity()?;
+        let bridge = self.get_keychain_bridge()?;
+        let data_dir = self.data_dir();
+
+        let core_token = vauchi_core::api::ShredToken::from_created_at(token.created_at);
+        let manager =
+            vauchi_core::api::ShredManager::new(&storage, &bridge, &identity, &data_dir);
+        let report = manager
+            .hard_shred(core_token)
+            .map_err(|e| MobileError::ShredError(e.to_string()))?;
+        Ok(MobileShredReport::from(&report))
+    }
+
+    /// Execute immediate crypto-shredding without grace period (Panic Shred).
+    ///
+    /// Loads pre-signed messages before destroying keys, then sends them
+    /// best-effort. Use only in emergencies.
+    ///
+    /// **WARNING**: This operation is irreversible and immediate. No grace period.
+    pub fn panic_shred(&self) -> Result<MobileShredReport, MobileError> {
+        let storage = self.open_storage()?;
+        let identity = self.get_identity()?;
+        let bridge = self.get_keychain_bridge()?;
+        let data_dir = self.data_dir();
+
+        let manager =
+            vauchi_core::api::ShredManager::new(&storage, &bridge, &identity, &data_dir);
+        let report = manager
+            .panic_shred()
+            .map_err(|e| MobileError::ShredError(e.to_string()))?;
+        Ok(MobileShredReport::from(&report))
+    }
+
+    /// Verify that shredding was successful by checking for residual data.
+    ///
+    /// Returns verification results showing which items were confirmed destroyed.
+    pub fn verify_shred(&self) -> Result<MobileShredVerification, MobileError> {
+        let storage = self.open_storage()?;
+        let identity = self.get_identity()?;
+        let bridge = self.get_keychain_bridge()?;
+        let data_dir = self.data_dir();
+
+        let manager =
+            vauchi_core::api::ShredManager::new(&storage, &bridge, &identity, &data_dir);
+        let verification = manager.verify_shred();
+        Ok(MobileShredVerification::from(&verification))
+    }
+
+    /// Get current shred status.
+    ///
+    /// Returns whether no shred is in progress, one is scheduled (with remaining
+    /// time), or has been executed.
+    pub fn shred_status(&self) -> Result<MobileShredStatus, MobileError> {
+        let storage = self.open_storage()?;
+        let manager = vauchi_core::api::DeletionManager::new(&storage);
+        let state = manager
+            .deletion_state()
+            .map_err(|e| MobileError::ShredError(e.to_string()))?;
+
+        match state {
+            vauchi_core::storage::DeletionState::None => Ok(MobileShredStatus::None),
+            vauchi_core::storage::DeletionState::Scheduled {
+                execute_at, ..
+            } => {
+                let now = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map(|d| d.as_secs())
+                    .unwrap_or(0);
+                let remaining = execute_at.saturating_sub(now);
+                Ok(MobileShredStatus::Scheduled {
+                    remaining_secs: remaining,
+                })
+            }
+            vauchi_core::storage::DeletionState::Executed { .. } => {
+                Ok(MobileShredStatus::Executed)
+            }
+        }
     }
 
     /// Grant consent for a specific type.

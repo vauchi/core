@@ -49,6 +49,9 @@ pub enum MobileError {
     #[error("Deletion not allowed: {0}")]
     DeletionNotAllowed(String),
 
+    #[error("Shred error: {0}")]
+    ShredError(String),
+
     #[error("Internal error: {0}")]
     Internal(String),
 }

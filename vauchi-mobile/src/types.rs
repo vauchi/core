@@ -1118,3 +1118,102 @@ pub fn mobile_get_string_with_args(
     let args_vec: Vec<(&str, &str)> = args.iter().map(|(k, v)| (k.as_str(), v.as_str())).collect();
     vauchi_core::i18n::get_string_with_args(locale.into(), &key, &args_vec)
 }
+
+// ============================================================
+// Shred Types
+// ============================================================
+
+/// Token returned by soft_shred to authorize hard_shred.
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct MobileShredToken {
+    /// When the token was created (unix seconds).
+    pub created_at: u64,
+}
+
+impl From<&vauchi_core::api::ShredToken> for MobileShredToken {
+    fn from(token: &vauchi_core::api::ShredToken) -> Self {
+        MobileShredToken {
+            created_at: token.created_at(),
+        }
+    }
+}
+
+/// Report of shred operations performed.
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct MobileShredReport {
+    /// Number of contacts notified of deletion.
+    pub contacts_notified: u32,
+    /// Whether the relay purge was sent successfully.
+    pub relay_purge_sent: bool,
+    /// Number of linked devices notified.
+    pub devices_notified: u32,
+    /// Whether SMK was destroyed from SecureStorage.
+    pub smk_destroyed: bool,
+    /// Whether the identity backup file was securely deleted.
+    pub identity_file_destroyed: bool,
+    /// Number of key files deleted.
+    pub key_files_destroyed: u32,
+    /// Whether the SQLite database was securely deleted.
+    pub sqlite_destroyed: bool,
+    /// Whether the pre-signed messages file was deleted.
+    pub pre_signed_deleted: bool,
+    /// Whether the data directory was removed.
+    pub data_dir_deleted: bool,
+}
+
+impl From<&vauchi_core::api::ShredReport> for MobileShredReport {
+    fn from(report: &vauchi_core::api::ShredReport) -> Self {
+        MobileShredReport {
+            contacts_notified: report.contacts_notified as u32,
+            relay_purge_sent: report.relay_purge_sent,
+            devices_notified: report.devices_notified as u32,
+            smk_destroyed: report.smk_destroyed,
+            identity_file_destroyed: report.identity_file_destroyed,
+            key_files_destroyed: report.key_files_destroyed as u32,
+            sqlite_destroyed: report.sqlite_destroyed,
+            pre_signed_deleted: report.pre_signed_deleted,
+            data_dir_deleted: report.data_dir_deleted,
+        }
+    }
+}
+
+/// Post-shred verification result.
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct MobileShredVerification {
+    /// Whether SMK is absent from SecureStorage.
+    pub smk_absent: bool,
+    /// Whether the database file is absent.
+    pub database_absent: bool,
+    /// Whether the data directory is absent.
+    pub data_dir_absent: bool,
+    /// Whether the pre-signed messages file is absent.
+    pub pre_signed_absent: bool,
+    /// Overall: all checks passed.
+    pub all_clear: bool,
+}
+
+impl From<&vauchi_core::api::ShredVerification> for MobileShredVerification {
+    fn from(v: &vauchi_core::api::ShredVerification) -> Self {
+        MobileShredVerification {
+            smk_absent: v.smk_absent,
+            database_absent: v.database_absent,
+            data_dir_absent: v.data_dir_absent,
+            pre_signed_absent: v.pre_signed_absent,
+            all_clear: v.all_clear,
+        }
+    }
+}
+
+/// Current shred status for the account.
+#[derive(Debug, Clone, PartialEq, Eq, uniffi::Enum)]
+pub enum MobileShredStatus {
+    /// No shred operation in progress.
+    None,
+    /// Soft shred scheduled — waiting for grace period to elapse.
+    Scheduled {
+        /// Seconds remaining in grace period.
+        remaining_secs: u64,
+    },
+    /// Hard shred has been executed — all data destroyed.
+    Executed,
+}

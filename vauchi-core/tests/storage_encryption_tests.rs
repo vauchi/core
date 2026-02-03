@@ -284,8 +284,8 @@ fn test_migration_v13_schema_version() {
         })
         .unwrap();
     assert!(
-        version >= 13,
-        "Schema version should be at least 13, got {}",
+        version >= 14,
+        "Schema version should be at least 14, got {}",
         version
     );
 }

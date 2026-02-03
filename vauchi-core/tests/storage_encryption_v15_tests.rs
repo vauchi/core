@@ -90,10 +90,10 @@ fn test_migration_v15_adds_encrypted_columns() {
 }
 
 #[test]
-fn test_schema_version_at_least_15() {
+fn test_schema_version_at_least_16() {
     let (_dir, storage) = open_storage();
     let version = storage.schema_version().unwrap();
-    assert!(version >= 15, "schema version should be at least 15, got {}", version);
+    assert!(version >= 16, "schema version should be at least 16, got {}", version);
 }
 
 // === field_validations roundtrip tests ===

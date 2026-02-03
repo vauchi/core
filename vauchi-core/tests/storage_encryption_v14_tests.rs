@@ -88,8 +88,8 @@ fn test_migration_v14_schema_version() {
         })
         .unwrap();
     assert!(
-        version >= 14,
-        "Schema version should be at least 14, got {}",
+        version >= 15,
+        "Schema version should be at least 15, got {}",
         version
     );
 }

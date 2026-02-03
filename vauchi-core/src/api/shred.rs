@@ -165,7 +165,7 @@ impl<'a> ShredManager<'a> {
 
         // 1. Verify grace period has elapsed
         let dm = DeletionManager::new(self.storage);
-        dm.execute_deletion()?;
+        dm.execute_deletion(self.identity)?;
 
         // 2-4. Network notifications (while keys alive) — best-effort
         // These would send to contacts and relay in a real implementation.

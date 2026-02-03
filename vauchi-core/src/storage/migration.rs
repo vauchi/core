@@ -226,14 +226,14 @@ pub fn all_migrations() -> Vec<Migration> {
             action: MigrationAction::Callback(migrate_v14_encrypt_high_priority),
         },
         Migration {
-            version: 14,
+            version: 15,
             name: "encrypt_medium_priority_tables",
-            action: MigrationAction::Callback(migrate_v14_encrypt_medium_priority),
+            action: MigrationAction::Callback(migrate_v15_encrypt_medium_priority),
         },
         Migration {
-            version: 15,
+            version: 16,
             name: "encrypt_low_priority_tables",
-            action: MigrationAction::Callback(migrate_v15_encrypt_low_priority),
+            action: MigrationAction::Callback(migrate_v16_encrypt_low_priority),
         },
     ]
 }
@@ -796,14 +796,14 @@ fn migrate_v14_encrypt_high_priority(
     Ok(())
 }
 
-/// Migration v14: Add encrypted columns for medium-priority plaintext tables.
+/// Migration v15: Add encrypted columns for medium-priority plaintext tables.
 ///
 /// Adds `_encrypted` BLOB columns to: device_info, version_vector,
 /// contact_sync_timestamps, pending_updates, retry_entries,
 /// device_sync_checkpoints, recovery_responses, deletion_state, and
 /// sync_checkpoints. Existing plaintext data is encrypted and stored
 /// in the new columns. Old plaintext columns are cleared.
-fn migrate_v14_encrypt_medium_priority(
+fn migrate_v15_encrypt_medium_priority(
     conn: &Connection,
     key: &SymmetricKey,
 ) -> Result<(), StorageError> {
@@ -821,7 +821,7 @@ fn migrate_v14_encrypt_medium_priority(
          ALTER TABLE deletion_state ADD COLUMN state_json_encrypted BLOB;
          ALTER TABLE sync_checkpoints ADD COLUMN state_json_encrypted BLOB;",
     )
-    .map_err(|e| StorageError::Migration(format!("Failed to add v14 encrypted columns: {}", e)))?;
+    .map_err(|e| StorageError::Migration(format!("Failed to add v15 encrypted columns: {}", e)))?;
 
     // Step 2: Encrypt existing data in device_info
     {
@@ -1042,7 +1042,7 @@ fn migrate_v14_encrypt_medium_priority(
     Ok(())
 }
 
-/// Migration v15: Add encrypted columns for low-priority plaintext tables.
+/// Migration v16: Add encrypted columns for low-priority plaintext tables.
 ///
 /// Tables encrypted: field_validations (field_value, signature),
 /// ux_state (aha_tracker_json, demo_contact_json), audit_log (details).
@@ -1050,7 +1050,7 @@ fn migrate_v14_encrypt_medium_priority(
 /// Tables skipped:
 /// - replay_nonces: contains only random nonces + timestamps, no personal data
 /// - consent_records: consent decisions aren't personal data; needed for queries
-fn migrate_v15_encrypt_low_priority(
+fn migrate_v16_encrypt_low_priority(
     conn: &Connection,
     key: &SymmetricKey,
 ) -> Result<(), StorageError> {
@@ -1064,7 +1064,7 @@ fn migrate_v15_encrypt_low_priority(
          ALTER TABLE ux_state ADD COLUMN demo_contact_json_encrypted BLOB;
          ALTER TABLE audit_log ADD COLUMN details_encrypted BLOB;",
     )
-    .map_err(|e| StorageError::Migration(format!("Add v15 columns: {}", e)))?;
+    .map_err(|e| StorageError::Migration(format!("Add v16 columns: {}", e)))?;
 
     // Step 2: Encrypt existing field_validations data
     {

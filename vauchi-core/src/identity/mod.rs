@@ -30,7 +30,7 @@ use crate::crypto::{
 use crate::exchange::X3DHKeyPair;
 use ring::rand::SystemRandom;
 use thiserror::Error;
-use zeroize::Zeroize;
+use zeroize::{Zeroize, Zeroizing};
 
 /// Identity-related errors.
 #[derive(Error, Debug)]
@@ -283,8 +283,10 @@ impl Identity {
         let device_name_len = (device_name_bytes.len() as u32).to_le_bytes();
         let device_index = self.device_info.device_index().to_le_bytes();
 
-        let mut plaintext =
-            Vec::with_capacity(4 + name_bytes.len() + 32 + 4 + 4 + device_name_bytes.len());
+        // Wrap in Zeroizing to ensure master_seed bytes are zeroized after encryption
+        let mut plaintext = Zeroizing::new(Vec::with_capacity(
+            4 + name_bytes.len() + 32 + 4 + 4 + device_name_bytes.len(),
+        ));
         plaintext.extend_from_slice(&name_len);
         plaintext.extend_from_slice(name_bytes);
         plaintext.extend_from_slice(&self.master_seed);
@@ -341,8 +343,10 @@ impl Identity {
             .map_err(|_| IdentityError::RestoreFailed)?;
 
         // Decrypt (auto-detects tagged XChaCha20-Poly1305)
-        let plaintext =
-            decrypt(&decryption_key, &data[16..]).map_err(|_| IdentityError::RestoreFailed)?;
+        // Wrap in Zeroizing to ensure plaintext (containing master_seed) is zeroized on drop
+        let plaintext = Zeroizing::new(
+            decrypt(&decryption_key, &data[16..]).map_err(|_| IdentityError::RestoreFailed)?,
+        );
 
         Self::parse_backup_plaintext(&plaintext)
     }
@@ -365,8 +369,10 @@ impl Identity {
             .map_err(|_| IdentityError::RestoreFailed)?;
 
         // Decrypt (auto-detects tagged or untagged AES-256-GCM)
-        let plaintext =
-            decrypt(&decryption_key, &data[16..]).map_err(|_| IdentityError::RestoreFailed)?;
+        // Wrap in Zeroizing to ensure plaintext (containing master_seed) is zeroized on drop
+        let plaintext = Zeroizing::new(
+            decrypt(&decryption_key, &data[16..]).map_err(|_| IdentityError::RestoreFailed)?,
+        );
 
         Self::parse_backup_plaintext(&plaintext)
     }

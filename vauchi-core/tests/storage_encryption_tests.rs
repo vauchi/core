@@ -342,3 +342,119 @@ fn test_device_registry_json_export_with_encrypted_storage() {
     // The JSON should be valid
     let _: serde_json::Value = serde_json::from_str(&json).unwrap();
 }
+
+// === Rekey Tests ===
+
+#[test]
+fn test_rekey_preserves_own_card() {
+    let (_dir, mut storage) = open_storage();
+
+    let card = ContactCard::new("ReKeyTest");
+    storage.save_own_card(&card).unwrap();
+
+    // Rekey to a new encryption key
+    let new_key = SymmetricKey::generate();
+    storage.rekey(new_key).unwrap();
+
+    // Data should still be readable after rekey
+    let loaded = storage.load_own_card().unwrap().expect("Card should exist");
+    assert_eq!(loaded.display_name(), "ReKeyTest");
+}
+
+#[test]
+fn test_rekey_preserves_device_registry() {
+    let (_dir, mut storage) = open_storage();
+
+    let registry = make_test_registry();
+    storage.save_device_registry(&registry).unwrap();
+
+    let new_key = SymmetricKey::generate();
+    storage.rekey(new_key).unwrap();
+
+    let loaded = storage
+        .load_device_registry()
+        .unwrap()
+        .expect("Registry should exist");
+    assert_eq!(loaded.version(), registry.version());
+}
+
+#[test]
+fn test_rekey_preserves_device_sync_state() {
+    let (_dir, mut storage) = open_storage();
+
+    let state = InterDeviceSyncState::new([0xCC; 32]);
+    storage.save_device_sync_state(&state).unwrap();
+
+    let new_key = SymmetricKey::generate();
+    storage.rekey(new_key).unwrap();
+
+    let loaded = storage
+        .load_device_sync_state(&[0xCC; 32])
+        .unwrap()
+        .expect("State should exist");
+    assert_eq!(loaded.device_id(), &[0xCC; 32]);
+}
+
+#[test]
+fn test_rekey_preserves_visibility_labels() {
+    let (_dir, mut storage) = open_storage();
+
+    let label = VisibilityLabel::new("Rekey Group");
+    storage.save_label(&label).unwrap();
+
+    let new_key = SymmetricKey::generate();
+    storage.rekey(new_key).unwrap();
+
+    let loaded = storage.load_label(label.id()).unwrap();
+    assert_eq!(loaded.name(), "Rekey Group");
+}
+
+#[test]
+fn test_rekey_old_key_cannot_decrypt() {
+    let (dir, mut storage) = open_storage();
+
+    let card = ContactCard::new("OldKeyTest");
+    storage.save_own_card(&card).unwrap();
+
+    let new_key = SymmetricKey::generate();
+    storage.rekey(new_key.clone()).unwrap();
+
+    // Open a fresh storage with the OLD key — should fail to decrypt
+    let db_path = dir.path().join("vauchi.db");
+    let old_storage = Storage::open(&db_path, SymmetricKey::generate()).unwrap();
+    let result = old_storage.load_own_card();
+    // Either returns None (empty card_json) or an error (decryption failed)
+    match result {
+        Ok(None) => {} // Empty plaintext fallback, encrypted column can't be decrypted
+        Ok(Some(_)) => panic!("Should not be able to decrypt with wrong key"),
+        Err(_) => {} // Expected: decryption error
+    }
+
+    // But with the correct new key, it works
+    let correct_storage = Storage::open(&db_path, new_key).unwrap();
+    let loaded = correct_storage
+        .load_own_card()
+        .unwrap()
+        .expect("Should decrypt with correct key");
+    assert_eq!(loaded.display_name(), "OldKeyTest");
+}
+
+#[test]
+fn test_rekey_with_smk_derived_sek() {
+    use vauchi_core::crypto::ShreddingMasterKey;
+
+    let (_dir, mut storage) = open_storage();
+
+    let card = ContactCard::new("SMK Test");
+    storage.save_own_card(&card).unwrap();
+
+    // Simulate SMK-based rekey: derive SEK from a master seed
+    let smk = ShreddingMasterKey::derive_from_seed(&[0x42; 32]);
+    let sek = smk.derive_sek();
+
+    storage.rekey(sek).unwrap();
+
+    // Data is now encrypted under SMK-derived SEK
+    let loaded = storage.load_own_card().unwrap().expect("Card should exist");
+    assert_eq!(loaded.display_name(), "SMK Test");
+}

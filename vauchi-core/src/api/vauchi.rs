@@ -356,8 +356,10 @@ impl<T: Transport> Vauchi<T> {
     /// For each contact with an established ratchet:
     /// 1. Computes delta between old and new card
     /// 2. Signs delta with our identity
-    /// 3. Encrypts with contact's ratchet
-    /// 4. Queues for delivery via relay
+    /// 3. If contact has CEK: wraps in `CekWrappedPayload` (version 0x02), rotates CEK
+    /// 4. If contact has no CEK: uses legacy format (raw JSON bytes)
+    /// 5. Encrypts with contact's ratchet
+    /// 6. Queues for delivery via relay
     ///
     /// Returns the number of contacts queued for update.
     pub fn propagate_card_update(
@@ -365,8 +367,9 @@ impl<T: Transport> Vauchi<T> {
         old_card: &ContactCard,
         new_card: &ContactCard,
     ) -> VauchiResult<usize> {
+        use crate::crypto::cek::ContentEncryptionKey;
         use crate::storage::{PendingUpdate, UpdateStatus};
-        use crate::sync::delta::CardDelta;
+        use crate::sync::delta::{CardDelta, CekWrappedPayload, VersionedPayload};
 
         let identity = self
             .identity
@@ -376,7 +379,7 @@ impl<T: Transport> Vauchi<T> {
         let contacts = self.storage.list_contacts()?;
         let mut queued = 0;
 
-        for contact in contacts {
+        for mut contact in contacts {
             // Skip contacts without ratchet (not yet synced)
             let (mut ratchet, is_initiator) = match self.storage.load_ratchet_state(contact.id())? {
                 Some(r) => r,
@@ -402,9 +405,39 @@ impl<T: Transport> Vauchi<T> {
             let delta_bytes = serde_json::to_vec(&delta)
                 .map_err(|e| VauchiError::Serialization(e.to_string()))?;
 
+            // Wrap with CEK if contact has one (version 0x02), otherwise legacy
+            let payload_bytes = if contact.cek().is_some() {
+                // Rotate CEK
+                let new_cek = ContentEncryptionKey::generate();
+
+                // Encrypt delta with new CEK
+                let cek_ciphertext = new_cek
+                    .encrypt(&delta_bytes)
+                    .map_err(|e| VauchiError::Crypto(format!("CEK encrypt: {:?}", e)))?;
+
+                // Build wrapped payload
+                let wrapped = CekWrappedPayload {
+                    cek: new_cek.to_bytes(),
+                    cek_ciphertext,
+                    signature: delta.signature,
+                    nonce: delta.nonce,
+                };
+
+                // Update contact with rotated CEK and re-save
+                // (re-encrypts card at rest with new CEK)
+                contact.set_cek(new_cek);
+                self.storage.save_contact(&contact)?;
+
+                // Version-tagged encoding
+                VersionedPayload::encode_cek(&wrapped)
+            } else {
+                // Legacy format: raw delta JSON bytes
+                delta_bytes
+            };
+
             // Encrypt with ratchet
             let ratchet_msg = ratchet
-                .encrypt(&delta_bytes)
+                .encrypt(&payload_bytes)
                 .map_err(|e| VauchiError::Crypto(format!("{:?}", e)))?;
             let encrypted = serde_json::to_vec(&ratchet_msg)
                 .map_err(|e| VauchiError::Serialization(e.to_string()))?;
@@ -437,9 +470,13 @@ impl<T: Transport> Vauchi<T> {
 
     /// Processes an encrypted card update from a contact.
     ///
-    /// 1. Decrypts the update using the contact's ratchet
-    /// 2. Verifies the signature using the contact's public key
-    /// 3. Applies the delta to the contact's card
+    /// 1. Checks revoked_senders tombstone — rejects updates from revoked senders
+    /// 2. Decrypts the update using the contact's ratchet
+    /// 3. Detects payload version:
+    ///    - Version 0x02 (CEK-wrapped): extracts CEK, decrypts delta, saves CEK
+    ///    - Version 0x01 or raw JSON (legacy): parses delta directly
+    /// 4. Verifies the signature using the contact's public key
+    /// 5. Applies the delta to the contact's card
     ///
     /// Returns a list of changed field labels.
     pub fn process_card_update(
@@ -447,8 +484,16 @@ impl<T: Transport> Vauchi<T> {
         contact_id: &str,
         encrypted: &[u8],
     ) -> VauchiResult<Vec<String>> {
+        use crate::crypto::cek::ContentEncryptionKey;
         use crate::crypto::ratchet::RatchetMessage;
-        use crate::sync::delta::CardDelta;
+        use crate::sync::delta::{CardDelta, VersionedPayload, PAYLOAD_VERSION_CEK};
+
+        // Check revoked_senders tombstone
+        if self.storage.is_sender_revoked(contact_id)? {
+            return Err(VauchiError::InvalidState(
+                "update from revoked sender".to_string(),
+            ));
+        }
 
         // Load contact
         let mut contact = self
@@ -464,13 +509,46 @@ impl<T: Transport> Vauchi<T> {
 
         let ratchet_msg: RatchetMessage = serde_json::from_slice(encrypted)
             .map_err(|e| VauchiError::Serialization(e.to_string()))?;
-        let delta_bytes = ratchet
+        let plaintext = ratchet
             .decrypt(&ratchet_msg)
             .map_err(|e| VauchiError::Crypto(format!("{:?}", e)))?;
 
-        // Save updated ratchet state
+        // Save updated ratchet state (must happen even if payload parsing fails,
+        // to keep the ratchet advancing)
         self.storage
             .save_ratchet_state(contact_id, &ratchet, is_initiator)?;
+
+        // Detect payload version and extract delta bytes + optional CEK
+        let (delta_bytes, new_cek) = if !plaintext.is_empty()
+            && plaintext[0] == PAYLOAD_VERSION_CEK
+        {
+            // Version 0x02: CEK-wrapped payload
+            match VersionedPayload::decode(&plaintext) {
+                Ok(VersionedPayload::CekWrapped(wrapped)) => {
+                    let cek = ContentEncryptionKey::from_bytes(wrapped.cek);
+                    let decrypted = cek.decrypt(&wrapped.cek_ciphertext).map_err(|e| {
+                        VauchiError::Crypto(format!("CEK decrypt: {:?}", e))
+                    })?;
+                    (decrypted, Some(cek))
+                }
+                Ok(VersionedPayload::Legacy(data)) => (data, None),
+                Err(e) => {
+                    return Err(VauchiError::Serialization(format!(
+                        "payload decode: {}",
+                        e
+                    )));
+                }
+            }
+        } else {
+            // Legacy: raw JSON bytes (no version tag, or version 0x01)
+            match VersionedPayload::decode(&plaintext) {
+                Ok(VersionedPayload::Legacy(data)) => (data, None),
+                _ => {
+                    // Fall back to treating entire plaintext as legacy delta JSON
+                    (plaintext, None)
+                }
+            }
+        };
 
         // Parse delta
         let delta: CardDelta = serde_json::from_slice(&delta_bytes)
@@ -490,11 +568,115 @@ impl<T: Transport> Vauchi<T> {
             .apply(&mut new_card)
             .map_err(|e| VauchiError::InvalidState(e.to_string()))?;
 
-        // Update contact
+        // Update contact card and CEK atomically
         contact.update_card(new_card);
+        if let Some(cek) = new_cek {
+            contact.set_cek(cek);
+        }
         self.storage.save_contact(&contact)?;
 
         Ok(changed)
+    }
+
+    // === CEK Migration ===
+
+    /// Migrates legacy contacts to CEK-protected format.
+    ///
+    /// For each contact that has an established ratchet but no CEK:
+    /// 1. Generates a new CEK
+    /// 2. Saves the CEK locally
+    /// 3. Queues a migration update (empty delta carrying the CEK) for relay delivery
+    ///
+    /// Returns the number of contacts migrated.
+    pub fn migrate_contacts_to_cek(&self) -> VauchiResult<usize> {
+        use crate::crypto::cek::ContentEncryptionKey;
+        use crate::storage::{PendingUpdate, UpdateStatus};
+        use crate::sync::delta::{CardDelta, CekWrappedPayload, VersionedPayload};
+
+        let identity = self
+            .identity
+            .as_ref()
+            .ok_or(VauchiError::IdentityNotInitialized)?;
+
+        let own_card = self
+            .storage
+            .load_own_card()?
+            .ok_or(VauchiError::IdentityNotInitialized)?;
+
+        let contacts = self.storage.list_contacts()?;
+        let mut migrated = 0;
+
+        for mut contact in contacts {
+            // Skip contacts that already have a CEK
+            if contact.cek().is_some() {
+                continue;
+            }
+
+            // Skip contacts without ratchet (can't send updates)
+            let (mut ratchet, is_initiator) =
+                match self.storage.load_ratchet_state(contact.id())? {
+                    Some(r) => r,
+                    None => continue,
+                };
+
+            // Generate a new CEK for this contact
+            let cek = ContentEncryptionKey::generate();
+
+            // Create a no-op delta (empty changes — just carries the CEK)
+            let mut delta = CardDelta::compute(&own_card, &own_card);
+            // Force a nonce so the delta is processable even with no changes
+            delta.sign(identity);
+
+            // Serialize and CEK-encrypt the delta
+            let delta_bytes = serde_json::to_vec(&delta)
+                .map_err(|e| VauchiError::Serialization(e.to_string()))?;
+            let cek_ciphertext = cek
+                .encrypt(&delta_bytes)
+                .map_err(|e| VauchiError::Crypto(format!("CEK encrypt: {:?}", e)))?;
+
+            let wrapped = CekWrappedPayload {
+                cek: cek.to_bytes(),
+                cek_ciphertext,
+                signature: delta.signature,
+                nonce: delta.nonce,
+            };
+            let payload_bytes = VersionedPayload::encode_cek(&wrapped);
+
+            // Ratchet-encrypt
+            let ratchet_msg = ratchet
+                .encrypt(&payload_bytes)
+                .map_err(|e| VauchiError::Crypto(format!("{:?}", e)))?;
+            let encrypted = serde_json::to_vec(&ratchet_msg)
+                .map_err(|e| VauchiError::Serialization(e.to_string()))?;
+
+            // Save updated ratchet state
+            self.storage
+                .save_ratchet_state(contact.id(), &ratchet, is_initiator)?;
+
+            // Set CEK on contact and re-save (re-encrypts card at rest with CEK)
+            contact.set_cek(cek);
+            self.storage.save_contact(&contact)?;
+
+            // Queue for delivery
+            let now = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_secs())
+                .unwrap_or(0);
+
+            let update = PendingUpdate {
+                id: format!("{}-cek-migrate-{}", contact.id(), now),
+                contact_id: contact.id().to_string(),
+                update_type: "cek_migration".to_string(),
+                payload: encrypted,
+                created_at: now,
+                retry_count: 0,
+                status: UpdateStatus::Pending,
+            };
+            self.storage.queue_update(&update)?;
+            migrated += 1;
+        }
+
+        Ok(migrated)
     }
 
     // === Event Operations ===

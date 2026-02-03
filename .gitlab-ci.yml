@@ -128,14 +128,17 @@ security:audit:
     - cargo binstall cargo-audit --no-confirm 2>/dev/null || cargo install cargo-audit || true
     - cargo audit
 
-# License compliance via cargo-deny (runs on dependency or deny.toml changes)
-security:licenses:
-  extends: [.linux-runner-readonly, .validation-licenses, .timeout-quick]
+# Full cargo-deny check: advisories, licenses, bans, sources (runs on all MRs)
+security:deny:
+  extends: [.linux-runner-readonly, .timeout-quick]
   stage: security
   needs: []
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_PIPELINE_SOURCE == "schedule"
   script:
     - cargo binstall cargo-deny --no-confirm 2>/dev/null || cargo install cargo-deny || true
-    - cargo deny check licenses
+    - cargo deny check
 
 # ============================================================
 # Build Stage - Tags (release builds)

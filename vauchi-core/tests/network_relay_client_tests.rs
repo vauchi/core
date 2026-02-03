@@ -254,3 +254,54 @@ fn test_relay_client_send_device_sync_message() {
         panic!("Expected DeviceSync message");
     }
 }
+
+#[test]
+fn test_send_purge_request() {
+    let transport = MockTransport::new();
+    let mut client = RelayClient::new(transport, create_test_config(), "sender-id".into());
+    client.connect().unwrap();
+
+    let request = PurgeRequest {
+        public_key: [0x42; 32],
+        signature: vec![0xAB; 64],
+        purge_token: [0xCD; 32],
+        timestamp: 1700000000,
+    };
+
+    let msg_id = client.send_purge_request(&request).unwrap();
+    assert!(!msg_id.is_empty());
+
+    let sent = client.connection().transport().sent_messages();
+    assert_eq!(sent.len(), 1);
+
+    if let MessagePayload::PurgeRequest(r) = &sent[0].payload {
+        assert_eq!(r.public_key, [0x42; 32]);
+        assert_eq!(r.purge_token, [0xCD; 32]);
+        assert_eq!(r.timestamp, 1700000000);
+    } else {
+        panic!("Expected PurgeRequest message");
+    }
+}
+
+#[test]
+fn test_send_purge_request_send_error() {
+    let transport = MockTransport::new();
+    let mut client = RelayClient::new(transport, create_test_config(), "sender-id".into());
+    client.connect().unwrap();
+
+    // Inject error after connecting so the send fails
+    client
+        .connection_mut()
+        .transport_mut()
+        .inject_error(NetworkError::SendFailed("connection lost".into()));
+
+    let request = PurgeRequest {
+        public_key: [0x01; 32],
+        signature: vec![0x02; 64],
+        purge_token: [0x03; 32],
+        timestamp: 1700000000,
+    };
+
+    let result = client.send_purge_request(&request);
+    assert!(result.is_err());
+}

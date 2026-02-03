@@ -13,7 +13,7 @@ use super::connection::ConnectionManager;
 use super::error::NetworkError;
 use super::message::{
     AckStatus, DeviceSyncMessage, EncryptedUpdate, MessageEnvelope, MessageId, MessagePayload,
-    RatchetHeader,
+    PurgeRequest, RatchetHeader,
 };
 use super::protocol::create_envelope;
 use super::transport::{Transport, TransportConfig};
@@ -202,6 +202,22 @@ impl<T: Transport> RelayClient<T> {
         };
 
         let envelope = create_envelope(MessagePayload::DeviceSync(sync_msg));
+        let message_id = envelope.message_id.clone();
+
+        self.connection.send(&envelope)?;
+
+        Ok(message_id)
+    }
+
+    /// Sends a purge request to the relay server.
+    ///
+    /// Requests the relay to delete all stored messages and data for this identity.
+    /// Used during account shredding (hard_shred / panic_shred).
+    pub fn send_purge_request(
+        &mut self,
+        request: &PurgeRequest,
+    ) -> Result<MessageId, NetworkError> {
+        let envelope = create_envelope(MessagePayload::PurgeRequest(request.clone()));
         let message_id = envelope.message_id.clone();
 
         self.connection.send(&envelope)?;

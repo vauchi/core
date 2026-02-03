@@ -18,8 +18,8 @@ use zeroize::Zeroize;
 
 use super::chain::{ChainError, ChainKey, MessageKey};
 use super::encryption::{decrypt_with_ad, encrypt_with_ad, EncryptionError, SymmetricKey};
-use super::padding;
 use super::kdf::HKDF;
+use super::padding;
 use crate::exchange::X3DHKeyPair;
 
 /// Maximum number of skipped message keys to store.

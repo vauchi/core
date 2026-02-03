@@ -166,7 +166,10 @@ fn test_encrypt_with_ad_empty_ad_fails_against_non_empty() {
     let key = SymmetricKey::generate();
     let ciphertext = encrypt_with_ad(&key, b"data", b"some-ad").unwrap();
     let result = decrypt_with_ad(&key, &ciphertext, b"");
-    assert!(result.is_err(), "Decryption with empty AD must fail when encrypted with non-empty AD");
+    assert!(
+        result.is_err(),
+        "Decryption with empty AD must fail when encrypted with non-empty AD"
+    );
 }
 
 #[test]
@@ -175,7 +178,10 @@ fn test_encrypt_with_ad_cannot_decrypt_without_ad() {
     let ciphertext = encrypt_with_ad(&key, b"data", b"context").unwrap();
     // Plain decrypt() should reject tag 0x03
     let result = decrypt(&key, &ciphertext);
-    assert!(result.is_err(), "Plain decrypt must reject AD-bound ciphertext");
+    assert!(
+        result.is_err(),
+        "Plain decrypt must reject AD-bound ciphertext"
+    );
 }
 
 #[test]

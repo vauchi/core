@@ -93,8 +93,8 @@ pub use error::NetworkError;
 pub use message::{
     negotiate_version, AccountDeletionNotice, AccountRevoked, AckStatus, Acknowledgment,
     DeletionStage, DeviceSyncMessage, EncryptedUpdate, Handshake, MessageEnvelope, MessageId,
-    MessagePayload, PresenceStatus, PresenceUpdate, RatchetHeader, VersionNegotiation,
-    PROTOCOL_VERSION,
+    MessagePayload, PresenceStatus, PresenceUpdate, PurgeRequest, RatchetHeader,
+    VersionNegotiation, PROTOCOL_VERSION,
 };
 
 // Protocol utilities

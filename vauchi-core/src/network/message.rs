@@ -44,6 +44,8 @@ pub enum MessagePayload {
     AccountRevoked(AccountRevoked),
     /// Account deletion notification sent to contacts.
     AccountDeletionNotice(AccountDeletionNotice),
+    /// Relay purge request (sent during shred to delete server-side data).
+    PurgeRequest(PurgeRequest),
 }
 
 /// Account revocation signal sent to contacts when the card owner deletes their account.
@@ -186,6 +188,25 @@ pub struct AccountDeletionNotice {
     /// Ed25519 signature over (public_key || stage || timestamp).
     #[serde(with = "bytes_array_64")]
     pub signature: [u8; 64],
+}
+
+/// Relay purge request sent during account shredding.
+///
+/// Requests the relay to delete all stored messages and data for this identity.
+/// Signed by the account's Ed25519 key so the relay can verify authenticity.
+/// Contains a one-time purge_token for replay prevention.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PurgeRequest {
+    /// Signing public key (Ed25519, 32 bytes).
+    #[serde(with = "bytes_array_32")]
+    pub public_key: [u8; 32],
+    /// Ed25519 signature over (public_key || purge_token || timestamp).
+    pub signature: Vec<u8>,
+    /// One-time token for replay prevention (32 bytes).
+    #[serde(with = "bytes_array_32")]
+    pub purge_token: [u8; 32],
+    /// Unix timestamp when the request was signed.
+    pub timestamp: u64,
 }
 
 /// Stages of account deletion.
@@ -534,6 +555,46 @@ mod tests {
                 assert_eq!(n.stage, DeletionStage::Pending);
             }
             _ => panic!("Expected AccountDeletionNotice"),
+        }
+    }
+
+    #[test]
+    fn test_purge_request_serde_roundtrip() {
+        let request = PurgeRequest {
+            public_key: [0x42; 32],
+            signature: vec![0xAB; 64],
+            purge_token: [0xCD; 32],
+            timestamp: 1700000000,
+        };
+
+        let json = serde_json::to_string(&request).unwrap();
+        let deserialized: PurgeRequest = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(deserialized.public_key, [0x42; 32]);
+        assert_eq!(deserialized.signature, vec![0xAB; 64]);
+        assert_eq!(deserialized.purge_token, [0xCD; 32]);
+        assert_eq!(deserialized.timestamp, 1700000000);
+    }
+
+    #[test]
+    fn test_purge_request_in_payload() {
+        let request = PurgeRequest {
+            public_key: [0x01; 32],
+            signature: vec![0x02; 64],
+            purge_token: [0x03; 32],
+            timestamp: 1700000000,
+        };
+
+        let payload = MessagePayload::PurgeRequest(request);
+        let json = serde_json::to_string(&payload).unwrap();
+        let deserialized: MessagePayload = serde_json::from_str(&json).unwrap();
+
+        match deserialized {
+            MessagePayload::PurgeRequest(r) => {
+                assert_eq!(r.public_key, [0x01; 32]);
+                assert_eq!(r.purge_token, [0x03; 32]);
+            }
+            _ => panic!("Expected PurgeRequest variant"),
         }
     }
 

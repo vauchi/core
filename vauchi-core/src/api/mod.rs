@@ -82,6 +82,11 @@ pub mod gdpr;
 mod gdpr;
 
 #[cfg(feature = "testing")]
+pub mod pre_signed;
+#[cfg(not(feature = "testing"))]
+mod pre_signed;
+
+#[cfg(feature = "testing")]
 pub mod sync_controller;
 #[cfg(not(feature = "testing"))]
 mod sync_controller;
@@ -99,6 +104,9 @@ pub use consent::{ConsentManager, ConsentRecord, ConsentType};
 
 // GDPR
 pub use gdpr::{export_all_data, GdprExport};
+
+// Pre-signed shred messages
+pub use pre_signed::{PreSignedError, PreSignedPurgeRequest, PreSignedShredMessages};
 
 // Error types
 pub use error::{VauchiError, VauchiResult};

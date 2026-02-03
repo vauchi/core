@@ -278,8 +278,11 @@ impl AccountRevoked {
             arr
         };
 
-        let canonical =
-            super::revocation::canonical_revocation_bytes(public_key, &recipient_bytes, self.timestamp);
+        let canonical = super::revocation::canonical_revocation_bytes(
+            public_key,
+            &recipient_bytes,
+            self.timestamp,
+        );
 
         let pubkey = crate::crypto::PublicKey::from_bytes(*public_key);
         let signature = crate::crypto::Signature::from_bytes(self.signature);

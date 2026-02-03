@@ -117,7 +117,8 @@ fn test_versioned_payload_empty_returns_error() {
 #[test]
 fn test_legacy_payload_preserves_exact_bytes() {
     // Legacy CardDelta bytes must be preserved exactly after version byte stripping
-    let original = br#"{"version":1,"timestamp":1700000000,"changes":[],"nonce":"AA==","signature":"AA=="}"#;
+    let original =
+        br#"{"version":1,"timestamp":1700000000,"changes":[],"nonce":"AA==","signature":"AA=="}"#;
 
     let encoded = VersionedPayload::encode_legacy(original);
     let decoded = VersionedPayload::decode(&encoded).unwrap();

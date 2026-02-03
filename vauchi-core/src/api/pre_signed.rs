@@ -105,10 +105,9 @@ impl PreSignedShredMessages {
     /// Saves the pre-signed messages to disk (unencrypted per DP-3).
     pub fn save(&self, data_dir: &Path) -> Result<(), PreSignedError> {
         let path = Self::file_path(data_dir);
-        let data =
-            bincode::serialize(self).map_err(|e| PreSignedError::SerializationFailed(e.to_string()))?;
-        std::fs::write(&path, &data)
-            .map_err(|e| PreSignedError::IoError(e.to_string()))?;
+        let data = bincode::serialize(self)
+            .map_err(|e| PreSignedError::SerializationFailed(e.to_string()))?;
+        std::fs::write(&path, &data).map_err(|e| PreSignedError::IoError(e.to_string()))?;
         Ok(())
     }
 
@@ -117,8 +116,7 @@ impl PreSignedShredMessages {
     /// This must work even after SMK destruction — the file is unencrypted.
     pub fn load(data_dir: &Path) -> Result<Self, PreSignedError> {
         let path = Self::file_path(data_dir);
-        let data =
-            std::fs::read(&path).map_err(|e| PreSignedError::IoError(e.to_string()))?;
+        let data = std::fs::read(&path).map_err(|e| PreSignedError::IoError(e.to_string()))?;
         bincode::deserialize(&data)
             .map_err(|e| PreSignedError::DeserializationFailed(e.to_string()))
     }
@@ -213,11 +211,17 @@ mod tests {
 
         // Deletion notice should be Confirmed stage
         assert_eq!(msgs.deletion_notice.stage, DeletionStage::Confirmed);
-        assert_eq!(msgs.deletion_notice.public_key, *identity.signing_public_key());
+        assert_eq!(
+            msgs.deletion_notice.public_key,
+            *identity.signing_public_key()
+        );
         assert!(msgs.deletion_notice.timestamp > 0);
 
         // Purge request should have matching public key
-        assert_eq!(msgs.purge_request.public_key, *identity.signing_public_key());
+        assert_eq!(
+            msgs.purge_request.public_key,
+            *identity.signing_public_key()
+        );
         assert!(msgs.purge_request.timestamp > 0);
         assert_eq!(msgs.purge_request.signature.len(), 64);
     }
@@ -237,8 +241,7 @@ mod tests {
         message.extend_from_slice(&notice.timestamp.to_be_bytes());
 
         // Verify using ring directly
-        let peer_key =
-            signature::UnparsedPublicKey::new(&signature::ED25519, &notice.public_key);
+        let peer_key = signature::UnparsedPublicKey::new(&signature::ED25519, &notice.public_key);
         peer_key
             .verify(&message, &notice.signature)
             .expect("Deletion notice signature should be valid");
@@ -258,8 +261,7 @@ mod tests {
         message.extend_from_slice(&purge.timestamp.to_be_bytes());
 
         // Verify using ring directly
-        let peer_key =
-            signature::UnparsedPublicKey::new(&signature::ED25519, &purge.public_key);
+        let peer_key = signature::UnparsedPublicKey::new(&signature::ED25519, &purge.public_key);
         peer_key
             .verify(&message, &purge.signature)
             .expect("Purge request signature should be valid");
@@ -274,11 +276,26 @@ mod tests {
         msgs.save(dir.path()).unwrap();
 
         let loaded = PreSignedShredMessages::load(dir.path()).unwrap();
-        assert_eq!(loaded.deletion_notice.public_key, msgs.deletion_notice.public_key);
-        assert_eq!(loaded.deletion_notice.timestamp, msgs.deletion_notice.timestamp);
-        assert_eq!(loaded.deletion_notice.signature, msgs.deletion_notice.signature);
-        assert_eq!(loaded.purge_request.public_key, msgs.purge_request.public_key);
-        assert_eq!(loaded.purge_request.purge_token, msgs.purge_request.purge_token);
+        assert_eq!(
+            loaded.deletion_notice.public_key,
+            msgs.deletion_notice.public_key
+        );
+        assert_eq!(
+            loaded.deletion_notice.timestamp,
+            msgs.deletion_notice.timestamp
+        );
+        assert_eq!(
+            loaded.deletion_notice.signature,
+            msgs.deletion_notice.signature
+        );
+        assert_eq!(
+            loaded.purge_request.public_key,
+            msgs.purge_request.public_key
+        );
+        assert_eq!(
+            loaded.purge_request.purge_token,
+            msgs.purge_request.purge_token
+        );
         assert_eq!(loaded.purge_request.signature, msgs.purge_request.signature);
         assert_eq!(loaded.refreshed_at, msgs.refreshed_at);
     }
@@ -310,7 +327,10 @@ mod tests {
         let msgs2 = PreSignedShredMessages::refresh(&identity);
 
         // Purge tokens should be different (random)
-        assert_ne!(msgs1.purge_request.purge_token, msgs2.purge_request.purge_token);
+        assert_ne!(
+            msgs1.purge_request.purge_token,
+            msgs2.purge_request.purge_token
+        );
     }
 
     #[test]
@@ -335,8 +355,7 @@ mod tests {
         relay_message.extend_from_slice(&purge.purge_token);
         relay_message.extend_from_slice(&purge.timestamp.to_be_bytes());
 
-        let peer_key =
-            signature::UnparsedPublicKey::new(&signature::ED25519, &purge.public_key);
+        let peer_key = signature::UnparsedPublicKey::new(&signature::ED25519, &purge.public_key);
         peer_key
             .verify(&relay_message, &purge.signature)
             .expect("Signature must be verifiable using relay's message format");

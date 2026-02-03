@@ -21,7 +21,12 @@ fn test_storage() -> Storage {
 
 fn test_contact(id: &str) -> Contact {
     let mut card = ContactCard::new("Test User");
-    card.add_field(ContactField::new(FieldType::Email, "email", "test@example.com")).unwrap();
+    card.add_field(ContactField::new(
+        FieldType::Email,
+        "email",
+        "test@example.com",
+    ))
+    .unwrap();
     let pk = [0x42u8; 32];
     let shared_key = SymmetricKey::generate();
     // Use a deterministic public key that matches the expected id
@@ -154,7 +159,9 @@ fn test_record_and_check_revoked_sender() {
 
     assert!(!storage.is_sender_revoked("alice_pk").unwrap());
 
-    storage.record_revoked_sender("alice_pk", 1700000000).unwrap();
+    storage
+        .record_revoked_sender("alice_pk", 1700000000)
+        .unwrap();
 
     assert!(storage.is_sender_revoked("alice_pk").unwrap());
     assert!(!storage.is_sender_revoked("bob_pk").unwrap());
@@ -167,7 +174,9 @@ fn test_revoked_sender_persists_after_contact_deletion() {
     storage.save_contact(&contact).unwrap();
 
     // Revoke and delete
-    storage.record_revoked_sender(contact.id(), 1700000000).unwrap();
+    storage
+        .record_revoked_sender(contact.id(), 1700000000)
+        .unwrap();
     storage.delete_contact(&contact.id()).unwrap();
 
     // Tombstone should persist
@@ -178,8 +187,12 @@ fn test_revoked_sender_persists_after_contact_deletion() {
 fn test_revoked_sender_idempotent() {
     let storage = test_storage();
 
-    storage.record_revoked_sender("alice_pk", 1700000000).unwrap();
-    storage.record_revoked_sender("alice_pk", 1700000001).unwrap();
+    storage
+        .record_revoked_sender("alice_pk", 1700000000)
+        .unwrap();
+    storage
+        .record_revoked_sender("alice_pk", 1700000001)
+        .unwrap();
 
     assert!(storage.is_sender_revoked("alice_pk").unwrap());
 }

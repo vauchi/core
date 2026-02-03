@@ -23,8 +23,12 @@ fn test_storage() -> Storage {
 
 fn make_contact_with_cek(pk: [u8; 32], name: &str) -> Contact {
     let mut card = ContactCard::new(name);
-    card.add_field(ContactField::new(FieldType::Email, "email", "test@example.com"))
-        .unwrap();
+    card.add_field(ContactField::new(
+        FieldType::Email,
+        "email",
+        "test@example.com",
+    ))
+    .unwrap();
     let shared_key = SymmetricKey::generate();
     let mut contact = Contact::from_exchange(pk, card, shared_key);
     contact.set_cek(ContentEncryptionKey::generate());
@@ -99,7 +103,11 @@ fn test_execute_deletion_revocations_have_correct_recipient_ids() {
 
     let result = manager.execute_deletion(&identity).unwrap();
 
-    let recipient_ids: Vec<&str> = result.revocations.iter().map(|r| r.recipient_id.as_str()).collect();
+    let recipient_ids: Vec<&str> = result
+        .revocations
+        .iter()
+        .map(|r| r.recipient_id.as_str())
+        .collect();
     assert!(recipient_ids.contains(&bob_id.as_str()));
     assert!(recipient_ids.contains(&carol_id.as_str()));
 }

@@ -167,8 +167,7 @@ impl<'a> DeletionManager<'a> {
 
                 for contact in &contacts {
                     // Generate signed AccountRevoked message
-                    let revoked =
-                        AccountRevoked::create(identity, contact.id(), now);
+                    let revoked = AccountRevoked::create(identity, contact.id(), now);
                     revocations.push(revoked);
 
                     // Crypto-shred: delete CEK (card becomes permanently unreadable)

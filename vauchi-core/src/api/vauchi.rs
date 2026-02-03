@@ -519,24 +519,20 @@ impl<T: Transport> Vauchi<T> {
             .save_ratchet_state(contact_id, &ratchet, is_initiator)?;
 
         // Detect payload version and extract delta bytes + optional CEK
-        let (delta_bytes, new_cek) = if !plaintext.is_empty()
-            && plaintext[0] == PAYLOAD_VERSION_CEK
+        let (delta_bytes, new_cek) = if !plaintext.is_empty() && plaintext[0] == PAYLOAD_VERSION_CEK
         {
             // Version 0x02: CEK-wrapped payload
             match VersionedPayload::decode(&plaintext) {
                 Ok(VersionedPayload::CekWrapped(wrapped)) => {
                     let cek = ContentEncryptionKey::from_bytes(wrapped.cek);
-                    let decrypted = cek.decrypt(&wrapped.cek_ciphertext).map_err(|e| {
-                        VauchiError::Crypto(format!("CEK decrypt: {:?}", e))
-                    })?;
+                    let decrypted = cek
+                        .decrypt(&wrapped.cek_ciphertext)
+                        .map_err(|e| VauchiError::Crypto(format!("CEK decrypt: {:?}", e)))?;
                     (decrypted, Some(cek))
                 }
                 Ok(VersionedPayload::Legacy(data)) => (data, None),
                 Err(e) => {
-                    return Err(VauchiError::Serialization(format!(
-                        "payload decode: {}",
-                        e
-                    )));
+                    return Err(VauchiError::Serialization(format!("payload decode: {}", e)));
                 }
             }
         } else {
@@ -613,11 +609,10 @@ impl<T: Transport> Vauchi<T> {
             }
 
             // Skip contacts without ratchet (can't send updates)
-            let (mut ratchet, is_initiator) =
-                match self.storage.load_ratchet_state(contact.id())? {
-                    Some(r) => r,
-                    None => continue,
-                };
+            let (mut ratchet, is_initiator) = match self.storage.load_ratchet_state(contact.id())? {
+                Some(r) => r,
+                None => continue,
+            };
 
             // Generate a new CEK for this contact
             let cek = ContentEncryptionKey::generate();

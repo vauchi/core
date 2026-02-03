@@ -21,8 +21,12 @@ fn test_storage() -> Storage {
 
 fn make_contact(name: &str) -> Contact {
     let mut card = ContactCard::new(name);
-    card.add_field(ContactField::new(FieldType::Email, "email", "test@example.com"))
-        .unwrap();
+    card.add_field(ContactField::new(
+        FieldType::Email,
+        "email",
+        "test@example.com",
+    ))
+    .unwrap();
     let pk = [0x42u8; 32];
     let shared_key = SymmetricKey::generate();
     Contact::from_exchange(pk, card, shared_key)

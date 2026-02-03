@@ -54,9 +54,8 @@ impl Storage {
                 let card_ct = cek
                     .encrypt(&card_json)
                     .map_err(|e| StorageError::Encryption(e.to_string()))?;
-                let cek_ct =
-                    crate::crypto::encrypt(&self.encryption_key, &cek.to_bytes())
-                        .map_err(|e| StorageError::Encryption(e.to_string()))?;
+                let cek_ct = crate::crypto::encrypt(&self.encryption_key, &cek.to_bytes())
+                    .map_err(|e| StorageError::Encryption(e.to_string()))?;
                 // Empty string instead of NULL because column is NOT NULL.
                 // No personal data leaks — the display name is only inside the
                 // CEK-encrypted card content.
@@ -65,11 +64,7 @@ impl Storage {
                 // Legacy path: encrypt card with storage key, plaintext display_name
                 let card_ct = crate::crypto::encrypt(&self.encryption_key, &card_json)
                     .map_err(|e| StorageError::Encryption(e.to_string()))?;
-                (
-                    card_ct,
-                    contact.display_name().to_string(),
-                    None::<Vec<u8>>,
-                )
+                (card_ct, contact.display_name().to_string(), None::<Vec<u8>>)
             };
 
         // Encrypt the shared key
@@ -307,11 +302,7 @@ impl Storage {
         for row_result in cek_rows {
             let row = row_result?;
             let contact = self.row_to_contact(row)?;
-            if contact
-                .display_name()
-                .to_lowercase()
-                .contains(&query_lower)
-            {
+            if contact.display_name().to_lowercase().contains(&query_lower) {
                 contacts.push(contact);
             }
         }

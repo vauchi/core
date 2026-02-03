@@ -6,6 +6,7 @@ pub mod cek;
 pub mod chain;
 pub mod encryption;
 pub mod kdf;
+pub mod padding;
 pub mod password_kdf;
 pub mod ratchet;
 pub mod shredding;

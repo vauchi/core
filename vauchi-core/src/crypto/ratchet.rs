@@ -18,6 +18,7 @@ use zeroize::Zeroize;
 
 use super::chain::{ChainError, ChainKey, MessageKey};
 use super::encryption::{decrypt, encrypt, EncryptionError, SymmetricKey};
+use super::padding;
 use super::kdf::HKDF;
 use crate::exchange::X3DHKeyPair;
 
@@ -222,8 +223,9 @@ impl DoubleRatchetState {
         let (message_key, next_chain) = send_chain.ratchet()?;
         self.send_chain = Some(next_chain);
 
-        // Encrypt the plaintext
-        let ciphertext = encrypt(message_key.symmetric_key(), plaintext)?;
+        // Pad plaintext to fixed bucket size to prevent traffic analysis
+        let padded = padding::pad(plaintext);
+        let ciphertext = encrypt(message_key.symmetric_key(), &padded)?;
 
         let message = RatchetMessage {
             dh_public: self.our_public_key(),
@@ -244,7 +246,11 @@ impl DoubleRatchetState {
     pub fn decrypt(&mut self, message: &RatchetMessage) -> Result<Vec<u8>, RatchetError> {
         // Try skipped keys first
         if let Some(key) = self.try_skipped_key(message) {
-            return decrypt(key.symmetric_key(), &message.ciphertext).map_err(RatchetError::from);
+            let padded =
+                decrypt(key.symmetric_key(), &message.ciphertext).map_err(RatchetError::from)?;
+            return padding::unpad(&padded).ok_or_else(|| {
+                RatchetError::InvalidMessage("Failed to unpad decrypted message".into())
+            });
         }
 
         // Check if we need to perform a DH ratchet
@@ -281,8 +287,11 @@ impl DoubleRatchetState {
         self.recv_chain = Some(next_chain);
         self.recv_message_count = message.message_index + 1;
 
-        // Decrypt
-        decrypt(message_key.symmetric_key(), &message.ciphertext).map_err(RatchetError::from)
+        // Decrypt and unpad
+        let padded =
+            decrypt(message_key.symmetric_key(), &message.ciphertext).map_err(RatchetError::from)?;
+        padding::unpad(&padded)
+            .ok_or_else(|| RatchetError::InvalidMessage("Failed to unpad decrypted message".into()))
     }
 
     /// Try to decrypt using a previously skipped key.

@@ -1,0 +1,48 @@
+# SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+[package]
+name = "vauchi-core-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+
+[dependencies.vauchi-core]
+path = ".."
+features = ["network-rustls"]
+
+# Prevent this from interfering with the parent workspace
+[workspace]
+members = ["."]
+
+[[bin]]
+name = "fuzz_decode_message"
+path = "fuzz_targets/fuzz_decode_message.rs"
+doc = false
+
+[[bin]]
+name = "fuzz_qr_payload"
+path = "fuzz_targets/fuzz_qr_payload.rs"
+doc = false
+
+[[bin]]
+name = "fuzz_unpad"
+path = "fuzz_targets/fuzz_unpad.rs"
+doc = false
+
+[[bin]]
+name = "fuzz_delta_decode"
+path = "fuzz_targets/fuzz_delta_decode.rs"
+doc = false
+
+[[bin]]
+name = "fuzz_recovery_claim"
+path = "fuzz_targets/fuzz_recovery_claim.rs"
+doc = false

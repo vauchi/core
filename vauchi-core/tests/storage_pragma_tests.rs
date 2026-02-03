@@ -69,6 +69,64 @@ fn test_in_memory_does_not_crash() {
 }
 
 // ============================================================================
+// Security PRAGMAs (crypto-shredding defense-in-depth)
+// ============================================================================
+
+/// secure_delete should be ON to overwrite deleted content with zeros.
+#[test]
+fn test_secure_delete_enabled() {
+    let tmp = NamedTempFile::new().unwrap();
+    let storage = Storage::open(tmp.path(), SymmetricKey::generate()).unwrap();
+
+    let secure_delete: i64 = storage
+        .connection()
+        .query_row("PRAGMA secure_delete", [], |row| row.get(0))
+        .unwrap();
+
+    assert_eq!(
+        secure_delete, 1,
+        "Expected secure_delete=ON (1), got {}",
+        secure_delete
+    );
+}
+
+/// temp_store should be MEMORY (2) to keep temporary tables in RAM.
+#[test]
+fn test_temp_store_memory() {
+    let tmp = NamedTempFile::new().unwrap();
+    let storage = Storage::open(tmp.path(), SymmetricKey::generate()).unwrap();
+
+    let temp_store: i64 = storage
+        .connection()
+        .query_row("PRAGMA temp_store", [], |row| row.get(0))
+        .unwrap();
+
+    assert_eq!(
+        temp_store, 2,
+        "Expected temp_store=MEMORY (2), got {}",
+        temp_store
+    );
+}
+
+/// auto_vacuum should be FULL (1) for new databases.
+#[test]
+fn test_auto_vacuum_full() {
+    let tmp = NamedTempFile::new().unwrap();
+    let storage = Storage::open(tmp.path(), SymmetricKey::generate()).unwrap();
+
+    let auto_vacuum: i64 = storage
+        .connection()
+        .query_row("PRAGMA auto_vacuum", [], |row| row.get(0))
+        .unwrap();
+
+    assert_eq!(
+        auto_vacuum, 1,
+        "Expected auto_vacuum=FULL (1), got {}",
+        auto_vacuum
+    );
+}
+
+// ============================================================================
 // Display name index tests (Migration V12)
 // ============================================================================
 

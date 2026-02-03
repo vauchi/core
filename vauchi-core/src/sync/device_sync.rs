@@ -10,6 +10,7 @@
 use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
+use zeroize::Zeroize;
 
 use crate::contact::Contact;
 use crate::contact_card::ContactCard;
@@ -41,6 +42,12 @@ pub struct ContactSyncData {
     /// Whether this contact is trusted for recovery.
     #[serde(default)]
     pub recovery_trusted: bool,
+}
+
+impl Drop for ContactSyncData {
+    fn drop(&mut self) {
+        self.shared_key.zeroize();
+    }
 }
 
 impl ContactSyncData {

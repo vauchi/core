@@ -427,7 +427,6 @@ release:create:
   tags:
     - docker
   interruptible: false
-  resource_group: release-publish
   needs: [publish:packages, publish:core, publish:mobile]
   script:
     - echo "Creating release $CI_COMMIT_TAG"

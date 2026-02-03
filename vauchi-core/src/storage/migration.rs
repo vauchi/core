@@ -651,6 +651,20 @@ const MIGRATION_V12_CONTACTS_INDEX: &str = "
 /// Adds per-contact Content Encryption Key (CEK) column and revoked_senders
 /// tombstone table. Existing contacts have `cek_encrypted = NULL` (legacy mode)
 /// until the card owner sends an update carrying a CEK.
+///
+/// ## GDPR note: `revoked_senders` retention (Art 6(1)(f))
+///
+/// The `revoked_senders` table persists indefinitely by design. This is
+/// defensible under GDPR Art 6(1)(f) — legitimate interest:
+///
+/// - **Purpose**: Prevents re-establishment attacks from revoked senders.
+///   Without tombstones, a revoked sender could forge a new exchange and
+///   re-appear as a trusted contact.
+/// - **Minimal data**: Only `sender_id` (a hash of the public key, not PII)
+///   and `revoked_at` timestamp are stored. No names, messages, or content.
+/// - **Full deletion path**: Account shredding (hard_shred / panic_shred)
+///   destroys the entire SQLite database including all tombstones. Users
+///   who exercise their right to erasure (Art 17) get complete deletion.
 const MIGRATION_V13_CRYPTO_SHREDDING: &str = "
     -- Per-contact CEK, encrypted with the storage master key.
     -- NULL for legacy contacts (pre-CEK). Non-NULL for CEK-protected contacts.
@@ -658,6 +672,7 @@ const MIGRATION_V13_CRYPTO_SHREDDING: &str = "
 
     -- Revocation tombstones: prevents processing updates from revoked senders.
     -- Persists indefinitely to prevent re-establishment attacks.
+    -- GDPR: Art 6(1)(f) legitimate interest — see doc comment above.
     CREATE TABLE IF NOT EXISTS revoked_senders (
         sender_id TEXT PRIMARY KEY,
         revoked_at INTEGER NOT NULL

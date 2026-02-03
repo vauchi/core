@@ -16,10 +16,23 @@ use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::api::account::{AccountError, DeletionManager};
-use crate::api::pre_signed::PreSignedShredMessages;
+use crate::api::pre_signed::{PreSignedPurgeRequest, PreSignedShredMessages};
 use crate::identity::Identity;
 use crate::storage::secure::SecureStorage;
 use crate::storage::Storage;
+
+/// Trait for sending relay purge requests during shred operations.
+///
+/// Abstracted to allow testing without a real relay connection and to
+/// decouple the shred orchestration from the network layer.
+pub trait PurgeSender {
+    /// Sends a pre-signed purge request to the relay.
+    ///
+    /// Returns `Ok(true)` if the relay acknowledged the purge,
+    /// `Ok(false)` if the request was sent but not confirmed,
+    /// or `Err` if sending failed entirely.
+    fn send_purge(&mut self, purge: &PreSignedPurgeRequest) -> Result<bool, ShredError>;
+}
 
 /// Key name for the Shredding Master Key in SecureStorage.
 const SMK_KEY_NAME: &str = "smk";
@@ -160,7 +173,14 @@ impl<'a> ShredManager<'a> {
     ///
     /// Requires grace period to have elapsed. Sends network notifications
     /// while keys are still available, then destroys all key material.
-    pub fn hard_shred(&self, _token: ShredToken) -> Result<ShredReport, ShredError> {
+    ///
+    /// If `purge_sender` is provided, sends a pre-signed purge request to the
+    /// relay before destroying local data. Purge failure does not abort shred.
+    pub fn hard_shred(
+        &self,
+        _token: ShredToken,
+        purge_sender: Option<&mut dyn PurgeSender>,
+    ) -> Result<ShredReport, ShredError> {
         let mut report = ShredReport::default();
 
         // 1. Verify grace period has elapsed
@@ -168,11 +188,17 @@ impl<'a> ShredManager<'a> {
         dm.execute_deletion(self.identity)?;
 
         // 2-4. Network notifications (while keys alive) — best-effort
-        // These would send to contacts and relay in a real implementation.
-        // For now, we log intent. Full networking requires relay client.
         report.contacts_notified = 0;
-        report.relay_purge_sent = false;
         report.devices_notified = 0;
+
+        // Send relay purge if sender provided (before point-of-no-return)
+        if let Some(sender) = purge_sender {
+            let pre_signed = PreSignedShredMessages::load(&self.data_dir)
+                .or_else(|_| Ok::<_, ShredError>(PreSignedShredMessages::generate(self.identity)));
+            if let Ok(msgs) = pre_signed {
+                report.relay_purge_sent = sender.send_purge(&msgs.purge_request).unwrap_or(false);
+            }
+        }
 
         // ═══ POINT OF NO RETURN ═══
 
@@ -201,13 +227,19 @@ impl<'a> ShredManager<'a> {
     ///
     /// Follows DP-2 (sign-before-destroy): loads pre-signed messages before
     /// destroying any key material. Network operations happen after destruction.
-    pub fn panic_shred(&self) -> Result<ShredReport, ShredError> {
+    ///
+    /// If `purge_sender` is provided, sends the pre-signed purge request to
+    /// the relay after key destruction (Phase C). Purge failure does not abort shred.
+    pub fn panic_shred(
+        &self,
+        purge_sender: Option<&mut dyn PurgeSender>,
+    ) -> Result<ShredReport, ShredError> {
         let mut report = ShredReport::default();
 
         // ── Phase A: Prepare outbound messages while keys available ──
 
         // 1. Load pre-signed messages from file (unencrypted per DP-3)
-        let _pre_signed = match PreSignedShredMessages::load(&self.data_dir) {
+        let pre_signed = match PreSignedShredMessages::load(&self.data_dir) {
             Ok(msgs) => Some(msgs),
             Err(_) => {
                 // 2. Fallback: sign fresh messages now (keys still available)
@@ -228,8 +260,10 @@ impl<'a> ShredManager<'a> {
         report.key_files_destroyed = self.delete_key_files();
 
         // ── Phase C: Best-effort network and cleanup ──
-        // In a full implementation, pre-signed messages would be sent here.
-        // Network operations are best-effort after key destruction.
+        // Send pre-signed purge after key destruction (best-effort)
+        if let (Some(sender), Some(msgs)) = (purge_sender, &pre_signed) {
+            report.relay_purge_sent = sender.send_purge(&msgs.purge_request).unwrap_or(false);
+        }
 
         // 8. Secure-delete SQLite database
         report.sqlite_destroyed = self.secure_delete_database();
@@ -444,7 +478,7 @@ mod tests {
         let token = manager.soft_shred().unwrap();
 
         // Hard shred should fail — grace period hasn't elapsed
-        let result = manager.hard_shred(token);
+        let result = manager.hard_shred(token, None);
         assert!(result.is_err());
     }
 
@@ -459,7 +493,7 @@ mod tests {
         let manager = ShredManager::new(&storage, &secure_storage, &identity, dir.path());
         let token = ShredToken::new();
 
-        let report = manager.hard_shred(token).unwrap();
+        let report = manager.hard_shred(token, None).unwrap();
 
         // SMK should be destroyed
         assert!(report.smk_destroyed);
@@ -479,7 +513,7 @@ mod tests {
 
         let manager = ShredManager::new(&storage, &secure_storage, &identity, dir.path());
         let token = ShredToken::new();
-        let report = manager.hard_shred(token).unwrap();
+        let report = manager.hard_shred(token, None).unwrap();
 
         assert!(report.smk_destroyed);
 
@@ -496,7 +530,7 @@ mod tests {
         assert!(secure_storage.load_key(SMK_KEY_NAME).unwrap().is_some());
 
         let manager = ShredManager::new(&storage, &secure_storage, &identity, dir.path());
-        let report = manager.panic_shred().unwrap();
+        let report = manager.panic_shred(None).unwrap();
 
         assert!(report.smk_destroyed);
         assert!(secure_storage.load_key(SMK_KEY_NAME).unwrap().is_none());
@@ -511,7 +545,7 @@ mod tests {
         msgs.save(dir.path()).unwrap();
 
         let manager = ShredManager::new(&storage, &secure_storage, &identity, dir.path());
-        let report = manager.panic_shred().unwrap();
+        let report = manager.panic_shred(None).unwrap();
 
         // Should succeed — pre-signed messages were loaded before key destruction
         assert!(report.smk_destroyed);
@@ -524,7 +558,7 @@ mod tests {
 
         // Do NOT create pre-signed file — panic shred should fall back to fresh signing
         let manager = ShredManager::new(&storage, &secure_storage, &identity, dir.path());
-        let report = manager.panic_shred().unwrap();
+        let report = manager.panic_shred(None).unwrap();
 
         // Should succeed even without pre-signed file
         assert!(report.smk_destroyed);
@@ -535,7 +569,7 @@ mod tests {
         let (dir, storage, secure_storage, identity) = setup_test_env();
         let manager = ShredManager::new(&storage, &secure_storage, &identity, dir.path());
 
-        manager.panic_shred().unwrap();
+        manager.panic_shred(None).unwrap();
 
         let verification = manager.verify_shred();
         assert!(verification.smk_absent, "SMK should be absent");
@@ -570,7 +604,7 @@ mod tests {
 
         let manager = ShredManager::new(&storage, &secure_storage, &identity, dir.path());
         let token = ShredToken::new();
-        let report = manager.hard_shred(token).unwrap();
+        let report = manager.hard_shred(token, None).unwrap();
 
         assert!(report.identity_file_destroyed);
         assert!(!identity_path.exists(), "Identity file should be deleted");
@@ -592,8 +626,113 @@ mod tests {
 
         let manager = ShredManager::new(&storage, &secure_storage, &identity, dir.path());
         let token = ShredToken::new();
-        let report = manager.hard_shred(token).unwrap();
+        let report = manager.hard_shred(token, None).unwrap();
 
         assert_eq!(report.key_files_destroyed, 2);
+    }
+
+    // === PurgeSender tests ===
+
+    struct MockPurgeSender {
+        purge_sent: bool,
+        should_fail: bool,
+    }
+
+    impl MockPurgeSender {
+        fn new() -> Self {
+            Self {
+                purge_sent: false,
+                should_fail: false,
+            }
+        }
+
+        fn failing() -> Self {
+            Self {
+                purge_sent: false,
+                should_fail: true,
+            }
+        }
+    }
+
+    impl PurgeSender for MockPurgeSender {
+        fn send_purge(&mut self, _purge: &PreSignedPurgeRequest) -> Result<bool, ShredError> {
+            if self.should_fail {
+                return Err(ShredError::FileError("mock purge failure".into()));
+            }
+            self.purge_sent = true;
+            Ok(true)
+        }
+    }
+
+    #[test]
+    fn test_hard_shred_sends_purge_when_sender_provided() {
+        let (dir, storage, secure_storage, identity) = setup_test_env();
+
+        let dm = DeletionManager::new(&storage);
+        dm.schedule_deletion_with_execute_at(1000, 1001).unwrap();
+
+        let manager = ShredManager::new(&storage, &secure_storage, &identity, dir.path());
+        let token = ShredToken::new();
+
+        let mut sender = MockPurgeSender::new();
+        let report = manager.hard_shred(token, Some(&mut sender)).unwrap();
+
+        assert!(sender.purge_sent, "Purge should have been sent");
+        assert!(report.relay_purge_sent, "Report should reflect purge sent");
+    }
+
+    #[test]
+    fn test_hard_shred_succeeds_when_purge_fails() {
+        let (dir, storage, secure_storage, identity) = setup_test_env();
+
+        let dm = DeletionManager::new(&storage);
+        dm.schedule_deletion_with_execute_at(1000, 1001).unwrap();
+
+        let manager = ShredManager::new(&storage, &secure_storage, &identity, dir.path());
+        let token = ShredToken::new();
+
+        let mut sender = MockPurgeSender::failing();
+        let report = manager.hard_shred(token, Some(&mut sender)).unwrap();
+
+        assert!(
+            !report.relay_purge_sent,
+            "Purge failure should not abort shred"
+        );
+        assert!(report.smk_destroyed, "SMK should still be destroyed");
+    }
+
+    #[test]
+    fn test_panic_shred_sends_purge() {
+        let (dir, storage, secure_storage, identity) = setup_test_env();
+
+        // Create pre-signed messages file
+        let msgs = PreSignedShredMessages::generate(&identity);
+        msgs.save(dir.path()).unwrap();
+
+        let manager = ShredManager::new(&storage, &secure_storage, &identity, dir.path());
+
+        let mut sender = MockPurgeSender::new();
+        let report = manager.panic_shred(Some(&mut sender)).unwrap();
+
+        assert!(sender.purge_sent, "Purge should have been sent");
+        assert!(report.relay_purge_sent, "Report should reflect purge sent");
+        assert!(report.smk_destroyed, "SMK should be destroyed");
+    }
+
+    #[test]
+    fn test_shred_without_sender_still_works() {
+        let (dir, storage, secure_storage, identity) = setup_test_env();
+
+        let dm = DeletionManager::new(&storage);
+        dm.schedule_deletion_with_execute_at(1000, 1001).unwrap();
+
+        let manager = ShredManager::new(&storage, &secure_storage, &identity, dir.path());
+        let token = ShredToken::new();
+
+        // Pass None — backward compat
+        let report = manager.hard_shred(token, None).unwrap();
+
+        assert!(!report.relay_purge_sent);
+        assert!(report.smk_destroyed);
     }
 }

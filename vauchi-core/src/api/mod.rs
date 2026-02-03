@@ -114,7 +114,9 @@ pub use gdpr::{export_all_data, GdprExport};
 pub use pre_signed::{PreSignedError, PreSignedPurgeRequest, PreSignedShredMessages};
 
 // Shred Manager
-pub use shred::{ShredError, ShredManager, ShredReport, ShredToken, ShredVerification};
+pub use shred::{
+    PurgeSender, ShredError, ShredManager, ShredReport, ShredToken, ShredVerification,
+};
 
 // Error types
 pub use error::{VauchiError, VauchiResult};

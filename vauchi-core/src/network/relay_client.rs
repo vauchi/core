@@ -333,6 +333,28 @@ impl<T: Transport> RelayClient<T> {
     }
 }
 
+impl<T: Transport> crate::api::PurgeSender for RelayClient<T> {
+    fn send_purge(
+        &mut self,
+        purge: &crate::api::PreSignedPurgeRequest,
+    ) -> Result<bool, crate::api::ShredError> {
+        let request = PurgeRequest {
+            public_key: purge.public_key,
+            signature: purge.signature.clone(),
+            purge_token: purge.purge_token,
+            timestamp: purge.timestamp,
+        };
+
+        match self.send_purge_request(&request) {
+            Ok(_) => Ok(true),
+            Err(e) => Err(crate::api::ShredError::FileError(format!(
+                "Relay purge failed: {}",
+                e
+            ))),
+        }
+    }
+}
+
 /// Result of processing pending updates.
 #[derive(Debug, Default)]
 pub struct ProcessResult {

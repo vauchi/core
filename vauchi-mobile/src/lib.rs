@@ -45,7 +45,7 @@ pub use content::{
     MobileApplyFailure, MobileApplyResult, MobileContentConfig, MobileContentType,
     MobileUpdateStatus,
 };
-pub use error::MobileError;
+pub use error::{KeychainError, MobileError};
 pub use types::{
     MobileAhaMoment, MobileAhaMomentType, MobileConsentRecord, MobileConsentType, MobileContact,
     MobileContactCard, MobileContactField, MobileDeletionInfo, MobileDeletionState,
@@ -73,14 +73,14 @@ uniffi::setup_scaffolding!();
 #[uniffi::export(callback_interface)]
 pub trait MobilePlatformKeychain: Send + Sync {
     /// Saves a key to the platform keychain.
-    fn save_key(&self, name: String, key: Vec<u8>) -> Result<(), String>;
+    fn save_key(&self, name: String, key: Vec<u8>) -> Result<(), KeychainError>;
 
     /// Loads a key from the platform keychain.
     /// Returns None if the key doesn't exist.
-    fn load_key(&self, name: String) -> Result<Option<Vec<u8>>, String>;
+    fn load_key(&self, name: String) -> Result<Option<Vec<u8>>, KeychainError>;
 
     /// Deletes a key from the platform keychain.
-    fn delete_key(&self, name: String) -> Result<(), String>;
+    fn delete_key(&self, name: String) -> Result<(), KeychainError>;
 }
 
 /// Bridge that adapts the UniFFI callback interface to vauchi-core's SecureStorage trait.
@@ -92,19 +92,19 @@ impl vauchi_core::storage::SecureStorage for KeychainBridge {
     fn save_key(&self, name: &str, key: &[u8]) -> Result<(), vauchi_core::StorageError> {
         self.callback
             .save_key(name.to_string(), key.to_vec())
-            .map_err(vauchi_core::StorageError::Encryption)
+            .map_err(|e| vauchi_core::StorageError::Encryption(e.to_string()))
     }
 
     fn load_key(&self, name: &str) -> Result<Option<Vec<u8>>, vauchi_core::StorageError> {
         self.callback
             .load_key(name.to_string())
-            .map_err(vauchi_core::StorageError::Encryption)
+            .map_err(|e| vauchi_core::StorageError::Encryption(e.to_string()))
     }
 
     fn delete_key(&self, name: &str) -> Result<(), vauchi_core::StorageError> {
         self.callback
             .delete_key(name.to_string())
-            .map_err(vauchi_core::StorageError::Encryption)
+            .map_err(|e| vauchi_core::StorageError::Encryption(e.to_string()))
     }
 }
 

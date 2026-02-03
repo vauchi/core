@@ -4,6 +4,16 @@
 
 //! Mobile-friendly error types.
 
+/// Error type for platform keychain callback interface.
+///
+/// UniFFI requires a named error enum for callback interfaces (String is not supported).
+/// Mobile platforms return this from keychain operations.
+#[derive(Debug, thiserror::Error, uniffi::Error)]
+pub enum KeychainError {
+    #[error("{msg}")]
+    OperationFailed { msg: String },
+}
+
 /// Mobile-friendly error type.
 #[derive(Debug, thiserror::Error, uniffi::Error)]
 pub enum MobileError {

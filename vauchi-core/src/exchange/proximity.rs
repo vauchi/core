@@ -8,6 +8,7 @@
 //! Implementations can use ultrasonic audio, BLE, or other mechanisms.
 
 use std::time::Duration;
+use subtle::ConstantTimeEq;
 use thiserror::Error;
 
 /// Errors that can occur during proximity verification.
@@ -151,7 +152,7 @@ impl ProximityVerifier for MockProximityVerifier {
         if response[0] != 0x01 {
             return false;
         }
-        &response[1..17] == challenge
+        response[1..17].ct_eq(challenge).into()
     }
 }
 

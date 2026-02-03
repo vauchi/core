@@ -26,6 +26,7 @@
 
 use super::{ProximityError, ProximityVerifier};
 use std::time::Duration;
+use subtle::ConstantTimeEq;
 
 /// Configuration for ultrasonic audio verification.
 #[derive(Debug, Clone)]
@@ -189,7 +190,7 @@ impl ProximityVerifier for UltrasonicVerifier {
     fn verify_response(&self, challenge: &[u8; 16], response: &[u8]) -> bool {
         if let Some(decoded) = Self::decode_response(response) {
             // Response should echo the challenge
-            &decoded == challenge
+            decoded.ct_eq(challenge).into()
         } else {
             false
         }

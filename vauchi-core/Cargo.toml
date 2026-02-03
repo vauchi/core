@@ -57,6 +57,9 @@ base64 = "0.22"
 # Hex encoding for fingerprints
 hex = "0.4"
 
+# Constant-time comparison for cryptographic operations
+subtle = "2.6"
+
 # Zeroize sensitive data in memory
 zeroize = { version = "1.8", features = ["derive"] }
 

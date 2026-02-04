@@ -16,7 +16,7 @@ libfuzzer-sys = "0.4"
 
 [dependencies.vauchi-core]
 path = ".."
-features = ["network-rustls"]
+features = ["network-rustls", "testing"]
 
 # Prevent this from interfering with the parent workspace
 [workspace]
@@ -45,4 +45,29 @@ doc = false
 [[bin]]
 name = "fuzz_recovery_claim"
 path = "fuzz_targets/fuzz_recovery_claim.rs"
+doc = false
+
+[[bin]]
+name = "fuzz_nfc_payload"
+path = "fuzz_targets/fuzz_nfc_payload.rs"
+doc = false
+
+[[bin]]
+name = "fuzz_ble_payload"
+path = "fuzz_targets/fuzz_ble_payload.rs"
+doc = false
+
+[[bin]]
+name = "fuzz_ble_advertisement"
+path = "fuzz_targets/fuzz_ble_advertisement.rs"
+doc = false
+
+[[bin]]
+name = "fuzz_exchange_payload"
+path = "fuzz_targets/fuzz_exchange_payload.rs"
+doc = false
+
+[[bin]]
+name = "fuzz_encrypted_exchange"
+path = "fuzz_targets/fuzz_encrypted_exchange.rs"
 doc = false

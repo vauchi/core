@@ -1,0 +1,21 @@
+# SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+# cargo-audit configuration
+# Mirrors ignore list from deny.toml for cargo-audit compatibility.
+
+[advisories]
+ignore = [
+    # rsa Marvin Attack (timing side channel) — transitive via arti-client.
+    # No fix available until arti updates rsa. Tracked upstream.
+    "RUSTSEC-2023-0071",
+    # rustls-pemfile is unmaintained — transitive via tungstenite/rustls-native-certs.
+    "RUSTSEC-2025-0134",
+    # bincode v1 is unmaintained — direct dependency, migrate to bincode v2 or bitcode.
+    "RUSTSEC-2025-0141",
+    # paste is unmaintained — transitive via uniffi.
+    "RUSTSEC-2024-0436",
+    # instant is unmaintained — transitive via arti-client.
+    "RUSTSEC-2024-0384",
+]

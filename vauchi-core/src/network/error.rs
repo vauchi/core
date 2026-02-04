@@ -52,4 +52,16 @@ pub enum NetworkError {
 
     #[error("Max retries exceeded")]
     MaxRetriesExceeded,
+
+    #[error("Tor error: {0}")]
+    Tor(String),
+
+    #[error("Tor not available (not bootstrapped)")]
+    TorNotAvailable,
+
+    #[error("Tor bootstrap failed: {0}")]
+    TorBootstrapFailed(String),
+
+    #[error("Tor circuit failed: {0}")]
+    TorCircuitFailed(String),
 }

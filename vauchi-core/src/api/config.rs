@@ -11,7 +11,8 @@ use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
 
 use crate::crypto::SymmetricKey;
-use crate::network::{ProxyConfig, RelayClientConfig, TransportConfig};
+use crate::network::{MultiRelayConfig, ProxyConfig, RelayClientConfig, TransportConfig};
+use crate::tor_config::TorConfig;
 
 /// Configuration for Vauchi instance.
 #[derive(Debug, Clone)]
@@ -37,6 +38,12 @@ pub struct VauchiConfig {
 
     /// Recovery configuration for social key recovery.
     pub recovery: RecoveryConfig,
+
+    /// Tor configuration (opt-in anonymity layer).
+    pub tor: TorConfig,
+
+    /// Multi-relay configuration (for federation client support).
+    pub relay_list: Option<MultiRelayConfig>,
 }
 
 impl Default for VauchiConfig {
@@ -49,6 +56,8 @@ impl Default for VauchiConfig {
             storage_key: None,
             delivery_receipts_enabled: true,
             recovery: RecoveryConfig::default(),
+            tor: TorConfig::default(),
+            relay_list: None,
         }
     }
 }
@@ -65,6 +74,18 @@ impl VauchiConfig {
     /// Sets the relay server URL.
     pub fn with_relay_url(mut self, url: impl Into<String>) -> Self {
         self.relay.server_url = url.into();
+        self
+    }
+
+    /// Sets the Tor configuration.
+    pub fn with_tor(mut self, tor: TorConfig) -> Self {
+        self.tor = tor;
+        self
+    }
+
+    /// Sets the multi-relay configuration.
+    pub fn with_relay_list(mut self, config: MultiRelayConfig) -> Self {
+        self.relay_list = Some(config);
         self
     }
 

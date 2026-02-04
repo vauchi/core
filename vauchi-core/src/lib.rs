@@ -26,6 +26,7 @@ pub mod social;
 pub mod storage;
 pub mod sync;
 pub mod theme;
+pub mod tor_config;
 
 pub use aha_moments::{AhaMoment, AhaMomentTracker, AhaMomentType};
 #[cfg(any(feature = "network-native-tls", feature = "network-rustls"))]
@@ -73,3 +74,4 @@ pub use theme::{
     get_bundled_themes, get_theme_by_id, validate_hex_color, Theme, ThemeColors, ThemeError,
     ThemeMode,
 };
+pub use tor_config::{TorConfig, TorRelayAddress, TorStatus};

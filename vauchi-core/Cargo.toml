@@ -19,6 +19,8 @@ secure-storage = ["keyring"]
 audio-cpal = ["cpal"]
 # Enable this feature to expose internal modules for integration tests
 testing = []
+# Tor anonymity layer (embedded arti client)
+tor = ["arti-client", "tor-rtcompat", "tokio-util"]
 # Remote content updates (requires HTTP client)
 content-updates = ["reqwest", "tokio"]
 
@@ -94,6 +96,11 @@ reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"
 
 # Async runtime for content fetching
 tokio = { version = "1.0", features = ["rt"], optional = true }
+
+# Embedded Tor client (optional, behind tor feature)
+arti-client = { version = "0.27", optional = true, default-features = false, features = ["tokio"] }
+tor-rtcompat = { version = "0.27", optional = true, features = ["tokio"] }
+tokio-util = { version = "0.7", optional = true, features = ["io"] }
 
 [dev-dependencies]
 # Temporary directories for storage tests

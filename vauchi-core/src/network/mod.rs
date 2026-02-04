@@ -88,8 +88,10 @@ pub mod noise;
 #[cfg(not(feature = "testing"))]
 mod noise;
 
+pub mod forwarding;
 pub mod pinning;
 pub mod revocation;
+pub mod tor;
 
 // Error types
 pub use error::NetworkError;
@@ -97,9 +99,9 @@ pub use error::NetworkError;
 // Message types
 pub use message::{
     negotiate_version, AccountDeletionNotice, AccountRevoked, AckStatus, Acknowledgment,
-    DeletionStage, DeviceSyncMessage, EncryptedUpdate, Handshake, MessageEnvelope, MessageId,
-    MessagePayload, PresenceStatus, PresenceUpdate, PurgeRequest, RatchetHeader,
-    VersionNegotiation, PROTOCOL_VERSION,
+    DeletionStage, DeviceSyncMessage, EncryptedUpdate, ForwardingHint, ForwardingHints, Handshake,
+    MessageEnvelope, MessageId, MessagePayload, PresenceStatus, PresenceUpdate, PurgeRequest,
+    RatchetHeader, VersionNegotiation, PROTOCOL_VERSION,
 };
 
 // Protocol utilities
@@ -136,3 +138,9 @@ pub use noise::{parse_relay_noise_pubkey, NoiseInitiator, NoiseTransport as Nois
 
 // Certificate pinning
 pub use pinning::{verify_pin, PinnedCertificate};
+
+// Tor transport
+pub use tor::{TorConfig, TorConnector, TorRelayAddress, TorStatus, TorTransport};
+
+#[cfg(feature = "tor")]
+pub use tor::{ArtiTorConnector, TorManager};

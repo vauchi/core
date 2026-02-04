@@ -11,6 +11,7 @@ use rusqlite::params;
 use super::{Storage, StorageError};
 use crate::aha_moments::AhaMomentTracker;
 use crate::demo_contact::DemoContactState;
+use crate::tor_config::TorConfig;
 
 impl Storage {
     // === Aha Moments Operations ===
@@ -155,6 +156,67 @@ impl Storage {
         }
     }
 
+    // === Tor Configuration Operations ===
+
+    /// Saves the Tor configuration (encrypted).
+    pub fn save_tor_config(&self, config: &TorConfig) -> Result<(), StorageError> {
+        let json = config
+            .to_json()
+            .map_err(|e| StorageError::Serialization(e.to_string()))?;
+
+        let encrypted = crate::crypto::encrypt(&self.encryption_key, json.as_bytes())
+            .map_err(|e| StorageError::Encryption(e.to_string()))?;
+
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("system time before UNIX epoch")
+            .as_secs();
+
+        self.conn.execute(
+            "INSERT OR REPLACE INTO ux_state (id, tor_config_encrypted, updated_at)
+             VALUES (1, ?1, ?2)
+             ON CONFLICT(id) DO UPDATE SET tor_config_encrypted = ?1, updated_at = ?2",
+            params![encrypted, now as i64],
+        )?;
+
+        Ok(())
+    }
+
+    /// Loads the Tor configuration (decrypted).
+    pub fn load_tor_config(&self) -> Result<Option<TorConfig>, StorageError> {
+        let result = self.conn.query_row(
+            "SELECT tor_config_encrypted FROM ux_state WHERE id = 1",
+            [],
+            |row| {
+                let encrypted: Option<Vec<u8>> = row.get(0)?;
+                Ok(encrypted)
+            },
+        );
+
+        match result {
+            Ok(Some(encrypted)) if !encrypted.is_empty() => {
+                let decrypted = crate::crypto::decrypt(&self.encryption_key, &encrypted)
+                    .map_err(|e| StorageError::Encryption(e.to_string()))?;
+                let json = String::from_utf8(decrypted)
+                    .map_err(|e| StorageError::Serialization(e.to_string()))?;
+                let config = TorConfig::from_json(&json)
+                    .map_err(|e| StorageError::Serialization(e.to_string()))?;
+                Ok(Some(config))
+            }
+            Ok(_) => Ok(None),
+            Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+            Err(e) => Err(StorageError::Database(e)),
+        }
+    }
+
+    /// Loads Tor config or returns default if none exists.
+    pub fn load_or_create_tor_config(&self) -> Result<TorConfig, StorageError> {
+        match self.load_tor_config()? {
+            Some(config) => Ok(config),
+            None => Ok(TorConfig::default()),
+        }
+    }
+
     // === Combined UX State Operations ===
 
     /// Saves both aha tracker and demo contact state atomically (encrypted).
@@ -202,6 +264,7 @@ mod tests {
     use super::*;
     use crate::aha_moments::AhaMomentType;
     use crate::crypto::SymmetricKey;
+    use crate::tor_config::TorConfig;
 
     fn test_storage() -> Storage {
         Storage::in_memory(SymmetricKey::generate()).unwrap()
@@ -301,6 +364,63 @@ mod tests {
         state.dismiss();
         storage.save_demo_contact_state(&state).unwrap();
         assert!(!storage.is_demo_contact_active().unwrap());
+    }
+
+    #[test]
+    fn test_tor_config_save_load() {
+        let storage = test_storage();
+        let config = TorConfig::enabled()
+            .with_bridges(vec!["obfs4 192.168.1.1:443".to_string()])
+            .with_circuit_rotation_secs(300);
+
+        storage.save_tor_config(&config).unwrap();
+        let loaded = storage.load_tor_config().unwrap().unwrap();
+
+        assert!(loaded.enabled);
+        assert_eq!(loaded.bridges.len(), 1);
+        assert_eq!(loaded.circuit_rotation_secs, 300);
+        assert!(loaded.prefer_onion);
+    }
+
+    #[test]
+    fn test_tor_config_load_empty() {
+        let storage = test_storage();
+        let loaded = storage.load_tor_config().unwrap();
+        assert!(loaded.is_none());
+    }
+
+    #[test]
+    fn test_tor_config_load_or_create() {
+        let storage = test_storage();
+
+        // First call returns default
+        let config = storage.load_or_create_tor_config().unwrap();
+        assert!(!config.enabled);
+        assert!(config.bridges.is_empty());
+
+        // Save enabled config
+        let config = TorConfig::enabled();
+        storage.save_tor_config(&config).unwrap();
+
+        // Load again
+        let loaded = storage.load_or_create_tor_config().unwrap();
+        assert!(loaded.enabled);
+    }
+
+    #[test]
+    fn test_tor_config_overwrite() {
+        let storage = test_storage();
+
+        // Save first config
+        let config1 = TorConfig::enabled().with_circuit_rotation_secs(100);
+        storage.save_tor_config(&config1).unwrap();
+
+        // Save second config (overwrites)
+        let config2 = TorConfig::enabled().with_circuit_rotation_secs(200);
+        storage.save_tor_config(&config2).unwrap();
+
+        let loaded = storage.load_tor_config().unwrap().unwrap();
+        assert_eq!(loaded.circuit_rotation_secs, 200);
     }
 
     #[test]

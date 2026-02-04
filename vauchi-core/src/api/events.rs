@@ -123,6 +123,40 @@ pub enum VauchiEvent {
         /// Error description.
         message: String,
     },
+
+    /// Tor bootstrap progress update.
+    TorBootstrapProgress {
+        /// Bootstrap percentage (0-100).
+        percentage: u8,
+    },
+
+    /// Tor connection status changed.
+    TorStatusChanged {
+        /// The new Tor status.
+        status: crate::tor_config::TorStatus,
+    },
+
+    /// Tor circuit was rotated.
+    TorCircuitRotated {
+        /// Age of the previous circuit in seconds.
+        circuit_age_secs: u64,
+    },
+
+    /// Relay health changed (for multi-relay support).
+    RelayHealthChanged {
+        /// The relay URL whose health changed.
+        relay_url: String,
+        /// Whether the relay is healthy.
+        healthy: bool,
+    },
+
+    /// Relay failover occurred.
+    RelayFailover {
+        /// The relay URL that failed.
+        from: String,
+        /// The relay URL that was selected as replacement.
+        to: String,
+    },
 }
 
 /// Event handler trait.

@@ -235,8 +235,21 @@ pub fn all_migrations() -> Vec<Migration> {
             name: "encrypt_low_priority_tables",
             action: MigrationAction::Callback(migrate_v16_encrypt_low_priority),
         },
+        Migration {
+            version: 17,
+            name: "tor_config_column",
+            action: MigrationAction::Sql(MIGRATION_V17_TOR_CONFIG),
+        },
     ]
 }
+
+/// Migration v17: Add tor_config_encrypted column to ux_state table.
+///
+/// Stores encrypted Tor configuration (enabled, bridges, preferences)
+/// alongside other UX state.
+const MIGRATION_V17_TOR_CONFIG: &str = "
+    ALTER TABLE ux_state ADD COLUMN tor_config_encrypted BLOB;
+";
 
 /// Migration v2: Re-encrypt all AES-GCM encrypted data to XChaCha20-Poly1305.
 ///

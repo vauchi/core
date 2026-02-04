@@ -1251,6 +1251,88 @@ impl<T: Transport> Vauchi<T> {
         self.storage.save_demo_contact_state(&state)?;
         Ok(())
     }
+
+    // === Tor Configuration ===
+
+    /// Returns the current Tor configuration.
+    pub fn tor_config(&self) -> &crate::tor_config::TorConfig {
+        &self.config.tor
+    }
+
+    /// Returns the current Tor status.
+    ///
+    /// Without the `tor` feature enabled, this always returns `Disabled`.
+    pub fn tor_status(&self) -> crate::tor_config::TorStatus {
+        crate::tor_config::TorStatus::Disabled
+    }
+
+    /// Enables Tor with the current configuration.
+    ///
+    /// Persists the enabled state to storage.
+    /// Note: Actual Tor bootstrapping requires the `tor` feature.
+    pub fn enable_tor(&mut self) -> VauchiResult<()> {
+        self.config.tor.enabled = true;
+        self.storage.save_tor_config(&self.config.tor)?;
+        self.events.dispatch(VauchiEvent::TorStatusChanged {
+            status: crate::tor_config::TorStatus::Disabled,
+        });
+        Ok(())
+    }
+
+    /// Disables Tor.
+    ///
+    /// Persists the disabled state to storage.
+    pub fn disable_tor(&mut self) -> VauchiResult<()> {
+        self.config.tor.enabled = false;
+        self.storage.save_tor_config(&self.config.tor)?;
+        self.events.dispatch(VauchiEvent::TorStatusChanged {
+            status: crate::tor_config::TorStatus::Disabled,
+        });
+        Ok(())
+    }
+
+    /// Configures Tor bridge addresses.
+    ///
+    /// Bridges are used when direct Tor connections are blocked.
+    pub fn configure_tor_bridges(&mut self, bridges: Vec<String>) -> VauchiResult<()> {
+        self.config.tor.bridges = bridges;
+        self.storage.save_tor_config(&self.config.tor)?;
+        Ok(())
+    }
+
+    /// Requests a new Tor circuit rotation.
+    ///
+    /// Without the `tor` feature, this is a no-op that returns Ok.
+    pub fn request_new_tor_circuit(&self) -> VauchiResult<()> {
+        // Actual circuit rotation requires the `tor` feature with arti
+        Ok(())
+    }
+
+    /// Loads the persisted Tor configuration from storage and applies it.
+    pub fn load_tor_config(&mut self) -> VauchiResult<()> {
+        if let Some(config) = self.storage.load_tor_config()? {
+            self.config.tor = config;
+        }
+        Ok(())
+    }
+
+    // === Multi-Relay Configuration ===
+
+    /// Returns the current multi-relay configuration, if any.
+    pub fn relay_list(&self) -> Option<&crate::network::MultiRelayConfig> {
+        self.config.relay_list.as_ref()
+    }
+
+    /// Sets the multi-relay configuration.
+    pub fn set_relay_list(&mut self, config: crate::network::MultiRelayConfig) -> VauchiResult<()> {
+        self.config.relay_list = Some(config);
+        Ok(())
+    }
+
+    /// Clears the multi-relay configuration (reverts to single relay).
+    pub fn clear_relay_list(&mut self) {
+        self.config.relay_list = None;
+    }
 }
 
 /// Builder for creating Vauchi instances.

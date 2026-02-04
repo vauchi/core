@@ -83,6 +83,11 @@ pub mod websocket;
 #[cfg(not(feature = "testing"))]
 mod websocket;
 
+#[cfg(feature = "testing")]
+pub mod noise;
+#[cfg(not(feature = "testing"))]
+mod noise;
+
 pub mod pinning;
 pub mod revocation;
 
@@ -125,6 +130,9 @@ pub use multi_relay::{
 
 // Anonymous sender identifiers
 pub use anonymous::{compute_anonymous_id, current_epoch, resolve_sender, AnonymousSender};
+
+// Noise NK inner transport encryption
+pub use noise::{parse_relay_noise_pubkey, NoiseInitiator, NoiseTransport as NoiseSession};
 
 // Certificate pinning
 pub use pinning::{verify_pin, PinnedCertificate};

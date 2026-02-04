@@ -109,6 +109,10 @@ pub struct TransportConfig {
     pub reconnect_base_delay_ms: u64,
     /// Proxy configuration (for Tor support).
     pub proxy: ProxyConfig,
+    /// Relay's Noise NK public key for inner transport encryption.
+    /// When set, the transport performs a Noise NK handshake after WebSocket
+    /// connect and wraps all subsequent messages with Noise encryption.
+    pub relay_noise_pubkey: Option<[u8; 32]>,
 }
 
 impl Default for TransportConfig {
@@ -120,6 +124,7 @@ impl Default for TransportConfig {
             max_reconnect_attempts: 5,
             reconnect_base_delay_ms: 1_000,
             proxy: ProxyConfig::None,
+            relay_noise_pubkey: None,
         }
     }
 }
@@ -135,6 +140,7 @@ impl TransportConfig {
             max_reconnect_attempts: 3,
             reconnect_base_delay_ms: 5_000,
             proxy: ProxyConfig::tor_default(),
+            relay_noise_pubkey: None,
         }
     }
 

@@ -24,6 +24,7 @@ use tungstenite::{Message, WebSocket};
 
 use super::error::NetworkError;
 use super::message::MessageEnvelope;
+use super::noise::{self, NoiseInitiator, NoiseTransport};
 use super::protocol::{decode_message, encode_message, read_frame_length, FRAME_HEADER_SIZE};
 use super::transport::{ConnectionState, Transport, TransportConfig, TransportResult};
 
@@ -47,6 +48,7 @@ pub struct WebSocketTransport {
     socket: Option<WebSocket<MaybeTlsStream<TcpStream>>>,
     config: TransportConfig,
     state: ConnectionState,
+    noise: Option<NoiseTransport>,
 }
 
 impl WebSocketTransport {
@@ -56,6 +58,7 @@ impl WebSocketTransport {
             socket: None,
             config: TransportConfig::default(),
             state: ConnectionState::Disconnected,
+            noise: None,
         }
     }
 
@@ -130,6 +133,68 @@ impl WebSocketTransport {
         let tls_stream = rustls::StreamOwned::new(tls_conn, tcp_stream);
         Ok(MaybeTlsStream::Rustls(tls_stream))
     }
+
+    /// Performs Noise NK handshake over the WebSocket connection.
+    fn perform_noise_handshake(&mut self, relay_pubkey: &[u8; 32]) -> TransportResult<()> {
+        let socket = self.socket.as_mut().ok_or(NetworkError::NotConnected)?;
+
+        // Create initiator and generate handshake message (-> e, es)
+        let (initiator, handshake_msg) = NoiseInitiator::new(relay_pubkey).map_err(|e| {
+            self.state = ConnectionState::Disconnected;
+            NetworkError::Encryption(format!("Noise handshake init failed: {}", e))
+        })?;
+
+        // Send V2 magic + handshake as binary WS message
+        let v2_msg = noise::build_v2_message(&handshake_msg);
+        socket.send(Message::Binary(v2_msg)).map_err(|e| {
+            self.state = ConnectionState::Disconnected;
+            NetworkError::Encryption(format!("Failed to send Noise handshake: {}", e))
+        })?;
+        socket
+            .flush()
+            .map_err(|e| NetworkError::Encryption(format!("Flush failed: {}", e)))?;
+
+        // Read responder's reply (<- e, ee): V2_MAGIC + 48-byte response
+        let response = loop {
+            match socket.read() {
+                Ok(Message::Binary(data)) => break data,
+                Ok(Message::Ping(data)) => {
+                    let _ = socket.send(Message::Pong(data));
+                }
+                Ok(Message::Pong(_)) => continue,
+                Ok(Message::Close(_)) => {
+                    self.state = ConnectionState::Disconnected;
+                    return Err(NetworkError::ConnectionClosed);
+                }
+                Ok(_) => continue,
+                Err(e) => {
+                    self.state = ConnectionState::Disconnected;
+                    return Err(NetworkError::Encryption(format!(
+                        "Failed to read Noise handshake response: {}",
+                        e
+                    )));
+                }
+            }
+        };
+
+        // Strip V2 magic prefix if present
+        let handshake_response = if response.len() >= noise::V2_MAGIC.len()
+            && response[..noise::V2_MAGIC.len()] == noise::V2_MAGIC
+        {
+            &response[noise::V2_MAGIC.len()..]
+        } else {
+            &response
+        };
+
+        // Finalize handshake -> transport mode
+        let transport = initiator.finalize(handshake_response).map_err(|e| {
+            self.state = ConnectionState::Disconnected;
+            NetworkError::Encryption(format!("Noise handshake finalize failed: {}", e))
+        })?;
+
+        self.noise = Some(transport);
+        Ok(())
+    }
 }
 
 impl Default for WebSocketTransport {
@@ -188,6 +253,12 @@ impl Transport for WebSocketTransport {
         })?;
 
         self.socket = Some(socket);
+
+        // Perform Noise NK handshake if relay pubkey is configured
+        if let Some(ref relay_pubkey) = config.relay_noise_pubkey {
+            self.perform_noise_handshake(relay_pubkey)?;
+        }
+
         self.state = ConnectionState::Connected;
 
         Ok(())
@@ -197,6 +268,7 @@ impl Transport for WebSocketTransport {
         if let Some(mut socket) = self.socket.take() {
             let _ = socket.close(None); // Ignore errors on close
         }
+        self.noise = None;
         self.state = ConnectionState::Disconnected;
         Ok(())
     }
@@ -209,7 +281,17 @@ impl Transport for WebSocketTransport {
         let socket = self.socket.as_mut().ok_or(NetworkError::NotConnected)?;
 
         let encoded = encode_message(message)?;
-        let ws_message = Message::Binary(encoded);
+
+        // Wrap with Noise encryption if active
+        let wire_data = if let Some(ref mut noise) = self.noise {
+            noise
+                .encrypt(&encoded)
+                .map_err(|e| NetworkError::Encryption(e.to_string()))?
+        } else {
+            encoded
+        };
+
+        let ws_message = Message::Binary(wire_data);
 
         socket.send(ws_message).map_err(|e| {
             // Connection may be broken
@@ -238,25 +320,37 @@ impl Transport for WebSocketTransport {
         // Try to read a message
         match socket.read() {
             Ok(Message::Binary(data)) => {
+                // Decrypt with Noise if active
+                let plaintext = if self.noise.is_some() {
+                    // Need to reborrow to satisfy borrow checker
+                    self.noise
+                        .as_mut()
+                        .unwrap()
+                        .decrypt(&data)
+                        .map_err(|e| NetworkError::Encryption(e.to_string()))?
+                } else {
+                    data
+                };
+
                 // Data includes the length prefix, skip it
-                if data.len() < FRAME_HEADER_SIZE {
+                if plaintext.len() < FRAME_HEADER_SIZE {
                     return Err(NetworkError::InvalidMessage("Frame too short".into()));
                 }
 
-                let header: [u8; FRAME_HEADER_SIZE] = data[..FRAME_HEADER_SIZE]
+                let header: [u8; FRAME_HEADER_SIZE] = plaintext[..FRAME_HEADER_SIZE]
                     .try_into()
                     .map_err(|_| NetworkError::InvalidMessage("Invalid header".into()))?;
                 let expected_len = read_frame_length(&header);
 
-                if data.len() - FRAME_HEADER_SIZE != expected_len {
+                if plaintext.len() - FRAME_HEADER_SIZE != expected_len {
                     return Err(NetworkError::InvalidMessage(format!(
                         "Length mismatch: expected {}, got {}",
                         expected_len,
-                        data.len() - FRAME_HEADER_SIZE
+                        plaintext.len() - FRAME_HEADER_SIZE
                     )));
                 }
 
-                let envelope = decode_message(&data[FRAME_HEADER_SIZE..])?;
+                let envelope = decode_message(&plaintext[FRAME_HEADER_SIZE..])?;
                 Ok(Some(envelope))
             }
             Ok(Message::Ping(data)) => {

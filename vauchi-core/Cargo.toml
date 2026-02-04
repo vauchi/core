@@ -12,8 +12,8 @@ description = "Core library for Vauchi - privacy-focused contact card exchange"
 [features]
 default = ["network"]
 network = ["network-native-tls"]
-network-native-tls = ["tungstenite", "tungstenite/handshake", "tungstenite/native-tls", "native-tls"]
-network-rustls = ["tungstenite", "tungstenite/handshake", "tungstenite/rustls-tls-native-roots", "rustls", "webpki-roots"]
+network-native-tls = ["tungstenite", "tungstenite/handshake", "tungstenite/native-tls", "native-tls", "snow"]
+network-rustls = ["tungstenite", "tungstenite/handshake", "tungstenite/rustls-tls-native-roots", "rustls", "webpki-roots", "snow"]
 secure-storage = ["keyring"]
 # Real audio proximity verification using CPAL (desktop only)
 audio-cpal = ["cpal"]
@@ -71,6 +71,9 @@ rusqlite = { version = "0.32", features = ["bundled"] }
 
 # UUID generation for IDs
 uuid = { version = "1.0", features = ["v4"] }
+
+# Noise protocol for inner transport encryption (defense-in-depth inside TLS)
+snow = { version = "0.9", optional = true }
 
 # WebSocket transport (optional, not needed for mobile)
 tungstenite = { version = "0.24", default-features = false, optional = true }

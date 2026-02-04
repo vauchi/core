@@ -111,6 +111,11 @@ pub struct RelayConfig {
 
     /// Proxy configuration (for Tor support).
     pub proxy: ProxyConfig,
+
+    /// Relay's Noise NK public key for inner transport encryption.
+    /// When set, the transport performs a Noise NK handshake after connect
+    /// and wraps all subsequent messages with Noise encryption.
+    pub relay_noise_pubkey: Option<[u8; 32]>,
 }
 
 impl Default for RelayConfig {
@@ -125,6 +130,7 @@ impl Default for RelayConfig {
             ack_timeout_ms: 30_000,
             max_retries: 5,
             proxy: ProxyConfig::None,
+            relay_noise_pubkey: None,
         }
     }
 }
@@ -153,6 +159,7 @@ impl RelayConfig {
             max_reconnect_attempts: self.max_reconnect_attempts,
             reconnect_base_delay_ms: self.reconnect_base_delay_ms,
             proxy: self.proxy.clone(),
+            relay_noise_pubkey: self.relay_noise_pubkey,
         }
     }
 

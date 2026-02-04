@@ -159,7 +159,7 @@ mod tests {
 
     #[test]
     fn test_group_hints_by_relay() {
-        let hints = vec![
+        let hints = [
             make_hint("blob-1", "wss://relay-a.test", 1000),
             make_hint("blob-2", "wss://relay-b.test", 1000),
             make_hint("blob-3", "wss://relay-a.test", 1000),

@@ -46,6 +46,8 @@ pub enum MessagePayload {
     AccountDeletionNotice(AccountDeletionNotice),
     /// Relay purge request (sent during shred to delete server-side data).
     PurgeRequest(PurgeRequest),
+    /// Forwarding hints from the relay indicating blobs stored on other relays.
+    ForwardingHints(ForwardingHints),
 }
 
 /// Account revocation signal sent to contacts when the card owner deletes their account.
@@ -207,6 +209,27 @@ pub struct PurgeRequest {
     pub purge_token: [u8; 32],
     /// Unix timestamp when the request was signed.
     pub timestamp: u64,
+}
+
+/// Forwarding hints indicating blobs stored on federated relay peers.
+///
+/// When a relay offloads blobs to peer relays, it sends forwarding hints
+/// to the recipient so they can fetch the blobs from the correct relay.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ForwardingHints {
+    /// List of forwarding hints.
+    pub hints: Vec<ForwardingHint>,
+}
+
+/// A single forwarding hint pointing to a blob on another relay.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ForwardingHint {
+    /// The blob ID to fetch.
+    pub blob_id: String,
+    /// The relay URL where the blob is stored.
+    pub relay_url: String,
+    /// Unix timestamp when the hint expires.
+    pub expires_at_secs: u64,
 }
 
 /// Stages of account deletion.

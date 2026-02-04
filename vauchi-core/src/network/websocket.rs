@@ -321,11 +321,8 @@ impl Transport for WebSocketTransport {
         match socket.read() {
             Ok(Message::Binary(data)) => {
                 // Decrypt with Noise if active
-                let plaintext = if self.noise.is_some() {
-                    // Need to reborrow to satisfy borrow checker
-                    self.noise
-                        .as_mut()
-                        .unwrap()
+                let plaintext = if let Some(noise) = &mut self.noise {
+                    noise
                         .decrypt(&data)
                         .map_err(|e| NetworkError::Encryption(e.to_string()))?
                 } else {

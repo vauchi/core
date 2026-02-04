@@ -208,7 +208,9 @@ mod tests {
         // Responder processes handshake
         let mut responder = build_test_responder(&priv_key);
         let mut read_buf = vec![0u8; 65535];
-        responder.read_message(&handshake_msg, &mut read_buf).unwrap();
+        responder
+            .read_message(&handshake_msg, &mut read_buf)
+            .unwrap();
 
         // Responder sends reply
         let mut response = vec![0u8; 65535];
@@ -263,7 +265,9 @@ mod tests {
         let (initiator, handshake_msg) = NoiseInitiator::new(&pub_key).unwrap();
         let mut responder = build_test_responder(&priv_key);
         let mut read_buf = vec![0u8; 65535];
-        responder.read_message(&handshake_msg, &mut read_buf).unwrap();
+        responder
+            .read_message(&handshake_msg, &mut read_buf)
+            .unwrap();
         let mut response = vec![0u8; 65535];
         let response_len = responder.write_message(&[], &mut response).unwrap();
         response.truncate(response_len);
@@ -333,7 +337,9 @@ mod tests {
         let (initiator, handshake_msg) = NoiseInitiator::new(&pub_key).unwrap();
         let mut responder = build_test_responder(&priv_key);
         let mut read_buf = vec![0u8; 65535];
-        responder.read_message(&handshake_msg, &mut read_buf).unwrap();
+        responder
+            .read_message(&handshake_msg, &mut read_buf)
+            .unwrap();
         let mut response = vec![0u8; 65535];
         let response_len = responder.write_message(&[], &mut response).unwrap();
         response.truncate(response_len);

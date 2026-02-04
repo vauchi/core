@@ -9,6 +9,7 @@
 use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use super::x3dh::X3DHKeyPair;
 use super::ExchangeError;
 use crate::crypto::{PublicKey, Signature};
 use crate::identity::Identity;
@@ -90,6 +91,64 @@ impl ExchangeQR {
         message.extend_from_slice(&timestamp.to_be_bytes());
 
         // Sign the message
+        let signature = identity.sign(&message);
+
+        ExchangeQR {
+            version: PROTOCOL_VERSION,
+            public_key,
+            exchange_key,
+            exchange_token,
+            audio_challenge,
+            timestamp,
+            signature: *signature.as_bytes(),
+        }
+    }
+
+    /// Generates a QR code with a provided ephemeral X25519 keypair.
+    ///
+    /// Used for mutual QR exchange where both sides use fresh ephemeral keys
+    /// instead of the identity's static X3DH key. This gives full forward
+    /// secrecy since the exchange key is not derived from long-term identity.
+    pub fn generate_with_ephemeral(identity: &Identity, ephemeral: &X3DHKeyPair) -> Self {
+        let timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("Time went backwards")
+            .as_secs();
+
+        Self::generate_with_ephemeral_and_timestamp(identity, ephemeral, timestamp)
+    }
+
+    /// Generates a QR code with a specific ephemeral keypair and timestamp (for testing).
+    pub fn generate_with_ephemeral_and_timestamp(
+        identity: &Identity,
+        ephemeral: &X3DHKeyPair,
+        timestamp: u64,
+    ) -> Self {
+        use ring::rand::SystemRandom;
+
+        let rng = SystemRandom::new();
+
+        let exchange_token = ring::rand::generate::<[u8; 32]>(&rng)
+            .expect("RNG should not fail")
+            .expose();
+
+        let audio_challenge = ring::rand::generate::<[u8; 16]>(&rng)
+            .expect("RNG should not fail")
+            .expose();
+
+        let public_key = *identity.signing_public_key();
+
+        // Use the provided ephemeral key instead of identity's exchange key
+        let exchange_key: [u8; 32] = *ephemeral.public_key();
+
+        let mut message = Vec::new();
+        message.push(PROTOCOL_VERSION);
+        message.extend_from_slice(&public_key);
+        message.extend_from_slice(&exchange_key);
+        message.extend_from_slice(&exchange_token);
+        message.extend_from_slice(&audio_challenge);
+        message.extend_from_slice(&timestamp.to_be_bytes());
+
         let signature = identity.sign(&message);
 
         ExchangeQR {

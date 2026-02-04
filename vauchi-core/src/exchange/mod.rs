@@ -23,6 +23,16 @@ mod ble;
 pub mod device_link;
 
 #[cfg(feature = "testing")]
+pub mod exchange_payload;
+#[cfg(not(feature = "testing"))]
+mod exchange_payload;
+
+#[cfg(feature = "testing")]
+pub mod nfc_active;
+#[cfg(not(feature = "testing"))]
+mod nfc_active;
+
+#[cfg(feature = "testing")]
 pub mod encrypted_message;
 #[cfg(not(feature = "testing"))]
 mod encrypted_message;
@@ -57,7 +67,9 @@ pub use audio::{AudioBackend, AudioCapability, AudioConfig, MockAudioBackend, Ul
 pub use audio_cpal::CpalAudioBackend;
 pub use ble::{
     BLEAdvertisement, BLEDevice, BLEError, BLEExchangeSession, BLEExchangeState,
-    BLEProximityVerifier, MockBLEVerifier, VAUCHI_BLE_SERVICE_UUID,
+    BLEProximityVerifier, BLETransport, ExchangeBle, MockBLETransport, MockBLEVerifier,
+    BLE_PAYLOAD_SIZE, CHAR_CARD_EXCHANGE, CHAR_CHALLENGE, CHAR_EXCHANGE_PAYLOAD,
+    VAUCHI_BLE_SERVICE_UUID,
 };
 pub use device_link::{
     generate_numeric_code, DeviceLinkInitiator, DeviceLinkInitiatorRestored, DeviceLinkQR,
@@ -65,12 +77,14 @@ pub use device_link::{
 };
 pub use encrypted_message::{DecryptedExchangePayload, EncryptedExchangeMessage};
 pub use error::ExchangeError;
+pub use nfc_active::apdu as nfc_apdu;
+pub use nfc_active::{ExchangeNfc, NFC_PAYLOAD_SIZE};
 pub use proximity::{
     ManualConfirmationVerifier, MockProximityVerifier, ProximityError, ProximityVerifier,
 };
 pub use qr::{check_clock_drift, ExchangeQR};
 pub use session::{
     DefaultPlatformCallbacks, DuplicateAction, ExchangeEvent, ExchangeMode,
-    ExchangePlatformCallbacks, ExchangeRole, ExchangeSession, ExchangeState,
+    ExchangePlatformCallbacks, ExchangeRole, ExchangeSession, ExchangeState, ExchangeTransport,
 };
 pub use x3dh::{X3DHKeyPair, X3DH};

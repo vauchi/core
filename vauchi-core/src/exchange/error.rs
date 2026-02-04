@@ -86,4 +86,33 @@ pub enum ExchangeError {
 
     #[error("Fingerprint verification required")]
     FingerprintRequired,
+
+    // NFC errors
+    #[error("Invalid NFC payload format")]
+    InvalidNfcFormat,
+
+    #[error("NFC payload has expired")]
+    NfcExpired,
+
+    #[error("NFC session lost during exchange")]
+    NfcSessionLost,
+
+    #[error("NFC not supported on this device")]
+    NfcNotSupported,
+
+    // BLE errors
+    #[error("Invalid BLE payload format")]
+    InvalidBleFormat,
+
+    #[error("BLE payload has expired")]
+    BleExpired,
+
+    #[error("BLE device out of range")]
+    BleOutOfRange,
+
+    #[error("BLE connection lost during exchange")]
+    BleConnectionLost,
+
+    #[error("BLE not available on this device")]
+    BleNotAvailable,
 }

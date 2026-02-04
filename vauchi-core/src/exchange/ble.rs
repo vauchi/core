@@ -8,10 +8,16 @@
 //! This module provides trait definitions, session management, and mock implementations
 //! for BLE-based contact exchange.
 
-use super::{ProximityError, ProximityVerifier};
+use super::exchange_payload::{
+    build_exchange_payload, is_payload_expired, parse_exchange_payload, verify_payload_signature,
+    ParsedPayload, EXCHANGE_PAYLOAD_SIZE,
+};
+use super::x3dh::X3DHKeyPair;
+use super::{ExchangeError, ProximityError, ProximityVerifier};
 use crate::crypto::{PublicKey, SigningKeyPair};
+use crate::identity::Identity;
 use serde::{Deserialize, Serialize};
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 mod hex_array_32 {
     use serde::{Deserialize, Deserializer, Serializer};
@@ -459,5 +465,251 @@ impl BLEExchangeSession {
     /// Cancel the session.
     pub fn cancel(&mut self) {
         self.state = BLEExchangeState::Cancelled;
+    }
+}
+
+// ============================================================
+// BLE Exchange Payload (174 bytes)
+// ============================================================
+
+/// BLE payload magic bytes.
+const BLE_MAGIC: &[u8; 4] = b"VBLE";
+
+/// BLE payload expiry in seconds (60 seconds).
+const BLE_EXPIRY_SECONDS: u64 = 60;
+
+/// BLE exchange payload size.
+pub const BLE_PAYLOAD_SIZE: usize = EXCHANGE_PAYLOAD_SIZE;
+
+/// GATT characteristic UUID for exchange payload (Read+Notify).
+pub const CHAR_EXCHANGE_PAYLOAD: &str = "a1b2c3d4-e5f6-7890-abcd-ef1234567891";
+
+/// GATT characteristic UUID for card exchange (Write+Notify).
+pub const CHAR_CARD_EXCHANGE: &str = "a1b2c3d4-e5f6-7890-abcd-ef1234567892";
+
+/// GATT characteristic UUID for challenge-response (Write+Notify).
+pub const CHAR_CHALLENGE: &str = "a1b2c3d4-e5f6-7890-abcd-ef1234567893";
+
+/// BLE exchange payload.
+///
+/// 174-byte payload exchanged during BLE GATT connection:
+/// - Magic "VBLE" (4 bytes)
+/// - Version (1 byte)
+/// - Flags (1 byte)
+/// - Identity key — Ed25519 signing public key (32 bytes)
+/// - Exchange key — fresh ephemeral X25519 public key (32 bytes)
+/// - Token — random session token (32 bytes)
+/// - Timestamp — Unix timestamp (8 bytes)
+/// - Signature — Ed25519 signature over all preceding fields (64 bytes)
+#[derive(Clone, Debug)]
+pub struct ExchangeBle {
+    inner: ParsedPayload,
+}
+
+impl ExchangeBle {
+    /// Generates a new BLE exchange payload.
+    pub fn generate(identity: &Identity, ephemeral: &X3DHKeyPair) -> Self {
+        use ring::rand::SystemRandom;
+
+        let rng = SystemRandom::new();
+        let token = ring::rand::generate::<[u8; 32]>(&rng)
+            .expect("RNG should not fail")
+            .expose();
+
+        let timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("Time went backwards")
+            .as_secs();
+
+        Self::generate_with_timestamp(identity, ephemeral, token, timestamp)
+    }
+
+    /// Generates with explicit timestamp (for testing).
+    pub fn generate_with_timestamp(
+        identity: &Identity,
+        ephemeral: &X3DHKeyPair,
+        token: [u8; 32],
+        timestamp: u64,
+    ) -> Self {
+        let bytes = build_exchange_payload(BLE_MAGIC, identity, ephemeral, token, timestamp);
+        let inner = parse_exchange_payload(&bytes, BLE_MAGIC, ExchangeError::InvalidBleFormat)
+            .expect("Freshly built payload should parse");
+        ExchangeBle { inner }
+    }
+
+    /// Returns the identity (Ed25519 signing) key.
+    pub fn identity_key(&self) -> &[u8; 32] {
+        &self.inner.identity_key
+    }
+
+    /// Returns the exchange (X25519 ephemeral) key.
+    pub fn exchange_key(&self) -> &[u8; 32] {
+        &self.inner.exchange_key
+    }
+
+    /// Returns the session token.
+    pub fn token(&self) -> &[u8; 32] {
+        &self.inner.token
+    }
+
+    /// Returns the timestamp.
+    pub fn timestamp(&self) -> u64 {
+        self.inner.timestamp
+    }
+
+    /// Checks if the payload has expired.
+    pub fn is_expired(&self) -> bool {
+        is_payload_expired(self.inner.timestamp, BLE_EXPIRY_SECONDS)
+    }
+
+    /// Verifies the Ed25519 signature.
+    pub fn verify_signature(&self) -> bool {
+        verify_payload_signature(BLE_MAGIC, &self.inner)
+    }
+
+    /// Serializes the payload to bytes.
+    pub fn to_bytes(&self) -> [u8; BLE_PAYLOAD_SIZE] {
+        let mut buf = [0u8; BLE_PAYLOAD_SIZE];
+        buf[0..4].copy_from_slice(BLE_MAGIC);
+        buf[4] = self.inner.version;
+        buf[5] = self.inner.flags;
+        buf[6..38].copy_from_slice(&self.inner.identity_key);
+        buf[38..70].copy_from_slice(&self.inner.exchange_key);
+        buf[70..102].copy_from_slice(&self.inner.token);
+        buf[102..110].copy_from_slice(&self.inner.timestamp.to_be_bytes());
+        buf[110..174].copy_from_slice(&self.inner.signature);
+        buf
+    }
+
+    /// Parses the payload from bytes.
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, ExchangeError> {
+        let inner = parse_exchange_payload(bytes, BLE_MAGIC, ExchangeError::InvalidBleFormat)?;
+        Ok(ExchangeBle { inner })
+    }
+}
+
+// ============================================================
+// BLE Transport Trait (platform abstraction)
+// ============================================================
+
+/// Trait for platform-specific BLE transport operations.
+///
+/// Platform implementations (Android, iOS) implement this trait;
+/// tests use `MockBLETransport`.
+pub trait BLETransport: Send + Sync {
+    /// Start advertising our exchange payload.
+    fn start_advertising(&self, payload: &ExchangeBle) -> Result<(), BLEError>;
+
+    /// Start scanning for nearby exchange advertisers.
+    fn start_scanning(&self) -> Result<(), BLEError>;
+
+    /// Stop advertising and/or scanning.
+    fn stop(&self);
+
+    /// Connect to a discovered device by ID.
+    fn connect(&self, device_id: &str) -> Result<(), BLEError>;
+
+    /// Write data to a GATT characteristic.
+    fn write_characteristic(&self, uuid: &str, data: &[u8]) -> Result<(), BLEError>;
+
+    /// Read data from a GATT characteristic.
+    fn read_characteristic(&self, uuid: &str) -> Result<Vec<u8>, BLEError>;
+
+    /// Disconnect from the current device.
+    fn disconnect(&self) -> Result<(), BLEError>;
+}
+
+/// Mock BLE transport for testing.
+pub struct MockBLETransport {
+    /// Payload to return when reading CHAR_EXCHANGE_PAYLOAD.
+    pub peer_payload: std::sync::Mutex<Option<Vec<u8>>>,
+    /// Whether operations should succeed.
+    pub should_succeed: bool,
+    /// Written characteristic data (uuid, data) for assertions.
+    pub written: std::sync::Mutex<Vec<(String, Vec<u8>)>>,
+}
+
+impl MockBLETransport {
+    /// Creates a mock that succeeds and returns the given peer payload.
+    pub fn with_peer_payload(payload: &[u8]) -> Self {
+        MockBLETransport {
+            peer_payload: std::sync::Mutex::new(Some(payload.to_vec())),
+            should_succeed: true,
+            written: std::sync::Mutex::new(Vec::new()),
+        }
+    }
+
+    /// Creates a mock that always fails.
+    pub fn failing() -> Self {
+        MockBLETransport {
+            peer_payload: std::sync::Mutex::new(None),
+            should_succeed: false,
+            written: std::sync::Mutex::new(Vec::new()),
+        }
+    }
+
+    /// Returns all written (uuid, data) pairs.
+    pub fn get_written(&self) -> Vec<(String, Vec<u8>)> {
+        self.written.lock().expect("mutex poisoned").clone()
+    }
+}
+
+impl BLETransport for MockBLETransport {
+    fn start_advertising(&self, _payload: &ExchangeBle) -> Result<(), BLEError> {
+        if self.should_succeed {
+            Ok(())
+        } else {
+            Err(BLEError::InvalidPayload("Mock failure".into()))
+        }
+    }
+
+    fn start_scanning(&self) -> Result<(), BLEError> {
+        if self.should_succeed {
+            Ok(())
+        } else {
+            Err(BLEError::Timeout)
+        }
+    }
+
+    fn stop(&self) {}
+
+    fn connect(&self, _device_id: &str) -> Result<(), BLEError> {
+        if self.should_succeed {
+            Ok(())
+        } else {
+            Err(BLEError::NotConnected)
+        }
+    }
+
+    fn write_characteristic(&self, uuid: &str, data: &[u8]) -> Result<(), BLEError> {
+        if self.should_succeed {
+            self.written
+                .lock()
+                .expect("mutex poisoned")
+                .push((uuid.to_string(), data.to_vec()));
+            Ok(())
+        } else {
+            Err(BLEError::NotConnected)
+        }
+    }
+
+    fn read_characteristic(&self, uuid: &str) -> Result<Vec<u8>, BLEError> {
+        if !self.should_succeed {
+            return Err(BLEError::NotConnected);
+        }
+
+        if uuid == CHAR_EXCHANGE_PAYLOAD {
+            if let Some(payload) = self.peer_payload.lock().expect("mutex poisoned").as_ref() {
+                return Ok(payload.clone());
+            }
+        }
+
+        Err(BLEError::InvalidPayload(
+            "No data for characteristic".into(),
+        ))
+    }
+
+    fn disconnect(&self) -> Result<(), BLEError> {
+        Ok(())
     }
 }

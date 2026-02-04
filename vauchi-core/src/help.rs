@@ -5,11 +5,13 @@
 //! In-App Help System
 //!
 //! Provides FAQ content and help resources for the app.
-//! Content is bundled for offline access.
+//! Content is loaded from i18n locale files for localization.
 //!
 //! Feature file: features/in_app_help.feature (pending)
 
 use serde::{Deserialize, Serialize};
+
+use crate::i18n::{get_string, Locale};
 
 /// Categories of help content
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -69,119 +71,123 @@ pub struct FaqItem {
     pub related: Vec<String>,
 }
 
-/// Get all bundled FAQ items
+/// FAQ definition with i18n key prefix and metadata.
+struct FaqDef {
+    id: &'static str,
+    i18n_key: &'static str,
+    category: HelpCategory,
+    related: &'static [&'static str],
+}
+
+/// All FAQ definitions — content comes from i18n keys.
+const FAQ_DEFS: &[FaqDef] = &[
+    FaqDef {
+        id: "faq-phone-lost",
+        i18n_key: "faq.phone_lost",
+        category: HelpCategory::Recovery,
+        related: &["faq-recovery-setup"],
+    },
+    FaqDef {
+        id: "faq-recovery-setup",
+        i18n_key: "faq.recovery_setup",
+        category: HelpCategory::Recovery,
+        related: &["faq-phone-lost"],
+    },
+    FaqDef {
+        id: "faq-tracking",
+        i18n_key: "faq.tracking",
+        category: HelpCategory::Privacy,
+        related: &["faq-data-storage", "faq-encryption"],
+    },
+    FaqDef {
+        id: "faq-data-storage",
+        i18n_key: "faq.data_storage",
+        category: HelpCategory::Privacy,
+        related: &["faq-encryption"],
+    },
+    FaqDef {
+        id: "faq-encryption",
+        i18n_key: "faq.encryption",
+        category: HelpCategory::Privacy,
+        related: &["faq-tracking"],
+    },
+    FaqDef {
+        id: "faq-remove-contact",
+        i18n_key: "faq.remove_contact",
+        category: HelpCategory::Contacts,
+        related: &["faq-block-contact"],
+    },
+    FaqDef {
+        id: "faq-block-contact",
+        i18n_key: "faq.block_contact",
+        category: HelpCategory::Contacts,
+        related: &["faq-remove-contact"],
+    },
+    FaqDef {
+        id: "faq-how-updates-work",
+        i18n_key: "faq.how_updates_work",
+        category: HelpCategory::Updates,
+        related: &["faq-offline-updates"],
+    },
+    FaqDef {
+        id: "faq-offline-updates",
+        i18n_key: "faq.offline_updates",
+        category: HelpCategory::Updates,
+        related: &["faq-how-updates-work"],
+    },
+    FaqDef {
+        id: "faq-first-contact",
+        i18n_key: "faq.first_contact",
+        category: HelpCategory::GettingStarted,
+        related: &["faq-why-in-person"],
+    },
+    FaqDef {
+        id: "faq-why-in-person",
+        i18n_key: "faq.why_in_person",
+        category: HelpCategory::GettingStarted,
+        related: &["faq-first-contact"],
+    },
+    FaqDef {
+        id: "faq-visibility-labels",
+        i18n_key: "faq.visibility_labels",
+        category: HelpCategory::Features,
+        related: &["faq-visibility-default"],
+    },
+    FaqDef {
+        id: "faq-visibility-default",
+        i18n_key: "faq.visibility_default",
+        category: HelpCategory::Features,
+        related: &["faq-visibility-labels"],
+    },
+    FaqDef {
+        id: "faq-multiple-devices",
+        i18n_key: "faq.multiple_devices",
+        category: HelpCategory::Features,
+        related: &[],
+    },
+];
+
+/// Build a FaqItem from a definition and locale.
+fn build_faq(def: &FaqDef, locale: Locale) -> FaqItem {
+    let question_key = format!("{}.question", def.i18n_key);
+    let answer_key = format!("{}.answer", def.i18n_key);
+    FaqItem {
+        id: def.id.to_string(),
+        category: def.category,
+        question: get_string(locale, &question_key),
+        answer: get_string(locale, &answer_key),
+        related: def.related.iter().map(|s| s.to_string()).collect(),
+    }
+}
+
+/// Get all bundled FAQ items in the specified locale.
+pub fn get_faqs_localized(locale: Locale) -> Vec<FaqItem> {
+    FAQ_DEFS.iter().map(|def| build_faq(def, locale)).collect()
+}
+
+/// Get all bundled FAQ items (English).
 pub fn get_faqs() -> Vec<FaqItem> {
-    vec![
-        // Recovery
-        FaqItem {
-            id: "faq-phone-lost".to_string(),
-            category: HelpCategory::Recovery,
-            question: "What happens if I lose my phone?".to_string(),
-            answer: "Your identity can be recovered through Social Recovery. If you've set up recovery contacts, meet 3 or more of them in person. They can vouch for you, and your identity will be restored.\n\nTo set up recovery: Go to Settings > Recovery > Add Recovery Contacts.".to_string(),
-            related: vec!["faq-recovery-setup".to_string()],
-        },
-        FaqItem {
-            id: "faq-recovery-setup".to_string(),
-            category: HelpCategory::Recovery,
-            question: "How do I set up recovery contacts?".to_string(),
-            answer: "Recovery contacts are people who can vouch for your identity if you lose access:\n\n1. Go to Settings > Recovery\n2. Tap 'Add Recovery Contact'\n3. Meet your trusted contact in person\n4. They'll scan your QR code to become a recovery contact\n\nWe recommend adding 5-7 people you trust and see regularly.".to_string(),
-            related: vec!["faq-phone-lost".to_string()],
-        },
-
-        // Privacy
-        FaqItem {
-            id: "faq-tracking".to_string(),
-            category: HelpCategory::Privacy,
-            question: "Can someone track me through Vauchi?".to_string(),
-            answer: "No. Vauchi is designed with privacy first:\n\n- No location data is ever collected or shared\n- Your card contains only what you choose to add\n- All data is end-to-end encrypted\n- The relay server can't read your content\n- We have no analytics or tracking\n\nYour contacts only see the fields you've shared with them.".to_string(),
-            related: vec!["faq-data-storage".to_string(), "faq-encryption".to_string()],
-        },
-        FaqItem {
-            id: "faq-data-storage".to_string(),
-            category: HelpCategory::Privacy,
-            question: "What data is stored where?".to_string(),
-            answer: "Your data lives in three places:\n\n**On your device:**\n- Your identity (private keys)\n- Your contact card\n- Your contacts' cards\n- All settings\n\n**On the relay server (encrypted):**\n- Messages waiting to be delivered\n- Never readable by us\n\n**Nowhere else.**\n\nWe never have access to your unencrypted data.".to_string(),
-            related: vec!["faq-encryption".to_string()],
-        },
-        FaqItem {
-            id: "faq-encryption".to_string(),
-            category: HelpCategory::Privacy,
-            question: "How is my data protected?".to_string(),
-            answer: "Vauchi uses multiple layers of encryption:\n\n**End-to-end encryption:**\nYour data is encrypted on your device before it leaves. Only you and your intended recipients can read it.\n\n**Double Ratchet protocol:**\nEach message uses a unique key. Even if one key is compromised, other messages remain secure.\n\n**Local storage encryption:**\nData on your device is encrypted with your device key.\n\nWe use the same cryptographic standards as Signal.".to_string(),
-            related: vec!["faq-tracking".to_string()],
-        },
-
-        // Contacts
-        FaqItem {
-            id: "faq-remove-contact".to_string(),
-            category: HelpCategory::Contacts,
-            question: "How do I remove a contact?".to_string(),
-            answer: "To remove a contact:\n\n1. Go to your Contacts list\n2. Tap on the contact\n3. Tap the menu (three dots)\n4. Select 'Remove Contact'\n\nNote: They will still have your card, but won't receive your future updates. Consider asking them to remove you too.".to_string(),
-            related: vec!["faq-block-contact".to_string()],
-        },
-        FaqItem {
-            id: "faq-block-contact".to_string(),
-            category: HelpCategory::Contacts,
-            question: "Can I block someone?".to_string(),
-            answer: "Yes. Blocking a contact:\n\n1. Removes them from your contact list\n2. Stops sending them your updates\n3. Ignores any updates from them\n\nTo block: Tap the contact > Menu > Block Contact\n\nThey won't be notified that they're blocked.".to_string(),
-            related: vec!["faq-remove-contact".to_string()],
-        },
-
-        // Updates
-        FaqItem {
-            id: "faq-how-updates-work".to_string(),
-            category: HelpCategory::Updates,
-            question: "How do updates reach my contacts?".to_string(),
-            answer: "When you edit your card:\n\n1. The change is encrypted on your device\n2. Sent to the relay server (still encrypted)\n3. Delivered to your contacts' devices\n4. Decrypted only on their devices\n\nUpdates are typically delivered within seconds. If a contact is offline, updates wait on the relay and are delivered when they reconnect.".to_string(),
-            related: vec!["faq-offline-updates".to_string()],
-        },
-        FaqItem {
-            id: "faq-offline-updates".to_string(),
-            category: HelpCategory::Updates,
-            question: "What happens when I'm offline?".to_string(),
-            answer: "Vauchi handles offline gracefully:\n\n**When you go offline:**\n- Your edits are saved locally\n- They'll be sent when you reconnect\n\n**When contacts are offline:**\n- Updates queue on the relay\n- Delivered when they reconnect\n- No data loss\n\nThe relay stores encrypted messages for up to 30 days.".to_string(),
-            related: vec!["faq-how-updates-work".to_string()],
-        },
-
-        // Getting Started
-        FaqItem {
-            id: "faq-first-contact".to_string(),
-            category: HelpCategory::GettingStarted,
-            question: "How do I add my first contact?".to_string(),
-            answer: "To add a contact, you need to meet in person:\n\n1. Tap the Exchange tab\n2. Show your QR code to the other person\n3. They scan it with their Vauchi app\n4. You scan their QR code\n5. Done! You're connected.\n\nThis in-person requirement prevents spam and ensures you only connect with people you've actually met.".to_string(),
-            related: vec!["faq-why-in-person".to_string()],
-        },
-        FaqItem {
-            id: "faq-why-in-person".to_string(),
-            category: HelpCategory::GettingStarted,
-            question: "Why do I need to meet in person?".to_string(),
-            answer: "The in-person QR exchange is a core privacy feature:\n\n- **No spam**: You can't be added by strangers\n- **Verified identity**: You know who you're connecting with\n- **No social graph**: We can't see who you know\n- **Physical trust**: Cryptographic trust starts with physical presence\n\nThis is similar to how Signal verifies contacts in person.".to_string(),
-            related: vec!["faq-first-contact".to_string()],
-        },
-
-        // Features
-        FaqItem {
-            id: "faq-visibility-labels".to_string(),
-            category: HelpCategory::Features,
-            question: "What are visibility labels?".to_string(),
-            answer: "Visibility labels let you control who sees what:\n\n1. Create labels like 'Family', 'Work', 'Friends'\n2. Assign contacts to labels\n3. Mark fields as visible to specific labels\n\nExample: Your home address shows to 'Family' but not 'Work'.\n\nTo set up: Go to your card > tap a field > Set Visibility.".to_string(),
-            related: vec!["faq-visibility-default".to_string()],
-        },
-        FaqItem {
-            id: "faq-visibility-default".to_string(),
-            category: HelpCategory::Features,
-            question: "What's the default visibility?".to_string(),
-            answer: "By default, all fields are visible to all contacts.\n\nTo restrict a field:\n1. Edit your card\n2. Tap the field\n3. Tap 'Visibility'\n4. Choose which labels can see it\n\nYou can also set per-contact overrides for fine-grained control.".to_string(),
-            related: vec!["faq-visibility-labels".to_string()],
-        },
-        FaqItem {
-            id: "faq-multiple-devices".to_string(),
-            category: HelpCategory::Features,
-            question: "Can I use Vauchi on multiple devices?".to_string(),
-            answer: "Yes! Link your devices in Settings:\n\n1. On your new device, install Vauchi\n2. Choose 'Link to Existing Account'\n3. On your original device, go to Settings > Devices > Link Device\n4. Scan the QR code on your new device\n\nYour contacts, cards, and settings will sync across devices.".to_string(),
-            related: vec![],
-        },
-    ]
+    get_faqs_localized(Locale::English)
 }
 
 /// Get FAQs for a specific category
@@ -192,15 +198,42 @@ pub fn get_faqs_by_category(category: HelpCategory) -> Vec<FaqItem> {
         .collect()
 }
 
+/// Get FAQs for a specific category in a locale.
+pub fn get_faqs_by_category_localized(category: HelpCategory, locale: Locale) -> Vec<FaqItem> {
+    get_faqs_localized(locale)
+        .into_iter()
+        .filter(|faq| faq.category == category)
+        .collect()
+}
+
 /// Get a specific FAQ by ID
 pub fn get_faq_by_id(id: &str) -> Option<FaqItem> {
     get_faqs().into_iter().find(|faq| faq.id == id)
+}
+
+/// Get a specific FAQ by ID in a locale.
+pub fn get_faq_by_id_localized(id: &str, locale: Locale) -> Option<FaqItem> {
+    get_faqs_localized(locale)
+        .into_iter()
+        .find(|faq| faq.id == id)
 }
 
 /// Search FAQs by keyword (searches question and answer)
 pub fn search_faqs(query: &str) -> Vec<FaqItem> {
     let query_lower = query.to_lowercase();
     get_faqs()
+        .into_iter()
+        .filter(|faq| {
+            faq.question.to_lowercase().contains(&query_lower)
+                || faq.answer.to_lowercase().contains(&query_lower)
+        })
+        .collect()
+}
+
+/// Search FAQs by keyword in a locale.
+pub fn search_faqs_localized(query: &str, locale: Locale) -> Vec<FaqItem> {
+    let query_lower = query.to_lowercase();
+    get_faqs_localized(locale)
         .into_iter()
         .filter(|faq| {
             faq.question.to_lowercase().contains(&query_lower)
@@ -296,5 +329,41 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn test_localized_faqs_german() {
+        let faqs = get_faqs_localized(Locale::German);
+        assert_eq!(faqs.len(), get_faqs().len());
+        let phone_lost = faqs.iter().find(|f| f.id == "faq-phone-lost").unwrap();
+        assert!(phone_lost.question.contains("Telefon"));
+    }
+
+    #[test]
+    fn test_localized_faqs_french() {
+        let faqs = get_faqs_localized(Locale::French);
+        let phone_lost = faqs.iter().find(|f| f.id == "faq-phone-lost").unwrap();
+        assert!(phone_lost.question.contains("telephone"));
+    }
+
+    #[test]
+    fn test_localized_faqs_spanish() {
+        let faqs = get_faqs_localized(Locale::Spanish);
+        let phone_lost = faqs.iter().find(|f| f.id == "faq-phone-lost").unwrap();
+        assert!(phone_lost.question.contains("telefono"));
+    }
+
+    #[test]
+    fn test_localized_search() {
+        // Search in German
+        let results = search_faqs_localized("Verschluesselung", Locale::German);
+        assert!(!results.is_empty());
+    }
+
+    #[test]
+    fn test_localized_faq_by_id() {
+        let faq = get_faq_by_id_localized("faq-phone-lost", Locale::German);
+        assert!(faq.is_some());
+        assert!(faq.unwrap().question.contains("Telefon"));
     }
 }

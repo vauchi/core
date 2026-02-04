@@ -48,7 +48,11 @@ pub use exchange::{
     EncryptedExchangeMessage, ExchangeError, ExchangeEvent, ExchangeQR, ExchangeSession,
     MockProximityVerifier, ProximityError, ProximityVerifier, X3DHKeyPair, X3DH,
 };
-pub use help::{get_faq_by_id, get_faqs, get_faqs_by_category, search_faqs, FaqItem, HelpCategory};
+pub use help::{
+    get_faq_by_id, get_faq_by_id_localized, get_faqs, get_faqs_by_category,
+    get_faqs_by_category_localized, get_faqs_localized, search_faqs, search_faqs_localized,
+    FaqItem, HelpCategory,
+};
 pub use i18n::{
     get_all_strings, get_available_locales, get_locale_info, get_string, get_string_with_args,
     Locale, LocaleInfo,

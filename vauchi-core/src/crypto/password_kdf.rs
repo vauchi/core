@@ -47,6 +47,7 @@ pub fn derive_key_argon2id(password: &[u8], salt: &[u8]) -> Result<SymmetricKey,
 /// Derives a 32-byte symmetric key from a password using PBKDF2-HMAC-SHA256.
 ///
 /// Used for decrypting legacy backups created before the Argon2id migration.
+#[deprecated(note = "Use derive_key_argon2id. PBKDF2 retained only for legacy backup import.")]
 pub fn derive_key_pbkdf2(
     password: &[u8],
     salt: &[u8],
@@ -71,10 +72,12 @@ pub fn derive_key_pbkdf2(
 /// Derives a 32-byte symmetric key using PBKDF2 with the default iteration count.
 ///
 /// Convenience wrapper for `derive_key_pbkdf2` with `PBKDF2_ITERATIONS`.
+#[deprecated(note = "Use derive_key_argon2id. PBKDF2 retained only for legacy backup import.")]
 pub fn derive_key_pbkdf2_default(
     password: &[u8],
     salt: &[u8],
 ) -> Result<SymmetricKey, PasswordKdfError> {
+    #[allow(deprecated)]
     derive_key_pbkdf2(password, salt, PBKDF2_ITERATIONS)
 }
 

@@ -24,9 +24,9 @@ pub use device::{
     DeviceRevocationCertificate, RegisteredDevice, RegistryBroadcast, MAX_DEVICES,
 };
 
-use crate::crypto::{
-    decrypt, derive_key_argon2id, derive_key_pbkdf2, encrypt, Signature, SigningKeyPair, HKDF,
-};
+#[allow(deprecated)]
+use crate::crypto::password_kdf::derive_key_pbkdf2;
+use crate::crypto::{decrypt, derive_key_argon2id, encrypt, Signature, SigningKeyPair, HKDF};
 use crate::exchange::X3DHKeyPair;
 use ring::rand::SystemRandom;
 use thiserror::Error;
@@ -372,7 +372,8 @@ impl Identity {
             .try_into()
             .map_err(|_| IdentityError::RestoreFailed)?;
 
-        // Derive decryption key using PBKDF2
+        // Derive decryption key using PBKDF2 (legacy backup format)
+        #[allow(deprecated)]
         let decryption_key = derive_key_pbkdf2(password.as_bytes(), &salt, PBKDF2_ITERATIONS)
             .map_err(|_| IdentityError::RestoreFailed)?;
 

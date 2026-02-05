@@ -4,6 +4,8 @@
 
 //! Tests for crypto::password_kdf
 
+#![allow(deprecated)]
+
 use vauchi_core::crypto::password_kdf::{
     derive_key_argon2id, derive_key_pbkdf2, derive_key_pbkdf2_default,
 };

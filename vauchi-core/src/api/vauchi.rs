@@ -1525,8 +1525,8 @@ impl<T: Transport> Vauchi<T> {
         delta.sign(identity);
 
         // Serialize delta
-        let delta_bytes = serde_json::to_vec(&delta)
-            .map_err(|e| VauchiError::Serialization(e.to_string()))?;
+        let delta_bytes =
+            serde_json::to_vec(&delta).map_err(|e| VauchiError::Serialization(e.to_string()))?;
 
         // Wrap with CEK if contact has one, otherwise legacy
         let payload_bytes = if contact.cek().is_some() {

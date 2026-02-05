@@ -40,6 +40,8 @@ pub struct MockTransport {
     state: ConnectionState,
     /// Messages that have been sent.
     sent_messages: Vec<MessageEnvelope>,
+    /// Raw bytes that have been sent via send_raw().
+    sent_raw: Vec<Vec<u8>>,
     /// Messages to return on receive().
     receive_queue: VecDeque<MessageEnvelope>,
     /// Error to inject on next operation.
@@ -60,6 +62,7 @@ impl MockTransport {
         MockTransport {
             state: ConnectionState::Disconnected,
             sent_messages: Vec::new(),
+            sent_raw: Vec::new(),
             receive_queue: VecDeque::new(),
             inject_error: None,
             auto_ack: false,
@@ -99,6 +102,11 @@ impl MockTransport {
     /// Returns the number of messages in the receive queue.
     pub fn receive_queue_len(&self) -> usize {
         self.receive_queue.len()
+    }
+
+    /// Returns all raw bytes that have been sent via `send_raw()`.
+    pub fn sent_raw(&self) -> &[Vec<u8>] {
+        &self.sent_raw
     }
 
     fn check_error(&mut self) -> TransportResult<()> {
@@ -165,5 +173,14 @@ impl Transport for MockTransport {
 
     fn has_pending(&self) -> bool {
         !self.receive_queue.is_empty()
+    }
+
+    fn send_raw(&mut self, data: &[u8]) -> TransportResult<()> {
+        self.check_error()?;
+        if self.state != ConnectionState::Connected {
+            return Err(NetworkError::NotConnected);
+        }
+        self.sent_raw.push(data.to_vec());
+        Ok(())
     }
 }

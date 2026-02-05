@@ -9,10 +9,15 @@
 use ring::rand::{SecureRandom, SystemRandom};
 
 use super::error::NetworkError;
-use super::message::{Handshake, MessageEnvelope, MessagePayload};
+use super::message::{MessageEnvelope, MessagePayload};
 use super::protocol::create_envelope;
 use super::transport::{ConnectionState, Transport, TransportConfig, TransportResult};
 use crate::identity::Identity;
+
+/// Converts a byte slice to a lowercase hex string.
+fn bytes_to_hex(bytes: &[u8]) -> String {
+    bytes.iter().map(|b| format!("{:02x}", b)).collect()
+}
 
 /// Connection manager with automatic reconnection and handshake.
 ///
@@ -159,6 +164,12 @@ impl<T: Transport> ConnectionManager<T> {
     }
 
     /// Sends the authentication handshake message.
+    ///
+    /// Builds a relay-compatible handshake with hex-encoded fields. The relay
+    /// uses hex encoding for all byte fields (`client_id`, `identity_public_key`,
+    /// `nonce`, `signature`) while the core `Handshake` struct uses base64.
+    /// To avoid a serialization mismatch, this builds a `serde_json::Value`
+    /// directly with hex-encoded fields.
     fn send_handshake(&mut self) -> TransportResult<()> {
         let identity = self
             .identity
@@ -181,14 +192,34 @@ impl<T: Transport> ConnectionManager<T> {
         sign_data.extend_from_slice(&timestamp.to_be_bytes());
         let signature = identity.sign(&sign_data);
 
-        let handshake = Handshake {
-            identity_public_key: *identity.signing_public_key(),
-            nonce,
-            signature: *signature.as_bytes(),
-        };
+        // Build relay-compatible handshake as JSON with hex-encoded fields.
+        // The relay expects client_id = hex(public_key), and all byte fields as hex strings.
+        let public_key = identity.signing_public_key();
+        let client_id = bytes_to_hex(public_key);
 
-        let envelope = create_envelope(MessagePayload::Handshake(handshake));
-        self.transport.send(&envelope)
+        let relay_handshake = serde_json::json!({
+            "version": super::message::PROTOCOL_VERSION,
+            "message_id": uuid::Uuid::new_v4().to_string(),
+            "timestamp": timestamp,
+            "payload": {
+                "type": "Handshake",
+                "client_id": client_id,
+                "identity_public_key": client_id,
+                "nonce": bytes_to_hex(&nonce),
+                "signature": bytes_to_hex(signature.as_bytes()),
+                "timestamp": timestamp,
+            }
+        });
+
+        let json = serde_json::to_vec(&relay_handshake)
+            .map_err(|e| NetworkError::Serialization(e.to_string()))?;
+
+        let len = json.len() as u32;
+        let mut frame = Vec::with_capacity(4 + json.len());
+        frame.extend_from_slice(&len.to_be_bytes());
+        frame.extend_from_slice(&json);
+
+        self.transport.send_raw(&frame)
     }
 }
 
@@ -269,20 +300,34 @@ mod tests {
         let mut conn = ConnectionManager::new(transport, create_test_config());
 
         let identity = Identity::create("Test User");
+        let public_key_hex: String = identity
+            .signing_public_key()
+            .iter()
+            .map(|b| format!("{:02x}", b))
+            .collect();
         conn.set_identity(identity);
 
         conn.connect().unwrap();
 
-        // Check that a handshake message was sent
-        let sent = conn.transport().sent_messages();
-        assert_eq!(sent.len(), 1);
+        // Check that a raw handshake was sent (relay-compatible format)
+        let sent_raw = conn.transport().sent_raw();
+        assert_eq!(sent_raw.len(), 1);
 
-        if let MessagePayload::Handshake(h) = &sent[0].payload {
-            assert_ne!(h.nonce, [0u8; 32]); // Should be random
-            assert_ne!(h.signature, [0u8; 64]); // Should be signed
-        } else {
-            panic!("Expected handshake message");
-        }
+        // Decode: skip 4-byte length prefix, parse JSON
+        let json: serde_json::Value =
+            serde_json::from_slice(&sent_raw[0][4..]).unwrap();
+
+        assert_eq!(json["payload"]["type"], "Handshake");
+        assert_eq!(json["payload"]["client_id"], public_key_hex);
+        assert_eq!(json["payload"]["identity_public_key"], public_key_hex);
+        // nonce should be a 64-char hex string (32 bytes)
+        let nonce_hex = json["payload"]["nonce"].as_str().unwrap();
+        assert_eq!(nonce_hex.len(), 64);
+        // signature should be a 128-char hex string (64 bytes)
+        let sig_hex = json["payload"]["signature"].as_str().unwrap();
+        assert_eq!(sig_hex.len(), 128);
+        // timestamp should be present
+        assert!(json["payload"]["timestamp"].is_u64());
     }
 
     #[test]

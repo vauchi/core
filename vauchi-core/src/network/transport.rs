@@ -205,4 +205,21 @@ pub trait Transport: Send {
 
     /// Checks if there are pending messages to receive (non-blocking).
     fn has_pending(&self) -> bool;
+
+    /// Sends pre-serialized bytes (with length prefix) to the relay.
+    ///
+    /// Used for handshakes where the serialization format differs from the
+    /// standard `MessageEnvelope` format (e.g., hex-encoded fields for relay
+    /// authentication). Default implementation delegates to `send()` after
+    /// deserializing, but transport implementations should override this
+    /// to send the raw bytes directly.
+    fn send_raw(&mut self, data: &[u8]) -> TransportResult<()> {
+        // Default: deserialize and send via the normal path.
+        // Real transport implementations should override this to avoid
+        // the roundtrip deserialization.
+        let json = &data[4..]; // Skip length prefix
+        let envelope: MessageEnvelope = serde_json::from_slice(json)
+            .map_err(|e| super::error::NetworkError::Serialization(e.to_string()))?;
+        self.send(&envelope)
+    }
 }

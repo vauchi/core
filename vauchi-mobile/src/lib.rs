@@ -416,6 +416,27 @@ pub fn search_faqs_localized(query: String, locale: MobileLocale) -> Vec<MobileF
         .collect()
 }
 
+/// Get localized aha moment content for a given moment type.
+///
+/// Returns the title, message, and animation flag for display.
+/// This is a stateless helper — it doesn't check whether the moment
+/// has been seen. Use `try_trigger_aha_moment` on VauchiMobile for
+/// state-tracked triggering.
+#[uniffi::export]
+pub fn get_aha_moment_localized(
+    moment_type: MobileAhaMomentType,
+    locale: MobileLocale,
+) -> MobileAhaMoment {
+    let core_type: vauchi_core::AhaMomentType = moment_type.into();
+    let core_locale: vauchi_core::i18n::Locale = locale.into();
+    MobileAhaMoment {
+        moment_type,
+        title: core_type.title_localized(core_locale),
+        message: core_type.message_localized(core_locale),
+        has_animation: core_type.has_animation(),
+    }
+}
+
 // === Main Interface ===
 
 /// Main Vauchi interface for mobile platforms.

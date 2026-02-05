@@ -12,9 +12,10 @@
 //! because they need access to Arc<VauchiMobile> internals.
 
 use vauchi_mobile::{
-    check_password_strength, generate_storage_key, get_faq_by_id_localized,
-    get_faqs_by_category_localized, get_faqs_localized, is_allowed_scheme, is_blocked_scheme,
-    is_safe_url, search_faqs_localized, MobileHelpCategory, MobileLocale, MobilePasswordStrength,
+    check_password_strength, generate_storage_key, get_aha_moment_localized,
+    get_faq_by_id_localized, get_faqs_by_category_localized, get_faqs_localized, is_allowed_scheme,
+    is_blocked_scheme, is_safe_url, search_faqs_localized, MobileAhaMomentType, MobileHelpCategory,
+    MobileLocale, MobilePasswordStrength,
 };
 
 // ============================================================================
@@ -357,4 +358,69 @@ fn test_search_faqs_localized_english() {
 fn test_search_faqs_localized_no_results() {
     let results = search_faqs_localized("xyznonexistent123".to_string(), MobileLocale::German);
     assert!(results.is_empty());
+}
+
+// ============================================================================
+// Localized Aha Moment Tests
+// Based on: features/aha_moments.feature - Localized milestone celebrations
+// ============================================================================
+
+/// Test: Get aha moment localized in German
+#[test]
+fn test_aha_moment_localized_german() {
+    let moment = get_aha_moment_localized(
+        MobileAhaMomentType::CardCreationComplete,
+        MobileLocale::German,
+    );
+    assert!(
+        moment.title.contains("Karte"),
+        "German title should contain 'Karte', got: {}",
+        moment.title
+    );
+    assert!(!moment.message.is_empty());
+    assert!(moment.has_animation);
+}
+
+/// Test: Get aha moment localized in English
+#[test]
+fn test_aha_moment_localized_english() {
+    let moment = get_aha_moment_localized(
+        MobileAhaMomentType::CardCreationComplete,
+        MobileLocale::English,
+    );
+    assert!(!moment.title.is_empty());
+    assert!(!moment.message.is_empty());
+}
+
+/// Test: All moment types return localized content
+#[test]
+fn test_all_aha_moments_localized() {
+    let types = [
+        MobileAhaMomentType::CardCreationComplete,
+        MobileAhaMomentType::FirstEdit,
+        MobileAhaMomentType::FirstContactAdded,
+        MobileAhaMomentType::FirstUpdateReceived,
+        MobileAhaMomentType::FirstOutboundDelivered,
+    ];
+    for moment_type in types {
+        let moment = get_aha_moment_localized(moment_type, MobileLocale::German);
+        assert!(
+            !moment.title.is_empty(),
+            "Localized title should not be empty for {:?}",
+            moment_type
+        );
+        assert!(
+            !moment.message.is_empty(),
+            "Localized message should not be empty for {:?}",
+            moment_type
+        );
+    }
+}
+
+/// Test: French aha moment content
+#[test]
+fn test_aha_moment_localized_french() {
+    let moment = get_aha_moment_localized(MobileAhaMomentType::FirstEdit, MobileLocale::French);
+    assert!(!moment.title.is_empty());
+    assert!(!moment.message.contains("Missing"));
 }

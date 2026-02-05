@@ -12,8 +12,9 @@
 //! because they need access to Arc<VauchiMobile> internals.
 
 use vauchi_mobile::{
-    check_password_strength, generate_storage_key, is_allowed_scheme, is_blocked_scheme,
-    is_safe_url, MobilePasswordStrength,
+    check_password_strength, generate_storage_key, get_faq_by_id_localized,
+    get_faqs_by_category_localized, get_faqs_localized, is_allowed_scheme, is_blocked_scheme,
+    is_safe_url, search_faqs_localized, MobileHelpCategory, MobileLocale, MobilePasswordStrength,
 };
 
 // ============================================================================
@@ -259,4 +260,101 @@ fn test_long_url() {
     let url = format!("https://example.com/{}", long_path);
     // Should not crash
     let _ = is_safe_url(url);
+}
+
+// ============================================================================
+// Localized FAQ Tests
+// Based on: features/help_system.feature - Localized help content
+// ============================================================================
+
+/// Test: Get all FAQs in German returns same count as English
+#[test]
+fn test_get_faqs_localized_german_count() {
+    let english = get_faqs_localized(MobileLocale::English);
+    let german = get_faqs_localized(MobileLocale::German);
+    assert_eq!(english.len(), german.len());
+    assert!(!german.is_empty());
+}
+
+/// Test: German FAQs contain German text
+#[test]
+fn test_get_faqs_localized_german_content() {
+    let german = get_faqs_localized(MobileLocale::German);
+    let phone_lost = german.iter().find(|f| f.id == "faq-phone-lost").unwrap();
+    assert!(
+        phone_lost.question.contains("Telefon"),
+        "German FAQ should contain 'Telefon', got: {}",
+        phone_lost.question
+    );
+}
+
+/// Test: French FAQs contain French text
+#[test]
+fn test_get_faqs_localized_french_content() {
+    let french = get_faqs_localized(MobileLocale::French);
+    let phone_lost = french.iter().find(|f| f.id == "faq-phone-lost").unwrap();
+    assert!(
+        phone_lost.question.contains("telephone"),
+        "French FAQ should contain 'telephone', got: {}",
+        phone_lost.question
+    );
+}
+
+/// Test: Spanish FAQs contain Spanish text
+#[test]
+fn test_get_faqs_localized_spanish_content() {
+    let spanish = get_faqs_localized(MobileLocale::Spanish);
+    let phone_lost = spanish.iter().find(|f| f.id == "faq-phone-lost").unwrap();
+    assert!(
+        phone_lost.question.contains("telefono"),
+        "Spanish FAQ should contain 'telefono', got: {}",
+        phone_lost.question
+    );
+}
+
+/// Test: Get FAQs by category in German
+#[test]
+fn test_get_faqs_by_category_localized() {
+    let german_privacy =
+        get_faqs_by_category_localized(MobileHelpCategory::Privacy, MobileLocale::German);
+    assert!(!german_privacy.is_empty());
+    for faq in &german_privacy {
+        assert_eq!(faq.category, MobileHelpCategory::Privacy);
+    }
+}
+
+/// Test: Get specific FAQ by ID in German
+#[test]
+fn test_get_faq_by_id_localized() {
+    let faq = get_faq_by_id_localized("faq-phone-lost".to_string(), MobileLocale::German);
+    assert!(faq.is_some());
+    assert!(faq.unwrap().question.contains("Telefon"));
+}
+
+/// Test: Get FAQ by ID that doesn't exist
+#[test]
+fn test_get_faq_by_id_localized_not_found() {
+    let faq = get_faq_by_id_localized("nonexistent".to_string(), MobileLocale::German);
+    assert!(faq.is_none());
+}
+
+/// Test: Search FAQs in German
+#[test]
+fn test_search_faqs_localized_german() {
+    let results = search_faqs_localized("Verschluesselung".to_string(), MobileLocale::German);
+    assert!(!results.is_empty(), "Should find German encryption FAQ");
+}
+
+/// Test: Search FAQs in English
+#[test]
+fn test_search_faqs_localized_english() {
+    let results = search_faqs_localized("encrypt".to_string(), MobileLocale::English);
+    assert!(!results.is_empty(), "Should find English encryption FAQ");
+}
+
+/// Test: Search with no results
+#[test]
+fn test_search_faqs_localized_no_results() {
+    let results = search_faqs_localized("xyznonexistent123".to_string(), MobileLocale::German);
+    assert!(results.is_empty());
 }

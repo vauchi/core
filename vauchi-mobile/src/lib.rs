@@ -376,6 +376,46 @@ pub fn search_faqs(query: String) -> Vec<MobileFaqItem> {
         .collect()
 }
 
+/// Get all FAQ items in the specified locale.
+#[uniffi::export]
+pub fn get_faqs_localized(locale: MobileLocale) -> Vec<MobileFaqItem> {
+    vauchi_core::help::get_faqs_localized(locale.into())
+        .iter()
+        .map(MobileFaqItem::from)
+        .collect()
+}
+
+/// Get FAQ items for a specific category in the specified locale.
+#[uniffi::export]
+pub fn get_faqs_by_category_localized(
+    category: MobileHelpCategory,
+    locale: MobileLocale,
+) -> Vec<MobileFaqItem> {
+    vauchi_core::help::get_faqs_by_category_localized(category.into(), locale.into())
+        .iter()
+        .map(MobileFaqItem::from)
+        .collect()
+}
+
+/// Get a specific FAQ item by ID in the specified locale.
+///
+/// Returns None if the FAQ is not found.
+#[uniffi::export]
+pub fn get_faq_by_id_localized(id: String, locale: MobileLocale) -> Option<MobileFaqItem> {
+    vauchi_core::help::get_faq_by_id_localized(&id, locale.into()).map(|f| MobileFaqItem::from(&f))
+}
+
+/// Search FAQs by query text in the specified locale.
+///
+/// Searches in both questions and answers (case-insensitive).
+#[uniffi::export]
+pub fn search_faqs_localized(query: String, locale: MobileLocale) -> Vec<MobileFaqItem> {
+    vauchi_core::help::search_faqs_localized(&query, locale.into())
+        .iter()
+        .map(MobileFaqItem::from)
+        .collect()
+}
+
 // === Main Interface ===
 
 /// Main Vauchi interface for mobile platforms.

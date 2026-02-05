@@ -157,6 +157,26 @@ pub enum VauchiEvent {
         /// The relay URL that was selected as replacement.
         to: String,
     },
+
+    /// A contact was blocked.
+    ContactBlocked {
+        /// The contact ID.
+        contact_id: String,
+    },
+
+    /// A contact was unblocked.
+    ContactUnblocked {
+        /// The contact ID.
+        contact_id: String,
+    },
+
+    /// Visibility rules changed for a contact, triggering re-propagation.
+    VisibilityChanged {
+        /// The contact ID whose visibility rules changed.
+        contact_id: String,
+        /// The field whose visibility changed.
+        field: String,
+    },
 }
 
 /// Event handler trait.

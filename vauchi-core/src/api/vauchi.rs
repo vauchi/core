@@ -6,7 +6,7 @@
 //!
 //! Main entry point for the Vauchi API.
 
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use crate::contact::Contact;
 use crate::contact_card::{ContactCard, ContactField};
@@ -15,8 +15,10 @@ use crate::crypto::{ShreddingMasterKey, SymmetricKey};
 use crate::identity::Identity;
 use crate::network::{MockTransport, Transport};
 use crate::storage::{SecureStorage, Storage};
+use crate::sync::state::ReplayDetector;
 
 use super::config::VauchiConfig;
+use super::consent::{ConsentManager, ConsentRecord, ConsentType};
 use super::contact_manager::ContactManager;
 use super::error::{VauchiError, VauchiResult};
 use super::events::{EventDispatcher, EventHandler, VauchiEvent};
@@ -63,6 +65,7 @@ pub struct Vauchi<T: Transport = MockTransport> {
     storage: Storage,
     events: Arc<EventDispatcher>,
     secure_storage: Option<Arc<dyn SecureStorage>>,
+    replay_detector: Mutex<ReplayDetector>,
     _phantom: std::marker::PhantomData<T>,
 }
 
@@ -131,6 +134,7 @@ impl<T: Transport> Vauchi<T> {
             storage,
             events,
             secure_storage,
+            replay_detector: Mutex::new(ReplayDetector::default_tolerance()),
             _phantom: std::marker::PhantomData,
         })
     }
@@ -180,6 +184,7 @@ impl<T: Transport> Vauchi<T> {
             storage,
             events,
             secure_storage: None,
+            replay_detector: Mutex::new(ReplayDetector::default_tolerance()),
             _phantom: std::marker::PhantomData,
         })
     }
@@ -516,6 +521,11 @@ impl<T: Transport> Vauchi<T> {
         let mut queued = 0;
 
         for mut contact in contacts {
+            // Skip blocked contacts
+            if contact.is_blocked() {
+                continue;
+            }
+
             // Skip contacts without ratchet (not yet synced)
             let (mut ratchet, is_initiator) = match self.storage.load_ratchet_state(contact.id())? {
                 Some(r) => r,
@@ -631,6 +641,13 @@ impl<T: Transport> Vauchi<T> {
             ));
         }
 
+        // Reject updates from blocked contacts
+        if let Some(contact) = self.storage.load_contact(contact_id)? {
+            if contact.is_blocked() {
+                return Err(VauchiError::ContactBlocked(contact_id.to_string()));
+            }
+        }
+
         // Load contact
         let mut contact = self
             .storage
@@ -690,6 +707,20 @@ impl<T: Transport> Vauchi<T> {
         if !delta.verify(contact.public_key()) {
             return Err(VauchiError::SignatureInvalid);
         }
+
+        // Check for replay attack
+        {
+            let mut detector = self
+                .replay_detector
+                .lock()
+                .map_err(|_| VauchiError::InvalidState("replay detector poisoned".into()))?;
+            if !detector.check_replay(contact_id, &delta.nonce, delta.timestamp) {
+                return Err(VauchiError::ReplayDetected);
+            }
+        }
+        // Persist accepted nonce
+        self.storage
+            .save_replay_nonce(contact_id, &delta.nonce, delta.timestamp)?;
 
         // Get changed fields before applying
         let changed = delta.changed_fields();
@@ -1332,6 +1363,221 @@ impl<T: Transport> Vauchi<T> {
     /// Clears the multi-relay configuration (reverts to single relay).
     pub fn clear_relay_list(&mut self) {
         self.config.relay_list = None;
+    }
+
+    // === Block/Unblock Contacts ===
+
+    /// Blocks a contact.
+    ///
+    /// Blocked contacts will not receive card updates and their incoming
+    /// updates will be rejected.
+    pub fn block_contact(&self, id: &str) -> VauchiResult<()> {
+        let mut contact = self
+            .storage
+            .load_contact(id)?
+            .ok_or_else(|| VauchiError::ContactNotFound(id.to_string()))?;
+        contact.block();
+        self.storage.save_contact(&contact)?;
+        self.events.dispatch(VauchiEvent::ContactBlocked {
+            contact_id: id.to_string(),
+        });
+        Ok(())
+    }
+
+    /// Unblocks a contact.
+    pub fn unblock_contact(&self, id: &str) -> VauchiResult<()> {
+        let mut contact = self
+            .storage
+            .load_contact(id)?
+            .ok_or_else(|| VauchiError::ContactNotFound(id.to_string()))?;
+        contact.unblock();
+        self.storage.save_contact(&contact)?;
+        self.events.dispatch(VauchiEvent::ContactUnblocked {
+            contact_id: id.to_string(),
+        });
+        Ok(())
+    }
+
+    /// Lists all blocked contacts.
+    pub fn list_blocked_contacts(&self) -> VauchiResult<Vec<Contact>> {
+        let contacts = self.storage.list_contacts()?;
+        Ok(contacts.into_iter().filter(|c| c.is_blocked()).collect())
+    }
+
+    // === Consent Management ===
+
+    /// Grants consent for a specific type.
+    pub fn grant_consent(&self, consent_type: ConsentType) -> VauchiResult<()> {
+        let manager = ConsentManager::new(&self.storage);
+        manager.grant(consent_type).map_err(VauchiError::from)
+    }
+
+    /// Revokes consent for a specific type.
+    pub fn revoke_consent(&self, consent_type: ConsentType) -> VauchiResult<()> {
+        let manager = ConsentManager::new(&self.storage);
+        manager.revoke(consent_type).map_err(VauchiError::from)
+    }
+
+    /// Checks whether consent is currently granted for a type.
+    pub fn check_consent(&self, consent_type: &ConsentType) -> VauchiResult<bool> {
+        let manager = ConsentManager::new(&self.storage);
+        manager.check(consent_type).map_err(VauchiError::from)
+    }
+
+    /// Exports all consent records.
+    pub fn export_consent_log(&self) -> VauchiResult<Vec<ConsentRecord>> {
+        let manager = ConsentManager::new(&self.storage);
+        manager.export_consent_log().map_err(VauchiError::from)
+    }
+
+    // === Visibility Re-Propagation ===
+
+    /// Sets a field as visible to everyone for a contact, and re-propagates the card.
+    pub fn set_field_public_and_repropagate(
+        &self,
+        contact_id: &str,
+        field: &str,
+    ) -> VauchiResult<()> {
+        let cm = ContactManager::new(&self.storage, self.events.clone());
+        cm.set_field_public(contact_id, field)?;
+        self.events.dispatch(VauchiEvent::VisibilityChanged {
+            contact_id: contact_id.to_string(),
+            field: field.to_string(),
+        });
+        self.repropagate_to_contact(contact_id)
+    }
+
+    /// Sets a field as private for a contact, and re-propagates the card.
+    pub fn set_field_private_and_repropagate(
+        &self,
+        contact_id: &str,
+        field: &str,
+    ) -> VauchiResult<()> {
+        let cm = ContactManager::new(&self.storage, self.events.clone());
+        cm.set_field_private(contact_id, field)?;
+        self.events.dispatch(VauchiEvent::VisibilityChanged {
+            contact_id: contact_id.to_string(),
+            field: field.to_string(),
+        });
+        self.repropagate_to_contact(contact_id)
+    }
+
+    /// Sets a field as restricted to specific contacts, and re-propagates the card.
+    pub fn set_field_restricted_and_repropagate(
+        &self,
+        contact_id: &str,
+        field: &str,
+        allowed: Vec<String>,
+    ) -> VauchiResult<()> {
+        let cm = ContactManager::new(&self.storage, self.events.clone());
+        cm.set_field_restricted(contact_id, field, allowed)?;
+        self.events.dispatch(VauchiEvent::VisibilityChanged {
+            contact_id: contact_id.to_string(),
+            field: field.to_string(),
+        });
+        self.repropagate_to_contact(contact_id)
+    }
+
+    /// Re-propagates the current card state to a single contact.
+    ///
+    /// Sends a "full card" delta so the contact receives the card as filtered
+    /// by their current visibility rules. Skips if the contact has no ratchet.
+    fn repropagate_to_contact(&self, contact_id: &str) -> VauchiResult<()> {
+        use crate::crypto::cek::ContentEncryptionKey;
+        use crate::storage::{PendingUpdate, UpdateStatus};
+        use crate::sync::delta::{CardDelta, CekWrappedPayload, VersionedPayload};
+
+        let identity = self
+            .identity
+            .as_ref()
+            .ok_or(VauchiError::IdentityNotInitialized)?;
+
+        let own_card = self
+            .storage
+            .load_own_card()?
+            .ok_or(VauchiError::IdentityNotInitialized)?;
+
+        let mut contact = self
+            .storage
+            .load_contact(contact_id)?
+            .ok_or_else(|| VauchiError::ContactNotFound(contact_id.to_string()))?;
+
+        // Skip contacts without ratchet (not yet synced)
+        let (mut ratchet, is_initiator) = match self.storage.load_ratchet_state(contact_id)? {
+            Some(r) => r,
+            None => return Ok(()),
+        };
+
+        // Compute a "full card" delta from an empty card
+        let empty_card = ContactCard::new(own_card.display_name());
+        let delta = CardDelta::compute(&empty_card, &own_card);
+        if delta.is_empty() {
+            return Ok(());
+        }
+
+        // Filter delta based on visibility rules for this contact
+        let mut delta = delta.filter_for_contact(contact_id, contact.visibility_rules());
+        if delta.is_empty() {
+            return Ok(());
+        }
+
+        // Sign delta with our identity
+        delta.sign(identity);
+
+        // Serialize delta
+        let delta_bytes = serde_json::to_vec(&delta)
+            .map_err(|e| VauchiError::Serialization(e.to_string()))?;
+
+        // Wrap with CEK if contact has one, otherwise legacy
+        let payload_bytes = if contact.cek().is_some() {
+            let new_cek = ContentEncryptionKey::generate();
+            let cek_ciphertext = new_cek
+                .encrypt(&delta_bytes)
+                .map_err(|e| VauchiError::Crypto(format!("CEK encrypt: {:?}", e)))?;
+
+            let wrapped = CekWrappedPayload {
+                cek: new_cek.to_bytes(),
+                cek_ciphertext,
+                signature: delta.signature,
+                nonce: delta.nonce,
+            };
+
+            contact.set_cek(new_cek);
+            self.storage.save_contact(&contact)?;
+            VersionedPayload::encode_cek(&wrapped)
+        } else {
+            delta_bytes
+        };
+
+        // Encrypt with ratchet
+        let ratchet_msg = ratchet
+            .encrypt(&payload_bytes)
+            .map_err(|e| VauchiError::Crypto(format!("{:?}", e)))?;
+        let encrypted = serde_json::to_vec(&ratchet_msg)
+            .map_err(|e| VauchiError::Serialization(e.to_string()))?;
+
+        // Save updated ratchet state
+        self.storage
+            .save_ratchet_state(contact_id, &ratchet, is_initiator)?;
+
+        // Queue for delivery
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+
+        let update = PendingUpdate {
+            id: format!("{}-vis-{}", contact_id, now),
+            contact_id: contact_id.to_string(),
+            update_type: "card_delta".to_string(),
+            payload: encrypted,
+            created_at: now,
+            retry_count: 0,
+            status: UpdateStatus::Pending,
+        };
+        self.storage.queue_update(&update)?;
+
+        Ok(())
     }
 }
 

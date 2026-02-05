@@ -77,6 +77,14 @@ pub enum VauchiError {
     /// Signature verification failed.
     #[error("invalid signature")]
     SignatureInvalid,
+
+    /// Replay attack detected (duplicate nonce or stale timestamp).
+    #[error("replay attack detected: duplicate nonce")]
+    ReplayDetected,
+
+    /// Contact is blocked.
+    #[error("contact is blocked: {0}")]
+    ContactBlocked(String),
 }
 
 /// Result type for Vauchi operations.

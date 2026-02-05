@@ -9,8 +9,7 @@
 use ring::rand::{SecureRandom, SystemRandom};
 
 use super::error::NetworkError;
-use super::message::{MessageEnvelope, MessagePayload};
-use super::protocol::create_envelope;
+use super::message::MessageEnvelope;
 use super::transport::{ConnectionState, Transport, TransportConfig, TransportResult};
 use crate::identity::Identity;
 
@@ -227,7 +226,9 @@ impl<T: Transport> ConnectionManager<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::network::message::MessagePayload;
     use crate::network::mock::MockTransport;
+    use crate::network::protocol::create_envelope;
 
     fn create_test_config() -> TransportConfig {
         TransportConfig {
@@ -314,8 +315,7 @@ mod tests {
         assert_eq!(sent_raw.len(), 1);
 
         // Decode: skip 4-byte length prefix, parse JSON
-        let json: serde_json::Value =
-            serde_json::from_slice(&sent_raw[0][4..]).unwrap();
+        let json: serde_json::Value = serde_json::from_slice(&sent_raw[0][4..]).unwrap();
 
         assert_eq!(json["payload"]["type"], "Handshake");
         assert_eq!(json["payload"]["client_id"], public_key_hex);

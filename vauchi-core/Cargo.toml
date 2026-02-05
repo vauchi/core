@@ -174,3 +174,7 @@ required-features = ["testing"]
 [[test]]
 name = "storage_encryption_v15_tests"
 required-features = ["testing"]
+
+[[test]]
+name = "encryption_coverage_tests"
+required-features = ["testing"]

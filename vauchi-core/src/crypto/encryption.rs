@@ -274,6 +274,7 @@ fn decrypt_aes_gcm(key: &SymmetricKey, data: &[u8]) -> Result<Vec<u8>, Encryptio
 /// Output format: `0x01 || nonce (12 bytes) || ciphertext || tag (16 bytes)`
 ///
 /// Primarily for testing backward compatibility. New code should use `encrypt()`.
+#[cfg(any(test, feature = "testing"))]
 pub fn encrypt_aes_gcm(key: &SymmetricKey, plaintext: &[u8]) -> Result<Vec<u8>, EncryptionError> {
     let rng = SystemRandom::new();
 
@@ -304,6 +305,7 @@ pub fn encrypt_aes_gcm(key: &SymmetricKey, plaintext: &[u8]) -> Result<Vec<u8>, 
 /// Output format: `nonce (12 bytes) || ciphertext || tag (16 bytes)`
 ///
 /// Only for testing migration from pre-tag format. Never use in production.
+#[cfg(any(test, feature = "testing"))]
 pub fn encrypt_legacy_untagged(
     key: &SymmetricKey,
     plaintext: &[u8],

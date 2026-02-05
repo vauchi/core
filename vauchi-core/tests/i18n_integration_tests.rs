@@ -26,7 +26,8 @@ fn ensure_init() {
     INIT.call_once(|| {
         // Integration tests load from the locale files in the repo
         let locales_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("locales");
-        vauchi_core::i18n::init(&locales_dir).expect("Failed to load locales for integration tests");
+        vauchi_core::i18n::init(&locales_dir)
+            .expect("Failed to load locales for integration tests");
     });
 }
 

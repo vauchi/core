@@ -11,12 +11,24 @@
 //! Note: Tests requiring VauchiMobile are in src/lib.rs as inline tests
 //! because they need access to Arc<VauchiMobile> internals.
 
+use std::sync::Once;
+
 use vauchi_mobile::{
     check_password_strength, generate_storage_key, get_aha_moment_localized,
     get_faq_by_id_localized, get_faqs_by_category_localized, get_faqs_localized, is_allowed_scheme,
     is_blocked_scheme, is_safe_url, search_faqs_localized, MobileAhaMomentType, MobileHelpCategory,
     MobileLocale, MobilePasswordStrength,
 };
+
+static INIT: Once = Once::new();
+fn ensure_init() {
+    INIT.call_once(|| {
+        // vauchi-mobile/tests/ -> vauchi-core/locales/
+        let locales_dir =
+            std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../vauchi-core/locales");
+        let _ = vauchi_core::i18n::init(&locales_dir);
+    });
+}
 
 // ============================================================================
 // Password Strength Tests
@@ -271,6 +283,7 @@ fn test_long_url() {
 /// Test: Get all FAQs in German returns same count as English
 #[test]
 fn test_get_faqs_localized_german_count() {
+    ensure_init();
     let english = get_faqs_localized(MobileLocale::English);
     let german = get_faqs_localized(MobileLocale::German);
     assert_eq!(english.len(), german.len());
@@ -280,6 +293,7 @@ fn test_get_faqs_localized_german_count() {
 /// Test: German FAQs contain German text
 #[test]
 fn test_get_faqs_localized_german_content() {
+    ensure_init();
     let german = get_faqs_localized(MobileLocale::German);
     let phone_lost = german.iter().find(|f| f.id == "faq-phone-lost").unwrap();
     assert!(
@@ -292,6 +306,7 @@ fn test_get_faqs_localized_german_content() {
 /// Test: French FAQs contain French text
 #[test]
 fn test_get_faqs_localized_french_content() {
+    ensure_init();
     let french = get_faqs_localized(MobileLocale::French);
     let phone_lost = french.iter().find(|f| f.id == "faq-phone-lost").unwrap();
     assert!(
@@ -304,6 +319,7 @@ fn test_get_faqs_localized_french_content() {
 /// Test: Spanish FAQs contain Spanish text
 #[test]
 fn test_get_faqs_localized_spanish_content() {
+    ensure_init();
     let spanish = get_faqs_localized(MobileLocale::Spanish);
     let phone_lost = spanish.iter().find(|f| f.id == "faq-phone-lost").unwrap();
     assert!(
@@ -316,6 +332,7 @@ fn test_get_faqs_localized_spanish_content() {
 /// Test: Get FAQs by category in German
 #[test]
 fn test_get_faqs_by_category_localized() {
+    ensure_init();
     let german_privacy =
         get_faqs_by_category_localized(MobileHelpCategory::Privacy, MobileLocale::German);
     assert!(!german_privacy.is_empty());
@@ -327,6 +344,7 @@ fn test_get_faqs_by_category_localized() {
 /// Test: Get specific FAQ by ID in German
 #[test]
 fn test_get_faq_by_id_localized() {
+    ensure_init();
     let faq = get_faq_by_id_localized("faq-phone-lost".to_string(), MobileLocale::German);
     assert!(faq.is_some());
     assert!(faq.unwrap().question.contains("Telefon"));
@@ -335,6 +353,7 @@ fn test_get_faq_by_id_localized() {
 /// Test: Get FAQ by ID that doesn't exist
 #[test]
 fn test_get_faq_by_id_localized_not_found() {
+    ensure_init();
     let faq = get_faq_by_id_localized("nonexistent".to_string(), MobileLocale::German);
     assert!(faq.is_none());
 }
@@ -342,6 +361,7 @@ fn test_get_faq_by_id_localized_not_found() {
 /// Test: Search FAQs in German
 #[test]
 fn test_search_faqs_localized_german() {
+    ensure_init();
     let results = search_faqs_localized("Verschluesselung".to_string(), MobileLocale::German);
     assert!(!results.is_empty(), "Should find German encryption FAQ");
 }
@@ -349,6 +369,7 @@ fn test_search_faqs_localized_german() {
 /// Test: Search FAQs in English
 #[test]
 fn test_search_faqs_localized_english() {
+    ensure_init();
     let results = search_faqs_localized("encrypt".to_string(), MobileLocale::English);
     assert!(!results.is_empty(), "Should find English encryption FAQ");
 }
@@ -356,6 +377,7 @@ fn test_search_faqs_localized_english() {
 /// Test: Search with no results
 #[test]
 fn test_search_faqs_localized_no_results() {
+    ensure_init();
     let results = search_faqs_localized("xyznonexistent123".to_string(), MobileLocale::German);
     assert!(results.is_empty());
 }
@@ -368,6 +390,7 @@ fn test_search_faqs_localized_no_results() {
 /// Test: Get aha moment localized in German
 #[test]
 fn test_aha_moment_localized_german() {
+    ensure_init();
     let moment = get_aha_moment_localized(
         MobileAhaMomentType::CardCreationComplete,
         MobileLocale::German,
@@ -384,6 +407,7 @@ fn test_aha_moment_localized_german() {
 /// Test: Get aha moment localized in English
 #[test]
 fn test_aha_moment_localized_english() {
+    ensure_init();
     let moment = get_aha_moment_localized(
         MobileAhaMomentType::CardCreationComplete,
         MobileLocale::English,
@@ -395,6 +419,7 @@ fn test_aha_moment_localized_english() {
 /// Test: All moment types return localized content
 #[test]
 fn test_all_aha_moments_localized() {
+    ensure_init();
     let types = [
         MobileAhaMomentType::CardCreationComplete,
         MobileAhaMomentType::FirstEdit,
@@ -420,6 +445,7 @@ fn test_all_aha_moments_localized() {
 /// Test: French aha moment content
 #[test]
 fn test_aha_moment_localized_french() {
+    ensure_init();
     let moment = get_aha_moment_localized(MobileAhaMomentType::FirstEdit, MobileLocale::French);
     assert!(!moment.title.is_empty());
     assert!(!moment.message.contains("Missing"));

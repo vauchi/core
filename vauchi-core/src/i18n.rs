@@ -189,9 +189,7 @@ pub fn init(resource_dir: &Path) -> Result<(), I18nError> {
         }
     }
 
-    let mut lock = LOCALE_STORE
-        .write()
-        .map_err(|_| I18nError::LockPoisoned)?;
+    let mut lock = LOCALE_STORE.write().map_err(|_| I18nError::LockPoisoned)?;
     *lock = Some(store);
     Ok(())
 }
@@ -203,9 +201,7 @@ pub fn init(resource_dir: &Path) -> Result<(), I18nError> {
 pub fn load_locale_from_bytes(code: &str, data: &[u8]) -> Result<(), I18nError> {
     let strings = parse_locale_bytes(data)?;
 
-    let mut lock = LOCALE_STORE
-        .write()
-        .map_err(|_| I18nError::LockPoisoned)?;
+    let mut lock = LOCALE_STORE.write().map_err(|_| I18nError::LockPoisoned)?;
 
     let store = lock.get_or_insert_with(HashMap::new);
     store.insert(code.to_string(), strings);
@@ -276,10 +272,7 @@ fn bundled_english() -> HashMap<String, String> {
         ("contacts.count", "{count} contacts"),
         ("card.title", "Your Card"),
         ("settings.title", "Settings"),
-        (
-            "settings.remote_updates",
-            "Remote Content Updates",
-        ),
+        ("settings.remote_updates", "Remote Content Updates"),
         (
             "settings.remote_updates.enabled",
             "Enable automatic content updates",
@@ -292,7 +285,10 @@ fn bundled_english() -> HashMap<String, String> {
         ("action.edit", "Edit"),
         ("action.share", "Share"),
         ("error.generic", "Something went wrong"),
-        ("error.network", "Network error. Please check your connection."),
+        (
+            "error.network",
+            "Network error. Please check your connection.",
+        ),
         ("error.validation", "Please check your input"),
         ("setup.title", "Setup"),
         ("setup.create", "Create New Identity"),
@@ -335,8 +331,16 @@ mod tests {
         dir
     }
 
-    /// Helper: reset the global store between tests
+    /// Helper: reset the global store between tests by reloading from locale files.
+    /// Uses the real locale directory instead of clearing to None, so other test modules
+    /// (help, aha_moments) that rely on i18n data aren't broken by the reset.
     fn reset_store() {
+        let locales_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("locales");
+        let _ = init(&locales_dir);
+    }
+
+    /// Helper: fully clear the store (only for tests that specifically test uninitialized state)
+    fn clear_store() {
         let mut lock = LOCALE_STORE.write().unwrap();
         *lock = None;
     }
@@ -473,7 +477,11 @@ mod tests {
             "action.cancel",
         ];
         for key in critical {
-            assert!(bundled.contains_key(key), "bundled_english missing: {}", key);
+            assert!(
+                bundled.contains_key(key),
+                "bundled_english missing: {}",
+                key
+            );
         }
     }
 
@@ -513,17 +521,21 @@ mod tests {
 
     #[test]
     fn test_is_initialized_false_before_init() {
-        reset_store();
+        clear_store();
         assert!(!is_initialized());
+        // Restore for other tests
+        reset_store();
     }
 
     #[test]
     fn test_load_locale_from_bytes_without_init() {
-        reset_store();
+        clear_store();
         let data = serde_json::json!({ "app.name": "Test" });
         load_locale_from_bytes("en", data.to_string().as_bytes()).unwrap();
         assert!(is_initialized());
         assert_eq!(get_string(Locale::English, "app.name"), "Test");
+        // Restore for other tests
+        reset_store();
     }
 
     #[test]

@@ -2,7 +2,10 @@
 # SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
-# Trigger downstream package repos after a release
+# Trigger downstream package repos after a release (local/manual use)
+#
+# In CI, the trigger: keyword in .gitlab-ci.yml handles this automatically.
+# This script is for local/manual triggering when needed.
 #
 # This script triggers CI pipelines in:
 # - vauchi/vauchi-mobile-swift
@@ -10,7 +13,6 @@
 #
 # Authentication:
 #   - CI: Uses CI_JOB_TOKEN (auto-provisioned, zero management)
-#         Requires downstream projects to add vauchi/core to CI_JOB_TOKEN allowlist
 #   - Local: Uses GITLAB_TOKEN (personal access token)
 #
 # Usage:

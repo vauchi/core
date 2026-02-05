@@ -471,12 +471,28 @@ trigger:downstream:
     - ./scripts/trigger-downstream.sh "$CI_COMMIT_TAG"
 
 # NOTE: Downstream triggers are handled by trigger:downstream above
-# (via trigger-downstream.sh) which uses the Pipeline Trigger API to
-# pass UPSTREAM_VERSION to distribution repos. This only runs on tags.
-# The trigger:swift-package and trigger:android-package jobs from the
-# downstream.yml template are disabled here — they used GitLab's trigger:
-# keyword which doesn't pass variables and sets a different pipeline
-# source type than what distribution repos expect.
+# (via trigger-downstream.sh) which uses CI_JOB_TOKEN with the Pipeline
+# API to pass UPSTREAM_VERSION to distribution repos. This only runs on tags.
+
+# ============================================================
+# Downstream Verification (main branch only)
+# ============================================================
+# When core merges to main, verify that Rust consumer repos (desktop, cli,
+# tui) still build and pass tests against the updated core. This catches
+# API breaks early — before a release is even considered.
+#
+# Uses GitLab's trigger: keyword which creates linked child pipelines
+# visible in the pipeline graph. CI_JOB_TOKEN is used implicitly —
+# downstream projects must add vauchi/core to their CI_JOB_TOKEN allowlist.
+
+verify:downstream-rust:
+  stage: trigger
+  extends: .trigger-parallel
+  parallel:
+    matrix:
+      - DOWNSTREAM: [vauchi/desktop, vauchi/cli, vauchi/tui]
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
 
 # ============================================================
 # Manual Dev Build (on-demand)

@@ -152,6 +152,34 @@ impl ContentManager {
     pub fn config(&self) -> &ContentConfig {
         &self.config
     }
+
+    /// Load cached locale files into the i18n system.
+    ///
+    /// Reads all `*.json` files from the content cache locales directory and
+    /// loads each into the i18n store via `i18n::load_locale_from_bytes()`.
+    /// Called at startup AFTER `i18n::init()` to overlay CDN-cached versions.
+    pub fn load_cached_locales_into_i18n(&self) {
+        let locales_dir = self.cache.content_dir(ContentType::Locales);
+        if !locales_dir.exists() {
+            return;
+        }
+
+        let entries = match std::fs::read_dir(&locales_dir) {
+            Ok(e) => e,
+            Err(_) => return,
+        };
+
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.extension().and_then(|e| e.to_str()) == Some("json") {
+                if let Some(code) = path.file_stem().and_then(|s| s.to_str()) {
+                    if let Ok(data) = std::fs::read(&path) {
+                        let _ = crate::i18n::load_locale_from_bytes(code, &data);
+                    }
+                }
+            }
+        }
+    }
 }
 
 // Async methods (require content-updates feature)
@@ -318,27 +346,30 @@ impl ContentManager {
                 )?;
             }
             ContentType::Locales => {
-                // For locales, we only download the user's language
-                // This is a simplified implementation
+                // Download ALL locale files (privacy: bundle everything so CDN
+                // cannot learn the user's language from request patterns)
                 let entry =
                     manifest.content.locales.as_ref().ok_or_else(|| {
                         ContentError::Fetch("No locales entry in manifest".into())
                     })?;
 
-                // Download English as default
-                if let Some(en_file) = entry.files.get("en") {
-                    let path = format!("{}{}", entry.path, en_file.path);
+                for (lang_code, file_entry) in &entry.files {
+                    let path = format!("{}{}", entry.path, file_entry.path);
                     let data = fetcher
-                        .fetch_content(&path, &en_file.checksum)
+                        .fetch_content(&path, &file_entry.checksum)
                         .await
                         .map_err(|e| ContentError::Fetch(e.to_string()))?;
 
+                    let filename = format!("{}.json", lang_code);
                     self.cache.save_content(
                         ContentType::Locales,
-                        "en.json",
+                        &filename,
                         &data,
-                        &en_file.checksum,
+                        &file_entry.checksum,
                     )?;
+
+                    // Hot-reload into the i18n system
+                    let _ = crate::i18n::load_locale_from_bytes(lang_code, &data);
                 }
             }
             ContentType::Themes => {

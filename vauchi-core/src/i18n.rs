@@ -7,14 +7,16 @@
 //! Provides localized strings for the app UI.
 //! Supports English (source), German, French, and Spanish.
 //!
-//! Strings are loaded from JSON locale files at compile time via `include_str!`.
-//! The canonical locale files live in `vauchi-core/locales/*.json`.
+//! Strings are loaded at runtime from JSON locale files via `init()`.
+//! If no locale files are loaded, a minimal hardcoded English fallback is used.
 //!
 //! Feature file: features/internationalization.feature (pending)
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::sync::OnceLock;
+use std::path::Path;
+use std::sync::RwLock;
+use thiserror::Error;
 
 /// Supported locales
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
@@ -124,8 +126,7 @@ pub fn get_string(locale: Locale, key: &str) -> String {
 /// Get all localized strings for a locale as a key-value map.
 /// Returns English strings with overrides from the specified locale.
 pub fn get_all_strings(locale: Locale) -> HashMap<String, String> {
-    let strings = get_strings_for_locale(locale);
-    strings.clone()
+    get_strings_for_locale(locale)
 }
 
 pub fn get_string_with_args(locale: Locale, key: &str, args: &[(&str, &str)]) -> String {
@@ -139,44 +140,206 @@ pub fn get_string_with_args(locale: Locale, key: &str, args: &[(&str, &str)]) ->
 }
 
 // ============================================================
-// JSON-based string loading (compile-time embedded)
+// Runtime locale store (RwLock-based, supports reload)
 // ============================================================
 
-static EN_STRINGS: OnceLock<HashMap<String, String>> = OnceLock::new();
-static DE_STRINGS: OnceLock<HashMap<String, String>> = OnceLock::new();
-static FR_STRINGS: OnceLock<HashMap<String, String>> = OnceLock::new();
-static ES_STRINGS: OnceLock<HashMap<String, String>> = OnceLock::new();
+/// Global locale store: maps locale code → string map
+static LOCALE_STORE: RwLock<Option<HashMap<String, HashMap<String, String>>>> = RwLock::new(None);
 
-/// Parse a locale JSON file into a string map, filtering out the `_meta` key.
-fn parse_locale_json(json: &str) -> HashMap<String, String> {
-    let raw: HashMap<String, serde_json::Value> =
-        serde_json::from_str(json).expect("locale JSON is valid");
-    raw.into_iter()
-        .filter(|(k, _)| k != "_meta")
-        .filter_map(|(k, v)| v.as_str().map(|s| (k, s.to_owned())))
-        .collect()
+/// Errors from i18n operations
+#[derive(Debug, Error)]
+pub enum I18nError {
+    #[error("IO error: {0}")]
+    Io(#[from] std::io::Error),
+
+    #[error("JSON parse error: {0}")]
+    Json(#[from] serde_json::Error),
+
+    #[error("Lock poisoned")]
+    LockPoisoned,
+
+    #[error("Invalid filename: {0}")]
+    InvalidFilename(String),
 }
 
-fn get_strings_for_locale(locale: Locale) -> &'static HashMap<String, String> {
-    match locale {
-        Locale::English => {
-            EN_STRINGS.get_or_init(|| parse_locale_json(include_str!("../locales/en.json")))
-        }
-        Locale::German => {
-            DE_STRINGS.get_or_init(|| parse_locale_json(include_str!("../locales/de.json")))
-        }
-        Locale::French => {
-            FR_STRINGS.get_or_init(|| parse_locale_json(include_str!("../locales/fr.json")))
-        }
-        Locale::Spanish => {
-            ES_STRINGS.get_or_init(|| parse_locale_json(include_str!("../locales/es.json")))
+/// Initialize i18n by loading locale JSON files from a directory.
+///
+/// Scans `resource_dir` for `*.json` files, parses each into locale strings,
+/// and stores them in the global locale store. The filename stem is used as
+/// the locale code (e.g., `en.json` → `"en"`).
+pub fn init(resource_dir: &Path) -> Result<(), I18nError> {
+    let mut store = HashMap::new();
+
+    if resource_dir.exists() {
+        for entry in std::fs::read_dir(resource_dir)? {
+            let entry = entry?;
+            let path = entry.path();
+
+            if path.extension().and_then(|e| e.to_str()) == Some("json") {
+                let code = path
+                    .file_stem()
+                    .and_then(|s| s.to_str())
+                    .ok_or_else(|| I18nError::InvalidFilename(path.display().to_string()))?
+                    .to_string();
+
+                let data = std::fs::read(&path)?;
+                let strings = parse_locale_bytes(&data)?;
+                store.insert(code, strings);
+            }
         }
     }
+
+    let mut lock = LOCALE_STORE
+        .write()
+        .map_err(|_| I18nError::LockPoisoned)?;
+    *lock = Some(store);
+    Ok(())
+}
+
+/// Load or reload a single locale from raw JSON bytes.
+///
+/// Called by the content update system after downloading locale files from CDN.
+/// If the store hasn't been initialized yet, creates it first.
+pub fn load_locale_from_bytes(code: &str, data: &[u8]) -> Result<(), I18nError> {
+    let strings = parse_locale_bytes(data)?;
+
+    let mut lock = LOCALE_STORE
+        .write()
+        .map_err(|_| I18nError::LockPoisoned)?;
+
+    let store = lock.get_or_insert_with(HashMap::new);
+    store.insert(code.to_string(), strings);
+    Ok(())
+}
+
+/// Check if any locales have been loaded into the store.
+pub fn is_initialized() -> bool {
+    LOCALE_STORE
+        .read()
+        .map(|lock| lock.as_ref().is_some_and(|s| !s.is_empty()))
+        .unwrap_or(false)
+}
+
+/// Parse a locale JSON byte slice into a string map, filtering out the `_meta` key.
+fn parse_locale_bytes(data: &[u8]) -> Result<HashMap<String, String>, I18nError> {
+    let raw: HashMap<String, serde_json::Value> = serde_json::from_slice(data)?;
+    Ok(raw
+        .into_iter()
+        .filter(|(k, _)| k != "_meta")
+        .filter_map(|(k, v)| v.as_str().map(|s| (k, s.to_owned())))
+        .collect())
+}
+
+/// Get strings for a specific locale. Reads from the RwLock store, falling
+/// back to `bundled_english()` if the store is empty or the locale is missing.
+fn get_strings_for_locale(locale: Locale) -> HashMap<String, String> {
+    let code = locale.code();
+
+    if let Ok(lock) = LOCALE_STORE.read() {
+        if let Some(store) = lock.as_ref() {
+            if let Some(strings) = store.get(code) {
+                return strings.clone();
+            }
+        }
+    }
+
+    // Fallback: if requesting English and nothing loaded, use bundled minimal set
+    if locale == Locale::English {
+        return bundled_english();
+    }
+
+    // For non-English locales with no data, return empty (caller will fall back to English)
+    HashMap::new()
+}
+
+/// Hardcoded minimal English strings — safety net when no locale files exist.
+/// Contains ~30 critical keys for navigation, errors, and basic actions.
+fn bundled_english() -> HashMap<String, String> {
+    let pairs = [
+        ("app.name", "Vauchi"),
+        ("app.tagline", "Privacy-focused contact cards"),
+        ("app.loading", "Loading..."),
+        ("welcome.title", "Welcome to Vauchi"),
+        (
+            "welcome.subtitle",
+            "Privacy-focused contact cards that update automatically",
+        ),
+        ("nav.home", "Home"),
+        ("nav.contacts", "Contacts"),
+        ("nav.exchange", "Exchange"),
+        ("nav.settings", "Settings"),
+        ("nav.devices", "Devices"),
+        ("nav.recovery", "Recovery"),
+        ("nav.help", "Help"),
+        ("contacts.title", "Contacts"),
+        ("contacts.empty", "No contacts yet"),
+        ("contacts.count", "{count} contacts"),
+        ("card.title", "Your Card"),
+        ("settings.title", "Settings"),
+        (
+            "settings.remote_updates",
+            "Remote Content Updates",
+        ),
+        (
+            "settings.remote_updates.enabled",
+            "Enable automatic content updates",
+        ),
+        ("help.title", "Help & FAQ"),
+        ("exchange.title", "Exchange"),
+        ("action.save", "Save"),
+        ("action.cancel", "Cancel"),
+        ("action.delete", "Delete"),
+        ("action.edit", "Edit"),
+        ("action.share", "Share"),
+        ("error.generic", "Something went wrong"),
+        ("error.network", "Network error. Please check your connection."),
+        ("error.validation", "Please check your input"),
+        ("setup.title", "Setup"),
+        ("setup.create", "Create New Identity"),
+    ];
+
+    pairs
+        .iter()
+        .map(|(k, v)| (k.to_string(), v.to_string()))
+        .collect()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs;
+    use tempfile::TempDir;
+
+    /// Helper: create a temp dir with locale JSON files for testing
+    fn setup_test_locales() -> TempDir {
+        let dir = TempDir::new().unwrap();
+        let en = serde_json::json!({
+            "_meta": { "locale": "en" },
+            "app.name": "Vauchi",
+            "welcome.title": "Welcome to Vauchi",
+            "contacts.count": "{count} contacts",
+            "contacts.title": "Contacts",
+            "contacts.empty": "No contacts yet",
+            "update.sent": "Sent {count} updates to {name}"
+        });
+        let de = serde_json::json!({
+            "_meta": { "locale": "de" },
+            "app.name": "Vauchi",
+            "welcome.title": "Willkommen bei Vauchi",
+            "contacts.count": "{count} Kontakte",
+            "contacts.title": "Kontakte",
+            "contacts.empty": "Noch keine Kontakte"
+        });
+        fs::write(dir.path().join("en.json"), en.to_string()).unwrap();
+        fs::write(dir.path().join("de.json"), de.to_string()).unwrap();
+        dir
+    }
+
+    /// Helper: reset the global store between tests
+    fn reset_store() {
+        let mut lock = LOCALE_STORE.write().unwrap();
+        *lock = None;
+    }
 
     #[test]
     fn test_locale_default() {
@@ -198,33 +361,54 @@ mod tests {
     }
 
     #[test]
-    fn test_get_string_english() {
+    fn test_init_loads_locales() {
+        reset_store();
+        let dir = setup_test_locales();
+        init(dir.path()).unwrap();
+
+        assert!(is_initialized());
         let s = get_string(Locale::English, "welcome.title");
         assert_eq!(s, "Welcome to Vauchi");
     }
 
     #[test]
-    fn test_get_string_german() {
+    fn test_init_german_strings() {
+        reset_store();
+        let dir = setup_test_locales();
+        init(dir.path()).unwrap();
+
         let s = get_string(Locale::German, "welcome.title");
         assert_eq!(s, "Willkommen bei Vauchi");
     }
 
     #[test]
-    fn test_get_string_fallback() {
-        // If a key doesn't exist in German, it should fall back to English
-        let en = get_string(Locale::English, "app.name");
-        let de = get_string(Locale::German, "app.name");
-        assert_eq!(en, de);
+    fn test_fallback_to_english() {
+        reset_store();
+        let dir = setup_test_locales();
+        init(dir.path()).unwrap();
+
+        // "update.sent" only exists in en, not de
+        let de = get_string(Locale::German, "update.sent");
+        let en = get_string(Locale::English, "update.sent");
+        assert_eq!(de, en);
     }
 
     #[test]
     fn test_get_string_missing() {
+        reset_store();
+        let dir = setup_test_locales();
+        init(dir.path()).unwrap();
+
         let s = get_string(Locale::English, "nonexistent");
         assert!(s.contains("Missing"));
     }
 
     #[test]
     fn test_interpolation() {
+        reset_store();
+        let dir = setup_test_locales();
+        init(dir.path()).unwrap();
+
         let s = get_string_with_args(Locale::English, "contacts.count", &[("count", "5")]);
         assert_eq!(s, "5 contacts");
     }
@@ -236,24 +420,121 @@ mod tests {
     }
 
     #[test]
-    fn test_all_locales_have_same_keys() {
-        let en = get_strings_for_locale(Locale::English);
-        for locale in [Locale::German, Locale::French, Locale::Spanish] {
-            let strings = get_strings_for_locale(locale);
-            for key in en.keys() {
-                assert!(
-                    strings.contains_key(key),
-                    "{:?} is missing key: {}",
-                    locale,
-                    key
-                );
-            }
+    fn test_meta_key_excluded() {
+        reset_store();
+        let dir = setup_test_locales();
+        init(dir.path()).unwrap();
+
+        let strings = get_strings_for_locale(Locale::English);
+        assert!(!strings.contains_key("_meta"));
+    }
+
+    #[test]
+    fn test_reload_locale_updates_strings() {
+        reset_store();
+        let dir = setup_test_locales();
+        init(dir.path()).unwrap();
+
+        assert_eq!(
+            get_string(Locale::English, "welcome.title"),
+            "Welcome to Vauchi"
+        );
+
+        // Reload with updated strings
+        let updated = serde_json::json!({
+            "welcome.title": "Welcome Back to Vauchi"
+        });
+        load_locale_from_bytes("en", updated.to_string().as_bytes()).unwrap();
+
+        assert_eq!(
+            get_string(Locale::English, "welcome.title"),
+            "Welcome Back to Vauchi"
+        );
+    }
+
+    #[test]
+    fn test_bundled_english_fallback() {
+        reset_store();
+        // Without init(), should fall back to bundled_english
+        let s = get_string(Locale::English, "app.name");
+        assert_eq!(s, "Vauchi");
+    }
+
+    #[test]
+    fn test_bundled_english_has_critical_keys() {
+        let bundled = bundled_english();
+        let critical = [
+            "app.name",
+            "nav.home",
+            "nav.contacts",
+            "nav.settings",
+            "error.generic",
+            "action.save",
+            "action.cancel",
+        ];
+        for key in critical {
+            assert!(bundled.contains_key(key), "bundled_english missing: {}", key);
         }
     }
 
     #[test]
-    fn test_meta_key_excluded() {
-        let en = get_strings_for_locale(Locale::English);
-        assert!(!en.contains_key("_meta"));
+    fn test_concurrent_read_during_reload() {
+        reset_store();
+        let dir = setup_test_locales();
+        init(dir.path()).unwrap();
+
+        // Spawn readers while we reload
+        let handles: Vec<_> = (0..10)
+            .map(|_| {
+                std::thread::spawn(|| {
+                    for _ in 0..100 {
+                        let _ = get_string(Locale::English, "welcome.title");
+                    }
+                })
+            })
+            .collect();
+
+        // Reload in the middle
+        let updated = serde_json::json!({ "welcome.title": "Updated" });
+        load_locale_from_bytes("en", updated.to_string().as_bytes()).unwrap();
+
+        for h in handles {
+            h.join().unwrap();
+        }
+    }
+
+    #[test]
+    fn test_init_with_nonexistent_dir() {
+        reset_store();
+        let result = init(Path::new("/tmp/nonexistent-vauchi-i18n-test"));
+        // Should succeed with empty store (dir doesn't exist = no files)
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_is_initialized_false_before_init() {
+        reset_store();
+        assert!(!is_initialized());
+    }
+
+    #[test]
+    fn test_load_locale_from_bytes_without_init() {
+        reset_store();
+        let data = serde_json::json!({ "app.name": "Test" });
+        load_locale_from_bytes("en", data.to_string().as_bytes()).unwrap();
+        assert!(is_initialized());
+        assert_eq!(get_string(Locale::English, "app.name"), "Test");
+    }
+
+    #[test]
+    fn test_all_strings_returns_full_map() {
+        reset_store();
+        let dir = setup_test_locales();
+        init(dir.path()).unwrap();
+
+        let all = get_all_strings(Locale::English);
+        assert!(all.contains_key("welcome.title"));
+        assert!(all.contains_key("contacts.count"));
+        assert!(!all.contains_key("_meta"));
     }
 }

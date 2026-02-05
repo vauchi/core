@@ -62,6 +62,9 @@ pub enum MobileError {
     #[error("Shred error: {0}")]
     ShredError(String),
 
+    #[error("Init error: {0}")]
+    InitError(String),
+
     #[error("Internal error: {0}")]
     Internal(String),
 }

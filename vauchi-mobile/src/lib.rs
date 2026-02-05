@@ -278,6 +278,17 @@ pub fn get_default_theme_id(prefer_dark: bool) -> String {
 // i18n Functions
 // ============================================================
 
+/// Initialize the i18n system by loading locale files from a directory.
+///
+/// Must be called once at app startup before any i18n functions.
+/// The resource_dir should point to a directory containing locale JSON files
+/// (e.g., en.json, de.json, fr.json, es.json).
+#[uniffi::export]
+pub fn init_locales(resource_dir: String) -> Result<(), MobileError> {
+    vauchi_core::i18n::init(std::path::Path::new(&resource_dir))
+        .map_err(|e| MobileError::InitError(e.to_string()))
+}
+
 /// Get all available locales.
 #[uniffi::export]
 pub fn get_available_locales() -> Vec<MobileLocaleInfo> {

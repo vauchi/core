@@ -13,9 +13,22 @@
 //! - Fallback to English for missing translations
 //! - RTL support detection
 
+use std::path::PathBuf;
+use std::sync::Once;
 use vauchi_core::i18n::{
     get_available_locales, get_locale_info, get_string, get_string_with_args, Locale,
 };
+
+/// Initialize i18n once for integration tests using the bundled locale files.
+static INIT: Once = Once::new();
+
+fn ensure_init() {
+    INIT.call_once(|| {
+        // Integration tests load from the locale files in the repo
+        let locales_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("locales");
+        vauchi_core::i18n::init(&locales_dir).expect("Failed to load locales for integration tests");
+    });
+}
 
 // ============================================================
 // Locale Support
@@ -75,6 +88,8 @@ fn test_locale_info() {
 /// Test: Basic strings are localized
 #[test]
 fn test_basic_string_localization() {
+    ensure_init();
+
     // English
     let en = get_string(Locale::English, "welcome.title");
     assert_eq!(en, "Welcome to Vauchi");
@@ -95,6 +110,8 @@ fn test_basic_string_localization() {
 /// Test: All key sections have translations
 #[test]
 fn test_key_sections_exist() {
+    ensure_init();
+
     let sections = ["welcome", "contacts", "exchange", "settings", "help"];
 
     for section in sections {
@@ -111,6 +128,8 @@ fn test_key_sections_exist() {
 /// Test: Fallback to English for missing translations
 #[test]
 fn test_fallback_to_english() {
+    ensure_init();
+
     // Use a key that might only exist in English
     let en = get_string(Locale::English, "app.name");
     let de = get_string(Locale::German, "app.name");
@@ -124,6 +143,8 @@ fn test_fallback_to_english() {
 /// Test: Missing key returns identifiable string
 #[test]
 fn test_missing_key_handling() {
+    ensure_init();
+
     let result = get_string(Locale::English, "nonexistent.key");
     assert!(result.contains("Missing:") || result.contains("nonexistent"));
 }
@@ -135,6 +156,8 @@ fn test_missing_key_handling() {
 /// Test: String interpolation with arguments
 #[test]
 fn test_string_interpolation() {
+    ensure_init();
+
     let result = get_string_with_args(Locale::English, "contacts.count", &[("count", "5")]);
     assert!(result.contains("5"), "Should interpolate count");
 }
@@ -142,6 +165,8 @@ fn test_string_interpolation() {
 /// Test: Multiple argument interpolation
 #[test]
 fn test_multiple_args_interpolation() {
+    ensure_init();
+
     let result = get_string_with_args(
         Locale::English,
         "update.sent",
@@ -154,6 +179,8 @@ fn test_multiple_args_interpolation() {
 /// Test: Interpolation works across locales
 #[test]
 fn test_interpolation_across_locales() {
+    ensure_init();
+
     let en = get_string_with_args(Locale::English, "contacts.count", &[("count", "10")]);
     let de = get_string_with_args(Locale::German, "contacts.count", &[("count", "10")]);
 
@@ -169,6 +196,8 @@ fn test_interpolation_across_locales() {
 /// Test: Navigation strings exist
 #[test]
 fn test_navigation_strings() {
+    ensure_init();
+
     let keys = ["nav.home", "nav.contacts", "nav.exchange", "nav.settings"];
 
     for key in keys {
@@ -184,6 +213,8 @@ fn test_navigation_strings() {
 /// Test: Action strings exist
 #[test]
 fn test_action_strings() {
+    ensure_init();
+
     let keys = [
         "action.save",
         "action.cancel",
@@ -205,6 +236,8 @@ fn test_action_strings() {
 /// Test: Error strings exist
 #[test]
 fn test_error_strings() {
+    ensure_init();
+
     let keys = ["error.generic", "error.network", "error.validation"];
 
     for key in keys {
@@ -253,6 +286,8 @@ fn test_locale_serialization() {
 /// Test: All English strings have German translations
 #[test]
 fn test_german_coverage() {
+    ensure_init();
+
     // Check a representative sample of keys
     let keys = [
         "welcome.title",
@@ -280,6 +315,8 @@ fn test_german_coverage() {
 /// Test: French translations exist
 #[test]
 fn test_french_coverage() {
+    ensure_init();
+
     let key = "welcome.title";
     let fr = get_string(Locale::French, key);
     assert!(!fr.contains("Missing"), "French translation should exist");
@@ -288,6 +325,8 @@ fn test_french_coverage() {
 /// Test: Spanish translations exist
 #[test]
 fn test_spanish_coverage() {
+    ensure_init();
+
     let key = "welcome.title";
     let es = get_string(Locale::Spanish, key);
     assert!(!es.contains("Missing"), "Spanish translation should exist");

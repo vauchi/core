@@ -99,8 +99,13 @@ impl ContentCache {
         atomic_write(&path, secs.to_string().as_bytes())
     }
 
+    /// Get the directory path for a content type
+    pub fn content_dir(&self, content_type: ContentType) -> PathBuf {
+        self.cache_dir.join(content_type.dir_name())
+    }
+
     fn content_path(&self, content_type: ContentType, filename: &str) -> PathBuf {
-        self.cache_dir.join(content_type.dir_name()).join(filename)
+        self.content_dir(content_type).join(filename)
     }
 }
 

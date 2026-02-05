@@ -55,7 +55,7 @@ pub use help::{
 };
 pub use i18n::{
     get_all_strings, get_available_locales, get_locale_info, get_string, get_string_with_args,
-    Locale, LocaleInfo,
+    I18nError, Locale, LocaleInfo,
 };
 pub use identity::{Identity, IdentityBackup};
 #[cfg(any(feature = "network-native-tls", feature = "network-rustls"))]

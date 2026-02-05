@@ -897,6 +897,50 @@ impl VauchiMobile {
         Ok(())
     }
 
+    /// Mark a contact as trusted for recovery.
+    ///
+    /// Blocked contacts cannot be trusted for recovery.
+    pub fn trust_contact_for_recovery(&self, id: String) -> Result<(), MobileError> {
+        let storage = self.open_storage()?;
+
+        let mut contact = storage
+            .load_contact(&id)?
+            .ok_or_else(|| MobileError::ContactNotFound(id.clone()))?;
+
+        if contact.is_blocked() {
+            return Err(MobileError::InvalidInput(
+                "Blocked contacts cannot be trusted for recovery".to_string(),
+            ));
+        }
+
+        contact.trust_for_recovery();
+        storage.save_contact(&contact)?;
+
+        Ok(())
+    }
+
+    /// Remove recovery trust from a contact.
+    pub fn untrust_contact_for_recovery(&self, id: String) -> Result<(), MobileError> {
+        let storage = self.open_storage()?;
+
+        let mut contact = storage
+            .load_contact(&id)?
+            .ok_or_else(|| MobileError::ContactNotFound(id.clone()))?;
+
+        contact.untrust_for_recovery();
+        storage.save_contact(&contact)?;
+
+        Ok(())
+    }
+
+    /// Get the number of contacts trusted for recovery.
+    pub fn trusted_contact_count(&self) -> Result<u32, MobileError> {
+        let storage = self.open_storage()?;
+        let contacts = storage.list_contacts()?;
+        let count = contacts.iter().filter(|c| c.is_recovery_trusted()).count();
+        Ok(count as u32)
+    }
+
     // === Visibility Operations ===
 
     /// Hide field from contact.
@@ -1950,10 +1994,29 @@ impl VauchiMobile {
             ));
         };
 
-        // Add voucher
-        proof
-            .add_voucher(voucher)
-            .map_err(|e| MobileError::InvalidInput(format!("Cannot add voucher: {}", e)))?;
+        // Add voucher (enforce trusted contacts only)
+        let storage = self.open_storage()?;
+        let contacts = storage.list_contacts()?;
+        let trusted_keys: std::collections::HashSet<[u8; 32]> = contacts
+            .iter()
+            .filter(|c| c.is_recovery_trusted())
+            .map(|c| *c.public_key())
+            .collect();
+
+        match proof.add_voucher_trusted(voucher, &trusted_keys) {
+            Ok(()) => {}
+            Err(vauchi_core::recovery::RecoveryError::UntrustedVoucher) => {
+                return Err(MobileError::InvalidInput(
+                    "Voucher is from an untrusted contact. Only contacts marked as recovery-trusted can provide valid vouchers.".to_string(),
+                ));
+            }
+            Err(e) => {
+                return Err(MobileError::InvalidInput(format!(
+                    "Cannot add voucher: {}",
+                    e
+                )));
+            }
+        }
 
         // Save updated proof
         std::fs::write(&proof_path, proof.to_bytes())

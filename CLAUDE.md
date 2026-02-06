@@ -4,7 +4,7 @@
 # CLAUDE.md - vauchi-core
 
 > **Inherits**: See [/CLAUDE.md](/CLAUDE.md) for project-wide rules.
-> **Reference**: [/PRINCIPLES.md](/PRINCIPLES.md), [TDD Rules](/_docs/2026-01-22-TDD_RULES.md)
+> **Reference**: [Principles](https://docs.vauchi.app/about/principles/), [TDD Rules](/_private/docs/guides/tdd-rules.md)
 
 Core library and mobile bindings for Vauchi - privacy-focused updatable contact cards.
 

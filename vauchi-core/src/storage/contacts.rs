@@ -21,6 +21,7 @@ pub(super) struct ContactRow {
     pub card_encrypted: Vec<u8>,
     pub shared_key_encrypted: Vec<u8>,
     pub visibility_rules_json: Option<String>,
+    pub visibility_rules_encrypted: Option<Vec<u8>>,
     pub exchange_timestamp: i64,
     pub fingerprint_verified: i32,
     pub blocked: i32,
@@ -72,14 +73,17 @@ impl Storage {
             crate::crypto::encrypt(&self.encryption_key, contact.shared_key().as_bytes())
                 .map_err(|e| StorageError::Encryption(e.to_string()))?;
 
-        // Serialize visibility rules
+        // Encrypt visibility rules
         let visibility_json = serde_json::to_string(contact.visibility_rules())
             .map_err(|e| StorageError::Serialization(e.to_string()))?;
+        let visibility_encrypted =
+            crate::crypto::encrypt(&self.encryption_key, visibility_json.as_bytes())
+                .map_err(|e| StorageError::Encryption(e.to_string()))?;
 
         self.conn.execute(
             "INSERT OR REPLACE INTO contacts
              (id, public_key, display_name, card_encrypted, shared_key_encrypted,
-              visibility_rules_json, exchange_timestamp, fingerprint_verified, last_sync_at,
+              visibility_rules_encrypted, exchange_timestamp, fingerprint_verified, last_sync_at,
               blocked, hidden, favorite, recovery_trusted, cek_encrypted)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)",
             params![
@@ -88,7 +92,7 @@ impl Storage {
                 display_name_db,
                 card_encrypted,
                 shared_key_encrypted,
-                visibility_json,
+                visibility_encrypted,
                 contact.exchange_timestamp() as i64,
                 contact.is_fingerprint_verified() as i32,
                 Option::<i64>::None,
@@ -107,8 +111,9 @@ impl Storage {
     pub fn load_contact(&self, id: &str) -> Result<Option<Contact>, StorageError> {
         let mut stmt = self.conn.prepare(
             "SELECT id, public_key, display_name, card_encrypted, shared_key_encrypted,
-                    visibility_rules_json, exchange_timestamp, fingerprint_verified,
-                    blocked, hidden, favorite, recovery_trusted, cek_encrypted
+                    visibility_rules_json, visibility_rules_encrypted, exchange_timestamp,
+                    fingerprint_verified, blocked, hidden, favorite, recovery_trusted,
+                    cek_encrypted
              FROM contacts WHERE id = ?1",
         )?;
 
@@ -120,13 +125,14 @@ impl Storage {
                 card_encrypted: row.get(3)?,
                 shared_key_encrypted: row.get(4)?,
                 visibility_rules_json: row.get(5)?,
-                exchange_timestamp: row.get(6)?,
-                fingerprint_verified: row.get(7)?,
-                blocked: row.get(8)?,
-                hidden: row.get(9)?,
-                favorite: row.get(10)?,
-                recovery_trusted: row.get(11)?,
-                cek_encrypted: row.get(12)?,
+                visibility_rules_encrypted: row.get(6)?,
+                exchange_timestamp: row.get(7)?,
+                fingerprint_verified: row.get(8)?,
+                blocked: row.get(9)?,
+                hidden: row.get(10)?,
+                favorite: row.get(11)?,
+                recovery_trusted: row.get(12)?,
+                cek_encrypted: row.get(13)?,
             })
         });
 
@@ -141,8 +147,9 @@ impl Storage {
     pub fn list_contacts(&self) -> Result<Vec<Contact>, StorageError> {
         let mut stmt = self.conn.prepare(
             "SELECT id, public_key, display_name, card_encrypted, shared_key_encrypted,
-                    visibility_rules_json, exchange_timestamp, fingerprint_verified,
-                    blocked, hidden, favorite, recovery_trusted, cek_encrypted
+                    visibility_rules_json, visibility_rules_encrypted, exchange_timestamp,
+                    fingerprint_verified, blocked, hidden, favorite, recovery_trusted,
+                    cek_encrypted
              FROM contacts ORDER BY display_name",
         )?;
 
@@ -154,13 +161,14 @@ impl Storage {
                 card_encrypted: row.get(3)?,
                 shared_key_encrypted: row.get(4)?,
                 visibility_rules_json: row.get(5)?,
-                exchange_timestamp: row.get(6)?,
-                fingerprint_verified: row.get(7)?,
-                blocked: row.get(8)?,
-                hidden: row.get(9)?,
-                favorite: row.get(10)?,
-                recovery_trusted: row.get(11)?,
-                cek_encrypted: row.get(12)?,
+                visibility_rules_encrypted: row.get(6)?,
+                exchange_timestamp: row.get(7)?,
+                fingerprint_verified: row.get(8)?,
+                blocked: row.get(9)?,
+                hidden: row.get(10)?,
+                favorite: row.get(11)?,
+                recovery_trusted: row.get(12)?,
+                cek_encrypted: row.get(13)?,
             })
         })?;
 
@@ -188,8 +196,9 @@ impl Storage {
 
         let mut stmt = self.conn.prepare(
             "SELECT id, public_key, display_name, card_encrypted, shared_key_encrypted,
-                    visibility_rules_json, exchange_timestamp, fingerprint_verified,
-                    blocked, hidden, favorite, recovery_trusted, cek_encrypted
+                    visibility_rules_json, visibility_rules_encrypted, exchange_timestamp,
+                    fingerprint_verified, blocked, hidden, favorite, recovery_trusted,
+                    cek_encrypted
              FROM contacts ORDER BY display_name
              LIMIT ?1 OFFSET ?2",
         )?;
@@ -202,13 +211,14 @@ impl Storage {
                 card_encrypted: row.get(3)?,
                 shared_key_encrypted: row.get(4)?,
                 visibility_rules_json: row.get(5)?,
-                exchange_timestamp: row.get(6)?,
-                fingerprint_verified: row.get(7)?,
-                blocked: row.get(8)?,
-                hidden: row.get(9)?,
-                favorite: row.get(10)?,
-                recovery_trusted: row.get(11)?,
-                cek_encrypted: row.get(12)?,
+                visibility_rules_encrypted: row.get(6)?,
+                exchange_timestamp: row.get(7)?,
+                fingerprint_verified: row.get(8)?,
+                blocked: row.get(9)?,
+                hidden: row.get(10)?,
+                favorite: row.get(11)?,
+                recovery_trusted: row.get(12)?,
+                cek_encrypted: row.get(13)?,
             })
         })?;
 
@@ -241,8 +251,9 @@ impl Storage {
         // Part 1: SQL search for legacy contacts (non-empty display_name)
         let mut stmt = self.conn.prepare(
             "SELECT id, public_key, display_name, card_encrypted, shared_key_encrypted,
-                    visibility_rules_json, exchange_timestamp, fingerprint_verified,
-                    blocked, hidden, favorite, recovery_trusted, cek_encrypted
+                    visibility_rules_json, visibility_rules_encrypted, exchange_timestamp,
+                    fingerprint_verified, blocked, hidden, favorite, recovery_trusted,
+                    cek_encrypted
              FROM contacts
              WHERE display_name != '' AND display_name LIKE ?1 COLLATE NOCASE
              ORDER BY display_name",
@@ -256,13 +267,14 @@ impl Storage {
                 card_encrypted: row.get(3)?,
                 shared_key_encrypted: row.get(4)?,
                 visibility_rules_json: row.get(5)?,
-                exchange_timestamp: row.get(6)?,
-                fingerprint_verified: row.get(7)?,
-                blocked: row.get(8)?,
-                hidden: row.get(9)?,
-                favorite: row.get(10)?,
-                recovery_trusted: row.get(11)?,
-                cek_encrypted: row.get(12)?,
+                visibility_rules_encrypted: row.get(6)?,
+                exchange_timestamp: row.get(7)?,
+                fingerprint_verified: row.get(8)?,
+                blocked: row.get(9)?,
+                hidden: row.get(10)?,
+                favorite: row.get(11)?,
+                recovery_trusted: row.get(12)?,
+                cek_encrypted: row.get(13)?,
             })
         })?;
 
@@ -275,8 +287,9 @@ impl Storage {
         // Part 2: In-memory search for CEK-protected contacts (empty display_name)
         let mut cek_stmt = self.conn.prepare(
             "SELECT id, public_key, display_name, card_encrypted, shared_key_encrypted,
-                    visibility_rules_json, exchange_timestamp, fingerprint_verified,
-                    blocked, hidden, favorite, recovery_trusted, cek_encrypted
+                    visibility_rules_json, visibility_rules_encrypted, exchange_timestamp,
+                    fingerprint_verified, blocked, hidden, favorite, recovery_trusted,
+                    cek_encrypted
              FROM contacts
              WHERE display_name = ''",
         )?;
@@ -289,13 +302,14 @@ impl Storage {
                 card_encrypted: row.get(3)?,
                 shared_key_encrypted: row.get(4)?,
                 visibility_rules_json: row.get(5)?,
-                exchange_timestamp: row.get(6)?,
-                fingerprint_verified: row.get(7)?,
-                blocked: row.get(8)?,
-                hidden: row.get(9)?,
-                favorite: row.get(10)?,
-                recovery_trusted: row.get(11)?,
-                cek_encrypted: row.get(12)?,
+                visibility_rules_encrypted: row.get(6)?,
+                exchange_timestamp: row.get(7)?,
+                fingerprint_verified: row.get(8)?,
+                blocked: row.get(9)?,
+                hidden: row.get(10)?,
+                favorite: row.get(11)?,
+                recovery_trusted: row.get(12)?,
+                cek_encrypted: row.get(13)?,
             })
         })?;
 
@@ -497,8 +511,14 @@ impl Storage {
             .try_into()
             .map_err(|_| StorageError::Encryption("Invalid public key length".into()))?;
 
-        // Parse visibility rules
-        let visibility_rules = if let Some(json) = row.visibility_rules_json {
+        // Parse visibility rules — prefer encrypted column, fall back to legacy plaintext
+        let visibility_rules = if let Some(encrypted) = row.visibility_rules_encrypted {
+            let json_bytes = crate::crypto::decrypt(&self.encryption_key, &encrypted)
+                .map_err(|e| StorageError::Encryption(e.to_string()))?;
+            let json = String::from_utf8(json_bytes)
+                .map_err(|e| StorageError::Serialization(e.to_string()))?;
+            serde_json::from_str(&json).map_err(|e| StorageError::Serialization(e.to_string()))?
+        } else if let Some(json) = row.visibility_rules_json {
             serde_json::from_str(&json).map_err(|e| StorageError::Serialization(e.to_string()))?
         } else {
             crate::contact::VisibilityRules::new()

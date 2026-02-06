@@ -240,6 +240,11 @@ pub fn all_migrations() -> Vec<Migration> {
             name: "tor_config_column",
             action: MigrationAction::Sql(MIGRATION_V17_TOR_CONFIG),
         },
+        Migration {
+            version: 18,
+            name: "encrypt_visibility_rules",
+            action: MigrationAction::Callback(migrate_v18_encrypt_visibility_rules),
+        },
     ]
 }
 
@@ -1180,6 +1185,49 @@ fn migrate_v16_encrypt_low_priority(
                 rusqlite::params![encrypted, id],
             )
             .map_err(|e| StorageError::Migration(format!("Update audit_log: {}", e)))?;
+        }
+    }
+
+    Ok(())
+}
+
+/// Migration v18: Encrypt visibility_rules column in contacts table.
+///
+/// The `visibility_rules_json` column was the only unencrypted personal data
+/// field in the contacts table. This migration adds an encrypted column,
+/// encrypts all existing plaintext rules, and clears the plaintext.
+fn migrate_v18_encrypt_visibility_rules(
+    conn: &Connection,
+    key: &SymmetricKey,
+) -> Result<(), StorageError> {
+    use crate::crypto::encrypt;
+
+    // 1. Add new encrypted column
+    conn.execute_batch("ALTER TABLE contacts ADD COLUMN visibility_rules_encrypted BLOB;")
+        .map_err(|e| StorageError::Migration(format!("Add column: {}", e)))?;
+
+    // 2. Read all contacts with plaintext visibility rules
+    let mut stmt = conn
+        .prepare("SELECT id, visibility_rules_json FROM contacts")
+        .map_err(|e| StorageError::Migration(format!("Read contacts: {}", e)))?;
+
+    let rows: Vec<(String, Option<String>)> = stmt
+        .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))
+        .map_err(|e| StorageError::Migration(format!("Query: {}", e)))?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| StorageError::Migration(format!("Collect: {}", e)))?;
+
+    // 3. Encrypt each visibility rules JSON and write to new column
+    for (id, json_opt) in &rows {
+        if let Some(json) = json_opt {
+            let encrypted = encrypt(key, json.as_bytes()).map_err(|e| {
+                StorageError::Migration(format!("Encrypt visibility for {}: {}", id, e))
+            })?;
+            conn.execute(
+                "UPDATE contacts SET visibility_rules_encrypted = ?1, visibility_rules_json = NULL WHERE id = ?2",
+                rusqlite::params![encrypted, id],
+            )
+            .map_err(|e| StorageError::Migration(format!("Update contact {}: {}", id, e)))?;
         }
     }
 

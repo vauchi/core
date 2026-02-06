@@ -194,3 +194,6 @@ required-features = ["testing"]
 [[test]]
 name = "exchange_proximity_enforcement_tests"
 required-features = ["testing"]
+
+[[test]]
+name = "visibility_rules_encryption_tests"

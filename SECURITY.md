@@ -78,9 +78,9 @@ We are a nonprofit and cannot offer monetary bounties at this time.
 
 For details on Vauchi's security architecture, see:
 
-- [Threat Analysis](../_private/docs/reference/threat-analysis.md) - Threat model and mitigations
-- [Security Audit Checklist](../_private/docs/reference/security-audit.md) - Audit guide for reviewers
-- [Architecture Docs](docs/architecture/) - System design
+- Threat Analysis - `_private/docs/reference/threat-analysis.md` (internal)
+- Security Audit Checklist - `_private/docs/reference/security-audit.md` (internal)
+- [Architecture](https://docs.vauchi.app/developers/architecture/) - System design
 
 ### Key Security Properties
 

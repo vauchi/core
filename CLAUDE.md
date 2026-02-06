@@ -14,7 +14,7 @@ See [README.md](README.md) for overview.
 
 - **Crypto**: `ring` only. No custom crypto. No mocking crypto.
 - **Coverage**: 90%+ for vauchi-core.
-- **Planning docs**: Feature complete → MUST update original `/_docs/planning/todo/` doc and move to `done/`.
+- **Planning docs**: Feature complete → MUST update original `_private/docs/planning/todo/` doc and move to `done/`.
 
 ## Commands
 

@@ -738,7 +738,7 @@ fn test_out_of_order_delivery_reordering() {
     // but created_at shows correct order 0, 1, 2
     let delivery_sequence = vec![
         ("msg-2", base_time + 20, DeliveryStatus::Delivered), // Arrived first but created last
-        ("msg-0", base_time + 0, DeliveryStatus::Delivered),  // Arrived second but created first
+        ("msg-0", base_time, DeliveryStatus::Delivered),  // Arrived second but created first
         ("msg-1", base_time + 10, DeliveryStatus::Delivered), // Arrived last but created middle
     ];
 

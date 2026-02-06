@@ -107,14 +107,6 @@ impl From<&Contact> for MobileContact {
     }
 }
 
-/// Exchange QR data.
-#[derive(Debug, Clone, uniffi::Record)]
-pub struct MobileExchangeData {
-    pub qr_data: String,
-    pub public_id: String,
-    pub expires_at: u64,
-}
-
 /// Exchange result.
 #[derive(Debug, Clone, uniffi::Record)]
 pub struct MobileExchangeResult {

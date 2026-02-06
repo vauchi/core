@@ -22,7 +22,7 @@ use vauchi_core::crypto::ratchet::DoubleRatchetState;
 use vauchi_core::exchange::{DeviceLinkQR, EncryptedExchangeMessage};
 use vauchi_core::recovery::{RecoveryClaim, RecoveryProof, RecoveryVoucher};
 use vauchi_core::{
-    Contact, ContactCard, ContactField, Identity, IdentityBackup, SocialNetworkRegistry, Storage,
+    ContactCard, ContactField, Identity, IdentityBackup, SocialNetworkRegistry, Storage,
     SymmetricKey,
 };
 
@@ -35,6 +35,7 @@ mod audio;
 mod cert_pinning;
 mod content;
 mod error;
+mod exchange;
 mod protocol;
 mod sync;
 mod types;
@@ -46,19 +47,20 @@ pub use content::{
     MobileUpdateStatus,
 };
 pub use error::{KeychainError, MobileError};
+pub use exchange::{MobileExchangeSession, MobileExchangeState, MobileProximityHandler};
 pub use types::{
     MobileAhaMoment, MobileAhaMomentType, MobileConsentRecord, MobileConsentType, MobileContact,
     MobileContactCard, MobileContactField, MobileDeletionInfo, MobileDeletionState,
     MobileDeliveryRecord, MobileDeliveryStatus, MobileDeliverySummary, MobileDemoContact,
     MobileDemoContactState, MobileDeviceDeliveryRecord, MobileDeviceDeliveryStatus,
     MobileDeviceInfo, MobileDeviceLinkData, MobileDeviceLinkInfo, MobileDeviceLinkResult,
-    MobileExchangeData, MobileExchangeResult, MobileFaqItem, MobileFieldType,
-    MobileFieldValidation, MobileGdprExport, MobileHelpCategory, MobileHelpCategoryInfo,
-    MobileLocale, MobileLocaleInfo, MobileRecoveryClaim, MobileRecoveryProgress,
-    MobileRecoveryVerification, MobileRecoveryVoucher, MobileRetryEntry, MobileShredReport,
-    MobileShredStatus, MobileShredToken, MobileShredVerification, MobileSocialNetwork,
-    MobileSyncResult, MobileSyncStatus, MobileTheme, MobileThemeColors, MobileThemeMode,
-    MobileTrustLevel, MobileValidationStatus, MobileVisibilityLabel, MobileVisibilityLabelDetail,
+    MobileExchangeResult, MobileFaqItem, MobileFieldType, MobileFieldValidation, MobileGdprExport,
+    MobileHelpCategory, MobileHelpCategoryInfo, MobileLocale, MobileLocaleInfo,
+    MobileRecoveryClaim, MobileRecoveryProgress, MobileRecoveryVerification, MobileRecoveryVoucher,
+    MobileRetryEntry, MobileShredReport, MobileShredStatus, MobileShredToken,
+    MobileShredVerification, MobileSocialNetwork, MobileSyncResult, MobileSyncStatus, MobileTheme,
+    MobileThemeColors, MobileThemeMode, MobileTrustLevel, MobileValidationStatus,
+    MobileVisibilityLabel, MobileVisibilityLabelDetail,
 };
 
 uniffi::setup_scaffolding!();
@@ -517,6 +519,16 @@ impl VauchiMobile {
     /// Get pinned certificate if set.
     fn get_pinned_cert(&self) -> Option<String> {
         self.pinned_cert_pem.lock().unwrap().clone()
+    }
+
+    /// Get our contact card, or create a default one from the identity.
+    fn get_own_card_or_default(&self, identity: &Identity) -> Result<ContactCard, MobileError> {
+        let storage = self.open_storage()?;
+        Ok(storage
+            .load_own_card()
+            .ok()
+            .flatten()
+            .unwrap_or_else(|| ContactCard::new(identity.display_name())))
     }
 
     /// Get the path to the recovery proof file.
@@ -1191,80 +1203,102 @@ impl VauchiMobile {
 
     // === Exchange Operations ===
 
-    /// Generate exchange QR data.
-    pub fn generate_exchange_qr(&self) -> Result<MobileExchangeData, MobileError> {
+    /// Create an exchange session as initiator (displaying QR) with proximity verification.
+    ///
+    /// The `proximity` handler is called during proximity verification with the
+    /// audio challenge from the QR code.
+    pub fn create_exchange_initiator(
+        &self,
+        proximity: Box<dyn MobileProximityHandler>,
+    ) -> Result<Arc<MobileExchangeSession>, MobileError> {
         let identity = self.get_identity()?;
-
-        let qr = vauchi_core::ExchangeQR::generate(&identity);
-        let qr_data = format!("wb://{}", qr.to_data_string());
-
-        let expires_at = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs()
-            + 300;
-
-        Ok(MobileExchangeData {
-            qr_data,
-            public_id: identity.public_id(),
-            expires_at,
-        })
+        let our_card = self.get_own_card_or_default(&identity)?;
+        Ok(exchange::create_initiator_proximity(
+            identity, our_card, proximity,
+        ))
     }
 
-    /// Complete exchange with scanned QR data.
-    pub fn complete_exchange(&self, qr_data: String) -> Result<MobileExchangeResult, MobileError> {
-        use vauchi_core::ExchangeQR;
+    /// Create an exchange session as responder (scanning QR) with proximity verification.
+    pub fn create_exchange_responder(
+        &self,
+        proximity: Box<dyn MobileProximityHandler>,
+    ) -> Result<Arc<MobileExchangeSession>, MobileError> {
+        let identity = self.get_identity()?;
+        let our_card = self.get_own_card_or_default(&identity)?;
+        Ok(exchange::create_responder_proximity(
+            identity, our_card, proximity,
+        ))
+    }
 
+    /// Create an exchange session as initiator with manual confirmation (no audio hardware).
+    pub fn create_exchange_initiator_manual(
+        &self,
+    ) -> Result<Arc<MobileExchangeSession>, MobileError> {
+        let identity = self.get_identity()?;
+        let our_card = self.get_own_card_or_default(&identity)?;
+        Ok(exchange::create_initiator_manual(identity, our_card))
+    }
+
+    /// Create an exchange session as responder with manual confirmation (no audio hardware).
+    pub fn create_exchange_responder_manual(
+        &self,
+    ) -> Result<Arc<MobileExchangeSession>, MobileError> {
+        let identity = self.get_identity()?;
+        let our_card = self.get_own_card_or_default(&identity)?;
+        Ok(exchange::create_responder_manual(identity, our_card))
+    }
+
+    /// Finalize a completed exchange session.
+    ///
+    /// Extracts the contact from the session's Complete state, saves it to storage,
+    /// initializes the double ratchet, and sends the encrypted exchange message via relay.
+    ///
+    /// The session must be in the Complete state (i.e., the state machine has been
+    /// driven through all steps).
+    pub fn finalize_exchange(
+        &self,
+        session: &MobileExchangeSession,
+    ) -> Result<MobileExchangeResult, MobileError> {
+        let contact = session.extract_contact()?;
         let identity = self.get_identity()?;
         let storage = self.open_storage()?;
 
-        let data_str = qr_data.strip_prefix("wb://").unwrap_or(&qr_data);
-        let their_qr =
-            ExchangeQR::from_data_string(data_str).map_err(|_| MobileError::InvalidQrCode)?;
+        let contact_id = contact.id().to_string();
+        let contact_name = contact.display_name().to_string();
 
-        if their_qr.is_expired() {
-            return Err(MobileError::ExchangeFailed("QR code expired".to_string()));
-        }
-
-        let their_signing_key = their_qr.public_key();
-        let their_exchange_key = their_qr.exchange_key();
-        let their_public_id = hex::encode(their_signing_key);
-
-        if storage.load_contact(&their_public_id)?.is_some() {
+        // Check for duplicate
+        if storage.load_contact(&contact_id)?.is_some() {
             return Err(MobileError::ExchangeFailed(
                 "Contact already exists".to_string(),
             ));
         }
 
-        let our_x3dh = identity.x3dh_keypair();
-        let (encrypted_msg, shared_secret) = EncryptedExchangeMessage::create(
-            &our_x3dh,
-            their_exchange_key,
-            identity.signing_public_key(),
-            identity.display_name(),
-        )
-        .map_err(|e| MobileError::ExchangeFailed(format!("Key agreement failed: {:?}", e)))?;
-
-        let their_card = ContactCard::new("New Contact");
-        let contact = Contact::from_exchange(*their_signing_key, their_card, shared_secret.clone());
-
-        let contact_id = contact.id().to_string();
-        let contact_name = contact.display_name().to_string();
-
+        // Save contact
         storage.save_contact(&contact)?;
 
-        let ratchet = DoubleRatchetState::initialize_initiator(&shared_secret, *their_exchange_key);
+        // Initialize double ratchet
+        let shared_key = contact.shared_key().clone();
+        let their_exchange_key = *contact.public_key();
+        let ratchet = DoubleRatchetState::initialize_initiator(&shared_key, their_exchange_key);
         storage.save_ratchet_state(&contact_id, &ratchet, true)?;
 
-        // Send encrypted exchange message
+        // Send encrypted exchange message via relay
         {
-            let mut socket = self.connect_to_relay()?;
+            let our_x3dh = identity.x3dh_keypair();
+            let (encrypted_msg, _) = EncryptedExchangeMessage::create(
+                &our_x3dh,
+                &their_exchange_key,
+                identity.signing_public_key(),
+                identity.display_name(),
+            )
+            .map_err(|e| MobileError::ExchangeFailed(format!("Key agreement failed: {:?}", e)))?;
 
+            let mut socket = self.connect_to_relay()?;
             let our_id = identity.public_id();
             sync::send_handshake(&mut socket, &our_id, None)?;
 
             let update = protocol::EncryptedUpdate {
-                recipient_id: their_public_id.clone(),
+                recipient_id: contact_id.clone(),
                 sender_id: our_id,
                 ciphertext: encrypted_msg.to_bytes(),
             };
@@ -2899,17 +2933,16 @@ mod tests {
     }
 
     #[test]
-    fn test_exchange_qr_generation() {
+    fn test_exchange_session_initiator() {
         let (wb, _dir) = create_test_instance();
         wb.create_identity("Alice".to_string()).unwrap();
 
-        let exchange_data = wb.generate_exchange_qr().unwrap();
+        let session = wb.create_exchange_initiator_manual().unwrap();
+        let qr_data = session.generate_qr().unwrap();
         assert!(
-            exchange_data.qr_data.starts_with("wb://"),
+            qr_data.starts_with("wb://"),
             "QR data should start with wb://"
         );
-        assert!(!exchange_data.public_id.is_empty());
-        assert!(exchange_data.expires_at > 0);
     }
 
     #[test]

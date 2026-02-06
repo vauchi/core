@@ -17,9 +17,9 @@ fn main() {
 
     // Look for locales in sibling repo (../../locales from vauchi-core/)
     let locale_paths = [
-        "../../locales/en.json", // Standard sibling repo layout
+        "../../locales/en.json",    // Standard sibling repo layout
         "../../../locales/en.json", // Alternative layout
-        "locales/en.json",      // Local copy (for crates.io publish)
+        "locales/en.json",          // Local copy (for crates.io publish)
     ];
 
     let mut locale_content = None;

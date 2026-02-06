@@ -1478,6 +1478,65 @@ impl<T: Transport> Vauchi<T> {
         self.repropagate_to_contact(contact_id)
     }
 
+    /// Adds a contact to a label and re-propagates the card to that contact.
+    ///
+    /// The contact receives an updated card reflecting their new label membership.
+    pub fn add_contact_to_label_and_repropagate(
+        &self,
+        label_id: &str,
+        contact_id: &str,
+    ) -> VauchiResult<()> {
+        self.storage.add_contact_to_label(label_id, contact_id)?;
+        self.repropagate_to_contact(contact_id)
+    }
+
+    /// Removes a contact from a label and re-propagates the card to that contact.
+    ///
+    /// The contact receives an updated card with fields they can no longer see removed.
+    pub fn remove_contact_from_label_and_repropagate(
+        &self,
+        label_id: &str,
+        contact_id: &str,
+    ) -> VauchiResult<()> {
+        self.storage
+            .remove_contact_from_label(label_id, contact_id)?;
+        self.repropagate_to_contact(contact_id)
+    }
+
+    /// Sets field visibility for a label and re-propagates to all contacts in that label.
+    ///
+    /// All contacts in the label receive updated cards reflecting the visibility change.
+    pub fn set_label_field_visibility_and_repropagate(
+        &self,
+        label_id: &str,
+        field_id: &str,
+        is_visible: bool,
+    ) -> VauchiResult<()> {
+        self.storage
+            .set_label_field_visibility(label_id, field_id, is_visible)?;
+
+        // Re-propagate to all contacts in this label
+        let label = self.storage.load_label(label_id)?;
+        for contact_id in label.contacts() {
+            self.repropagate_to_contact(contact_id)?;
+        }
+        Ok(())
+    }
+
+    /// Sets a per-contact visibility override and re-propagates to that contact.
+    ///
+    /// The contact receives an updated card reflecting the override.
+    pub fn set_contact_visibility_override_and_repropagate(
+        &self,
+        contact_id: &str,
+        field_id: &str,
+        is_visible: bool,
+    ) -> VauchiResult<()> {
+        self.storage
+            .save_contact_override(contact_id, field_id, is_visible)?;
+        self.repropagate_to_contact(contact_id)
+    }
+
     /// Re-propagates the current card state to a single contact.
     ///
     /// Sends a "full card" delta so the contact receives the card as filtered
@@ -1515,8 +1574,12 @@ impl<T: Transport> Vauchi<T> {
             return Ok(());
         }
 
-        // Filter delta based on visibility rules for this contact
-        let mut delta = delta.filter_for_contact(contact_id, contact.visibility_rules());
+        // Filter delta using effective visibility (labels + overrides + defaults)
+        let contact_id_owned = contact_id.to_string();
+        let mut delta = delta.filter_with(|field_id| {
+            self.get_effective_field_visibility(&contact_id_owned, field_id)
+                .unwrap_or(false)
+        });
         if delta.is_empty() {
             return Ok(());
         }

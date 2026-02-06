@@ -275,6 +275,36 @@ impl CardDelta {
         }
     }
 
+    /// Filters this delta using a custom visibility predicate.
+    ///
+    /// Returns a new delta containing only the changes where `can_see(field_id)`
+    /// returns true. Display name changes are always included.
+    ///
+    /// This is useful when visibility rules come from multiple sources (labels,
+    /// per-contact overrides, default rules) and the caller has already resolved
+    /// the effective visibility.
+    pub fn filter_with<F: Fn(&str) -> bool>(&self, can_see: F) -> Self {
+        let filtered_changes: Vec<FieldChange> = self
+            .changes
+            .iter()
+            .filter(|change| match change {
+                FieldChange::DisplayNameChanged { .. } => true,
+                FieldChange::Added { field } => can_see(field.id()),
+                FieldChange::Modified { field_id, .. } => can_see(field_id),
+                FieldChange::Removed { field_id } => can_see(field_id),
+            })
+            .cloned()
+            .collect();
+
+        CardDelta {
+            version: self.version,
+            timestamp: self.timestamp,
+            changes: filtered_changes,
+            nonce: self.nonce,
+            signature: self.signature,
+        }
+    }
+
     /// Compresses a payload using DEFLATE compression.
     ///
     /// Useful for reducing the size of delta payloads before transmission.

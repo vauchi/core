@@ -344,3 +344,132 @@ fn test_delta_filter_display_name_always_visible() {
         FieldChange::DisplayNameChanged { .. }
     ));
 }
+
+// ============================================================
+// filter_with() tests
+// ============================================================
+
+#[test]
+fn test_filter_with_allows_matching_fields() {
+    // Create old card with two fields
+    let work_field = ContactField::new(FieldType::Email, "work", "old@co.com");
+    let work_id = work_field.id().to_string();
+    let mobile_field = ContactField::new(FieldType::Phone, "mobile", "+1234567890");
+    let mobile_id = mobile_field.id().to_string();
+
+    let mut old = ContactCard::new("Alice");
+    old.add_field(work_field).expect("add work field");
+    old.add_field(mobile_field).expect("add mobile field");
+
+    // Create new card by cloning and modifying both fields
+    let mut new = old.clone();
+    for field in new.fields_mut() {
+        field.set_value(if field.id() == work_id {
+            "new@co.com"
+        } else {
+            "+9876543210"
+        });
+    }
+
+    let delta = CardDelta::compute(&old, &new);
+    // Both fields should be detected as modified
+    let change_count = delta.changes.len();
+    assert!(
+        change_count >= 1,
+        "Should detect at least 1 change, got {}",
+        change_count
+    );
+
+    // Filter: only allow the work field
+    let work_id_clone = work_id.clone();
+    let filtered = delta.filter_with(|field_id| field_id == work_id_clone);
+
+    // Count how many changes match the work field
+    let work_changes: Vec<_> = filtered
+        .changes
+        .iter()
+        .filter(|c| matches!(c, FieldChange::Modified { field_id, .. } if field_id == &work_id))
+        .collect();
+
+    // The mobile field changes should be filtered out
+    let mobile_changes: Vec<_> = filtered
+        .changes
+        .iter()
+        .filter(|c| matches!(c, FieldChange::Modified { field_id, .. } if field_id == &mobile_id))
+        .collect();
+
+    assert!(
+        !work_changes.is_empty(),
+        "Work field changes should be included"
+    );
+    assert!(
+        mobile_changes.is_empty(),
+        "Mobile field changes should be filtered out"
+    );
+}
+
+#[test]
+fn test_filter_with_always_includes_display_name() {
+    let old = ContactCard::new("Alice");
+    let new = ContactCard::new("Alice Smith");
+
+    let delta = CardDelta::compute(&old, &new);
+    assert_eq!(delta.changes.len(), 1);
+
+    // Filter that rejects everything — display name should still pass
+    let filtered = delta.filter_with(|_| false);
+    assert_eq!(filtered.changes.len(), 1);
+    assert!(matches!(
+        &filtered.changes[0],
+        FieldChange::DisplayNameChanged { .. }
+    ));
+}
+
+#[test]
+fn test_filter_with_handles_added_and_removed() {
+    // Start with a card containing work+mobile
+    let work_field = ContactField::new(FieldType::Email, "work", "a@co.com");
+    let work_id = work_field.id().to_string();
+    let mobile_field = ContactField::new(FieldType::Phone, "mobile", "+1234567890");
+    let mobile_id = mobile_field.id().to_string();
+
+    let mut old = ContactCard::new("Alice");
+    old.add_field(work_field).expect("add work field");
+    old.add_field(mobile_field).expect("add mobile field");
+
+    assert_eq!(old.fields().len(), 2, "old should have 2 fields");
+
+    // New card only has work (mobile was removed)
+    let mut new = old.clone();
+    new.remove_field(&mobile_id)
+        .expect("remove_field should succeed");
+    assert_eq!(
+        new.fields().len(),
+        1,
+        "new should have 1 field after removal"
+    );
+
+    let delta = CardDelta::compute(&old, &new);
+    eprintln!("Delta changes: {:?}", delta.changes);
+    assert_eq!(
+        delta.changes.len(),
+        1,
+        "Should have exactly 1 Removed change"
+    );
+    assert!(
+        delta
+            .changes
+            .iter()
+            .any(|c| matches!(c, FieldChange::Removed { field_id } if field_id == &mobile_id)),
+        "Should have Removed change for mobile field"
+    );
+
+    // Filter: allow mobile_id (removed field passes through)
+    let mobile_id_clone = mobile_id.clone();
+    let filtered = delta.filter_with(|field_id| field_id == mobile_id_clone);
+    assert_eq!(filtered.changes.len(), 1);
+
+    // Filter: allow only work_id (removed mobile field is filtered out)
+    let filtered2 = delta.filter_with(|field_id| field_id == work_id);
+    assert_eq!(filtered2.changes.len(), 0);
+}

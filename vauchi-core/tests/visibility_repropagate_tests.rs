@@ -165,3 +165,182 @@ fn test_set_field_restricted_queues_update() {
         "Restricted visibility change should queue an update"
     );
 }
+
+// ============================================================
+// Label-aware re-propagation tests
+// ============================================================
+
+#[test]
+fn test_add_contact_to_label_triggers_repropagate() {
+    let wb = create_test_vauchi();
+
+    wb.add_own_field(ContactField::new(
+        FieldType::Email,
+        "work",
+        "alice@company.com",
+    ))
+    .unwrap();
+
+    let bob_id = add_contact_with_ratchet(&wb, "Bob");
+    let label = wb.create_label("Work").unwrap();
+
+    // Set field visible in this label
+    wb.set_label_field_visibility(label.id(), "work", true)
+        .unwrap();
+
+    let pending_before = wb.storage().get_pending_updates(&bob_id).unwrap();
+    assert!(pending_before.is_empty());
+
+    // Add contact to label AND repropagate
+    wb.add_contact_to_label_and_repropagate(label.id(), &bob_id)
+        .unwrap();
+
+    let pending_after = wb.storage().get_pending_updates(&bob_id).unwrap();
+    assert!(
+        !pending_after.is_empty(),
+        "Adding contact to label should queue a re-propagation update"
+    );
+}
+
+#[test]
+fn test_remove_contact_from_label_triggers_repropagate() {
+    let wb = create_test_vauchi();
+
+    wb.add_own_field(ContactField::new(
+        FieldType::Email,
+        "work",
+        "alice@company.com",
+    ))
+    .unwrap();
+
+    let bob_id = add_contact_with_ratchet(&wb, "Bob");
+    let label = wb.create_label("Work").unwrap();
+
+    // Add contact to label first (without repropagate to keep pending clean)
+    wb.add_contact_to_label(label.id(), &bob_id).unwrap();
+
+    // Now remove and repropagate
+    wb.remove_contact_from_label_and_repropagate(label.id(), &bob_id)
+        .unwrap();
+
+    let pending = wb.storage().get_pending_updates(&bob_id).unwrap();
+    assert!(
+        !pending.is_empty(),
+        "Removing contact from label should queue a re-propagation update"
+    );
+}
+
+#[test]
+fn test_set_label_field_visibility_repropagates_to_all_members() {
+    let wb = create_test_vauchi();
+
+    wb.add_own_field(ContactField::new(
+        FieldType::Email,
+        "work",
+        "alice@company.com",
+    ))
+    .unwrap();
+
+    let bob_id = add_contact_with_ratchet(&wb, "Bob");
+    let carol_id = add_contact_with_ratchet(&wb, "Carol");
+
+    let label = wb.create_label("Team").unwrap();
+    wb.add_contact_to_label(label.id(), &bob_id).unwrap();
+    wb.add_contact_to_label(label.id(), &carol_id).unwrap();
+
+    // Set field visibility for the label and repropagate to all members
+    wb.set_label_field_visibility_and_repropagate(label.id(), "work", true)
+        .unwrap();
+
+    let bob_pending = wb.storage().get_pending_updates(&bob_id).unwrap();
+    let carol_pending = wb.storage().get_pending_updates(&carol_id).unwrap();
+
+    assert!(
+        !bob_pending.is_empty(),
+        "Bob should receive re-propagation update"
+    );
+    assert!(
+        !carol_pending.is_empty(),
+        "Carol should receive re-propagation update"
+    );
+}
+
+#[test]
+fn test_set_contact_override_triggers_repropagate() {
+    let wb = create_test_vauchi();
+
+    wb.add_own_field(ContactField::new(
+        FieldType::Email,
+        "personal",
+        "alice@personal.com",
+    ))
+    .unwrap();
+
+    let bob_id = add_contact_with_ratchet(&wb, "Bob");
+
+    let pending_before = wb.storage().get_pending_updates(&bob_id).unwrap();
+    assert!(pending_before.is_empty());
+
+    // Set per-contact override and repropagate
+    wb.set_contact_visibility_override_and_repropagate(&bob_id, "personal", false)
+        .unwrap();
+
+    let pending_after = wb.storage().get_pending_updates(&bob_id).unwrap();
+    assert!(
+        !pending_after.is_empty(),
+        "Per-contact override should queue a re-propagation update"
+    );
+}
+
+#[test]
+fn test_repropagate_uses_effective_visibility() {
+    let wb = create_test_vauchi();
+
+    // Add two fields
+    wb.add_own_field(ContactField::new(
+        FieldType::Email,
+        "work",
+        "alice@company.com",
+    ))
+    .unwrap();
+    wb.add_own_field(ContactField::new(
+        FieldType::Phone,
+        "personal-phone",
+        "+1234567890",
+    ))
+    .unwrap();
+
+    let bob_id = add_contact_with_ratchet(&wb, "Bob");
+
+    // Create a label that shows only work email
+    let label = wb.create_label("Work").unwrap();
+    wb.set_label_field_visibility(label.id(), "work", true)
+        .unwrap();
+
+    // Add bob to the label and set personal-phone to hidden via override
+    wb.add_contact_to_label(label.id(), &bob_id).unwrap();
+    wb.set_contact_visibility_override(&bob_id, "personal-phone", false)
+        .unwrap();
+
+    // Verify effective visibility
+    assert!(
+        wb.get_effective_field_visibility(&bob_id, "work").unwrap(),
+        "Work field should be visible via label"
+    );
+    assert!(
+        !wb.get_effective_field_visibility(&bob_id, "personal-phone")
+            .unwrap(),
+        "Personal phone should be hidden via override"
+    );
+
+    // Re-propagate using the new label-aware method
+    wb.set_field_public_and_repropagate(&bob_id, "work")
+        .unwrap();
+
+    // Should have queued an update (the re-propagation uses effective visibility)
+    let pending = wb.storage().get_pending_updates(&bob_id).unwrap();
+    assert!(
+        !pending.is_empty(),
+        "Re-propagation should queue update using effective visibility"
+    );
+}

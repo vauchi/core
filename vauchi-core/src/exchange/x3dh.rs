@@ -2,10 +2,32 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! X3DH Key Agreement Protocol
+//! X3DH-Inspired Key Agreement
 //!
-//! Implements a simplified X3DH-style key agreement for contact exchange.
-//! Uses X25519 for Diffie-Hellman key agreement.
+//! This module implements a **simplified variant** of X3DH for contact card
+//! exchange. The current implementation performs a single DH operation per
+//! side (ephemeral x static), providing forward secrecy via the ephemeral key.
+//!
+//! ## Differences from Signal X3DH Spec
+//!
+//! | Property             | This Implementation       | Full X3DH               |
+//! |----------------------|---------------------------|-------------------------|
+//! | DH operations        | 1 per side                | 3-4 per side            |
+//! | Static key usage     | Unused in `initiate`      | DH1 + DH3              |
+//! | Forward secrecy      | Per-exchange (ephemeral)  | Per-exchange + identity |
+//! | Key derivation       | Direct DH output          | HKDF over all DH outputs|
+//!
+//! ## Security Assessment
+//!
+//! Adequate for current use case (contact card exchange where both parties are
+//! physically present). The single ephemeral DH provides confidentiality and
+//! forward secrecy. Identity binding (from the missing DH operations) would be
+//! needed for asynchronous messaging where impersonation is a concern.
+//!
+//! ## Future Work
+//!
+//! Full X3DH compliance is tracked in the problem record:
+//! `_private/docs/problems/2026-02-01-x3dh-protocol-hardening/`
 
 use rand::rngs::OsRng;
 use x25519_dalek::{EphemeralSecret, PublicKey, StaticSecret};

@@ -72,8 +72,9 @@ pub use ble::{
     VAUCHI_BLE_SERVICE_UUID,
 };
 pub use device_link::{
-    generate_numeric_code, DeviceLinkInitiator, DeviceLinkInitiatorRestored, DeviceLinkQR,
-    DeviceLinkRequest, DeviceLinkResponder, DeviceLinkResponse,
+    generate_numeric_code, DeviceLinkConfirmation, DeviceLinkInitiator,
+    DeviceLinkInitiatorRestored, DeviceLinkQR, DeviceLinkRequest, DeviceLinkResponder,
+    DeviceLinkResponse,
 };
 pub use encrypted_message::{DecryptedExchangePayload, EncryptedExchangeMessage};
 pub use error::ExchangeError;

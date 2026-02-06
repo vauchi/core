@@ -9,6 +9,7 @@
 //! scans it and receives the encrypted master seed to derive identical keys.
 
 use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
+use ring::hmac;
 use ring::rand::SystemRandom;
 use std::time::{SystemTime, UNIX_EPOCH};
 use zeroize::Zeroize;
@@ -205,6 +206,19 @@ impl DeviceLinkQR {
             .dark_color('█')
             .quiet_zone(false)
             .build()
+    }
+
+    /// Returns a human-readable fingerprint of the identity public key.
+    ///
+    /// Format: first 8 bytes of the identity public key, hex-encoded with
+    /// separators every 4 hex chars: `AB12-CD34-EF56-7890`.
+    pub fn identity_fingerprint(&self) -> String {
+        let bytes = &self.identity_public_key[..8];
+        let hex: Vec<String> = bytes
+            .chunks(2)
+            .map(|c| format!("{:02X}{:02X}", c[0], c[1]))
+            .collect();
+        hex.join("-")
     }
 }
 
@@ -503,6 +517,39 @@ impl Drop for DeviceLinkResponse {
     }
 }
 
+/// Confirmation details shown to the initiating device before approving a link.
+///
+/// Both devices independently compute the same confirmation code. The user
+/// compares the codes on both screens before approving. This prevents a remote
+/// attacker who intercepts QR data from silently linking their device.
+#[derive(Debug, Clone)]
+pub struct DeviceLinkConfirmation {
+    /// The new device's proposed name.
+    pub device_name: String,
+    /// 6-digit confirmation code (formatted as `XXX-XXX`), derived from shared
+    /// material so both devices display the same code.
+    pub confirmation_code: String,
+    /// Identity fingerprint (first 8 bytes of identity public key, hex-formatted
+    /// with separators: `AB12-CD34-EF56-7890`).
+    pub identity_fingerprint: String,
+}
+
+/// Derives a 6-digit confirmation code from the link key and request nonce.
+///
+/// Both the initiator and responder can compute this independently since they
+/// share the link key (from QR) and the nonce (from the request). Uses
+/// HMAC-SHA256 with the link key as the signing key and the nonce as the
+/// message, then takes the first 3 bytes modulo 1_000_000 for a 6-digit code.
+fn derive_confirmation_code(link_key: &[u8; 32], request_nonce: &[u8; 32]) -> String {
+    let hmac_key = hmac::Key::new(hmac::HMAC_SHA256, link_key);
+    let tag = hmac::sign(&hmac_key, request_nonce);
+    let bytes = tag.as_ref();
+
+    // Take first 4 bytes as u32, reduce to 6 digits
+    let value = u32::from_be_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]) % 1_000_000;
+    format!("{:03}-{:03}", value / 1000, value % 1000)
+}
+
 /// State machine for device linking from the existing device's perspective.
 pub struct DeviceLinkInitiator {
     /// The identity on this device (reserved for future verification)
@@ -541,92 +588,131 @@ impl DeviceLinkInitiator {
         &self.qr
     }
 
-    /// Processes a link request and creates a response.
+    /// Decrypts a link request and returns confirmation details for the user.
     ///
-    /// Returns the encrypted response and the updated registry with the new device.
-    pub fn process_request(
+    /// The caller must display `DeviceLinkConfirmation` to the user (device name,
+    /// confirmation code, identity fingerprint) and get explicit approval before
+    /// calling `confirm_link()`.
+    ///
+    /// Both devices independently display the same confirmation code, allowing the
+    /// user to verify the link is legitimate even without NFC/camera/bluetooth/audio.
+    pub fn prepare_confirmation(
         &self,
         encrypted_request: &[u8],
-    ) -> Result<(Vec<u8>, DeviceRegistry, DeviceInfo), ExchangeError> {
-        // Decrypt the request
+    ) -> Result<(DeviceLinkConfirmation, DeviceLinkRequest), ExchangeError> {
         let request = DeviceLinkRequest::decrypt(encrypted_request, self.qr.link_key())?;
 
-        // Validate device name
         if request.device_name.is_empty() {
             return Err(ExchangeError::InvalidQRFormat);
         }
 
-        // Determine next device index
-        let device_index = self.registry.next_device_index();
+        let confirmation_code = derive_confirmation_code(self.qr.link_key(), &request.nonce);
+        let identity_fingerprint = self.qr.identity_fingerprint();
 
-        // Create device info for the new device
-        let new_device_info =
-            DeviceInfo::derive(&self.master_seed, device_index, request.device_name.clone());
+        let confirmation = DeviceLinkConfirmation {
+            device_name: request.device_name.clone(),
+            confirmation_code,
+            identity_fingerprint,
+        };
 
-        // Create updated registry with new device
-        let mut updated_registry = self.registry.clone();
-        updated_registry
-            .add_device_unsigned(new_device_info.to_registered(&self.master_seed))
-            .map_err(|_| ExchangeError::CryptoError)?;
+        Ok((confirmation, request))
+    }
 
-        // Create and encrypt response
-        let response = DeviceLinkResponse::new(
-            self.master_seed,
-            self.display_name.clone(),
-            device_index,
-            updated_registry.clone(),
-        );
+    /// After the user confirms the link, creates the encrypted response with the
+    /// master seed and returns the updated registry and new device info.
+    ///
+    /// Call `prepare_confirmation()` first to get the `DeviceLinkRequest`.
+    pub fn confirm_link(
+        &self,
+        request: &DeviceLinkRequest,
+    ) -> Result<(Vec<u8>, DeviceRegistry, DeviceInfo), ExchangeError> {
+        self.build_response(request, None)
+    }
 
-        let encrypted_response = response.encrypt(self.qr.link_key())?;
+    /// After the user confirms the link, creates the encrypted response with the
+    /// master seed and sync payload.
+    ///
+    /// Call `prepare_confirmation()` first to get the `DeviceLinkRequest`.
+    pub fn confirm_link_with_sync(
+        &self,
+        request: &DeviceLinkRequest,
+        sync_payload_json: &str,
+    ) -> Result<(Vec<u8>, DeviceRegistry, DeviceInfo), ExchangeError> {
+        self.build_response(request, Some(sync_payload_json))
+    }
 
-        // Create the new device's DeviceInfo for the caller to store
-        let new_device = DeviceInfo::derive(&self.master_seed, device_index, request.device_name);
+    /// Processes a link request and creates a response.
+    ///
+    /// Returns the encrypted response and the updated registry with the new device.
+    #[deprecated(note = "Use prepare_confirmation() + confirm_link() for user verification")]
+    pub fn process_request(
+        &self,
+        encrypted_request: &[u8],
+    ) -> Result<(Vec<u8>, DeviceRegistry, DeviceInfo), ExchangeError> {
+        let request = DeviceLinkRequest::decrypt(encrypted_request, self.qr.link_key())?;
 
-        Ok((encrypted_response, updated_registry, new_device))
+        if request.device_name.is_empty() {
+            return Err(ExchangeError::InvalidQRFormat);
+        }
+
+        self.build_response(&request, None)
     }
 
     /// Processes a link request and creates a response with sync payload.
     ///
     /// This variant includes the full sync payload for the new device.
+    #[deprecated(
+        note = "Use prepare_confirmation() + confirm_link_with_sync() for user verification"
+    )]
     pub fn process_request_with_sync(
         &self,
         encrypted_request: &[u8],
         sync_payload_json: &str,
     ) -> Result<(Vec<u8>, DeviceRegistry, DeviceInfo), ExchangeError> {
-        // Decrypt the request
         let request = DeviceLinkRequest::decrypt(encrypted_request, self.qr.link_key())?;
 
-        // Validate device name
         if request.device_name.is_empty() {
             return Err(ExchangeError::InvalidQRFormat);
         }
 
-        // Determine next device index
+        self.build_response(&request, Some(sync_payload_json))
+    }
+
+    /// Internal helper to build the response from a validated request.
+    fn build_response(
+        &self,
+        request: &DeviceLinkRequest,
+        sync_payload_json: Option<&str>,
+    ) -> Result<(Vec<u8>, DeviceRegistry, DeviceInfo), ExchangeError> {
         let device_index = self.registry.next_device_index();
 
-        // Create device info for the new device
         let new_device_info =
             DeviceInfo::derive(&self.master_seed, device_index, request.device_name.clone());
 
-        // Create updated registry with new device
         let mut updated_registry = self.registry.clone();
         updated_registry
             .add_device_unsigned(new_device_info.to_registered(&self.master_seed))
             .map_err(|_| ExchangeError::CryptoError)?;
 
-        // Create response with sync payload
-        let response = DeviceLinkResponse::with_sync_payload(
-            self.master_seed,
-            self.display_name.clone(),
-            device_index,
-            updated_registry.clone(),
-            sync_payload_json.to_string(),
-        );
+        let response = match sync_payload_json {
+            Some(payload) => DeviceLinkResponse::with_sync_payload(
+                self.master_seed,
+                self.display_name.clone(),
+                device_index,
+                updated_registry.clone(),
+                payload.to_string(),
+            ),
+            None => DeviceLinkResponse::new(
+                self.master_seed,
+                self.display_name.clone(),
+                device_index,
+                updated_registry.clone(),
+            ),
+        };
 
         let encrypted_response = response.encrypt(self.qr.link_key())?;
-
-        // Create the new device's DeviceInfo for the caller to store
-        let new_device = DeviceInfo::derive(&self.master_seed, device_index, request.device_name);
+        let new_device =
+            DeviceInfo::derive(&self.master_seed, device_index, request.device_name.clone());
 
         Ok((encrypted_response, updated_registry, new_device))
     }
@@ -674,93 +760,116 @@ impl DeviceLinkInitiatorRestored {
         &self.qr
     }
 
-    /// Processes a link request and creates a response.
+    /// Decrypts a link request and returns confirmation details for the user.
     ///
-    /// Returns the encrypted response and the updated registry with the new device.
-    pub fn process_request(
+    /// See `DeviceLinkInitiator::prepare_confirmation()` for details.
+    pub fn prepare_confirmation(
         &self,
         encrypted_request: &[u8],
-    ) -> Result<(Vec<u8>, DeviceRegistry, DeviceInfo), ExchangeError> {
-        // Decrypt the request
+    ) -> Result<(DeviceLinkConfirmation, DeviceLinkRequest), ExchangeError> {
         let request = DeviceLinkRequest::decrypt(encrypted_request, self.qr.link_key())?;
 
-        // Validate device name
         if request.device_name.is_empty() {
             return Err(ExchangeError::InvalidQRFormat);
         }
 
-        // Determine next device index
-        let device_index = self.registry.next_device_index();
+        let confirmation_code = derive_confirmation_code(self.qr.link_key(), &request.nonce);
+        let identity_fingerprint = self.qr.identity_fingerprint();
 
-        // Create device info for the new device
-        let new_device_info =
-            DeviceInfo::derive(&self.master_seed, device_index, request.device_name.clone());
+        let confirmation = DeviceLinkConfirmation {
+            device_name: request.device_name.clone(),
+            confirmation_code,
+            identity_fingerprint,
+        };
 
-        // Create updated registry with new device
-        let mut updated_registry = self.registry.clone();
-        updated_registry
-            .add_device_unsigned(new_device_info.to_registered(&self.master_seed))
-            .map_err(|_| ExchangeError::CryptoError)?;
+        Ok((confirmation, request))
+    }
 
-        // Create and encrypt response
-        let response = DeviceLinkResponse::new(
-            self.master_seed,
-            self.display_name.clone(),
-            device_index,
-            updated_registry.clone(),
-        );
+    /// After the user confirms the link, creates the encrypted response.
+    pub fn confirm_link(
+        &self,
+        request: &DeviceLinkRequest,
+    ) -> Result<(Vec<u8>, DeviceRegistry, DeviceInfo), ExchangeError> {
+        self.build_response(request, None)
+    }
 
-        let encrypted_response = response.encrypt(self.qr.link_key())?;
+    /// After the user confirms the link, creates the encrypted response with sync payload.
+    pub fn confirm_link_with_sync(
+        &self,
+        request: &DeviceLinkRequest,
+        sync_payload_json: &str,
+    ) -> Result<(Vec<u8>, DeviceRegistry, DeviceInfo), ExchangeError> {
+        self.build_response(request, Some(sync_payload_json))
+    }
 
-        // Create the new device's DeviceInfo for the caller to store
-        let new_device = DeviceInfo::derive(&self.master_seed, device_index, request.device_name);
+    /// Processes a link request and creates a response.
+    #[deprecated(note = "Use prepare_confirmation() + confirm_link() for user verification")]
+    pub fn process_request(
+        &self,
+        encrypted_request: &[u8],
+    ) -> Result<(Vec<u8>, DeviceRegistry, DeviceInfo), ExchangeError> {
+        let request = DeviceLinkRequest::decrypt(encrypted_request, self.qr.link_key())?;
 
-        Ok((encrypted_response, updated_registry, new_device))
+        if request.device_name.is_empty() {
+            return Err(ExchangeError::InvalidQRFormat);
+        }
+
+        self.build_response(&request, None)
     }
 
     /// Processes a link request with sync payload and creates a response.
-    ///
-    /// This variant includes the sync payload in the response so the new device
-    /// receives all existing contacts during initial linking.
+    #[deprecated(
+        note = "Use prepare_confirmation() + confirm_link_with_sync() for user verification"
+    )]
     pub fn process_request_with_sync(
         &self,
         encrypted_request: &[u8],
         sync_payload_json: &str,
     ) -> Result<(Vec<u8>, DeviceRegistry, DeviceInfo), ExchangeError> {
-        // Decrypt the request
         let request = DeviceLinkRequest::decrypt(encrypted_request, self.qr.link_key())?;
 
-        // Validate device name
         if request.device_name.is_empty() {
             return Err(ExchangeError::InvalidQRFormat);
         }
 
-        // Determine next device index
+        self.build_response(&request, Some(sync_payload_json))
+    }
+
+    /// Internal helper to build the response from a validated request.
+    fn build_response(
+        &self,
+        request: &DeviceLinkRequest,
+        sync_payload_json: Option<&str>,
+    ) -> Result<(Vec<u8>, DeviceRegistry, DeviceInfo), ExchangeError> {
         let device_index = self.registry.next_device_index();
 
-        // Create device info for the new device
         let new_device_info =
             DeviceInfo::derive(&self.master_seed, device_index, request.device_name.clone());
 
-        // Create updated registry with new device
         let mut updated_registry = self.registry.clone();
         updated_registry
             .add_device_unsigned(new_device_info.to_registered(&self.master_seed))
             .map_err(|_| ExchangeError::CryptoError)?;
 
-        // Create and encrypt response with sync payload
-        let response = DeviceLinkResponse::with_sync_payload(
-            self.master_seed,
-            self.display_name.clone(),
-            device_index,
-            updated_registry.clone(),
-            sync_payload_json.to_string(),
-        );
+        let response = match sync_payload_json {
+            Some(payload) => DeviceLinkResponse::with_sync_payload(
+                self.master_seed,
+                self.display_name.clone(),
+                device_index,
+                updated_registry.clone(),
+                payload.to_string(),
+            ),
+            None => DeviceLinkResponse::new(
+                self.master_seed,
+                self.display_name.clone(),
+                device_index,
+                updated_registry.clone(),
+            ),
+        };
 
         let encrypted_response = response.encrypt(self.qr.link_key())?;
-
-        // Create the new device's DeviceInfo for the caller to store
-        let new_device = DeviceInfo::derive(&self.master_seed, device_index, request.device_name);
+        let new_device =
+            DeviceInfo::derive(&self.master_seed, device_index, request.device_name.clone());
 
         Ok((encrypted_response, updated_registry, new_device))
     }
@@ -778,6 +887,8 @@ pub struct DeviceLinkResponder {
     qr: DeviceLinkQR,
     /// The device name for this new device
     device_name: String,
+    /// Nonce from the last created request (for confirmation code computation).
+    last_request_nonce: Option<[u8; 32]>,
 }
 
 impl DeviceLinkResponder {
@@ -787,13 +898,36 @@ impl DeviceLinkResponder {
             return Err(ExchangeError::TokenExpired);
         }
 
-        Ok(DeviceLinkResponder { qr, device_name })
+        Ok(DeviceLinkResponder {
+            qr,
+            device_name,
+            last_request_nonce: None,
+        })
     }
 
     /// Creates a request to send to the existing device.
-    pub fn create_request(&self) -> Result<Vec<u8>, ExchangeError> {
+    pub fn create_request(&mut self) -> Result<Vec<u8>, ExchangeError> {
         let request = DeviceLinkRequest::new(self.device_name.clone());
+        self.last_request_nonce = Some(request.nonce);
         request.encrypt(self.qr.link_key())
+    }
+
+    /// Computes the confirmation code that should match the initiator's display.
+    ///
+    /// Must be called after `create_request()`. Both devices derive the same code
+    /// from the shared link key and request nonce.
+    pub fn compute_confirmation_code(&self) -> Result<String, ExchangeError> {
+        let nonce = self
+            .last_request_nonce
+            .ok_or(ExchangeError::InvalidQRFormat)?;
+        Ok(derive_confirmation_code(self.qr.link_key(), &nonce))
+    }
+
+    /// Returns the identity fingerprint from the QR code.
+    ///
+    /// Should match the fingerprint shown on the initiator's confirmation screen.
+    pub fn identity_fingerprint(&self) -> String {
+        self.qr.identity_fingerprint()
     }
 
     /// Processes the response from the existing device.
@@ -948,6 +1082,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(deprecated)]
     fn test_device_link_full_flow() {
         // Existing device (Device A) setup
         let master_seed_a = [0x42u8; 32];
@@ -961,7 +1096,8 @@ mod tests {
         // New device (Device B) scans QR
         let qr_string = qr.to_data_string();
         let scanned_qr = DeviceLinkQR::from_data_string(&qr_string).unwrap();
-        let responder = DeviceLinkResponder::from_qr(scanned_qr, "My Phone".to_string()).unwrap();
+        let mut responder =
+            DeviceLinkResponder::from_qr(scanned_qr, "My Phone".to_string()).unwrap();
 
         // Device B creates request
         let encrypted_request = responder.create_request().unwrap();
@@ -1123,6 +1259,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(deprecated)]
     fn test_device_link_process_request_empty_device_name() {
         let master_seed = [0x42u8; 32];
         let identity = Identity::create("Alice");
@@ -1232,6 +1369,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(deprecated)]
     fn test_device_link_with_full_sync_payload() {
         // Existing device (Device A) setup with data
         let master_seed = [0x42u8; 32];
@@ -1263,7 +1401,8 @@ mod tests {
         // New device scans QR
         let qr_string = initiator.qr().to_data_string();
         let scanned_qr = DeviceLinkQR::from_data_string(&qr_string).unwrap();
-        let responder = DeviceLinkResponder::from_qr(scanned_qr, "My Phone".to_string()).unwrap();
+        let mut responder =
+            DeviceLinkResponder::from_qr(scanned_qr, "My Phone".to_string()).unwrap();
 
         // Device B creates request
         let encrypted_request = responder.create_request().unwrap();
@@ -1303,6 +1442,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(deprecated)]
     fn test_device_link_initiator_restored_flow() {
         // Device A creates a QR and saves it
         let master_seed = [0x42u8; 32];
@@ -1320,7 +1460,8 @@ mod tests {
 
         // Device B scans the QR and creates request
         let scanned_qr = DeviceLinkQR::from_data_string(&qr_string).unwrap();
-        let responder = DeviceLinkResponder::from_qr(scanned_qr, "My Phone".to_string()).unwrap();
+        let mut responder =
+            DeviceLinkResponder::from_qr(scanned_qr, "My Phone".to_string()).unwrap();
         let encrypted_request = responder.create_request().unwrap();
 
         // Device A processes request using restored initiator
@@ -1360,5 +1501,229 @@ mod tests {
         let qr_string = initiator.qr().to_data_string();
         let restored_qr = DeviceLinkQR::from_data_string(&qr_string).unwrap();
         let _restored = identity.restore_device_link_initiator(registry, restored_qr);
+    }
+
+    // ============================================================
+    // Two-Phase Confirmation Flow Tests
+    // ============================================================
+
+    #[test]
+    fn test_confirmation_code_matches_both_sides() {
+        let master_seed = [0x42u8; 32];
+        let identity = Identity::create("Alice");
+        let registry = create_test_registry(&identity);
+
+        let initiator = DeviceLinkInitiator::new(master_seed, &identity, registry);
+
+        let qr_string = initiator.qr().to_data_string();
+        let scanned_qr = DeviceLinkQR::from_data_string(&qr_string).unwrap();
+        let mut responder =
+            DeviceLinkResponder::from_qr(scanned_qr, "My Phone".to_string()).unwrap();
+
+        let encrypted_request = responder.create_request().unwrap();
+
+        // Initiator prepares confirmation
+        let (confirmation, _request) = initiator.prepare_confirmation(&encrypted_request).unwrap();
+
+        // Responder computes confirmation code
+        let responder_code = responder.compute_confirmation_code().unwrap();
+
+        // Both sides should show the same code
+        assert_eq!(confirmation.confirmation_code, responder_code);
+        assert_eq!(confirmation.device_name, "My Phone");
+
+        // Code should be in XXX-XXX format
+        assert_eq!(confirmation.confirmation_code.len(), 7);
+        assert_eq!(&confirmation.confirmation_code[3..4], "-");
+    }
+
+    #[test]
+    fn test_prepare_and_confirm_flow() {
+        let master_seed = [0x42u8; 32];
+        let identity = Identity::create("Alice");
+        let registry = create_test_registry(&identity);
+
+        let initiator = DeviceLinkInitiator::new(master_seed, &identity, registry);
+
+        let qr_string = initiator.qr().to_data_string();
+        let scanned_qr = DeviceLinkQR::from_data_string(&qr_string).unwrap();
+        let mut responder =
+            DeviceLinkResponder::from_qr(scanned_qr, "My Phone".to_string()).unwrap();
+
+        let encrypted_request = responder.create_request().unwrap();
+
+        // Phase 1: Prepare confirmation
+        let (confirmation, request) = initiator.prepare_confirmation(&encrypted_request).unwrap();
+        assert_eq!(confirmation.device_name, "My Phone");
+
+        // Phase 2: User confirms, complete the link
+        let (encrypted_response, updated_registry, new_device) =
+            initiator.confirm_link(&request).unwrap();
+
+        // Device B processes response
+        let response = responder.process_response(&encrypted_response).unwrap();
+
+        assert_eq!(response.master_seed(), &master_seed);
+        assert_eq!(response.display_name(), "Alice");
+        assert_eq!(response.device_index(), 1);
+        assert_eq!(new_device.device_name(), "My Phone");
+        assert_eq!(updated_registry.device_count(), 2);
+    }
+
+    #[test]
+    fn test_prepare_and_confirm_with_sync_flow() {
+        let master_seed = [0x42u8; 32];
+        let identity = Identity::create("Alice");
+        let registry = create_test_registry(&identity);
+        let storage = create_test_storage();
+
+        let contact = create_test_contact("Bob");
+        storage.save_contact(&contact).unwrap();
+
+        let device_a = DeviceInfo::derive(&master_seed, 0, "Device A".to_string());
+        let orchestrator = DeviceSyncOrchestrator::new(&storage, device_a, registry.clone());
+        let sync_payload = orchestrator.create_full_sync_payload().unwrap();
+        let sync_json = serde_json::to_string(&sync_payload).unwrap();
+
+        let initiator = DeviceLinkInitiator::new(master_seed, &identity, registry);
+
+        let qr_string = initiator.qr().to_data_string();
+        let scanned_qr = DeviceLinkQR::from_data_string(&qr_string).unwrap();
+        let mut responder =
+            DeviceLinkResponder::from_qr(scanned_qr, "My Phone".to_string()).unwrap();
+
+        let encrypted_request = responder.create_request().unwrap();
+
+        let (_confirmation, request) = initiator.prepare_confirmation(&encrypted_request).unwrap();
+
+        let (encrypted_response, _updated_registry, _new_device) = initiator
+            .confirm_link_with_sync(&request, &sync_json)
+            .unwrap();
+
+        let response = responder.process_response(&encrypted_response).unwrap();
+        assert!(!response.sync_payload_json().is_empty());
+
+        let received_payload: DeviceSyncPayload =
+            serde_json::from_str(response.sync_payload_json()).unwrap();
+        assert_eq!(received_payload.contact_count(), 1);
+    }
+
+    #[test]
+    fn test_confirmation_code_without_create_request_fails() {
+        let identity = create_test_identity();
+        let qr = DeviceLinkQR::generate(&identity);
+        let responder = DeviceLinkResponder::from_qr(qr, "My Phone".to_string()).unwrap();
+
+        // Should fail because create_request() was never called
+        let result = responder.compute_confirmation_code();
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_identity_fingerprint_format() {
+        let identity = create_test_identity();
+        let qr = DeviceLinkQR::generate(&identity);
+
+        let fingerprint = qr.identity_fingerprint();
+
+        // Format: XXXX-XXXX-XXXX-XXXX (4 groups of 4 hex chars)
+        let parts: Vec<&str> = fingerprint.split('-').collect();
+        assert_eq!(
+            parts.len(),
+            4,
+            "Fingerprint should have 4 groups: {}",
+            fingerprint
+        );
+        for part in &parts {
+            assert_eq!(part.len(), 4, "Each group should be 4 hex chars: {}", part);
+            assert!(part.chars().all(|c| c.is_ascii_hexdigit()));
+        }
+    }
+
+    #[test]
+    fn test_identity_fingerprint_matches_both_sides() {
+        let master_seed = [0x42u8; 32];
+        let identity = Identity::create("Alice");
+        let registry = create_test_registry(&identity);
+
+        let initiator = DeviceLinkInitiator::new(master_seed, &identity, registry);
+
+        let qr_string = initiator.qr().to_data_string();
+        let scanned_qr = DeviceLinkQR::from_data_string(&qr_string).unwrap();
+        let mut responder =
+            DeviceLinkResponder::from_qr(scanned_qr, "My Phone".to_string()).unwrap();
+
+        let encrypted_request = responder.create_request().unwrap();
+
+        let (confirmation, _request) = initiator.prepare_confirmation(&encrypted_request).unwrap();
+
+        let responder_fingerprint = responder.identity_fingerprint();
+
+        assert_eq!(confirmation.identity_fingerprint, responder_fingerprint);
+    }
+
+    #[test]
+    #[allow(deprecated)]
+    fn test_deprecated_process_request_still_works() {
+        let master_seed = [0x42u8; 32];
+        let identity = Identity::create("Alice");
+        let registry = create_test_registry(&identity);
+
+        let initiator = DeviceLinkInitiator::new(master_seed, &identity, registry);
+
+        let qr_string = initiator.qr().to_data_string();
+        let scanned_qr = DeviceLinkQR::from_data_string(&qr_string).unwrap();
+        let mut responder =
+            DeviceLinkResponder::from_qr(scanned_qr, "My Phone".to_string()).unwrap();
+
+        let encrypted_request = responder.create_request().unwrap();
+
+        // Old API should still work
+        let (encrypted_response, updated_registry, new_device) =
+            initiator.process_request(&encrypted_request).unwrap();
+
+        let response = responder.process_response(&encrypted_response).unwrap();
+
+        assert_eq!(response.master_seed(), &master_seed);
+        assert_eq!(new_device.device_name(), "My Phone");
+        assert_eq!(updated_registry.device_count(), 2);
+    }
+
+    #[test]
+    fn test_restored_initiator_confirmation_flow() {
+        let master_seed = [0x42u8; 32];
+        let identity = Identity::create("Alice");
+        let registry = create_test_registry(&identity);
+
+        let initiator = DeviceLinkInitiator::new(master_seed, &identity, registry.clone());
+        let qr_string = initiator.qr().to_data_string();
+
+        let restored_qr = DeviceLinkQR::from_data_string(&qr_string).unwrap();
+        let restored_initiator =
+            DeviceLinkInitiatorRestored::new(master_seed, &identity, registry, restored_qr);
+
+        let scanned_qr = DeviceLinkQR::from_data_string(&qr_string).unwrap();
+        let mut responder =
+            DeviceLinkResponder::from_qr(scanned_qr, "My Phone".to_string()).unwrap();
+
+        let encrypted_request = responder.create_request().unwrap();
+
+        // Prepare confirmation on restored initiator
+        let (confirmation, request) = restored_initiator
+            .prepare_confirmation(&encrypted_request)
+            .unwrap();
+
+        // Codes should match
+        let responder_code = responder.compute_confirmation_code().unwrap();
+        assert_eq!(confirmation.confirmation_code, responder_code);
+
+        // Confirm and complete
+        let (encrypted_response, updated_registry, new_device) =
+            restored_initiator.confirm_link(&request).unwrap();
+
+        let response = responder.process_response(&encrypted_response).unwrap();
+        assert_eq!(response.master_seed(), &master_seed);
+        assert_eq!(new_device.device_name(), "My Phone");
+        assert_eq!(updated_registry.device_count(), 2);
     }
 }

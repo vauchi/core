@@ -160,14 +160,15 @@ fn bench_contact_list_scaling(c: &mut Criterion) {
     group.finish();
 }
 
-/// Benchmark exchange QR generation
+/// Benchmark exchange session creation and QR generation
 fn bench_exchange_qr(c: &mut Criterion) {
     let mut group = c.benchmark_group("exchange");
 
-    group.bench_function("generate_qr", |b| {
+    group.bench_function("create_initiator_manual", |b| {
         let (instance, _dir) = create_instance_with_identity("Test User");
         b.iter(|| {
-            black_box(instance.generate_exchange_qr().unwrap());
+            let session = instance.create_exchange_initiator_manual().unwrap();
+            black_box(session.generate_qr().unwrap());
         })
     });
 

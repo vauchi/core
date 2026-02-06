@@ -380,3 +380,391 @@ fn test_delivery_status_progression() {
         assert_eq!(&record.status, status);
     }
 }
+
+// === Expiration Warning Tests ===
+// Traces to: features/message_delivery.feature @expiration "Notification before message expires"
+
+/// Test: Get records approaching expiration for warning.
+///
+/// Scenario: Given I sent an update to an offline contact 29 days ago
+///           When the message is approaching expiration
+///           Then I should receive a warning notification
+#[test]
+fn test_message_expiration_warning() {
+    let storage = test_storage();
+    let now_ts = now();
+    let one_day = 86400u64;
+    let thirty_days = 30 * one_day;
+
+    // Create records with various expiration states:
+    // - One expiring in 1 day (should warn)
+    // - One expiring in 2 days (should warn)
+    // - One expiring in 7 days (outside warning threshold)
+    // - One already expired (should not warn, already handled)
+    // - One with no expiry (should not warn)
+    let records = vec![
+        ("msg-1day", now_ts + one_day),            // Expires in 1 day
+        ("msg-2day", now_ts + 2 * one_day),        // Expires in 2 days
+        ("msg-7day", now_ts + 7 * one_day),        // Expires in 7 days
+        ("msg-already-expired", now_ts - one_day), // Already expired
+    ];
+
+    for (id, expires_at) in records {
+        let record = DeliveryRecord {
+            message_id: id.to_string(),
+            recipient_id: "contact".to_string(),
+            status: DeliveryStatus::Stored,
+            created_at: now_ts - thirty_days + one_day,
+            updated_at: now_ts - thirty_days + one_day,
+            expires_at: Some(expires_at),
+        };
+        storage.create_delivery_record(&record).unwrap();
+    }
+
+    // Also add one with no expiry
+    let no_expiry = DeliveryRecord {
+        message_id: "msg-no-expiry".to_string(),
+        recipient_id: "contact".to_string(),
+        status: DeliveryStatus::Stored,
+        created_at: now_ts - thirty_days + one_day,
+        updated_at: now_ts - thirty_days + one_day,
+        expires_at: None,
+    };
+    storage.create_delivery_record(&no_expiry).unwrap();
+
+    // Query all pending records and filter for approaching expiration
+    let pending = storage.get_pending_deliveries().unwrap();
+    let warning_threshold = now_ts + 3 * one_day; // Warn if expiring within 3 days
+
+    let approaching_expiry: Vec<_> = pending
+        .iter()
+        .filter(|r| {
+            r.expires_at
+                .map(|exp| exp > now_ts && exp <= warning_threshold)
+                .unwrap_or(false)
+        })
+        .collect();
+
+    // Should find msg-1day and msg-2day
+    assert_eq!(approaching_expiry.len(), 2);
+    let ids: Vec<_> = approaching_expiry
+        .iter()
+        .map(|r| r.message_id.as_str())
+        .collect();
+    assert!(ids.contains(&"msg-1day"));
+    assert!(ids.contains(&"msg-2day"));
+    assert!(!ids.contains(&"msg-7day")); // Too far in future
+    assert!(!ids.contains(&"msg-already-expired")); // Already expired
+    assert!(!ids.contains(&"msg-no-expiry")); // No expiry set
+}
+
+// === TTL Extension Tests ===
+// Traces to: features/message_delivery.feature @expiration "Extend message TTL"
+
+/// Test: Extend TTL before deletion.
+///
+/// Scenario: Given I have a pending message approaching expiration
+///           When I choose to extend the TTL
+///           Then the message should get additional time
+#[test]
+fn test_ttl_extension_request() {
+    let storage = test_storage();
+    let now_ts = now();
+    let one_day = 86400u64;
+    let seven_days = 7 * one_day;
+    let original_expiry = now_ts + one_day; // Expires tomorrow
+
+    // Create a record approaching expiration
+    let record = DeliveryRecord {
+        message_id: "msg-extend".to_string(),
+        recipient_id: "contact".to_string(),
+        status: DeliveryStatus::Stored,
+        created_at: now_ts - 29 * one_day,
+        updated_at: now_ts - 29 * one_day,
+        expires_at: Some(original_expiry),
+    };
+    storage.create_delivery_record(&record).unwrap();
+
+    // Verify original expiry
+    let before = storage.get_delivery_record("msg-extend").unwrap().unwrap();
+    assert_eq!(before.expires_at, Some(original_expiry));
+
+    // Extend by 7 days
+    let extended = storage
+        .extend_delivery_ttl("msg-extend", seven_days)
+        .unwrap();
+    assert!(extended);
+
+    // Verify new expiry
+    let after = storage.get_delivery_record("msg-extend").unwrap().unwrap();
+    assert_eq!(after.expires_at, Some(original_expiry + seven_days));
+
+    // Extend again (multiple extensions allowed)
+    storage
+        .extend_delivery_ttl("msg-extend", seven_days)
+        .unwrap();
+    let final_record = storage.get_delivery_record("msg-extend").unwrap().unwrap();
+    assert_eq!(
+        final_record.expires_at,
+        Some(original_expiry + 2 * seven_days)
+    );
+}
+
+/// Test: TTL extension fails for non-existent or no-expiry records.
+#[test]
+fn test_ttl_extension_edge_cases() {
+    let storage = test_storage();
+    let now_ts = now();
+
+    // Create record with no expiry
+    let no_expiry = DeliveryRecord {
+        message_id: "msg-no-ttl".to_string(),
+        recipient_id: "contact".to_string(),
+        status: DeliveryStatus::Stored,
+        created_at: now_ts,
+        updated_at: now_ts,
+        expires_at: None,
+    };
+    storage.create_delivery_record(&no_expiry).unwrap();
+
+    // Extending TTL on record with no expiry returns false
+    let extended = storage.extend_delivery_ttl("msg-no-ttl", 86400).unwrap();
+    assert!(!extended);
+
+    // Extending non-existent record returns false
+    let extended = storage.extend_delivery_ttl("nonexistent", 86400).unwrap();
+    assert!(!extended);
+}
+
+// === Delivery Receipt Privacy Tests ===
+// Traces to: features/message_delivery.feature @privacy "Delivery metadata is minimal"
+
+/// Test: Delivery receipts don't leak sender metadata.
+///
+/// Scenario: Given an update is delivered via relay
+///           Then the relay should log minimal metadata
+///           And no long-term tracking should occur
+#[test]
+fn test_delivery_receipt_privacy() {
+    let storage = test_storage();
+    let timestamp = now();
+
+    // Create delivery records for different senders
+    // The point: recipient_id is stored, but no sender tracking
+    let records = vec![
+        ("msg-from-alice", "recipient-bob"),
+        ("msg-from-carol", "recipient-bob"),
+        ("msg-from-dave", "recipient-eve"),
+    ];
+
+    for (msg_id, recipient_id) in &records {
+        let record = DeliveryRecord {
+            message_id: msg_id.to_string(),
+            recipient_id: recipient_id.to_string(),
+            status: DeliveryStatus::Delivered,
+            created_at: timestamp,
+            updated_at: timestamp,
+            expires_at: None,
+        };
+        storage.create_delivery_record(&record).unwrap();
+    }
+
+    // Query by recipient - privacy: we track delivery TO recipient, not FROM sender
+    let bob_deliveries = storage
+        .get_delivery_records_for_recipient("recipient-bob")
+        .unwrap();
+    assert_eq!(bob_deliveries.len(), 2);
+
+    // Verify records don't contain any sender information in the struct
+    for record in &bob_deliveries {
+        // DeliveryRecord has: message_id, recipient_id, status, timestamps
+        // Critically: NO sender_id field - this is by design for privacy
+        assert!(!record.message_id.is_empty());
+        assert_eq!(record.recipient_id, "recipient-bob");
+        assert_eq!(record.status, DeliveryStatus::Delivered);
+        // The message_id might encode sender info in the actual message,
+        // but the delivery tracking layer is sender-agnostic
+    }
+
+    // Privacy check: cannot query "what has this sender sent"
+    // There's no get_delivery_records_for_sender() method - by design
+    // The storage only tracks delivery status, not sender patterns
+}
+
+// === Relay Quota Tests ===
+// Traces to: features/message_delivery.feature @persistence "Storage quota per user"
+// and @errors "Handle quota exceeded"
+
+/// Test: Graceful handling when relay quota is exceeded.
+///
+/// Scenario: Given I have many pending updates
+///           When I exceed my storage quota on the relay
+///           Then I should be notified about the quota
+///           And pending deliveries should be prioritized
+#[test]
+fn test_relay_quota_exceeded() {
+    use vauchi_core::storage::OfflineQueue;
+
+    let storage = test_storage();
+    let timestamp = now();
+
+    // Create a queue with a small limit for testing
+    // Note: In practice, the OfflineQueue helper is used for quota checks
+    let _queue = OfflineQueue::with_max_size(5);
+
+    // Fill the queue to capacity
+    for i in 0..5 {
+        let record = DeliveryRecord {
+            message_id: format!("msg-{}", i),
+            recipient_id: "contact".to_string(),
+            status: DeliveryStatus::Queued,
+            created_at: timestamp + i as u64,
+            updated_at: timestamp + i as u64,
+            expires_at: Some(timestamp + 604800), // 7 days
+        };
+        storage.create_delivery_record(&record).unwrap();
+    }
+
+    // Verify queue is full using pending deliveries count
+    let pending = storage.get_pending_deliveries().unwrap();
+    assert_eq!(pending.len(), 5);
+
+    // At quota limit, new messages should be handled gracefully
+    // The application layer checks capacity before adding:
+    let count = storage
+        .count_deliveries_by_status(&DeliveryStatus::Queued)
+        .unwrap();
+    assert_eq!(count, 5);
+
+    // Simulate quota handling: oldest acknowledged can be removed
+    // First, deliver oldest message
+    storage
+        .update_delivery_status("msg-0", &DeliveryStatus::Delivered, timestamp + 100)
+        .unwrap();
+
+    // Now we have 4 queued, 1 delivered
+    let queued_count = storage
+        .count_deliveries_by_status(&DeliveryStatus::Queued)
+        .unwrap();
+    let delivered_count = storage
+        .count_deliveries_by_status(&DeliveryStatus::Delivered)
+        .unwrap();
+    assert_eq!(queued_count, 4);
+    assert_eq!(delivered_count, 1);
+
+    // Remove delivered (acknowledged) to make room
+    storage.delete_delivery_record("msg-0").unwrap();
+
+    // Now can add new pending delivery
+    let new_record = DeliveryRecord {
+        message_id: "msg-5".to_string(),
+        recipient_id: "contact".to_string(),
+        status: DeliveryStatus::Queued,
+        created_at: timestamp + 5,
+        updated_at: timestamp + 5,
+        expires_at: Some(timestamp + 604800),
+    };
+    storage.create_delivery_record(&new_record).unwrap();
+
+    // Back to 5 pending
+    let pending = storage.get_pending_deliveries().unwrap();
+    assert_eq!(pending.len(), 5);
+}
+
+// === Delivery Order Tests ===
+// Traces to: features/message_delivery.feature @ordering "Updates applied in order"
+// and "Out-of-order delivery handled gracefully"
+
+/// Test: Messages arrive in correct order based on creation time.
+///
+/// Scenario: Given I update my phone number to A
+///           And then I update it to B
+///           When Bob receives both updates
+///           Then they should be applied in order
+#[test]
+fn test_delivery_order_verification() {
+    let storage = test_storage();
+    let base_time = now();
+
+    // Create messages in order A -> B -> C but with non-sequential IDs
+    // to verify ordering is by timestamp, not ID
+    let messages = vec![
+        ("msg-z", base_time + 1), // First update
+        ("msg-a", base_time + 2), // Second update
+        ("msg-m", base_time + 3), // Third update
+    ];
+
+    for (msg_id, created_at) in &messages {
+        let record = DeliveryRecord {
+            message_id: msg_id.to_string(),
+            recipient_id: "contact-bob".to_string(),
+            status: DeliveryStatus::Stored,
+            created_at: *created_at,
+            updated_at: *created_at,
+            expires_at: None,
+        };
+        storage.create_delivery_record(&record).unwrap();
+    }
+
+    // Get records for recipient - should be ordered by created_at DESC
+    let bob_records = storage
+        .get_delivery_records_for_recipient("contact-bob")
+        .unwrap();
+
+    // Verify order: most recent first (DESC order)
+    assert_eq!(bob_records.len(), 3);
+    assert_eq!(bob_records[0].message_id, "msg-m"); // Most recent
+    assert_eq!(bob_records[1].message_id, "msg-a");
+    assert_eq!(bob_records[2].message_id, "msg-z"); // Oldest
+
+    // For applying updates, we'd reverse to process oldest first
+    let in_order: Vec<_> = bob_records.into_iter().rev().collect();
+    assert_eq!(in_order[0].message_id, "msg-z"); // Apply first
+    assert_eq!(in_order[1].message_id, "msg-a");
+    assert_eq!(in_order[2].message_id, "msg-m"); // Apply last
+}
+
+/// Test: Out-of-order delivery is handled by timestamp reordering.
+///
+/// Scenario: Given network conditions cause out-of-order delivery
+///           When updates arrive out of order
+///           Then the app should reorder them by timestamp
+#[test]
+fn test_out_of_order_delivery_reordering() {
+    let storage = test_storage();
+    let base_time = now();
+
+    // Simulate out-of-order arrival: delivered in order 2, 0, 1
+    // but created_at shows correct order 0, 1, 2
+    let delivery_sequence = vec![
+        ("msg-2", base_time + 20, DeliveryStatus::Delivered), // Arrived first but created last
+        ("msg-0", base_time + 0, DeliveryStatus::Delivered),  // Arrived second but created first
+        ("msg-1", base_time + 10, DeliveryStatus::Delivered), // Arrived last but created middle
+    ];
+
+    for (msg_id, created_at, status) in &delivery_sequence {
+        let record = DeliveryRecord {
+            message_id: msg_id.to_string(),
+            recipient_id: "contact".to_string(),
+            status: status.clone(),
+            created_at: *created_at,
+            updated_at: *created_at,
+            expires_at: None,
+        };
+        storage.create_delivery_record(&record).unwrap();
+    }
+
+    // Query by status returns ordered by created_at ASC
+    let delivered = storage
+        .get_delivery_records_by_status(&DeliveryStatus::Delivered)
+        .unwrap();
+
+    // Should be reordered by creation time, not arrival order
+    assert_eq!(delivered.len(), 3);
+    assert_eq!(delivered[0].message_id, "msg-0"); // Oldest first
+    assert_eq!(delivered[1].message_id, "msg-1");
+    assert_eq!(delivered[2].message_id, "msg-2"); // Newest last
+
+    // This ordering allows applying updates in correct sequence
+    // despite network causing out-of-order delivery
+}

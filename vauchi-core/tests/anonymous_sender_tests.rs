@@ -143,3 +143,247 @@ fn test_resolve_sender_multiple_contacts() {
     assert!(result.is_some());
     assert_eq!(result.unwrap().display_name(), "Bob");
 }
+
+// ============================================================
+// Clock Skew Tolerance Tests
+// Traces to: features/anonymous_sender.feature @resolution
+// "Resolution tolerates previous epoch for clock skew"
+// ============================================================
+
+/// Tests that the resolver tolerates clock skew by accepting messages
+/// from the previous epoch. The current implementation accepts epoch N-1
+/// when resolving at epoch N, providing ~1 hour of tolerance.
+///
+/// Note: ±5 minute tolerance within an epoch is implicit since epochs are
+/// hourly boundaries. Messages sent within 5 minutes of each other in the
+/// same epoch will always have matching IDs.
+#[test]
+fn test_clock_skew_tolerance() {
+    let key = SymmetricKey::generate();
+    let contact = make_contact_with_key("Alice", key.clone());
+    let contacts = vec![contact];
+
+    let current_epoch = 1000;
+
+    // Sender's clock is behind (previous epoch)
+    let sender_epoch = current_epoch - 1;
+    let anon_id = compute_anonymous_id(contacts[0].shared_key().as_bytes(), sender_epoch);
+
+    // Receiver resolves at current epoch - should find Alice due to tolerance
+    let result = resolve_sender(&contacts, &anon_id, current_epoch);
+    assert!(
+        result.is_some(),
+        "Should resolve sender from previous epoch"
+    );
+    assert_eq!(result.unwrap().display_name(), "Alice");
+
+    // Two epochs back should NOT resolve (beyond tolerance window)
+    let stale_epoch = current_epoch - 2;
+    let stale_id = compute_anonymous_id(contacts[0].shared_key().as_bytes(), stale_epoch);
+    let stale_result = resolve_sender(&contacts, &stale_id, current_epoch);
+    assert!(
+        stale_result.is_none(),
+        "Should NOT resolve sender from 2 epochs ago"
+    );
+}
+
+// ============================================================
+// Epoch Boundary Handling Tests
+// Traces to: features/anonymous_sender.feature @epoch
+// "Epoch boundary handling"
+// ============================================================
+
+/// Tests that messages sent near epoch boundaries are handled correctly.
+/// When an epoch transition occurs, the anonymous ID changes, but the
+/// resolver tolerates the previous epoch for boundary conditions.
+#[test]
+fn test_epoch_boundary_handling() {
+    let key = SymmetricKey::generate();
+    let contact = make_contact_with_key("EdgeCase", key.clone());
+    let contacts = vec![contact];
+
+    let epoch_n = 500;
+    let epoch_n_plus_1 = 501;
+
+    // Message sent at end of epoch N
+    let id_epoch_n = compute_anonymous_id(contacts[0].shared_key().as_bytes(), epoch_n);
+
+    // Message sent at start of epoch N+1
+    let id_epoch_n_plus_1 =
+        compute_anonymous_id(contacts[0].shared_key().as_bytes(), epoch_n_plus_1);
+
+    // IDs should be different (epoch rotation)
+    assert_ne!(
+        id_epoch_n, id_epoch_n_plus_1,
+        "IDs must differ across epoch boundary"
+    );
+
+    // Receiver in epoch N+1 should resolve both:
+    // - Message from epoch N (boundary tolerance)
+    // - Message from epoch N+1 (current epoch)
+    let result_n = resolve_sender(&contacts, &id_epoch_n, epoch_n_plus_1);
+    let result_n_plus_1 = resolve_sender(&contacts, &id_epoch_n_plus_1, epoch_n_plus_1);
+
+    assert!(
+        result_n.is_some(),
+        "Should resolve epoch N message at epoch N+1"
+    );
+    assert!(
+        result_n_plus_1.is_some(),
+        "Should resolve epoch N+1 message at epoch N+1"
+    );
+    assert_eq!(result_n.unwrap().display_name(), "EdgeCase");
+    assert_eq!(result_n_plus_1.unwrap().display_name(), "EdgeCase");
+
+    // Receiver in epoch N should NOT resolve epoch N+1 message (future epoch)
+    let future_result = resolve_sender(&contacts, &id_epoch_n_plus_1, epoch_n);
+    assert!(
+        future_result.is_none(),
+        "Should NOT resolve future epoch message"
+    );
+}
+
+// ============================================================
+// Sender Unlinkability Tests
+// Traces to: features/anonymous_sender.feature @privacy
+// "Relay cannot link sender across epochs"
+// ============================================================
+
+/// Tests that anonymous IDs from different epochs are cryptographically
+/// unlinkable. An observer (e.g., relay) seeing IDs from different epochs
+/// cannot determine they originate from the same sender.
+#[test]
+fn test_sender_unlinkability() {
+    let key = [0x42u8; 32];
+
+    // Collect IDs across 10 consecutive epochs
+    let epochs: Vec<u64> = (1000..1010).collect();
+    let ids: Vec<[u8; 32]> = epochs
+        .iter()
+        .map(|&e| compute_anonymous_id(&key, e))
+        .collect();
+
+    // All IDs must be unique (no collisions across epochs)
+    for i in 0..ids.len() {
+        for j in (i + 1)..ids.len() {
+            assert_ne!(
+                ids[i], ids[j],
+                "IDs for epochs {} and {} must be different",
+                epochs[i], epochs[j]
+            );
+        }
+    }
+
+    // IDs should have no obvious correlation (statistical test: check byte variance)
+    // A weak derivation might produce similar prefixes/suffixes
+    let first_bytes: Vec<u8> = ids.iter().map(|id| id[0]).collect();
+    let unique_first_bytes: std::collections::HashSet<_> = first_bytes.iter().collect();
+    // With 10 random-ish values, we expect reasonable diversity
+    assert!(
+        unique_first_bytes.len() >= 5,
+        "First bytes should show diversity (got {} unique out of 10)",
+        unique_first_bytes.len()
+    );
+}
+
+/// Tests that the same sender communicating with different contacts
+/// produces unlinkable anonymous IDs, even in the same epoch.
+#[test]
+fn test_sender_unlinkability_across_contacts() {
+    // Simulate shared keys with different contacts
+    let key_with_alice = [0xAAu8; 32];
+    let key_with_bob = [0xBBu8; 32];
+    let key_with_carol = [0xCCu8; 32];
+
+    let epoch = 1000;
+
+    let id_alice = compute_anonymous_id(&key_with_alice, epoch);
+    let id_bob = compute_anonymous_id(&key_with_bob, epoch);
+    let id_carol = compute_anonymous_id(&key_with_carol, epoch);
+
+    // All three IDs must be different
+    assert_ne!(id_alice, id_bob);
+    assert_ne!(id_alice, id_carol);
+    assert_ne!(id_bob, id_carol);
+
+    // Relay observing these three IDs cannot determine they're from the same sender
+    // (This is the privacy property - different shared keys → different IDs)
+}
+
+// ============================================================
+// Replay Prevention Tests
+// Traces to: features/anonymous_sender.feature @resolution
+// Note: Core anonymous ID module provides identification, not replay prevention.
+// Replay prevention should be implemented at the message processing layer
+// using message IDs, timestamps, or sequence numbers.
+// ============================================================
+
+/// Tests the foundation for replay prevention: anonymous IDs are epoch-bound.
+/// A replayed message from a past epoch will have a stale anonymous ID.
+///
+/// Full replay prevention requires additional mechanisms at the message layer:
+/// - Message ID deduplication
+/// - Timestamp validation
+/// - Sequence numbers per sender
+///
+/// This test verifies that the anonymous ID system provides the epoch-binding
+/// necessary to detect replay attacks beyond the tolerance window.
+#[test]
+fn test_replay_prevention_epoch_binding() {
+    let key = SymmetricKey::generate();
+    let contact = make_contact_with_key("Victim", key.clone());
+    let contacts = vec![contact];
+
+    // Attacker captures a message from epoch 1000
+    let captured_epoch = 1000;
+    let captured_id = compute_anonymous_id(contacts[0].shared_key().as_bytes(), captured_epoch);
+
+    // Original message resolves correctly at time of capture
+    let original_result = resolve_sender(&contacts, &captured_id, captured_epoch);
+    assert!(original_result.is_some(), "Original message should resolve");
+
+    // Attacker replays the message in epoch 1001 (within tolerance - still works)
+    let replay_epoch_1 = 1001;
+    let replay_result_1 = resolve_sender(&contacts, &captured_id, replay_epoch_1);
+    assert!(
+        replay_result_1.is_some(),
+        "Replay within tolerance window succeeds at ID level"
+    );
+
+    // Attacker replays the message in epoch 1002 (beyond tolerance - rejected)
+    let replay_epoch_2 = 1002;
+    let replay_result_2 = resolve_sender(&contacts, &captured_id, replay_epoch_2);
+    assert!(
+        replay_result_2.is_none(),
+        "Replay beyond tolerance window should fail sender resolution"
+    );
+}
+
+/// Tests that replay prevention at the message layer would need message-level
+/// deduplication. This demonstrates the expected behavior: the same anonymous ID
+/// can be used for multiple messages within an epoch, so deduplication must
+/// happen at a higher layer using message IDs or sequence numbers.
+#[test]
+fn test_replay_prevention_same_epoch_requires_message_dedup() {
+    let key = SymmetricKey::generate();
+    let contact = make_contact_with_key("Target", key.clone());
+    let contacts = vec![contact];
+
+    let epoch = 1000;
+    let anon_id = compute_anonymous_id(contacts[0].shared_key().as_bytes(), epoch);
+
+    // Same anonymous ID resolves successfully multiple times (expected)
+    // This is NOT a security flaw - multiple messages in same epoch use same ID
+    let first_resolution = resolve_sender(&contacts, &anon_id, epoch);
+    let second_resolution = resolve_sender(&contacts, &anon_id, epoch);
+
+    assert!(first_resolution.is_some());
+    assert!(second_resolution.is_some());
+    assert_eq!(first_resolution.unwrap().display_name(), "Target");
+    assert_eq!(second_resolution.unwrap().display_name(), "Target");
+
+    // NOTE: Actual replay prevention must be implemented at the message
+    // processing layer, not at the anonymous ID resolution layer.
+    // The message layer should maintain a set of seen message IDs and
+    // reject duplicates.
+}

@@ -186,3 +186,11 @@ required-features = ["testing"]
 [[test]]
 name = "tor_mode_tests"
 required-features = ["testing"]
+
+[[test]]
+name = "exchange_tests"
+required-features = ["testing"]
+
+[[test]]
+name = "exchange_proximity_enforcement_tests"
+required-features = ["testing"]

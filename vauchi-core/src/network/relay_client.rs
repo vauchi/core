@@ -225,6 +225,23 @@ impl<T: Transport> RelayClient<T> {
         Ok(message_id)
     }
 
+    /// Sends an account revocation message to a contact via the relay.
+    ///
+    /// Used during identity deletion (hard_shred / panic_shred) to notify
+    /// contacts that this identity has been revoked. The message is signed
+    /// (not encrypted) so it can be processed even without ratchet state.
+    pub fn send_account_revoked(
+        &mut self,
+        revoked: &super::message::AccountRevoked,
+    ) -> Result<MessageId, NetworkError> {
+        let envelope = create_envelope(MessagePayload::AccountRevoked(revoked.clone()));
+        let message_id = envelope.message_id.clone();
+
+        self.connection.send(&envelope)?;
+
+        Ok(message_id)
+    }
+
     /// Processes incoming messages (acknowledgments, updates from others).
     ///
     /// Returns a list of update IDs that have been successfully acknowledged.
@@ -349,6 +366,21 @@ impl<T: Transport> crate::api::PurgeSender for RelayClient<T> {
             Ok(_) => Ok(true),
             Err(e) => Err(crate::api::ShredError::FileError(format!(
                 "Relay purge failed: {}",
+                e
+            ))),
+        }
+    }
+}
+
+impl<T: Transport> crate::api::RevocationSender for RelayClient<T> {
+    fn send_revocation(
+        &mut self,
+        revocation: &crate::network::AccountRevoked,
+    ) -> Result<bool, crate::api::ShredError> {
+        match self.send_account_revoked(revocation) {
+            Ok(_) => Ok(true),
+            Err(e) => Err(crate::api::ShredError::FileError(format!(
+                "Relay revocation failed: {}",
                 e
             ))),
         }

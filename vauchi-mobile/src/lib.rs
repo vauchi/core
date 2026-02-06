@@ -1729,7 +1729,7 @@ impl VauchiMobile {
         let report = manager
             // GDPR Gap 4 deferred: mobile has no relay client yet, so no purge sender.
             // When mobile gains a relay connection, pass a PurgeSender here.
-            .hard_shred(core_token, None)
+            .hard_shred(core_token, None, None)
             .map_err(|e| MobileError::ShredError(e.to_string()))?;
         Ok(MobileShredReport::from(&report))
     }
@@ -1750,7 +1750,7 @@ impl VauchiMobile {
         let report = manager
             // GDPR Gap 4 deferred: mobile has no relay client yet, so no purge sender.
             // When mobile gains a relay connection, pass a PurgeSender here.
-            .panic_shred(None)
+            .panic_shred(None, None)
             .map_err(|e| MobileError::ShredError(e.to_string()))?;
         Ok(MobileShredReport::from(&report))
     }

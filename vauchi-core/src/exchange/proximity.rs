@@ -173,14 +173,22 @@ impl ManualConfirmationVerifier {
         }
     }
 
-    /// Creates a verifier that is already confirmed (for testing).
+    /// Creates a verifier that is already confirmed (for testing only).
+    ///
+    /// Gated behind `cfg(test)` or `feature = "testing"` to prevent production
+    /// code from trivially bypassing proximity verification.
+    #[cfg(any(test, feature = "testing"))]
     pub fn pre_confirmed() -> Self {
         ManualConfirmationVerifier {
             confirmed: std::sync::Mutex::new(true),
         }
     }
 
-    /// Creates a verifier with a specific initial state (for testing).
+    /// Creates a verifier with a specific initial state (for testing only).
+    ///
+    /// Gated behind `cfg(test)` or `feature = "testing"` to prevent production
+    /// code from trivially bypassing proximity verification.
+    #[cfg(any(test, feature = "testing"))]
     pub fn with_state(confirmed: bool) -> Self {
         ManualConfirmationVerifier {
             confirmed: std::sync::Mutex::new(confirmed),

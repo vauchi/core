@@ -34,6 +34,22 @@ pub trait PurgeSender {
     fn send_purge(&mut self, purge: &PreSignedPurgeRequest) -> Result<bool, ShredError>;
 }
 
+/// Trait for sending account revocation messages to contacts during shred.
+///
+/// Abstracted to allow testing without a real relay connection and to
+/// decouple the shred orchestration from the network layer.
+pub trait RevocationSender {
+    /// Sends an account revocation message to a contact via the relay.
+    ///
+    /// Returns `Ok(true)` if the relay acknowledged the message,
+    /// `Ok(false)` if the message was sent but not confirmed,
+    /// or `Err` if sending failed entirely.
+    fn send_revocation(
+        &mut self,
+        revocation: &crate::network::AccountRevoked,
+    ) -> Result<bool, ShredError>;
+}
+
 /// Key name for the Shredding Master Key in SecureStorage.
 const SMK_KEY_NAME: &str = "smk";
 
@@ -180,15 +196,22 @@ impl<'a> ShredManager<'a> {
         &self,
         _token: ShredToken,
         purge_sender: Option<&mut dyn PurgeSender>,
+        revocation_sender: Option<&mut dyn RevocationSender>,
     ) -> Result<ShredReport, ShredError> {
         let mut report = ShredReport::default();
 
-        // 1. Verify grace period has elapsed
+        // 1. Verify grace period has elapsed and generate revocations
         let dm = DeletionManager::new(self.storage);
-        dm.execute_deletion(self.identity)?;
+        let deletion_result = dm.execute_deletion(self.identity)?;
 
-        // 2-4. Network notifications (while keys alive) — best-effort
-        report.contacts_notified = 0;
+        // 2. Send revocation notifications to contacts (best-effort, while keys alive)
+        if let Some(sender) = revocation_sender {
+            for revocation in &deletion_result.revocations {
+                if sender.send_revocation(revocation).unwrap_or(false) {
+                    report.contacts_notified += 1;
+                }
+            }
+        }
         report.devices_notified = 0;
 
         // Send relay purge if sender provided (before point-of-no-return)
@@ -233,6 +256,7 @@ impl<'a> ShredManager<'a> {
     pub fn panic_shred(
         &self,
         purge_sender: Option<&mut dyn PurgeSender>,
+        revocation_sender: Option<&mut dyn RevocationSender>,
     ) -> Result<ShredReport, ShredError> {
         let mut report = ShredReport::default();
 
@@ -246,6 +270,19 @@ impl<'a> ShredManager<'a> {
                 let msgs = PreSignedShredMessages::generate(self.identity);
                 Some(msgs)
             }
+        };
+
+        // Sign fresh revocations for each contact (keys still available)
+        let revocations = {
+            let now = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs();
+            let contacts = self.storage.list_contacts().unwrap_or_default();
+            contacts
+                .iter()
+                .map(|c| crate::network::AccountRevoked::create(self.identity, c.id(), now))
+                .collect::<Vec<_>>()
         };
 
         // ── Phase B: Destroy all key material ──
@@ -263,6 +300,15 @@ impl<'a> ShredManager<'a> {
         // Send pre-signed purge after key destruction (best-effort)
         if let (Some(sender), Some(msgs)) = (purge_sender, &pre_signed) {
             report.relay_purge_sent = sender.send_purge(&msgs.purge_request).unwrap_or(false);
+        }
+
+        // Send revocations to contacts (best-effort, keys already destroyed)
+        if let Some(sender) = revocation_sender {
+            for revocation in &revocations {
+                if sender.send_revocation(revocation).unwrap_or(false) {
+                    report.contacts_notified += 1;
+                }
+            }
         }
 
         // 8. Secure-delete SQLite database
@@ -478,7 +524,7 @@ mod tests {
         let token = manager.soft_shred().unwrap();
 
         // Hard shred should fail — grace period hasn't elapsed
-        let result = manager.hard_shred(token, None);
+        let result = manager.hard_shred(token, None, None);
         assert!(result.is_err());
     }
 
@@ -493,7 +539,7 @@ mod tests {
         let manager = ShredManager::new(&storage, &secure_storage, &identity, dir.path());
         let token = ShredToken::new();
 
-        let report = manager.hard_shred(token, None).unwrap();
+        let report = manager.hard_shred(token, None, None).unwrap();
 
         // SMK should be destroyed
         assert!(report.smk_destroyed);
@@ -513,7 +559,7 @@ mod tests {
 
         let manager = ShredManager::new(&storage, &secure_storage, &identity, dir.path());
         let token = ShredToken::new();
-        let report = manager.hard_shred(token, None).unwrap();
+        let report = manager.hard_shred(token, None, None).unwrap();
 
         assert!(report.smk_destroyed);
 
@@ -530,7 +576,7 @@ mod tests {
         assert!(secure_storage.load_key(SMK_KEY_NAME).unwrap().is_some());
 
         let manager = ShredManager::new(&storage, &secure_storage, &identity, dir.path());
-        let report = manager.panic_shred(None).unwrap();
+        let report = manager.panic_shred(None, None).unwrap();
 
         assert!(report.smk_destroyed);
         assert!(secure_storage.load_key(SMK_KEY_NAME).unwrap().is_none());
@@ -545,7 +591,7 @@ mod tests {
         msgs.save(dir.path()).unwrap();
 
         let manager = ShredManager::new(&storage, &secure_storage, &identity, dir.path());
-        let report = manager.panic_shred(None).unwrap();
+        let report = manager.panic_shred(None, None).unwrap();
 
         // Should succeed — pre-signed messages were loaded before key destruction
         assert!(report.smk_destroyed);
@@ -558,7 +604,7 @@ mod tests {
 
         // Do NOT create pre-signed file — panic shred should fall back to fresh signing
         let manager = ShredManager::new(&storage, &secure_storage, &identity, dir.path());
-        let report = manager.panic_shred(None).unwrap();
+        let report = manager.panic_shred(None, None).unwrap();
 
         // Should succeed even without pre-signed file
         assert!(report.smk_destroyed);
@@ -569,7 +615,7 @@ mod tests {
         let (dir, storage, secure_storage, identity) = setup_test_env();
         let manager = ShredManager::new(&storage, &secure_storage, &identity, dir.path());
 
-        manager.panic_shred(None).unwrap();
+        manager.panic_shred(None, None).unwrap();
 
         let verification = manager.verify_shred();
         assert!(verification.smk_absent, "SMK should be absent");
@@ -604,7 +650,7 @@ mod tests {
 
         let manager = ShredManager::new(&storage, &secure_storage, &identity, dir.path());
         let token = ShredToken::new();
-        let report = manager.hard_shred(token, None).unwrap();
+        let report = manager.hard_shred(token, None, None).unwrap();
 
         assert!(report.identity_file_destroyed);
         assert!(!identity_path.exists(), "Identity file should be deleted");
@@ -626,7 +672,7 @@ mod tests {
 
         let manager = ShredManager::new(&storage, &secure_storage, &identity, dir.path());
         let token = ShredToken::new();
-        let report = manager.hard_shred(token, None).unwrap();
+        let report = manager.hard_shred(token, None, None).unwrap();
 
         assert_eq!(report.key_files_destroyed, 2);
     }
@@ -675,7 +721,7 @@ mod tests {
         let token = ShredToken::new();
 
         let mut sender = MockPurgeSender::new();
-        let report = manager.hard_shred(token, Some(&mut sender)).unwrap();
+        let report = manager.hard_shred(token, Some(&mut sender), None).unwrap();
 
         assert!(sender.purge_sent, "Purge should have been sent");
         assert!(report.relay_purge_sent, "Report should reflect purge sent");
@@ -692,7 +738,7 @@ mod tests {
         let token = ShredToken::new();
 
         let mut sender = MockPurgeSender::failing();
-        let report = manager.hard_shred(token, Some(&mut sender)).unwrap();
+        let report = manager.hard_shred(token, Some(&mut sender), None).unwrap();
 
         assert!(
             !report.relay_purge_sent,
@@ -712,7 +758,7 @@ mod tests {
         let manager = ShredManager::new(&storage, &secure_storage, &identity, dir.path());
 
         let mut sender = MockPurgeSender::new();
-        let report = manager.panic_shred(Some(&mut sender)).unwrap();
+        let report = manager.panic_shred(Some(&mut sender), None).unwrap();
 
         assert!(sender.purge_sent, "Purge should have been sent");
         assert!(report.relay_purge_sent, "Report should reflect purge sent");
@@ -730,9 +776,161 @@ mod tests {
         let token = ShredToken::new();
 
         // Pass None — backward compat
-        let report = manager.hard_shred(token, None).unwrap();
+        let report = manager.hard_shred(token, None, None).unwrap();
 
         assert!(!report.relay_purge_sent);
+        assert!(report.smk_destroyed);
+    }
+
+    // === RevocationSender tests ===
+
+    struct MockRevocationSender {
+        revocations_sent: std::cell::RefCell<Vec<String>>,
+        should_fail: bool,
+    }
+
+    impl MockRevocationSender {
+        fn new() -> Self {
+            Self {
+                revocations_sent: std::cell::RefCell::new(Vec::new()),
+                should_fail: false,
+            }
+        }
+
+        fn failing() -> Self {
+            Self {
+                revocations_sent: std::cell::RefCell::new(Vec::new()),
+                should_fail: true,
+            }
+        }
+
+        fn sent_count(&self) -> usize {
+            self.revocations_sent.borrow().len()
+        }
+    }
+
+    impl RevocationSender for MockRevocationSender {
+        fn send_revocation(
+            &mut self,
+            revocation: &crate::network::AccountRevoked,
+        ) -> Result<bool, ShredError> {
+            if self.should_fail {
+                return Err(ShredError::FileError("mock revocation failure".into()));
+            }
+            self.revocations_sent
+                .borrow_mut()
+                .push(revocation.recipient_id.clone());
+            Ok(true)
+        }
+    }
+
+    fn add_test_contact(storage: &Storage, _contact_id: &str) {
+        use crate::contact::Contact;
+        use crate::contact_card::ContactCard;
+        use crate::crypto::SymmetricKey;
+
+        let card = ContactCard::new("Test Contact");
+        // Use a deterministic public key derived from the contact_id
+        let mut public_key = [0u8; 32];
+        let id_bytes = _contact_id.as_bytes();
+        let len = id_bytes.len().min(32);
+        public_key[..len].copy_from_slice(&id_bytes[..len]);
+
+        let shared_key = SymmetricKey::generate();
+        let contact = Contact::from_exchange(public_key, card, shared_key);
+        storage.save_contact(&contact).unwrap();
+    }
+
+    #[test]
+    fn test_hard_shred_sends_revocations() {
+        let (dir, storage, secure_storage, identity) = setup_test_env();
+
+        // Add test contacts
+        add_test_contact(&storage, "contact_aaa");
+        add_test_contact(&storage, "contact_bbb");
+
+        let dm = DeletionManager::new(&storage);
+        dm.schedule_deletion_with_execute_at(1000, 1001).unwrap();
+
+        let manager = ShredManager::new(&storage, &secure_storage, &identity, dir.path());
+        let token = ShredToken::new();
+
+        let mut sender = MockRevocationSender::new();
+        let report = manager.hard_shred(token, None, Some(&mut sender)).unwrap();
+
+        assert_eq!(report.contacts_notified, 2);
+        assert_eq!(sender.sent_count(), 2);
+    }
+
+    #[test]
+    fn test_hard_shred_revocation_failure_does_not_abort() {
+        let (dir, storage, secure_storage, identity) = setup_test_env();
+
+        add_test_contact(&storage, "contact_aaa");
+
+        let dm = DeletionManager::new(&storage);
+        dm.schedule_deletion_with_execute_at(1000, 1001).unwrap();
+
+        let manager = ShredManager::new(&storage, &secure_storage, &identity, dir.path());
+        let token = ShredToken::new();
+
+        let mut sender = MockRevocationSender::failing();
+        let report = manager.hard_shred(token, None, Some(&mut sender)).unwrap();
+
+        // Revocation failed but shred still succeeded
+        assert_eq!(report.contacts_notified, 0);
+        assert!(report.smk_destroyed, "SMK should still be destroyed");
+    }
+
+    #[test]
+    fn test_panic_shred_sends_revocations() {
+        let (dir, storage, secure_storage, identity) = setup_test_env();
+
+        add_test_contact(&storage, "contact_aaa");
+        add_test_contact(&storage, "contact_bbb");
+        add_test_contact(&storage, "contact_ccc");
+
+        let manager = ShredManager::new(&storage, &secure_storage, &identity, dir.path());
+
+        let mut sender = MockRevocationSender::new();
+        let report = manager.panic_shred(None, Some(&mut sender)).unwrap();
+
+        assert_eq!(report.contacts_notified, 3);
+        assert_eq!(sender.sent_count(), 3);
+        assert!(report.smk_destroyed);
+    }
+
+    #[test]
+    fn test_panic_shred_revocation_failure_does_not_abort() {
+        let (dir, storage, secure_storage, identity) = setup_test_env();
+
+        add_test_contact(&storage, "contact_aaa");
+
+        let manager = ShredManager::new(&storage, &secure_storage, &identity, dir.path());
+
+        let mut sender = MockRevocationSender::failing();
+        let report = manager.panic_shred(None, Some(&mut sender)).unwrap();
+
+        assert_eq!(report.contacts_notified, 0);
+        assert!(report.smk_destroyed, "SMK should still be destroyed");
+    }
+
+    #[test]
+    fn test_hard_shred_no_revocation_sender_backward_compat() {
+        let (dir, storage, secure_storage, identity) = setup_test_env();
+
+        add_test_contact(&storage, "contact_aaa");
+
+        let dm = DeletionManager::new(&storage);
+        dm.schedule_deletion_with_execute_at(1000, 1001).unwrap();
+
+        let manager = ShredManager::new(&storage, &secure_storage, &identity, dir.path());
+        let token = ShredToken::new();
+
+        // Pass None for revocation_sender — backward compat
+        let report = manager.hard_shred(token, None, None).unwrap();
+
+        assert_eq!(report.contacts_notified, 0);
         assert!(report.smk_destroyed);
     }
 }

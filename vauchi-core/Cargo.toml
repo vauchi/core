@@ -116,6 +116,10 @@ criterion = "0.5"
 name = "crypto_benchmarks"
 harness = false
 
+[[bench]]
+name = "performance_regression"
+harness = false
+
 [[test]]
 name = "content"
 path = "tests/content/mod.rs"
@@ -177,4 +181,8 @@ required-features = ["testing"]
 
 [[test]]
 name = "encryption_coverage_tests"
+required-features = ["testing"]
+
+[[test]]
+name = "tor_mode_tests"
 required-features = ["testing"]

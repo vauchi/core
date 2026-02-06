@@ -22,8 +22,11 @@ const ARGON2_T_COST: u32 = 3;
 /// Argon2id parallelism.
 const ARGON2_P_COST: u32 = 4;
 
-/// PBKDF2 iterations for legacy key derivation.
-const PBKDF2_ITERATIONS: u32 = 100_000;
+/// PBKDF2 iterations for new key derivation (NIST SP 800-132 2024 recommendation).
+const PBKDF2_ITERATIONS: u32 = 600_000;
+
+/// Legacy PBKDF2 iteration count (pre-v18 backups).
+const PBKDF2_LEGACY_ITERATIONS: u32 = 100_000;
 
 /// Derives a 32-byte symmetric key from a password using Argon2id.
 ///
@@ -79,6 +82,23 @@ pub fn derive_key_pbkdf2_default(
 ) -> Result<SymmetricKey, PasswordKdfError> {
     #[allow(deprecated)]
     derive_key_pbkdf2(password, salt, PBKDF2_ITERATIONS)
+}
+
+/// Derives candidate keys for decrypting legacy PBKDF2 backups.
+///
+/// Returns keys derived at both the modern (600K) and legacy (100K) iteration
+/// counts. Callers should try each key until decryption succeeds. This avoids
+/// storing iteration metadata alongside encrypted data.
+#[deprecated(note = "Use derive_key_argon2id. PBKDF2 retained only for legacy backup import.")]
+pub fn derive_key_pbkdf2_compat(
+    password: &[u8],
+    salt: &[u8],
+) -> Result<Vec<SymmetricKey>, PasswordKdfError> {
+    #[allow(deprecated)]
+    Ok(vec![
+        derive_key_pbkdf2(password, salt, PBKDF2_ITERATIONS)?,
+        derive_key_pbkdf2(password, salt, PBKDF2_LEGACY_ITERATIONS)?,
+    ])
 }
 
 /// Password KDF error types.

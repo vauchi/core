@@ -49,7 +49,9 @@ pub enum IdentityError {
 const BACKUP_VERSION_V2: u8 = 0x02;
 
 /// PBKDF2 iterations for legacy key derivation.
-const PBKDF2_ITERATIONS: u32 = 100_000;
+/// The canonical constant is in crypto::password_kdf. This matches the legacy
+/// value for backward compatibility with v1 backup decryption.
+const PBKDF2_LEGACY_ITERATIONS: u32 = 100_000;
 
 /// User identity containing cryptographic keys and metadata.
 pub struct Identity {
@@ -372,10 +374,12 @@ impl Identity {
             .try_into()
             .map_err(|_| IdentityError::RestoreFailed)?;
 
-        // Derive decryption key using PBKDF2 (legacy backup format)
+        // Derive decryption key using PBKDF2 (legacy backup format).
+        // Try legacy iterations (100K) since v1 backups were created with this count.
         #[allow(deprecated)]
-        let decryption_key = derive_key_pbkdf2(password.as_bytes(), &salt, PBKDF2_ITERATIONS)
-            .map_err(|_| IdentityError::RestoreFailed)?;
+        let decryption_key =
+            derive_key_pbkdf2(password.as_bytes(), &salt, PBKDF2_LEGACY_ITERATIONS)
+                .map_err(|_| IdentityError::RestoreFailed)?;
 
         // Decrypt (auto-detects tagged or untagged AES-256-GCM)
         // Wrap in Zeroizing to ensure plaintext (containing master_seed) is zeroized on drop

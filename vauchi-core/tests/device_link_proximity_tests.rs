@@ -34,8 +34,7 @@ fn test_build_response_rejected_without_proximity() {
 
     let qr_string = initiator.qr().to_data_string();
     let scanned_qr = DeviceLinkQR::from_data_string(&qr_string).unwrap();
-    let mut responder =
-        DeviceLinkResponder::from_qr(scanned_qr, "My Phone".to_string()).unwrap();
+    let mut responder = DeviceLinkResponder::from_qr(scanned_qr, "My Phone".to_string()).unwrap();
 
     let encrypted_request = responder.create_request().unwrap();
 
@@ -60,8 +59,7 @@ fn test_build_response_succeeds_after_proximity_verified() {
 
     let qr_string = initiator.qr().to_data_string();
     let scanned_qr = DeviceLinkQR::from_data_string(&qr_string).unwrap();
-    let mut responder =
-        DeviceLinkResponder::from_qr(scanned_qr, "My Phone".to_string()).unwrap();
+    let mut responder = DeviceLinkResponder::from_qr(scanned_qr, "My Phone".to_string()).unwrap();
 
     let encrypted_request = responder.create_request().unwrap();
 
@@ -123,8 +121,7 @@ fn test_both_sides_derive_same_challenge() {
     // Responder scans the same QR
     let qr_string = initiator.qr().to_data_string();
     let scanned_qr = DeviceLinkQR::from_data_string(&qr_string).unwrap();
-    let responder =
-        DeviceLinkResponder::from_qr(scanned_qr, "My Phone".to_string()).unwrap();
+    let responder = DeviceLinkResponder::from_qr(scanned_qr, "My Phone".to_string()).unwrap();
 
     // Both sides derive the same challenge from the shared link key
     let initiator_challenge = initiator.proximity_challenge();
@@ -149,8 +146,7 @@ fn test_restored_initiator_requires_proximity() {
 
     // Responder side
     let scanned_qr = DeviceLinkQR::from_data_string(&qr_string).unwrap();
-    let mut responder =
-        DeviceLinkResponder::from_qr(scanned_qr, "My Phone".to_string()).unwrap();
+    let mut responder = DeviceLinkResponder::from_qr(scanned_qr, "My Phone".to_string()).unwrap();
     let encrypted_request = responder.create_request().unwrap();
 
     let (_confirmation, request) = restored_initiator
@@ -178,8 +174,7 @@ fn test_deprecated_process_request_requires_proximity() {
 
     let qr_string = initiator.qr().to_data_string();
     let scanned_qr = DeviceLinkQR::from_data_string(&qr_string).unwrap();
-    let mut responder =
-        DeviceLinkResponder::from_qr(scanned_qr, "My Phone".to_string()).unwrap();
+    let mut responder = DeviceLinkResponder::from_qr(scanned_qr, "My Phone".to_string()).unwrap();
     let encrypted_request = responder.create_request().unwrap();
 
     // Deprecated process_request() should also enforce proximity

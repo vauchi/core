@@ -12,6 +12,10 @@ fn test_encode_decode_roundtrip() {
     let handshake = SimpleHandshake {
         client_id: "test-client".to_string(),
         device_id: None,
+        identity_public_key: None,
+        nonce: None,
+        signature: None,
+        timestamp: None,
     };
     let envelope = create_simple_envelope(SimplePayload::Handshake(handshake));
 

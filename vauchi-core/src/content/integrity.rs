@@ -73,6 +73,64 @@ pub fn compute_checksum(data: &[u8]) -> String {
     format!("sha256:{}", hex::encode(digest.as_ref()))
 }
 
+/// Verify an Ed25519 signature on a content manifest.
+///
+/// The signed data is the canonical JSON of the manifest with the `signature` field removed.
+/// This matches the signing process: serialize the manifest without the signature, sign,
+/// then attach the signature.
+///
+/// # Arguments
+/// * `manifest` - The manifest to verify (must have a `signature` field set)
+/// * `public_key` - The publisher's Ed25519 public key (32 bytes)
+///
+/// # Returns
+/// * `Ok(())` if the signature is valid
+/// * `Err(IntegrityError)` if the signature is missing, malformed, or invalid
+///
+/// # Note
+/// This function is available for future use once the CI signing infrastructure is in place.
+/// Currently no code path gates updates on manifest signatures.
+pub fn verify_manifest_signature(
+    manifest: &super::types::ContentManifest,
+    public_key: &crate::crypto::signing::PublicKey,
+) -> Result<(), IntegrityError> {
+    let sig_hex = manifest
+        .signature
+        .as_ref()
+        .ok_or(IntegrityError::MissingSignature)?;
+
+    // Decode hex signature (128 hex chars = 64 bytes)
+    let sig_bytes: Vec<u8> = (0..sig_hex.len())
+        .step_by(2)
+        .map(|i| u8::from_str_radix(&sig_hex[i..i + 2], 16))
+        .collect::<Result<Vec<u8>, _>>()
+        .map_err(|_| IntegrityError::InvalidSignatureFormat)?;
+
+    if sig_bytes.len() != 64 {
+        return Err(IntegrityError::InvalidSignatureFormat);
+    }
+
+    let signature = crate::crypto::signing::Signature::from_bytes(
+        sig_bytes
+            .try_into()
+            .map_err(|_| IntegrityError::InvalidSignatureFormat)?,
+    );
+
+    // Compute canonical signed data: manifest JSON without the signature field
+    let mut manifest_for_signing = manifest.clone();
+    manifest_for_signing.signature = None;
+    let canonical_json = serde_json::to_vec(&manifest_for_signing)
+        .map_err(|e| IntegrityError::SignatureVerificationFailed(e.to_string()))?;
+
+    if public_key.verify(&canonical_json, &signature) {
+        Ok(())
+    } else {
+        Err(IntegrityError::SignatureVerificationFailed(
+            "Ed25519 signature verification failed".to_string(),
+        ))
+    }
+}
+
 /// Errors that can occur during integrity verification
 #[derive(Debug, Error)]
 pub enum IntegrityError {
@@ -88,6 +146,18 @@ pub enum IntegrityError {
         /// Actual computed checksum (hex string without prefix)
         actual: String,
     },
+
+    /// Manifest has no signature field
+    #[error("Manifest signature is missing")]
+    MissingSignature,
+
+    /// Signature format is invalid (not valid hex or wrong length)
+    #[error("Invalid signature format")]
+    InvalidSignatureFormat,
+
+    /// Signature verification failed
+    #[error("Signature verification failed: {0}")]
+    SignatureVerificationFailed(String),
 }
 
 #[cfg(test)]
@@ -100,5 +170,139 @@ mod tests {
         let data = b"hello world";
         let expected = "sha256:b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9";
         assert!(verify_checksum(data, expected).is_ok());
+    }
+
+    // Trace: codebase-review-tracker item #24
+    #[test]
+    fn test_verify_manifest_signature_valid() {
+        use crate::content::types::{ContentIndex, ContentManifest};
+        use crate::crypto::signing::SigningKeyPair;
+
+        let keypair = SigningKeyPair::generate();
+        let public_key = keypair.public_key();
+
+        // Create manifest without signature
+        let mut manifest = ContentManifest {
+            schema_version: 1,
+            generated_at: "2026-02-14T00:00:00Z".to_string(),
+            base_url: "https://vauchi.app/app-files".to_string(),
+            content: ContentIndex::default(),
+            signature: None,
+        };
+
+        // Sign: canonical JSON of manifest without signature
+        let canonical_json = serde_json::to_vec(&manifest).unwrap();
+        let signature = keypair.sign(&canonical_json);
+        manifest.signature = Some(hex::encode(signature.as_bytes()));
+
+        // Verify
+        assert!(verify_manifest_signature(&manifest, &public_key).is_ok());
+    }
+
+    // Trace: codebase-review-tracker item #24
+    #[test]
+    fn test_verify_manifest_signature_tampered() {
+        use crate::content::types::{ContentIndex, ContentManifest};
+        use crate::crypto::signing::SigningKeyPair;
+
+        let keypair = SigningKeyPair::generate();
+        let public_key = keypair.public_key();
+
+        let mut manifest = ContentManifest {
+            schema_version: 1,
+            generated_at: "2026-02-14T00:00:00Z".to_string(),
+            base_url: "https://vauchi.app/app-files".to_string(),
+            content: ContentIndex::default(),
+            signature: None,
+        };
+
+        // Sign the original
+        let canonical_json = serde_json::to_vec(&manifest).unwrap();
+        let signature = keypair.sign(&canonical_json);
+        manifest.signature = Some(hex::encode(signature.as_bytes()));
+
+        // Tamper with the manifest
+        manifest.base_url = "https://evil.example.com/files".to_string();
+
+        // Verification should fail
+        assert!(verify_manifest_signature(&manifest, &public_key).is_err());
+    }
+
+    // Trace: codebase-review-tracker item #24
+    #[test]
+    fn test_verify_manifest_signature_missing() {
+        use crate::content::types::{ContentIndex, ContentManifest};
+        use crate::crypto::signing::SigningKeyPair;
+
+        let keypair = SigningKeyPair::generate();
+        let public_key = keypair.public_key();
+
+        let manifest = ContentManifest {
+            schema_version: 1,
+            generated_at: "2026-02-14T00:00:00Z".to_string(),
+            base_url: "https://vauchi.app/app-files".to_string(),
+            content: ContentIndex::default(),
+            signature: None,
+        };
+
+        let result = verify_manifest_signature(&manifest, &public_key);
+        assert!(result.is_err());
+        assert!(matches!(
+            result.unwrap_err(),
+            IntegrityError::MissingSignature
+        ));
+    }
+
+    // Trace: codebase-review-tracker item #24
+    #[test]
+    fn test_verify_manifest_signature_wrong_key() {
+        use crate::content::types::{ContentIndex, ContentManifest};
+        use crate::crypto::signing::SigningKeyPair;
+
+        let signer = SigningKeyPair::generate();
+        let wrong_key = SigningKeyPair::generate().public_key();
+
+        let mut manifest = ContentManifest {
+            schema_version: 1,
+            generated_at: "2026-02-14T00:00:00Z".to_string(),
+            base_url: "https://vauchi.app/app-files".to_string(),
+            content: ContentIndex::default(),
+            signature: None,
+        };
+
+        let canonical_json = serde_json::to_vec(&manifest).unwrap();
+        let signature = signer.sign(&canonical_json);
+        manifest.signature = Some(hex::encode(signature.as_bytes()));
+
+        // Verification with wrong key should fail
+        assert!(verify_manifest_signature(&manifest, &wrong_key).is_err());
+    }
+
+    // Trace: codebase-review-tracker item #24
+    #[test]
+    fn test_manifest_signature_field_backward_compatible() {
+        // Ensure manifests without signature field still deserialize
+        let json = r#"{
+            "schema_version": 1,
+            "generated_at": "2026-01-01T00:00:00Z",
+            "base_url": "https://vauchi.app/files",
+            "content": {}
+        }"#;
+
+        let manifest: crate::content::types::ContentManifest = serde_json::from_str(json).unwrap();
+        assert!(manifest.signature.is_none());
+
+        // And manifests with signature field also deserialize
+        let json_with_sig = r#"{
+            "schema_version": 1,
+            "generated_at": "2026-01-01T00:00:00Z",
+            "base_url": "https://vauchi.app/files",
+            "content": {},
+            "signature": "abcd1234"
+        }"#;
+
+        let manifest: crate::content::types::ContentManifest =
+            serde_json::from_str(json_with_sig).unwrap();
+        assert_eq!(manifest.signature.as_deref(), Some("abcd1234"));
     }
 }

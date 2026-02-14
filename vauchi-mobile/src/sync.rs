@@ -22,8 +22,9 @@ use crate::cert_pinning;
 use crate::error::MobileError;
 use crate::protocol::{
     self, create_device_sync_ack, create_device_sync_message, AckStatus, DeviceSyncMessage,
-    EncryptedUpdate, ExchangeMessage, Handshake, MessagePayload,
+    EncryptedUpdate, ExchangeMessage, MessagePayload,
 };
+use vauchi_core::network::simple_message::create_signed_handshake;
 use crate::types::MobileSyncResult;
 
 /// Result of receiving pending messages from relay.
@@ -38,16 +39,13 @@ pub struct ReceivedMessages {
     pub device_sync_messages: Vec<DeviceSyncMessage>,
 }
 
-/// Sends handshake to relay.
+/// Sends authenticated handshake to relay.
 pub fn send_handshake(
     socket: &mut WebSocket<MaybeTlsStream<TcpStream>>,
-    client_id: &str,
+    identity: &Identity,
     device_id: Option<&str>,
 ) -> Result<(), MobileError> {
-    let handshake = Handshake {
-        client_id: client_id.to_string(),
-        device_id: device_id.map(|s| s.to_string()),
-    };
+    let handshake = create_signed_handshake(identity, device_id.map(|s| s.to_string()));
     let envelope = protocol::create_envelope(MessagePayload::Handshake(handshake));
     let data = protocol::encode_message(&envelope)
         .map_err(|e| MobileError::SyncFailed(format!("Encode error: {}", e)))?;
@@ -303,7 +301,7 @@ pub fn send_exchange_response(
         .map_err(MobileError::NetworkError)?;
 
     let our_id = identity.public_id();
-    send_handshake(&mut socket, &our_id, None)?;
+    send_handshake(&mut socket, identity, None)?;
 
     // Create encrypted exchange message using X3DH
     let our_x3dh = identity.x3dh_keypair();
@@ -634,7 +632,6 @@ pub fn do_sync(
     relay_url: &str,
     pinned_cert: Option<&str>,
 ) -> Result<MobileSyncResult, MobileError> {
-    let client_id = identity.public_id();
     let device_id_hex = hex::encode(identity.device_id());
 
     // Connect to relay
@@ -647,7 +644,7 @@ pub fn do_sync(
     }
 
     // Send handshake with device_id for inter-device sync
-    send_handshake(&mut socket, &client_id, Some(&device_id_hex))?;
+    send_handshake(&mut socket, identity, Some(&device_id_hex))?;
 
     // Wait briefly for server to send pending messages
     std::thread::sleep(Duration::from_millis(500));

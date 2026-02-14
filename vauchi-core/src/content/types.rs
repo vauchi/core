@@ -24,6 +24,11 @@ pub struct ContentManifest {
     pub base_url: String,
     /// Index of available content
     pub content: ContentIndex,
+    /// Optional Ed25519 signature over the canonical manifest content (hex-encoded, 128 chars).
+    /// When present, clients can verify the manifest was signed by the expected publisher key.
+    /// Signing covers: `schema_version || generated_at || base_url || canonical(content)`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub signature: Option<String>,
 }
 
 /// Index of all available content types

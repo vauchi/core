@@ -1295,7 +1295,7 @@ impl VauchiMobile {
 
             let mut socket = self.connect_to_relay()?;
             let our_id = identity.public_id();
-            sync::send_handshake(&mut socket, &our_id, None)?;
+            sync::send_handshake(&mut socket, &identity, None)?;
 
             let update = protocol::EncryptedUpdate {
                 recipient_id: contact_id.clone(),

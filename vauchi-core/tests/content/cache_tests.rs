@@ -32,6 +32,7 @@ fn create_test_manifest() -> ContentManifest {
             help: None,
             themes: None,
         },
+        signature: None,
     }
 }
 

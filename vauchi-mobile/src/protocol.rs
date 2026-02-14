@@ -14,11 +14,13 @@ pub use vauchi_core::network::simple_message::{
     create_simple_envelope as create_envelope, decode_simple_message as decode_message,
     encode_simple_message as encode_message, LegacyExchangeMessage as ExchangeMessage,
     SimpleAckStatus as AckStatus, SimpleDeviceSyncMessage as DeviceSyncMessage,
-    SimpleEncryptedUpdate as EncryptedUpdate, SimpleHandshake as Handshake,
+    SimpleEncryptedUpdate as EncryptedUpdate,
     SimplePayload as MessagePayload,
 };
 
 // Re-export for tests
+#[cfg(test)]
+pub use vauchi_core::network::simple_message::SimpleHandshake as Handshake;
 #[cfg(test)]
 pub use vauchi_core::network::simple_message::SIMPLE_PROTOCOL_VERSION as PROTOCOL_VERSION;
 
@@ -32,6 +34,10 @@ mod tests {
         let handshake = Handshake {
             client_id: "test-client".to_string(),
             device_id: None,
+            identity_public_key: None,
+            nonce: None,
+            signature: None,
+            timestamp: None,
         };
         let envelope = create_envelope(MessagePayload::Handshake(handshake));
 

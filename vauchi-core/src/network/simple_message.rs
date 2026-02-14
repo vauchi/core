@@ -80,6 +80,18 @@ pub struct SimpleHandshake {
     /// Optional device ID for inter-device sync (hex-encoded, 64 chars = 32 bytes).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub device_id: Option<String>,
+    /// Ed25519 public key proving ownership of client_id (hex, 64 chars = 32 bytes).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub identity_public_key: Option<String>,
+    /// Random nonce for replay prevention (hex, 64 chars = 32 bytes).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub nonce: Option<String>,
+    /// Ed25519 signature over `nonce || timestamp.to_be_bytes()` (hex, 128 chars = 64 bytes).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub signature: Option<String>,
+    /// Unix timestamp in seconds, must be within ±60s of relay clock.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub timestamp: Option<u64>,
 }
 
 /// Legacy exchange message format (plaintext, for backward compatibility).
@@ -173,6 +185,50 @@ pub fn encode_simple_message(envelope: &SimpleEnvelope) -> Result<Vec<u8>, Strin
     Ok(frame)
 }
 
+/// Creates a signed handshake that the relay can verify with Ed25519.
+///
+/// Signs `nonce || timestamp.to_be_bytes()` using the identity's signing key.
+/// The relay verifies the signature, checks the timestamp window (±60s),
+/// and prevents nonce replay.
+pub fn create_signed_handshake(
+    identity: &crate::Identity,
+    device_id: Option<String>,
+) -> SimpleHandshake {
+    let client_id = identity.public_id();
+
+    // Generate random 32-byte nonce
+    let rng = ring::rand::SystemRandom::new();
+    let mut nonce_bytes = [0u8; 32];
+    ring::rand::SecureRandom::fill(&rng, &mut nonce_bytes).expect("RNG failure");
+
+    let timestamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("system time before UNIX epoch")
+        .as_secs();
+
+    // Sign: nonce || timestamp.to_be_bytes()
+    let mut signed_data = Vec::with_capacity(40);
+    signed_data.extend_from_slice(&nonce_bytes);
+    signed_data.extend_from_slice(&timestamp.to_be_bytes());
+
+    let signature = identity.signing_keypair().sign(&signed_data);
+    let public_key = identity.signing_keypair().public_key();
+
+    SimpleHandshake {
+        client_id,
+        device_id,
+        identity_public_key: Some(hex_encode(public_key.as_bytes())),
+        nonce: Some(hex_encode(&nonce_bytes)),
+        signature: Some(hex_encode(signature.as_bytes())),
+        timestamp: Some(timestamp),
+    }
+}
+
+/// Hex-encodes a byte slice to a lowercase hex string.
+fn hex_encode(bytes: &[u8]) -> String {
+    bytes.iter().map(|b| format!("{:02x}", b)).collect()
+}
+
 /// Decode a simple envelope from bytes with length prefix.
 pub fn decode_simple_message(data: &[u8]) -> Result<SimpleEnvelope, String> {
     if data.len() < FRAME_HEADER_SIZE {
@@ -230,4 +286,125 @@ pub fn create_device_sync_ack(message_id: &str, synced_version: u64) -> SimpleEn
         message_id: message_id.to_string(),
         synced_version,
     }))
+}
+
+// ===========================================================================
+// Tests
+// Trace: codebase-review-tracker item #50
+// ===========================================================================
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_signed_handshake_has_auth_fields() {
+        let identity = crate::Identity::create("Test User");
+        let handshake = create_signed_handshake(&identity, None);
+
+        assert!(!handshake.client_id.is_empty());
+        assert!(handshake.identity_public_key.is_some());
+        assert!(handshake.nonce.is_some());
+        assert!(handshake.signature.is_some());
+        assert!(handshake.timestamp.is_some());
+
+        // Public key should be 64 hex chars (32 bytes)
+        assert_eq!(handshake.identity_public_key.as_ref().unwrap().len(), 64);
+        // Nonce should be 64 hex chars (32 bytes)
+        assert_eq!(handshake.nonce.as_ref().unwrap().len(), 64);
+        // Signature should be 128 hex chars (64 bytes)
+        assert_eq!(handshake.signature.as_ref().unwrap().len(), 128);
+    }
+
+    #[test]
+    fn test_signed_handshake_signature_verifiable() {
+        let identity = crate::Identity::create("Test User");
+        let handshake = create_signed_handshake(&identity, None);
+
+        // Reconstruct the signed data as the relay would
+        let nonce_hex = handshake.nonce.as_ref().unwrap();
+        let sig_hex = handshake.signature.as_ref().unwrap();
+        let pk_hex = handshake.identity_public_key.as_ref().unwrap();
+        let timestamp = handshake.timestamp.unwrap();
+
+        // Decode hex values
+        let nonce_bytes: Vec<u8> = (0..nonce_hex.len())
+            .step_by(2)
+            .map(|i| u8::from_str_radix(&nonce_hex[i..i + 2], 16).unwrap())
+            .collect();
+        let sig_bytes: Vec<u8> = (0..sig_hex.len())
+            .step_by(2)
+            .map(|i| u8::from_str_radix(&sig_hex[i..i + 2], 16).unwrap())
+            .collect();
+        let pk_bytes: Vec<u8> = (0..pk_hex.len())
+            .step_by(2)
+            .map(|i| u8::from_str_radix(&pk_hex[i..i + 2], 16).unwrap())
+            .collect();
+
+        // Reconstruct signed data: nonce || timestamp.to_be_bytes()
+        let mut signed_data = Vec::with_capacity(40);
+        signed_data.extend_from_slice(&nonce_bytes);
+        signed_data.extend_from_slice(&timestamp.to_be_bytes());
+
+        // Verify with ring (as the relay does)
+        let public_key =
+            ring::signature::UnparsedPublicKey::new(&ring::signature::ED25519, &pk_bytes);
+        assert!(public_key.verify(&signed_data, &sig_bytes).is_ok());
+    }
+
+    #[test]
+    fn test_signed_handshake_with_device_id() {
+        let identity = crate::Identity::create("Test User");
+        let device_id = Some("abcd1234".to_string());
+        let handshake = create_signed_handshake(&identity, device_id.clone());
+
+        assert_eq!(handshake.device_id, device_id);
+        assert!(handshake.signature.is_some());
+    }
+
+    #[test]
+    fn test_signed_handshake_serialization_includes_auth() {
+        let identity = crate::Identity::create("Test User");
+        let handshake = create_signed_handshake(&identity, None);
+
+        let envelope = create_simple_envelope(SimplePayload::Handshake(handshake));
+        let encoded = encode_simple_message(&envelope).unwrap();
+        let decoded = decode_simple_message(&encoded).unwrap();
+
+        if let SimplePayload::Handshake(h) = decoded.payload {
+            assert!(h.identity_public_key.is_some());
+            assert!(h.nonce.is_some());
+            assert!(h.signature.is_some());
+            assert!(h.timestamp.is_some());
+        } else {
+            panic!("Expected Handshake payload");
+        }
+    }
+
+    #[test]
+    fn test_unsigned_handshake_backward_compatible() {
+        // Old-style handshake without auth fields should still deserialize
+        let handshake = SimpleHandshake {
+            client_id: "abc123".to_string(),
+            device_id: None,
+            identity_public_key: None,
+            nonce: None,
+            signature: None,
+            timestamp: None,
+        };
+
+        let envelope = create_simple_envelope(SimplePayload::Handshake(handshake));
+        let encoded = encode_simple_message(&envelope).unwrap();
+        let decoded = decode_simple_message(&encoded).unwrap();
+
+        if let SimplePayload::Handshake(h) = decoded.payload {
+            assert_eq!(h.client_id, "abc123");
+            assert!(h.identity_public_key.is_none());
+            assert!(h.nonce.is_none());
+            assert!(h.signature.is_none());
+            assert!(h.timestamp.is_none());
+        } else {
+            panic!("Expected Handshake payload");
+        }
+    }
 }

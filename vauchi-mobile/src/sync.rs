@@ -24,8 +24,8 @@ use crate::protocol::{
     self, create_device_sync_ack, create_device_sync_message, AckStatus, DeviceSyncMessage,
     EncryptedUpdate, ExchangeMessage, MessagePayload,
 };
-use vauchi_core::network::simple_message::create_signed_handshake;
 use crate::types::MobileSyncResult;
+use vauchi_core::network::simple_message::create_signed_handshake;
 
 /// Result of receiving pending messages from relay.
 pub struct ReceivedMessages {

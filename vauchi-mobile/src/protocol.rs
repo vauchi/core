@@ -14,8 +14,7 @@ pub use vauchi_core::network::simple_message::{
     create_simple_envelope as create_envelope, decode_simple_message as decode_message,
     encode_simple_message as encode_message, LegacyExchangeMessage as ExchangeMessage,
     SimpleAckStatus as AckStatus, SimpleDeviceSyncMessage as DeviceSyncMessage,
-    SimpleEncryptedUpdate as EncryptedUpdate,
-    SimplePayload as MessagePayload,
+    SimpleEncryptedUpdate as EncryptedUpdate, SimplePayload as MessagePayload,
 };
 
 // Re-export for tests

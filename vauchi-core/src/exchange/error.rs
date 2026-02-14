@@ -115,4 +115,7 @@ pub enum ExchangeError {
 
     #[error("BLE not available on this device")]
     BleNotAvailable,
+
+    #[error("Proximity verification required before device linking")]
+    ProximityNotVerified,
 }

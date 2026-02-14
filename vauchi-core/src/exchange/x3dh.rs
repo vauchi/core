@@ -113,7 +113,9 @@ impl X3DH {
         let dh1 = our_keys.diffie_hellman(their_public);
 
         // DH2: ephemeral × their_static (forward secrecy)
-        let dh2 = *ephemeral_secret.diffie_hellman(&their_public_key).as_bytes();
+        let dh2 = *ephemeral_secret
+            .diffie_hellman(&their_public_key)
+            .as_bytes();
 
         // Concatenate DH1 ‖ DH2 and derive via HKDF
         let mut ikm = [0u8; 64];

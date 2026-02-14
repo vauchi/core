@@ -160,8 +160,11 @@ impl EncryptedExchangeMessage {
     ) -> Result<(DecryptedExchangePayload, SymmetricKey), ExchangeError> {
         // Derive the shared secret using X3DH::respond
         // DH1 uses sender_exchange_key for identity binding
-        let shared_secret =
-            X3DH::respond(our_keys, &self.sender_exchange_key, &self.ephemeral_public_key)?;
+        let shared_secret = X3DH::respond(
+            our_keys,
+            &self.sender_exchange_key,
+            &self.ephemeral_public_key,
+        )?;
 
         // Decrypt the ciphertext
         let payload_bytes =

@@ -553,8 +553,7 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
                 // DH(our_secret × their_exchange_key) — both sides compute the same shared secret.
                 // HKDF is applied for domain separation (different IKM structure than full X3DH).
                 let shared_bytes = self.our_x3dh.diffie_hellman(&their_exchange_key);
-                let derived =
-                    HKDF::derive_key(None, &shared_bytes, b"vauchi-x3dh-symmetric-v1");
+                let derived = HKDF::derive_key(None, &shared_bytes, b"vauchi-x3dh-symmetric-v1");
                 crate::crypto::SymmetricKey::from_bytes(derived)
             }
         };

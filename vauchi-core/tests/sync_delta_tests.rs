@@ -485,7 +485,10 @@ fn test_unsigned_delta_rejected_by_verify() {
 
     // Create delta but do NOT sign it — signature is [0u8; 64]
     let delta = CardDelta::compute(&old, &new);
-    assert_eq!(delta.signature, [0u8; 64], "Unsigned delta should have zero signature");
+    assert_eq!(
+        delta.signature, [0u8; 64],
+        "Unsigned delta should have zero signature"
+    );
 
     // verify() must reject a zero-signature delta
     assert!(

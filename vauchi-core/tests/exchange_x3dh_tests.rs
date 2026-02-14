@@ -38,8 +38,12 @@ fn test_x3dh_respond_key_differs_from_raw_dh() {
         X3DH::initiate(&initiator_keys, responder_keys.public_key()).unwrap();
 
     // Respond to get the derived key
-    let responder_key =
-        X3DH::respond(&responder_keys, initiator_keys.public_key(), &ephemeral_public).unwrap();
+    let responder_key = X3DH::respond(
+        &responder_keys,
+        initiator_keys.public_key(),
+        &ephemeral_public,
+    )
+    .unwrap();
 
     // Compute the raw DH output (what respond would get without HKDF)
     let raw_dh = responder_keys.diffie_hellman(&ephemeral_public);
@@ -75,8 +79,7 @@ fn test_x3dh_identity_binding_wrong_key_fails() {
     let (alice_secret, ephemeral) = X3DH::initiate(&alice_keys, bob_keys.public_key()).unwrap();
 
     // Bob responds with CORRECT identity (alice's key) → should match
-    let bob_secret_correct =
-        X3DH::respond(&bob_keys, alice_keys.public_key(), &ephemeral).unwrap();
+    let bob_secret_correct = X3DH::respond(&bob_keys, alice_keys.public_key(), &ephemeral).unwrap();
     assert_eq!(
         alice_secret.as_bytes(),
         bob_secret_correct.as_bytes(),
@@ -84,8 +87,7 @@ fn test_x3dh_identity_binding_wrong_key_fails() {
     );
 
     // Bob responds with WRONG identity (carol's key) → must NOT match
-    let bob_secret_wrong =
-        X3DH::respond(&bob_keys, carol_keys.public_key(), &ephemeral).unwrap();
+    let bob_secret_wrong = X3DH::respond(&bob_keys, carol_keys.public_key(), &ephemeral).unwrap();
     assert_ne!(
         alice_secret.as_bytes(),
         bob_secret_wrong.as_bytes(),

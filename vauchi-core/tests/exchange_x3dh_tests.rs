@@ -58,3 +58,71 @@ fn test_x3dh_respond_key_differs_from_raw_dh() {
         "Initiator and responder must derive the same key"
     );
 }
+
+// === Identity Binding Tests (Item #29 — Full X3DH) ===
+// Verifies that the shared secret is cryptographically tied to both
+// parties' long-term X25519 keys via DH1 (our_static × their_static).
+
+/// Wrong identity key must produce a different shared secret.
+/// With full X3DH, DH1 binds the secret to both parties' identity keys.
+#[test]
+fn test_x3dh_identity_binding_wrong_key_fails() {
+    let alice_keys = X3DHKeyPair::generate();
+    let bob_keys = X3DHKeyPair::generate();
+    let carol_keys = X3DHKeyPair::generate();
+
+    // Alice initiates with bob's public key
+    let (alice_secret, ephemeral) = X3DH::initiate(&alice_keys, bob_keys.public_key()).unwrap();
+
+    // Bob responds with CORRECT identity (alice's key) → should match
+    let bob_secret_correct =
+        X3DH::respond(&bob_keys, alice_keys.public_key(), &ephemeral).unwrap();
+    assert_eq!(
+        alice_secret.as_bytes(),
+        bob_secret_correct.as_bytes(),
+        "Correct identity key must produce matching secret"
+    );
+
+    // Bob responds with WRONG identity (carol's key) → must NOT match
+    let bob_secret_wrong =
+        X3DH::respond(&bob_keys, carol_keys.public_key(), &ephemeral).unwrap();
+    assert_ne!(
+        alice_secret.as_bytes(),
+        bob_secret_wrong.as_bytes(),
+        "Wrong identity key must produce different secret"
+    );
+}
+
+/// Zero identity key must not produce a matching secret.
+#[test]
+fn test_x3dh_zero_identity_does_not_match() {
+    let alice_keys = X3DHKeyPair::generate();
+    let bob_keys = X3DHKeyPair::generate();
+
+    let (alice_secret, ephemeral) = X3DH::initiate(&alice_keys, bob_keys.public_key()).unwrap();
+
+    // Bob responds with zero identity key
+    let bob_secret_zero = X3DH::respond(&bob_keys, &[0u8; 32], &ephemeral).unwrap();
+    assert_ne!(
+        alice_secret.as_bytes(),
+        bob_secret_zero.as_bytes(),
+        "Zero identity key must not produce matching secret"
+    );
+}
+
+/// Full bidirectional agreement: initiate with alice_keys + bob's public,
+/// respond with bob_keys + alice's public → same secret.
+#[test]
+fn test_x3dh_full_bidirectional_agreement() {
+    let alice_keys = X3DHKeyPair::generate();
+    let bob_keys = X3DHKeyPair::generate();
+
+    let (alice_secret, ephemeral) = X3DH::initiate(&alice_keys, bob_keys.public_key()).unwrap();
+    let bob_secret = X3DH::respond(&bob_keys, alice_keys.public_key(), &ephemeral).unwrap();
+
+    assert_eq!(
+        alice_secret.as_bytes(),
+        bob_secret.as_bytes(),
+        "Full X3DH bidirectional agreement must produce same secret"
+    );
+}

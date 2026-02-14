@@ -65,11 +65,12 @@ fn test_full_exchange_produces_matching_shared_keys() {
         .apply(ExchangeEvent::PerformKeyAgreement)
         .unwrap();
 
-    // Transfer Bob's ephemeral to Alice
+    // Transfer Bob's ephemeral and exchange key to Alice
     let bob_ephemeral = bob_session
         .ephemeral_public()
         .expect("Scanner should have ephemeral");
-    alice_session.set_their_ephemeral(bob_ephemeral);
+    let bob_exchange_key = *bob_session.our_exchange_public_key();
+    alice_session.set_their_ephemeral(bob_ephemeral, bob_exchange_key);
 
     // Now Alice (displayer/X3DH responder) can perform key agreement
     alice_session

@@ -2,42 +2,41 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! X3DH-Inspired Key Agreement
+//! Full X3DH Key Agreement
 //!
-//! This module implements a **simplified variant** of X3DH for contact card
-//! exchange. The current implementation performs a single DH operation per
-//! side (ephemeral x static), providing forward secrecy via the ephemeral key.
+//! This module implements X3DH with identity binding for contact card
+//! exchange. Two DH operations per side provide both forward secrecy
+//! (via the ephemeral key) and identity binding (via static keys).
 //!
-//! ## Differences from Signal X3DH Spec
+//! ## DH Operations
 //!
-//! | Property             | This Implementation       | Full X3DH               |
-//! |----------------------|---------------------------|-------------------------|
-//! | DH operations        | 1 per side                | 3-4 per side            |
-//! | Static key usage     | Unused in `initiate`      | DH1 + DH3              |
-//! | Forward secrecy      | Per-exchange (ephemeral)  | Per-exchange + identity |
-//! | Key derivation       | HKDF over single DH       | HKDF over all DH outputs|
+//! | Operation | Initiator side             | Responder side            | Purpose          |
+//! |-----------|----------------------------|---------------------------|------------------|
+//! | DH1       | our_static × their_static  | our_static × their_static | Identity binding |
+//! | DH2       | ephemeral × their_static   | our_static × their_ephemeral | Forward secrecy |
 //!
-//! ## Security Assessment
+//! The shared secret is derived as `HKDF(DH1 ‖ DH2, info="vauchi-x3dh-key-v2")`.
 //!
-//! Adequate for current use case (contact card exchange where both parties are
-//! physically present). The single ephemeral DH provides confidentiality and
-//! forward secrecy. Identity binding (from the missing DH operations) would be
-//! needed for asynchronous messaging where impersonation is a concern.
+//! ## Security Properties
 //!
-//! ## Future Work
-//!
-//! Full X3DH compliance is tracked in the problem record:
-//! `_private/docs/problems/2026-02-01-x3dh-protocol-hardening/`
+//! - **Forward secrecy**: Compromising long-term keys does not reveal past sessions
+//!   (ephemeral key is destroyed after use).
+//! - **Identity binding**: The shared secret is cryptographically tied to both
+//!   parties' long-term X25519 keys, preventing key-compromise impersonation.
 
 use rand::rngs::OsRng;
 use x25519_dalek::{EphemeralSecret, PublicKey, StaticSecret};
+use zeroize::Zeroize;
 
 use super::ExchangeError;
 use crate::crypto::kdf::HKDF;
 use crate::crypto::SymmetricKey;
 
 /// Domain separation info for X3DH key derivation via HKDF.
-const X3DH_KEY_INFO: &[u8] = b"vauchi-x3dh-key-v1";
+///
+/// Bumped from v1 to v2 when identity binding (DH1) was added.
+/// The IKM is now 64 bytes (DH1 ‖ DH2) instead of 32 bytes (DH2 only).
+const X3DH_KEY_INFO: &[u8] = b"vauchi-x3dh-key-v2";
 
 /// X25519 keypair for X3DH key agreement.
 ///
@@ -94,12 +93,13 @@ pub struct X3DH;
 impl X3DH {
     /// Initiates key agreement as the initiator (scanner).
     ///
-    /// The initiator generates an ephemeral keypair and performs DH with
-    /// the responder's static public key.
+    /// Performs two DH operations:
+    /// - DH1: our_static × their_static (identity binding)
+    /// - DH2: ephemeral × their_static (forward secrecy)
     ///
     /// Returns: (shared_secret, ephemeral_public_key_to_send)
     pub fn initiate(
-        _our_keys: &X3DHKeyPair,
+        our_keys: &X3DHKeyPair,
         their_public: &[u8; 32],
     ) -> Result<(SymmetricKey, [u8; 32]), ExchangeError> {
         // Generate ephemeral key for this exchange
@@ -109,12 +109,18 @@ impl X3DH {
         // Convert their public key
         let their_public_key = PublicKey::from(*their_public);
 
-        // Perform DH: ephemeral_secret * their_public
-        let shared_secret = ephemeral_secret.diffie_hellman(&their_public_key);
+        // DH1: our_static × their_static (identity binding)
+        let dh1 = our_keys.diffie_hellman(their_public);
 
-        // Derive symmetric key from shared secret via HKDF (RFC 5869)
-        // Raw DH output has non-uniform distribution; HKDF produces a proper PRK
-        let derived = HKDF::derive_key(None, shared_secret.as_bytes(), X3DH_KEY_INFO);
+        // DH2: ephemeral × their_static (forward secrecy)
+        let dh2 = *ephemeral_secret.diffie_hellman(&their_public_key).as_bytes();
+
+        // Concatenate DH1 ‖ DH2 and derive via HKDF
+        let mut ikm = [0u8; 64];
+        ikm[..32].copy_from_slice(&dh1);
+        ikm[32..].copy_from_slice(&dh2);
+        let derived = HKDF::derive_key(None, &ikm, X3DH_KEY_INFO);
+        ikm.zeroize();
         let key = SymmetricKey::from_bytes(derived);
 
         Ok((key, *ephemeral_public.as_bytes()))
@@ -122,22 +128,29 @@ impl X3DH {
 
     /// Responds to key agreement as the responder (QR displayer).
     ///
-    /// The responder uses their static key to perform DH with the
-    /// initiator's ephemeral public key.
+    /// Performs two DH operations (mirrors initiator):
+    /// - DH1: our_static × their_static (identity binding)
+    /// - DH2: our_static × their_ephemeral (forward secrecy)
     pub fn respond(
         our_keys: &X3DHKeyPair,
-        _their_identity_public: &[u8; 32],
+        their_identity_public: &[u8; 32],
         their_ephemeral_public: &[u8; 32],
     ) -> Result<SymmetricKey, ExchangeError> {
         // Convert their ephemeral public key
         let their_ephemeral = PublicKey::from(*their_ephemeral_public);
 
-        // Perform DH: our_secret * their_ephemeral
-        let shared_secret = our_keys.secret.diffie_hellman(&their_ephemeral);
+        // DH1: our_static × their_static (identity binding — mirrors initiator)
+        let dh1 = our_keys.diffie_hellman(their_identity_public);
 
-        // Derive symmetric key from shared secret via HKDF (RFC 5869)
-        // Raw DH output has non-uniform distribution; HKDF produces a proper PRK
-        let derived = HKDF::derive_key(None, shared_secret.as_bytes(), X3DH_KEY_INFO);
+        // DH2: our_static × their_ephemeral (forward secrecy)
+        let dh2 = *our_keys.secret.diffie_hellman(&their_ephemeral).as_bytes();
+
+        // Concatenate DH1 ‖ DH2 and derive via HKDF
+        let mut ikm = [0u8; 64];
+        ikm[..32].copy_from_slice(&dh1);
+        ikm[32..].copy_from_slice(&dh2);
+        let derived = HKDF::derive_key(None, &ikm, X3DH_KEY_INFO);
+        ikm.zeroize();
         let key = SymmetricKey::from_bytes(derived);
 
         Ok(key)

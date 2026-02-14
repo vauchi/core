@@ -41,17 +41,27 @@ mod bytes_array_32 {
 
 /// An encrypted exchange message for secure contact card exchange.
 ///
-/// The ephemeral public key is sent in plaintext (required for X3DH),
-/// while the identity key and display name are encrypted with the
-/// X3DH-derived shared secret.
+/// The ephemeral public key and sender's exchange key are sent in plaintext
+/// (required for X3DH key agreement), while the identity key and display
+/// name are encrypted with the X3DH-derived shared secret.
 ///
 /// Wire format:
-/// - ephemeral_public_key: 32 bytes (plaintext, needed for key agreement)
+/// - sender_exchange_key: 32 bytes (plaintext, needed for DH1 identity binding)
+/// - ephemeral_public_key: 32 bytes (plaintext, needed for DH2 forward secrecy)
 /// - ciphertext: variable (encrypted identity key + display name)
+///
+/// Privacy: The X25519 exchange key is already public (transmitted in QR, NFC,
+/// BLE payloads). Adding it here reveals nothing new. The relay sees two
+/// unlinkable 32-byte keys + opaque ciphertext.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EncryptedExchangeMessage {
+    /// Sender's X3DH exchange public key (plaintext, 32 bytes).
+    /// The recipient uses this for DH1 (identity binding).
+    #[serde(with = "bytes_array_32")]
+    pub sender_exchange_key: [u8; 32],
+
     /// Ephemeral public key for X3DH (plaintext, 32 bytes).
-    /// The recipient uses this to derive the same shared secret.
+    /// The recipient uses this for DH2 (forward secrecy).
     #[serde(with = "bytes_array_32")]
     pub ephemeral_public_key: [u8; 32],
 
@@ -125,6 +135,7 @@ impl EncryptedExchangeMessage {
 
         Ok((
             EncryptedExchangeMessage {
+                sender_exchange_key: *our_keys.public_key(),
                 ephemeral_public_key,
                 ciphertext,
             },
@@ -148,8 +159,9 @@ impl EncryptedExchangeMessage {
         our_keys: &X3DHKeyPair,
     ) -> Result<(DecryptedExchangePayload, SymmetricKey), ExchangeError> {
         // Derive the shared secret using X3DH::respond
-        // Note: X3DH::respond ignores the identity key parameter in this implementation
-        let shared_secret = X3DH::respond(our_keys, &[0u8; 32], &self.ephemeral_public_key)?;
+        // DH1 uses sender_exchange_key for identity binding
+        let shared_secret =
+            X3DH::respond(our_keys, &self.sender_exchange_key, &self.ephemeral_public_key)?;
 
         // Decrypt the ciphertext
         let payload_bytes =
@@ -167,17 +179,6 @@ impl EncryptedExchangeMessage {
             },
             shared_secret,
         ))
-    }
-
-    /// Decrypts an exchange message (legacy API for backwards compatibility with tests).
-    #[doc(hidden)]
-    pub fn decrypt_legacy(
-        &self,
-        our_keys: &X3DHKeyPair,
-        _their_identity_public: &[u8; 32],
-    ) -> Result<([u8; 32], String), ExchangeError> {
-        let (payload, _) = self.decrypt(our_keys)?;
-        Ok((payload.identity_key, payload.display_name))
     }
 
     /// Serializes the message to bytes for wire transmission.

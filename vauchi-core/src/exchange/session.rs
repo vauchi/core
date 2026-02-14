@@ -13,6 +13,7 @@ use std::time::{Duration, Instant};
 use super::{ExchangeError, ExchangeQR, ProximityVerifier, X3DHKeyPair, X3DH};
 use crate::contact::Contact;
 use crate::contact_card::ContactCard;
+use crate::crypto::kdf::HKDF;
 use crate::identity::Identity;
 
 /// Session timeout duration (60 seconds for resumption).
@@ -172,6 +173,8 @@ pub struct ExchangeSession<P: ProximityVerifier> {
     our_ephemeral: Option<[u8; 32]>,
     /// Their ephemeral public key (received when we're the displayer/X3DH responder)
     their_ephemeral: Option<[u8; 32]>,
+    /// Their exchange public key (received alongside ephemeral for identity binding)
+    their_exchange_key_received: Option<[u8; 32]>,
     /// Hashes of QR codes that have already been consumed (prevents reuse).
     used_qrs: HashSet<[u8; 32]>,
 }
@@ -194,6 +197,7 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
             interrupted: false,
             our_ephemeral: None,
             their_ephemeral: None,
+            their_exchange_key_received: None,
             used_qrs: HashSet::new(),
         }
     }
@@ -216,6 +220,7 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
             interrupted: false,
             our_ephemeral: None,
             their_ephemeral: None,
+            their_exchange_key_received: None,
             used_qrs: HashSet::new(),
         }
     }
@@ -241,6 +246,7 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
             interrupted: false,
             our_ephemeral: None,
             their_ephemeral: None,
+            their_exchange_key_received: None,
             used_qrs: HashSet::new(),
         }
     }
@@ -265,6 +271,7 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
             interrupted: false,
             our_ephemeral: None,
             their_ephemeral: None,
+            their_exchange_key_received: None,
             used_qrs: HashSet::new(),
         }
     }
@@ -289,6 +296,7 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
             interrupted: false,
             our_ephemeral: None,
             their_ephemeral: None,
+            their_exchange_key_received: None,
             used_qrs: HashSet::new(),
         }
     }
@@ -325,11 +333,13 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
         self.our_ephemeral
     }
 
-    /// Sets their ephemeral public key (if we're the displayer/X3DH responder).
+    /// Sets their ephemeral and exchange public keys (if we're the displayer/X3DH responder).
     ///
-    /// This must be called before key agreement when we're the QR displayer.
-    pub fn set_their_ephemeral(&mut self, ephemeral: [u8; 32]) {
+    /// Both values must be provided before key agreement when we're the QR displayer.
+    /// The exchange key is used for DH1 (identity binding) in full X3DH.
+    pub fn set_their_ephemeral(&mut self, ephemeral: [u8; 32], exchange_key: [u8; 32]) {
         self.their_ephemeral = Some(ephemeral);
+        self.their_exchange_key_received = Some(exchange_key);
     }
 
     /// Returns the exchange mode.
@@ -519,7 +529,8 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
                     }
                     ExchangeRole::Initiator => {
                         // Initiator (QR displayer) is the X3DH RESPONDER:
-                        // - Needs the scanner's ephemeral (received via their_ephemeral)
+                        // - Needs the scanner's ephemeral (received via set_their_ephemeral)
+                        // - Needs the scanner's exchange key for DH1 (identity binding)
                         // - Uses own X3DH keys to derive shared secret
                         let their_ephemeral = self.their_ephemeral.ok_or_else(|| {
                             ExchangeError::InvalidState(
@@ -527,15 +538,24 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
                                     .into(),
                             )
                         })?;
-                        X3DH::respond(&self.our_x3dh, &[0u8; 32], &their_ephemeral)?
+                        let their_exchange = self.their_exchange_key_received.ok_or_else(|| {
+                            ExchangeError::InvalidState(
+                                "Missing exchange key from scanner - call set_their_ephemeral first"
+                                    .into(),
+                            )
+                        })?;
+                        X3DH::respond(&self.our_x3dh, &their_exchange, &their_ephemeral)?
                     }
                 }
             }
             ExchangeTransport::QrMutual | ExchangeTransport::Nfc | ExchangeTransport::Ble => {
                 // Symmetric DH: both sides have fresh ephemeral keys.
                 // DH(our_secret × their_exchange_key) — both sides compute the same shared secret.
+                // HKDF is applied for domain separation (different IKM structure than full X3DH).
                 let shared_bytes = self.our_x3dh.diffie_hellman(&their_exchange_key);
-                crate::crypto::SymmetricKey::from_bytes(shared_bytes)
+                let derived =
+                    HKDF::derive_key(None, &shared_bytes, b"vauchi-x3dh-symmetric-v1");
+                crate::crypto::SymmetricKey::from_bytes(derived)
             }
         };
 

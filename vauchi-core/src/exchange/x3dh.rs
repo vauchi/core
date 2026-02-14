@@ -15,7 +15,7 @@
 //! | DH operations        | 1 per side                | 3-4 per side            |
 //! | Static key usage     | Unused in `initiate`      | DH1 + DH3              |
 //! | Forward secrecy      | Per-exchange (ephemeral)  | Per-exchange + identity |
-//! | Key derivation       | Direct DH output          | HKDF over all DH outputs|
+//! | Key derivation       | HKDF over single DH       | HKDF over all DH outputs|
 //!
 //! ## Security Assessment
 //!
@@ -33,7 +33,11 @@ use rand::rngs::OsRng;
 use x25519_dalek::{EphemeralSecret, PublicKey, StaticSecret};
 
 use super::ExchangeError;
+use crate::crypto::kdf::HKDF;
 use crate::crypto::SymmetricKey;
+
+/// Domain separation info for X3DH key derivation via HKDF.
+const X3DH_KEY_INFO: &[u8] = b"vauchi-x3dh-key-v1";
 
 /// X25519 keypair for X3DH key agreement.
 ///
@@ -108,8 +112,10 @@ impl X3DH {
         // Perform DH: ephemeral_secret * their_public
         let shared_secret = ephemeral_secret.diffie_hellman(&their_public_key);
 
-        // Derive symmetric key from shared secret
-        let key = SymmetricKey::from_bytes(*shared_secret.as_bytes());
+        // Derive symmetric key from shared secret via HKDF (RFC 5869)
+        // Raw DH output has non-uniform distribution; HKDF produces a proper PRK
+        let derived = HKDF::derive_key(None, shared_secret.as_bytes(), X3DH_KEY_INFO);
+        let key = SymmetricKey::from_bytes(derived);
 
         Ok((key, *ephemeral_public.as_bytes()))
     }
@@ -129,8 +135,10 @@ impl X3DH {
         // Perform DH: our_secret * their_ephemeral
         let shared_secret = our_keys.secret.diffie_hellman(&their_ephemeral);
 
-        // Derive symmetric key from shared secret
-        let key = SymmetricKey::from_bytes(*shared_secret.as_bytes());
+        // Derive symmetric key from shared secret via HKDF (RFC 5869)
+        // Raw DH output has non-uniform distribution; HKDF produces a proper PRK
+        let derived = HKDF::derive_key(None, shared_secret.as_bytes(), X3DH_KEY_INFO);
+        let key = SymmetricKey::from_bytes(derived);
 
         Ok(key)
     }

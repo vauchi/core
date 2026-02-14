@@ -666,11 +666,6 @@ impl<T: Transport> Vauchi<T> {
             .decrypt(&ratchet_msg)
             .map_err(|e| VauchiError::Crypto(format!("{:?}", e)))?;
 
-        // Save updated ratchet state (must happen even if payload parsing fails,
-        // to keep the ratchet advancing)
-        self.storage
-            .save_ratchet_state(contact_id, &ratchet, is_initiator)?;
-
         // Detect payload version and extract delta bytes + optional CEK
         let (delta_bytes, new_cek) = if !plaintext.is_empty() && plaintext[0] == PAYLOAD_VERSION_CEK
         {
@@ -718,9 +713,6 @@ impl<T: Transport> Vauchi<T> {
                 return Err(VauchiError::ReplayDetected);
             }
         }
-        // Persist accepted nonce
-        self.storage
-            .save_replay_nonce(contact_id, &delta.nonce, delta.timestamp)?;
 
         // Get changed fields before applying
         let changed = delta.changed_fields();
@@ -736,9 +728,29 @@ impl<T: Transport> Vauchi<T> {
         if let Some(cek) = new_cek {
             contact.set_cek(cek);
         }
-        self.storage.save_contact(&contact)?;
 
-        Ok(changed)
+        // All DB writes in a single transaction: ratchet state, replay nonce, contact card.
+        // If any write fails, all are rolled back to prevent inconsistent state.
+        self.storage.begin_transaction()?;
+        let result = (|| -> VauchiResult<()> {
+            self.storage
+                .save_ratchet_state(contact_id, &ratchet, is_initiator)?;
+            self.storage
+                .save_replay_nonce(contact_id, &delta.nonce, delta.timestamp)?;
+            self.storage.save_contact(&contact)?;
+            Ok(())
+        })();
+
+        match result {
+            Ok(()) => {
+                self.storage.commit()?;
+                Ok(changed)
+            }
+            Err(e) => {
+                self.storage.rollback();
+                Err(e)
+            }
+        }
     }
 
     // === CEK Migration ===

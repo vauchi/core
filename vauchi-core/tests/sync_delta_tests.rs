@@ -473,3 +473,23 @@ fn test_filter_with_handles_added_and_removed() {
     let filtered2 = delta.filter_with(|field_id| field_id == work_id);
     assert_eq!(filtered2.changes.len(), 0);
 }
+
+// === Zero Signature Rejection Tests (Item 102) ===
+
+#[test]
+fn test_unsigned_delta_rejected_by_verify() {
+    let identity = Identity::create("Alice");
+
+    let old = ContactCard::new("Alice");
+    let new = ContactCard::new("Alice Updated");
+
+    // Create delta but do NOT sign it — signature is [0u8; 64]
+    let delta = CardDelta::compute(&old, &new);
+    assert_eq!(delta.signature, [0u8; 64], "Unsigned delta should have zero signature");
+
+    // verify() must reject a zero-signature delta
+    assert!(
+        !delta.verify(identity.signing_public_key()),
+        "Unsigned delta with zero signature must be rejected"
+    );
+}

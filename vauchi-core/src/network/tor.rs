@@ -103,7 +103,10 @@ impl TorConnector for MockTorConnector {
         if self.should_fail_bootstrap {
             return Err(NetworkError::Tor("Mock bootstrap failure".to_string()));
         }
-        let mut status = self.status.lock().unwrap();
+        let mut status = self
+            .status
+            .lock()
+            .map_err(|_| NetworkError::Tor("status mutex poisoned".into()))?;
         *status = TorStatus::Connected;
         Ok(())
     }
@@ -114,7 +117,10 @@ impl TorConnector for MockTorConnector {
                 "Mock connect failure".to_string(),
             ));
         }
-        let status = self.status.lock().unwrap();
+        let status = self
+            .status
+            .lock()
+            .map_err(|_| NetworkError::Tor("status mutex poisoned".into()))?;
         if *status != TorStatus::Connected {
             return Err(NetworkError::TorNotAvailable);
         }
@@ -122,7 +128,10 @@ impl TorConnector for MockTorConnector {
     }
 
     fn rotate_circuit(&self) -> Result<(), NetworkError> {
-        let status = self.status.lock().unwrap();
+        let status = self
+            .status
+            .lock()
+            .map_err(|_| NetworkError::Tor("status mutex poisoned".into()))?;
         if *status != TorStatus::Connected {
             return Err(NetworkError::TorNotAvailable);
         }
@@ -130,11 +139,17 @@ impl TorConnector for MockTorConnector {
     }
 
     fn status(&self) -> TorStatus {
-        self.status.lock().unwrap().clone()
+        self.status
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .clone()
     }
 
     fn shutdown(&self) -> Result<(), NetworkError> {
-        let mut status = self.status.lock().unwrap();
+        let mut status = self
+            .status
+            .lock()
+            .map_err(|_| NetworkError::Tor("status mutex poisoned".into()))?;
         *status = TorStatus::Disabled;
         Ok(())
     }
@@ -182,7 +197,10 @@ mod manager {
 
         /// Returns the current circuit age in seconds, if a circuit exists.
         pub fn circuit_age_secs(&self) -> Option<u64> {
-            let created = self.circuit_created_at.lock().unwrap();
+            let created = self
+                .circuit_created_at
+                .lock()
+                .unwrap_or_else(|e| e.into_inner());
             created.map(|t| t.elapsed().as_secs())
         }
 
@@ -203,7 +221,10 @@ mod manager {
     impl TorConnector for TorManager {
         fn bootstrap(&self) -> Result<(), NetworkError> {
             {
-                let mut status = self.status.lock().unwrap();
+                let mut status = self
+                    .status
+                    .lock()
+                    .map_err(|_| NetworkError::Tor("status mutex poisoned".into()))?;
                 *status = TorStatus::Connecting;
             }
 
@@ -216,26 +237,39 @@ mod manager {
 
             match result {
                 Ok(client) => {
-                    let mut c = self.client.lock().unwrap();
+                    let mut c = self
+                        .client
+                        .lock()
+                        .map_err(|_| NetworkError::Tor("client mutex poisoned".into()))?;
                     *c = Some(Arc::new(client));
-                    let mut status = self.status.lock().unwrap();
+                    let mut status = self
+                        .status
+                        .lock()
+                        .map_err(|_| NetworkError::Tor("status mutex poisoned".into()))?;
                     *status = TorStatus::Connected;
-                    let mut created = self.circuit_created_at.lock().unwrap();
+                    let mut created = self
+                        .circuit_created_at
+                        .lock()
+                        .map_err(|_| NetworkError::Tor("circuit mutex poisoned".into()))?;
                     *created = Some(Instant::now());
                     Ok(())
                 }
                 Err(e) => {
-                    let mut status = self.status.lock().unwrap();
-                    *status = TorStatus::Disconnected {
-                        reason: e.to_string(),
-                    };
+                    if let Ok(mut status) = self.status.lock() {
+                        *status = TorStatus::Disconnected {
+                            reason: e.to_string(),
+                        };
+                    }
                     Err(e)
                 }
             }
         }
 
         fn connect_to(&self, host: &str, port: u16) -> Result<Box<dyn TorStream>, NetworkError> {
-            let client_guard = self.client.lock().unwrap();
+            let client_guard = self
+                .client
+                .lock()
+                .map_err(|_| NetworkError::Tor("client mutex poisoned".into()))?;
             let client = client_guard
                 .as_ref()
                 .ok_or(NetworkError::TorNotAvailable)?
@@ -258,25 +292,43 @@ mod manager {
         }
 
         fn rotate_circuit(&self) -> Result<(), NetworkError> {
-            let client_guard = self.client.lock().unwrap();
+            let client_guard = self
+                .client
+                .lock()
+                .map_err(|_| NetworkError::Tor("client mutex poisoned".into()))?;
             let _client = client_guard.as_ref().ok_or(NetworkError::TorNotAvailable)?;
 
-            let mut created = self.circuit_created_at.lock().unwrap();
+            let mut created = self
+                .circuit_created_at
+                .lock()
+                .map_err(|_| NetworkError::Tor("circuit mutex poisoned".into()))?;
             *created = Some(Instant::now());
 
             Ok(())
         }
 
         fn status(&self) -> TorStatus {
-            self.status.lock().unwrap().clone()
+            self.status
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .clone()
         }
 
         fn shutdown(&self) -> Result<(), NetworkError> {
-            let mut client = self.client.lock().unwrap();
+            let mut client = self
+                .client
+                .lock()
+                .map_err(|_| NetworkError::Tor("client mutex poisoned".into()))?;
             *client = None;
-            let mut status = self.status.lock().unwrap();
+            let mut status = self
+                .status
+                .lock()
+                .map_err(|_| NetworkError::Tor("status mutex poisoned".into()))?;
             *status = TorStatus::Disabled;
-            let mut created = self.circuit_created_at.lock().unwrap();
+            let mut created = self
+                .circuit_created_at
+                .lock()
+                .map_err(|_| NetworkError::Tor("circuit mutex poisoned".into()))?;
             *created = None;
             Ok(())
         }

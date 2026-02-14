@@ -241,7 +241,10 @@ impl MockAudioBackend {
 
     /// Sets the data that will be "received" during listen.
     pub fn set_receive_data(&self, data: Vec<u8>) {
-        *self.receive_data.lock().unwrap() = Some(data);
+        *self
+            .receive_data
+            .lock()
+            .unwrap_or_else(|e| e.into_inner()) = Some(data);
     }
 
     /// Simulates receiving a valid challenge response.

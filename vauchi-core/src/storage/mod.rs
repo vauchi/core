@@ -873,6 +873,29 @@ impl Storage {
         }
     }
 
+    /// Begins a database transaction.
+    ///
+    /// Must be paired with `commit()` or `rollback()`.
+    /// Use `BEGIN IMMEDIATE` to acquire a write lock immediately,
+    /// preventing deadlocks when multiple writes are planned.
+    pub fn begin_transaction(&self) -> Result<(), StorageError> {
+        self.conn
+            .execute_batch("BEGIN IMMEDIATE TRANSACTION")
+            .map_err(StorageError::from)
+    }
+
+    /// Commits the current transaction.
+    pub fn commit(&self) -> Result<(), StorageError> {
+        self.conn
+            .execute_batch("COMMIT")
+            .map_err(StorageError::from)
+    }
+
+    /// Rolls back the current transaction.
+    pub fn rollback(&self) {
+        let _ = self.conn.execute_batch("ROLLBACK");
+    }
+
     /// Returns a reference to the underlying connection (testing only).
     #[cfg(feature = "testing")]
     pub fn connection(&self) -> &Connection {

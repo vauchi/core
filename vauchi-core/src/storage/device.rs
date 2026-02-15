@@ -594,6 +594,22 @@ impl Storage {
         Ok(())
     }
 
+    /// Checks whether a replay nonce has already been recorded for a contact.
+    ///
+    /// Returns `true` if the nonce exists (i.e., this is a replay), `false` if fresh.
+    pub fn is_replay_nonce(
+        &self,
+        contact_id: &str,
+        nonce: &[u8; 32],
+    ) -> Result<bool, StorageError> {
+        let count: i64 = self.conn.query_row(
+            "SELECT COUNT(*) FROM replay_nonces WHERE contact_id = ?1 AND nonce = ?2",
+            params![contact_id, nonce.as_slice()],
+            |row| row.get(0),
+        )?;
+        Ok(count > 0)
+    }
+
     /// Loads all replay nonces for a contact.
     ///
     /// Returns (nonce, timestamp) pairs.

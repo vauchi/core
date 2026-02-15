@@ -10,10 +10,10 @@
 //! Key hierarchy:
 //! ```text
 //! Master Seed (256-bit)
-//!     └── SMK = HKDF(master_seed, "Vauchi_Shred_Key")
-//!         ├── SEK (Storage Encryption Key) = HKDF(SMK, "Vauchi_Storage_Key")
+//!     └── SMK = HKDF(ikm=master_seed, info="Vauchi_Shred_Key_v2")
+//!         ├── SEK = HKDF(ikm=SMK, info="Vauchi_Storage_Key_v2")
 //!         │   └── encrypts all local SQLite data
-//!         └── FKEK (File Key Encryption Key) = HKDF(SMK, "Vauchi_FileKey_Key")
+//!         └── FKEK = HKDF(ikm=SMK, info="Vauchi_FileKey_Key_v2")
 //!             └── encrypts FileKeyStorage encryption_key
 //! ```
 //!
@@ -27,11 +27,12 @@ use crate::crypto::{SymmetricKey, HKDF};
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
 /// HKDF info string for SMK derivation from master_seed.
-const SMK_INFO: &[u8] = b"Vauchi_Shred_Key";
+/// v2: Fixed HKDF parameter ordering (seed as IKM, not salt).
+const SMK_INFO: &[u8] = b"Vauchi_Shred_Key_v2";
 /// HKDF info string for SEK derivation from SMK.
-const SEK_INFO: &[u8] = b"Vauchi_Storage_Key";
+const SEK_INFO: &[u8] = b"Vauchi_Storage_Key_v2";
 /// HKDF info string for FKEK derivation from SMK.
-const FKEK_INFO: &[u8] = b"Vauchi_FileKey_Key";
+const FKEK_INFO: &[u8] = b"Vauchi_FileKey_Key_v2";
 
 /// Shredding Master Key — the root of the crypto-shredding key hierarchy.
 ///
@@ -55,11 +56,8 @@ impl ShreddingMasterKey {
     ///
     /// Called once at identity creation or during migration from pre-SMK storage.
     /// The resulting SMK should be persisted to SecureStorage immediately.
-    ///
-    /// Uses the existing codebase HKDF convention where master_seed is passed
-    /// as salt (see DP-5 in implementation plan).
     pub fn derive_from_seed(master_seed: &[u8; 32]) -> Self {
-        let bytes = HKDF::derive_key(Some(master_seed), &[], SMK_INFO);
+        let bytes = HKDF::derive_key(None, master_seed, SMK_INFO);
         Self { bytes }
     }
 
@@ -78,7 +76,7 @@ impl ShreddingMasterKey {
     /// SEK encrypts all SQLite columns containing sensitive data.
     /// Called at boot after loading SMK from SecureStorage.
     pub fn derive_sek(&self) -> SymmetricKey {
-        let bytes = HKDF::derive_key(Some(&self.bytes), &[], SEK_INFO);
+        let bytes = HKDF::derive_key(None, &self.bytes, SEK_INFO);
         SymmetricKey::from_bytes(bytes)
     }
 
@@ -87,7 +85,7 @@ impl ShreddingMasterKey {
     /// FKEK encrypts FileKeyStorage's encryption_key.
     /// Called at boot after loading SMK from SecureStorage.
     pub fn derive_fkek(&self) -> SymmetricKey {
-        let bytes = HKDF::derive_key(Some(&self.bytes), &[], FKEK_INFO);
+        let bytes = HKDF::derive_key(None, &self.bytes, FKEK_INFO);
         SymmetricKey::from_bytes(bytes)
     }
 }
@@ -174,8 +172,8 @@ mod tests {
         let smk = ShreddingMasterKey::derive_from_seed(&seed);
 
         // Identity key uses SigningKeyPair::from_seed (raw seed, no HKDF)
-        // Exchange key uses HKDF with "Vauchi_Exchange_Seed"
-        let exchange_key = HKDF::derive_key(Some(&seed), &[], b"Vauchi_Exchange_Seed");
+        // Exchange key uses HKDF with seed as IKM
+        let exchange_key = HKDF::derive_key(None, &seed, b"Vauchi_Exchange_Seed_v2");
 
         assert_ne!(
             smk.as_bytes(),

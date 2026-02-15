@@ -46,7 +46,10 @@ impl AnonymousSender {
 /// every epoch, preventing long-term correlation.
 pub fn compute_anonymous_id(shared_key: &[u8; 32], epoch: u64) -> [u8; 32] {
     let epoch_bytes = epoch.to_le_bytes();
-    HKDF::derive_key(Some(shared_key), &epoch_bytes, b"Vauchi_AnonymousSender")
+    // shared_key is IKM (high-entropy input), epoch embedded in info
+    let mut info = b"Vauchi_AnonymousSender_v2".to_vec();
+    info.extend_from_slice(&epoch_bytes);
+    HKDF::derive_key(None, shared_key, &info)
 }
 
 /// Returns the current epoch (unix_timestamp / 3600).

@@ -123,7 +123,8 @@ impl Identity {
         let signing_public_key = *signing_keypair.public_key().as_bytes();
 
         // Derive exchange keypair using HKDF with domain separation
-        let exchange_seed = HKDF::derive_key(Some(&master_seed), &[], b"Vauchi_Exchange_Seed");
+        // master_seed is IKM (high-entropy input), no salt needed
+        let exchange_seed = HKDF::derive_key(None, &master_seed, b"Vauchi_Exchange_Seed_v2");
 
         // Create X25519 keypair and store the actual public key
         let x3dh = X3DHKeyPair::from_bytes(exchange_seed);
@@ -178,7 +179,7 @@ impl Identity {
     pub fn x3dh_keypair(&self) -> X3DHKeyPair {
         // Derive X25519 secret from master_seed using HKDF
         // Uses same derivation as exchange_public_key for consistency
-        let x25519_secret = HKDF::derive_key(Some(&self.master_seed), &[], b"Vauchi_Exchange_Seed");
+        let x25519_secret = HKDF::derive_key(None, &self.master_seed, b"Vauchi_Exchange_Seed_v2");
         X3DHKeyPair::from_bytes(x25519_secret)
     }
 

@@ -14,8 +14,9 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use thiserror::Error;
 
 /// Domain separation constants for device key derivation.
-const DEVICE_ID_INFO: &[u8] = b"Vauchi_Device_ID";
-const DEVICE_EXCHANGE_INFO: &[u8] = b"Vauchi_Device_Exchange";
+/// v2: Fixed HKDF parameter ordering (master_seed as IKM, index in info).
+const DEVICE_ID_INFO: &[u8] = b"Vauchi_Device_ID_v2";
+const DEVICE_EXCHANGE_INFO: &[u8] = b"Vauchi_Device_Exchange_v2";
 
 /// Maximum number of linked devices per identity.
 pub const MAX_DEVICES: usize = 10;
@@ -58,11 +59,15 @@ impl DeviceInfo {
     pub fn derive(master_seed: &[u8; 32], device_index: u32, device_name: String) -> Self {
         let index_bytes = device_index.to_le_bytes();
 
-        // Derive device ID: HKDF(master_seed, index, "Vauchi_Device_ID")
-        let device_id = HKDF::derive_key(Some(master_seed), &index_bytes, DEVICE_ID_INFO);
+        // Derive device ID: master_seed as IKM, index embedded in info
+        let mut id_info = DEVICE_ID_INFO.to_vec();
+        id_info.extend_from_slice(&index_bytes);
+        let device_id = HKDF::derive_key(None, master_seed, &id_info);
 
         // Derive device exchange key seed
-        let exchange_seed = HKDF::derive_key(Some(master_seed), &index_bytes, DEVICE_EXCHANGE_INFO);
+        let mut exchange_info = DEVICE_EXCHANGE_INFO.to_vec();
+        exchange_info.extend_from_slice(&index_bytes);
+        let exchange_seed = HKDF::derive_key(None, master_seed, &exchange_info);
         let device_exchange_keypair = X3DHKeyPair::from_bytes(exchange_seed);
 
         let created_at = SystemTime::now()

@@ -54,6 +54,7 @@ fn create_encrypted_update(
     bob_ratchet: &mut DoubleRatchetState,
     display_name: &str,
     email: &str,
+    recipient_pk: &[u8; 32],
 ) -> Vec<u8> {
     let old_card = ContactCard::new("Bob");
     let mut new_card = ContactCard::new(display_name);
@@ -62,7 +63,7 @@ fn create_encrypted_update(
         .unwrap();
 
     let mut delta = CardDelta::compute(&old_card, &new_card);
-    delta.sign(bob_identity);
+    delta.sign(bob_identity, recipient_pk);
 
     let delta_bytes = serde_json::to_vec(&delta).unwrap();
     let ratchet_msg = bob_ratchet.encrypt(&delta_bytes).unwrap();
@@ -72,6 +73,7 @@ fn create_encrypted_update(
 #[test]
 fn test_replay_rejects_duplicate_payload() {
     let (alice, bob_id, bob_identity, mut bob_ratchet) = setup_alice_receiving_from_bob();
+    let alice_pk = alice.identity().unwrap().signing_public_key();
 
     // First update succeeds
     let encrypted = create_encrypted_update(
@@ -79,6 +81,7 @@ fn test_replay_rejects_duplicate_payload() {
         &mut bob_ratchet,
         "Bob Updated",
         "bob@work.com",
+        alice_pk,
     );
     let result = alice.process_card_update(&bob_id, &encrypted);
     assert!(result.is_ok(), "First update should succeed");
@@ -93,6 +96,7 @@ fn test_replay_rejects_duplicate_payload() {
 #[test]
 fn test_replay_rejects_reused_nonce_different_encryption() {
     let (alice, bob_id, bob_identity, mut bob_ratchet) = setup_alice_receiving_from_bob();
+    let alice_pk = alice.identity().unwrap().signing_public_key();
 
     // Create a delta with a specific nonce
     let old_card = ContactCard::new("Bob");
@@ -101,7 +105,7 @@ fn test_replay_rejects_reused_nonce_different_encryption() {
         .add_field(ContactField::new(FieldType::Email, "work", "bob@v2.com"))
         .unwrap();
     let mut delta = CardDelta::compute(&old_card, &new_card);
-    delta.sign(&bob_identity);
+    delta.sign(&bob_identity, alice_pk);
     let saved_nonce = delta.nonce;
     let saved_timestamp = delta.timestamp;
 
@@ -117,7 +121,7 @@ fn test_replay_rejects_reused_nonce_different_encryption() {
         .add_field(ContactField::new(FieldType::Email, "work", "bob@v3.com"))
         .unwrap();
     let mut delta2 = CardDelta::compute(&old_card, &new_card2);
-    delta2.sign(&bob_identity);
+    delta2.sign(&bob_identity, alice_pk);
     // Overwrite nonce and timestamp to match the first delta (replay attack)
     delta2.nonce = saved_nonce;
     delta2.timestamp = saved_timestamp;
@@ -139,16 +143,17 @@ fn test_replay_rejects_reused_nonce_different_encryption() {
 #[test]
 fn test_replay_accepts_fresh_nonces() {
     let (alice, bob_id, bob_identity, mut bob_ratchet) = setup_alice_receiving_from_bob();
+    let alice_pk = alice.identity().unwrap().signing_public_key();
 
     // First update with unique nonce
     let encrypted1 =
-        create_encrypted_update(&bob_identity, &mut bob_ratchet, "Bob V1", "bob@v1.com");
+        create_encrypted_update(&bob_identity, &mut bob_ratchet, "Bob V1", "bob@v1.com", alice_pk);
     let result1 = alice.process_card_update(&bob_id, &encrypted1);
     assert!(result1.is_ok(), "First fresh nonce should succeed");
 
     // Second update with a different nonce (CardDelta::compute generates fresh nonce each time)
     let encrypted2 =
-        create_encrypted_update(&bob_identity, &mut bob_ratchet, "Bob V2", "bob@v2.com");
+        create_encrypted_update(&bob_identity, &mut bob_ratchet, "Bob V2", "bob@v2.com", alice_pk);
     let result2 = alice.process_card_update(&bob_id, &encrypted2);
     assert!(result2.is_ok(), "Second fresh nonce should succeed");
 
@@ -160,6 +165,7 @@ fn test_replay_accepts_fresh_nonces() {
 #[test]
 fn test_replay_nonce_persisted_after_successful_update() {
     let (alice, bob_id, bob_identity, mut bob_ratchet) = setup_alice_receiving_from_bob();
+    let alice_pk = alice.identity().unwrap().signing_public_key();
 
     // No nonces initially
     let nonces_before = alice.storage().load_replay_nonces(&bob_id).unwrap();
@@ -171,6 +177,7 @@ fn test_replay_nonce_persisted_after_successful_update() {
         &mut bob_ratchet,
         "Bob Updated",
         "bob@work.com",
+        alice_pk,
     );
     alice.process_card_update(&bob_id, &encrypted).unwrap();
 

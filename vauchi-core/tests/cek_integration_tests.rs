@@ -148,6 +148,7 @@ fn test_propagate_without_cek_still_works() {
 #[test]
 fn test_process_cek_wrapped_update_saves_cek() {
     let (alice, bob_id, bob_identity, bob_dh, shared_secret) = setup_alice_with_bob_ratchet();
+    let alice_pk = alice.identity().unwrap().signing_public_key();
 
     // Bob creates a CEK-wrapped update
     let mut bob_ratchet =
@@ -158,7 +159,7 @@ fn test_process_cek_wrapped_update_saves_cek() {
     let new_card = ContactCard::new("Bob Updated");
 
     let mut delta = CardDelta::compute(&old_card, &new_card);
-    delta.sign(&bob_identity);
+    delta.sign(&bob_identity, alice_pk);
 
     // Wrap delta in CEK
     let cek = ContentEncryptionKey::generate();
@@ -198,6 +199,7 @@ fn test_process_cek_wrapped_update_saves_cek() {
 #[test]
 fn test_process_legacy_update_backward_compat() {
     let (alice, bob_id, bob_identity, bob_dh, shared_secret) = setup_alice_with_bob_ratchet();
+    let alice_pk = alice.identity().unwrap().signing_public_key();
 
     // Bob sends a legacy (non-CEK) update — existing behavior must keep working
     let mut bob_ratchet =
@@ -212,7 +214,7 @@ fn test_process_legacy_update_backward_compat() {
     ));
 
     let mut delta = CardDelta::compute(&old_card, &new_card);
-    delta.sign(&bob_identity);
+    delta.sign(&bob_identity, alice_pk);
 
     // Legacy: just raw JSON bytes (no version tag)
     let delta_bytes = serde_json::to_vec(&delta).unwrap();
@@ -231,6 +233,7 @@ fn test_process_legacy_update_backward_compat() {
 #[test]
 fn test_process_update_from_revoked_sender_rejected() {
     let (alice, bob_id, bob_identity, bob_dh, shared_secret) = setup_alice_with_bob_ratchet();
+    let alice_pk = alice.identity().unwrap().signing_public_key();
 
     // Record Bob as revoked
     alice
@@ -246,7 +249,7 @@ fn test_process_update_from_revoked_sender_rejected() {
     let new_card = ContactCard::new("Bob Evil");
 
     let mut delta = CardDelta::compute(&old_card, &new_card);
-    delta.sign(&bob_identity);
+    delta.sign(&bob_identity, alice_pk);
 
     let delta_bytes = serde_json::to_vec(&delta).unwrap();
     let ratchet_msg = bob_ratchet.encrypt(&delta_bytes).unwrap();
@@ -263,6 +266,7 @@ fn test_process_update_from_revoked_sender_rejected() {
 #[test]
 fn test_process_cek_wrapped_update_applies_delta() {
     let (alice, bob_id, bob_identity, bob_dh, shared_secret) = setup_alice_with_bob_ratchet();
+    let alice_pk = alice.identity().unwrap().signing_public_key();
 
     let mut bob_ratchet =
         DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key());
@@ -277,7 +281,7 @@ fn test_process_cek_wrapped_update_applies_delta() {
     ));
 
     let mut delta = CardDelta::compute(&old_card, &new_card);
-    delta.sign(&bob_identity);
+    delta.sign(&bob_identity, alice_pk);
 
     // CEK-wrap the delta
     let cek = ContentEncryptionKey::generate();

@@ -164,22 +164,27 @@ impl CardDelta {
         }
     }
 
-    /// Signs the delta with the given identity.
+    /// Signs the delta with the given identity, binding to the recipient.
     ///
-    /// Creates a signature over the delta content (excluding the signature field).
-    pub fn sign(&mut self, identity: &Identity) {
-        let message = self.signable_bytes();
+    /// The signature covers the delta content plus the sender and recipient
+    /// identity keys. This prevents a signed delta from being forwarded to
+    /// a different recipient with a valid signature.
+    pub fn sign(&mut self, identity: &Identity, recipient_pk: &[u8; 32]) {
+        let message = self.signable_bytes(identity.signing_public_key(), recipient_pk);
         let signature = identity.sign(&message);
         self.signature = *signature.as_bytes();
     }
 
-    /// Verifies the delta signature against a public key.
-    pub fn verify(&self, public_key: &[u8; 32]) -> bool {
+    /// Verifies the delta signature against sender and recipient public keys.
+    ///
+    /// Both keys must match the values used during signing for the signature
+    /// to verify. This binds the delta to a specific sender-recipient pair.
+    pub fn verify(&self, sender_pk: &[u8; 32], recipient_pk: &[u8; 32]) -> bool {
         use crate::crypto::PublicKey;
 
-        let message = self.signable_bytes();
+        let message = self.signable_bytes(sender_pk, recipient_pk);
         let signature = crate::crypto::Signature::from_bytes(self.signature);
-        let pubkey = PublicKey::from_bytes(*public_key);
+        let pubkey = PublicKey::from_bytes(*sender_pk);
 
         pubkey.verify(&message, &signature)
     }
@@ -336,25 +341,36 @@ impl CardDelta {
     }
 
     /// Returns the bytes to be signed/verified.
-    fn signable_bytes(&self) -> Vec<u8> {
-        // Create a version without the signature for signing
+    ///
+    /// Includes sender and recipient identity keys to bind the signature
+    /// to a specific sender-recipient pair.
+    fn signable_bytes(&self, sender_pk: &[u8; 32], recipient_pk: &[u8; 32]) -> Vec<u8> {
         let signable = SignableDelta {
+            domain: "vauchi-delta-v2",
             version: self.version,
             timestamp: self.timestamp,
             changes: &self.changes,
             nonce: &self.nonce,
+            sender_pk,
+            recipient_pk,
         };
         serde_json::to_vec(&signable).unwrap_or_default()
     }
 }
 
 /// Helper struct for creating signable representation.
+///
+/// Includes domain separator and identity keys to prevent
+/// cross-context signature misuse.
 #[derive(Serialize)]
 struct SignableDelta<'a> {
+    domain: &'static str,
     version: u32,
     timestamp: u64,
     changes: &'a Vec<FieldChange>,
     nonce: &'a [u8; 32],
+    sender_pk: &'a [u8; 32],
+    recipient_pk: &'a [u8; 32],
 }
 
 // =============================================================================

@@ -185,19 +185,20 @@ fn test_delta_signature_rejects_wrong_signer() {
         .unwrap();
 
     let mut delta = CardDelta::compute(&old_card, &new_card);
+    let recipient_pk = &[0u8; 32];
 
     // Alice signs the delta
-    delta.sign(&alice);
+    delta.sign(&alice, recipient_pk);
 
     // Verify with Alice's key should pass
     assert!(
-        delta.verify(alice.signing_public_key()),
+        delta.verify(alice.signing_public_key(), recipient_pk),
         "Should verify with correct key"
     );
 
     // Verify with Eve's key should fail
     assert!(
-        !delta.verify(eve.signing_public_key()),
+        !delta.verify(eve.signing_public_key(), recipient_pk),
         "Should reject wrong signer"
     );
 }
@@ -221,12 +222,13 @@ fn test_delta_signature_rejects_tampered_delta() {
         .unwrap();
 
     let mut delta = CardDelta::compute(&old_card, &new_card);
+    let recipient_pk = &[0u8; 32];
 
     // Alice signs the delta
-    delta.sign(&alice);
+    delta.sign(&alice, recipient_pk);
 
     // Verify original signature
-    assert!(delta.verify(alice.signing_public_key()));
+    assert!(delta.verify(alice.signing_public_key(), recipient_pk));
 
     // Tamper with the delta (add another change)
     delta.changes.push(FieldChange::DisplayNameChanged {
@@ -235,7 +237,7 @@ fn test_delta_signature_rejects_tampered_delta() {
 
     // Signature should now fail
     assert!(
-        !delta.verify(alice.signing_public_key()),
+        !delta.verify(alice.signing_public_key(), recipient_pk),
         "Should reject tampered delta"
     );
 }

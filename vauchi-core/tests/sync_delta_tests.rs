@@ -179,14 +179,48 @@ fn test_delta_sign_and_verify() {
     let new = ContactCard::new("Alice Smith");
 
     let mut delta = CardDelta::compute(&old, &new);
-    delta.sign(&identity);
+    let recipient_pk = &[0u8; 32];
+    delta.sign(&identity, recipient_pk);
 
     // Verify with correct public key
-    assert!(delta.verify(identity.signing_public_key()));
+    assert!(delta.verify(identity.signing_public_key(), recipient_pk));
 
-    // Verify with wrong public key should fail
+    // Verify with wrong sender key should fail
     let other_identity = Identity::create("Other User");
-    assert!(!delta.verify(other_identity.signing_public_key()));
+    assert!(!delta.verify(other_identity.signing_public_key(), recipient_pk));
+
+    // Verify with wrong recipient key should fail (prevents delta forwarding)
+    let wrong_recipient = &[0xFF; 32];
+    assert!(
+        !delta.verify(identity.signing_public_key(), wrong_recipient),
+        "Delta signed for one recipient must not verify for a different recipient"
+    );
+}
+
+#[test]
+fn test_delta_signature_binds_sender_and_recipient() {
+    let alice = Identity::create("Alice");
+    let bob = Identity::create("Bob");
+    let carol = Identity::create("Carol");
+
+    let old = ContactCard::new("Alice");
+    let new = ContactCard::new("Alice Updated");
+
+    // Alice signs delta for Bob
+    let mut delta = CardDelta::compute(&old, &new);
+    delta.sign(&alice, bob.signing_public_key());
+
+    // Verifies correctly for Alice → Bob
+    assert!(delta.verify(alice.signing_public_key(), bob.signing_public_key()));
+
+    // Fails for Alice → Carol (wrong recipient)
+    assert!(
+        !delta.verify(alice.signing_public_key(), carol.signing_public_key()),
+        "Delta forwarded to wrong recipient must not verify"
+    );
+
+    // Fails for Bob → Bob (wrong sender)
+    assert!(!delta.verify(bob.signing_public_key(), bob.signing_public_key()));
 }
 
 #[test]
@@ -492,7 +526,7 @@ fn test_unsigned_delta_rejected_by_verify() {
 
     // verify() must reject a zero-signature delta
     assert!(
-        !delta.verify(identity.signing_public_key()),
+        !delta.verify(identity.signing_public_key(), &[0u8; 32]),
         "Unsigned delta with zero signature must be rejected"
     );
 }

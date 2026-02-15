@@ -544,8 +544,8 @@ impl<T: Transport> Vauchi<T> {
                 continue;
             }
 
-            // Sign delta with our identity
-            delta.sign(identity);
+            // Sign delta with our identity, bound to recipient
+            delta.sign(identity, contact.public_key());
 
             // Serialize delta
             let delta_bytes = serde_json::to_vec(&delta)
@@ -698,8 +698,12 @@ impl<T: Transport> Vauchi<T> {
         let delta: CardDelta = serde_json::from_slice(&delta_bytes)
             .map_err(|e| VauchiError::Serialization(e.to_string()))?;
 
-        // Verify signature with contact's public key
-        if !delta.verify(contact.public_key()) {
+        // Verify signature with contact's (sender) and our (recipient) public keys
+        let identity = self
+            .identity
+            .as_ref()
+            .ok_or(VauchiError::IdentityNotInitialized)?;
+        if !delta.verify(contact.public_key(), identity.signing_public_key()) {
             return Err(VauchiError::SignatureInvalid);
         }
 
@@ -799,7 +803,7 @@ impl<T: Transport> Vauchi<T> {
             // Create a no-op delta (empty changes — just carries the CEK)
             let mut delta = CardDelta::compute(&own_card, &own_card);
             // Force a nonce so the delta is processable even with no changes
-            delta.sign(identity);
+            delta.sign(identity, contact.public_key());
 
             // Serialize and CEK-encrypt the delta
             let delta_bytes = serde_json::to_vec(&delta)
@@ -1596,8 +1600,8 @@ impl<T: Transport> Vauchi<T> {
             return Ok(());
         }
 
-        // Sign delta with our identity
-        delta.sign(identity);
+        // Sign delta with our identity, bound to recipient
+        delta.sign(identity, contact.public_key());
 
         // Serialize delta
         let delta_bytes =

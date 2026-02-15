@@ -405,7 +405,8 @@ fn test_process_incoming_card_update() {
     ));
 
     let mut delta = CardDelta::compute(&old_card, &new_card);
-    delta.sign(&bob_identity);
+    let alice_pk = alice_wb.identity().unwrap().signing_public_key();
+    delta.sign(&bob_identity, alice_pk);
 
     // Encrypt the delta
     let delta_bytes = serde_json::to_vec(&delta).unwrap();
@@ -526,7 +527,8 @@ fn test_process_update_rejects_invalid_signature() {
     ));
 
     let mut delta = CardDelta::compute(&old_card, &new_card);
-    delta.sign(&wrong_identity); // WRONG signature!
+    let alice_pk = alice_wb.identity().unwrap().signing_public_key();
+    delta.sign(&wrong_identity, alice_pk); // WRONG signature!
 
     let delta_bytes = serde_json::to_vec(&delta).unwrap();
     let ratchet_msg = bob_ratchet.encrypt(&delta_bytes).unwrap();

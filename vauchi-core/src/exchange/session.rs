@@ -19,16 +19,6 @@ use crate::identity::Identity;
 /// Session timeout duration (60 seconds for resumption).
 const SESSION_TIMEOUT: Duration = Duration::from_secs(60);
 
-/// Mode of the exchange session.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum ExchangeMode {
-    /// Both parties exchange contact cards (default).
-    #[default]
-    Mutual,
-    /// Only the initiator sends their card; the responder does not share.
-    ShareOnly,
-}
-
 /// Transport mechanism used for this exchange session.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum ExchangeTransport {
@@ -120,8 +110,6 @@ pub enum ExchangeEvent {
 pub struct ExchangeSession<P: ProximityVerifier> {
     /// Current state
     state: ExchangeState,
-    /// Exchange mode (Mutual or ShareOnly)
-    mode: ExchangeMode,
     /// Transport mechanism (QR, NFC, BLE)
     transport: ExchangeTransport,
     /// Our identity
@@ -152,7 +140,6 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
         let our_x3dh = X3DHKeyPair::generate();
         ExchangeSession {
             state: ExchangeState::Idle,
-            mode: ExchangeMode::default(),
             transport: ExchangeTransport::Qr,
             identity,
             our_card,
@@ -173,7 +160,6 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
         let our_x3dh = X3DHKeyPair::generate();
         ExchangeSession {
             state: ExchangeState::AwaitingNfcTap,
-            mode: ExchangeMode::default(),
             transport: ExchangeTransport::Nfc,
             identity,
             our_card,
@@ -194,7 +180,6 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
         let our_x3dh = X3DHKeyPair::generate();
         ExchangeSession {
             state: ExchangeState::AwaitingBleConnection,
-            mode: ExchangeMode::default(),
             transport: ExchangeTransport::Ble,
             identity,
             our_card,
@@ -223,16 +208,6 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
             ExchangeState::PeerScanned { our_qr, .. } => Some(our_qr),
             _ => None,
         }
-    }
-
-    /// Returns the exchange mode.
-    pub fn mode(&self) -> ExchangeMode {
-        self.mode
-    }
-
-    /// Sets the exchange mode.
-    pub fn set_mode(&mut self, mode: ExchangeMode) {
-        self.mode = mode;
     }
 
     /// Checks whether a QR code hash has already been consumed.

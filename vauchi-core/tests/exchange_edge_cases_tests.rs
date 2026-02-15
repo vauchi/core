@@ -576,33 +576,6 @@ fn test_qr_events_rejected_on_ble_transport() {
 }
 
 // =============================================================================
-// Exchange Mode Tests
-// =============================================================================
-
-/// Scenario: Default exchange mode is Mutual
-#[test]
-fn test_default_mode_is_mutual() {
-    use vauchi_core::exchange::ExchangeMode;
-
-    let alice = Identity::create("Alice");
-    let session = ExchangeSession::new_qr(alice, ContactCard::new("Alice"), mock_proximity());
-
-    assert_eq!(session.mode(), ExchangeMode::Mutual);
-}
-
-/// Scenario: Exchange mode can be set to ShareOnly
-#[test]
-fn test_set_share_only_mode() {
-    use vauchi_core::exchange::ExchangeMode;
-
-    let alice = Identity::create("Alice");
-    let mut session = ExchangeSession::new_qr(alice, ContactCard::new("Alice"), mock_proximity());
-
-    session.set_mode(ExchangeMode::ShareOnly);
-    assert_eq!(session.mode(), ExchangeMode::ShareOnly);
-}
-
-// =============================================================================
 // Exchange Public Key Accessibility
 // =============================================================================
 

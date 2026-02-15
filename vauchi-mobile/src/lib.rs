@@ -1203,49 +1203,26 @@ impl VauchiMobile {
 
     // === Exchange Operations ===
 
-    /// Create an exchange session as initiator (displaying QR) with proximity verification.
+    /// Create a QR exchange session with proximity verification.
     ///
-    /// The `proximity` handler is called during proximity verification with the
-    /// audio challenge from the QR code.
-    pub fn create_exchange_initiator(
+    /// Both parties display and scan QR codes. Uses fresh ephemeral keys
+    /// for full forward secrecy.
+    pub fn create_qr_exchange(
         &self,
         proximity: Box<dyn MobileProximityHandler>,
     ) -> Result<Arc<MobileExchangeSession>, MobileError> {
         let identity = self.get_identity()?;
         let our_card = self.get_own_card_or_default(&identity)?;
-        Ok(exchange::create_initiator_proximity(
+        Ok(exchange::create_qr_exchange_proximity(
             identity, our_card, proximity,
         ))
     }
 
-    /// Create an exchange session as responder (scanning QR) with proximity verification.
-    pub fn create_exchange_responder(
-        &self,
-        proximity: Box<dyn MobileProximityHandler>,
-    ) -> Result<Arc<MobileExchangeSession>, MobileError> {
+    /// Create a QR exchange session with manual confirmation (no audio hardware).
+    pub fn create_qr_exchange_manual(&self) -> Result<Arc<MobileExchangeSession>, MobileError> {
         let identity = self.get_identity()?;
         let our_card = self.get_own_card_or_default(&identity)?;
-        Ok(exchange::create_responder_proximity(
-            identity, our_card, proximity,
-        ))
-    }
-
-    /// Create an exchange session as initiator with manual confirmation (no audio hardware).
-    pub fn create_exchange_initiator_manual(
-        &self,
-    ) -> Result<Arc<MobileExchangeSession>, MobileError> {
-        let identity = self.get_identity()?;
-        let our_card = self.get_own_card_or_default(&identity)?;
-        Ok(exchange::create_initiator_manual(identity, our_card))
-    }
-
-    /// Create an exchange session as responder with manual confirmation (no audio hardware).
-    pub fn create_exchange_responder_manual(
-        &self,
-    ) -> Result<Arc<MobileExchangeSession>, MobileError> {
-        let identity = self.get_identity()?;
-        let our_card = self.get_own_card_or_default(&identity)?;
-        Ok(exchange::create_responder_manual(identity, our_card))
+        Ok(exchange::create_qr_exchange_manual(identity, our_card))
     }
 
     /// Finalize a completed exchange session.
@@ -2933,11 +2910,11 @@ mod tests {
     }
 
     #[test]
-    fn test_exchange_session_initiator() {
+    fn test_exchange_session_qr() {
         let (wb, _dir) = create_test_instance();
         wb.create_identity("Alice".to_string()).unwrap();
 
-        let session = wb.create_exchange_initiator_manual().unwrap();
+        let session = wb.create_qr_exchange_manual().unwrap();
         let qr_data = session.generate_qr().unwrap();
         assert!(
             qr_data.starts_with("wb://"),

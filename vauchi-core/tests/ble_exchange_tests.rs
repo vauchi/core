@@ -454,7 +454,7 @@ fn test_ble_rejects_wrong_transport() {
     let proximity = MockProximityVerifier::success();
 
     // QR session
-    let mut session = ExchangeSession::new_initiator(identity, card, proximity);
+    let mut session = ExchangeSession::new_qr(identity, card, proximity);
 
     let result = session.apply(ExchangeEvent::BlePayloadExchanged {
         their_payload: vec![],

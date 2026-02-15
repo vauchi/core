@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! Tests for Mutual QR Exchange (Feature A)
+//! Tests for QR Exchange
 //!
 //! Feature file: features/contact_exchange.feature @qr-mutual
 //!
@@ -24,7 +24,7 @@ fn test_qr_generate_with_ephemeral() {
     let identity = Identity::create("Alice");
     let ephemeral = X3DHKeyPair::generate();
 
-    let qr = ExchangeQR::generate_with_ephemeral(&identity, &ephemeral);
+    let qr = ExchangeQR::generate(&identity, &ephemeral);
 
     // Identity key should match
     assert_eq!(qr.public_key(), identity.signing_public_key());
@@ -34,7 +34,7 @@ fn test_qr_generate_with_ephemeral() {
     assert_ne!(
         qr.exchange_key(),
         identity.exchange_public_key(),
-        "Ephemeral QR should NOT use identity's exchange key"
+        "QR should NOT use identity's static exchange key"
     );
 
     // Should be valid
@@ -49,8 +49,8 @@ fn test_qr_ephemeral_changes_each_call() {
     let eph1 = X3DHKeyPair::generate();
     let eph2 = X3DHKeyPair::generate();
 
-    let qr1 = ExchangeQR::generate_with_ephemeral(&identity, &eph1);
-    let qr2 = ExchangeQR::generate_with_ephemeral(&identity, &eph2);
+    let qr1 = ExchangeQR::generate(&identity, &eph1);
+    let qr2 = ExchangeQR::generate(&identity, &eph2);
 
     // Same identity key
     assert_eq!(qr1.public_key(), qr2.public_key());
@@ -72,7 +72,7 @@ fn test_qr_ephemeral_roundtrip_via_data_string() {
     let identity = Identity::create("Alice");
     let ephemeral = X3DHKeyPair::generate();
 
-    let qr = ExchangeQR::generate_with_ephemeral(&identity, &ephemeral);
+    let qr = ExchangeQR::generate(&identity, &ephemeral);
     let data = qr.to_data_string();
     let parsed = ExchangeQR::from_data_string(&data).expect("Should parse");
 
@@ -83,78 +83,70 @@ fn test_qr_ephemeral_roundtrip_via_data_string() {
 }
 
 // ============================================================
-// Mutual QR state machine transitions
+// QR state machine transitions
 // ============================================================
 
 #[test]
-fn test_mutual_start_generates_qr() {
+fn test_start_qr_generates_qr() {
     let identity = Identity::create("Alice");
     let card = ContactCard::new("Alice");
     let proximity = MockProximityVerifier::success();
 
-    let mut session = ExchangeSession::new_mutual_qr(identity, card, proximity);
+    let mut session = ExchangeSession::new_qr(identity, card, proximity);
 
     assert!(matches!(session.state(), ExchangeState::Idle));
-    assert_eq!(session.transport(), ExchangeTransport::QrMutual);
+    assert_eq!(session.transport(), ExchangeTransport::Qr);
 
-    session.apply(ExchangeEvent::StartMutualQR).unwrap();
+    session.apply(ExchangeEvent::StartQR).unwrap();
 
     assert!(
-        matches!(
-            session.state(),
-            ExchangeState::MutualAwaitingTheirScan { .. }
-        ),
-        "Should transition to MutualAwaitingTheirScan"
+        matches!(session.state(), ExchangeState::DisplayingQr { .. }),
+        "Should transition to DisplayingQr"
     );
 
-    let qr = session
-        .qr()
-        .expect("Should have QR in MutualAwaitingTheirScan");
+    let qr = session.qr().expect("Should have QR in DisplayingQr");
     assert!(qr.verify_signature());
     assert!(!qr.is_expired());
 }
 
 #[test]
-fn test_mutual_start_rejects_wrong_transport() {
+fn test_start_qr_rejects_wrong_transport() {
     let identity = Identity::create("Alice");
     let card = ContactCard::new("Alice");
     let proximity = MockProximityVerifier::success();
 
-    // One-way QR session
-    let mut session = ExchangeSession::new_initiator(identity, card, proximity);
+    // NFC session — StartQR should fail
+    let mut session = ExchangeSession::new_nfc(identity, card, proximity);
 
-    let result = session.apply(ExchangeEvent::StartMutualQR);
-    assert!(
-        result.is_err(),
-        "Should reject StartMutualQR on QrOneWay transport"
-    );
+    let result = session.apply(ExchangeEvent::StartQR);
+    assert!(result.is_err(), "Should reject StartQR on NFC transport");
 }
 
 #[test]
-fn test_mutual_scan_their_qr_transitions() {
+fn test_scan_their_qr_transitions() {
     let alice_identity = Identity::create("Alice");
     let bob_identity = Identity::create("Bob");
 
     let alice_card = ContactCard::new("Alice");
     let proximity = MockProximityVerifier::success();
 
-    let mut alice_session = ExchangeSession::new_mutual_qr(alice_identity, alice_card, proximity);
+    let mut alice_session = ExchangeSession::new_qr(alice_identity, alice_card, proximity);
 
-    // Alice starts mutual QR
-    alice_session.apply(ExchangeEvent::StartMutualQR).unwrap();
+    // Alice starts QR
+    alice_session.apply(ExchangeEvent::StartQR).unwrap();
 
     // Bob also creates a QR (simulating his side)
     let bob_ephemeral = X3DHKeyPair::generate();
-    let bob_qr = ExchangeQR::generate_with_ephemeral(&bob_identity, &bob_ephemeral);
+    let bob_qr = ExchangeQR::generate(&bob_identity, &bob_ephemeral);
 
     // Alice scans Bob's QR
     alice_session
-        .apply(ExchangeEvent::ScannedTheirQR(bob_qr))
+        .apply(ExchangeEvent::ProcessQR(bob_qr))
         .unwrap();
 
     assert!(
-        matches!(alice_session.state(), ExchangeState::MutualVerified { .. }),
-        "Should transition to MutualVerified"
+        matches!(alice_session.state(), ExchangeState::PeerScanned { .. }),
+        "Should transition to PeerScanned"
     );
 
     // QR should still be accessible (for Bob to scan)
@@ -162,15 +154,15 @@ fn test_mutual_scan_their_qr_transitions() {
 }
 
 #[test]
-fn test_mutual_scan_rejects_expired() {
+fn test_scan_rejects_expired() {
     let alice_identity = Identity::create("Alice");
     let bob_identity = Identity::create("Bob");
 
     let alice_card = ContactCard::new("Alice");
     let proximity = MockProximityVerifier::success();
 
-    let mut alice_session = ExchangeSession::new_mutual_qr(alice_identity, alice_card, proximity);
-    alice_session.apply(ExchangeEvent::StartMutualQR).unwrap();
+    let mut alice_session = ExchangeSession::new_qr(alice_identity, alice_card, proximity);
+    alice_session.apply(ExchangeEvent::StartQR).unwrap();
 
     // Bob's expired QR (6 minutes ago)
     let bob_ephemeral = X3DHKeyPair::generate();
@@ -178,10 +170,9 @@ fn test_mutual_scan_rejects_expired() {
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap()
         .as_secs();
-    let expired_qr =
-        ExchangeQR::generate_with_ephemeral_and_timestamp(&bob_identity, &bob_ephemeral, now - 360);
+    let expired_qr = ExchangeQR::generate_with_timestamp(&bob_identity, &bob_ephemeral, now - 360);
 
-    let result = alice_session.apply(ExchangeEvent::ScannedTheirQR(expired_qr));
+    let result = alice_session.apply(ExchangeEvent::ProcessQR(expired_qr));
     assert!(
         matches!(result, Err(vauchi_core::exchange::ExchangeError::QRExpired)),
         "Should reject expired QR"
@@ -189,20 +180,20 @@ fn test_mutual_scan_rejects_expired() {
 }
 
 #[test]
-fn test_mutual_scan_rejects_self_exchange() {
+fn test_scan_rejects_self_exchange() {
     let alice_identity = Identity::create("Alice");
 
     // Generate own QR before moving identity into session
     let own_ephemeral = X3DHKeyPair::generate();
-    let own_qr = ExchangeQR::generate_with_ephemeral(&alice_identity, &own_ephemeral);
+    let own_qr = ExchangeQR::generate(&alice_identity, &own_ephemeral);
 
     let alice_card = ContactCard::new("Alice");
     let proximity = MockProximityVerifier::success();
 
-    let mut session = ExchangeSession::new_mutual_qr(alice_identity, alice_card, proximity);
-    session.apply(ExchangeEvent::StartMutualQR).unwrap();
+    let mut session = ExchangeSession::new_qr(alice_identity, alice_card, proximity);
+    session.apply(ExchangeEvent::StartQR).unwrap();
 
-    let result = session.apply(ExchangeEvent::ScannedTheirQR(own_qr));
+    let result = session.apply(ExchangeEvent::ProcessQR(own_qr));
     assert!(
         matches!(
             result,
@@ -217,7 +208,7 @@ fn test_mutual_scan_rejects_self_exchange() {
 // ============================================================
 
 #[test]
-fn test_mutual_key_agreement_symmetric() {
+fn test_key_agreement_symmetric() {
     // Both sides use fresh ephemerals, so DH should be symmetric:
     // Alice: DH(alice_secret, bob_public) == Bob: DH(bob_secret, alice_public)
     let alice_keys = X3DHKeyPair::generate();
@@ -232,51 +223,12 @@ fn test_mutual_key_agreement_symmetric() {
     );
 }
 
-#[test]
-fn test_mutual_key_differs_from_oneway() {
-    // Mutual QR uses fresh ephemerals; one-way QR uses identity's X3DH key.
-    // With different keys, the shared secrets should differ.
-    let alice_identity = Identity::create("Alice");
-    let _bob_identity = Identity::create("Bob");
-
-    // One-way: Bob initiates X3DH with Alice's identity exchange key
-    let alice_identity_x3dh = alice_identity.x3dh_keypair();
-    let bob_oneway = X3DHKeyPair::generate();
-    let oneway_shared = bob_oneway.diffie_hellman(alice_identity_x3dh.public_key());
-
-    // Mutual: both use fresh ephemerals
-    let alice_ephemeral = X3DHKeyPair::generate();
-    let bob_ephemeral = X3DHKeyPair::generate();
-    let mutual_shared = alice_ephemeral.diffie_hellman(bob_ephemeral.public_key());
-
-    // Different keys → different shared secrets
-    // (with overwhelming probability, since they use different key material)
-    assert_ne!(
-        oneway_shared, mutual_shared,
-        "Mutual and one-way should produce different shared secrets (different key material)"
-    );
-
-    // But the identity exchange key is deterministic for one-way
-    assert_eq!(
-        alice_identity_x3dh.public_key(),
-        &alice_identity.exchange_public_key()[..32],
-        "One-way QR uses identity's exchange key"
-    );
-
-    // Mutual ephemeral should NOT match identity key
-    assert_ne!(
-        alice_ephemeral.public_key(),
-        alice_identity_x3dh.public_key(),
-        "Mutual ephemeral should be different from identity exchange key"
-    );
-}
-
 // ============================================================
-// Full mutual QR exchange lifecycle
+// Full QR exchange lifecycle
 // ============================================================
 
 #[test]
-fn test_mutual_full_exchange() {
+fn test_full_qr_exchange() {
     use vauchi_core::crypto::{decrypt, encrypt};
 
     let alice_identity = Identity::create("Alice");
@@ -285,18 +237,16 @@ fn test_mutual_full_exchange() {
     let alice_card = ContactCard::new("Alice");
     let bob_card = ContactCard::new("Bob");
 
-    // Both create mutual QR sessions
     let alice_proximity = MockProximityVerifier::success();
     let bob_proximity = MockProximityVerifier::success();
 
     let mut alice_session =
-        ExchangeSession::new_mutual_qr(alice_identity, alice_card.clone(), alice_proximity);
-    let mut bob_session =
-        ExchangeSession::new_mutual_qr(bob_identity, bob_card.clone(), bob_proximity);
+        ExchangeSession::new_qr(alice_identity, alice_card.clone(), alice_proximity);
+    let mut bob_session = ExchangeSession::new_qr(bob_identity, bob_card.clone(), bob_proximity);
 
-    // Step 1: Both start mutual QR — each generates a QR with fresh ephemeral
-    alice_session.apply(ExchangeEvent::StartMutualQR).unwrap();
-    bob_session.apply(ExchangeEvent::StartMutualQR).unwrap();
+    // Step 1: Both start QR — each generates a QR with fresh ephemeral
+    alice_session.apply(ExchangeEvent::StartQR).unwrap();
+    bob_session.apply(ExchangeEvent::StartQR).unwrap();
 
     // Get each other's QR codes
     let alice_qr = alice_session.qr().unwrap().clone();
@@ -304,20 +254,20 @@ fn test_mutual_full_exchange() {
 
     // Step 2: Both scan each other's QR
     alice_session
-        .apply(ExchangeEvent::ScannedTheirQR(bob_qr))
+        .apply(ExchangeEvent::ProcessQR(bob_qr))
         .unwrap();
     bob_session
-        .apply(ExchangeEvent::ScannedTheirQR(alice_qr))
+        .apply(ExchangeEvent::ProcessQR(alice_qr))
         .unwrap();
 
-    // Both in MutualVerified state
+    // Both in PeerScanned state
     assert!(matches!(
         alice_session.state(),
-        ExchangeState::MutualVerified { .. }
+        ExchangeState::PeerScanned { .. }
     ));
     assert!(matches!(
         bob_session.state(),
-        ExchangeState::MutualVerified { .. }
+        ExchangeState::PeerScanned { .. }
     ));
 
     // Step 3: Both confirm the other scanned (transition to key agreement)
@@ -387,19 +337,19 @@ fn test_mutual_full_exchange() {
     );
 
     // Verify encryption works bidirectionally
-    let msg = b"Hello from Alice via mutual QR!";
+    let msg = b"Hello from Alice via QR!";
     let ct = encrypt(&alice_shared, msg).unwrap();
     let pt = decrypt(&bob_shared, &ct).unwrap();
     assert_eq!(pt, msg);
 
-    let msg2 = b"Hello from Bob via mutual QR!";
+    let msg2 = b"Hello from Bob via QR!";
     let ct2 = encrypt(&bob_shared, msg2).unwrap();
     let pt2 = decrypt(&alice_shared, &ct2).unwrap();
     assert_eq!(pt2, msg2);
 }
 
 #[test]
-fn test_mutual_uses_fresh_ephemeral_not_identity() {
+fn test_qr_uses_fresh_ephemeral_not_identity() {
     let alice_identity = Identity::create("Alice");
 
     // Capture identity exchange key before moving identity into session
@@ -411,64 +361,61 @@ fn test_mutual_uses_fresh_ephemeral_not_identity() {
     let alice_card = ContactCard::new("Alice");
     let proximity = MockProximityVerifier::success();
 
-    let session = ExchangeSession::new_mutual_qr(alice_identity, alice_card, proximity);
+    let session = ExchangeSession::new_qr(alice_identity, alice_card, proximity);
 
     // The session's exchange key should NOT match identity's exchange key
     let session_exchange = session.our_exchange_public_key();
 
     assert_ne!(
         session_exchange, &identity_exchange,
-        "Mutual QR should use fresh ephemeral, not identity's exchange key"
+        "QR should use fresh ephemeral, not identity's exchange key"
     );
 }
 
 #[test]
-fn test_mutual_they_scanned_requires_verified_state() {
+fn test_they_scanned_requires_peer_scanned_state() {
     let identity = Identity::create("Alice");
     let card = ContactCard::new("Alice");
     let proximity = MockProximityVerifier::success();
 
-    let mut session = ExchangeSession::new_mutual_qr(identity, card, proximity);
-    session.apply(ExchangeEvent::StartMutualQR).unwrap();
+    let mut session = ExchangeSession::new_qr(identity, card, proximity);
+    session.apply(ExchangeEvent::StartQR).unwrap();
 
     // Try TheyScannedOurQR without scanning their QR first
     let result = session.apply(ExchangeEvent::TheyScannedOurQR);
-    assert!(
-        result.is_err(),
-        "Should fail when not in MutualVerified state"
-    );
+    assert!(result.is_err(), "Should fail when not in PeerScanned state");
 }
 
 #[test]
-fn test_mutual_qr_contact_names_correct() {
+fn test_qr_contact_names_correct() {
     let alice_identity = Identity::create("Alice");
     let bob_identity = Identity::create("Bob");
 
     let alice_card = ContactCard::new("Alice");
     let bob_card = ContactCard::new("Bob");
 
-    let mut alice_session = ExchangeSession::new_mutual_qr(
+    let mut alice_session = ExchangeSession::new_qr(
         alice_identity,
         alice_card.clone(),
         MockProximityVerifier::success(),
     );
-    let mut bob_session = ExchangeSession::new_mutual_qr(
+    let mut bob_session = ExchangeSession::new_qr(
         bob_identity,
         bob_card.clone(),
         MockProximityVerifier::success(),
     );
 
-    alice_session.apply(ExchangeEvent::StartMutualQR).unwrap();
-    bob_session.apply(ExchangeEvent::StartMutualQR).unwrap();
+    alice_session.apply(ExchangeEvent::StartQR).unwrap();
+    bob_session.apply(ExchangeEvent::StartQR).unwrap();
 
     let alice_qr = alice_session.qr().unwrap().clone();
     let bob_qr = bob_session.qr().unwrap().clone();
 
     alice_session
-        .apply(ExchangeEvent::ScannedTheirQR(bob_qr))
+        .apply(ExchangeEvent::ProcessQR(bob_qr))
         .unwrap();
     bob_session
-        .apply(ExchangeEvent::ScannedTheirQR(alice_qr))
+        .apply(ExchangeEvent::ProcessQR(alice_qr))
         .unwrap();
 
     alice_session

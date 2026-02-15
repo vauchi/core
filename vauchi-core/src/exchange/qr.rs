@@ -47,79 +47,21 @@ pub struct ExchangeQR {
 }
 
 impl ExchangeQR {
-    /// Generates a new exchange QR code for the given identity.
-    pub fn generate(identity: &Identity) -> Self {
-        let timestamp = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("Time went backwards")
-            .as_secs();
-
-        Self::generate_with_timestamp(identity, timestamp)
-    }
-
-    /// Generates a QR code with a specific timestamp (for testing).
-    pub fn generate_with_timestamp(identity: &Identity, timestamp: u64) -> Self {
-        use ring::rand::SystemRandom;
-
-        let rng = SystemRandom::new();
-
-        // Generate random exchange token
-        let exchange_token = ring::rand::generate::<[u8; 32]>(&rng)
-            .expect("RNG should not fail")
-            .expose();
-
-        // Generate random audio challenge seed
-        let audio_challenge = ring::rand::generate::<[u8; 16]>(&rng)
-            .expect("RNG should not fail")
-            .expose();
-
-        let public_key = *identity.signing_public_key();
-
-        // Get X25519 exchange key for X3DH
-        let exchange_key: [u8; 32] = identity
-            .exchange_public_key()
-            .try_into()
-            .expect("Exchange key should be 32 bytes");
-
-        // Create message to sign (all fields except signature)
-        let mut message = Vec::new();
-        message.push(PROTOCOL_VERSION);
-        message.extend_from_slice(&public_key);
-        message.extend_from_slice(&exchange_key);
-        message.extend_from_slice(&exchange_token);
-        message.extend_from_slice(&audio_challenge);
-        message.extend_from_slice(&timestamp.to_be_bytes());
-
-        // Sign the message
-        let signature = identity.sign(&message);
-
-        ExchangeQR {
-            version: PROTOCOL_VERSION,
-            public_key,
-            exchange_key,
-            exchange_token,
-            audio_challenge,
-            timestamp,
-            signature: *signature.as_bytes(),
-        }
-    }
-
-    /// Generates a QR code with a provided ephemeral X25519 keypair.
+    /// Generates a new exchange QR code with a fresh ephemeral X25519 key.
     ///
-    /// Used for mutual QR exchange where both sides use fresh ephemeral keys
-    /// instead of the identity's static X3DH key. This gives full forward
-    /// secrecy since the exchange key is not derived from long-term identity.
-    pub fn generate_with_ephemeral(identity: &Identity, ephemeral: &X3DHKeyPair) -> Self {
+    /// The exchange key in the QR is the provided ephemeral key, not the
+    /// identity's static X3DH key. This gives full forward secrecy.
+    pub fn generate(identity: &Identity, ephemeral: &X3DHKeyPair) -> Self {
         let timestamp = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .expect("Time went backwards")
             .as_secs();
 
-        Self::generate_with_ephemeral_and_timestamp(identity, ephemeral, timestamp)
+        Self::generate_with_timestamp(identity, ephemeral, timestamp)
     }
 
     /// Generates a QR code with a specific ephemeral keypair and timestamp (for testing).
-    pub fn generate_with_ephemeral_and_timestamp(
+    pub fn generate_with_timestamp(
         identity: &Identity,
         ephemeral: &X3DHKeyPair,
         timestamp: u64,
@@ -138,7 +80,7 @@ impl ExchangeQR {
 
         let public_key = *identity.signing_public_key();
 
-        // Use the provided ephemeral key instead of identity's exchange key
+        // Use the provided ephemeral key — NOT identity's static exchange key
         let exchange_key: [u8; 32] = *ephemeral.public_key();
 
         let mut message = Vec::new();
@@ -344,16 +286,19 @@ mod tests {
     #[test]
     fn test_qr_generation() {
         let identity = Identity::create("Alice");
-        let qr = ExchangeQR::generate(&identity);
+        let ephemeral = X3DHKeyPair::generate();
+        let qr = ExchangeQR::generate(&identity, &ephemeral);
 
         assert_eq!(qr.version, PROTOCOL_VERSION);
         assert_eq!(qr.public_key(), identity.signing_public_key());
+        assert_eq!(qr.exchange_key(), ephemeral.public_key());
     }
 
     #[test]
     fn test_qr_signature_valid() {
         let identity = Identity::create("Alice");
-        let qr = ExchangeQR::generate(&identity);
+        let ephemeral = X3DHKeyPair::generate();
+        let qr = ExchangeQR::generate(&identity, &ephemeral);
 
         assert!(qr.verify_signature());
     }
@@ -361,7 +306,8 @@ mod tests {
     #[test]
     fn test_qr_not_expired_initially() {
         let identity = Identity::create("Alice");
-        let qr = ExchangeQR::generate(&identity);
+        let ephemeral = X3DHKeyPair::generate();
+        let qr = ExchangeQR::generate(&identity, &ephemeral);
 
         assert!(!qr.is_expired());
     }

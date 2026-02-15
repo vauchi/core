@@ -10,7 +10,7 @@
 use std::collections::HashSet;
 use std::time::{Duration, Instant};
 
-use super::{ExchangeError, ExchangeQR, ProximityVerifier, X3DHKeyPair, X3DH};
+use super::{ExchangeError, ExchangeQR, ProximityVerifier, X3DHKeyPair};
 use crate::contact::Contact;
 use crate::contact_card::ContactCard;
 use crate::crypto::kdf::HKDF;
@@ -18,9 +18,6 @@ use crate::identity::Identity;
 
 /// Session timeout duration (60 seconds for resumption).
 const SESSION_TIMEOUT: Duration = Duration::from_secs(60);
-
-/// Default proximity verification timeout.
-const PROXIMITY_TIMEOUT: Duration = Duration::from_secs(30);
 
 /// Mode of the exchange session.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -35,13 +32,10 @@ pub enum ExchangeMode {
 /// Transport mechanism used for this exchange session.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum ExchangeTransport {
-    /// One-way QR scan (existing default): displayer uses identity X3DH key,
-    /// scanner generates ephemeral. Asymmetric X3DH.
-    #[default]
-    QrOneWay,
-    /// Mutual QR exchange: both sides display and scan QR codes.
+    /// QR exchange: both sides display and scan QR codes.
     /// Both use fresh ephemeral X25519 keys for full forward secrecy.
-    QrMutual,
+    #[default]
+    Qr,
     /// NFC Active (phone-to-phone tap): single tap replaces scan + proximity.
     /// Fresh ephemeral X25519 keys on both sides.
     Nfc,
@@ -55,15 +49,16 @@ pub enum ExchangeTransport {
 pub enum ExchangeState {
     /// Initial state
     Idle,
-    /// Displaying QR code, waiting for scan
-    AwaitingScan { qr: ExchangeQR },
-    /// QR scanned by other party, waiting for proximity verification
-    AwaitingProximity {
+    /// Displaying our QR code, waiting for the other party to scan it.
+    DisplayingQr { our_qr: ExchangeQR },
+    /// We have scanned their QR; waiting for them to scan ours
+    /// (or they already did and we proceed to key agreement).
+    PeerScanned {
+        our_qr: ExchangeQR,
         their_public_key: [u8; 32],
         their_exchange_key: [u8; 32],
-        their_qr: ExchangeQR,
     },
-    /// Proximity verified, performing key agreement
+    /// Ready for key agreement (both parties have exchanged keys).
     AwaitingKeyAgreement {
         their_public_key: [u8; 32],
         their_exchange_key: [u8; 32],
@@ -72,15 +67,6 @@ pub enum ExchangeState {
     AwaitingCardExchange {
         their_public_key: [u8; 32],
         shared_key: crate::crypto::SymmetricKey,
-    },
-    /// Mutual QR: displaying our QR, waiting for the other party to scan it.
-    MutualAwaitingTheirScan { our_qr: ExchangeQR },
-    /// Mutual QR: we have scanned their QR; waiting for them to scan ours
-    /// (or they already did and we proceed to key agreement).
-    MutualVerified {
-        our_qr: ExchangeQR,
-        their_public_key: [u8; 32],
-        their_exchange_key: [u8; 32],
     },
     /// NFC: waiting for both devices to tap.
     AwaitingNfcTap,
@@ -101,26 +87,18 @@ pub enum ExchangeState {
 /// Events that drive the exchange state machine.
 #[derive(Debug)]
 pub enum ExchangeEvent {
-    /// Initiator generates a QR code to be scanned.
-    GenerateQR,
-    /// Responder processes a scanned QR code.
+    /// Start a QR exchange (generates our QR with fresh ephemeral).
+    StartQR,
+    /// We scanned their QR code.
     ProcessQR(ExchangeQR),
-    /// Start or confirm proximity verification.
-    VerifyProximity,
+    /// The other party confirmed they scanned our QR (signal to proceed).
+    TheyScannedOurQR,
     /// Perform cryptographic key agreement.
     PerformKeyAgreement,
     /// Exchange contact cards and complete the session.
     CompleteExchange(ContactCard),
     /// Explicitly fail the session.
     Fail(ExchangeError),
-
-    // --- Mutual QR events ---
-    /// Start a mutual QR exchange (generates our QR with fresh ephemeral).
-    StartMutualQR,
-    /// We scanned their QR code during a mutual exchange.
-    ScannedTheirQR(ExchangeQR),
-    /// The other party confirmed they scanned our QR (signal to proceed).
-    TheyScannedOurQR,
 
     // --- NFC events ---
     /// NFC tap completed; contains their payload bytes.
@@ -138,115 +116,50 @@ pub enum ExchangeEvent {
     BleProximityVerified,
 }
 
-/// Role in the exchange.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ExchangeRole {
-    /// Initiated exchange by displaying QR
-    Initiator,
-    /// Responded by scanning QR
-    Responder,
-}
-
 /// An exchange session managing the state of a contact exchange.
 pub struct ExchangeSession<P: ProximityVerifier> {
     /// Current state
     state: ExchangeState,
-    /// Our role in the exchange
-    role: ExchangeRole,
     /// Exchange mode (Mutual or ShareOnly)
     mode: ExchangeMode,
-    /// Transport mechanism (QR one-way, QR mutual, NFC, BLE)
+    /// Transport mechanism (QR, NFC, BLE)
     transport: ExchangeTransport,
     /// Our identity
     identity: Identity,
     /// Our contact card to share
     our_card: ContactCard,
-    /// Our X3DH keypair for this session
+    /// Our X3DH keypair for this session (fresh ephemeral)
     our_x3dh: X3DHKeyPair,
-    /// Proximity verifier
+    /// Proximity verifier (used by NFC/BLE flows, not QR)
+    #[allow(dead_code)]
     proximity: P,
     /// When the session started
     started_at: Instant,
     /// Whether the session was interrupted
     interrupted: bool,
-    /// Our ephemeral public key (set when we're the scanner/X3DH initiator)
-    our_ephemeral: Option<[u8; 32]>,
-    /// Their ephemeral public key (received when we're the displayer/X3DH responder)
-    their_ephemeral: Option<[u8; 32]>,
-    /// Their exchange public key (received alongside ephemeral for identity binding)
-    their_exchange_key_received: Option<[u8; 32]>,
     /// Hashes of QR codes that have already been consumed (prevents reuse).
     used_qrs: HashSet<[u8; 32]>,
 }
 
 impl<P: ProximityVerifier> ExchangeSession<P> {
-    /// Creates a new session as the initiator (displaying QR).
-    pub fn new_initiator(identity: Identity, our_card: ContactCard, proximity: P) -> Self {
-        // Use identity's X3DH keypair so our exchange key matches QR
-        let our_x3dh = identity.x3dh_keypair();
-        ExchangeSession {
-            state: ExchangeState::Idle,
-            role: ExchangeRole::Initiator,
-            mode: ExchangeMode::default(),
-            transport: ExchangeTransport::QrOneWay,
-            identity,
-            our_card,
-            our_x3dh,
-            proximity,
-            started_at: Instant::now(),
-            interrupted: false,
-            our_ephemeral: None,
-            their_ephemeral: None,
-            their_exchange_key_received: None,
-            used_qrs: HashSet::new(),
-        }
-    }
-
-    /// Creates a new session as the responder (scanning QR).
-    pub fn new_responder(identity: Identity, our_card: ContactCard, proximity: P) -> Self {
-        // Responder (scanner) generates ephemeral, doesn't need identity's X3DH
-        // but we keep it for consistency
-        let our_x3dh = identity.x3dh_keypair();
-        ExchangeSession {
-            state: ExchangeState::Idle,
-            role: ExchangeRole::Responder,
-            mode: ExchangeMode::default(),
-            transport: ExchangeTransport::QrOneWay,
-            identity,
-            our_card,
-            our_x3dh,
-            proximity,
-            started_at: Instant::now(),
-            interrupted: false,
-            our_ephemeral: None,
-            their_ephemeral: None,
-            their_exchange_key_received: None,
-            used_qrs: HashSet::new(),
-        }
-    }
-
-    /// Creates a new mutual QR exchange session.
+    /// Creates a new QR exchange session.
     ///
     /// Both parties display QR codes with fresh ephemeral X25519 keys and
     /// scan each other's. This gives bidirectional identity verification
     /// and full forward secrecy (no identity-derived X3DH keys used).
-    pub fn new_mutual_qr(identity: Identity, our_card: ContactCard, proximity: P) -> Self {
+    pub fn new_qr(identity: Identity, our_card: ContactCard, proximity: P) -> Self {
         // Fresh ephemeral keypair — NOT derived from identity
         let our_x3dh = X3DHKeyPair::generate();
         ExchangeSession {
             state: ExchangeState::Idle,
-            role: ExchangeRole::Initiator, // Both sides are symmetric in mutual QR
             mode: ExchangeMode::default(),
-            transport: ExchangeTransport::QrMutual,
+            transport: ExchangeTransport::Qr,
             identity,
             our_card,
             our_x3dh,
             proximity,
             started_at: Instant::now(),
             interrupted: false,
-            our_ephemeral: None,
-            their_ephemeral: None,
-            their_exchange_key_received: None,
             used_qrs: HashSet::new(),
         }
     }
@@ -260,7 +173,6 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
         let our_x3dh = X3DHKeyPair::generate();
         ExchangeSession {
             state: ExchangeState::AwaitingNfcTap,
-            role: ExchangeRole::Initiator,
             mode: ExchangeMode::default(),
             transport: ExchangeTransport::Nfc,
             identity,
@@ -269,9 +181,6 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
             proximity,
             started_at: Instant::now(),
             interrupted: false,
-            our_ephemeral: None,
-            their_ephemeral: None,
-            their_exchange_key_received: None,
             used_qrs: HashSet::new(),
         }
     }
@@ -285,7 +194,6 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
         let our_x3dh = X3DHKeyPair::generate();
         ExchangeSession {
             state: ExchangeState::AwaitingBleConnection,
-            role: ExchangeRole::Initiator,
             mode: ExchangeMode::default(),
             transport: ExchangeTransport::Ble,
             identity,
@@ -294,9 +202,6 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
             proximity,
             started_at: Instant::now(),
             interrupted: false,
-            our_ephemeral: None,
-            their_ephemeral: None,
-            their_exchange_key_received: None,
             used_qrs: HashSet::new(),
         }
     }
@@ -311,35 +216,13 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
         self.transport
     }
 
-    /// Returns the QR code if in AwaitingScan or MutualAwaitingTheirScan state.
+    /// Returns the QR code if in DisplayingQr or PeerScanned state.
     pub fn qr(&self) -> Option<&ExchangeQR> {
         match &self.state {
-            ExchangeState::AwaitingScan { qr } => Some(qr),
-            ExchangeState::MutualAwaitingTheirScan { our_qr } => Some(our_qr),
-            ExchangeState::MutualVerified { our_qr, .. } => Some(our_qr),
+            ExchangeState::DisplayingQr { our_qr } => Some(our_qr),
+            ExchangeState::PeerScanned { our_qr, .. } => Some(our_qr),
             _ => None,
         }
-    }
-
-    /// Returns our role in the exchange.
-    pub fn role(&self) -> ExchangeRole {
-        self.role
-    }
-
-    /// Returns our ephemeral public key (if we're the scanner/X3DH initiator).
-    ///
-    /// This should be sent to the QR displayer after key agreement.
-    pub fn ephemeral_public(&self) -> Option<[u8; 32]> {
-        self.our_ephemeral
-    }
-
-    /// Sets their ephemeral and exchange public keys (if we're the displayer/X3DH responder).
-    ///
-    /// Both values must be provided before key agreement when we're the QR displayer.
-    /// The exchange key is used for DH1 (identity binding) in full X3DH.
-    pub fn set_their_ephemeral(&mut self, ephemeral: [u8; 32], exchange_key: [u8; 32]) {
-        self.their_ephemeral = Some(ephemeral);
-        self.their_exchange_key_received = Some(exchange_key);
     }
 
     /// Returns the exchange mode.
@@ -381,9 +264,11 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
     /// Processes an event and transitions the state machine.
     pub fn apply(&mut self, event: ExchangeEvent) -> Result<(), ExchangeError> {
         match event {
-            ExchangeEvent::GenerateQR => self.handle_generate_qr(),
+            // QR events
+            ExchangeEvent::StartQR => self.handle_start_qr(),
             ExchangeEvent::ProcessQR(qr) => self.handle_process_qr(qr),
-            ExchangeEvent::VerifyProximity => self.handle_verify_proximity(),
+            ExchangeEvent::TheyScannedOurQR => self.handle_they_scanned_our_qr(),
+            // Shared events
             ExchangeEvent::PerformKeyAgreement => self.handle_perform_key_agreement(),
             ExchangeEvent::CompleteExchange(card) => {
                 self.handle_complete_exchange(card).map(|_| ())
@@ -392,10 +277,6 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
                 self.fail(err);
                 Ok(())
             }
-            // Mutual QR
-            ExchangeEvent::StartMutualQR => self.handle_start_mutual_qr(),
-            ExchangeEvent::ScannedTheirQR(qr) => self.handle_scanned_their_qr(qr),
-            ExchangeEvent::TheyScannedOurQR => self.handle_they_scanned_our_qr(),
             // NFC
             ExchangeEvent::NfcTapComplete { their_payload } => {
                 self.handle_nfc_tap_complete(their_payload)
@@ -408,97 +289,6 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
             } => self.handle_ble_payload_exchanged(their_payload, device_id),
             ExchangeEvent::BleProximityVerified => self.handle_ble_proximity_verified(),
         }
-    }
-
-    fn handle_generate_qr(&mut self) -> Result<(), ExchangeError> {
-        if self.role != ExchangeRole::Initiator {
-            return Err(ExchangeError::InvalidState(
-                "Only initiator can generate QR".into(),
-            ));
-        }
-
-        if !matches!(self.state, ExchangeState::Idle) {
-            return Err(ExchangeError::InvalidState(
-                "Can only generate QR from Idle state".into(),
-            ));
-        }
-
-        let qr = ExchangeQR::generate(&self.identity);
-        self.state = ExchangeState::AwaitingScan { qr };
-        Ok(())
-    }
-
-    fn handle_process_qr(&mut self, qr: ExchangeQR) -> Result<(), ExchangeError> {
-        if self.role != ExchangeRole::Responder {
-            return Err(ExchangeError::InvalidState(
-                "Only responder can process QR".into(),
-            ));
-        }
-
-        if !matches!(self.state, ExchangeState::Idle) {
-            return Err(ExchangeError::InvalidState(
-                "Can only process QR from Idle state".into(),
-            ));
-        }
-
-        // Verify QR code
-        if qr.is_expired() {
-            return Err(ExchangeError::QRExpired);
-        }
-
-        if !qr.verify_signature() {
-            return Err(ExchangeError::InvalidSignature);
-        }
-
-        let their_public_key = *qr.public_key();
-        let their_exchange_key = *qr.exchange_key();
-
-        // Check for self-exchange (scanning own QR code)
-        if their_public_key == *self.identity.signing_public_key() {
-            return Err(ExchangeError::SelfExchange);
-        }
-
-        self.state = ExchangeState::AwaitingProximity {
-            their_public_key,
-            their_exchange_key,
-            their_qr: qr,
-        };
-
-        Ok(())
-    }
-
-    fn handle_verify_proximity(&mut self) -> Result<(), ExchangeError> {
-        let (their_public_key, their_exchange_key, challenge) = match &self.state {
-            ExchangeState::AwaitingProximity {
-                their_public_key,
-                their_exchange_key,
-                their_qr,
-            } => (
-                *their_public_key,
-                *their_exchange_key,
-                *their_qr.audio_challenge(),
-            ),
-            ExchangeState::AwaitingScan { qr } => {
-                // Initiator waits for proximity challenge from responder
-                // Initiator doesn't have their exchange key yet - will receive ephemeral
-                (*qr.public_key(), [0u8; 32], *qr.audio_challenge())
-            }
-            _ => {
-                return Err(ExchangeError::InvalidState(
-                    "Not in proximity verification state".into(),
-                ))
-            }
-        };
-
-        self.proximity
-            .verify_proximity(&challenge, PROXIMITY_TIMEOUT)
-            .map_err(|_| ExchangeError::ProximityFailed)?;
-
-        self.state = ExchangeState::AwaitingKeyAgreement {
-            their_public_key,
-            their_exchange_key,
-        };
-        Ok(())
     }
 
     fn handle_perform_key_agreement(&mut self) -> Result<(), ExchangeError> {
@@ -514,49 +304,12 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
             }
         };
 
-        let shared_key = match self.transport {
-            ExchangeTransport::QrOneWay => {
-                // Asymmetric X3DH: scanner generates ephemeral, displayer responds
-                match self.role {
-                    ExchangeRole::Responder => {
-                        // Responder (QR scanner) is the X3DH INITIATOR:
-                        // - Has their exchange key from the QR
-                        // - Generates ephemeral, stores it for transfer to displayer
-                        let (shared, ephemeral) =
-                            X3DH::initiate(&self.our_x3dh, &their_exchange_key)?;
-                        self.our_ephemeral = Some(ephemeral);
-                        shared
-                    }
-                    ExchangeRole::Initiator => {
-                        // Initiator (QR displayer) is the X3DH RESPONDER:
-                        // - Needs the scanner's ephemeral (received via set_their_ephemeral)
-                        // - Needs the scanner's exchange key for DH1 (identity binding)
-                        // - Uses own X3DH keys to derive shared secret
-                        let their_ephemeral = self.their_ephemeral.ok_or_else(|| {
-                            ExchangeError::InvalidState(
-                                "Missing ephemeral from scanner - call set_their_ephemeral first"
-                                    .into(),
-                            )
-                        })?;
-                        let their_exchange = self.their_exchange_key_received.ok_or_else(|| {
-                            ExchangeError::InvalidState(
-                                "Missing exchange key from scanner - call set_their_ephemeral first"
-                                    .into(),
-                            )
-                        })?;
-                        X3DH::respond(&self.our_x3dh, &their_exchange, &their_ephemeral)?
-                    }
-                }
-            }
-            ExchangeTransport::QrMutual | ExchangeTransport::Nfc | ExchangeTransport::Ble => {
-                // Symmetric DH: both sides have fresh ephemeral keys.
-                // DH(our_secret × their_exchange_key) — both sides compute the same shared secret.
-                // HKDF is applied for domain separation (different IKM structure than full X3DH).
-                let shared_bytes = self.our_x3dh.diffie_hellman(&their_exchange_key);
-                let derived = HKDF::derive_key(None, &shared_bytes, b"vauchi-x3dh-symmetric-v1");
-                crate::crypto::SymmetricKey::from_bytes(derived)
-            }
-        };
+        // Symmetric DH: both sides have fresh ephemeral keys.
+        // DH(our_secret × their_exchange_key) — both sides compute the same shared secret.
+        // HKDF is applied for domain separation (different IKM structure than full X3DH).
+        let shared_bytes = self.our_x3dh.diffie_hellman(&their_exchange_key);
+        let derived = HKDF::derive_key(None, &shared_bytes, b"vauchi-x3dh-symmetric-v1");
+        let shared_key = crate::crypto::SymmetricKey::from_bytes(derived);
 
         self.state = ExchangeState::AwaitingCardExchange {
             their_public_key,
@@ -593,37 +346,37 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
         Ok(contact)
     }
 
-    // ---- Mutual QR handlers ----
+    // ---- QR handlers ----
 
-    fn handle_start_mutual_qr(&mut self) -> Result<(), ExchangeError> {
-        if self.transport != ExchangeTransport::QrMutual {
+    fn handle_start_qr(&mut self) -> Result<(), ExchangeError> {
+        if self.transport != ExchangeTransport::Qr {
             return Err(ExchangeError::InvalidState(
-                "StartMutualQR requires QrMutual transport".into(),
+                "StartQR requires Qr transport".into(),
             ));
         }
         if !matches!(self.state, ExchangeState::Idle) {
             return Err(ExchangeError::InvalidState(
-                "Can only start mutual QR from Idle state".into(),
+                "Can only start QR from Idle state".into(),
             ));
         }
 
-        let our_qr = ExchangeQR::generate_with_ephemeral(&self.identity, &self.our_x3dh);
-        self.state = ExchangeState::MutualAwaitingTheirScan { our_qr };
+        let our_qr = ExchangeQR::generate(&self.identity, &self.our_x3dh);
+        self.state = ExchangeState::DisplayingQr { our_qr };
         Ok(())
     }
 
-    fn handle_scanned_their_qr(&mut self, qr: ExchangeQR) -> Result<(), ExchangeError> {
-        if self.transport != ExchangeTransport::QrMutual {
+    fn handle_process_qr(&mut self, qr: ExchangeQR) -> Result<(), ExchangeError> {
+        if self.transport != ExchangeTransport::Qr {
             return Err(ExchangeError::InvalidState(
-                "ScannedTheirQR requires QrMutual transport".into(),
+                "ProcessQR requires Qr transport".into(),
             ));
         }
 
         let our_qr = match &self.state {
-            ExchangeState::MutualAwaitingTheirScan { our_qr } => our_qr.clone(),
+            ExchangeState::DisplayingQr { our_qr } => our_qr.clone(),
             _ => {
                 return Err(ExchangeError::InvalidState(
-                    "Can only scan their QR from MutualAwaitingTheirScan state".into(),
+                    "Can only scan their QR from DisplayingQr state".into(),
                 ));
             }
         };
@@ -644,7 +397,7 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
             return Err(ExchangeError::SelfExchange);
         }
 
-        self.state = ExchangeState::MutualVerified {
+        self.state = ExchangeState::PeerScanned {
             our_qr,
             their_public_key,
             their_exchange_key,
@@ -654,21 +407,21 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
     }
 
     fn handle_they_scanned_our_qr(&mut self) -> Result<(), ExchangeError> {
-        if self.transport != ExchangeTransport::QrMutual {
+        if self.transport != ExchangeTransport::Qr {
             return Err(ExchangeError::InvalidState(
-                "TheyScannedOurQR requires QrMutual transport".into(),
+                "TheyScannedOurQR requires Qr transport".into(),
             ));
         }
 
         let (their_public_key, their_exchange_key) = match &self.state {
-            ExchangeState::MutualVerified {
+            ExchangeState::PeerScanned {
                 their_public_key,
                 their_exchange_key,
                 ..
             } => (*their_public_key, *their_exchange_key),
             _ => {
                 return Err(ExchangeError::InvalidState(
-                    "Can only confirm their scan from MutualVerified state".into(),
+                    "Can only confirm their scan from PeerScanned state".into(),
                 ));
             }
         };
@@ -829,16 +582,13 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
     /// Returns the existing contact if found (matched by public key).
     pub fn check_duplicate<'a>(&self, contacts: &'a [Contact]) -> Option<&'a Contact> {
         let their_key = match &self.state {
-            ExchangeState::AwaitingProximity {
+            ExchangeState::PeerScanned {
                 their_public_key, ..
             }
             | ExchangeState::AwaitingKeyAgreement {
                 their_public_key, ..
             }
             | ExchangeState::AwaitingCardExchange {
-                their_public_key, ..
-            }
-            | ExchangeState::MutualVerified {
                 their_public_key, ..
             }
             | ExchangeState::AwaitingBleVerification {

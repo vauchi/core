@@ -90,7 +90,8 @@ fn test_x3dh_shared_secret_usable_for_encryption() {
 #[test]
 fn test_generate_qr_contains_public_key() {
     let identity = Identity::create("Alice");
-    let qr = ExchangeQR::generate(&identity);
+    let ephemeral = X3DHKeyPair::generate();
+    let qr = ExchangeQR::generate(&identity, &ephemeral);
 
     assert_eq!(qr.public_key(), identity.signing_public_key());
 }
@@ -99,7 +100,8 @@ fn test_generate_qr_contains_public_key() {
 #[test]
 fn test_qr_roundtrip_encode_decode() {
     let identity = Identity::create("Alice");
-    let original = ExchangeQR::generate(&identity);
+    let ephemeral = X3DHKeyPair::generate();
+    let original = ExchangeQR::generate(&identity, &ephemeral);
 
     let encoded = original.to_data_string();
     let decoded = ExchangeQR::from_data_string(&encoded).expect("Decoding should succeed");
@@ -112,7 +114,8 @@ fn test_qr_roundtrip_encode_decode() {
 #[test]
 fn test_qr_expires_after_5_minutes() {
     let identity = Identity::create("Alice");
-    let qr = ExchangeQR::generate(&identity);
+    let ephemeral = X3DHKeyPair::generate();
+    let qr = ExchangeQR::generate(&identity, &ephemeral);
 
     // Fresh QR should not be expired
     assert!(!qr.is_expired());
@@ -120,6 +123,7 @@ fn test_qr_expires_after_5_minutes() {
     // Create a QR with timestamp 6 minutes in the past
     let old_qr = ExchangeQR::generate_with_timestamp(
         &identity,
+        &ephemeral,
         std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
@@ -134,7 +138,8 @@ fn test_qr_expires_after_5_minutes() {
 #[test]
 fn test_qr_signature_verification() {
     let identity = Identity::create("Alice");
-    let qr = ExchangeQR::generate(&identity);
+    let ephemeral = X3DHKeyPair::generate();
+    let qr = ExchangeQR::generate(&identity, &ephemeral);
 
     assert!(qr.verify_signature());
 }

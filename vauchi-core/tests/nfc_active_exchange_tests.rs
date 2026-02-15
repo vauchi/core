@@ -353,8 +353,8 @@ fn test_nfc_rejects_wrong_transport() {
     let card = ContactCard::new("Alice");
     let proximity = MockProximityVerifier::success();
 
-    // One-way QR session
-    let mut session = ExchangeSession::new_initiator(identity, card, proximity);
+    // QR session
+    let mut session = ExchangeSession::new_qr(identity, card, proximity);
 
     let result = session.apply(ExchangeEvent::NfcTapComplete {
         their_payload: vec![],
@@ -509,19 +509,17 @@ fn test_nfc_full_exchange_payload_crypto() {
 
 #[test]
 fn test_nfc_key_independence_from_qr() {
-    // NFC and QR use different ephemeral keys — shared secrets should differ
-    let alice_identity = Identity::create("Alice");
-    let _bob_identity = Identity::create("Bob");
+    // NFC and QR use independent ephemeral keys — shared secrets should differ
 
     // NFC path: fresh ephemerals
     let alice_nfc_eph = X3DHKeyPair::generate();
     let bob_nfc_eph = X3DHKeyPair::generate();
     let nfc_shared = alice_nfc_eph.diffie_hellman(bob_nfc_eph.public_key());
 
-    // QR one-way path: identity's X3DH key
-    let alice_qr_x3dh = alice_identity.x3dh_keypair();
+    // QR path: also uses fresh ephemerals (mutual QR)
+    let alice_qr_eph = X3DHKeyPair::generate();
     let bob_qr_eph = X3DHKeyPair::generate();
-    let qr_shared = bob_qr_eph.diffie_hellman(alice_qr_x3dh.public_key());
+    let qr_shared = alice_qr_eph.diffie_hellman(bob_qr_eph.public_key());
 
     assert_ne!(
         nfc_shared, qr_shared,

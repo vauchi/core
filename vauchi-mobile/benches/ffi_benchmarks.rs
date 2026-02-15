@@ -164,10 +164,10 @@ fn bench_contact_list_scaling(c: &mut Criterion) {
 fn bench_exchange_qr(c: &mut Criterion) {
     let mut group = c.benchmark_group("exchange");
 
-    group.bench_function("create_initiator_manual", |b| {
+    group.bench_function("create_qr_exchange_manual", |b| {
         let (instance, _dir) = create_instance_with_identity("Test User");
         b.iter(|| {
-            let session = instance.create_exchange_initiator_manual().unwrap();
+            let session = instance.create_qr_exchange_manual().unwrap();
             black_box(session.generate_qr().unwrap());
         })
     });

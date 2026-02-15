@@ -86,6 +86,6 @@ pub use proximity::{
 pub use qr::{check_clock_drift, ExchangeQR};
 pub use session::{
     DefaultPlatformCallbacks, DuplicateAction, ExchangeEvent, ExchangeMode,
-    ExchangePlatformCallbacks, ExchangeRole, ExchangeSession, ExchangeState, ExchangeTransport,
+    ExchangePlatformCallbacks, ExchangeSession, ExchangeState, ExchangeTransport,
 };
 pub use x3dh::{X3DHKeyPair, X3DH};

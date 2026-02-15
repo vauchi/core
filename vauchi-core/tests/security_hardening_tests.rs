@@ -20,7 +20,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use vauchi_core::crypto::{derive_key_argon2id, SigningKeyPair, SymmetricKey};
 use vauchi_core::exchange::{
     BLEProximityVerifier, ExchangeError, ExchangeEvent, ExchangeQR, ExchangeSession,
-    MockBLEVerifier, MockProximityVerifier, ProximityError,
+    MockBLEVerifier, MockProximityVerifier, ProximityError, X3DHKeyPair,
 };
 use vauchi_core::storage::Storage;
 use vauchi_core::Identity;
@@ -119,6 +119,7 @@ fn test_brute_force_rate_calculation() {
 #[test]
 fn test_qr_screenshot_attack_prevention() {
     let identity = Identity::create("Alice");
+    let ephemeral = X3DHKeyPair::generate();
 
     // Generate QR with timestamp in the past (6 minutes ago = expired)
     let six_minutes_ago = SystemTime::now()
@@ -127,7 +128,7 @@ fn test_qr_screenshot_attack_prevention() {
         .as_secs()
         - 360;
 
-    let qr = ExchangeQR::generate_with_timestamp(&identity, six_minutes_ago);
+    let qr = ExchangeQR::generate_with_timestamp(&identity, &ephemeral, six_minutes_ago);
 
     // QR should be marked as expired
     assert!(
@@ -136,7 +137,7 @@ fn test_qr_screenshot_attack_prevention() {
     );
 
     // Verify recently generated QR is not expired
-    let fresh_qr = ExchangeQR::generate(&identity);
+    let fresh_qr = ExchangeQR::generate(&identity, &ephemeral);
     assert!(
         !fresh_qr.is_expired(),
         "Freshly generated QR should not be expired"
@@ -147,6 +148,7 @@ fn test_qr_screenshot_attack_prevention() {
 #[test]
 fn test_expired_qr_rejected_in_session() {
     let alice_identity = Identity::create("Alice");
+    let alice_ephemeral = X3DHKeyPair::generate();
 
     // Alice generates QR (with timestamp 6 minutes ago = expired)
     let six_minutes_ago = SystemTime::now()
@@ -154,14 +156,18 @@ fn test_expired_qr_rejected_in_session() {
         .unwrap()
         .as_secs()
         - 360;
-    let expired_qr = ExchangeQR::generate_with_timestamp(&alice_identity, six_minutes_ago);
+    let expired_qr =
+        ExchangeQR::generate_with_timestamp(&alice_identity, &alice_ephemeral, six_minutes_ago);
     let qr_data = expired_qr.to_data_string();
 
     // Bob tries to use Alice's expired QR
     let bob_identity = Identity::create("Bob");
     let bob_card = vauchi_core::ContactCard::new("Bob");
     let bob_proximity = MockProximityVerifier::success();
-    let mut bob_session = ExchangeSession::new_responder(bob_identity, bob_card, bob_proximity);
+    let mut bob_session = ExchangeSession::new_qr(bob_identity, bob_card, bob_proximity);
+
+    // Bob starts his QR display first
+    bob_session.apply(ExchangeEvent::StartQR).unwrap();
 
     // Parsing the QR data should succeed (signature is valid)
     let parsed_qr = ExchangeQR::from_data_string(&qr_data);
@@ -244,73 +250,70 @@ fn test_ble_relay_attack_prevention() {
     );
 }
 
-/// Scenario: Exchange session blocks without proximity verification
+/// Scenario: Exchange session blocks without mutual QR exchange
 #[test]
-fn test_exchange_requires_proximity() {
-    let alice_identity = Identity::create("Alice");
-    let alice_card = vauchi_core::ContactCard::new("Alice");
-    // Alice's proximity verifier will FAIL
-    let alice_proximity = MockProximityVerifier::failure();
-    let mut alice_session =
-        ExchangeSession::new_initiator(alice_identity, alice_card, alice_proximity);
-
-    alice_session.apply(ExchangeEvent::GenerateQR).unwrap();
-    let alice_qr = alice_session.qr().unwrap().clone();
-
-    let bob_identity = Identity::create("Bob");
-    let bob_card = vauchi_core::ContactCard::new("Bob");
-    // Bob's proximity verifier will also FAIL (simulating relay)
-    let bob_proximity = MockProximityVerifier::failure();
-    let mut bob_session = ExchangeSession::new_responder(bob_identity, bob_card, bob_proximity);
-
-    // Bob scans Alice's QR
-    bob_session
-        .apply(ExchangeEvent::ProcessQR(alice_qr))
-        .unwrap();
-
-    // Bob tries to verify proximity - should fail
-    let proximity_result = bob_session.apply(ExchangeEvent::VerifyProximity);
-    assert!(
-        proximity_result.is_err(),
-        "Proximity verification should fail"
-    );
-
-    // Bob tries to skip directly to key agreement - should fail
-    let result = bob_session.apply(ExchangeEvent::PerformKeyAgreement);
-    assert!(
-        result.is_err(),
-        "Key agreement should fail without proximity verification"
-    );
-}
-
-/// Scenario: Successful exchange when proximity is verified
-#[test]
-fn test_exchange_succeeds_with_proximity() {
+fn test_exchange_requires_mutual_scan() {
     let alice_identity = Identity::create("Alice");
     let alice_card = vauchi_core::ContactCard::new("Alice");
     let alice_proximity = MockProximityVerifier::success();
-    let mut alice_session =
-        ExchangeSession::new_initiator(alice_identity, alice_card, alice_proximity);
+    let mut alice_session = ExchangeSession::new_qr(alice_identity, alice_card, alice_proximity);
 
-    alice_session.apply(ExchangeEvent::GenerateQR).unwrap();
+    alice_session.apply(ExchangeEvent::StartQR).unwrap();
     let alice_qr = alice_session.qr().unwrap().clone();
 
     let bob_identity = Identity::create("Bob");
     let bob_card = vauchi_core::ContactCard::new("Bob");
     let bob_proximity = MockProximityVerifier::success();
-    let mut bob_session = ExchangeSession::new_responder(bob_identity, bob_card, bob_proximity);
+    let mut bob_session = ExchangeSession::new_qr(bob_identity, bob_card, bob_proximity);
 
-    // Bob scans, verifies proximity, and completes exchange
+    // Bob starts his QR display
+    bob_session.apply(ExchangeEvent::StartQR).unwrap();
+
+    // Bob scans Alice's QR -> moves to PeerScanned
     bob_session
         .apply(ExchangeEvent::ProcessQR(alice_qr))
         .unwrap();
-    bob_session.apply(ExchangeEvent::VerifyProximity).unwrap();
+
+    // Bob tries to skip directly to key agreement without TheyScannedOurQR - should fail
+    let result = bob_session.apply(ExchangeEvent::PerformKeyAgreement);
+    assert!(
+        result.is_err(),
+        "Key agreement should fail without mutual QR exchange (TheyScannedOurQR)"
+    );
+}
+
+/// Scenario: Successful exchange when mutual QR scan completes
+#[test]
+fn test_exchange_succeeds_with_mutual_scan() {
+    let alice_identity = Identity::create("Alice");
+    let alice_card = vauchi_core::ContactCard::new("Alice");
+    let alice_proximity = MockProximityVerifier::success();
+    let mut alice_session = ExchangeSession::new_qr(alice_identity, alice_card, alice_proximity);
+
+    alice_session.apply(ExchangeEvent::StartQR).unwrap();
+    let alice_qr = alice_session.qr().unwrap().clone();
+
+    let bob_identity = Identity::create("Bob");
+    let bob_card = vauchi_core::ContactCard::new("Bob");
+    let bob_proximity = MockProximityVerifier::success();
+    let mut bob_session = ExchangeSession::new_qr(bob_identity, bob_card, bob_proximity);
+
+    // Bob starts his QR display
+    bob_session.apply(ExchangeEvent::StartQR).unwrap();
+
+    // Bob scans Alice's QR -> PeerScanned
+    bob_session
+        .apply(ExchangeEvent::ProcessQR(alice_qr))
+        .unwrap();
+
+    // Alice scans Bob's QR (signal that they scanned ours)
+    bob_session.apply(ExchangeEvent::TheyScannedOurQR).unwrap();
 
     // Key agreement should now succeed
     let result = bob_session.apply(ExchangeEvent::PerformKeyAgreement);
     assert!(
         result.is_ok(),
-        "Key agreement should succeed after proximity verification"
+        "Key agreement should succeed after mutual QR exchange"
     );
 }
 
@@ -578,11 +581,12 @@ fn test_kdf_no_intermediate_leakage() {
 #[test]
 fn test_exchange_token_randomness() {
     let identity = Identity::create("Test");
+    let ephemeral = X3DHKeyPair::generate();
 
     // Generate multiple QRs and verify tokens are unique
-    let qr1 = ExchangeQR::generate(&identity);
-    let qr2 = ExchangeQR::generate(&identity);
-    let qr3 = ExchangeQR::generate(&identity);
+    let qr1 = ExchangeQR::generate(&identity, &ephemeral);
+    let qr2 = ExchangeQR::generate(&identity, &ephemeral);
+    let qr3 = ExchangeQR::generate(&identity, &ephemeral);
 
     // All tokens should be different (collision probability is negligible)
     assert_ne!(
@@ -606,9 +610,10 @@ fn test_exchange_token_randomness() {
 #[test]
 fn test_audio_challenge_randomness() {
     let identity = Identity::create("Test");
+    let ephemeral = X3DHKeyPair::generate();
 
-    let qr1 = ExchangeQR::generate(&identity);
-    let qr2 = ExchangeQR::generate(&identity);
+    let qr1 = ExchangeQR::generate(&identity, &ephemeral);
+    let qr2 = ExchangeQR::generate(&identity, &ephemeral);
 
     // Audio challenges should be different
     assert_ne!(
@@ -622,7 +627,8 @@ fn test_audio_challenge_randomness() {
 #[test]
 fn test_qr_signature_prevents_tampering() {
     let identity = Identity::create("Alice");
-    let qr = ExchangeQR::generate(&identity);
+    let ephemeral = X3DHKeyPair::generate();
+    let qr = ExchangeQR::generate(&identity, &ephemeral);
     let qr_data = qr.to_data_string();
 
     // Decode, tamper, re-encode

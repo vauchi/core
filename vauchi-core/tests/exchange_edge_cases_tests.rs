@@ -6,112 +6,158 @@
 //!
 //! Tests for edge cases in contact exchange flow.
 //! Based on: features/contact_exchange.feature
+//!
+//! Updated for the mutual QR-only API: no roles, no proximity step.
+//! The flow is: Idle → StartQR → DisplayingQr → ProcessQR → PeerScanned
+//!   → TheyScannedOurQR → AwaitingKeyAgreement → PerformKeyAgreement
+//!   → AwaitingCardExchange → CompleteExchange → Complete.
 
 use vauchi_core::exchange::{
-    ExchangeError, ExchangeEvent, ExchangeRole, ExchangeSession, ExchangeState,
-    MockProximityVerifier,
+    ExchangeError, ExchangeEvent, ExchangeQR, ExchangeSession, ExchangeState,
+    MockProximityVerifier, X3DHKeyPair,
 };
 use vauchi_core::identity::Identity;
 use vauchi_core::ContactCard;
 
-/// Helper to create a proximity verifier
-fn proximity(success: bool) -> MockProximityVerifier {
-    if success {
-        MockProximityVerifier::success()
-    } else {
-        MockProximityVerifier::failure()
-    }
+/// Helper to create a mock proximity verifier.
+///
+/// Proximity verification is still used for audio/BLE transports but no
+/// longer drives any state transition in the QR flow. We pass a mock
+/// verifier because `ExchangeSession` is generic over `ProximityVerifier`.
+fn mock_proximity() -> MockProximityVerifier {
+    MockProximityVerifier::success()
+}
+
+/// Helper: advance a QR session through the full happy-path up to
+/// (but not including) `CompleteExchange`. Returns both sessions in
+/// `AwaitingCardExchange` state.
+///
+/// Creates fresh identities internally since `Identity` is not `Clone`.
+fn advance_to_card_exchange() -> (
+    ExchangeSession<MockProximityVerifier>,
+    ExchangeSession<MockProximityVerifier>,
+) {
+    let alice_identity = Identity::create("Alice");
+    let bob_identity = Identity::create("Bob");
+
+    let mut alice =
+        ExchangeSession::new_qr(alice_identity, ContactCard::new("Alice"), mock_proximity());
+    let mut bob = ExchangeSession::new_qr(bob_identity, ContactCard::new("Bob"), mock_proximity());
+
+    // Both display their QR codes
+    alice.apply(ExchangeEvent::StartQR).unwrap();
+    bob.apply(ExchangeEvent::StartQR).unwrap();
+
+    let alice_qr = alice.qr().unwrap().clone();
+    let bob_qr = bob.qr().unwrap().clone();
+
+    // Each scans the other's QR
+    alice.apply(ExchangeEvent::ProcessQR(bob_qr)).unwrap();
+    bob.apply(ExchangeEvent::ProcessQR(alice_qr)).unwrap();
+
+    // Signal that the peer scanned our QR
+    alice.apply(ExchangeEvent::TheyScannedOurQR).unwrap();
+    bob.apply(ExchangeEvent::TheyScannedOurQR).unwrap();
+
+    // Key agreement
+    alice.apply(ExchangeEvent::PerformKeyAgreement).unwrap();
+    bob.apply(ExchangeEvent::PerformKeyAgreement).unwrap();
+
+    (alice, bob)
 }
 
 // =============================================================================
 // Self-Exchange Prevention Tests
 // =============================================================================
 
-/// Scenario: Scanning own QR code should fail
-/// Note: This tests the self-exchange prevention at the session level.
-/// In practice, the same identity cannot be in two sessions simultaneously,
-/// but we test by creating the QR from one identity and attempting to process
-/// it with a session that has the same signing key (simulated by using the
-/// QR's public key to detect self-exchange).
+/// Scenario: Scanning own QR code should fail with SelfExchange error.
+///
+/// In the new flow both parties create sessions with `new_qr()`. If a
+/// user somehow scans their own QR the session must reject it because
+/// the QR's signing public key matches the session's identity.
 #[test]
 fn test_self_exchange_rejected() {
-    // Create Alice who will generate QR
-    let alice_initiator = Identity::create("Alice");
-    let alice_card = ContactCard::new("Alice");
-    let prox1 = proximity(true);
+    let alice = Identity::create("Alice");
 
-    // Alice generates QR as initiator
-    let mut initiator = ExchangeSession::new_initiator(alice_initiator, alice_card.clone(), prox1);
-    initiator.apply(ExchangeEvent::GenerateQR).unwrap();
+    let mut session = ExchangeSession::new_qr(alice, ContactCard::new("Alice"), mock_proximity());
 
-    let qr = initiator.qr().unwrap().clone();
-    let _alice_public_key = *qr.public_key();
+    // Display our QR
+    session.apply(ExchangeEvent::StartQR).unwrap();
+    let our_qr = session.qr().unwrap().clone();
 
-    // Simulate Alice trying to scan her own QR by creating an identity
-    // with the same public key (which would be the same person)
-    // In real scenario, this is impossible since Identity::create generates new keys
-    // The protection in session.rs checks if qr.public_key() == identity.signing_public_key()
-
-    // For testing, we verify the error is defined
-    assert!(matches!(
-        ExchangeError::SelfExchange,
-        ExchangeError::SelfExchange
-    ));
-
-    // And verify normal exchange works with different identity
-    let bob = Identity::create("Bob");
-    let prox2 = proximity(true);
-    let mut responder = ExchangeSession::new_responder(bob, ContactCard::new("Bob"), prox2);
-    let result = responder.apply(ExchangeEvent::ProcessQR(qr));
-    assert!(result.is_ok()); // Different identity should work
+    // Attempt to scan our own QR — must fail with SelfExchange
+    let result = session.apply(ExchangeEvent::ProcessQR(our_qr));
+    assert!(
+        matches!(result, Err(ExchangeError::SelfExchange)),
+        "Scanning own QR should return SelfExchange error, got: {result:?}"
+    );
 }
 
-/// Scenario: Different identity scanning QR succeeds
+/// Scenario: Different identity scanning QR succeeds normally.
 #[test]
 fn test_different_identity_exchange_succeeds() {
     let alice = Identity::create("Alice");
     let bob = Identity::create("Bob");
-    let alice_card = ContactCard::new("Alice");
-    let bob_card = ContactCard::new("Bob");
-
-    let proximity_alice = proximity(true);
-    let proximity_bob = proximity(true);
 
     // Alice generates QR
-    let mut initiator = ExchangeSession::new_initiator(alice, alice_card, proximity_alice);
-    initiator.apply(ExchangeEvent::GenerateQR).unwrap();
-    let qr = initiator.qr().unwrap().clone();
+    let mut alice_session =
+        ExchangeSession::new_qr(alice, ContactCard::new("Alice"), mock_proximity());
+    alice_session.apply(ExchangeEvent::StartQR).unwrap();
+    let alice_qr = alice_session.qr().unwrap().clone();
 
-    // Bob scans Alice's QR (should succeed)
-    let mut responder = ExchangeSession::new_responder(bob, bob_card, proximity_bob);
-    let result = responder.apply(ExchangeEvent::ProcessQR(qr));
+    // Bob displays his QR first, then scans Alice's
+    let mut bob_session = ExchangeSession::new_qr(bob, ContactCard::new("Bob"), mock_proximity());
+    bob_session.apply(ExchangeEvent::StartQR).unwrap();
 
-    assert!(result.is_ok());
-    assert!(matches!(
-        responder.state(),
-        ExchangeState::AwaitingProximity { .. }
-    ));
+    let result = bob_session.apply(ExchangeEvent::ProcessQR(alice_qr));
+    assert!(result.is_ok(), "Different identity should succeed");
+    assert!(
+        matches!(bob_session.state(), ExchangeState::PeerScanned { .. }),
+        "Bob should be in PeerScanned state after scanning Alice's QR"
+    );
 }
 
 // =============================================================================
-// QR Code Reuse Tests
+// QR Code Expiration Tests
 // =============================================================================
 
 /// Scenario: QR code expiration (5 minutes)
 #[test]
 fn test_qr_expiration() {
-    // QR expiration is handled by ExchangeQR::is_expired()
-    // Testing the error path
     let alice = Identity::create("Alice");
-
-    let prox = proximity(true);
-    let mut initiator = ExchangeSession::new_initiator(alice, ContactCard::new("Alice"), prox);
-    initiator.apply(ExchangeEvent::GenerateQR).unwrap();
-
-    let qr = initiator.qr().unwrap();
+    let ephemeral = X3DHKeyPair::generate();
 
     // Fresh QR should not be expired
-    assert!(!qr.is_expired());
+    let fresh_qr = ExchangeQR::generate(&alice, &ephemeral);
+    assert!(!fresh_qr.is_expired());
+}
+
+/// Scenario: Expired QR is rejected during ProcessQR
+#[test]
+fn test_expired_qr_rejected_on_process() {
+    let alice = Identity::create("Alice");
+    let bob = Identity::create("Bob");
+    let ephemeral = X3DHKeyPair::generate();
+
+    // Create an expired QR (6 minutes ago)
+    let expired_ts = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs()
+        - 360;
+    let expired_qr = ExchangeQR::generate_with_timestamp(&alice, &ephemeral, expired_ts);
+    assert!(expired_qr.is_expired());
+
+    // Bob starts his session and displays QR
+    let mut bob_session = ExchangeSession::new_qr(bob, ContactCard::new("Bob"), mock_proximity());
+    bob_session.apply(ExchangeEvent::StartQR).unwrap();
+
+    // Attempt to process expired QR should fail
+    let result = bob_session.apply(ExchangeEvent::ProcessQR(expired_qr));
+    assert!(
+        matches!(result, Err(ExchangeError::QRExpired)),
+        "Expired QR should be rejected, got: {result:?}"
+    );
 }
 
 // =============================================================================
@@ -123,33 +169,67 @@ fn test_qr_expiration() {
 fn test_duplicate_contact_detection() {
     let alice = Identity::create("Alice");
     let bob = Identity::create("Bob");
-    let alice_card = ContactCard::new("Alice");
-    let bob_card = ContactCard::new("Bob");
-
-    let prox_alice = proximity(true);
-    let prox_bob = proximity(true);
 
     // Alice generates QR
-    let mut initiator = ExchangeSession::new_initiator(alice, alice_card, prox_alice);
-    initiator.apply(ExchangeEvent::GenerateQR).unwrap();
-    let qr = initiator.qr().unwrap().clone();
+    let mut alice_session =
+        ExchangeSession::new_qr(alice, ContactCard::new("Alice"), mock_proximity());
+    alice_session.apply(ExchangeEvent::StartQR).unwrap();
+    let alice_qr = alice_session.qr().unwrap().clone();
 
     // Bob already has Alice as a contact
     let existing_alice = vauchi_core::Contact::from_exchange(
-        *qr.public_key(),
+        *alice_qr.public_key(),
         ContactCard::new("Alice"),
         vauchi_core::SymmetricKey::generate(),
     );
 
-    // Bob scans Alice's QR
-    let mut responder = ExchangeSession::new_responder(bob, bob_card, prox_bob);
-    responder.apply(ExchangeEvent::ProcessQR(qr)).unwrap();
+    // Bob starts his session, displays QR, then scans Alice's QR
+    let mut bob_session = ExchangeSession::new_qr(bob, ContactCard::new("Bob"), mock_proximity());
+    bob_session.apply(ExchangeEvent::StartQR).unwrap();
+    bob_session
+        .apply(ExchangeEvent::ProcessQR(alice_qr))
+        .unwrap();
 
     // Check for duplicate
     let contacts = [existing_alice];
-    let duplicate = responder.check_duplicate(&contacts);
+    let duplicate = bob_session.check_duplicate(&contacts);
     assert!(duplicate.is_some());
     assert_eq!(duplicate.unwrap().display_name(), "Alice");
+}
+
+/// Scenario: No duplicate detected for new contact
+#[test]
+fn test_no_duplicate_for_new_contact() {
+    let alice = Identity::create("Alice");
+    let bob = Identity::create("Bob");
+    let charlie = Identity::create("Charlie");
+
+    // Bob already has Charlie, not Alice
+    let existing_charlie = vauchi_core::Contact::from_exchange(
+        *charlie.signing_public_key(),
+        ContactCard::new("Charlie"),
+        vauchi_core::SymmetricKey::generate(),
+    );
+
+    // Alice generates QR
+    let mut alice_session =
+        ExchangeSession::new_qr(alice, ContactCard::new("Alice"), mock_proximity());
+    alice_session.apply(ExchangeEvent::StartQR).unwrap();
+    let alice_qr = alice_session.qr().unwrap().clone();
+
+    // Bob displays QR, scans Alice's
+    let mut bob_session = ExchangeSession::new_qr(bob, ContactCard::new("Bob"), mock_proximity());
+    bob_session.apply(ExchangeEvent::StartQR).unwrap();
+    bob_session
+        .apply(ExchangeEvent::ProcessQR(alice_qr))
+        .unwrap();
+
+    let contacts = [existing_charlie];
+    let duplicate = bob_session.check_duplicate(&contacts);
+    assert!(
+        duplicate.is_none(),
+        "Alice should not be detected as duplicate"
+    );
 }
 
 // =============================================================================
@@ -160,9 +240,7 @@ fn test_duplicate_contact_detection() {
 #[test]
 fn test_session_timeout_detection() {
     let alice = Identity::create("Alice");
-    let proximity = proximity(true);
-
-    let session = ExchangeSession::new_initiator(alice, ContactCard::new("Alice"), proximity);
+    let session = ExchangeSession::new_qr(alice, ContactCard::new("Alice"), mock_proximity());
 
     // Fresh session should not be timed out
     assert!(!session.is_timed_out());
@@ -172,9 +250,7 @@ fn test_session_timeout_detection() {
 #[test]
 fn test_interrupted_session_resumable() {
     let alice = Identity::create("Alice");
-    let proximity = proximity(true);
-
-    let mut session = ExchangeSession::new_initiator(alice, ContactCard::new("Alice"), proximity);
+    let mut session = ExchangeSession::new_qr(alice, ContactCard::new("Alice"), mock_proximity());
 
     // Fresh session cannot be resumed (not interrupted)
     assert!(!session.can_resume());
@@ -187,81 +263,115 @@ fn test_interrupted_session_resumable() {
 }
 
 // =============================================================================
-// Invalid State Transitions Tests
+// Invalid State Transition Tests
 // =============================================================================
 
-/// Scenario: Initiator cannot process QR
+/// Scenario: Cannot ProcessQR from Idle state (must call StartQR first)
 #[test]
-fn test_initiator_cannot_process_qr() {
+fn test_cannot_process_qr_from_idle() {
     let alice = Identity::create("Alice");
     let bob = Identity::create("Bob");
-    let prox1 = proximity(true);
+    let ephemeral = X3DHKeyPair::generate();
 
-    // Alice as initiator
-    let mut initiator = ExchangeSession::new_initiator(alice, ContactCard::new("Alice"), prox1);
+    // Generate a QR from Bob for Alice to scan
+    let bob_qr = ExchangeQR::generate(&bob, &ephemeral);
 
-    // Generate a QR from Bob
-    let bob_prox = proximity(true);
-    let mut bob_session = ExchangeSession::new_initiator(bob, ContactCard::new("Bob"), bob_prox);
-    bob_session.apply(ExchangeEvent::GenerateQR).unwrap();
-    let bob_qr = bob_session.qr().unwrap().clone();
+    // Alice is in Idle state — never called StartQR
+    let mut alice_session =
+        ExchangeSession::new_qr(alice, ContactCard::new("Alice"), mock_proximity());
 
-    // Alice (initiator) tries to process QR - should fail
-    let result = initiator.apply(ExchangeEvent::ProcessQR(bob_qr));
-    assert!(matches!(result, Err(ExchangeError::InvalidState(_))));
-}
-
-/// Scenario: Responder cannot generate QR
-#[test]
-fn test_responder_cannot_generate_qr() {
-    let alice = Identity::create("Alice");
-    let proximity = proximity(true);
-
-    let mut responder = ExchangeSession::new_responder(alice, ContactCard::new("Alice"), proximity);
-
-    let result = responder.apply(ExchangeEvent::GenerateQR);
-    assert!(matches!(result, Err(ExchangeError::InvalidState(_))));
-}
-
-/// Scenario: Cannot verify proximity from wrong state
-#[test]
-fn test_cannot_verify_proximity_from_idle() {
-    let alice = Identity::create("Alice");
-    let proximity = proximity(true);
-
-    let mut session = ExchangeSession::new_responder(alice, ContactCard::new("Alice"), proximity);
-
-    // Try to verify proximity from Idle state
-    let result = session.apply(ExchangeEvent::VerifyProximity);
-    assert!(matches!(result, Err(ExchangeError::InvalidState(_))));
-}
-
-// =============================================================================
-// Role Verification Tests
-// =============================================================================
-
-/// Scenario: Session role is correctly assigned
-#[test]
-fn test_session_role_assignment() {
-    let alice_for_initiator = Identity::create("Alice");
-    let alice_for_responder = Identity::create("Alice2");
-
-    let initiator_prox = proximity(true);
-    let responder_prox = proximity(true);
-
-    let initiator = ExchangeSession::new_initiator(
-        alice_for_initiator,
-        ContactCard::new("Alice"),
-        initiator_prox,
+    let result = alice_session.apply(ExchangeEvent::ProcessQR(bob_qr));
+    assert!(
+        matches!(result, Err(ExchangeError::InvalidState(_))),
+        "ProcessQR from Idle should fail, got: {result:?}"
     );
-    let responder = ExchangeSession::new_responder(
-        alice_for_responder,
-        ContactCard::new("Alice"),
-        responder_prox,
-    );
+}
 
-    assert_eq!(initiator.role(), ExchangeRole::Initiator);
-    assert_eq!(responder.role(), ExchangeRole::Responder);
+/// Scenario: Cannot call StartQR twice (already in DisplayingQr)
+#[test]
+fn test_cannot_start_qr_twice() {
+    let alice = Identity::create("Alice");
+    let mut session = ExchangeSession::new_qr(alice, ContactCard::new("Alice"), mock_proximity());
+
+    session.apply(ExchangeEvent::StartQR).unwrap();
+
+    // Second StartQR should fail — already in DisplayingQr
+    let result = session.apply(ExchangeEvent::StartQR);
+    assert!(
+        matches!(result, Err(ExchangeError::InvalidState(_))),
+        "Double StartQR should fail, got: {result:?}"
+    );
+}
+
+/// Scenario: Cannot perform key agreement from Idle
+#[test]
+fn test_cannot_key_agreement_from_idle() {
+    let alice = Identity::create("Alice");
+    let mut session = ExchangeSession::new_qr(alice, ContactCard::new("Alice"), mock_proximity());
+
+    let result = session.apply(ExchangeEvent::PerformKeyAgreement);
+    assert!(
+        matches!(result, Err(ExchangeError::InvalidState(_))),
+        "PerformKeyAgreement from Idle should fail, got: {result:?}"
+    );
+}
+
+/// Scenario: Cannot complete exchange from Idle
+#[test]
+fn test_cannot_complete_exchange_from_idle() {
+    let alice = Identity::create("Alice");
+    let mut session = ExchangeSession::new_qr(alice, ContactCard::new("Alice"), mock_proximity());
+
+    let result = session.apply(ExchangeEvent::CompleteExchange(ContactCard::new("Bob")));
+    assert!(
+        matches!(result, Err(ExchangeError::InvalidState(_))),
+        "CompleteExchange from Idle should fail, got: {result:?}"
+    );
+}
+
+/// Scenario: Cannot TheyScannedOurQR from DisplayingQr (must be in PeerScanned)
+#[test]
+fn test_cannot_they_scanned_from_displaying_qr() {
+    let alice = Identity::create("Alice");
+    let mut session = ExchangeSession::new_qr(alice, ContactCard::new("Alice"), mock_proximity());
+    session.apply(ExchangeEvent::StartQR).unwrap();
+
+    let result = session.apply(ExchangeEvent::TheyScannedOurQR);
+    assert!(
+        matches!(result, Err(ExchangeError::InvalidState(_))),
+        "TheyScannedOurQR from DisplayingQr (before ProcessQR) should fail, got: {result:?}"
+    );
+}
+
+/// Scenario: Cannot ProcessQR from PeerScanned (already scanned one)
+#[test]
+fn test_cannot_process_qr_from_peer_scanned() {
+    let alice = Identity::create("Alice");
+    let bob = Identity::create("Bob");
+
+    let mut alice_session =
+        ExchangeSession::new_qr(alice, ContactCard::new("Alice"), mock_proximity());
+    alice_session.apply(ExchangeEvent::StartQR).unwrap();
+    let alice_qr = alice_session.qr().unwrap().clone();
+
+    let mut bob_session = ExchangeSession::new_qr(bob, ContactCard::new("Bob"), mock_proximity());
+    bob_session.apply(ExchangeEvent::StartQR).unwrap();
+
+    // Bob scans Alice's QR -> PeerScanned
+    bob_session
+        .apply(ExchangeEvent::ProcessQR(alice_qr.clone()))
+        .unwrap();
+    assert!(matches!(
+        bob_session.state(),
+        ExchangeState::PeerScanned { .. }
+    ));
+
+    // Attempt to process another QR from PeerScanned should fail
+    let result = bob_session.apply(ExchangeEvent::ProcessQR(alice_qr));
+    assert!(
+        matches!(result, Err(ExchangeError::InvalidState(_))),
+        "ProcessQR from PeerScanned should fail, got: {result:?}"
+    );
 }
 
 // =============================================================================
@@ -273,9 +383,7 @@ fn test_session_role_assignment() {
 fn test_our_card_accessible() {
     let alice = Identity::create("Alice");
     let card = ContactCard::new("Alice Card");
-    let proximity = proximity(true);
-
-    let session = ExchangeSession::new_initiator(alice, card, proximity);
+    let session = ExchangeSession::new_qr(alice, card, mock_proximity());
 
     assert_eq!(session.our_card().display_name(), "Alice Card");
 }
@@ -284,45 +392,230 @@ fn test_our_card_accessible() {
 // Signature Verification Tests
 // =============================================================================
 
-/// Scenario: Invalid signature rejected
+/// Scenario: Generated QR has valid signature
 #[test]
-fn test_invalid_signature_rejected() {
-    // This requires creating a QR with invalid signature
-    // The ExchangeQR::verify_signature() handles this
+fn test_qr_signature_valid() {
     let alice = Identity::create("Alice");
-    let proximity = proximity(true);
-
-    let mut session = ExchangeSession::new_initiator(alice, ContactCard::new("Alice"), proximity);
-    session.apply(ExchangeEvent::GenerateQR).unwrap();
+    let mut session = ExchangeSession::new_qr(alice, ContactCard::new("Alice"), mock_proximity());
+    session.apply(ExchangeEvent::StartQR).unwrap();
 
     let qr = session.qr().unwrap();
-    // Valid QR should have valid signature
-    assert!(qr.verify_signature());
+    assert!(
+        qr.verify_signature(),
+        "Generated QR should have valid signature"
+    );
 }
 
-// =============================================================================
-// Proximity Failure Tests
-// =============================================================================
-
-/// Scenario: Proximity verification fails
+/// Scenario: QR with invalid signature rejected during ProcessQR
+///
+/// The session checks `verify_signature()` on the incoming QR. We test
+/// this indirectly: a validly-generated QR from a different identity
+/// passes, while a maliciously-constructed QR would fail. Here we
+/// verify the positive path since we cannot easily tamper with signature
+/// bytes through the public API (the QR struct fields are private).
 #[test]
-fn test_proximity_verification_failure() {
+fn test_valid_signature_accepted() {
     let alice = Identity::create("Alice");
     let bob = Identity::create("Bob");
 
-    // Alice with passing proximity
-    let alice_prox = proximity(true);
-    let mut initiator =
-        ExchangeSession::new_initiator(alice, ContactCard::new("Alice"), alice_prox);
-    initiator.apply(ExchangeEvent::GenerateQR).unwrap();
-    let qr = initiator.qr().unwrap().clone();
+    let mut alice_session =
+        ExchangeSession::new_qr(alice, ContactCard::new("Alice"), mock_proximity());
+    alice_session.apply(ExchangeEvent::StartQR).unwrap();
+    let alice_qr = alice_session.qr().unwrap().clone();
 
-    // Bob with failing proximity
-    let bob_prox = proximity(false);
-    let mut responder = ExchangeSession::new_responder(bob, ContactCard::new("Bob"), bob_prox);
-    responder.apply(ExchangeEvent::ProcessQR(qr)).unwrap();
+    // Verify the QR has valid signature before scanning
+    assert!(alice_qr.verify_signature());
 
-    // Proximity verification should fail
-    let result = responder.apply(ExchangeEvent::VerifyProximity);
-    assert!(matches!(result, Err(ExchangeError::ProximityFailed)));
+    // Bob should accept it
+    let mut bob_session = ExchangeSession::new_qr(bob, ContactCard::new("Bob"), mock_proximity());
+    bob_session.apply(ExchangeEvent::StartQR).unwrap();
+
+    let result = bob_session.apply(ExchangeEvent::ProcessQR(alice_qr));
+    assert!(
+        result.is_ok(),
+        "Valid QR with good signature should be accepted"
+    );
+}
+
+// =============================================================================
+// QR Reuse Prevention Tests
+// =============================================================================
+
+/// Scenario: QR reuse is detected by check_qr_reuse
+#[test]
+fn test_qr_reuse_detected() {
+    let alice = Identity::create("Alice");
+    let mut session = ExchangeSession::new_qr(alice, ContactCard::new("Alice"), mock_proximity());
+
+    let qr_hash = [42u8; 32];
+
+    // First use succeeds
+    assert!(session.check_qr_reuse(&qr_hash).is_ok());
+
+    // Second use with same hash should fail
+    let result = session.check_qr_reuse(&qr_hash);
+    assert!(
+        matches!(result, Err(ExchangeError::QRAlreadyUsed)),
+        "Reused QR hash should be rejected, got: {result:?}"
+    );
+}
+
+/// Scenario: Different QR hashes are independent
+#[test]
+fn test_different_qr_hashes_independent() {
+    let alice = Identity::create("Alice");
+    let mut session = ExchangeSession::new_qr(alice, ContactCard::new("Alice"), mock_proximity());
+
+    let hash_a = [1u8; 32];
+    let hash_b = [2u8; 32];
+
+    assert!(session.check_qr_reuse(&hash_a).is_ok());
+    assert!(session.check_qr_reuse(&hash_b).is_ok());
+}
+
+// =============================================================================
+// Full Flow Completion Tests
+// =============================================================================
+
+/// Scenario: Complete exchange flow produces Complete state
+#[test]
+fn test_complete_exchange_flow() {
+    let (mut alice_session, mut bob_session) = advance_to_card_exchange();
+
+    // Both should be in AwaitingCardExchange
+    assert!(matches!(
+        alice_session.state(),
+        ExchangeState::AwaitingCardExchange { .. }
+    ));
+    assert!(matches!(
+        bob_session.state(),
+        ExchangeState::AwaitingCardExchange { .. }
+    ));
+
+    // Complete exchange
+    alice_session
+        .apply(ExchangeEvent::CompleteExchange(ContactCard::new("Bob")))
+        .unwrap();
+    bob_session
+        .apply(ExchangeEvent::CompleteExchange(ContactCard::new("Alice")))
+        .unwrap();
+
+    assert!(
+        matches!(alice_session.state(), ExchangeState::Complete { .. }),
+        "Alice should be in Complete state"
+    );
+    assert!(
+        matches!(bob_session.state(), ExchangeState::Complete { .. }),
+        "Bob should be in Complete state"
+    );
+}
+
+// =============================================================================
+// Explicit Fail Tests
+// =============================================================================
+
+/// Scenario: Session can be explicitly failed from any state
+#[test]
+fn test_explicit_fail_from_idle() {
+    let alice = Identity::create("Alice");
+    let mut session = ExchangeSession::new_qr(alice, ContactCard::new("Alice"), mock_proximity());
+
+    session
+        .apply(ExchangeEvent::Fail(ExchangeError::SessionTimeout))
+        .unwrap();
+
+    assert!(matches!(session.state(), ExchangeState::Failed { .. }));
+}
+
+/// Scenario: Session can be explicitly failed from DisplayingQr
+#[test]
+fn test_explicit_fail_from_displaying_qr() {
+    let alice = Identity::create("Alice");
+    let mut session = ExchangeSession::new_qr(alice, ContactCard::new("Alice"), mock_proximity());
+    session.apply(ExchangeEvent::StartQR).unwrap();
+
+    session
+        .apply(ExchangeEvent::Fail(ExchangeError::Interrupted))
+        .unwrap();
+
+    assert!(matches!(session.state(), ExchangeState::Failed { .. }));
+}
+
+// =============================================================================
+// Transport Enforcement Tests
+// =============================================================================
+
+/// Scenario: QR events are rejected on NFC transport sessions
+#[test]
+fn test_qr_events_rejected_on_nfc_transport() {
+    let alice = Identity::create("Alice");
+    let mut nfc_session =
+        ExchangeSession::new_nfc(alice, ContactCard::new("Alice"), mock_proximity());
+
+    // StartQR should fail on NFC transport
+    let result = nfc_session.apply(ExchangeEvent::StartQR);
+    assert!(
+        matches!(result, Err(ExchangeError::InvalidState(_))),
+        "StartQR should be rejected on NFC transport, got: {result:?}"
+    );
+}
+
+/// Scenario: QR events are rejected on BLE transport sessions
+#[test]
+fn test_qr_events_rejected_on_ble_transport() {
+    let alice = Identity::create("Alice");
+    let mut ble_session =
+        ExchangeSession::new_ble(alice, ContactCard::new("Alice"), mock_proximity());
+
+    // StartQR should fail on BLE transport
+    let result = ble_session.apply(ExchangeEvent::StartQR);
+    assert!(
+        matches!(result, Err(ExchangeError::InvalidState(_))),
+        "StartQR should be rejected on BLE transport, got: {result:?}"
+    );
+}
+
+// =============================================================================
+// Exchange Mode Tests
+// =============================================================================
+
+/// Scenario: Default exchange mode is Mutual
+#[test]
+fn test_default_mode_is_mutual() {
+    use vauchi_core::exchange::ExchangeMode;
+
+    let alice = Identity::create("Alice");
+    let session = ExchangeSession::new_qr(alice, ContactCard::new("Alice"), mock_proximity());
+
+    assert_eq!(session.mode(), ExchangeMode::Mutual);
+}
+
+/// Scenario: Exchange mode can be set to ShareOnly
+#[test]
+fn test_set_share_only_mode() {
+    use vauchi_core::exchange::ExchangeMode;
+
+    let alice = Identity::create("Alice");
+    let mut session = ExchangeSession::new_qr(alice, ContactCard::new("Alice"), mock_proximity());
+
+    session.set_mode(ExchangeMode::ShareOnly);
+    assert_eq!(session.mode(), ExchangeMode::ShareOnly);
+}
+
+// =============================================================================
+// Exchange Public Key Accessibility
+// =============================================================================
+
+/// Scenario: Our exchange public key is accessible
+#[test]
+fn test_our_exchange_public_key_accessible() {
+    let alice = Identity::create("Alice");
+    let session = ExchangeSession::new_qr(alice, ContactCard::new("Alice"), mock_proximity());
+
+    // Should return a non-zero 32-byte key
+    let key = session.our_exchange_public_key();
+    assert_ne!(
+        key, &[0u8; 32],
+        "Exchange public key should not be all zeros"
+    );
 }

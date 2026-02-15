@@ -91,10 +91,6 @@ impl ManualConfirmationBridge {
             inner: ManualConfirmationVerifier::new(),
         }
     }
-
-    fn confirm(&self) {
-        self.inner.confirm();
-    }
 }
 
 impl ProximityVerifier for ManualConfirmationBridge {
@@ -125,12 +121,10 @@ impl ProximityVerifier for ManualConfirmationBridge {
 #[derive(Debug, Clone, uniffi::Enum)]
 pub enum MobileExchangeState {
     Idle,
-    AwaitingScan {
+    DisplayingQr {
         qr_data: String,
     },
-    AwaitingProximity {
-        their_public_id: String,
-    },
+    PeerScanned,
     AwaitingKeyAgreement,
     AwaitingCardExchange,
     Complete {
@@ -222,14 +216,10 @@ impl MobileExchangeSession {
         let inner = self.inner.lock().unwrap();
         match inner.state() {
             ExchangeState::Idle => MobileExchangeState::Idle,
-            ExchangeState::AwaitingScan { qr } => MobileExchangeState::AwaitingScan {
-                qr_data: format!("wb://{}", qr.to_data_string()),
+            ExchangeState::DisplayingQr { our_qr } => MobileExchangeState::DisplayingQr {
+                qr_data: format!("wb://{}", our_qr.to_data_string()),
             },
-            ExchangeState::AwaitingProximity {
-                their_public_key, ..
-            } => MobileExchangeState::AwaitingProximity {
-                their_public_id: hex::encode(their_public_key),
-            },
+            ExchangeState::PeerScanned { .. } => MobileExchangeState::PeerScanned,
             ExchangeState::AwaitingKeyAgreement { .. } => MobileExchangeState::AwaitingKeyAgreement,
             ExchangeState::AwaitingCardExchange { .. } => MobileExchangeState::AwaitingCardExchange,
             ExchangeState::Complete { contact } => MobileExchangeState::Complete {
@@ -239,32 +229,17 @@ impl MobileExchangeSession {
             ExchangeState::Failed { error } => MobileExchangeState::Failed {
                 error: format!("{:?}", error),
             },
-            // Map other states to their closest mobile equivalents
-            ExchangeState::MutualAwaitingTheirScan { our_qr } => {
-                MobileExchangeState::AwaitingScan {
-                    qr_data: format!("wb://{}", our_qr.to_data_string()),
-                }
-            }
-            ExchangeState::MutualVerified { .. } => MobileExchangeState::AwaitingKeyAgreement,
-            ExchangeState::AwaitingNfcTap => MobileExchangeState::AwaitingProximity {
-                their_public_id: String::new(),
-            },
-            ExchangeState::AwaitingBleConnection => MobileExchangeState::AwaitingProximity {
-                their_public_id: String::new(),
-            },
-            ExchangeState::AwaitingBleVerification { .. } => {
-                MobileExchangeState::AwaitingProximity {
-                    their_public_id: String::new(),
-                }
-            }
+            ExchangeState::AwaitingNfcTap => MobileExchangeState::Idle,
+            ExchangeState::AwaitingBleConnection => MobileExchangeState::Idle,
+            ExchangeState::AwaitingBleVerification { .. } => MobileExchangeState::Idle,
         }
     }
 
-    /// Generate a QR code (initiator only). Transitions Idle -> AwaitingScan.
+    /// Generate and display a QR code. Transitions Idle -> DisplayingQr.
     pub fn generate_qr(&self) -> Result<String, MobileError> {
         let mut inner = self.inner.lock().unwrap();
         inner
-            .apply(ExchangeEvent::GenerateQR)
+            .apply(ExchangeEvent::StartQR)
             .map_err(|e| MobileError::ExchangeFailed(format!("{:?}", e)))?;
 
         // Return the QR data string
@@ -274,7 +249,7 @@ impl MobileExchangeSession {
             .ok_or_else(|| MobileError::ExchangeFailed("QR not generated".into()))
     }
 
-    /// Process a scanned QR code (responder only). Transitions Idle -> AwaitingProximity.
+    /// Process a scanned QR code. Transitions DisplayingQr -> PeerScanned.
     pub fn process_qr(&self, qr_data: String) -> Result<(), MobileError> {
         let data_str = qr_data.strip_prefix("wb://").unwrap_or(&qr_data);
         let qr = ExchangeQR::from_data_string(data_str).map_err(|_| MobileError::InvalidQrCode)?;
@@ -285,39 +260,12 @@ impl MobileExchangeSession {
             .map_err(|e| MobileError::ExchangeFailed(format!("{:?}", e)))
     }
 
-    /// Verify proximity. Transitions AwaitingProximity -> AwaitingKeyAgreement.
-    ///
-    /// For audio-based sessions, this calls the MobileProximityHandler callback.
-    /// For manual sessions, call `confirm_proximity()` first, then this method.
-    pub fn verify_proximity(&self) -> Result<(), MobileError> {
+    /// Signal that the other party scanned our QR. Transitions PeerScanned -> AwaitingKeyAgreement.
+    pub fn they_scanned_our_qr(&self) -> Result<(), MobileError> {
         let mut inner = self.inner.lock().unwrap();
         inner
-            .apply(ExchangeEvent::VerifyProximity)
+            .apply(ExchangeEvent::TheyScannedOurQR)
             .map_err(|e| MobileError::ExchangeFailed(format!("{:?}", e)))
-    }
-
-    /// Confirm manual proximity (for sessions without audio hardware).
-    ///
-    /// Sets the confirmation flag so that the next `verify_proximity()` call succeeds.
-    /// Only valid for manual confirmation sessions.
-    pub fn confirm_proximity(&self) -> Result<(), MobileError> {
-        let inner = self.inner.lock().unwrap();
-        match &*inner {
-            SessionInner::Manual(session) => {
-                // We can't access the proximity field directly since it's private.
-                // ManualConfirmationVerifier uses a Mutex<bool> internally.
-                // We need to work around this by storing the bridge separately.
-                // For now, the ManualConfirmationBridge is embedded in ExchangeSession.
-                // Since ExchangeSession doesn't expose its proximity verifier,
-                // we set it confirmed at creation time (pre_confirmed).
-                // This is a design constraint — manual sessions are pre-confirmed.
-                let _ = session;
-                Ok(())
-            }
-            SessionInner::Proximity(_) => Err(MobileError::ExchangeFailed(
-                "Cannot manually confirm proximity on audio-based session".into(),
-            )),
-        }
     }
 
     /// Perform key agreement. Transitions AwaitingKeyAgreement -> AwaitingCardExchange.
@@ -348,8 +296,8 @@ impl MobileExchangeSession {
 
 // === Factory Functions ===
 
-/// Create an exchange session as initiator with proximity verification.
-pub(crate) fn create_initiator_proximity(
+/// Create a QR exchange session with proximity verification.
+pub(crate) fn create_qr_exchange_proximity(
     identity: Identity,
     our_card: ContactCard,
     handler: Box<dyn MobileProximityHandler>,
@@ -357,44 +305,17 @@ pub(crate) fn create_initiator_proximity(
     let bridge = ProximityBridge {
         handler: Arc::from(handler),
     };
-    let session = ExchangeSession::new_initiator(identity, our_card, bridge);
+    let session = ExchangeSession::new_qr(identity, our_card, bridge);
     Arc::new(MobileExchangeSession::from_proximity(session))
 }
 
-/// Create an exchange session as responder with proximity verification.
-pub(crate) fn create_responder_proximity(
-    identity: Identity,
-    our_card: ContactCard,
-    handler: Box<dyn MobileProximityHandler>,
-) -> Arc<MobileExchangeSession> {
-    let bridge = ProximityBridge {
-        handler: Arc::from(handler),
-    };
-    let session = ExchangeSession::new_responder(identity, our_card, bridge);
-    Arc::new(MobileExchangeSession::from_proximity(session))
-}
-
-/// Create an exchange session as initiator with manual confirmation.
-pub(crate) fn create_initiator_manual(
+/// Create a QR exchange session with manual confirmation.
+pub(crate) fn create_qr_exchange_manual(
     identity: Identity,
     our_card: ContactCard,
 ) -> Arc<MobileExchangeSession> {
     let bridge = ManualConfirmationBridge::new();
-    // Pre-confirm since manual sessions bypass audio verification.
-    // The user confirms visually by comparing fingerprints.
-    bridge.confirm();
-    let session = ExchangeSession::new_initiator(identity, our_card, bridge);
-    Arc::new(MobileExchangeSession::from_manual(session))
-}
-
-/// Create an exchange session as responder with manual confirmation.
-pub(crate) fn create_responder_manual(
-    identity: Identity,
-    our_card: ContactCard,
-) -> Arc<MobileExchangeSession> {
-    let bridge = ManualConfirmationBridge::new();
-    bridge.confirm();
-    let session = ExchangeSession::new_responder(identity, our_card, bridge);
+    let session = ExchangeSession::new_qr(identity, our_card, bridge);
     Arc::new(MobileExchangeSession::from_manual(session))
 }
 
@@ -449,11 +370,11 @@ mod tests {
     }
 
     #[test]
-    fn test_session_initiator_generates_qr() {
+    fn test_session_generates_qr() {
         let identity = Identity::create("Alice");
         let card = ContactCard::new("Alice");
 
-        let session = create_initiator_manual(identity, card);
+        let session = create_qr_exchange_manual(identity, card);
 
         // Initially idle
         assert!(matches!(session.state(), MobileExchangeState::Idle));
@@ -462,68 +383,71 @@ mod tests {
         let qr_data = session.generate_qr().unwrap();
         assert!(qr_data.starts_with("wb://"));
 
-        // State should be AwaitingScan
+        // State should be DisplayingQr
         assert!(matches!(
             session.state(),
-            MobileExchangeState::AwaitingScan { .. }
+            MobileExchangeState::DisplayingQr { .. }
         ));
     }
 
     #[test]
-    fn test_session_responder_processes_qr() {
+    fn test_session_mutual_qr_flow() {
         let alice = Identity::create("Alice");
         let alice_card = ContactCard::new("Alice");
         let bob = Identity::create("Bob");
         let bob_card = ContactCard::new("Bob");
 
-        // Alice generates QR as initiator
-        let alice_session = create_initiator_manual(alice, alice_card);
-        let qr_data = alice_session.generate_qr().unwrap();
+        // Both sides create QR sessions and generate QR codes
+        let alice_session = create_qr_exchange_manual(alice, alice_card);
+        let alice_qr = alice_session.generate_qr().unwrap();
 
-        // Bob processes Alice's QR as responder
-        let bob_session = create_responder_manual(bob, bob_card);
-        bob_session.process_qr(qr_data).unwrap();
+        let bob_session = create_qr_exchange_manual(bob, bob_card);
+        let bob_qr = bob_session.generate_qr().unwrap();
 
-        // Bob should be in AwaitingProximity
+        // Both scan each other's QR
+        alice_session.process_qr(bob_qr).unwrap();
+        bob_session.process_qr(alice_qr).unwrap();
+
+        // Both should be in PeerScanned
         assert!(matches!(
-            bob_session.state(),
-            MobileExchangeState::AwaitingProximity { .. }
+            alice_session.state(),
+            MobileExchangeState::PeerScanned
         ));
-    }
-
-    #[test]
-    fn test_session_manual_confirmation_flow() {
-        let alice = Identity::create("Alice");
-        let alice_card = ContactCard::new("Alice");
-        let bob = Identity::create("Bob");
-        let bob_card = ContactCard::new("Bob");
-
-        // Alice generates QR
-        let alice_session = create_initiator_manual(alice, alice_card);
-        let qr_data = alice_session.generate_qr().unwrap();
-
-        // Bob processes QR
-        let bob_session = create_responder_manual(bob, bob_card);
-        bob_session.process_qr(qr_data).unwrap();
-
-        // Bob verifies proximity (manual — pre-confirmed)
-        bob_session.verify_proximity().unwrap();
         assert!(matches!(
             bob_session.state(),
+            MobileExchangeState::PeerScanned
+        ));
+
+        // Signal that the other party scanned our QR
+        alice_session.they_scanned_our_qr().unwrap();
+        bob_session.they_scanned_our_qr().unwrap();
+
+        assert!(matches!(
+            alice_session.state(),
             MobileExchangeState::AwaitingKeyAgreement
         ));
 
-        // Bob performs key agreement
+        // Key agreement
+        alice_session.perform_key_agreement().unwrap();
         bob_session.perform_key_agreement().unwrap();
+
         assert!(matches!(
-            bob_session.state(),
+            alice_session.state(),
             MobileExchangeState::AwaitingCardExchange
         ));
 
-        // Bob completes card exchange
+        // Complete card exchange
+        alice_session
+            .complete_card_exchange("Bob".to_string())
+            .unwrap();
         bob_session
             .complete_card_exchange("Alice".to_string())
             .unwrap();
+
+        assert!(matches!(
+            alice_session.state(),
+            MobileExchangeState::Complete { .. }
+        ));
         assert!(matches!(
             bob_session.state(),
             MobileExchangeState::Complete { .. }
@@ -535,7 +459,7 @@ mod tests {
         let identity = Identity::create("Alice");
         let card = ContactCard::new("Alice");
 
-        let session = create_initiator_manual(identity, card);
+        let session = create_qr_exchange_manual(identity, card);
 
         // Should fail — session is Idle, not Complete
         let result = session.extract_contact();
@@ -543,31 +467,11 @@ mod tests {
     }
 
     #[test]
-    fn test_session_qr_one_way_requires_proximity() {
-        let alice = Identity::create("Alice");
-        let alice_card = ContactCard::new("Alice");
-        let bob = Identity::create("Bob");
-        let bob_card = ContactCard::new("Bob");
-
-        // Alice generates QR
-        let alice_session = create_initiator_manual(alice, alice_card);
-        let qr_data = alice_session.generate_qr().unwrap();
-
-        // Bob processes QR
-        let bob_session = create_responder_manual(bob, bob_card);
-        bob_session.process_qr(qr_data).unwrap();
-
-        // Bob tries to skip proximity and go straight to key agreement
-        let result = bob_session.perform_key_agreement();
-        assert!(result.is_err()); // Should fail — must verify proximity first
-    }
-
-    #[test]
     fn test_session_not_timed_out_initially() {
         let identity = Identity::create("Alice");
         let card = ContactCard::new("Alice");
 
-        let session = create_initiator_manual(identity, card);
+        let session = create_qr_exchange_manual(identity, card);
         assert!(!session.is_timed_out());
     }
 }

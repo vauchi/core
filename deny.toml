@@ -27,6 +27,8 @@ ignore = [
     # No fix available until tungstenite updates. Tracked upstream.
     "RUSTSEC-2025-0134",
     # bincode replaced with postcard (2026-02-15). Advisory no longer applies.
+    # bincode is unmaintained — transitive via uniffi_macros. Cannot remove until uniffi updates.
+    "RUSTSEC-2025-0141",
     # paste is unmaintained — transitive via uniffi. No action available.
     "RUSTSEC-2024-0436",
 ]

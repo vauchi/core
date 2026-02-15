@@ -387,25 +387,25 @@ pub fn process_card_updates(
         };
 
         // Detect payload version and extract delta bytes + optional CEK
-        let (delta_bytes, new_cek) =
-            if !plaintext.is_empty() && plaintext[0] == PAYLOAD_VERSION_CEK {
-                match VersionedPayload::decode(&plaintext) {
-                    Ok(VersionedPayload::CekWrapped(wrapped)) => {
-                        let cek = ContentEncryptionKey::from_bytes(wrapped.cek);
-                        match cek.decrypt(&wrapped.cek_ciphertext) {
-                            Ok(decrypted) => (decrypted, Some(cek)),
-                            Err(_) => continue,
-                        }
+        let (delta_bytes, new_cek) = if !plaintext.is_empty() && plaintext[0] == PAYLOAD_VERSION_CEK
+        {
+            match VersionedPayload::decode(&plaintext) {
+                Ok(VersionedPayload::CekWrapped(wrapped)) => {
+                    let cek = ContentEncryptionKey::from_bytes(wrapped.cek);
+                    match cek.decrypt(&wrapped.cek_ciphertext) {
+                        Ok(decrypted) => (decrypted, Some(cek)),
+                        Err(_) => continue,
                     }
-                    Ok(VersionedPayload::Legacy(data)) => (data, None),
-                    Err(_) => continue,
                 }
-            } else {
-                match VersionedPayload::decode(&plaintext) {
-                    Ok(VersionedPayload::Legacy(data)) => (data, None),
-                    _ => (plaintext, None),
-                }
-            };
+                Ok(VersionedPayload::Legacy(data)) => (data, None),
+                Err(_) => continue,
+            }
+        } else {
+            match VersionedPayload::decode(&plaintext) {
+                Ok(VersionedPayload::Legacy(data)) => (data, None),
+                _ => (plaintext, None),
+            }
+        };
 
         // Parse delta
         let delta: vauchi_core::sync::CardDelta = match serde_json::from_slice(&delta_bytes) {

@@ -146,14 +146,24 @@ fn test_replay_accepts_fresh_nonces() {
     let alice_pk = alice.identity().unwrap().signing_public_key();
 
     // First update with unique nonce
-    let encrypted1 =
-        create_encrypted_update(&bob_identity, &mut bob_ratchet, "Bob V1", "bob@v1.com", alice_pk);
+    let encrypted1 = create_encrypted_update(
+        &bob_identity,
+        &mut bob_ratchet,
+        "Bob V1",
+        "bob@v1.com",
+        alice_pk,
+    );
     let result1 = alice.process_card_update(&bob_id, &encrypted1);
     assert!(result1.is_ok(), "First fresh nonce should succeed");
 
     // Second update with a different nonce (CardDelta::compute generates fresh nonce each time)
-    let encrypted2 =
-        create_encrypted_update(&bob_identity, &mut bob_ratchet, "Bob V2", "bob@v2.com", alice_pk);
+    let encrypted2 = create_encrypted_update(
+        &bob_identity,
+        &mut bob_ratchet,
+        "Bob V2",
+        "bob@v2.com",
+        alice_pk,
+    );
     let result2 = alice.process_card_update(&bob_id, &encrypted2);
     assert!(result2.is_ok(), "Second fresh nonce should succeed");
 

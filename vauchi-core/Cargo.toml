@@ -197,3 +197,11 @@ required-features = ["testing"]
 
 [[test]]
 name = "visibility_rules_encryption_tests"
+
+[[test]]
+name = "exchange_ceremony_tests"
+required-features = ["testing"]
+
+[[test]]
+name = "crypto_shredding_integration_tests"
+required-features = ["testing"]

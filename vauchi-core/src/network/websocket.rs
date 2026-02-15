@@ -25,6 +25,7 @@ use tungstenite::{Message, WebSocket};
 use super::error::NetworkError;
 use super::message::MessageEnvelope;
 use super::noise::{self, NoiseInitiator, NoiseTransport};
+use super::pinning;
 use super::protocol::{decode_message, encode_message, read_frame_length, FRAME_HEADER_SIZE};
 use super::transport::{ConnectionState, Transport, TransportConfig, TransportResult};
 
@@ -134,6 +135,56 @@ impl WebSocketTransport {
         Ok(MaybeTlsStream::Rustls(tls_stream))
     }
 
+    /// Extracts the leaf (server) certificate DER bytes from a TLS stream.
+    #[cfg(all(feature = "network-native-tls", not(feature = "network-rustls")))]
+    fn extract_leaf_cert_der(stream: &MaybeTlsStream<TcpStream>) -> Option<Vec<u8>> {
+        if let MaybeTlsStream::NativeTls(ref tls) = stream {
+            tls.peer_certificate()
+                .ok()
+                .flatten()
+                .and_then(|cert| cert.to_der().ok())
+        } else {
+            None
+        }
+    }
+
+    /// Extracts the leaf (server) certificate DER bytes from a TLS stream.
+    #[cfg(feature = "network-rustls")]
+    fn extract_leaf_cert_der(stream: &MaybeTlsStream<TcpStream>) -> Option<Vec<u8>> {
+        if let MaybeTlsStream::Rustls(ref tls) = stream {
+            tls.conn
+                .peer_certificates()
+                .and_then(|certs| certs.first())
+                .map(|cert| cert.as_ref().to_vec())
+        } else {
+            None
+        }
+    }
+
+    /// Verifies that the server's TLS certificate matches a pinned fingerprint.
+    ///
+    /// Called only when `pinned_certs` is non-empty. Returns an error if the
+    /// server certificate does not match any pin.
+    fn verify_cert_pins(
+        stream: &MaybeTlsStream<TcpStream>,
+        pins: &[pinning::PinnedCertificate],
+    ) -> TransportResult<()> {
+        match Self::extract_leaf_cert_der(stream) {
+            Some(der) => {
+                if pinning::verify_pin(&der, pins) {
+                    Ok(())
+                } else {
+                    Err(NetworkError::ConnectionFailed(
+                        "Certificate pin verification failed: server certificate does not match any pinned certificate".into(),
+                    ))
+                }
+            }
+            None => Err(NetworkError::ConnectionFailed(
+                "Certificate pin verification failed: no peer certificate available".into(),
+            )),
+        }
+    }
+
     /// Performs Noise NK handshake over the WebSocket connection.
     fn perform_noise_handshake(&mut self, relay_pubkey: &[u8; 32]) -> TransportResult<()> {
         let socket = self.socket.as_mut().ok_or(NetworkError::NotConnected)?;
@@ -236,6 +287,13 @@ impl Transport for WebSocketTransport {
         } else {
             MaybeTlsStream::Plain(tcp_stream)
         };
+
+        // Verify TLS certificate pins before WebSocket upgrade
+        if !config.pinned_certs.is_empty() {
+            Self::verify_cert_pins(&stream, &config.pinned_certs).inspect_err(|_| {
+                self.state = ConnectionState::Disconnected;
+            })?;
+        }
 
         // WebSocket handshake - use IntoClientRequest for proper HTTP/1.1 request
         let request = config

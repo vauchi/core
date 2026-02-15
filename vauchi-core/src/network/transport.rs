@@ -8,6 +8,7 @@
 
 use super::error::NetworkError;
 use super::message::MessageEnvelope;
+use super::pinning::PinnedCertificate;
 
 /// Result type for transport operations.
 pub type TransportResult<T> = Result<T, NetworkError>;
@@ -113,6 +114,10 @@ pub struct TransportConfig {
     /// When set, the transport performs a Noise NK handshake after WebSocket
     /// connect and wraps all subsequent messages with Noise encryption.
     pub relay_noise_pubkey: Option<[u8; 32]>,
+    /// Pinned relay certificates for TLS certificate pinning.
+    /// When non-empty, the TLS handshake verifies the server's leaf certificate
+    /// matches at least one pinned SHA-256 fingerprint. Empty means no pinning.
+    pub pinned_certs: Vec<PinnedCertificate>,
 }
 
 impl Default for TransportConfig {
@@ -125,6 +130,7 @@ impl Default for TransportConfig {
             reconnect_base_delay_ms: 1_000,
             proxy: ProxyConfig::None,
             relay_noise_pubkey: None,
+            pinned_certs: Vec::new(),
         }
     }
 }
@@ -141,6 +147,7 @@ impl TransportConfig {
             reconnect_base_delay_ms: 5_000,
             proxy: ProxyConfig::tor_default(),
             relay_noise_pubkey: None,
+            pinned_certs: Vec::new(),
         }
     }
 

@@ -340,7 +340,7 @@ fn test_pre_signed_offline_storage_unencrypted() {
     let raw_bytes = std::fs::read(&path).unwrap();
 
     // Should be directly deserializable (no decryption needed)
-    let loaded: PreSignedShredMessages = bincode::deserialize(&raw_bytes)
+    let loaded: PreSignedShredMessages = postcard::from_bytes(&raw_bytes)
         .expect("Pre-signed messages should be readable without decryption");
 
     assert_eq!(

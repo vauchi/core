@@ -105,7 +105,7 @@ impl PreSignedShredMessages {
     /// Saves the pre-signed messages to disk (unencrypted per DP-3).
     pub fn save(&self, data_dir: &Path) -> Result<(), PreSignedError> {
         let path = Self::file_path(data_dir);
-        let data = bincode::serialize(self)
+        let data = postcard::to_allocvec(self)
             .map_err(|e| PreSignedError::SerializationFailed(e.to_string()))?;
         std::fs::write(&path, &data).map_err(|e| PreSignedError::IoError(e.to_string()))?;
         Ok(())
@@ -117,7 +117,7 @@ impl PreSignedShredMessages {
     pub fn load(data_dir: &Path) -> Result<Self, PreSignedError> {
         let path = Self::file_path(data_dir);
         let data = std::fs::read(&path).map_err(|e| PreSignedError::IoError(e.to_string()))?;
-        bincode::deserialize(&data)
+        postcard::from_bytes(&data)
             .map_err(|e| PreSignedError::DeserializationFailed(e.to_string()))
     }
 
@@ -314,7 +314,7 @@ mod tests {
         assert!(!raw.is_empty());
 
         // Should deserialize from raw bytes
-        let loaded: PreSignedShredMessages = bincode::deserialize(&raw).unwrap();
+        let loaded: PreSignedShredMessages = postcard::from_bytes(&raw).unwrap();
         assert_eq!(loaded.deletion_notice.stage, DeletionStage::Confirmed);
     }
 

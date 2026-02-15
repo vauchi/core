@@ -11,7 +11,9 @@ use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
 
 use crate::crypto::SymmetricKey;
-use crate::network::{MultiRelayConfig, ProxyConfig, RelayClientConfig, TransportConfig};
+use crate::network::{
+    MultiRelayConfig, PinnedCertificate, ProxyConfig, RelayClientConfig, TransportConfig,
+};
 use crate::tor_config::TorConfig;
 
 /// Configuration for Vauchi instance.
@@ -137,6 +139,10 @@ pub struct RelayConfig {
     /// When set, the transport performs a Noise NK handshake after connect
     /// and wraps all subsequent messages with Noise encryption.
     pub relay_noise_pubkey: Option<[u8; 32]>,
+
+    /// Pinned relay certificates for TLS certificate pinning.
+    /// When non-empty, verifies the server's leaf certificate matches a pin.
+    pub pinned_certs: Vec<PinnedCertificate>,
 }
 
 impl Default for RelayConfig {
@@ -152,6 +158,7 @@ impl Default for RelayConfig {
             max_retries: 5,
             proxy: ProxyConfig::None,
             relay_noise_pubkey: None,
+            pinned_certs: Vec::new(),
         }
     }
 }
@@ -181,6 +188,7 @@ impl RelayConfig {
             reconnect_base_delay_ms: self.reconnect_base_delay_ms,
             proxy: self.proxy.clone(),
             relay_noise_pubkey: self.relay_noise_pubkey,
+            pinned_certs: self.pinned_certs.clone(),
         }
     }
 

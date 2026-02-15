@@ -26,8 +26,7 @@ ignore = [
     # rustls-pemfile is unmaintained — transitive via tungstenite/rustls-native-certs.
     # No fix available until tungstenite updates. Tracked upstream.
     "RUSTSEC-2025-0134",
-    # bincode v1 is unmaintained — direct dependency, migrate to bincode v2 or bitcode.
-    "RUSTSEC-2025-0141",
+    # bincode replaced with postcard (2026-02-15). Advisory no longer applies.
     # paste is unmaintained — transitive via uniffi. No action available.
     "RUSTSEC-2024-0436",
 ]

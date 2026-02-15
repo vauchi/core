@@ -638,13 +638,13 @@ impl RecoveryProof {
 
     /// Serializes the proof to bytes.
     pub fn to_bytes(&self) -> Vec<u8> {
-        // Use bincode for serialization
-        bincode::serialize(self).expect("Serialization should not fail")
+        // Use postcard for compact serialization
+        postcard::to_allocvec(self).expect("Serialization should not fail")
     }
 
     /// Deserializes a proof from bytes.
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, RecoveryError> {
-        bincode::deserialize(bytes).map_err(|e| RecoveryError::SerializationError(e.to_string()))
+        postcard::from_bytes(bytes).map_err(|e| RecoveryError::SerializationError(e.to_string()))
     }
 }
 
@@ -1015,11 +1015,11 @@ impl RecoveryRevocation {
 
     /// Serializes the revocation to bytes.
     pub fn to_bytes(&self) -> Vec<u8> {
-        bincode::serialize(self).expect("Serialization should not fail")
+        postcard::to_allocvec(self).expect("Serialization should not fail")
     }
 
     /// Deserializes a revocation from bytes.
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, RecoveryError> {
-        bincode::deserialize(bytes).map_err(|e| RecoveryError::SerializationError(e.to_string()))
+        postcard::from_bytes(bytes).map_err(|e| RecoveryError::SerializationError(e.to_string()))
     }
 }

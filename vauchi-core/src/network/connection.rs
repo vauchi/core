@@ -112,14 +112,17 @@ impl<T: Transport> ConnectionManager<T> {
 
     /// Attempts to reconnect with exponential backoff.
     ///
+    /// Sleeps for an exponentially increasing delay before each attempt.
     /// Returns error if max retries exceeded.
     pub fn reconnect(&mut self) -> TransportResult<()> {
         if self.reconnect_attempt >= self.config.max_reconnect_attempts {
             return Err(NetworkError::MaxRetriesExceeded);
         }
 
-        // Calculate backoff delay (not actually sleeping here - that's for the caller)
-        let _delay_ms = self.config.reconnect_base_delay_ms * (1 << self.reconnect_attempt.min(6));
+        // Exponential backoff: base_delay * 2^attempt, capped at 2^6 = 64x
+        let delay_ms =
+            self.config.reconnect_base_delay_ms * (1u64 << self.reconnect_attempt.min(6));
+        std::thread::sleep(std::time::Duration::from_millis(delay_ms));
 
         self.reconnect_attempt += 1;
 

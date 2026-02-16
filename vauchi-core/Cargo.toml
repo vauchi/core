@@ -205,3 +205,7 @@ required-features = ["testing"]
 [[test]]
 name = "crypto_shredding_integration_tests"
 required-features = ["testing"]
+
+[[test]]
+name = "panic_widget_tests"
+required-features = ["testing"]

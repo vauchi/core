@@ -16,7 +16,7 @@ pub mod state;
 
 pub use card_update::{process_card_updates, process_single_card_update, CardUpdateResult};
 pub use delta::{CardDelta, DeltaError, FieldChange};
-pub use device_orchestrator::DeviceSyncOrchestrator;
+pub use device_orchestrator::{build_device_sync_envelopes, DeviceSyncOrchestrator};
 pub use device_sync::{
     validate_timestamp, ContactSyncData, DeviceSyncError, DeviceSyncPayload, InterDeviceSyncState,
     SyncItem, VersionVector,

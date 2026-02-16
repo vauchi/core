@@ -412,6 +412,82 @@ impl<'a> DeviceSyncOrchestrator<'a> {
             .clear_sync_checkpoint(target_device_id)
             .map_err(|e| DeviceSyncError::Serialization(e.to_string()))
     }
+
+    /// Builds device sync envelopes for all devices with pending items.
+    ///
+    /// This is the canonical implementation of the sync orchestration logic.
+    /// All clients (CLI, Desktop, TUI, Mobile) should use this instead of
+    /// implementing their own iteration + encryption + envelope creation.
+    ///
+    /// Returns a list of encoded envelopes ready to send over the wire.
+    pub fn build_outbound_envelopes(
+        &self,
+        identity: &crate::Identity,
+    ) -> Result<Vec<Vec<u8>>, DeviceSyncError> {
+        let identity_id = identity.public_id();
+        let sender_device_id = hex::encode(identity.device_id());
+        let mut envelopes = Vec::new();
+
+        for device in self.registry.active_devices() {
+            if device.device_id == *identity.device_id() {
+                continue;
+            }
+
+            let pending = self.pending_for_device(&device.device_id);
+            if pending.is_empty() {
+                continue;
+            }
+
+            let payload = serde_json::to_vec(pending)
+                .map_err(|e| DeviceSyncError::Serialization(e.to_string()))?;
+
+            let encrypted = self.encrypt_for_device(&device.exchange_public_key, &payload)?;
+
+            let target_device_id = hex::encode(device.device_id);
+            let version = self.version_vector.get(identity.device_id());
+
+            let envelope = crate::network::simple_message::create_device_sync_message(
+                &identity_id,
+                &target_device_id,
+                &sender_device_id,
+                encrypted,
+                version,
+            );
+
+            let encoded = crate::network::simple_message::encode_simple_message(&envelope)
+                .map_err(DeviceSyncError::Serialization)?;
+
+            envelopes.push(encoded);
+        }
+
+        Ok(envelopes)
+    }
+}
+
+/// Builds device sync envelopes from storage state.
+///
+/// Loads the device registry and orchestrator state from storage, then
+/// builds all pending sync envelopes. Returns an empty vec if there are
+/// no linked devices or nothing to sync.
+///
+/// All clients should call this instead of implementing their own sync
+/// orchestration logic.
+pub fn build_device_sync_envelopes(
+    identity: &crate::Identity,
+    storage: &Storage,
+) -> Result<Vec<Vec<u8>>, DeviceSyncError> {
+    let registry = match storage
+        .load_device_registry()
+        .map_err(|e| DeviceSyncError::Deserialization(e.to_string()))?
+    {
+        Some(r) if r.device_count() > 1 => r,
+        _ => return Ok(Vec::new()),
+    };
+
+    let orchestrator =
+        DeviceSyncOrchestrator::load(storage, identity.create_device_info(), registry)?;
+
+    orchestrator.build_outbound_envelopes(identity)
 }
 
 /// A message containing pending sync items to send to another device.

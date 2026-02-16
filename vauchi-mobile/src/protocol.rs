@@ -10,7 +10,7 @@
 
 // Re-export types from vauchi-core's simple_message module
 pub use vauchi_core::network::simple_message::{
-    create_device_sync_ack, create_device_sync_message, create_simple_ack as create_ack,
+    create_device_sync_ack, create_simple_ack as create_ack,
     create_simple_envelope as create_envelope, decode_simple_message as decode_message,
     encode_simple_message as encode_message, LegacyExchangeMessage as ExchangeMessage,
     SimpleAckStatus as AckStatus, SimpleDeviceSyncMessage as DeviceSyncMessage,

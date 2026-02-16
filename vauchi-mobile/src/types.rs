@@ -90,6 +90,7 @@ pub struct MobileContact {
     pub display_name: String,
     pub is_verified: bool,
     pub is_recovery_trusted: bool,
+    pub is_hidden: bool,
     pub card: MobileContactCard,
     pub added_at: u64,
 }
@@ -101,6 +102,7 @@ impl From<&Contact> for MobileContact {
             display_name: contact.display_name().to_string(),
             is_verified: contact.is_fingerprint_verified(),
             is_recovery_trusted: contact.is_recovery_trusted(),
+            is_hidden: contact.is_hidden(),
             card: MobileContactCard::from(contact.card()),
             added_at: contact.exchange_timestamp(),
         }

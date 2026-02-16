@@ -158,6 +158,18 @@ pub enum VauchiEvent {
         to: String,
     },
 
+    /// A contact was hidden from the main list.
+    ContactHidden {
+        /// The contact ID.
+        contact_id: String,
+    },
+
+    /// A contact was unhidden (returned to the main list).
+    ContactUnhidden {
+        /// The contact ID.
+        contact_id: String,
+    },
+
     /// A contact was blocked.
     ContactBlocked {
         /// The contact ID.

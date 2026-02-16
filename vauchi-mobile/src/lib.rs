@@ -964,6 +964,50 @@ impl VauchiMobile {
         Ok(count as u32)
     }
 
+    // === Hidden Contact Operations ===
+
+    /// Hides a contact from the main contact list.
+    ///
+    /// Hidden contacts provide plausible deniability - they only appear
+    /// via secret access (gesture, PIN, or special settings navigation).
+    pub fn hide_contact(&self, contact_id: String) -> Result<(), MobileError> {
+        let storage = self.open_storage()?;
+
+        let mut contact = storage
+            .load_contact(&contact_id)?
+            .ok_or_else(|| MobileError::ContactNotFound(contact_id.clone()))?;
+
+        contact.hide();
+        storage.save_contact(&contact)?;
+
+        Ok(())
+    }
+
+    /// Unhides a contact, making it visible in the main contact list again.
+    pub fn unhide_contact(&self, contact_id: String) -> Result<(), MobileError> {
+        let storage = self.open_storage()?;
+
+        let mut contact = storage
+            .load_contact(&contact_id)?
+            .ok_or_else(|| MobileError::ContactNotFound(contact_id.clone()))?;
+
+        contact.unhide();
+        storage.save_contact(&contact)?;
+
+        Ok(())
+    }
+
+    /// Lists all hidden contacts.
+    pub fn list_hidden_contacts(&self) -> Result<Vec<MobileContact>, MobileError> {
+        let storage = self.open_storage()?;
+        let contacts = storage.list_contacts()?;
+        Ok(contacts
+            .iter()
+            .filter(|c| c.is_hidden())
+            .map(MobileContact::from)
+            .collect())
+    }
+
     // === Visibility Operations ===
 
     /// Hide field from contact.

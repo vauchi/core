@@ -1381,6 +1381,47 @@ impl<T: Transport> Vauchi<T> {
         self.config.relay_list = None;
     }
 
+    // === Hide/Unhide Contacts ===
+
+    /// Hides a contact from the main contact list.
+    ///
+    /// Hidden contacts provide plausible deniability - they only appear
+    /// via secret access (gesture, PIN, or special settings navigation).
+    /// Updates from hidden contacts are still received but notifications
+    /// are suppressed.
+    pub fn hide_contact(&self, id: &str) -> VauchiResult<()> {
+        let mut contact = self
+            .storage
+            .load_contact(id)?
+            .ok_or_else(|| VauchiError::ContactNotFound(id.to_string()))?;
+        contact.hide();
+        self.storage.save_contact(&contact)?;
+        self.events.dispatch(VauchiEvent::ContactHidden {
+            contact_id: id.to_string(),
+        });
+        Ok(())
+    }
+
+    /// Unhides a contact, making it visible in the main contact list again.
+    pub fn unhide_contact(&self, id: &str) -> VauchiResult<()> {
+        let mut contact = self
+            .storage
+            .load_contact(id)?
+            .ok_or_else(|| VauchiError::ContactNotFound(id.to_string()))?;
+        contact.unhide();
+        self.storage.save_contact(&contact)?;
+        self.events.dispatch(VauchiEvent::ContactUnhidden {
+            contact_id: id.to_string(),
+        });
+        Ok(())
+    }
+
+    /// Lists all hidden contacts.
+    pub fn list_hidden_contacts(&self) -> VauchiResult<Vec<Contact>> {
+        let contacts = self.storage.list_contacts()?;
+        Ok(contacts.into_iter().filter(|c| c.is_hidden()).collect())
+    }
+
     // === Block/Unblock Contacts ===
 
     /// Blocks a contact.

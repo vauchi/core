@@ -1213,3 +1213,36 @@ pub enum MobileShredStatus {
     /// Hard shred has been executed — all data destroyed.
     Executed,
 }
+
+// =============================================================================
+// Duress PIN Types
+// =============================================================================
+
+/// Authentication mode result for mobile platforms.
+#[derive(Debug, Clone, PartialEq, Eq, uniffi::Enum)]
+pub enum MobileAuthMode {
+    /// The normal (real) password was used.
+    Normal,
+    /// The duress PIN was used — show decoy contacts only.
+    Duress,
+}
+
+/// Duress alert settings for mobile platforms.
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct MobileDuressSettings {
+    /// Contact IDs of trusted contacts who receive duress alerts.
+    pub alert_contact_ids: Vec<String>,
+    /// Custom alert message included in the alert payload.
+    pub alert_message: String,
+    /// Whether to include device location in the alert.
+    pub include_location: bool,
+}
+
+/// A decoy contact for mobile platforms.
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct MobileDecoyContact {
+    /// Unique identifier for the decoy contact.
+    pub id: String,
+    /// Display name shown in the contact list.
+    pub display_name: String,
+}

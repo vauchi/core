@@ -1246,3 +1246,23 @@ pub struct MobileDecoyContact {
     /// Display name shown in the contact list.
     pub display_name: String,
 }
+
+/// Emergency broadcast result for mobile platforms.
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct MobileBroadcastResult {
+    /// Number of alerts successfully queued for delivery.
+    pub sent: u32,
+    /// Total number of trusted contacts in the config.
+    pub total: u32,
+}
+
+/// Emergency broadcast configuration for mobile platforms.
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct MobileEmergencyConfig {
+    /// Contact IDs of trusted contacts who receive emergency alerts.
+    pub trusted_contact_ids: Vec<String>,
+    /// Custom alert message included in the alert payload.
+    pub message: String,
+    /// Whether to include device location in the alert.
+    pub include_location: bool,
+}

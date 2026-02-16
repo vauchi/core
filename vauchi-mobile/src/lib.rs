@@ -49,19 +49,19 @@ pub use content::{
 pub use error::{KeychainError, MobileError};
 pub use exchange::{MobileExchangeSession, MobileExchangeState, MobileProximityHandler};
 pub use types::{
-    MobileAhaMoment, MobileAhaMomentType, MobileAuthMode, MobileConsentRecord, MobileConsentType,
-    MobileContact, MobileContactCard, MobileContactField, MobileDecoyContact,
-    MobileDeletionInfo, MobileDeletionState, MobileDeliveryRecord, MobileDeliveryStatus,
-    MobileDeliverySummary, MobileDemoContact, MobileDemoContactState, MobileDeviceDeliveryRecord,
-    MobileDeviceDeliveryStatus, MobileDeviceInfo, MobileDeviceLinkData, MobileDeviceLinkInfo,
-    MobileDeviceLinkResult, MobileDuressSettings, MobileExchangeResult, MobileFaqItem,
-    MobileFieldType, MobileFieldValidation, MobileGdprExport, MobileHelpCategory,
-    MobileHelpCategoryInfo, MobileLocale, MobileLocaleInfo, MobileRecoveryClaim,
-    MobileRecoveryProgress, MobileRecoveryVerification, MobileRecoveryVoucher, MobileRetryEntry,
-    MobileShredReport, MobileShredStatus, MobileShredToken, MobileShredVerification,
-    MobileSocialNetwork, MobileSyncResult, MobileSyncStatus, MobileTheme, MobileThemeColors,
-    MobileThemeMode, MobileTrustLevel, MobileValidationStatus, MobileVisibilityLabel,
-    MobileVisibilityLabelDetail,
+    MobileAhaMoment, MobileAhaMomentType, MobileAuthMode, MobileBroadcastResult,
+    MobileConsentRecord, MobileConsentType, MobileContact, MobileContactCard, MobileContactField,
+    MobileDecoyContact, MobileDeletionInfo, MobileDeletionState, MobileDeliveryRecord,
+    MobileDeliveryStatus, MobileDeliverySummary, MobileDemoContact, MobileDemoContactState,
+    MobileDeviceDeliveryRecord, MobileDeviceDeliveryStatus, MobileDeviceInfo, MobileDeviceLinkData,
+    MobileDeviceLinkInfo, MobileDeviceLinkResult, MobileDuressSettings, MobileEmergencyConfig,
+    MobileExchangeResult, MobileFaqItem, MobileFieldType, MobileFieldValidation, MobileGdprExport,
+    MobileHelpCategory, MobileHelpCategoryInfo, MobileLocale, MobileLocaleInfo,
+    MobileRecoveryClaim, MobileRecoveryProgress, MobileRecoveryVerification, MobileRecoveryVoucher,
+    MobileRetryEntry, MobileShredReport, MobileShredStatus, MobileShredToken,
+    MobileShredVerification, MobileSocialNetwork, MobileSyncResult, MobileSyncStatus, MobileTheme,
+    MobileThemeColors, MobileThemeMode, MobileTrustLevel, MobileValidationStatus,
+    MobileVisibilityLabel, MobileVisibilityLabelDetail,
 };
 
 uniffi::setup_scaffolding!();
@@ -1146,6 +1146,63 @@ impl VauchiMobile {
             alert_message: s.alert_message,
             include_location: s.include_location,
         }))
+    }
+
+    // === Emergency Broadcast ===
+
+    /// Configures the emergency broadcast system.
+    ///
+    /// Sets which contacts receive emergency alerts, the alert message,
+    /// and whether to include device location.
+    pub fn configure_emergency_broadcast(
+        &self,
+        contact_ids: Vec<String>,
+        message: String,
+        include_location: bool,
+    ) -> Result<(), MobileError> {
+        let mut vauchi = self.open_vauchi()?;
+        let identity = self.get_identity()?;
+        vauchi
+            .set_identity(identity)
+            .map_err(|e| MobileError::Internal(e.to_string()))?;
+        vauchi.configure_emergency_broadcast(contact_ids, message, include_location)?;
+        Ok(())
+    }
+
+    /// Sends an emergency broadcast to all trusted contacts.
+    ///
+    /// Returns the number of alerts sent and total configured.
+    pub fn send_emergency_broadcast(&self) -> Result<MobileBroadcastResult, MobileError> {
+        let mut vauchi = self.open_vauchi()?;
+        let identity = self.get_identity()?;
+        vauchi
+            .set_identity(identity)
+            .map_err(|e| MobileError::Internal(e.to_string()))?;
+        let result = vauchi.send_emergency_broadcast()?;
+        Ok(MobileBroadcastResult {
+            sent: result.sent as u32,
+            total: result.total as u32,
+        })
+    }
+
+    /// Gets the current emergency broadcast configuration.
+    ///
+    /// Returns `None` if no configuration has been set.
+    pub fn get_emergency_config(&self) -> Result<Option<MobileEmergencyConfig>, MobileError> {
+        let vauchi = self.open_vauchi()?;
+        let config = vauchi.load_emergency_config()?;
+        Ok(config.map(|c| MobileEmergencyConfig {
+            trusted_contact_ids: c.trusted_contact_ids,
+            message: c.message,
+            include_location: c.include_location,
+        }))
+    }
+
+    /// Disables the emergency broadcast by deleting the configuration.
+    pub fn disable_emergency_broadcast(&self) -> Result<(), MobileError> {
+        let mut vauchi = self.open_vauchi()?;
+        vauchi.delete_emergency_config()?;
+        Ok(())
     }
 
     // === Decoy Contacts ===

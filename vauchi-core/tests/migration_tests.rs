@@ -532,7 +532,10 @@ fn test_default_column_values() {
 /// Helper: runs migrations up to (and including) the given version on an in-memory connection.
 fn run_migrations_up_to(conn: &Connection, key: &SymmetricKey, up_to_version: u32) {
     let migrations = all_migrations();
-    let subset: Vec<_> = migrations.into_iter().filter(|m| m.version <= up_to_version).collect();
+    let subset: Vec<_> = migrations
+        .into_iter()
+        .filter(|m| m.version <= up_to_version)
+        .collect();
     MigrationRunner::run(conn, key, &subset).unwrap();
 }
 
@@ -579,9 +582,11 @@ fn test_migration_v19_adds_password_columns() {
     .unwrap();
 
     let duress_enabled: i64 = conn
-        .query_row("SELECT duress_enabled FROM identity WHERE id = 1", [], |row| {
-            row.get(0)
-        })
+        .query_row(
+            "SELECT duress_enabled FROM identity WHERE id = 1",
+            [],
+            |row| row.get(0),
+        )
         .unwrap();
     assert_eq!(duress_enabled, 0, "duress_enabled should default to 0");
 }
@@ -727,8 +732,8 @@ fn test_schema_version_is_21_after_all_migrations() {
     // Verify final schema version
     let version = MigrationRunner::current_version(&conn).unwrap();
     assert_eq!(
-        version, 21,
-        "Schema version should be 21 after all migrations, got {}",
+        version, 22,
+        "Schema version should be 22 after all migrations, got {}",
         version
     );
 }
@@ -756,7 +761,10 @@ fn test_migration_v19_is_safe_on_fresh_identity_table() {
             |row| row.get(0),
         )
         .unwrap();
-    assert!(pw_hash.is_none(), "password_hash_encrypted should default to NULL");
+    assert!(
+        pw_hash.is_none(),
+        "password_hash_encrypted should default to NULL"
+    );
 
     let pw_salt: Option<Vec<u8>> = conn
         .query_row(
@@ -774,14 +782,15 @@ fn test_migration_v19_is_safe_on_fresh_identity_table() {
             |row| row.get(0),
         )
         .unwrap();
-    assert!(duress_hash.is_none(), "duress_hash_encrypted should default to NULL");
+    assert!(
+        duress_hash.is_none(),
+        "duress_hash_encrypted should default to NULL"
+    );
 
     let duress_salt: Option<Vec<u8>> = conn
-        .query_row(
-            "SELECT duress_salt FROM identity WHERE id = 1",
-            [],
-            |row| row.get(0),
-        )
+        .query_row("SELECT duress_salt FROM identity WHERE id = 1", [], |row| {
+            row.get(0)
+        })
         .unwrap();
     assert!(duress_salt.is_none(), "duress_salt should default to NULL");
 
@@ -793,4 +802,78 @@ fn test_migration_v19_is_safe_on_fresh_identity_table() {
         )
         .unwrap();
     assert_eq!(duress_enabled, 0, "duress_enabled should default to 0");
+}
+
+// =============================================================================
+// EMERGENCY BROADCAST MIGRATION TEST (V22)
+// =============================================================================
+
+#[test]
+fn test_migration_v22_creates_emergency_config_table() {
+    let conn = Connection::open_in_memory().unwrap();
+    let key = SymmetricKey::generate();
+
+    // Run migrations up to V21
+    run_migrations_up_to(&conn, &key, 21);
+
+    // Verify emergency_config does NOT exist yet
+    let tables = get_table_names(&conn);
+    assert!(
+        !tables.contains(&"emergency_config".to_string()),
+        "emergency_config should not exist before V22"
+    );
+
+    // Now run V22
+    run_migrations_up_to(&conn, &key, 22);
+
+    // Verify table exists
+    let tables = get_table_names(&conn);
+    assert!(
+        tables.contains(&"emergency_config".to_string()),
+        "emergency_config table should exist after V22"
+    );
+
+    // Verify columns
+    let cols = get_column_names(&conn, "emergency_config");
+    let expected = [
+        "id",
+        "trusted_contact_ids_encrypted",
+        "message_encrypted",
+        "include_location",
+        "created_at",
+        "updated_at",
+    ];
+    for col in &expected {
+        assert!(
+            cols.contains(&col.to_string()),
+            "emergency_config missing column: {}",
+            col
+        );
+    }
+
+    // Verify singleton constraint (id must be 1)
+    conn.execute(
+        "INSERT INTO emergency_config (id, created_at, updated_at) VALUES (1, 1000, 1000)",
+        [],
+    )
+    .unwrap();
+
+    let result = conn.execute(
+        "INSERT INTO emergency_config (id, created_at, updated_at) VALUES (2, 1000, 1000)",
+        [],
+    );
+    assert!(
+        result.is_err(),
+        "emergency_config should enforce id = 1 singleton constraint"
+    );
+
+    // Verify include_location defaults to 0
+    let include_location: i64 = conn
+        .query_row(
+            "SELECT include_location FROM emergency_config WHERE id = 1",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert_eq!(include_location, 0, "include_location should default to 0");
 }

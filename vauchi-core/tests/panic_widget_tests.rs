@@ -75,7 +75,10 @@ fn test_widget_panic_shred_destroys_database() {
     let db_path = dir.path().join("vauchi.db");
 
     // Verify database exists before shred
-    assert!(db_path.exists(), "Database should exist before widget shred");
+    assert!(
+        db_path.exists(),
+        "Database should exist before widget shred"
+    );
 
     // Execute widget panic shred
     let report = widget_panic_shred(dir.path(), &secure_storage).unwrap();

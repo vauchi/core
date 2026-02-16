@@ -121,7 +121,13 @@ impl Storage {
         );
 
         match result {
-            Ok((Some(hash_enc), Some(salt_bytes), duress_hash_enc, duress_salt_bytes, duress_enabled)) => {
+            Ok((
+                Some(hash_enc),
+                Some(salt_bytes),
+                duress_hash_enc,
+                duress_salt_bytes,
+                duress_enabled,
+            )) => {
                 // Decrypt the password hash
                 let hash_bytes = crate::crypto::decrypt(&self.encryption_key, &hash_enc)
                     .map_err(|e| StorageError::Encryption(e.to_string()))?;
@@ -155,13 +161,15 @@ impl Storage {
                     None
                 };
 
-                Ok(Some(crate::api::app_password::AppPasswordConfig::from_stored(
-                    password_hash,
-                    password_salt,
-                    duress_hash,
-                    duress_salt,
-                    duress_enabled != 0,
-                )))
+                Ok(Some(
+                    crate::api::app_password::AppPasswordConfig::from_stored(
+                        password_hash,
+                        password_salt,
+                        duress_hash,
+                        duress_salt,
+                        duress_enabled != 0,
+                    ),
+                ))
             }
             Ok((None, _, _, _, _)) | Ok((_, None, _, _, _)) => {
                 // No password set

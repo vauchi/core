@@ -13,9 +13,9 @@
 
 mod common;
 
-use vauchi_core::{AppPasswordConfig, AuthMode, AuthResult};
 use vauchi_core::contact_card::ContactCard;
 use vauchi_core::storage::Storage;
+use vauchi_core::{AppPasswordConfig, AuthMode, AuthResult};
 
 use common::helpers::{create_vauchi_with_identity, setup_alice_bob_exchange};
 
@@ -132,12 +132,10 @@ fn test_setup_duress_same_as_normal_rejected() {
 
 #[test]
 fn test_load_password_config_returns_none_initially() {
-    let storage = Storage::in_memory(vauchi_core::SymmetricKey::generate())
-        .expect("storage should open");
+    let storage =
+        Storage::in_memory(vauchi_core::SymmetricKey::generate()).expect("storage should open");
 
-    let config = storage
-        .load_password_config()
-        .expect("load should succeed");
+    let config = storage.load_password_config().expect("load should succeed");
     assert!(
         config.is_none(),
         "password config should be None before any password is set"
@@ -146,8 +144,8 @@ fn test_load_password_config_returns_none_initially() {
 
 #[test]
 fn test_save_load_app_password_roundtrip() {
-    let storage = Storage::in_memory(vauchi_core::SymmetricKey::generate())
-        .expect("storage should open");
+    let storage =
+        Storage::in_memory(vauchi_core::SymmetricKey::generate()).expect("storage should open");
 
     // Create and save identity first (password columns are on identity table)
     // Create identity row so password columns can be updated
@@ -159,7 +157,10 @@ fn test_save_load_app_password_roundtrip() {
     let password_config =
         AppPasswordConfig::create("test-password").expect("create should succeed");
     storage
-        .save_app_password(password_config.password_hash(), password_config.password_salt())
+        .save_app_password(
+            password_config.password_hash(),
+            password_config.password_salt(),
+        )
         .expect("save should succeed");
 
     let loaded = storage
@@ -174,8 +175,8 @@ fn test_save_load_app_password_roundtrip() {
 
 #[test]
 fn test_save_load_duress_password_roundtrip() {
-    let storage = Storage::in_memory(vauchi_core::SymmetricKey::generate())
-        .expect("storage should open");
+    let storage =
+        Storage::in_memory(vauchi_core::SymmetricKey::generate()).expect("storage should open");
 
     // Create identity row so password columns can be updated
     let backup_data = b"dummy-backup-data";
@@ -187,7 +188,10 @@ fn test_save_load_duress_password_roundtrip() {
     let mut password_config =
         AppPasswordConfig::create("test-password").expect("create should succeed");
     storage
-        .save_app_password(password_config.password_hash(), password_config.password_salt())
+        .save_app_password(
+            password_config.password_hash(),
+            password_config.password_salt(),
+        )
         .expect("save app password should succeed");
 
     // Set up and save duress password
@@ -196,8 +200,12 @@ fn test_save_load_duress_password_roundtrip() {
         .expect("setup duress should succeed");
     storage
         .save_duress_password(
-            password_config.duress_hash().expect("duress hash should exist"),
-            password_config.duress_salt().expect("duress salt should exist"),
+            password_config
+                .duress_hash()
+                .expect("duress hash should exist"),
+            password_config
+                .duress_salt()
+                .expect("duress salt should exist"),
         )
         .expect("save duress should succeed");
 
@@ -213,8 +221,8 @@ fn test_save_load_duress_password_roundtrip() {
 
 #[test]
 fn test_disable_duress_clears_data() {
-    let storage = Storage::in_memory(vauchi_core::SymmetricKey::generate())
-        .expect("storage should open");
+    let storage =
+        Storage::in_memory(vauchi_core::SymmetricKey::generate()).expect("storage should open");
 
     // Create identity row so password columns can be updated
     let backup_data = b"dummy-backup-data";
@@ -226,7 +234,10 @@ fn test_disable_duress_clears_data() {
     let mut password_config =
         AppPasswordConfig::create("test-password").expect("create should succeed");
     storage
-        .save_app_password(password_config.password_hash(), password_config.password_salt())
+        .save_app_password(
+            password_config.password_hash(),
+            password_config.password_salt(),
+        )
         .expect("save app password should succeed");
     password_config
         .setup_duress("duress-pin")
@@ -257,28 +268,27 @@ fn test_disable_duress_clears_data() {
 
 #[test]
 fn test_load_decoy_contacts_empty_initially() {
-    let storage = Storage::in_memory(vauchi_core::SymmetricKey::generate())
-        .expect("storage should open");
+    let storage =
+        Storage::in_memory(vauchi_core::SymmetricKey::generate()).expect("storage should open");
 
-    let contacts = storage
-        .load_decoy_contacts()
-        .expect("load should succeed");
-    assert!(contacts.is_empty(), "decoy contacts should be empty initially");
+    let contacts = storage.load_decoy_contacts().expect("load should succeed");
+    assert!(
+        contacts.is_empty(),
+        "decoy contacts should be empty initially"
+    );
 }
 
 #[test]
 fn test_save_load_decoy_contact() {
-    let storage = Storage::in_memory(vauchi_core::SymmetricKey::generate())
-        .expect("storage should open");
+    let storage =
+        Storage::in_memory(vauchi_core::SymmetricKey::generate()).expect("storage should open");
 
     let card = ContactCard::new("Fake Alice");
     storage
         .save_decoy_contact("decoy-1", "Fake Alice", &card)
         .expect("save should succeed");
 
-    let contacts = storage
-        .load_decoy_contacts()
-        .expect("load should succeed");
+    let contacts = storage.load_decoy_contacts().expect("load should succeed");
     assert_eq!(contacts.len(), 1);
     assert_eq!(contacts[0].0, "decoy-1"); // id
     assert_eq!(contacts[0].1, "Fake Alice"); // display_name
@@ -287,8 +297,8 @@ fn test_save_load_decoy_contact() {
 
 #[test]
 fn test_delete_decoy_contact() {
-    let storage = Storage::in_memory(vauchi_core::SymmetricKey::generate())
-        .expect("storage should open");
+    let storage =
+        Storage::in_memory(vauchi_core::SymmetricKey::generate()).expect("storage should open");
 
     let card = ContactCard::new("Fake Alice");
     storage
@@ -299,16 +309,17 @@ fn test_delete_decoy_contact() {
         .delete_decoy_contact("decoy-1")
         .expect("delete should succeed");
 
-    let contacts = storage
-        .load_decoy_contacts()
-        .expect("load should succeed");
-    assert!(contacts.is_empty(), "decoy contacts should be empty after delete");
+    let contacts = storage.load_decoy_contacts().expect("load should succeed");
+    assert!(
+        contacts.is_empty(),
+        "decoy contacts should be empty after delete"
+    );
 }
 
 #[test]
 fn test_clear_all_decoy_contacts() {
-    let storage = Storage::in_memory(vauchi_core::SymmetricKey::generate())
-        .expect("storage should open");
+    let storage =
+        Storage::in_memory(vauchi_core::SymmetricKey::generate()).expect("storage should open");
 
     let card1 = ContactCard::new("Fake Alice");
     let card2 = ContactCard::new("Fake Bob");
@@ -323,10 +334,11 @@ fn test_clear_all_decoy_contacts() {
         .clear_all_decoy_contacts()
         .expect("clear should succeed");
 
-    let contacts = storage
-        .load_decoy_contacts()
-        .expect("load should succeed");
-    assert!(contacts.is_empty(), "decoy contacts should be empty after clear");
+    let contacts = storage.load_decoy_contacts().expect("load should succeed");
+    assert!(
+        contacts.is_empty(),
+        "decoy contacts should be empty after clear"
+    );
 }
 
 // =============================================================================
@@ -364,9 +376,7 @@ fn test_authenticate_normal_password() {
     wb.setup_app_password("my-pin-1234")
         .expect("setup should succeed");
 
-    let mode = wb
-        .authenticate("my-pin-1234")
-        .expect("auth should succeed");
+    let mode = wb.authenticate("my-pin-1234").expect("auth should succeed");
 
     assert_eq!(
         mode,
@@ -384,15 +394,9 @@ fn test_authenticate_invalid_password_fails() {
         .expect("setup should succeed");
 
     let result = wb.authenticate("wrong-pin");
-    assert!(
-        result.is_err(),
-        "wrong password should return an error"
-    );
+    assert!(result.is_err(), "wrong password should return an error");
     // Auth mode should remain Unauthenticated
-    assert_eq!(
-        wb.auth_mode(),
-        AuthMode::Unauthenticated
-    );
+    assert_eq!(wb.auth_mode(), AuthMode::Unauthenticated);
 }
 
 #[test]
@@ -404,9 +408,7 @@ fn test_authenticate_duress_password_sets_mode() {
     wb.setup_duress_password("duress-999")
         .expect("setup duress should succeed");
 
-    let mode = wb
-        .authenticate("duress-999")
-        .expect("auth should succeed");
+    let mode = wb.authenticate("duress-999").expect("auth should succeed");
 
     assert_eq!(
         mode,
@@ -452,13 +454,13 @@ fn test_list_contacts_unauthenticated_returns_real() {
     let (alice_wb, _bob_wb, _secret, _bob_id, _alice_id) = setup_alice_bob_exchange();
 
     // Alice is unauthenticated (no password set), should see real contacts
-    assert_eq!(
-        alice_wb.auth_mode(),
-        AuthMode::Unauthenticated
-    );
+    assert_eq!(alice_wb.auth_mode(), AuthMode::Unauthenticated);
     let contacts = alice_wb.list_contacts().expect("list should succeed");
     // Alice has one real contact (Bob) — hidden filtering applies, but Bob isn't hidden
-    assert!(!contacts.is_empty(), "unauthenticated mode should return real contacts");
+    assert!(
+        !contacts.is_empty(),
+        "unauthenticated mode should return real contacts"
+    );
 }
 
 #[test]
@@ -474,7 +476,10 @@ fn test_list_contacts_normal_mode_returns_real() {
     assert_eq!(mode, AuthMode::Normal);
 
     let contacts = alice_wb.list_contacts().expect("list should succeed");
-    assert!(!contacts.is_empty(), "normal mode should return real contacts");
+    assert!(
+        !contacts.is_empty(),
+        "normal mode should return real contacts"
+    );
 }
 
 #[test]
@@ -503,7 +508,11 @@ fn test_list_contacts_duress_mode_returns_decoy() {
 
     let contacts = alice_wb.list_contacts().expect("list should succeed");
     // Should see the decoy contact, not Bob
-    assert_eq!(contacts.len(), 1, "duress mode should return decoy contacts");
+    assert_eq!(
+        contacts.len(),
+        1,
+        "duress mode should return decoy contacts"
+    );
     assert_eq!(contacts[0].display_name(), "Decoy Contact");
 }
 
@@ -558,8 +567,7 @@ fn test_delete_duress_settings() {
     wb.save_duress_settings(&settings)
         .expect("save should succeed");
 
-    wb.delete_duress_settings()
-        .expect("delete should succeed");
+    wb.delete_duress_settings().expect("delete should succeed");
 
     let loaded = wb.load_duress_settings().expect("load should succeed");
     assert!(
@@ -648,13 +656,19 @@ fn test_duress_alert_contains_timestamp_and_device_id() {
     assert!(!alerts.is_empty());
 
     let alert = &alerts[0];
-    assert!(alert.timestamp > 0, "alert should have a non-zero timestamp");
+    assert!(
+        alert.timestamp > 0,
+        "alert should have a non-zero timestamp"
+    );
     assert!(
         !alert.device_id.is_empty(),
         "alert should have a non-empty device_id"
     );
     assert!(
-        matches!(alert.alert_type, vauchi_core::api::duress::DuressAlertType::Unlock),
+        matches!(
+            alert.alert_type,
+            vauchi_core::api::duress::DuressAlertType::Unlock
+        ),
         "alert type should be Unlock"
     );
 }

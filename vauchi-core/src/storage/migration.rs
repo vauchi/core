@@ -260,6 +260,11 @@ pub fn all_migrations() -> Vec<Migration> {
             name: "decoy_contacts",
             action: MigrationAction::Sql(MIGRATION_V21_DECOY_CONTACTS),
         },
+        Migration {
+            version: 22,
+            name: "emergency_config",
+            action: MigrationAction::Sql(MIGRATION_V22_EMERGENCY_CONFIG),
+        },
     ]
 }
 
@@ -312,6 +317,22 @@ const MIGRATION_V21_DECOY_CONTACTS: &str = "
         id TEXT PRIMARY KEY,
         display_name TEXT NOT NULL,
         card_encrypted BLOB NOT NULL,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+    );
+";
+
+/// Migration v22: Emergency broadcast configuration table.
+///
+/// Singleton table (id = 1) storing encrypted configuration for emergency
+/// alerts: which contacts to alert, what message to send, and whether to
+/// include device location. All sensitive fields are encrypted BLOBs.
+const MIGRATION_V22_EMERGENCY_CONFIG: &str = "
+    CREATE TABLE IF NOT EXISTS emergency_config (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        trusted_contact_ids_encrypted BLOB,
+        message_encrypted BLOB,
+        include_location INTEGER DEFAULT 0,
         created_at INTEGER NOT NULL,
         updated_at INTEGER NOT NULL
     );

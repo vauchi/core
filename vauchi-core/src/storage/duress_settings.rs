@@ -21,9 +21,8 @@ impl Storage {
     pub fn save_duress_settings(&self, settings: &DuressSettings) -> Result<(), StorageError> {
         let contact_ids_json = serde_json::to_vec(&settings.alert_contact_ids)
             .map_err(|e| StorageError::Serialization(e.to_string()))?;
-        let contact_ids_encrypted =
-            crate::crypto::encrypt(&self.encryption_key, &contact_ids_json)
-                .map_err(|e| StorageError::Encryption(e.to_string()))?;
+        let contact_ids_encrypted = crate::crypto::encrypt(&self.encryption_key, &contact_ids_json)
+            .map_err(|e| StorageError::Encryption(e.to_string()))?;
 
         let message_encrypted =
             crate::crypto::encrypt(&self.encryption_key, settings.alert_message.as_bytes())
@@ -69,9 +68,8 @@ impl Storage {
                 let contact_ids_json =
                     crate::crypto::decrypt(&self.encryption_key, &contact_ids_encrypted)
                         .map_err(|e| StorageError::Encryption(e.to_string()))?;
-                let alert_contact_ids: Vec<String> =
-                    serde_json::from_slice(&contact_ids_json)
-                        .map_err(|e| StorageError::Serialization(e.to_string()))?;
+                let alert_contact_ids: Vec<String> = serde_json::from_slice(&contact_ids_json)
+                    .map_err(|e| StorageError::Serialization(e.to_string()))?;
 
                 let message_bytes =
                     crate::crypto::decrypt(&self.encryption_key, &message_encrypted)

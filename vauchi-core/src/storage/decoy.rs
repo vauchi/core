@@ -23,8 +23,8 @@ impl Storage {
         display_name: &str,
         card: &ContactCard,
     ) -> Result<(), StorageError> {
-        let card_json = serde_json::to_vec(card)
-            .map_err(|e| StorageError::Serialization(e.to_string()))?;
+        let card_json =
+            serde_json::to_vec(card).map_err(|e| StorageError::Serialization(e.to_string()))?;
 
         let encrypted = crate::crypto::encrypt(&self.encryption_key, &card_json)
             .map_err(|e| StorageError::Encryption(e.to_string()))?;
@@ -45,9 +45,7 @@ impl Storage {
     /// Loads all decoy contacts.
     ///
     /// Returns a list of (id, display_name, card) tuples.
-    pub fn load_decoy_contacts(
-        &self,
-    ) -> Result<Vec<(String, String, ContactCard)>, StorageError> {
+    pub fn load_decoy_contacts(&self) -> Result<Vec<(String, String, ContactCard)>, StorageError> {
         let mut stmt = self.conn.prepare(
             "SELECT id, display_name, card_encrypted FROM decoy_contacts ORDER BY created_at",
         )?;
@@ -75,10 +73,8 @@ impl Storage {
 
     /// Deletes a single decoy contact by ID.
     pub fn delete_decoy_contact(&self, id: &str) -> Result<(), StorageError> {
-        self.conn.execute(
-            "DELETE FROM decoy_contacts WHERE id = ?1",
-            params![id],
-        )?;
+        self.conn
+            .execute("DELETE FROM decoy_contacts WHERE id = ?1", params![id])?;
 
         Ok(())
     }

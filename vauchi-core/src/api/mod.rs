@@ -46,6 +46,8 @@
 //! - [`sync_controller`] - Sync and network orchestration
 //! - [`vauchi`] - Main Vauchi orchestrator
 
+pub mod app_password;
+
 #[cfg(feature = "testing")]
 pub mod account;
 #[cfg(not(feature = "testing"))]
@@ -134,5 +136,8 @@ pub use contact_manager::ContactManager;
 // Sync Controller
 pub use sync_controller::{SyncController, SyncResult};
 
+// App Password / Duress PIN
+pub use app_password::{AppPasswordConfig, AuthResult};
+
 // Vauchi
-pub use vauchi::{Vauchi, VauchiBuilder};
+pub use vauchi::{AuthMode, Vauchi, VauchiBuilder};

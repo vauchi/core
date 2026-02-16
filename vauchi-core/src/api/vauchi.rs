@@ -17,11 +17,27 @@ use crate::network::{MockTransport, Transport};
 use crate::storage::{SecureStorage, Storage};
 use crate::sync::state::ReplayDetector;
 
+use super::app_password::{AppPasswordConfig, AuthResult};
 use super::config::VauchiConfig;
 use super::consent::{ConsentManager, ConsentRecord, ConsentType};
 use super::contact_manager::ContactManager;
 use super::error::{VauchiError, VauchiResult};
 use super::events::{EventDispatcher, EventHandler, VauchiEvent};
+
+/// Authentication mode for the Vauchi instance.
+///
+/// Determines which data is shown to the user. The password system is
+/// opt-in: without a password, the mode is `Unauthenticated` and behaves
+/// identically to the legacy (pre-password) behavior.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AuthMode {
+    /// The normal (real) password was used — show real contacts.
+    Normal,
+    /// The duress PIN was used — show decoy contacts only.
+    Duress,
+    /// No password is set — backward-compatible, show real contacts.
+    Unauthenticated,
+}
 
 /// Main Vauchi orchestrator.
 ///
@@ -66,6 +82,7 @@ pub struct Vauchi<T: Transport = MockTransport> {
     events: Arc<EventDispatcher>,
     secure_storage: Option<Arc<dyn SecureStorage>>,
     replay_detector: Mutex<ReplayDetector>,
+    auth_mode: AuthMode,
     _phantom: std::marker::PhantomData<T>,
 }
 
@@ -135,6 +152,7 @@ impl<T: Transport> Vauchi<T> {
             events,
             secure_storage,
             replay_detector: Mutex::new(ReplayDetector::default_tolerance()),
+            auth_mode: AuthMode::Unauthenticated,
             _phantom: std::marker::PhantomData,
         })
     }
@@ -185,6 +203,7 @@ impl<T: Transport> Vauchi<T> {
             events,
             secure_storage: None,
             replay_detector: Mutex::new(ReplayDetector::default_tolerance()),
+            auth_mode: AuthMode::Unauthenticated,
             _phantom: std::marker::PhantomData,
         })
     }
@@ -386,10 +405,34 @@ impl<T: Transport> Vauchi<T> {
         manager.get_contact(id)
     }
 
-    /// Lists all contacts.
+    /// Lists all contacts, respecting the current auth mode.
+    ///
+    /// - **Normal** or **Unauthenticated**: Returns real contacts (filtered
+    ///   by hidden status, as before).
+    /// - **Duress**: Returns decoy contacts only, presented as real contacts.
     pub fn list_contacts(&self) -> VauchiResult<Vec<Contact>> {
-        let manager = ContactManager::new(&self.storage, self.events.clone());
-        manager.list_contacts()
+        match self.auth_mode {
+            AuthMode::Duress => {
+                // Load decoy contacts and convert to Contact structs
+                let decoys = self.storage.load_decoy_contacts()?;
+                Ok(decoys
+                    .into_iter()
+                    .map(|(id, _display_name, card)| {
+                        Contact::from_exchange(
+                            // Use a deterministic "public key" derived from the ID
+                            // (decoys don't have real keys — this is display-only)
+                            decoy_id_to_fake_pk(&id),
+                            card,
+                            crate::crypto::SymmetricKey::generate(),
+                        )
+                    })
+                    .collect())
+            }
+            AuthMode::Normal | AuthMode::Unauthenticated => {
+                let manager = ContactManager::new(&self.storage, self.events.clone());
+                manager.list_contacts()
+            }
+        }
     }
 
     /// Lists contacts with pagination.
@@ -876,6 +919,138 @@ impl<T: Transport> Vauchi<T> {
     /// Dispatches an event to all handlers.
     pub fn dispatch_event(&self, event: VauchiEvent) {
         self.events.dispatch(event);
+    }
+
+    // === App Password / Duress PIN ===
+
+    /// Returns the current authentication mode.
+    pub fn auth_mode(&self) -> AuthMode {
+        self.auth_mode
+    }
+
+    /// Authenticates with a password.
+    ///
+    /// Loads the password configuration from storage, verifies the password,
+    /// and sets the auth mode accordingly:
+    /// - `Normal` if the real password matches
+    /// - `Duress` if the duress PIN matches
+    /// - Returns an error if neither matches
+    pub fn authenticate(&mut self, password: &str) -> VauchiResult<AuthMode> {
+        let config = self
+            .storage
+            .load_password_config()?
+            .ok_or_else(|| VauchiError::InvalidState("no password configured".into()))?;
+
+        match config.verify(password) {
+            AuthResult::Normal => {
+                self.auth_mode = AuthMode::Normal;
+                Ok(AuthMode::Normal)
+            }
+            AuthResult::Duress => {
+                self.auth_mode = AuthMode::Duress;
+                // TODO: queue_duress_alert() — will be implemented in Task 8
+                Ok(AuthMode::Duress)
+            }
+            AuthResult::Invalid => Err(VauchiError::InvalidState(
+                "invalid password".into(),
+            )),
+        }
+    }
+
+    /// Sets up an app password (PIN).
+    ///
+    /// Requires an identity to be created first (the password columns
+    /// live on the `identity` table). If the identity row doesn't exist
+    /// in the database yet, it is created with a placeholder.
+    pub fn setup_app_password(&mut self, password: &str) -> VauchiResult<()> {
+        if self.identity.is_none() {
+            return Err(VauchiError::IdentityNotInitialized);
+        }
+
+        // Ensure the identity row exists in DB (may not yet if create_identity
+        // only stored the own_card). Insert a placeholder row if missing.
+        if !self.storage.has_identity()? {
+            self.storage.save_identity(b"", "")?;
+        }
+
+        let config = AppPasswordConfig::create(password)?;
+        self.storage
+            .save_app_password(config.password_hash(), config.password_salt())?;
+
+        Ok(())
+    }
+
+    /// Sets up a duress PIN.
+    ///
+    /// Requires an app password to be configured first.
+    pub fn setup_duress_password(&mut self, duress_password: &str) -> VauchiResult<()> {
+        let mut config = self
+            .storage
+            .load_password_config()?
+            .ok_or_else(|| {
+                VauchiError::InvalidState("app password must be set before duress PIN".into())
+            })?;
+
+        config.setup_duress(duress_password)?;
+
+        let duress_hash = config
+            .duress_hash()
+            .ok_or_else(|| VauchiError::InvalidState("duress hash not set".into()))?;
+        let duress_salt = config
+            .duress_salt()
+            .ok_or_else(|| VauchiError::InvalidState("duress salt not set".into()))?;
+
+        self.storage
+            .save_duress_password(duress_hash, duress_salt)?;
+
+        Ok(())
+    }
+
+    /// Returns whether an app password has been configured.
+    pub fn is_password_enabled(&self) -> VauchiResult<bool> {
+        Ok(self.storage.load_password_config()?.is_some())
+    }
+
+    /// Returns whether duress mode is enabled.
+    pub fn is_duress_enabled(&self) -> VauchiResult<bool> {
+        match self.storage.load_password_config()? {
+            Some(config) => Ok(config.duress_enabled()),
+            None => Ok(false),
+        }
+    }
+
+    /// Disables duress mode and clears duress hash/salt.
+    pub fn disable_duress(&mut self) -> VauchiResult<()> {
+        self.storage.disable_duress()?;
+        Ok(())
+    }
+
+    /// Adds a decoy contact for duress mode.
+    pub fn add_decoy_contact(
+        &self,
+        id: &str,
+        display_name: &str,
+        card: &ContactCard,
+    ) -> VauchiResult<()> {
+        self.storage.save_decoy_contact(id, display_name, card)?;
+        Ok(())
+    }
+
+    /// Removes a decoy contact.
+    pub fn remove_decoy_contact(&self, id: &str) -> VauchiResult<()> {
+        self.storage.delete_decoy_contact(id)?;
+        Ok(())
+    }
+
+    /// Lists all decoy contacts as (id, display_name, card) tuples.
+    pub fn list_decoy_contacts(&self) -> VauchiResult<Vec<(String, String, ContactCard)>> {
+        Ok(self.storage.load_decoy_contacts()?)
+    }
+
+    /// Clears all decoy contacts.
+    pub fn clear_decoy_contacts(&self) -> VauchiResult<()> {
+        self.storage.clear_all_decoy_contacts()?;
+        Ok(())
     }
 
     // === Configuration ===
@@ -1699,6 +1874,20 @@ impl<T: Transport> Vauchi<T> {
 
         Ok(())
     }
+}
+
+/// Converts a decoy contact ID string into a fake 32-byte "public key".
+///
+/// This is a deterministic mapping used only for display purposes — decoy
+/// contacts don't have real cryptographic keys. The resulting bytes are
+/// derived by hashing the ID with ring's SHA-256, ensuring consistent
+/// IDs across sessions.
+fn decoy_id_to_fake_pk(id: &str) -> [u8; 32] {
+    use ring::digest;
+    let hash = digest::digest(&digest::SHA256, id.as_bytes());
+    let mut pk = [0u8; 32];
+    pk.copy_from_slice(hash.as_ref());
+    pk
 }
 
 /// Builder for creating Vauchi instances.

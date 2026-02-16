@@ -77,6 +77,11 @@ pub mod ux;
 #[cfg(not(feature = "testing"))]
 mod ux;
 
+#[cfg(feature = "testing")]
+pub mod decoy;
+#[cfg(not(feature = "testing"))]
+mod decoy;
+
 pub mod migration;
 pub mod secure;
 

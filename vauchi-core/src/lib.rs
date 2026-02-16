@@ -30,7 +30,10 @@ pub mod tor_config;
 
 pub use aha_moments::{AhaMoment, AhaMomentTracker, AhaMomentType};
 #[cfg(any(feature = "network-native-tls", feature = "network-rustls"))]
-pub use api::{Vauchi, VauchiBuilder, VauchiConfig, VauchiError, VauchiEvent, VauchiResult};
+pub use api::{
+    AppPasswordConfig, AuthMode, AuthResult, Vauchi, VauchiBuilder, VauchiConfig, VauchiError,
+    VauchiEvent, VauchiResult,
+};
 pub use contact::{
     Contact, FieldVisibility, LabelError, LabelManager, VisibilityLabel, VisibilityRules,
     MAX_LABELS, SUGGESTED_LABELS,

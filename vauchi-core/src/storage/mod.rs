@@ -87,6 +87,11 @@ pub mod duress_settings;
 #[cfg(not(feature = "testing"))]
 mod duress_settings;
 
+#[cfg(feature = "testing")]
+pub mod emergency;
+#[cfg(not(feature = "testing"))]
+mod emergency;
+
 pub mod migration;
 pub mod secure;
 

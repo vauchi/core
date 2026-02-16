@@ -99,9 +99,10 @@ pub use error::NetworkError;
 // Message types
 pub use message::{
     negotiate_version, AccountDeletionNotice, AccountRevoked, AckStatus, Acknowledgment,
-    DeletionStage, DeviceSyncMessage, EncryptedUpdate, ForwardingHint, ForwardingHints, Handshake,
-    MessageEnvelope, MessageId, MessagePayload, PresenceStatus, PresenceUpdate, PurgeRequest,
-    RatchetHeader, VersionNegotiation, PROTOCOL_VERSION,
+    DeletionStage, DeviceSyncMessage, EmergencyAlert, EncryptedUpdate, ForwardingHint,
+    ForwardingHints, GeoLocation, Handshake, MessageEnvelope, MessageId, MessagePayload,
+    PresenceStatus, PresenceUpdate, PurgeRequest, RatchetHeader, VersionNegotiation,
+    PROTOCOL_VERSION,
 };
 
 // Protocol utilities

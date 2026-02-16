@@ -189,6 +189,26 @@ pub enum VauchiEvent {
         /// The field whose visibility changed.
         field: String,
     },
+
+    /// An emergency alert was received from a contact.
+    EmergencyAlertReceived {
+        /// The contact ID who sent the alert.
+        contact_id: String,
+        /// The alert message.
+        message: String,
+        /// Unix timestamp when the alert was created.
+        timestamp: u64,
+        /// Optional location as (latitude, longitude).
+        location: Option<(f64, f64)>,
+    },
+
+    /// An emergency broadcast was sent.
+    EmergencyBroadcastSent {
+        /// Number of alerts successfully queued for delivery.
+        sent_count: usize,
+        /// Total number of trusted contacts in the config.
+        total: usize,
+    },
 }
 
 /// Event handler trait.

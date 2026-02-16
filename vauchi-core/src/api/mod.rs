@@ -48,6 +48,7 @@
 
 pub mod app_password;
 pub mod duress;
+pub mod emergency;
 
 #[cfg(feature = "testing")]
 pub mod account;
@@ -142,6 +143,9 @@ pub use app_password::{AppPasswordConfig, AuthResult};
 
 // Duress Alert System
 pub use duress::{DuressAlert, DuressAlertType, DuressSettings};
+
+// Emergency Broadcast System
+pub use emergency::{BroadcastResult, EmergencyBroadcastConfig, MAX_TRUSTED_CONTACTS};
 
 // Vauchi
 pub use vauchi::{AuthMode, Vauchi, VauchiBuilder};

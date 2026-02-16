@@ -31,8 +31,9 @@ pub mod tor_config;
 pub use aha_moments::{AhaMoment, AhaMomentTracker, AhaMomentType};
 #[cfg(any(feature = "network-native-tls", feature = "network-rustls"))]
 pub use api::{
-    AppPasswordConfig, AuthMode, AuthResult, DuressAlert, DuressAlertType, DuressSettings, Vauchi,
-    VauchiBuilder, VauchiConfig, VauchiError, VauchiEvent, VauchiResult,
+    AppPasswordConfig, AuthMode, AuthResult, BroadcastResult, CallbackHandler, DuressAlert,
+    DuressAlertType, DuressSettings, EmergencyBroadcastConfig, Vauchi, VauchiBuilder, VauchiConfig,
+    VauchiError, VauchiEvent, VauchiResult,
 };
 pub use contact::{
     Contact, FieldVisibility, LabelError, LabelManager, VisibilityLabel, VisibilityRules,
@@ -63,8 +64,8 @@ pub use i18n::{
 pub use identity::{Identity, IdentityBackup};
 #[cfg(any(feature = "network-native-tls", feature = "network-rustls"))]
 pub use network::{
-    ConnectionState, MessageEnvelope, MockTransport, NetworkError, RelayClient, RelayClientConfig,
-    Transport, WebSocketTransport,
+    ConnectionState, EmergencyAlert, GeoLocation, MessageEnvelope, MockTransport, NetworkError,
+    RelayClient, RelayClientConfig, Transport, WebSocketTransport,
 };
 pub use recovery::{
     ConflictingClaim, RecoveryClaim, RecoveryConflict, RecoveryError, RecoveryProof,

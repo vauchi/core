@@ -243,6 +243,34 @@ pub enum DeletionStage {
     Cancelled,
 }
 
+/// An emergency alert payload embedded inside an encrypted update.
+///
+/// When serialized and encrypted inside an `EncryptedUpdate`, this is
+/// indistinguishable from a normal card update on the wire. The alert
+/// type is only revealed after decryption by the recipient.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EmergencyAlert {
+    /// Sender's public key fingerprint (contact ID).
+    pub sender_id: String,
+    /// Alert message text.
+    pub message: String,
+    /// Unix timestamp when the alert was created.
+    pub timestamp: u64,
+    /// Optional geographic location of the sender.
+    pub location: Option<GeoLocation>,
+}
+
+/// Geographic location with optional accuracy.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GeoLocation {
+    /// Latitude in decimal degrees.
+    pub latitude: f64,
+    /// Longitude in decimal degrees.
+    pub longitude: f64,
+    /// Location accuracy in meters.
+    pub accuracy_meters: Option<f32>,
+}
+
 /// Version negotiation message for protocol compatibility.
 ///
 /// Sent during connection establishment to agree on a common protocol version.

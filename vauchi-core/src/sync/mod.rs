@@ -7,12 +7,14 @@
 //! Manages synchronization of contact card updates between users.
 //! Handles offline queuing, retry logic, and state tracking.
 
+pub mod card_update;
 pub mod delta;
 pub mod device_orchestrator;
 pub mod device_sync;
 pub mod merkle;
 pub mod state;
 
+pub use card_update::{process_card_updates, process_single_card_update, CardUpdateResult};
 pub use delta::{CardDelta, DeltaError, FieldChange};
 pub use device_orchestrator::DeviceSyncOrchestrator;
 pub use device_sync::{

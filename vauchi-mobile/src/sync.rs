@@ -15,7 +15,10 @@ use tungstenite::{Message, WebSocket};
 
 use vauchi_core::crypto::ratchet::DoubleRatchetState;
 use vauchi_core::exchange::{EncryptedExchangeMessage, X3DHKeyPair};
-use vauchi_core::sync::{ContactSyncData, DeviceSyncOrchestrator, SyncItem};
+use vauchi_core::sync::{
+    process_card_updates as core_process_card_updates, ContactSyncData, DeviceSyncOrchestrator,
+    SyncItem,
+};
 use vauchi_core::{Contact, ContactCard, Identity, Storage};
 
 use crate::cert_pinning;
@@ -333,7 +336,7 @@ pub fn send_exchange_response(
 
 /// Processes incoming card updates from existing contacts.
 ///
-/// Applies the same security checks as the core `Vauchi::process_card_update`:
+/// Delegates to core's shared secure pipeline which handles:
 /// - Revoked sender rejection
 /// - Blocked contact rejection
 /// - Signature verification (sender + recipient binding)
@@ -345,116 +348,8 @@ pub fn process_card_updates(
     storage: &Storage,
     updates: Vec<(String, Vec<u8>)>,
 ) -> Result<u32, MobileError> {
-    use vauchi_core::crypto::cek::ContentEncryptionKey;
-    use vauchi_core::sync::delta::{VersionedPayload, PAYLOAD_VERSION_CEK};
-
-    let mut processed = 0u32;
-
-    for (sender_id, ciphertext) in updates {
-        // Reject updates from revoked senders
-        if storage.is_sender_revoked(&sender_id)? {
-            continue;
-        }
-
-        // Get contact
-        let mut contact = match storage.load_contact(&sender_id)? {
-            Some(c) => c,
-            None => continue,
-        };
-
-        // Reject updates from blocked contacts
-        if contact.is_blocked() {
-            continue;
-        }
-
-        // Get ratchet state
-        let (mut ratchet, is_initiator) = match storage.load_ratchet_state(&sender_id)? {
-            Some(state) => state,
-            None => continue,
-        };
-
-        // Try to parse as a RatchetMessage from JSON
-        let ratchet_msg: vauchi_core::crypto::ratchet::RatchetMessage =
-            match serde_json::from_slice(&ciphertext) {
-                Ok(msg) => msg,
-                Err(_) => continue,
-            };
-
-        // Decrypt the card delta
-        let plaintext = match ratchet.decrypt(&ratchet_msg) {
-            Ok(pt) => pt,
-            Err(_) => continue,
-        };
-
-        // Detect payload version and extract delta bytes + optional CEK
-        let (delta_bytes, new_cek) = if !plaintext.is_empty() && plaintext[0] == PAYLOAD_VERSION_CEK
-        {
-            match VersionedPayload::decode(&plaintext) {
-                Ok(VersionedPayload::CekWrapped(wrapped)) => {
-                    let cek = ContentEncryptionKey::from_bytes(wrapped.cek);
-                    match cek.decrypt(&wrapped.cek_ciphertext) {
-                        Ok(decrypted) => (decrypted, Some(cek)),
-                        Err(_) => continue,
-                    }
-                }
-                Ok(VersionedPayload::Legacy(data)) => (data, None),
-                Err(_) => continue,
-            }
-        } else {
-            match VersionedPayload::decode(&plaintext) {
-                Ok(VersionedPayload::Legacy(data)) => (data, None),
-                _ => (plaintext, None),
-            }
-        };
-
-        // Parse delta
-        let delta: vauchi_core::sync::CardDelta = match serde_json::from_slice(&delta_bytes) {
-            Ok(d) => d,
-            Err(_) => continue,
-        };
-
-        // Verify signature with contact's (sender) and our (recipient) public keys
-        if !delta.verify(contact.public_key(), identity.signing_public_key()) {
-            continue;
-        }
-
-        // Replay detection: check nonce hasn't been seen before
-        if storage.is_replay_nonce(&sender_id, &delta.nonce)? {
-            continue;
-        }
-
-        // Apply delta to contact's card
-        let mut card = contact.card().clone();
-        if delta.apply(&mut card).is_err() {
-            continue;
-        }
-        contact.update_card(card);
-
-        if let Some(cek) = new_cek {
-            contact.set_cek(cek);
-        }
-
-        // Atomic transaction: ratchet state, replay nonce, contact card
-        storage.begin_transaction()?;
-        let result = (|| -> Result<(), MobileError> {
-            storage.save_ratchet_state(&sender_id, &ratchet, is_initiator)?;
-            storage.save_replay_nonce(&sender_id, &delta.nonce, delta.timestamp)?;
-            storage.save_contact(&contact)?;
-            Ok(())
-        })();
-
-        match result {
-            Ok(()) => {
-                storage.commit()?;
-                processed += 1;
-            }
-            Err(_) => {
-                storage.rollback();
-            }
-        }
-    }
-
-    Ok(processed)
+    let result = core_process_card_updates(identity, storage, updates)?;
+    Ok(result.processed)
 }
 
 /// Sends pending outbound updates to contacts.

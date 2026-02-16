@@ -245,6 +245,21 @@ pub fn all_migrations() -> Vec<Migration> {
             name: "encrypt_visibility_rules",
             action: MigrationAction::Callback(migrate_v18_encrypt_visibility_rules),
         },
+        Migration {
+            version: 19,
+            name: "app_password_schema",
+            action: MigrationAction::Sql(MIGRATION_V19_APP_PASSWORD),
+        },
+        Migration {
+            version: 20,
+            name: "duress_settings",
+            action: MigrationAction::Sql(MIGRATION_V20_DURESS_SETTINGS),
+        },
+        Migration {
+            version: 21,
+            name: "decoy_contacts",
+            action: MigrationAction::Sql(MIGRATION_V21_DECOY_CONTACTS),
+        },
     ]
 }
 
@@ -254,6 +269,52 @@ pub fn all_migrations() -> Vec<Migration> {
 /// alongside other UX state.
 const MIGRATION_V17_TOR_CONFIG: &str = "
     ALTER TABLE ux_state ADD COLUMN tor_config_encrypted BLOB;
+";
+
+/// Migration v19: App password/PIN schema for duress PIN support.
+///
+/// Adds columns to the `identity` table for app-level password/PIN
+/// authentication and duress PIN detection. All hash/salt columns are
+/// encrypted BLOBs (application-level encryption with the storage master key).
+/// The `duress_enabled` flag is an unencrypted INTEGER for quick checks.
+const MIGRATION_V19_APP_PASSWORD: &str = "
+    ALTER TABLE identity ADD COLUMN password_hash_encrypted BLOB;
+    ALTER TABLE identity ADD COLUMN password_salt BLOB;
+    ALTER TABLE identity ADD COLUMN duress_hash_encrypted BLOB;
+    ALTER TABLE identity ADD COLUMN duress_salt BLOB;
+    ALTER TABLE identity ADD COLUMN duress_enabled INTEGER DEFAULT 0;
+";
+
+/// Migration v20: Duress settings configuration table.
+///
+/// Singleton table (id = 1) storing encrypted duress configuration:
+/// which contacts to alert, what message to send, and whether to
+/// include device location in the alert. All sensitive fields are
+/// encrypted BLOBs.
+const MIGRATION_V20_DURESS_SETTINGS: &str = "
+    CREATE TABLE IF NOT EXISTS duress_settings (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        alert_contact_ids_encrypted BLOB,
+        alert_message_encrypted BLOB,
+        include_location INTEGER DEFAULT 0,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+    );
+";
+
+/// Migration v21: Decoy contacts table for duress mode.
+///
+/// Stores fake contacts displayed when the app is unlocked with the
+/// duress PIN. Each decoy has a display name (plaintext for UI rendering)
+/// and an encrypted card blob containing the full fake contact card.
+const MIGRATION_V21_DECOY_CONTACTS: &str = "
+    CREATE TABLE IF NOT EXISTS decoy_contacts (
+        id TEXT PRIMARY KEY,
+        display_name TEXT NOT NULL,
+        card_encrypted BLOB NOT NULL,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+    );
 ";
 
 /// Migration v2: Re-encrypt all AES-GCM encrypted data to XChaCha20-Poly1305.

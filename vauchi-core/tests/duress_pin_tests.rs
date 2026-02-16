@@ -506,3 +506,208 @@ fn test_list_contacts_duress_mode_returns_decoy() {
     assert_eq!(contacts.len(), 1, "duress mode should return decoy contacts");
     assert_eq!(contacts[0].display_name(), "Decoy Contact");
 }
+
+// =============================================================================
+// Duress Settings Storage Tests
+// =============================================================================
+
+#[test]
+fn test_load_duress_settings_returns_none_initially() {
+    let wb = create_vauchi_with_identity("Alice");
+
+    let settings = wb.load_duress_settings().expect("load should succeed");
+    assert!(
+        settings.is_none(),
+        "duress settings should be None before any configuration"
+    );
+}
+
+#[test]
+fn test_save_load_duress_settings_roundtrip() {
+    let wb = create_vauchi_with_identity("Alice");
+
+    let settings = vauchi_core::api::duress::DuressSettings {
+        alert_contact_ids: vec!["contact-1".to_string(), "contact-2".to_string()],
+        alert_message: "I need help".to_string(),
+        include_location: true,
+    };
+
+    wb.save_duress_settings(&settings)
+        .expect("save should succeed");
+
+    let loaded = wb
+        .load_duress_settings()
+        .expect("load should succeed")
+        .expect("should have duress settings");
+
+    assert_eq!(loaded.alert_contact_ids, settings.alert_contact_ids);
+    assert_eq!(loaded.alert_message, settings.alert_message);
+    assert_eq!(loaded.include_location, settings.include_location);
+}
+
+#[test]
+fn test_delete_duress_settings() {
+    let wb = create_vauchi_with_identity("Alice");
+
+    let settings = vauchi_core::api::duress::DuressSettings {
+        alert_contact_ids: vec!["contact-1".to_string()],
+        alert_message: "Help".to_string(),
+        include_location: false,
+    };
+
+    wb.save_duress_settings(&settings)
+        .expect("save should succeed");
+
+    wb.delete_duress_settings()
+        .expect("delete should succeed");
+
+    let loaded = wb.load_duress_settings().expect("load should succeed");
+    assert!(
+        loaded.is_none(),
+        "duress settings should be None after delete"
+    );
+}
+
+// =============================================================================
+// Duress Alert Tests
+// =============================================================================
+
+#[test]
+fn test_queue_duress_alert_on_duress_authenticate() {
+    let mut wb = create_vauchi_with_identity("Alice");
+
+    wb.setup_app_password("my-pin-1234")
+        .expect("setup should succeed");
+    wb.setup_duress_password("duress-999")
+        .expect("setup duress should succeed");
+
+    // Configure duress settings with trusted contacts
+    let settings = vauchi_core::api::duress::DuressSettings {
+        alert_contact_ids: vec!["trusted-contact-1".to_string()],
+        alert_message: "I'm in danger".to_string(),
+        include_location: false,
+    };
+    wb.save_duress_settings(&settings)
+        .expect("save settings should succeed");
+
+    // Authenticate with duress PIN — should queue an alert
+    let mode = wb.authenticate("duress-999").expect("auth should succeed");
+    assert_eq!(mode, AuthMode::Duress);
+
+    // Verify that a duress alert was queued
+    let alerts = wb.pending_duress_alerts();
+    assert!(
+        !alerts.is_empty(),
+        "duress authentication should queue at least one alert"
+    );
+}
+
+#[test]
+fn test_queue_duress_alert_without_settings_is_noop() {
+    let mut wb = create_vauchi_with_identity("Alice");
+
+    wb.setup_app_password("my-pin-1234")
+        .expect("setup should succeed");
+    wb.setup_duress_password("duress-999")
+        .expect("setup duress should succeed");
+
+    // Do NOT configure duress settings
+
+    // Authenticate with duress PIN — should NOT fail, just no alerts
+    let mode = wb.authenticate("duress-999").expect("auth should succeed");
+    assert_eq!(mode, AuthMode::Duress);
+
+    // No alerts should be queued
+    let alerts = wb.pending_duress_alerts();
+    assert!(
+        alerts.is_empty(),
+        "duress authentication without settings should not queue alerts"
+    );
+}
+
+#[test]
+fn test_duress_alert_contains_timestamp_and_device_id() {
+    let mut wb = create_vauchi_with_identity("Alice");
+
+    wb.setup_app_password("my-pin-1234")
+        .expect("setup should succeed");
+    wb.setup_duress_password("duress-999")
+        .expect("setup duress should succeed");
+
+    let settings = vauchi_core::api::duress::DuressSettings {
+        alert_contact_ids: vec!["trusted-1".to_string()],
+        alert_message: "Help".to_string(),
+        include_location: false,
+    };
+    wb.save_duress_settings(&settings)
+        .expect("save settings should succeed");
+
+    wb.authenticate("duress-999").expect("auth should succeed");
+
+    let alerts = wb.pending_duress_alerts();
+    assert!(!alerts.is_empty());
+
+    let alert = &alerts[0];
+    assert!(alert.timestamp > 0, "alert should have a non-zero timestamp");
+    assert!(
+        !alert.device_id.is_empty(),
+        "alert should have a non-empty device_id"
+    );
+    assert!(
+        matches!(alert.alert_type, vauchi_core::api::duress::DuressAlertType::Unlock),
+        "alert type should be Unlock"
+    );
+}
+
+// =============================================================================
+// Full Duress Flow Test
+// =============================================================================
+
+#[test]
+fn test_full_duress_flow_setup_to_alert() {
+    let mut wb = create_vauchi_with_identity("Alice");
+
+    // 1. Set up app password
+    wb.setup_app_password("my-pin-1234")
+        .expect("setup app password should succeed");
+
+    // 2. Set up duress password
+    wb.setup_duress_password("duress-999")
+        .expect("setup duress should succeed");
+
+    // 3. Add decoy contacts
+    let decoy_card = ContactCard::new("Fake Friend");
+    wb.add_decoy_contact("decoy-1", "Fake Friend", &decoy_card)
+        .expect("add decoy should succeed");
+
+    // 4. Configure duress alert settings
+    let settings = vauchi_core::api::duress::DuressSettings {
+        alert_contact_ids: vec!["trusted-contact-1".to_string()],
+        alert_message: "Emergency - duress unlock".to_string(),
+        include_location: true,
+    };
+    wb.save_duress_settings(&settings)
+        .expect("save duress settings should succeed");
+
+    // 5. Verify everything is configured
+    assert!(wb.is_password_enabled().expect("check should succeed"));
+    assert!(wb.is_duress_enabled().expect("check should succeed"));
+    let loaded_settings = wb
+        .load_duress_settings()
+        .expect("load should succeed")
+        .expect("should have settings");
+    assert_eq!(loaded_settings.alert_contact_ids.len(), 1);
+
+    // 6. Authenticate with duress PIN — triggers full flow
+    let mode = wb.authenticate("duress-999").expect("auth should succeed");
+    assert_eq!(mode, AuthMode::Duress);
+
+    // 7. Verify duress mode shows decoy contacts
+    let contacts = wb.list_contacts().expect("list should succeed");
+    assert_eq!(contacts.len(), 1, "should show decoy contacts only");
+    assert_eq!(contacts[0].display_name(), "Fake Friend");
+
+    // 8. Verify alert was queued
+    let alerts = wb.pending_duress_alerts();
+    assert!(!alerts.is_empty(), "should have queued a duress alert");
+}

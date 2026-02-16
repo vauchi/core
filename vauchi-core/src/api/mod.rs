@@ -118,8 +118,8 @@ pub use pre_signed::{PreSignedError, PreSignedPurgeRequest, PreSignedShredMessag
 
 // Shred Manager
 pub use shred::{
-    PurgeSender, RevocationSender, ShredError, ShredManager, ShredReport, ShredToken,
-    ShredVerification,
+    widget_panic_shred, PurgeSender, RevocationSender, ShredError, ShredManager, ShredReport,
+    ShredToken, ShredVerification, WidgetConfirmationMode,
 };
 
 // Error types

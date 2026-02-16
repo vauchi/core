@@ -351,40 +351,29 @@ fn test_transcript_binding_includes_identity_keys() {
 
     // Create Bob's session to generate a valid QR
     let bob_proximity = MockProximityVerifier::success();
-    let mut bob_session =
-        ExchangeSession::new_qr(bob_identity, bob_card, bob_proximity);
+    let mut bob_session = ExchangeSession::new_qr(bob_identity, bob_card, bob_proximity);
     bob_session.apply(ExchangeEvent::StartQR).unwrap();
     let bob_qr = bob_session.qr().unwrap().clone();
 
     // Session A: identity_a + fixed ephemeral
     let prox_a = MockProximityVerifier::success();
-    let mut session_a =
-        ExchangeSession::new_qr_with_x3dh(identity_a, card_a, prox_a, fixed_x3dh_a);
+    let mut session_a = ExchangeSession::new_qr_with_x3dh(identity_a, card_a, prox_a, fixed_x3dh_a);
     session_a.apply(ExchangeEvent::StartQR).unwrap();
     session_a
         .apply(ExchangeEvent::ProcessQR(bob_qr.clone()))
         .unwrap();
-    session_a
-        .apply(ExchangeEvent::TheyScannedOurQR)
-        .unwrap();
-    session_a
-        .apply(ExchangeEvent::PerformKeyAgreement)
-        .unwrap();
+    session_a.apply(ExchangeEvent::TheyScannedOurQR).unwrap();
+    session_a.apply(ExchangeEvent::PerformKeyAgreement).unwrap();
 
     // Session B: identity_b + same fixed ephemeral
     let prox_b = MockProximityVerifier::success();
-    let mut session_b =
-        ExchangeSession::new_qr_with_x3dh(identity_b, card_b, prox_b, fixed_x3dh_b);
+    let mut session_b = ExchangeSession::new_qr_with_x3dh(identity_b, card_b, prox_b, fixed_x3dh_b);
     session_b.apply(ExchangeEvent::StartQR).unwrap();
     session_b
         .apply(ExchangeEvent::ProcessQR(bob_qr.clone()))
         .unwrap();
-    session_b
-        .apply(ExchangeEvent::TheyScannedOurQR)
-        .unwrap();
-    session_b
-        .apply(ExchangeEvent::PerformKeyAgreement)
-        .unwrap();
+    session_b.apply(ExchangeEvent::TheyScannedOurQR).unwrap();
+    session_b.apply(ExchangeEvent::PerformKeyAgreement).unwrap();
 
     // Extract shared keys from AwaitingCardExchange state
     let key_a = match session_a.state() {
@@ -426,33 +415,23 @@ fn test_transcript_binding_includes_ephemeral_keys() {
 
     // Session 1
     let prox_1 = MockProximityVerifier::success();
-    let mut session_1 =
-        ExchangeSession::new_qr_with_x3dh(alice_identity_1, card_1, prox_1, x3dh_1);
+    let mut session_1 = ExchangeSession::new_qr_with_x3dh(alice_identity_1, card_1, prox_1, x3dh_1);
     session_1.apply(ExchangeEvent::StartQR).unwrap();
     session_1
         .apply(ExchangeEvent::ProcessQR(bob_qr.clone()))
         .unwrap();
-    session_1
-        .apply(ExchangeEvent::TheyScannedOurQR)
-        .unwrap();
-    session_1
-        .apply(ExchangeEvent::PerformKeyAgreement)
-        .unwrap();
+    session_1.apply(ExchangeEvent::TheyScannedOurQR).unwrap();
+    session_1.apply(ExchangeEvent::PerformKeyAgreement).unwrap();
 
     // Session 2
     let prox_2 = MockProximityVerifier::success();
-    let mut session_2 =
-        ExchangeSession::new_qr_with_x3dh(alice_identity_2, card_2, prox_2, x3dh_2);
+    let mut session_2 = ExchangeSession::new_qr_with_x3dh(alice_identity_2, card_2, prox_2, x3dh_2);
     session_2.apply(ExchangeEvent::StartQR).unwrap();
     session_2
         .apply(ExchangeEvent::ProcessQR(bob_qr.clone()))
         .unwrap();
-    session_2
-        .apply(ExchangeEvent::TheyScannedOurQR)
-        .unwrap();
-    session_2
-        .apply(ExchangeEvent::PerformKeyAgreement)
-        .unwrap();
+    session_2.apply(ExchangeEvent::TheyScannedOurQR).unwrap();
+    session_2.apply(ExchangeEvent::PerformKeyAgreement).unwrap();
 
     let key_1 = match session_1.state() {
         ExchangeState::AwaitingCardExchange { shared_key, .. } => shared_key.as_bytes().to_owned(),

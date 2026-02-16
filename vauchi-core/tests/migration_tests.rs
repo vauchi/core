@@ -12,6 +12,7 @@
 
 use rusqlite::Connection;
 use vauchi_core::crypto::SymmetricKey;
+use vauchi_core::storage::migration::{all_migrations, MigrationRunner};
 use vauchi_core::storage::Storage;
 
 // =============================================================================
@@ -522,4 +523,274 @@ fn test_default_column_values() {
     let loaded = storage.get_all_pending_updates().unwrap();
     assert_eq!(loaded[0].retry_count, 0);
     assert!(matches!(loaded[0].status, UpdateStatus::Pending));
+}
+
+// =============================================================================
+// DURESS PIN MIGRATION TESTS (V19–V21)
+// =============================================================================
+
+/// Helper: runs migrations up to (and including) the given version on an in-memory connection.
+fn run_migrations_up_to(conn: &Connection, key: &SymmetricKey, up_to_version: u32) {
+    let migrations = all_migrations();
+    let subset: Vec<_> = migrations.into_iter().filter(|m| m.version <= up_to_version).collect();
+    MigrationRunner::run(conn, key, &subset).unwrap();
+}
+
+#[test]
+fn test_migration_v19_adds_password_columns() {
+    let conn = Connection::open_in_memory().unwrap();
+    let key = SymmetricKey::generate();
+
+    // Run migrations up to V18 (current baseline)
+    run_migrations_up_to(&conn, &key, 18);
+
+    // Verify the new columns do NOT exist yet
+    let identity_cols = get_column_names(&conn, "identity");
+    assert!(
+        !identity_cols.contains(&"password_hash_encrypted".to_string()),
+        "password_hash_encrypted should not exist before V19"
+    );
+
+    // Now run V19
+    run_migrations_up_to(&conn, &key, 19);
+
+    // Verify all new columns exist
+    let identity_cols = get_column_names(&conn, "identity");
+    let expected_new_cols = [
+        "password_hash_encrypted",
+        "password_salt",
+        "duress_hash_encrypted",
+        "duress_salt",
+        "duress_enabled",
+    ];
+    for col in &expected_new_cols {
+        assert!(
+            identity_cols.contains(&col.to_string()),
+            "identity table missing column after V19: {}",
+            col
+        );
+    }
+
+    // Verify duress_enabled defaults to 0
+    conn.execute(
+        "INSERT INTO identity (id, backup_data_encrypted, display_name, created_at) VALUES (1, X'00', 'test', 1000)",
+        [],
+    )
+    .unwrap();
+
+    let duress_enabled: i64 = conn
+        .query_row("SELECT duress_enabled FROM identity WHERE id = 1", [], |row| {
+            row.get(0)
+        })
+        .unwrap();
+    assert_eq!(duress_enabled, 0, "duress_enabled should default to 0");
+}
+
+#[test]
+fn test_migration_v20_creates_duress_settings_table() {
+    let conn = Connection::open_in_memory().unwrap();
+    let key = SymmetricKey::generate();
+
+    // Run migrations up to V19
+    run_migrations_up_to(&conn, &key, 19);
+
+    // Verify duress_settings does NOT exist yet
+    let tables = get_table_names(&conn);
+    assert!(
+        !tables.contains(&"duress_settings".to_string()),
+        "duress_settings should not exist before V20"
+    );
+
+    // Now run V20
+    run_migrations_up_to(&conn, &key, 20);
+
+    // Verify table exists
+    let tables = get_table_names(&conn);
+    assert!(
+        tables.contains(&"duress_settings".to_string()),
+        "duress_settings table should exist after V20"
+    );
+
+    // Verify columns
+    let cols = get_column_names(&conn, "duress_settings");
+    let expected = [
+        "id",
+        "alert_contact_ids_encrypted",
+        "alert_message_encrypted",
+        "include_location",
+        "created_at",
+        "updated_at",
+    ];
+    for col in &expected {
+        assert!(
+            cols.contains(&col.to_string()),
+            "duress_settings missing column: {}",
+            col
+        );
+    }
+
+    // Verify singleton constraint (id must be 1)
+    conn.execute(
+        "INSERT INTO duress_settings (id, created_at, updated_at) VALUES (1, 1000, 1000)",
+        [],
+    )
+    .unwrap();
+
+    let result = conn.execute(
+        "INSERT INTO duress_settings (id, created_at, updated_at) VALUES (2, 1000, 1000)",
+        [],
+    );
+    assert!(
+        result.is_err(),
+        "duress_settings should enforce id = 1 singleton constraint"
+    );
+
+    // Verify include_location defaults to 0
+    let include_location: i64 = conn
+        .query_row(
+            "SELECT include_location FROM duress_settings WHERE id = 1",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert_eq!(include_location, 0, "include_location should default to 0");
+}
+
+#[test]
+fn test_migration_v21_creates_decoy_contacts_table() {
+    let conn = Connection::open_in_memory().unwrap();
+    let key = SymmetricKey::generate();
+
+    // Run migrations up to V20
+    run_migrations_up_to(&conn, &key, 20);
+
+    // Verify decoy_contacts does NOT exist yet
+    let tables = get_table_names(&conn);
+    assert!(
+        !tables.contains(&"decoy_contacts".to_string()),
+        "decoy_contacts should not exist before V21"
+    );
+
+    // Now run V21
+    run_migrations_up_to(&conn, &key, 21);
+
+    // Verify table exists
+    let tables = get_table_names(&conn);
+    assert!(
+        tables.contains(&"decoy_contacts".to_string()),
+        "decoy_contacts table should exist after V21"
+    );
+
+    // Verify columns
+    let cols = get_column_names(&conn, "decoy_contacts");
+    let expected = [
+        "id",
+        "display_name",
+        "card_encrypted",
+        "created_at",
+        "updated_at",
+    ];
+    for col in &expected {
+        assert!(
+            cols.contains(&col.to_string()),
+            "decoy_contacts missing column: {}",
+            col
+        );
+    }
+
+    // Verify we can insert and retrieve a decoy contact
+    conn.execute(
+        "INSERT INTO decoy_contacts (id, display_name, card_encrypted, created_at, updated_at) VALUES ('dc-1', 'Decoy Alice', X'DEADBEEF', 1000, 1000)",
+        [],
+    )
+    .unwrap();
+
+    let name: String = conn
+        .query_row(
+            "SELECT display_name FROM decoy_contacts WHERE id = 'dc-1'",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert_eq!(name, "Decoy Alice");
+}
+
+#[test]
+fn test_schema_version_is_21_after_all_migrations() {
+    let conn = Connection::open_in_memory().unwrap();
+    let key = SymmetricKey::generate();
+
+    // Run ALL migrations
+    let migrations = all_migrations();
+    MigrationRunner::run(&conn, &key, &migrations).unwrap();
+
+    // Verify final schema version
+    let version = MigrationRunner::current_version(&conn).unwrap();
+    assert_eq!(
+        version, 21,
+        "Schema version should be 21 after all migrations, got {}",
+        version
+    );
+}
+
+#[test]
+fn test_migration_v19_is_safe_on_fresh_identity_table() {
+    // V19 uses ALTER TABLE which should work even if the identity table has no rows
+    let conn = Connection::open_in_memory().unwrap();
+    let key = SymmetricKey::generate();
+
+    run_migrations_up_to(&conn, &key, 19);
+
+    // Verify we can still insert into identity with the new nullable columns
+    conn.execute(
+        "INSERT INTO identity (id, backup_data_encrypted, display_name, created_at) VALUES (1, X'00', 'test', 1000)",
+        [],
+    )
+    .unwrap();
+
+    // New columns should be NULL by default (except duress_enabled which defaults to 0)
+    let pw_hash: Option<Vec<u8>> = conn
+        .query_row(
+            "SELECT password_hash_encrypted FROM identity WHERE id = 1",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert!(pw_hash.is_none(), "password_hash_encrypted should default to NULL");
+
+    let pw_salt: Option<Vec<u8>> = conn
+        .query_row(
+            "SELECT password_salt FROM identity WHERE id = 1",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert!(pw_salt.is_none(), "password_salt should default to NULL");
+
+    let duress_hash: Option<Vec<u8>> = conn
+        .query_row(
+            "SELECT duress_hash_encrypted FROM identity WHERE id = 1",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert!(duress_hash.is_none(), "duress_hash_encrypted should default to NULL");
+
+    let duress_salt: Option<Vec<u8>> = conn
+        .query_row(
+            "SELECT duress_salt FROM identity WHERE id = 1",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert!(duress_salt.is_none(), "duress_salt should default to NULL");
+
+    let duress_enabled: i64 = conn
+        .query_row(
+            "SELECT duress_enabled FROM identity WHERE id = 1",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert_eq!(duress_enabled, 0, "duress_enabled should default to 0");
 }

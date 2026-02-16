@@ -67,6 +67,9 @@ pub enum MobileError {
 
     #[error("Internal error: {0}")]
     Internal(String),
+
+    #[error("BLE exchange not available: {0}")]
+    BleNotAvailable(String),
 }
 
 impl From<vauchi_core::StorageError> for MobileError {

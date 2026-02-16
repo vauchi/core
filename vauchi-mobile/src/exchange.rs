@@ -136,6 +136,15 @@ pub enum MobileExchangeState {
     },
 }
 
+/// Status of BLE exchange availability on this device.
+#[derive(Debug, Clone, uniffi::Enum)]
+pub enum MobileBleExchangeStatus {
+    /// BLE exchange is available (native transport configured)
+    Available,
+    /// BLE exchange not available — requires native Bluetooth implementation
+    NotAvailable { reason: String },
+}
+
 // === Session Wrapper ===
 
 /// Internal enum to hold either type of session.
@@ -317,6 +326,17 @@ pub(crate) fn create_qr_exchange_manual(
     let bridge = ManualConfirmationBridge::new();
     let session = ExchangeSession::new_qr(identity, our_card, bridge);
     Arc::new(MobileExchangeSession::from_manual(session))
+}
+
+/// Check if BLE exchange is available on this device.
+///
+/// Returns NotAvailable until native BLE transport is implemented
+/// for each platform (CoreBluetooth on iOS, Android BLE on Android).
+#[uniffi::export]
+pub fn ble_exchange_status() -> MobileBleExchangeStatus {
+    MobileBleExchangeStatus::NotAvailable {
+        reason: "Native Bluetooth transport not yet implemented".into(),
+    }
 }
 
 // === Tests ===

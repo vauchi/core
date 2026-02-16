@@ -47,7 +47,7 @@ pub use content::{
     MobileUpdateStatus,
 };
 pub use error::{KeychainError, MobileError};
-pub use exchange::{MobileExchangeSession, MobileExchangeState, MobileProximityHandler};
+pub use exchange::{MobileBleExchangeStatus, MobileExchangeSession, MobileExchangeState, MobileProximityHandler};
 pub use types::{
     MobileAhaMoment, MobileAhaMomentType, MobileAuthMode, MobileBroadcastResult,
     MobileConsentRecord, MobileConsentType, MobileContact, MobileContactCard, MobileContactField,

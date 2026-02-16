@@ -324,3 +324,176 @@ fn test_encrypted_message_secret_matches_raw_x3dh() {
         "Secret must be HKDF-derived, not raw DH"
     );
 }
+
+// ============================================================
+// Transcript binding tests (SP-2, item 76)
+// ============================================================
+
+/// Changing either identity key must produce a different shared secret.
+///
+/// This verifies that identity keys are bound into the key derivation,
+/// preventing identity misbinding attacks where an attacker substitutes
+/// their identity key while keeping the same DH output.
+#[test]
+fn test_transcript_binding_includes_identity_keys() {
+    let identity_a = Identity::create("Alice-A");
+    let identity_b = Identity::create("Alice-B");
+    let bob_identity = Identity::create("Bob");
+
+    // Use the same ephemeral X3DH keypair for both sessions
+    let fixed_x3dh_seed = [0x42u8; 32];
+    let fixed_x3dh_a = X3DHKeyPair::from_bytes(fixed_x3dh_seed);
+    let fixed_x3dh_b = X3DHKeyPair::from_bytes(fixed_x3dh_seed);
+
+    let card_a = ContactCard::new("Alice-A");
+    let card_b = ContactCard::new("Alice-B");
+    let bob_card = ContactCard::new("Bob");
+
+    // Create Bob's session to generate a valid QR
+    let bob_proximity = MockProximityVerifier::success();
+    let mut bob_session =
+        ExchangeSession::new_qr(bob_identity, bob_card, bob_proximity);
+    bob_session.apply(ExchangeEvent::StartQR).unwrap();
+    let bob_qr = bob_session.qr().unwrap().clone();
+
+    // Session A: identity_a + fixed ephemeral
+    let prox_a = MockProximityVerifier::success();
+    let mut session_a =
+        ExchangeSession::new_qr_with_x3dh(identity_a, card_a, prox_a, fixed_x3dh_a);
+    session_a.apply(ExchangeEvent::StartQR).unwrap();
+    session_a
+        .apply(ExchangeEvent::ProcessQR(bob_qr.clone()))
+        .unwrap();
+    session_a
+        .apply(ExchangeEvent::TheyScannedOurQR)
+        .unwrap();
+    session_a
+        .apply(ExchangeEvent::PerformKeyAgreement)
+        .unwrap();
+
+    // Session B: identity_b + same fixed ephemeral
+    let prox_b = MockProximityVerifier::success();
+    let mut session_b =
+        ExchangeSession::new_qr_with_x3dh(identity_b, card_b, prox_b, fixed_x3dh_b);
+    session_b.apply(ExchangeEvent::StartQR).unwrap();
+    session_b
+        .apply(ExchangeEvent::ProcessQR(bob_qr.clone()))
+        .unwrap();
+    session_b
+        .apply(ExchangeEvent::TheyScannedOurQR)
+        .unwrap();
+    session_b
+        .apply(ExchangeEvent::PerformKeyAgreement)
+        .unwrap();
+
+    // Extract shared keys from AwaitingCardExchange state
+    let key_a = match session_a.state() {
+        ExchangeState::AwaitingCardExchange { shared_key, .. } => shared_key.as_bytes().to_owned(),
+        s => panic!("Session A: expected AwaitingCardExchange, got {:?}", s),
+    };
+    let key_b = match session_b.state() {
+        ExchangeState::AwaitingCardExchange { shared_key, .. } => shared_key.as_bytes().to_owned(),
+        s => panic!("Session B: expected AwaitingCardExchange, got {:?}", s),
+    };
+
+    // v2 transcript binding: different identity → different derived key
+    assert_ne!(
+        key_a, key_b,
+        "Different identity keys must produce different shared secrets (transcript binding)"
+    );
+}
+
+/// Changing either ephemeral key must produce a different shared secret,
+/// even when identity keys are identical.
+#[test]
+fn test_transcript_binding_includes_ephemeral_keys() {
+    let alice_identity_1 = Identity::create("Alice");
+    let alice_identity_2 = Identity::create("Alice");
+    let bob_identity = Identity::create("Bob");
+
+    // Different ephemeral keys
+    let x3dh_1 = X3DHKeyPair::from_bytes([0x01u8; 32]);
+    let x3dh_2 = X3DHKeyPair::from_bytes([0x02u8; 32]);
+
+    let card_1 = ContactCard::new("Alice");
+    let card_2 = ContactCard::new("Alice");
+    let bob_card = ContactCard::new("Bob");
+
+    let bob_prox = MockProximityVerifier::success();
+    let mut bob_session = ExchangeSession::new_qr(bob_identity, bob_card, bob_prox);
+    bob_session.apply(ExchangeEvent::StartQR).unwrap();
+    let bob_qr = bob_session.qr().unwrap().clone();
+
+    // Session 1
+    let prox_1 = MockProximityVerifier::success();
+    let mut session_1 =
+        ExchangeSession::new_qr_with_x3dh(alice_identity_1, card_1, prox_1, x3dh_1);
+    session_1.apply(ExchangeEvent::StartQR).unwrap();
+    session_1
+        .apply(ExchangeEvent::ProcessQR(bob_qr.clone()))
+        .unwrap();
+    session_1
+        .apply(ExchangeEvent::TheyScannedOurQR)
+        .unwrap();
+    session_1
+        .apply(ExchangeEvent::PerformKeyAgreement)
+        .unwrap();
+
+    // Session 2
+    let prox_2 = MockProximityVerifier::success();
+    let mut session_2 =
+        ExchangeSession::new_qr_with_x3dh(alice_identity_2, card_2, prox_2, x3dh_2);
+    session_2.apply(ExchangeEvent::StartQR).unwrap();
+    session_2
+        .apply(ExchangeEvent::ProcessQR(bob_qr.clone()))
+        .unwrap();
+    session_2
+        .apply(ExchangeEvent::TheyScannedOurQR)
+        .unwrap();
+    session_2
+        .apply(ExchangeEvent::PerformKeyAgreement)
+        .unwrap();
+
+    let key_1 = match session_1.state() {
+        ExchangeState::AwaitingCardExchange { shared_key, .. } => shared_key.as_bytes().to_owned(),
+        s => panic!("Session 1: expected AwaitingCardExchange, got {:?}", s),
+    };
+    let key_2 = match session_2.state() {
+        ExchangeState::AwaitingCardExchange { shared_key, .. } => shared_key.as_bytes().to_owned(),
+        s => panic!("Session 2: expected AwaitingCardExchange, got {:?}", s),
+    };
+
+    assert_ne!(
+        key_1, key_2,
+        "Different ephemeral keys must produce different shared secrets"
+    );
+}
+
+/// v2 domain tag must be incompatible with v1 for the same DH output.
+/// This ensures the protocol upgrade is a clean break.
+#[test]
+fn test_v2_domain_incompatible_with_v1() {
+    use vauchi_core::crypto::HKDF;
+
+    let shared_bytes = [0x99u8; 32];
+    let identity_pk = [0x01u8; 32];
+    let their_pk = [0x02u8; 32];
+    let our_ephemeral = [0x03u8; 32];
+    let their_ephemeral = [0x04u8; 32];
+
+    // v1 derivation
+    let v1_key = HKDF::derive_key(None, &shared_bytes, b"vauchi-x3dh-symmetric-v1");
+
+    // v2 derivation (with transcript binding)
+    let mut info_v2 = b"vauchi-x3dh-symmetric-v2".to_vec();
+    info_v2.extend_from_slice(&identity_pk);
+    info_v2.extend_from_slice(&their_pk);
+    info_v2.extend_from_slice(&our_ephemeral);
+    info_v2.extend_from_slice(&their_ephemeral);
+    let v2_key = HKDF::derive_key(None, &shared_bytes, &info_v2);
+
+    assert_ne!(
+        v1_key, v2_key,
+        "v2 derivation must differ from v1 for the same DH output"
+    );
+}

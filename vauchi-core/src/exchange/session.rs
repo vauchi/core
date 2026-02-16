@@ -151,6 +151,27 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
         }
     }
 
+    /// Test-only constructor that accepts a specific X3DH keypair for deterministic testing.
+    #[cfg(any(test, feature = "testing"))]
+    pub fn new_qr_with_x3dh(
+        identity: Identity,
+        our_card: ContactCard,
+        proximity: P,
+        our_x3dh: X3DHKeyPair,
+    ) -> Self {
+        ExchangeSession {
+            state: ExchangeState::Idle,
+            transport: ExchangeTransport::Qr,
+            identity,
+            our_card,
+            our_x3dh,
+            proximity,
+            started_at: Instant::now(),
+            interrupted: false,
+            used_qrs: HashSet::new(),
+        }
+    }
+
     /// Creates a new NFC active exchange session.
     ///
     /// A single NFC tap replaces both QR scan and proximity verification.
@@ -281,9 +302,28 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
 
         // Symmetric DH: both sides have fresh ephemeral keys.
         // DH(our_secret × their_exchange_key) — both sides compute the same shared secret.
-        // HKDF is applied for domain separation (different IKM structure than full X3DH).
+        // HKDF info binds all four public keys into the derivation (transcript binding),
+        // preventing identity misbinding attacks. Keys are sorted lexicographically so
+        // both sides compute identical info regardless of who is "Alice" vs "Bob".
         let shared_bytes = self.our_x3dh.diffie_hellman(&their_exchange_key);
-        let derived = HKDF::derive_key(None, &shared_bytes, b"vauchi-x3dh-symmetric-v1");
+        let our_id = self.identity.signing_public_key();
+        let our_eph = self.our_x3dh.public_key();
+        let (id_lo, id_hi) = if our_id < &their_public_key {
+            (our_id.as_slice(), their_public_key.as_slice())
+        } else {
+            (their_public_key.as_slice(), our_id.as_slice())
+        };
+        let (eph_lo, eph_hi) = if our_eph < &their_exchange_key {
+            (our_eph.as_slice(), their_exchange_key.as_slice())
+        } else {
+            (their_exchange_key.as_slice(), our_eph.as_slice())
+        };
+        let mut info = b"vauchi-x3dh-symmetric-v2".to_vec();
+        info.extend_from_slice(id_lo);
+        info.extend_from_slice(id_hi);
+        info.extend_from_slice(eph_lo);
+        info.extend_from_slice(eph_hi);
+        let derived = HKDF::derive_key(None, &shared_bytes, &info);
         let shared_key = crate::crypto::SymmetricKey::from_bytes(derived);
 
         self.state = ExchangeState::AwaitingCardExchange {

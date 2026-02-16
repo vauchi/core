@@ -126,34 +126,47 @@ impl<'a> ContactManager<'a> {
             .ok_or_else(|| VauchiError::ContactNotFound(id.to_string()))
     }
 
-    /// Lists all contacts.
+    /// Lists all visible (non-hidden) contacts.
+    ///
+    /// Hidden contacts are excluded from the main list and only
+    /// accessible via `Vauchi::list_hidden_contacts()`.
     pub fn list_contacts(&self) -> VauchiResult<Vec<Contact>> {
-        Ok(self.storage.list_contacts()?)
+        let contacts = self.storage.list_contacts()?;
+        Ok(contacts.into_iter().filter(|c| !c.is_hidden()).collect())
     }
 
-    /// Lists contacts with pagination.
+    /// Lists visible (non-hidden) contacts with pagination.
+    ///
+    /// Hidden contacts are excluded before applying offset/limit.
     pub fn list_contacts_paginated(
         &self,
         offset: usize,
         limit: usize,
     ) -> VauchiResult<Vec<Contact>> {
-        Ok(self.storage.list_contacts_paginated(offset, limit)?)
+        let contacts = self.storage.list_contacts()?;
+        let visible: Vec<Contact> = contacts.into_iter().filter(|c| !c.is_hidden()).collect();
+        Ok(visible.into_iter().skip(offset).take(limit).collect())
     }
 
-    /// Searches contacts by display name (case-insensitive).
+    /// Searches visible (non-hidden) contacts by display name (case-insensitive).
     pub fn search_contacts(&self, query: &str) -> VauchiResult<Vec<Contact>> {
         let query_lower = query.to_lowercase();
         let contacts = self.storage.list_contacts()?;
 
         Ok(contacts
             .into_iter()
-            .filter(|c| c.display_name().to_lowercase().contains(&query_lower))
+            .filter(|c| !c.is_hidden() && c.display_name().to_lowercase().contains(&query_lower))
             .collect())
     }
 
-    /// Returns the number of contacts.
+    /// Returns the number of visible (non-hidden) contacts.
     pub fn contact_count(&self) -> VauchiResult<usize> {
-        Ok(self.storage.list_contacts()?.len())
+        Ok(self
+            .storage
+            .list_contacts()?
+            .into_iter()
+            .filter(|c| !c.is_hidden())
+            .count())
     }
 
     /// Adds a new contact from an exchange.

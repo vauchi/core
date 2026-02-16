@@ -71,6 +71,13 @@ fn test_hide_contact_removes_from_main_list() {
     let loaded = wb.get_contact(&contact_id).unwrap().unwrap();
     assert!(loaded.is_hidden());
 
+    // Verify NO LONGER in list_contacts()
+    let visible = wb.list_contacts().unwrap();
+    assert!(
+        !visible.iter().any(|c| c.id() == contact_id),
+        "Hidden contact must not appear in list_contacts()"
+    );
+
     // Verify appears in hidden list
     let hidden = wb.list_hidden_contacts().unwrap();
     assert_eq!(hidden.len(), 1);

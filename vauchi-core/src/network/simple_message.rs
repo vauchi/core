@@ -64,11 +64,18 @@ pub struct SimpleAcknowledgment {
 }
 
 /// Acknowledgment status.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+///
+/// Must stay aligned with the relay's `protocol::AckStatus` enum
+/// to ensure wire compatibility for JSON deserialization.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum SimpleAckStatus {
+    /// Relay has persisted the message (store-and-forward).
+    Stored,
+    /// Message delivered to the recipient's connection.
     Delivered,
+    /// Recipient has acknowledged receipt.
     ReceivedByRecipient,
-    #[allow(dead_code)]
+    /// Delivery failed.
     Failed,
 }
 

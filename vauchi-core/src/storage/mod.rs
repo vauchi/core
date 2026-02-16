@@ -82,6 +82,11 @@ pub mod decoy;
 #[cfg(not(feature = "testing"))]
 mod decoy;
 
+#[cfg(feature = "testing")]
+pub mod duress_settings;
+#[cfg(not(feature = "testing"))]
+mod duress_settings;
+
 pub mod migration;
 pub mod secure;
 

@@ -21,6 +21,7 @@ use super::app_password::{AppPasswordConfig, AuthResult};
 use super::config::VauchiConfig;
 use super::consent::{ConsentManager, ConsentRecord, ConsentType};
 use super::contact_manager::ContactManager;
+use super::duress::{DuressAlert, DuressAlertType, DuressSettings};
 use super::error::{VauchiError, VauchiResult};
 use super::events::{EventDispatcher, EventHandler, VauchiEvent};
 
@@ -83,6 +84,12 @@ pub struct Vauchi<T: Transport = MockTransport> {
     secure_storage: Option<Arc<dyn SecureStorage>>,
     replay_detector: Mutex<ReplayDetector>,
     auth_mode: AuthMode,
+    /// In-memory queue of duress alerts waiting to be sent.
+    ///
+    /// Populated when `authenticate()` detects a duress PIN. Alerts are
+    /// drained by the sync system and sent as card updates to trusted
+    /// contacts, indistinguishable from normal sync traffic.
+    duress_alerts: Vec<DuressAlert>,
     _phantom: std::marker::PhantomData<T>,
 }
 
@@ -153,6 +160,7 @@ impl<T: Transport> Vauchi<T> {
             secure_storage,
             replay_detector: Mutex::new(ReplayDetector::default_tolerance()),
             auth_mode: AuthMode::Unauthenticated,
+            duress_alerts: Vec::new(),
             _phantom: std::marker::PhantomData,
         })
     }
@@ -204,6 +212,7 @@ impl<T: Transport> Vauchi<T> {
             secure_storage: None,
             replay_detector: Mutex::new(ReplayDetector::default_tolerance()),
             auth_mode: AuthMode::Unauthenticated,
+            duress_alerts: Vec::new(),
             _phantom: std::marker::PhantomData,
         })
     }
@@ -948,7 +957,7 @@ impl<T: Transport> Vauchi<T> {
             }
             AuthResult::Duress => {
                 self.auth_mode = AuthMode::Duress;
-                // TODO: queue_duress_alert() — will be implemented in Task 8
+                self.queue_duress_alert()?;
                 Ok(AuthMode::Duress)
             }
             AuthResult::Invalid => Err(VauchiError::InvalidState(
@@ -1024,6 +1033,79 @@ impl<T: Transport> Vauchi<T> {
         self.storage.disable_duress()?;
         Ok(())
     }
+
+    // === Duress Settings ===
+
+    /// Saves duress alert settings (trusted contacts, message, location).
+    pub fn save_duress_settings(&self, settings: &DuressSettings) -> VauchiResult<()> {
+        self.storage.save_duress_settings(settings)?;
+        Ok(())
+    }
+
+    /// Loads duress alert settings.
+    ///
+    /// Returns `None` if no settings have been configured.
+    pub fn load_duress_settings(&self) -> VauchiResult<Option<DuressSettings>> {
+        Ok(self.storage.load_duress_settings()?)
+    }
+
+    /// Deletes duress alert settings.
+    pub fn delete_duress_settings(&self) -> VauchiResult<()> {
+        self.storage.delete_duress_settings()?;
+        Ok(())
+    }
+
+    /// Returns a reference to the pending duress alerts queue.
+    ///
+    /// Alerts are queued when `authenticate()` detects a duress PIN.
+    /// The sync system should drain this queue and send alerts as
+    /// card updates to trusted contacts.
+    pub fn pending_duress_alerts(&self) -> &[DuressAlert] {
+        &self.duress_alerts
+    }
+
+    /// Queues a duress alert for sending to trusted contacts.
+    ///
+    /// Called internally by `authenticate()` when the duress PIN is entered.
+    /// If no duress settings are configured, this is a no-op.
+    ///
+    /// The alert is stored in an in-memory queue. When the sync system
+    /// connects, it drains this queue and sends alerts as card updates
+    /// (indistinguishable from normal sync traffic).
+    fn queue_duress_alert(&mut self) -> VauchiResult<()> {
+        let settings = self.storage.load_duress_settings()?;
+        if let Some(_settings) = settings {
+            let now = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_secs())
+                .unwrap_or(0);
+
+            let device_id = self.device_id_string();
+
+            let alert = DuressAlert {
+                timestamp: now,
+                device_id,
+                alert_type: DuressAlertType::Unlock,
+            };
+
+            self.duress_alerts.push(alert);
+        }
+        Ok(())
+    }
+
+    /// Returns a string identifier for this device.
+    ///
+    /// Uses the identity's public ID if available, otherwise falls
+    /// back to a placeholder. Used in duress alerts to identify the
+    /// originating device.
+    fn device_id_string(&self) -> String {
+        self.identity
+            .as_ref()
+            .map(|id| hex::encode(id.signing_public_key()))
+            .unwrap_or_else(|| "unknown-device".to_string())
+    }
+
+    // === Decoy Contacts ===
 
     /// Adds a decoy contact for duress mode.
     pub fn add_decoy_contact(

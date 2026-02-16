@@ -47,6 +47,7 @@
 //! - [`vauchi`] - Main Vauchi orchestrator
 
 pub mod app_password;
+pub mod duress;
 
 #[cfg(feature = "testing")]
 pub mod account;
@@ -138,6 +139,9 @@ pub use sync_controller::{SyncController, SyncResult};
 
 // App Password / Duress PIN
 pub use app_password::{AppPasswordConfig, AuthResult};
+
+// Duress Alert System
+pub use duress::{DuressAlert, DuressAlertType, DuressSettings};
 
 // Vauchi
 pub use vauchi::{AuthMode, Vauchi, VauchiBuilder};

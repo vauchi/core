@@ -23,7 +23,7 @@ use vauchi_core::exchange::{DeviceLinkQR, EncryptedExchangeMessage};
 use vauchi_core::recovery::{RecoveryClaim, RecoveryProof, RecoveryVoucher};
 use vauchi_core::{
     ContactCard, ContactField, Identity, IdentityBackup, SocialNetworkRegistry, Storage,
-    SymmetricKey,
+    SymmetricKey, Vauchi, VauchiConfig,
 };
 
 #[cfg(feature = "content-updates")]
@@ -474,6 +474,17 @@ impl VauchiMobile {
     fn open_storage(&self) -> Result<Storage, MobileError> {
         Storage::open(&self.storage_path, self.storage_key.clone())
             .map_err(|e| MobileError::StorageError(e.to_string()))
+    }
+
+    /// Opens a Vauchi API instance backed by the same storage.
+    ///
+    /// Use this for operations that must dispatch events (e.g. hide/unhide contact).
+    /// Operations that only read data can continue using `open_storage()` directly.
+    fn open_vauchi(&self) -> Result<Vauchi, MobileError> {
+        let config = VauchiConfig::with_storage_path(&self.storage_path)
+            .with_relay_url(&self.relay_url)
+            .with_storage_key(self.storage_key.clone());
+        Vauchi::new(config).map_err(|e| MobileError::Internal(e.to_string()))
     }
 
     /// Returns the data directory (parent of the database file).
@@ -970,42 +981,27 @@ impl VauchiMobile {
     ///
     /// Hidden contacts provide plausible deniability - they only appear
     /// via secret access (gesture, PIN, or special settings navigation).
+    /// Routes through the Vauchi API to ensure `ContactHidden` events are dispatched.
     pub fn hide_contact(&self, contact_id: String) -> Result<(), MobileError> {
-        let storage = self.open_storage()?;
-
-        let mut contact = storage
-            .load_contact(&contact_id)?
-            .ok_or_else(|| MobileError::ContactNotFound(contact_id.clone()))?;
-
-        contact.hide();
-        storage.save_contact(&contact)?;
-
+        let vauchi = self.open_vauchi()?;
+        vauchi.hide_contact(&contact_id)?;
         Ok(())
     }
 
     /// Unhides a contact, making it visible in the main contact list again.
+    /// Routes through the Vauchi API to ensure `ContactUnhidden` events are dispatched.
     pub fn unhide_contact(&self, contact_id: String) -> Result<(), MobileError> {
-        let storage = self.open_storage()?;
-
-        let mut contact = storage
-            .load_contact(&contact_id)?
-            .ok_or_else(|| MobileError::ContactNotFound(contact_id.clone()))?;
-
-        contact.unhide();
-        storage.save_contact(&contact)?;
-
+        let vauchi = self.open_vauchi()?;
+        vauchi.unhide_contact(&contact_id)?;
         Ok(())
     }
 
     /// Lists all hidden contacts.
+    /// Routes through the Vauchi API for consistency with hide/unhide operations.
     pub fn list_hidden_contacts(&self) -> Result<Vec<MobileContact>, MobileError> {
-        let storage = self.open_storage()?;
-        let contacts = storage.list_contacts()?;
-        Ok(contacts
-            .iter()
-            .filter(|c| c.is_hidden())
-            .map(MobileContact::from)
-            .collect())
+        let vauchi = self.open_vauchi()?;
+        let contacts = vauchi.list_hidden_contacts()?;
+        Ok(contacts.iter().map(MobileContact::from).collect())
     }
 
     // === Visibility Operations ===

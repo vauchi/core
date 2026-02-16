@@ -74,3 +74,13 @@ impl From<vauchi_core::StorageError> for MobileError {
         MobileError::StorageError(err.to_string())
     }
 }
+
+impl From<vauchi_core::VauchiError> for MobileError {
+    fn from(err: vauchi_core::VauchiError) -> Self {
+        match err {
+            vauchi_core::VauchiError::ContactNotFound(id) => MobileError::ContactNotFound(id),
+            vauchi_core::VauchiError::Storage(e) => MobileError::StorageError(e.to_string()),
+            other => MobileError::Internal(other.to_string()),
+        }
+    }
+}

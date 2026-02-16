@@ -135,6 +135,13 @@ fn test_unhide_contact_returns_to_main_list() {
     // Should not appear in hidden list
     let hidden = wb.list_hidden_contacts().unwrap();
     assert!(hidden.is_empty());
+
+    // Should reappear in main contact list
+    let visible = wb.list_contacts().unwrap();
+    assert!(
+        visible.iter().any(|c| c.id() == contact_id),
+        "Unhidden contact must appear in list_contacts()"
+    );
 }
 
 #[test]

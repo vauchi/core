@@ -451,6 +451,47 @@ pub fn get_aha_moment_localized(
     }
 }
 
+// === Widget Panic Shred ===
+
+/// Widget confirmation mode for panic shred activation.
+///
+/// Defines how the user confirms a panic shred from the home screen widget.
+#[derive(Debug, Clone, PartialEq, Eq, uniffi::Enum)]
+pub enum MobileWidgetConfirmationMode {
+    /// Default: tap once, then confirm in a dialog.
+    TapConfirm,
+    /// Long press to trigger.
+    LongPress,
+    /// Double tap to trigger.
+    DoubleTap,
+}
+
+/// Panic shred callable from a widget without full app initialization.
+///
+/// This is the key API for iOS/Android home screen widgets that need to
+/// trigger emergency data destruction without opening the full app or
+/// calling `open_vauchi()`.
+///
+/// Only requires:
+/// - `data_dir`: The app's data directory path (String for UniFFI compat)
+/// - `keychain`: Platform keychain callback for SMK destruction
+///
+/// **WARNING**: This operation is irreversible and immediate. All account
+/// data in the specified directory will be permanently destroyed.
+#[uniffi::export]
+pub fn widget_panic_shred(
+    data_dir: String,
+    keychain: Box<dyn MobilePlatformKeychain>,
+) -> Result<MobileShredReport, MobileError> {
+    let bridge = KeychainBridge {
+        callback: Arc::from(keychain),
+    };
+    let path = std::path::Path::new(&data_dir);
+    let report = vauchi_core::api::widget_panic_shred(path, &bridge)
+        .map_err(|e| MobileError::ShredError(e.to_string()))?;
+    Ok(MobileShredReport::from(&report))
+}
+
 // === Main Interface ===
 
 /// Main Vauchi interface for mobile platforms.

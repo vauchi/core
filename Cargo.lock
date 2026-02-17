@@ -6156,6 +6156,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "vauchi-protocol"
+version = "0.1.14"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "vcpkg"
 version = "0.2.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"

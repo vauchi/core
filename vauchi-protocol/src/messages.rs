@@ -162,6 +162,15 @@ pub struct PurgeRequest {
     pub include_recovery_proofs: bool,
     #[serde(default)]
     pub recovery_key_hash: Option<String>,
+    // v2: Signed purge fields (optional for backward compat)
+    #[serde(default)]
+    pub public_key: Option<String>,
+    #[serde(default)]
+    pub signature: Option<String>,
+    #[serde(default)]
+    pub purge_token: Option<String>,
+    #[serde(default)]
+    pub timestamp: Option<u64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -240,12 +249,20 @@ mod tests {
             include_device_sync: true,
             include_recovery_proofs: true,
             recovery_key_hash: Some("abc123".to_string()),
+            public_key: Some("pk123".to_string()),
+            signature: Some("sig456".to_string()),
+            purge_token: Some("tok789".to_string()),
+            timestamp: Some(1234567890),
         };
         let json = serde_json::to_string(&req).unwrap();
         let decoded: PurgeRequest = serde_json::from_str(&json).unwrap();
         assert!(decoded.include_device_sync);
         assert!(decoded.include_recovery_proofs);
         assert_eq!(decoded.recovery_key_hash, Some("abc123".to_string()));
+        assert_eq!(decoded.public_key, Some("pk123".to_string()));
+        assert_eq!(decoded.signature, Some("sig456".to_string()));
+        assert_eq!(decoded.purge_token, Some("tok789".to_string()));
+        assert_eq!(decoded.timestamp, Some(1234567890));
     }
 
     #[test]
@@ -255,6 +272,10 @@ mod tests {
         assert!(!decoded.include_device_sync);
         assert!(!decoded.include_recovery_proofs);
         assert_eq!(decoded.recovery_key_hash, None);
+        assert_eq!(decoded.public_key, None);
+        assert_eq!(decoded.signature, None);
+        assert_eq!(decoded.purge_token, None);
+        assert_eq!(decoded.timestamp, None);
     }
 
     #[test]

@@ -526,22 +526,22 @@ fn apply_sync_item(storage: &Storage, item: &SyncItem) -> Result<(), MobileError
     Ok(())
 }
 
+struct WsSender<'a>(&'a mut WebSocket<MaybeTlsStream<TcpStream>>);
+
+impl vauchi_core::sync::BinarySender for WsSender<'_> {
+    fn send_binary(&mut self, data: Vec<u8>) -> Result<(), String> {
+        self.0.send(Message::Binary(data)).map_err(|e| e.to_string())
+    }
+}
+
 /// Sends pending device sync items to other devices.
 pub fn send_device_sync(
     identity: &Identity,
     storage: &Storage,
     socket: &mut WebSocket<MaybeTlsStream<TcpStream>>,
 ) -> Result<u32, MobileError> {
-    let envelopes = vauchi_core::sync::build_device_sync_envelopes(identity, storage)
-        .map_err(|e| MobileError::SyncFailed(e.to_string()))?;
-
-    let mut sent = 0u32;
-    for data in envelopes {
-        if socket.send(Message::Binary(data)).is_ok() {
-            sent += 1;
-        }
-    }
-    Ok(sent)
+    vauchi_core::sync::send_device_sync(identity, storage, &mut WsSender(socket))
+        .map_err(|e| MobileError::SyncFailed(e.to_string()))
 }
 
 /// Performs a complete sync operation.

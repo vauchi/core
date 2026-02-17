@@ -32,6 +32,7 @@ cargo fmt                       # Format
 |-------|---------|
 | vauchi-core | Crypto, protocols, data models |
 | vauchi-mobile | UniFFI bindings for iOS/Android |
+| vauchi-protocol | Shared relay/client protocol message types (serde-only, no crypto) |
 
 ## Downstream Repos
 
@@ -41,7 +42,7 @@ These depend on vauchi-core via git dependency:
 - `desktop/` - Tauri + SolidJS desktop app
 - `e2e/` - End-to-end tests
 
-Note: `relay/` is standalone and does **not** depend on vauchi-core.
+Note: `relay/` depends on `vauchi-protocol` (shared types) but does **not** depend on `vauchi-core`.
 
 ## NFC Exchange Scenarios
 

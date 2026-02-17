@@ -530,7 +530,9 @@ struct WsSender<'a>(&'a mut WebSocket<MaybeTlsStream<TcpStream>>);
 
 impl vauchi_core::sync::BinarySender for WsSender<'_> {
     fn send_binary(&mut self, data: Vec<u8>) -> Result<(), String> {
-        self.0.send(Message::Binary(data)).map_err(|e| e.to_string())
+        self.0
+            .send(Message::Binary(data))
+            .map_err(|e| e.to_string())
     }
 }
 

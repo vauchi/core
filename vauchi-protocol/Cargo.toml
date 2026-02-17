@@ -1,0 +1,14 @@
+# SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+[package]
+name = "vauchi-protocol"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Shared protocol message types for Vauchi relay communication"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"

@@ -248,17 +248,25 @@ fn test_dr_large_message() {
 
 #[test]
 fn test_ratchet_serialize_roundtrip() {
-    let (alice, _bob) = create_test_pair();
+    let (alice, mut bob) = create_test_pair();
 
-    // Serialize
+    // Serialize alice before any messages
     let serialized = alice.serialize();
+    let mut restored = DoubleRatchetState::deserialize(serialized).unwrap();
 
-    // Deserialize
-    let restored = DoubleRatchetState::deserialize(serialized).unwrap();
-
-    // Verify state is preserved
+    // Verify structural fields preserved
     assert_eq!(alice.dh_generation(), restored.dh_generation());
     assert_eq!(alice.our_public_key(), restored.our_public_key());
+
+    // core-F-007: Verify functional decrypt after deserialization —
+    // the restored state must be able to continue the conversation.
+    let msg = restored.encrypt(b"After roundtrip").unwrap();
+    let decrypted = bob.decrypt(&msg).unwrap();
+    assert_eq!(
+        b"After roundtrip".as_slice(),
+        decrypted.as_slice(),
+        "Deserialized ratchet must produce valid ciphertext"
+    );
 }
 
 #[test]

@@ -324,10 +324,11 @@ fn test_exchange_succeeds_with_mutual_scan() {
 // - Sensitive data should be zeroed after use
 // - Keys implement Drop with zeroize
 
-/// Scenario: SymmetricKey is zeroed on drop
+/// Verify that Debug formatting on SymmetricKey does not leak key bytes.
+/// (core-F-003: Renamed from test_memory_dump_protection to reflect
+/// what the test actually verifies — Debug trait redaction, not memory zeroing.)
 #[test]
-fn test_memory_dump_protection() {
-    // Create a key and get a pointer to its bytes before drop
+fn test_debug_format_excludes_key_material() {
     let key = SymmetricKey::generate();
     let key_bytes = *key.as_bytes();
 
@@ -335,12 +336,7 @@ fn test_memory_dump_protection() {
     let all_zero = key_bytes.iter().all(|&b| b == 0);
     assert!(!all_zero, "Generated key should not be all zeros");
 
-    // The key itself implements Drop with zeroize
-    // We can't directly test the memory after drop in safe Rust,
-    // but we verify the zeroize trait is being used by checking
-    // the implementation exists (compile-time check via the crate)
-
-    // What we CAN test: Debug output doesn't leak key material
+    // Debug output must not leak raw key bytes
     let debug_output = format!("{:?}", key);
     assert!(
         debug_output.contains("REDACTED"),
@@ -348,36 +344,45 @@ fn test_memory_dump_protection() {
         debug_output
     );
 
-    // Drop happens here at end of scope - zeroize is called
-    drop(key);
-
-    // Note: In a real security audit, you'd use tools like valgrind
-    // or memory inspection to verify the actual bytes are zeroed.
-    // This test verifies the code structure implements the protection.
+    // Verify no hex-encoded key bytes appear in debug output
+    let hex_key = hex::encode(key_bytes);
+    assert!(
+        !debug_output.contains(&hex_key),
+        "Debug output must not contain hex-encoded key bytes"
+    );
 }
 
-/// Scenario: SigningKeyPair seed is zeroed on drop
+/// Verify that signing works and the keypair can be exercised without panic.
+/// (core-F-002: SigningKeyPair does not implement Debug, so we cannot test
+/// debug redaction. Instead we verify sign/verify roundtrip and that the
+/// public key is different from a second generated keypair — ensuring
+/// unique key generation. Actual memory zeroing requires unsafe/valgrind.)
 #[test]
-fn test_signing_key_zeroed() {
-    // Create keypair
-    let keypair = SigningKeyPair::generate();
+fn test_signing_key_generation_and_uniqueness() {
+    let keypair1 = SigningKeyPair::generate();
+    let keypair2 = SigningKeyPair::generate();
 
-    // Sign something to exercise the key
+    // Verify signing works
     let message = b"test message";
-    let signature = keypair.sign(message);
-
-    // Verify signature works
+    let signature = keypair1.sign(message);
     assert!(
-        keypair.public_key().verify(message, &signature),
+        keypair1.public_key().verify(message, &signature),
         "Signature should be valid"
     );
 
-    // SigningKeyPair implements Drop with zeroize for the seed
-    // The actual zeroing happens when keypair goes out of scope
-    drop(keypair);
+    // Signatures from different keys must differ
+    let signature2 = keypair2.sign(message);
+    assert_ne!(
+        signature.as_bytes(),
+        signature2.as_bytes(),
+        "Different keys must produce different signatures"
+    );
 
-    // If we reach here without panic, the drop completed successfully.
-    // The seed bytes were zeroed via the zeroize crate.
+    // Cross-verify: keypair2's signature should NOT verify with keypair1's public key
+    assert!(
+        !keypair1.public_key().verify(message, &signature2),
+        "Cross-key verification must fail"
+    );
 }
 
 /// Scenario: Password KDF output is zeroed after use

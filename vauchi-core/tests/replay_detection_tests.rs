@@ -36,12 +36,11 @@ fn test_same_message_decrypted_once() {
     // The ratchet has advanced, so the key for this message_index is gone
     let result = bob.decrypt(&msg);
 
-    // This should fail because the chain has already advanced
-    // Note: The exact error depends on implementation - it might be InvalidMessage
-    // or the decryption might fail (wrong key)
+    // Replay must fail with an error — not silently return different bytes.
+    // (core-F-004: Previously accepted Ok(different_bytes) as passing.)
     assert!(
-        result.is_err() || result.as_ref().unwrap() != b"Secret message",
-        "Replay should not succeed with same plaintext"
+        result.is_err(),
+        "Replay of consumed message must return Err, not Ok with garbled data"
     );
 }
 

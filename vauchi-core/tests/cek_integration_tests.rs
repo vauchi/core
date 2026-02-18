@@ -116,6 +116,16 @@ fn test_propagate_with_cek_rotates_cek() {
         new_cek.to_bytes(),
         "CEK should be rotated on card update"
     );
+
+    // core-F-009: Verify old CEK cannot decrypt data encrypted with new CEK.
+    let test_data = b"test payload after rotation";
+    let encrypted = new_cek.encrypt(test_data).unwrap();
+    let old_cek_restored = ContentEncryptionKey::from_bytes(old_cek_bytes);
+    let result = old_cek_restored.decrypt(&encrypted);
+    assert!(
+        result.is_err(),
+        "Old CEK must not decrypt data encrypted under rotated CEK"
+    );
 }
 
 #[test]

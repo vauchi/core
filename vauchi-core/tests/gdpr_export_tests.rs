@@ -66,16 +66,35 @@ fn test_export_excludes_private_keys() {
 
     let export = export_all_data(&storage).unwrap();
 
+    // core-F-008: Parse JSON to verify structure, not just substring search.
     let json = serde_json::to_string(&export).unwrap();
-    // Should not contain "shared_key" or "private_key" in the export
-    assert!(
-        !json.contains("shared_key"),
-        "Export should not contain shared keys"
-    );
-    assert!(
-        !json.contains("private_key"),
-        "Export should not contain private keys"
-    );
+    let parsed: serde_json::Value = serde_json::from_str(&json)
+        .expect("Export should produce valid JSON");
+    assert!(parsed.is_object(), "Export should be a JSON object");
+
+    // core-F-010: Check for ALL key-type patterns, not just 2.
+    let sensitive_patterns = [
+        "shared_key",
+        "private_key",
+        "signing_key",
+        "signing_seed",
+        "ratchet_key",
+        "chain_key",
+        "root_key",
+        "x3dh_private",
+        "ephemeral_key",
+        "master_seed",
+    ];
+
+    let json_lower = json.to_lowercase();
+    for pattern in &sensitive_patterns {
+        assert!(
+            !json_lower.contains(pattern),
+            "Export must not contain '{}' — found in: {}",
+            pattern,
+            &json[..json.len().min(500)]
+        );
+    }
 }
 
 #[test]

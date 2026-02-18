@@ -126,15 +126,17 @@ test:core:
     - cargo binstall cargo-llvm-cov --no-confirm 2>/dev/null || cargo install cargo-llvm-cov --locked || true
   script:
     - cargo llvm-cov -p vauchi-core --lcov --output-path lcov-core.info
+    - cargo llvm-cov report -p vauchi-core --cobertura --output-path cobertura-core.xml
     - cargo llvm-cov report -p vauchi-core
   coverage: '/Total:\s+(\d+(?:\.\d+)?%)/'
   artifacts:
     reports:
       coverage_report:
         coverage_format: cobertura
-        path: lcov-core.info
+        path: cobertura-core.xml
     paths:
       - lcov-core.info
+      - cobertura-core.xml
     expire_in: 1 week
 
 test:mobile:
@@ -147,15 +149,17 @@ test:mobile:
     - cargo binstall cargo-llvm-cov --no-confirm 2>/dev/null || cargo install cargo-llvm-cov --locked || true
   script:
     - cargo llvm-cov -p vauchi-mobile --lcov --output-path lcov-mobile.info
+    - cargo llvm-cov report -p vauchi-mobile --cobertura --output-path cobertura-mobile.xml
     - cargo llvm-cov report -p vauchi-mobile
   coverage: '/Total:\s+(\d+(?:\.\d+)?%)/'
   artifacts:
     reports:
       coverage_report:
         coverage_format: cobertura
-        path: lcov-mobile.info
+        path: cobertura-mobile.xml
     paths:
       - lcov-mobile.info
+      - cobertura-mobile.xml
     expire_in: 1 week
 
 # ============================================================

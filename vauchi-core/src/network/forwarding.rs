@@ -7,6 +7,12 @@
 //! When a relay offloads blobs to peer relays (federation), it sends
 //! forwarding hints to the recipient client. This module handles parsing
 //! those hints and fetching the offloaded blobs from the hinted relays.
+//!
+//! ## Signature Verification (Tracker #117)
+//!
+//! Forwarding hints may be signed by the relay's Ed25519 key. Clients
+//! should call [`verify_hint_signature`] before following hints to ensure
+//! they originate from the expected relay and have not been tampered with.
 
 use std::collections::HashSet;
 
@@ -56,6 +62,48 @@ pub fn group_hints_by_relay<'a>(
     groups
 }
 
+/// Verifies the Ed25519 signature on forwarding hints (Tracker #117).
+///
+/// Returns `Ok(())` if the signature is valid and was produced by the
+/// given `expected_relay_key` (32-byte Ed25519 public key, hex-encoded).
+/// Returns `Err` with a description if verification fails.
+///
+/// If the hints are unsigned (no `relay_signing_key` or `signature`),
+/// returns `Err("unsigned")`.
+pub fn verify_hint_signature(
+    hints: &ForwardingHints,
+    expected_relay_key: &str,
+) -> Result<(), String> {
+    let relay_key_hex = hints
+        .relay_signing_key
+        .as_ref()
+        .ok_or_else(|| "unsigned".to_string())?;
+    let signature_hex = hints
+        .signature
+        .as_ref()
+        .ok_or_else(|| "missing signature".to_string())?;
+
+    // Verify the signing key matches the expected relay
+    if relay_key_hex != expected_relay_key {
+        return Err(format!(
+            "relay key mismatch: expected {}, got {}",
+            expected_relay_key, relay_key_hex
+        ));
+    }
+
+    let pk_bytes = hex::decode(relay_key_hex).map_err(|e| format!("invalid public key hex: {}", e))?;
+    let sig_bytes =
+        hex::decode(signature_hex).map_err(|e| format!("invalid signature hex: {}", e))?;
+
+    let public_key =
+        ring::signature::UnparsedPublicKey::new(&ring::signature::ED25519, &pk_bytes);
+
+    let canonical = hints.canonical_data();
+    public_key
+        .verify(&canonical, &sig_bytes)
+        .map_err(|_| "signature verification failed".to_string())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -71,15 +119,21 @@ mod tests {
         }
     }
 
+    fn make_unsigned_hints(hint_list: Vec<ForwardingHint>) -> ForwardingHints {
+        ForwardingHints {
+            hints: hint_list,
+            relay_signing_key: None,
+            signature: None,
+        }
+    }
+
     #[test]
     fn test_filter_expired_hints() {
-        let hints = ForwardingHints {
-            hints: vec![
-                make_hint("blob-1", "wss://relay-a.test", 1000),
-                make_hint("blob-2", "wss://relay-b.test", 2000),
-                make_hint("blob-3", "wss://relay-a.test", 500),
-            ],
-        };
+        let hints = make_unsigned_hints(vec![
+            make_hint("blob-1", "wss://relay-a.test", 1000),
+            make_hint("blob-2", "wss://relay-b.test", 2000),
+            make_hint("blob-3", "wss://relay-a.test", 500),
+        ]);
 
         let active = filter_expired_hints(&hints, 800);
         assert_eq!(active.len(), 2);
@@ -89,12 +143,10 @@ mod tests {
 
     #[test]
     fn test_filter_all_expired() {
-        let hints = ForwardingHints {
-            hints: vec![
-                make_hint("blob-1", "wss://relay-a.test", 100),
-                make_hint("blob-2", "wss://relay-b.test", 200),
-            ],
-        };
+        let hints = make_unsigned_hints(vec![
+            make_hint("blob-1", "wss://relay-a.test", 100),
+            make_hint("blob-2", "wss://relay-b.test", 200),
+        ]);
 
         let active = filter_expired_hints(&hints, 300);
         assert!(active.is_empty());
@@ -102,12 +154,10 @@ mod tests {
 
     #[test]
     fn test_filter_none_expired() {
-        let hints = ForwardingHints {
-            hints: vec![
-                make_hint("blob-1", "wss://relay-a.test", 1000),
-                make_hint("blob-2", "wss://relay-b.test", 2000),
-            ],
-        };
+        let hints = make_unsigned_hints(vec![
+            make_hint("blob-1", "wss://relay-a.test", 1000),
+            make_hint("blob-2", "wss://relay-b.test", 2000),
+        ]);
 
         let active = filter_expired_hints(&hints, 0);
         assert_eq!(active.len(), 2);
@@ -135,19 +185,19 @@ mod tests {
                 version: PROTOCOL_VERSION,
                 message_id: "msg-1".to_string(),
                 timestamp: 100,
-                payload: MessagePayload::ForwardingHints(ForwardingHints { hints: vec![] }),
+                payload: MessagePayload::ForwardingHints(ForwardingHints { hints: vec![], relay_signing_key: None, signature: None }),
             },
             MessageEnvelope {
                 version: PROTOCOL_VERSION,
                 message_id: "msg-1".to_string(), // duplicate
                 timestamp: 200,
-                payload: MessagePayload::ForwardingHints(ForwardingHints { hints: vec![] }),
+                payload: MessagePayload::ForwardingHints(ForwardingHints { hints: vec![], relay_signing_key: None, signature: None }),
             },
             MessageEnvelope {
                 version: PROTOCOL_VERSION,
                 message_id: "msg-2".to_string(),
                 timestamp: 300,
-                payload: MessagePayload::ForwardingHints(ForwardingHints { hints: vec![] }),
+                payload: MessagePayload::ForwardingHints(ForwardingHints { hints: vec![], relay_signing_key: None, signature: None }),
             },
         ];
 
@@ -196,7 +246,7 @@ mod tests {
 
     #[test]
     fn test_empty_hints() {
-        let hints = ForwardingHints { hints: vec![] };
+        let hints = ForwardingHints { hints: vec![], relay_signing_key: None, signature: None };
         let active = filter_expired_hints(&hints, 0);
         assert!(active.is_empty());
 
@@ -206,12 +256,10 @@ mod tests {
 
     #[test]
     fn test_forwarding_hints_serde_roundtrip() {
-        let hints = ForwardingHints {
-            hints: vec![
-                make_hint("blob-1", "wss://relay-a.test", 1000),
-                make_hint("blob-2", "wss://relay-b.test", 2000),
-            ],
-        };
+        let hints = make_unsigned_hints(vec![
+            make_hint("blob-1", "wss://relay-a.test", 1000),
+            make_hint("blob-2", "wss://relay-b.test", 2000),
+        ]);
 
         let json = serde_json::to_string(&hints).unwrap();
         let deserialized: ForwardingHints = serde_json::from_str(&json).unwrap();
@@ -227,9 +275,9 @@ mod tests {
             version: PROTOCOL_VERSION,
             message_id: "test-fwd-1".to_string(),
             timestamp: 1700000000,
-            payload: MessagePayload::ForwardingHints(ForwardingHints {
-                hints: vec![make_hint("blob-1", "wss://relay-a.test", 1000)],
-            }),
+            payload: MessagePayload::ForwardingHints(make_unsigned_hints(vec![
+                make_hint("blob-1", "wss://relay-a.test", 1000),
+            ])),
         };
 
         let json = serde_json::to_string(&envelope).unwrap();
@@ -242,5 +290,41 @@ mod tests {
             }
             _ => panic!("Expected ForwardingHints variant"),
         }
+    }
+
+    // === Tracker #117: Signature Verification Tests ===
+
+    #[test]
+    fn test_verify_unsigned_hints_returns_error() {
+        let hints = make_unsigned_hints(vec![
+            make_hint("blob-1", "wss://relay.test", 1000),
+        ]);
+        let result = verify_hint_signature(&hints, "deadbeef");
+        assert_eq!(result, Err("unsigned".to_string()));
+    }
+
+    #[test]
+    fn test_verify_mismatched_relay_key_returns_error() {
+        let hints = ForwardingHints {
+            hints: vec![make_hint("blob-1", "wss://relay.test", 1000)],
+            relay_signing_key: Some("aa".repeat(32)),
+            signature: Some("bb".repeat(64)),
+        };
+        let result = verify_hint_signature(&hints, &"cc".repeat(32));
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("relay key mismatch"));
+    }
+
+    #[test]
+    fn test_canonical_data_is_order_independent() {
+        let hints1 = make_unsigned_hints(vec![
+            make_hint("blob-b", "wss://relay-2.test", 2000),
+            make_hint("blob-a", "wss://relay-1.test", 1000),
+        ]);
+        let hints2 = make_unsigned_hints(vec![
+            make_hint("blob-a", "wss://relay-1.test", 1000),
+            make_hint("blob-b", "wss://relay-2.test", 2000),
+        ]);
+        assert_eq!(hints1.canonical_data(), hints2.canonical_data());
     }
 }

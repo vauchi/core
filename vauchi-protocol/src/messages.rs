@@ -197,9 +197,22 @@ pub struct AccountRevoked {
 // Forwarding hints (federation)
 // =========================================================================
 
+/// Forwarding hints with optional relay signature (Tracker #117).
+///
+/// When signed, the relay includes its Ed25519 public key and a signature
+/// over the canonical hint data, allowing clients to verify the hints
+/// originate from the authenticated relay.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ForwardingHints {
     pub hints: Vec<ForwardingHintInfo>,
+    /// Relay's Ed25519 signing public key (32 bytes, hex-encoded).
+    /// Present when the relay signs its forwarding hints.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub relay_signing_key: Option<String>,
+    /// Ed25519 signature over the canonical hint data (hex-encoded).
+    /// Signed data: sorted hints concatenated as `blob_id || relay_url || expires_at_secs_be`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub signature: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -207,6 +220,25 @@ pub struct ForwardingHintInfo {
     pub blob_id: String,
     pub relay_url: String,
     pub expires_at_secs: u64,
+}
+
+impl ForwardingHints {
+    /// Computes the canonical byte representation of the hints for signing.
+    ///
+    /// Hints are sorted by `blob_id` to ensure deterministic ordering.
+    /// Each hint contributes: `blob_id_bytes || relay_url_bytes || expires_at_secs_be_bytes`.
+    pub fn canonical_data(&self) -> Vec<u8> {
+        let mut sorted_hints: Vec<&ForwardingHintInfo> = self.hints.iter().collect();
+        sorted_hints.sort_by(|a, b| a.blob_id.cmp(&b.blob_id));
+
+        let mut data = Vec::new();
+        for hint in &sorted_hints {
+            data.extend_from_slice(hint.blob_id.as_bytes());
+            data.extend_from_slice(hint.relay_url.as_bytes());
+            data.extend_from_slice(&hint.expires_at_secs.to_be_bytes());
+        }
+        data
+    }
 }
 
 // =========================================================================
@@ -378,10 +410,84 @@ mod tests {
                 relay_url: "wss://peer.example.com".to_string(),
                 expires_at_secs: 9999999999,
             }],
+            relay_signing_key: None,
+            signature: None,
         };
         let json = serde_json::to_string(&hints).unwrap();
         let decoded: ForwardingHints = serde_json::from_str(&json).unwrap();
         assert_eq!(decoded.hints.len(), 1);
         assert_eq!(decoded.hints[0].relay_url, "wss://peer.example.com");
+        // Unsigned hints should not have signature fields in JSON
+        assert!(!json.contains("relay_signing_key"));
+        assert!(!json.contains("signature"));
+    }
+
+    #[test]
+    fn test_forwarding_hints_signed_roundtrip() {
+        let hints = ForwardingHints {
+            hints: vec![ForwardingHintInfo {
+                blob_id: "blob1".to_string(),
+                relay_url: "wss://peer.example.com".to_string(),
+                expires_at_secs: 9999999999,
+            }],
+            relay_signing_key: Some("ab".repeat(32)),
+            signature: Some("cd".repeat(64)),
+        };
+        let json = serde_json::to_string(&hints).unwrap();
+        let decoded: ForwardingHints = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.relay_signing_key, Some("ab".repeat(32)));
+        assert_eq!(decoded.signature, Some("cd".repeat(64)));
+    }
+
+    #[test]
+    fn test_forwarding_hints_canonical_data_deterministic() {
+        let hints1 = ForwardingHints {
+            hints: vec![
+                ForwardingHintInfo {
+                    blob_id: "blob-b".to_string(),
+                    relay_url: "wss://relay-2.test".to_string(),
+                    expires_at_secs: 2000,
+                },
+                ForwardingHintInfo {
+                    blob_id: "blob-a".to_string(),
+                    relay_url: "wss://relay-1.test".to_string(),
+                    expires_at_secs: 1000,
+                },
+            ],
+            relay_signing_key: None,
+            signature: None,
+        };
+        // Same hints in different order
+        let hints2 = ForwardingHints {
+            hints: vec![
+                ForwardingHintInfo {
+                    blob_id: "blob-a".to_string(),
+                    relay_url: "wss://relay-1.test".to_string(),
+                    expires_at_secs: 1000,
+                },
+                ForwardingHintInfo {
+                    blob_id: "blob-b".to_string(),
+                    relay_url: "wss://relay-2.test".to_string(),
+                    expires_at_secs: 2000,
+                },
+            ],
+            relay_signing_key: None,
+            signature: None,
+        };
+        assert_eq!(
+            hints1.canonical_data(),
+            hints2.canonical_data(),
+            "canonical_data must be order-independent"
+        );
+    }
+
+    #[test]
+    fn test_forwarding_hints_backward_compatible_deserialization() {
+        // Old format without signature fields
+        let json = r#"{"hints":[{"blob_id":"b1","relay_url":"wss://r.test","expires_at_secs":100}]}"#;
+        let decoded: ForwardingHints = serde_json::from_str(json).unwrap();
+        assert_eq!(decoded.hints.len(), 1);
+        assert!(decoded.relay_signing_key.is_none());
+        assert!(decoded.signature.is_none());
     }
 }

@@ -93,10 +93,19 @@ impl SymmetricKey {
 /// Encrypts data using XChaCha20-Poly1305 (default algorithm).
 ///
 /// Output format: `0x02 || nonce (24 bytes) || ciphertext || tag (16 bytes)`
+///
+/// # Nonce Security (Tracker #226)
+///
+/// Each encryption generates a fresh 24-byte (192-bit) nonce from
+/// `ring::rand::SystemRandom` (OS CSPRNG). The 192-bit nonce space of
+/// XChaCha20-Poly1305 makes random collision negligible even at high
+/// volume (~2^96 encryptions before birthday-bound concern). This is
+/// why XChaCha20 was chosen over AES-GCM (96-bit nonce, birthday-bound
+/// at ~2^32 encryptions per key).
 pub fn encrypt(key: &SymmetricKey, plaintext: &[u8]) -> Result<Vec<u8>, EncryptionError> {
     let rng = SystemRandom::new();
 
-    // Generate random 24-byte nonce
+    // Generate cryptographically random 24-byte nonce from OS CSPRNG
     let mut nonce_bytes = [0u8; XCHACHA20_NONCE_SIZE];
     rng.fill(&mut nonce_bytes)
         .map_err(|_| EncryptionError::EncryptionFailed)?;

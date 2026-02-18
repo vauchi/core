@@ -19,6 +19,21 @@
 //!
 //! Destroying the SMK renders all locally persisted data irrecoverable.
 //!
+//! ## Protection Model (Tracker #93)
+//!
+//! SMK is stored **unwrapped** (raw 32 bytes) in the platform's SecureStorage:
+//! - **macOS/iOS**: Keychain Services (hardware-backed Secure Enclave on supported devices)
+//! - **Linux**: Secret Service API (GNOME Keyring / KDE Wallet)
+//! - **Windows**: Credential Manager (DPAPI-protected)
+//!
+//! The OS keychain provides hardware-level protection at rest. Adding a software
+//! encryption wrapper over SMK would only shift the problem (where to store the
+//! wrapping key?) without meaningful security gain, since the attacker model
+//! that can extract raw bytes from the OS keychain can also extract any
+//! software-derived wrapping key. The `SecureStorage::secure_delete_key()`
+//! implementation delegates to the platform's secure erasure primitive, which
+//! may use hardware-assisted clearing on supported devices.
+//!
 //! Design principle (DP-1): SMK is derived once from master_seed at identity
 //! creation or migration, then stored in SecureStorage. At boot, SMK is loaded
 //! from SecureStorage — never re-derived — to avoid bootstrap deadlock.

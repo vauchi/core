@@ -128,3 +128,83 @@ fn test_x3dh_full_bidirectional_agreement() {
         "Full X3DH bidirectional agreement must produce same secret"
     );
 }
+
+// === Ephemeral Key Uniqueness Tests (Tracker #43) ===
+// Verifies that each X3DH initiation generates a fresh ephemeral key.
+// The `EphemeralSecret` type in x25519_dalek is consumed on use (affine type),
+// enforcing single-use at the type level. These tests additionally verify
+// that the RNG produces unique ephemeral public keys across calls.
+
+/// Tracker #43: Each X3DH initiation must produce a unique ephemeral public key.
+///
+/// Two initiations with the same static keys and same peer must produce
+/// different ephemeral public keys, proving the ephemeral secret is freshly
+/// generated each time (not derived from static keys).
+#[test]
+fn test_x3dh_ephemeral_key_uniqueness() {
+    let alice_keys = X3DHKeyPair::generate();
+    let bob_keys = X3DHKeyPair::generate();
+
+    let mut ephemeral_pubs: Vec<Vec<u8>> = Vec::with_capacity(20);
+    for _ in 0..20 {
+        let (_secret, ephemeral_public) =
+            X3DH::initiate(&alice_keys, bob_keys.public_key()).unwrap();
+        ephemeral_pubs.push(ephemeral_public.to_vec());
+    }
+
+    // All ephemeral public keys must be unique
+    for i in 0..ephemeral_pubs.len() {
+        for j in (i + 1)..ephemeral_pubs.len() {
+            assert_ne!(
+                ephemeral_pubs[i], ephemeral_pubs[j],
+                "Ephemeral keys at indices {} and {} are identical — RNG failure",
+                i, j
+            );
+        }
+    }
+}
+
+/// Tracker #43: Ephemeral keys produce different shared secrets per session.
+///
+/// Even with the same identity keys and peer, each X3DH session must derive
+/// a unique shared secret (forward secrecy property). Compromising one
+/// session's key must not reveal others.
+#[test]
+fn test_x3dh_forward_secrecy_different_sessions() {
+    let alice_keys = X3DHKeyPair::generate();
+    let bob_keys = X3DHKeyPair::generate();
+
+    let (secret1, eph1) = X3DH::initiate(&alice_keys, bob_keys.public_key()).unwrap();
+    let (secret2, eph2) = X3DH::initiate(&alice_keys, bob_keys.public_key()).unwrap();
+
+    // Different ephemeral keys
+    assert_ne!(
+        eph1.as_slice(),
+        eph2.as_slice(),
+        "Ephemeral public keys must differ between sessions"
+    );
+
+    // Different shared secrets (forward secrecy)
+    assert_ne!(
+        secret1.as_bytes(),
+        secret2.as_bytes(),
+        "Shared secrets must differ between sessions (forward secrecy)"
+    );
+
+    // But both sessions must still allow agreement with Bob
+    let bob_secret1 =
+        X3DH::respond(&bob_keys, alice_keys.public_key(), &eph1).unwrap();
+    let bob_secret2 =
+        X3DH::respond(&bob_keys, alice_keys.public_key(), &eph2).unwrap();
+
+    assert_eq!(
+        secret1.as_bytes(),
+        bob_secret1.as_bytes(),
+        "Session 1 must produce agreement"
+    );
+    assert_eq!(
+        secret2.as_bytes(),
+        bob_secret2.as_bytes(),
+        "Session 2 must produce agreement"
+    );
+}

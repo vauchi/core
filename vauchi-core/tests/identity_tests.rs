@@ -53,3 +53,71 @@ fn test_device_id_deterministic() {
     // Different identities have different device IDs
     assert_ne!(identity1.device_id(), identity2.device_id());
 }
+
+/// Tracker #235: Master seed entropy validation — uniqueness.
+///
+/// Verifies that `Identity::create()` produces cryptographically unique
+/// identities. Since the master seed is private, we verify indirectly via
+/// the derived signing public key (deterministically derived from seed via
+/// HKDF). Two identical public keys would mean identical seeds, which would
+/// indicate a catastrophic RNG failure.
+#[test]
+fn test_identity_create_produces_unique_keys() {
+    let mut public_keys: Vec<[u8; 32]> = Vec::with_capacity(20);
+    for i in 0..20 {
+        let identity = Identity::create(&format!("User{}", i));
+        let pk = *identity.signing_public_key();
+        public_keys.push(pk);
+    }
+
+    // All signing public keys must be unique
+    for i in 0..public_keys.len() {
+        for j in (i + 1)..public_keys.len() {
+            assert_ne!(
+                public_keys[i], public_keys[j],
+                "Identity {} and {} have identical signing keys — catastrophic RNG failure",
+                i, j
+            );
+        }
+    }
+}
+
+/// Tracker #235: Master seed entropy validation — non-degenerate keys.
+///
+/// Verifies that generated identity keys are not degenerate (all-zero or
+/// all-same-byte). A degenerate key would indicate an uninitialized or
+/// stuck RNG, making all cryptographic operations insecure.
+#[test]
+fn test_identity_keys_not_degenerate() {
+    let identity = Identity::create("Entropy Test");
+
+    // Signing public key must not be all zeros
+    let spk = identity.signing_public_key();
+    assert!(
+        spk.iter().any(|&b| b != 0),
+        "Signing public key must not be all zeros"
+    );
+    let first = spk[0];
+    assert!(
+        spk.iter().any(|&b| b != first),
+        "Signing public key must not be all the same byte ({:#04x})",
+        first
+    );
+
+    // Exchange public key must not be all zeros
+    let epk = identity.exchange_public_key();
+    assert!(
+        epk.iter().any(|&b| b != 0),
+        "Exchange public key must not be all zeros"
+    );
+    let first = epk[0];
+    assert!(
+        epk.iter().any(|&b| b != first),
+        "Exchange public key must not be all the same byte ({:#04x})",
+        first
+    );
+
+    // Public ID must not be empty
+    let pid = identity.public_id();
+    assert!(!pid.is_empty(), "Public ID must not be empty");
+}

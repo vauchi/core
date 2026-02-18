@@ -215,10 +215,23 @@ pub struct PurgeRequest {
 ///
 /// When a relay offloads blobs to peer relays, it sends forwarding hints
 /// to the recipient so they can fetch the blobs from the correct relay.
+///
+/// ## Signed Hints (Tracker #117)
+///
+/// When signed by the relay, `relay_signing_key` contains the relay's
+/// Ed25519 public key and `signature` contains the Ed25519 signature
+/// over the canonical hint data. Clients should verify the signature
+/// against a pinned relay public key before following the hints.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ForwardingHints {
     /// List of forwarding hints.
     pub hints: Vec<ForwardingHint>,
+    /// Relay's Ed25519 signing public key (32 bytes, hex-encoded).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub relay_signing_key: Option<String>,
+    /// Ed25519 signature over the canonical hint data (hex-encoded).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub signature: Option<String>,
 }
 
 /// A single forwarding hint pointing to a blob on another relay.
@@ -230,6 +243,24 @@ pub struct ForwardingHint {
     pub relay_url: String,
     /// Unix timestamp when the hint expires.
     pub expires_at_secs: u64,
+}
+
+impl ForwardingHints {
+    /// Computes the canonical byte representation for signature verification.
+    ///
+    /// Hints are sorted by `blob_id` to ensure deterministic ordering.
+    pub fn canonical_data(&self) -> Vec<u8> {
+        let mut sorted_hints: Vec<&ForwardingHint> = self.hints.iter().collect();
+        sorted_hints.sort_by(|a, b| a.blob_id.cmp(&b.blob_id));
+
+        let mut data = Vec::new();
+        for hint in &sorted_hints {
+            data.extend_from_slice(hint.blob_id.as_bytes());
+            data.extend_from_slice(hint.relay_url.as_bytes());
+            data.extend_from_slice(&hint.expires_at_secs.to_be_bytes());
+        }
+        data
+    }
 }
 
 /// Stages of account deletion.

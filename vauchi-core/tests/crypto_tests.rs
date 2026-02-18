@@ -237,6 +237,72 @@ fn test_encryption_uses_random_nonce() {
     );
 }
 
+/// Tracker #226: Nonce entropy assertion.
+///
+/// Extracts the 24-byte nonce from XChaCha20-Poly1305 ciphertext and asserts
+/// it is not degenerate (not all-zero, not all-same-byte). A degenerate nonce
+/// would indicate a broken or uninitialized RNG, which would be catastrophic
+/// for encryption security (nonce reuse → plaintext recovery).
+///
+/// Ciphertext format: `0x02 || nonce (24 bytes) || ciphertext || tag`
+#[test]
+fn test_nonce_bytes_have_entropy() {
+    let key = SymmetricKey::generate();
+    let plaintext = b"Nonce entropy test";
+
+    for _ in 0..10 {
+        let ciphertext = encrypt(&key, plaintext).expect("Encryption should succeed");
+
+        // Extract nonce: skip algorithm tag (1 byte), take 24 bytes
+        assert!(ciphertext.len() > 25, "Ciphertext too short to contain nonce");
+        let nonce = &ciphertext[1..25];
+
+        // Nonce must not be all zeros (degenerate RNG)
+        assert!(
+            nonce.iter().any(|&b| b != 0),
+            "Nonce must not be all zeros — indicates broken RNG"
+        );
+
+        // Nonce must not be all the same byte (stuck RNG)
+        let first = nonce[0];
+        assert!(
+            nonce.iter().any(|&b| b != first),
+            "Nonce bytes must not all be identical ({:#04x}) — indicates stuck RNG",
+            first
+        );
+    }
+}
+
+/// Tracker #226: Nonce uniqueness across encryptions.
+///
+/// Verifies that nonces extracted from 100 consecutive encryptions are all unique.
+/// With 24-byte (192-bit) nonces from SystemRandom, collision probability is
+/// negligible (~2^-128 for 100 samples). A collision here would indicate a
+/// catastrophic RNG failure.
+#[test]
+fn test_nonce_uniqueness_across_encryptions() {
+    let key = SymmetricKey::generate();
+    let plaintext = b"Nonce uniqueness test";
+
+    let mut nonces: Vec<Vec<u8>> = Vec::with_capacity(100);
+    for _ in 0..100 {
+        let ciphertext = encrypt(&key, plaintext).expect("Encryption should succeed");
+        let nonce = ciphertext[1..25].to_vec();
+        nonces.push(nonce);
+    }
+
+    // All nonces must be unique
+    for i in 0..nonces.len() {
+        for j in (i + 1)..nonces.len() {
+            assert_ne!(
+                nonces[i], nonces[j],
+                "Nonce collision at indices {} and {} — catastrophic RNG failure",
+                i, j
+            );
+        }
+    }
+}
+
 /// Tests encryption of empty data
 #[test]
 fn test_encrypt_empty_data() {

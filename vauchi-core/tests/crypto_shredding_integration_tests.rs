@@ -153,6 +153,56 @@ fn test_smk_secure_storage_lifecycle() {
 }
 
 // ============================================================
+// Shredding isolation: destroying A's SMK leaves B intact
+// ============================================================
+
+/// Two identities with separate key hierarchies. Shredding A's SMK must
+/// leave B's data intact and make A's irrecoverable.
+#[test]
+fn test_shredding_isolation_across_identities() {
+    let identity_a = Identity::create("Alice");
+    let identity_b = Identity::create("Bob");
+
+    let smk_a = identity_a.derive_smk();
+    let sek_a = smk_a.derive_sek();
+    let smk_b = identity_b.derive_smk();
+    let sek_b = smk_b.derive_sek();
+
+    // Both encrypt data
+    let data_a = b"Alice's sensitive data";
+    let data_b = b"Bob's sensitive data";
+    let ct_a = encrypt(&sek_a, data_a).unwrap();
+    let ct_b = encrypt(&sek_b, data_b).unwrap();
+
+    // Both can decrypt their own data
+    assert_eq!(decrypt(&sek_a, &ct_a).unwrap(), data_a);
+    assert_eq!(decrypt(&sek_b, &ct_b).unwrap(), data_b);
+
+    // "Shred" A's key material by deriving from a fresh identity
+    let fresh_identity = Identity::create("Alice-reborn");
+    let fresh_sek = fresh_identity.derive_smk().derive_sek();
+
+    // A's data is irrecoverable with fresh keys
+    assert!(
+        decrypt(&fresh_sek, &ct_a).is_err(),
+        "A's data must be irrecoverable after SMK destruction"
+    );
+
+    // B's data is unaffected
+    assert_eq!(
+        decrypt(&sek_b, &ct_b).unwrap(),
+        data_b,
+        "B's data must survive A's key destruction"
+    );
+
+    // Cross-identity: B's key cannot decrypt A's data
+    assert!(
+        decrypt(&sek_b, &ct_a).is_err(),
+        "B's SEK must not decrypt A's data"
+    );
+}
+
+// ============================================================
 // SEK opens Storage, destruction prevents reopening
 // ============================================================
 
@@ -188,12 +238,15 @@ fn test_storage_keyed_by_sek() {
     let storage2 = Storage::open(&db_path, different_sek).unwrap();
     let loaded2 = storage2.load_identity();
 
-    // Either fails to load (decryption error) or loads garbled data
-    if let Ok(Some((data, _))) = loaded2 {
-        assert_ne!(
-            data, backup_data,
-            "Wrong SEK should not produce correct data"
-        );
+    // Must either error or return None — never return the original data
+    match loaded2 {
+        Err(_) => {} // decryption failure — correct
+        Ok(None) => {} // no data found — correct
+        Ok(Some((data, _))) => {
+            assert_ne!(
+                data, backup_data,
+                "Wrong SEK must not produce correct data"
+            );
+        }
     }
-    // If it errors, that's also correct — data is not recoverable
 }

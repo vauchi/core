@@ -312,6 +312,43 @@ fn test_process_cek_wrapped_update_applies_delta() {
 }
 
 // =============================================================================
+// CRIT-06: Forged signature must be rejected
+// =============================================================================
+
+#[test]
+fn test_cek_wrapped_forged_signature_rejected() {
+    let (alice, bob_id, bob_identity, bob_dh, shared_secret) = setup_alice_with_bob_ratchet();
+    let alice_pk = alice.identity().unwrap().signing_public_key();
+
+    let mut bob_ratchet =
+        DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key());
+
+    // Create a valid delta
+    let old_card = ContactCard::new("Bob");
+    let new_card = ContactCard::new("Bob Tampered");
+
+    let mut delta = CardDelta::compute(&old_card, &new_card);
+    delta.sign(&bob_identity, alice_pk);
+
+    // Tamper with the signature: flip bytes
+    for byte in delta.signature.iter_mut() {
+        *byte ^= 0xFF;
+    }
+
+    // Encode as legacy (non-CEK) to test signature path directly
+    let delta_bytes = serde_json::to_vec(&delta).unwrap();
+    let ratchet_msg = bob_ratchet.encrypt(&delta_bytes).unwrap();
+    let encrypted = serde_json::to_vec(&ratchet_msg).unwrap();
+
+    // Alice should reject the forged update
+    let result = alice.process_card_update(&bob_id, &encrypted);
+    assert!(
+        result.is_err(),
+        "Updates with forged signatures must be rejected"
+    );
+}
+
+// =============================================================================
 // migrate_contacts_to_cek
 // =============================================================================
 

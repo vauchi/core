@@ -182,10 +182,13 @@ fn test_deleted_cek_renders_encrypted_data_unreadable() {
         "CEK must be gone after crypto-shredding"
     );
 
-    // Even if an attacker has the ciphertext, without the CEK it's unreadable
-    // (The original CEK variable still exists in memory for this test,
-    // but in production it would be zeroized. The point is that the stored
-    // CEK is destroyed, so future loads return None.)
+    // Attacker has the ciphertext but no CEK — try decryption with a random key
+    let wrong_cek = ContentEncryptionKey::generate();
+    let result = wrong_cek.decrypt(&ciphertext);
+    assert!(
+        result.is_err(),
+        "Ciphertext must be unreadable without the original CEK"
+    );
 }
 
 #[test]

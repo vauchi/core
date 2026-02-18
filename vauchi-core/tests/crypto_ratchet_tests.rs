@@ -61,20 +61,57 @@ fn test_dr_bidirectional_communication() {
 fn test_dr_forward_secrecy() {
     let (mut alice, mut bob) = create_test_pair();
 
-    // Alice sends multiple messages
+    // Alice sends a message, Bob decrypts, Bob replies (DH ratchet advances)
     let msg1 = alice.encrypt(b"Message 1").unwrap();
-    let msg2 = alice.encrypt(b"Message 2").unwrap();
-
-    // Bob decrypts message 1
     bob.decrypt(&msg1).unwrap();
+    let reply = bob.encrypt(b"Reply").unwrap();
+    alice.decrypt(&reply).unwrap();
 
-    // Even if we had access to current keys, we can't decrypt msg1 again
-    // (the key was consumed)
-    // This is forward secrecy - old keys are deleted
+    // Save Bob's current state (simulating an attacker who compromises Bob now)
+    let compromised_state = bob.serialize();
+    let mut attacker = DoubleRatchetState::deserialize(compromised_state).unwrap();
 
-    // But msg2 still works
+    // The attacker tries to decrypt msg1 using Bob's current (post-ratchet) state
+    let result = attacker.decrypt(&msg1);
+    assert!(
+        result.is_err(),
+        "Forward secrecy: compromised current state must not decrypt earlier messages"
+    );
+
+    // Also verify normal flow still works: Alice sends a new message
+    let msg2 = alice.encrypt(b"Message 2").unwrap();
     let dec2 = bob.decrypt(&msg2).unwrap();
     assert_eq!(b"Message 2".as_slice(), dec2.as_slice());
+}
+
+#[test]
+fn test_forward_secrecy_compromised_state() {
+    // CRIT-04: Serialize ratchet state, advance it, then attempt to decrypt
+    // earlier messages from the serialized (compromised) state.
+    let (mut alice, mut bob) = create_test_pair();
+
+    // Alice sends message 0
+    let msg0 = alice.encrypt(b"Secret message 0").unwrap();
+
+    // Bob decrypts it (advances his ratchet)
+    bob.decrypt(&msg0).unwrap();
+
+    // Alice sends more messages, Bob replies (advances ratchet further)
+    let msg1 = alice.encrypt(b"Message 1").unwrap();
+    bob.decrypt(&msg1).unwrap();
+    let reply = bob.encrypt(b"Reply").unwrap();
+    alice.decrypt(&reply).unwrap();
+
+    // Attacker compromises Bob's current state
+    let compromised_state = bob.serialize();
+    let mut attacker_bob = DoubleRatchetState::deserialize(compromised_state).unwrap();
+
+    // Attacker tries to decrypt msg0 using compromised current state
+    let result = attacker_bob.decrypt(&msg0);
+    assert!(
+        result.is_err(),
+        "Compromised current state must not decrypt earlier consumed messages (forward secrecy)"
+    );
 }
 
 #[test]

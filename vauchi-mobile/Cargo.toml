@@ -25,8 +25,8 @@ content-updates = ["vauchi-core/content-updates", "tokio"]
 # Note: version required for `cargo package` (path used for local dev, version for published crate)
 vauchi-core = { path = "../vauchi-core", version = "0.1.0", default-features = false, features = ["network-rustls"] }
 
-# Async runtime for content updates (optional)
-tokio = { version = "1.0", features = ["rt-multi-thread"], optional = true }
+# Async runtime for content updates and async sync (optional)
+tokio = { version = "1.0", features = ["rt-multi-thread", "net", "time"], optional = true }
 
 # UniFFI for cross-language bindings (tokio feature enables async export support)
 uniffi = { version = "0.28", features = ["cli", "tokio"] }
@@ -51,8 +51,11 @@ hex = "0.4"
 # UUID for message IDs
 uuid = { version = "1.0", features = ["v4"] }
 
-# WebSocket for sync (rustls for Android/iOS cross-compilation)
-tungstenite = { version = "0.24", default-features = false, features = ["handshake", "rustls-tls-native-roots"] }
+# WebSocket for sync (async, rustls for Android/iOS cross-compilation)
+tokio-tungstenite = { version = "0.24", default-features = false, features = ["connect", "rustls-tls-native-roots"] }
+
+# Stream/Sink combinators for async WebSocket
+futures-util = "0.3"
 
 # TLS for certificate pinning (rustls with ring backend - no C compilation needed)
 rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }

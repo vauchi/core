@@ -6,12 +6,16 @@
 //!
 //! This module handles sending and receiving messages through the relay,
 //! including exchange messages and card updates.
+//!
+//! Uses async tokio-tungstenite for non-blocking WebSocket communication.
+//! Storage is created in scoped blocks and dropped before `.await` points
+//! to keep futures `Send` (required by UniFFI async exports).
 
-use std::net::TcpStream;
+use std::path::Path;
 use std::time::Duration;
 
-use tungstenite::stream::MaybeTlsStream;
-use tungstenite::{Message, WebSocket};
+use futures_util::{SinkExt, StreamExt};
+use tokio_tungstenite::tungstenite::Message;
 
 use vauchi_core::crypto::ratchet::DoubleRatchetState;
 use vauchi_core::exchange::{EncryptedExchangeMessage, X3DHKeyPair};
@@ -19,9 +23,9 @@ use vauchi_core::sync::{
     process_card_updates as core_process_card_updates, ContactSyncData, DeviceSyncOrchestrator,
     SyncItem,
 };
-use vauchi_core::{Contact, ContactCard, Identity, Storage};
+use vauchi_core::{Contact, ContactCard, Identity, Storage, SymmetricKey};
 
-use crate::cert_pinning;
+use crate::cert_pinning::{self, WsStream};
 use crate::error::MobileError;
 use crate::protocol::{
     self, create_device_sync_ack, AckStatus, DeviceSyncMessage, EncryptedUpdate, ExchangeMessage,
@@ -42,9 +46,15 @@ pub struct ReceivedMessages {
     pub device_sync_messages: Vec<DeviceSyncMessage>,
 }
 
+/// Exchange response data collected during processing for async sending.
+struct ExchangeResponseData {
+    recipient_id: String,
+    recipient_exchange_key: [u8; 32],
+}
+
 /// Sends authenticated handshake to relay.
-pub fn send_handshake(
-    socket: &mut WebSocket<MaybeTlsStream<TcpStream>>,
+async fn send_handshake(
+    socket: &mut WsStream,
     identity: &Identity,
     device_id: Option<&str>,
 ) -> Result<(), MobileError> {
@@ -54,29 +64,27 @@ pub fn send_handshake(
         .map_err(|e| MobileError::SyncFailed(format!("Encode error: {}", e)))?;
     socket
         .send(Message::Binary(data))
+        .await
         .map_err(|e| MobileError::NetworkError(e.to_string()))?;
     Ok(())
 }
 
-/// Receives pending messages from relay.
-///
-/// Classifies incoming messages into:
-/// - Legacy plaintext exchange messages
-/// - Encrypted exchange messages
-/// - Card updates (ratchet-encrypted)
-/// - Device sync messages (inter-device synchronization)
-#[allow(clippy::type_complexity)]
-pub fn receive_pending(
-    socket: &mut WebSocket<MaybeTlsStream<TcpStream>>,
-) -> Result<ReceivedMessages, MobileError> {
+/// Receives pending messages from relay with per-message timeout.
+async fn receive_pending(socket: &mut WsStream) -> Result<ReceivedMessages, MobileError> {
     let mut legacy_exchange_messages = Vec::new();
     let mut encrypted_exchange_messages = Vec::new();
     let mut card_updates = Vec::new();
     let mut device_sync_messages = Vec::new();
 
     loop {
-        match socket.read() {
-            Ok(Message::Binary(data)) => {
+        let msg = match tokio::time::timeout(Duration::from_secs(1), socket.next()).await {
+            Ok(Some(Ok(msg))) => msg,
+            Ok(Some(Err(_))) | Ok(None) => break,
+            Err(_) => break, // Timeout — no more pending messages
+        };
+
+        match msg {
+            Message::Binary(data) => {
                 if let Ok(envelope) = protocol::decode_message(&data) {
                     match envelope.payload {
                         MessagePayload::EncryptedUpdate(update) => {
@@ -88,36 +96,32 @@ pub fn receive_pending(
                             );
 
                             // Send acknowledgment
-                            send_ack(socket, &envelope.message_id);
+                            let ack = protocol::create_ack(
+                                &envelope.message_id,
+                                AckStatus::ReceivedByRecipient,
+                            );
+                            if let Ok(ack_data) = protocol::encode_message(&ack) {
+                                let _ = socket.send(Message::Binary(ack_data)).await;
+                            }
                         }
                         MessagePayload::DeviceSyncMessage(msg) => {
-                            // Get version before moving msg
                             let version = msg.version;
                             device_sync_messages.push(msg);
 
-                            // Send device sync ack
                             let ack = create_device_sync_ack(&envelope.message_id, version);
                             if let Ok(ack_data) = protocol::encode_message(&ack) {
-                                let _ = socket.send(Message::Binary(ack_data));
+                                let _ = socket.send(Message::Binary(ack_data)).await;
                             }
                         }
                         _ => {}
                     }
                 }
             }
-            Ok(Message::Ping(data)) => {
-                let _ = socket.send(Message::Pong(data));
+            Message::Ping(data) => {
+                let _ = socket.send(Message::Pong(data)).await;
             }
-            Ok(Message::Close(_)) => break,
-            Ok(_) => { /* Ignore other message types */ }
-            Err(tungstenite::Error::Io(ref e))
-                if e.kind() == std::io::ErrorKind::WouldBlock
-                    || e.kind() == std::io::ErrorKind::TimedOut =>
-            {
-                // No more messages
-                break;
-            }
-            Err(_) => break,
+            Message::Close(_) => break,
+            _ => {}
         }
     }
 
@@ -154,27 +158,19 @@ fn classify_and_store_message(
     card_updates.push((update.sender_id, update.ciphertext));
 }
 
-/// Sends an acknowledgment for a received message.
-fn send_ack(socket: &mut WebSocket<MaybeTlsStream<TcpStream>>, message_id: &str) {
-    let ack = protocol::create_ack(message_id, AckStatus::ReceivedByRecipient);
-    if let Ok(ack_data) = protocol::encode_message(&ack) {
-        let _ = socket.send(Message::Binary(ack_data));
-    }
-}
-
-/// Processes legacy plaintext exchange messages and creates new contacts.
-pub fn process_legacy_exchange_messages(
+/// Processes legacy plaintext exchange messages and creates new contacts (sync).
+///
+/// Returns the count added and a list of exchange responses to send asynchronously.
+fn process_legacy_exchange_messages(
     identity: &Identity,
     storage: &Storage,
     messages: Vec<ExchangeMessage>,
-    relay_url: &str,
-    pinned_cert: Option<&str>,
-) -> Result<u32, MobileError> {
+) -> Result<(u32, Vec<ExchangeResponseData>), MobileError> {
     let mut added = 0u32;
+    let mut responses = Vec::new();
     let our_x3dh = identity.x3dh_keypair();
 
     for exchange in messages {
-        // Parse identity key
         let identity_key = match parse_hex_key(&exchange.identity_public_key) {
             Some(key) => key,
             None => continue,
@@ -182,7 +178,7 @@ pub fn process_legacy_exchange_messages(
 
         let public_id = hex::encode(identity_key);
 
-        // Handle response to our exchange (update contact name)
+        // Handle response (update contact name)
         if exchange.is_response {
             update_contact_name_if_needed(storage, &public_id, &exchange.display_name);
             continue;
@@ -193,7 +189,6 @@ pub fn process_legacy_exchange_messages(
             continue;
         }
 
-        // Parse ephemeral key
         let ephemeral_key = match parse_hex_key(&exchange.ephemeral_public_key) {
             Some(key) => key,
             None => continue,
@@ -222,33 +217,34 @@ pub fn process_legacy_exchange_messages(
 
         added += 1;
 
-        // Send encrypted exchange response
-        let _ =
-            send_exchange_response(identity, &public_id, &ephemeral_key, relay_url, pinned_cert);
+        // Collect response data for async sending after Storage is dropped
+        responses.push(ExchangeResponseData {
+            recipient_id: public_id,
+            recipient_exchange_key: ephemeral_key,
+        });
     }
 
-    Ok(added)
+    Ok((added, responses))
 }
 
-/// Processes encrypted exchange messages (new format with proper encryption).
-pub fn process_encrypted_exchange_messages(
+/// Processes encrypted exchange messages (new format with proper encryption, sync).
+///
+/// Returns the count added and a list of exchange responses to send asynchronously.
+fn process_encrypted_exchange_messages(
     identity: &Identity,
     storage: &Storage,
     encrypted_data: Vec<Vec<u8>>,
-    relay_url: &str,
-    pinned_cert: Option<&str>,
-) -> Result<u32, MobileError> {
+) -> Result<(u32, Vec<ExchangeResponseData>), MobileError> {
     let mut added = 0u32;
+    let mut responses = Vec::new();
     let our_x3dh = identity.x3dh_keypair();
 
     for data in encrypted_data {
-        // Try to parse as EncryptedExchangeMessage
         let encrypted_msg = match EncryptedExchangeMessage::from_bytes(&data) {
             Ok(msg) => msg,
             Err(_) => continue,
         };
 
-        // Decrypt to get sender's info
         let (payload, shared_secret) = match encrypted_msg.decrypt(&our_x3dh) {
             Ok(result) => result,
             Err(_) => continue,
@@ -258,7 +254,6 @@ pub fn process_encrypted_exchange_messages(
 
         // Check if contact already exists
         if storage.load_contact(&public_id)?.is_some() {
-            // Contact exists - might be a response, update name if needed
             update_contact_name_if_needed(storage, &public_id, &payload.display_name);
             continue;
         }
@@ -279,36 +274,26 @@ pub fn process_encrypted_exchange_messages(
 
         added += 1;
 
-        // Send encrypted exchange response
-        let _ = send_exchange_response(
-            identity,
-            &public_id,
-            &payload.exchange_key,
-            relay_url,
-            pinned_cert,
-        );
+        // Collect response data for async sending
+        responses.push(ExchangeResponseData {
+            recipient_id: public_id,
+            recipient_exchange_key: payload.exchange_key,
+        });
     }
 
-    Ok(added)
+    Ok((added, responses))
 }
 
-/// Sends encrypted exchange response with our identity and name.
-pub fn send_exchange_response(
+/// Sends an encrypted exchange response via an already-open async socket.
+async fn send_exchange_response(
+    socket: &mut WsStream,
     identity: &Identity,
     recipient_id: &str,
     recipient_exchange_key: &[u8; 32],
-    relay_url: &str,
-    pinned_cert: Option<&str>,
 ) -> Result<(), MobileError> {
-    let mut socket = cert_pinning::connect_with_pinning(relay_url, pinned_cert)
-        .map_err(MobileError::NetworkError)?;
-
     let our_id = identity.public_id();
-    send_handshake(&mut socket, identity, None)?;
-
-    // Create encrypted exchange message using X3DH
     let our_x3dh = identity.x3dh_keypair();
-    let (encrypted_msg, _shared_secret) = EncryptedExchangeMessage::create(
+    let (encrypted_msg, _) = EncryptedExchangeMessage::create(
         &our_x3dh,
         recipient_exchange_key,
         identity.signing_public_key(),
@@ -326,10 +311,8 @@ pub fn send_exchange_response(
     let data = protocol::encode_message(&envelope).map_err(MobileError::SyncFailed)?;
     socket
         .send(Message::Binary(data))
+        .await
         .map_err(|e| MobileError::NetworkError(e.to_string()))?;
-
-    std::thread::sleep(Duration::from_millis(100));
-    let _ = socket.close(None);
 
     Ok(())
 }
@@ -343,7 +326,7 @@ pub fn send_exchange_response(
 /// - Replay detection via storage nonces
 /// - Versioned payload handling (CEK-wrapped and legacy)
 /// - Atomic transaction for ratchet + nonce + contact saves
-pub fn process_card_updates(
+fn process_card_updates(
     identity: &Identity,
     storage: &Storage,
     updates: Vec<(String, Vec<u8>)>,
@@ -352,18 +335,25 @@ pub fn process_card_updates(
     Ok(result.processed)
 }
 
-/// Sends pending outbound updates to contacts.
-pub fn send_pending_updates(
+/// Collects pending outbound updates as serialized data for async sending.
+///
+/// Returns `(update_id, serialized_envelope)` pairs.
+fn collect_pending_updates_data(
     identity: &Identity,
     storage: &Storage,
-    socket: &mut WebSocket<MaybeTlsStream<TcpStream>>,
-) -> Result<u32, MobileError> {
-    let contacts = storage.list_contacts()?;
+) -> Vec<(String, Vec<u8>)> {
+    let contacts = match storage.list_contacts() {
+        Ok(c) => c,
+        Err(_) => return Vec::new(),
+    };
     let our_id = identity.public_id();
-    let mut sent = 0u32;
+    let mut result = Vec::new();
 
     for contact in contacts {
-        let pending = storage.get_pending_updates(contact.id())?;
+        let pending = match storage.get_pending_updates(contact.id()) {
+            Ok(p) => p,
+            Err(_) => continue,
+        };
 
         for update in pending {
             let msg = EncryptedUpdate {
@@ -374,19 +364,16 @@ pub fn send_pending_updates(
 
             let envelope = protocol::create_envelope(MessagePayload::EncryptedUpdate(msg));
             if let Ok(data) = protocol::encode_message(&envelope) {
-                if socket.send(Message::Binary(data)).is_ok() {
-                    let _ = storage.delete_pending_update(&update.id);
-                    sent += 1;
-                }
+                result.push((update.id, data));
             }
         }
     }
 
-    Ok(sent)
+    result
 }
 
 /// Processes incoming device sync messages from other devices.
-pub fn process_device_sync_messages(
+fn process_device_sync_messages(
     identity: &Identity,
     storage: &Storage,
     messages: Vec<DeviceSyncMessage>,
@@ -456,158 +443,106 @@ pub fn process_device_sync_messages(
     Ok(processed)
 }
 
-/// Applies a single sync item to local storage.
-fn apply_sync_item(storage: &Storage, item: &SyncItem) -> Result<(), MobileError> {
-    match item {
-        SyncItem::ContactAdded { contact_data, .. } => {
-            if let Ok(contact) = contact_data.to_contact() {
-                storage.save_contact(&contact)?;
-            }
-        }
-        SyncItem::ContactRemoved { contact_id, .. } => {
-            storage.delete_contact(contact_id)?;
-        }
-        SyncItem::CardUpdated {
-            field_label,
-            new_value,
-            ..
-        } => {
-            if let Ok(Some(mut card)) = storage.load_own_card() {
-                if card.update_field_value(field_label, new_value).is_ok() {
-                    storage.save_own_card(&card)?;
-                }
-            }
-        }
-        SyncItem::VisibilityChanged {
-            contact_id,
-            field_label,
-            is_visible,
-            ..
-        } => {
-            if let Some(mut contact) = storage.load_contact(contact_id)? {
-                if *is_visible {
-                    contact.visibility_rules_mut().set_everyone(field_label);
-                } else {
-                    contact.visibility_rules_mut().set_nobody(field_label);
-                }
-                storage.save_contact(&contact)?;
-            }
-        }
-        SyncItem::LabelChange { .. } => {
-            // Label changes are handled by the label manager during full sync
-        }
-        SyncItem::ContactTrustChanged {
-            contact_id,
-            recovery_trusted,
-            ..
-        } => {
-            if let Some(mut contact) = storage.load_contact(contact_id)? {
-                contact.set_recovery_trusted(*recovery_trusted);
-                storage.save_contact(&contact)?;
-            }
-        }
-        SyncItem::DeletionScheduled {
-            scheduled_at,
-            execute_at,
-            ..
-        } => {
-            // Propagate deletion schedule from another device
-            let state = vauchi_core::storage::DeletionState::Scheduled {
-                scheduled_at: *scheduled_at,
-                execute_at: *execute_at,
-            };
-            storage.save_deletion_state(&state)?;
-        }
-        SyncItem::DeletionCancelled { .. } => {
-            // Cancel deletion propagated from another device
-            storage.save_deletion_state(&vauchi_core::storage::DeletionState::None)?;
-        }
-    }
-    Ok(())
-}
-
-struct WsSender<'a>(&'a mut WebSocket<MaybeTlsStream<TcpStream>>);
-
-impl vauchi_core::sync::BinarySender for WsSender<'_> {
-    fn send_binary(&mut self, data: Vec<u8>) -> Result<(), String> {
-        self.0
-            .send(Message::Binary(data))
-            .map_err(|e| e.to_string())
-    }
-}
-
-/// Sends pending device sync items to other devices.
-pub fn send_device_sync(
+/// Performs a complete sync operation (async, Storage scoped for Send safety).
+///
+/// Storage is created in scoped blocks and dropped before any `.await` points
+/// so the returned future is `Send` (required by UniFFI async exports).
+pub async fn do_sync_async(
+    storage_path: &Path,
+    storage_key: SymmetricKey,
     identity: &Identity,
-    storage: &Storage,
-    socket: &mut WebSocket<MaybeTlsStream<TcpStream>>,
-) -> Result<u32, MobileError> {
-    vauchi_core::sync::send_device_sync(identity, storage, &mut WsSender(socket))
-        .map_err(|e| MobileError::SyncFailed(e.to_string()))
-}
-
-/// Performs a complete sync operation.
-pub fn do_sync(
-    identity: &Identity,
-    storage: &Storage,
     relay_url: &str,
     pinned_cert: Option<&str>,
 ) -> Result<MobileSyncResult, MobileError> {
     let device_id_hex = hex::encode(identity.device_id());
 
-    // Connect to relay
+    // Phase 1: Connect to relay and receive messages (async, no Storage)
     let mut socket = cert_pinning::connect_with_pinning(relay_url, pinned_cert)
+        .await
         .map_err(MobileError::NetworkError)?;
 
-    // Set read timeout for non-blocking receive
-    if let MaybeTlsStream::Plain(ref stream) = socket.get_ref() {
-        let _ = stream.set_read_timeout(Some(Duration::from_millis(1000)));
+    send_handshake(&mut socket, identity, Some(&device_id_hex)).await?;
+
+    tokio::time::sleep(Duration::from_millis(500)).await;
+
+    let received = receive_pending(&mut socket).await?;
+
+    // Phase 2: Process received messages (Storage scoped, no await)
+    let (contacts_added, exchange_responses, cards_updated, device_synced, device_envelopes, pending_updates) = {
+        let storage = Storage::open(storage_path, storage_key.clone())
+            .map_err(|e| MobileError::StorageError(e.to_string()))?;
+
+        // Process legacy exchange messages
+        let (legacy_added, mut responses) =
+            process_legacy_exchange_messages(identity, &storage, received.legacy_exchange)?;
+
+        // Process encrypted exchange messages
+        let (encrypted_added, encrypted_responses) =
+            process_encrypted_exchange_messages(identity, &storage, received.encrypted_exchange)?;
+        responses.extend(encrypted_responses);
+
+        let contacts_added = legacy_added + encrypted_added;
+
+        // Process card updates
+        let cards_updated = process_card_updates(identity, &storage, received.card_updates)?;
+
+        // Process device sync messages
+        let device_synced =
+            process_device_sync_messages(identity, &storage, received.device_sync_messages)?;
+
+        // Build device sync envelopes
+        let device_envelopes =
+            vauchi_core::sync::build_device_sync_envelopes(identity, &storage).unwrap_or_default();
+
+        // Collect pending updates
+        let pending_updates = collect_pending_updates_data(identity, &storage);
+
+        (contacts_added, responses, cards_updated, device_synced, device_envelopes, pending_updates)
+        // storage dropped here
+    };
+
+    // Phase 3: Send outbound data (async, no Storage)
+
+    // Send exchange responses via the same connection
+    for response in &exchange_responses {
+        let _ = send_exchange_response(
+            &mut socket,
+            identity,
+            &response.recipient_id,
+            &response.recipient_exchange_key,
+        )
+        .await;
     }
 
-    // Send handshake with device_id for inter-device sync
-    send_handshake(&mut socket, identity, Some(&device_id_hex))?;
+    // Send device sync envelopes
+    let mut device_sync_sent = 0u32;
+    for data in device_envelopes {
+        if socket.send(Message::Binary(data)).await.is_ok() {
+            device_sync_sent += 1;
+        }
+    }
 
-    // Wait briefly for server to send pending messages
-    std::thread::sleep(Duration::from_millis(500));
-
-    // Receive and classify pending messages
-    let received = receive_pending(&mut socket)?;
-
-    // Process legacy plaintext exchange messages
-    let legacy_added = process_legacy_exchange_messages(
-        identity,
-        storage,
-        received.legacy_exchange,
-        relay_url,
-        pinned_cert,
-    )?;
-
-    // Process encrypted exchange messages
-    let encrypted_added = process_encrypted_exchange_messages(
-        identity,
-        storage,
-        received.encrypted_exchange,
-        relay_url,
-        pinned_cert,
-    )?;
-
-    let contacts_added = legacy_added + encrypted_added;
-
-    // Process card updates
-    let cards_updated = process_card_updates(identity, storage, received.card_updates)?;
-
-    // Process device sync messages (inter-device synchronization)
-    let device_synced =
-        process_device_sync_messages(identity, storage, received.device_sync_messages)?;
-
-    // Send pending device sync items to other devices
-    let device_sync_sent = send_device_sync(identity, storage, &mut socket)?;
-
-    // Send pending outbound updates
-    let updates_sent = send_pending_updates(identity, storage, &mut socket)?;
+    // Send pending updates
+    let mut updates_sent = 0u32;
+    let mut sent_ids = Vec::new();
+    for (update_id, data) in pending_updates {
+        if socket.send(Message::Binary(data)).await.is_ok() {
+            sent_ids.push(update_id);
+            updates_sent += 1;
+        }
+    }
 
     // Close connection
-    let _ = socket.close(None);
+    let _ = socket.close(None).await;
+
+    // Phase 4: Cleanup sent updates (Storage scoped, no await)
+    if !sent_ids.is_empty() {
+        let storage = Storage::open(storage_path, storage_key)
+            .map_err(|e| MobileError::StorageError(e.to_string()))?;
+        for id in &sent_ids {
+            let _ = storage.delete_pending_update(id);
+        }
+    }
 
     Ok(MobileSyncResult {
         contacts_added,
@@ -670,5 +605,73 @@ fn record_contact_for_device_sync(
         .record_local_change(item)
         .map_err(|e| MobileError::SyncFailed(format!("Failed to record device sync: {:?}", e)))?;
 
+    Ok(())
+}
+
+/// Applies a single sync item to local storage.
+fn apply_sync_item(storage: &Storage, item: &SyncItem) -> Result<(), MobileError> {
+    match item {
+        SyncItem::ContactAdded { contact_data, .. } => {
+            if let Ok(contact) = contact_data.to_contact() {
+                storage.save_contact(&contact)?;
+            }
+        }
+        SyncItem::ContactRemoved { contact_id, .. } => {
+            storage.delete_contact(contact_id)?;
+        }
+        SyncItem::CardUpdated {
+            field_label,
+            new_value,
+            ..
+        } => {
+            if let Ok(Some(mut card)) = storage.load_own_card() {
+                if card.update_field_value(field_label, new_value).is_ok() {
+                    storage.save_own_card(&card)?;
+                }
+            }
+        }
+        SyncItem::VisibilityChanged {
+            contact_id,
+            field_label,
+            is_visible,
+            ..
+        } => {
+            if let Some(mut contact) = storage.load_contact(contact_id)? {
+                if *is_visible {
+                    contact.visibility_rules_mut().set_everyone(field_label);
+                } else {
+                    contact.visibility_rules_mut().set_nobody(field_label);
+                }
+                storage.save_contact(&contact)?;
+            }
+        }
+        SyncItem::LabelChange { .. } => {
+            // Label changes are handled by the label manager during full sync
+        }
+        SyncItem::ContactTrustChanged {
+            contact_id,
+            recovery_trusted,
+            ..
+        } => {
+            if let Some(mut contact) = storage.load_contact(contact_id)? {
+                contact.set_recovery_trusted(*recovery_trusted);
+                storage.save_contact(&contact)?;
+            }
+        }
+        SyncItem::DeletionScheduled {
+            scheduled_at,
+            execute_at,
+            ..
+        } => {
+            let state = vauchi_core::storage::DeletionState::Scheduled {
+                scheduled_at: *scheduled_at,
+                execute_at: *execute_at,
+            };
+            storage.save_deletion_state(&state)?;
+        }
+        SyncItem::DeletionCancelled { .. } => {
+            storage.save_deletion_state(&vauchi_core::storage::DeletionState::None)?;
+        }
+    }
     Ok(())
 }

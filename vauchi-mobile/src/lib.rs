@@ -10,13 +10,12 @@
 //! Note: Storage connections are created on-demand for thread safety,
 //! as rusqlite's Connection is not Sync.
 
-use std::net::TcpStream;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use tungstenite::stream::MaybeTlsStream;
-use tungstenite::{Message, WebSocket};
+use futures_util::SinkExt;
+use tokio_tungstenite::tungstenite::Message;
 
 use vauchi_core::crypto::ratchet::DoubleRatchetState;
 use vauchi_core::exchange::{DeviceLinkQR, EncryptedExchangeMessage};
@@ -551,14 +550,6 @@ impl VauchiMobile {
             })?
             .clone();
         Ok(KeychainBridge { callback })
-    }
-
-    /// Connect to relay with optional certificate pinning.
-    fn connect_to_relay(&self) -> Result<WebSocket<MaybeTlsStream<TcpStream>>, MobileError> {
-        let pinned_cert = self.pinned_cert_pem.lock().unwrap();
-        let cert_pem = pinned_cert.as_deref();
-        cert_pinning::connect_with_pinning(&self.relay_url, cert_pem)
-            .map_err(MobileError::NetworkError)
     }
 
     /// Gets the identity from stored data.
@@ -1544,7 +1535,7 @@ impl VauchiMobile {
         let ratchet = DoubleRatchetState::initialize_initiator(&shared_key, their_exchange_key);
         storage.save_ratchet_state(&contact_id, &ratchet, true)?;
 
-        // Send encrypted exchange message via relay
+        // Send encrypted exchange message via relay (async, uses block_on)
         {
             let our_x3dh = identity.x3dh_keypair();
             let (encrypted_msg, _) = EncryptedExchangeMessage::create(
@@ -1555,9 +1546,9 @@ impl VauchiMobile {
             )
             .map_err(|e| MobileError::ExchangeFailed(format!("Key agreement failed: {:?}", e)))?;
 
-            let mut socket = self.connect_to_relay()?;
             let our_id = identity.public_id();
-            sync::send_handshake(&mut socket, &identity, None)?;
+            let pinned_cert = self.get_pinned_cert();
+            let relay_url = self.relay_url.clone();
 
             let update = protocol::EncryptedUpdate {
                 recipient_id: contact_id.clone(),
@@ -1568,12 +1559,41 @@ impl VauchiMobile {
             let envelope =
                 protocol::create_envelope(protocol::MessagePayload::EncryptedUpdate(update));
             let data = protocol::encode_message(&envelope).map_err(MobileError::SyncFailed)?;
-            socket
-                .send(Message::Binary(data))
-                .map_err(|e| MobileError::NetworkError(e.to_string()))?;
 
-            std::thread::sleep(Duration::from_millis(100));
-            let _ = socket.close(None);
+            let rt = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .map_err(|e| MobileError::Internal(format!("Runtime error: {}", e)))?;
+
+            rt.block_on(async {
+                let mut socket =
+                    cert_pinning::connect_with_pinning(&relay_url, pinned_cert.as_deref())
+                        .await
+                        .map_err(MobileError::NetworkError)?;
+
+                let handshake = vauchi_core::network::simple_message::create_signed_handshake(
+                    &identity, None,
+                );
+                let hs_envelope = protocol::create_envelope(
+                    protocol::MessagePayload::Handshake(handshake),
+                );
+                let hs_data = protocol::encode_message(&hs_envelope)
+                    .map_err(|e| MobileError::SyncFailed(format!("Encode error: {}", e)))?;
+                socket
+                    .send(Message::Binary(hs_data))
+                    .await
+                    .map_err(|e| MobileError::NetworkError(e.to_string()))?;
+
+                socket
+                    .send(Message::Binary(data))
+                    .await
+                    .map_err(|e| MobileError::NetworkError(e.to_string()))?;
+
+                tokio::time::sleep(Duration::from_millis(100)).await;
+                let _ = socket.close(None).await;
+
+                Ok::<(), MobileError>(())
+            })?;
         }
 
         Ok(MobileExchangeResult {
@@ -1591,10 +1611,20 @@ impl VauchiMobile {
         *self.sync_status.lock().unwrap() = MobileSyncStatus::Syncing;
 
         let identity = self.get_identity()?;
-        let storage = self.open_storage()?;
         let pinned_cert = self.get_pinned_cert();
 
-        let result = sync::do_sync(&identity, &storage, &self.relay_url, pinned_cert.as_deref());
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .map_err(|e| MobileError::Internal(format!("Runtime error: {}", e)))?;
+
+        let result = rt.block_on(sync::do_sync_async(
+            &self.storage_path,
+            self.storage_key.clone(),
+            &identity,
+            &self.relay_url,
+            pinned_cert.as_deref(),
+        ));
 
         match &result {
             Ok(_) => *self.sync_status.lock().unwrap() = MobileSyncStatus::Idle,
@@ -3006,15 +3036,32 @@ impl VauchiMobile {
 #[cfg(feature = "async-sync")]
 #[uniffi::export(async_runtime = "tokio")]
 impl VauchiMobile {
-    /// Async version of sync that runs in a background thread.
+    /// Async version of sync using native async WebSocket.
     ///
     /// Use this from mobile UI threads to prevent freezing.
-    /// The blocking WebSocket sync is offloaded to a tokio blocking thread.
+    /// Storage is opened in scoped blocks and dropped before `.await` to keep
+    /// the future `Send` (required by UniFFI async exports).
     pub async fn sync_async(self: Arc<Self>) -> Result<MobileSyncResult, MobileError> {
-        let this = self.clone();
-        tokio::task::spawn_blocking(move || this.sync())
-            .await
-            .map_err(|e| MobileError::Internal(format!("Sync task panicked: {}", e)))?
+        *self.sync_status.lock().unwrap() = MobileSyncStatus::Syncing;
+
+        let identity = self.get_identity()?;
+        let pinned_cert = self.get_pinned_cert();
+
+        let result = sync::do_sync_async(
+            &self.storage_path,
+            self.storage_key.clone(),
+            &identity,
+            &self.relay_url,
+            pinned_cert.as_deref(),
+        )
+        .await;
+
+        match &result {
+            Ok(_) => *self.sync_status.lock().unwrap() = MobileSyncStatus::Idle,
+            Err(_) => *self.sync_status.lock().unwrap() = MobileSyncStatus::Error,
+        }
+
+        result
     }
 }
 

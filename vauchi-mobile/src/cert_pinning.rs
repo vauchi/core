@@ -8,14 +8,16 @@
 //! ensuring that only connections to servers with a known certificate are allowed.
 //! Uses rustls for pure-Rust TLS (no OpenSSL dependency - works on Android/iOS).
 
-use rustls::pki_types::{CertificateDer, ServerName};
+use rustls::pki_types::CertificateDer;
 use rustls::ClientConfig;
-use std::net::TcpStream;
 use std::sync::Arc;
-use tungstenite::client::IntoClientRequest;
-use tungstenite::stream::MaybeTlsStream;
-use tungstenite::WebSocket;
-use url::Url;
+use std::time::Duration;
+
+
+/// Type alias for the async WebSocket stream.
+pub type WsStream = tokio_tungstenite::WebSocketStream<
+    tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>,
+>;
 
 /// Parse PEM-encoded certificates into DER format.
 fn parse_pem_certs(pem: &str) -> Result<Vec<CertificateDer<'static>>, String> {
@@ -49,9 +51,6 @@ fn parse_pem_certs(pem: &str) -> Result<Vec<CertificateDer<'static>>, String> {
 }
 
 /// Create a rustls ClientConfig with certificate pinning.
-///
-/// The `pinned_cert_pem` should be the PEM-encoded certificate of the relay server.
-/// Only connections to servers presenting this exact certificate will be allowed.
 fn create_pinned_config(pinned_cert_pem: &str) -> Result<Arc<ClientConfig>, String> {
     let certs = parse_pem_certs(pinned_cert_pem)?;
 
@@ -81,58 +80,32 @@ fn create_default_config() -> Result<Arc<ClientConfig>, String> {
     Ok(Arc::new(config))
 }
 
-/// Connect to a WebSocket server with optional certificate pinning.
+/// Connect to a WebSocket server with optional certificate pinning (async).
 ///
 /// If `pinned_cert_pem` is None, uses standard TLS without pinning (for development).
-pub fn connect_with_pinning(
+pub async fn connect_with_pinning(
     url_str: &str,
     pinned_cert_pem: Option<&str>,
-) -> Result<WebSocket<MaybeTlsStream<TcpStream>>, String> {
-    let url = Url::parse(url_str).map_err(|e| format!("Invalid URL: {}", e))?;
-    let is_wss = url.scheme() == "wss";
-
-    if !is_wss {
-        // Plain WebSocket (ws://) - no TLS
-        let request = url_str
-            .into_client_request()
-            .map_err(|e| format!("Invalid URL: {}", e))?;
-        return tungstenite::connect(request)
-            .map(|(ws, _)| ws)
-            .map_err(|e| format!("Connection failed: {}", e));
-    }
-
-    // WSS connection - use TLS
-    let host = url.host_str().ok_or("No host in URL")?;
-    let port = url.port().unwrap_or(443);
-    let addr = format!("{}:{}", host, port);
-
-    // Create TCP connection
-    let tcp_stream =
-        TcpStream::connect(&addr).map_err(|e| format!("TCP connection failed: {}", e))?;
-
-    // Create TLS config (with or without pinning)
-    let tls_config = match pinned_cert_pem {
-        Some(pem) => create_pinned_config(pem)?,
-        None => create_default_config()?,
+) -> Result<WsStream, String> {
+    let connector = match pinned_cert_pem {
+        Some(pem) => {
+            let config = create_pinned_config(pem)?;
+            Some(tokio_tungstenite::Connector::Rustls(config))
+        }
+        None => {
+            let config = create_default_config()?;
+            Some(tokio_tungstenite::Connector::Rustls(config))
+        }
     };
 
-    // Create TLS connection
-    let server_name: ServerName<'_> = host
-        .try_into()
-        .map_err(|_| format!("Invalid server name: {}", host))?;
-
-    let tls_conn = rustls::ClientConnection::new(tls_config, server_name.to_owned())
-        .map_err(|e| format!("TLS connection setup failed: {}", e))?;
-
-    let tls_stream = rustls::StreamOwned::new(tls_conn, tcp_stream);
-
-    // Upgrade to WebSocket
-    let request = url_str
-        .into_client_request()
-        .map_err(|e| format!("Invalid WebSocket request: {}", e))?;
-
-    let (ws, _) = tungstenite::client(request, MaybeTlsStream::Rustls(tls_stream))
-        .map_err(|e| format!("WebSocket upgrade failed: {}", e))?;
+    let (ws, _) = tokio::time::timeout(
+        Duration::from_secs(5),
+        tokio_tungstenite::connect_async_tls_with_config(url_str, None, false, connector),
+    )
+    .await
+    .map_err(|_| "Connection timed out".to_string())?
+    .map_err(|e| format!("WebSocket connection failed: {}", e))?;
 
     Ok(ws)
 }
+

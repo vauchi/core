@@ -338,10 +338,7 @@ fn process_card_updates(
 /// Collects pending outbound updates as serialized data for async sending.
 ///
 /// Returns `(update_id, serialized_envelope)` pairs.
-fn collect_pending_updates_data(
-    identity: &Identity,
-    storage: &Storage,
-) -> Vec<(String, Vec<u8>)> {
+fn collect_pending_updates_data(identity: &Identity, storage: &Storage) -> Vec<(String, Vec<u8>)> {
     let contacts = match storage.list_contacts() {
         Ok(c) => c,
         Err(_) => return Vec::new(),
@@ -468,7 +465,14 @@ pub async fn do_sync_async(
     let received = receive_pending(&mut socket).await?;
 
     // Phase 2: Process received messages (Storage scoped, no await)
-    let (contacts_added, exchange_responses, cards_updated, device_synced, device_envelopes, pending_updates) = {
+    let (
+        contacts_added,
+        exchange_responses,
+        cards_updated,
+        device_synced,
+        device_envelopes,
+        pending_updates,
+    ) = {
         let storage = Storage::open(storage_path, storage_key.clone())
             .map_err(|e| MobileError::StorageError(e.to_string()))?;
 
@@ -497,7 +501,14 @@ pub async fn do_sync_async(
         // Collect pending updates
         let pending_updates = collect_pending_updates_data(identity, &storage);
 
-        (contacts_added, responses, cards_updated, device_synced, device_envelopes, pending_updates)
+        (
+            contacts_added,
+            responses,
+            cards_updated,
+            device_synced,
+            device_envelopes,
+            pending_updates,
+        )
         // storage dropped here
     };
 

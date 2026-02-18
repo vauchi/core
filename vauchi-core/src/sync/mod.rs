@@ -67,7 +67,7 @@ pub async fn send_device_sync_async(
         sender
             .send_binary(data)
             .await
-            .map_err(|e| DeviceSyncError::SendFailed(e))?;
+            .map_err(DeviceSyncError::SendFailed)?;
         sent += 1;
     }
     Ok(sent)

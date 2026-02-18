@@ -1571,12 +1571,10 @@ impl VauchiMobile {
                         .await
                         .map_err(MobileError::NetworkError)?;
 
-                let handshake = vauchi_core::network::simple_message::create_signed_handshake(
-                    &identity, None,
-                );
-                let hs_envelope = protocol::create_envelope(
-                    protocol::MessagePayload::Handshake(handshake),
-                );
+                let handshake =
+                    vauchi_core::network::simple_message::create_signed_handshake(&identity, None);
+                let hs_envelope =
+                    protocol::create_envelope(protocol::MessagePayload::Handshake(handshake));
                 let hs_data = protocol::encode_message(&hs_envelope)
                     .map_err(|e| MobileError::SyncFailed(format!("Encode error: {}", e)))?;
                 socket

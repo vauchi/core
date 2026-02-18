@@ -13,11 +13,9 @@ use rustls::ClientConfig;
 use std::sync::Arc;
 use std::time::Duration;
 
-
 /// Type alias for the async WebSocket stream.
-pub type WsStream = tokio_tungstenite::WebSocketStream<
-    tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>,
->;
+pub type WsStream =
+    tokio_tungstenite::WebSocketStream<tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>>;
 
 /// Parse PEM-encoded certificates into DER format.
 fn parse_pem_certs(pem: &str) -> Result<Vec<CertificateDer<'static>>, String> {
@@ -108,4 +106,3 @@ pub async fn connect_with_pinning(
 
     Ok(ws)
 }
-

@@ -32,6 +32,8 @@ pub struct ContentFetcher {
     client: Client,
     base_url: String,
     max_content_size: u64,
+    /// Publisher key for manifest signature verification (Tracker #145).
+    publisher_public_key: Option<crate::crypto::signing::PublicKey>,
 }
 
 #[cfg(feature = "content-updates")]
@@ -54,6 +56,7 @@ impl ContentFetcher {
             client: builder.build()?,
             base_url: config.content_url.clone(),
             max_content_size: config.max_content_size,
+            publisher_public_key: config.publisher_public_key.clone(),
         })
     }
 
@@ -67,6 +70,12 @@ impl ContentFetcher {
         }
 
         let manifest: ContentManifest = response.json().await?;
+
+        // Verify manifest signature if publisher key is configured (Tracker #145)
+        if let Some(ref pub_key) = self.publisher_public_key {
+            super::integrity::verify_manifest_signature(&manifest, pub_key)?;
+        }
+
         Ok(manifest)
     }
 

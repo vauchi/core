@@ -30,6 +30,12 @@ pub struct ContentConfig {
 
     /// Proxy URL (for Tor support)
     pub proxy_url: Option<String>,
+
+    /// Publisher's Ed25519 public key for manifest signature verification (Tracker #145).
+    ///
+    /// When set, fetched manifests are verified against this key before use.
+    /// When `None`, manifest signatures are not checked (backward-compatible).
+    pub publisher_public_key: Option<crate::crypto::signing::PublicKey>,
 }
 
 impl Default for ContentConfig {
@@ -42,6 +48,7 @@ impl Default for ContentConfig {
             timeout: Duration::from_secs(30),
             max_content_size: 5 * 1024 * 1024, // 5 MB
             proxy_url: None,
+            publisher_public_key: None,
         }
     }
 }

@@ -166,7 +166,12 @@ pub fn process_single_card_update(
         contact.set_cek(cek);
     }
 
-    // 9. Atomic transaction: ratchet state + replay nonce + contact card
+    // 9. Atomic transaction: ratchet state + replay nonce + contact card (Tracker #159)
+    //
+    // Ratchet state is saved in the SAME transaction as the contact card update
+    // and replay nonce. If any write fails, all are rolled back. This prevents
+    // the "ratchet advanced but message lost" crash scenario where the ratchet
+    // state advances past a message that was never applied.
     storage.begin_transaction()?;
     let txn_result = (|| -> Result<(), CardUpdateError> {
         storage.save_ratchet_state(sender_id, &ratchet, is_initiator)?;

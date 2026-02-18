@@ -357,3 +357,107 @@ fn test_apply_revocation_to_contact_registry() {
         .unwrap()
         .is_active());
 }
+
+// =============================================================================
+// BROADCAST REPLAY PROTECTION (Tracker #78)
+// =============================================================================
+
+/// Tests that verify_with_freshness rejects broadcasts with old versions.
+///
+/// Feature: device_management.feature
+/// Scenario: Replayed broadcast with stale version is rejected
+#[test]
+fn test_broadcast_rejects_old_version() {
+    let seed = test_master_seed();
+    let signing_key = test_signing_keypair();
+    let device = DeviceInfo::derive(&seed, 0, "Primary".to_string());
+
+    let registry = DeviceRegistry::new(device.to_registered(&seed), &signing_key);
+    let broadcast = RegistryBroadcast::new(&registry, &signing_key);
+
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+
+    // Broadcast version is 1 (initial), last accepted is 1 → should reject
+    let result = broadcast.verify_with_freshness(
+        &signing_key.public_key(),
+        1,     // last_accepted_version == broadcast.version()
+        now,
+        3600,  // 1 hour max age
+    );
+    assert!(result.is_err(), "Should reject broadcast with version <= last accepted");
+    assert!(result.unwrap_err().to_string().contains("version"));
+}
+
+/// Tests that verify_with_freshness accepts fresh broadcasts.
+#[test]
+fn test_broadcast_accepts_fresh() {
+    let seed = test_master_seed();
+    let signing_key = test_signing_keypair();
+    let device = DeviceInfo::derive(&seed, 0, "Primary".to_string());
+
+    let registry = DeviceRegistry::new(device.to_registered(&seed), &signing_key);
+    let broadcast = RegistryBroadcast::new(&registry, &signing_key);
+
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+
+    // Broadcast version is 1, last accepted is 0 → should accept
+    let result = broadcast.verify_with_freshness(
+        &signing_key.public_key(),
+        0,     // last_accepted_version < broadcast.version()
+        now,
+        3600,  // 1 hour max age
+    );
+    assert!(result.is_ok(), "Should accept fresh broadcast: {:?}", result);
+}
+
+/// Tests that verify_with_freshness rejects stale timestamps.
+#[test]
+fn test_broadcast_rejects_stale_timestamp() {
+    let seed = test_master_seed();
+    let signing_key = test_signing_keypair();
+    let device = DeviceInfo::derive(&seed, 0, "Primary".to_string());
+
+    let registry = DeviceRegistry::new(device.to_registered(&seed), &signing_key);
+    let broadcast = RegistryBroadcast::new(&registry, &signing_key);
+
+    let far_future = broadcast.timestamp() + 7200; // 2 hours later
+
+    // Broadcast timestamp is now, but we pretend now is 2 hours later → stale
+    let result = broadcast.verify_with_freshness(
+        &signing_key.public_key(),
+        0,
+        far_future,
+        3600, // 1 hour max age → broadcast is 2 hours old
+    );
+    assert!(result.is_err(), "Should reject stale broadcast");
+    assert!(result.unwrap_err().to_string().contains("old"));
+}
+
+/// Tests that verify_with_freshness rejects future timestamps.
+#[test]
+fn test_broadcast_rejects_future_timestamp() {
+    let seed = test_master_seed();
+    let signing_key = test_signing_keypair();
+    let device = DeviceInfo::derive(&seed, 0, "Primary".to_string());
+
+    let registry = DeviceRegistry::new(device.to_registered(&seed), &signing_key);
+    let broadcast = RegistryBroadcast::new(&registry, &signing_key);
+
+    let past = broadcast.timestamp().saturating_sub(120); // 2 minutes before broadcast
+
+    // We pretend now is 2 minutes before the broadcast → future timestamp
+    let result = broadcast.verify_with_freshness(
+        &signing_key.public_key(),
+        0,
+        past,
+        3600,
+    );
+    assert!(result.is_err(), "Should reject future broadcast");
+    assert!(result.unwrap_err().to_string().contains("future"));
+}

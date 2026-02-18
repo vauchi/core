@@ -412,3 +412,82 @@ fn test_device_info_preservation() {
         "Device name should be preserved"
     );
 }
+
+// =============================================================================
+// BACKUP RE-EXPORT WITH DIFFERENT PASSWORD (Tracker #53)
+// =============================================================================
+
+/// Tests that re-exporting a backup with a different password works correctly:
+/// the new backup decrypts only with the new password, not the old one.
+///
+/// Feature: backup_format_versioning.feature
+/// Scenario: Re-export backup with changed password
+#[test]
+fn test_re_export_with_different_password() {
+    let identity = Identity::create("Password Change Test");
+    let original_public_id = identity.public_id();
+
+    let password_a = "OriginalP@ssw0rd!2024";
+    let password_b = "DifferentP@ssw0rd!2025";
+
+    // Export with password A
+    let backup_a = identity.export_backup(password_a).unwrap();
+
+    // Restore from backup A
+    let restored = Identity::import_backup(&backup_a, password_a).unwrap();
+
+    // Re-export with password B
+    let backup_b = restored.export_backup(password_b).unwrap();
+
+    // New backup should NOT decrypt with old password
+    let result = Identity::import_backup(&backup_b, password_a);
+    assert!(
+        result.is_err(),
+        "Re-exported backup should not decrypt with old password"
+    );
+
+    // New backup should decrypt with new password
+    let final_restored = Identity::import_backup(&backup_b, password_b).unwrap();
+    assert_eq!(
+        final_restored.public_id(),
+        original_public_id,
+        "Identity should be preserved after password change"
+    );
+}
+
+// =============================================================================
+// IDENTITY CLONE VIA BACKUP (Tracker #69)
+// =============================================================================
+
+/// Documents that importing the same backup twice creates identical signing keys.
+///
+/// This is a known limitation — both restored identities have the same
+/// master_seed and are cryptographically indistinguishable.
+#[test]
+fn test_backup_import_creates_identical_signing_keys() {
+    let identity = Identity::create("Clone Test");
+    let password = "SecureP@ssw0rd!2024";
+
+    let backup = identity.export_backup(password).unwrap();
+
+    // Import the same backup twice
+    let clone_a = Identity::import_backup(&backup, password).unwrap();
+    let clone_b = Identity::import_backup(&backup, password).unwrap();
+
+    // Both clones have the same signing key (this is the documented risk)
+    assert_eq!(
+        clone_a.signing_public_key(),
+        clone_b.signing_public_key(),
+        "Two imports of same backup produce identical signing keys (Tracker #69)"
+    );
+    assert_eq!(
+        clone_a.public_id(),
+        clone_b.public_id(),
+        "Two imports of same backup produce identical public IDs"
+    );
+    assert_eq!(
+        clone_a.public_id(),
+        identity.public_id(),
+        "Clones have the same identity as the original"
+    );
+}

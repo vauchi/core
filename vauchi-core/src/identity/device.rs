@@ -38,6 +38,8 @@ pub enum DeviceError {
     EmptyDeviceName,
     #[error("Cannot transfer primary: target device is revoked")]
     CannotTransferToRevoked,
+    #[error("Broadcast is stale: {0}")]
+    BroadcastStale(String),
 }
 
 /// Device-specific cryptographic material and metadata.
@@ -613,11 +615,61 @@ impl RegistryBroadcast {
         &self.active_devices
     }
 
+    /// Returns the broadcast timestamp (unix seconds).
+    pub fn timestamp(&self) -> u64 {
+        self.timestamp
+    }
+
     /// Verifies the broadcast signature.
     pub fn verify(&self, public_key: &crate::crypto::PublicKey) -> bool {
         let data = self.signing_data();
         let signature = Signature::from_bytes(self.signature);
         public_key.verify(&data, &signature)
+    }
+
+    /// Verifies signature AND checks freshness constraints (Tracker #78).
+    ///
+    /// Rejects broadcasts that:
+    /// - Have an invalid signature
+    /// - Have a version <= `last_accepted_version` (replay / rollback)
+    /// - Have a timestamp older than `max_age_secs` from `now_secs`
+    /// - Have a timestamp in the future by more than 60 seconds (clock skew tolerance)
+    pub fn verify_with_freshness(
+        &self,
+        public_key: &crate::crypto::PublicKey,
+        last_accepted_version: u64,
+        now_secs: u64,
+        max_age_secs: u64,
+    ) -> Result<(), DeviceError> {
+        if !self.verify(public_key) {
+            return Err(DeviceError::InvalidRegistrySignature);
+        }
+
+        // Version monotonicity: reject replays of older versions
+        if self.version <= last_accepted_version {
+            return Err(DeviceError::BroadcastStale(format!(
+                "version {} <= last accepted {}",
+                self.version, last_accepted_version
+            )));
+        }
+
+        // Timestamp freshness: reject stale broadcasts
+        if now_secs > self.timestamp && (now_secs - self.timestamp) > max_age_secs {
+            return Err(DeviceError::BroadcastStale(format!(
+                "timestamp {} is more than {}s old (now={})",
+                self.timestamp, max_age_secs, now_secs
+            )));
+        }
+
+        // Reject future timestamps (>60s clock skew tolerance)
+        if self.timestamp > now_secs + 60 {
+            return Err(DeviceError::BroadcastStale(format!(
+                "timestamp {} is in the future (now={})",
+                self.timestamp, now_secs
+            )));
+        }
+
+        Ok(())
     }
 
     /// Signs the broadcast.

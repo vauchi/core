@@ -382,6 +382,14 @@ impl InterDeviceSyncState {
 ///
 /// Used to detect concurrent updates and determine if changes
 /// happened before, after, or concurrently with other changes.
+///
+/// ## Integration Status (Tracker #34)
+///
+/// The `is_concurrent_with` and `dominates` methods are implemented and tested,
+/// but the `DeviceSyncOrchestrator::process_incoming` method does NOT use them.
+/// Conflict resolution currently relies on scalar `field_timestamps` (LWW) rather
+/// than vector clock causality. The `field_timestamps` map is also in-memory only,
+/// not persisted to storage.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct VersionVector {
     /// Map of device ID to version number.

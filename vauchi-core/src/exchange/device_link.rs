@@ -327,6 +327,14 @@ impl DeviceLinkRequest {
 }
 
 /// Response from existing device containing the encrypted seed.
+///
+/// ## Security Note (Tracker #31)
+///
+/// The raw 32-byte master seed is transmitted, encrypted only by the ephemeral
+/// QR link key. A compromised new device gains full key derivation capability
+/// for ALL device indices (past and future). The intended mitigation is to
+/// replace this with a device-specific derived subkey (HKDF from master_seed
+/// with device_index binding), limiting a compromised device to its own keys.
 #[derive(Clone)]
 pub struct DeviceLinkResponse {
     /// The master seed (encrypted with link key before transmission)

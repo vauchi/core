@@ -123,6 +123,14 @@ impl Storage {
     }
 
     /// Loads all validations for a specific field.
+    ///
+    /// ## Note (Tracker #112)
+    ///
+    /// Loaded validations are decrypted but their Ed25519 signatures are not
+    /// re-verified against the validator's public key. A corrupted or tampered
+    /// database could return validations with invalid signatures. Callers that
+    /// display trust-sensitive information should re-verify signatures via
+    /// `ProfileValidation::verify()`.
     pub fn load_validations_for_field(
         &self,
         contact_id: &str,

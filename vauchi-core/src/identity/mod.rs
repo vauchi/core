@@ -323,6 +323,15 @@ impl Identity {
     /// Auto-detects backup version:
     /// - v2 (0x02): Argon2id + XChaCha20-Poly1305
     /// - v1/legacy: PBKDF2 + AES-256-GCM (tagged or untagged)
+    ///
+    /// ## Security Note (Tracker #69)
+    ///
+    /// The restored identity has the same `master_seed` and therefore the same
+    /// signing key pair as the original. Two devices importing the same backup
+    /// are cryptographically indistinguishable — there is no protocol-level
+    /// mechanism to detect or prevent "identity clones" operating independently.
+    /// The restored device also starts with the backup's `device_index`, not a
+    /// fresh one, so it can impersonate the original device.
     pub fn import_backup(backup: &IdentityBackup, password: &str) -> Result<Self, IdentityError> {
         let data = backup.as_bytes();
 

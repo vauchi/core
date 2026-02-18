@@ -149,6 +149,39 @@ impl MigrationRunner {
     }
 }
 
+/// Idempotent ALTER TABLE ADD COLUMN: adds a column only if it doesn't already exist.
+///
+/// SQLite does not support `ADD COLUMN IF NOT EXISTS`. This helper queries
+/// `PRAGMA table_info` to check before adding. Needed for crash-recovery
+/// safety in v14/v15/v16/v18 encrypt-in-place migrations (Tracker #54).
+fn add_column_if_not_exists(
+    conn: &Connection,
+    table: &str,
+    column: &str,
+    col_type: &str,
+) -> Result<(), StorageError> {
+    let exists: bool = conn
+        .prepare(&format!("PRAGMA table_info({})", table))
+        .map_err(|e| StorageError::Migration(format!("PRAGMA table_info({}): {}", table, e)))?
+        .query_map([], |row| row.get::<_, String>(1))
+        .map_err(|e| StorageError::Migration(format!("Query table_info({}): {}", table, e)))?
+        .any(|name| name.as_deref() == Ok(column));
+
+    if !exists {
+        conn.execute_batch(&format!(
+            "ALTER TABLE {} ADD COLUMN {} {};",
+            table, column, col_type
+        ))
+        .map_err(|e| {
+            StorageError::Migration(format!(
+                "ALTER TABLE {} ADD COLUMN {}: {}",
+                table, column, e
+            ))
+        })?;
+    }
+    Ok(())
+}
+
 /// Returns all registered migrations in version order.
 ///
 /// This is the single source of truth for the database schema.
@@ -787,21 +820,37 @@ const MIGRATION_V13_CRYPTO_SHREDDING: &str = "
 /// and visibility_labels. Existing plaintext data is encrypted and stored in the
 /// new columns. The old plaintext columns are kept for backward compatibility but
 /// cleared to empty strings.
+///
+/// ## Idempotency (Tracker #54)
+///
+/// Uses `add_column_if_not_exists` so that a crash after ALTER TABLE but before
+/// COMMIT does not prevent the migration from re-running successfully.
+///
+/// ## No Pre-Migration Backup (Tracker #66)
+///
+/// This migration relies on SQLite transaction rollback for crash safety. No
+/// file-level database backup (VACUUM INTO) is taken before encryption. A
+/// pre-migration WAL checkpoint + file copy would provide defense-in-depth
+/// against SQLite corruption scenarios.
+///
+/// ## ANR Risk on Mobile (Tracker #164)
+///
+/// All pending migrations run in a single `BEGIN EXCLUSIVE TRANSACTION`. For
+/// databases with many rows, encrypt-in-place can take >5s on slow storage,
+/// risking ANR on Android. Consider splitting into per-table transactions with
+/// a progress callback for mobile clients.
 fn migrate_v14_encrypt_high_priority(
     conn: &Connection,
     key: &SymmetricKey,
 ) -> Result<(), StorageError> {
     use crate::crypto::encrypt;
 
-    // Step 1: Add encrypted columns to each table
-    conn.execute_batch(
-        "ALTER TABLE own_card ADD COLUMN card_json_encrypted BLOB;
-         ALTER TABLE device_registry ADD COLUMN registry_json_encrypted BLOB;
-         ALTER TABLE device_sync_state ADD COLUMN state_json_encrypted BLOB;
-         ALTER TABLE visibility_labels ADD COLUMN contacts_json_encrypted BLOB;
-         ALTER TABLE visibility_labels ADD COLUMN visible_fields_json_encrypted BLOB;",
-    )
-    .map_err(|e| StorageError::Migration(format!("Failed to add encrypted columns: {}", e)))?;
+    // Step 1: Add encrypted columns to each table (idempotent — Tracker #54)
+    add_column_if_not_exists(conn, "own_card", "card_json_encrypted", "BLOB")?;
+    add_column_if_not_exists(conn, "device_registry", "registry_json_encrypted", "BLOB")?;
+    add_column_if_not_exists(conn, "device_sync_state", "state_json_encrypted", "BLOB")?;
+    add_column_if_not_exists(conn, "visibility_labels", "contacts_json_encrypted", "BLOB")?;
+    add_column_if_not_exists(conn, "visibility_labels", "visible_fields_json_encrypted", "BLOB")?;
 
     // Step 2: Encrypt existing plaintext data in own_card
     {
@@ -923,19 +972,16 @@ fn migrate_v15_encrypt_medium_priority(
 ) -> Result<(), StorageError> {
     use crate::crypto::encrypt;
 
-    // Step 1: Add encrypted columns to each table
-    conn.execute_batch(
-        "ALTER TABLE device_info ADD COLUMN device_info_encrypted BLOB;
-         ALTER TABLE version_vector ADD COLUMN vector_json_encrypted BLOB;
-         ALTER TABLE contact_sync_timestamps ADD COLUMN last_sync_at_encrypted BLOB;
-         ALTER TABLE pending_updates ADD COLUMN payload_encrypted BLOB;
-         ALTER TABLE retry_entries ADD COLUMN payload_encrypted BLOB;
-         ALTER TABLE device_sync_checkpoints ADD COLUMN items_json_encrypted BLOB;
-         ALTER TABLE recovery_responses ADD COLUMN response_encrypted BLOB;
-         ALTER TABLE deletion_state ADD COLUMN state_json_encrypted BLOB;
-         ALTER TABLE sync_checkpoints ADD COLUMN state_json_encrypted BLOB;",
-    )
-    .map_err(|e| StorageError::Migration(format!("Failed to add v15 encrypted columns: {}", e)))?;
+    // Step 1: Add encrypted columns to each table (idempotent — Tracker #54)
+    add_column_if_not_exists(conn, "device_info", "device_info_encrypted", "BLOB")?;
+    add_column_if_not_exists(conn, "version_vector", "vector_json_encrypted", "BLOB")?;
+    add_column_if_not_exists(conn, "contact_sync_timestamps", "last_sync_at_encrypted", "BLOB")?;
+    add_column_if_not_exists(conn, "pending_updates", "payload_encrypted", "BLOB")?;
+    add_column_if_not_exists(conn, "retry_entries", "payload_encrypted", "BLOB")?;
+    add_column_if_not_exists(conn, "device_sync_checkpoints", "items_json_encrypted", "BLOB")?;
+    add_column_if_not_exists(conn, "recovery_responses", "response_encrypted", "BLOB")?;
+    add_column_if_not_exists(conn, "deletion_state", "state_json_encrypted", "BLOB")?;
+    add_column_if_not_exists(conn, "sync_checkpoints", "state_json_encrypted", "BLOB")?;
 
     // Step 2: Encrypt existing data in device_info
     {
@@ -1165,15 +1211,12 @@ fn migrate_v16_encrypt_low_priority(
 ) -> Result<(), StorageError> {
     use crate::crypto::encrypt;
 
-    // Step 1: Add encrypted columns
-    conn.execute_batch(
-        "ALTER TABLE field_validations ADD COLUMN field_value_encrypted BLOB;
-         ALTER TABLE field_validations ADD COLUMN signature_encrypted BLOB;
-         ALTER TABLE ux_state ADD COLUMN aha_tracker_json_encrypted BLOB;
-         ALTER TABLE ux_state ADD COLUMN demo_contact_json_encrypted BLOB;
-         ALTER TABLE audit_log ADD COLUMN details_encrypted BLOB;",
-    )
-    .map_err(|e| StorageError::Migration(format!("Add v16 columns: {}", e)))?;
+    // Step 1: Add encrypted columns (idempotent — Tracker #54)
+    add_column_if_not_exists(conn, "field_validations", "field_value_encrypted", "BLOB")?;
+    add_column_if_not_exists(conn, "field_validations", "signature_encrypted", "BLOB")?;
+    add_column_if_not_exists(conn, "ux_state", "aha_tracker_json_encrypted", "BLOB")?;
+    add_column_if_not_exists(conn, "ux_state", "demo_contact_json_encrypted", "BLOB")?;
+    add_column_if_not_exists(conn, "audit_log", "details_encrypted", "BLOB")?;
 
     // Step 2: Encrypt existing field_validations data
     {
@@ -1284,9 +1327,8 @@ fn migrate_v18_encrypt_visibility_rules(
 ) -> Result<(), StorageError> {
     use crate::crypto::encrypt;
 
-    // 1. Add new encrypted column
-    conn.execute_batch("ALTER TABLE contacts ADD COLUMN visibility_rules_encrypted BLOB;")
-        .map_err(|e| StorageError::Migration(format!("Add column: {}", e)))?;
+    // 1. Add new encrypted column (idempotent — Tracker #54)
+    add_column_if_not_exists(conn, "contacts", "visibility_rules_encrypted", "BLOB")?;
 
     // 2. Read all contacts with plaintext visibility rules
     let mut stmt = conn

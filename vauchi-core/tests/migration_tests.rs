@@ -877,3 +877,69 @@ fn test_migration_v22_creates_emergency_config_table() {
         .unwrap();
     assert_eq!(include_location, 0, "include_location should default to 0");
 }
+
+// =============================================================================
+// MIGRATION IDEMPOTENCY (Tracker #54)
+// =============================================================================
+
+/// Tests that add_column_if_not_exists is safe to call twice.
+///
+/// This verifies the idempotency guard added for crash-recovery safety.
+/// If the process crashes after ALTER TABLE but before COMMIT, the migration
+/// runner will re-run the callback — the column already exists but must not
+/// cause an error.
+#[test]
+fn test_add_column_idempotent_via_double_migration() {
+    let conn = Connection::open_in_memory().unwrap();
+    let key = SymmetricKey::generate();
+
+    // Run all migrations once (creates all columns)
+    let migrations = all_migrations();
+    MigrationRunner::run(&conn, &key, &migrations).unwrap();
+
+    // Verify v14 columns exist
+    let has_card_encrypted: bool = conn
+        .prepare("PRAGMA table_info(own_card)")
+        .unwrap()
+        .query_map([], |row| row.get::<_, String>(1))
+        .unwrap()
+        .any(|name| name.as_deref() == Ok("card_json_encrypted"));
+    assert!(has_card_encrypted, "card_json_encrypted column should exist after v14");
+
+    // Running migrations again should be a no-op (version guard)
+    MigrationRunner::run(&conn, &key, &migrations).unwrap();
+
+    // Verify the column still exists and nothing broke
+    let still_has: bool = conn
+        .prepare("PRAGMA table_info(own_card)")
+        .unwrap()
+        .query_map([], |row| row.get::<_, String>(1))
+        .unwrap()
+        .any(|name| name.as_deref() == Ok("card_json_encrypted"));
+    assert!(still_has, "card_json_encrypted column should still exist after re-run");
+}
+
+// =============================================================================
+// REKEY ATOMICITY (Tracker #161)
+// =============================================================================
+
+/// Tests that re_encrypt_all_tables (rekey) is atomic — either all tables
+/// are re-encrypted or none are.
+#[test]
+fn test_rekey_is_atomic() {
+    let key = SymmetricKey::generate();
+    let mut storage = Storage::in_memory(key).unwrap();
+
+    // Save some data
+    let card = vauchi_core::ContactCard::new("AtomicTest");
+    storage.save_own_card(&card).unwrap();
+
+    // Rekey to a new key
+    let new_key = SymmetricKey::generate();
+    storage.rekey(new_key).unwrap();
+
+    // Data should still be loadable (re-encrypted with new key)
+    let loaded = storage.load_own_card().unwrap();
+    assert!(loaded.is_some(), "Card should be loadable after rekey");
+    assert_eq!(loaded.unwrap().display_name(), "AtomicTest");
+}

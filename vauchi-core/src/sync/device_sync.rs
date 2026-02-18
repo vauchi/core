@@ -160,6 +160,9 @@ pub enum DeviceSyncError {
 
     #[error("Decryption failed: {0}")]
     Decryption(String),
+
+    #[error("Send failed: {0}")]
+    SendFailed(String),
 }
 
 // ============================================================

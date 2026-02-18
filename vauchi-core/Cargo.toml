@@ -35,6 +35,9 @@ chacha20poly1305 = "0.10"
 # Argon2id password KDF (spec-mandated, documented exception to ring-only rule)
 argon2 = "0.5"
 
+# Async trait support for async sync pipeline
+async-trait = "0.1"
+
 # Compression for delta payloads
 flate2 = "1.0"
 
@@ -105,6 +108,8 @@ tokio-util = { version = "0.7", optional = true, features = ["io"] }
 [dev-dependencies]
 # Temporary directories for storage tests
 tempfile = "3.0"
+# Async runtime for async sync tests
+tokio = { version = "1.0", features = ["rt", "macros"] }
 # Property-based testing
 quickcheck = "1.0"
 quickcheck_macros = "1.0"

@@ -3001,6 +3001,23 @@ impl VauchiMobile {
     }
 }
 
+// Async sync method — runs sync in a background thread to prevent UI freeze.
+// Feature-gated behind `async-sync` (default) which pulls in tokio.
+#[cfg(feature = "async-sync")]
+#[uniffi::export(async_runtime = "tokio")]
+impl VauchiMobile {
+    /// Async version of sync that runs in a background thread.
+    ///
+    /// Use this from mobile UI threads to prevent freezing.
+    /// The blocking WebSocket sync is offloaded to a tokio blocking thread.
+    pub async fn sync_async(self: Arc<Self>) -> Result<MobileSyncResult, MobileError> {
+        let this = self.clone();
+        tokio::task::spawn_blocking(move || this.sync())
+            .await
+            .map_err(|e| MobileError::Internal(format!("Sync task panicked: {}", e)))?
+    }
+}
+
 // Internal implementation methods for content updates (feature-gated)
 #[cfg(feature = "content-updates")]
 impl VauchiMobile {

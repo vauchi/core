@@ -45,6 +45,7 @@ include:
       - '/ci-templates/release.yml'
       - '/ci-templates/downstream.yml'
       - '/ci-templates/reuse.yml'
+      - '/ci-templates/test-quality.yml'
 
 stages:
   - auto-tag

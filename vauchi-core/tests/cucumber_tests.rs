@@ -29,7 +29,10 @@ pub struct VauchiWorld {
     pub pending_label: Option<String>,
     pub pending_value: Option<String>,
     pub pending_display_name: Option<String>,
+    pub pending_password: Option<String>,
+    pub backup_data: Option<Vec<u8>>,
     pub last_result: Result<(), String>,
+    pub last_error_message: Option<String>,
 }
 
 impl std::fmt::Debug for VauchiWorld {
@@ -40,6 +43,7 @@ impl std::fmt::Debug for VauchiWorld {
             .field("pending_label", &self.pending_label)
             .field("pending_value", &self.pending_value)
             .field("last_result", &self.last_result)
+            .field("last_error_message", &self.last_error_message)
             .finish()
     }
 }
@@ -55,22 +59,26 @@ impl VauchiWorld {
             pending_label: None,
             pending_value: None,
             pending_display_name: None,
+            pending_password: None,
+            backup_data: None,
             last_result: Ok(()),
+            last_error_message: None,
         }
     }
 }
 
 fn main() {
-    // Run only the contact_card_management feature (first bound file).
-    // As more step definitions are added, expand to the full features/ directory.
-    let feature_file = concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/../../features/contact_card_management.feature"
-    );
+    // Run all feature files. Unbound steps show as "skipped" (exit 0).
+    // As more step definitions are added, more scenarios become green.
+    //
+    // To run a specific feature:
+    //   cargo test --test cucumber_tests -- --tags @contact-card
+    //   cargo test --test cucumber_tests -- --tags @identity
+    let features_dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../../features");
 
     futures::executor::block_on(
         VauchiWorld::cucumber()
             .with_default_cli()
-            .run(feature_file),
+            .run(features_dir),
     );
 }

@@ -42,6 +42,7 @@ stages:
   - auto-tag
   - lint
   - test
+  - mutation
   - security
   - build
   - package
@@ -161,6 +162,42 @@ test:mobile:
       - lcov-mobile.info
       - cobertura-mobile.xml
     expire_in: 1 week
+
+# ============================================================
+# Mutation Stage
+# ============================================================
+
+# Nightly full mutation testing (scheduled pipeline)
+mutation:nightly:
+  extends: [.linux-runner, .timeout-extended]
+  stage: mutation
+  needs: []
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+  script:
+    - cargo binstall cargo-mutants --no-confirm 2>/dev/null || cargo install cargo-mutants --locked || true
+    - cargo mutants -p vauchi-core --timeout 60 --output target/mutants
+  artifacts:
+    paths:
+      - target/mutants/
+    expire_in: 1 week
+
+# Per-MR incremental mutation testing (advisory)
+mutation:incremental:
+  extends: [.linux-runner, .timeout-extended]
+  stage: mutation
+  needs: []
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+  allow_failure: true
+  script:
+    - cargo binstall cargo-mutants --no-confirm 2>/dev/null || cargo install cargo-mutants --locked || true
+    - cargo mutants -p vauchi-core --in-diff "origin/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME" --timeout 60
+  artifacts:
+    paths:
+      - mutants.out/
+    expire_in: 1 week
+    when: always
 
 # ============================================================
 # Security Stage (MR only, change-based)

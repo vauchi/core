@@ -1,0 +1,12 @@
+# SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+# cargo-mutants configuration for vauchi-core
+# See: https://mutants.rs/configuration.html
+
+# Exclude test infrastructure, generated code, and benchmarks from mutation
+exclude_globs = ["tests/**", "benches/**", "fuzz/**"]
+
+# Allow 1.5x the normal test timeout per mutant
+timeout_multiplier = 1.5

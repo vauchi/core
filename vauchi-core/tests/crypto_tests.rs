@@ -254,7 +254,10 @@ fn test_nonce_bytes_have_entropy() {
         let ciphertext = encrypt(&key, plaintext).expect("Encryption should succeed");
 
         // Extract nonce: skip algorithm tag (1 byte), take 24 bytes
-        assert!(ciphertext.len() > 25, "Ciphertext too short to contain nonce");
+        assert!(
+            ciphertext.len() > 25,
+            "Ciphertext too short to contain nonce"
+        );
         let nonce = &ciphertext[1..25];
 
         // Nonce must not be all zeros (degenerate RNG)

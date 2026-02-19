@@ -151,10 +151,7 @@ fn test_concurrent_disjoint_devices() {
         a.is_concurrent_with(&b),
         "Disjoint device vectors should be concurrent"
     );
-    assert!(
-        b.is_concurrent_with(&a),
-        "Concurrency should be symmetric"
-    );
+    assert!(b.is_concurrent_with(&a), "Concurrency should be symmetric");
 }
 
 /// When one vector has strictly higher version for the only shared device,
@@ -204,10 +201,8 @@ fn test_conflict_resolution_equal_timestamp_device_id_tiebreaker() {
     let device_b_id = [0x99u8; 32]; // higher ID
 
     // Regardless of argument order, the higher device_id (0x99) should win
-    let resolved_ab =
-        SyncItem::resolve_conflict(&item_a, &item_b, &device_a_id, &device_b_id);
-    let resolved_ba =
-        SyncItem::resolve_conflict(&item_b, &item_a, &device_b_id, &device_a_id);
+    let resolved_ab = SyncItem::resolve_conflict(&item_a, &item_b, &device_a_id, &device_b_id);
+    let resolved_ba = SyncItem::resolve_conflict(&item_b, &item_a, &device_b_id, &device_a_id);
 
     match &resolved_ab {
         SyncItem::CardUpdated { new_value, .. } => {
@@ -490,10 +485,7 @@ fn test_checkpoint_overwrite() {
 /// Timestamps must be non-zero and not too far in the future.
 #[test]
 fn test_validate_timestamp_rejects_zero() {
-    assert!(
-        !validate_timestamp(0),
-        "Zero timestamp should be rejected"
-    );
+    assert!(!validate_timestamp(0), "Zero timestamp should be rejected");
 }
 
 #[test]
@@ -503,10 +495,7 @@ fn test_validate_timestamp_accepts_recent() {
         .unwrap()
         .as_secs();
 
-    assert!(
-        validate_timestamp(now),
-        "Current timestamp should be valid"
-    );
+    assert!(validate_timestamp(now), "Current timestamp should be valid");
     assert!(
         validate_timestamp(now - 3600),
         "Timestamp 1 hour ago should be valid"

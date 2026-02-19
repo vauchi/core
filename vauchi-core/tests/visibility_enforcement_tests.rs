@@ -136,7 +136,7 @@ fn test_contacts_variant_enforced_at_propagation() {
     let mut new_card = old_card.clone();
     let _ = new_card.add_field(email_field);
 
-    let queued = wb.propagate_card_update(&old_card, &new_card).unwrap();
+    let _queued = wb.propagate_card_update(&old_card, &new_card).unwrap();
 
     // Bob should get the update (default visibility = Everyone)
     let bob_pending = wb.storage().get_pending_updates(&bob_id).unwrap();
@@ -192,7 +192,7 @@ fn test_display_name_propagated_alongside_hidden_field() {
     let email_id = email_field.id().to_string();
 
     // Bob's visibility rules: email hidden (Nobody)
-    let bob_id = add_contact_with_ratchet_and_visibility(&wb, "Bob", |rules| {
+    let _bob_id = add_contact_with_ratchet_and_visibility(&wb, "Bob", |rules| {
         rules.set_nobody(&email_id);
     });
 

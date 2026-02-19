@@ -484,7 +484,8 @@ mod tests {
     #[test]
     fn test_forwarding_hints_backward_compatible_deserialization() {
         // Old format without signature fields
-        let json = r#"{"hints":[{"blob_id":"b1","relay_url":"wss://r.test","expires_at_secs":100}]}"#;
+        let json =
+            r#"{"hints":[{"blob_id":"b1","relay_url":"wss://r.test","expires_at_secs":100}]}"#;
         let decoded: ForwardingHints = serde_json::from_str(json).unwrap();
         assert_eq!(decoded.hints.len(), 1);
         assert!(decoded.relay_signing_key.is_none());

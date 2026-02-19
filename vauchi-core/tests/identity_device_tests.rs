@@ -383,11 +383,14 @@ fn test_broadcast_rejects_old_version() {
     // Broadcast version is 1 (initial), last accepted is 1 → should reject
     let result = broadcast.verify_with_freshness(
         &signing_key.public_key(),
-        1,     // last_accepted_version == broadcast.version()
+        1, // last_accepted_version == broadcast.version()
         now,
-        3600,  // 1 hour max age
+        3600, // 1 hour max age
     );
-    assert!(result.is_err(), "Should reject broadcast with version <= last accepted");
+    assert!(
+        result.is_err(),
+        "Should reject broadcast with version <= last accepted"
+    );
     assert!(result.unwrap_err().to_string().contains("version"));
 }
 
@@ -409,11 +412,15 @@ fn test_broadcast_accepts_fresh() {
     // Broadcast version is 1, last accepted is 0 → should accept
     let result = broadcast.verify_with_freshness(
         &signing_key.public_key(),
-        0,     // last_accepted_version < broadcast.version()
+        0, // last_accepted_version < broadcast.version()
         now,
-        3600,  // 1 hour max age
+        3600, // 1 hour max age
     );
-    assert!(result.is_ok(), "Should accept fresh broadcast: {:?}", result);
+    assert!(
+        result.is_ok(),
+        "Should accept fresh broadcast: {:?}",
+        result
+    );
 }
 
 /// Tests that verify_with_freshness rejects stale timestamps.
@@ -452,12 +459,7 @@ fn test_broadcast_rejects_future_timestamp() {
     let past = broadcast.timestamp().saturating_sub(120); // 2 minutes before broadcast
 
     // We pretend now is 2 minutes before the broadcast → future timestamp
-    let result = broadcast.verify_with_freshness(
-        &signing_key.public_key(),
-        0,
-        past,
-        3600,
-    );
+    let result = broadcast.verify_with_freshness(&signing_key.public_key(), 0, past, 3600);
     assert!(result.is_err(), "Should reject future broadcast");
     assert!(result.unwrap_err().to_string().contains("future"));
 }

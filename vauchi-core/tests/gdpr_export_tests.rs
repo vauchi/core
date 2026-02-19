@@ -68,8 +68,8 @@ fn test_export_excludes_private_keys() {
 
     // core-F-008: Parse JSON to verify structure, not just substring search.
     let json = serde_json::to_string(&export).unwrap();
-    let parsed: serde_json::Value = serde_json::from_str(&json)
-        .expect("Export should produce valid JSON");
+    let parsed: serde_json::Value =
+        serde_json::from_str(&json).expect("Export should produce valid JSON");
     assert!(parsed.is_object(), "Export should be a JSON object");
 
     // core-F-010: Check for ALL key-type patterns, not just 2.

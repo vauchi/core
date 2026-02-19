@@ -91,12 +91,12 @@ pub fn verify_hint_signature(
         ));
     }
 
-    let pk_bytes = hex::decode(relay_key_hex).map_err(|e| format!("invalid public key hex: {}", e))?;
+    let pk_bytes =
+        hex::decode(relay_key_hex).map_err(|e| format!("invalid public key hex: {}", e))?;
     let sig_bytes =
         hex::decode(signature_hex).map_err(|e| format!("invalid signature hex: {}", e))?;
 
-    let public_key =
-        ring::signature::UnparsedPublicKey::new(&ring::signature::ED25519, &pk_bytes);
+    let public_key = ring::signature::UnparsedPublicKey::new(&ring::signature::ED25519, &pk_bytes);
 
     let canonical = hints.canonical_data();
     public_key
@@ -185,19 +185,31 @@ mod tests {
                 version: PROTOCOL_VERSION,
                 message_id: "msg-1".to_string(),
                 timestamp: 100,
-                payload: MessagePayload::ForwardingHints(ForwardingHints { hints: vec![], relay_signing_key: None, signature: None }),
+                payload: MessagePayload::ForwardingHints(ForwardingHints {
+                    hints: vec![],
+                    relay_signing_key: None,
+                    signature: None,
+                }),
             },
             MessageEnvelope {
                 version: PROTOCOL_VERSION,
                 message_id: "msg-1".to_string(), // duplicate
                 timestamp: 200,
-                payload: MessagePayload::ForwardingHints(ForwardingHints { hints: vec![], relay_signing_key: None, signature: None }),
+                payload: MessagePayload::ForwardingHints(ForwardingHints {
+                    hints: vec![],
+                    relay_signing_key: None,
+                    signature: None,
+                }),
             },
             MessageEnvelope {
                 version: PROTOCOL_VERSION,
                 message_id: "msg-2".to_string(),
                 timestamp: 300,
-                payload: MessagePayload::ForwardingHints(ForwardingHints { hints: vec![], relay_signing_key: None, signature: None }),
+                payload: MessagePayload::ForwardingHints(ForwardingHints {
+                    hints: vec![],
+                    relay_signing_key: None,
+                    signature: None,
+                }),
             },
         ];
 
@@ -246,7 +258,11 @@ mod tests {
 
     #[test]
     fn test_empty_hints() {
-        let hints = ForwardingHints { hints: vec![], relay_signing_key: None, signature: None };
+        let hints = ForwardingHints {
+            hints: vec![],
+            relay_signing_key: None,
+            signature: None,
+        };
         let active = filter_expired_hints(&hints, 0);
         assert!(active.is_empty());
 
@@ -275,9 +291,11 @@ mod tests {
             version: PROTOCOL_VERSION,
             message_id: "test-fwd-1".to_string(),
             timestamp: 1700000000,
-            payload: MessagePayload::ForwardingHints(make_unsigned_hints(vec![
-                make_hint("blob-1", "wss://relay-a.test", 1000),
-            ])),
+            payload: MessagePayload::ForwardingHints(make_unsigned_hints(vec![make_hint(
+                "blob-1",
+                "wss://relay-a.test",
+                1000,
+            )])),
         };
 
         let json = serde_json::to_string(&envelope).unwrap();
@@ -296,9 +314,7 @@ mod tests {
 
     #[test]
     fn test_verify_unsigned_hints_returns_error() {
-        let hints = make_unsigned_hints(vec![
-            make_hint("blob-1", "wss://relay.test", 1000),
-        ]);
+        let hints = make_unsigned_hints(vec![make_hint("blob-1", "wss://relay.test", 1000)]);
         let result = verify_hint_signature(&hints, "deadbeef");
         assert_eq!(result, Err("unsigned".to_string()));
     }

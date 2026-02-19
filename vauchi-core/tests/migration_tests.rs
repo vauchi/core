@@ -904,7 +904,10 @@ fn test_add_column_idempotent_via_double_migration() {
         .query_map([], |row| row.get::<_, String>(1))
         .unwrap()
         .any(|name| name.as_deref() == Ok("card_json_encrypted"));
-    assert!(has_card_encrypted, "card_json_encrypted column should exist after v14");
+    assert!(
+        has_card_encrypted,
+        "card_json_encrypted column should exist after v14"
+    );
 
     // Running migrations again should be a no-op (version guard)
     MigrationRunner::run(&conn, &key, &migrations).unwrap();
@@ -916,7 +919,10 @@ fn test_add_column_idempotent_via_double_migration() {
         .query_map([], |row| row.get::<_, String>(1))
         .unwrap()
         .any(|name| name.as_deref() == Ok("card_json_encrypted"));
-    assert!(still_has, "card_json_encrypted column should still exist after re-run");
+    assert!(
+        still_has,
+        "card_json_encrypted column should still exist after re-run"
+    );
 }
 
 // =============================================================================

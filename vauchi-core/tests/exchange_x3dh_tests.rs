@@ -192,10 +192,8 @@ fn test_x3dh_forward_secrecy_different_sessions() {
     );
 
     // But both sessions must still allow agreement with Bob
-    let bob_secret1 =
-        X3DH::respond(&bob_keys, alice_keys.public_key(), &eph1).unwrap();
-    let bob_secret2 =
-        X3DH::respond(&bob_keys, alice_keys.public_key(), &eph2).unwrap();
+    let bob_secret1 = X3DH::respond(&bob_keys, alice_keys.public_key(), &eph1).unwrap();
+    let bob_secret2 = X3DH::respond(&bob_keys, alice_keys.public_key(), &eph2).unwrap();
 
     assert_eq!(
         secret1.as_bytes(),

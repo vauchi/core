@@ -240,13 +240,10 @@ fn test_storage_keyed_by_sek() {
 
     // Must either error or return None — never return the original data
     match loaded2 {
-        Err(_) => {} // decryption failure — correct
+        Err(_) => {}   // decryption failure — correct
         Ok(None) => {} // no data found — correct
         Ok(Some((data, _))) => {
-            assert_ne!(
-                data, backup_data,
-                "Wrong SEK must not produce correct data"
-            );
+            assert_ne!(data, backup_data, "Wrong SEK must not produce correct data");
         }
     }
 }

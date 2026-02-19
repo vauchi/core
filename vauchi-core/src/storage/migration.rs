@@ -850,7 +850,12 @@ fn migrate_v14_encrypt_high_priority(
     add_column_if_not_exists(conn, "device_registry", "registry_json_encrypted", "BLOB")?;
     add_column_if_not_exists(conn, "device_sync_state", "state_json_encrypted", "BLOB")?;
     add_column_if_not_exists(conn, "visibility_labels", "contacts_json_encrypted", "BLOB")?;
-    add_column_if_not_exists(conn, "visibility_labels", "visible_fields_json_encrypted", "BLOB")?;
+    add_column_if_not_exists(
+        conn,
+        "visibility_labels",
+        "visible_fields_json_encrypted",
+        "BLOB",
+    )?;
 
     // Step 2: Encrypt existing plaintext data in own_card
     {
@@ -975,10 +980,20 @@ fn migrate_v15_encrypt_medium_priority(
     // Step 1: Add encrypted columns to each table (idempotent — Tracker #54)
     add_column_if_not_exists(conn, "device_info", "device_info_encrypted", "BLOB")?;
     add_column_if_not_exists(conn, "version_vector", "vector_json_encrypted", "BLOB")?;
-    add_column_if_not_exists(conn, "contact_sync_timestamps", "last_sync_at_encrypted", "BLOB")?;
+    add_column_if_not_exists(
+        conn,
+        "contact_sync_timestamps",
+        "last_sync_at_encrypted",
+        "BLOB",
+    )?;
     add_column_if_not_exists(conn, "pending_updates", "payload_encrypted", "BLOB")?;
     add_column_if_not_exists(conn, "retry_entries", "payload_encrypted", "BLOB")?;
-    add_column_if_not_exists(conn, "device_sync_checkpoints", "items_json_encrypted", "BLOB")?;
+    add_column_if_not_exists(
+        conn,
+        "device_sync_checkpoints",
+        "items_json_encrypted",
+        "BLOB",
+    )?;
     add_column_if_not_exists(conn, "recovery_responses", "response_encrypted", "BLOB")?;
     add_column_if_not_exists(conn, "deletion_state", "state_json_encrypted", "BLOB")?;
     add_column_if_not_exists(conn, "sync_checkpoints", "state_json_encrypted", "BLOB")?;

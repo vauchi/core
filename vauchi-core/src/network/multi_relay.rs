@@ -311,11 +311,24 @@ impl RelayHealth {
         }
     }
 
-    /// Calculate cooldown based on failure count (exponential backoff)
+    /// Calculate cooldown with exponential backoff and jitter (#122).
+    ///
+    /// Returns a duration in `[max/2, max]` where `max = base * 2^(n-1)` capped
+    /// at `self.max_cooldown`. The half-range uniform jitter prevents thundering
+    /// herd when multiple clients reconnect after a relay outage.
     fn calculate_cooldown(&self, failure_count: u32) -> Duration {
         let multiplier = 2u64.saturating_pow(failure_count.saturating_sub(1));
-        let cooldown = self.base_cooldown.saturating_mul(multiplier as u32);
-        cooldown.min(self.max_cooldown)
+        let max_cooldown = self
+            .base_cooldown
+            .saturating_mul(multiplier as u32)
+            .min(self.max_cooldown);
+        let max_ms = max_cooldown.as_millis() as u64;
+        if max_ms == 0 {
+            return Duration::ZERO;
+        }
+        let half = max_ms / 2;
+        let jittered = half + (rand::Rng::gen_range(&mut rand::thread_rng(), 0..=half));
+        Duration::from_millis(jittered)
     }
 }
 
@@ -505,14 +518,28 @@ mod tests {
     }
 
     #[test]
-    fn test_exponential_backoff() {
+    fn test_exponential_backoff_with_jitter() {
         let health = RelayHealth::new();
 
-        let c1 = health.calculate_cooldown(1);
-        let c2 = health.calculate_cooldown(2);
-        let c3 = health.calculate_cooldown(3);
+        // Sample many cooldowns to verify statistical properties
+        let samples = 200;
+        let mut c1_total = 0u128;
+        let mut c3_total = 0u128;
+        for _ in 0..samples {
+            c1_total += health.calculate_cooldown(1).as_millis();
+            c3_total += health.calculate_cooldown(3).as_millis();
+        }
+        // Average cooldown at failure_count=3 should exceed failure_count=1
+        let avg1 = c1_total / samples as u128;
+        let avg3 = c3_total / samples as u128;
+        assert!(
+            avg3 > avg1,
+            "avg cooldown(3)={avg3}ms should exceed cooldown(1)={avg1}ms"
+        );
 
-        assert!(c2 > c1);
-        assert!(c3 > c2);
+        // Verify jitter: cooldown(1) should be in [base/2, base] = [2500, 5000]ms
+        let c = health.calculate_cooldown(1);
+        assert!(c.as_millis() >= 2500, "jitter floor: {c:?}");
+        assert!(c.as_millis() <= 5000, "jitter ceiling: {c:?}");
     }
 }

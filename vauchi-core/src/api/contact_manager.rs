@@ -521,7 +521,7 @@ mod tests {
     #[test]
     fn test_event_dispatch_on_add_contact() {
         let storage = create_test_storage();
-        let mut dispatcher = EventDispatcher::new();
+        let dispatcher = EventDispatcher::new();
         let event_count = Arc::new(AtomicUsize::new(0));
 
         let count = event_count.clone();

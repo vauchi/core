@@ -52,8 +52,7 @@ impl Storage {
         ) {
             Ok(stmt) => stmt,
             Err(rusqlite::Error::SqliteFailure(err, _))
-                if err.code == rusqlite::ffi::ErrorCode::Unknown
-                    || err.extended_code == 1 =>
+                if err.code == rusqlite::ffi::ErrorCode::Unknown || err.extended_code == 1 =>
             {
                 return Ok(Vec::new());
             }
@@ -108,8 +107,7 @@ impl Storage {
         ) {
             Ok(stmt) => stmt,
             Err(rusqlite::Error::SqliteFailure(err, _))
-                if err.code == rusqlite::ffi::ErrorCode::Unknown
-                    || err.extended_code == 1 =>
+                if err.code == rusqlite::ffi::ErrorCode::Unknown || err.extended_code == 1 =>
             {
                 return Ok(Vec::new());
             }

@@ -3,7 +3,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 //! GDPR Data Export
-#![allow(dead_code)]
 //!
 //! Provides full data export for GDPR compliance (right to data portability).
 

@@ -147,12 +147,9 @@ impl Storage {
     // === Recovery Settings Persistence (#77) ===
 
     /// Saves recovery settings to storage (encrypted).
-    pub fn save_recovery_settings(
-        &self,
-        settings: &RecoverySettings,
-    ) -> Result<(), StorageError> {
-        let json = serde_json::to_vec(settings)
-            .map_err(|e| StorageError::Serialization(e.to_string()))?;
+    pub fn save_recovery_settings(&self, settings: &RecoverySettings) -> Result<(), StorageError> {
+        let json =
+            serde_json::to_vec(settings).map_err(|e| StorageError::Serialization(e.to_string()))?;
         let encrypted = crate::crypto::encrypt(&self.encryption_key, &json)
             .map_err(|e| StorageError::Encryption(e.to_string()))?;
 

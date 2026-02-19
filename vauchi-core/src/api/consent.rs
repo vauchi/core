@@ -3,7 +3,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 //! Consent Management
-#![allow(dead_code)]
 //!
 //! Tracks user consent for data processing activities (GDPR Article 7).
 

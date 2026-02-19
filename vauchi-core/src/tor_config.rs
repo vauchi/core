@@ -273,8 +273,7 @@ mod tests {
 
     #[test]
     fn test_bridge_validation_rejects_invalid_port() {
-        let result =
-            TorConfig::enabled().with_bridges(vec!["obfs4 198.51.100.1:abc".to_string()]);
+        let result = TorConfig::enabled().with_bridges(vec!["obfs4 198.51.100.1:abc".to_string()]);
         assert!(result.is_err());
     }
 
@@ -288,8 +287,7 @@ mod tests {
 
     #[test]
     fn test_bridge_validation_accepts_plain_bridge() {
-        let result =
-            TorConfig::enabled().with_bridges(vec!["198.51.100.1:9001".to_string()]);
+        let result = TorConfig::enabled().with_bridges(vec!["198.51.100.1:9001".to_string()]);
         assert!(result.is_ok());
     }
 

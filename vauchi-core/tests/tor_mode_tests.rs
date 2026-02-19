@@ -290,7 +290,7 @@ fn test_tor_bridge_validation() {
     // Test bridge address format (obfs4)
     let config = TorConfig::enabled()
         .with_bridges(vec![
-            "obfs4 198.51.100.1:443 cert=ABC fingerprint=DEF".to_string(),
+            "obfs4 198.51.100.1:443 cert=ABC fingerprint=DEF".to_string()
         ])
         .unwrap();
 

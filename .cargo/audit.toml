@@ -12,7 +12,7 @@ ignore = [
     "RUSTSEC-2023-0071",
     # rustls-pemfile is unmaintained — transitive via tungstenite/rustls-native-certs.
     "RUSTSEC-2025-0134",
-    # bincode v1 is unmaintained — direct dependency, migrate to bincode v2 or bitcode.
+    # bincode v1 is unmaintained — transitive via uniffi_macros only, not a direct dependency.
     "RUSTSEC-2025-0141",
     # paste is unmaintained — transitive via uniffi.
     "RUSTSEC-2024-0436",

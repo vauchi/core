@@ -138,18 +138,32 @@ fn test_event_dispatcher_remove_handler() {
     assert_eq!(count_b.load(Ordering::SeqCst), 1);
 
     // Remove handler A
-    assert!(dispatcher.remove_handler(id_a), "Should find and remove handler A");
+    assert!(
+        dispatcher.remove_handler(id_a),
+        "Should find and remove handler A"
+    );
     assert_eq!(dispatcher.handler_count(), 1);
 
     // Only handler B fires now
     dispatcher.dispatch(VauchiEvent::ContactAdded {
         contact_id: "test2".into(),
     });
-    assert_eq!(count_a.load(Ordering::SeqCst), 1, "Handler A should not fire after removal");
-    assert_eq!(count_b.load(Ordering::SeqCst), 2, "Handler B should still fire");
+    assert_eq!(
+        count_a.load(Ordering::SeqCst),
+        1,
+        "Handler A should not fire after removal"
+    );
+    assert_eq!(
+        count_b.load(Ordering::SeqCst),
+        2,
+        "Handler B should still fire"
+    );
 
     // Removing unknown ID returns false
-    assert!(!dispatcher.remove_handler(999), "Unknown ID should return false");
+    assert!(
+        !dispatcher.remove_handler(999),
+        "Unknown ID should return false"
+    );
 }
 
 #[test]

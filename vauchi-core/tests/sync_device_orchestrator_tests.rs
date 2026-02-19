@@ -856,5 +856,9 @@ fn test_conflict_deletion_schedule_and_cancel_independent() {
     // Cancel deletion on another device (different conflict key)
     let cancel = SyncItem::DeletionCancelled { timestamp: 2000 };
     let applied = orchestrator.process_incoming(vec![cancel]).unwrap();
-    assert_eq!(applied.len(), 1, "Cancel uses a different key than schedule");
+    assert_eq!(
+        applied.len(),
+        1,
+        "Cancel uses a different key than schedule"
+    );
 }

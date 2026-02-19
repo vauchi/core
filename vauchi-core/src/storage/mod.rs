@@ -256,6 +256,7 @@ impl Storage {
     ///
     /// See [`rekey`] for details. The `progress` callback, if provided,
     /// is called after each table completes with `(completed, total, table_name)`.
+    #[allow(clippy::type_complexity)]
     pub fn rekey_with_progress(
         &mut self,
         new_key: SymmetricKey,

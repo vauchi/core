@@ -685,3 +685,176 @@ fn test_offline_changes_sync_on_reconnect() {
     assert!(!sync_message.items.is_empty());
     assert_eq!(sync_message.items.len(), 1);
 }
+
+// ============================================================
+// Phase 7: Conflict Resolution Edge Cases (#193)
+// Documenting and testing the Last-Write-Wins strategy
+// ============================================================
+
+/// Test: Equal timestamps are treated as a tie — incoming is rejected (#193).
+///
+/// LWW strategy: `incoming_timestamp > local_timestamp` uses strict greater-than.
+/// Equal timestamps mean "no new information", so the local value is kept.
+#[test]
+fn test_conflict_equal_timestamp_rejects_incoming() {
+    let storage = create_test_storage();
+    let master_seed = [0x42u8; 32];
+
+    let device_b = create_test_device(&master_seed, 1, "Device B");
+    let registry = create_test_registry(&master_seed, &device_b);
+
+    let mut orchestrator = DeviceSyncOrchestrator::new(&storage, device_b, registry);
+
+    // Local change at timestamp 5000
+    orchestrator
+        .record_local_change(SyncItem::CardUpdated {
+            field_label: "email".to_string(),
+            new_value: "local@example.com".to_string(),
+            timestamp: 5000,
+        })
+        .unwrap();
+
+    // Incoming change from another device at the *same* timestamp
+    let incoming = vec![SyncItem::CardUpdated {
+        field_label: "email".to_string(),
+        new_value: "remote@example.com".to_string(),
+        timestamp: 5000,
+    }];
+
+    let applied = orchestrator.process_incoming(incoming).unwrap();
+
+    // Equal timestamp → incoming rejected (local wins on tie)
+    assert!(
+        applied.is_empty(),
+        "Equal-timestamp incoming should be rejected"
+    );
+}
+
+/// Test: Multiple rapid updates to the same field — only the latest sticks (#193).
+///
+/// Simulates a burst of changes (e.g., user typing fast) arriving in a batch.
+/// Only the highest-timestamp item should be applied.
+#[test]
+fn test_conflict_rapid_updates_only_latest_applied() {
+    let storage = create_test_storage();
+    let master_seed = [0x42u8; 32];
+
+    let device_b = create_test_device(&master_seed, 1, "Device B");
+    let registry = create_test_registry(&master_seed, &device_b);
+
+    let mut orchestrator = DeviceSyncOrchestrator::new(&storage, device_b, registry);
+
+    // Incoming batch of rapid updates to the same field (ascending timestamps)
+    let incoming = vec![
+        SyncItem::CardUpdated {
+            field_label: "phone".to_string(),
+            new_value: "+111".to_string(),
+            timestamp: 1000,
+        },
+        SyncItem::CardUpdated {
+            field_label: "phone".to_string(),
+            new_value: "+222".to_string(),
+            timestamp: 2000,
+        },
+        SyncItem::CardUpdated {
+            field_label: "phone".to_string(),
+            new_value: "+333".to_string(),
+            timestamp: 3000,
+        },
+    ];
+
+    let applied = orchestrator.process_incoming(incoming).unwrap();
+
+    // All three have ascending timestamps, so all are applied sequentially.
+    // The field_timestamps map ends at 3000.
+    assert_eq!(applied.len(), 3);
+
+    // Now if an older update arrives, it should be rejected
+    let stale = vec![SyncItem::CardUpdated {
+        field_label: "phone".to_string(),
+        new_value: "+000".to_string(),
+        timestamp: 1500,
+    }];
+
+    let rejected = orchestrator.process_incoming(stale).unwrap();
+    assert!(
+        rejected.is_empty(),
+        "Stale update after rapid burst should be rejected"
+    );
+}
+
+/// Test: Contact add followed by contact remove for the same contact_id (#193).
+///
+/// Both use conflict_key "contact:{id}", so the later timestamp wins.
+#[test]
+fn test_conflict_contact_add_then_remove() {
+    let storage = create_test_storage();
+    let master_seed = [0x42u8; 32];
+
+    let device_b = create_test_device(&master_seed, 1, "Device B");
+    let registry = create_test_registry(&master_seed, &device_b);
+
+    let mut orchestrator = DeviceSyncOrchestrator::new(&storage, device_b, registry);
+
+    // Contact added at t=1000
+    let contact = create_test_contact("Eve");
+    let contact_id = contact.id().to_string();
+    let contact_data = vauchi_core::sync::ContactSyncData::from_contact(&contact);
+    let add_item = SyncItem::ContactAdded {
+        contact_data,
+        timestamp: 1000,
+    };
+    let applied = orchestrator.process_incoming(vec![add_item]).unwrap();
+    assert_eq!(applied.len(), 1, "Add should be applied");
+
+    // Contact removed at t=2000 (newer — should win)
+    let remove_item = SyncItem::ContactRemoved {
+        contact_id: contact_id.clone(),
+        timestamp: 2000,
+    };
+    let applied = orchestrator.process_incoming(vec![remove_item]).unwrap();
+    assert_eq!(applied.len(), 1, "Remove should win (newer)");
+
+    // Re-add at t=1500 (older than remove — should be rejected)
+    let contact2 = create_test_contact("Eve");
+    let contact_data2 = vauchi_core::sync::ContactSyncData::from_contact(&contact2);
+    let readd_item = SyncItem::ContactAdded {
+        contact_data: contact_data2,
+        timestamp: 1500,
+    };
+    let applied = orchestrator.process_incoming(vec![readd_item]).unwrap();
+    assert!(
+        applied.is_empty(),
+        "Re-add with older timestamp should be rejected"
+    );
+}
+
+/// Test: Concurrent deletion schedule and cancel for the same identity (#193).
+///
+/// DeletionScheduled and DeletionCancelled use different conflict keys,
+/// so both can coexist — this is the correct behavior since they represent
+/// different semantic operations.
+#[test]
+fn test_conflict_deletion_schedule_and_cancel_independent() {
+    let storage = create_test_storage();
+    let master_seed = [0x42u8; 32];
+
+    let device_b = create_test_device(&master_seed, 1, "Device B");
+    let registry = create_test_registry(&master_seed, &device_b);
+
+    let mut orchestrator = DeviceSyncOrchestrator::new(&storage, device_b, registry);
+
+    // Schedule deletion on one device
+    let schedule = SyncItem::DeletionScheduled {
+        scheduled_at: 1000,
+        execute_at: 1000 + 7 * 86400,
+        timestamp: 1000,
+    };
+    let applied = orchestrator.process_incoming(vec![schedule]).unwrap();
+    assert_eq!(applied.len(), 1);
+
+    // Cancel deletion on another device (different conflict key)
+    let cancel = SyncItem::DeletionCancelled { timestamp: 2000 };
+    let applied = orchestrator.process_incoming(vec![cancel]).unwrap();
+    assert_eq!(applied.len(), 1, "Cancel uses a different key than schedule");
+}

@@ -16,7 +16,8 @@
 use std::path::PathBuf;
 use std::sync::Once;
 use vauchi_core::i18n::{
-    get_available_locales, get_locale_info, get_string, get_string_with_args, Locale,
+    get_available_locales, get_locale_info, get_string, get_string_with_args,
+    load_locale_from_bytes, Locale,
 };
 
 /// Initialize i18n once for integration tests using the bundled locale files.
@@ -331,4 +332,81 @@ fn test_spanish_coverage() {
     let key = "welcome.title";
     let es = get_string(Locale::Spanish, key);
     assert!(!es.contains("Missing"), "Spanish translation should exist");
+}
+
+// ============================================================
+// Fallback & Cache Tests (#208)
+// ============================================================
+
+/// Test: Deterministic fallback — key present in English but absent in German (#208).
+///
+/// Uses `load_locale_from_bytes` to inject a controlled locale with known-missing keys.
+/// Verifies that `get_string` returns the English value when the German key is absent.
+#[test]
+fn test_deterministic_fallback_to_english() {
+    ensure_init();
+
+    // Load a minimal German locale that is missing the "test.fallback_only" key
+    let partial_de = r#"{"test.partial_key": "Teilweise"}"#;
+    load_locale_from_bytes("de", partial_de.as_bytes()).expect("Should load partial DE locale");
+
+    // English has the key (inject it)
+    let en_with_key = format!(
+        r#"{{"test.fallback_only": "English Fallback Value", "test.partial_key": "Partial Key"}}"#
+    );
+    load_locale_from_bytes("en", en_with_key.as_bytes()).expect("Should load EN locale");
+
+    // German lookup for missing key should fall back to English
+    let de_result = get_string(Locale::German, "test.fallback_only");
+    assert_eq!(
+        de_result, "English Fallback Value",
+        "German should fall back to English for missing key"
+    );
+
+    // German lookup for present key should return German value
+    let de_present = get_string(Locale::German, "test.partial_key");
+    assert_eq!(
+        de_present, "Teilweise",
+        "German should return own value when key exists"
+    );
+}
+
+/// Test: Cache reload via `load_locale_from_bytes` updates subsequent lookups (#208).
+///
+/// Verifies that calling `load_locale_from_bytes` a second time replaces the
+/// previous locale data and `get_string` reflects the new values.
+#[test]
+fn test_locale_cache_reload() {
+    ensure_init();
+
+    // Load initial French data with a specific value
+    let fr_v1 = r#"{"test.reload_key": "Version Un"}"#;
+    load_locale_from_bytes("fr", fr_v1.as_bytes()).expect("Should load FR v1");
+
+    let v1_result = get_string(Locale::French, "test.reload_key");
+    assert_eq!(v1_result, "Version Un");
+
+    // Reload French with updated value (simulates locale file update)
+    let fr_v2 = r#"{"test.reload_key": "Version Deux"}"#;
+    load_locale_from_bytes("fr", fr_v2.as_bytes()).expect("Should load FR v2");
+
+    let v2_result = get_string(Locale::French, "test.reload_key");
+    assert_eq!(
+        v2_result, "Version Deux",
+        "Cache should reflect reloaded locale data"
+    );
+}
+
+/// Test: Missing key returns "Missing:" prefix even after cache operations (#208).
+#[test]
+fn test_missing_key_after_cache_operations() {
+    ensure_init();
+
+    // After various load operations, a truly nonexistent key should still return "Missing:"
+    let result = get_string(Locale::English, "test.absolutely_nonexistent_key_12345");
+    assert!(
+        result.starts_with("Missing:"),
+        "Nonexistent key should return Missing prefix, got: {}",
+        result
+    );
 }

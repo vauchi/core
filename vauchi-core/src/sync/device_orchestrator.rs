@@ -335,10 +335,20 @@ impl<'a> DeviceSyncOrchestrator<'a> {
 
     /// Processes incoming sync items from another device.
     ///
-    /// Uses last-write-wins conflict resolution:
-    /// - If incoming item has a newer timestamp than local, apply it
-    /// - If incoming item has an older timestamp, reject it
-    /// - Different fields/items don't conflict
+    /// ## Conflict Resolution Strategy: Last-Write-Wins (LWW) (#193)
+    ///
+    /// Each sync item carries a Unix millisecond timestamp set by the originating device.
+    /// Conflict is determined by the `conflict_key()` function, which maps items to a
+    /// namespace:id string (e.g., `"field:email"`, `"contact:abc123"`).
+    ///
+    /// Rules:
+    /// - **Newer wins:** If incoming timestamp > local timestamp for the same key, apply it.
+    /// - **Tie → local wins:** If timestamps are equal, the incoming item is rejected.
+    ///   This avoids unnecessary churn when both devices produce identical timestamps.
+    /// - **Independent fields coexist:** Items with different conflict keys never conflict.
+    ///   E.g., updating email and phone simultaneously on two devices both succeed.
+    /// - **Cross-type conflicts:** ContactAdded and ContactRemoved share the same
+    ///   `"contact:{id}"` key, so a remove-after-add with a newer timestamp wins.
     ///
     /// Returns the list of items that were applied.
     pub fn process_incoming(

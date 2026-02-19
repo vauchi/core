@@ -80,6 +80,15 @@ impl MigrationRunner {
 
         let current_version = Self::current_version(conn)?;
 
+        // Reject databases created by a newer app version (downgrade prevention)
+        let latest_migration = migrations.iter().map(|m| m.version).max().unwrap_or(0);
+        if current_version > latest_migration {
+            return Err(StorageError::Migration(format!(
+                "Database schema v{} is newer than this app (max v{}). Please upgrade the app.",
+                current_version, latest_migration
+            )));
+        }
+
         // Collect pending migrations
         let pending: Vec<&Migration> = migrations
             .iter()

@@ -7,21 +7,12 @@
 //! Tests that grant_consent(), revoke_consent(), check_consent(), and
 //! export_consent_log() are properly delegated from Vauchi to ConsentManager.
 //!
-//! Note: The consent storage uses second-precision timestamps for ordering.
-//! Tests that rely on grant→revoke ordering must sleep between operations
-//! to ensure distinct timestamps.
+//! The consent storage uses second-precision timestamps with rowid tiebreaker
+//! for ordering, so tests don't need sleeps between operations.
 
 use vauchi_core::api::{ConsentRecord, ConsentType};
 use vauchi_core::network::MockTransport;
 use vauchi_core::Vauchi;
-
-use std::thread::sleep;
-use std::time::Duration;
-
-/// Sleep just over 1 second so consent timestamps differ.
-fn tick() {
-    sleep(Duration::from_millis(1100));
-}
 
 fn create_test_vauchi() -> Vauchi<MockTransport> {
     let mut wb = Vauchi::in_memory().unwrap();
@@ -49,11 +40,10 @@ fn test_consent_grant_and_check() {
 fn test_consent_revoke() {
     let wb = create_test_vauchi();
 
-    // Grant then revoke (with tick to ensure different timestamps)
+    // Grant then revoke
     wb.grant_consent(ConsentType::ContactSharing).unwrap();
     assert!(wb.check_consent(&ConsentType::ContactSharing).unwrap());
 
-    tick();
     wb.revoke_consent(ConsentType::ContactSharing).unwrap();
     assert!(
         !wb.check_consent(&ConsentType::ContactSharing).unwrap(),
@@ -69,7 +59,7 @@ fn test_consent_multiple_types_independent() {
     wb.grant_consent(ConsentType::DataProcessing).unwrap();
 
     // Revoking one doesn't affect the other
-    tick();
+
     wb.revoke_consent(ConsentType::Analytics).unwrap();
 
     assert!(
@@ -93,7 +83,7 @@ fn test_consent_export_log() {
     // Grant and revoke some consents
     wb.grant_consent(ConsentType::Analytics).unwrap();
     wb.grant_consent(ConsentType::ContactSharing).unwrap();
-    tick();
+
     wb.revoke_consent(ConsentType::Analytics).unwrap();
 
     // Log should have 3 entries

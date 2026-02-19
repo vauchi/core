@@ -354,15 +354,13 @@ fn test_ux_state_encrypted_in_db() {
 
 #[test]
 fn test_audit_log_roundtrip() {
+    // allow(zero_assertions): Write-only interface — no read-back API to assert against
     let (_dir, storage) = open_storage();
 
     storage
         .log_audit_event("test_event", Some("detailed info here"))
         .unwrap();
     storage.log_audit_event("another_event", None).unwrap();
-
-    // Audit log doesn't have a read-back API in the original code.
-    // The test verifies that logging with encryption doesn't crash.
 }
 
 #[test]

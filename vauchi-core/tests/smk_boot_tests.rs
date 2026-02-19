@@ -168,6 +168,7 @@ fn test_migrate_smk_stored_before_rekey_for_safety() {
 
 #[test]
 fn test_after_migration_old_key_cannot_decrypt() {
+    // allow(zero_assertions): Assertion via panic!() in match arm below
     let old_key = SymmetricKey::generate();
     let dir = tempfile::tempdir().unwrap();
     let db_path = dir.path().join("vauchi.db");

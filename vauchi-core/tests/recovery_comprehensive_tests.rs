@@ -341,27 +341,17 @@ fn test_reject_invalid_signature() {
     let old_pk = [0x01u8; 32];
     let new_pk = [0x02u8; 32];
 
-    let _proof = RecoveryProof::new(&old_pk, &new_pk, 3);
     let voucher_keypair = SigningKeyPair::generate();
 
+    // Create a valid voucher, then tamper with it to invalidate the signature
     let mut voucher = vauchi_core::RecoveryVoucher::create(&old_pk, &new_pk, &voucher_keypair);
+    voucher.set_new_pk_for_testing(&[0x88u8; 32]);
 
-    // Tamper with the voucher
-    voucher.set_new_pk_for_testing(&[0x99u8; 32]);
-
-    // Manually fix the new_pk back but signature is now invalid
-    voucher.set_new_pk_for_testing(&new_pk);
-
-    // Actually, the tampering changed the data, so verify should fail
-    // Let's just create an invalid voucher scenario differently
-    // Create voucher, then tamper
-    let mut voucher = vauchi_core::RecoveryVoucher::create(&old_pk, &new_pk, &voucher_keypair);
-    let tampered = [0x88u8; 32];
-    voucher.set_new_pk_for_testing(&tampered);
-
-    // Reset to correct new_pk (signature is still for tampered)
-    // Actually this won't work as expected. Let's test a different way.
-    // The voucher.verify() checks signature, so add_voucher will catch it
+    // Tampered voucher should fail verification
+    assert!(
+        !voucher.verify(),
+        "Tampered voucher should fail signature verification"
+    );
 }
 
 /// Scenario: Self-vouching rejected in proof

@@ -259,19 +259,17 @@ fn test_malformed_urls() {
 /// Test: Unicode in URLs
 #[test]
 fn test_unicode_urls() {
-    // International domain names should work
+    // allow(zero_assertions): No-panic boundary test — validates exotic input doesn't crash
     let result = is_safe_url("https://例え.jp".to_string());
-    // May or may not be safe depending on URL parsing
-    // Main thing is it shouldn't crash
     let _ = result;
 }
 
 /// Test: Very long URL
 #[test]
 fn test_long_url() {
+    // allow(zero_assertions): No-panic boundary test — validates long input doesn't crash
     let long_path = "a".repeat(10000);
     let url = format!("https://example.com/{}", long_path);
-    // Should not crash
     let _ = is_safe_url(url);
 }
 

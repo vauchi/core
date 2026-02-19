@@ -103,10 +103,10 @@ fn test_consent_upsert_overwrites() {
 
 #[test]
 fn test_audit_log() {
+    // allow(zero_assertions): Write-only interface — no read-back API to assert against
     let storage = test_storage();
     storage
         .log_audit_event("data_export", Some("GDPR export triggered"))
         .unwrap();
     storage.log_audit_event("consent_change", None).unwrap();
-    // Just confirm no errors — audit log is write-only from this interface
 }

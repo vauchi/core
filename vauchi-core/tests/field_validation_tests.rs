@@ -678,9 +678,9 @@ fn test_email_domain_part_length() {
 
 #[test]
 fn test_email_internationalized_domain() {
+    // allow(zero_assertions): IDN support is implementation-dependent — testing no-panic only
     use vauchi_core::contact_card::{ContactField, FieldType};
 
-    // IDN (Internationalized Domain Names)
     let idn_emails = vec![
         "user@例え.jp",    // Japanese
         "user@münchen.de", // German umlaut
@@ -690,8 +690,6 @@ fn test_email_internationalized_domain() {
     for email in idn_emails {
         let field = ContactField::new(FieldType::Email, "Work", email);
         let result = field.validate();
-        // Current implementation may or may not support IDN
-        // Just exercising the code path
         let _ = result;
     }
 }

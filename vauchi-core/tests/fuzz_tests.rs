@@ -35,7 +35,7 @@ proptest! {
     /// Random bytes should not cause panics when deserializing ContactCard
     #[test]
     fn fuzz_contact_card_deserialize_no_panic(data in arbitrary_json_string()) {
-        // This should either succeed or return an error, never panic
+        // allow(zero_assertions): No-panic fuzz test — validates input doesn't crash the parser
         let _ = serde_json::from_str::<vauchi_core::ContactCard>(&data);
     }
 
@@ -85,12 +85,14 @@ proptest! {
     /// Random bytes should not cause panics when deserializing ContactField
     #[test]
     fn fuzz_contact_field_deserialize_no_panic(data in arbitrary_json_string()) {
+        // allow(zero_assertions): No-panic fuzz test
         let _ = serde_json::from_str::<vauchi_core::ContactField>(&data);
     }
 
     /// Random bytes should not cause panics when deserializing FieldType
     #[test]
     fn fuzz_field_type_deserialize_no_panic(data in arbitrary_json_string()) {
+        // allow(zero_assertions): No-panic fuzz test
         let _ = serde_json::from_str::<vauchi_core::FieldType>(&data);
     }
 }
@@ -105,12 +107,14 @@ proptest! {
     /// Random bytes should not cause panics when deserializing SyncItem
     #[test]
     fn fuzz_sync_item_deserialize_no_panic(data in arbitrary_json_string()) {
+        // allow(zero_assertions): No-panic fuzz test
         let _ = serde_json::from_str::<vauchi_core::sync::SyncItem>(&data);
     }
 
     /// Random bytes should not cause panics when deserializing FieldChange
     #[test]
     fn fuzz_field_change_deserialize_no_panic(data in arbitrary_json_string()) {
+        // allow(zero_assertions): No-panic fuzz test
         let _ = serde_json::from_str::<vauchi_core::sync::FieldChange>(&data);
     }
 }
@@ -125,6 +129,7 @@ proptest! {
     /// Random bytes should not cause panics when deserializing RatchetMessage
     #[test]
     fn fuzz_ratchet_message_deserialize_no_panic(data in arbitrary_json_string()) {
+        // allow(zero_assertions): No-panic fuzz test
         let _ = serde_json::from_str::<vauchi_core::crypto::ratchet::RatchetMessage>(&data);
     }
 
@@ -168,12 +173,14 @@ proptest! {
     /// Random bytes should not cause panics when deserializing FieldVisibility
     #[test]
     fn fuzz_field_visibility_deserialize_no_panic(data in arbitrary_json_string()) {
+        // allow(zero_assertions): No-panic fuzz test
         let _ = serde_json::from_str::<vauchi_core::FieldVisibility>(&data);
     }
 
     /// Random bytes should not cause panics when deserializing VisibilityRules
     #[test]
     fn fuzz_visibility_rules_deserialize_no_panic(data in arbitrary_json_string()) {
+        // allow(zero_assertions): No-panic fuzz test
         let _ = serde_json::from_str::<vauchi_core::VisibilityRules>(&data);
     }
 
@@ -220,6 +227,7 @@ proptest! {
     /// Random bytes should not cause panics when deserializing RegisteredDevice
     #[test]
     fn fuzz_registered_device_deserialize_no_panic(data in arbitrary_json_string()) {
+        // allow(zero_assertions): No-panic fuzz test
         let _ = serde_json::from_str::<vauchi_core::identity::RegisteredDevice>(&data);
     }
 }
@@ -234,6 +242,7 @@ proptest! {
     /// Random bytes should not cause panics when deserializing SocialNetwork
     #[test]
     fn fuzz_social_network_deserialize_no_panic(data in arbitrary_json_string()) {
+        // allow(zero_assertions): No-panic fuzz test
         let _ = serde_json::from_str::<vauchi_core::SocialNetwork>(&data);
     }
 
@@ -282,14 +291,13 @@ proptest! {
     /// Decryption of garbage should fail gracefully, not panic
     #[test]
     fn fuzz_decryption_garbage(data in arbitrary_bytes(100)) {
+        // allow(zero_assertions): No-panic fuzz test — validates garbage input doesn't crash
         use vauchi_core::crypto::{decrypt, SymmetricKey};
 
         let key = SymmetricKey::generate();
 
         // Decrypting garbage should return an error, not panic
         let result = decrypt(&key, &data);
-        // Either it fails (expected) or succeeds (unlikely but possible)
-        // The important thing is it doesn't panic
         let _ = result;
     }
 
@@ -355,10 +363,10 @@ proptest! {
     /// Key generation should always produce valid keys
     #[test]
     fn fuzz_key_generation_consistency(_seed in any::<u64>()) {
+        // allow(zero_assertions): No-panic fuzz test — validates key generation never crashes
         use vauchi_core::crypto::{SigningKeyPair, SymmetricKey};
         use vauchi_core::exchange::X3DHKeyPair;
 
-        // Generate various keys - should never panic
         let _sym = SymmetricKey::generate();
         let _signing = SigningKeyPair::generate();
         let _x3dh = X3DHKeyPair::generate();

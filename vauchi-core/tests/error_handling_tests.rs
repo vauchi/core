@@ -355,8 +355,8 @@ fn test_mark_nonexistent_update_delivered() {
     let sync_manager = SyncManager::new(&storage);
 
     let result = sync_manager.mark_delivered("nonexistent-update-id");
-    // Should not panic, behavior depends on implementation
-    let _ = result;
+    // Should handle gracefully — not panic
+    assert!(result.is_ok(), "Marking nonexistent update should not error");
 }
 
 // =============================================================================
@@ -429,6 +429,7 @@ fn test_visibility_on_nonexistent_field() {
         .visibility_rules_mut()
         .set_nobody("nonexistent-field-id");
 
-    // Save should succeed
-    wb.storage().save_contact(&contact).unwrap();
+    // Save should succeed even with visibility set on nonexistent field
+    let result = wb.storage().save_contact(&contact);
+    assert!(result.is_ok(), "Save should succeed with visibility on nonexistent field");
 }

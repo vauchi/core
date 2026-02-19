@@ -202,13 +202,10 @@ fn test_field_with_various_unicode() {
 /// Test: Empty string handling
 #[test]
 fn test_empty_string_field_value() {
+    // allow(zero_assertions): Both Ok and Err are valid — testing no-panic only
     let mut card = ContactCard::new("Test");
-
-    // Empty value should be allowed (or rejected depending on implementation)
     let result = card.add_field(ContactField::new(FieldType::Custom, "empty", ""));
-
-    // Document the behavior
-    let _ = result; // Either ok or error is acceptable
+    let _ = result;
 }
 
 // =============================================================================

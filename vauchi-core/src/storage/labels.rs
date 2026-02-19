@@ -169,7 +169,8 @@ impl Storage {
         Ok(labels)
     }
 
-    /// Decrypts an encrypted blob, falling back to plaintext if unavailable.
+    /// Decrypts an encrypted blob, falling back to plaintext only for
+    /// pre-migration data (#156).
     fn decrypt_or_fallback(
         &self,
         encrypted: Option<&[u8]>,
@@ -182,6 +183,15 @@ impl Storage {
                 return String::from_utf8(decrypted)
                     .map_err(|e| StorageError::Serialization(e.to_string()));
             }
+        }
+        // Plaintext fallback is only valid for pre-migration data where
+        // the plaintext columns contained real data. Post-migration, plaintext
+        // is always '[]'. Return an error if the fallback itself is empty/default
+        // so callers don't silently lose data.
+        if plaintext_fallback == "[]" {
+            return Err(StorageError::Encryption(
+                "encrypted column is empty and plaintext fallback contains no data".to_string(),
+            ));
         }
         Ok(plaintext_fallback.to_string())
     }

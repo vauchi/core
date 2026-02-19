@@ -58,7 +58,7 @@ fn test_sync_no_changes() {
 #[test]
 fn test_sync_queue_visibility_change() {
     let storage = create_test_storage();
-    let mut manager = SyncManager::new(&storage);
+    let manager = SyncManager::new(&storage);
 
     let update_id = manager
         .queue_visibility_change("contact-1", vec!["email".to_string(), "phone".to_string()])
@@ -168,7 +168,7 @@ fn test_sync_state_pending() {
 #[test]
 fn test_sync_state_synced() {
     let storage = create_test_storage();
-    let mut manager = SyncManager::new(&storage);
+    let manager = SyncManager::new(&storage);
 
     let state = manager.get_sync_state("contact-1").unwrap();
     assert!(matches!(state, SyncState::Synced { .. }));

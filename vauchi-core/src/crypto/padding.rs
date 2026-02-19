@@ -101,7 +101,7 @@ pub fn is_valid_bucket_size(len: usize) -> bool {
         || len == BUCKET_MEDIUM_SMALL
         || len == BUCKET_MEDIUM
         || len == BUCKET_LARGE
-        || (len > BUCKET_LARGE && len % OVERFLOW_ALIGNMENT == 0)
+        || (len > BUCKET_LARGE && len.is_multiple_of(OVERFLOW_ALIGNMENT))
 }
 
 /// Selects the smallest bucket that fits the given size.

@@ -199,11 +199,7 @@ impl Storage {
     /// HMAC-SHA256(hmac_key, data). This allows equality lookups on encrypted
     /// data without decryption (e.g., label name uniqueness checks).
     pub(crate) fn compute_lookup_hmac(&self, domain: &[u8], data: &[u8]) -> Vec<u8> {
-        let hmac_key_bytes = HKDF::derive_key(
-            None,
-            self.encryption_key.as_bytes(),
-            domain,
-        );
+        let hmac_key_bytes = HKDF::derive_key(None, self.encryption_key.as_bytes(), domain);
         let key = hmac::Key::new(hmac::HMAC_SHA256, &hmac_key_bytes);
         hmac::sign(&key, data).as_ref().to_vec()
     }
@@ -473,14 +469,18 @@ impl Storage {
                     .prepare("SELECT id, contacts_json_encrypted, visible_fields_json_encrypted, name_encrypted FROM visibility_labels WHERE contacts_json_encrypted IS NOT NULL")
                     .map_err(|e| StorageError::Migration(format!("Read labels: {}", e)))?;
 
+                #[allow(clippy::type_complexity)]
                 let rows: Vec<(String, Vec<u8>, Option<Vec<u8>>, Option<Vec<u8>>)> = stmt
-                    .query_map([], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)))
+                    .query_map([], |row| {
+                        Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?))
+                    })
                     .map_err(|e| StorageError::Migration(format!("Query labels: {}", e)))?
                     .collect::<Result<Vec<_>, _>>()
                     .map_err(|e| StorageError::Migration(format!("Collect labels: {}", e)))?;
 
                 // Derive HMAC keys for old and new SEK
-                let new_hmac_key_bytes = HKDF::derive_key(None, new_key.as_bytes(), b"Vauchi_Label_Name_HMAC_v1");
+                let new_hmac_key_bytes =
+                    HKDF::derive_key(None, new_key.as_bytes(), b"Vauchi_Label_Name_HMAC_v1");
                 let new_hmac_key = hmac::Key::new(hmac::HMAC_SHA256, &new_hmac_key_bytes);
 
                 for (id, contacts_enc, fields_enc, name_enc) in &rows {

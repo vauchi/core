@@ -569,7 +569,7 @@ fn secure_overwrite_file(path: &Path) -> Result<(), std::io::Error> {
     let rng = ring::rand::SystemRandom::new();
     let mut random = vec![0u8; size];
     rng.fill(&mut random)
-        .map_err(|_| std::io::Error::new(std::io::ErrorKind::Other, "RNG fill failed"))?;
+        .map_err(|_| std::io::Error::other("RNG fill failed"))?;
     file.write_all(&random)?;
     file.sync_all()?;
 

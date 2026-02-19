@@ -352,7 +352,7 @@ fn test_cannot_add_duplicate_contact() {
 #[test]
 fn test_mark_nonexistent_update_delivered() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
-    let mut sync_manager = SyncManager::new(&storage);
+    let sync_manager = SyncManager::new(&storage);
 
     let result = sync_manager.mark_delivered("nonexistent-update-id");
     // Should not panic, behavior depends on implementation

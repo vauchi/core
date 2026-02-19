@@ -40,7 +40,8 @@ fn field_value_strategy() -> impl Strategy<Value = String> {
 /// Strategy for generating 32-byte arrays (keys, IDs).
 /// Filters out all-zeros since SymmetricKey::from_bytes rejects degenerate keys.
 fn bytes32_strategy() -> impl Strategy<Value = [u8; 32]> {
-    prop::array::uniform32(any::<u8>()).prop_filter("all-zeros rejected", |b| b.iter().any(|&x| x != 0))
+    prop::array::uniform32(any::<u8>())
+        .prop_filter("all-zeros rejected", |b| b.iter().any(|&x| x != 0))
 }
 
 /// Strategy for generating timestamps

@@ -335,10 +335,7 @@ fn test_ratchet_deserialize_rejects_future_version() {
     let mut serialized = alice.serialize();
     serialized.version = 255; // Far future version
     let result = DoubleRatchetState::deserialize(serialized);
-    assert!(
-        result.is_err(),
-        "Should reject unsupported future version"
-    );
+    assert!(result.is_err(), "Should reject unsupported future version");
 }
 
 /// SP-9 #236: Deserialize accepts version 1 (current) and version 0 (legacy default).

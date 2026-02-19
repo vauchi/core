@@ -10,11 +10,12 @@
 //!
 //! ## Bucket Sizes
 //!
-//! | Bucket | Size  | Typical Content |
-//! |--------|-------|-----------------|
-//! | Small  | 256 B | ACK, presence, revocation |
-//! | Medium | 1 KB  | Card deltas, small updates |
-//! | Large  | 4 KB  | Media references, large payloads |
+//! | Bucket       | Size  | Typical Content |
+//! |--------------|-------|-----------------|
+//! | Small        | 256 B | ACK, presence, revocation |
+//! | Medium-Small | 512 B | Visibility changes, device sync ACKs (#169) |
+//! | Medium       | 1 KB  | Card deltas, small updates |
+//! | Large        | 4 KB  | Media references, large payloads |
 //!
 //! Messages larger than the large bucket are rounded up to the next
 //! 256-byte boundary.
@@ -32,6 +33,7 @@ use ring::rand::{SecureRandom, SystemRandom};
 
 /// Bucket sizes in bytes (including the 4-byte length prefix).
 const BUCKET_SMALL: usize = 256;
+const BUCKET_MEDIUM_SMALL: usize = 512; // #169: close gap between small and medium
 const BUCKET_MEDIUM: usize = 1024;
 const BUCKET_LARGE: usize = 4096;
 
@@ -96,6 +98,7 @@ pub fn unpad(padded: &[u8]) -> Option<Vec<u8>> {
 /// An unexpected size may indicate tampering or a protocol mismatch.
 pub fn is_valid_bucket_size(len: usize) -> bool {
     len == BUCKET_SMALL
+        || len == BUCKET_MEDIUM_SMALL
         || len == BUCKET_MEDIUM
         || len == BUCKET_LARGE
         || (len > BUCKET_LARGE && len % OVERFLOW_ALIGNMENT == 0)
@@ -105,6 +108,8 @@ pub fn is_valid_bucket_size(len: usize) -> bool {
 fn select_bucket(size: usize) -> usize {
     if size <= BUCKET_SMALL {
         BUCKET_SMALL
+    } else if size <= BUCKET_MEDIUM_SMALL {
+        BUCKET_MEDIUM_SMALL
     } else if size <= BUCKET_MEDIUM {
         BUCKET_MEDIUM
     } else if size <= BUCKET_LARGE {
@@ -129,8 +134,17 @@ mod tests {
     }
 
     #[test]
+    fn test_pad_unpad_roundtrip_medium_small() {
+        let plaintext = vec![0xAB; 300]; // Exceeds small, fits medium-small
+        let padded = pad(&plaintext);
+        assert_eq!(padded.len(), BUCKET_MEDIUM_SMALL);
+        let recovered = unpad(&padded).unwrap();
+        assert_eq!(recovered, plaintext);
+    }
+
+    #[test]
     fn test_pad_unpad_roundtrip_medium() {
-        let plaintext = vec![0xAB; 300]; // Exceeds small bucket
+        let plaintext = vec![0xAB; 600]; // Exceeds medium-small, fits medium
         let padded = pad(&plaintext);
         assert_eq!(padded.len(), BUCKET_MEDIUM);
         let recovered = unpad(&padded).unwrap();
@@ -185,10 +199,10 @@ mod tests {
 
     #[test]
     fn test_pad_one_byte_over_bucket() {
-        // One byte over small bucket boundary -> medium
+        // One byte over small bucket boundary -> medium-small
         let plaintext = vec![0x42; BUCKET_SMALL - LENGTH_PREFIX_SIZE + 1];
         let padded = pad(&plaintext);
-        assert_eq!(padded.len(), BUCKET_MEDIUM);
+        assert_eq!(padded.len(), BUCKET_MEDIUM_SMALL);
         let recovered = unpad(&padded).unwrap();
         assert_eq!(recovered, plaintext);
     }
@@ -214,7 +228,13 @@ mod tests {
             let plaintext = vec![0u8; size];
             assert_eq!(pad(&plaintext).len(), BUCKET_SMALL, "size={}", size);
         }
-        for size in 253..=1020 {
+        // 253..=508: medium-small (512 - 4 = 508 max plaintext)
+        for size in 253..=508 {
+            let plaintext = vec![0u8; size];
+            assert_eq!(pad(&plaintext).len(), BUCKET_MEDIUM_SMALL, "size={}", size);
+        }
+        // 509..=1020: medium (1024 - 4 = 1020 max plaintext)
+        for size in 509..=1020 {
             let plaintext = vec![0u8; size];
             assert_eq!(pad(&plaintext).len(), BUCKET_MEDIUM, "size={}", size);
         }
@@ -241,13 +261,14 @@ mod tests {
     #[test]
     fn test_is_valid_bucket_size() {
         assert!(is_valid_bucket_size(BUCKET_SMALL));
+        assert!(is_valid_bucket_size(BUCKET_MEDIUM_SMALL));
         assert!(is_valid_bucket_size(BUCKET_MEDIUM));
         assert!(is_valid_bucket_size(BUCKET_LARGE));
         assert!(is_valid_bucket_size(4352)); // Overflow aligned
         assert!(is_valid_bucket_size(4608));
         assert!(!is_valid_bucket_size(0));
         assert!(!is_valid_bucket_size(100)); // Not a valid bucket
-        assert!(!is_valid_bucket_size(512)); // Between small and medium
+        assert!(!is_valid_bucket_size(300)); // Between small and medium-small
         assert!(!is_valid_bucket_size(4097)); // Not aligned
     }
 
@@ -255,7 +276,9 @@ mod tests {
     fn test_select_bucket() {
         assert_eq!(select_bucket(1), BUCKET_SMALL);
         assert_eq!(select_bucket(256), BUCKET_SMALL);
-        assert_eq!(select_bucket(257), BUCKET_MEDIUM);
+        assert_eq!(select_bucket(257), BUCKET_MEDIUM_SMALL);
+        assert_eq!(select_bucket(512), BUCKET_MEDIUM_SMALL);
+        assert_eq!(select_bucket(513), BUCKET_MEDIUM);
         assert_eq!(select_bucket(1024), BUCKET_MEDIUM);
         assert_eq!(select_bucket(1025), BUCKET_LARGE);
         assert_eq!(select_bucket(4096), BUCKET_LARGE);

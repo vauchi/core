@@ -10,6 +10,13 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+/// Maximum supported manifest schema version.
+///
+/// The client rejects manifests with schema_version > this constant,
+/// preventing a compromised CDN from feeding data in an unknown format (#241).
+#[cfg(feature = "content-updates")]
+pub const MAX_SUPPORTED_SCHEMA_VERSION: u32 = 1;
+
 /// Content manifest from remote server
 ///
 /// The manifest describes all available content and their versions,

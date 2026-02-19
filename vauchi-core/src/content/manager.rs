@@ -204,6 +204,14 @@ impl ContentManager {
 
         match fetcher.fetch_manifest().await {
             Ok(remote) => {
+                // Reject unknown schema versions (#241)
+                if remote.schema_version > super::types::MAX_SUPPORTED_SCHEMA_VERSION {
+                    return UpdateStatus::CheckFailed(format!(
+                        "Unsupported manifest schema version {} (max: {})",
+                        remote.schema_version,
+                        super::types::MAX_SUPPORTED_SCHEMA_VERSION,
+                    ));
+                }
                 // Record check time
                 let _ = self.record_check_time();
                 self.compare_versions(&remote)
@@ -229,6 +237,15 @@ impl ContentManager {
             Ok(m) => m,
             Err(e) => return Err(ContentError::Fetch(e.to_string())),
         };
+
+        // Reject unknown schema versions (#241)
+        if remote.schema_version > super::types::MAX_SUPPORTED_SCHEMA_VERSION {
+            return Err(ContentError::Fetch(format!(
+                "Unsupported manifest schema version {} (max: {})",
+                remote.schema_version,
+                super::types::MAX_SUPPORTED_SCHEMA_VERSION,
+            )));
+        }
 
         let updates = self.find_updates(&remote);
         if updates.is_empty() {

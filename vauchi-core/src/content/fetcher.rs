@@ -14,8 +14,6 @@ use thiserror::Error;
 
 #[cfg(feature = "content-updates")]
 use super::config::ContentConfig;
-#[cfg(feature = "content-updates")]
-use super::integrity::verify_checksum;
 use super::integrity::IntegrityError;
 #[cfg(feature = "content-updates")]
 use super::types::ContentManifest;
@@ -79,14 +77,18 @@ impl ContentFetcher {
         Ok(manifest)
     }
 
-    /// Fetch content file from remote with checksum verification
+    /// Fetch content file from remote with streaming checksum verification (#146).
+    ///
+    /// Downloads in chunks, incrementally hashing each chunk. Aborts early if
+    /// the running total exceeds `max_content_size`, preventing a compromised
+    /// CDN from forcing the client to buffer arbitrary data.
     pub async fn fetch_content(
         &self,
         path: &str,
         expected_checksum: &str,
     ) -> Result<Vec<u8>, FetchError> {
         let url = format!("{}/{}", self.base_url, path);
-        let response = self.client.get(&url).send().await?;
+        let mut response = self.client.get(&url).send().await?;
 
         if !response.status().is_success() {
             return Err(FetchError::HttpError(response.status().as_u16()));
@@ -102,18 +104,36 @@ impl ContentFetcher {
             }
         }
 
-        let data = response.bytes().await?.to_vec();
+        // Stream-verify: download in chunks with incremental SHA-256 hash (#146)
+        let mut hasher = ring::digest::Context::new(&ring::digest::SHA256);
+        let mut data = Vec::new();
+        let mut total: u64 = 0;
 
-        // Verify size after download (in case content-length was missing)
-        if data.len() as u64 > self.max_content_size {
-            return Err(FetchError::TooLarge {
-                size: data.len() as u64,
-                max: self.max_content_size,
-            });
+        while let Some(chunk) = response.chunk().await? {
+            total += chunk.len() as u64;
+            if total > self.max_content_size {
+                return Err(FetchError::TooLarge {
+                    size: total,
+                    max: self.max_content_size,
+                });
+            }
+            hasher.update(&chunk);
+            data.extend_from_slice(&chunk);
         }
 
-        // Verify checksum
-        verify_checksum(&data, expected_checksum)?;
+        // Verify checksum against expected
+        let expected_hex = expected_checksum
+            .strip_prefix("sha256:")
+            .ok_or(super::integrity::IntegrityError::InvalidFormat)?;
+        let digest = hasher.finish();
+        let computed_hex = hex::encode(digest.as_ref());
+        if computed_hex != expected_hex {
+            return Err(super::integrity::IntegrityError::ChecksumMismatch {
+                expected: expected_hex.to_string(),
+                actual: computed_hex,
+            }
+            .into());
+        }
 
         Ok(data)
     }

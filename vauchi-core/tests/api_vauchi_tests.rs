@@ -157,8 +157,10 @@ fn test_vauchi_public_id() {
 
 #[test]
 fn test_vauchi_builder() {
+    let dir = tempfile::tempdir().unwrap();
+    let db_path = dir.path().join("vauchi.db");
     let wb: Vauchi<MockTransport> = VauchiBuilder::new()
-        .storage_path("/tmp/test_vauchi")
+        .storage_path(db_path.to_str().unwrap())
         .relay_url("wss://relay.example.com")
         .build()
         .unwrap();
@@ -168,11 +170,13 @@ fn test_vauchi_builder() {
 
 #[test]
 fn test_vauchi_builder_with_identity() {
+    let dir = tempfile::tempdir().unwrap();
+    let db_path = dir.path().join("vauchi.db");
     let identity = Identity::create("Alice");
     let public_id = identity.public_id();
 
     let wb: Vauchi<MockTransport> = VauchiBuilder::new()
-        .storage_path("/tmp/test_vauchi2")
+        .storage_path(db_path.to_str().unwrap())
         .identity(identity)
         .build()
         .unwrap();

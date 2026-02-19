@@ -949,3 +949,39 @@ fn test_rekey_is_atomic() {
     assert!(loaded.is_some(), "Card should be loadable after rekey");
     assert_eq!(loaded.unwrap().display_name(), "AtomicTest");
 }
+
+// =============================================================================
+// DOWNGRADE PREVENTION
+// =============================================================================
+
+#[test]
+fn test_migration_rejects_newer_schema_version() {
+    let conn = Connection::open_in_memory().unwrap();
+    let key = SymmetricKey::generate();
+
+    // Run all migrations to establish full schema
+    let migrations = all_migrations();
+    MigrationRunner::run(&conn, &key, &migrations).unwrap();
+
+    // Manually bump schema_version to simulate a DB created by a newer app
+    let future_version = 999;
+    conn.execute(
+        "INSERT INTO schema_version (version, applied_at) VALUES (?1, ?2)",
+        rusqlite::params![future_version, 0i64],
+    )
+    .unwrap();
+
+    // Running migrations again should fail with a downgrade error
+    let result = MigrationRunner::run(&conn, &key, &migrations);
+    assert!(
+        result.is_err(),
+        "Should reject database from a newer app version"
+    );
+
+    let err_msg = format!("{}", result.unwrap_err());
+    assert!(
+        err_msg.contains("newer than this app"),
+        "Error should mention newer app: {}",
+        err_msg
+    );
+}

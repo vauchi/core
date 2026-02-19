@@ -961,7 +961,7 @@ fn test_migration_rejects_newer_schema_version() {
 
     // Run all migrations to establish full schema
     let migrations = all_migrations();
-    MigrationRunner::run(&conn, &key, &migrations).unwrap();
+    MigrationRunner::run(&conn, &key, &migrations, None).unwrap();
 
     // Manually bump schema_version to simulate a DB created by a newer app
     let future_version = 999;
@@ -972,7 +972,7 @@ fn test_migration_rejects_newer_schema_version() {
     .unwrap();
 
     // Running migrations again should fail with a downgrade error
-    let result = MigrationRunner::run(&conn, &key, &migrations);
+    let result = MigrationRunner::run(&conn, &key, &migrations, None);
     assert!(
         result.is_err(),
         "Should reject database from a newer app version"

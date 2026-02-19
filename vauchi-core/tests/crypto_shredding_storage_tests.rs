@@ -312,7 +312,7 @@ fn test_revoked_sender_persists_after_contact_deletion() {
     storage
         .record_revoked_sender(contact.id(), 1700000000)
         .unwrap();
-    storage.delete_contact(&contact.id()).unwrap();
+    storage.delete_contact(contact.id()).unwrap();
 
     // Tombstone should persist
     assert!(storage.is_sender_revoked(contact.id()).unwrap());

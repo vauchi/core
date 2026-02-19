@@ -157,7 +157,7 @@ fn test_migrate_smk_stored_before_rekey_for_safety() {
     assert!(secure.has_key(SMK_KEY_NAME).unwrap());
 
     // Now rekey
-    let mut storage = Storage::open(&dir.path().join("vauchi.db"), old_key).unwrap();
+    let mut storage = Storage::open(dir.path().join("vauchi.db"), old_key).unwrap();
     let sek = smk.derive_sek();
     storage.rekey(sek).unwrap();
 

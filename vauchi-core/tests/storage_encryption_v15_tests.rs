@@ -171,6 +171,7 @@ fn test_field_validation_encrypted_in_db() {
     let db_path = dir.path().join("vauchi.db");
     let raw_conn = rusqlite::Connection::open(&db_path).unwrap();
 
+    #[allow(clippy::type_complexity)]
     let (fv_plain, fv_enc, sig_plain, sig_enc): (String, Option<Vec<u8>>, Vec<u8>, Option<Vec<u8>>) = raw_conn
         .query_row(
             "SELECT field_value, field_value_encrypted, signature, signature_encrypted FROM field_validations LIMIT 1",
@@ -315,6 +316,7 @@ fn test_ux_state_encrypted_in_db() {
     let db_path = dir.path().join("vauchi.db");
     let raw_conn = rusqlite::Connection::open(&db_path).unwrap();
 
+    #[allow(clippy::type_complexity)]
     let (aha_plain, aha_enc, demo_plain, demo_enc): (
         Option<String>,
         Option<Vec<u8>>,
@@ -330,11 +332,11 @@ fn test_ux_state_encrypted_in_db() {
 
     // Plaintext columns should be cleared
     assert!(
-        aha_plain.map_or(true, |s| s.is_empty()),
+        aha_plain.is_none_or(|s| s.is_empty()),
         "plaintext aha_tracker_json should be cleared"
     );
     assert!(
-        demo_plain.map_or(true, |s| s.is_empty()),
+        demo_plain.is_none_or(|s| s.is_empty()),
         "plaintext demo_contact_json should be cleared"
     );
     // Encrypted columns should have data
@@ -385,7 +387,7 @@ fn test_audit_log_encrypted_in_db() {
 
     // Plaintext details should be cleared
     assert!(
-        details_plain.map_or(true, |s| s.is_empty()),
+        details_plain.is_none_or(|s| s.is_empty()),
         "plaintext details should be cleared"
     );
     // Encrypted details should have data

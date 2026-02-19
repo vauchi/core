@@ -12,8 +12,8 @@
 //! `ManualConfirmationVerifier::pre_confirmed()` which is gated.
 
 use vauchi_core::exchange::{
-    ExchangeError, ExchangeEvent, ExchangeQR, ExchangeSession, ExchangeState,
-    ManualConfirmationVerifier, MockProximityVerifier, X3DHKeyPair,
+    ExchangeError, ExchangeEvent, ExchangeSession, ExchangeState, ManualConfirmationVerifier,
+    MockProximityVerifier,
 };
 use vauchi_core::*;
 

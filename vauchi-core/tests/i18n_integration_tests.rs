@@ -351,9 +351,8 @@ fn test_deterministic_fallback_to_english() {
     load_locale_from_bytes("de", partial_de.as_bytes()).expect("Should load partial DE locale");
 
     // English has the key (inject it)
-    let en_with_key = format!(
-        r#"{{"test.fallback_only": "English Fallback Value", "test.partial_key": "Partial Key"}}"#
-    );
+    let en_with_key =
+        r#"{"test.fallback_only": "English Fallback Value", "test.partial_key": "Partial Key"}"#;
     load_locale_from_bytes("en", en_with_key.as_bytes()).expect("Should load EN locale");
 
     // German lookup for missing key should fall back to English

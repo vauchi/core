@@ -147,13 +147,15 @@ pub fn export_all_data(storage: &Storage) -> Result<GdprExport, crate::storage::
     });
 
     // Export audit log (Art 15 — access to all personal data)
+    // Filter sensitive key material from details before export (#21)
     let audit_log = storage
         .list_audit_log()?
         .into_iter()
         .map(|(event_type, details, timestamp)| {
+            let filtered_details = details.map(|d| filter_audit_details(&d));
             serde_json::json!({
                 "event_type": event_type,
-                "details": details,
+                "details": filtered_details,
                 "timestamp": timestamp,
             })
         })
@@ -173,6 +175,70 @@ pub fn export_all_data(storage: &Storage) -> Result<GdprExport, crate::storage::
         recovery_config,
         audit_log,
     })
+}
+
+/// Strips sensitive cryptographic fields from audit log details (#21).
+///
+/// If the details string is valid JSON, removes fields whose keys contain
+/// sensitive terms (key, nonce, secret, seed, etc.). Otherwise, redacts
+/// long hex strings that likely represent key material.
+fn filter_audit_details(details: &str) -> String {
+    if let Ok(mut value) = serde_json::from_str::<serde_json::Value>(details) {
+        if let Some(obj) = value.as_object_mut() {
+            let sensitive = [
+                "key",
+                "nonce",
+                "secret",
+                "seed",
+                "private_key",
+                "encryption_key",
+                "cek",
+                "smk",
+                "sek",
+                "fkek",
+                "ratchet_state",
+                "shared_secret",
+            ];
+            obj.retain(|k, _| {
+                let lower = k.to_lowercase();
+                !sensitive.iter().any(|s| lower.contains(s))
+            });
+        }
+        serde_json::to_string(&value).unwrap_or_else(|_| details.to_string())
+    } else {
+        redact_hex_strings(details)
+    }
+}
+
+/// Replaces hex strings of 32+ characters with `[redacted]`.
+fn redact_hex_strings(text: &str) -> String {
+    let mut result = String::with_capacity(text.len());
+    let mut hex_run = 0usize;
+    let mut hex_start = 0usize;
+
+    for (i, ch) in text.char_indices() {
+        if ch.is_ascii_hexdigit() {
+            if hex_run == 0 {
+                hex_start = i;
+            }
+            hex_run += 1;
+        } else {
+            if hex_run >= 32 {
+                result.push_str("[redacted]");
+            } else {
+                result.push_str(&text[hex_start..hex_start + hex_run]);
+            }
+            result.push(ch);
+            hex_run = 0;
+        }
+    }
+    // Handle trailing hex run
+    if hex_run >= 32 {
+        result.push_str("[redacted]");
+    } else if hex_run > 0 {
+        result.push_str(&text[text.len() - hex_run..]);
+    }
+    result
 }
 
 /// Exports device information (best effort).
@@ -205,5 +271,105 @@ fn export_devices(storage: &Storage) -> Option<Vec<GdprDevice>> {
             Some(Vec::new())
         }
         _ => Some(Vec::new()),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_filter_audit_details_strips_json_key_fields() {
+        let input = r#"{"action":"exchange","encryption_key":"deadbeef","contact":"Bob"}"#;
+        let result = filter_audit_details(input);
+        let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
+        assert!(parsed.get("contact").is_some());
+        assert!(parsed.get("action").is_some());
+        assert!(parsed.get("encryption_key").is_none());
+    }
+
+    #[test]
+    fn test_filter_audit_details_strips_nonce_and_secret() {
+        let input = r#"{"nonce":"abc","shared_secret":"xyz","event":"sync"}"#;
+        let result = filter_audit_details(input);
+        let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
+        assert!(parsed.get("event").is_some());
+        assert!(parsed.get("nonce").is_none());
+        assert!(parsed.get("shared_secret").is_none());
+    }
+
+    #[test]
+    fn test_filter_audit_details_strips_cek_smk_sek() {
+        let input = r#"{"cek":"abc","smk":"def","sek":"ghi","contact_id":"123"}"#;
+        let result = filter_audit_details(input);
+        let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
+        assert!(parsed.get("contact_id").is_some());
+        assert!(parsed.get("cek").is_none());
+        assert!(parsed.get("smk").is_none());
+        assert!(parsed.get("sek").is_none());
+    }
+
+    #[test]
+    fn test_filter_audit_details_case_insensitive() {
+        let input = r#"{"Encryption_Key":"val","Private_Key":"val2","ok":"yes"}"#;
+        let result = filter_audit_details(input);
+        let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
+        assert!(parsed.get("ok").is_some());
+        assert!(parsed.get("Encryption_Key").is_none());
+        assert!(parsed.get("Private_Key").is_none());
+    }
+
+    #[test]
+    fn test_filter_audit_details_preserves_non_sensitive_json() {
+        let input = r#"{"action":"delete","contact_id":"abc-123","timestamp":1234}"#;
+        let result = filter_audit_details(input);
+        assert_eq!(result, input);
+    }
+
+    #[test]
+    fn test_redact_hex_strings_redacts_long_hex() {
+        let input = "prefix_aabbccdd00112233445566778899aabbccdd00112233_suffix";
+        let result = redact_hex_strings(input);
+        assert!(result.contains("[redacted]"));
+        assert!(result.contains("prefix_"));
+        assert!(result.contains("_suffix"));
+    }
+
+    #[test]
+    fn test_redact_hex_strings_preserves_short_hex() {
+        let input = "id=abcd1234 done";
+        let result = redact_hex_strings(input);
+        assert_eq!(result, input);
+    }
+
+    #[test]
+    fn test_filter_audit_details_non_json_with_hex() {
+        let hex64 = "a".repeat(64);
+        let input = format!("key={hex64} ok");
+        let result = filter_audit_details(&input);
+        assert!(result.contains("[redacted]"));
+        assert!(!result.contains(&hex64));
+    }
+
+    #[test]
+    fn test_filter_audit_details_empty_json() {
+        let result = filter_audit_details("{}");
+        assert_eq!(result, "{}");
+    }
+
+    #[test]
+    fn test_filter_audit_details_plain_text() {
+        let result = filter_audit_details("just a plain log message");
+        assert_eq!(result, "just a plain log message");
+    }
+
+    #[test]
+    fn test_filter_strips_ratchet_and_seed() {
+        let input = r#"{"ratchet_state":"abc","seed":"xyz","count":5}"#;
+        let result = filter_audit_details(input);
+        let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
+        assert!(parsed.get("count").is_some());
+        assert!(parsed.get("ratchet_state").is_none());
+        assert!(parsed.get("seed").is_none());
     }
 }

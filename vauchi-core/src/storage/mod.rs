@@ -208,6 +208,17 @@ impl Storage {
         hmac::sign(&key, data).as_ref().to_vec()
     }
 
+    /// Forces a WAL checkpoint, merging all WAL frames into the main DB file (#81).
+    ///
+    /// TRUNCATE mode flushes WAL contents and truncates the WAL file to zero bytes.
+    /// This must be called before secure delete or rekey operations to ensure that
+    /// pre-modification data in the WAL is merged and overwritable.
+    pub fn wal_checkpoint(&self) -> Result<(), StorageError> {
+        self.conn
+            .execute_batch("PRAGMA wal_checkpoint(TRUNCATE);")
+            .map_err(|e| StorageError::Migration(format!("WAL checkpoint: {}", e)))
+    }
+
     /// Re-encrypts all encrypted columns from the current key to a new key.
     ///
     /// This is used during SMK migration: the database was opened with the old
@@ -220,6 +231,9 @@ impl Storage {
     pub fn rekey(&mut self, new_key: SymmetricKey) -> Result<(), StorageError> {
         use crate::crypto::{decrypt, encrypt};
         use rusqlite::params;
+
+        // Flush WAL before rekey to ensure all data is in the main DB file (#129)
+        self.wal_checkpoint()?;
 
         let old_key = &self.encryption_key;
 

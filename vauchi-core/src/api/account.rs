@@ -16,38 +16,26 @@ use crate::storage::{DeletionState, Storage, StorageError};
 /// Duration of deletion grace period in seconds (7 days).
 const DELETION_GRACE_PERIOD_SECS: u64 = 7 * 24 * 60 * 60;
 
-/// Deletes all local account data.
+/// Deletes all local account data with secure overwrite.
 ///
-/// This performs a thorough cleanup:
-/// 1. Drops all database tables
-/// 2. Vacuums the database to overwrite freed pages
-/// 3. Removes the database file from disk
+/// Uses `secure_overwrite_file` to overwrite database files with random data
+/// and zeros before unlinking, preventing forensic recovery (#200a).
 ///
 /// After calling this, the Storage instance should not be used.
 pub fn delete_account_data<P: AsRef<Path>>(db_path: P) -> Result<(), AccountError> {
     let path = db_path.as_ref();
 
-    // Remove the database file and WAL/journal files
-    if path.exists() {
-        std::fs::remove_file(path).map_err(|e| AccountError::DeletionFailed(e.to_string()))?;
-    }
-
-    // Remove WAL file if it exists
-    let wal_path = path.with_extension("db-wal");
-    if wal_path.exists() {
-        let _ = std::fs::remove_file(wal_path);
-    }
-
-    // Remove SHM file if it exists
-    let shm_path = path.with_extension("db-shm");
-    if shm_path.exists() {
-        let _ = std::fs::remove_file(shm_path);
-    }
-
-    // Remove journal file if it exists
-    let journal_path = path.with_extension("db-journal");
-    if journal_path.exists() {
-        let _ = std::fs::remove_file(journal_path);
+    // Securely overwrite the database file and WAL/journal files
+    for suffix in &["", "-wal", "-shm", "-journal"] {
+        let file_path = if suffix.is_empty() {
+            path.to_path_buf()
+        } else {
+            path.with_extension(format!("db{}", suffix))
+        };
+        if file_path.exists() {
+            super::shred::secure_overwrite_file_public(&file_path)
+                .map_err(|e| AccountError::DeletionFailed(e.to_string()))?;
+        }
     }
 
     Ok(())
@@ -175,7 +163,19 @@ impl<'a> DeletionManager<'a> {
                     self.storage
                         .delete_contact_cek(contact.id())
                         .map_err(|e| AccountError::DeletionFailed(e.to_string()))?;
+
+                    // Delete contact row and ratchet state (#48)
+                    // After CEK shredding, rows contain metadata (public_key,
+                    // display_name, timestamps) that should not survive deletion.
+                    self.storage
+                        .delete_contact(contact.id())
+                        .map_err(|e| AccountError::DeletionFailed(e.to_string()))?;
                 }
+
+                // Flush WAL so secure_delete=ON takes effect on deleted data (#81)
+                self.storage
+                    .wal_checkpoint()
+                    .map_err(|e| AccountError::DeletionFailed(e.to_string()))?;
 
                 // Mark state as executed
                 let state = DeletionState::Executed { executed_at: now };

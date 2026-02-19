@@ -732,8 +732,8 @@ fn test_schema_version_is_21_after_all_migrations() {
     // Verify final schema version
     let version = MigrationRunner::current_version(&conn).unwrap();
     assert_eq!(
-        version, 24,
-        "Schema version should be 24 after all migrations, got {}",
+        version, 25,
+        "Schema version should be 25 after all migrations, got {}",
         version
     );
 }

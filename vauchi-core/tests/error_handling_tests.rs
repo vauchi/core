@@ -23,7 +23,7 @@ use vauchi_core::{
 #[test]
 fn test_sync_state_pending_on_undelivered() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
-    let sync_manager = SyncManager::new(&storage);
+    let mut sync_manager = SyncManager::new(&storage);
 
     let mut old_card = ContactCard::new("Test");
     old_card
@@ -87,7 +87,7 @@ fn test_relay_disconnect_clears_state() {
 #[test]
 fn test_multiple_pending_updates_queued() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
-    let sync_manager = SyncManager::new(&storage);
+    let mut sync_manager = SyncManager::new(&storage);
 
     let card1 = ContactCard::new("Version 1");
     let card2 = ContactCard::new("Version 2");
@@ -352,7 +352,7 @@ fn test_cannot_add_duplicate_contact() {
 #[test]
 fn test_mark_nonexistent_update_delivered() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
-    let sync_manager = SyncManager::new(&storage);
+    let mut sync_manager = SyncManager::new(&storage);
 
     let result = sync_manager.mark_delivered("nonexistent-update-id");
     // Should not panic, behavior depends on implementation

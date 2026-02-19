@@ -153,7 +153,7 @@ fn test_relay_multiple_in_flight() {
 #[test]
 fn test_sync_manager_queue_for_relay() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
-    let sync_manager = SyncManager::new(&storage);
+    let mut sync_manager = SyncManager::new(&storage);
 
     let mut old_card = ContactCard::new("Alice");
     old_card
@@ -188,7 +188,7 @@ fn test_sync_manager_queue_for_relay() {
 #[test]
 fn test_sync_manager_mark_delivered() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
-    let sync_manager = SyncManager::new(&storage);
+    let mut sync_manager = SyncManager::new(&storage);
 
     let old_card = ContactCard::new("Test");
     let new_card = ContactCard::new("Test Updated");
@@ -217,7 +217,7 @@ fn test_sync_manager_mark_delivered() {
 #[test]
 fn test_sync_state_pending_count() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
-    let sync_manager = SyncManager::new(&storage);
+    let mut sync_manager = SyncManager::new(&storage);
 
     let card1 = ContactCard::new("V1");
     let card2 = ContactCard::new("V2");

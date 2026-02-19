@@ -184,6 +184,37 @@ fn add_column_if_not_exists(
     Ok(())
 }
 
+/// Encrypts data and verifies the ciphertext decrypts back to the original (#165a).
+///
+/// This prevents data loss during encrypt-in-place migrations: if the key is
+/// wrong or encryption produces an unreadable blob, this function returns an
+/// error before the plaintext column is cleared.
+fn encrypt_and_verify(
+    key: &SymmetricKey,
+    plaintext: &[u8],
+    context: &str,
+) -> Result<Vec<u8>, StorageError> {
+    use crate::crypto::{decrypt, encrypt};
+
+    let encrypted = encrypt(key, plaintext)
+        .map_err(|e| StorageError::Migration(format!("Encrypt {}: {}", context, e)))?;
+
+    // Verify roundtrip: decrypt must produce the original plaintext
+    let decrypted = decrypt(key, &encrypted)
+        .map_err(|e| StorageError::Migration(format!("Roundtrip verify {}: {}", context, e)))?;
+
+    if decrypted != plaintext {
+        return Err(StorageError::Migration(format!(
+            "Roundtrip mismatch for {} (encrypted {} bytes, decrypted {} bytes)",
+            context,
+            encrypted.len(),
+            decrypted.len(),
+        )));
+    }
+
+    Ok(encrypted)
+}
+
 /// Returns all registered migrations in version order.
 ///
 /// This is the single source of truth for the database schema.
@@ -310,6 +341,11 @@ pub fn all_migrations() -> Vec<Migration> {
             name: "per_contact_ratchet_keys",
             action: MigrationAction::Callback(migrate_v24_per_contact_ratchet_keys),
         },
+        Migration {
+            version: 25,
+            name: "contact_delta_version_tracking",
+            action: MigrationAction::Sql(MIGRATION_V25_DELTA_VERSION),
+        },
     ]
 }
 
@@ -403,6 +439,14 @@ fn migrate_v2_re_encrypt(conn: &Connection, key: &SymmetricKey) -> Result<(), St
             .map_err(|e| StorageError::Migration(format!("Failed to collect contacts: {}", e)))?;
 
         for (id, card_enc, key_enc) in &rows {
+            // Skip rows already in XChaCha20 format (tag 0x02) (#167)
+            let card_already_xchacha = card_enc.first() == Some(&0x02);
+            let key_already_xchacha = key_enc.first() == Some(&0x02);
+
+            if card_already_xchacha && key_already_xchacha {
+                continue; // Both already migrated
+            }
+
             // Decrypt with legacy format (handled by decrypt's auto-detect)
             let card_plain = decrypt(key, card_enc)
                 .map_err(|e| StorageError::Migration(format!("Decrypt card for {}: {}", id, e)))?;
@@ -435,15 +479,18 @@ fn migrate_v2_re_encrypt(conn: &Connection, key: &SymmetricKey) -> Result<(), St
         );
 
         if let Ok((id, backup_enc)) = result {
-            let plain = decrypt(key, &backup_enc)
-                .map_err(|e| StorageError::Migration(format!("Decrypt identity: {}", e)))?;
-            let new_enc = encrypt(key, &plain)
-                .map_err(|e| StorageError::Migration(format!("Re-encrypt identity: {}", e)))?;
-            conn.execute(
-                "UPDATE identity SET backup_data_encrypted = ?1 WHERE id = ?2",
-                rusqlite::params![new_enc, id],
-            )
-            .map_err(|e| StorageError::Migration(format!("Update identity: {}", e)))?;
+            // Skip if already XChaCha20 (#167)
+            if backup_enc.first() != Some(&0x02) {
+                let plain = decrypt(key, &backup_enc)
+                    .map_err(|e| StorageError::Migration(format!("Decrypt identity: {}", e)))?;
+                let new_enc = encrypt(key, &plain)
+                    .map_err(|e| StorageError::Migration(format!("Re-encrypt identity: {}", e)))?;
+                conn.execute(
+                    "UPDATE identity SET backup_data_encrypted = ?1 WHERE id = ?2",
+                    rusqlite::params![new_enc, id],
+                )
+                .map_err(|e| StorageError::Migration(format!("Update identity: {}", e)))?;
+            }
         }
     }
 
@@ -460,6 +507,11 @@ fn migrate_v2_re_encrypt(conn: &Connection, key: &SymmetricKey) -> Result<(), St
             .map_err(|e| StorageError::Migration(format!("Failed to collect ratchets: {}", e)))?;
 
         for (contact_id, ratchet_enc) in &rows {
+            // Skip if already XChaCha20 (#167)
+            if ratchet_enc.first() == Some(&0x02) {
+                continue;
+            }
+
             let plain = decrypt(key, ratchet_enc).map_err(|e| {
                 StorageError::Migration(format!("Decrypt ratchet for {}: {}", contact_id, e))
             })?;
@@ -855,7 +907,6 @@ fn migrate_v14_encrypt_high_priority(
     conn: &Connection,
     key: &SymmetricKey,
 ) -> Result<(), StorageError> {
-    use crate::crypto::encrypt;
 
     // Step 1: Add encrypted columns to each table (idempotent — Tracker #54)
     add_column_if_not_exists(conn, "own_card", "card_json_encrypted", "BLOB")?;
@@ -877,8 +928,7 @@ fn migrate_v14_encrypt_high_priority(
             });
 
         if let Ok((card_json,)) = result {
-            let encrypted = encrypt(key, card_json.as_bytes())
-                .map_err(|e| StorageError::Migration(format!("Encrypt own_card: {}", e)))?;
+            let encrypted = encrypt_and_verify(key, card_json.as_bytes(), "own_card")?;
             conn.execute(
                 "UPDATE own_card SET card_json_encrypted = ?1, card_json = '' WHERE id = 1",
                 rusqlite::params![encrypted],
@@ -896,8 +946,7 @@ fn migrate_v14_encrypt_high_priority(
         );
 
         if let Ok((registry_json,)) = result {
-            let encrypted = encrypt(key, registry_json.as_bytes())
-                .map_err(|e| StorageError::Migration(format!("Encrypt device_registry: {}", e)))?;
+            let encrypted = encrypt_and_verify(key, registry_json.as_bytes(), "device_registry")?;
             conn.execute(
                 "UPDATE device_registry SET registry_json_encrypted = ?1, registry_json = '' WHERE id = 1",
                 rusqlite::params![encrypted],
@@ -925,9 +974,7 @@ fn migrate_v14_encrypt_high_priority(
             })?;
 
         for (device_id, state_json) in &rows {
-            let encrypted = encrypt(key, state_json.as_bytes()).map_err(|e| {
-                StorageError::Migration(format!("Encrypt device_sync_state: {}", e))
-            })?;
+            let encrypted = encrypt_and_verify(key, state_json.as_bytes(), "device_sync_state")?;
             conn.execute(
                 "UPDATE device_sync_state SET state_json_encrypted = ?1, state_json = '' WHERE device_id = ?2",
                 rusqlite::params![encrypted, device_id],
@@ -957,12 +1004,8 @@ fn migrate_v14_encrypt_high_priority(
             })?;
 
         for (id, contacts_json, fields_json) in &rows {
-            let contacts_enc = encrypt(key, contacts_json.as_bytes()).map_err(|e| {
-                StorageError::Migration(format!("Encrypt visibility_labels contacts: {}", e))
-            })?;
-            let fields_enc = encrypt(key, fields_json.as_bytes()).map_err(|e| {
-                StorageError::Migration(format!("Encrypt visibility_labels fields: {}", e))
-            })?;
+            let contacts_enc = encrypt_and_verify(key, contacts_json.as_bytes(), "label_contacts")?;
+            let fields_enc = encrypt_and_verify(key, fields_json.as_bytes(), "label_fields")?;
             conn.execute(
                 "UPDATE visibility_labels SET contacts_json_encrypted = ?1, visible_fields_json_encrypted = ?2, contacts_json = '[]', visible_fields_json = '[]' WHERE id = ?3",
                 rusqlite::params![contacts_enc, fields_enc, id],
@@ -987,8 +1030,6 @@ fn migrate_v15_encrypt_medium_priority(
     conn: &Connection,
     key: &SymmetricKey,
 ) -> Result<(), StorageError> {
-    use crate::crypto::encrypt;
-
     // Step 1: Add encrypted columns to each table (idempotent — Tracker #54)
     add_column_if_not_exists(conn, "device_info", "device_info_encrypted", "BLOB")?;
     add_column_if_not_exists(conn, "version_vector", "vector_json_encrypted", "BLOB")?;
@@ -1027,8 +1068,7 @@ fn migrate_v15_encrypt_medium_priority(
             });
             let json_bytes = serde_json::to_vec(&json)
                 .map_err(|e| StorageError::Migration(format!("Serialize device_info: {}", e)))?;
-            let encrypted = encrypt(key, &json_bytes)
-                .map_err(|e| StorageError::Migration(format!("Encrypt device_info: {}", e)))?;
+            let encrypted = encrypt_and_verify(key, &json_bytes, "device_info")?;
             conn.execute(
                 "UPDATE device_info SET device_info_encrypted = ?1, device_name = '' WHERE id = 1",
                 rusqlite::params![encrypted],
@@ -1046,8 +1086,7 @@ fn migrate_v15_encrypt_medium_priority(
         );
 
         if let Ok((vector_json,)) = result {
-            let encrypted = encrypt(key, vector_json.as_bytes())
-                .map_err(|e| StorageError::Migration(format!("Encrypt version_vector: {}", e)))?;
+            let encrypted = encrypt_and_verify(key, vector_json.as_bytes(), "version_vector")?;
             conn.execute(
                 "UPDATE version_vector SET vector_json_encrypted = ?1, vector_json = '' WHERE id = 1",
                 rusqlite::params![encrypted],
@@ -1072,9 +1111,7 @@ fn migrate_v15_encrypt_medium_priority(
 
         for (contact_id, last_sync_at) in &rows {
             let ts_bytes = last_sync_at.to_le_bytes();
-            let encrypted = encrypt(key, &ts_bytes).map_err(|e| {
-                StorageError::Migration(format!("Encrypt contact_sync_timestamps: {}", e))
-            })?;
+            let encrypted = encrypt_and_verify(key, &ts_bytes, "sync_timestamps")?;
             conn.execute(
                 "UPDATE contact_sync_timestamps SET last_sync_at_encrypted = ?1 WHERE contact_id = ?2",
                 rusqlite::params![encrypted, contact_id],
@@ -1096,8 +1133,7 @@ fn migrate_v15_encrypt_medium_priority(
             .map_err(|e| StorageError::Migration(format!("Collect pending_updates: {}", e)))?;
 
         for (id, payload) in &rows {
-            let encrypted = encrypt(key, payload)
-                .map_err(|e| StorageError::Migration(format!("Encrypt pending_updates: {}", e)))?;
+            let encrypted = encrypt_and_verify(key, payload, "pending_updates")?;
             conn.execute(
                 "UPDATE pending_updates SET payload_encrypted = ?1, payload = X'' WHERE id = ?2",
                 rusqlite::params![encrypted, id],
@@ -1119,8 +1155,7 @@ fn migrate_v15_encrypt_medium_priority(
             .map_err(|e| StorageError::Migration(format!("Collect retry_entries: {}", e)))?;
 
         for (message_id, payload) in &rows {
-            let encrypted = encrypt(key, payload)
-                .map_err(|e| StorageError::Migration(format!("Encrypt retry_entries: {}", e)))?;
+            let encrypted = encrypt_and_verify(key, payload, "retry_entries")?;
             conn.execute(
                 "UPDATE retry_entries SET payload_encrypted = ?1, payload = X'' WHERE message_id = ?2",
                 rusqlite::params![encrypted, message_id],
@@ -1144,9 +1179,7 @@ fn migrate_v15_encrypt_medium_priority(
             })?;
 
         for (target_device_id, items_json) in &rows {
-            let encrypted = encrypt(key, items_json.as_bytes()).map_err(|e| {
-                StorageError::Migration(format!("Encrypt device_sync_checkpoints: {}", e))
-            })?;
+            let encrypted = encrypt_and_verify(key, items_json.as_bytes(), "sync_checkpoints")?;
             conn.execute(
                 "UPDATE device_sync_checkpoints SET items_json_encrypted = ?1, items_json = '' WHERE target_device_id = ?2",
                 rusqlite::params![encrypted, target_device_id],
@@ -1168,9 +1201,7 @@ fn migrate_v15_encrypt_medium_priority(
             .map_err(|e| StorageError::Migration(format!("Collect recovery_responses: {}", e)))?;
 
         for (claim_id, response) in &rows {
-            let encrypted = encrypt(key, response.as_bytes()).map_err(|e| {
-                StorageError::Migration(format!("Encrypt recovery_responses: {}", e))
-            })?;
+            let encrypted = encrypt_and_verify(key, response.as_bytes(), "recovery_responses")?;
             conn.execute(
                 "UPDATE recovery_responses SET response_encrypted = ?1, response = '' WHERE claim_id = ?2",
                 rusqlite::params![encrypted, claim_id],
@@ -1188,8 +1219,7 @@ fn migrate_v15_encrypt_medium_priority(
         );
 
         if let Ok((state_json,)) = result {
-            let encrypted = encrypt(key, state_json.as_bytes())
-                .map_err(|e| StorageError::Migration(format!("Encrypt deletion_state: {}", e)))?;
+            let encrypted = encrypt_and_verify(key, state_json.as_bytes(), "deletion_state")?;
             conn.execute(
                 "UPDATE deletion_state SET state_json_encrypted = ?1, state_json = '' WHERE id = 1",
                 rusqlite::params![encrypted],
@@ -1211,8 +1241,7 @@ fn migrate_v15_encrypt_medium_priority(
             .map_err(|e| StorageError::Migration(format!("Collect sync_checkpoints: {}", e)))?;
 
         for (checkpoint_id, state_json) in &rows {
-            let encrypted = encrypt(key, state_json.as_bytes())
-                .map_err(|e| StorageError::Migration(format!("Encrypt sync_checkpoints: {}", e)))?;
+            let encrypted = encrypt_and_verify(key, state_json.as_bytes(), "sync_checkpoint")?;
             conn.execute(
                 "UPDATE sync_checkpoints SET state_json_encrypted = ?1, state_json = '' WHERE checkpoint_id = ?2",
                 rusqlite::params![encrypted, checkpoint_id],
@@ -1236,8 +1265,6 @@ fn migrate_v16_encrypt_low_priority(
     conn: &Connection,
     key: &SymmetricKey,
 ) -> Result<(), StorageError> {
-    use crate::crypto::encrypt;
-
     // Step 1: Add encrypted columns (idempotent — Tracker #54)
     add_column_if_not_exists(conn, "field_validations", "field_value_encrypted", "BLOB")?;
     add_column_if_not_exists(conn, "field_validations", "signature_encrypted", "BLOB")?;
@@ -1257,10 +1284,8 @@ fn migrate_v16_encrypt_low_priority(
             .map_err(|e| StorageError::Migration(format!("Collect field_validations: {}", e)))?;
 
         for (id, field_value, signature) in &rows {
-            let fv_encrypted = encrypt(key, field_value.as_bytes())
-                .map_err(|e| StorageError::Migration(format!("Encrypt field_value: {}", e)))?;
-            let sig_encrypted = encrypt(key, signature)
-                .map_err(|e| StorageError::Migration(format!("Encrypt signature: {}", e)))?;
+            let fv_encrypted = encrypt_and_verify(key, field_value.as_bytes(), "field_value")?;
+            let sig_encrypted = encrypt_and_verify(key, signature, "signature")?;
             conn.execute(
                 "UPDATE field_validations SET field_value_encrypted = ?1, field_value = '', signature_encrypted = ?2, signature = X'' WHERE id = ?3",
                 rusqlite::params![fv_encrypted, sig_encrypted, id],
@@ -1285,9 +1310,7 @@ fn migrate_v16_encrypt_low_priority(
         if let Ok((id, aha_json, demo_json)) = result {
             let aha_encrypted = if let Some(ref json) = aha_json {
                 if !json.is_empty() {
-                    Some(encrypt(key, json.as_bytes()).map_err(|e| {
-                        StorageError::Migration(format!("Encrypt aha_tracker: {}", e))
-                    })?)
+                    Some(encrypt_and_verify(key, json.as_bytes(), "aha_tracker")?)
                 } else {
                     None
                 }
@@ -1297,9 +1320,7 @@ fn migrate_v16_encrypt_low_priority(
 
             let demo_encrypted = if let Some(ref json) = demo_json {
                 if !json.is_empty() {
-                    Some(encrypt(key, json.as_bytes()).map_err(|e| {
-                        StorageError::Migration(format!("Encrypt demo_contact: {}", e))
-                    })?)
+                    Some(encrypt_and_verify(key, json.as_bytes(), "demo_contact")?)
                 } else {
                     None
                 }
@@ -1329,9 +1350,7 @@ fn migrate_v16_encrypt_low_priority(
             .map_err(|e| StorageError::Migration(format!("Collect audit_log: {}", e)))?;
 
         for (id, details) in &rows {
-            let encrypted = encrypt(key, details.as_bytes()).map_err(|e| {
-                StorageError::Migration(format!("Encrypt audit_log details: {}", e))
-            })?;
+            let encrypted = encrypt_and_verify(key, details.as_bytes(), "audit_log")?;
             conn.execute(
                 "UPDATE audit_log SET details_encrypted = ?1, details = '' WHERE id = ?2",
                 rusqlite::params![encrypted, id],
@@ -1352,7 +1371,6 @@ fn migrate_v18_encrypt_visibility_rules(
     conn: &Connection,
     key: &SymmetricKey,
 ) -> Result<(), StorageError> {
-    use crate::crypto::encrypt;
 
     // 1. Add new encrypted column (idempotent — Tracker #54)
     add_column_if_not_exists(conn, "contacts", "visibility_rules_encrypted", "BLOB")?;
@@ -1371,9 +1389,7 @@ fn migrate_v18_encrypt_visibility_rules(
     // 3. Encrypt each visibility rules JSON and write to new column
     for (id, json_opt) in &rows {
         if let Some(json) = json_opt {
-            let encrypted = encrypt(key, json.as_bytes()).map_err(|e| {
-                StorageError::Migration(format!("Encrypt visibility for {}: {}", id, e))
-            })?;
+            let encrypted = encrypt_and_verify(key, json.as_bytes(), "visibility_rules")?;
             conn.execute(
                 "UPDATE contacts SET visibility_rules_encrypted = ?1, visibility_rules_json = NULL WHERE id = ?2",
                 rusqlite::params![encrypted, id],
@@ -1422,8 +1438,7 @@ fn migrate_v23_encrypt_label_names(
         .map_err(|e| StorageError::Migration(format!("Collect labels: {}", e)))?;
 
     for (id, name) in &rows {
-        let name_encrypted = crate::crypto::encrypt(key, name.as_bytes())
-            .map_err(|e| StorageError::Migration(format!("Encrypt label name: {}", e)))?;
+        let name_encrypted = encrypt_and_verify(key, name.as_bytes(), "label_name")?;
         let name_hmac_value = hmac::sign(&hmac_key, name.as_bytes());
 
         // Set plaintext name to the label id (satisfies UNIQUE constraint without leaking data)
@@ -1442,6 +1457,14 @@ fn migrate_v23_encrypt_label_names(
 /// Previously all ratchet states were encrypted with the shared storage master key.
 /// This migration re-encrypts each row using an HKDF-derived per-contact key,
 /// ensuring that compromising one contact's ratchet state does not expose the SMK.
+/// Migration v25: Add `last_delta_version` column to contacts (#42).
+///
+/// Tracks the highest delta version received from each contact,
+/// enabling rejection of stale/downgraded updates.
+const MIGRATION_V25_DELTA_VERSION: &str = "
+    ALTER TABLE contacts ADD COLUMN last_delta_version INTEGER DEFAULT 0;
+";
+
 fn migrate_v24_per_contact_ratchet_keys(
     conn: &Connection,
     key: &SymmetricKey,

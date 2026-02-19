@@ -156,12 +156,18 @@ impl CardDelta {
             .expect("System RNG should not fail");
 
         CardDelta {
-            version: 1, // Will be set properly during signing
+            version: 1, // Default; callers should set via set_version() before signing
             timestamp: now,
             changes,
             nonce,
             signature: [0u8; 64], // Will be set during signing
         }
+    }
+
+    /// Sets the version number (#42). Must be called before `sign()` because
+    /// the version is included in the signed payload.
+    pub fn set_version(&mut self, version: u32) {
+        self.version = version;
     }
 
     /// Signs the delta with the given identity, binding to the recipient.

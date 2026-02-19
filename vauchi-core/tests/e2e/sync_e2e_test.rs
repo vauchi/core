@@ -127,7 +127,7 @@ fn test_sync_update_propagation_happy_path() {
 #[test]
 fn test_sync_manager_queue_happy_path() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
-    let sync_manager = SyncManager::new(&storage);
+    let mut sync_manager = SyncManager::new(&storage);
 
     let mut old_card = ContactCard::new("Alice");
     old_card

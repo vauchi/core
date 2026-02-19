@@ -21,7 +21,7 @@ fn test_sync_manager_workflow() {
 
     // Create storage
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
-    let sync_manager = SyncManager::new(&storage);
+    let mut sync_manager = SyncManager::new(&storage);
 
     // Queue a card update
     let mut old_card = ContactCard::new("Test");

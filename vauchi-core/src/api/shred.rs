@@ -19,7 +19,7 @@ use crate::api::account::{AccountError, DeletionManager};
 use crate::api::pre_signed::{PreSignedPurgeRequest, PreSignedShredMessages};
 use crate::identity::Identity;
 use crate::storage::secure::SecureStorage;
-use crate::storage::Storage;
+use crate::storage::{DeletionState, Storage};
 
 /// Trait for sending relay purge requests during shred operations.
 ///
@@ -194,14 +194,25 @@ impl<'a> ShredManager<'a> {
     /// relay before destroying local data. Purge failure does not abort shred.
     pub fn hard_shred(
         &self,
-        _token: ShredToken,
+        token: ShredToken,
         purge_sender: Option<&mut dyn PurgeSender>,
         revocation_sender: Option<&mut dyn RevocationSender>,
     ) -> Result<ShredReport, ShredError> {
         let mut report = ShredReport::default();
 
-        // 1. Verify grace period has elapsed and generate revocations
+        // Validate ShredToken was created at or after the scheduled deletion time (#199a).
+        // This ensures the token came from soft_shred(), not fabricated independently.
         let dm = DeletionManager::new(self.storage);
+        let state = dm.deletion_state()?;
+        if let DeletionState::Scheduled { scheduled_at, .. } = &state {
+            if token.created_at() < *scheduled_at {
+                return Err(ShredError::Account(AccountError::DeletionFailed(
+                    "ShredToken predates scheduled deletion".to_string(),
+                )));
+            }
+        }
+
+        // 1. Verify grace period has elapsed and generate revocations
         let deletion_result = dm.execute_deletion(self.identity)?;
 
         // 2. Send revocation notifications to contacts (best-effort, while keys alive)
@@ -381,6 +392,9 @@ impl<'a> ShredManager<'a> {
     }
 
     fn secure_delete_database(&self) -> bool {
+        // Flush WAL into main DB before file-level overwrite (#81)
+        let _ = self.storage.wal_checkpoint();
+
         let db_path = self.data_dir.join("vauchi.db");
         let mut success = true;
 
@@ -400,7 +414,8 @@ impl<'a> ShredManager<'a> {
     fn delete_pre_signed_file(&self) -> bool {
         let path = PreSignedShredMessages::file_path(&self.data_dir);
         if path.exists() {
-            std::fs::remove_file(&path).is_ok()
+            // Use secure overwrite instead of bare remove_file (#200a)
+            secure_overwrite_file(&path).is_ok()
         } else {
             true
         }
@@ -506,10 +521,10 @@ pub fn widget_panic_shred(
     }
     report.sqlite_destroyed = db_success;
 
-    // 5. Delete pre-signed messages file
+    // 5. Delete pre-signed messages file (secure overwrite, #200a)
     let pre_signed_path = PreSignedShredMessages::file_path(data_dir);
     report.pre_signed_deleted = if pre_signed_path.exists() {
-        std::fs::remove_file(&pre_signed_path).is_ok()
+        secure_overwrite_file(&pre_signed_path).is_ok()
     } else {
         true
     };
@@ -524,9 +539,19 @@ pub fn widget_panic_shred(
     Ok(report)
 }
 
+/// Public entry point for secure file overwrite, callable from other modules.
+pub(crate) fn secure_overwrite_file_public(path: &Path) -> Result<(), std::io::Error> {
+    secure_overwrite_file(path)
+}
+
 /// Securely overwrites a file with random data then zeros before removing it.
+///
+/// Uses 2-pass overwrite (#200a): random data (destroys original bit patterns)
+/// followed by zeros (verifiable wipe). Both passes are flushed to disk with
+/// `sync_all()` to ensure the overwrite reaches physical storage.
 fn secure_overwrite_file(path: &Path) -> Result<(), std::io::Error> {
-    use std::io::Write;
+    use ring::rand::SecureRandom;
+    use std::io::{Seek, Write};
 
     if !path.exists() {
         return Ok(());
@@ -540,7 +565,16 @@ fn secure_overwrite_file(path: &Path) -> Result<(), std::io::Error> {
 
     let mut file = std::fs::OpenOptions::new().write(true).open(path)?;
 
-    // Pass 1: Overwrite with zeros (simple, cross-platform)
+    // Pass 1: Overwrite with random data
+    let rng = ring::rand::SystemRandom::new();
+    let mut random = vec![0u8; size];
+    rng.fill(&mut random)
+        .map_err(|_| std::io::Error::new(std::io::ErrorKind::Other, "RNG fill failed"))?;
+    file.write_all(&random)?;
+    file.sync_all()?;
+
+    // Pass 2: Overwrite with zeros
+    file.seek(std::io::SeekFrom::Start(0))?;
     let zeros = vec![0u8; size];
     file.write_all(&zeros)?;
     file.sync_all()?;

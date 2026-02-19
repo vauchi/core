@@ -771,6 +771,15 @@ impl<T: Transport> Vauchi<T> {
             }
         }
 
+        // Reject stale/downgraded delta versions (#42)
+        let last_version = self.storage.last_delta_version(contact_id).unwrap_or(0);
+        if delta.version > 0 && delta.version < last_version {
+            return Err(VauchiError::InvalidState(format!(
+                "stale delta version {} (last applied: {})",
+                delta.version, last_version
+            )));
+        }
+
         // Get changed fields before applying
         let changed = delta.changed_fields();
 
@@ -795,6 +804,10 @@ impl<T: Transport> Vauchi<T> {
             self.storage
                 .save_replay_nonce(contact_id, &delta.nonce, delta.timestamp)?;
             self.storage.save_contact(&contact)?;
+            // Track delta version for downgrade detection (#42)
+            if delta.version > 0 {
+                self.storage.record_delta_version(contact_id, delta.version)?;
+            }
             Ok(())
         })();
 

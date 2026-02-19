@@ -130,17 +130,22 @@ impl<'a> SyncManager<'a> {
     /// it for delivery. Multiple updates to the same contact may be
     /// coalesced into a single update.
     pub fn queue_card_update(
-        &self,
+        &mut self,
         contact_id: &str,
         old_card: &ContactCard,
         new_card: &ContactCard,
     ) -> Result<String, SyncError> {
         // Compute delta
-        let delta = CardDelta::compute(old_card, new_card);
+        let mut delta = CardDelta::compute(old_card, new_card);
 
         if delta.changes.is_empty() {
             return Err(SyncError::NoChanges);
         }
+
+        // Auto-increment version per contact (#42)
+        let next_version = self.last_applied_versions.get(contact_id).copied().unwrap_or(0) + 1;
+        delta.set_version(next_version);
+        self.record_applied_version(contact_id, next_version);
 
         // Serialize delta
         let payload =

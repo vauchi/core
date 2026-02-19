@@ -38,7 +38,7 @@ fn first_field_id(card: &ContactCard) -> String {
 #[test]
 fn test_rapid_edits_coalesce_into_single_sync_payload() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
-    let sync_manager = SyncManager::new(&storage);
+    let mut sync_manager = SyncManager::new(&storage);
 
     let contact_id = "test-contact-001";
     let mut current_card = base_card();
@@ -85,7 +85,7 @@ fn test_rapid_edits_coalesce_into_single_sync_payload() {
 #[test]
 fn test_coalesce_preserves_final_state() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
-    let sync_manager = SyncManager::new(&storage);
+    let mut sync_manager = SyncManager::new(&storage);
 
     let contact_id = "test-contact-002";
     let original_card = base_card();
@@ -131,7 +131,7 @@ fn test_coalesce_preserves_final_state() {
 #[test]
 fn test_coalesce_skips_when_single_update() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
-    let sync_manager = SyncManager::new(&storage);
+    let mut sync_manager = SyncManager::new(&storage);
 
     let contact_id = "test-contact-003";
     let original_card = base_card();
@@ -182,7 +182,7 @@ fn test_batch_encryption_50_contacts() {
 #[test]
 fn test_batch_sync_multiple_contacts_pending() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
-    let sync_manager = SyncManager::new(&storage);
+    let mut sync_manager = SyncManager::new(&storage);
 
     let original_card = base_card();
     let field_id = first_field_id(&original_card);
@@ -211,7 +211,7 @@ fn test_batch_sync_multiple_contacts_pending() {
 #[test]
 fn test_coalesce_does_not_affect_other_update_types() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
-    let sync_manager = SyncManager::new(&storage);
+    let mut sync_manager = SyncManager::new(&storage);
 
     let contact_id = "test-contact-004";
     let original_card = base_card();

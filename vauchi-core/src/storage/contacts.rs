@@ -733,6 +733,39 @@ impl Storage {
         Ok(())
     }
 
+    /// Returns the last applied delta version for a contact (#42).
+    ///
+    /// Returns 0 if no version has been recorded (new or legacy contact).
+    pub fn last_delta_version(&self, contact_id: &str) -> Result<u32, StorageError> {
+        let version: i64 = self
+            .conn
+            .query_row(
+                "SELECT COALESCE(last_delta_version, 0) FROM contacts WHERE id = ?1",
+                params![contact_id],
+                |row| row.get(0),
+            )
+            .map_err(|e| match e {
+                rusqlite::Error::QueryReturnedNoRows => {
+                    StorageError::NotFound(format!("Contact: {}", contact_id))
+                }
+                other => StorageError::Database(other),
+            })?;
+        Ok(version as u32)
+    }
+
+    /// Records the last applied delta version for a contact (#42).
+    pub fn record_delta_version(
+        &self,
+        contact_id: &str,
+        version: u32,
+    ) -> Result<(), StorageError> {
+        self.conn.execute(
+            "UPDATE contacts SET last_delta_version = ?1 WHERE id = ?2",
+            params![version as i64, contact_id],
+        )?;
+        Ok(())
+    }
+
     // === Revoked Senders Operations ===
 
     /// Records a revoked sender in the tombstone table.

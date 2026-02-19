@@ -18,7 +18,7 @@ fn create_test_storage() -> Storage {
 #[test]
 fn test_sync_queue_card_update() {
     let storage = create_test_storage();
-    let manager = SyncManager::new(&storage);
+    let mut manager = SyncManager::new(&storage);
 
     let mut old_card = ContactCard::new("Alice");
     let _ = old_card.add_field(ContactField::new(
@@ -47,7 +47,7 @@ fn test_sync_queue_card_update() {
 #[test]
 fn test_sync_no_changes() {
     let storage = create_test_storage();
-    let manager = SyncManager::new(&storage);
+    let mut manager = SyncManager::new(&storage);
 
     let card = ContactCard::new("Alice");
 
@@ -58,7 +58,7 @@ fn test_sync_no_changes() {
 #[test]
 fn test_sync_queue_visibility_change() {
     let storage = create_test_storage();
-    let manager = SyncManager::new(&storage);
+    let mut manager = SyncManager::new(&storage);
 
     let update_id = manager
         .queue_visibility_change("contact-1", vec!["email".to_string(), "phone".to_string()])
@@ -74,7 +74,7 @@ fn test_sync_queue_visibility_change() {
 #[test]
 fn test_sync_mark_delivered() {
     let storage = create_test_storage();
-    let manager = SyncManager::new(&storage);
+    let mut manager = SyncManager::new(&storage);
 
     let mut old_card = ContactCard::new("Alice");
     let _ = old_card.add_field(ContactField::new(
@@ -104,7 +104,7 @@ fn test_sync_mark_delivered() {
 #[test]
 fn test_sync_mark_failed_with_backoff() {
     let storage = create_test_storage();
-    let manager = SyncManager::new(&storage);
+    let mut manager = SyncManager::new(&storage);
 
     let mut old_card = ContactCard::new("Alice");
     let _ = old_card.add_field(ContactField::new(
@@ -135,7 +135,7 @@ fn test_sync_mark_failed_with_backoff() {
 #[test]
 fn test_sync_state_pending() {
     let storage = create_test_storage();
-    let manager = SyncManager::new(&storage);
+    let mut manager = SyncManager::new(&storage);
 
     let mut old_card = ContactCard::new("Alice");
     let _ = old_card.add_field(ContactField::new(
@@ -168,7 +168,7 @@ fn test_sync_state_pending() {
 #[test]
 fn test_sync_state_synced() {
     let storage = create_test_storage();
-    let manager = SyncManager::new(&storage);
+    let mut manager = SyncManager::new(&storage);
 
     let state = manager.get_sync_state("contact-1").unwrap();
     assert!(matches!(state, SyncState::Synced { .. }));
@@ -177,7 +177,7 @@ fn test_sync_state_synced() {
 #[test]
 fn test_sync_state_failed() {
     let storage = create_test_storage();
-    let manager = SyncManager::new(&storage);
+    let mut manager = SyncManager::new(&storage);
 
     let mut old_card = ContactCard::new("Alice");
     let _ = old_card.add_field(ContactField::new(
@@ -205,7 +205,7 @@ fn test_sync_state_failed() {
 #[test]
 fn test_sync_coalesce_updates() {
     let storage = create_test_storage();
-    let manager = SyncManager::new(&storage);
+    let mut manager = SyncManager::new(&storage);
 
     // Queue multiple updates
     let card1 = ContactCard::new("Alice");
@@ -243,7 +243,7 @@ fn test_sync_coalesce_updates() {
 #[test]
 fn test_sync_status_multiple_contacts() {
     let storage = create_test_storage();
-    let manager = SyncManager::new(&storage);
+    let mut manager = SyncManager::new(&storage);
 
     let card1 = ContactCard::new("Alice");
     let mut card2 = ContactCard::new("Alice");
@@ -271,7 +271,7 @@ fn test_sync_status_multiple_contacts() {
 #[test]
 fn test_sync_state_tracks_last_sync_timestamp() {
     let storage = create_test_storage();
-    let manager = SyncManager::new(&storage);
+    let mut manager = SyncManager::new(&storage);
 
     let mut old_card = ContactCard::new("Alice");
     let _ = old_card.add_field(ContactField::new(

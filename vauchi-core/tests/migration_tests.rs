@@ -536,7 +536,7 @@ fn run_migrations_up_to(conn: &Connection, key: &SymmetricKey, up_to_version: u3
         .into_iter()
         .filter(|m| m.version <= up_to_version)
         .collect();
-    MigrationRunner::run(conn, key, &subset).unwrap();
+    MigrationRunner::run(conn, key, &subset, None).unwrap();
 }
 
 #[test]
@@ -721,19 +721,19 @@ fn test_migration_v21_creates_decoy_contacts_table() {
 }
 
 #[test]
-fn test_schema_version_is_21_after_all_migrations() {
+fn test_schema_version_after_all_migrations() {
     let conn = Connection::open_in_memory().unwrap();
     let key = SymmetricKey::generate();
 
     // Run ALL migrations
     let migrations = all_migrations();
-    MigrationRunner::run(&conn, &key, &migrations).unwrap();
+    MigrationRunner::run(&conn, &key, &migrations, None).unwrap();
 
     // Verify final schema version
     let version = MigrationRunner::current_version(&conn).unwrap();
     assert_eq!(
-        version, 25,
-        "Schema version should be 25 after all migrations, got {}",
+        version, 26,
+        "Schema version should be 26 after all migrations, got {}",
         version
     );
 }
@@ -895,7 +895,7 @@ fn test_add_column_idempotent_via_double_migration() {
 
     // Run all migrations once (creates all columns)
     let migrations = all_migrations();
-    MigrationRunner::run(&conn, &key, &migrations).unwrap();
+    MigrationRunner::run(&conn, &key, &migrations, None).unwrap();
 
     // Verify v14 columns exist
     let has_card_encrypted: bool = conn
@@ -910,7 +910,7 @@ fn test_add_column_idempotent_via_double_migration() {
     );
 
     // Running migrations again should be a no-op (version guard)
-    MigrationRunner::run(&conn, &key, &migrations).unwrap();
+    MigrationRunner::run(&conn, &key, &migrations, None).unwrap();
 
     // Verify the column still exists and nothing broke
     let still_has: bool = conn

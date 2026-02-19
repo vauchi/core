@@ -8,6 +8,21 @@
 //! Each migration has a version number, name, and either SQL or a Rust callback.
 //! The runner tracks applied versions in a `schema_version` table and runs
 //! pending migrations in order within a single transaction.
+//!
+//! ## Design Decision: Forward-Only Migrations (#17)
+//!
+//! This framework intentionally does not support down-migrations (rollback).
+//! Rationale:
+//! - Down-migrations are rarely tested and often broken in production
+//! - Vauchi's data is encrypted at rest — reversing encryption migrations
+//!   would require the original key, making rollback unsafe
+//! - SQLite has no DROP COLUMN, making schema reversal impractical
+//!
+//! If a migration fails, the transaction is rolled back atomically.
+//! If a deployed migration needs reversal, a new forward migration should
+//! undo the changes explicitly.
+
+use std::path::Path;
 
 use rusqlite::Connection;
 
@@ -45,10 +60,14 @@ impl MigrationRunner {
     /// any migrations whose version is greater than the current schema version.
     /// All pending migrations run within a single transaction — if any migration
     /// fails, all changes are rolled back.
+    ///
+    /// If `db_path` is provided and there are pending migrations, a backup is
+    /// created at `<db_path>.pre-migration-v<current>.bak` before applying (#17).
     pub fn run(
         conn: &Connection,
         key: &SymmetricKey,
         migrations: &[Migration],
+        db_path: Option<&Path>,
     ) -> Result<(), StorageError> {
         // Create the schema_version table if it doesn't exist (outside transaction,
         // since we need to read it before starting the migration transaction).
@@ -69,6 +88,32 @@ impl MigrationRunner {
 
         if pending.is_empty() {
             return Ok(());
+        }
+
+        // Create pre-migration backup for file-based databases (#17).
+        // Uses VACUUM INTO for a consistent snapshot. Failure is logged but
+        // does not block migration — the transaction provides rollback safety.
+        if let Some(path) = db_path {
+            let backup_path = path.with_extension(format!(
+                "pre-migration-v{}.bak",
+                current_version
+            ));
+            if let Err(e) = conn.execute(
+                "VACUUM INTO ?1",
+                rusqlite::params![backup_path.to_string_lossy().as_ref()],
+            ) {
+                eprintln!(
+                    "Pre-migration backup to {:?} failed (non-fatal): {}",
+                    backup_path, e
+                );
+            } else {
+                eprintln!(
+                    "Pre-migration backup created at {:?} (v{} → v{})",
+                    backup_path,
+                    current_version,
+                    pending.last().map(|m| m.version).unwrap_or(0)
+                );
+            }
         }
 
         // Verify migrations are in order
@@ -346,6 +391,11 @@ pub fn all_migrations() -> Vec<Migration> {
             name: "contact_delta_version_tracking",
             action: MigrationAction::Sql(MIGRATION_V25_DELTA_VERSION),
         },
+        Migration {
+            version: 26,
+            name: "recovery_settings",
+            action: MigrationAction::Sql(MIGRATION_V26_RECOVERY_SETTINGS),
+        },
     ]
 }
 
@@ -415,6 +465,18 @@ const MIGRATION_V22_EMERGENCY_CONFIG: &str = "
         message_encrypted BLOB,
         include_location INTEGER DEFAULT 0,
         created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+    );
+";
+
+/// Migration v23: Recovery settings persistence (#77).
+///
+/// Singleton table (id = 1) storing encrypted recovery thresholds.
+/// `settings_encrypted` is a JSON blob encrypted with the storage key.
+const MIGRATION_V26_RECOVERY_SETTINGS: &str = "
+    CREATE TABLE IF NOT EXISTS recovery_settings (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        settings_encrypted BLOB NOT NULL,
         updated_at INTEGER NOT NULL
     );
 ";

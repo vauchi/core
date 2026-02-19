@@ -9,6 +9,7 @@
 use rusqlite::params;
 
 use super::{Storage, StorageError};
+use crate::recovery::RecoverySettings;
 
 impl Storage {
     // === Recovery Response Operations ===
@@ -141,5 +142,54 @@ impl Storage {
         )?;
 
         Ok(())
+    }
+
+    // === Recovery Settings Persistence (#77) ===
+
+    /// Saves recovery settings to storage (encrypted).
+    pub fn save_recovery_settings(
+        &self,
+        settings: &RecoverySettings,
+    ) -> Result<(), StorageError> {
+        let json = serde_json::to_vec(settings)
+            .map_err(|e| StorageError::Serialization(e.to_string()))?;
+        let encrypted = crate::crypto::encrypt(&self.encryption_key, &json)
+            .map_err(|e| StorageError::Encryption(e.to_string()))?;
+
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("system time before UNIX epoch")
+            .as_secs();
+
+        self.conn.execute(
+            "INSERT OR REPLACE INTO recovery_settings (id, settings_encrypted, updated_at)
+             VALUES (1, ?1, ?2)",
+            params![encrypted, now as i64],
+        )?;
+        Ok(())
+    }
+
+    /// Loads recovery settings from storage.
+    ///
+    /// Returns `None` if no settings have been saved, in which case callers
+    /// should use `RecoverySettings::default()`.
+    pub fn load_recovery_settings(&self) -> Result<Option<RecoverySettings>, StorageError> {
+        let result = self.conn.query_row(
+            "SELECT settings_encrypted FROM recovery_settings WHERE id = 1",
+            [],
+            |row| row.get::<_, Vec<u8>>(0),
+        );
+
+        match result {
+            Ok(encrypted) => {
+                let json = crate::crypto::decrypt(&self.encryption_key, &encrypted)
+                    .map_err(|e| StorageError::Encryption(e.to_string()))?;
+                let settings: RecoverySettings = serde_json::from_slice(&json)
+                    .map_err(|e| StorageError::Serialization(e.to_string()))?;
+                Ok(Some(settings))
+            }
+            Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+            Err(e) => Err(StorageError::Database(e)),
+        }
     }
 }

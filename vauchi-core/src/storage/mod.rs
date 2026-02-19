@@ -118,10 +118,20 @@ use crate::crypto::{SymmetricKey, HKDF};
 ///
 /// Stores data in a local SQLite database with application-level encryption
 /// for sensitive fields (keys, cards, etc.).
+///
+/// # Thread Safety (#80)
+///
+/// `Storage` is intentionally **not `Send`** because `rusqlite::Connection`
+/// is not `Send`. Each client creates its own `Storage` instance on its
+/// thread. For async contexts, wrap in `tokio::task::spawn_blocking` or use
+/// a dedicated storage thread with a channel. The UniFFI mobile bindings
+/// open a fresh storage per call via `open_vauchi()`.
 pub struct Storage {
     conn: Connection,
     /// Encryption key derived from user's master key
     pub(crate) encryption_key: SymmetricKey,
+    /// Database file path (None for in-memory databases).
+    db_path: Option<std::path::PathBuf>,
 }
 
 impl Storage {
@@ -130,11 +140,13 @@ impl Storage {
         path: P,
         encryption_key: SymmetricKey,
     ) -> Result<Self, StorageError> {
-        let conn = Connection::open(path)?;
+        let path_buf = path.as_ref().to_path_buf();
+        let conn = Connection::open(&path_buf)?;
         Self::configure_pragmas(&conn)?;
         let storage = Storage {
             conn,
             encryption_key,
+            db_path: Some(path_buf),
         };
         storage.run_migrations()?;
         Ok(storage)
@@ -147,6 +159,7 @@ impl Storage {
         let storage = Storage {
             conn,
             encryption_key,
+            db_path: None,
         };
         storage.run_migrations()?;
         Ok(storage)
@@ -183,9 +196,17 @@ impl Storage {
     }
 
     /// Runs all pending schema migrations.
+    ///
+    /// For file-based databases, creates a pre-migration backup before
+    /// applying pending migrations (#17).
     fn run_migrations(&self) -> Result<(), StorageError> {
         let migrations = migration::all_migrations();
-        migration::MigrationRunner::run(&self.conn, &self.encryption_key, &migrations)
+        migration::MigrationRunner::run(
+            &self.conn,
+            &self.encryption_key,
+            &migrations,
+            self.db_path.as_deref(),
+        )
     }
 
     /// Returns the current schema version.
@@ -224,7 +245,22 @@ impl Storage {
     ///
     /// The operation runs in a single transaction for atomicity — if any step
     /// fails, all changes are rolled back and the old key remains valid.
+    ///
+    /// The optional `progress` callback receives `(completed_tables, total_tables, table_name)`
+    /// after each table is re-encrypted (#166a).
     pub fn rekey(&mut self, new_key: SymmetricKey) -> Result<(), StorageError> {
+        self.rekey_with_progress(new_key, None)
+    }
+
+    /// Re-encrypts all encrypted columns with progress reporting (#166a).
+    ///
+    /// See [`rekey`] for details. The `progress` callback, if provided,
+    /// is called after each table completes with `(completed, total, table_name)`.
+    pub fn rekey_with_progress(
+        &mut self,
+        new_key: SymmetricKey,
+        progress: Option<&dyn Fn(u32, u32, &str)>,
+    ) -> Result<(), StorageError> {
         use crate::crypto::{decrypt, encrypt};
         use rusqlite::params;
 
@@ -232,6 +268,15 @@ impl Storage {
         self.wal_checkpoint()?;
 
         let old_key = &self.encryption_key;
+        const TOTAL_TABLES: u32 = 20;
+        let mut completed: u32 = 0;
+
+        let report = |completed: &mut u32, table: &str| {
+            *completed += 1;
+            if let Some(cb) = &progress {
+                cb(*completed, TOTAL_TABLES, table);
+            }
+        };
 
         self.conn.execute_batch("BEGIN EXCLUSIVE TRANSACTION")?;
 
@@ -270,6 +315,7 @@ impl Storage {
                     ).map_err(|e| StorageError::Migration(format!("Update contact {}: {}", id, e)))?;
                 }
             }
+            report(&mut completed, "contacts");
 
             // Re-encrypt contacts: personal_notes_encrypted and avatar_encrypted (nullable)
             {
@@ -316,6 +362,7 @@ impl Storage {
                     ).map_err(|e| StorageError::Migration(format!("Update contact extras {}: {}", id, e)))?;
                 }
             }
+            report(&mut completed, "contact_extras");
 
             // Re-encrypt identity: backup_data_encrypted
             {
@@ -338,6 +385,7 @@ impl Storage {
                         .map_err(|e| StorageError::Migration(format!("Update identity: {}", e)))?;
                 }
             }
+            report(&mut completed, "identity");
 
             // Re-encrypt ratchet state with per-contact derived keys (#126)
             {
@@ -380,6 +428,7 @@ impl Storage {
                     ).map_err(|e| StorageError::Migration(format!("Update ratchet {}: {}", contact_id, e)))?;
                 }
             }
+            report(&mut completed, "ratchets");
 
             // Re-encrypt own_card: card_json_encrypted
             {
@@ -408,6 +457,7 @@ impl Storage {
                     }
                 }
             }
+            report(&mut completed, "own_card");
 
             // Re-encrypt device_registry: registry_json_encrypted
             {
@@ -432,6 +482,7 @@ impl Storage {
                     }
                 }
             }
+            report(&mut completed, "device_registry");
 
             // Re-encrypt device_sync_state: state_json_encrypted
             {
@@ -461,6 +512,7 @@ impl Storage {
                     }
                 }
             }
+            report(&mut completed, "device_sync_state");
 
             // Re-encrypt visibility_labels: contacts_json_encrypted, visible_fields_json_encrypted, name_encrypted, name_hmac
             {
@@ -540,6 +592,7 @@ impl Storage {
                     ).map_err(|e| StorageError::Migration(format!("Update label {}: {}", id, e)))?;
                 }
             }
+            report(&mut completed, "visibility_labels");
 
             // Re-encrypt device_info: device_info_encrypted
             {
@@ -568,6 +621,7 @@ impl Storage {
                     }
                 }
             }
+            report(&mut completed, "device_info");
 
             // Re-encrypt version_vector: vector_json_encrypted
             {
@@ -596,6 +650,7 @@ impl Storage {
                     }
                 }
             }
+            report(&mut completed, "version_vector");
 
             // Re-encrypt contact_sync_timestamps: last_sync_at_encrypted
             {
@@ -626,6 +681,7 @@ impl Storage {
                     }
                 }
             }
+            report(&mut completed, "sync_timestamps");
 
             // Re-encrypt pending_updates: payload_encrypted
             {
@@ -658,6 +714,7 @@ impl Storage {
                     }
                 }
             }
+            report(&mut completed, "pending_updates");
 
             // Re-encrypt retry_entries: payload_encrypted
             {
@@ -686,6 +743,7 @@ impl Storage {
                     }
                 }
             }
+            report(&mut completed, "retry_entries");
 
             // Re-encrypt device_sync_checkpoints: items_json_encrypted
             {
@@ -714,6 +772,7 @@ impl Storage {
                     }
                 }
             }
+            report(&mut completed, "device_sync_checkpoints");
 
             // Re-encrypt recovery_responses: response_encrypted
             {
@@ -742,6 +801,7 @@ impl Storage {
                     }
                 }
             }
+            report(&mut completed, "recovery_responses");
 
             // Re-encrypt deletion_state: state_json_encrypted
             {
@@ -770,6 +830,7 @@ impl Storage {
                     }
                 }
             }
+            report(&mut completed, "deletion_state");
 
             // Re-encrypt sync_checkpoints: state_json_encrypted
             {
@@ -808,6 +869,7 @@ impl Storage {
                     }
                 }
             }
+            report(&mut completed, "sync_checkpoints");
 
             // Re-encrypt field_validations: field_value_encrypted, signature_encrypted
             {
@@ -862,6 +924,7 @@ impl Storage {
                     }
                 }
             }
+            report(&mut completed, "field_validations");
 
             // Re-encrypt ux_state: aha_tracker_json_encrypted, demo_contact_json_encrypted
             {
@@ -907,6 +970,7 @@ impl Storage {
                     }
                 }
             }
+            report(&mut completed, "ux_state");
 
             // Re-encrypt audit_log: details_encrypted
             {
@@ -938,6 +1002,7 @@ impl Storage {
                     }
                 }
             }
+            report(&mut completed, "audit_log");
 
             Ok(())
         })();

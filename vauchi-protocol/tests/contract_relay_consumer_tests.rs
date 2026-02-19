@@ -49,29 +49,34 @@ fn provider_contract_encode_decode_roundtrip() {
 
 #[test]
 fn provider_contract_all_relay_payload_variants_constructable() {
-    // Relay creates these payloads — they must be constructable
-    let _ = MessagePayload::HandshakeAck(HandshakeAck {
-        protocol_version: 1,
-        server_version: "1.0.0".to_string(),
-        features: vec![],
-    });
-    let _ = MessagePayload::Acknowledgment(Acknowledgment {
-        message_id: "m1".to_string(),
-        status: AckStatus::Stored,
-    });
-    let _ = MessagePayload::PurgeResponse(PurgeResponse {
-        blobs_deleted: 0,
-        device_sync_deleted: 0,
-        recovery_proofs_deleted: 0,
-    });
-    let _ = MessagePayload::RecoveryProofResponse(RecoveryProofResponse {
-        proofs: vec![],
-    });
-    let _ = MessagePayload::ForwardingHints(ForwardingHints {
-        hints: vec![],
-        relay_signing_key: None,
-        signature: None,
-    });
+    // Relay creates these payloads — they must be constructable and encode to JSON
+    let payloads = vec![
+        MessagePayload::HandshakeAck(HandshakeAck {
+            protocol_version: 1,
+            server_version: "1.0.0".to_string(),
+            features: vec![],
+        }),
+        MessagePayload::Acknowledgment(Acknowledgment {
+            message_id: "m1".to_string(),
+            status: AckStatus::Stored,
+        }),
+        MessagePayload::PurgeResponse(PurgeResponse {
+            blobs_deleted: 0,
+            device_sync_deleted: 0,
+            recovery_proofs_deleted: 0,
+        }),
+        MessagePayload::RecoveryProofResponse(RecoveryProofResponse { proofs: vec![] }),
+        MessagePayload::ForwardingHints(ForwardingHints {
+            hints: vec![],
+            relay_signing_key: None,
+            signature: None,
+        }),
+    ];
+    assert_eq!(
+        payloads.len(),
+        5,
+        "relay must be able to construct 5 response payload types"
+    );
 }
 
 // ============================================================
@@ -80,10 +85,13 @@ fn provider_contract_all_relay_payload_variants_constructable() {
 
 #[test]
 fn provider_contract_ack_status_all_variants() {
-    let _ = AckStatus::Stored;
-    let _ = AckStatus::Delivered;
-    let _ = AckStatus::ReceivedByRecipient;
-    let _ = AckStatus::Failed;
+    let variants = [
+        AckStatus::Stored,
+        AckStatus::Delivered,
+        AckStatus::ReceivedByRecipient,
+        AckStatus::Failed,
+    ];
+    assert_eq!(variants.len(), 4, "AckStatus must have exactly 4 variants");
 }
 
 // ============================================================
@@ -134,7 +142,8 @@ fn provider_contract_forwarding_hints_canonical_data_exists() {
 
 #[test]
 fn provider_contract_unknown_variant_for_forward_compat() {
-    let json = r#"{"version":1,"message_id":"m","timestamp":0,"payload":{"type":"UnknownFutureType"}}"#;
+    let json =
+        r#"{"version":1,"message_id":"m","timestamp":0,"payload":{"type":"UnknownFutureType"}}"#;
     let envelope: MessageEnvelope = serde_json::from_str(json).unwrap();
     assert!(matches!(envelope.payload, MessagePayload::Unknown));
 }

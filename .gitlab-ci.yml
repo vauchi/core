@@ -58,6 +58,11 @@ stages:
   - publish
   - trigger
 
+# Override: advisory until pre-existing proptest/fuzz zero-assertion tests
+# are refactored (scanner cannot detect prop_assert! inside proptest! macros)
+quality:zero-assertions:
+  allow_failure: true
+
 # ============================================================
 # Auto-Tag Stage (main branch only)
 # ============================================================

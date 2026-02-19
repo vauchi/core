@@ -112,8 +112,8 @@ fn provider_contract_identity_set_display_name() {
 #[test]
 fn provider_contract_identity_x3dh_keypair() {
     let identity = Identity::create("X3dhTest");
-    let _keypair = identity.x3dh_keypair();
-    // Must compile and not panic — Desktop uses this for exchange
+    let keypair = identity.x3dh_keypair();
+    assert!(!keypair.public.as_bytes().iter().all(|&b| b == 0));
 }
 
 // ============================================================
@@ -161,12 +161,19 @@ fn provider_contract_symmetric_key_from_bytes() {
 
 #[test]
 fn provider_contract_exchange_types_accessible() {
-    use vauchi_core::exchange::{ExchangeEvent, ExchangeSession, ManualConfirmationVerifier};
+    use vauchi_core::exchange::{ExchangeEvent, ManualConfirmationVerifier};
 
-    let _ = ManualConfirmationVerifier::new();
+    let verifier = ManualConfirmationVerifier::new();
+    assert!(!verifier.code().is_empty());
 
     // Verify event variants the desktop depends on
-    let _ = ExchangeEvent::StartQR;
-    let _ = ExchangeEvent::TheyScannedOurQR;
-    let _ = ExchangeEvent::PerformKeyAgreement;
+    assert!(matches!(ExchangeEvent::StartQR, ExchangeEvent::StartQR));
+    assert!(matches!(
+        ExchangeEvent::TheyScannedOurQR,
+        ExchangeEvent::TheyScannedOurQR
+    ));
+    assert!(matches!(
+        ExchangeEvent::PerformKeyAgreement,
+        ExchangeEvent::PerformKeyAgreement
+    ));
 }

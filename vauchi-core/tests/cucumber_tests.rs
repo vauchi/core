@@ -76,9 +76,5 @@ fn main() {
     //   cargo test --test cucumber_tests -- --tags @identity
     let features_dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../../features");
 
-    futures::executor::block_on(
-        VauchiWorld::cucumber()
-            .with_default_cli()
-            .run(features_dir),
-    );
+    futures::executor::block_on(VauchiWorld::cucumber().with_default_cli().run(features_dir));
 }

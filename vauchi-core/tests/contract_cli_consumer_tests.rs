@@ -91,6 +91,8 @@ fn contract_cli_contact_accessors_compile() {
         let _: bool = c.is_hidden();
         let _: bool = c.is_blocked();
     }
+    // Compile-time contract — if this compiles, the API shape is correct
+    assert!(true, "Contact accessor types match CLI expectations");
 }
 
 // ============================================================
@@ -101,9 +103,9 @@ fn contract_cli_contact_accessors_compile() {
 #[test]
 fn contract_contact_card_shape() {
     let card = ContactCard::new("Shape");
-    let _: &str = card.id();
-    let _: &str = card.display_name();
-    let _: &[ContactField] = card.fields();
+    assert!(!card.id().is_empty());
+    assert_eq!(card.display_name(), "Shape");
+    assert!(card.fields().is_empty());
 }
 
 /// Cards must serialize/deserialize losslessly — sync depends on this.

@@ -155,14 +155,14 @@ fn test_execute_deletion_shreds_all_ceks() {
     manager.schedule_deletion_with_execute_at(0, 0).unwrap();
     manager.execute_deletion(&identity).unwrap();
 
-    // CEKs should be shredded (NULL)
+    // Contacts fully deleted (#48) — CEKs and rows removed
     assert!(
-        storage.load_contact_cek(&bob_id).unwrap().is_none(),
-        "Bob's CEK should be shredded"
+        storage.load_contact_cek(&bob_id).is_err(),
+        "Bob's contact should be deleted"
     );
     assert!(
-        storage.load_contact_cek(&carol_id).unwrap().is_none(),
-        "Carol's CEK should be shredded"
+        storage.load_contact_cek(&carol_id).is_err(),
+        "Carol's contact should be deleted"
     );
 }
 
@@ -282,6 +282,6 @@ fn test_execute_deletion_mixed_cek_and_legacy_contacts() {
     // Both get revocations
     assert_eq!(result.revocations.len(), 2);
 
-    // Bob's CEK should be shredded
-    assert!(storage.load_contact_cek(&bob_id).unwrap().is_none());
+    // Bob's contact fully deleted (#48)
+    assert!(storage.load_contact_cek(&bob_id).is_err());
 }

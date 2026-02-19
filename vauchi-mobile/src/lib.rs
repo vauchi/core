@@ -670,7 +670,7 @@ impl VauchiMobile {
         let key_array: [u8; 32] = storage_key_bytes.try_into().map_err(|_| {
             MobileError::StorageError("Storage key must be exactly 32 bytes".to_string())
         })?;
-        let storage_key = SymmetricKey::from_bytes(key_array);
+        let storage_key = SymmetricKey::from_bytes_unchecked(key_array);
 
         let _storage = Storage::open(&storage_path, storage_key.clone())
             .map_err(|e| MobileError::StorageError(e.to_string()))?;
@@ -707,7 +707,7 @@ impl VauchiMobile {
             let key_array: [u8; 32] = key_bytes
                 .try_into()
                 .map_err(|_| MobileError::StorageError("Invalid key length".to_string()))?;
-            SymmetricKey::from_bytes(key_array)
+            SymmetricKey::from_bytes_unchecked(key_array)
         } else {
             let key = SymmetricKey::generate();
             std::fs::write(&key_path, key.as_bytes())

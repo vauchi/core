@@ -7,9 +7,13 @@
 //! Implements HMAC-based Extract-and-Expand Key Derivation Function (HKDF)
 //! as specified in RFC 5869. Used for deriving cryptographic keys in the
 //! Double Ratchet protocol.
+//!
+//! All intermediate key material (PRK, T(i) blocks) is zeroized after use
+//! to prevent key extraction from memory dumps (#234).
 
 use ring::hmac;
 use thiserror::Error;
+use zeroize::Zeroize;
 
 /// KDF error types.
 #[derive(Error, Debug)]
@@ -47,6 +51,8 @@ impl HKDF {
     /// where T(i) = HMAC-SHA256(PRK, T(i-1) || info || i)
     ///
     /// Maximum output length is 255 * 32 = 8160 bytes.
+    ///
+    /// Intermediate buffers (T(i-1), input concatenation) are zeroized after use.
     pub fn expand(prk: &[u8; 32], info: &[u8], length: usize) -> Result<Vec<u8>, KDFError> {
         const HASH_LEN: usize = 32;
         const MAX_OUTPUT: usize = 255 * HASH_LEN;
@@ -73,9 +79,17 @@ impl HKDF {
             input.push(i as u8);
 
             let tag = hmac::sign(&key, &input);
+
+            // Zeroize intermediate buffers before overwriting
+            input.zeroize();
+            t_prev.zeroize();
+
             t_prev = tag.as_ref().to_vec();
             okm.extend_from_slice(&t_prev);
         }
+
+        // Zeroize the last T(N) block
+        t_prev.zeroize();
 
         okm.truncate(length);
         Ok(okm)
@@ -84,38 +98,47 @@ impl HKDF {
     /// Full HKDF: Extract-then-Expand in one step.
     ///
     /// This is the most common usage pattern.
+    /// The intermediate PRK is zeroized after expansion.
     pub fn derive(
         salt: Option<&[u8]>,
         ikm: &[u8],
         info: &[u8],
         length: usize,
     ) -> Result<Vec<u8>, KDFError> {
-        let prk = Self::extract(salt, ikm);
-        Self::expand(&prk, info, length)
+        let mut prk = Self::extract(salt, ikm);
+        let result = Self::expand(&prk, info, length);
+        prk.zeroize();
+        result
     }
 
     /// Derives a fixed-size 32-byte key.
     ///
     /// Convenience method for the common case of deriving a single symmetric key.
+    /// The intermediate PRK and OKM buffer are zeroized after extraction.
     pub fn derive_key(salt: Option<&[u8]>, ikm: &[u8], info: &[u8]) -> [u8; 32] {
-        let prk = Self::extract(salt, ikm);
+        let mut prk = Self::extract(salt, ikm);
         // expand for exactly 32 bytes can't fail
-        let okm = Self::expand(&prk, info, 32).expect("32 bytes is valid length");
+        let mut okm = Self::expand(&prk, info, 32).expect("32 bytes is valid length");
+        prk.zeroize();
         let mut key = [0u8; 32];
         key.copy_from_slice(&okm);
+        okm.zeroize();
         key
     }
 
     /// Derives two 32-byte keys from the same input.
     ///
     /// Used in Double Ratchet for deriving (root_key, chain_key) pairs.
+    /// The intermediate PRK and OKM buffer are zeroized after extraction.
     pub fn derive_key_pair(salt: Option<&[u8]>, ikm: &[u8], info: &[u8]) -> ([u8; 32], [u8; 32]) {
-        let prk = Self::extract(salt, ikm);
-        let okm = Self::expand(&prk, info, 64).expect("64 bytes is valid length");
+        let mut prk = Self::extract(salt, ikm);
+        let mut okm = Self::expand(&prk, info, 64).expect("64 bytes is valid length");
+        prk.zeroize();
         let mut key1 = [0u8; 32];
         let mut key2 = [0u8; 32];
         key1.copy_from_slice(&okm[..32]);
         key2.copy_from_slice(&okm[32..]);
+        okm.zeroize();
         (key1, key2)
     }
 }

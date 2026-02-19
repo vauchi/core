@@ -503,7 +503,7 @@ impl Storage {
         let shared_key_array: [u8; 32] = shared_key_bytes
             .try_into()
             .map_err(|_| StorageError::Encryption("Invalid key length".into()))?;
-        let shared_key = SymmetricKey::from_bytes(shared_key_array);
+        let shared_key = SymmetricKey::from_bytes_unchecked(shared_key_array);
 
         // Parse public key
         let public_key: [u8; 32] = row

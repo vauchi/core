@@ -79,7 +79,7 @@ impl ContactSyncData {
         let visibility_rules = serde_json::from_str(&self.visibility_rules_json)
             .map_err(|e| DeviceSyncError::Deserialization(e.to_string()))?;
 
-        let shared_key = SymmetricKey::from_bytes(self.shared_key);
+        let shared_key = SymmetricKey::from_bytes_unchecked(self.shared_key);
 
         let mut contact = Contact::from_sync_data(
             self.public_key,

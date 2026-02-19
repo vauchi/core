@@ -49,7 +49,12 @@ const XCHACHA20_NONCE_SIZE: usize = 24;
 const TAG_SIZE: usize = 16;
 
 /// 256-bit symmetric encryption key.
-#[derive(Clone)]
+///
+/// Security properties:
+/// - `Clone`: Safe — both original and clone are zeroized on drop via `ZeroizeOnDrop`.
+/// - `Debug`: Redacted — key bytes never appear in debug/log output.
+/// - `Drop`: Automatic zeroization via `ZeroizeOnDrop` derive.
+#[derive(Clone, Zeroize, zeroize::ZeroizeOnDrop)]
 pub struct SymmetricKey {
     bytes: [u8; 32],
 }
@@ -60,12 +65,6 @@ impl std::fmt::Debug for SymmetricKey {
         f.debug_struct("SymmetricKey")
             .field("bytes", &"[REDACTED]")
             .finish()
-    }
-}
-
-impl Drop for SymmetricKey {
-    fn drop(&mut self) {
-        self.bytes.zeroize();
     }
 }
 
@@ -80,7 +79,23 @@ impl SymmetricKey {
     }
 
     /// Creates a key from raw bytes.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the key is all zeros (degenerate key).
     pub fn from_bytes(bytes: [u8; 32]) -> Self {
+        assert!(
+            bytes.iter().any(|&b| b != 0),
+            "SymmetricKey::from_bytes: all-zeros key is degenerate and rejected"
+        );
+        SymmetricKey { bytes }
+    }
+
+    /// Creates a key from raw bytes without validation.
+    ///
+    /// Only use this for deserialization of keys known to be valid
+    /// (e.g., from encrypted storage). Prefer `from_bytes` for new keys.
+    pub fn from_bytes_unchecked(bytes: [u8; 32]) -> Self {
         SymmetricKey { bytes }
     }
 

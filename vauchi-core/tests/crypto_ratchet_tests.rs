@@ -315,3 +315,43 @@ fn test_ratchet_serialize_with_skipped_keys() {
     assert_eq!(b"One".as_slice(), dec1.as_slice());
     assert_eq!(b"Two".as_slice(), dec2.as_slice());
 }
+
+/// SP-9 #236: Serialized ratchet state includes version field.
+#[test]
+fn test_ratchet_serialize_includes_version() {
+    let (alice, _bob) = create_test_pair();
+    let serialized = alice.serialize();
+    assert_eq!(
+        serialized.version,
+        vauchi_core::crypto::RATCHET_STATE_VERSION,
+        "Serialized ratchet state should have current version"
+    );
+}
+
+/// SP-9 #236: Deserialize rejects future versions.
+#[test]
+fn test_ratchet_deserialize_rejects_future_version() {
+    let (alice, _bob) = create_test_pair();
+    let mut serialized = alice.serialize();
+    serialized.version = 255; // Far future version
+    let result = DoubleRatchetState::deserialize(serialized);
+    assert!(
+        result.is_err(),
+        "Should reject unsupported future version"
+    );
+}
+
+/// SP-9 #236: Deserialize accepts version 1 (current) and version 0 (legacy default).
+#[test]
+fn test_ratchet_deserialize_accepts_current_and_legacy_version() {
+    let (alice, _bob) = create_test_pair();
+
+    // Version 1 (current)
+    let serialized_v1 = alice.serialize();
+    assert!(DoubleRatchetState::deserialize(serialized_v1).is_ok());
+
+    // Version 0 (legacy — from before versioning was added, serde default)
+    let mut serialized_v0 = alice.serialize();
+    serialized_v0.version = 0;
+    assert!(DoubleRatchetState::deserialize(serialized_v0).is_ok());
+}

@@ -47,12 +47,24 @@ pub enum RatchetError {
     Deserialization(String),
 }
 
+/// Current serialization format version for ratchet state (#236).
+///
+/// Increment when changing the `SerializedRatchetState` layout.
+/// Deserialization checks this version and rejects unknown future versions.
+pub const RATCHET_STATE_VERSION: u8 = 1;
+
 /// Serializable representation of DoubleRatchetState.
 ///
 /// This struct captures all necessary state to persist and restore a ratchet session.
 /// Contains sensitive cryptographic material that is zeroized on drop.
+///
+/// The `version` field enables schema evolution: new fields can be added in future
+/// versions while maintaining backward compatibility for loading older states.
 #[derive(Serialize, Deserialize)]
 pub struct SerializedRatchetState {
+    /// Schema version for forward compatibility (#236)
+    #[serde(default = "default_ratchet_version")]
+    pub version: u8,
     /// Root key for deriving new chain keys
     pub root_key: [u8; 32],
     /// Our DH secret key bytes
@@ -73,6 +85,11 @@ pub struct SerializedRatchetState {
     pub previous_send_chain_length: u32,
     /// Skipped message keys: (dh_gen, msg_index) -> key_bytes
     pub skipped_keys: Vec<((u32, u32), [u8; 32])>,
+}
+
+/// Default version for deserializing ratchet states that predate the version field.
+fn default_ratchet_version() -> u8 {
+    1
 }
 
 impl Drop for SerializedRatchetState {
@@ -400,6 +417,7 @@ impl DoubleRatchetState {
     /// Serializes the ratchet state for persistence.
     pub fn serialize(&self) -> SerializedRatchetState {
         SerializedRatchetState {
+            version: RATCHET_STATE_VERSION,
             root_key: self.root_key,
             our_dh_secret: self.our_dh.secret_bytes(),
             their_dh: self.their_dh,
@@ -424,7 +442,15 @@ impl DoubleRatchetState {
     }
 
     /// Deserializes a ratchet state from its serialized form.
+    ///
+    /// Validates the version field and rejects unknown future versions (#236).
     pub fn deserialize(mut s: SerializedRatchetState) -> Result<Self, RatchetError> {
+        if s.version > RATCHET_STATE_VERSION {
+            return Err(RatchetError::Deserialization(format!(
+                "unsupported ratchet state version {} (max supported: {})",
+                s.version, RATCHET_STATE_VERSION
+            )));
+        }
         // Use std::mem::take to extract values, leaving zeros behind for Drop
         let root_key = std::mem::take(&mut s.root_key);
         let our_dh_secret = std::mem::take(&mut s.our_dh_secret);

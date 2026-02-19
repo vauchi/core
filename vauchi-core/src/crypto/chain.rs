@@ -40,7 +40,14 @@ const MESSAGE_KEY_INFO: &[u8] = b"Vauchi_Message_Key";
 /// Chain keys are never used directly for encryption. They derive:
 /// - Message keys (for actual encryption)
 /// - The next chain key (for ratcheting forward)
-#[derive(Clone)]
+///
+/// # Safety: Clone (#90)
+///
+/// `Clone` is required by `skip_to()` which iterates forward from the current
+/// position without consuming the original. Both the original and clone are
+/// zeroized on drop via `ZeroizeOnDrop`. The clone is short-lived (loop
+/// variable), and the generation counter prevents key reuse.
+#[derive(Clone, Zeroize, zeroize::ZeroizeOnDrop)]
 pub struct ChainKey {
     key: [u8; 32],
     generation: u32,
@@ -52,12 +59,6 @@ impl std::fmt::Debug for ChainKey {
             .field("key", &"[REDACTED]")
             .field("generation", &self.generation)
             .finish()
-    }
-}
-
-impl Drop for ChainKey {
-    fn drop(&mut self) {
-        self.key.zeroize();
     }
 }
 
@@ -176,11 +177,12 @@ impl MessageKey {
 
     /// Creates a MessageKey from raw bytes (for deserialization).
     ///
-    /// Note: Generation is set to 0 since skipped keys don't track their generation
-    /// after being stored.
+    /// Uses `from_bytes_unchecked` since stored keys are already validated
+    /// at creation time. Generation is set to 0 since skipped keys don't
+    /// track their generation after being stored.
     pub fn from_bytes(bytes: [u8; 32]) -> Self {
         MessageKey {
-            key: SymmetricKey::from_bytes(bytes),
+            key: SymmetricKey::from_bytes_unchecked(bytes),
             generation: 0,
         }
     }

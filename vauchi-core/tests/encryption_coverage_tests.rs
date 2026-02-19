@@ -107,6 +107,20 @@ fn test_symmetric_key_debug_redacted() {
     assert!(!debug.contains(&format!("{:?}", key.as_bytes())));
 }
 
+/// SP-9 #227: SymmetricKey::from_bytes rejects all-zeros (degenerate key).
+#[test]
+#[should_panic(expected = "all-zeros key is degenerate")]
+fn test_symmetric_key_from_bytes_rejects_zeros() {
+    SymmetricKey::from_bytes([0u8; 32]);
+}
+
+/// SP-9 #227: from_bytes_unchecked allows any key (for deserialization).
+#[test]
+fn test_symmetric_key_from_bytes_unchecked_allows_zeros() {
+    let key = SymmetricKey::from_bytes_unchecked([0u8; 32]);
+    assert_eq!(key.as_bytes(), &[0u8; 32]);
+}
+
 #[test]
 fn test_large_plaintext() {
     let key = SymmetricKey::generate();

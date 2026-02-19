@@ -557,6 +557,11 @@ mod tests {
         // Note: These tests interact with the actual system keychain.
         // They require a Secret Service daemon (GNOME Keyring, KDE Wallet) on Linux,
         // or equivalent on macOS/Windows. Run manually with desktop session active.
+        //
+        // CI strategy (#185): PlatformKeyring tests run locally via `cargo test --ignored`.
+        // CI jobs use FileKeyStorage (platform-agnostic). The SecureStorage trait
+        // interface is validated by MemoryKeyStorage and FileKeyStorage test suites;
+        // PlatformKeyring tests verify platform integration only.
 
         #[test]
         #[ignore = "Requires system keychain (desktop session)"]

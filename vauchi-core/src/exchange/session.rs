@@ -258,7 +258,15 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
     }
 
     /// Processes an event and transitions the state machine.
+    ///
+    /// Returns `SessionTimeout` if the session has exceeded `SESSION_TIMEOUT` (#196).
+    /// The `Fail` event is exempt so that callers can always cleanly terminate a session.
     pub fn apply(&mut self, event: ExchangeEvent) -> Result<(), ExchangeError> {
+        // Enforce session timeout on all events except Fail (#196)
+        if !matches!(event, ExchangeEvent::Fail(_)) && self.is_timed_out() {
+            self.fail(ExchangeError::SessionTimeout);
+            return Err(ExchangeError::SessionTimeout);
+        }
         match event {
             // QR events
             ExchangeEvent::StartQR => self.handle_start_qr(),

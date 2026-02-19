@@ -538,3 +538,112 @@ fn test_process_update_rejects_invalid_signature() {
     let result = alice_wb.process_card_update(&bob_id, &encrypted);
     assert!(matches!(result, Err(VauchiError::SignatureInvalid)));
 }
+
+// === Malformed data tests for process_card_update (#195) ===
+
+#[test]
+fn test_process_card_update_truncated_message() {
+    // Truncated ratchet message should fail deserialization
+    let mut alice_wb = create_test_vauchi();
+    alice_wb.create_identity("Alice").unwrap();
+
+    let bob_identity = Identity::create("Bob");
+    let bob_dh = vauchi_core::exchange::X3DHKeyPair::generate();
+    let shared_secret = SymmetricKey::generate();
+
+    let contact = Contact::from_exchange(
+        *bob_identity.signing_public_key(),
+        ContactCard::new("Bob"),
+        shared_secret.clone(),
+    );
+    let bob_id = contact.id().to_string();
+    alice_wb.add_contact(contact).unwrap();
+    alice_wb
+        .create_ratchet_as_responder(
+            &bob_id,
+            &shared_secret,
+            vauchi_core::exchange::X3DHKeyPair::from_bytes(bob_dh.secret_bytes()),
+        )
+        .unwrap();
+
+    // Send truncated bytes — should fail to parse as RatchetMessage
+    let result = alice_wb.process_card_update(&bob_id, &[0xDE, 0xAD, 0xBE, 0xEF]);
+    assert!(result.is_err(), "Truncated message should be rejected");
+}
+
+#[test]
+fn test_process_card_update_empty_payload() {
+    let mut alice_wb = create_test_vauchi();
+    alice_wb.create_identity("Alice").unwrap();
+
+    let bob_identity = Identity::create("Bob");
+    let bob_dh = vauchi_core::exchange::X3DHKeyPair::generate();
+    let shared_secret = SymmetricKey::generate();
+
+    let contact = Contact::from_exchange(
+        *bob_identity.signing_public_key(),
+        ContactCard::new("Bob"),
+        shared_secret.clone(),
+    );
+    let bob_id = contact.id().to_string();
+    alice_wb.add_contact(contact).unwrap();
+    alice_wb
+        .create_ratchet_as_responder(
+            &bob_id,
+            &shared_secret,
+            vauchi_core::exchange::X3DHKeyPair::from_bytes(bob_dh.secret_bytes()),
+        )
+        .unwrap();
+
+    // Empty payload
+    let result = alice_wb.process_card_update(&bob_id, &[]);
+    assert!(result.is_err(), "Empty payload should be rejected");
+}
+
+#[test]
+fn test_process_card_update_malformed_json_in_ratchet() {
+    use vauchi_core::crypto::ratchet::DoubleRatchetState;
+
+    let mut alice_wb = create_test_vauchi();
+    alice_wb.create_identity("Alice").unwrap();
+
+    let bob_identity = Identity::create("Bob");
+    let bob_dh = vauchi_core::exchange::X3DHKeyPair::generate();
+    let shared_secret = SymmetricKey::generate();
+
+    let contact = Contact::from_exchange(
+        *bob_identity.signing_public_key(),
+        ContactCard::new("Bob"),
+        shared_secret.clone(),
+    );
+    let bob_id = contact.id().to_string();
+    alice_wb.add_contact(contact).unwrap();
+    alice_wb
+        .create_ratchet_as_responder(
+            &bob_id,
+            &shared_secret,
+            vauchi_core::exchange::X3DHKeyPair::from_bytes(bob_dh.secret_bytes()),
+        )
+        .unwrap();
+
+    // Encrypt malformed JSON inside a valid ratchet message
+    let mut bob_ratchet =
+        DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key());
+    let garbage_json = b"{ this is not valid json }}}";
+    let ratchet_msg = bob_ratchet.encrypt(garbage_json).unwrap();
+    let encrypted = serde_json::to_vec(&ratchet_msg).unwrap();
+
+    // Should decrypt successfully but fail to parse as CardDelta
+    let result = alice_wb.process_card_update(&bob_id, &encrypted);
+    assert!(result.is_err(), "Malformed delta JSON should be rejected");
+}
+
+#[test]
+fn test_process_card_update_unknown_contact() {
+    let mut alice_wb = create_test_vauchi();
+    alice_wb.create_identity("Alice").unwrap();
+
+    // Process update for a contact that doesn't exist
+    let result = alice_wb.process_card_update("nonexistent-contact-id", &[1, 2, 3]);
+    assert!(result.is_err(), "Unknown contact should be rejected");
+}

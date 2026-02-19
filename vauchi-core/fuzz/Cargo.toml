@@ -71,3 +71,8 @@ doc = false
 name = "fuzz_encrypted_exchange"
 path = "fuzz_targets/fuzz_encrypted_exchange.rs"
 doc = false
+
+[[bin]]
+name = "fuzz_ratchet_state"
+path = "fuzz_targets/fuzz_ratchet_state.rs"
+doc = false

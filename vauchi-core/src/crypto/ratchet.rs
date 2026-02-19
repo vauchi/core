@@ -115,6 +115,23 @@ impl Drop for SerializedRatchetState {
 const ROOT_RATCHET_INFO: &[u8] = b"Vauchi_Root_Ratchet";
 
 /// A ratcheted message ready for transmission.
+///
+/// ## Header encryption (#229 trade-off)
+///
+/// The Signal spec describes optional header encryption to hide `dh_public`,
+/// `dh_generation`, and `message_index` from observers. Vauchi does **not**
+/// implement header encryption because:
+///
+/// - All traffic already flows over TLS to the relay — headers are not
+///   visible to passive network observers.
+/// - The relay is untrusted but already sees opaque WebSocket frames; header
+///   metadata does not meaningfully increase its knowledge beyond message
+///   count and timing (which header encryption cannot hide).
+/// - Header encryption adds complexity (header keys, sealed sender chains)
+///   for marginal benefit in our relay-mediated topology.
+///
+/// If the threat model changes (e.g., direct peer-to-peer transport over
+/// unencrypted channels), header encryption should be reconsidered.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RatchetMessage {
     /// Sender's current DH public key

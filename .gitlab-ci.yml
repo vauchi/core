@@ -103,7 +103,7 @@ lint:format:
     - cargo fmt --all -- --check
 
 lint:clippy:
-  extends: [.linux-runner-readonly, .validation-rust, .timeout-quick]
+  extends: [.linux-runner, .validation-rust, .timeout-standard]
   stage: lint
   needs: []
   script:

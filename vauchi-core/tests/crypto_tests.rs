@@ -20,7 +20,11 @@ use vauchi_core::crypto::{decrypt, encrypt, SigningKeyPair, SymmetricKey};
 fn test_generate_ed25519_keypair_succeeds() {
     let keypair = SigningKeyPair::generate();
     let public_key = keypair.public_key();
-    assert_eq!(public_key.as_bytes().len(), 32, "Ed25519 public key should be 32 bytes");
+    assert_eq!(
+        public_key.as_bytes().len(),
+        32,
+        "Ed25519 public key should be 32 bytes"
+    );
 }
 
 /// Tests that generated keypairs are unique (different each time)

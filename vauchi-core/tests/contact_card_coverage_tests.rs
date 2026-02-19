@@ -98,7 +98,10 @@ fn test_max_fields_reached() {
 #[test]
 fn test_validate_size_ok() {
     let card = ContactCard::new("Test");
-    assert!(card.validate_size().is_ok(), "Default card should pass size validation");
+    assert!(
+        card.validate_size().is_ok(),
+        "Default card should pass size validation"
+    );
 }
 
 #[test]

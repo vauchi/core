@@ -453,6 +453,9 @@ pub fn check_identity_collision(our_pk: &[u8; 32], other_pk: &[u8; 32]) -> bool 
 // Phase 5: Device Revocation Types
 // ============================================================
 
+/// Default validity period for revocation certificates: 90 days (#82).
+const REVOCATION_CERT_VALIDITY_SECS: u64 = 90 * 24 * 3600;
+
 /// A signed certificate proving that a device has been revoked.
 ///
 /// This certificate can be shared with contacts so they stop sending
@@ -465,6 +468,10 @@ pub struct DeviceRevocationCertificate {
     reason: String,
     /// Timestamp when revoked.
     revoked_at: u64,
+    /// Certificate expiry timestamp (#82). Defaults to 90 days after revocation.
+    /// Old certificates without this field deserialize to 0 (treated as no expiry).
+    #[serde(default)]
+    expires_at: u64,
     /// Signature over the certificate by the identity signing key.
     #[serde(with = "signature_serde")]
     signature: [u8; 64],
@@ -482,6 +489,7 @@ impl DeviceRevocationCertificate {
             device_id: *device_id,
             reason,
             revoked_at,
+            expires_at: revoked_at + REVOCATION_CERT_VALIDITY_SECS,
             signature: [0u8; 64],
         };
 
@@ -504,6 +512,25 @@ impl DeviceRevocationCertificate {
         &self.reason
     }
 
+    /// Returns the certificate expiry timestamp (#82).
+    /// Returns 0 for legacy certificates without an expiry field.
+    pub fn expires_at(&self) -> u64 {
+        self.expires_at
+    }
+
+    /// Returns true if this certificate has expired (#82).
+    /// Legacy certificates (expires_at == 0) are treated as non-expiring.
+    pub fn is_expired(&self) -> bool {
+        if self.expires_at == 0 {
+            return false; // Legacy cert without expiry
+        }
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
+        now > self.expires_at
+    }
+
     /// Verifies the certificate signature.
     pub fn verify(&self, public_key: &crate::crypto::PublicKey) -> bool {
         let data = self.signing_data();
@@ -524,6 +551,7 @@ impl DeviceRevocationCertificate {
         data.extend_from_slice(b"REVOKE:");
         data.extend_from_slice(&self.device_id);
         data.extend_from_slice(&self.revoked_at.to_le_bytes());
+        data.extend_from_slice(&self.expires_at.to_le_bytes());
         data.extend_from_slice(self.reason.as_bytes());
         data
     }

@@ -42,14 +42,15 @@ fn test_callback_handler() {
 
 #[test]
 fn test_event_dispatcher_add_handler() {
-    let mut dispatcher = EventDispatcher::new();
+    let dispatcher = EventDispatcher::new();
 
     assert_eq!(dispatcher.handler_count(), 0);
 
     let handler = Arc::new(CallbackHandler::new(|_| {}));
-    dispatcher.add_handler(handler);
+    let id = dispatcher.add_handler(handler);
 
     assert_eq!(dispatcher.handler_count(), 1);
+    assert!(id > 0, "HandlerId should be positive");
 }
 
 #[test]
@@ -57,7 +58,7 @@ fn test_event_dispatcher_dispatch() {
     let count = Arc::new(AtomicUsize::new(0));
     let count_clone = count.clone();
 
-    let mut dispatcher = EventDispatcher::new();
+    let dispatcher = EventDispatcher::new();
 
     let handler = Arc::new(CallbackHandler::new(move |_| {
         count_clone.fetch_add(1, Ordering::SeqCst);
@@ -76,7 +77,7 @@ fn test_event_dispatcher_dispatch() {
 fn test_event_dispatcher_multiple_handlers() {
     let count = Arc::new(AtomicUsize::new(0));
 
-    let mut dispatcher = EventDispatcher::new();
+    let dispatcher = EventDispatcher::new();
 
     // Add 3 handlers
     for _ in 0..3 {
@@ -97,7 +98,7 @@ fn test_event_dispatcher_multiple_handlers() {
 
 #[test]
 fn test_event_dispatcher_clear_handlers() {
-    let mut dispatcher = EventDispatcher::new();
+    let dispatcher = EventDispatcher::new();
 
     let handler = Arc::new(CallbackHandler::new(|_| {}));
     dispatcher.add_handler(handler);
@@ -107,6 +108,48 @@ fn test_event_dispatcher_clear_handlers() {
     dispatcher.clear_handlers();
 
     assert_eq!(dispatcher.handler_count(), 0);
+}
+
+/// Test: remove_handler removes a specific handler by ID (#89).
+#[test]
+fn test_event_dispatcher_remove_handler() {
+    let count_a = Arc::new(AtomicUsize::new(0));
+    let count_b = Arc::new(AtomicUsize::new(0));
+
+    let dispatcher = EventDispatcher::new();
+
+    let count_a_clone = count_a.clone();
+    let handler_a = Arc::new(CallbackHandler::new(move |_| {
+        count_a_clone.fetch_add(1, Ordering::SeqCst);
+    }));
+    let id_a = dispatcher.add_handler(handler_a);
+
+    let count_b_clone = count_b.clone();
+    let handler_b = Arc::new(CallbackHandler::new(move |_| {
+        count_b_clone.fetch_add(1, Ordering::SeqCst);
+    }));
+    dispatcher.add_handler(handler_b);
+
+    // Both fire on dispatch
+    dispatcher.dispatch(VauchiEvent::ContactAdded {
+        contact_id: "test".into(),
+    });
+    assert_eq!(count_a.load(Ordering::SeqCst), 1);
+    assert_eq!(count_b.load(Ordering::SeqCst), 1);
+
+    // Remove handler A
+    assert!(dispatcher.remove_handler(id_a), "Should find and remove handler A");
+    assert_eq!(dispatcher.handler_count(), 1);
+
+    // Only handler B fires now
+    dispatcher.dispatch(VauchiEvent::ContactAdded {
+        contact_id: "test2".into(),
+    });
+    assert_eq!(count_a.load(Ordering::SeqCst), 1, "Handler A should not fire after removal");
+    assert_eq!(count_b.load(Ordering::SeqCst), 2, "Handler B should still fire");
+
+    // Removing unknown ID returns false
+    assert!(!dispatcher.remove_handler(999), "Unknown ID should return false");
 }
 
 #[test]

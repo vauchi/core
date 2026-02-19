@@ -6,10 +6,14 @@
 //!
 //! Callbacks for Vauchi events.
 
-use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{Arc, Mutex};
 
 use crate::network::ConnectionState;
 use crate::sync::SyncState;
+
+/// Unique identifier for a registered event handler.
+pub type HandlerId = u64;
 
 /// Events emitted by Vauchi.
 #[derive(Debug, Clone)]
@@ -248,38 +252,70 @@ where
     }
 }
 
-/// Event dispatcher for managing multiple handlers.
-#[derive(Default)]
+/// Event dispatcher for managing multiple handlers (#87, #89, #94).
+///
+/// Uses interior mutability (`Mutex`) so that `add_handler` and `remove_handler`
+/// take `&self` instead of `&mut self`. This allows handler registration even
+/// when the dispatcher is shared via `Arc` (e.g., with `SyncController`).
 pub struct EventDispatcher {
-    handlers: Vec<Arc<dyn EventHandler>>,
+    handlers: Mutex<Vec<(HandlerId, Arc<dyn EventHandler>)>>,
+    next_id: AtomicU64,
+}
+
+impl Default for EventDispatcher {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl EventDispatcher {
     /// Creates a new event dispatcher.
     pub fn new() -> Self {
         EventDispatcher {
-            handlers: Vec::new(),
+            handlers: Mutex::new(Vec::new()),
+            next_id: AtomicU64::new(1),
         }
     }
 
-    /// Adds an event handler.
-    pub fn add_handler(&mut self, handler: Arc<dyn EventHandler>) {
-        self.handlers.push(handler);
+    /// Adds an event handler and returns its unique ID (#87, #94).
+    ///
+    /// Takes `&self` (not `&mut self`) thanks to interior mutability.
+    /// The returned `HandlerId` can be used with `remove_handler()`.
+    pub fn add_handler(&self, handler: Arc<dyn EventHandler>) -> HandlerId {
+        let id = self.next_id.fetch_add(1, Ordering::Relaxed);
+        let mut handlers = self.handlers.lock().expect("EventDispatcher lock poisoned");
+        handlers.push((id, handler));
+        id
+    }
+
+    /// Removes a handler by its ID (#89). Returns true if a handler was removed.
+    pub fn remove_handler(&self, id: HandlerId) -> bool {
+        let mut handlers = self.handlers.lock().expect("EventDispatcher lock poisoned");
+        let len_before = handlers.len();
+        handlers.retain(|(hid, _)| *hid != id);
+        handlers.len() < len_before
     }
 
     /// Removes all handlers.
-    pub fn clear_handlers(&mut self) {
-        self.handlers.clear();
+    pub fn clear_handlers(&self) {
+        let mut handlers = self.handlers.lock().expect("EventDispatcher lock poisoned");
+        handlers.clear();
     }
 
     /// Returns the number of registered handlers.
     pub fn handler_count(&self) -> usize {
-        self.handlers.len()
+        let handlers = self.handlers.lock().expect("EventDispatcher lock poisoned");
+        handlers.len()
     }
 
     /// Dispatches an event to all handlers.
+    ///
+    /// NOTE (#71): Dispatch is synchronous — a slow handler blocks the caller.
+    /// For non-blocking dispatch, callers should spawn handler execution on a
+    /// separate thread or use an async event channel.
     pub fn dispatch(&self, event: VauchiEvent) {
-        for handler in &self.handlers {
+        let handlers = self.handlers.lock().expect("EventDispatcher lock poisoned");
+        for (_, handler) in handlers.iter() {
             handler.on_event(event.clone());
         }
     }

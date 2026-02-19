@@ -42,7 +42,7 @@ fn test_sync_progress_dispatched_via_handler() {
     let received = Arc::new(Mutex::new(Vec::new()));
     let received_clone = received.clone();
 
-    let mut dispatcher = EventDispatcher::new();
+    let dispatcher = EventDispatcher::new();
     let handler = Arc::new(CallbackHandler::new(move |event: VauchiEvent| {
         if let VauchiEvent::SyncProgress { .. } = &event {
             received_clone.lock().unwrap().push(event);
@@ -81,7 +81,7 @@ fn test_sync_progress_total_matches_ready_updates() {
     let received = Arc::new(Mutex::new(Vec::new()));
     let received_clone = received.clone();
 
-    let mut dispatcher = EventDispatcher::new();
+    let dispatcher = EventDispatcher::new();
     let handler = Arc::new(CallbackHandler::new(move |event: VauchiEvent| {
         if let VauchiEvent::SyncProgress { .. } = &event {
             received_clone.lock().unwrap().push(event);

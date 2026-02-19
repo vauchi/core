@@ -130,7 +130,7 @@ pub use error::{VauchiError, VauchiResult};
 pub use config::{RecoveryConfig, RelayConfig, SyncConfig, VauchiConfig};
 
 // Events
-pub use events::{CallbackHandler, EventDispatcher, EventHandler, VauchiEvent};
+pub use events::{CallbackHandler, EventDispatcher, EventHandler, HandlerId, VauchiEvent};
 
 // Contact Manager
 pub use contact_manager::ContactManager;

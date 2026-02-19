@@ -926,18 +926,27 @@ impl<T: Transport> Vauchi<T> {
 
     // === Event Operations ===
 
-    /// Adds an event handler.
-    pub fn add_event_handler(&mut self, handler: Arc<dyn EventHandler>) {
-        if let Some(events) = Arc::get_mut(&mut self.events) {
-            events.add_handler(handler);
-        }
+    /// Adds an event handler (#87, #94).
+    ///
+    /// Returns the handler ID which can be used with `remove_event_handler()`.
+    /// No longer requires `&mut self` — registration works even when the
+    /// dispatcher is shared with SyncController.
+    pub fn add_event_handler(
+        &self,
+        handler: Arc<dyn EventHandler>,
+    ) -> crate::api::events::HandlerId {
+        self.events.add_handler(handler)
+    }
+
+    /// Removes an event handler by its ID (#89).
+    /// Returns true if the handler was found and removed.
+    pub fn remove_event_handler(&self, id: crate::api::events::HandlerId) -> bool {
+        self.events.remove_handler(id)
     }
 
     /// Clears all event handlers.
-    pub fn clear_event_handlers(&mut self) {
-        if let Some(events) = Arc::get_mut(&mut self.events) {
-            events.clear_handlers();
-        }
+    pub fn clear_event_handlers(&self) {
+        self.events.clear_handlers();
     }
 
     /// Dispatches an event to all handlers.

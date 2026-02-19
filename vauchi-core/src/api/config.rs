@@ -214,6 +214,13 @@ pub struct SyncConfig {
 
     /// Maximum pending updates before forcing sync.
     pub max_pending_updates: usize,
+
+    /// Maximum updates to send per sync cycle (#64).
+    /// Prevents blocking the thread when a large backlog exists
+    /// (e.g., after a long offline period). Remaining updates are
+    /// sent in subsequent sync cycles.
+    /// `None` means no limit (send all pending).
+    pub batch_size: Option<usize>,
 }
 
 impl Default for SyncConfig {
@@ -222,6 +229,7 @@ impl Default for SyncConfig {
             auto_sync: true,
             sync_interval_ms: 60_000, // 1 minute
             max_pending_updates: 50,
+            batch_size: Some(20),
         }
     }
 }

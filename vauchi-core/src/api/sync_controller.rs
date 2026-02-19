@@ -152,13 +152,21 @@ impl<'a, T: Transport> SyncController<'a, T> {
         }
 
         // Get updates ready to send (pending or ready for retry)
-        let ready_updates = match self.sync_manager.get_ready_for_retry() {
+        let mut ready_updates = match self.sync_manager.get_ready_for_retry() {
             Ok(updates) => updates,
             Err(e) => {
                 result.errors.push(("get_ready".into(), e.to_string()));
                 return Ok(result);
             }
         };
+
+        // Apply batch_size limit (#64) — cap updates per cycle to avoid
+        // blocking the thread when a large backlog exists.
+        if let Some(batch_size) = self.config.batch_size {
+            if batch_size > 0 {
+                ready_updates.truncate(batch_size);
+            }
+        }
 
         // Send each ready update
         let total = ready_updates.len();

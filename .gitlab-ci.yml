@@ -176,7 +176,50 @@ mutation:nightly:
     - if: $CI_PIPELINE_SOURCE == "schedule"
   script:
     - cargo binstall cargo-mutants --no-confirm 2>/dev/null || cargo install cargo-mutants --locked || true
-    - cargo mutants -p vauchi-core --timeout 60 --output target/mutants
+    - |
+      MUTANTS_OUT="target/mutants"
+      cargo mutants -p vauchi-core --timeout 60 --output "$MUTANTS_OUT" &
+      MUTANTS_PID=$!
+      trap 'kill $MUTANTS_PID 2>/dev/null; wait $MUTANTS_PID 2>/dev/null' EXIT
+
+      count() { if [ -f "$1" ]; then wc -l < "$1" | tr -d ' '; else echo 0; fi; }
+
+      while [ ! -f "$MUTANTS_OUT/mutants.json" ] && kill -0 "$MUTANTS_PID" 2>/dev/null; do
+        sleep 10
+      done
+      TOTAL="?"
+      [ -f "$MUTANTS_OUT/mutants.json" ] && TOTAL=$(jq 'length' "$MUTANTS_OUT/mutants.json" 2>/dev/null || echo "?")
+
+      SECONDS=0
+      while kill -0 "$MUTANTS_PID" 2>/dev/null; do
+        sleep 30
+        c=$(count "$MUTANTS_OUT/caught.txt"); m=$(count "$MUTANTS_OUT/missed.txt")
+        t=$(count "$MUTANTS_OUT/timeout.txt"); u=$(count "$MUTANTS_OUT/unviable.txt")
+        d=$((c + m + t + u))
+        printf "[%3d/%s] %d caught, %d missed, %d timeout, %d unviable  (%dm elapsed)\n" \
+          "$d" "$TOTAL" "$c" "$m" "$t" "$u" "$((SECONDS / 60))"
+      done
+
+      wait "$MUTANTS_PID"
+      EXIT_CODE=$?
+
+      c=$(count "$MUTANTS_OUT/caught.txt"); m=$(count "$MUTANTS_OUT/missed.txt")
+      t=$(count "$MUTANTS_OUT/timeout.txt"); u=$(count "$MUTANTS_OUT/unviable.txt")
+      d=$((c + m + t + u))
+      echo ""
+      echo "=== Mutation Testing Summary ==="
+      echo "  Total:    $d"
+      echo "  Caught:   $c"
+      echo "  Missed:   $m"
+      echo "  Timeout:  $t"
+      echo "  Unviable: $u"
+      if [ -s "$MUTANTS_OUT/missed.txt" ]; then
+        echo ""
+        echo "Missed mutants:"
+        sed 's/^/  /' "$MUTANTS_OUT/missed.txt"
+      fi
+
+      exit "$EXIT_CODE"
   artifacts:
     paths:
       - target/mutants/
@@ -196,7 +239,50 @@ mutation:incremental:
     - cargo binstall cargo-mutants --no-confirm 2>/dev/null || cargo install cargo-mutants --locked || true
     - git fetch origin "$CI_MERGE_REQUEST_TARGET_BRANCH_NAME" --depth=100
     - git diff "origin/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME"...HEAD > mr.diff
-    - cargo mutants -p vauchi-core --in-diff mr.diff --timeout 60
+    - |
+      MUTANTS_OUT="mutants.out"
+      cargo mutants -p vauchi-core --in-diff mr.diff --timeout 60 &
+      MUTANTS_PID=$!
+      trap 'kill $MUTANTS_PID 2>/dev/null; wait $MUTANTS_PID 2>/dev/null' EXIT
+
+      count() { if [ -f "$1" ]; then wc -l < "$1" | tr -d ' '; else echo 0; fi; }
+
+      while [ ! -f "$MUTANTS_OUT/mutants.json" ] && kill -0 "$MUTANTS_PID" 2>/dev/null; do
+        sleep 10
+      done
+      TOTAL="?"
+      [ -f "$MUTANTS_OUT/mutants.json" ] && TOTAL=$(jq 'length' "$MUTANTS_OUT/mutants.json" 2>/dev/null || echo "?")
+
+      SECONDS=0
+      while kill -0 "$MUTANTS_PID" 2>/dev/null; do
+        sleep 30
+        c=$(count "$MUTANTS_OUT/caught.txt"); m=$(count "$MUTANTS_OUT/missed.txt")
+        t=$(count "$MUTANTS_OUT/timeout.txt"); u=$(count "$MUTANTS_OUT/unviable.txt")
+        d=$((c + m + t + u))
+        printf "[%3d/%s] %d caught, %d missed, %d timeout, %d unviable  (%dm elapsed)\n" \
+          "$d" "$TOTAL" "$c" "$m" "$t" "$u" "$((SECONDS / 60))"
+      done
+
+      wait "$MUTANTS_PID"
+      EXIT_CODE=$?
+
+      c=$(count "$MUTANTS_OUT/caught.txt"); m=$(count "$MUTANTS_OUT/missed.txt")
+      t=$(count "$MUTANTS_OUT/timeout.txt"); u=$(count "$MUTANTS_OUT/unviable.txt")
+      d=$((c + m + t + u))
+      echo ""
+      echo "=== Mutation Testing Summary ==="
+      echo "  Total:    $d"
+      echo "  Caught:   $c"
+      echo "  Missed:   $m"
+      echo "  Timeout:  $t"
+      echo "  Unviable: $u"
+      if [ -s "$MUTANTS_OUT/missed.txt" ]; then
+        echo ""
+        echo "Missed mutants:"
+        sed 's/^/  /' "$MUTANTS_OUT/missed.txt"
+      fi
+
+      exit "$EXIT_CODE"
   artifacts:
     paths:
       - mutants.out/

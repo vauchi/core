@@ -464,6 +464,7 @@ mod tests {
 
     #[test]
     fn test_concurrent_read_during_reload() {
+        // allow(zero_assertions): Concurrency stress test — validates no panic under contention
         let _lock = TEST_LOCK.lock().unwrap();
         reset_store();
         let dir = setup_test_locales();

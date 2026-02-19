@@ -299,11 +299,7 @@ fn test_storage_ratchet_per_contact_key_isolation() {
         ContactCard::new("Alice"),
         SymmetricKey::generate(),
     );
-    let bob = Contact::from_exchange(
-        [2u8; 32],
-        ContactCard::new("Bob"),
-        SymmetricKey::generate(),
-    );
+    let bob = Contact::from_exchange([2u8; 32], ContactCard::new("Bob"), SymmetricKey::generate());
     storage.save_contact(&alice).unwrap();
     storage.save_contact(&bob).unwrap();
 

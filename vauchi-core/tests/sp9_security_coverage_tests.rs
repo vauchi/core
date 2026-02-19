@@ -51,7 +51,10 @@ fn test_session_timeout_is_60_seconds() {
     let mut session = ExchangeSession::new_qr(identity, card, proximity);
 
     // Not interrupted, so can_resume should be false regardless of timeout
-    assert!(!session.can_resume(), "Non-interrupted session cannot resume");
+    assert!(
+        !session.can_resume(),
+        "Non-interrupted session cannot resume"
+    );
 
     // Mark interrupted — should be resumable since not timed out
     session.mark_interrupted();
@@ -199,7 +202,10 @@ fn test_qr_reuse_rejected() {
     let mut session = ExchangeSession::new_qr(identity, card, proximity);
 
     let hash = [0x42u8; 32];
-    assert!(session.check_qr_reuse(&hash).is_ok(), "First use should succeed");
+    assert!(
+        session.check_qr_reuse(&hash).is_ok(),
+        "First use should succeed"
+    );
     assert!(
         session.check_qr_reuse(&hash).is_err(),
         "Second use of same QR hash should be rejected"
@@ -341,8 +347,7 @@ fn test_rekey_makes_old_key_ciphertexts_unreadable() {
     let new_key = SymmetricKey::generate();
 
     // Create storage, save data
-    let mut storage =
-        vauchi_core::storage::Storage::open(&db_path, old_key.clone()).unwrap();
+    let mut storage = vauchi_core::storage::Storage::open(&db_path, old_key.clone()).unwrap();
 
     let card = vauchi_core::contact_card::ContactCard::new("ReKeyTest");
     storage.save_own_card(&card).unwrap();
@@ -352,8 +357,7 @@ fn test_rekey_makes_old_key_ciphertexts_unreadable() {
 
     // Drop and re-open with old key — must not be able to read data
     drop(storage);
-    let old_storage =
-        vauchi_core::storage::Storage::open(&db_path, old_key).unwrap();
+    let old_storage = vauchi_core::storage::Storage::open(&db_path, old_key).unwrap();
     let result = old_storage.load_own_card();
     match result {
         Ok(None) => {} // Data indecipherable, returns None
@@ -363,8 +367,7 @@ fn test_rekey_makes_old_key_ciphertexts_unreadable() {
 
     // Re-open with new key — must succeed
     drop(old_storage);
-    let new_storage =
-        vauchi_core::storage::Storage::open(&db_path, new_key).unwrap();
+    let new_storage = vauchi_core::storage::Storage::open(&db_path, new_key).unwrap();
     let loaded = new_storage
         .load_own_card()
         .unwrap()
@@ -405,8 +408,7 @@ fn test_rekey_preserves_all_encrypted_tables() {
 
     // Re-open with new key and verify all data is intact
     drop(storage);
-    let new_storage =
-        vauchi_core::storage::Storage::open(&db_path, new_key).unwrap();
+    let new_storage = vauchi_core::storage::Storage::open(&db_path, new_key).unwrap();
 
     let loaded_card = new_storage
         .load_own_card()
@@ -493,10 +495,7 @@ fn test_encrypt_wrong_key_decryption_fails() {
     let encrypted = encrypt(&key1, plaintext).unwrap();
 
     let result = decrypt(&key2, &encrypted);
-    assert!(
-        result.is_err(),
-        "Decryption with wrong key should fail"
-    );
+    assert!(result.is_err(), "Decryption with wrong key should fail");
 }
 
 /// Verifies that tampered ciphertext is rejected by AEAD.

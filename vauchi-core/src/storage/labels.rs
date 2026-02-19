@@ -29,10 +29,10 @@ impl Storage {
             .map_err(|e| StorageError::Encryption(e.to_string()))?;
 
         // Encrypt label name and compute HMAC for lookups (#128)
-        let name_encrypted =
-            crate::crypto::encrypt(&self.encryption_key, label.name().as_bytes())
-                .map_err(|e| StorageError::Encryption(e.to_string()))?;
-        let name_hmac = self.compute_lookup_hmac(b"Vauchi_Label_Name_HMAC_v1", label.name().as_bytes());
+        let name_encrypted = crate::crypto::encrypt(&self.encryption_key, label.name().as_bytes())
+            .map_err(|e| StorageError::Encryption(e.to_string()))?;
+        let name_hmac =
+            self.compute_lookup_hmac(b"Vauchi_Label_Name_HMAC_v1", label.name().as_bytes());
 
         // Store label id in plaintext `name` column to satisfy UNIQUE constraint
         // without leaking the actual name (which is in name_encrypted).
@@ -416,7 +416,8 @@ impl Storage {
         }
 
         // Check for duplicate via HMAC lookup (#128)
-        let new_name_hmac = self.compute_lookup_hmac(b"Vauchi_Label_Name_HMAC_v1", new_name.as_bytes());
+        let new_name_hmac =
+            self.compute_lookup_hmac(b"Vauchi_Label_Name_HMAC_v1", new_name.as_bytes());
         let existing = self.conn.query_row(
             "SELECT COUNT(*) FROM visibility_labels WHERE name_hmac = ?1 AND id != ?2",
             rusqlite::params![new_name_hmac, label_id],
@@ -428,9 +429,8 @@ impl Storage {
         }
 
         // Encrypt new name (#128)
-        let name_encrypted =
-            crate::crypto::encrypt(&self.encryption_key, new_name.as_bytes())
-                .map_err(|e| StorageError::Encryption(e.to_string()))?;
+        let name_encrypted = crate::crypto::encrypt(&self.encryption_key, new_name.as_bytes())
+            .map_err(|e| StorageError::Encryption(e.to_string()))?;
 
         // Update
         let now = std::time::SystemTime::now()

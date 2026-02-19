@@ -754,11 +754,7 @@ impl Storage {
     }
 
     /// Records the last applied delta version for a contact (#42).
-    pub fn record_delta_version(
-        &self,
-        contact_id: &str,
-        version: u32,
-    ) -> Result<(), StorageError> {
+    pub fn record_delta_version(&self, contact_id: &str, version: u32) -> Result<(), StorageError> {
         self.conn.execute(
             "UPDATE contacts SET last_delta_version = ?1 WHERE id = ?2",
             params![version as i64, contact_id],

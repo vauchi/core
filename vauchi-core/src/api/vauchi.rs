@@ -806,7 +806,8 @@ impl<T: Transport> Vauchi<T> {
             self.storage.save_contact(&contact)?;
             // Track delta version for downgrade detection (#42)
             if delta.version > 0 {
-                self.storage.record_delta_version(contact_id, delta.version)?;
+                self.storage
+                    .record_delta_version(contact_id, delta.version)?;
             }
             Ok(())
         })();

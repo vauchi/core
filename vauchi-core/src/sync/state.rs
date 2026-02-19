@@ -143,7 +143,12 @@ impl<'a> SyncManager<'a> {
         }
 
         // Auto-increment version per contact (#42)
-        let next_version = self.last_applied_versions.get(contact_id).copied().unwrap_or(0) + 1;
+        let next_version = self
+            .last_applied_versions
+            .get(contact_id)
+            .copied()
+            .unwrap_or(0)
+            + 1;
         delta.set_version(next_version);
         self.record_applied_version(contact_id, next_version);
 

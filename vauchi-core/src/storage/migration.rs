@@ -907,7 +907,6 @@ fn migrate_v14_encrypt_high_priority(
     conn: &Connection,
     key: &SymmetricKey,
 ) -> Result<(), StorageError> {
-
     // Step 1: Add encrypted columns to each table (idempotent — Tracker #54)
     add_column_if_not_exists(conn, "own_card", "card_json_encrypted", "BLOB")?;
     add_column_if_not_exists(conn, "device_registry", "registry_json_encrypted", "BLOB")?;
@@ -1371,7 +1370,6 @@ fn migrate_v18_encrypt_visibility_rules(
     conn: &Connection,
     key: &SymmetricKey,
 ) -> Result<(), StorageError> {
-
     // 1. Add new encrypted column (idempotent — Tracker #54)
     add_column_if_not_exists(conn, "contacts", "visibility_rules_encrypted", "BLOB")?;
 
@@ -1420,8 +1418,7 @@ fn migrate_v23_encrypt_label_names(
     .map_err(|e| StorageError::Migration(format!("Add label name columns: {}", e)))?;
 
     // Derive HMAC key for label name lookups
-    let hmac_key_bytes =
-        HKDF::derive_key(None, key.as_bytes(), b"Vauchi_Label_Name_HMAC_v1");
+    let hmac_key_bytes = HKDF::derive_key(None, key.as_bytes(), b"Vauchi_Label_Name_HMAC_v1");
     let hmac_key = hmac::Key::new(hmac::HMAC_SHA256, &hmac_key_bytes);
 
     // Encrypt existing plaintext names
@@ -1486,8 +1483,9 @@ fn migrate_v24_per_contact_ratchet_keys(
 
     for (contact_id, encrypted) in &rows {
         // Decrypt with old shared key
-        let plaintext = crate::crypto::decrypt(key, encrypted)
-            .map_err(|e| StorageError::Migration(format!("Decrypt ratchet {}: {}", contact_id, e)))?;
+        let plaintext = crate::crypto::decrypt(key, encrypted).map_err(|e| {
+            StorageError::Migration(format!("Decrypt ratchet {}: {}", contact_id, e))
+        })?;
 
         // Derive per-contact key
         let mut info = b"vauchi-ratchet-storage-v1:".to_vec();
@@ -1496,8 +1494,9 @@ fn migrate_v24_per_contact_ratchet_keys(
         let derived_key = SymmetricKey::from_bytes(derived_bytes);
 
         // Re-encrypt with per-contact key
-        let re_encrypted = crate::crypto::encrypt(&derived_key, &plaintext)
-            .map_err(|e| StorageError::Migration(format!("Re-encrypt ratchet {}: {}", contact_id, e)))?;
+        let re_encrypted = crate::crypto::encrypt(&derived_key, &plaintext).map_err(|e| {
+            StorageError::Migration(format!("Re-encrypt ratchet {}: {}", contact_id, e))
+        })?;
 
         conn.execute(
             "UPDATE contact_ratchets SET ratchet_state_encrypted = ?1 WHERE contact_id = ?2",

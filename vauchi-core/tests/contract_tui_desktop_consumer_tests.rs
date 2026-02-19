@@ -113,7 +113,7 @@ fn provider_contract_identity_set_display_name() {
 fn provider_contract_identity_x3dh_keypair() {
     let identity = Identity::create("X3dhTest");
     let keypair = identity.x3dh_keypair();
-    assert!(!keypair.public.as_bytes().iter().all(|&b| b == 0));
+    assert!(!keypair.public_key().iter().all(|&b| b == 0));
 }
 
 // ============================================================
@@ -164,7 +164,9 @@ fn provider_contract_exchange_types_accessible() {
     use vauchi_core::exchange::{ExchangeEvent, ManualConfirmationVerifier};
 
     let verifier = ManualConfirmationVerifier::new();
-    assert!(!verifier.code().is_empty());
+    assert!(!verifier.is_confirmed());
+    verifier.confirm();
+    assert!(verifier.is_confirmed());
 
     // Verify event variants the desktop depends on
     assert!(matches!(ExchangeEvent::StartQR, ExchangeEvent::StartQR));

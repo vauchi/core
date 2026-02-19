@@ -151,6 +151,20 @@ impl Storage {
         Ok(rows_affected)
     }
 
+    /// Deletes terminal delivery records older than `cutoff` timestamp (#124/#158).
+    ///
+    /// Removes records with status 'delivered', 'expired', or 'failed' whose
+    /// `updated_at` is before `cutoff`. Returns the number of rows deleted.
+    pub fn cleanup_old_deliveries(&self, cutoff: u64) -> Result<usize, StorageError> {
+        let rows_deleted = self.conn.execute(
+            "DELETE FROM delivery_records
+             WHERE status IN ('delivered', 'expired', 'failed')
+             AND updated_at < ?1",
+            params![cutoff as i64],
+        )?;
+        Ok(rows_deleted)
+    }
+
     /// Extends the TTL of a delivery record by adding additional seconds to `expires_at`.
     ///
     /// Returns `true` if the record was found and updated, `false` if the

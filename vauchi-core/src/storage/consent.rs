@@ -46,20 +46,19 @@ impl Storage {
     ///
     /// Returns raw tuples to avoid circular dependency with the api::consent module.
     pub fn list_consent_records(&self) -> Result<Vec<(String, String, bool, u64)>, StorageError> {
-        // Return empty vec if the table doesn't exist yet (pre-migration)
-        let table_exists: bool = self.conn.query_row(
-            "SELECT COUNT(*) > 0 FROM sqlite_master WHERE type='table' AND name='consent_records'",
-            [],
-            |row| row.get(0),
-        )?;
-
-        if !table_exists {
-            return Ok(Vec::new());
-        }
-
-        let mut stmt = self.conn.prepare(
+        // Handle missing table gracefully (pre-migration) (#60)
+        let mut stmt = match self.conn.prepare(
             "SELECT id, consent_type, granted, timestamp FROM consent_records ORDER BY timestamp",
-        )?;
+        ) {
+            Ok(stmt) => stmt,
+            Err(rusqlite::Error::SqliteFailure(err, _))
+                if err.code == rusqlite::ffi::ErrorCode::Unknown
+                    || err.extended_code == 1 =>
+            {
+                return Ok(Vec::new());
+            }
+            Err(e) => return Err(StorageError::Database(e)),
+        };
 
         let records = stmt
             .query_map([], |row| {
@@ -102,20 +101,20 @@ impl Storage {
     pub fn list_consent_records_with_version(
         &self,
     ) -> Result<Vec<(String, String, bool, u64, Option<String>)>, StorageError> {
-        let table_exists: bool = self.conn.query_row(
-            "SELECT COUNT(*) > 0 FROM sqlite_master WHERE type='table' AND name='consent_records'",
-            [],
-            |row| row.get(0),
-        )?;
-
-        if !table_exists {
-            return Ok(Vec::new());
-        }
-
-        let mut stmt = self.conn.prepare(
+        // Handle missing table gracefully (pre-migration) (#60)
+        let mut stmt = match self.conn.prepare(
             "SELECT id, consent_type, granted, timestamp, policy_version
              FROM consent_records ORDER BY timestamp",
-        )?;
+        ) {
+            Ok(stmt) => stmt,
+            Err(rusqlite::Error::SqliteFailure(err, _))
+                if err.code == rusqlite::ffi::ErrorCode::Unknown
+                    || err.extended_code == 1 =>
+            {
+                return Ok(Vec::new());
+            }
+            Err(e) => return Err(StorageError::Database(e)),
+        };
 
         let records = stmt
             .query_map([], |row| {
@@ -195,19 +194,19 @@ impl Storage {
     /// Encrypted details are decrypted with the storage key; falls back to
     /// plaintext `details` column for pre-encryption entries.
     pub fn list_audit_log(&self) -> Result<Vec<(String, Option<String>, u64)>, StorageError> {
-        let table_exists: bool = self.conn.query_row(
-            "SELECT COUNT(*) > 0 FROM sqlite_master WHERE type='table' AND name='audit_log'",
-            [],
-            |row| row.get(0),
-        )?;
-
-        if !table_exists {
-            return Ok(Vec::new());
-        }
-
-        let mut stmt = self.conn.prepare(
+        // Handle missing table gracefully (pre-migration) (#60)
+        let mut stmt = match self.conn.prepare(
             "SELECT event_type, details_encrypted, details, timestamp FROM audit_log ORDER BY timestamp",
-        )?;
+        ) {
+            Ok(stmt) => stmt,
+            Err(rusqlite::Error::SqliteFailure(err, _))
+                if err.code == rusqlite::ffi::ErrorCode::Unknown
+                    || err.extended_code == 1 =>
+            {
+                return Ok(Vec::new());
+            }
+            Err(e) => return Err(StorageError::Database(e)),
+        };
 
         let rows = stmt
             .query_map([], |row| {

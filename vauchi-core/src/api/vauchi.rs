@@ -652,7 +652,7 @@ impl<T: Transport> Vauchi<T> {
                 .unwrap_or(0);
 
             let update = PendingUpdate {
-                id: format!("{}-{}", contact.id(), now),
+                id: uuid::Uuid::new_v4().to_string(),
                 contact_id: contact.id().to_string(),
                 update_type: "card_delta".to_string(),
                 payload: encrypted,
@@ -909,7 +909,7 @@ impl<T: Transport> Vauchi<T> {
                 .unwrap_or(0);
 
             let update = PendingUpdate {
-                id: format!("{}-cek-migrate-{}", contact.id(), now),
+                id: uuid::Uuid::new_v4().to_string(),
                 contact_id: contact.id().to_string(),
                 update_type: "cek_migration".to_string(),
                 payload: encrypted,
@@ -1230,7 +1230,7 @@ impl<T: Transport> Vauchi<T> {
             // Queue for delivery (update_type = "emergency_alert" internally,
             // but on the wire it's just an EncryptedUpdate like any other)
             let update = PendingUpdate {
-                id: format!("{}-emergency-{}", contact_id, now),
+                id: uuid::Uuid::new_v4().to_string(),
                 contact_id: contact_id.to_string(),
                 update_type: "card_delta".to_string(), // Indistinguishable
                 payload: encrypted,
@@ -2096,7 +2096,7 @@ impl<T: Transport> Vauchi<T> {
             .unwrap_or(0);
 
         let update = PendingUpdate {
-            id: format!("{}-vis-{}", contact_id, now),
+            id: uuid::Uuid::new_v4().to_string(),
             contact_id: contact_id.to_string(),
             update_type: "card_delta".to_string(),
             payload: encrypted,

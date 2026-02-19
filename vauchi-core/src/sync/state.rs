@@ -454,11 +454,18 @@ impl<'a> SyncManager<'a> {
     }
 }
 
+/// Maximum number of nonces to retain before evicting oldest entries (#41).
+const MAX_REPLAY_NONCES: usize = 10_000;
+
 /// Detects replay attacks by tracking per-contact nonces and timestamps.
 ///
 /// Each incoming delta includes a random nonce. The detector rejects:
 /// 1. Duplicate nonces (exact replay)
 /// 2. Deltas with timestamps older than the last accepted timestamp minus a tolerance window
+///
+/// The nonce set is capped at `MAX_REPLAY_NONCES` to prevent unbounded memory
+/// growth (#41). When the cap is reached, nonces for the oldest contacts
+/// (by last timestamp) are evicted.
 pub struct ReplayDetector {
     /// Set of (contact_id, nonce) pairs already seen.
     seen_nonces: HashSet<(String, [u8; 32])>,
@@ -504,6 +511,11 @@ impl ReplayDetector {
             }
         }
 
+        // Evict oldest contact nonces if at capacity (#41)
+        if self.seen_nonces.len() >= MAX_REPLAY_NONCES {
+            self.evict_oldest();
+        }
+
         // Accept: record nonce and update timestamp
         self.seen_nonces.insert(key);
         let entry = self
@@ -531,5 +543,26 @@ impl ReplayDetector {
             self.seen_nonces.retain(|(id, _)| id != contact_id);
             self.last_timestamps.remove(contact_id);
         }
+    }
+
+    /// Evicts nonces for the contact with the oldest timestamp (#41).
+    ///
+    /// Called when `seen_nonces` reaches `MAX_REPLAY_NONCES` to keep
+    /// memory bounded.
+    fn evict_oldest(&mut self) {
+        if let Some(oldest_id) = self
+            .last_timestamps
+            .iter()
+            .min_by_key(|(_, &ts)| ts)
+            .map(|(id, _)| id.clone())
+        {
+            self.seen_nonces.retain(|(id, _)| *id != oldest_id);
+            self.last_timestamps.remove(&oldest_id);
+        }
+    }
+
+    /// Returns the current number of tracked nonces.
+    pub fn nonce_count(&self) -> usize {
+        self.seen_nonces.len()
     }
 }

@@ -238,10 +238,12 @@ fn test_tor_bridge_configuration() {
     // Given Tor mode is enabled
     // And direct Tor access is blocked
     // When I configure bridge addresses
-    let bridge_config = TorConfig::enabled().with_bridges(vec![
-        "obfs4 192.168.1.1:443 cert=abc123".to_string(),
-        "obfs4 10.0.0.1:9001 cert=def456".to_string(),
-    ]);
+    let bridge_config = TorConfig::enabled()
+        .with_bridges(vec![
+            "obfs4 192.168.1.1:443 cert=abc123".to_string(),
+            "obfs4 10.0.0.1:9001 cert=def456".to_string(),
+        ])
+        .unwrap();
 
     // Then bridges should be configured
     assert!(bridge_config.has_bridges(), "Bridges should be configured");
@@ -269,6 +271,7 @@ fn test_tor_bridge_configuration_serialization() {
     // Given a config with bridges
     let config = TorConfig::enabled()
         .with_bridges(vec!["obfs4 192.168.1.1:443 cert=test".to_string()])
+        .unwrap()
         .with_circuit_rotation_secs(300);
 
     // When serialized and deserialized
@@ -285,9 +288,11 @@ fn test_tor_bridge_configuration_serialization() {
 #[test]
 fn test_tor_bridge_validation() {
     // Test bridge address format (obfs4)
-    let config = TorConfig::enabled().with_bridges(vec![
-        "obfs4 198.51.100.1:443 cert=ABC fingerprint=DEF".to_string(),
-    ]);
+    let config = TorConfig::enabled()
+        .with_bridges(vec![
+            "obfs4 198.51.100.1:443 cert=ABC fingerprint=DEF".to_string(),
+        ])
+        .unwrap();
 
     assert!(config.has_bridges());
     assert!(config.bridges[0].starts_with("obfs4"));
@@ -492,7 +497,8 @@ fn test_tor_connector_lifecycle() {
 fn test_tor_config_builder_chain() {
     // Test fluent builder pattern
     let config = TorConfig::enabled()
-        .with_bridges(vec!["bridge1".to_string()])
+        .with_bridges(vec!["198.51.100.1:9001".to_string()])
+        .unwrap()
         .with_prefer_onion(false)
         .with_circuit_rotation_secs(120);
 

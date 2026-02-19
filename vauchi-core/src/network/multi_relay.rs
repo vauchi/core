@@ -319,7 +319,13 @@ impl RelayHealth {
     }
 }
 
-/// Client for connecting to multiple relay servers with failover support
+/// Client for connecting to multiple relay servers with failover support.
+///
+/// **Status (#115):** Relay selection and health tracking are fully implemented.
+/// The `send_raw()` and `receive_pending()` methods are stubs — they do not
+/// open real WebSocket connections. For production use, `RelayClient` provides
+/// the actual single-relay transport. This struct is a future extension point
+/// for multi-relay failover when the protocol supports it.
 pub struct MultiRelayClient {
     /// Configuration
     config: MultiRelayConfig,

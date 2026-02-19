@@ -111,19 +111,37 @@ impl<'a> DeviceSyncOrchestrator<'a> {
             state.queue_item(item.clone());
         }
 
-        // Persist updated states
-        for state in self.device_states.values() {
-            self.storage
-                .save_device_sync_state(state)
-                .map_err(|e| DeviceSyncError::Serialization(e.to_string()))?;
-        }
-
-        // Persist version vector
+        // Persist device states + version vector atomically (#105).
+        // A transaction ensures either all state is saved or none, preventing
+        // inconsistency if the process crashes mid-write.
         self.storage
-            .save_version_vector(&self.version_vector)
+            .begin_transaction()
             .map_err(|e| DeviceSyncError::Serialization(e.to_string()))?;
 
-        Ok(())
+        let result = (|| {
+            for state in self.device_states.values() {
+                self.storage
+                    .save_device_sync_state(state)
+                    .map_err(|e| DeviceSyncError::Serialization(e.to_string()))?;
+            }
+            self.storage
+                .save_version_vector(&self.version_vector)
+                .map_err(|e| DeviceSyncError::Serialization(e.to_string()))?;
+            Ok(())
+        })();
+
+        match result {
+            Ok(()) => {
+                self.storage
+                    .commit()
+                    .map_err(|e| DeviceSyncError::Serialization(e.to_string()))?;
+                Ok(())
+            }
+            Err(e) => {
+                self.storage.rollback();
+                Err(e)
+            }
+        }
     }
 
     /// Returns pending sync items for a specific device.
@@ -184,33 +202,53 @@ impl<'a> DeviceSyncOrchestrator<'a> {
     /// Applies a full sync payload received during device linking.
     ///
     /// This replaces the local state with the received data.
+    /// All writes are wrapped in a transaction for atomicity (#105).
     pub fn apply_full_sync(&mut self, payload: DeviceSyncPayload) -> Result<(), DeviceSyncError> {
-        // Save own card
-        if !payload.own_card_json.is_empty() {
-            let own_card: ContactCard = serde_json::from_str(&payload.own_card_json)
-                .map_err(|e| DeviceSyncError::Deserialization(e.to_string()))?;
-            self.storage
-                .save_own_card(&own_card)
-                .map_err(|e| DeviceSyncError::Serialization(e.to_string()))?;
-        }
-
-        // Save contacts
-        for contact_data in &payload.contacts {
-            let contact = contact_data.to_contact()?;
-            self.storage
-                .save_contact(&contact)
-                .map_err(|e| DeviceSyncError::Serialization(e.to_string()))?;
-        }
-
-        // Update version vector to match received version
-        self.version_vector
-            .increment(self.current_device.device_id());
-
         self.storage
-            .save_version_vector(&self.version_vector)
+            .begin_transaction()
             .map_err(|e| DeviceSyncError::Serialization(e.to_string()))?;
 
-        Ok(())
+        let result = (|| {
+            // Save own card
+            if !payload.own_card_json.is_empty() {
+                let own_card: ContactCard = serde_json::from_str(&payload.own_card_json)
+                    .map_err(|e| DeviceSyncError::Deserialization(e.to_string()))?;
+                self.storage
+                    .save_own_card(&own_card)
+                    .map_err(|e| DeviceSyncError::Serialization(e.to_string()))?;
+            }
+
+            // Save contacts
+            for contact_data in &payload.contacts {
+                let contact = contact_data.to_contact()?;
+                self.storage
+                    .save_contact(&contact)
+                    .map_err(|e| DeviceSyncError::Serialization(e.to_string()))?;
+            }
+
+            // Update version vector to match received version
+            self.version_vector
+                .increment(self.current_device.device_id());
+
+            self.storage
+                .save_version_vector(&self.version_vector)
+                .map_err(|e| DeviceSyncError::Serialization(e.to_string()))?;
+
+            Ok(())
+        })();
+
+        match result {
+            Ok(()) => {
+                self.storage
+                    .commit()
+                    .map_err(|e| DeviceSyncError::Serialization(e.to_string()))?;
+                Ok(())
+            }
+            Err(e) => {
+                self.storage.rollback();
+                Err(e)
+            }
+        }
     }
 
     /// Returns the current device info.

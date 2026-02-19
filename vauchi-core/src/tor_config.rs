@@ -79,10 +79,69 @@ impl TorConfig {
         }
     }
 
-    /// Builder: set bridge addresses.
-    pub fn with_bridges(mut self, bridges: Vec<String>) -> Self {
+    /// Builder: set bridge addresses (#107).
+    ///
+    /// Each bridge must be non-empty and contain a transport keyword followed
+    /// by an IP:port (e.g., `obfs4 198.51.100.1:443 cert=...`).
+    /// Returns an error if any bridge string is malformed.
+    pub fn with_bridges(mut self, bridges: Vec<String>) -> Result<Self, String> {
+        for bridge in &bridges {
+            Self::validate_bridge(bridge)?;
+        }
         self.bridges = bridges;
-        self
+        Ok(self)
+    }
+
+    /// Validates a single bridge address string (#107).
+    ///
+    /// Accepted formats:
+    /// - `obfs4 IP:PORT cert=... iat-mode=N`
+    /// - `IP:PORT` (plain bridge)
+    fn validate_bridge(bridge: &str) -> Result<(), String> {
+        let bridge = bridge.trim();
+        if bridge.is_empty() {
+            return Err("bridge address cannot be empty".to_string());
+        }
+
+        // Split into parts. First token is either a transport or an IP:PORT.
+        let parts: Vec<&str> = bridge.split_whitespace().collect();
+        if parts.is_empty() {
+            return Err("bridge address cannot be empty".to_string());
+        }
+
+        // Check if first part is a known transport
+        let addr_part = match parts[0] {
+            "obfs4" | "obfs3" | "meek_lite" | "snowflake" | "webtunnel" => {
+                if parts.len() < 2 {
+                    return Err(format!(
+                        "bridge transport '{}' requires at least an IP:PORT",
+                        parts[0]
+                    ));
+                }
+                parts[1]
+            }
+            _ => parts[0], // Assume it's a plain IP:PORT bridge
+        };
+
+        // Validate that addr_part looks like IP:PORT
+        if !addr_part.contains(':') {
+            return Err(format!(
+                "bridge address '{}' missing port (expected IP:PORT)",
+                addr_part
+            ));
+        }
+
+        // Validate port is numeric
+        if let Some(port_str) = addr_part.rsplit(':').next() {
+            if port_str.parse::<u16>().is_err() {
+                return Err(format!(
+                    "bridge port '{}' is not a valid port number",
+                    port_str
+                ));
+            }
+        }
+
+        Ok(())
     }
 
     /// Builder: set .onion preference.
@@ -175,7 +234,11 @@ mod tests {
     #[test]
     fn test_tor_config_builder() {
         let config = TorConfig::enabled()
-            .with_bridges(vec!["bridge1".to_string(), "bridge2".to_string()])
+            .with_bridges(vec![
+                "obfs4 198.51.100.1:443 cert=abc iat-mode=0".to_string(),
+                "obfs4 198.51.100.2:9001 cert=def iat-mode=1".to_string(),
+            ])
+            .unwrap()
             .with_prefer_onion(false)
             .with_circuit_rotation_secs(300);
 
@@ -190,14 +253,51 @@ mod tests {
         let config = TorConfig::default();
         assert!(!config.has_bridges());
 
-        let config = TorConfig::enabled().with_bridges(vec!["bridge1".to_string()]);
+        let config = TorConfig::enabled()
+            .with_bridges(vec!["198.51.100.1:9001".to_string()])
+            .unwrap();
         assert!(config.has_bridges());
+    }
+
+    #[test]
+    fn test_bridge_validation_rejects_empty() {
+        let result = TorConfig::enabled().with_bridges(vec!["".to_string()]);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_bridge_validation_rejects_no_port() {
+        let result = TorConfig::enabled().with_bridges(vec!["obfs4 198.51.100.1".to_string()]);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_bridge_validation_rejects_invalid_port() {
+        let result =
+            TorConfig::enabled().with_bridges(vec!["obfs4 198.51.100.1:abc".to_string()]);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_bridge_validation_accepts_obfs4() {
+        let result = TorConfig::enabled().with_bridges(vec![
+            "obfs4 198.51.100.1:443 cert=abcdef iat-mode=0".to_string(),
+        ]);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_bridge_validation_accepts_plain_bridge() {
+        let result =
+            TorConfig::enabled().with_bridges(vec!["198.51.100.1:9001".to_string()]);
+        assert!(result.is_ok());
     }
 
     #[test]
     fn test_tor_config_serialization() {
         let config = TorConfig::enabled()
-            .with_bridges(vec!["obfs4 192.168.1.1:443".to_string()])
+            .with_bridges(vec!["obfs4 192.168.1.1:443 cert=test".to_string()])
+            .unwrap()
             .with_circuit_rotation_secs(300);
 
         let json = config.to_json().unwrap();

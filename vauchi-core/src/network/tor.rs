@@ -291,6 +291,13 @@ mod manager {
             Ok(Box::new(sync_stream))
         }
 
+        /// Resets the circuit age timer (#106).
+        ///
+        /// NOTE: This does not actually create a new Tor circuit. The arti client
+        /// reuses circuits based on its own isolation policy. This method only resets
+        /// the `circuit_created_at` timer so that `needs_circuit_rotation()` returns
+        /// false. True circuit isolation requires reconnecting with a fresh
+        /// `IsolationToken`, which is done by the transport layer on reconnect.
         fn rotate_circuit(&self) -> Result<(), NetworkError> {
             let client_guard = self
                 .client
@@ -356,7 +363,6 @@ pub struct TorTransport {
     connector: Arc<dyn TorConnector>,
     state: ConnectionState,
     stream: Option<Box<dyn TorStream>>,
-    receive_buffer: Vec<MessageEnvelope>,
 }
 
 impl TorTransport {
@@ -366,7 +372,6 @@ impl TorTransport {
             connector,
             state: ConnectionState::Disconnected,
             stream: None,
-            receive_buffer: Vec::new(),
         }
     }
 }
@@ -426,10 +431,6 @@ impl Transport for TorTransport {
     }
 
     fn receive(&mut self) -> TransportResult<Option<MessageEnvelope>> {
-        if !self.receive_buffer.is_empty() {
-            return Ok(Some(self.receive_buffer.remove(0)));
-        }
-
         if self.stream.is_none() {
             return Err(super::error::NetworkError::NotConnected);
         }
@@ -466,7 +467,7 @@ impl Transport for TorTransport {
     }
 
     fn has_pending(&self) -> bool {
-        !self.receive_buffer.is_empty()
+        false
     }
 }
 

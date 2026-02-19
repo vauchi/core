@@ -8,6 +8,8 @@
 //! This prevents relay-side correlation of messages to real identities.
 //! Anonymous IDs rotate hourly (epoch = unix_timestamp / 3600).
 
+use std::collections::HashMap;
+
 use crate::contact::Contact;
 use crate::crypto::HKDF;
 
@@ -63,6 +65,7 @@ pub fn current_epoch() -> u64 {
 /// Resolves an anonymous sender ID to a contact by trying each contact's shared key.
 ///
 /// Returns the matching contact, or None if no contact matches.
+/// This is O(n) per call. For repeated lookups, use [`SenderIndex`] instead (#104).
 pub fn resolve_sender<'a>(
     contacts: &'a [Contact],
     anonymous_id: &[u8; 32],
@@ -83,4 +86,49 @@ pub fn resolve_sender<'a>(
         }
     }
     None
+}
+
+/// Pre-computed index for O(1) anonymous sender ID resolution (#104).
+///
+/// Maps anonymous IDs (for current + previous epoch) to contact indices.
+/// Rebuild when contacts change or on epoch boundary.
+pub struct SenderIndex {
+    /// Maps anonymous_id → contact_id for both current and previous epochs.
+    lookup: HashMap<[u8; 32], String>,
+    /// The epoch this index was built for.
+    epoch: u64,
+}
+
+impl SenderIndex {
+    /// Builds the index from a contact list for the given epoch.
+    ///
+    /// O(n) to build, O(1) per lookup. Includes both current and previous
+    /// epoch entries for boundary tolerance.
+    pub fn build(contacts: &[Contact], epoch: u64) -> Self {
+        let mut lookup = HashMap::with_capacity(contacts.len() * 2);
+        for contact in contacts {
+            let id_current = compute_anonymous_id(contact.shared_key().as_bytes(), epoch);
+            lookup.insert(id_current, contact.id().to_string());
+            if epoch > 0 {
+                let id_prev = compute_anonymous_id(contact.shared_key().as_bytes(), epoch - 1);
+                lookup.insert(id_prev, contact.id().to_string());
+            }
+        }
+        SenderIndex { lookup, epoch }
+    }
+
+    /// Resolves an anonymous sender ID to a contact ID in O(1).
+    pub fn resolve(&self, anonymous_id: &[u8; 32]) -> Option<&str> {
+        self.lookup.get(anonymous_id).map(|s| s.as_str())
+    }
+
+    /// Returns true if this index is stale (built for a different epoch).
+    pub fn is_stale(&self) -> bool {
+        self.epoch != current_epoch()
+    }
+
+    /// The epoch this index was built for.
+    pub fn epoch(&self) -> u64 {
+        self.epoch
+    }
 }

@@ -370,7 +370,8 @@ mod tests {
     fn test_tor_config_save_load() {
         let storage = test_storage();
         let config = TorConfig::enabled()
-            .with_bridges(vec!["obfs4 192.168.1.1:443".to_string()])
+            .with_bridges(vec!["obfs4 192.168.1.1:443 cert=test".to_string()])
+            .unwrap()
             .with_circuit_rotation_secs(300);
 
         storage.save_tor_config(&config).unwrap();

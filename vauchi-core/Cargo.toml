@@ -101,9 +101,9 @@ reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"
 tokio = { version = "1.0", features = ["rt"], optional = true }
 
 # Embedded Tor client (optional, behind tor feature)
-arti-client = { version = "0.27", optional = true, default-features = false, features = ["tokio"] }
-tor-rtcompat = { version = "0.27", optional = true, features = ["tokio"] }
-tokio-util = { version = "0.7", optional = true, features = ["io"] }
+arti-client = { version = "0.27", optional = true, default-features = false, features = ["tokio", "native-tls"] }
+tor-rtcompat = { version = "0.27", optional = true, features = ["tokio", "native-tls"] }
+tokio-util = { version = "0.7", optional = true, features = ["io-util"] }
 
 [dev-dependencies]
 # Temporary directories for storage tests

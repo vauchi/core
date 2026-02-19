@@ -50,7 +50,7 @@ fn provider_contract_encode_decode_roundtrip() {
 #[test]
 fn provider_contract_all_relay_payload_variants_constructable() {
     // Relay creates these payloads — they must be constructable and encode to JSON
-    let payloads = vec![
+    let payloads = [
         MessagePayload::HandshakeAck(HandshakeAck {
             protocol_version: 1,
             server_version: "1.0.0".to_string(),

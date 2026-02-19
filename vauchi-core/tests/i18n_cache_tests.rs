@@ -17,8 +17,7 @@ static INIT: Once = Once::new();
 fn ensure_init() {
     INIT.call_once(|| {
         let locales_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("locales");
-        vauchi_core::i18n::init(&locales_dir)
-            .expect("Failed to load locales for cache tests");
+        vauchi_core::i18n::init(&locales_dir).expect("Failed to load locales for cache tests");
     });
 }
 

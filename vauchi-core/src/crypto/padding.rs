@@ -89,6 +89,18 @@ pub fn unpad(padded: &[u8]) -> Option<Vec<u8>> {
     Some(padded[LENGTH_PREFIX_SIZE..LENGTH_PREFIX_SIZE + len].to_vec())
 }
 
+/// Validates that a received padded buffer has a valid bucket size (#149).
+///
+/// Returns `true` if the buffer length matches a known bucket (256, 1024, 4096)
+/// or is aligned to `OVERFLOW_ALIGNMENT` for oversized messages.
+/// An unexpected size may indicate tampering or a protocol mismatch.
+pub fn is_valid_bucket_size(len: usize) -> bool {
+    len == BUCKET_SMALL
+        || len == BUCKET_MEDIUM
+        || len == BUCKET_LARGE
+        || (len > BUCKET_LARGE && len % OVERFLOW_ALIGNMENT == 0)
+}
+
 /// Selects the smallest bucket that fits the given size.
 fn select_bucket(size: usize) -> usize {
     if size <= BUCKET_SMALL {
@@ -224,6 +236,19 @@ mod tests {
         // The random tail portion should differ
         // (first 4+4=8 bytes are deterministic: length + plaintext)
         assert_ne!(padded1[8..], padded2[8..]);
+    }
+
+    #[test]
+    fn test_is_valid_bucket_size() {
+        assert!(is_valid_bucket_size(BUCKET_SMALL));
+        assert!(is_valid_bucket_size(BUCKET_MEDIUM));
+        assert!(is_valid_bucket_size(BUCKET_LARGE));
+        assert!(is_valid_bucket_size(4352)); // Overflow aligned
+        assert!(is_valid_bucket_size(4608));
+        assert!(!is_valid_bucket_size(0));
+        assert!(!is_valid_bucket_size(100)); // Not a valid bucket
+        assert!(!is_valid_bucket_size(512)); // Between small and medium
+        assert!(!is_valid_bucket_size(4097)); // Not aligned
     }
 
     #[test]

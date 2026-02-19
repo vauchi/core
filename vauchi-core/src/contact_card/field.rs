@@ -12,6 +12,9 @@ use serde::{Deserialize, Serialize};
 /// Maximum length for field values.
 pub const MAX_VALUE_LENGTH: usize = 1000;
 
+/// Maximum length for field labels (#192).
+pub const MAX_LABEL_LENGTH: usize = 64;
+
 /// Type of contact field.
 ///
 /// Note: Social networks are handled generically via `Social` type.
@@ -87,9 +90,13 @@ impl ContactField {
         &self.label
     }
 
-    /// Sets the field label.
+    /// Sets the field label. Truncates to MAX_LABEL_LENGTH chars (#192).
     pub fn set_label(&mut self, label: &str) {
-        self.label = label.to_string();
+        if label.chars().count() > MAX_LABEL_LENGTH {
+            self.label = label.chars().take(MAX_LABEL_LENGTH).collect();
+        } else {
+            self.label = label.to_string();
+        }
     }
 
     /// Returns the field value.

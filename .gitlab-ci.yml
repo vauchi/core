@@ -187,8 +187,12 @@ mutation:nightly:
       while [ ! -f "$MUTANTS_OUT/mutants.json" ] && kill -0 "$MUTANTS_PID" 2>/dev/null; do
         sleep 10
       done
-      TOTAL="?"
-      [ -f "$MUTANTS_OUT/mutants.json" ] && TOTAL=$(jq 'length' "$MUTANTS_OUT/mutants.json" 2>/dev/null || echo "?")
+
+      if ! kill -0 "$MUTANTS_PID" 2>/dev/null; then
+        wait "$MUTANTS_PID"; exit $?
+      fi
+
+      TOTAL=$(python3 -c "import json; print(len(json.load(open('$MUTANTS_OUT/mutants.json'))))" 2>/dev/null || echo "?")
 
       SECONDS=0
       while kill -0 "$MUTANTS_PID" 2>/dev/null; do
@@ -196,8 +200,12 @@ mutation:nightly:
         c=$(count "$MUTANTS_OUT/caught.txt"); m=$(count "$MUTANTS_OUT/missed.txt")
         t=$(count "$MUTANTS_OUT/timeout.txt"); u=$(count "$MUTANTS_OUT/unviable.txt")
         d=$((c + m + t + u))
-        printf "[%3d/%s] %d caught, %d missed, %d timeout, %d unviable  (%dm elapsed)\n" \
-          "$d" "$TOTAL" "$c" "$m" "$t" "$u" "$((SECONDS / 60))"
+        if [ "$d" -eq 0 ]; then
+          echo "Baseline: running unmutated tests... ($((SECONDS / 60))m elapsed)"
+        else
+          printf "[%3d/%s] %d caught, %d missed, %d timeout, %d unviable  (%dm elapsed)\n" \
+            "$d" "$TOTAL" "$c" "$m" "$t" "$u" "$((SECONDS / 60))"
+        fi
       done
 
       wait "$MUTANTS_PID"
@@ -208,7 +216,7 @@ mutation:nightly:
       d=$((c + m + t + u))
       echo ""
       echo "=== Mutation Testing Summary ==="
-      echo "  Total:    $d"
+      echo "  Total:    $d / $TOTAL"
       echo "  Caught:   $c"
       echo "  Missed:   $m"
       echo "  Timeout:  $t"
@@ -250,8 +258,12 @@ mutation:incremental:
       while [ ! -f "$MUTANTS_OUT/mutants.json" ] && kill -0 "$MUTANTS_PID" 2>/dev/null; do
         sleep 10
       done
-      TOTAL="?"
-      [ -f "$MUTANTS_OUT/mutants.json" ] && TOTAL=$(jq 'length' "$MUTANTS_OUT/mutants.json" 2>/dev/null || echo "?")
+
+      if ! kill -0 "$MUTANTS_PID" 2>/dev/null; then
+        wait "$MUTANTS_PID"; exit $?
+      fi
+
+      TOTAL=$(python3 -c "import json; print(len(json.load(open('$MUTANTS_OUT/mutants.json'))))" 2>/dev/null || echo "?")
 
       SECONDS=0
       while kill -0 "$MUTANTS_PID" 2>/dev/null; do
@@ -259,8 +271,12 @@ mutation:incremental:
         c=$(count "$MUTANTS_OUT/caught.txt"); m=$(count "$MUTANTS_OUT/missed.txt")
         t=$(count "$MUTANTS_OUT/timeout.txt"); u=$(count "$MUTANTS_OUT/unviable.txt")
         d=$((c + m + t + u))
-        printf "[%3d/%s] %d caught, %d missed, %d timeout, %d unviable  (%dm elapsed)\n" \
-          "$d" "$TOTAL" "$c" "$m" "$t" "$u" "$((SECONDS / 60))"
+        if [ "$d" -eq 0 ]; then
+          echo "Baseline: running unmutated tests... ($((SECONDS / 60))m elapsed)"
+        else
+          printf "[%3d/%s] %d caught, %d missed, %d timeout, %d unviable  (%dm elapsed)\n" \
+            "$d" "$TOTAL" "$c" "$m" "$t" "$u" "$((SECONDS / 60))"
+        fi
       done
 
       wait "$MUTANTS_PID"
@@ -271,7 +287,7 @@ mutation:incremental:
       d=$((c + m + t + u))
       echo ""
       echo "=== Mutation Testing Summary ==="
-      echo "  Total:    $d"
+      echo "  Total:    $d / $TOTAL"
       echo "  Caught:   $c"
       echo "  Missed:   $m"
       echo "  Timeout:  $t"

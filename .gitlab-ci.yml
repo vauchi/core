@@ -192,7 +192,8 @@ mutation:incremental:
   allow_failure: true
   script:
     - cargo binstall cargo-mutants --no-confirm 2>/dev/null || cargo install cargo-mutants --locked || true
-    - cargo mutants -p vauchi-core --in-diff "origin/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME" --timeout 60
+    - git diff "origin/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME"...HEAD > mr.diff
+    - cargo mutants -p vauchi-core --in-diff mr.diff --timeout 60
   artifacts:
     paths:
       - mutants.out/

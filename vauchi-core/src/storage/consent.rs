@@ -30,7 +30,7 @@ impl Storage {
     /// Checks if consent is granted for a type (latest record).
     pub fn check_consent(&self, consent_type: &str) -> Result<bool, StorageError> {
         let result = self.conn.query_row(
-            "SELECT granted FROM consent_records WHERE consent_type = ?1 ORDER BY timestamp DESC LIMIT 1",
+            "SELECT granted FROM consent_records WHERE consent_type = ?1 ORDER BY timestamp DESC, rowid DESC LIMIT 1",
             params![consent_type],
             |row| row.get::<_, i32>(0),
         );

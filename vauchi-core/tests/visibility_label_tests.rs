@@ -1114,9 +1114,7 @@ fn test_label_timestamps() {
     // Initially, created_at and modified_at should be equal
     assert_eq!(created_at, initial_modified);
 
-    // Wait a tiny bit and modify the label
-    std::thread::sleep(std::time::Duration::from_millis(10));
-
+    // Modify the label
     let label = manager.get_label_mut(&label_id).unwrap();
     label.set_name("Updated Label");
 
@@ -1129,8 +1127,6 @@ fn test_label_timestamps() {
     assert!(label.modified_at() >= initial_modified);
 
     // Modify again by adding a field
-    std::thread::sleep(std::time::Duration::from_millis(10));
-
     let label = manager.get_label_mut(&label_id).unwrap();
     label.add_visible_field("test-field");
 
@@ -1139,8 +1135,6 @@ fn test_label_timestamps() {
 
     // Modify by adding a contact
     let prev_modified = label.modified_at();
-    std::thread::sleep(std::time::Duration::from_millis(10));
-
     let label = manager.get_label_mut(&label_id).unwrap();
     label.add_contact("test-contact");
 

@@ -4,9 +4,17 @@
 
 # GitLab CI for vauchi-core
 #
-# Pipeline strategy:
-#   - MR: Validation (lint, test+coverage, security) - runs only on relevant changes
+# Pipeline strategy (PI-13 fail-fast DAG):
+#   - MR: Validation with DAG ordering — cheap checks gate expensive ones
 #   - Tags (v*): Build, package, publish releases
+#
+# DAG execution order (MR pipelines):
+#   lint (< 2 min) ──┬── test (< 5 min) ──── mutation (advisory)
+#                     ├── bench (advisory, change-based)
+#                     └── security (< 5 min)
+#
+#   Lint must pass before tests or security run. Mutation only runs
+#   after tests pass. Security runs parallel with tests.
 #
 # Uses shared templates from vauchi/scripts for consistency.
 #
@@ -17,7 +25,7 @@
 #     - Security audit: Cargo.toml, Cargo.lock (dependencies)
 #     - License check: Cargo.*, deny.toml
 #   - Test and coverage combined in single pass
-#   - DAG execution: lint/security/test jobs start immediately (needs: [])
+#   - DAG execution: needs: with optional:true for cross-rule compatibility
 #   - Parallel build jobs (iOS + Android)
 #   - Parallel test jobs (core + mobile)
 #   - Parallel publish jobs (core + mobile)
@@ -37,6 +45,7 @@ include:
       - '/ci-templates/release.yml'
       - '/ci-templates/downstream.yml'
       - '/ci-templates/reuse.yml'
+      - '/ci-templates/test-quality.yml'
 
 stages:
   - auto-tag
@@ -48,6 +57,11 @@ stages:
   - package
   - publish
   - trigger
+
+# Override: advisory until pre-existing proptest/fuzz zero-assertion tests
+# are refactored (scanner cannot detect prop_assert! inside proptest! macros)
+quality:zero-assertions:
+  allow_failure: true
 
 # ============================================================
 # Auto-Tag Stage (main branch only)
@@ -92,8 +106,10 @@ auto-tag:version:
       echo "✓ Created and pushed tag ${TAG}"
 
 # ============================================================
-# Lint Stage (MR only, change-based)
+# Lint Stage — Preflight Gate (MR only, change-based)
 # ============================================================
+# Cheapest checks run first. Test + security jobs wait for these
+# to pass before starting (PI-13 fail-fast DAG).
 
 lint:format:
   extends: [.linux-runner-nocache, .validation-rust, .timeout-quick]
@@ -114,13 +130,17 @@ lint:clippy:
 # REUSE compliance provided by vauchi/scripts ci-templates/reuse.yml
 
 # ============================================================
-# Test Stage (MR only, runs on Rust code changes)
+# Test Stage (MR only, gated by lint)
 # ============================================================
 
 test:core:
   extends: [.linux-runner, .validation-rust, .timeout-standard]
   stage: test
-  needs: []
+  needs:
+    - job: lint:format
+      optional: true
+    - job: lint:clippy
+      optional: true
   before_script:
     - !reference [.self-hosted, before_script]
     - rustup component add llvm-tools-preview
@@ -143,7 +163,11 @@ test:core:
 test:mobile:
   extends: [.linux-runner, .validation-mobile, .timeout-standard]
   stage: test
-  needs: []
+  needs:
+    - job: lint:format
+      optional: true
+    - job: lint:clippy
+      optional: true
   before_script:
     - !reference [.self-hosted, before_script]
     - rustup component add llvm-tools-preview
@@ -162,6 +186,84 @@ test:mobile:
       - lcov-mobile.info
       - cobertura-mobile.xml
     expire_in: 1 week
+
+# ============================================================
+# Benchmark Stage — Performance Regression Gate (PI-10)
+# ============================================================
+# Criterion benchmarks with baseline comparison.
+# - merge to main: save baseline results
+# - MR: compare against saved baseline, warn on > 20% regression
+
+# Cache for benchmark baselines (shared between main and MR jobs)
+.bench-cache:
+  cache:
+    key: bench-baseline-main
+    paths:
+      - target/criterion/
+
+# Save baseline on merge to main
+bench:save-baseline:
+  extends: [.linux-runner, .timeout-standard, .bench-cache]
+  stage: test
+  needs:
+    - job: lint:format
+      optional: true
+    - job: lint:clippy
+      optional: true
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+  script:
+    - cargo bench -p vauchi-core -- --save-baseline main
+  artifacts:
+    paths:
+      - target/criterion/
+    expire_in: 30 days
+
+# Compare against baseline on MRs (advisory)
+bench:compare:
+  extends: [.linux-runner, .timeout-standard, .bench-cache]
+  stage: test
+  needs:
+    - job: lint:format
+      optional: true
+    - job: lint:clippy
+      optional: true
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes:
+        compare_to: refs/heads/main
+        paths:
+          - "vauchi-core/src/**/*.rs"
+          - "vauchi-core/benches/**/*.rs"
+          - "vauchi-core/Cargo.toml"
+          - ".gitlab-ci.yml"
+  allow_failure: true
+  cache:
+    key: bench-baseline-main
+    paths:
+      - target/criterion/
+    policy: pull
+  script:
+    - |
+      if [ -d "target/criterion" ]; then
+        echo "Found baseline — comparing..."
+        cargo bench -p vauchi-core -- --baseline main 2>&1 | tee bench-results.txt
+        # Check for regressions > 20%
+        if grep -E 'regressed.*\+[2-9][0-9]\.' bench-results.txt || grep -E 'regressed.*\+[1-9][0-9][0-9]' bench-results.txt; then
+          echo "⚠ WARNING: Performance regression > 20% detected!"
+          echo "  Review bench-results.txt for details."
+        else
+          echo "✓ No significant regressions detected"
+        fi
+      else
+        echo "No baseline found — running benchmarks without comparison"
+        cargo bench -p vauchi-core 2>&1 | tee bench-results.txt
+      fi
+  artifacts:
+    paths:
+      - bench-results.txt
+    expire_in: 1 week
+    when: always
 
 # ============================================================
 # Mutation Stage
@@ -277,11 +379,13 @@ mutation:nightly:
       - target/mutants/
     expire_in: 1 week
 
-# Per-MR incremental mutation testing (advisory)
+# Per-MR incremental mutation testing (advisory, runs after tests pass)
 mutation:incremental:
   extends: [.linux-runner, .timeout-extended]
   stage: mutation
-  needs: []
+  needs:
+    - job: test:core
+      optional: true
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
   allow_failure: true
@@ -394,14 +498,18 @@ mutation:incremental:
     when: always
 
 # ============================================================
-# Security Stage (MR only, change-based)
+# Security Stage (MR only, gated by lint, parallel with test)
 # ============================================================
 
 # Rust-specific security audit (runs on dependency changes)
 security:audit:
   extends: [.linux-runner-readonly, .validation-deps, .timeout-quick]
   stage: security
-  needs: []
+  needs:
+    - job: lint:format
+      optional: true
+    - job: lint:clippy
+      optional: true
   script:
     - cargo binstall cargo-audit --no-confirm 2>/dev/null || cargo install cargo-audit || true
     - cargo audit
@@ -410,7 +518,11 @@ security:audit:
 security:deny:
   extends: [.linux-runner-readonly, .timeout-quick]
   stage: security
-  needs: []
+  needs:
+    - job: lint:format
+      optional: true
+    - job: lint:clippy
+      optional: true
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
     - if: $CI_PIPELINE_SOURCE == "schedule"

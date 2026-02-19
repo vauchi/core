@@ -114,6 +114,13 @@ tokio = { version = "1.0", features = ["rt", "macros"] }
 proptest = "1.4"
 # Benchmarking
 criterion = "0.5"
+# BDD testing (executable Gherkin)
+cucumber = "0.21"
+futures = "0.3"
+
+[[test]]
+name = "cucumber_tests"
+harness = false
 
 [[bench]]
 name = "crypto_benchmarks"

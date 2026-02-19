@@ -72,6 +72,9 @@ pub enum RecoveryError {
 
     #[error("Voucher is from an untrusted contact")]
     UntrustedVoucher,
+
+    #[error("Invalid recovery proof: {0}")]
+    InvalidProof(String),
 }
 
 // =============================================================================
@@ -453,15 +456,29 @@ impl RecoveryVoucher {
     }
 }
 
+/// Current serialization format version for recovery proofs (#72).
+pub const RECOVERY_PROOF_VERSION: u8 = 1;
+
 /// Complete recovery proof with multiple vouchers.
+///
+/// The `version` field enables schema evolution: new fields can be added in future
+/// versions while maintaining backward compatibility for loading older proofs.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct RecoveryProof {
+    /// Schema version for forward compatibility (#72).
+    #[serde(default = "default_proof_version")]
+    version: u8,
     old_pk: [u8; 32],
     new_pk: [u8; 32],
     threshold: u32,
     vouchers: Vec<RecoveryVoucher>,
     created_at: u64,
     expires_at: u64,
+}
+
+/// Default version for deserializing proofs that predate the version field.
+fn default_proof_version() -> u8 {
+    1
 }
 
 impl RecoveryProof {
@@ -478,6 +495,7 @@ impl RecoveryProof {
         let expires_at = now + Self::DEFAULT_EXPIRY_DAYS * 24 * 60 * 60;
 
         Self {
+            version: RECOVERY_PROOF_VERSION,
             old_pk: *old_pk,
             new_pk: *new_pk,
             threshold,
@@ -485,6 +503,25 @@ impl RecoveryProof {
             created_at: now,
             expires_at,
         }
+    }
+
+    /// Returns the schema version of this proof.
+    pub fn version(&self) -> u8 {
+        self.version
+    }
+
+    /// Validates that this proof's version is supported (#72).
+    ///
+    /// Returns `Err` if the proof was serialized by a newer version
+    /// of the software that we don't understand.
+    pub fn validate_version(&self) -> Result<(), RecoveryError> {
+        if self.version > RECOVERY_PROOF_VERSION {
+            return Err(RecoveryError::InvalidProof(format!(
+                "unsupported proof version {} (max supported: {})",
+                self.version, RECOVERY_PROOF_VERSION
+            )));
+        }
+        Ok(())
     }
 
     /// Returns the old (lost) public key.

@@ -13,6 +13,8 @@ use rusqlite::Connection;
 
 use crate::crypto::SymmetricKey;
 
+use ring::hmac;
+
 use super::StorageError;
 
 /// A single schema migration step.
@@ -297,6 +299,16 @@ pub fn all_migrations() -> Vec<Migration> {
             version: 22,
             name: "emergency_config",
             action: MigrationAction::Sql(MIGRATION_V22_EMERGENCY_CONFIG),
+        },
+        Migration {
+            version: 23,
+            name: "encrypt_label_names",
+            action: MigrationAction::Callback(migrate_v23_encrypt_label_names),
+        },
+        Migration {
+            version: 24,
+            name: "per_contact_ratchet_keys",
+            action: MigrationAction::Callback(migrate_v24_per_contact_ratchet_keys),
         },
     ]
 }
@@ -1368,6 +1380,107 @@ fn migrate_v18_encrypt_visibility_rules(
             )
             .map_err(|e| StorageError::Migration(format!("Update contact {}: {}", id, e)))?;
         }
+    }
+
+    Ok(())
+}
+
+/// Migration v23: Encrypt label names (#128).
+///
+/// Adds `name_encrypted` BLOB and `name_hmac` BLOB columns to `visibility_labels`.
+/// Encrypts existing plaintext names and computes HMAC for lookups.
+/// After migration, the plaintext `name` column is blanked.
+fn migrate_v23_encrypt_label_names(
+    conn: &Connection,
+    key: &SymmetricKey,
+) -> Result<(), StorageError> {
+    use crate::crypto::HKDF;
+
+    // Add new columns
+    conn.execute_batch(
+        "ALTER TABLE visibility_labels ADD COLUMN name_encrypted BLOB;
+         ALTER TABLE visibility_labels ADD COLUMN name_hmac BLOB;",
+    )
+    .map_err(|e| StorageError::Migration(format!("Add label name columns: {}", e)))?;
+
+    // Derive HMAC key for label name lookups
+    let hmac_key_bytes =
+        HKDF::derive_key(None, key.as_bytes(), b"Vauchi_Label_Name_HMAC_v1");
+    let hmac_key = hmac::Key::new(hmac::HMAC_SHA256, &hmac_key_bytes);
+
+    // Encrypt existing plaintext names
+    let mut stmt = conn
+        .prepare("SELECT id, name FROM visibility_labels")
+        .map_err(|e| StorageError::Migration(format!("Select labels: {}", e)))?;
+
+    let rows: Vec<(String, String)> = stmt
+        .query_map([], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+        })
+        .map_err(|e| StorageError::Migration(format!("Query labels: {}", e)))?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| StorageError::Migration(format!("Collect labels: {}", e)))?;
+
+    for (id, name) in &rows {
+        let name_encrypted = crate::crypto::encrypt(key, name.as_bytes())
+            .map_err(|e| StorageError::Migration(format!("Encrypt label name: {}", e)))?;
+        let name_hmac_value = hmac::sign(&hmac_key, name.as_bytes());
+
+        // Set plaintext name to the label id (satisfies UNIQUE constraint without leaking data)
+        conn.execute(
+            "UPDATE visibility_labels SET name_encrypted = ?1, name_hmac = ?2, name = ?3 WHERE id = ?3",
+            rusqlite::params![name_encrypted, name_hmac_value.as_ref(), id],
+        )
+        .map_err(|e| StorageError::Migration(format!("Update label {}: {}", id, e)))?;
+    }
+
+    Ok(())
+}
+
+/// Migration v24: Re-encrypt ratchet states with per-contact derived keys (#126).
+///
+/// Previously all ratchet states were encrypted with the shared storage master key.
+/// This migration re-encrypts each row using an HKDF-derived per-contact key,
+/// ensuring that compromising one contact's ratchet state does not expose the SMK.
+fn migrate_v24_per_contact_ratchet_keys(
+    conn: &Connection,
+    key: &SymmetricKey,
+) -> Result<(), StorageError> {
+    use crate::crypto::HKDF;
+
+    // Load all ratchet rows
+    let mut stmt = conn
+        .prepare("SELECT contact_id, ratchet_state_encrypted FROM contact_ratchets")
+        .map_err(|e| StorageError::Migration(format!("Select ratchets: {}", e)))?;
+
+    let rows: Vec<(String, Vec<u8>)> = stmt
+        .query_map([], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, Vec<u8>>(1)?))
+        })
+        .map_err(|e| StorageError::Migration(format!("Query ratchets: {}", e)))?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| StorageError::Migration(format!("Collect ratchets: {}", e)))?;
+
+    for (contact_id, encrypted) in &rows {
+        // Decrypt with old shared key
+        let plaintext = crate::crypto::decrypt(key, encrypted)
+            .map_err(|e| StorageError::Migration(format!("Decrypt ratchet {}: {}", contact_id, e)))?;
+
+        // Derive per-contact key
+        let mut info = b"vauchi-ratchet-storage-v1:".to_vec();
+        info.extend_from_slice(contact_id.as_bytes());
+        let derived_bytes = HKDF::derive_key(None, key.as_bytes(), &info);
+        let derived_key = SymmetricKey::from_bytes(derived_bytes);
+
+        // Re-encrypt with per-contact key
+        let re_encrypted = crate::crypto::encrypt(&derived_key, &plaintext)
+            .map_err(|e| StorageError::Migration(format!("Re-encrypt ratchet {}: {}", contact_id, e)))?;
+
+        conn.execute(
+            "UPDATE contact_ratchets SET ratchet_state_encrypted = ?1 WHERE contact_id = ?2",
+            rusqlite::params![re_encrypted, contact_id],
+        )
+        .map_err(|e| StorageError::Migration(format!("Update ratchet {}: {}", contact_id, e)))?;
     }
 
     Ok(())

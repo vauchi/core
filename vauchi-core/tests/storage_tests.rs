@@ -282,6 +282,60 @@ fn test_storage_ratchet_not_found() {
     assert!(result.is_none());
 }
 
+/// SP-9 #126: Ratchet states use per-contact derived encryption keys.
+/// Verifies that two contacts' ratchet states are independently encrypted
+/// and can be loaded back correctly.
+#[test]
+fn test_storage_ratchet_per_contact_key_isolation() {
+    use vauchi_core::crypto::ratchet::DoubleRatchetState;
+    use vauchi_core::crypto::SymmetricKey;
+    use vauchi_core::exchange::X3DHKeyPair;
+
+    let storage = create_test_storage();
+
+    // Use distinct public keys to create separate contacts
+    let alice = Contact::from_exchange(
+        [1u8; 32],
+        ContactCard::new("Alice"),
+        SymmetricKey::generate(),
+    );
+    let bob = Contact::from_exchange(
+        [2u8; 32],
+        ContactCard::new("Bob"),
+        SymmetricKey::generate(),
+    );
+    storage.save_contact(&alice).unwrap();
+    storage.save_contact(&bob).unwrap();
+
+    // Create and save ratchet state for Alice
+    let secret_a = SymmetricKey::generate();
+    let dh_a = X3DHKeyPair::generate();
+    let ratchet_a = DoubleRatchetState::initialize_initiator(&secret_a, *dh_a.public_key());
+    storage
+        .save_ratchet_state(alice.id(), &ratchet_a, true)
+        .unwrap();
+
+    // Create and save ratchet state for Bob
+    let secret_b = SymmetricKey::generate();
+    let dh_b = X3DHKeyPair::generate();
+    let ratchet_b = DoubleRatchetState::initialize_initiator(&secret_b, *dh_b.public_key());
+    storage
+        .save_ratchet_state(bob.id(), &ratchet_b, false)
+        .unwrap();
+
+    // Load Alice's ratchet — must succeed and match
+    let (loaded_a, is_init_a) = storage.load_ratchet_state(alice.id()).unwrap().unwrap();
+    assert!(is_init_a);
+    assert_eq!(loaded_a.dh_generation(), ratchet_a.dh_generation());
+    assert_eq!(loaded_a.our_public_key(), ratchet_a.our_public_key());
+
+    // Load Bob's ratchet — must succeed and match
+    let (loaded_b, is_init_b) = storage.load_ratchet_state(bob.id()).unwrap().unwrap();
+    assert!(!is_init_b);
+    assert_eq!(loaded_b.dh_generation(), ratchet_b.dh_generation());
+    assert_eq!(loaded_b.our_public_key(), ratchet_b.our_public_key());
+}
+
 #[test]
 fn test_storage_save_load_device_info() {
     let storage = create_test_storage();

@@ -7,10 +7,24 @@
 use rusqlite::params;
 
 use super::{Storage, StorageError};
+use crate::crypto::kdf::HKDF;
 use crate::crypto::ratchet::DoubleRatchetState;
+use crate::crypto::SymmetricKey;
 
 impl Storage {
     // === Double Ratchet State Operations ===
+
+    /// Derives a per-contact encryption key for ratchet state storage.
+    ///
+    /// Uses HKDF with the storage master key as IKM and the contact ID
+    /// as domain separator. This ensures that compromising one contact's
+    /// ratchet state does not expose the SMK or other contacts' states.
+    fn derive_ratchet_key(&self, contact_id: &str) -> SymmetricKey {
+        let mut info = b"vauchi-ratchet-storage-v1:".to_vec();
+        info.extend_from_slice(contact_id.as_bytes());
+        let key_bytes = HKDF::derive_key(None, self.encryption_key.as_bytes(), &info);
+        SymmetricKey::from_bytes(key_bytes)
+    }
 
     /// Saves a Double Ratchet state for a contact.
     pub fn save_ratchet_state(
@@ -24,8 +38,9 @@ impl Storage {
         let state_json = serde_json::to_vec(&serialized)
             .map_err(|e| StorageError::Serialization(e.to_string()))?;
 
-        // Encrypt the serialized state
-        let state_encrypted = crate::crypto::encrypt(&self.encryption_key, &state_json)
+        // Encrypt with per-contact derived key
+        let ratchet_key = self.derive_ratchet_key(contact_id);
+        let state_encrypted = crate::crypto::encrypt(&ratchet_key, &state_json)
             .map_err(|e| StorageError::Encryption(e.to_string()))?;
 
         let now = std::time::SystemTime::now()
@@ -63,8 +78,9 @@ impl Storage {
 
         match result {
             Ok((encrypted, is_initiator)) => {
-                // Decrypt the state
-                let state_json = crate::crypto::decrypt(&self.encryption_key, &encrypted)
+                // Decrypt with per-contact derived key
+                let ratchet_key = self.derive_ratchet_key(contact_id);
+                let state_json = crate::crypto::decrypt(&ratchet_key, &encrypted)
                     .map_err(|e| StorageError::Encryption(e.to_string()))?;
 
                 // Deserialize

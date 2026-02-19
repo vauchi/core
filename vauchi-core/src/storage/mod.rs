@@ -108,10 +108,11 @@ pub use secure::MemoryKeyStorage;
 #[cfg(feature = "secure-storage")]
 pub use secure::PlatformKeyring;
 
+use ring::hmac;
 use rusqlite::Connection;
 use std::path::Path;
 
-use crate::crypto::SymmetricKey;
+use crate::crypto::{SymmetricKey, HKDF};
 
 /// SQLite-based storage implementation.
 ///
@@ -190,6 +191,21 @@ impl Storage {
     /// Returns the current schema version.
     pub fn schema_version(&self) -> Result<u32, StorageError> {
         migration::MigrationRunner::current_version(&self.conn)
+    }
+
+    /// Computes a deterministic HMAC for encrypted column lookups (#128).
+    ///
+    /// Derives a dedicated HMAC key from the SEK via HKDF, then computes
+    /// HMAC-SHA256(hmac_key, data). This allows equality lookups on encrypted
+    /// data without decryption (e.g., label name uniqueness checks).
+    pub(crate) fn compute_lookup_hmac(&self, domain: &[u8], data: &[u8]) -> Vec<u8> {
+        let hmac_key_bytes = HKDF::derive_key(
+            None,
+            self.encryption_key.as_bytes(),
+            domain,
+        );
+        let key = hmac::Key::new(hmac::HMAC_SHA256, &hmac_key_bytes);
+        hmac::sign(&key, data).as_ref().to_vec()
     }
 
     /// Re-encrypts all encrypted columns from the current key to a new key.
@@ -313,8 +329,10 @@ impl Storage {
                 }
             }
 
-            // Re-encrypt ratchet state: ratchet_state_encrypted
+            // Re-encrypt ratchet state with per-contact derived keys (#126)
             {
+                use crate::crypto::kdf::HKDF;
+
                 let mut stmt = self
                     .conn
                     .prepare("SELECT contact_id, ratchet_state_encrypted FROM contact_ratchets")
@@ -327,10 +345,23 @@ impl Storage {
                     .map_err(|e| StorageError::Migration(format!("Collect ratchets: {}", e)))?;
 
                 for (contact_id, ratchet_enc) in &rows {
-                    let plain = decrypt(old_key, ratchet_enc).map_err(|e| {
+                    // Decrypt with old per-contact key
+                    let mut old_info = b"vauchi-ratchet-storage-v1:".to_vec();
+                    old_info.extend_from_slice(contact_id.as_bytes());
+                    let old_derived = HKDF::derive_key(None, old_key.as_bytes(), &old_info);
+                    let old_ratchet_key = SymmetricKey::from_bytes(old_derived);
+
+                    let plain = decrypt(&old_ratchet_key, ratchet_enc).map_err(|e| {
                         StorageError::Migration(format!("Decrypt ratchet {}: {}", contact_id, e))
                     })?;
-                    let new_enc = encrypt(&new_key, &plain).map_err(|e| {
+
+                    // Re-encrypt with new per-contact key
+                    let mut new_info = b"vauchi-ratchet-storage-v1:".to_vec();
+                    new_info.extend_from_slice(contact_id.as_bytes());
+                    let new_derived = HKDF::derive_key(None, new_key.as_bytes(), &new_info);
+                    let new_ratchet_key = SymmetricKey::from_bytes(new_derived);
+
+                    let new_enc = encrypt(&new_ratchet_key, &plain).map_err(|e| {
                         StorageError::Migration(format!("Encrypt ratchet {}: {}", contact_id, e))
                     })?;
                     self.conn.execute(
@@ -421,20 +452,24 @@ impl Storage {
                 }
             }
 
-            // Re-encrypt visibility_labels: contacts_json_encrypted, visible_fields_json_encrypted
+            // Re-encrypt visibility_labels: contacts_json_encrypted, visible_fields_json_encrypted, name_encrypted, name_hmac
             {
                 let mut stmt = self
                     .conn
-                    .prepare("SELECT id, contacts_json_encrypted, visible_fields_json_encrypted FROM visibility_labels WHERE contacts_json_encrypted IS NOT NULL")
+                    .prepare("SELECT id, contacts_json_encrypted, visible_fields_json_encrypted, name_encrypted FROM visibility_labels WHERE contacts_json_encrypted IS NOT NULL")
                     .map_err(|e| StorageError::Migration(format!("Read labels: {}", e)))?;
 
-                let rows: Vec<(String, Vec<u8>, Option<Vec<u8>>)> = stmt
-                    .query_map([], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)))
+                let rows: Vec<(String, Vec<u8>, Option<Vec<u8>>, Option<Vec<u8>>)> = stmt
+                    .query_map([], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)))
                     .map_err(|e| StorageError::Migration(format!("Query labels: {}", e)))?
                     .collect::<Result<Vec<_>, _>>()
                     .map_err(|e| StorageError::Migration(format!("Collect labels: {}", e)))?;
 
-                for (id, contacts_enc, fields_enc) in &rows {
+                // Derive HMAC keys for old and new SEK
+                let new_hmac_key_bytes = HKDF::derive_key(None, new_key.as_bytes(), b"Vauchi_Label_Name_HMAC_v1");
+                let new_hmac_key = hmac::Key::new(hmac::HMAC_SHA256, &new_hmac_key_bytes);
+
+                for (id, contacts_enc, fields_enc, name_enc) in &rows {
                     let contacts_new = if !contacts_enc.is_empty() {
                         let plain = decrypt(old_key, contacts_enc).map_err(|e| {
                             StorageError::Migration(format!("Decrypt label contacts {}: {}", id, e))
@@ -467,9 +502,27 @@ impl Storage {
                         None
                     };
 
+                    // Re-encrypt name and recompute HMAC (#128)
+                    let (name_new, name_hmac_new) = if let Some(enc) = name_enc {
+                        if !enc.is_empty() {
+                            let plain = decrypt(old_key, enc).map_err(|e| {
+                                StorageError::Migration(format!("Decrypt label name {}: {}", id, e))
+                            })?;
+                            let new_enc = encrypt(&new_key, &plain).map_err(|e| {
+                                StorageError::Migration(format!("Encrypt label name {}: {}", id, e))
+                            })?;
+                            let hmac_val = hmac::sign(&new_hmac_key, &plain);
+                            (Some(new_enc), Some(hmac_val.as_ref().to_vec()))
+                        } else {
+                            (Some(enc.clone()), None)
+                        }
+                    } else {
+                        (None, None)
+                    };
+
                     self.conn.execute(
-                        "UPDATE visibility_labels SET contacts_json_encrypted = ?1, visible_fields_json_encrypted = ?2 WHERE id = ?3",
-                        params![contacts_new, fields_new, id],
+                        "UPDATE visibility_labels SET contacts_json_encrypted = ?1, visible_fields_json_encrypted = ?2, name_encrypted = ?3, name_hmac = ?4 WHERE id = ?5",
+                        params![contacts_new, fields_new, name_new, name_hmac_new, id],
                     ).map_err(|e| StorageError::Migration(format!("Update label {}: {}", id, e)))?;
                 }
             }

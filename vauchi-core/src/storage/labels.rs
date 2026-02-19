@@ -14,6 +14,8 @@ use super::{Storage, StorageError};
 
 impl Storage {
     /// Saves a visibility label to storage (encrypted).
+    ///
+    /// Label name is encrypted at rest with HMAC for lookups (#128).
     pub fn save_label(&self, label: &VisibilityLabel) -> Result<(), StorageError> {
         let contacts_json = serde_json::to_string(label.contacts())
             .map_err(|e| StorageError::Serialization(e.to_string()))?;
@@ -26,13 +28,23 @@ impl Storage {
         let fields_encrypted = crate::crypto::encrypt(&self.encryption_key, fields_json.as_bytes())
             .map_err(|e| StorageError::Encryption(e.to_string()))?;
 
+        // Encrypt label name and compute HMAC for lookups (#128)
+        let name_encrypted =
+            crate::crypto::encrypt(&self.encryption_key, label.name().as_bytes())
+                .map_err(|e| StorageError::Encryption(e.to_string()))?;
+        let name_hmac = self.compute_lookup_hmac(b"Vauchi_Label_Name_HMAC_v1", label.name().as_bytes());
+
+        // Store label id in plaintext `name` column to satisfy UNIQUE constraint
+        // without leaking the actual name (which is in name_encrypted).
         self.conn.execute(
             "INSERT OR REPLACE INTO visibility_labels
-             (id, name, contacts_json, visible_fields_json, contacts_json_encrypted, visible_fields_json_encrypted, created_at, modified_at)
-             VALUES (?1, ?2, '[]', '[]', ?3, ?4, ?5, ?6)",
+             (id, name, name_encrypted, name_hmac, contacts_json, visible_fields_json, contacts_json_encrypted, visible_fields_json_encrypted, created_at, modified_at)
+             VALUES (?1, ?2, ?3, ?4, '[]', '[]', ?5, ?6, ?7, ?8)",
             rusqlite::params![
                 label.id(),
-                label.name(),
+                label.id(),
+                name_encrypted,
+                name_hmac,
                 contacts_encrypted,
                 fields_encrypted,
                 label.created_at() as i64,
@@ -46,7 +58,7 @@ impl Storage {
     /// Loads a visibility label by ID (decrypted).
     pub fn load_label(&self, label_id: &str) -> Result<VisibilityLabel, StorageError> {
         let mut stmt = self.conn.prepare(
-            "SELECT id, name, contacts_json, visible_fields_json, created_at, modified_at, contacts_json_encrypted, visible_fields_json_encrypted
+            "SELECT id, name, contacts_json, visible_fields_json, created_at, modified_at, contacts_json_encrypted, visible_fields_json_encrypted, name_encrypted
              FROM visibility_labels WHERE id = ?1",
         )?;
 
@@ -59,6 +71,7 @@ impl Storage {
             let modified_at: i64 = row.get(5)?;
             let contacts_encrypted: Option<Vec<u8>> = row.get(6)?;
             let fields_encrypted: Option<Vec<u8>> = row.get(7)?;
+            let name_encrypted: Option<Vec<u8>> = row.get(8)?;
 
             Ok((
                 id,
@@ -69,8 +82,12 @@ impl Storage {
                 modified_at,
                 contacts_encrypted,
                 fields_encrypted,
+                name_encrypted,
             ))
         })?;
+
+        // Decrypt label name (#128): prefer encrypted, fall back to plaintext
+        let name = self.decrypt_or_fallback(label.8.as_deref(), &label.1)?;
 
         let contacts_json = self.decrypt_or_fallback(label.6.as_deref(), &label.2)?;
         let fields_json = self.decrypt_or_fallback(label.7.as_deref(), &label.3)?;
@@ -82,7 +99,7 @@ impl Storage {
 
         Ok(VisibilityLabel::from_storage(
             label.0,
-            label.1,
+            name,
             contacts,
             visible_fields,
             label.4 as u64,
@@ -91,10 +108,13 @@ impl Storage {
     }
 
     /// Loads all visibility labels (decrypted).
+    ///
+    /// Labels are sorted by decrypted name in Rust since encrypted names
+    /// cannot be sorted in SQL (#128).
     pub fn load_all_labels(&self) -> Result<Vec<VisibilityLabel>, StorageError> {
         let mut stmt = self.conn.prepare(
-            "SELECT id, name, contacts_json, visible_fields_json, created_at, modified_at, contacts_json_encrypted, visible_fields_json_encrypted
-             FROM visibility_labels ORDER BY name",
+            "SELECT id, name, contacts_json, visible_fields_json, created_at, modified_at, contacts_json_encrypted, visible_fields_json_encrypted, name_encrypted
+             FROM visibility_labels",
         )?;
 
         let rows = stmt.query_map([], |row| {
@@ -106,6 +126,7 @@ impl Storage {
             let modified_at: i64 = row.get(5)?;
             let contacts_encrypted: Option<Vec<u8>> = row.get(6)?;
             let fields_encrypted: Option<Vec<u8>> = row.get(7)?;
+            let name_encrypted: Option<Vec<u8>> = row.get(8)?;
 
             Ok((
                 id,
@@ -116,12 +137,14 @@ impl Storage {
                 modified_at,
                 contacts_encrypted,
                 fields_encrypted,
+                name_encrypted,
             ))
         })?;
 
         let mut labels = Vec::new();
         for row_result in rows {
             let row = row_result?;
+            let name = self.decrypt_or_fallback(row.8.as_deref(), &row.1)?;
             let contacts_json = self.decrypt_or_fallback(row.6.as_deref(), &row.2)?;
             let fields_json = self.decrypt_or_fallback(row.7.as_deref(), &row.3)?;
 
@@ -132,13 +155,16 @@ impl Storage {
 
             labels.push(VisibilityLabel::from_storage(
                 row.0,
-                row.1,
+                name,
                 contacts,
                 visible_fields,
                 row.4 as u64,
                 row.5 as u64,
             ));
         }
+
+        // Sort by decrypted name (can't ORDER BY in SQL with encrypted names)
+        labels.sort_by(|a, b| a.name().cmp(b.name()));
 
         Ok(labels)
     }
@@ -340,10 +366,11 @@ impl Storage {
             ));
         }
 
-        // Check for duplicate
+        // Check for duplicate via HMAC lookup (#128)
+        let name_hmac = self.compute_lookup_hmac(b"Vauchi_Label_Name_HMAC_v1", name.as_bytes());
         let existing = self.conn.query_row(
-            "SELECT COUNT(*) FROM visibility_labels WHERE name = ?1",
-            [name],
+            "SELECT COUNT(*) FROM visibility_labels WHERE name_hmac = ?1",
+            [&name_hmac],
             |row| row.get::<_, i32>(0),
         )?;
 
@@ -388,16 +415,22 @@ impl Storage {
             ));
         }
 
-        // Check for duplicate (excluding this label)
+        // Check for duplicate via HMAC lookup (#128)
+        let new_name_hmac = self.compute_lookup_hmac(b"Vauchi_Label_Name_HMAC_v1", new_name.as_bytes());
         let existing = self.conn.query_row(
-            "SELECT COUNT(*) FROM visibility_labels WHERE name = ?1 AND id != ?2",
-            (new_name, label_id),
+            "SELECT COUNT(*) FROM visibility_labels WHERE name_hmac = ?1 AND id != ?2",
+            rusqlite::params![new_name_hmac, label_id],
             |row| row.get::<_, i32>(0),
         )?;
 
         if existing > 0 {
             return Err(StorageError::AlreadyExists(format!("Label: {}", new_name)));
         }
+
+        // Encrypt new name (#128)
+        let name_encrypted =
+            crate::crypto::encrypt(&self.encryption_key, new_name.as_bytes())
+                .map_err(|e| StorageError::Encryption(e.to_string()))?;
 
         // Update
         let now = std::time::SystemTime::now()
@@ -406,8 +439,8 @@ impl Storage {
             .as_secs();
 
         let changes = self.conn.execute(
-            "UPDATE visibility_labels SET name = ?1, modified_at = ?2 WHERE id = ?3",
-            (new_name, now as i64, label_id),
+            "UPDATE visibility_labels SET name_encrypted = ?1, name_hmac = ?2, modified_at = ?3 WHERE id = ?4",
+            rusqlite::params![name_encrypted, new_name_hmac, now as i64, label_id],
         )?;
 
         if changes == 0 {

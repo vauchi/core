@@ -190,8 +190,11 @@ mutation:incremental:
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
   allow_failure: true
+  variables:
+    GIT_DEPTH: "100"
   script:
     - cargo binstall cargo-mutants --no-confirm 2>/dev/null || cargo install cargo-mutants --locked || true
+    - git fetch origin "$CI_MERGE_REQUEST_TARGET_BRANCH_NAME" --depth=100
     - git diff "origin/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME"...HEAD > mr.diff
     - cargo mutants -p vauchi-core --in-diff mr.diff --timeout 60
   artifacts:

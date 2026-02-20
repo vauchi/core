@@ -142,7 +142,7 @@ test:core:
   before_script:
     - !reference [.self-hosted, before_script]
   script:
-    - cargo llvm-cov nextest -p vauchi-core --lcov --output-path lcov-core.info
+    - cargo llvm-cov -p vauchi-core --lcov --output-path lcov-core.info
     - cargo llvm-cov report -p vauchi-core --cobertura --output-path cobertura-core.xml
     - cargo llvm-cov report -p vauchi-core
   coverage: '/Total:\s+(\d+(?:\.\d+)?%)/'
@@ -167,7 +167,7 @@ test:mobile:
   before_script:
     - !reference [.self-hosted, before_script]
   script:
-    - cargo llvm-cov nextest -p vauchi-mobile --lcov --output-path lcov-mobile.info
+    - cargo llvm-cov -p vauchi-mobile --lcov --output-path lcov-mobile.info
     - cargo llvm-cov report -p vauchi-mobile --cobertura --output-path cobertura-mobile.xml
     - cargo llvm-cov report -p vauchi-mobile
   coverage: '/Total:\s+(\d+(?:\.\d+)?%)/'

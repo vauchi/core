@@ -127,14 +127,11 @@ impl MobileDeviceLinkInitiator {
     ///
     /// Must call prepare_confirmation() and set_proximity_verified() first.
     pub fn confirm_link(&self) -> Result<MobileDeviceLinkResult, MobileError> {
-        let request = self
-            .pending_request
-            .lock()
-            .unwrap()
-            .take()
-            .ok_or_else(|| {
-                MobileError::ExchangeFailed("No pending request — call prepare_confirmation first".into())
-            })?;
+        let request = self.pending_request.lock().unwrap().take().ok_or_else(|| {
+            MobileError::ExchangeFailed(
+                "No pending request — call prepare_confirmation first".into(),
+            )
+        })?;
 
         let initiator = self.inner.lock().unwrap();
         let (encrypted_response, _registry, device_info) = initiator
@@ -183,7 +180,10 @@ impl MobileDeviceLinkResponder {
     }
 
     /// Processes the encrypted response from the existing device.
-    pub fn finish_join(&self, encrypted_response: Vec<u8>) -> Result<MobileDeviceJoinResult, MobileError> {
+    pub fn finish_join(
+        &self,
+        encrypted_response: Vec<u8>,
+    ) -> Result<MobileDeviceJoinResult, MobileError> {
         let responder = self.inner.lock().unwrap();
         let response = responder
             .process_response(&encrypted_response)
@@ -3708,7 +3708,9 @@ mod tests {
         assert!(result.device_index > 0);
 
         // Step 5: New device processes response
-        let response_bytes = result.encrypted_response.expect("should have response bytes");
+        let response_bytes = result
+            .encrypted_response
+            .expect("should have response bytes");
         let join_result = responder.finish_join(response_bytes).unwrap();
         assert!(join_result.success);
     }

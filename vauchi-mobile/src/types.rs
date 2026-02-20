@@ -286,6 +286,17 @@ pub struct MobileDeviceLinkInfo {
     pub is_expired: bool,
 }
 
+/// Confirmation details for device link (shown before approving).
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct MobileDeviceLinkConfirmation {
+    /// The new device's proposed name.
+    pub device_name: String,
+    /// 6-digit confirmation code (formatted as `XXX-XXX`).
+    pub confirmation_code: String,
+    /// Identity fingerprint (e.g. `AB12-CD34-EF56-7890`).
+    pub identity_fingerprint: String,
+}
+
 /// Result of completing device link (for existing device).
 #[derive(Debug, Clone, uniffi::Record)]
 pub struct MobileDeviceLinkResult {
@@ -294,6 +305,21 @@ pub struct MobileDeviceLinkResult {
     /// New device's name.
     pub device_name: String,
     /// New device's index.
+    pub device_index: u32,
+    /// Error message if failed.
+    pub error_message: Option<String>,
+    /// Encrypted response bytes for the new device (base64-encoded).
+    pub encrypted_response: Option<Vec<u8>>,
+}
+
+/// Result of joining a device link (for new device).
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct MobileDeviceJoinResult {
+    /// Whether joining was successful.
+    pub success: bool,
+    /// Display name of the identity.
+    pub display_name: String,
+    /// Assigned device index.
     pub device_index: u32,
     /// Error message if failed.
     pub error_message: Option<String>,

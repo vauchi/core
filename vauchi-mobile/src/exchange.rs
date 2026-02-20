@@ -82,14 +82,18 @@ impl ProximityVerifier for ProximityBridge {
 /// `confirm_proximity()` on the session, which sets the confirmation flag
 /// before the state machine checks it.
 pub(crate) struct ManualConfirmationBridge {
-    inner: ManualConfirmationVerifier,
+    inner: Arc<ManualConfirmationVerifier>,
 }
 
 impl ManualConfirmationBridge {
-    fn new() -> Self {
-        Self {
-            inner: ManualConfirmationVerifier::new(),
-        }
+    fn new() -> (Self, Arc<ManualConfirmationVerifier>) {
+        let verifier = Arc::new(ManualConfirmationVerifier::new());
+        (
+            Self {
+                inner: verifier.clone(),
+            },
+            verifier,
+        )
     }
 }
 
@@ -189,6 +193,7 @@ impl SessionInner {
 #[derive(uniffi::Object)]
 pub struct MobileExchangeSession {
     inner: Mutex<SessionInner>,
+    manual_verifier: Option<Arc<ManualConfirmationVerifier>>,
 }
 
 impl MobileExchangeSession {
@@ -196,13 +201,18 @@ impl MobileExchangeSession {
     pub(crate) fn from_proximity(session: ExchangeSession<ProximityBridge>) -> Self {
         MobileExchangeSession {
             inner: Mutex::new(SessionInner::Proximity(session)),
+            manual_verifier: None,
         }
     }
 
     /// Create a new session from a manual-confirmation inner session.
-    pub(crate) fn from_manual(session: ExchangeSession<ManualConfirmationBridge>) -> Self {
+    pub(crate) fn from_manual(
+        session: ExchangeSession<ManualConfirmationBridge>,
+        verifier: Arc<ManualConfirmationVerifier>,
+    ) -> Self {
         MobileExchangeSession {
             inner: Mutex::new(SessionInner::Manual(session)),
+            manual_verifier: Some(verifier),
         }
     }
 
@@ -297,6 +307,20 @@ impl MobileExchangeSession {
             .map_err(|e| MobileError::ExchangeFailed(format!("{:?}", e)))
     }
 
+    /// Confirm physical proximity (manual verification).
+    ///
+    /// For manual sessions: sets the confirmation flag so the exchange
+    /// can proceed. Call this after the user confirms they are physically
+    /// present with the other party.
+    ///
+    /// For proximity sessions: no-op (auto-verified via audio hardware).
+    pub fn confirm_proximity(&self) -> Result<(), MobileError> {
+        if let Some(verifier) = &self.manual_verifier {
+            verifier.confirm();
+        }
+        Ok(())
+    }
+
     /// Check if the session has timed out.
     pub fn is_timed_out(&self) -> bool {
         self.inner.lock().unwrap().is_timed_out()
@@ -323,9 +347,9 @@ pub(crate) fn create_qr_exchange_manual(
     identity: Identity,
     our_card: ContactCard,
 ) -> Arc<MobileExchangeSession> {
-    let bridge = ManualConfirmationBridge::new();
+    let (bridge, verifier) = ManualConfirmationBridge::new();
     let session = ExchangeSession::new_qr(identity, our_card, bridge);
-    Arc::new(MobileExchangeSession::from_manual(session))
+    Arc::new(MobileExchangeSession::from_manual(session, verifier))
 }
 
 /// Check if BLE exchange is available on this device.
@@ -484,6 +508,27 @@ mod tests {
         // Should fail — session is Idle, not Complete
         let result = session.extract_contact();
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_confirm_proximity_manual_session() {
+        let identity = Identity::create("Alice");
+        let card = ContactCard::new("Alice");
+
+        let session = create_qr_exchange_manual(identity, card);
+        // Should succeed without error
+        session.confirm_proximity().unwrap();
+    }
+
+    #[test]
+    fn test_confirm_proximity_proximity_session() {
+        let identity = Identity::create("Alice");
+        let card = ContactCard::new("Alice");
+
+        let session =
+            create_qr_exchange_proximity(identity, card, Box::new(SuccessHandler));
+        // Should be no-op for proximity sessions (auto-verified)
+        session.confirm_proximity().unwrap();
     }
 
     #[test]

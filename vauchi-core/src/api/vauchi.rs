@@ -335,6 +335,26 @@ impl<T: Transport> Vauchi<T> {
             .ok_or(VauchiError::IdentityNotInitialized)
     }
 
+    /// Returns the formatted fingerprint of the current identity's public key.
+    ///
+    /// The fingerprint is the hex-encoded public key formatted as 16 groups
+    /// of 4 uppercase hex characters (e.g., "ABCD 1234 EF56 ...").
+    pub fn own_fingerprint(&self) -> VauchiResult<String> {
+        let identity = self
+            .identity
+            .as_ref()
+            .ok_or(VauchiError::IdentityNotInitialized)?;
+        let hex = hex::encode(identity.signing_public_key());
+        Ok(hex
+            .chars()
+            .collect::<Vec<_>>()
+            .chunks(4)
+            .map(|c| c.iter().collect::<String>())
+            .collect::<Vec<_>>()
+            .join(" ")
+            .to_uppercase())
+    }
+
     /// Returns true if an identity has been created or set.
     pub fn has_identity(&self) -> bool {
         self.identity.is_some()

@@ -141,6 +141,48 @@ fn test_vauchi_verify_fingerprint() {
 }
 
 #[test]
+fn test_contact_fingerprint_format() {
+    let contact =
+        Contact::from_exchange([0xABu8; 32], ContactCard::new("Bob"), SymmetricKey::generate());
+
+    let fp = contact.fingerprint();
+
+    // Must be uppercase hex in groups of 4 separated by spaces
+    let groups: Vec<&str> = fp.split(' ').collect();
+    assert_eq!(groups.len(), 16, "fingerprint should have 16 groups of 4 hex chars");
+    for group in &groups {
+        assert_eq!(group.len(), 4, "each group should be 4 chars");
+        assert!(group.chars().all(|c| c.is_ascii_hexdigit() && !c.is_ascii_lowercase()),
+            "each group should be uppercase hex: {}", group);
+    }
+
+    // Known value: [0xAB; 32] → "ABAB ABAB ..." (16 groups)
+    assert_eq!(fp, "ABAB ABAB ABAB ABAB ABAB ABAB ABAB ABAB ABAB ABAB ABAB ABAB ABAB ABAB ABAB ABAB");
+}
+
+#[test]
+fn test_vauchi_own_fingerprint() {
+    let mut wb = create_test_vauchi();
+
+    // No identity yet
+    let result = wb.own_fingerprint();
+    assert!(result.is_err());
+
+    // Create identity
+    wb.create_identity("Alice").unwrap();
+
+    let fp = wb.own_fingerprint().unwrap();
+
+    // Must be formatted like Contact::fingerprint() — 16 groups of 4 uppercase hex
+    let groups: Vec<&str> = fp.split(' ').collect();
+    assert_eq!(groups.len(), 16);
+    for group in groups {
+        assert_eq!(group.len(), 4);
+        assert!(group.chars().all(|c: char| c.is_ascii_hexdigit() && !c.is_ascii_lowercase()));
+    }
+}
+
+#[test]
 fn test_vauchi_public_id() {
     let mut wb = create_test_vauchi();
 

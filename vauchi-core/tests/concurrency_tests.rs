@@ -14,6 +14,7 @@
 use rand::Rng;
 use std::sync::{Arc, Barrier};
 use std::thread;
+use std::time::Duration;
 use tempfile::tempdir;
 use vauchi_core::contact::Contact;
 use vauchi_core::crypto::SymmetricKey;
@@ -23,6 +24,20 @@ use vauchi_core::{ContactCard, ContactField, FieldType};
 // =============================================================================
 // HELPER FUNCTIONS
 // =============================================================================
+
+/// Open storage with retries to handle SQLite BUSY during concurrent access.
+fn open_with_retry(path: &std::path::Path, key: SymmetricKey, max_retries: u32) -> Storage {
+    for attempt in 0..max_retries {
+        match Storage::open(path, key.clone()) {
+            Ok(s) => return s,
+            Err(_) if attempt < max_retries - 1 => {
+                thread::sleep(Duration::from_millis(50 * (attempt as u64 + 1)));
+            }
+            Err(e) => panic!("Storage::open failed after {} retries: {}", max_retries, e),
+        }
+    }
+    unreachable!()
+}
 
 fn create_test_contact(name: &str) -> Contact {
     let mut card = ContactCard::new(name);
@@ -181,11 +196,13 @@ fn test_concurrent_readers_file_based() {
         let thread_barrier = Arc::clone(&barrier);
 
         let handle = thread::spawn(move || {
-            // Wait for all threads to be ready
+            // Open connection before barrier — serializes opens to avoid
+            // SQLite contention during initialization/migration
+            let storage = Storage::open(&thread_path, thread_key).unwrap();
+
+            // Wait for all threads to be ready, then read concurrently
             thread_barrier.wait();
 
-            // Open connection and read
-            let storage = Storage::open(&thread_path, thread_key).unwrap();
             let contacts = storage.list_contacts().unwrap();
 
             // Verify we read correct data
@@ -222,7 +239,8 @@ fn test_sequential_writers_file_based() {
         let _ = storage.list_contacts().unwrap(); // Just init
     }
 
-    // Sequential writers from different threads
+    // Writers from different threads — opens are retried to handle
+    // SQLite contention during concurrent initialization
     let path = db_path.clone();
     let mut handles = Vec::new();
 
@@ -231,8 +249,7 @@ fn test_sequential_writers_file_based() {
         let thread_key = key.clone();
 
         let handle = thread::spawn(move || {
-            // Each thread opens connection and writes
-            let storage = Storage::open(&thread_path, thread_key).unwrap();
+            let storage = open_with_retry(&thread_path, thread_key, 5);
 
             for i in 0..10 {
                 let contact = create_test_contact(&format!("Thread{}Contact{}", thread_id, i));

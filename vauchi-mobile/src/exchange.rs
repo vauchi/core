@@ -517,7 +517,9 @@ mod tests {
 
         let session = create_qr_exchange_manual(identity, card);
         // Should succeed without error
-        session.confirm_proximity().unwrap();
+        session
+            .confirm_proximity()
+            .expect("confirm_proximity should succeed on manual session");
     }
 
     #[test]
@@ -525,10 +527,11 @@ mod tests {
         let identity = Identity::create("Alice");
         let card = ContactCard::new("Alice");
 
-        let session =
-            create_qr_exchange_proximity(identity, card, Box::new(SuccessHandler));
+        let session = create_qr_exchange_proximity(identity, card, Box::new(SuccessHandler));
         // Should be no-op for proximity sessions (auto-verified)
-        session.confirm_proximity().unwrap();
+        session
+            .confirm_proximity()
+            .expect("confirm_proximity should be a no-op on proximity session");
     }
 
     #[test]

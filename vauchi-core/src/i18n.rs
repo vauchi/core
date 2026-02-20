@@ -264,6 +264,7 @@ fn bundled_english() -> HashMap<String, String> {
         .collect()
 }
 
+// INLINE_TEST_REQUIRED: tests access private LOCALE_STORE global state and internal init/reset
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -304,7 +305,8 @@ mod tests {
     /// Uses the real locale directory instead of clearing to None, so other test modules
     /// (help, aha_moments) that rely on i18n data aren't broken by the reset.
     fn reset_store() {
-        let locales_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("locales");
+        let locales_dir =
+            std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../locales");
         let _ = init(&locales_dir);
     }
 

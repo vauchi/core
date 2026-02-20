@@ -51,8 +51,8 @@ stages:
   - auto-tag
   - lint
   - test
-  - mutation
   - security
+  - mutation
   - build
   - package
   - publish
@@ -116,7 +116,7 @@ lint:format:
   stage: lint
   needs: []
   script:
-    - rustup component add rustfmt
+    - rustup component add rustfmt 2>/dev/null || true
     - cargo fmt --all -- --check
 
 lint:clippy:
@@ -124,7 +124,7 @@ lint:clippy:
   stage: lint
   needs: []
   script:
-    - rustup component add clippy
+    - rustup component add clippy 2>/dev/null || true
     - cargo clippy --all-targets -- -D warnings
 
 # REUSE compliance provided by vauchi/scripts ci-templates/reuse.yml
@@ -143,8 +143,8 @@ test:core:
       optional: true
   before_script:
     - !reference [.self-hosted, before_script]
-    - rustup component add llvm-tools-preview
-    - cargo binstall cargo-llvm-cov --no-confirm 2>/dev/null || cargo install cargo-llvm-cov --locked || true
+    - rustup component add llvm-tools-preview 2>/dev/null || true
+    - command -v cargo-llvm-cov >/dev/null 2>&1 || cargo binstall cargo-llvm-cov --no-confirm 2>/dev/null || cargo install cargo-llvm-cov --locked || true
   script:
     - cargo llvm-cov -p vauchi-core --lcov --output-path lcov-core.info
     - cargo llvm-cov report -p vauchi-core --cobertura --output-path cobertura-core.xml
@@ -170,8 +170,8 @@ test:mobile:
       optional: true
   before_script:
     - !reference [.self-hosted, before_script]
-    - rustup component add llvm-tools-preview
-    - cargo binstall cargo-llvm-cov --no-confirm 2>/dev/null || cargo install cargo-llvm-cov --locked || true
+    - rustup component add llvm-tools-preview 2>/dev/null || true
+    - command -v cargo-llvm-cov >/dev/null 2>&1 || cargo binstall cargo-llvm-cov --no-confirm 2>/dev/null || cargo install cargo-llvm-cov --locked || true
   script:
     - cargo llvm-cov -p vauchi-mobile --lcov --output-path lcov-mobile.info
     - cargo llvm-cov report -p vauchi-mobile --cobertura --output-path cobertura-mobile.xml
@@ -277,7 +277,7 @@ mutation:nightly:
   rules:
     - if: $CI_PIPELINE_SOURCE == "schedule"
   script:
-    - cargo binstall cargo-mutants --no-confirm 2>/dev/null || cargo install cargo-mutants --locked || true
+    - command -v cargo-mutants >/dev/null 2>&1 || cargo binstall cargo-mutants --no-confirm 2>/dev/null || cargo install cargo-mutants --locked || true
     - |
       MUTANTS_OUT="target/mutants"
       cargo mutants -p vauchi-core --timeout 60 --output "$MUTANTS_OUT" &
@@ -392,7 +392,7 @@ mutation:incremental:
   variables:
     GIT_DEPTH: "100"
   script:
-    - cargo binstall cargo-mutants --no-confirm 2>/dev/null || cargo install cargo-mutants --locked || true
+    - command -v cargo-mutants >/dev/null 2>&1 || cargo binstall cargo-mutants --no-confirm 2>/dev/null || cargo install cargo-mutants --locked || true
     - git fetch origin "$CI_MERGE_REQUEST_TARGET_BRANCH_NAME" --depth=100
     - git diff "origin/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME"...HEAD > mr.diff
     - |
@@ -511,7 +511,7 @@ security:audit:
     - job: lint:clippy
       optional: true
   script:
-    - cargo binstall cargo-audit --no-confirm 2>/dev/null || cargo install cargo-audit || true
+    - command -v cargo-audit >/dev/null 2>&1 || cargo binstall cargo-audit --no-confirm 2>/dev/null || cargo install cargo-audit || true
     - cargo audit
 
 # Full cargo-deny check: advisories, licenses, bans, sources (runs on all MRs)
@@ -527,7 +527,7 @@ security:deny:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
     - if: $CI_PIPELINE_SOURCE == "schedule"
   script:
-    - cargo binstall cargo-deny --no-confirm 2>/dev/null || cargo install cargo-deny || true
+    - command -v cargo-deny >/dev/null 2>&1 || cargo binstall cargo-deny --no-confirm 2>/dev/null || cargo install cargo-deny || true
     - cargo deny check
 
 # ============================================================

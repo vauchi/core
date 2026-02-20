@@ -54,7 +54,8 @@ pub use types::{
     MobileConsentRecord, MobileConsentType, MobileContact, MobileContactCard, MobileContactField,
     MobileDecoyContact, MobileDeletionInfo, MobileDeletionState, MobileDeliveryRecord,
     MobileDeliveryStatus, MobileDeliverySummary, MobileDemoContact, MobileDemoContactState,
-    MobileDeviceDeliveryRecord, MobileDeviceDeliveryStatus, MobileDeviceInfo, MobileDeviceLinkData,
+    MobileDeviceDeliveryRecord, MobileDeviceDeliveryStatus, MobileDeviceInfo,
+    MobileDeviceJoinResult, MobileDeviceLinkConfirmation, MobileDeviceLinkData,
     MobileDeviceLinkInfo, MobileDeviceLinkResult, MobileDuressSettings, MobileEmergencyConfig,
     MobileExchangeResult, MobileFaqItem, MobileFieldType, MobileFieldValidation, MobileGdprExport,
     MobileHelpCategory, MobileHelpCategoryInfo, MobileLocale, MobileLocaleInfo,
@@ -66,6 +67,136 @@ pub use types::{
 };
 
 uniffi::setup_scaffolding!();
+
+// === Device Link Wrapper Objects ===
+
+use vauchi_core::exchange::{DeviceLinkInitiator, DeviceLinkRequest, DeviceLinkResponder};
+
+/// UniFFI-exposed wrapper around DeviceLinkInitiator.
+///
+/// Uses Mutex for interior mutability (required by UniFFI's Arc<T>).
+/// Holds both the initiator and a pending request between prepare_confirmation
+/// and confirm_link calls.
+#[derive(uniffi::Object)]
+pub struct MobileDeviceLinkInitiator {
+    inner: Mutex<DeviceLinkInitiator>,
+    /// Pending request stored after prepare_confirmation for use in confirm_link.
+    pending_request: Mutex<Option<DeviceLinkRequest>>,
+}
+
+#[uniffi::export]
+impl MobileDeviceLinkInitiator {
+    /// Returns the QR data string for display.
+    pub fn qr_data(&self) -> String {
+        self.inner.lock().unwrap().qr().to_data_string()
+    }
+
+    /// Returns the 16-byte proximity challenge.
+    pub fn proximity_challenge(&self) -> Vec<u8> {
+        self.inner.lock().unwrap().proximity_challenge().to_vec()
+    }
+
+    /// Decrypts an incoming link request and returns confirmation details.
+    ///
+    /// The caller displays the confirmation code and device name to the user.
+    pub fn prepare_confirmation(
+        &self,
+        encrypted_request: Vec<u8>,
+    ) -> Result<MobileDeviceLinkConfirmation, MobileError> {
+        let initiator = self.inner.lock().unwrap();
+        let (confirmation, request) = initiator
+            .prepare_confirmation(&encrypted_request)
+            .map_err(|e| MobileError::ExchangeFailed(e.to_string()))?;
+
+        // Store request for confirm_link
+        *self.pending_request.lock().unwrap() = Some(request);
+
+        Ok(MobileDeviceLinkConfirmation {
+            device_name: confirmation.device_name,
+            confirmation_code: confirmation.confirmation_code,
+            identity_fingerprint: confirmation.identity_fingerprint,
+        })
+    }
+
+    /// Marks proximity as verified.
+    pub fn set_proximity_verified(&self) {
+        self.inner.lock().unwrap().set_proximity_verified();
+    }
+
+    /// After user confirms, creates the encrypted response.
+    ///
+    /// Must call prepare_confirmation() and set_proximity_verified() first.
+    pub fn confirm_link(&self) -> Result<MobileDeviceLinkResult, MobileError> {
+        let request = self.pending_request.lock().unwrap().take().ok_or_else(|| {
+            MobileError::ExchangeFailed(
+                "No pending request — call prepare_confirmation first".into(),
+            )
+        })?;
+
+        let initiator = self.inner.lock().unwrap();
+        let (encrypted_response, _registry, device_info) = initiator
+            .confirm_link(&request)
+            .map_err(|e| MobileError::ExchangeFailed(e.to_string()))?;
+
+        Ok(MobileDeviceLinkResult {
+            success: true,
+            device_name: device_info.device_name().to_string(),
+            device_index: device_info.device_index(),
+            error_message: None,
+            encrypted_response: Some(encrypted_response),
+        })
+    }
+}
+
+/// UniFFI-exposed wrapper around DeviceLinkResponder.
+#[derive(uniffi::Object)]
+pub struct MobileDeviceLinkResponder {
+    inner: Mutex<DeviceLinkResponder>,
+}
+
+#[uniffi::export]
+impl MobileDeviceLinkResponder {
+    /// Creates an encrypted request to send to the existing device.
+    pub fn create_request(&self) -> Result<Vec<u8>, MobileError> {
+        self.inner
+            .lock()
+            .unwrap()
+            .create_request()
+            .map_err(|e| MobileError::ExchangeFailed(e.to_string()))
+    }
+
+    /// Computes the confirmation code (must call create_request first).
+    pub fn compute_confirmation_code(&self) -> Result<String, MobileError> {
+        self.inner
+            .lock()
+            .unwrap()
+            .compute_confirmation_code()
+            .map_err(|e| MobileError::ExchangeFailed(e.to_string()))
+    }
+
+    /// Returns the identity fingerprint from the QR.
+    pub fn identity_fingerprint(&self) -> String {
+        self.inner.lock().unwrap().identity_fingerprint()
+    }
+
+    /// Processes the encrypted response from the existing device.
+    pub fn finish_join(
+        &self,
+        encrypted_response: Vec<u8>,
+    ) -> Result<MobileDeviceJoinResult, MobileError> {
+        let responder = self.inner.lock().unwrap();
+        let response = responder
+            .process_response(&encrypted_response)
+            .map_err(|e| MobileError::ExchangeFailed(e.to_string()))?;
+
+        Ok(MobileDeviceJoinResult {
+            success: true,
+            display_name: response.display_name().to_string(),
+            device_index: response.device_index(),
+            error_message: None,
+        })
+    }
+}
 
 // === Platform Secure Storage Callback ===
 
@@ -3074,6 +3205,46 @@ impl VauchiMobile {
         })
     }
 
+    /// Start a device link as the existing device (initiator).
+    ///
+    /// Returns a `MobileDeviceLinkInitiator` that holds the QR data and can
+    /// process incoming link requests from new devices.
+    pub fn start_device_link(&self) -> Result<Arc<MobileDeviceLinkInitiator>, MobileError> {
+        let identity = self.get_identity()?;
+        let storage = self.open_storage()?;
+
+        let registry = storage
+            .load_device_registry()?
+            .unwrap_or_else(|| identity.initial_device_registry());
+
+        let initiator = identity.create_device_link_initiator(registry);
+
+        Ok(Arc::new(MobileDeviceLinkInitiator {
+            inner: Mutex::new(initiator),
+            pending_request: Mutex::new(None),
+        }))
+    }
+
+    /// Start a device join as the new device (responder).
+    ///
+    /// Parses the QR data scanned from the existing device and returns a
+    /// `MobileDeviceLinkResponder` that can create requests and process responses.
+    pub fn start_device_join(
+        &self,
+        qr_data: String,
+        device_name: String,
+    ) -> Result<Arc<MobileDeviceLinkResponder>, MobileError> {
+        let qr =
+            DeviceLinkQR::from_data_string(&qr_data).map_err(|_| MobileError::InvalidQrCode)?;
+
+        let responder = DeviceLinkResponder::from_qr(qr, device_name)
+            .map_err(|e| MobileError::ExchangeFailed(e.to_string()))?;
+
+        Ok(Arc::new(MobileDeviceLinkResponder {
+            inner: Mutex::new(responder),
+        }))
+    }
+
     /// Get the device count.
     ///
     /// Returns the number of devices linked to this identity.
@@ -3651,5 +3822,104 @@ mod tests {
                 .chars()
                 .all(|c: char| c.is_ascii_hexdigit() && !c.is_ascii_lowercase()));
         }
+    }
+
+    // === Device Link Initiator/Responder Tests ===
+
+    #[test]
+    fn test_start_device_link_returns_initiator() {
+        let (wb, _dir) = create_test_instance();
+        wb.create_identity("Alice".to_string()).unwrap();
+
+        let initiator = wb.start_device_link().unwrap();
+        let qr_data = initiator.qr_data();
+        assert!(!qr_data.is_empty());
+
+        let challenge = initiator.proximity_challenge();
+        assert_eq!(challenge.len(), 16);
+    }
+
+    #[test]
+    fn test_start_device_join_returns_responder() {
+        let (wb, _dir) = create_test_instance();
+        wb.create_identity("Alice".to_string()).unwrap();
+
+        // Generate QR from initiator
+        let initiator = wb.start_device_link().unwrap();
+        let qr_data = initiator.qr_data();
+
+        // Create responder from QR (new device)
+        let (wb2, _dir2) = create_test_instance();
+        let responder = wb2
+            .start_device_join(qr_data, "Bob's Phone".to_string())
+            .unwrap();
+
+        let request_bytes = responder.create_request().unwrap();
+        assert!(!request_bytes.is_empty());
+
+        let code = responder.compute_confirmation_code().unwrap();
+        assert_eq!(code.len(), 7); // "XXX-XXX"
+    }
+
+    #[test]
+    fn test_device_link_full_flow() {
+        let (wb, _dir) = create_test_instance();
+        wb.create_identity("Alice".to_string()).unwrap();
+
+        // Step 1: Existing device creates initiator
+        let initiator = wb.start_device_link().unwrap();
+        let qr_data = initiator.qr_data();
+
+        // Step 2: New device scans QR and creates request
+        let (wb2, _dir2) = create_test_instance();
+        let responder = wb2
+            .start_device_join(qr_data, "Bob's Phone".to_string())
+            .unwrap();
+        let request_bytes = responder.create_request().unwrap();
+        let responder_code = responder.compute_confirmation_code().unwrap();
+
+        // Step 3: Existing device prepares confirmation
+        let confirmation = initiator.prepare_confirmation(request_bytes).unwrap();
+        assert_eq!(confirmation.device_name, "Bob's Phone");
+        assert_eq!(confirmation.confirmation_code.len(), 7);
+        assert!(!confirmation.identity_fingerprint.is_empty());
+
+        // Codes should match
+        assert_eq!(confirmation.confirmation_code, responder_code);
+
+        // Step 4: Existing device confirms (after proximity verification)
+        initiator.set_proximity_verified();
+        let result = initiator.confirm_link().unwrap();
+        assert!(result.success);
+        assert_eq!(result.device_name, "Bob's Phone");
+        assert!(result.device_index > 0);
+
+        // Step 5: New device processes response
+        let response_bytes = result
+            .encrypted_response
+            .expect("should have response bytes");
+        let join_result = responder.finish_join(response_bytes).unwrap();
+        assert!(join_result.success);
+    }
+
+    #[test]
+    fn test_device_link_confirm_without_proximity_fails() {
+        let (wb, _dir) = create_test_instance();
+        wb.create_identity("Alice".to_string()).unwrap();
+
+        let initiator = wb.start_device_link().unwrap();
+        let qr_data = initiator.qr_data();
+
+        let (wb2, _dir2) = create_test_instance();
+        let responder = wb2
+            .start_device_join(qr_data, "Bob's Phone".to_string())
+            .unwrap();
+        let request_bytes = responder.create_request().unwrap();
+
+        let _confirmation = initiator.prepare_confirmation(request_bytes).unwrap();
+
+        // Should fail without set_proximity_verified
+        let result = initiator.confirm_link();
+        assert!(result.is_err());
     }
 }

@@ -501,7 +501,6 @@ pub fn widget_panic_shred(
 /// the revocation as `SimplePayload::AccountRevoked`.
 struct MobileRevocationSender {
     relay_url: String,
-    sender_id: String,
     pinned_cert: Option<String>,
     runtime: tokio::runtime::Runtime,
 }
@@ -509,7 +508,7 @@ struct MobileRevocationSender {
 impl MobileRevocationSender {
     fn new(
         relay_url: &str,
-        sender_id: &str,
+        _sender_id: &str,
         pinned_cert: Option<String>,
     ) -> Result<Self, vauchi_core::api::ShredError> {
         let runtime = tokio::runtime::Builder::new_current_thread()
@@ -520,7 +519,6 @@ impl MobileRevocationSender {
             })?;
         Ok(Self {
             relay_url: relay_url.to_string(),
-            sender_id: sender_id.to_string(),
             pinned_cert,
             runtime,
         })
@@ -538,8 +536,7 @@ impl vauchi_core::api::RevocationSender for MobileRevocationSender {
             timestamp: revocation.timestamp,
             signature: revocation.signature.to_vec(),
         };
-        let envelope =
-            protocol::create_envelope(protocol::MessagePayload::AccountRevoked(simple));
+        let envelope = protocol::create_envelope(protocol::MessagePayload::AccountRevoked(simple));
         let data = protocol::encode_message(&envelope)
             .map_err(|e| vauchi_core::api::ShredError::FileError(format!("Encode: {}", e)))?;
 
@@ -552,11 +549,9 @@ impl vauchi_core::api::RevocationSender for MobileRevocationSender {
                     })?;
 
             socket
-                .send(Message::Binary(data.into()))
+                .send(Message::Binary(data))
                 .await
-                .map_err(|e| {
-                    vauchi_core::api::ShredError::FileError(format!("Send: {}", e))
-                })?;
+                .map_err(|e| vauchi_core::api::ShredError::FileError(format!("Send: {}", e)))?;
 
             let _ = socket.close(None).await;
             Ok(true)
@@ -2134,7 +2129,9 @@ impl VauchiMobile {
             .hard_shred(
                 core_token,
                 None,
-                revocation_sender.as_mut().map(|s| s as &mut dyn vauchi_core::api::RevocationSender),
+                revocation_sender
+                    .as_mut()
+                    .map(|s| s as &mut dyn vauchi_core::api::RevocationSender),
             )
             .map_err(|e| MobileError::ShredError(e.to_string()))?;
         Ok(MobileShredReport::from(&report))
@@ -2165,7 +2162,9 @@ impl VauchiMobile {
             // PurgeSender deferred: requires relay-side purge endpoint support.
             .panic_shred(
                 None,
-                revocation_sender.as_mut().map(|s| s as &mut dyn vauchi_core::api::RevocationSender),
+                revocation_sender
+                    .as_mut()
+                    .map(|s| s as &mut dyn vauchi_core::api::RevocationSender),
             )
             .map_err(|e| MobileError::ShredError(e.to_string()))?;
         Ok(MobileShredReport::from(&report))
@@ -3551,8 +3550,8 @@ mod tests {
     #[test]
     fn test_mobile_revocation_sender_implements_trait() {
         fn accepts_sender(_: &mut dyn vauchi_core::api::RevocationSender) {}
-        let mut sender =
-            MobileRevocationSender::new("ws://localhost:8080", "abcd1234", None).unwrap();
+        let mut sender = MobileRevocationSender::new("ws://localhost:8080", "abcd1234", None)
+            .expect("MobileRevocationSender should construct successfully");
         accepts_sender(&mut sender);
     }
 

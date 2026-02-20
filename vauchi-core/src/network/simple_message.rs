@@ -410,8 +410,7 @@ mod tests {
             timestamp: 1700000000,
             signature: vec![0xAB; 64],
         };
-        let envelope =
-            create_simple_envelope(SimplePayload::AccountRevoked(revoked));
+        let envelope = create_simple_envelope(SimplePayload::AccountRevoked(revoked));
         let encoded = encode_simple_message(&envelope).unwrap();
         let decoded = decode_simple_message(&encoded).unwrap();
         match decoded.payload {

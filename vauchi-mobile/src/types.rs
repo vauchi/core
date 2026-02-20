@@ -88,6 +88,7 @@ impl From<&ContactCard> for MobileContactCard {
 pub struct MobileContact {
     pub id: String,
     pub display_name: String,
+    pub fingerprint: String,
     pub is_verified: bool,
     pub is_recovery_trusted: bool,
     pub is_hidden: bool,
@@ -100,6 +101,7 @@ impl From<&Contact> for MobileContact {
         MobileContact {
             id: contact.id().to_string(),
             display_name: contact.display_name().to_string(),
+            fingerprint: contact.fingerprint(),
             is_verified: contact.is_fingerprint_verified(),
             is_recovery_trusted: contact.is_recovery_trusted(),
             is_hidden: contact.is_hidden(),

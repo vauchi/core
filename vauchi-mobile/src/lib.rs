@@ -816,6 +816,23 @@ impl VauchiMobile {
         Ok(identity.public_id())
     }
 
+    /// Get formatted fingerprint of own identity public key.
+    ///
+    /// Returns the fingerprint as 16 groups of 4 uppercase hex characters,
+    /// suitable for display and manual comparison with contacts.
+    pub fn get_own_fingerprint(&self) -> Result<String, MobileError> {
+        let identity = self.get_identity()?;
+        let hex = hex::encode(identity.signing_public_key());
+        Ok(hex
+            .chars()
+            .collect::<Vec<_>>()
+            .chunks(4)
+            .map(|c| c.iter().collect::<String>())
+            .collect::<Vec<_>>()
+            .join(" ")
+            .to_uppercase())
+    }
+
     /// Get display name.
     pub fn get_display_name(&self) -> Result<String, MobileError> {
         let storage = self.open_storage()?;
@@ -3464,5 +3481,54 @@ mod tests {
         // Paginate with 0 contacts should return empty
         let page = wb.list_contacts_paginated(0, 3).unwrap();
         assert!(page.is_empty());
+    }
+
+    // === Fingerprint Verification Tests (P0-4) ===
+
+    #[test]
+    fn test_mobile_contact_has_fingerprint_field() {
+        let (wb, _dir) = create_test_instance();
+        wb.create_identity("Alice".to_string()).unwrap();
+
+        // Add a contact via exchange simulation
+        let contact = vauchi_core::Contact::from_exchange(
+            [0xAB; 32],
+            vauchi_core::contact_card::ContactCard::new("Bob"),
+            vauchi_core::crypto::SymmetricKey::generate(),
+        );
+        let storage = wb.open_storage().unwrap();
+        storage.save_contact(&contact).unwrap();
+
+        let contacts = wb.list_contacts().unwrap();
+        assert_eq!(contacts.len(), 1);
+
+        // MobileContact must have a pre-formatted fingerprint field
+        let mc = &contacts[0];
+        assert!(
+            !mc.fingerprint.is_empty(),
+            "MobileContact should have a fingerprint field"
+        );
+
+        // Must match Contact::fingerprint() format: 16 groups of 4 uppercase hex
+        let groups: Vec<&str> = mc.fingerprint.split(' ').collect();
+        assert_eq!(groups.len(), 16);
+    }
+
+    #[test]
+    fn test_get_own_fingerprint() {
+        let (wb, _dir) = create_test_instance();
+        wb.create_identity("Alice".to_string()).unwrap();
+
+        let fp = wb.get_own_fingerprint().unwrap();
+
+        // Must be 16 groups of 4 uppercase hex chars
+        let groups: Vec<&str> = fp.split(' ').collect();
+        assert_eq!(groups.len(), 16, "own fingerprint should have 16 groups");
+        for group in groups {
+            assert_eq!(group.len(), 4);
+            assert!(group
+                .chars()
+                .all(|c: char| c.is_ascii_hexdigit() && !c.is_ascii_lowercase()));
+        }
     }
 }

@@ -3504,7 +3504,10 @@ mod tests {
 
         // MobileContact must have a pre-formatted fingerprint field
         let mc = &contacts[0];
-        assert!(!mc.fingerprint.is_empty(), "MobileContact should have a fingerprint field");
+        assert!(
+            !mc.fingerprint.is_empty(),
+            "MobileContact should have a fingerprint field"
+        );
 
         // Must match Contact::fingerprint() format: 16 groups of 4 uppercase hex
         let groups: Vec<&str> = mc.fingerprint.split(' ').collect();
@@ -3523,7 +3526,9 @@ mod tests {
         assert_eq!(groups.len(), 16, "own fingerprint should have 16 groups");
         for group in groups {
             assert_eq!(group.len(), 4);
-            assert!(group.chars().all(|c: char| c.is_ascii_hexdigit() && !c.is_ascii_lowercase()));
+            assert!(group
+                .chars()
+                .all(|c: char| c.is_ascii_hexdigit() && !c.is_ascii_lowercase()));
         }
     }
 }

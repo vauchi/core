@@ -123,6 +123,9 @@ lint:clippy:
   extends: [.linux-runner, .validation-rust, .timeout-standard]
   stage: lint
   needs: []
+  before_script:
+    - !reference [.self-hosted, before_script]
+    - !reference [.clone-locales, before_script]
   script:
     - rustup component add clippy 2>/dev/null || true
     - cargo clippy --all-targets -- -D warnings
@@ -132,6 +135,11 @@ lint:clippy:
 # ============================================================
 # Test Stage (MR only, gated by lint)
 # ============================================================
+
+# Clone sibling locales repo (needed by build.rs and i18n tests)
+.clone-locales:
+  before_script:
+    - git clone --depth=1 https://gitlab.com/vauchi/locales.git ../locales
 
 test:core:
   extends: [.linux-runner, .validation-rust, .timeout-standard]
@@ -143,6 +151,7 @@ test:core:
       optional: true
   before_script:
     - !reference [.self-hosted, before_script]
+    - !reference [.clone-locales, before_script]
     - rustup component add llvm-tools-preview 2>/dev/null || true
     - command -v cargo-llvm-cov >/dev/null 2>&1 || cargo binstall cargo-llvm-cov --no-confirm 2>/dev/null || cargo install cargo-llvm-cov --locked || true
   script:
@@ -170,6 +179,7 @@ test:mobile:
       optional: true
   before_script:
     - !reference [.self-hosted, before_script]
+    - !reference [.clone-locales, before_script]
     - rustup component add llvm-tools-preview 2>/dev/null || true
     - command -v cargo-llvm-cov >/dev/null 2>&1 || cargo binstall cargo-llvm-cov --no-confirm 2>/dev/null || cargo install cargo-llvm-cov --locked || true
   script:

@@ -24,10 +24,13 @@ static INIT: Once = Once::new();
 
 fn ensure_init() {
     INIT.call_once(|| {
-        // Integration tests load from the locale files in the repo
-        let locales_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("locales");
+        // Integration tests load from the sibling locales/ repo
+        let locales_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("..")
+            .join("..")
+            .join("locales");
         vauchi_core::i18n::init(&locales_dir)
-            .expect("Failed to load locales for integration tests");
+            .expect("Failed to load locales from sibling locales/ repo");
     });
 }
 
@@ -331,6 +334,116 @@ fn test_spanish_coverage() {
     let key = "welcome.title";
     let es = get_string(Locale::Spanish, key);
     assert!(!es.contains("Missing"), "Spanish translation should exist");
+}
+
+// ============================================================
+// Locale File Parity
+// ============================================================
+
+/// Test: All locale files have the same keys as English
+///
+/// Reads raw JSON from the sibling locales/ repo and verifies that every
+/// non-English locale has exactly the same set of keys (excluding `_meta`).
+#[test]
+fn test_all_locale_files_have_same_keys_as_english() {
+    use std::collections::BTreeSet;
+
+    let locales_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("..")
+        .join("..")
+        .join("locales");
+
+    let en_path = locales_dir.join("en.json");
+    assert!(
+        en_path.exists(),
+        "English locale not found at {}",
+        en_path.display()
+    );
+
+    let en_content: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(&en_path).expect("read en.json"))
+            .expect("parse en.json");
+    let en_keys: BTreeSet<String> = en_content
+        .as_object()
+        .expect("en.json should be an object")
+        .keys()
+        .filter(|k| !k.starts_with("_meta"))
+        .cloned()
+        .collect();
+
+    assert!(!en_keys.is_empty(), "en.json should have keys");
+
+    for entry in std::fs::read_dir(&locales_dir).expect("read locales dir") {
+        let entry = entry.expect("read dir entry");
+        let path = entry.path();
+        if path.extension().and_then(|e| e.to_str()) != Some("json") {
+            continue;
+        }
+        let filename = path.file_stem().unwrap().to_str().unwrap().to_string();
+        if filename == "en" {
+            continue;
+        }
+
+        let content: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(&path).expect("read locale file"))
+                .unwrap_or_else(|e| panic!("parse {}.json: {}", filename, e));
+        let locale_keys: BTreeSet<String> = content
+            .as_object()
+            .unwrap_or_else(|| panic!("{}.json should be an object", filename))
+            .keys()
+            .filter(|k| !k.starts_with("_meta"))
+            .cloned()
+            .collect();
+
+        let missing: Vec<&String> = en_keys.difference(&locale_keys).collect();
+        let extra: Vec<&String> = locale_keys.difference(&en_keys).collect();
+
+        assert!(
+            missing.is_empty() && extra.is_empty(),
+            "Locale '{}' key mismatch vs English:\n  Missing: {:?}\n  Extra: {:?}",
+            filename,
+            missing,
+            extra,
+        );
+    }
+}
+
+/// Test: No locale has empty string values
+#[test]
+fn test_no_locale_has_empty_values() {
+    let locales_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("..")
+        .join("..")
+        .join("locales");
+
+    for entry in std::fs::read_dir(&locales_dir).expect("read locales dir") {
+        let entry = entry.expect("read dir entry");
+        let path = entry.path();
+        if path.extension().and_then(|e| e.to_str()) != Some("json") {
+            continue;
+        }
+        let filename = path.file_stem().unwrap().to_str().unwrap().to_string();
+
+        let content: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(&path).expect("read locale file"))
+                .unwrap_or_else(|e| panic!("parse {}.json: {}", filename, e));
+
+        let empty_keys: Vec<String> = content
+            .as_object()
+            .unwrap_or_else(|| panic!("{}.json should be an object", filename))
+            .iter()
+            .filter(|(k, _)| !k.starts_with("_meta"))
+            .filter(|(_, v)| v.as_str().is_some_and(|s| s.is_empty()))
+            .map(|(k, _)| k.clone())
+            .collect();
+
+        assert!(
+            empty_keys.is_empty(),
+            "Locale '{}' has empty values for keys: {:?}",
+            filename,
+            empty_keys,
+        );
+    }
 }
 
 // Fallback & Cache tests (#208) that call `load_locale_from_bytes` live in

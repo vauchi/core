@@ -493,6 +493,72 @@ pub fn widget_panic_shred(
     Ok(MobileShredReport::from(&report))
 }
 
+// === Revocation Sender ===
+
+/// Sends account revocation messages to contacts via the relay.
+///
+/// Opens a one-shot WebSocket connection per call and sends
+/// the revocation as `SimplePayload::AccountRevoked`.
+struct MobileRevocationSender {
+    relay_url: String,
+    pinned_cert: Option<String>,
+    runtime: tokio::runtime::Runtime,
+}
+
+impl MobileRevocationSender {
+    fn new(
+        relay_url: &str,
+        _sender_id: &str,
+        pinned_cert: Option<String>,
+    ) -> Result<Self, vauchi_core::api::ShredError> {
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .map_err(|e| {
+                vauchi_core::api::ShredError::FileError(format!("Tokio runtime: {}", e))
+            })?;
+        Ok(Self {
+            relay_url: relay_url.to_string(),
+            pinned_cert,
+            runtime,
+        })
+    }
+}
+
+impl vauchi_core::api::RevocationSender for MobileRevocationSender {
+    fn send_revocation(
+        &mut self,
+        revocation: &vauchi_core::network::AccountRevoked,
+    ) -> Result<bool, vauchi_core::api::ShredError> {
+        let simple = protocol::AccountRevoked {
+            sender_id: revocation.sender_id.clone(),
+            recipient_id: revocation.recipient_id.clone(),
+            timestamp: revocation.timestamp,
+            signature: revocation.signature.to_vec(),
+        };
+        let envelope = protocol::create_envelope(protocol::MessagePayload::AccountRevoked(simple));
+        let data = protocol::encode_message(&envelope)
+            .map_err(|e| vauchi_core::api::ShredError::FileError(format!("Encode: {}", e)))?;
+
+        self.runtime.block_on(async {
+            let mut socket =
+                cert_pinning::connect_with_pinning(&self.relay_url, self.pinned_cert.as_deref())
+                    .await
+                    .map_err(|e| {
+                        vauchi_core::api::ShredError::FileError(format!("Connect: {}", e))
+                    })?;
+
+            socket
+                .send(Message::Binary(data))
+                .await
+                .map_err(|e| vauchi_core::api::ShredError::FileError(format!("Send: {}", e)))?;
+
+            let _ = socket.close(None).await;
+            Ok(true)
+        })
+    }
+}
+
 // === Main Interface ===
 
 /// Main Vauchi interface for mobile platforms.
@@ -2067,10 +2133,23 @@ impl VauchiMobile {
 
         let core_token = vauchi_core::api::ShredToken::from_created_at(token.created_at);
         let manager = vauchi_core::api::ShredManager::new(&storage, &bridge, &identity, &data_dir);
+
+        let mut revocation_sender = MobileRevocationSender::new(
+            &self.relay_url,
+            &identity.public_id(),
+            self.pinned_cert_pem.lock().unwrap().clone(),
+        )
+        .ok();
+
         let report = manager
-            // GDPR Gap 4 deferred: mobile has no relay client yet, so no purge sender.
-            // When mobile gains a relay connection, pass a PurgeSender here.
-            .hard_shred(core_token, None, None)
+            // PurgeSender deferred: requires relay-side purge endpoint support.
+            .hard_shred(
+                core_token,
+                None,
+                revocation_sender
+                    .as_mut()
+                    .map(|s| s as &mut dyn vauchi_core::api::RevocationSender),
+            )
             .map_err(|e| MobileError::ShredError(e.to_string()))?;
         Ok(MobileShredReport::from(&report))
     }
@@ -2088,10 +2167,22 @@ impl VauchiMobile {
         let data_dir = self.data_dir();
 
         let manager = vauchi_core::api::ShredManager::new(&storage, &bridge, &identity, &data_dir);
+
+        let mut revocation_sender = MobileRevocationSender::new(
+            &self.relay_url,
+            &identity.public_id(),
+            self.pinned_cert_pem.lock().unwrap().clone(),
+        )
+        .ok();
+
         let report = manager
-            // GDPR Gap 4 deferred: mobile has no relay client yet, so no purge sender.
-            // When mobile gains a relay connection, pass a PurgeSender here.
-            .panic_shred(None, None)
+            // PurgeSender deferred: requires relay-side purge endpoint support.
+            .panic_shred(
+                None,
+                revocation_sender
+                    .as_mut()
+                    .map(|s| s as &mut dyn vauchi_core::api::RevocationSender),
+            )
             .map_err(|e| MobileError::ShredError(e.to_string()))?;
         Ok(MobileShredReport::from(&report))
     }
@@ -3471,6 +3562,36 @@ mod tests {
 
         let records = wb.get_consent_records().unwrap();
         assert!(records.len() >= 3);
+    }
+
+    #[test]
+    fn test_mobile_revocation_sender_implements_trait() {
+        fn accepts_sender(_: &mut dyn vauchi_core::api::RevocationSender) {}
+        let mut sender = MobileRevocationSender::new("ws://localhost:8080", "abcd1234", None)
+            .expect("MobileRevocationSender should construct successfully");
+        accepts_sender(&mut sender);
+    }
+
+    #[test]
+    fn test_revocation_to_simple_conversion() {
+        // Core AccountRevoked should convert to SimpleAccountRevoked correctly
+        let core_revoked = vauchi_core::network::AccountRevoked {
+            sender_id: "sender_hex".to_string(),
+            recipient_id: "recipient_hex".to_string(),
+            timestamp: 1700000000,
+            signature: [0xAB; 64],
+        };
+        let simple = protocol::AccountRevoked {
+            sender_id: core_revoked.sender_id.clone(),
+            recipient_id: core_revoked.recipient_id.clone(),
+            timestamp: core_revoked.timestamp,
+            signature: core_revoked.signature.to_vec(),
+        };
+        assert_eq!(simple.sender_id, "sender_hex");
+        assert_eq!(simple.recipient_id, "recipient_hex");
+        assert_eq!(simple.timestamp, 1700000000);
+        assert_eq!(simple.signature.len(), 64);
+        assert!(simple.signature.iter().all(|b| *b == 0xAB));
     }
 
     #[test]

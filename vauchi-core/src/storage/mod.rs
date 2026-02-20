@@ -169,6 +169,7 @@ impl Storage {
     ///
     /// Performance:
     /// - WAL mode: enables concurrent reads during writes
+    /// - busy_timeout=5000: wait up to 5s for locks instead of failing immediately
     /// - synchronous=NORMAL: safe with WAL, better write throughput
     /// - cache_size=10000: larger page cache for query performance
     ///
@@ -187,6 +188,7 @@ impl Storage {
         conn.execute_batch(
             "PRAGMA auto_vacuum=FULL;
              PRAGMA journal_mode=WAL;
+             PRAGMA busy_timeout=5000;
              PRAGMA synchronous=NORMAL;
              PRAGMA cache_size=10000;
              PRAGMA secure_delete=ON;

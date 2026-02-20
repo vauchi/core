@@ -187,8 +187,8 @@ impl Storage {
         // the database header.
         conn.execute_batch(
             "PRAGMA auto_vacuum=FULL;
-             PRAGMA journal_mode=WAL;
              PRAGMA busy_timeout=5000;
+             PRAGMA journal_mode=WAL;
              PRAGMA synchronous=NORMAL;
              PRAGMA cache_size=10000;
              PRAGMA secure_delete=ON;

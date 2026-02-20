@@ -139,7 +139,7 @@ lint:clippy:
 # Clone sibling locales repo (needed by build.rs and i18n tests)
 .clone-locales:
   before_script:
-    - git clone --depth=1 https://gitlab.com/vauchi/locales.git ../locales
+    - if [ ! -d ../locales ]; then git clone --depth=1 https://gitlab.com/vauchi/locales.git ../locales; else git -C ../locales pull --ff-only 2>/dev/null || true; fi
 
 test:core:
   extends: [.linux-runner, .validation-rust, .timeout-standard]

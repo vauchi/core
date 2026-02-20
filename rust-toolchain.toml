@@ -6,4 +6,4 @@
 # Update this version intentionally — do not rely on rust:latest.
 [toolchain]
 channel = "1.93.1"
-components = ["rustfmt", "clippy"]
+components = ["rustfmt", "clippy", "llvm-tools-preview"]

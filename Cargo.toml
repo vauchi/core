@@ -29,7 +29,8 @@ strip = true         # Strip debug symbols from release binaries
 [profile.dev]
 opt-level = 0        # No optimization
 debug = true         # Full debug info
-strip = false       
+strip = false
+split-debuginfo = "unpacked"  # Reduce linker work (skip debuginfo bundling)
 
 # Release with debug info (for profiling)
 [profile.release-with-debug]

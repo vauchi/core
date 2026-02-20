@@ -116,7 +116,6 @@ lint:format:
   stage: lint
   needs: []
   script:
-    - rustup component add rustfmt 2>/dev/null || true
     - cargo fmt --all -- --check
 
 lint:clippy:
@@ -124,7 +123,6 @@ lint:clippy:
   stage: lint
   needs: []
   script:
-    - rustup component add clippy 2>/dev/null || true
     - cargo clippy --all-targets -- -D warnings
 
 # REUSE compliance provided by vauchi/scripts ci-templates/reuse.yml
@@ -133,17 +131,44 @@ lint:clippy:
 # Test Stage (MR only, gated by lint)
 # ============================================================
 
+# MR test jobs: use nextest for fast feedback (12x faster than cargo test,
+# avoids llvm-cov instrumentation rebuild). Coverage runs on main only.
 test:core:
-  extends: [.linux-runner, .validation-rust, .timeout-standard]
+  extends: [.linux-runner, .validation-rust, .timeout-quick]
   stage: test
   needs:
     - job: lint:format
       optional: true
     - job: lint:clippy
       optional: true
+  script:
+    - cargo nextest run -p vauchi-core
+
+test:mobile:
+  extends: [.linux-runner, .validation-mobile, .timeout-quick]
+  stage: test
+  needs:
+    - job: lint:format
+      optional: true
+    - job: lint:clippy
+      optional: true
+  script:
+    - cargo nextest run -p vauchi-mobile
+
+# Coverage jobs: run on main merges only (not MRs) — llvm-cov is too slow
+# for per-push feedback but still needed for coverage tracking/badges.
+coverage:core:
+  extends: [.linux-runner, .timeout-standard]
+  stage: test
+  needs:
+    - job: lint:format
+      optional: true
+    - job: lint:clippy
+      optional: true
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
   before_script:
     - !reference [.self-hosted, before_script]
-    - rustup component add llvm-tools-preview 2>/dev/null || true
     - command -v cargo-llvm-cov >/dev/null 2>&1 || cargo binstall cargo-llvm-cov --no-confirm 2>/dev/null || cargo install cargo-llvm-cov --locked || true
   script:
     - cargo llvm-cov -p vauchi-core --lcov --output-path lcov-core.info
@@ -160,17 +185,18 @@ test:core:
       - cobertura-core.xml
     expire_in: 1 week
 
-test:mobile:
-  extends: [.linux-runner, .validation-mobile, .timeout-standard]
+coverage:mobile:
+  extends: [.linux-runner, .timeout-standard]
   stage: test
   needs:
     - job: lint:format
       optional: true
     - job: lint:clippy
       optional: true
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
   before_script:
     - !reference [.self-hosted, before_script]
-    - rustup component add llvm-tools-preview 2>/dev/null || true
     - command -v cargo-llvm-cov >/dev/null 2>&1 || cargo binstall cargo-llvm-cov --no-confirm 2>/dev/null || cargo install cargo-llvm-cov --locked || true
   script:
     - cargo llvm-cov -p vauchi-mobile --lcov --output-path lcov-mobile.info
@@ -237,6 +263,7 @@ bench:compare:
           - "vauchi-core/benches/**/*.rs"
           - "vauchi-core/Cargo.toml"
           - ".gitlab-ci.yml"
+      when: manual
   allow_failure: true
   cache:
     key: bench-baseline-main

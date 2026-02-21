@@ -62,6 +62,9 @@ fn create_visibility_update(id: &str, contact_id: &str, field_id: &str) -> Pendi
 /// - Create a visibility group
 /// - Add contact to group updates their visibility
 /// - Remove contact from group updates their visibility
+// @scenario: visibility_control.feature:Create a visibility group
+// @scenario: visibility_control.feature:Add contact to group updates their visibility
+// @scenario: visibility_control.feature:Remove contact from group updates their visibility
 #[test]
 fn test_visibility_group_add_remove() {
     let mut manager = LabelManager::new();
@@ -156,6 +159,7 @@ fn test_visibility_group_add_remove() {
 ///
 /// Feature: visibility_control.feature
 /// Scenario: Add contact to group updates their visibility
+// @scenario: visibility_control.feature:Add contact to group updates their visibility
 #[test]
 fn test_visibility_group_grants_all_fields() {
     let mut manager = LabelManager::new();
@@ -201,6 +205,7 @@ fn test_visibility_group_grants_all_fields() {
 ///
 /// Feature: visibility_control.feature
 /// Scenario: Per-contact override overrides group visibility
+// @scenario: visibility_control.feature:Hide a field from a specific contact
 #[test]
 fn test_visibility_group_with_per_contact_override() {
     let mut manager = LabelManager::new();
@@ -257,6 +262,7 @@ fn test_visibility_group_with_per_contact_override() {
 ///
 /// Feature: visibility_control.feature
 /// Scenario: Visibility change when contact is offline
+// @scenario: visibility_control.feature:Visibility change when contact is offline
 #[test]
 fn test_visibility_propagation_offline() {
     let storage = test_storage();
@@ -301,6 +307,7 @@ fn test_visibility_propagation_offline() {
 ///
 /// Feature: visibility_control.feature
 /// Scenario: Multiple visibility changes queue correctly
+// @scenario: visibility_control.feature:Visibility change when contact is offline
 #[test]
 fn test_visibility_propagation_multiple_changes() {
     let storage = test_storage();
@@ -339,6 +346,7 @@ fn test_visibility_propagation_multiple_changes() {
 ///
 /// Feature: visibility_control.feature
 /// Scenario: Queue limits prevent unbounded growth
+// @scenario: visibility_control.feature:Visibility change when contact is offline
 #[test]
 fn test_visibility_propagation_queue_limits() {
     let storage = test_storage();
@@ -368,6 +376,7 @@ fn test_visibility_propagation_queue_limits() {
 ///
 /// Feature: visibility_control.feature
 /// Scenario: Clear queued updates when contact is deleted/blocked
+// @scenario: visibility_control.feature:Delete contact removes their visibility rules
 #[test]
 fn test_visibility_propagation_flush_contact_queue() {
     let storage = test_storage();
@@ -405,6 +414,7 @@ fn test_visibility_propagation_flush_contact_queue() {
 ///
 /// Feature: visibility_control.feature
 /// Scenario: Apply template visibility to new contact
+// @scenario: visibility_control.feature:Apply template visibility to new contact
 #[test]
 fn test_visibility_templates() {
     // Define visibility templates as predefined VisibilityRules configurations
@@ -504,6 +514,7 @@ fn test_visibility_templates() {
 ///
 /// Feature: visibility_control.feature
 /// Scenario: Apply different templates to different contacts
+// @scenario: visibility_control.feature:Apply template visibility to new contact
 #[test]
 fn test_visibility_templates_per_contact() {
     let all_fields = vec![
@@ -544,6 +555,7 @@ fn test_visibility_templates_per_contact() {
 ///
 /// Feature: visibility_control.feature
 /// Scenario: Show a field only to specific contacts
+// @scenario: visibility_control.feature:Show a field only to specific contacts
 #[test]
 fn test_visibility_templates_with_contacts_list() {
     let mut rules = VisibilityRules::new();
@@ -596,6 +608,7 @@ fn test_visibility_templates_with_contacts_list() {
 ///
 /// Feature: visibility_control.feature
 /// Scenario: Set visibility for all fields at once
+// @scenario: visibility_control.feature:Set visibility for all fields at once
 #[test]
 fn test_visibility_bulk_operations() {
     let fields = vec![
@@ -643,6 +656,7 @@ fn test_visibility_bulk_operations() {
 ///
 /// Feature: visibility_control.feature
 /// Scenario: Reset all visibility to default
+// @scenario: visibility_control.feature:Reset all visibility to default
 #[test]
 fn test_visibility_bulk_reset_to_default() {
     let fields = vec!["field-1", "field-2", "field-3", "field-4", "field-5"];
@@ -687,6 +701,7 @@ fn test_visibility_bulk_reset_to_default() {
 ///
 /// Feature: visibility_control.feature
 /// Scenario: Bulk add/remove fields from a group
+// @scenario: visibility_control.feature:Apply visibility group to a field
 #[test]
 fn test_visibility_bulk_label_operations() {
     let mut manager = LabelManager::new();
@@ -755,6 +770,7 @@ fn test_visibility_bulk_label_operations() {
 ///
 /// Feature: visibility_control.feature
 /// Scenario: Clear all per-contact overrides
+// @scenario: visibility_control.feature:Hide a field from a specific contact
 #[test]
 fn test_visibility_bulk_clear_overrides() {
     let mut manager = LabelManager::new();
@@ -794,6 +810,7 @@ fn test_visibility_bulk_clear_overrides() {
 ///
 /// Feature: visibility_control.feature
 /// Scenario: Delete contact removes their visibility rules
+// @scenario: visibility_control.feature:Delete contact removes their visibility rules
 #[test]
 fn test_visibility_bulk_remove_contact_from_all_labels() {
     let mut manager = LabelManager::new();

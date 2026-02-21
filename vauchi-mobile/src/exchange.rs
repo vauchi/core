@@ -365,6 +365,7 @@ pub fn ble_exchange_status() -> MobileBleExchangeStatus {
 
 // === Tests ===
 
+// INLINE_TEST_REQUIRED: tests use private ProximityBridge internals and create_qr_exchange_manual/proximity helpers
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -385,6 +386,7 @@ mod tests {
         }
     }
 
+    // @scenario: contact_exchange:Successful QR code exchange with proximity
     #[test]
     fn test_proximity_bridge_success() {
         let handler = Arc::new(SuccessHandler);
@@ -397,6 +399,7 @@ mod tests {
         assert!(result.is_ok());
     }
 
+    // @scenario: contact_exchange:QR code exchange blocked without proximity
     #[test]
     fn test_proximity_bridge_failure() {
         let handler = Arc::new(FailureHandler);
@@ -413,6 +416,7 @@ mod tests {
         }
     }
 
+    // @scenario: contact_exchange:Generate exchange QR code
     #[test]
     fn test_session_generates_qr() {
         let identity = Identity::create("Alice");
@@ -434,6 +438,7 @@ mod tests {
         ));
     }
 
+    // @scenario: contact_exchange:Mutual QR exchange with bidirectional scanning
     #[test]
     fn test_session_mutual_qr_flow() {
         let alice = Identity::create("Alice");
@@ -498,6 +503,7 @@ mod tests {
         ));
     }
 
+    // @scenario: contact_exchange:Incomplete exchange recovery
     #[test]
     fn test_finalize_requires_complete_state() {
         let identity = Identity::create("Alice");
@@ -510,6 +516,7 @@ mod tests {
         assert!(result.is_err());
     }
 
+    // @scenario: contact_exchange:Successful QR code exchange with proximity
     #[test]
     fn test_confirm_proximity_manual_session() {
         let identity = Identity::create("Alice");
@@ -522,6 +529,7 @@ mod tests {
             .expect("confirm_proximity should succeed on manual session");
     }
 
+    // @scenario: contact_exchange:Successful QR code exchange with proximity
     #[test]
     fn test_confirm_proximity_proximity_session() {
         let identity = Identity::create("Alice");
@@ -534,6 +542,7 @@ mod tests {
             .expect("confirm_proximity should be a no-op on proximity session");
     }
 
+    // @scenario: contact_exchange:Exchange timeout after interruption
     #[test]
     fn test_session_not_timed_out_initially() {
         let identity = Identity::create("Alice");

@@ -141,6 +141,8 @@ lint:clippy:
 
 # MR test jobs: use nextest for fast feedback (12x faster than cargo test,
 # avoids llvm-cov instrumentation rebuild). Coverage runs on main only.
+# Cucumber tests use cargo test (not nextest) because harness=false output
+# is incompatible with nextest's test listing format.
 test:core:
   extends: [.linux-runner, .validation-rust, .timeout-quick]
   stage: test
@@ -151,6 +153,20 @@ test:core:
       optional: true
   script:
     - cargo nextest run -p vauchi-core
+
+test:cucumber:
+  extends: [.linux-runner, .validation-rust, .timeout-quick]
+  stage: test
+  needs:
+    - job: lint:format
+      optional: true
+    - job: lint:clippy
+      optional: true
+  before_script:
+    - !reference [.self-hosted, before_script]
+    - if [ ! -d ../features ]; then git clone --depth=1 https://gitlab.com/vauchi/features.git ../features; else git -C ../features pull --ff-only 2>/dev/null || true; fi
+  script:
+    - cargo test --test cucumber_tests -- --tags "not @wip"
 
 test:mobile:
   extends: [.linux-runner, .validation-mobile, .timeout-quick]

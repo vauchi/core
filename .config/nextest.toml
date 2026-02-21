@@ -1,0 +1,9 @@
+# SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+[profile.default]
+# Exclude cucumber_tests from nextest — its harness=false binary outputs
+# non-standard format that nextest cannot parse. Cucumber tests run via
+# `cargo test --test cucumber_tests` separately.
+default-filter = "not binary(cucumber_tests)"

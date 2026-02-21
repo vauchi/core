@@ -19,6 +19,7 @@ use vauchi_core::storage::Storage;
 // Deletion Grace Period Tests
 // ============================================================
 
+// @scenario: privacy_compliance.feature:Grace period before permanent deletion
 #[test]
 fn test_schedule_deletion_sets_grace_period() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
@@ -41,6 +42,7 @@ fn test_schedule_deletion_sets_grace_period() {
     }
 }
 
+// @scenario: privacy_compliance.feature:Cancel deletion during grace period
 #[test]
 fn test_cancel_deletion_within_grace_period() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
@@ -62,6 +64,7 @@ fn test_cancel_deletion_within_grace_period() {
     );
 }
 
+// @scenario: privacy_compliance.feature:Execute deletion requires grace period to have elapsed
 #[test]
 fn test_execute_deletion_fails_before_grace_period() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
@@ -75,6 +78,7 @@ fn test_execute_deletion_fails_before_grace_period() {
     assert!(result.is_err(), "Execution before grace period should fail");
 }
 
+// @scenario: privacy_compliance.feature:Execute deletion after grace period sends revocations and purge
 #[test]
 fn test_execute_deletion_succeeds_after_grace_period() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
@@ -100,6 +104,7 @@ fn test_execute_deletion_succeeds_after_grace_period() {
     );
 }
 
+// @scenario: privacy_compliance.feature:Grace period before permanent deletion
 #[test]
 fn test_deletion_state_persisted_across_manager_instances() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
@@ -118,6 +123,7 @@ fn test_deletion_state_persisted_across_manager_instances() {
     );
 }
 
+// @scenario: privacy_compliance.feature:Cancel deletion during grace period
 #[test]
 fn test_cancel_deletion_when_not_scheduled() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
@@ -128,6 +134,7 @@ fn test_cancel_deletion_when_not_scheduled() {
     assert!(result.is_ok(), "Cancel when not scheduled should be ok");
 }
 
+// @scenario: privacy_compliance.feature:Delete my account
 #[test]
 fn test_schedule_deletion_when_already_scheduled() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();

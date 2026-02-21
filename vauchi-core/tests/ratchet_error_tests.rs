@@ -77,6 +77,7 @@ fn test_ratchet_handles_message_skip() {
 }
 
 /// Test: Duplicate message detection
+// @scenario: security.feature:Replay attack prevention
 #[test]
 fn test_ratchet_rejects_duplicate_message() {
     let shared_secret = SymmetricKey::generate();
@@ -169,6 +170,7 @@ fn test_ratchet_handles_large_plaintext() {
 // =============================================================================
 
 /// Test: Different shared secrets produce different ratchets
+// @scenario: security.feature:Forward secrecy via Double Ratchet
 #[test]
 fn test_different_secrets_produce_different_ratchets() {
     let secret1 = SymmetricKey::generate();
@@ -190,6 +192,7 @@ fn test_different_secrets_produce_different_ratchets() {
 }
 
 /// Test: Same plaintext encrypts differently each time (nonce)
+// @scenario: security.feature:Forward secrecy via Double Ratchet
 #[test]
 fn test_same_plaintext_different_ciphertext() {
     let shared_secret = SymmetricKey::generate();
@@ -214,6 +217,7 @@ fn test_same_plaintext_different_ciphertext() {
 // =============================================================================
 
 /// Test: Bidirectional ratchet conversation
+// @scenario: security.feature:Forward secrecy via Double Ratchet
 #[test]
 fn test_bidirectional_conversation() {
     let shared_secret = SymmetricKey::generate();

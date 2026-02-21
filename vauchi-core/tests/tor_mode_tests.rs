@@ -26,6 +26,7 @@ use vauchi_core::tor_config::{TorConfig, TorRelayAddress, TorStatus};
 // Scenario: Tor mode is disabled by default
 // =============================================================================
 
+// @scenario: tor_mode.feature:Tor mode is disabled by default
 #[test]
 fn test_tor_opt_in_default() {
     // Given I have just installed the app (fresh TorConfig)
@@ -52,6 +53,7 @@ fn test_tor_opt_in_default() {
     );
 }
 
+// @scenario: tor_mode.feature:Enable Tor mode from settings
 #[test]
 fn test_tor_config_enabled_requires_explicit_opt_in() {
     // Given Tor mode is disabled (default)
@@ -82,6 +84,7 @@ fn test_tor_config_enabled_requires_explicit_opt_in() {
 // Scenario: Automatic circuit rotation
 // =============================================================================
 
+// @scenario: tor_mode.feature:Establish new Tor circuit
 #[test]
 fn test_tor_circuit_rotation() {
     // Given Tor mode is enabled
@@ -112,6 +115,7 @@ fn test_tor_circuit_rotation() {
     );
 }
 
+// @scenario: tor_mode.feature:Establish new Tor circuit
 #[test]
 fn test_tor_circuit_rotation_requires_connection() {
     // Given Tor mode is enabled but not connected
@@ -153,6 +157,7 @@ fn test_tor_circuit_rotation_after_shutdown() {
 // Scenario: Tor bootstrap failure handling
 // =============================================================================
 
+// @scenario: tor_mode.feature:Tor bootstrap progress shown
 #[test]
 fn test_tor_bootstrap_progress() {
     // Given Tor mode is enabled
@@ -177,6 +182,7 @@ fn test_tor_bootstrap_progress() {
     );
 }
 
+// @scenario: tor_mode.feature:Tor bootstrap failure handling
 #[test]
 fn test_tor_bootstrap_failure_handling() {
     // Given Tor mode is enabled
@@ -233,6 +239,7 @@ fn test_tor_bootstrap_percentage_status() {
 // Scenario: Pluggable transports support
 // =============================================================================
 
+// @scenario: tor_mode.feature:Configure Tor bridges
 #[test]
 fn test_tor_bridge_configuration() {
     // Given Tor mode is enabled
@@ -266,6 +273,7 @@ fn test_tor_bridge_configuration_empty_by_default() {
     assert!(config.bridges.is_empty(), "Bridges list should be empty");
 }
 
+// @scenario: tor_mode.feature:Tor mode persists across app restarts
 #[test]
 fn test_tor_bridge_configuration_serialization() {
     // Given a config with bridges
@@ -305,6 +313,7 @@ fn test_tor_bridge_validation() {
 // Scenario: Fallback to clearnet relay if .onion unavailable
 // =============================================================================
 
+// @scenario: tor_mode.feature:Connect to relay .onion address
 #[test]
 fn test_onion_address_fallback() {
     // Given Tor mode is enabled
@@ -331,6 +340,7 @@ fn test_onion_address_fallback() {
     );
 }
 
+// @scenario: tor_mode.feature:Fallback to clearnet relay if .onion unavailable
 #[test]
 fn test_onion_address_fallback_when_no_onion() {
     // Given the relay only has a clearnet address
@@ -385,6 +395,7 @@ fn test_relay_address_equality() {
 // Scenario: Connection fails gracefully without Tor
 // =============================================================================
 
+// @scenario: tor_mode.feature:Connection fails gracefully without Tor
 #[test]
 fn test_tor_transport_requires_bootstrap() {
     // Given Tor mode is enabled but not bootstrapped
@@ -407,6 +418,7 @@ fn test_tor_transport_requires_bootstrap() {
     );
 }
 
+// @scenario: tor_mode.feature:Relay connections use Tor when enabled
 #[test]
 fn test_tor_transport_connect_after_bootstrap() {
     // Given Tor mode is enabled and bootstrapped
@@ -508,6 +520,7 @@ fn test_tor_config_builder_chain() {
     assert_eq!(config.circuit_rotation_secs, 120);
 }
 
+// @scenario: tor_mode.feature:Automatic circuit rotation
 #[test]
 fn test_tor_config_custom_circuit_rotation() {
     // Given I want faster circuit rotation for high-security use
@@ -517,6 +530,7 @@ fn test_tor_config_custom_circuit_rotation() {
     assert_eq!(config.circuit_rotation_secs, 60);
 }
 
+// @scenario: tor_mode.feature:Connect to relay .onion address
 #[test]
 fn test_tor_config_prefer_onion_toggle() {
     // Given default config prefers onion

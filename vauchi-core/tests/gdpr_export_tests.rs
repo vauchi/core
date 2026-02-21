@@ -40,6 +40,7 @@ fn setup_storage_with_contacts() -> Storage {
     storage
 }
 
+// @scenario: privacy_compliance.feature:Export includes all data types
 #[test]
 fn test_export_includes_contacts() {
     let storage = setup_storage_with_contacts();
@@ -51,6 +52,7 @@ fn test_export_includes_contacts() {
     assert!(!export.contacts[0].card_fields.is_empty());
 }
 
+// @scenario: privacy_compliance.feature:Export includes all data types
 #[test]
 fn test_export_includes_own_card() {
     let storage = setup_storage_with_contacts();
@@ -60,6 +62,7 @@ fn test_export_includes_own_card() {
     assert!(export.own_card.is_some(), "Export should include own card");
 }
 
+// @scenario: privacy_compliance.feature:Export all my data
 #[test]
 fn test_export_excludes_private_keys() {
     let storage = setup_storage_with_contacts();
@@ -97,6 +100,7 @@ fn test_export_excludes_private_keys() {
     }
 }
 
+// @scenario: privacy_compliance.feature:Export includes all data types
 #[test]
 fn test_export_includes_consent_records() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
@@ -117,6 +121,7 @@ fn test_export_includes_consent_records() {
     );
 }
 
+// @scenario: privacy_compliance.feature:Export includes device list and recovery config
 #[test]
 fn test_export_includes_devices() {
     let storage = setup_storage_with_contacts();
@@ -130,6 +135,7 @@ fn test_export_includes_devices() {
     );
 }
 
+// @scenario: privacy_compliance.feature:Export includes device list and recovery config
 #[test]
 fn test_export_includes_recovery_config() {
     let storage = setup_storage_with_contacts();
@@ -143,6 +149,7 @@ fn test_export_includes_recovery_config() {
     );
 }
 
+// @scenario: privacy_compliance.feature:Export all my data
 #[test]
 fn test_export_version_bumped_to_3() {
     let storage = setup_storage_with_contacts();
@@ -199,6 +206,7 @@ fn test_list_audit_log_decrypts_details() {
     );
 }
 
+// @scenario: privacy_compliance.feature:Export includes all data types
 #[test]
 fn test_export_includes_audit_log() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();

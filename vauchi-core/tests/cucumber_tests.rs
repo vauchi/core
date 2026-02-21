@@ -76,5 +76,15 @@ fn main() {
     //   cargo test --test cucumber_tests -- --tags @identity
     let features_dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../../features");
 
+    // In CI, only the core repo is checked out — the sibling features/ repo
+    // is not available. Skip gracefully instead of failing the pipeline.
+    if !std::path::Path::new(features_dir).exists() {
+        eprintln!(
+            "Skipping cucumber tests: features directory not found at {features_dir}. \
+             Run `just setup` to clone the features repo."
+        );
+        return;
+    }
+
     futures::executor::block_on(VauchiWorld::cucumber().with_default_cli().run(features_dir));
 }

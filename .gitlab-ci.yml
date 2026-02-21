@@ -151,6 +151,9 @@ test:core:
       optional: true
     - job: lint:clippy
       optional: true
+  before_script:
+    - !reference [.self-hosted, before_script]
+    - !reference [.clone-locales, before_script]
   script:
     - cargo nextest run -p vauchi-core
 
@@ -177,6 +180,9 @@ test:mobile:
       optional: true
     - job: lint:clippy
       optional: true
+  before_script:
+    - !reference [.self-hosted, before_script]
+    - !reference [.clone-locales, before_script]
   script:
     - cargo nextest run -p vauchi-mobile
 

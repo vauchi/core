@@ -25,6 +25,7 @@ use vauchi_core::{
 
 /// Test: Demo contact has correct name and ID
 /// Feature: demo_contact.feature @demo-appear
+// @scenario: demo_contact.feature:Demo contact appears for users with no contacts
 #[test]
 fn test_demo_contact_constants() {
     assert_eq!(DEMO_CONTACT_NAME, "Vauchi Tips");
@@ -33,6 +34,7 @@ fn test_demo_contact_constants() {
 
 /// Test: Demo contact appears as active for new users
 /// Feature: demo_contact.feature @demo-appear
+// @scenario: demo_contact.feature:Demo contact appears for users with no contacts
 #[test]
 fn test_demo_contact_appears_for_new_users() {
     let state = DemoContactState::new_active();
@@ -44,6 +46,7 @@ fn test_demo_contact_appears_for_new_users() {
 
 /// Test: Demo contact is visually distinct (marked as demo)
 /// Feature: demo_contact.feature @demo-appear
+// @scenario: demo_contact.feature:Demo contact is visually distinct
 #[test]
 fn test_demo_contact_visually_distinct() {
     let state = DemoContactState::new_active();
@@ -62,6 +65,7 @@ fn test_demo_contact_visually_distinct() {
 
 /// Test: Demo tips exist and have content
 /// Feature: demo_contact.feature @demo-updates
+// @scenario: demo_contact.feature:Demo contact sends periodic updates
 #[test]
 fn test_demo_tips_exist() {
     let tips = get_demo_tips();
@@ -79,6 +83,7 @@ fn test_demo_tips_exist() {
 
 /// Test: Demo state tracks current tip
 /// Feature: demo_contact.feature @demo-updates
+// @scenario: demo_contact.feature:Demo contact sends periodic updates
 #[test]
 fn test_demo_state_tracks_tip() {
     let state = DemoContactState::new_active();
@@ -89,6 +94,7 @@ fn test_demo_state_tracks_tip() {
 
 /// Test: Tips advance over time
 /// Feature: demo_contact.feature @demo-updates
+// @scenario: demo_contact.feature:Demo contact sends periodic updates
 #[test]
 fn test_demo_tips_advance() {
     let mut state = DemoContactState::new_active();
@@ -105,6 +111,7 @@ fn test_demo_tips_advance() {
 
 /// Test: Update due check respects interval
 /// Feature: demo_contact.feature @demo-updates
+// @scenario: demo_contact.feature:Demo contact sends periodic updates
 #[test]
 fn test_demo_update_due_check() {
     let state = DemoContactState::new_active();
@@ -123,6 +130,7 @@ fn test_demo_update_due_check() {
 
 /// Test: Tips cover multiple categories
 /// Feature: demo_contact.feature @demo-content
+// @scenario: demo_contact.feature:Demo contact has rotating tips
 #[test]
 fn test_demo_tips_multiple_categories() {
     let tips = get_demo_tips();
@@ -149,6 +157,7 @@ fn test_demo_tips_multiple_categories() {
 
 /// Test: All tip categories are available
 /// Feature: demo_contact.feature @demo-content
+// @scenario: demo_contact.feature:Demo contact has rotating tips
 #[test]
 fn test_all_tip_categories_exist() {
     let all_categories = DemoTipCategory::all();
@@ -164,6 +173,7 @@ fn test_all_tip_categories_exist() {
 
 /// Test: Tips rotate through all content
 /// Feature: demo_contact.feature @demo-content
+// @scenario: demo_contact.feature:Demo contact has rotating tips
 #[test]
 fn test_demo_tips_rotate() {
     let mut state = DemoContactState::new_active();
@@ -188,6 +198,7 @@ fn test_demo_tips_rotate() {
 
 /// Test: Manual dismissal works
 /// Feature: demo_contact.feature @demo-dismiss
+// @scenario: demo_contact.feature:Demo contact can be manually dismissed
 #[test]
 fn test_demo_contact_manual_dismiss() {
     let mut state = DemoContactState::new_active();
@@ -202,6 +213,7 @@ fn test_demo_contact_manual_dismiss() {
 
 /// Test: Auto-removal after first real exchange
 /// Feature: demo_contact.feature @demo-dismiss
+// @scenario: demo_contact.feature:Demo contact auto-removes after first real exchange
 #[test]
 fn test_demo_contact_auto_remove() {
     let mut state = DemoContactState::new_active();
@@ -215,6 +227,7 @@ fn test_demo_contact_auto_remove() {
 
 /// Test: Demo contact can be restored from settings
 /// Feature: demo_contact.feature @demo-dismiss
+// @scenario: demo_contact.feature:Demo contact can be restored from settings
 #[test]
 fn test_demo_contact_restore() {
     let mut state = DemoContactState::new_active();
@@ -233,6 +246,7 @@ fn test_demo_contact_restore() {
 
 /// Test: Restore works after auto-remove too
 /// Feature: demo_contact.feature @demo-dismiss
+// @scenario: demo_contact.feature:Demo contact can be restored from settings
 #[test]
 fn test_demo_contact_restore_after_auto_remove() {
     let mut state = DemoContactState::new_active();
@@ -252,6 +266,7 @@ fn test_demo_contact_restore_after_auto_remove() {
 
 /// Test: Demo contact card is self-contained
 /// Feature: demo_contact.feature @demo-privacy
+// @scenario: demo_contact.feature:Demo contact is local only
 #[test]
 fn test_demo_contact_local_only() {
     let state = DemoContactState::new_active();
@@ -273,6 +288,7 @@ fn test_demo_contact_local_only() {
 
 /// Test: Demo state persists via serialization
 /// Feature: demo_contact.feature @demo-persistence
+// @scenario: demo_contact.feature:Demo contact state persists across app restarts
 #[test]
 fn test_demo_state_persists() {
     let mut state = DemoContactState::new_active();
@@ -294,6 +310,7 @@ fn test_demo_state_persists() {
 
 /// Test: Dismissal persists across app restarts
 /// Feature: demo_contact.feature @demo-persistence
+// @scenario: demo_contact.feature:Dismissal persists across app restarts
 #[test]
 fn test_dismissal_persists() {
     let mut state = DemoContactState::new_active();
@@ -308,6 +325,7 @@ fn test_dismissal_persists() {
 
 /// Test: Update history persists
 /// Feature: demo_contact.feature @demo-persistence
+// @scenario: demo_contact.feature:Demo contact state persists across app restarts
 #[test]
 fn test_update_history_persists() {
     let mut state = DemoContactState::new_active();
@@ -334,6 +352,7 @@ fn test_update_history_persists() {
 
 /// Test: Demo contact works offline (no network needed)
 /// Feature: demo_contact.feature @demo-edge
+// @scenario: demo_contact.feature:Demo contact handles no network gracefully
 #[test]
 fn test_demo_works_offline() {
     // Demo contact is entirely local, no network calls
@@ -353,6 +372,7 @@ fn test_demo_works_offline() {
 
 /// Test: Update not due when inactive
 /// Feature: demo_contact.feature @demo-edge
+// @scenario: demo_contact.feature:Demo contact can be manually dismissed
 #[test]
 fn test_update_not_due_when_inactive() {
     let mut state = DemoContactState::new_active();

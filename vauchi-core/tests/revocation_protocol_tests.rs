@@ -89,6 +89,7 @@ fn test_canonical_bytes_starts_with_domain_separator() {
 
 // === AccountRevoked Message ===
 
+// @scenario: privacy_compliance.feature:Revocation signal is cryptographically authenticated
 #[test]
 fn test_account_revoked_sign_and_verify() {
     let identity = Identity::create("Alice Test");
@@ -102,6 +103,7 @@ fn test_account_revoked_sign_and_verify() {
     assert!(revoked.verify(identity.signing_public_key()));
 }
 
+// @scenario: privacy_compliance.feature:Spoofed revocation signal is rejected
 #[test]
 fn test_account_revoked_rejects_tampered_timestamp() {
     let identity = Identity::create("Alice Test");
@@ -116,6 +118,7 @@ fn test_account_revoked_rejects_tampered_timestamp() {
     assert!(!revoked.verify(identity.signing_public_key()));
 }
 
+// @scenario: privacy_compliance.feature:Spoofed revocation signal is rejected
 #[test]
 fn test_account_revoked_rejects_wrong_key() {
     let identity = Identity::create("Alice");
@@ -146,6 +149,7 @@ fn test_account_revoked_serialization_roundtrip() {
 
 // === Revocation Processing ===
 
+// @scenario: privacy_compliance.feature:Account deletion sends revocation signal to all contacts
 #[test]
 fn test_process_revocation_deletes_contact_and_records_tombstone() {
     let storage = test_storage();
@@ -171,6 +175,7 @@ fn test_process_revocation_deletes_contact_and_records_tombstone() {
     assert!(storage.is_sender_revoked(alice_contact.id()).unwrap());
 }
 
+// @scenario: privacy_compliance.feature:Spoofed revocation signal is rejected
 #[test]
 fn test_process_revocation_rejects_invalid_signature() {
     let storage = test_storage();
@@ -195,6 +200,7 @@ fn test_process_revocation_rejects_invalid_signature() {
     assert!(storage.load_contact(alice_contact.id()).unwrap().is_some());
 }
 
+// @scenario: privacy_compliance.feature:Replayed revocation for re-established contact is rejected
 #[test]
 fn test_process_revocation_stale_rejected() {
     let storage = test_storage();
@@ -228,6 +234,7 @@ fn test_process_revocation_unknown_sender_noop() {
     assert!(result.is_ok());
 }
 
+// @scenario: privacy_compliance.feature:Card update arriving after revocation is discarded
 #[test]
 fn test_update_after_revocation_discarded_via_tombstone() {
     let storage = test_storage();

@@ -23,6 +23,7 @@ fn create_test_registry(identity: &Identity) -> DeviceRegistry {
     )
 }
 
+// @scenario: device_management.feature:Linking requires proximity verification
 #[test]
 fn test_build_response_rejected_without_proximity() {
     let master_seed = [0x42u8; 32];
@@ -49,6 +50,7 @@ fn test_build_response_rejected_without_proximity() {
     );
 }
 
+// @scenario: device_management.feature:Linking requires proximity verification
 #[test]
 fn test_build_response_succeeds_after_proximity_verified() {
     let master_seed = [0x42u8; 32];
@@ -110,6 +112,7 @@ fn test_proximity_challenge_differs_per_session() {
     assert_ne!(challenge1, challenge2);
 }
 
+// @scenario: device_management.feature:Verify device during linking
 #[test]
 fn test_both_sides_derive_same_challenge() {
     let master_seed = [0x42u8; 32];
@@ -130,6 +133,7 @@ fn test_both_sides_derive_same_challenge() {
     assert_eq!(initiator_challenge, responder_challenge);
 }
 
+// @scenario: device_management.feature:Linking requires proximity verification
 #[test]
 fn test_restored_initiator_requires_proximity() {
     let master_seed = [0x42u8; 32];

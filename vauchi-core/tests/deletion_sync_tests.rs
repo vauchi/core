@@ -9,6 +9,7 @@
 
 use vauchi_core::sync::device_sync::SyncItem;
 
+// @scenario: privacy_compliance.feature:Account deletion propagates across all user devices
 #[test]
 fn test_deletion_scheduled_sync_item() {
     let item = SyncItem::DeletionScheduled {
@@ -37,6 +38,7 @@ fn test_deletion_scheduled_sync_item() {
     }
 }
 
+// @scenario: privacy_compliance.feature:Cancel deletion during grace period
 #[test]
 fn test_deletion_cancelled_sync_item() {
     let item = SyncItem::DeletionCancelled {

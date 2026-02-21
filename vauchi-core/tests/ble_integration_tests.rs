@@ -26,6 +26,7 @@ use vauchi_core::exchange::{
 // ============================================================
 
 /// Test: Create BLE advertisement for exchange
+// @scenario: contact_exchange.feature:BLE exchange generates payload
 #[test]
 fn test_create_ble_advertisement() {
     let keypair = SigningKeyPair::generate();
@@ -38,6 +39,7 @@ fn test_create_ble_advertisement() {
 }
 
 /// Test: Advertisement includes service UUID
+// @scenario: contact_exchange.feature:BLE exchange generates payload
 #[test]
 fn test_advertisement_service_uuid() {
     let keypair = SigningKeyPair::generate();
@@ -51,6 +53,7 @@ fn test_advertisement_service_uuid() {
 }
 
 /// Test: Advertisement payload fits in BLE limits
+// @scenario: contact_exchange.feature:BLE exchange generates payload
 #[test]
 fn test_advertisement_payload_size() {
     let keypair = SigningKeyPair::generate();
@@ -68,6 +71,7 @@ fn test_advertisement_payload_size() {
 }
 
 /// Test: Parse advertisement from bytes
+// @scenario: contact_exchange.feature:BLE exchange generates payload
 #[test]
 fn test_parse_advertisement() {
     let keypair = SigningKeyPair::generate();
@@ -88,6 +92,7 @@ fn test_parse_advertisement() {
 // ============================================================
 
 /// Test: Discover nearby devices
+// @scenario: contact_exchange.feature:BLE device discovery
 #[test]
 fn test_discover_nearby_devices() {
     let device1 = BLEDevice::new("device-1", -50);
@@ -101,6 +106,7 @@ fn test_discover_nearby_devices() {
 }
 
 /// Test: Filter devices by exchange token
+// @scenario: contact_exchange.feature:BLE device discovery
 #[test]
 fn test_filter_devices_with_exchange_token() {
     let token = [42u8; 32];
@@ -120,6 +126,7 @@ fn test_filter_devices_with_exchange_token() {
 }
 
 /// Test: Estimate distance from RSSI
+// @scenario: contact_exchange.feature:Proximity verification prevents remote exchange
 #[test]
 fn test_estimate_distance() {
     let device = BLEDevice::new("device-1", -50);
@@ -131,6 +138,7 @@ fn test_estimate_distance() {
 }
 
 /// Test: Device within range check
+// @scenario: contact_exchange.feature:Proximity verification prevents remote exchange
 #[test]
 fn test_device_within_range() {
     let device = BLEDevice::new("device-1", -50);
@@ -147,6 +155,7 @@ fn test_device_within_range() {
 // ============================================================
 
 /// Test: Create exchange session
+// @scenario: contact_exchange.feature:BLE exchange session starts in AwaitingBleConnection
 #[test]
 fn test_create_exchange_session() {
     let keypair = SigningKeyPair::generate();
@@ -198,6 +207,7 @@ fn test_connect_to_device() {
 }
 
 /// Test: Exchange contact data
+// @scenario: contact_exchange.feature:Successful BLE exchange with proximity
 #[test]
 fn test_exchange_contact_data() {
     let alice_keypair = SigningKeyPair::generate();
@@ -232,6 +242,7 @@ fn test_exchange_contact_data() {
 }
 
 /// Test: Session timeout
+// @scenario: contact_exchange.feature:Exchange session timeout
 #[test]
 fn test_session_timeout() {
     let keypair = SigningKeyPair::generate();
@@ -247,6 +258,7 @@ fn test_session_timeout() {
 }
 
 /// Test: Cancel session
+// @scenario: contact_exchange.feature:Exchange session cancellation
 #[test]
 fn test_cancel_session() {
     let keypair = SigningKeyPair::generate();
@@ -264,6 +276,7 @@ fn test_cancel_session() {
 // ============================================================
 
 /// Test: Verify device proximity before exchange
+// @scenario: contact_exchange.feature:Proximity verification prevents remote exchange
 #[test]
 fn test_verify_proximity_before_exchange() {
     let device = BLEDevice::new("peer", -50);
@@ -276,6 +289,7 @@ fn test_verify_proximity_before_exchange() {
 }
 
 /// Test: Proximity challenge-response
+// @scenario: contact_exchange.feature:Proximity verification prevents remote exchange
 #[test]
 fn test_proximity_challenge_response() {
     let verifier = MockBLEVerifier::success_at_distance(1.0);
@@ -291,6 +305,7 @@ fn test_proximity_challenge_response() {
 }
 
 /// Test: Proximity verification fails when too far
+// @scenario: contact_exchange.feature:Proximity verification prevents remote exchange
 #[test]
 fn test_proximity_fails_when_too_far() {
     let device = BLEDevice::new("far-device", -90);

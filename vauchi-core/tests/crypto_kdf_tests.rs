@@ -9,6 +9,7 @@ use vauchi_core::crypto::*;
 
 // RFC 5869 Test Vectors for HKDF-SHA256
 
+// @scenario: security.feature:Correct algorithms used
 #[test]
 fn test_hkdf_sha256_test_vector_1() {
     // Test Case 1 from RFC 5869
@@ -29,6 +30,7 @@ fn test_hkdf_sha256_test_vector_1() {
     assert_eq!(okm, expected_okm);
 }
 
+// @scenario: security.feature:Correct algorithms used
 #[test]
 fn test_hkdf_sha256_test_vector_2() {
     // Test Case 2 from RFC 5869 (longer inputs/outputs)
@@ -66,6 +68,7 @@ fn test_hkdf_sha256_test_vector_2() {
     assert_eq!(okm, expected_okm);
 }
 
+// @scenario: security.feature:Correct algorithms used
 #[test]
 fn test_hkdf_sha256_test_vector_3() {
     // Test Case 3 from RFC 5869 (zero-length salt and info)
@@ -87,6 +90,7 @@ fn test_hkdf_sha256_test_vector_3() {
     assert_eq!(okm, expected_okm);
 }
 
+// @scenario: security.feature:Shared key derivation via X3DH
 #[test]
 fn test_hkdf_derive_convenience() {
     let ikm = b"input key material";
@@ -101,6 +105,8 @@ fn test_hkdf_derive_convenience() {
     assert_eq!(result, result2);
 }
 
+// @scenario: security.feature:Shared key derivation via X3DH
+// @scenario: security.feature:Forward secrecy via Double Ratchet
 #[test]
 fn test_hkdf_derive_key() {
     let ikm = b"shared secret from X3DH";
@@ -114,6 +120,7 @@ fn test_hkdf_derive_key() {
     assert_eq!(key, key2);
 }
 
+// @scenario: security.feature:Forward secrecy via Double Ratchet
 #[test]
 fn test_hkdf_derive_key_pair() {
     let ikm = b"DH shared secret";

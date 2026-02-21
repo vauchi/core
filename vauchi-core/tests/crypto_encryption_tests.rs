@@ -7,6 +7,7 @@
 
 use vauchi_core::crypto::*;
 
+// @scenario: security.feature:Contact cards are encrypted at rest
 #[test]
 fn test_basic_roundtrip() {
     let key = SymmetricKey::generate();
@@ -16,6 +17,7 @@ fn test_basic_roundtrip() {
     assert_eq!(data.to_vec(), decrypted);
 }
 
+// @scenario: security.feature:Contact cards are encrypted at rest
 #[test]
 fn test_empty_data() {
     let key = SymmetricKey::generate();
@@ -27,12 +29,14 @@ fn test_empty_data() {
 
 // --- SP-9 #227: SymmetricKey::from_bytes validation ---
 
+// @scenario: security.feature:Sufficient key lengths
 #[test]
 #[should_panic(expected = "all-zeros key is degenerate")]
 fn test_symmetric_key_rejects_all_zeros() {
     let _ = SymmetricKey::from_bytes([0u8; 32]);
 }
 
+// @scenario: security.feature:Sufficient key lengths
 #[test]
 fn test_symmetric_key_accepts_nonzero() {
     let mut bytes = [0u8; 32];
@@ -43,6 +47,7 @@ fn test_symmetric_key_accepts_nonzero() {
 
 // --- SP-9 #231: Algorithm tag swap does not produce valid decryption ---
 
+// @scenario: security.feature:Correct algorithms used
 #[test]
 fn test_algorithm_tag_swap_fails_decryption() {
     let key = SymmetricKey::generate();
@@ -62,6 +67,7 @@ fn test_algorithm_tag_swap_fails_decryption() {
     );
 }
 
+// @scenario: security.feature:Contact cards are encrypted at rest
 #[test]
 fn test_encrypt_with_ad_prevents_ad_mismatch() {
     let key = SymmetricKey::generate();
@@ -79,6 +85,7 @@ fn test_encrypt_with_ad_prevents_ad_mismatch() {
     assert!(result.is_err(), "Wrong AD must fail AEAD authentication");
 }
 
+// @scenario: security.feature:Contact cards are encrypted at rest
 #[test]
 fn test_ad_bound_ciphertext_cannot_use_plain_decrypt() {
     let key = SymmetricKey::generate();
@@ -98,6 +105,7 @@ fn test_ad_bound_ciphertext_cannot_use_plain_decrypt() {
 
 // --- SP-9 #234: HKDF derive_key vs derive flexibility ---
 
+// @scenario: security.feature:Correct algorithms used
 #[test]
 fn test_hkdf_derive_key_produces_32_bytes() {
     let key = HKDF::derive_key(Some(b"salt"), b"ikm", b"info");
@@ -137,6 +145,7 @@ fn test_hkdf_different_salt_different_keys() {
 //  exchange/audio.rs, and exchange/proximity.rs for secret comparisons.
 //  Public key comparisons correctly use standard == since they are non-secret.)
 
+// @scenario: security.feature:Contact cards are encrypted at rest
 #[test]
 fn test_wrong_key_cannot_decrypt() {
     let key1 = SymmetricKey::generate();

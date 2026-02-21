@@ -7,12 +7,15 @@
 
 use vauchi_core::crypto::*;
 
+// @scenario: identity_management.feature:Create new identity on first launch
+// @scenario: security.feature:Correct algorithms used
 #[test]
 fn test_keypair_generation() {
     let kp = SigningKeyPair::generate();
     assert_eq!(kp.public_key().as_bytes().len(), 32);
 }
 
+// @scenario: security.feature:Contact card signatures verified
 #[test]
 fn test_sign_verify() {
     let kp = SigningKeyPair::generate();

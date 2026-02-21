@@ -16,6 +16,7 @@ fn make_contact_with_key(name: &str, key: SymmetricKey) -> Contact {
     Contact::from_exchange(pk, ContactCard::new(name), key)
 }
 
+// @scenario: anonymous_sender.feature:Anonymous sender ID is deterministic for same key and epoch
 #[test]
 fn test_compute_deterministic() {
     let key = [0xABu8; 32];
@@ -25,6 +26,7 @@ fn test_compute_deterministic() {
     assert_eq!(id1, id2);
 }
 
+// @scenario: anonymous_sender.feature:Anonymous ID changes each epoch
 #[test]
 fn test_different_epochs_different_ids() {
     let key = [0xABu8; 32];
@@ -33,6 +35,7 @@ fn test_different_epochs_different_ids() {
     assert_ne!(id1, id2);
 }
 
+// @scenario: anonymous_sender.feature:Different shared keys produce different anonymous IDs
 #[test]
 fn test_different_keys_different_ids() {
     let key1 = [0xABu8; 32];
@@ -42,6 +45,7 @@ fn test_different_keys_different_ids() {
     assert_ne!(id1, id2);
 }
 
+// @scenario: anonymous_sender.feature:Generate anonymous sender ID for relay message
 #[test]
 fn test_anonymous_sender_compute() {
     let key = [0x42u8; 32];
@@ -51,6 +55,7 @@ fn test_anonymous_sender_compute() {
     assert_eq!(sender.anonymous_id, compute_anonymous_id(&key, epoch));
 }
 
+// @scenario: anonymous_sender.feature:Generate anonymous sender ID for relay message
 #[test]
 fn test_anonymous_sender_for_current_epoch() {
     let key = [0x42u8; 32];
@@ -58,6 +63,7 @@ fn test_anonymous_sender_for_current_epoch() {
     assert_eq!(sender.epoch, current_epoch());
 }
 
+// @scenario: anonymous_sender.feature:Epoch boundary handling
 #[test]
 fn test_current_epoch_is_reasonable() {
     let epoch = current_epoch();
@@ -67,6 +73,7 @@ fn test_current_epoch_is_reasonable() {
     assert!(epoch > 400_000);
 }
 
+// @scenario: anonymous_sender.feature:Receiver resolves anonymous sender from contact list
 #[test]
 fn test_resolve_sender_finds_match() {
     let key = SymmetricKey::generate();
@@ -81,6 +88,7 @@ fn test_resolve_sender_finds_match() {
     assert_eq!(result.unwrap().display_name(), "Alice");
 }
 
+// @scenario: anonymous_sender.feature:Receiver resolves anonymous sender from contact list
 #[test]
 fn test_resolve_sender_no_match() {
     let key = SymmetricKey::generate();
@@ -92,6 +100,7 @@ fn test_resolve_sender_no_match() {
     assert!(result.is_none());
 }
 
+// @scenario: anonymous_sender.feature:Resolution tolerates previous epoch for clock skew
 #[test]
 fn test_resolve_sender_previous_epoch_tolerance() {
     let key = SymmetricKey::generate();
@@ -108,6 +117,7 @@ fn test_resolve_sender_previous_epoch_tolerance() {
     assert_eq!(result.unwrap().display_name(), "Bob");
 }
 
+// @scenario: anonymous_sender.feature:Receiver resolves anonymous sender from contact list
 #[test]
 fn test_resolve_sender_empty_contacts() {
     let contacts: Vec<Contact> = vec![];
@@ -116,6 +126,7 @@ fn test_resolve_sender_empty_contacts() {
     assert!(result.is_none());
 }
 
+// @scenario: anonymous_sender.feature:Receiver resolves anonymous sender from contact list
 #[test]
 fn test_resolve_sender_epoch_zero() {
     let key = SymmetricKey::generate();
@@ -127,6 +138,7 @@ fn test_resolve_sender_epoch_zero() {
     assert!(result.is_some());
 }
 
+// @scenario: anonymous_sender.feature:Receiver resolves anonymous sender from contact list
 #[test]
 fn test_resolve_sender_multiple_contacts() {
     let key1 = SymmetricKey::generate();
@@ -157,6 +169,7 @@ fn test_resolve_sender_multiple_contacts() {
 /// Note: ±5 minute tolerance within an epoch is implicit since epochs are
 /// hourly boundaries. Messages sent within 5 minutes of each other in the
 /// same epoch will always have matching IDs.
+// @scenario: anonymous_sender.feature:Resolution tolerates previous epoch for clock skew
 #[test]
 fn test_clock_skew_tolerance() {
     let key = SymmetricKey::generate();
@@ -196,6 +209,7 @@ fn test_clock_skew_tolerance() {
 /// Tests that messages sent near epoch boundaries are handled correctly.
 /// When an epoch transition occurs, the anonymous ID changes, but the
 /// resolver tolerates the previous epoch for boundary conditions.
+// @scenario: anonymous_sender.feature:Epoch boundary handling
 #[test]
 fn test_epoch_boundary_handling() {
     let key = SymmetricKey::generate();
@@ -252,6 +266,7 @@ fn test_epoch_boundary_handling() {
 /// Tests that anonymous IDs from different epochs are cryptographically
 /// unlinkable. An observer (e.g., relay) seeing IDs from different epochs
 /// cannot determine they originate from the same sender.
+// @scenario: anonymous_sender.feature:Relay cannot link sender across epochs
 #[test]
 fn test_sender_unlinkability() {
     let key = [0x42u8; 32];
@@ -288,6 +303,7 @@ fn test_sender_unlinkability() {
 
 /// Tests that the same sender communicating with different contacts
 /// produces unlinkable anonymous IDs, even in the same epoch.
+// @scenario: anonymous_sender.feature:Relay cannot link sender across epochs
 #[test]
 fn test_sender_unlinkability_across_contacts() {
     // Simulate shared keys with different contacts
@@ -328,6 +344,7 @@ fn test_sender_unlinkability_across_contacts() {
 ///
 /// This test verifies that the anonymous ID system provides the epoch-binding
 /// necessary to detect replay attacks beyond the tolerance window.
+// @scenario: anonymous_sender.feature:Anonymous ID changes each epoch
 #[test]
 fn test_replay_prevention_epoch_binding() {
     let key = SymmetricKey::generate();
@@ -363,6 +380,7 @@ fn test_replay_prevention_epoch_binding() {
 /// deduplication. This demonstrates the expected behavior: the same anonymous ID
 /// can be used for multiple messages within an epoch, so deduplication must
 /// happen at a higher layer using message IDs or sequence numbers.
+// @scenario: anonymous_sender.feature:Receiver resolves anonymous sender from contact list
 #[test]
 fn test_replay_prevention_same_epoch_requires_message_dedup() {
     let key = SymmetricKey::generate();

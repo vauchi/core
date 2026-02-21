@@ -26,6 +26,7 @@ fn test_password_strength_from_score() {
     );
 }
 
+// @scenario: identity_management.feature:Backup password requirements
 #[test]
 fn test_short_password() {
     assert!(validate_password("short").is_err());
@@ -33,6 +34,7 @@ fn test_short_password() {
     assert!(validate_password("1234567").is_err());
 }
 
+// @scenario: identity_management.feature:Backup password requirements
 #[test]
 fn test_common_passwords() {
     assert!(validate_password("password").is_err());
@@ -40,6 +42,7 @@ fn test_common_passwords() {
     assert!(validate_password("qwertyui").is_err());
 }
 
+// @scenario: identity_management.feature:Backup password requirements
 #[test]
 fn test_strong_passphrase() {
     let result = validate_password("correct-horse-battery-staple");

@@ -51,7 +51,7 @@ pub use error::{KeychainError, MobileError};
 pub use exchange::{
     MobileBleExchangeStatus, MobileExchangeSession, MobileExchangeState, MobileProximityHandler,
 };
-pub use multipart_qr::{encode_multipart, MultipartDecoder};
+pub use multipart_qr::{encode_multipart, MobileMultipartDecoder, MultipartDecoder};
 pub use types::{
     MobileAhaMoment, MobileAhaMomentType, MobileAuthMode, MobileBroadcastResult,
     MobileConsentRecord, MobileConsentType, MobileContact, MobileContactCard, MobileContactField,
@@ -3404,6 +3404,17 @@ impl VauchiMobile {
         let identity = self.get_identity()?;
         Ok(identity.device_info().device_index() == 0)
     }
+
+    // === Multipart QR ===
+
+    /// Encode data into multipart QR chunk strings for animated display.
+    ///
+    /// Each chunk fits within a QR code's data capacity. The chunks should
+    /// be displayed in sequence as an animated QR code for the scanning
+    /// device to reassemble using `MobileMultipartDecoder`.
+    pub fn encode_multipart_qr(&self, data: Vec<u8>) -> Vec<String> {
+        crate::multipart_qr::encode_multipart(&data, 1800)
+    }
 }
 
 // Async sync method — runs sync in a background thread to prevent UI freeze.
@@ -4019,5 +4030,52 @@ mod tests {
         // Should fail without set_proximity_verified
         let result = initiator.confirm_link();
         assert!(result.is_err());
+    }
+
+    // =========================================================================
+    // Multipart QR via VauchiMobile
+    // =========================================================================
+
+    #[test]
+    fn test_encode_multipart_qr_returns_chunks() {
+        let (wb, _dir) = create_test_instance();
+        let data = vec![0xABu8; 5000];
+        let chunks = wb.encode_multipart_qr(data.clone());
+
+        assert!(
+            chunks.len() >= 3,
+            "5KB payload should produce multiple chunks, got {}",
+            chunks.len()
+        );
+
+        // Verify each chunk is valid format: index/total/crc32/data
+        for (i, chunk) in chunks.iter().enumerate() {
+            let parts: Vec<&str> = chunk.splitn(4, '/').collect();
+            assert_eq!(
+                parts.len(),
+                4,
+                "chunk {i} must have 4 slash-separated parts"
+            );
+        }
+    }
+
+    #[test]
+    fn test_encode_multipart_qr_roundtrip_with_mobile_decoder() {
+        let (wb, _dir) = create_test_instance();
+        let original = b"End-to-end test: VauchiMobile encodes, MobileMultipartDecoder decodes.";
+        let chunks = wb.encode_multipart_qr(original.to_vec());
+
+        let decoder = multipart_qr::MobileMultipartDecoder::new();
+        for chunk in &chunks {
+            decoder.add_chunk(chunk.clone()).expect("valid chunk");
+        }
+
+        assert!(decoder.is_complete(), "decoder should be complete");
+        let assembled = decoder.assemble().expect("assemble should succeed");
+        assert_eq!(
+            assembled,
+            original.to_vec(),
+            "roundtrip via VauchiMobile + MobileMultipartDecoder must preserve data"
+        );
     }
 }

@@ -47,6 +47,7 @@ pub enum MessagePayload {
     PurgeResponse(PurgeResponse),
     AccountRevoked(AccountRevoked),
     ForwardingHints(ForwardingHints),
+    DeviceLinkRelay(DeviceLinkRelay),
     #[serde(other)]
     Unknown,
 }
@@ -148,6 +149,21 @@ pub struct DeviceSyncMessage {
 pub struct DeviceSyncAck {
     pub message_id: String,
     pub synced_version: u64,
+}
+
+// =========================================================================
+// Device link relay messages
+// =========================================================================
+
+/// Relay message for device linking protocol.
+///
+/// Routes encrypted blobs between existing and new devices using the
+/// identity key (from QR) as a routing address.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DeviceLinkRelay {
+    pub target_identity: String,
+    pub sender_token: String,
+    pub encrypted_payload: Vec<u8>,
 }
 
 // =========================================================================
@@ -271,6 +287,7 @@ pub fn encode_message(envelope: &MessageEnvelope) -> Result<Vec<u8>, String> {
 // Tests
 // =========================================================================
 
+// INLINE_TEST_REQUIRED: Serde roundtrip tests for protocol message types colocated with type definitions
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -490,5 +507,35 @@ mod tests {
         assert_eq!(decoded.hints.len(), 1);
         assert!(decoded.relay_signing_key.is_none());
         assert!(decoded.signature.is_none());
+    }
+
+    #[test]
+    fn test_device_link_relay_roundtrip() {
+        let msg = DeviceLinkRelay {
+            target_identity: "abc123".to_string(),
+            sender_token: "def456".to_string(),
+            encrypted_payload: vec![1, 2, 3, 4],
+        };
+        let envelope = MessageEnvelope {
+            version: PROTOCOL_VERSION,
+            message_id: "link-test-1".to_string(),
+            timestamp: 1234567890,
+            payload: MessagePayload::DeviceLinkRelay(msg),
+        };
+        let encoded = encode_message(&envelope).unwrap();
+        let decoded = decode_message(&encoded).unwrap();
+
+        assert_eq!(decoded.version, PROTOCOL_VERSION);
+        assert_eq!(decoded.message_id, "link-test-1");
+        assert_eq!(decoded.timestamp, 1234567890);
+
+        match decoded.payload {
+            MessagePayload::DeviceLinkRelay(m) => {
+                assert_eq!(m.target_identity, "abc123");
+                assert_eq!(m.sender_token, "def456");
+                assert_eq!(m.encrypted_payload, vec![1, 2, 3, 4]);
+            }
+            _ => panic!("Expected DeviceLinkRelay payload"),
+        }
     }
 }

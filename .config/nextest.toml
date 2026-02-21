@@ -7,3 +7,5 @@
 # non-standard format that nextest cannot parse. Cucumber tests run via
 # `cargo test --test cucumber_tests` separately.
 default-filter = "not binary(cucumber_tests)"
+# Per-test timeout: prevent deadlocked concurrency tests from hanging the pipeline.
+slow-timeout = { period = "60s", terminate-after = 3 }

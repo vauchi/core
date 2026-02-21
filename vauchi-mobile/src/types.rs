@@ -264,6 +264,17 @@ impl From<&vauchi_core::VisibilityLabel> for MobileVisibilityLabelDetail {
 
 // === Device Linking Types ===
 
+/// Incoming device link request received via relay.
+///
+/// Returned by `listen_for_device_link_request` on the existing device.
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct MobileDeviceLinkRequest {
+    /// Encrypted device link request payload.
+    pub encrypted_payload: Vec<u8>,
+    /// Sender token for routing the response back.
+    pub sender_token: String,
+}
+
 /// Device link QR data for display on existing device.
 #[derive(Debug, Clone, uniffi::Record)]
 pub struct MobileDeviceLinkData {

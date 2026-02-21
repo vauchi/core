@@ -2268,12 +2268,17 @@ impl VauchiMobile {
         let core_token = vauchi_core::api::ShredToken::from_created_at(token.created_at);
         let manager = vauchi_core::api::ShredManager::new(&storage, &bridge, &identity, &data_dir);
 
-        let mut revocation_sender = MobileRevocationSender::new(
+        let (mut revocation_sender, rev_error) = match MobileRevocationSender::new(
             &self.relay_url,
             &identity.public_id(),
             self.pinned_cert_pem.lock().unwrap().clone(),
-        )
-        .ok();
+        ) {
+            Ok(sender) => (Some(sender), None),
+            Err(e) => {
+                eprintln!("WARNING: Failed to create revocation sender: {e}");
+                (None, Some(e.to_string()))
+            }
+        };
 
         let report = manager
             // PurgeSender deferred: requires relay-side purge endpoint support.
@@ -2285,7 +2290,12 @@ impl VauchiMobile {
                     .map(|s| s as &mut dyn vauchi_core::api::RevocationSender),
             )
             .map_err(|e| MobileError::ShredError(e.to_string()))?;
-        Ok(MobileShredReport::from(&report))
+        let mut mobile_report = MobileShredReport::from(&report);
+        if let Some(err) = rev_error {
+            mobile_report.revocation_failed = true;
+            mobile_report.revocation_error = Some(err);
+        }
+        Ok(mobile_report)
     }
 
     /// Execute immediate crypto-shredding without grace period (Panic Shred).
@@ -2302,12 +2312,17 @@ impl VauchiMobile {
 
         let manager = vauchi_core::api::ShredManager::new(&storage, &bridge, &identity, &data_dir);
 
-        let mut revocation_sender = MobileRevocationSender::new(
+        let (mut revocation_sender, rev_error) = match MobileRevocationSender::new(
             &self.relay_url,
             &identity.public_id(),
             self.pinned_cert_pem.lock().unwrap().clone(),
-        )
-        .ok();
+        ) {
+            Ok(sender) => (Some(sender), None),
+            Err(e) => {
+                eprintln!("WARNING: Failed to create revocation sender: {e}");
+                (None, Some(e.to_string()))
+            }
+        };
 
         let report = manager
             // PurgeSender deferred: requires relay-side purge endpoint support.
@@ -2318,7 +2333,12 @@ impl VauchiMobile {
                     .map(|s| s as &mut dyn vauchi_core::api::RevocationSender),
             )
             .map_err(|e| MobileError::ShredError(e.to_string()))?;
-        Ok(MobileShredReport::from(&report))
+        let mut mobile_report = MobileShredReport::from(&report);
+        if let Some(err) = rev_error {
+            mobile_report.revocation_failed = true;
+            mobile_report.revocation_error = Some(err);
+        }
+        Ok(mobile_report)
     }
 
     /// Verify that shredding was successful by checking for residual data.

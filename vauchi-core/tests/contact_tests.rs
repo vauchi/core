@@ -17,6 +17,7 @@ fn create_test_contact() -> Contact {
     Contact::from_exchange(public_key, card, shared_key)
 }
 
+// @scenario: contacts_management.feature:View contact details
 #[test]
 fn test_create_contact() {
     let contact = create_test_contact();
@@ -26,6 +27,7 @@ fn test_create_contact() {
     assert!(!contact.is_fingerprint_verified());
 }
 
+// @scenario: security.feature:Fingerprint verification
 #[test]
 fn test_fingerprint_verification() {
     let mut contact = create_test_contact();
@@ -35,6 +37,7 @@ fn test_fingerprint_verification() {
     assert!(contact.is_fingerprint_verified());
 }
 
+// @scenario: security.feature:Fingerprint verification
 #[test]
 fn test_fingerprint_format() {
     let contact = create_test_contact();
@@ -46,6 +49,8 @@ fn test_fingerprint_format() {
     assert_eq!(fp, fp.to_uppercase());
 }
 
+// @scenario: visibility_control.feature:Default visibility is public
+// @scenario: visibility_control.feature:Set field visibility to private
 #[test]
 fn test_visibility_rules() {
     let mut contact = create_test_contact();
@@ -66,6 +71,7 @@ fn test_visibility_rules() {
 // Additional tests (added for coverage)
 // ============================================================
 
+// @scenario: sync_updates.feature:Receive contact update from relay
 #[test]
 fn test_contact_from_sync_data() {
     let public_key = [0x42u8; 32];
@@ -91,6 +97,7 @@ fn test_contact_from_sync_data() {
         .can_see("private_field", "anyone"));
 }
 
+// @scenario: sync_updates.feature:Receive contact update from relay
 #[test]
 fn test_contact_update_card() {
     let mut contact = create_test_contact();
@@ -104,6 +111,7 @@ fn test_contact_update_card() {
     assert_eq!(contact.card().display_name(), "Updated User");
 }
 
+// @scenario: contact_card_management.feature:Update display name
 #[test]
 fn test_contact_set_display_name() {
     let mut contact = create_test_contact();
@@ -113,6 +121,7 @@ fn test_contact_set_display_name() {
     assert_eq!(contact.card().display_name(), "New Name");
 }
 
+// @scenario: contact_card_management.feature:Display name must not be empty
 #[test]
 fn test_contact_set_display_name_empty_error() {
     let mut contact = create_test_contact();
@@ -121,6 +130,7 @@ fn test_contact_set_display_name_empty_error() {
     assert!(result.is_err());
 }
 
+// @scenario: contacts_management.feature:View contact details
 #[test]
 fn test_contact_accessors() {
     let public_key = [0x42u8; 32];
@@ -143,6 +153,7 @@ fn test_contact_accessors() {
     assert!(contact.exchange_timestamp() > now - 60);
 }
 
+// @scenario: contacts_management.feature:View contact details
 #[test]
 fn test_contact_id_is_hex_encoded_public_key() {
     let public_key = [0xABu8; 32];
@@ -155,6 +166,7 @@ fn test_contact_id_is_hex_encoded_public_key() {
     assert_eq!(contact.id(), hex::encode(public_key));
 }
 
+// @scenario: security.feature:Fingerprint verification
 #[test]
 fn test_fingerprint_readability() {
     let mut public_key = [0u8; 32];
@@ -181,6 +193,7 @@ fn test_fingerprint_readability() {
 // Hidden Contacts Tests
 // ============================================================
 
+// @scenario: contacts_management.feature:Hide contact from main list
 #[test]
 fn test_contact_hidden_default_false() {
     let contact = create_test_contact();
@@ -188,6 +201,7 @@ fn test_contact_hidden_default_false() {
     assert!(contact.is_visible_in_main_list());
 }
 
+// @scenario: contacts_management.feature:Hide contact from main list
 #[test]
 fn test_contact_hide_and_unhide() {
     let mut contact = create_test_contact();
@@ -203,6 +217,7 @@ fn test_contact_hide_and_unhide() {
     assert!(contact.is_visible_in_main_list());
 }
 
+// @scenario: contacts_management.feature:Hide contact from main list
 #[test]
 fn test_contact_set_hidden() {
     let mut contact = create_test_contact();
@@ -218,6 +233,7 @@ fn test_contact_set_hidden() {
 // Blocked Contacts Tests
 // ============================================================
 
+// @scenario: contacts_management.feature:Block a contact
 #[test]
 fn test_contact_blocked_default_false() {
     let contact = create_test_contact();
@@ -226,6 +242,8 @@ fn test_contact_blocked_default_false() {
     assert!(contact.should_send_updates());
 }
 
+// @scenario: contacts_management.feature:Block a contact
+// @scenario: contacts_management.feature:Unblock a contact
 #[test]
 fn test_contact_block_and_unblock() {
     let mut contact = create_test_contact();
@@ -243,6 +261,7 @@ fn test_contact_block_and_unblock() {
     assert!(contact.should_send_updates());
 }
 
+// @scenario: contacts_management.feature:Block a contact
 #[test]
 fn test_contact_set_blocked() {
     let mut contact = create_test_contact();
@@ -254,6 +273,7 @@ fn test_contact_set_blocked() {
     assert!(!contact.is_blocked());
 }
 
+// @scenario: contacts_management.feature:Block a contact
 #[test]
 fn test_contact_hidden_and_blocked_independent() {
     let mut contact = create_test_contact();
@@ -279,6 +299,7 @@ fn test_contact_hidden_and_blocked_independent() {
     assert!(!contact.should_process_updates());
 }
 
+// @scenario: sync_updates.feature:Receive contact update from relay
 #[test]
 fn test_contact_from_sync_data_full() {
     let public_key = [0x42u8; 32];
@@ -308,12 +329,14 @@ fn test_contact_from_sync_data_full() {
 // Recovery Trust Tests
 // ========================================
 
+// @scenario: identity_management.feature:Social recovery setup
 #[test]
 fn test_contact_default_not_recovery_trusted() {
     let contact = create_test_contact();
     assert!(!contact.is_recovery_trusted());
 }
 
+// @scenario: identity_management.feature:Social recovery setup
 #[test]
 fn test_contact_trust_for_recovery() {
     let mut contact = create_test_contact();
@@ -323,6 +346,7 @@ fn test_contact_trust_for_recovery() {
     assert!(contact.is_recovery_trusted());
 }
 
+// @scenario: identity_management.feature:Social recovery setup
 #[test]
 fn test_contact_untrust_for_recovery() {
     let mut contact = create_test_contact();
@@ -333,6 +357,7 @@ fn test_contact_untrust_for_recovery() {
     assert!(!contact.is_recovery_trusted());
 }
 
+// @scenario: identity_management.feature:Social recovery setup
 #[test]
 fn test_contact_set_recovery_trusted() {
     let mut contact = create_test_contact();
@@ -344,6 +369,8 @@ fn test_contact_set_recovery_trusted() {
     assert!(!contact.is_recovery_trusted());
 }
 
+// @scenario: identity_management.feature:Social recovery setup
+// @scenario: sync_updates.feature:Receive contact update from relay
 #[test]
 fn test_contact_from_sync_data_full_with_recovery_trusted() {
     let public_key = [0x42u8; 32];
@@ -368,6 +395,7 @@ fn test_contact_from_sync_data_full_with_recovery_trusted() {
     assert!(!contact.is_blocked());
 }
 
+// @scenario: identity_management.feature:Social recovery setup
 #[test]
 fn test_recovery_trust_independent_of_blocked_hidden() {
     let mut contact = create_test_contact();

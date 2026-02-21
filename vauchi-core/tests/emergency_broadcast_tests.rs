@@ -27,6 +27,7 @@ use common::helpers::{create_vauchi_with_identity, setup_alice_bob_exchange, set
 // Config Storage Tests
 // =============================================================================
 
+// @scenario: emergency_broadcast.feature:Emergency broadcast is opt-in
 #[test]
 fn test_load_emergency_config_returns_none_initially() {
     let wb = create_vauchi_with_identity("Alice");
@@ -38,6 +39,9 @@ fn test_load_emergency_config_returns_none_initially() {
     );
 }
 
+// @scenario: emergency_broadcast.feature:Configure emergency broadcast contacts
+// @scenario: emergency_broadcast.feature:Configure alert message
+// @scenario: emergency_broadcast.feature:Configure location sharing for alerts
 #[test]
 fn test_save_load_emergency_config_roundtrip() {
     let mut wb = create_vauchi_with_identity("Alice");
@@ -62,6 +66,7 @@ fn test_save_load_emergency_config_roundtrip() {
     assert!(config.include_location);
 }
 
+// @scenario: emergency_broadcast.feature:Configure emergency broadcast contacts
 #[test]
 fn test_delete_emergency_config() {
     let mut wb = create_vauchi_with_identity("Alice");
@@ -82,6 +87,8 @@ fn test_delete_emergency_config() {
 // Alert Types Tests
 // =============================================================================
 
+// @scenario: emergency_broadcast.feature:Alert message content
+// @scenario: emergency_broadcast.feature:Include location when enabled
 #[test]
 fn test_emergency_alert_serialization() {
     let alert = EmergencyAlert {
@@ -109,6 +116,7 @@ fn test_emergency_alert_serialization() {
     assert!((loc.accuracy_meters.unwrap() - 10.0).abs() < f32::EPSILON);
 }
 
+// @scenario: emergency_broadcast.feature:Location disabled by default
 #[test]
 fn test_geo_location_optional() {
     let alert = EmergencyAlert {
@@ -129,6 +137,7 @@ fn test_geo_location_optional() {
 // Broadcast API Tests
 // =============================================================================
 
+// @scenario: emergency_broadcast.feature:Configure emergency broadcast contacts
 #[test]
 fn test_configure_emergency_broadcast() {
     let mut wb = create_vauchi_with_identity("Alice");
@@ -150,6 +159,7 @@ fn test_configure_emergency_broadcast() {
     assert!(!config.include_location);
 }
 
+// @scenario: emergency_broadcast.feature:Configure emergency broadcast contacts
 #[test]
 fn test_configure_emergency_broadcast_max_10_contacts() {
     let mut wb = create_vauchi_with_identity("Alice");
@@ -163,6 +173,7 @@ fn test_configure_emergency_broadcast_max_10_contacts() {
     );
 }
 
+// @scenario: emergency_broadcast.feature:No trusted contacts configured
 #[test]
 fn test_send_emergency_broadcast_without_config_fails() {
     let mut wb = create_vauchi_with_identity("Alice");
@@ -174,6 +185,8 @@ fn test_send_emergency_broadcast_without_config_fails() {
     );
 }
 
+// @scenario: emergency_broadcast.feature:Send emergency broadcast from app
+// @scenario: emergency_broadcast.feature:Alert delivery to multiple contacts
 #[test]
 fn test_send_emergency_broadcast_queues_alerts() {
     let (mut alice_wb, _bob_wb, secret, bob_id, _alice_id) = setup_alice_bob_exchange();
@@ -201,6 +214,7 @@ fn test_send_emergency_broadcast_queues_alerts() {
     assert_eq!(result.total, 1, "total should be 1");
 }
 
+// @scenario: emergency_broadcast.feature:Alert delivery to multiple contacts
 #[test]
 fn test_send_emergency_broadcast_returns_result() {
     let (mut alice_wb, _bob_wb, secret, bob_id, _alice_id) = setup_alice_bob_exchange();
@@ -229,6 +243,7 @@ fn test_send_emergency_broadcast_returns_result() {
     assert_eq!(result.sent, 1, "sent should only count reachable contacts");
 }
 
+// @scenario: emergency_broadcast.feature:Send emergency broadcast from app
 #[test]
 fn test_broadcast_dispatches_event() {
     let (mut alice_wb, _bob_wb, secret, bob_id, _alice_id) = setup_alice_bob_exchange();
@@ -276,6 +291,7 @@ fn test_broadcast_dispatches_event() {
 // Storage-Level Config Tests
 // =============================================================================
 
+// @scenario: emergency_broadcast.feature:Configure emergency broadcast contacts
 #[test]
 fn test_storage_save_load_emergency_config_roundtrip() {
     let storage = Storage::in_memory(SymmetricKey::generate()).expect("storage should open");
@@ -300,6 +316,7 @@ fn test_storage_save_load_emergency_config_roundtrip() {
     assert_eq!(loaded.include_location, config.include_location);
 }
 
+// @scenario: emergency_broadcast.feature:Emergency broadcast is opt-in
 #[test]
 fn test_storage_load_emergency_config_returns_none_initially() {
     let storage = Storage::in_memory(SymmetricKey::generate()).expect("storage should open");
@@ -310,6 +327,7 @@ fn test_storage_load_emergency_config_returns_none_initially() {
     assert!(config.is_none());
 }
 
+// @scenario: emergency_broadcast.feature:Configure emergency broadcast contacts
 #[test]
 fn test_storage_delete_emergency_config() {
     let storage = Storage::in_memory(SymmetricKey::generate()).expect("storage should open");

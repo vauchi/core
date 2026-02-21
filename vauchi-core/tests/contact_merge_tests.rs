@@ -33,6 +33,7 @@ fn test_no_duplicates_single_contact() {
     assert!(dups.is_empty());
 }
 
+// @scenario: contacts_management.feature:Detect potential duplicate contacts
 #[test]
 fn test_exact_name_duplicate() {
     let contacts = vec![
@@ -44,6 +45,7 @@ fn test_exact_name_duplicate() {
     assert!(dups[0].similarity >= 0.7);
 }
 
+// @scenario: contacts_management.feature:Detect potential duplicate contacts
 #[test]
 fn test_case_insensitive_name_match() {
     let contacts = vec![
@@ -54,6 +56,7 @@ fn test_case_insensitive_name_match() {
     assert!(!dups.is_empty());
 }
 
+// @scenario: contacts_management.feature:Detect potential duplicate contacts
 #[test]
 fn test_different_names_no_duplicate() {
     let contacts = vec![make_contact("Alice", &[]), make_contact("Bob", &[])];
@@ -61,6 +64,7 @@ fn test_different_names_no_duplicate() {
     assert!(dups.is_empty());
 }
 
+// @scenario: contacts_management.feature:Detect potential duplicate contacts
 #[test]
 fn test_similar_names_with_shared_fields() {
     let contacts = vec![
@@ -78,6 +82,7 @@ fn test_similar_names_with_shared_fields() {
     assert!(dups[0].similarity >= 0.9);
 }
 
+// @scenario: contacts_management.feature:Detect potential duplicate contacts
 #[test]
 fn test_partial_name_match() {
     // "Alice" is contained in "Alice Smith" → similarity ~0.8
@@ -87,6 +92,7 @@ fn test_partial_name_match() {
     assert!(!dups.is_empty());
 }
 
+// @scenario: contacts_management.feature:Detect potential duplicate contacts
 #[test]
 fn test_duplicates_sorted_by_similarity() {
     let contacts = vec![
@@ -106,6 +112,7 @@ fn test_duplicates_sorted_by_similarity() {
     assert!(dups[0].similarity >= dups[1].similarity);
 }
 
+// @scenario: contacts_management.feature:Detect potential duplicate contacts
 #[test]
 fn test_three_contacts_detects_all_pairs() {
     let contacts = vec![
@@ -118,6 +125,7 @@ fn test_three_contacts_detects_all_pairs() {
     assert_eq!(dups.len(), 3);
 }
 
+// @scenario: contacts_management.feature:Detect potential duplicate contacts
 #[test]
 fn test_duplicate_pair_has_correct_ids() {
     let contacts = vec![make_contact("Alice", &[]), make_contact("Alice", &[])];

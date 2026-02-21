@@ -13,7 +13,7 @@
 //! - Health tracking
 //! - Failover behavior
 
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use vauchi_core::network::{MultiRelayConfig, RelayHealth, RelaySelector};
 
 // ============================================================
@@ -167,10 +167,22 @@ fn test_relay_recovery_after_cooldown() {
     health.record_failure("wss://relay.vauchi.app");
     assert!(!health.is_healthy("wss://relay.vauchi.app"));
 
-    std::thread::sleep(Duration::from_millis(100));
+    // Poll until cooldown expires (CC-06: no bare sleeps for synchronization)
+    // Note: should_retry uses random jitter per call, so we poll until it returns true
+    let deadline = Instant::now() + Duration::from_secs(2);
+    let retried = loop {
+        if health.should_retry("wss://relay.vauchi.app") {
+            break true;
+        }
+        assert!(
+            Instant::now() < deadline,
+            "Timed out waiting for cooldown to expire"
+        );
+        std::thread::sleep(Duration::from_millis(10));
+    };
 
     // After cooldown, relay should be considered for retry
-    assert!(health.should_retry("wss://relay.vauchi.app"));
+    assert!(retried);
 }
 
 /// Test: Consecutive failures increase cooldown

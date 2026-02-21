@@ -112,11 +112,19 @@ fn test_relay_client_timeout_detection() {
         .send_update("recipient-id", &mut alice_ratchet, b"test", "update-1")
         .unwrap();
 
-    // Wait for timeout
-    std::thread::sleep(std::time::Duration::from_millis(10));
-
-    // Check timeouts
-    let timed_out = client.check_timeouts();
+    // Poll until timeout is detected (CC-06: no bare sleeps for synchronization)
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
+    let timed_out = loop {
+        let result = client.check_timeouts();
+        if !result.is_empty() {
+            break result;
+        }
+        assert!(
+            std::time::Instant::now() < deadline,
+            "Timed out waiting for message timeout detection"
+        );
+        std::thread::sleep(std::time::Duration::from_millis(1));
+    };
 
     assert_eq!(timed_out.len(), 1);
     assert_eq!(timed_out[0], "update-1");

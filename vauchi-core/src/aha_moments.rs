@@ -261,13 +261,15 @@ impl AhaMomentTracker {
     }
 }
 
+// INLINE_TEST_REQUIRED: tests access private AhaMoment internals and localized title/message methods
 #[cfg(test)]
 mod tests {
     use super::*;
 
     fn ensure_init() {
         if !crate::i18n::is_initialized() {
-            let locales_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("locales");
+            let locales_dir =
+                std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../locales");
             let _ = crate::i18n::init(&locales_dir);
         }
     }

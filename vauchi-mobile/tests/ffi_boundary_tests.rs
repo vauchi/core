@@ -23,9 +23,9 @@ use vauchi_mobile::{
 static INIT: Once = Once::new();
 fn ensure_init() {
     INIT.call_once(|| {
-        // vauchi-mobile/tests/ -> vauchi-core/locales/
+        // vauchi-mobile/ -> ../../locales/ (sibling locales repo)
         let locales_dir =
-            std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../vauchi-core/locales");
+            std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../locales");
         let _ = vauchi_core::i18n::init(&locales_dir);
     });
 }

@@ -34,3 +34,6 @@ dist/
 
 .sccache/
 .claude/
+
+# Locale files loaded from sibling locales/ repo at runtime
+vauchi-core/locales/

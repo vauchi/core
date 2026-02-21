@@ -68,6 +68,9 @@ url = "2.5"
 # Password strength checking
 zxcvbn = "3.0"
 
+# CRC32 checksums for multipart QR codec
+crc32fast = "1.4"
+
 [[bin]]
 name = "uniffi-bindgen"
 path = "uniffi-bindgen.rs"
@@ -75,6 +78,7 @@ path = "uniffi-bindgen.rs"
 [dev-dependencies]
 tempfile = "3.0"
 criterion = "0.5"
+proptest = "1.4"
 
 [[bench]]
 name = "ffi_benchmarks"

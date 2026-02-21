@@ -35,6 +35,7 @@ mod cert_pinning;
 mod content;
 mod error;
 mod exchange;
+mod multipart_qr;
 mod protocol;
 mod sync;
 mod types;

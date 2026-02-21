@@ -9,6 +9,242 @@
 //!
 //! Chunk format: `{index}/{total}/{crc32_hex_8chars}/{base64url_data}`
 
+use std::collections::HashMap;
+
+use base64::engine::general_purpose::URL_SAFE_NO_PAD;
+use base64::Engine;
+
+/// Encode a byte payload into multiple QR-sized chunk strings.
+///
+/// Each chunk has the format: `{index}/{total}/{crc32_hex_8chars}/{base64url_data}`
+///
+/// - `data`: the raw bytes to encode
+/// - `max_chunk_bytes`: maximum byte length of each chunk string
+///
+/// Returns a `Vec<String>` of chunks ordered by index (0-based).
+pub fn encode_multipart(data: &[u8], max_chunk_bytes: usize) -> Vec<String> {
+    // We need to figure out how many chunks we need. The overhead per chunk is:
+    //   len(index_str) + 1 + len(total_str) + 1 + 8 + 1 = len(index_str) + len(total_str) + 11
+    //
+    // Base64url-no-pad encoding: ceil(n * 4 / 3) chars for n raw bytes.
+    // We iterate to find the right split because the number of digits in the total
+    // changes the overhead.
+
+    if data.is_empty() {
+        // Special case: empty payload produces one chunk with empty data
+        let crc = crc32fast::hash(b"");
+        return vec![format!("0/1/{crc:08x}/")];
+    }
+
+    // Estimate the number of chunks needed, then refine
+    let total = compute_chunk_count(data.len(), max_chunk_bytes);
+
+    let total_str_len = digit_count(total);
+
+    // Compute max raw bytes per chunk such that the encoded chunk fits in max_chunk_bytes
+    let mut chunks = Vec::with_capacity(total);
+    let mut offset = 0;
+
+    for i in 0..total {
+        let index_str_len = digit_count(i);
+        // overhead = index_digits + '/' + total_digits + '/' + 8 (crc hex) + '/'
+        let overhead = index_str_len + 1 + total_str_len + 1 + 8 + 1;
+        let max_b64_len = max_chunk_bytes.saturating_sub(overhead);
+        // base64url-no-pad: 4 output chars per 3 input bytes
+        // max_raw = floor(max_b64_len * 3 / 4)
+        let max_raw = max_b64_len * 3 / 4;
+
+        let end = (offset + max_raw).min(data.len());
+        let chunk_data = &data[offset..end];
+        offset = end;
+
+        let b64 = URL_SAFE_NO_PAD.encode(chunk_data);
+        let crc = crc32fast::hash(chunk_data);
+        chunks.push(format!("{i}/{total}/{crc:08x}/{b64}"));
+    }
+
+    chunks
+}
+
+/// Compute the number of chunks needed for `data_len` bytes with `max_chunk_bytes` limit.
+fn compute_chunk_count(data_len: usize, max_chunk_bytes: usize) -> usize {
+    // Start with a guess and refine
+    for candidate_total in 1..=data_len + 1 {
+        let total_str_len = digit_count(candidate_total);
+        // Worst-case overhead is for the last chunk (largest index)
+        let max_index_str_len = digit_count(candidate_total - 1);
+        let overhead = max_index_str_len + 1 + total_str_len + 1 + 8 + 1;
+        let max_b64_len = max_chunk_bytes.saturating_sub(overhead);
+        let max_raw_per_chunk = max_b64_len * 3 / 4;
+
+        if max_raw_per_chunk == 0 {
+            continue;
+        }
+
+        // Total raw bytes this many chunks can carry
+        // For a more precise calculation, sum across all chunks (some have smaller index digits)
+        // But worst-case estimate is good enough and simpler
+        let total_capacity = max_raw_per_chunk * candidate_total;
+        if total_capacity >= data_len {
+            return candidate_total;
+        }
+    }
+
+    // Fallback: one byte per chunk (should never reach here for reasonable inputs)
+    data_len
+}
+
+/// Count the number of decimal digits in a number.
+fn digit_count(n: usize) -> usize {
+    if n == 0 {
+        return 1;
+    }
+    ((n as f64).log10().floor() as usize) + 1
+}
+
+/// Decoder for reassembling multipart QR chunks.
+///
+/// Chunks can be added in any order. Duplicates are detected and ignored.
+pub struct MultipartDecoder {
+    /// Expected total number of chunks (set from first chunk received)
+    total: Option<usize>,
+    /// Received chunks indexed by their position
+    chunks: HashMap<usize, Vec<u8>>,
+}
+
+impl Default for MultipartDecoder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl MultipartDecoder {
+    /// Create a new empty decoder.
+    pub fn new() -> Self {
+        Self {
+            total: None,
+            chunks: HashMap::new(),
+        }
+    }
+
+    /// Add a chunk string to the decoder.
+    ///
+    /// Returns `Ok(true)` if the chunk is new, `Ok(false)` if it was a duplicate.
+    /// Returns `Err` if the chunk format is invalid or the CRC checksum fails.
+    pub fn add_chunk(&mut self, raw: &str) -> Result<bool, String> {
+        let parts: Vec<&str> = raw.splitn(4, '/').collect();
+        if parts.len() < 4 {
+            return Err("invalid chunk format: expected index/total/crc32/data".into());
+        }
+
+        let index: usize = parts[0]
+            .parse()
+            .map_err(|e| format!("invalid chunk index: {e}"))?;
+        let total: usize = parts[1]
+            .parse()
+            .map_err(|e| format!("invalid chunk total: {e}"))?;
+        let expected_crc_hex = parts[2];
+        let b64_data = parts[3];
+
+        if total == 0 {
+            return Err("invalid chunk total: must be > 0".into());
+        }
+        if index >= total {
+            return Err(format!(
+                "chunk index {index} out of range for total {total}"
+            ));
+        }
+        if expected_crc_hex.len() != 8 {
+            return Err(format!(
+                "invalid CRC32 hex length: expected 8, got {}",
+                expected_crc_hex.len()
+            ));
+        }
+
+        // Check total consistency
+        if let Some(existing_total) = self.total {
+            if total != existing_total {
+                return Err(format!(
+                    "chunk total mismatch: expected {existing_total}, got {total}"
+                ));
+            }
+        }
+
+        // Decode the base64 data
+        let chunk_bytes = URL_SAFE_NO_PAD
+            .decode(b64_data)
+            .map_err(|e| format!("invalid base64url data: {e}"))?;
+
+        // Verify CRC32
+        let actual_crc = crc32fast::hash(&chunk_bytes);
+        let expected_crc = u32::from_str_radix(expected_crc_hex, 16)
+            .map_err(|e| format!("invalid CRC32 hex: {e}"))?;
+
+        if actual_crc != expected_crc {
+            return Err(format!(
+                "CRC32 checksum mismatch for chunk {index}: expected {expected_crc:08x}, got {actual_crc:08x}"
+            ));
+        }
+
+        // Store total on first chunk
+        self.total = Some(total);
+
+        // Check for duplicate
+        if self.chunks.contains_key(&index) {
+            return Ok(false);
+        }
+
+        self.chunks.insert(index, chunk_bytes);
+        Ok(true)
+    }
+
+    /// Number of unique chunks received so far.
+    pub fn received(&self) -> usize {
+        self.chunks.len()
+    }
+
+    /// Expected total number of chunks, if at least one has been received.
+    pub fn expected_total(&self) -> Option<usize> {
+        self.total
+    }
+
+    /// Whether all chunks have been received.
+    pub fn is_complete(&self) -> bool {
+        match self.total {
+            Some(total) => self.chunks.len() == total,
+            None => false,
+        }
+    }
+
+    /// Reassemble the original payload from received chunks.
+    ///
+    /// Returns `Err` if not all chunks have been received yet.
+    pub fn assemble(&self) -> Result<Vec<u8>, String> {
+        let total = self
+            .total
+            .ok_or_else(|| "no chunks received yet".to_string())?;
+
+        if self.chunks.len() != total {
+            return Err(format!(
+                "incomplete: received {}/{} chunks",
+                self.chunks.len(),
+                total
+            ));
+        }
+
+        let mut result = Vec::new();
+        for i in 0..total {
+            let chunk = self
+                .chunks
+                .get(&i)
+                .ok_or_else(|| format!("missing chunk {i}"))?;
+            result.extend_from_slice(chunk);
+        }
+
+        Ok(result)
+    }
+}
+
 // INLINE_TEST_REQUIRED: Tests exercise internal chunk parsing and CRC verification logic
 
 #[cfg(test)]

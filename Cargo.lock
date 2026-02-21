@@ -6545,11 +6545,13 @@ name = "vauchi-mobile"
 version = "0.1.15"
 dependencies = [
  "base64",
+ "crc32fast",
  "criterion",
  "futures-util",
  "hex",
  "once_cell",
  "parking_lot",
+ "proptest",
  "rustls",
  "rustls-pki-types",
  "serde",

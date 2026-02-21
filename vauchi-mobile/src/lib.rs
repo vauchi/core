@@ -50,6 +50,7 @@ pub use error::{KeychainError, MobileError};
 pub use exchange::{
     MobileBleExchangeStatus, MobileExchangeSession, MobileExchangeState, MobileProximityHandler,
 };
+pub use multipart_qr::{encode_multipart, MultipartDecoder};
 pub use types::{
     MobileAhaMoment, MobileAhaMomentType, MobileAuthMode, MobileBroadcastResult,
     MobileConsentRecord, MobileConsentType, MobileContact, MobileContactCard, MobileContactField,

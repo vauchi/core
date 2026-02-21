@@ -26,6 +26,8 @@ use vauchi_core::{ContactCard, Identity};
 /// 2. Both display QR codes with fresh ephemerals, scan each other's
 /// 3. Both derive the SAME shared key via symmetric DH
 /// 4. Messages encrypted by one can be decrypted by the other
+// @scenario: contact_exchange.feature:Exchange creates mutual keys
+// @scenario: contact_exchange.feature:Successful QR code exchange with proximity
 #[test]
 fn test_full_exchange_produces_matching_shared_keys() {
     use vauchi_core::crypto::{decrypt, encrypt};
@@ -124,6 +126,7 @@ fn test_full_exchange_produces_matching_shared_keys() {
 ///
 /// Both sides have fresh ephemeral X25519 keys. DH is commutative:
 /// DH(alice_secret, bob_public) == DH(bob_secret, alice_public)
+// @scenario: contact_exchange.feature:X3DH key agreement during exchange
 #[test]
 fn test_symmetric_dh_produces_matching_keys() {
     let alice_keys = X3DHKeyPair::generate();
@@ -139,6 +142,7 @@ fn test_symmetric_dh_produces_matching_keys() {
 }
 
 /// Test: QR code contains ephemeral exchange key (not identity key)
+// @scenario: contact_exchange.feature:Mutual QR uses fresh ephemeral keys for forward secrecy
 #[test]
 fn test_qr_contains_ephemeral_exchange_key() {
     let identity = Identity::create("Alice");
@@ -172,6 +176,7 @@ fn test_qr_contains_ephemeral_exchange_key() {
 // ============================================================
 
 /// Test: StartQR transitions from Idle to DisplayingQr
+// @scenario: contact_exchange.feature:Generate exchange QR code
 #[test]
 fn test_start_qr_transitions_to_displaying() {
     let identity = Identity::create("Alice");
@@ -195,6 +200,7 @@ fn test_start_qr_transitions_to_displaying() {
 }
 
 /// Test: ProcessQR requires DisplayingQr state (must call StartQR first)
+// @scenario: contact_exchange.feature:QR code exchange blocked without proximity
 #[test]
 fn test_process_qr_requires_displaying_qr_state() {
     let alice_identity = Identity::create("Alice");
@@ -218,6 +224,7 @@ fn test_process_qr_requires_displaying_qr_state() {
 }
 
 /// Test: TheyScannedOurQR requires PeerScanned state
+// @scenario: contact_exchange.feature:QR code exchange blocked without proximity
 #[test]
 fn test_they_scanned_requires_peer_scanned_state() {
     let identity = Identity::create("Alice");
@@ -233,6 +240,7 @@ fn test_they_scanned_requires_peer_scanned_state() {
 }
 
 /// Test: Complete state transition sequence
+// @scenario: contact_exchange.feature:Mutual QR exchange with bidirectional scanning
 #[test]
 fn test_complete_state_transition_sequence() {
     let alice_identity = Identity::create("Alice");
@@ -339,6 +347,7 @@ fn test_complete_state_transition_sequence() {
 // ============================================================
 
 /// Test: Wrong DH key produces different shared secret
+// @scenario: security.feature:Man-in-the-middle detection during exchange
 #[test]
 fn test_wrong_dh_key_produces_different_secret() {
     let alice_keys = X3DHKeyPair::generate();
@@ -359,6 +368,7 @@ fn test_wrong_dh_key_produces_different_secret() {
 }
 
 /// Test: Self-exchange is rejected
+// @scenario: contact_exchange.feature:Cannot exchange with yourself
 #[test]
 fn test_self_exchange_rejected() {
     let alice_identity = Identity::create("Alice");
@@ -384,6 +394,8 @@ fn test_self_exchange_rejected() {
 }
 
 /// Test: Expired QR is rejected
+// @scenario: contact_exchange.feature:QR code expiration
+// @scenario: contact_exchange.feature:Mutual QR rejects expired peer QR code
 #[test]
 fn test_expired_qr_rejected() {
     let alice_identity = Identity::create("Alice");
@@ -411,6 +423,7 @@ fn test_expired_qr_rejected() {
 }
 
 /// Test: Fresh ephemeral is used, not identity's static exchange key
+// @scenario: contact_exchange.feature:Mutual QR uses fresh ephemeral keys for forward secrecy
 #[test]
 fn test_session_uses_fresh_ephemeral_not_identity_key() {
     let alice_identity = Identity::create("Alice");
@@ -436,6 +449,7 @@ fn test_session_uses_fresh_ephemeral_not_identity_key() {
 }
 
 /// Test: Contact names are correct after exchange
+// @scenario: contact_exchange.feature:Successful QR code exchange with proximity
 #[test]
 fn test_contact_names_correct_after_exchange() {
     let alice_identity = Identity::create("Alice");
@@ -507,6 +521,7 @@ fn test_contact_names_correct_after_exchange() {
 ///
 /// Even with the same identity, two sessions should have different
 /// ephemeral keys because each generates a fresh X25519 keypair.
+// @scenario: contact_exchange.feature:Mutual QR uses fresh ephemeral keys for forward secrecy
 #[test]
 fn test_each_session_gets_unique_ephemeral() {
     let identity1 = Identity::create("Alice");

@@ -19,6 +19,7 @@ use vauchi_core::*;
 
 /// QR exchange: both sides display and scan — implicit proximity.
 /// Key agreement after scanning and confirming should succeed.
+// @scenario: contact_exchange.feature:Successful QR code exchange with proximity
 #[test]
 fn test_qr_exchange_key_agreement_succeeds() {
     let alice = Identity::create("Alice");
@@ -77,6 +78,7 @@ fn test_qr_exchange_key_agreement_succeeds() {
 }
 
 /// QR exchange: attempting key agreement from wrong state should fail.
+// @scenario: contact_exchange.feature:QR code exchange blocked without proximity
 #[test]
 fn test_qr_key_agreement_from_wrong_state_fails() {
     let alice = Identity::create("Alice");
@@ -99,6 +101,7 @@ fn test_qr_key_agreement_from_wrong_state_fails() {
 }
 
 /// NFC: does not require proximity verification step (physical tap IS proximity).
+// @scenario: contact_exchange.feature:NFC active exchange between two phones
 #[test]
 fn test_nfc_skips_proximity() {
     let alice = Identity::create("Alice");

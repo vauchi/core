@@ -29,6 +29,7 @@ fn create_contact(name: &str) -> Contact {
 
 // === Block / Unblock Basic API ===
 
+// @scenario: contacts_management.feature:Block a contact
 #[test]
 fn test_block_contact() {
     let mut wb = create_test_vauchi();
@@ -46,6 +47,7 @@ fn test_block_contact() {
     assert!(contact.is_blocked(), "Contact should be blocked");
 }
 
+// @scenario: contacts_management.feature:Unblock a contact
 #[test]
 fn test_unblock_contact() {
     let mut wb = create_test_vauchi();
@@ -64,6 +66,7 @@ fn test_unblock_contact() {
     assert!(!contact.is_blocked(), "Contact should be unblocked");
 }
 
+// @scenario: contacts_management.feature:Block a contact
 #[test]
 fn test_block_nonexistent_contact() {
     let mut wb = create_test_vauchi();
@@ -76,6 +79,7 @@ fn test_block_nonexistent_contact() {
     );
 }
 
+// @scenario: contacts_management.feature:Unblock a contact
 #[test]
 fn test_unblock_nonexistent_contact() {
     let mut wb = create_test_vauchi();
@@ -88,6 +92,7 @@ fn test_unblock_nonexistent_contact() {
     );
 }
 
+// @scenario: contacts_management.feature:View blocked contacts
 #[test]
 fn test_list_blocked_contacts() {
     let mut wb = create_test_vauchi();
@@ -124,6 +129,8 @@ fn test_list_blocked_contacts() {
     assert!(!blocked_ids.contains(&carol_id));
 }
 
+// @scenario: contacts_management.feature:Unblock a contact
+// @scenario: contacts_management.feature:View blocked contacts
 #[test]
 fn test_list_blocked_after_unblock() {
     let mut wb = create_test_vauchi();
@@ -146,6 +153,7 @@ fn test_list_blocked_after_unblock() {
 
 // === Blocked Contact Enforcement ===
 
+// @scenario: contacts_management.feature:Blocked contact cannot re-exchange
 #[test]
 fn test_blocked_contact_update_rejected() {
     let mut alice = create_test_vauchi();
@@ -200,6 +208,7 @@ fn test_blocked_contact_update_rejected() {
     );
 }
 
+// @scenario: contacts_management.feature:Block a contact
 #[test]
 fn test_propagate_skips_blocked_contacts() {
     let mut alice = create_test_vauchi();

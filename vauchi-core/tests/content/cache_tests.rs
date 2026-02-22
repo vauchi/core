@@ -256,3 +256,42 @@ fn test_cache_last_check_time() {
     let diff = now.duration_since(loaded).unwrap_or_default();
     assert!(diff.as_secs() < 1);
 }
+
+#[test]
+fn test_cache_help_content_roundtrip() {
+    let temp = TempDir::new().unwrap();
+    let cache = ContentCache::new(temp.path()).unwrap();
+
+    let help_en = b"help content english";
+    let help_de = b"help content deutsch";
+
+    cache
+        .save_content(
+            ContentType::Help,
+            "en.json",
+            help_en,
+            &compute_checksum(help_en),
+        )
+        .unwrap();
+    cache
+        .save_content(
+            ContentType::Help,
+            "de.json",
+            help_de,
+            &compute_checksum(help_de),
+        )
+        .unwrap();
+
+    assert_eq!(
+        cache.get_content(ContentType::Help, "en.json").unwrap(),
+        help_en
+    );
+    assert_eq!(
+        cache.get_content(ContentType::Help, "de.json").unwrap(),
+        help_de
+    );
+
+    // Verify files exist in help subdirectory
+    assert!(temp.path().join("content/help/en.json").exists());
+    assert!(temp.path().join("content/help/de.json").exists());
+}

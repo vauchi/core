@@ -78,8 +78,9 @@ pub use social::{
 };
 pub use storage::{PendingUpdate, Storage, StorageError, UpdateStatus};
 pub use sync::{CardDelta, DeltaError, FieldChange, SyncError, SyncManager, SyncState};
+#[allow(deprecated)]
 pub use theme::{
-    get_bundled_themes, get_theme_by_id, validate_hex_color, Theme, ThemeColors, ThemeError,
-    ThemeMode,
+    default_theme, get_bundled_themes, get_theme_by_id, load_themes_from_json, validate_hex_color,
+    Theme, ThemeColors, ThemeError, ThemeMode,
 };
 pub use tor_config::{TorConfig, TorRelayAddress, TorStatus};

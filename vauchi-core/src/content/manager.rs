@@ -81,6 +81,36 @@ impl ContentManager {
         bundled_networks()
     }
 
+    /// Get themes (cached → single bundled default).
+    ///
+    /// Returns all themes from the cached themes.json if available,
+    /// otherwise returns a vec containing only the bundled default theme.
+    pub fn themes(&self) -> Vec<crate::Theme> {
+        if let Some(data) = self.cache.get_content(ContentType::Themes, "themes.json") {
+            if let Ok(themes) = crate::load_themes_from_json(&data) {
+                if !themes.is_empty() {
+                    return themes;
+                }
+            }
+        }
+
+        // Fallback: single bundled default
+        vec![crate::default_theme()]
+    }
+
+    /// Get help content for language (cached only, no bundled fallback)
+    pub fn help(&self, lang: &str) -> Option<LocaleStrings> {
+        let filename = format!("{}.json", lang);
+
+        if let Some(data) = self.cache.get_content(ContentType::Help, &filename) {
+            if let Ok(strings) = serde_json::from_slice(&data) {
+                return Some(strings);
+            }
+        }
+
+        None
+    }
+
     /// Get locale strings for language (cached → bundled → None)
     pub fn locale(&self, lang: &str) -> Option<LocaleStrings> {
         let filename = format!("{}.json", lang);
@@ -314,6 +344,19 @@ impl ContentManager {
             }
         }
 
+        // Check help
+        if let Some(remote_entry) = &remote.content.help {
+            let needs_update = cached
+                .as_ref()
+                .and_then(|c| c.content.help.as_ref())
+                .map(|local| local.version != remote_entry.version)
+                .unwrap_or(true);
+
+            if needs_update && self.is_compatible(&remote_entry.min_app_version) {
+                updates.push(ContentType::Help);
+            }
+        }
+
         // Check themes
         if let Some(remote_entry) = &remote.content.themes {
             let needs_update = cached
@@ -409,7 +452,30 @@ impl ContentManager {
                 )?;
             }
             ContentType::Help => {
-                // TODO: Implement help content caching when help system is defined
+                // Download ALL help files (privacy: bundle everything so CDN
+                // cannot learn the user's language from request patterns)
+                let entry = manifest
+                    .content
+                    .help
+                    .as_ref()
+                    .ok_or_else(|| ContentError::Fetch("No help entry in manifest".into()))?;
+
+                for (lang_code, file_entry) in &entry.files {
+                    let path = format!("{}{}", entry.path, file_entry.path);
+                    let data = fetcher
+                        .fetch_content(&path, &file_entry.checksum)
+                        .await
+                        .map_err(|e| ContentError::Fetch(e.to_string()))?;
+
+                    let filename = format!("{}.json", lang_code);
+                    self.cache.save_content(
+                        ContentType::Help,
+                        &filename,
+                        &data,
+                        &file_entry.checksum,
+                    )?;
+                }
+                // Cache-only, no hot-reload (unlike locales)
             }
         }
 

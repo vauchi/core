@@ -166,6 +166,89 @@ fn test_manager_get_locale_unknown_returns_none() {
 }
 
 #[test]
+fn test_manager_help_returns_none_when_cache_empty() {
+    let temp = TempDir::new().unwrap();
+    let config = test_config(&temp);
+    let manager = ContentManager::new(config).unwrap();
+
+    // No bundled help content; should return None
+    let help = manager.help("en");
+    assert!(help.is_none());
+}
+
+#[test]
+fn test_manager_help_returns_cached_content() {
+    let temp = TempDir::new().unwrap();
+    let config = test_config(&temp);
+
+    // Pre-populate cache with help content
+    let cache = ContentCache::new(temp.path()).unwrap();
+    let help_data =
+        br#"{"getting_started": "Welcome to Vauchi", "faq": "Frequently asked questions"}"#;
+    let checksum = compute_checksum(help_data);
+    cache
+        .save_content(ContentType::Help, "en.json", help_data, &checksum)
+        .unwrap();
+
+    let manager = ContentManager::new(config).unwrap();
+    let help = manager.help("en");
+
+    assert!(help.is_some());
+    let strings = help.unwrap();
+    assert_eq!(strings.get("getting_started").unwrap(), "Welcome to Vauchi");
+    assert_eq!(strings.get("faq").unwrap(), "Frequently asked questions");
+}
+
+#[test]
+fn test_manager_help_unknown_language_returns_none() {
+    let temp = TempDir::new().unwrap();
+    let config = test_config(&temp);
+    let manager = ContentManager::new(config).unwrap();
+
+    let help = manager.help("zz");
+    assert!(help.is_none());
+}
+
+#[test]
+fn test_manager_themes_returns_default_when_cache_empty() {
+    let temp = TempDir::new().unwrap();
+    let config = test_config(&temp);
+    let manager = ContentManager::new(config).unwrap();
+
+    let themes = manager.themes();
+    assert_eq!(themes.len(), 1, "Should return single default theme");
+    assert_eq!(themes[0].id, "default-dark");
+}
+
+#[test]
+fn test_manager_themes_returns_cached_themes() {
+    let temp = TempDir::new().unwrap();
+    let config = test_config(&temp);
+    let manager = ContentManager::new(config).unwrap();
+
+    // Populate cache with themes.json
+    let themes_json = r##"[
+        {"id":"test-a","name":"Test A","version":"1.0.0","mode":"dark","colors":{"bg-primary":"#1a1a2e","bg-secondary":"#16213e","bg-tertiary":"#0f3460","text-primary":"#eeeeee","text-secondary":"#a0a0a0","accent":"#4fc3f7","accent-dark":"#0288d1","success":"#4caf50","error":"#f44336","warning":"#ff9800","border":"#333333"}},
+        {"id":"test-b","name":"Test B","version":"1.0.0","mode":"light","colors":{"bg-primary":"#ffffff","bg-secondary":"#f5f5f5","bg-tertiary":"#e0e0e0","text-primary":"#212121","text-secondary":"#757575","accent":"#1976d2","accent-dark":"#0d47a1","success":"#388e3c","error":"#d32f2f","warning":"#f57c00","border":"#e0e0e0"}}
+    ]"##;
+    let checksum = compute_checksum(themes_json.as_bytes());
+    let cache = ContentCache::new(temp.path()).unwrap();
+    cache
+        .save_content(
+            ContentType::Themes,
+            "themes.json",
+            themes_json.as_bytes(),
+            &checksum,
+        )
+        .unwrap();
+
+    let themes = manager.themes();
+    assert_eq!(themes.len(), 2);
+    assert_eq!(themes[0].id, "test-a");
+    assert_eq!(themes[1].id, "test-b");
+}
+
+#[test]
 fn test_manager_record_check_time() {
     let temp = TempDir::new().unwrap();
     let config = test_config(&temp);

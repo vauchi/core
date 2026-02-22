@@ -245,6 +245,17 @@ impl DeviceRegistry {
         self.devices.iter().find(|d| &d.device_id == device_id)
     }
 
+    /// Finds an active device by hex ID prefix.
+    ///
+    /// Searches only active (non-revoked) devices. Returns the first
+    /// device whose hex-encoded device ID starts with the given prefix.
+    /// Useful for CLI UX where users can type a short prefix to identify a device.
+    pub fn find_device_by_prefix(&self, hex_prefix: &str) -> Option<&RegisteredDevice> {
+        self.active_devices()
+            .into_iter()
+            .find(|d| d.device_id_hex().starts_with(hex_prefix))
+    }
+
     /// Adds a new device to the registry.
     pub fn add_device(
         &mut self,

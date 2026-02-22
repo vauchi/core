@@ -159,6 +159,34 @@ impl<'a> ContactManager<'a> {
             .collect())
     }
 
+    /// Finds contacts by fuzzy matching on display name or ID prefix.
+    ///
+    /// Combines case-insensitive name substring matching (from `search_contacts`)
+    /// with ID prefix matching. Returns the union of both result sets,
+    /// deduplicated. Hidden contacts are excluded.
+    pub fn find_contact_fuzzy(&self, query: &str) -> VauchiResult<Vec<Contact>> {
+        let query_lower = query.to_lowercase();
+        let contacts = self.storage.list_contacts()?;
+
+        let mut seen_ids = std::collections::HashSet::new();
+        let mut results = Vec::new();
+
+        for contact in contacts {
+            if contact.is_hidden() {
+                continue;
+            }
+
+            let name_match = contact.display_name().to_lowercase().contains(&query_lower);
+            let id_match = !query.is_empty() && contact.id().starts_with(query);
+
+            if (name_match || id_match) && seen_ids.insert(contact.id().to_string()) {
+                results.push(contact);
+            }
+        }
+
+        Ok(results)
+    }
+
     /// Returns the number of visible (non-hidden) contacts.
     pub fn contact_count(&self) -> VauchiResult<usize> {
         Ok(self

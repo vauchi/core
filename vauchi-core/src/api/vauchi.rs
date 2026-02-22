@@ -497,6 +497,15 @@ impl<T: Transport> Vauchi<T> {
         manager.search_contacts(query)
     }
 
+    /// Finds contacts by fuzzy matching on display name or ID prefix.
+    ///
+    /// Combines case-insensitive name substring matching with ID prefix matching.
+    /// Returns the union of both result sets, deduplicated.
+    pub fn find_contact_fuzzy(&self, query: &str) -> VauchiResult<Vec<Contact>> {
+        let manager = ContactManager::new(&self.storage, self.events.clone());
+        manager.find_contact_fuzzy(query)
+    }
+
     /// Returns the number of contacts.
     pub fn contact_count(&self) -> VauchiResult<usize> {
         let manager = ContactManager::new(&self.storage, self.events.clone());

@@ -16,15 +16,14 @@
 //! - Remote theme updates (@remote)
 //! - QR code theming consistency (@qr)
 
-#![allow(deprecated)] // Tests use get_bundled_themes()/get_theme_by_id() for bundled fallback coverage
+mod common;
 
+use common::helpers::{all_themes, theme_by_id};
 use tempfile::TempDir;
 use vauchi_core::content::{
     compute_checksum, ContentCache, ContentConfig, ContentManager, ContentType,
 };
-use vauchi_core::theme::{
-    get_bundled_themes, get_theme_by_id, validate_hex_color, Theme, ThemeError, ThemeMode,
-};
+use vauchi_core::theme::{validate_hex_color, Theme, ThemeError, ThemeMode};
 
 // ============================================================
 // Theme Preview Before Apply
@@ -60,7 +59,7 @@ impl ThemePreview {
         if self.is_preview_active {
             Some(self.preview_theme.clone())
         } else {
-            get_theme_by_id(&self.original_theme_id)
+            theme_by_id(&self.original_theme_id)
         }
     }
 }
@@ -72,10 +71,10 @@ impl ThemePreview {
 fn test_theme_preview_before_apply() {
     // Given the user has "default-dark" theme selected
     let current_theme_id = "default-dark";
-    let current_theme = get_theme_by_id(current_theme_id).expect("default-dark should exist");
+    let current_theme = theme_by_id(current_theme_id).expect("default-dark should exist");
 
     // When the user taps on "Catppuccin Mocha"
-    let preview_theme = get_theme_by_id("catppuccin-mocha").expect("catppuccin-mocha should exist");
+    let preview_theme = theme_by_id("catppuccin-mocha").expect("catppuccin-mocha should exist");
 
     // Start preview (in-memory only, not persisted)
     let preview = ThemePreview::start_preview(current_theme_id, preview_theme.clone());
@@ -100,7 +99,7 @@ fn test_theme_preview_before_apply() {
 #[test]
 fn test_theme_preview_cancel_returns_to_original() {
     let current_theme_id = "default-dark";
-    let preview_theme = get_theme_by_id("dracula").expect("dracula should exist");
+    let preview_theme = theme_by_id("dracula").expect("dracula should exist");
 
     let mut preview = ThemePreview::start_preview(current_theme_id, preview_theme);
 
@@ -124,12 +123,12 @@ fn test_theme_preview_sequence() {
     let original_id = "default-light";
 
     // Preview first theme
-    let theme1 = get_theme_by_id("nord").unwrap();
+    let theme1 = theme_by_id("nord").unwrap();
     let preview = ThemePreview::start_preview(original_id, theme1);
     assert_eq!(preview.active_theme().unwrap().id, "nord");
 
     // Switch preview to another theme
-    let theme2 = get_theme_by_id("gruvbox-dark").unwrap();
+    let theme2 = theme_by_id("gruvbox-dark").unwrap();
     let preview = ThemePreview::start_preview(original_id, theme2);
     assert_eq!(preview.active_theme().unwrap().id, "gruvbox-dark");
 
@@ -197,7 +196,7 @@ impl ThemeResolver {
             "default" => format!("default-{}", suffix),
             // For themes without variants (dracula, nord), return as-is if dark
             other => {
-                let theme = get_theme_by_id(other);
+                let theme = theme_by_id(other);
                 if let Some(t) = &theme {
                     // Return the theme if it matches the mode, otherwise fall back to default
                     if (t.mode == ThemeMode::Dark) == is_dark {
@@ -208,7 +207,7 @@ impl ThemeResolver {
             }
         };
 
-        get_theme_by_id(&family_variant)
+        theme_by_id(&family_variant)
     }
 }
 
@@ -399,7 +398,7 @@ impl CustomizedTheme {
 #[test]
 fn test_accent_color_customization() {
     // Given the user has selected "Catppuccin Mocha" theme
-    let base = get_theme_by_id("catppuccin-mocha").unwrap();
+    let base = theme_by_id("catppuccin-mocha").unwrap();
     let default_accent = base.colors.accent.clone();
 
     // Default accent should be blue
@@ -436,7 +435,7 @@ fn test_catppuccin_accents_valid_hex() {
 /// Feature: theming.feature @accent
 #[test]
 fn test_invalid_accent_rejected() {
-    let base = get_theme_by_id("default-dark").unwrap();
+    let base = theme_by_id("default-dark").unwrap();
     let customized = CustomizedTheme::new(base);
 
     // Invalid hex should be rejected
@@ -462,7 +461,7 @@ fn test_custom_accent_persists() {
     };
 
     // Simulate app restart by recreating from settings
-    let base = get_theme_by_id(&settings.theme_id).unwrap();
+    let base = theme_by_id(&settings.theme_id).unwrap();
     let restored = if let Some(accent) = &settings.custom_accent {
         CustomizedTheme::new(base).with_accent(accent).unwrap()
     } else {
@@ -544,7 +543,7 @@ fn test_new_theme_after_update() {
     let cache = ContentCache::new(temp.path()).unwrap();
 
     // Initially, cache is empty - only bundled themes available
-    let bundled = get_bundled_themes();
+    let bundled = all_themes();
     let has_tokyo_night = bundled.iter().any(|t| t.id == "tokyo-night");
     assert!(!has_tokyo_night, "Tokyo Night should not be bundled");
 
@@ -591,7 +590,7 @@ fn test_bundled_themes_always_available() {
     let manager = ContentManager::new(config).unwrap();
 
     // When the user views available themes
-    let bundled = get_bundled_themes();
+    let bundled = all_themes();
 
     // Then "Default Dark" and "Default Light" should be available
     assert!(
@@ -625,7 +624,7 @@ fn test_theme_selection_preserved_after_update() {
 
     // When a new version of Catppuccin themes is available and applied
     // (simulated by theme still existing with same ID but updated colors)
-    let updated_theme = get_theme_by_id(&settings.selected_theme_id);
+    let updated_theme = theme_by_id(&settings.selected_theme_id);
 
     // Then the user's theme selection should be preserved
     assert!(updated_theme.is_some());
@@ -716,7 +715,7 @@ impl QrCodeDisplay {
 #[test]
 fn test_qr_code_theming_consistency() {
     // Test across all bundled themes
-    for theme in get_bundled_themes() {
+    for theme in all_themes() {
         let qr_display = QrCodeDisplay::for_theme(&theme);
 
         // QR code itself should remain standard black-on-white
@@ -795,7 +794,7 @@ fn test_qr_foreground_is_dark() {
 /// Feature: theming.feature @qr
 #[test]
 fn test_qr_container_contrast_with_dark_theme() {
-    let dark_theme = get_theme_by_id("catppuccin-mocha").unwrap();
+    let dark_theme = theme_by_id("catppuccin-mocha").unwrap();
     let qr_display = QrCodeDisplay::for_theme(&dark_theme);
 
     // Container bg (#1e1e2e) should contrast with white QR bg (#ffffff)
@@ -814,7 +813,7 @@ fn test_qr_container_contrast_with_dark_theme() {
 /// Feature: theming.feature @qr
 #[test]
 fn test_qr_container_with_light_theme() {
-    let light_theme = get_theme_by_id("catppuccin-latte").unwrap();
+    let light_theme = theme_by_id("catppuccin-latte").unwrap();
     let qr_display = QrCodeDisplay::for_theme(&light_theme);
 
     // Container bg (#eff1f5) and QR bg (#ffffff) are both light

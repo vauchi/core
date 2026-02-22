@@ -14,10 +14,11 @@
 //! - WCAG AA color contrast compliance
 //! - Font scaling support (100-200%)
 
-#![allow(deprecated)] // Tests use get_bundled_themes() for bundled fallback coverage
+mod common;
 
+use common::helpers::all_themes;
 use vauchi_core::contact_card::{ContactField, FieldType};
-use vauchi_core::theme::{get_bundled_themes, Theme, ThemeColors, ThemeMode};
+use vauchi_core::theme::{Theme, ThemeColors, ThemeMode};
 use vauchi_core::ContactCard;
 
 // ============================================================
@@ -260,7 +261,7 @@ fn test_focusable_elements_order() {
 /// Scenario: Sufficient color contrast
 #[test]
 fn test_contrast_ratios_wcag_aa() {
-    let themes = get_bundled_themes();
+    let themes = all_themes();
 
     for theme in &themes {
         // Primary text on primary background must have 4.5:1 ratio
@@ -282,7 +283,7 @@ fn test_contrast_ratios_wcag_aa() {
 /// Scenario: WCAG 2.1 AA compliance on desktop
 #[test]
 fn test_theme_validate_accessibility_method() {
-    let themes = get_bundled_themes();
+    let themes = all_themes();
 
     for theme in &themes {
         let result = theme.validate_accessibility();
@@ -300,7 +301,7 @@ fn test_theme_validate_accessibility_method() {
 /// Scenario: Text should remain readable
 #[test]
 fn test_secondary_text_contrast() {
-    let themes = get_bundled_themes();
+    let themes = all_themes();
 
     for theme in &themes {
         let bg = parse_hex(&theme.colors.bg_primary);
@@ -332,7 +333,7 @@ fn test_secondary_text_contrast() {
 /// Themes with ratios below 2.5:1 are flagged as warnings.
 #[test]
 fn test_status_colors_contrast() {
-    let themes = get_bundled_themes();
+    let themes = all_themes();
 
     // Minimum contrast for status colors (decorative, with icon/text backup)
     // Set to 2.0 to accommodate popular themes while ensuring basic visibility

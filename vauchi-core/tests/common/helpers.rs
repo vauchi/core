@@ -7,9 +7,24 @@
 //! Common helper functions for setting up test scenarios.
 
 use vauchi_core::{
-    crypto::ratchet::DoubleRatchetState, exchange::X3DHKeyPair, network::MockTransport, Contact,
-    ContactCard, ContactField, FieldType, SymmetricKey, Vauchi,
+    crypto::ratchet::DoubleRatchetState,
+    exchange::X3DHKeyPair,
+    network::MockTransport,
+    theme::{load_themes_from_json, Theme},
+    Contact, ContactCard, ContactField, FieldType, SymmetricKey, Vauchi,
 };
+
+const THEMES_JSON: &[u8] = include_bytes!("../../../../themes/themes.json");
+
+/// Load all themes from themes.json (replaces deprecated get_bundled_themes).
+pub fn all_themes() -> Vec<Theme> {
+    load_themes_from_json(THEMES_JSON).expect("themes.json must be valid")
+}
+
+/// Find a theme by ID from themes.json (replaces deprecated get_theme_by_id).
+pub fn theme_by_id(id: &str) -> Option<Theme> {
+    all_themes().into_iter().find(|t| t.id == id)
+}
 
 /// Create an in-memory Vauchi with an identity.
 pub fn create_vauchi_with_identity(name: &str) -> Vauchi<MockTransport> {

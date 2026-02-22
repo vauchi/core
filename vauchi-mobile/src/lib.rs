@@ -383,11 +383,13 @@ pub fn is_blocked_scheme(scheme: String) -> bool {
 // Theme Functions
 // ============================================================
 
-/// Get all available bundled themes.
-#[allow(deprecated)] // Bundled themes still serve as offline fallback
+const THEMES_JSON: &[u8] = include_bytes!("../../../themes/themes.json");
+
+/// Get all available themes from themes.json.
 #[uniffi::export]
 pub fn get_available_themes() -> Vec<MobileTheme> {
-    vauchi_core::theme::get_bundled_themes()
+    vauchi_core::theme::load_themes_from_json(THEMES_JSON)
+        .unwrap_or_else(|_| vec![vauchi_core::theme::default_theme()])
         .iter()
         .map(MobileTheme::from)
         .collect()
@@ -396,10 +398,13 @@ pub fn get_available_themes() -> Vec<MobileTheme> {
 /// Get a specific theme by ID.
 ///
 /// Returns None if the theme is not found.
-#[allow(deprecated)] // Bundled themes still serve as offline fallback
 #[uniffi::export]
 pub fn get_theme(theme_id: String) -> Option<MobileTheme> {
-    vauchi_core::theme::get_theme_by_id(&theme_id).map(|t| MobileTheme::from(&t))
+    vauchi_core::theme::load_themes_from_json(THEMES_JSON)
+        .unwrap_or_default()
+        .iter()
+        .find(|t| t.id == theme_id)
+        .map(MobileTheme::from)
 }
 
 /// Get the default theme ID based on system preference.

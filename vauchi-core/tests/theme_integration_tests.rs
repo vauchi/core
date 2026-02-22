@@ -13,11 +13,10 @@
 //! - Bundled themes (default, Catppuccin, Dracula, Nord, Solarized, Gruvbox)
 //! - Theme persistence and selection
 
-#![allow(deprecated)] // Tests use get_bundled_themes()/get_theme_by_id() for bundled fallback coverage
+mod common;
 
-use vauchi_core::theme::{
-    get_bundled_themes, get_theme_by_id, validate_hex_color, Theme, ThemeColors, ThemeMode,
-};
+use common::helpers::{all_themes, theme_by_id};
+use vauchi_core::theme::{validate_hex_color, Theme, ThemeColors, ThemeMode};
 
 // ============================================================
 // Theme Structure
@@ -27,7 +26,7 @@ use vauchi_core::theme::{
 /// Test: Theme has required fields
 #[test]
 fn test_theme_has_required_fields() {
-    let themes = get_bundled_themes();
+    let themes = all_themes();
     assert!(!themes.is_empty(), "Should have bundled themes");
 
     for theme in &themes {
@@ -40,7 +39,7 @@ fn test_theme_has_required_fields() {
 /// Test: ThemeColors has all required color fields
 #[test]
 fn test_theme_colors_complete() {
-    let themes = get_bundled_themes();
+    let themes = all_themes();
 
     for theme in &themes {
         let colors = &theme.colors;
@@ -79,7 +78,7 @@ fn test_theme_colors_complete() {
 /// Test: Themes have correct mode (light/dark)
 #[test]
 fn test_theme_modes() {
-    let themes = get_bundled_themes();
+    let themes = all_themes();
 
     let dark_themes: Vec<_> = themes
         .iter()
@@ -99,7 +98,7 @@ fn test_theme_modes() {
 /// Scenario: Default theme on fresh install
 #[test]
 fn test_default_theme_is_dark() {
-    let default = get_theme_by_id("default-dark");
+    let default = theme_by_id("default-dark");
     assert!(default.is_some(), "Should have default-dark theme");
     assert_eq!(default.unwrap().mode, ThemeMode::Dark);
 }
@@ -112,7 +111,7 @@ fn test_default_theme_is_dark() {
 /// Test: All themes pass WCAG contrast requirements
 #[test]
 fn test_all_themes_accessible() {
-    let themes = get_bundled_themes();
+    let themes = all_themes();
 
     for theme in &themes {
         let result = theme.validate_accessibility();
@@ -208,8 +207,8 @@ fn test_low_contrast_fails() {
 /// Test: Default themes exist
 #[test]
 fn test_default_themes_exist() {
-    assert!(get_theme_by_id("default-dark").is_some());
-    assert!(get_theme_by_id("default-light").is_some());
+    assert!(theme_by_id("default-dark").is_some());
+    assert!(theme_by_id("default-light").is_some());
 }
 
 /// Test: Catppuccin themes exist
@@ -217,11 +216,11 @@ fn test_default_themes_exist() {
 #[test]
 fn test_catppuccin_themes_exist() {
     assert!(
-        get_theme_by_id("catppuccin-mocha").is_some(),
+        theme_by_id("catppuccin-mocha").is_some(),
         "Should have Catppuccin Mocha"
     );
     assert!(
-        get_theme_by_id("catppuccin-latte").is_some(),
+        theme_by_id("catppuccin-latte").is_some(),
         "Should have Catppuccin Latte"
     );
 }
@@ -230,7 +229,7 @@ fn test_catppuccin_themes_exist() {
 /// Feature: theming.feature @catppuccin @dark
 #[test]
 fn test_catppuccin_mocha_colors() {
-    let theme = get_theme_by_id("catppuccin-mocha").unwrap();
+    let theme = theme_by_id("catppuccin-mocha").unwrap();
 
     assert_eq!(theme.mode, ThemeMode::Dark);
     assert_eq!(theme.colors.bg_primary, "#1e1e2e");
@@ -242,7 +241,7 @@ fn test_catppuccin_mocha_colors() {
 /// Feature: theming.feature @catppuccin @light
 #[test]
 fn test_catppuccin_latte_colors() {
-    let theme = get_theme_by_id("catppuccin-latte").unwrap();
+    let theme = theme_by_id("catppuccin-latte").unwrap();
 
     assert_eq!(theme.mode, ThemeMode::Light);
     assert_eq!(theme.colors.bg_primary, "#eff1f5");
@@ -253,7 +252,7 @@ fn test_catppuccin_latte_colors() {
 /// Feature: theming.feature (implied)
 #[test]
 fn test_dracula_theme() {
-    let theme = get_theme_by_id("dracula").unwrap();
+    let theme = theme_by_id("dracula").unwrap();
 
     assert_eq!(theme.mode, ThemeMode::Dark);
     assert_eq!(theme.colors.bg_primary, "#282a36");
@@ -264,7 +263,7 @@ fn test_dracula_theme() {
 /// Test: Nord theme exists and has correct colors
 #[test]
 fn test_nord_theme() {
-    let theme = get_theme_by_id("nord").unwrap();
+    let theme = theme_by_id("nord").unwrap();
 
     assert_eq!(theme.mode, ThemeMode::Dark);
     assert_eq!(theme.colors.bg_primary, "#2e3440");
@@ -274,15 +273,15 @@ fn test_nord_theme() {
 /// Test: Solarized themes exist
 #[test]
 fn test_solarized_themes() {
-    assert!(get_theme_by_id("solarized-dark").is_some());
-    assert!(get_theme_by_id("solarized-light").is_some());
+    assert!(theme_by_id("solarized-dark").is_some());
+    assert!(theme_by_id("solarized-light").is_some());
 }
 
 /// Test: Gruvbox themes exist
 #[test]
 fn test_gruvbox_themes() {
-    assert!(get_theme_by_id("gruvbox-dark").is_some());
-    assert!(get_theme_by_id("gruvbox-light").is_some());
+    assert!(theme_by_id("gruvbox-dark").is_some());
+    assert!(theme_by_id("gruvbox-light").is_some());
 }
 
 // ============================================================
@@ -292,7 +291,7 @@ fn test_gruvbox_themes() {
 /// Test: Have expected number of bundled themes
 #[test]
 fn test_bundled_theme_count() {
-    let themes = get_bundled_themes();
+    let themes = all_themes();
     // default-dark, default-light, catppuccin-mocha, catppuccin-latte,
     // dracula, nord, solarized-dark, solarized-light, gruvbox-dark, gruvbox-light
     assert!(themes.len() >= 10, "Should have at least 10 bundled themes");
@@ -301,7 +300,7 @@ fn test_bundled_theme_count() {
 /// Test: All themes have unique IDs
 #[test]
 fn test_unique_theme_ids() {
-    let themes = get_bundled_themes();
+    let themes = all_themes();
     let mut ids: Vec<_> = themes.iter().map(|t| &t.id).collect();
     let original_len = ids.len();
     ids.sort();
@@ -338,7 +337,7 @@ fn test_invalid_hex_colors() {
 /// Test: Themes can be serialized to JSON
 #[test]
 fn test_theme_serialization() {
-    let theme = get_theme_by_id("catppuccin-mocha").unwrap();
+    let theme = theme_by_id("catppuccin-mocha").unwrap();
 
     let json = serde_json::to_string(&theme).expect("Should serialize");
     assert!(json.contains("catppuccin-mocha"));
@@ -356,11 +355,11 @@ fn test_theme_serialization() {
 /// Test: Third-party themes have attribution
 #[test]
 fn test_theme_attribution() {
-    let catppuccin = get_theme_by_id("catppuccin-mocha").unwrap();
+    let catppuccin = theme_by_id("catppuccin-mocha").unwrap();
     assert!(catppuccin.author.is_some());
     assert!(catppuccin.license.is_some());
     assert!(catppuccin.source.is_some());
 
-    let dracula = get_theme_by_id("dracula").unwrap();
+    let dracula = theme_by_id("dracula").unwrap();
     assert!(dracula.author.is_some());
 }

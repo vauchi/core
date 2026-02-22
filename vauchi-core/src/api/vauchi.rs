@@ -981,6 +981,29 @@ impl<T: Transport> Vauchi<T> {
         Ok(migrated)
     }
 
+    // === Content Update Operations ===
+
+    /// Checks if content updates are available.
+    ///
+    /// Compares stored/cached manifest versions against available versions.
+    /// Returns the status of available updates without applying them.
+    ///
+    /// This is the synchronous version intended for CLI, desktop, and TUI.
+    /// For async mobile usage, see `vauchi-mobile`'s `MobileContentUpdater`.
+    pub fn check_content_updates(&self) -> crate::content::UpdateStatus {
+        let content_config = crate::content::ContentConfig {
+            storage_path: self.config.storage_path.join("content_cache"),
+            ..Default::default()
+        };
+
+        match crate::content::ContentManager::new(content_config) {
+            Ok(manager) => manager.check_for_updates_sync(),
+            Err(_) => crate::content::UpdateStatus::CheckFailed(
+                "Failed to initialize content manager".to_string(),
+            ),
+        }
+    }
+
     // === Device Sync Item Application ===
 
     /// Applies a list of sync items received from another device.

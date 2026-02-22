@@ -25,6 +25,48 @@ fn now() -> u64 {
 }
 
 // ============================================================
+// API 1: find_device_by_prefix (facade)
+// ============================================================
+
+#[test]
+fn test_vauchi_find_device_by_prefix_with_registry() {
+    let mut wb = create_test_vauchi();
+    wb.create_identity("Alice").unwrap();
+
+    let identity = wb.identity().unwrap();
+    let registry = identity.initial_device_registry();
+
+    // Get the primary device's hex ID
+    let primary = registry.primary_device().unwrap();
+    let hex_id = primary.device_id_hex();
+    let prefix = &hex_id[..8];
+
+    // Save registry to storage
+    wb.storage().save_device_registry(&registry).unwrap();
+
+    // Find device by prefix through the facade
+    let found = wb.find_device_by_prefix(prefix).unwrap();
+    assert!(
+        found.is_some(),
+        "Should find device by prefix through facade"
+    );
+    assert_eq!(found.unwrap().device_id_hex(), hex_id);
+}
+
+#[test]
+fn test_vauchi_find_device_by_prefix_no_registry() {
+    let mut wb = create_test_vauchi();
+    wb.create_identity("Alice").unwrap();
+
+    // No registry saved -> should return None
+    let found = wb.find_device_by_prefix("abcd").unwrap();
+    assert!(
+        found.is_none(),
+        "Should return None when no device registry exists"
+    );
+}
+
+// ============================================================
 // API 2: get_delivery_status_for_contact / get_failed_deliveries
 // ============================================================
 

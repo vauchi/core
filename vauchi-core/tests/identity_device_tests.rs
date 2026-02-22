@@ -463,3 +463,92 @@ fn test_broadcast_rejects_future_timestamp() {
     assert!(result.is_err(), "Should reject future broadcast");
     assert!(result.unwrap_err().to_string().contains("future"));
 }
+
+// ============================================================
+// find_device_by_prefix tests
+// ============================================================
+
+#[test]
+fn test_find_device_by_prefix_matches_hex_start() {
+    let seed = test_master_seed();
+    let signing_key = test_signing_keypair();
+    let device0 = DeviceInfo::derive(&seed, 0, "Primary".to_string());
+    let registered0 = device0.to_registered(&seed);
+    let expected_hex = registered0.device_id_hex();
+
+    let registry = DeviceRegistry::new(registered0.clone(), &signing_key);
+
+    // Use the first 8 hex characters as prefix
+    let prefix = &expected_hex[..8];
+    let found = registry.find_device_by_prefix(prefix);
+    assert!(found.is_some(), "Should find device by hex prefix");
+    assert_eq!(
+        found.unwrap().device_id_hex(),
+        expected_hex,
+        "Found device should match the expected device"
+    );
+}
+
+#[test]
+fn test_find_device_by_prefix_returns_none_for_no_match() {
+    let seed = test_master_seed();
+    let signing_key = test_signing_keypair();
+    let device0 = DeviceInfo::derive(&seed, 0, "Primary".to_string());
+
+    let registry = DeviceRegistry::new(device0.to_registered(&seed), &signing_key);
+
+    // Use a prefix that won't match any device
+    let found = registry.find_device_by_prefix("0000000000000000");
+    assert!(
+        found.is_none(),
+        "Should return None when no device matches prefix"
+    );
+}
+
+#[test]
+fn test_find_device_by_prefix_only_matches_active_devices() {
+    let seed = test_master_seed();
+    let signing_key = test_signing_keypair();
+    let device0 = DeviceInfo::derive(&seed, 0, "Primary".to_string());
+    let device1 = DeviceInfo::derive(&seed, 1, "Secondary".to_string());
+    let device1_hex = device1.to_registered(&seed).device_id_hex();
+
+    let mut registry = DeviceRegistry::new(device0.to_registered(&seed), &signing_key);
+    registry
+        .add_device(device1.to_registered(&seed), &signing_key)
+        .unwrap();
+
+    // Revoke device1
+    registry
+        .revoke_device(
+            device1
+                .to_registered(&seed)
+                .device_id
+                .as_ref()
+                .try_into()
+                .unwrap(),
+            &signing_key,
+        )
+        .unwrap();
+
+    // Searching by device1's prefix should return None (it's revoked)
+    let prefix = &device1_hex[..8];
+    let found = registry.find_device_by_prefix(prefix);
+    assert!(found.is_none(), "Should not find revoked device by prefix");
+}
+
+#[test]
+fn test_find_device_by_prefix_empty_prefix_returns_first_active() {
+    let seed = test_master_seed();
+    let signing_key = test_signing_keypair();
+    let device0 = DeviceInfo::derive(&seed, 0, "Primary".to_string());
+
+    let registry = DeviceRegistry::new(device0.to_registered(&seed), &signing_key);
+
+    // Empty prefix matches everything (starts_with("") is always true)
+    let found = registry.find_device_by_prefix("");
+    assert!(
+        found.is_some(),
+        "Empty prefix should match the first active device"
+    );
+}

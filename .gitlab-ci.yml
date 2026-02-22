@@ -125,6 +125,7 @@ lint:clippy:
   before_script:
     - !reference [.self-hosted, before_script]
     - !reference [.clone-locales, before_script]
+    - !reference [.clone-themes, before_script]
   script:
     - cargo clippy --all-targets -- -D warnings
 
@@ -159,6 +160,7 @@ test:core:
   before_script:
     - !reference [.self-hosted, before_script]
     - !reference [.clone-locales, before_script]
+    - !reference [.clone-themes, before_script]
   script:
     - cargo nextest run -p vauchi-core
 
@@ -188,6 +190,7 @@ test:mobile:
   before_script:
     - !reference [.self-hosted, before_script]
     - !reference [.clone-locales, before_script]
+    - !reference [.clone-themes, before_script]
   script:
     - cargo nextest run -p vauchi-mobile
 
@@ -233,6 +236,7 @@ coverage:core:
   before_script:
     - !reference [.self-hosted, before_script]
     - !reference [.clone-locales, before_script]
+    - !reference [.clone-themes, before_script]
     - rustup component add llvm-tools-preview 2>/dev/null || true
     - command -v cargo-llvm-cov >/dev/null 2>&1 || cargo binstall cargo-llvm-cov --no-confirm 2>/dev/null || cargo install cargo-llvm-cov --locked || true
   script:
@@ -263,6 +267,7 @@ coverage:mobile:
   before_script:
     - !reference [.self-hosted, before_script]
     - !reference [.clone-locales, before_script]
+    - !reference [.clone-themes, before_script]
     - rustup component add llvm-tools-preview 2>/dev/null || true
     - command -v cargo-llvm-cov >/dev/null 2>&1 || cargo binstall cargo-llvm-cov --no-confirm 2>/dev/null || cargo install cargo-llvm-cov --locked || true
   script:

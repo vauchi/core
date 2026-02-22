@@ -139,6 +139,11 @@ lint:clippy:
   before_script:
     - if [ ! -d ../locales ]; then git clone --depth=1 https://gitlab.com/vauchi/locales.git ../locales; else git -C ../locales pull --ff-only 2>/dev/null || true; fi
 
+# Clone sibling themes repo (needed by content contract validation)
+.clone-themes:
+  before_script:
+    - if [ ! -d ../themes ]; then git clone --depth=1 https://gitlab.com/vauchi/themes.git ../themes; else git -C ../themes pull --ff-only 2>/dev/null || true; fi
+
 # MR test jobs: use nextest for fast feedback (12x faster than cargo test,
 # avoids llvm-cov instrumentation rebuild). Coverage runs on main only.
 # Cucumber tests use cargo test (not nextest) because harness=false output
@@ -185,6 +190,33 @@ test:mobile:
     - !reference [.clone-locales, before_script]
   script:
     - cargo nextest run -p vauchi-mobile
+
+# Content contract validation — detect drift between core parsers and
+# sibling content repos (themes/, locales/). Runs when parser code changes.
+validate:content-contracts:
+  extends: [.linux-runner, .timeout-quick]
+  stage: test
+  needs:
+    - job: lint:format
+      optional: true
+    - job: lint:clippy
+      optional: true
+  before_script:
+    - !reference [.self-hosted, before_script]
+    - !reference [.clone-locales, before_script]
+    - !reference [.clone-themes, before_script]
+  script:
+    - bash scripts/validate-content-contracts.sh
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes:
+        compare_to: refs/heads/main
+        paths:
+          - "vauchi-core/src/theme.rs"
+          - "vauchi-core/src/i18n.rs"
+          - "vauchi-core/src/social/**/*.rs"
+          - "vauchi-core/src/content/**/*.rs"
+          - "scripts/validate-content-contracts.sh"
 
 # Coverage jobs: run on main merges only (not MRs) — llvm-cov is too slow
 # for per-push feedback but still needed for coverage tracking/badges.

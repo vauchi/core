@@ -23,6 +23,9 @@ pub enum ThemeError {
 
     #[error("Theme not found: {0}")]
     NotFound(String),
+
+    #[error("Invalid theme JSON: {0}")]
+    InvalidThemeJson(String),
 }
 
 /// Theme mode (light or dark)
@@ -139,7 +142,23 @@ fn contrast_ratio(c1: (u8, u8, u8), c2: (u8, u8, u8)) -> f64 {
     (lighter + 0.05) / (darker + 0.05)
 }
 
+/// Load themes from JSON data (e.g. from themes.json remote content).
+///
+/// This is the primary way to load themes. The themes.json file in app-files
+/// is the source of truth for all platform themes. Core bundles a single
+/// fallback theme for first-launch; all others come from this JSON.
+pub fn load_themes_from_json(data: &[u8]) -> Result<Vec<Theme>, ThemeError> {
+    serde_json::from_slice(data).map_err(|e| ThemeError::InvalidThemeJson(e.to_string()))
+}
+
+/// Get the single bundled default theme (fallback for first-launch before
+/// any remote themes are downloaded).
+pub fn default_theme() -> Theme {
+    default_dark()
+}
+
 /// Get all bundled themes
+#[deprecated(note = "Use load_themes_from_json() with remote themes.json instead")]
 pub fn get_bundled_themes() -> Vec<Theme> {
     vec![
         // Default themes
@@ -161,6 +180,8 @@ pub fn get_bundled_themes() -> Vec<Theme> {
 }
 
 /// Get a theme by ID
+#[deprecated(note = "Use load_themes_from_json() with remote themes.json instead")]
+#[allow(deprecated)]
 pub fn get_theme_by_id(id: &str) -> Option<Theme> {
     get_bundled_themes().into_iter().find(|t| t.id == id)
 }
@@ -494,6 +515,7 @@ fn gruvbox_light() -> Theme {
     }
 }
 
+// INLINE_TEST_REQUIRED: contract test needs access to load_themes_from_json and internal parsing
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -541,5 +563,141 @@ mod tests {
     fn test_get_theme_by_id_not_found() {
         let theme = get_theme_by_id("nonexistent");
         assert!(theme.is_none());
+    }
+
+    #[test]
+    fn test_load_themes_from_json_valid() {
+        let json = r##"[{
+            "id": "test-dark",
+            "name": "Test Dark",
+            "version": "1.0.0",
+            "mode": "dark",
+            "colors": {
+                "bg-primary": "#1a1a2e",
+                "bg-secondary": "#16213e",
+                "bg-tertiary": "#0f3460",
+                "text-primary": "#eeeeee",
+                "text-secondary": "#a0a0a0",
+                "accent": "#4fc3f7",
+                "accent-dark": "#0288d1",
+                "success": "#4caf50",
+                "error": "#f44336",
+                "warning": "#ff9800",
+                "border": "#333333"
+            }
+        }]"##;
+        let themes = load_themes_from_json(json.as_bytes()).unwrap();
+        assert_eq!(themes.len(), 1);
+        assert_eq!(themes[0].id, "test-dark");
+        assert_eq!(themes[0].name, "Test Dark");
+        assert_eq!(themes[0].mode, ThemeMode::Dark);
+        assert_eq!(themes[0].colors.bg_primary, "#1a1a2e");
+        assert_eq!(themes[0].colors.accent, "#4fc3f7");
+    }
+
+    #[test]
+    fn test_load_themes_from_json_multiple_themes() {
+        let json = r##"[
+            {"id":"a","name":"A","version":"1.0.0","mode":"dark","colors":{"bg-primary":"#000000","bg-secondary":"#111111","bg-tertiary":"#222222","text-primary":"#ffffff","text-secondary":"#cccccc","accent":"#0000ff","accent-dark":"#000099","success":"#00ff00","error":"#ff0000","warning":"#ffff00","border":"#333333"}},
+            {"id":"b","name":"B","version":"1.0.0","mode":"light","colors":{"bg-primary":"#ffffff","bg-secondary":"#eeeeee","bg-tertiary":"#dddddd","text-primary":"#000000","text-secondary":"#333333","accent":"#0000ff","accent-dark":"#000099","success":"#00ff00","error":"#ff0000","warning":"#ffff00","border":"#cccccc"}}
+        ]"##;
+        let themes = load_themes_from_json(json.as_bytes()).unwrap();
+        assert_eq!(themes.len(), 2);
+        assert_eq!(themes[0].mode, ThemeMode::Dark);
+        assert_eq!(themes[1].mode, ThemeMode::Light);
+    }
+
+    #[test]
+    fn test_load_themes_from_json_invalid_json() {
+        let result = load_themes_from_json(b"not json");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_load_themes_from_json_empty_array() {
+        let result = load_themes_from_json(b"[]").unwrap();
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_load_themes_from_json_preserves_optional_fields() {
+        let json = r##"[{
+            "id": "test",
+            "name": "Test",
+            "version": "1.0.0",
+            "author": "Author Name",
+            "license": "MIT",
+            "source": "https://example.com",
+            "mode": "dark",
+            "colors": {
+                "bg-primary": "#000000","bg-secondary": "#111111","bg-tertiary": "#222222",
+                "text-primary": "#ffffff","text-secondary": "#cccccc",
+                "accent": "#0000ff","accent-dark": "#000099",
+                "success": "#00ff00","error": "#ff0000","warning": "#ffff00","border": "#333333"
+            }
+        }]"##;
+        let themes = load_themes_from_json(json.as_bytes()).unwrap();
+        assert_eq!(themes[0].author.as_deref(), Some("Author Name"));
+        assert_eq!(themes[0].license.as_deref(), Some("MIT"));
+        assert_eq!(themes[0].source.as_deref(), Some("https://example.com"));
+    }
+
+    #[test]
+    fn test_default_theme_returns_valid_dark_theme() {
+        let theme = default_theme();
+        assert_eq!(theme.id, "default-dark");
+        assert_eq!(theme.mode, ThemeMode::Dark);
+        theme
+            .validate_accessibility()
+            .expect("Default theme should pass WCAG AA");
+    }
+
+    /// Contract test: validates core can parse the real themes.json from the sibling repo.
+    /// Set VAUCHI_THEMES_PATH to the path of themes/themes.json to activate.
+    /// Used by CI's validate-content-contracts job to detect parser/schema drift.
+    #[test]
+    fn test_load_real_themes_json() {
+        let path = match std::env::var("VAUCHI_THEMES_PATH") {
+            Ok(p) => p,
+            Err(_) => {
+                // Also try the default sibling repo path
+                let sibling = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                    .join("../../themes/themes.json");
+                if sibling.exists() {
+                    sibling.to_string_lossy().to_string()
+                } else {
+                    eprintln!(
+                        "VAUCHI_THEMES_PATH not set and themes/ sibling repo not found — skipping"
+                    );
+                    return;
+                }
+            }
+        };
+
+        let data = std::fs::read(&path)
+            .unwrap_or_else(|e| panic!("Failed to read themes.json at {path}: {e}"));
+        let themes = load_themes_from_json(&data)
+            .unwrap_or_else(|e| panic!("Core parser cannot parse themes.json at {path}: {e}"));
+
+        assert!(
+            !themes.is_empty(),
+            "themes.json should contain at least one theme"
+        );
+
+        // Verify all themes have non-empty required fields
+        for theme in &themes {
+            assert!(!theme.id.is_empty(), "Theme ID must not be empty");
+            assert!(!theme.name.is_empty(), "Theme name must not be empty");
+            assert!(
+                !theme.colors.bg_primary.is_empty(),
+                "Theme {} missing bg_primary",
+                theme.id
+            );
+        }
+
+        eprintln!(
+            "Contract check passed: core parsed {} themes from {path}",
+            themes.len()
+        );
     }
 }

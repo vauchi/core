@@ -145,3 +145,7 @@ pub use tor::{TorConfig, TorConnector, TorRelayAddress, TorStatus, TorTransport}
 
 #[cfg(feature = "tor")]
 pub use tor::{ArtiTorConnector, TorManager};
+
+// Message classification
+mod classify;
+pub use classify::{classify_message, MessageType};

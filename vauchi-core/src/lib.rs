@@ -64,8 +64,8 @@ pub use i18n::{
 pub use identity::{Identity, IdentityBackup};
 #[cfg(any(feature = "network-native-tls", feature = "network-rustls"))]
 pub use network::{
-    ConnectionState, EmergencyAlert, GeoLocation, MessageEnvelope, MockTransport, NetworkError,
-    RelayClient, RelayClientConfig, Transport, WebSocketTransport,
+    classify_message, ConnectionState, EmergencyAlert, GeoLocation, MessageEnvelope, MessageType,
+    MockTransport, NetworkError, RelayClient, RelayClientConfig, Transport, WebSocketTransport,
 };
 pub use recovery::{
     ConflictingClaim, RecoveryClaim, RecoveryConflict, RecoveryError, RecoveryProof,

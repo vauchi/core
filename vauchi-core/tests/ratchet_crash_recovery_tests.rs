@@ -16,6 +16,7 @@ use vauchi_core::exchange::X3DHKeyPair;
 // =============================================================================
 
 /// Scenario: Ratchet state survives serialization roundtrip
+// @scenario: security.feature:Forward secrecy via Double Ratchet
 #[test]
 fn test_ratchet_state_serialization_roundtrip() {
     let x3dh_secret = SymmetricKey::generate();
@@ -43,6 +44,7 @@ fn test_ratchet_state_serialization_roundtrip() {
 }
 
 /// Scenario: Both parties can restore state and continue
+// @scenario: security.feature:Forward secrecy via Double Ratchet
 #[test]
 fn test_both_parties_restore_state() {
     let x3dh_secret = SymmetricKey::generate();
@@ -82,6 +84,7 @@ fn test_both_parties_restore_state() {
 // =============================================================================
 
 /// Scenario: State can be restored at any point during conversation
+// @scenario: security.feature:Forward secrecy via Double Ratchet
 #[test]
 fn test_restore_mid_conversation() {
     let x3dh_secret = SymmetricKey::generate();
@@ -153,6 +156,7 @@ fn test_dh_ratchet_state_survives() {
 // =============================================================================
 
 /// Scenario: Skipped message keys survive serialization
+// @scenario: security.feature:Forward secrecy via Double Ratchet
 #[test]
 fn test_skipped_keys_survive_serialization() {
     let x3dh_secret = SymmetricKey::generate();

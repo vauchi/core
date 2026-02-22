@@ -21,6 +21,7 @@ const SMK_KEY_NAME: &str = "smk";
 
 /// After SMK is destroyed and re-derived from a different identity,
 /// all prior encrypted data is irrecoverable (different key material).
+// @scenario: privacy_compliance.feature:Crypto-shredding renders card unreadable without key
 #[test]
 fn test_smk_destruction_makes_data_irrecoverable() {
     let identity = Identity::create("Alice");
@@ -55,6 +56,7 @@ fn test_smk_destruction_makes_data_irrecoverable() {
 
 /// FKEK encrypts file keys; after SMK destruction those file keys
 /// are irrecoverable.
+// @scenario: privacy_compliance.feature:Account deletion destroys all content encryption keys
 #[test]
 fn test_fkek_protects_file_keys() {
     let identity = Identity::create("Alice");
@@ -207,6 +209,7 @@ fn test_shredding_isolation_across_identities() {
 // ============================================================
 
 /// Storage opened with SEK works; different SEK cannot read the data.
+// @scenario: security.feature:Local database encryption
 #[test]
 fn test_storage_keyed_by_sek() {
     let identity = Identity::create("Alice");

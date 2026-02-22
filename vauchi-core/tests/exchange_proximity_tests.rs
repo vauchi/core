@@ -8,6 +8,7 @@
 use std::time::Duration;
 use vauchi_core::exchange::*;
 
+// @scenario: contact_exchange.feature:Proximity verification prevents remote exchange
 #[test]
 fn test_mock_proximity_success() {
     let verifier = MockProximityVerifier::success();
@@ -17,6 +18,7 @@ fn test_mock_proximity_success() {
     assert!(result.is_ok());
 }
 
+// @scenario: contact_exchange.feature:Proximity verification prevents remote exchange
 #[test]
 fn test_mock_proximity_failure() {
     let verifier = MockProximityVerifier::failure();
@@ -26,6 +28,7 @@ fn test_mock_proximity_failure() {
     assert!(result.is_err());
 }
 
+// @scenario: contact_exchange.feature:Proximity verification prevents remote exchange
 #[test]
 fn test_mock_proximity_timeout() {
     let verifier = MockProximityVerifier::timeout();
@@ -50,6 +53,7 @@ fn test_mock_records_challenges() {
     assert_eq!(emitted[1], challenge2);
 }
 
+// @scenario: contact_exchange.feature:Proximity verification prevents remote exchange
 #[test]
 fn test_manual_confirmation() {
     let verifier = ManualConfirmationVerifier::new();

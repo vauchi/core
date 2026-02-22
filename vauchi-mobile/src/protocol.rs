@@ -29,6 +29,7 @@ pub use vauchi_core::network::simple_message::SIMPLE_PROTOCOL_VERSION as PROTOCO
 mod tests {
     use super::*;
 
+    // @scenario: relay_network:Relay protocol versioning
     #[test]
     fn test_encode_decode_roundtrip() {
         let handshake = Handshake {
@@ -53,6 +54,7 @@ mod tests {
         }
     }
 
+    // @scenario: contact_exchange:X3DH key agreement during exchange
     #[test]
     fn test_exchange_message_detection() {
         let exchange = ExchangeMessage {

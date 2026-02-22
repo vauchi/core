@@ -14,6 +14,8 @@ use vauchi_core::Identity;
 // =============================================================================
 
 /// Tests that X3DH key agreement produces the same shared secret on both sides
+// @scenario: contact_exchange.feature:X3DH key agreement during exchange
+// @scenario: security.feature:Shared key derivation via X3DH
 #[test]
 fn test_x3dh_key_agreement_produces_same_secret() {
     // Alice and Bob each have identity keys
@@ -33,6 +35,7 @@ fn test_x3dh_key_agreement_produces_same_secret() {
 }
 
 /// Tests that different key pairs produce different shared secrets
+// @scenario: contact_exchange.feature:X3DH key agreement during exchange
 #[test]
 fn test_x3dh_different_keys_different_secrets() {
     let alice = X3DHKeyPair::generate();
@@ -50,6 +53,7 @@ fn test_x3dh_different_keys_different_secrets() {
 }
 
 /// Tests that ephemeral keys are unique per session
+// @scenario: contact_exchange.feature:Mutual QR uses fresh ephemeral keys for forward secrecy
 #[test]
 fn test_x3dh_ephemeral_keys_unique_per_session() {
     let alice = X3DHKeyPair::generate();
@@ -63,6 +67,8 @@ fn test_x3dh_ephemeral_keys_unique_per_session() {
 }
 
 /// Tests that shared secret can be used for encryption
+// @scenario: contact_exchange.feature:Exchange creates mutual keys
+// @scenario: security.feature:Contact cards are encrypted in transit
 #[test]
 fn test_x3dh_shared_secret_usable_for_encryption() {
     use vauchi_core::crypto::{decrypt, encrypt};
@@ -87,6 +93,7 @@ fn test_x3dh_shared_secret_usable_for_encryption() {
 // =============================================================================
 
 /// Tests that QR code contains public key
+// @scenario: contact_exchange.feature:Generate exchange QR code
 #[test]
 fn test_generate_qr_contains_public_key() {
     let identity = Identity::create("Alice");
@@ -97,6 +104,7 @@ fn test_generate_qr_contains_public_key() {
 }
 
 /// Tests QR code roundtrip encode/decode
+// @scenario: contact_exchange.feature:Generate exchange QR code
 #[test]
 fn test_qr_roundtrip_encode_decode() {
     let identity = Identity::create("Alice");
@@ -111,6 +119,7 @@ fn test_qr_roundtrip_encode_decode() {
 }
 
 /// Tests that QR code expires after 5 minutes
+// @scenario: contact_exchange.feature:QR code expiration
 #[test]
 fn test_qr_expires_after_5_minutes() {
     let identity = Identity::create("Alice");
@@ -135,6 +144,7 @@ fn test_qr_expires_after_5_minutes() {
 }
 
 /// Tests QR signature verification
+// @scenario: contact_exchange.feature:Exchange verifies identity
 #[test]
 fn test_qr_signature_verification() {
     let identity = Identity::create("Alice");
@@ -145,6 +155,7 @@ fn test_qr_signature_verification() {
 }
 
 /// Tests that malformed QR data is rejected
+// @scenario: contact_exchange.feature:Handle malformed QR code
 #[test]
 fn test_malformed_qr_rejected() {
     let result = ExchangeQR::from_data_string("not-valid-qr-data");
@@ -155,6 +166,7 @@ fn test_malformed_qr_rejected() {
 }
 
 /// Tests that QR from different app/protocol is rejected
+// @scenario: contact_exchange.feature:Handle non-Vauchi QR code
 #[test]
 fn test_non_vauchi_qr_rejected() {
     // Random base64 data that's not our protocol
@@ -173,6 +185,7 @@ use vauchi_core::exchange::{BLEDevice, BLEProximityVerifier, MockBLEVerifier, Pr
 /// Feature: Contact Card Exchange
 /// Scenario: Discover nearby Vauchi users via BLE
 /// Tests that BLE can discover nearby devices advertising Vauchi
+// @scenario: contact_exchange.feature:Discover nearby Vauchi users via BLE
 #[test]
 fn test_ble_discover_nearby_vauchi_users() {
     // Given Alice has BLE enabled
@@ -195,6 +208,7 @@ fn test_ble_discover_nearby_vauchi_users() {
 /// Feature: Contact Card Exchange
 /// Scenario: Initiate BLE exchange
 /// Tests BLE exchange succeeds when devices are within 2 meters
+// @scenario: contact_exchange.feature:Initiate BLE exchange
 #[test]
 fn test_ble_exchange_succeeds_within_2_meters() {
     // Given Alice sees Bob in the nearby users list
@@ -213,6 +227,7 @@ fn test_ble_exchange_succeeds_within_2_meters() {
 /// Feature: Contact Card Exchange
 /// Scenario: BLE exchange blocked when too far
 /// Tests that exchange is blocked when devices are more than 2 meters apart
+// @scenario: contact_exchange.feature:BLE exchange blocked when too far
 #[test]
 fn test_ble_exchange_blocked_when_too_far() {
     // Given Alice sees Bob in the nearby users list
@@ -230,6 +245,8 @@ fn test_ble_exchange_blocked_when_too_far() {
 /// Feature: Contact Card Exchange
 /// Scenario: BLE exchange with relay attack prevention
 /// Tests that challenge-response detects relay attacks
+// @scenario: contact_exchange.feature:BLE exchange with relay attack prevention
+// @scenario: security.feature:Relay attack prevention on BLE
 #[test]
 fn test_ble_relay_attack_detection() {
     // Given an attacker is relaying BLE signals
@@ -309,6 +326,7 @@ fn test_ble_discovery_failure() {
 use vauchi_core::exchange::{ManualConfirmationVerifier, ProximityVerifier};
 
 /// Tests manual confirmation exchange initiates when both parties confirm
+// @scenario: contact_exchange.feature:Desktop exchange without audio (requires confirmation)
 #[test]
 fn test_manual_proximity_exchange_initiation() {
     // Given Alice and Bob are physically present
@@ -364,6 +382,8 @@ use vauchi_core::exchange::EncryptedExchangeMessage;
 
 /// Tests that exchange messages are properly encrypted with X3DH shared secret.
 /// This ensures the relay cannot see identity keys or display names.
+// @scenario: security.feature:Contact cards are encrypted in transit
+// @scenario: contact_exchange.feature:X3DH key agreement during exchange
 #[test]
 fn test_exchange_message_is_encrypted_not_plaintext() {
     // Given Alice and Bob want to exchange contacts
@@ -404,6 +424,7 @@ fn test_exchange_message_is_encrypted_not_plaintext() {
 }
 
 /// Tests that the recipient can decrypt the exchange message using X3DH.
+// @scenario: contact_exchange.feature:Exchange creates mutual keys
 #[test]
 fn test_exchange_message_recipient_can_decrypt() {
     // Given Alice creates an encrypted exchange message for Bob
@@ -433,6 +454,7 @@ fn test_exchange_message_recipient_can_decrypt() {
 }
 
 /// Tests that wrong keys cannot decrypt the exchange message.
+// @scenario: security.feature:Man-in-the-middle detection during exchange
 #[test]
 fn test_exchange_message_wrong_key_fails_decrypt() {
     // Given Alice creates an encrypted exchange message for Bob
@@ -460,6 +482,8 @@ fn test_exchange_message_wrong_key_fails_decrypt() {
 
 /// Tests that the relay cannot read exchange message contents.
 /// This is the critical security property - relay only sees opaque ciphertext.
+// @scenario: security.feature:Server cannot access plaintext
+// @scenario: relay_network.feature:Relay only sees encrypted blobs
 #[test]
 fn test_relay_cannot_read_exchange_message() {
     let alice = X3DHKeyPair::generate();

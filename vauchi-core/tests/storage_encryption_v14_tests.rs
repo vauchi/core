@@ -22,6 +22,7 @@ fn open_storage() -> (tempfile::TempDir, Storage) {
 
 // === Migration Tests ===
 
+// @scenario: security.feature:Local database encryption
 #[test]
 fn test_migration_v14_adds_encrypted_columns() {
     let (dir, _storage) = open_storage();
@@ -112,6 +113,7 @@ fn test_device_info_encrypted_roundtrip() {
     assert_eq!(loaded.3, 1000);
 }
 
+// @scenario: security.feature:Local database encryption
 #[test]
 fn test_device_info_stored_as_encrypted_blob() {
     let (dir, storage) = open_storage();
@@ -165,6 +167,7 @@ fn test_version_vector_encrypted_roundtrip() {
     assert_eq!(loaded.get(&[0x02; 32]), vector.get(&[0x02; 32]));
 }
 
+// @scenario: security.feature:Local database encryption
 #[test]
 fn test_version_vector_stored_as_encrypted_blob() {
     let (dir, storage) = open_storage();
@@ -265,6 +268,7 @@ fn test_pending_update_encrypted_roundtrip() {
     assert_eq!(loaded.contact_id, "contact-1");
 }
 
+// @scenario: security.feature:Local database encryption
 #[test]
 fn test_pending_update_payload_stored_encrypted() {
     let (dir, storage) = open_storage();
@@ -328,6 +332,7 @@ fn test_retry_entry_encrypted_roundtrip() {
     assert_eq!(loaded.recipient_id, "recipient-1");
 }
 
+// @scenario: security.feature:Local database encryption
 #[test]
 fn test_retry_entry_payload_stored_encrypted() {
     let (dir, storage) = open_storage();
@@ -481,6 +486,7 @@ fn test_deletion_state_encrypted_roundtrip() {
     assert_eq!(loaded, state);
 }
 
+// @scenario: security.feature:Local database encryption
 #[test]
 fn test_deletion_state_stored_encrypted() {
     let (dir, storage) = open_storage();

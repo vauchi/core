@@ -3582,6 +3582,7 @@ mod tests {
         (wb, dir)
     }
 
+    // @scenario: identity_management:User creates a new identity
     #[test]
     fn test_create_identity() {
         let (wb, _dir) = create_test_instance();
@@ -3594,6 +3595,7 @@ mod tests {
         assert_eq!(name, "Alice");
     }
 
+    // @scenario: contact_card_management:User adds a field to their card
     #[test]
     fn test_add_field() {
         let (wb, _dir) = create_test_instance();
@@ -3612,6 +3614,7 @@ mod tests {
         assert_eq!(card.fields[0].value, "alice@company.com");
     }
 
+    // @scenario: contact_card_management:User edits a field on their card
     #[test]
     fn test_update_field() {
         let (wb, _dir) = create_test_instance();
@@ -3631,6 +3634,7 @@ mod tests {
         assert_eq!(card.fields[0].value, "+0987654321");
     }
 
+    // @scenario: contact_card_management:User removes a field from their card
     #[test]
     fn test_remove_field() {
         let (wb, _dir) = create_test_instance();
@@ -3650,6 +3654,7 @@ mod tests {
         assert!(card.fields.is_empty());
     }
 
+    // @scenario: contact_card_management:Social network profile links
     #[test]
     fn test_social_networks() {
         let (wb, _dir) = create_test_instance();
@@ -3664,6 +3669,7 @@ mod tests {
         assert_eq!(url, Some("https://github.com/octocat".to_string()));
     }
 
+    // @scenario: contact_exchange:Two users exchange contact cards via QR code
     #[test]
     fn test_exchange_session_qr() {
         let (wb, _dir) = create_test_instance();
@@ -3677,6 +3683,7 @@ mod tests {
         );
     }
 
+    // @scenario: identity_management:User exports and imports backup
     #[test]
     fn test_backup_restore() {
         let (wb, _dir) = create_test_instance();
@@ -3709,6 +3716,7 @@ mod tests {
         assert_eq!(name, "Alice");
     }
 
+    // @scenario: device_management:User views linked devices
     #[test]
     fn test_get_devices_no_registry() {
         let (wb, _dir) = create_test_instance();
@@ -3722,6 +3730,7 @@ mod tests {
         assert_eq!(devices[0].device_index, 0);
     }
 
+    // @scenario: device_management:User links a new device
     #[test]
     fn test_generate_device_link_qr() {
         let (wb, _dir) = create_test_instance();
@@ -3733,6 +3742,7 @@ mod tests {
         assert!(link_data.expires_at > link_data.timestamp);
     }
 
+    // @scenario: device_management:User links a new device
     #[test]
     fn test_parse_device_link_qr() {
         let (wb, _dir) = create_test_instance();
@@ -3745,6 +3755,7 @@ mod tests {
         assert!(!parsed.is_expired);
     }
 
+    // @scenario: device_management:Invalid device link QR rejected
     #[test]
     fn test_parse_device_link_qr_invalid() {
         let (wb, _dir) = create_test_instance();
@@ -3754,6 +3765,7 @@ mod tests {
         assert!(result.is_err());
     }
 
+    // @scenario: device_management:User views linked devices
     #[test]
     fn test_device_count() {
         let (wb, _dir) = create_test_instance();
@@ -3763,6 +3775,7 @@ mod tests {
         assert_eq!(count, 1);
     }
 
+    // @scenario: device_management:User views linked devices
     #[test]
     fn test_is_primary_device() {
         let (wb, _dir) = create_test_instance();
@@ -3772,6 +3785,7 @@ mod tests {
         assert!(is_primary);
     }
 
+    // @scenario: device_management:User unlinks a device
     #[test]
     fn test_unlink_device_no_registry() {
         let (wb, _dir) = create_test_instance();
@@ -3784,6 +3798,7 @@ mod tests {
 
     // === GDPR Tests ===
 
+    // @scenario: privacy_compliance:User exports GDPR data
     #[test]
     fn test_export_gdpr_data() {
         let (wb, _dir) = create_test_instance();
@@ -3807,6 +3822,7 @@ mod tests {
         assert!(parsed["settings"].is_object());
     }
 
+    // @scenario: privacy_compliance:User schedules account deletion
     #[test]
     fn test_schedule_cancel_deletion() {
         let (wb, _dir) = create_test_instance();
@@ -3828,6 +3844,7 @@ mod tests {
         assert_eq!(info.state, MobileDeletionState::None);
     }
 
+    // @scenario: privacy_compliance:User manages consent preferences
     #[test]
     fn test_consent_grant_revoke() {
         let (wb, _dir) = create_test_instance();
@@ -3851,6 +3868,7 @@ mod tests {
         assert!(!granted);
     }
 
+    // @scenario: privacy_compliance:User manages consent preferences
     #[test]
     fn test_consent_records_list() {
         let (wb, _dir) = create_test_instance();
@@ -3864,6 +3882,7 @@ mod tests {
         assert!(records.len() >= 3);
     }
 
+    // @scenario: security:Contact card signatures verified
     #[test]
     fn test_mobile_revocation_sender_implements_trait() {
         fn accepts_sender(_: &mut dyn vauchi_core::api::RevocationSender) {}
@@ -3872,6 +3891,7 @@ mod tests {
         accepts_sender(&mut sender);
     }
 
+    // @scenario: security:Contact card signatures verified
     #[test]
     fn test_revocation_to_simple_conversion() {
         // Core AccountRevoked should convert to SimpleAccountRevoked correctly
@@ -3894,6 +3914,7 @@ mod tests {
         assert!(simple.signature.iter().all(|b| *b == 0xAB));
     }
 
+    // @scenario: contacts_management:View contacts list
     #[test]
     fn test_list_contacts_paginated() {
         let (wb, _dir) = create_test_instance();
@@ -3906,6 +3927,7 @@ mod tests {
 
     // === Fingerprint Verification Tests (P0-4) ===
 
+    // @scenario: security:Verify contact fingerprint manually
     #[test]
     fn test_mobile_contact_has_fingerprint_field() {
         let (wb, _dir) = create_test_instance();
@@ -3935,6 +3957,7 @@ mod tests {
         assert_eq!(groups.len(), 16);
     }
 
+    // @scenario: identity_management:Identity verification via public key fingerprint
     #[test]
     fn test_get_own_fingerprint() {
         let (wb, _dir) = create_test_instance();
@@ -3955,6 +3978,7 @@ mod tests {
 
     // === Device Link Initiator/Responder Tests ===
 
+    // @scenario: device_management:Generate device linking code
     #[test]
     fn test_start_device_link_returns_initiator() {
         let (wb, _dir) = create_test_instance();
@@ -3968,6 +3992,7 @@ mod tests {
         assert_eq!(challenge.len(), 16);
     }
 
+    // @scenario: device_management:Link new device via QR code
     #[test]
     fn test_start_device_join_returns_responder() {
         let (wb, _dir) = create_test_instance();
@@ -3990,6 +4015,7 @@ mod tests {
         assert_eq!(code.len(), 7); // "XXX-XXX"
     }
 
+    // @scenario: device_management:Link new device via QR code
     #[test]
     fn test_device_link_full_flow() {
         let (wb, _dir) = create_test_instance();
@@ -4031,6 +4057,7 @@ mod tests {
         assert!(join_result.success);
     }
 
+    // @scenario: device_management:Linking requires proximity verification
     #[test]
     fn test_device_link_confirm_without_proximity_fails() {
         let (wb, _dir) = create_test_instance();

@@ -5,6 +5,7 @@
 use vauchi_core::exchange::*;
 use vauchi_core::*;
 
+// @scenario: contact_exchange.feature:QR code exchange blocked without proximity
 #[test]
 fn test_lazy_frontend_skips_they_scanned() {
     let alice_identity = Identity::create("Alice");
@@ -39,6 +40,7 @@ fn test_lazy_frontend_skips_they_scanned() {
     );
 }
 
+// @scenario: contact_exchange.feature:QR code exchange blocked without proximity
 #[test]
 fn test_formalized_state_machine() {
     let alice_identity = Identity::create("Alice");

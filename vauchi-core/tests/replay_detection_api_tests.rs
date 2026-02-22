@@ -70,6 +70,7 @@ fn create_encrypted_update(
     serde_json::to_vec(&ratchet_msg).unwrap()
 }
 
+// @scenario: security.feature:Replay attack prevention
 #[test]
 fn test_replay_rejects_duplicate_payload() {
     let (alice, bob_id, bob_identity, mut bob_ratchet) = setup_alice_receiving_from_bob();
@@ -93,6 +94,7 @@ fn test_replay_rejects_duplicate_payload() {
     assert!(result2.is_err(), "Duplicate payload should be rejected");
 }
 
+// @scenario: security.feature:Replay attack prevention
 #[test]
 fn test_replay_rejects_reused_nonce_different_encryption() {
     let (alice, bob_id, bob_identity, mut bob_ratchet) = setup_alice_receiving_from_bob();
@@ -140,6 +142,7 @@ fn test_replay_rejects_reused_nonce_different_encryption() {
     );
 }
 
+// @scenario: security.feature:Replay attack prevention
 #[test]
 fn test_replay_accepts_fresh_nonces() {
     let (alice, bob_id, bob_identity, mut bob_ratchet) = setup_alice_receiving_from_bob();
@@ -172,6 +175,7 @@ fn test_replay_accepts_fresh_nonces() {
     assert_eq!(nonces.len(), 2, "Two distinct nonces should be persisted");
 }
 
+// @scenario: security.feature:Replay attack prevention
 #[test]
 fn test_replay_nonce_persisted_after_successful_update() {
     let (alice, bob_id, bob_identity, mut bob_ratchet) = setup_alice_receiving_from_bob();

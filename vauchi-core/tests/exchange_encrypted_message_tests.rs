@@ -7,6 +7,7 @@
 
 use vauchi_core::exchange::*;
 
+// @scenario: contact_exchange.feature:X3DH key agreement during exchange
 #[test]
 fn test_encrypted_message_basic_roundtrip() {
     let alice = X3DHKeyPair::generate();
@@ -27,6 +28,7 @@ fn test_encrypted_message_basic_roundtrip() {
 }
 
 /// Wire format includes sender_exchange_key for identity binding.
+// @scenario: contact_exchange.feature:Exchange verifies identity
 #[test]
 fn test_encrypted_message_contains_sender_exchange_key() {
     let alice = X3DHKeyPair::generate();
@@ -43,6 +45,7 @@ fn test_encrypted_message_contains_sender_exchange_key() {
 }
 
 /// Full roundtrip with identity binding: create + decrypt produces matching keys.
+// @scenario: contact_exchange.feature:Exchange creates mutual keys
 #[test]
 fn test_encrypted_message_roundtrip_with_identity_binding() {
     let alice = X3DHKeyPair::generate();

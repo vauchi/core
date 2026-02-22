@@ -16,6 +16,7 @@ use vauchi_core::exchange::X3DHKeyPair;
 // =============================================================================
 
 /// Scenario: Same message cannot be decrypted twice
+// @scenario: security.feature:Replay attack prevention
 #[test]
 fn test_same_message_decrypted_once() {
     let x3dh_secret = SymmetricKey::generate();
@@ -45,6 +46,7 @@ fn test_same_message_decrypted_once() {
 }
 
 /// Scenario: Replayed message with same index fails after chain advances
+// @scenario: security.feature:Replay attack prevention
 #[test]
 fn test_replay_after_chain_advance() {
     let x3dh_secret = SymmetricKey::generate();
@@ -77,6 +79,7 @@ fn test_replay_after_chain_advance() {
 }
 
 /// Scenario: Out-of-order messages work, but duplicates don't
+// @scenario: security.feature:Replay attack prevention
 #[test]
 fn test_out_of_order_vs_duplicate() {
     let x3dh_secret = SymmetricKey::generate();
@@ -113,6 +116,7 @@ fn test_out_of_order_vs_duplicate() {
 // =============================================================================
 
 /// Scenario: Message from old DH generation rejected after ratchet
+// @scenario: security.feature:Replay attack prevention
 #[test]
 fn test_old_dh_generation_rejected() {
     let x3dh_secret = SymmetricKey::generate();
@@ -151,6 +155,7 @@ fn test_old_dh_generation_rejected() {
 // =============================================================================
 
 /// Scenario: Skipped keys are deleted after use
+// @scenario: security.feature:Replay attack prevention
 #[test]
 fn test_skipped_keys_deleted_after_use() {
     let x3dh_secret = SymmetricKey::generate();
@@ -185,6 +190,7 @@ fn test_skipped_keys_deleted_after_use() {
 }
 
 /// Scenario: Too many skipped messages rejected (DoS protection)
+// @scenario: security.feature:Replay attack prevention
 #[test]
 fn test_too_many_skipped_messages() {
     let x3dh_secret = SymmetricKey::generate();
@@ -214,6 +220,7 @@ fn test_too_many_skipped_messages() {
 
 /// Scenario: Replay detection doesn't rely on timestamps alone
 /// (Important: nonce/index based detection works regardless of clock)
+// @scenario: security.feature:Replay attack prevention
 #[test]
 fn test_replay_detection_timestamp_independent() {
     let x3dh_secret = SymmetricKey::generate();
@@ -243,6 +250,7 @@ fn test_replay_detection_timestamp_independent() {
 // =============================================================================
 
 /// Scenario: Message from one chain can't be replayed on another
+// @scenario: security.feature:Replay attack prevention
 #[test]
 fn test_cross_chain_replay_prevention() {
     let x3dh_secret = SymmetricKey::generate();

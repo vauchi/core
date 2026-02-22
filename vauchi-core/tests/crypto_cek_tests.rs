@@ -11,6 +11,8 @@
 
 use vauchi_core::crypto::cek::ContentEncryptionKey;
 
+// @scenario: security.feature:Contact cards are encrypted at rest
+// @scenario: privacy_compliance.feature:Card updates use per-contact content encryption key
 #[test]
 fn test_cek_generate_encrypt_decrypt() {
     let cek = ContentEncryptionKey::generate();
@@ -23,6 +25,7 @@ fn test_cek_generate_encrypt_decrypt() {
     assert_eq!(decrypted, plaintext);
 }
 
+// @scenario: security.feature:Contact cards are encrypted at rest
 #[test]
 fn test_cek_different_keys_cannot_decrypt() {
     let cek1 = ContentEncryptionKey::generate();
@@ -34,6 +37,7 @@ fn test_cek_different_keys_cannot_decrypt() {
     assert!(result.is_err(), "different CEK should not decrypt");
 }
 
+// @scenario: security.feature:Forward secrecy via Double Ratchet
 #[test]
 fn test_cek_rotation_invalidates_old() {
     let old_cek = ContentEncryptionKey::generate();
@@ -56,6 +60,7 @@ fn test_cek_rotation_invalidates_old() {
     assert!(old_cek.decrypt(&ciphertext_v2).is_err());
 }
 
+// @scenario: security.feature:Secure deletion of data
 #[test]
 fn test_cek_destroy_renders_card_unreadable() {
     let cek = ContentEncryptionKey::generate();
@@ -111,6 +116,7 @@ fn test_cek_encrypt_large_payload() {
     assert_eq!(decrypted, plaintext);
 }
 
+// @scenario: security.feature:Correct algorithms used
 #[test]
 fn test_cek_ciphertext_is_tagged_xchacha20() {
     let cek = ContentEncryptionKey::generate();

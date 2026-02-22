@@ -35,6 +35,7 @@ fn ensure_init() {
 // Based on: features/identity_management.feature - Backup security
 // ============================================================================
 
+// @scenario: identity_management:Password strength validation
 /// Test: Short passwords are rejected
 #[test]
 fn test_password_too_short() {
@@ -44,6 +45,7 @@ fn test_password_too_short() {
     assert!(result.feedback.contains("8 characters"));
 }
 
+// @scenario: identity_management:Password strength validation
 /// Test: Common passwords are weak
 #[test]
 fn test_common_passwords_are_weak() {
@@ -60,6 +62,7 @@ fn test_common_passwords_are_weak() {
     }
 }
 
+// @scenario: identity_management:Password strength validation
 /// Test: Strong passwords are accepted
 #[test]
 fn test_strong_passwords() {
@@ -79,6 +82,7 @@ fn test_strong_passwords() {
     }
 }
 
+// @scenario: identity_management:Password strength validation
 /// Test: Empty password is too weak
 #[test]
 fn test_empty_password() {
@@ -87,6 +91,7 @@ fn test_empty_password() {
     assert!(!result.is_acceptable);
 }
 
+// @scenario: identity_management:Password strength validation
 /// Test: Exactly 8 character password
 #[test]
 fn test_minimum_length_password() {
@@ -100,6 +105,7 @@ fn test_minimum_length_password() {
 // Based on: features/identity_management.feature - Secure storage
 // ============================================================================
 
+// @scenario: security:Sufficient key lengths
 /// Test: Storage key is 32 bytes
 #[test]
 fn test_storage_key_length() {
@@ -107,6 +113,7 @@ fn test_storage_key_length() {
     assert_eq!(key.len(), 32, "Storage key must be exactly 32 bytes");
 }
 
+// @scenario: security:Sufficient key lengths
 /// Test: Storage keys are unique
 #[test]
 fn test_storage_keys_are_unique() {
@@ -119,6 +126,7 @@ fn test_storage_keys_are_unique() {
     assert_ne!(key1, key3, "Keys should be unique");
 }
 
+// @scenario: security:Sufficient key lengths
 /// Test: Storage key is not all zeros
 #[test]
 fn test_storage_key_not_zeros() {
@@ -132,6 +140,7 @@ fn test_storage_key_not_zeros() {
 // Based on: Security requirements for URL handling
 // ============================================================================
 
+// @scenario: security:No weak cryptography
 /// Test: HTTPS URLs are safe
 #[test]
 fn test_https_urls_safe() {
@@ -142,12 +151,14 @@ fn test_https_urls_safe() {
     ));
 }
 
+// @scenario: security:No weak cryptography
 /// Test: HTTP URLs are safe (will be upgraded)
 #[test]
 fn test_http_urls_safe() {
     assert!(is_safe_url("http://example.com".to_string()));
 }
 
+// @scenario: security:No weak cryptography
 /// Test: Tel URLs are safe
 #[test]
 fn test_tel_urls_safe() {
@@ -155,6 +166,7 @@ fn test_tel_urls_safe() {
     assert!(is_safe_url("tel:123-456-7890".to_string()));
 }
 
+// @scenario: security:No weak cryptography
 /// Test: Mailto URLs are safe
 #[test]
 fn test_mailto_urls_safe() {
@@ -164,18 +176,21 @@ fn test_mailto_urls_safe() {
     ));
 }
 
+// @scenario: security:No weak cryptography
 /// Test: SMS URLs are safe
 #[test]
 fn test_sms_urls_safe() {
     assert!(is_safe_url("sms:+1234567890".to_string()));
 }
 
+// @scenario: security:No weak cryptography
 /// Test: Geo URLs are safe
 #[test]
 fn test_geo_urls_safe() {
     assert!(is_safe_url("geo:37.7749,-122.4194".to_string()));
 }
 
+// @scenario: security:No weak cryptography
 /// Test: JavaScript URLs are blocked
 #[test]
 fn test_javascript_urls_blocked() {
@@ -183,6 +198,7 @@ fn test_javascript_urls_blocked() {
     assert!(!is_safe_url("JAVASCRIPT:void(0)".to_string()));
 }
 
+// @scenario: security:No weak cryptography
 /// Test: Data URLs are blocked
 #[test]
 fn test_data_urls_blocked() {
@@ -191,6 +207,7 @@ fn test_data_urls_blocked() {
     ));
 }
 
+// @scenario: security:No weak cryptography
 /// Test: File URLs are blocked
 #[test]
 fn test_file_urls_blocked() {
@@ -201,6 +218,7 @@ fn test_file_urls_blocked() {
 // Scheme Validation Tests
 // ============================================================================
 
+// @scenario: security:No weak cryptography
 /// Test: Allowed schemes
 #[test]
 fn test_allowed_schemes() {
@@ -212,6 +230,7 @@ fn test_allowed_schemes() {
     assert!(is_allowed_scheme("geo".to_string()));
 }
 
+// @scenario: security:No weak cryptography
 /// Test: Blocked schemes
 #[test]
 fn test_blocked_schemes() {
@@ -223,6 +242,7 @@ fn test_blocked_schemes() {
     assert!(is_blocked_scheme("blob".to_string()));
 }
 
+// @scenario: security:No weak cryptography
 /// Test: Unknown schemes are not explicitly allowed or blocked
 #[test]
 fn test_unknown_schemes() {
@@ -239,6 +259,7 @@ fn test_unknown_schemes() {
 // Edge Cases
 // ============================================================================
 
+// @scenario: security:No weak cryptography
 /// Test: Empty URL
 #[test]
 fn test_empty_url() {
@@ -248,6 +269,7 @@ fn test_empty_url() {
     assert!(!result);
 }
 
+// @scenario: security:No weak cryptography
 /// Test: Malformed URLs
 #[test]
 fn test_malformed_urls() {
@@ -256,6 +278,7 @@ fn test_malformed_urls() {
     assert!(!is_safe_url("://missing-scheme".to_string()));
 }
 
+// @scenario: security:No weak cryptography
 /// Test: Unicode in URLs
 #[test]
 fn test_unicode_urls() {
@@ -264,6 +287,7 @@ fn test_unicode_urls() {
     let _ = result;
 }
 
+// @scenario: security:No weak cryptography
 /// Test: Very long URL
 #[test]
 fn test_long_url() {
@@ -278,6 +302,7 @@ fn test_long_url() {
 // Based on: features/help_system.feature - Localized help content
 // ============================================================================
 
+// @scenario: help_faq:FAQ localization for supported languages
 /// Test: Get all FAQs in German returns same count as English
 #[test]
 fn test_get_faqs_localized_german_count() {
@@ -288,6 +313,7 @@ fn test_get_faqs_localized_german_count() {
     assert!(!german.is_empty());
 }
 
+// @scenario: help_faq:FAQ localization for supported languages
 /// Test: German FAQs contain German text
 #[test]
 fn test_get_faqs_localized_german_content() {
@@ -301,6 +327,7 @@ fn test_get_faqs_localized_german_content() {
     );
 }
 
+// @scenario: help_faq:FAQ localization for supported languages
 /// Test: French FAQs contain French text
 #[test]
 fn test_get_faqs_localized_french_content() {
@@ -314,6 +341,7 @@ fn test_get_faqs_localized_french_content() {
     );
 }
 
+// @scenario: help_faq:FAQ localization for supported languages
 /// Test: Spanish FAQs contain Spanish text
 #[test]
 fn test_get_faqs_localized_spanish_content() {
@@ -327,6 +355,7 @@ fn test_get_faqs_localized_spanish_content() {
     );
 }
 
+// @scenario: help_faq:Browse FAQs in a category
 /// Test: Get FAQs by category in German
 #[test]
 fn test_get_faqs_by_category_localized() {
@@ -339,6 +368,7 @@ fn test_get_faqs_by_category_localized() {
     }
 }
 
+// @scenario: help_faq:View a specific FAQ
 /// Test: Get specific FAQ by ID in German
 #[test]
 fn test_get_faq_by_id_localized() {
@@ -348,6 +378,7 @@ fn test_get_faq_by_id_localized() {
     assert!(faq.unwrap().question.contains("Telefon"));
 }
 
+// @scenario: help_faq:View a specific FAQ
 /// Test: Get FAQ by ID that doesn't exist
 #[test]
 fn test_get_faq_by_id_localized_not_found() {
@@ -356,6 +387,7 @@ fn test_get_faq_by_id_localized_not_found() {
     assert!(faq.is_none());
 }
 
+// @scenario: help_faq:Search FAQs by keyword
 /// Test: Search FAQs in German
 #[test]
 fn test_search_faqs_localized_german() {
@@ -364,6 +396,7 @@ fn test_search_faqs_localized_german() {
     assert!(!results.is_empty(), "Should find German encryption FAQ");
 }
 
+// @scenario: help_faq:Search FAQs by keyword
 /// Test: Search FAQs in English
 #[test]
 fn test_search_faqs_localized_english() {
@@ -372,6 +405,7 @@ fn test_search_faqs_localized_english() {
     assert!(!results.is_empty(), "Should find English encryption FAQ");
 }
 
+// @scenario: help_faq:Search with no results
 /// Test: Search with no results
 #[test]
 fn test_search_faqs_localized_no_results() {
@@ -385,6 +419,7 @@ fn test_search_faqs_localized_no_results() {
 // Based on: features/aha_moments.feature - Localized milestone celebrations
 // ============================================================================
 
+// @scenario: aha_moments:Card creation shows completion message
 /// Test: Get aha moment localized in German
 #[test]
 fn test_aha_moment_localized_german() {
@@ -402,6 +437,7 @@ fn test_aha_moment_localized_german() {
     assert!(moment.has_animation);
 }
 
+// @scenario: aha_moments:Card creation shows completion message
 /// Test: Get aha moment localized in English
 #[test]
 fn test_aha_moment_localized_english() {
@@ -414,6 +450,7 @@ fn test_aha_moment_localized_english() {
     assert!(!moment.message.is_empty());
 }
 
+// @scenario: aha_moments:Aha moments are tracked per milestone
 /// Test: All moment types return localized content
 #[test]
 fn test_all_aha_moments_localized() {
@@ -440,6 +477,7 @@ fn test_all_aha_moments_localized() {
     }
 }
 
+// @scenario: aha_moments:First edit shows would-update feedback
 /// Test: French aha moment content
 #[test]
 fn test_aha_moment_localized_french() {

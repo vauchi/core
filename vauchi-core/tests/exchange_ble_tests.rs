@@ -8,6 +8,7 @@
 use std::time::Duration;
 use vauchi_core::exchange::*;
 
+// @scenario: contact_exchange.feature:Discover nearby Vauchi users via BLE
 #[test]
 fn test_ble_discover_nearby_devices() {
     let devices = vec![
@@ -23,6 +24,7 @@ fn test_ble_discover_nearby_devices() {
     assert_eq!(discovered[1].name.as_deref(), Some("Bob's Phone"));
 }
 
+// @scenario: contact_exchange.feature:Initiate BLE exchange
 #[test]
 fn test_ble_accept_within_2_meters() {
     let verifier = MockBLEVerifier::success_at_distance(1.5); // 1.5 meters away
@@ -32,6 +34,7 @@ fn test_ble_accept_within_2_meters() {
     assert!(verifier.verify_device_proximity(device).is_ok());
 }
 
+// @scenario: contact_exchange.feature:BLE exchange blocked when too far
 #[test]
 fn test_ble_reject_if_too_far() {
     let verifier = MockBLEVerifier::success_at_distance(5.0); // 5 meters away
@@ -43,6 +46,7 @@ fn test_ble_reject_if_too_far() {
     assert!(matches!(result, Err(ProximityError::TooFar)));
 }
 
+// @scenario: contact_exchange.feature:Initiate BLE exchange
 #[test]
 fn test_ble_device_with_exchange_token() {
     let token = [42u8; 32];

@@ -21,6 +21,7 @@ use vauchi_core::network::{verify_pin, PinnedCertificate};
 /// A valid SHA-256 fingerprint must be exactly 32 bytes.
 ///
 /// Maps to: @format "the pin should be exactly 32 bytes"
+// @scenario: certificate_pinning.feature:Pin is SHA-256 hash of DER certificate
 #[test]
 fn test_pin_format_validation_correct_length() {
     // Valid 32-byte fingerprint
@@ -32,6 +33,7 @@ fn test_pin_format_validation_correct_length() {
 /// Tests that pins computed from DER certificates are always 32 bytes.
 ///
 /// Maps to: @format "the pin should be the SHA-256 hash of the DER bytes"
+// @scenario: certificate_pinning.feature:Pin is SHA-256 hash of DER certificate
 #[test]
 fn test_pin_format_validation_from_der_is_sha256() {
     let cert_der = b"test DER-encoded certificate data";
@@ -88,6 +90,7 @@ fn test_pin_format_validation_different_inputs_different_hashes() {
 /// Tests that the same DER input always produces the same fingerprint.
 ///
 /// Maps to: @format "Pin computation is deterministic"
+// @scenario: certificate_pinning.feature:Pin computation is deterministic
 #[test]
 fn test_pin_format_validation_deterministic() {
     let cert_der = b"Consistent DER certificate content";
@@ -112,6 +115,8 @@ fn test_pin_format_validation_deterministic() {
 ///
 /// Maps to: @mitm "Detect MITM with forged certificate"
 /// Maps to: @pin "Connection rejected with mismatched certificate"
+// @scenario: certificate_pinning.feature:Detect MITM with forged certificate
+// @scenario: certificate_pinning.feature:Connection rejected with mismatched certificate
 #[test]
 fn test_mitm_detection_mismatched_certificate() {
     // The legitimate server's certificate
@@ -133,6 +138,7 @@ fn test_mitm_detection_mismatched_certificate() {
 /// Tests that a matching certificate passes verification.
 ///
 /// Maps to: @pin "Connection succeeds with matching certificate pin"
+// @scenario: certificate_pinning.feature:Connection succeeds with matching certificate pin
 #[test]
 fn test_mitm_detection_matching_certificate_passes() {
     let server_cert = b"Actual Server Certificate DER";
@@ -168,6 +174,7 @@ fn test_mitm_detection_wrong_fingerprint() {
 ///
 /// Maps to: @mitm "Pin verification happens before sending data"
 /// Maps to: @pin "Empty pin list rejects all certificates"
+// @scenario: certificate_pinning.feature:Empty pin list rejects all certificates
 #[test]
 fn test_mitm_detection_empty_pins_rejects_all() {
     let any_cert = b"Any Certificate";
@@ -211,6 +218,8 @@ fn test_mitm_detection_single_byte_difference() {
 ///
 /// Maps to: @rotation "Graceful certificate rotation"
 /// Maps to: @pin "Multiple pins allow certificate rotation"
+// @scenario: certificate_pinning.feature:Multiple pins allow certificate rotation
+// @scenario: certificate_pinning.feature:Graceful certificate rotation
 #[test]
 fn test_graceful_pin_rotation_old_certificate() {
     let old_cert = b"Old Server Certificate 2025";
@@ -233,6 +242,7 @@ fn test_graceful_pin_rotation_old_certificate() {
 /// Tests that new certificate works when both pins are configured.
 ///
 /// Maps to: @rotation "connections should continue to succeed"
+// @scenario: certificate_pinning.feature:Multiple pins allow certificate rotation
 #[test]
 fn test_graceful_pin_rotation_new_certificate() {
     let old_cert = b"Old Server Certificate 2025";
@@ -255,6 +265,7 @@ fn test_graceful_pin_rotation_new_certificate() {
 /// Tests that after rotation, old pin can be removed.
 ///
 /// Maps to: @rotation "the old pin can be removed after transition"
+// @scenario: certificate_pinning.feature:Graceful certificate rotation
 #[test]
 fn test_graceful_pin_rotation_old_pin_removed() {
     let old_cert = b"Old Server Certificate 2025";
@@ -430,6 +441,7 @@ fn test_pinned_certificate_debug() {
 /// Tests a realistic certificate rotation scenario.
 ///
 /// Maps to: @rotation "Graceful certificate rotation" complete flow
+// @scenario: certificate_pinning.feature:Graceful certificate rotation
 #[test]
 fn test_integration_full_rotation_lifecycle() {
     // Step 1: Initial deployment with single certificate
@@ -473,6 +485,7 @@ fn test_integration_full_rotation_lifecycle() {
 /// Tests that MITM attacks with valid-but-different certificates are detected.
 ///
 /// Maps to: @mitm "the attacker presents a valid but different TLS certificate"
+// @scenario: certificate_pinning.feature:Detect MITM with forged certificate
 #[test]
 fn test_integration_mitm_with_valid_attacker_cert() {
     // Legitimate relay's certificate

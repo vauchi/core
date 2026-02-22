@@ -10,6 +10,7 @@ fn test_storage() -> Storage {
     Storage::in_memory(SymmetricKey::generate()).unwrap()
 }
 
+// @scenario: contact_recovery.feature:Accept recovery and reconnect
 #[test]
 fn test_save_and_get_recovery_response() {
     let storage = test_storage();
@@ -61,6 +62,7 @@ fn test_recovery_response_not_found() {
     assert!(result.is_none());
 }
 
+// @scenario: contact_recovery.feature:Relay rate limits recovery queries
 #[test]
 fn test_check_recovery_rate_limit_empty() {
     let storage = test_storage();
@@ -69,6 +71,7 @@ fn test_check_recovery_rate_limit_empty() {
     assert_eq!(window_start, 0);
 }
 
+// @scenario: contact_recovery.feature:Relay rate limits recovery queries
 #[test]
 fn test_update_and_check_recovery_rate_limit() {
     let storage = test_storage();
@@ -83,6 +86,7 @@ fn test_update_and_check_recovery_rate_limit() {
     assert_eq!(window_start, 1700000000);
 }
 
+// @scenario: contact_recovery.feature:Relay rate limits recovery queries
 #[test]
 fn test_recovery_rate_limit_overwrite() {
     let storage = test_storage();

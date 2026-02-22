@@ -64,6 +64,10 @@ fn create_manager_with_labels(names: &[&str]) -> (LabelManager, Vec<String>) {
 /// - Rename an existing label
 /// - Cannot rename to existing label name
 /// - Delete a label
+// @scenario: visibility_labels.feature:Create a new visibility label
+// @scenario: visibility_labels.feature:Cannot create duplicate label names
+// @scenario: visibility_labels.feature:Rename an existing label
+// @scenario: visibility_labels.feature:Delete a label
 #[test]
 fn test_label_crud_operations() {
     let mut manager = LabelManager::new();
@@ -209,6 +213,7 @@ fn test_label_crud_operations() {
 ///
 /// Feature: visibility_labels.feature
 /// Scenario: Maximum number of labels
+// @scenario: visibility_labels.feature:Maximum number of labels
 #[test]
 fn test_label_max_limit() {
     let mut manager = LabelManager::new();
@@ -256,6 +261,9 @@ fn test_label_max_limit() {
 /// - Remove a contact from a label
 /// - Contact in multiple labels
 /// - View all labels for a contact
+// @scenario: visibility_labels.feature:Add a contact to a label
+// @scenario: visibility_labels.feature:Remove a contact from a label
+// @scenario: visibility_labels.feature:Contact in multiple labels
 #[test]
 fn test_contact_assignment_to_label() {
     let (mut manager, label_ids) = create_manager_with_labels(&["Family", "Friends", "Colleagues"]);
@@ -392,6 +400,8 @@ fn test_contact_assignment_to_label() {
 /// - Adding contact to label grants visibility
 /// - Removing contact from label revokes visibility
 /// - Contact sees fields based on label membership
+// @scenario: visibility_labels.feature:Adding contact to label grants visibility
+// @scenario: visibility_labels.feature:Removing contact from label revokes visibility
 #[test]
 fn test_cascading_visibility_changes() {
     let mut manager = LabelManager::new();
@@ -569,6 +579,8 @@ fn test_cascading_visibility_changes() {
 /// - Associate field with multiple labels
 /// - Remove field from label visibility
 /// - Per-contact override takes precedence over label
+// @scenario: visibility_labels.feature:Associate a field with a label
+// @scenario: visibility_labels.feature:Per-contact override takes precedence over label
 #[test]
 fn test_label_based_field_visibility() {
     let mut manager = LabelManager::new();
@@ -784,6 +796,8 @@ fn test_label_based_field_visibility() {
 /// Scenarios:
 /// - Labels sync across my own devices only
 /// - Labels are not shared with contacts
+// @scenario: visibility_labels.feature:Labels sync across my own devices only
+// @scenario: visibility_labels.feature:Labels are not shared with contacts
 #[test]
 fn test_label_sync_across_devices() {
     // =========================================================================
@@ -1014,6 +1028,7 @@ fn test_label_sync_across_devices() {
 ///
 /// Feature: visibility_labels.feature
 /// Scenario: Delete contact removes from all labels
+// @scenario: visibility_labels.feature:Delete contact removes from all labels
 #[test]
 fn test_delete_contact_clears_overrides() {
     let mut manager = LabelManager::new();
@@ -1052,6 +1067,7 @@ fn test_delete_contact_clears_overrides() {
 ///
 /// Feature: visibility_labels.feature
 /// Scenario: Configure default fields for a label
+// @scenario: visibility_labels.feature:Configure default fields for a label
 #[test]
 fn test_set_visible_fields_bulk() {
     let mut manager = LabelManager::new();

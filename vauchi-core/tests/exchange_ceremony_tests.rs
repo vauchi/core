@@ -20,6 +20,8 @@ use vauchi_core::{ContactCard, Identity};
 
 /// Verify QR session key agreement produces matching keys and they
 /// are usable for bidirectional encryption. This is the core ceremony test.
+// @scenario: contact_exchange.feature:X3DH key agreement during exchange
+// @scenario: contact_exchange.feature:Exchange creates mutual keys
 #[test]
 fn test_qr_ceremony_shared_keys_match_and_encrypt() {
     let alice_identity = Identity::create("Alice");
@@ -106,6 +108,7 @@ fn test_qr_ceremony_shared_keys_match_and_encrypt() {
 /// If an attacker modifies the ephemeral_public_key in transit, the
 /// recipient derives a different shared secret, and AEAD tag verification
 /// fails. This is a ceremony-level integrity test.
+// @scenario: security.feature:Man-in-the-middle detection during exchange
 #[test]
 fn test_tampered_ephemeral_key_causes_decrypt_failure() {
     let alice = X3DHKeyPair::generate();
@@ -129,6 +132,7 @@ fn test_tampered_ephemeral_key_causes_decrypt_failure() {
 }
 
 /// Tampered sender_exchange_key causes DH1 identity binding mismatch.
+// @scenario: security.feature:Man-in-the-middle detection during exchange
 #[test]
 fn test_tampered_sender_exchange_key_causes_decrypt_failure() {
     let alice = X3DHKeyPair::generate();
@@ -149,6 +153,7 @@ fn test_tampered_sender_exchange_key_causes_decrypt_failure() {
 }
 
 /// Tampered ciphertext causes AEAD tag failure.
+// @scenario: security.feature:Man-in-the-middle detection during exchange
 #[test]
 fn test_tampered_ciphertext_causes_decrypt_failure() {
     let alice = X3DHKeyPair::generate();
@@ -175,6 +180,7 @@ fn test_tampered_ciphertext_causes_decrypt_failure() {
 // ============================================================
 
 /// Different identity keys (DH1) produce different shared secrets.
+// @scenario: contact_exchange.feature:Exchange verifies identity
 #[test]
 fn test_identity_binding_changes_shared_secret() {
     let alice1 = X3DHKeyPair::generate();
@@ -192,6 +198,7 @@ fn test_identity_binding_changes_shared_secret() {
 }
 
 /// Same identity keys with different ephemerals produce different secrets.
+// @scenario: contact_exchange.feature:Mutual QR uses fresh ephemeral keys for forward secrecy
 #[test]
 fn test_ephemeral_changes_shared_secret() {
     let alice = X3DHKeyPair::generate();
@@ -213,6 +220,7 @@ fn test_ephemeral_changes_shared_secret() {
 // ============================================================
 
 /// Independent sessions using fresh ephemerals produce different shared secrets.
+// @scenario: contact_exchange.feature:Mutual QR uses fresh ephemeral keys for forward secrecy
 #[test]
 fn test_independent_sessions_produce_different_secrets() {
     let alice_card = ContactCard::new("Alice");
@@ -298,6 +306,7 @@ fn test_independent_sessions_produce_different_secrets() {
 ///
 /// This cross-checks that the message layer uses X3DH internally
 /// and produces the same key as calling X3DH::initiate/respond directly.
+// @scenario: contact_exchange.feature:X3DH key agreement during exchange
 #[test]
 fn test_encrypted_message_secret_matches_raw_x3dh() {
     let alice = X3DHKeyPair::generate();
@@ -334,6 +343,7 @@ fn test_encrypted_message_secret_matches_raw_x3dh() {
 /// This verifies that identity keys are bound into the key derivation,
 /// preventing identity misbinding attacks where an attacker substitutes
 /// their identity key while keeping the same DH output.
+// @scenario: contact_exchange.feature:Exchange verifies identity
 #[test]
 fn test_transcript_binding_includes_identity_keys() {
     let identity_a = Identity::create("Alice-A");
@@ -394,6 +404,7 @@ fn test_transcript_binding_includes_identity_keys() {
 
 /// Changing either ephemeral key must produce a different shared secret,
 /// even when identity keys are identical.
+// @scenario: contact_exchange.feature:Mutual QR uses fresh ephemeral keys for forward secrecy
 #[test]
 fn test_transcript_binding_includes_ephemeral_keys() {
     let alice_identity_1 = Identity::create("Alice");

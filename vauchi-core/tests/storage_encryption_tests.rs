@@ -37,6 +37,7 @@ fn make_test_registry() -> DeviceRegistry {
 
 // === Own Card Encryption ===
 
+// @scenario: security.feature:Contact cards are encrypted at rest
 #[test]
 fn test_own_card_encrypted_roundtrip() {
     let (_dir, storage) = open_storage();
@@ -55,6 +56,7 @@ fn test_own_card_encrypted_roundtrip() {
     assert_eq!(loaded.fields().len(), card.fields().len());
 }
 
+// @scenario: security.feature:Local database encryption
 #[test]
 fn test_own_card_stored_as_encrypted_blob() {
     let (dir, storage) = open_storage();
@@ -412,6 +414,7 @@ fn test_rekey_preserves_visibility_labels() {
     assert_eq!(loaded.name(), "Rekey Group");
 }
 
+// @scenario: security.feature:Local database encryption
 #[test]
 fn test_rekey_old_key_cannot_decrypt() {
     let (dir, mut storage) = open_storage();

@@ -7,6 +7,7 @@
 
 use vauchi_core::*;
 
+// @scenario: contact_card_management.feature:Create contact card with display name
 #[test]
 fn test_create_card() {
     let card = ContactCard::new("Test User");
@@ -14,6 +15,8 @@ fn test_create_card() {
     assert!(card.fields().is_empty());
 }
 
+// @scenario: contact_card_management.feature:Add field to contact card
+// @scenario: contact_card_management.feature:Remove field from contact card
 #[test]
 fn test_add_and_remove_field() {
     let mut card = ContactCard::new("Test");

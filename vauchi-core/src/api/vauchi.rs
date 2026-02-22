@@ -981,6 +981,33 @@ impl<T: Transport> Vauchi<T> {
         Ok(migrated)
     }
 
+    // === Delivery Status Operations ===
+
+    /// Gets delivery records for a specific contact.
+    ///
+    /// Returns all delivery records where the given contact is the recipient,
+    /// ordered by creation time (most recent first).
+    pub fn get_delivery_status_for_contact(
+        &self,
+        contact_id: &str,
+    ) -> VauchiResult<Vec<crate::storage::DeliveryRecord>> {
+        Ok(self
+            .storage
+            .get_delivery_records_for_recipient(contact_id)?)
+    }
+
+    /// Gets all failed delivery records across all contacts.
+    ///
+    /// Returns delivery records with `Failed` status, useful for showing
+    /// the user which messages need attention or retry.
+    pub fn get_failed_deliveries(&self) -> VauchiResult<Vec<crate::storage::DeliveryRecord>> {
+        Ok(self.storage.get_delivery_records_by_status(
+            &crate::storage::DeliveryStatus::Failed {
+                reason: String::new(),
+            },
+        )?)
+    }
+
     // === Event Operations ===
 
     /// Adds an event handler (#87, #94).

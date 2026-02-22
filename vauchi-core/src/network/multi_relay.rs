@@ -332,6 +332,64 @@ impl RelayHealth {
     }
 }
 
+/// Lightweight relay selection and health manager.
+///
+/// Wraps a `MultiRelayConfig` and `RelayHealth` to provide relay selection
+/// with automatic failover. Unlike `MultiRelayClient`, this does not manage
+/// connections — the caller picks a URL and creates/reuses a transport.
+pub struct MultiRelayManager {
+    config: MultiRelayConfig,
+    health: RelayHealth,
+}
+
+impl MultiRelayManager {
+    /// Create a new manager from a configuration.
+    pub fn new(config: MultiRelayConfig) -> Self {
+        todo!()
+    }
+
+    /// Select the best healthy relay based on the configured strategy.
+    /// Returns `None` if all relays are unhealthy.
+    pub fn select_relay(&self) -> Option<String> {
+        todo!()
+    }
+
+    /// Mark a relay as healthy after a successful operation.
+    pub fn mark_healthy(&mut self, relay: &str) {
+        todo!()
+    }
+
+    /// Mark a relay as unhealthy after a failed operation.
+    pub fn mark_unhealthy(&mut self, relay: &str) {
+        todo!()
+    }
+
+    /// Check if a specific relay is considered healthy.
+    pub fn is_relay_healthy(&self, relay: &str) -> bool {
+        todo!()
+    }
+
+    /// Get all configured relay URLs.
+    pub fn all_relays(&self) -> &[String] {
+        todo!()
+    }
+
+    /// Get the number of configured relays.
+    pub fn relay_count(&self) -> usize {
+        todo!()
+    }
+
+    /// Get a reference to the underlying config.
+    pub fn config(&self) -> &MultiRelayConfig {
+        todo!()
+    }
+
+    /// Get a reference to the health tracker.
+    pub fn health(&self) -> &RelayHealth {
+        todo!()
+    }
+}
+
 /// Client for connecting to multiple relay servers with failover support.
 ///
 /// **Status (#115):** Relay selection and health tracking are fully implemented.
@@ -485,6 +543,7 @@ impl MultiRelayClient {
     }
 }
 
+// INLINE_TEST_REQUIRED: tests need access to private RelayHealthState fields and calculate_cooldown
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -515,6 +574,89 @@ mod tests {
 
         health.record_failure("relay2");
         assert!(!health.is_healthy("relay2"));
+    }
+
+    #[test]
+    fn test_multi_relay_manager_select_primary_first() {
+        let config = MultiRelayConfig::builder()
+            .primary_relay("wss://primary.test")
+            .add_relay("wss://backup.test")
+            .build()
+            .unwrap();
+
+        let manager = MultiRelayManager::new(config);
+        let selected = manager.select_relay();
+
+        assert_eq!(
+            selected,
+            Some("wss://primary.test".to_string()),
+            "PrimaryFirst strategy should select the primary relay"
+        );
+    }
+
+    #[test]
+    fn test_multi_relay_manager_fallback_on_unhealthy() {
+        let config = MultiRelayConfig::builder()
+            .primary_relay("wss://primary.test")
+            .add_relay("wss://backup.test")
+            .build()
+            .unwrap();
+
+        let mut manager = MultiRelayManager::new(config);
+        manager.mark_unhealthy("wss://primary.test");
+
+        let selected = manager.select_relay();
+        assert_eq!(
+            selected,
+            Some("wss://backup.test".to_string()),
+            "Should fall back to backup when primary is unhealthy"
+        );
+    }
+
+    #[test]
+    fn test_multi_relay_manager_marks_health() {
+        let config = MultiRelayConfig::builder()
+            .add_relay("wss://relay1.test")
+            .build()
+            .unwrap();
+
+        let mut manager = MultiRelayManager::new(config);
+
+        assert!(
+            manager.is_relay_healthy("wss://relay1.test"),
+            "Unknown relay should be considered healthy"
+        );
+
+        manager.mark_unhealthy("wss://relay1.test");
+        assert!(
+            !manager.is_relay_healthy("wss://relay1.test"),
+            "Should be unhealthy after marking"
+        );
+
+        manager.mark_healthy("wss://relay1.test");
+        assert!(
+            manager.is_relay_healthy("wss://relay1.test"),
+            "Should be healthy again after marking healthy"
+        );
+    }
+
+    #[test]
+    fn test_multi_relay_manager_all_unhealthy_returns_none() {
+        let config = MultiRelayConfig::builder()
+            .primary_relay("wss://relay1.test")
+            .add_relay("wss://relay2.test")
+            .build()
+            .unwrap();
+
+        let mut manager = MultiRelayManager::new(config);
+        manager.mark_unhealthy("wss://relay1.test");
+        manager.mark_unhealthy("wss://relay2.test");
+
+        let selected = manager.select_relay();
+        assert_eq!(
+            selected, None,
+            "Should return None when all relays are unhealthy"
+        );
     }
 
     #[test]

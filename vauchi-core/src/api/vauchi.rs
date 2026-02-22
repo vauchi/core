@@ -1925,6 +1925,35 @@ impl<T: Transport> Vauchi<T> {
         manager.export_consent_log().map_err(VauchiError::from)
     }
 
+    /// Returns the aggregated consent status for a specific consent type.
+    ///
+    /// Combines the boolean grant status with the latest consent record's
+    /// timestamp and policy version. This replaces inline status assembly
+    /// in TUI and iOS (ADR-021 Tier 1).
+    pub fn get_consent_status(
+        &self,
+        consent_type: ConsentType,
+    ) -> VauchiResult<super::consent::ConsentStatus> {
+        let manager = ConsentManager::new(&self.storage);
+        let granted = manager.check(&consent_type).map_err(VauchiError::from)?;
+
+        // Find the latest record for this consent type from the versioned log
+        let records = manager
+            .export_consent_log_with_version()
+            .map_err(VauchiError::from)?;
+
+        let latest = records
+            .iter()
+            .filter(|r| r.consent_type == consent_type)
+            .max_by_key(|r| r.timestamp);
+
+        Ok(super::consent::ConsentStatus {
+            granted,
+            last_changed_at: latest.map(|r| r.timestamp),
+            policy_version: latest.and_then(|r| r.policy_version.clone()),
+        })
+    }
+
     // === Visibility Re-Propagation ===
 
     /// Sets a field as visible to everyone for a contact, and re-propagates the card.

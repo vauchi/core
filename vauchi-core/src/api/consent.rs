@@ -59,6 +59,21 @@ pub struct ConsentRecord {
     pub policy_version: Option<String>,
 }
 
+/// Aggregated consent status for a specific consent type.
+///
+/// Combines the boolean grant status with metadata from the consent log
+/// (timestamp of last change, policy version). Eliminates the need for
+/// clients to query multiple APIs and assemble this information inline.
+#[derive(Debug, Clone)]
+pub struct ConsentStatus {
+    /// Whether consent is currently granted.
+    pub granted: bool,
+    /// Unix timestamp of the most recent grant or revocation, if any.
+    pub last_changed_at: Option<u64>,
+    /// Privacy policy version from the most recent consent record, if any.
+    pub policy_version: Option<String>,
+}
+
 /// Manages consent records in storage.
 pub struct ConsentManager<'a> {
     storage: &'a crate::storage::Storage,

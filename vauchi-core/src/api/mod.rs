@@ -109,7 +109,7 @@ mod vauchi;
 pub use account::{delete_account_data, AccountError, DeletionManager, DeletionResult};
 
 // Consent
-pub use consent::{ConsentManager, ConsentRecord, ConsentType};
+pub use consent::{ConsentManager, ConsentRecord, ConsentStatus, ConsentType};
 
 // GDPR
 pub use gdpr::{export_all_data, GdprExport};

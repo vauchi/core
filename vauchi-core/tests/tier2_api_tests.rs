@@ -7,7 +7,9 @@
 //! Traces to: features/adr021_api_surface.feature
 
 use vauchi_core::api::*;
+use vauchi_core::contact_card::{ContactCard, ContactField, FieldType};
 use vauchi_core::storage::{DeliveryRecord, DeliveryStatus};
+use vauchi_core::sync::device_sync::{ContactSyncData, SyncItem};
 use vauchi_core::*;
 
 fn create_test_vauchi() -> Vauchi<MockTransport> {
@@ -158,4 +160,109 @@ fn test_get_failed_deliveries_returns_only_failed() {
     let message_ids: Vec<&str> = failed.iter().map(|r| r.message_id.as_str()).collect();
     assert!(message_ids.contains(&"msg-fail-1"));
     assert!(message_ids.contains(&"msg-fail-2"));
+}
+
+// ============================================================
+// API 3: apply_sync_items
+// ============================================================
+
+fn make_contact_sync_data(id: &str, name: &str) -> ContactSyncData {
+    let card = ContactCard::new(name);
+    let card_json = serde_json::to_string(&card).unwrap();
+    let visibility_rules =
+        serde_json::to_string(&vauchi_core::contact::VisibilityRules::default()).unwrap();
+
+    ContactSyncData {
+        id: id.to_string(),
+        public_key: [0xAA; 32],
+        display_name: name.to_string(),
+        card_json,
+        shared_key: [0xBB; 32],
+        exchange_timestamp: now(),
+        fingerprint_verified: false,
+        visibility_rules_json: visibility_rules,
+        recovery_trusted: false,
+    }
+}
+
+#[test]
+fn test_apply_sync_items_processes_contact_added() {
+    let mut wb = create_test_vauchi();
+    wb.create_identity("Alice").unwrap();
+
+    // Verify no contacts initially
+    assert_eq!(wb.contact_count().unwrap(), 0);
+
+    let items = vec![SyncItem::ContactAdded {
+        contact_data: make_contact_sync_data("contact-123", "Bob"),
+        timestamp: now(),
+    }];
+
+    let applied = wb.apply_sync_items(items).unwrap();
+    assert_eq!(applied, 1, "Should have applied 1 sync item");
+
+    // Verify the contact was added
+    assert_eq!(wb.contact_count().unwrap(), 1);
+    let contact = wb.get_contact("contact-123").unwrap();
+    assert!(contact.is_some(), "Contact should exist after sync");
+    assert_eq!(contact.unwrap().display_name(), "Bob");
+}
+
+#[test]
+fn test_apply_sync_items_processes_contact_removed() {
+    let mut wb = create_test_vauchi();
+    wb.create_identity("Alice").unwrap();
+
+    // First add a contact via sync
+    let add_items = vec![SyncItem::ContactAdded {
+        contact_data: make_contact_sync_data("contact-456", "Charlie"),
+        timestamp: now(),
+    }];
+    wb.apply_sync_items(add_items).unwrap();
+    assert_eq!(wb.contact_count().unwrap(), 1);
+
+    // Now remove it via sync
+    let remove_items = vec![SyncItem::ContactRemoved {
+        contact_id: "contact-456".to_string(),
+        timestamp: now() + 1,
+    }];
+    let applied = wb.apply_sync_items(remove_items).unwrap();
+    assert_eq!(applied, 1, "Should have applied the removal");
+
+    // Verify it's gone
+    let contact = wb.get_contact("contact-456").unwrap();
+    assert!(contact.is_none(), "Contact should be removed after sync");
+}
+
+#[test]
+fn test_apply_sync_items_processes_visibility_changed() {
+    let mut wb = create_test_vauchi();
+    wb.create_identity("Alice").unwrap();
+
+    // Add a contact first
+    let add_items = vec![SyncItem::ContactAdded {
+        contact_data: make_contact_sync_data("contact-789", "Diana"),
+        timestamp: now(),
+    }];
+    wb.apply_sync_items(add_items).unwrap();
+
+    // Change visibility
+    let vis_items = vec![SyncItem::VisibilityChanged {
+        contact_id: "contact-789".to_string(),
+        field_label: "email".to_string(),
+        is_visible: false,
+        timestamp: now() + 1,
+    }];
+
+    let applied = wb.apply_sync_items(vis_items).unwrap();
+    assert_eq!(applied, 1, "Should have applied visibility change");
+}
+
+#[test]
+fn test_apply_sync_items_empty_list_returns_zero() {
+    let mut wb = create_test_vauchi();
+    wb.create_identity("Alice").unwrap();
+
+    let applied = wb.apply_sync_items(vec![]).unwrap();
+    assert_eq!(applied, 0, "Empty item list should apply 0 items");
 }

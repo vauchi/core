@@ -32,8 +32,8 @@ pub use aha_moments::{AhaMoment, AhaMomentTracker, AhaMomentType};
 #[cfg(any(feature = "network-native-tls", feature = "network-rustls"))]
 pub use api::{
     AppPasswordConfig, AuthMode, AuthResult, BroadcastResult, CallbackHandler, ConsentStatus,
-    DuressAlert, DuressAlertType, DuressSettings, EmergencyBroadcastConfig, HandlerId, Vauchi,
-    VauchiBuilder, VauchiConfig, VauchiError, VauchiEvent, VauchiResult,
+    DuressAlert, DuressAlertType, DuressSettings, EmergencyBroadcastConfig, HandlerId,
+    RecoveryReadiness, Vauchi, VauchiBuilder, VauchiConfig, VauchiError, VauchiEvent, VauchiResult,
 };
 pub use contact::{
     Contact, FieldVisibility, LabelError, LabelManager, VisibilityLabel, VisibilityRules,

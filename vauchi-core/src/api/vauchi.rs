@@ -26,6 +26,22 @@ use super::emergency::{BroadcastResult, EmergencyBroadcastConfig, MAX_TRUSTED_CO
 use super::error::{VauchiError, VauchiResult};
 use super::events::{EventDispatcher, EventHandler, VauchiEvent};
 
+/// Recovery readiness assessment.
+///
+/// Aggregates the count of recovery-trusted contacts against the configured
+/// threshold, so clients can display readiness without computing it inline.
+#[derive(Debug, Clone)]
+pub struct RecoveryReadiness {
+    /// Number of contacts marked as recovery-trusted.
+    pub trusted_count: usize,
+    /// The recovery threshold from configuration.
+    pub threshold: u32,
+    /// Whether the user has enough trusted contacts for recovery.
+    pub is_ready: bool,
+    /// How many more trusted contacts are needed (`threshold - trusted_count`, saturating).
+    pub shortfall: usize,
+}
+
 /// Authentication mode for the Vauchi instance.
 ///
 /// Determines which data is shown to the user. The password system is
@@ -1951,6 +1967,29 @@ impl<T: Transport> Vauchi<T> {
             granted,
             last_changed_at: latest.map(|r| r.timestamp),
             policy_version: latest.and_then(|r| r.policy_version.clone()),
+        })
+    }
+
+    // === Recovery Readiness ===
+
+    /// Returns the recovery readiness assessment.
+    ///
+    /// Counts contacts marked as recovery-trusted and compares against the
+    /// configured recovery threshold. Replaces inline readiness computation
+    /// in CLI contacts.rs and recovery.rs (ADR-021 Tier 1).
+    pub fn get_recovery_readiness(&self) -> VauchiResult<RecoveryReadiness> {
+        let contacts = self.storage.list_contacts()?;
+        let trusted_count = contacts.iter().filter(|c| c.is_recovery_trusted()).count();
+        let threshold = self.config.recovery.threshold;
+
+        let is_ready = trusted_count >= threshold as usize;
+        let shortfall = (threshold as usize).saturating_sub(trusted_count);
+
+        Ok(RecoveryReadiness {
+            trusted_count,
+            threshold,
+            is_ready,
+            shortfall,
         })
     }
 

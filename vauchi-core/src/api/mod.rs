@@ -148,4 +148,4 @@ pub use duress::{DuressAlert, DuressAlertType, DuressSettings};
 pub use emergency::{BroadcastResult, EmergencyBroadcastConfig, MAX_TRUSTED_CONTACTS};
 
 // Vauchi
-pub use vauchi::{AuthMode, Vauchi, VauchiBuilder};
+pub use vauchi::{AuthMode, RecoveryReadiness, Vauchi, VauchiBuilder};

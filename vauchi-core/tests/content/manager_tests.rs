@@ -217,7 +217,7 @@ fn test_manager_themes_returns_default_when_cache_empty() {
 
     let themes = manager.themes();
     assert_eq!(themes.len(), 1, "Should return single default theme");
-    assert_eq!(themes[0].id, "default-dark");
+    assert_eq!(themes[0].id, "catppuccin-mocha");
 }
 
 #[test]

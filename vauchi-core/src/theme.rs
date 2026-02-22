@@ -159,25 +159,25 @@ pub fn default_theme() -> Theme {
 
 fn default_dark() -> Theme {
     Theme {
-        id: "default-dark".to_string(),
-        name: "Vauchi Dark".to_string(),
+        id: "catppuccin-mocha".to_string(),
+        name: "Catppuccin Mocha".to_string(),
         version: "1.0.0".to_string(),
-        author: Some("Vauchi".to_string()),
+        author: Some("Catppuccin".to_string()),
         license: Some("MIT".to_string()),
-        source: None,
+        source: Some("https://github.com/catppuccin/catppuccin".to_string()),
         mode: ThemeMode::Dark,
         colors: ThemeColors {
-            bg_primary: "#1a1a2e".to_string(),
-            bg_secondary: "#16213e".to_string(),
-            bg_tertiary: "#0f3460".to_string(),
-            text_primary: "#eeeeee".to_string(),
-            text_secondary: "#a0a0a0".to_string(),
-            accent: "#4fc3f7".to_string(),
-            accent_dark: "#0288d1".to_string(),
-            success: "#4caf50".to_string(),
-            error: "#f44336".to_string(),
-            warning: "#ff9800".to_string(),
-            border: "#333333".to_string(),
+            bg_primary: "#1e1e2e".to_string(),
+            bg_secondary: "#181825".to_string(),
+            bg_tertiary: "#313244".to_string(),
+            text_primary: "#cdd6f4".to_string(),
+            text_secondary: "#a6adc8".to_string(),
+            accent: "#89b4fa".to_string(),
+            accent_dark: "#74c7ec".to_string(),
+            success: "#a6e3a1".to_string(),
+            error: "#f38ba8".to_string(),
+            warning: "#fab387".to_string(),
+            border: "#45475a".to_string(),
         },
     }
 }
@@ -317,7 +317,7 @@ mod tests {
     #[test]
     fn test_default_theme_returns_valid_dark_theme() {
         let theme = default_theme();
-        assert_eq!(theme.id, "default-dark");
+        assert_eq!(theme.id, "catppuccin-mocha");
         assert_eq!(theme.mode, ThemeMode::Dark);
         theme
             .validate_accessibility()

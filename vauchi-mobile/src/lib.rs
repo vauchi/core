@@ -409,13 +409,13 @@ pub fn get_theme(theme_id: String) -> Option<MobileTheme> {
 
 /// Get the default theme ID based on system preference.
 ///
-/// Returns "default-dark" for dark mode, "default-light" for light mode.
+/// Returns "catppuccin-mocha" for dark mode, "catppuccin-latte" for light mode.
 #[uniffi::export]
 pub fn get_default_theme_id(prefer_dark: bool) -> String {
     if prefer_dark {
-        "default-dark".to_string()
+        "catppuccin-mocha".to_string()
     } else {
-        "default-light".to_string()
+        "catppuccin-latte".to_string()
     }
 }
 

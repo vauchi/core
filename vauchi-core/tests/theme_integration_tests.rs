@@ -13,6 +13,8 @@
 //! - Bundled themes (default, Catppuccin, Dracula, Nord, Solarized, Gruvbox)
 //! - Theme persistence and selection
 
+#![allow(deprecated)] // Tests use get_bundled_themes()/get_theme_by_id() for bundled fallback coverage
+
 use vauchi_core::theme::{
     get_bundled_themes, get_theme_by_id, validate_hex_color, Theme, ThemeColors, ThemeMode,
 };

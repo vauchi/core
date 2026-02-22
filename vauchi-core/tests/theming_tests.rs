@@ -16,6 +16,8 @@
 //! - Remote theme updates (@remote)
 //! - QR code theming consistency (@qr)
 
+#![allow(deprecated)] // Tests use get_bundled_themes()/get_theme_by_id() for bundled fallback coverage
+
 use tempfile::TempDir;
 use vauchi_core::content::{
     compute_checksum, ContentCache, ContentConfig, ContentManager, ContentType,

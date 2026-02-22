@@ -384,6 +384,7 @@ pub fn is_blocked_scheme(scheme: String) -> bool {
 // ============================================================
 
 /// Get all available bundled themes.
+#[allow(deprecated)] // Bundled themes still serve as offline fallback
 #[uniffi::export]
 pub fn get_available_themes() -> Vec<MobileTheme> {
     vauchi_core::theme::get_bundled_themes()
@@ -395,6 +396,7 @@ pub fn get_available_themes() -> Vec<MobileTheme> {
 /// Get a specific theme by ID.
 ///
 /// Returns None if the theme is not found.
+#[allow(deprecated)] // Bundled themes still serve as offline fallback
 #[uniffi::export]
 pub fn get_theme(theme_id: String) -> Option<MobileTheme> {
     vauchi_core::theme::get_theme_by_id(&theme_id).map(|t| MobileTheme::from(&t))

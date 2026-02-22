@@ -548,18 +548,21 @@ mod tests {
     }
 
     #[test]
+    #[allow(deprecated)]
     fn test_bundled_themes_not_empty() {
         let themes = get_bundled_themes();
         assert!(!themes.is_empty());
     }
 
     #[test]
+    #[allow(deprecated)]
     fn test_get_theme_by_id_found() {
         let theme = get_theme_by_id("catppuccin-mocha");
         assert!(theme.is_some());
     }
 
     #[test]
+    #[allow(deprecated)]
     fn test_get_theme_by_id_not_found() {
         let theme = get_theme_by_id("nonexistent");
         assert!(theme.is_none());

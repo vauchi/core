@@ -14,6 +14,8 @@
 //! - WCAG AA color contrast compliance
 //! - Font scaling support (100-200%)
 
+#![allow(deprecated)] // Tests use get_bundled_themes() for bundled fallback coverage
+
 use vauchi_core::contact_card::{ContactField, FieldType};
 use vauchi_core::theme::{get_bundled_themes, Theme, ThemeColors, ThemeMode};
 use vauchi_core::ContactCard;

@@ -187,6 +187,36 @@ impl<'a> ContactManager<'a> {
         Ok(results)
     }
 
+    /// Finds a visibility label by fuzzy matching on name or ID prefix.
+    ///
+    /// First tries case-insensitive name matching (exact match on the full name).
+    /// If no name match is found, tries matching on label ID prefix.
+    /// Returns the first match, or `None` if no label matches.
+    pub fn find_label_fuzzy(
+        &self,
+        query: &str,
+    ) -> VauchiResult<Option<crate::contact::VisibilityLabel>> {
+        let labels = self.storage.load_all_labels()?;
+        let query_lower = query.to_lowercase();
+
+        // First: try case-insensitive name match
+        if let Some(label) = labels
+            .iter()
+            .find(|l| l.name().to_lowercase() == query_lower)
+        {
+            return Ok(Some(label.clone()));
+        }
+
+        // Second: try ID prefix match
+        if !query.is_empty() {
+            if let Some(label) = labels.iter().find(|l| l.id().starts_with(query)) {
+                return Ok(Some(label.clone()));
+            }
+        }
+
+        Ok(None)
+    }
+
     /// Returns the number of visible (non-hidden) contacts.
     pub fn contact_count(&self) -> VauchiResult<usize> {
         Ok(self

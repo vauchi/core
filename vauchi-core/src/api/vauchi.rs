@@ -506,6 +506,18 @@ impl<T: Transport> Vauchi<T> {
         manager.find_contact_fuzzy(query)
     }
 
+    /// Finds a visibility label by fuzzy matching on name or ID prefix.
+    ///
+    /// First tries case-insensitive name matching, then ID prefix matching.
+    /// Returns the first match, or `None` if no label matches.
+    pub fn find_label_fuzzy(
+        &self,
+        query: &str,
+    ) -> VauchiResult<Option<crate::contact::VisibilityLabel>> {
+        let manager = ContactManager::new(&self.storage, self.events.clone());
+        manager.find_label_fuzzy(query)
+    }
+
     /// Returns the number of contacts.
     pub fn contact_count(&self) -> VauchiResult<usize> {
         let manager = ContactManager::new(&self.storage, self.events.clone());

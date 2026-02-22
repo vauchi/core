@@ -3859,8 +3859,8 @@ mod tests {
         let granted = wb.check_consent(MobileConsentType::Analytics).unwrap();
         assert!(granted);
 
-        // Sleep to ensure different timestamp (consent check orders by timestamp)
-        std::thread::sleep(std::time::Duration::from_secs(1));
+        // No sleep needed: consent query uses ORDER BY timestamp DESC, rowid DESC
+        // so same-second inserts are correctly ordered by rowid (CC-06)
 
         // Revoke consent
         wb.revoke_consent(MobileConsentType::Analytics).unwrap();

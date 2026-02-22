@@ -877,7 +877,6 @@ trigger:swift:
   stage: trigger
   needs: [release:create]
   interruptible: false
-  allow_failure: true
   variables:
     UPSTREAM_VERSION: $CI_COMMIT_TAG
   trigger:
@@ -891,7 +890,6 @@ trigger:android:
   stage: trigger
   needs: [release:create]
   interruptible: false
-  allow_failure: true
   variables:
     UPSTREAM_VERSION: $CI_COMMIT_TAG
   trigger:

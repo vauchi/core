@@ -981,6 +981,24 @@ impl<T: Transport> Vauchi<T> {
         Ok(migrated)
     }
 
+    // === Device Lookup Operations ===
+
+    /// Finds an active device by hex ID prefix.
+    ///
+    /// Loads the device registry from storage and searches active devices
+    /// whose hex-encoded device ID starts with the given prefix.
+    /// Returns `None` if no registry exists or no device matches.
+    pub fn find_device_by_prefix(
+        &self,
+        hex_prefix: &str,
+    ) -> VauchiResult<Option<crate::identity::RegisteredDevice>> {
+        let registry = self.storage.load_device_registry()?;
+        match registry {
+            Some(reg) => Ok(reg.find_device_by_prefix(hex_prefix).cloned()),
+            None => Ok(None),
+        }
+    }
+
     // === Content Update Operations ===
 
     /// Checks if content updates are available.

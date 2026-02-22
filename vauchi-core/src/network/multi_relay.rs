@@ -345,48 +345,51 @@ pub struct MultiRelayManager {
 impl MultiRelayManager {
     /// Create a new manager from a configuration.
     pub fn new(config: MultiRelayConfig) -> Self {
-        todo!()
+        MultiRelayManager {
+            config,
+            health: RelayHealth::new(),
+        }
     }
 
     /// Select the best healthy relay based on the configured strategy.
     /// Returns `None` if all relays are unhealthy.
     pub fn select_relay(&self) -> Option<String> {
-        todo!()
+        self.config.select_healthy_relay(&self.health)
     }
 
     /// Mark a relay as healthy after a successful operation.
     pub fn mark_healthy(&mut self, relay: &str) {
-        todo!()
+        self.health.record_success(relay);
     }
 
     /// Mark a relay as unhealthy after a failed operation.
     pub fn mark_unhealthy(&mut self, relay: &str) {
-        todo!()
+        self.health.record_failure(relay);
     }
 
     /// Check if a specific relay is considered healthy.
     pub fn is_relay_healthy(&self, relay: &str) -> bool {
-        todo!()
+        self.health.is_healthy(relay)
     }
 
     /// Get all configured relay URLs.
     pub fn all_relays(&self) -> &[String] {
-        todo!()
+        self.config.relays()
     }
 
     /// Get the number of configured relays.
     pub fn relay_count(&self) -> usize {
-        todo!()
+        self.config.relay_count()
     }
 
     /// Get a reference to the underlying config.
     pub fn config(&self) -> &MultiRelayConfig {
-        todo!()
+        &self.config
     }
 
     /// Get a reference to the health tracker.
     pub fn health(&self) -> &RelayHealth {
-        todo!()
+        &self.health
     }
 }
 

@@ -26,14 +26,14 @@ content-updates = ["reqwest", "tokio"]
 
 [dependencies]
 # Cryptography (audited library)
-ring = "0.17"
-x25519-dalek = { version = "2.0", features = ["static_secrets"] }
+ring = "0.17.14"
+x25519-dalek = { version = "2.0.1", features = ["static_secrets"] }
 
 # XChaCha20-Poly1305 (spec-mandated cipher, documented exception to ring-only rule)
-chacha20poly1305 = "0.10"
+chacha20poly1305 = "0.10.1"
 
 # Argon2id password KDF (spec-mandated, documented exception to ring-only rule)
-argon2 = "0.5"
+argon2 = "0.5.3"
 
 # Async trait support for async sync pipeline
 async-trait = "0.1"

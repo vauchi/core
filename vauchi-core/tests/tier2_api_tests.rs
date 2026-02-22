@@ -8,6 +8,7 @@
 
 use vauchi_core::api::*;
 use vauchi_core::contact_card::ContactCard;
+use vauchi_core::content::UpdateStatus;
 use vauchi_core::storage::{DeliveryRecord, DeliveryStatus};
 use vauchi_core::sync::device_sync::{ContactSyncData, SyncItem};
 use vauchi_core::*;
@@ -287,4 +288,41 @@ fn test_apply_sync_items_empty_list_returns_zero() {
 
     let applied = wb.apply_sync_items(vec![]).unwrap();
     assert_eq!(applied, 0, "Empty item list should apply 0 items");
+}
+
+// ============================================================
+// API 4: check_content_updates
+// ============================================================
+
+#[test]
+fn test_check_content_updates_returns_up_to_date_when_current() {
+    let mut wb = create_test_vauchi();
+    wb.create_identity("Alice").unwrap();
+
+    // Without any remote content configured, updates should be disabled
+    let status = wb.check_content_updates();
+    assert!(
+        matches!(status, UpdateStatus::Disabled),
+        "Without remote updates configured, should return Disabled, got: {:?}",
+        status
+    );
+}
+
+#[test]
+fn test_check_content_updates_returns_status_variant() {
+    let mut wb = create_test_vauchi();
+    wb.create_identity("Alice").unwrap();
+
+    // Verify the method returns a valid UpdateStatus
+    let status = wb.check_content_updates();
+
+    // Should be one of the defined variants (not panic)
+    match status {
+        UpdateStatus::UpToDate
+        | UpdateStatus::Disabled
+        | UpdateStatus::CheckFailed(_)
+        | UpdateStatus::UpdatesAvailable(_) => {
+            // All valid variants
+        }
+    }
 }

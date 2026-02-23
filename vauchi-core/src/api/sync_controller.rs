@@ -34,6 +34,18 @@ pub struct SyncResult {
     pub errors: Vec<(String, String)>,
 }
 
+impl SyncResult {
+    /// Total number of operations processed (sent + acknowledged + failed + timed_out).
+    pub fn total(&self) -> usize {
+        self.sent + self.acknowledged + self.failed + self.timed_out
+    }
+
+    /// Whether any changes were synced (sent > 0 or acknowledged > 0).
+    pub fn has_changes(&self) -> bool {
+        self.sent > 0 || self.acknowledged > 0
+    }
+}
+
 /// Controls synchronization and network operations.
 ///
 /// The SyncController orchestrates:

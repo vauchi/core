@@ -333,6 +333,69 @@ fn test_apply_sync_items_empty_list_returns_zero() {
 }
 
 // ============================================================
+// SyncResult convenience methods (V13)
+// ============================================================
+
+#[test]
+fn test_sync_result_total_sums_all_operations() {
+    let result = SyncResult {
+        sent: 3,
+        acknowledged: 2,
+        failed: 1,
+        timed_out: 0,
+        errors: vec![],
+    };
+    assert_eq!(
+        result.total(),
+        6,
+        "total() should sum sent + acknowledged + failed + timed_out"
+    );
+}
+
+#[test]
+fn test_sync_result_total_zero_for_default() {
+    let result = SyncResult::default();
+    assert_eq!(
+        result.total(),
+        0,
+        "Default SyncResult should have total() == 0"
+    );
+}
+
+#[test]
+fn test_sync_result_has_changes_true_when_sent() {
+    let result = SyncResult {
+        sent: 1,
+        ..SyncResult::default()
+    };
+    assert!(
+        result.has_changes(),
+        "has_changes() should be true when sent > 0"
+    );
+}
+
+#[test]
+fn test_sync_result_has_changes_true_when_acknowledged() {
+    let result = SyncResult {
+        acknowledged: 1,
+        ..SyncResult::default()
+    };
+    assert!(
+        result.has_changes(),
+        "has_changes() should be true when acknowledged > 0"
+    );
+}
+
+#[test]
+fn test_sync_result_has_changes_false_for_default() {
+    let result = SyncResult::default();
+    assert!(
+        !result.has_changes(),
+        "Default SyncResult should have has_changes() == false"
+    );
+}
+
+// ============================================================
 // API 4: check_content_updates
 // ============================================================
 

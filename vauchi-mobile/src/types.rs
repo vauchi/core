@@ -1139,6 +1139,27 @@ impl From<&vauchi_core::api::ConsentRecord> for MobileConsentRecord {
     }
 }
 
+/// Aggregated consent status for a specific consent type.
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct MobileConsentStatus {
+    /// Whether consent is currently granted.
+    pub granted: bool,
+    /// Unix timestamp of the most recent grant or revocation, if any.
+    pub last_changed_at: Option<u64>,
+    /// Privacy policy version from the most recent consent record, if any.
+    pub policy_version: Option<String>,
+}
+
+impl From<vauchi_core::api::ConsentStatus> for MobileConsentStatus {
+    fn from(status: vauchi_core::api::ConsentStatus) -> Self {
+        MobileConsentStatus {
+            granted: status.granted,
+            last_changed_at: status.last_changed_at,
+            policy_version: status.policy_version,
+        }
+    }
+}
+
 /// Get a localized string by key.
 pub fn mobile_get_string(locale: MobileLocale, key: String) -> String {
     vauchi_core::i18n::get_string(locale.into(), &key)

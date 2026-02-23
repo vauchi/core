@@ -54,11 +54,11 @@ pub use exchange::{
 pub use multipart_qr::{encode_multipart, MobileMultipartDecoder, MultipartDecoder};
 pub use types::{
     MobileAhaMoment, MobileAhaMomentType, MobileAuthMode, MobileBroadcastResult,
-    MobileConsentRecord, MobileConsentType, MobileContact, MobileContactCard, MobileContactField,
-    MobileDecoyContact, MobileDeletionInfo, MobileDeletionState, MobileDeliveryRecord,
-    MobileDeliveryStatus, MobileDeliverySummary, MobileDemoContact, MobileDemoContactState,
-    MobileDeviceDeliveryRecord, MobileDeviceDeliveryStatus, MobileDeviceInfo,
-    MobileDeviceJoinResult, MobileDeviceLinkConfirmation, MobileDeviceLinkData,
+    MobileConsentRecord, MobileConsentStatus, MobileConsentType, MobileContact, MobileContactCard,
+    MobileContactField, MobileDecoyContact, MobileDeletionInfo, MobileDeletionState,
+    MobileDeliveryRecord, MobileDeliveryStatus, MobileDeliverySummary, MobileDemoContact,
+    MobileDemoContactState, MobileDeviceDeliveryRecord, MobileDeviceDeliveryStatus,
+    MobileDeviceInfo, MobileDeviceJoinResult, MobileDeviceLinkConfirmation, MobileDeviceLinkData,
     MobileDeviceLinkInfo, MobileDeviceLinkRequest, MobileDeviceLinkResult, MobileDuressSettings,
     MobileEmergencyConfig, MobileExchangeResult, MobileFaqItem, MobileFieldType,
     MobileFieldValidation, MobileGdprExport, MobileHelpCategory, MobileHelpCategoryInfo,
@@ -2413,6 +2413,20 @@ impl VauchiMobile {
         Ok(granted)
     }
 
+    /// Get the aggregated consent status for a specific type.
+    ///
+    /// Returns granted state, last change timestamp, and policy version
+    /// in a single call. Replaces inline consent record filtering in clients.
+    pub fn get_consent_status(
+        &self,
+        consent_type: MobileConsentType,
+    ) -> Result<MobileConsentStatus, MobileError> {
+        let vauchi = self.open_vauchi()?;
+        let status =
+            vauchi.get_consent_status(vauchi_core::api::ConsentType::from(consent_type))?;
+        Ok(MobileConsentStatus::from(status))
+    }
+
     /// Get all consent records.
     pub fn get_consent_records(&self) -> Result<Vec<MobileConsentRecord>, MobileError> {
         let storage = self.open_storage()?;
@@ -3887,6 +3901,32 @@ mod tests {
 
         let records = wb.get_consent_records().unwrap();
         assert!(records.len() >= 3);
+    }
+
+    // @scenario: privacy_compliance:User views consent status
+    #[test]
+    fn test_get_consent_status_returns_granted_with_timestamp() {
+        let (wb, _dir) = create_test_instance();
+        wb.create_identity("Alice".to_string()).unwrap();
+
+        // Before any consent action, status should be not granted with no timestamp
+        let status = wb.get_consent_status(MobileConsentType::Analytics).unwrap();
+        assert!(!status.granted);
+        assert!(status.last_changed_at.is_none());
+        assert!(status.policy_version.is_none());
+
+        // After granting, status should be granted with a timestamp
+        wb.grant_consent(MobileConsentType::Analytics).unwrap();
+        let status = wb.get_consent_status(MobileConsentType::Analytics).unwrap();
+        assert!(status.granted);
+        assert!(status.last_changed_at.is_some());
+        assert!(status.last_changed_at.unwrap() > 0);
+
+        // After revoking, status should be not granted but still have a timestamp
+        wb.revoke_consent(MobileConsentType::Analytics).unwrap();
+        let status = wb.get_consent_status(MobileConsentType::Analytics).unwrap();
+        assert!(!status.granted);
+        assert!(status.last_changed_at.is_some());
     }
 
     // @scenario: security:Contact card signatures verified

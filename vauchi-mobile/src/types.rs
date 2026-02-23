@@ -137,6 +137,10 @@ pub struct MobileSyncResult {
     pub cards_updated: u32,
     /// Number of outbound updates sent.
     pub updates_sent: u32,
+    /// Total number of operations (contacts_added + cards_updated + updates_sent).
+    pub total: u32,
+    /// Whether any changes were synced.
+    pub has_changes: bool,
 }
 
 /// Social network info.

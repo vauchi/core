@@ -3929,6 +3929,40 @@ mod tests {
         assert!(status.last_changed_at.is_some());
     }
 
+    // @scenario: device_sync:Sync result aggregation
+    #[test]
+    fn test_mobile_sync_result_total_and_has_changes() {
+        let empty = MobileSyncResult {
+            contacts_added: 0,
+            cards_updated: 0,
+            updates_sent: 0,
+            total: 0,
+            has_changes: false,
+        };
+        assert_eq!(empty.total, 0);
+        assert!(!empty.has_changes);
+
+        let with_changes = MobileSyncResult {
+            contacts_added: 2,
+            cards_updated: 1,
+            updates_sent: 3,
+            total: 6,
+            has_changes: true,
+        };
+        assert_eq!(with_changes.total, 6);
+        assert!(with_changes.has_changes);
+
+        let partial = MobileSyncResult {
+            contacts_added: 0,
+            cards_updated: 0,
+            updates_sent: 1,
+            total: 1,
+            has_changes: true,
+        };
+        assert_eq!(partial.total, 1);
+        assert!(partial.has_changes);
+    }
+
     // @scenario: security:Contact card signatures verified
     #[test]
     fn test_mobile_revocation_sender_implements_trait() {

@@ -555,10 +555,14 @@ pub async fn do_sync_async(
         }
     }
 
+    let total_cards = cards_updated + device_synced;
+    let total_sent = updates_sent + device_sync_sent;
     Ok(MobileSyncResult {
         contacts_added,
-        cards_updated: cards_updated + device_synced,
-        updates_sent: updates_sent + device_sync_sent,
+        cards_updated: total_cards,
+        updates_sent: total_sent,
+        total: contacts_added + total_cards + total_sent,
+        has_changes: contacts_added > 0 || total_cards > 0 || total_sent > 0,
     })
 }
 

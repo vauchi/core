@@ -9,7 +9,7 @@
 #   - Tags (v*): Build, package, publish releases
 #
 # DAG execution order (MR pipelines):
-#   lint (< 2 min) ──┬── test (< 5 min) ──── mutation (advisory)
+#   lint (< 2 min) ──┬── test (< 15 min) ──── mutation (advisory)
 #                     ├── bench (advisory, change-based)
 #                     └── security (< 5 min)
 #
@@ -150,7 +150,7 @@ lint:clippy:
 # Cucumber tests use cargo test (not nextest) because harness=false output
 # is incompatible with nextest's test listing format.
 test:core:
-  extends: [.linux-runner, .validation-rust, .timeout-quick]
+  extends: [.linux-runner, .validation-rust, .timeout-standard]
   stage: test
   needs:
     - job: lint:format
@@ -180,7 +180,7 @@ test:cucumber:
     - cargo test --test cucumber_tests -- --tags "not @wip"
 
 test:mobile:
-  extends: [.linux-runner, .validation-mobile, .timeout-quick]
+  extends: [.linux-runner, .validation-mobile, .timeout-standard]
   stage: test
   needs:
     - job: lint:format

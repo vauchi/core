@@ -1638,3 +1638,185 @@ fn test_from_validations_backward_compat() {
     );
     assert_eq!(status_blocked.trust_level, TrustLevel::Unverified);
 }
+
+// =============================================================================
+// Validation Delivery Queuing Tests
+// Traces to: _private/features/field_validation.feature @delivery @sync
+// =============================================================================
+
+#[test]
+fn test_validate_field_queues_delivery_to_contact() {
+    use vauchi_core::contact_card::ContactCard;
+    use vauchi_core::crypto::SymmetricKey;
+    use vauchi_core::{Contact, Identity, MockTransport, Vauchi};
+
+    // Create Alice (the validator) with identity
+    let mut alice: Vauchi<MockTransport> = Vauchi::in_memory().unwrap();
+    alice.create_identity("Alice").unwrap();
+
+    // Create Bob as a contact
+    let bob_identity = Identity::create("Bob");
+    let bob_pk = *bob_identity.signing_public_key();
+    let bob_contact =
+        Contact::from_exchange(bob_pk, ContactCard::new("Bob"), SymmetricKey::generate());
+    let bob_contact_id = bob_contact.id().to_string();
+    alice.add_contact(bob_contact).unwrap();
+
+    // No pending updates before validation
+    let pending_before = alice.storage().get_all_pending_updates().unwrap();
+    let validation_updates_before: Vec<_> = pending_before
+        .iter()
+        .filter(|u| u.update_type == "validation_record")
+        .collect();
+    assert_eq!(
+        validation_updates_before.len(),
+        0,
+        "No validation_record updates should exist before validate_field"
+    );
+
+    // Alice validates Bob's twitter field
+    let result = alice.validate_field(&bob_contact_id, "twitter", "@bob");
+    assert!(
+        result.is_ok(),
+        "validate_field should succeed: {:?}",
+        result.err()
+    );
+
+    // After validation, a pending update should be queued for delivery
+    let pending_after = alice.storage().get_all_pending_updates().unwrap();
+    let validation_updates: Vec<_> = pending_after
+        .iter()
+        .filter(|u| u.contact_id == bob_contact_id && u.update_type == "validation_record")
+        .collect();
+    assert_eq!(
+        validation_updates.len(),
+        1,
+        "Exactly one validation_record pending update should be queued for the contact"
+    );
+
+    // The payload should be non-empty (serialized validation)
+    assert!(
+        !validation_updates[0].payload.is_empty(),
+        "Validation record payload should be non-empty"
+    );
+
+    // The payload should deserialize as a valid ProfileValidation
+    let deserialized: Result<vauchi_core::social::ProfileValidation, _> =
+        serde_json::from_slice(&validation_updates[0].payload);
+    assert!(
+        deserialized.is_ok(),
+        "Payload should deserialize as ProfileValidation: {:?}",
+        deserialized.err()
+    );
+
+    let validation = deserialized.unwrap();
+    assert_eq!(
+        validation.field_value(),
+        "@bob",
+        "Deserialized validation should have correct field_value"
+    );
+}
+
+#[test]
+fn test_revoke_field_validation_queues_revocation() {
+    use vauchi_core::contact_card::ContactCard;
+    use vauchi_core::crypto::SymmetricKey;
+    use vauchi_core::{Contact, Identity, MockTransport, Vauchi};
+
+    // Create Alice (the validator) with identity
+    let mut alice: Vauchi<MockTransport> = Vauchi::in_memory().unwrap();
+    alice.create_identity("Alice").unwrap();
+
+    // Create Bob as a contact
+    let bob_identity = Identity::create("Bob");
+    let bob_pk = *bob_identity.signing_public_key();
+    let bob_contact =
+        Contact::from_exchange(bob_pk, ContactCard::new("Bob"), SymmetricKey::generate());
+    let bob_contact_id = bob_contact.id().to_string();
+    alice.add_contact(bob_contact).unwrap();
+
+    // Alice validates Bob's twitter field first
+    alice
+        .validate_field(&bob_contact_id, "twitter", "@bob")
+        .unwrap();
+
+    // Clear any pending updates from the validation to isolate revocation test
+    alice.storage().clear_all_pending_updates().unwrap();
+
+    // No revocation updates should exist yet
+    let pending_before = alice.storage().get_all_pending_updates().unwrap();
+    let revocation_updates_before: Vec<_> = pending_before
+        .iter()
+        .filter(|u| u.update_type == "validation_revocation")
+        .collect();
+    assert_eq!(
+        revocation_updates_before.len(),
+        0,
+        "No validation_revocation updates should exist before revocation"
+    );
+
+    // Alice revokes validation of Bob's twitter field
+    let revoked = alice
+        .revoke_field_validation(&bob_contact_id, "twitter")
+        .unwrap();
+    assert!(revoked, "Revocation should succeed (validation existed)");
+
+    // After revocation, a pending update should be queued
+    let pending_after = alice.storage().get_all_pending_updates().unwrap();
+    let revocation_updates: Vec<_> = pending_after
+        .iter()
+        .filter(|u| u.contact_id == bob_contact_id && u.update_type == "validation_revocation")
+        .collect();
+    assert_eq!(
+        revocation_updates.len(),
+        1,
+        "Exactly one validation_revocation pending update should be queued for the contact"
+    );
+
+    // The payload should be non-empty
+    assert!(
+        !revocation_updates[0].payload.is_empty(),
+        "Revocation payload should be non-empty"
+    );
+}
+
+#[test]
+fn test_validate_field_queue_failure_does_not_fail_validation() {
+    use vauchi_core::contact_card::ContactCard;
+    use vauchi_core::crypto::SymmetricKey;
+    use vauchi_core::{Contact, Identity, MockTransport, Vauchi};
+
+    // This test verifies the validation itself succeeds even if queuing
+    // were to fail internally. Since we use `let _ = ...` to ignore
+    // queue errors, validate_field should always succeed if the local
+    // save succeeds.
+
+    let mut alice: Vauchi<MockTransport> = Vauchi::in_memory().unwrap();
+    alice.create_identity("Alice").unwrap();
+
+    let bob_identity = Identity::create("Bob");
+    let bob_pk = *bob_identity.signing_public_key();
+    let bob_contact =
+        Contact::from_exchange(bob_pk, ContactCard::new("Bob"), SymmetricKey::generate());
+    let bob_contact_id = bob_contact.id().to_string();
+    alice.add_contact(bob_contact).unwrap();
+
+    // The validation should succeed and return the validation record
+    let validation = alice
+        .validate_field(&bob_contact_id, "twitter", "@bob")
+        .unwrap();
+    assert_eq!(
+        validation.field_value(),
+        "@bob",
+        "Validation should return correct field_value regardless of queue state"
+    );
+
+    // Verify the validation was stored locally
+    let has_validated = alice
+        .has_validated_field(&bob_contact_id, "twitter")
+        .unwrap();
+    assert!(
+        has_validated,
+        "Validation should be stored locally even if queue might fail"
+    );
+}

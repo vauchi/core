@@ -107,6 +107,7 @@ fn test_delta_apply_display_name() {
         }],
         nonce: [0u8; 32],
         signature: [0u8; 64],
+        validation_summary: None,
     };
 
     delta.apply(&mut card).unwrap();
@@ -126,6 +127,7 @@ fn test_delta_apply_add_field() {
         changes: vec![FieldChange::Added { field: new_field }],
         nonce: [0u8; 32],
         signature: [0u8; 64],
+        validation_summary: None,
     };
 
     delta.apply(&mut card).unwrap();
@@ -148,6 +150,7 @@ fn test_delta_apply_remove_field() {
         changes: vec![FieldChange::Removed { field_id }],
         nonce: [0u8; 32],
         signature: [0u8; 64],
+        validation_summary: None,
     };
 
     delta.apply(&mut card).unwrap();
@@ -543,4 +546,178 @@ fn test_unsigned_delta_rejected_by_verify() {
         !delta.verify(identity.signing_public_key(), &[0u8; 32]),
         "Unsigned delta with zero signature must be rejected"
     );
+}
+
+// === ValidationSummary in CardDelta Tests (Task 7 — G3) ===
+
+// @scenario: field_validation.feature:Validation counts in card updates
+#[test]
+fn test_card_delta_with_validation_summary_roundtrip() {
+    use std::collections::HashMap;
+    use vauchi_core::sync::delta::ValidationSummary;
+
+    let old = ContactCard::new("Bob");
+    let mut new = ContactCard::new("Bob");
+    let _ = new.add_field(ContactField::new(
+        FieldType::Email,
+        "email",
+        "bob@example.com",
+    ));
+
+    let mut delta = CardDelta::compute(&old, &new);
+
+    // Attach validation summary
+    let mut summary = HashMap::new();
+    summary.insert(
+        "email-field-1".to_string(),
+        ValidationSummary {
+            count: 3,
+            trust_level: "verified".to_string(),
+        },
+    );
+    delta.validation_summary = Some(summary);
+
+    // Serialize to JSON
+    let json = serde_json::to_string(&delta).expect("serialize");
+
+    // Deserialize back
+    let restored: CardDelta = serde_json::from_str(&json).expect("deserialize");
+
+    // Assert the summary is preserved
+    let restored_summary = restored
+        .validation_summary
+        .expect("validation_summary should be Some after roundtrip");
+    assert_eq!(restored_summary.len(), 1);
+    let entry = restored_summary
+        .get("email-field-1")
+        .expect("should have email-field-1 entry");
+    assert_eq!(entry.count, 3);
+    assert_eq!(entry.trust_level, "verified");
+}
+
+// @scenario: field_validation.feature:Backward compatible card updates
+#[test]
+fn test_card_delta_without_summary_backward_compat() {
+    // Simulate a JSON payload from an older client that has no validation_summary field
+    let json = r#"{
+        "version": 1,
+        "timestamp": 12345,
+        "changes": [],
+        "nonce": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+        "signature": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=="
+    }"#;
+
+    let delta: CardDelta = serde_json::from_str(json).expect("deserialize legacy delta");
+
+    assert!(
+        delta.validation_summary.is_none(),
+        "Legacy delta without validation_summary field should deserialize with None"
+    );
+}
+
+// @scenario: field_validation.feature:Validation summary not serialized when empty
+#[test]
+fn test_card_delta_none_summary_not_serialized() {
+    let old = ContactCard::new("Alice");
+    let new = ContactCard::new("Alice Updated");
+
+    let delta = CardDelta::compute(&old, &new);
+
+    // By default, validation_summary should be None
+    assert!(
+        delta.validation_summary.is_none(),
+        "Freshly computed delta should have no validation_summary"
+    );
+
+    // When serialized, the JSON should NOT contain the validation_summary key
+    let json = serde_json::to_string(&delta).expect("serialize");
+    assert!(
+        !json.contains("validation_summary"),
+        "JSON should not contain validation_summary when it is None (skip_serializing_if)"
+    );
+}
+
+// @scenario: field_validation.feature:Validation summary in filtered deltas
+#[test]
+fn test_card_delta_filter_preserves_validation_summary() {
+    use std::collections::HashMap;
+    use vauchi_core::contact::VisibilityRules;
+    use vauchi_core::sync::delta::ValidationSummary;
+
+    let old = ContactCard::new("Alice");
+    let mut new = ContactCard::new("Alice");
+    let email_field = ContactField::new(FieldType::Email, "email", "alice@example.com");
+    let email_id = email_field.id().to_string();
+    let _ = new.add_field(email_field);
+
+    let mut delta = CardDelta::compute(&old, &new);
+
+    // Attach validation summary
+    let mut summary = HashMap::new();
+    summary.insert(
+        email_id.clone(),
+        ValidationSummary {
+            count: 5,
+            trust_level: "trusted".to_string(),
+        },
+    );
+    delta.validation_summary = Some(summary);
+
+    let rules = VisibilityRules::new();
+    let filtered = delta.filter_for_contact("bob", &rules);
+
+    // The filtered delta should preserve the validation_summary
+    assert!(
+        filtered.validation_summary.is_some(),
+        "Filtered delta should preserve validation_summary"
+    );
+    let filtered_summary = filtered.validation_summary.unwrap();
+    assert_eq!(filtered_summary.len(), 1);
+    assert_eq!(filtered_summary.get(&email_id).unwrap().count, 5);
+}
+
+// @scenario: field_validation.feature:Validation summary with multiple fields
+#[test]
+fn test_card_delta_validation_summary_multiple_fields() {
+    use std::collections::HashMap;
+    use vauchi_core::sync::delta::ValidationSummary;
+
+    let mut summary = HashMap::new();
+    summary.insert(
+        "field-email".to_string(),
+        ValidationSummary {
+            count: 7,
+            trust_level: "verified".to_string(),
+        },
+    );
+    summary.insert(
+        "field-phone".to_string(),
+        ValidationSummary {
+            count: 2,
+            trust_level: "unverified".to_string(),
+        },
+    );
+    summary.insert(
+        "field-address".to_string(),
+        ValidationSummary {
+            count: 0,
+            trust_level: "none".to_string(),
+        },
+    );
+
+    let old = ContactCard::new("Carol");
+    let new = ContactCard::new("Carol Updated");
+
+    let mut delta = CardDelta::compute(&old, &new);
+    delta.validation_summary = Some(summary);
+
+    let json = serde_json::to_string(&delta).expect("serialize");
+    let restored: CardDelta = serde_json::from_str(&json).expect("deserialize");
+
+    let restored_summary = restored.validation_summary.expect("should have summary");
+    assert_eq!(restored_summary.len(), 3);
+    assert_eq!(restored_summary["field-email"].count, 7);
+    assert_eq!(restored_summary["field-phone"].count, 2);
+    assert_eq!(restored_summary["field-address"].count, 0);
+    assert_eq!(restored_summary["field-address"].trust_level, "none");
 }

@@ -16,10 +16,23 @@
 
 use ring::rand::SecureRandom;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use thiserror::Error;
 
 use crate::contact_card::{ContactCard, ContactField};
 use crate::identity::Identity;
+
+/// Aggregated validation count for a single field in a card update.
+///
+/// Embedded in card deltas so recipients can see how many people
+/// verified a field, without revealing validator identities.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct ValidationSummary {
+    /// Number of validators who confirmed this field value.
+    pub count: u32,
+    /// Human-readable trust level derived from the count (e.g. "none", "unverified", "verified").
+    pub trust_level: String,
+}
 
 /// Version byte for legacy CardDelta payloads (raw serialized JSON).
 pub const PAYLOAD_VERSION_LEGACY: u8 = 0x01;
@@ -71,6 +84,10 @@ pub struct CardDelta {
     /// Ed25519 signature of the delta (64 bytes).
     #[serde(with = "signature_serde")]
     pub signature: [u8; 64],
+    /// Per-field validation summaries (counts only, privacy-preserving).
+    /// Optional for backward compatibility with older clients.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub validation_summary: Option<HashMap<String, ValidationSummary>>,
 }
 
 /// Represents a single field change.
@@ -161,6 +178,7 @@ impl CardDelta {
             changes,
             nonce,
             signature: [0u8; 64], // Will be set during signing
+            validation_summary: None,
         }
     }
 
@@ -283,6 +301,7 @@ impl CardDelta {
             changes: filtered_changes,
             nonce: self.nonce,
             signature: self.signature,
+            validation_summary: self.validation_summary.clone(),
         }
     }
 
@@ -313,6 +332,7 @@ impl CardDelta {
             changes: filtered_changes,
             nonce: self.nonce,
             signature: self.signature,
+            validation_summary: self.validation_summary.clone(),
         }
     }
 

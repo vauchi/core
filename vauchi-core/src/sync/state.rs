@@ -426,7 +426,8 @@ impl<'a> SyncManager<'a> {
             timestamp: now,
             changes: merged_changes,
             nonce,
-            signature: [0u8; 64], // Will be signed before transmission
+            signature: [0u8; 64],     // Will be signed before transmission
+            validation_summary: None, // Coalesced deltas re-compute summaries before send
         };
 
         let payload = serde_json::to_vec(&merged_delta)

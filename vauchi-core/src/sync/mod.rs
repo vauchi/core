@@ -15,7 +15,7 @@ pub mod merkle;
 pub mod state;
 
 pub use card_update::{process_card_updates, process_single_card_update, CardUpdateResult};
-pub use delta::{CardDelta, DeltaError, FieldChange};
+pub use delta::{CardDelta, DeltaError, FieldChange, ValidationSummary};
 pub use device_orchestrator::{build_device_sync_envelopes, DeviceSyncOrchestrator};
 pub use device_sync::{
     validate_timestamp, ContactSyncData, DeviceSyncError, DeviceSyncPayload, InterDeviceSyncState,
@@ -73,6 +73,7 @@ pub async fn send_device_sync_async(
     Ok(sent)
 }
 
+// INLINE_TEST_REQUIRED: Tests for BinarySender/AsyncBinarySender traits defined in this module
 #[cfg(test)]
 mod send_tests {
     use super::*;

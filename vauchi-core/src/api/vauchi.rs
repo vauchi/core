@@ -1772,6 +1772,13 @@ impl<T: Transport> Vauchi<T> {
         // Store it
         self.storage.save_validation(&validation)?;
 
+        // Queue for delivery to the validated contact.
+        // Queue failure does NOT fail the validation itself — local storage succeeded.
+        if let Ok(validation_bytes) = serde_json::to_vec(&validation) {
+            let sync_manager = crate::sync::state::SyncManager::new(&self.storage);
+            let _ = sync_manager.queue_validation_delivery(contact_id, validation_bytes);
+        }
+
         Ok(validation)
     }
 
@@ -1849,6 +1856,20 @@ impl<T: Transport> Vauchi<T> {
         let deleted = self
             .storage
             .delete_validation(contact_id, field_id, &validator_id)?;
+
+        // Queue revocation for delivery to the contact.
+        // Queue failure does NOT fail the revocation itself — local deletion succeeded.
+        if deleted {
+            let revocation_info = serde_json::json!({
+                "contact_id": contact_id,
+                "field_id": field_id,
+                "validator_id": validator_id,
+            });
+            if let Ok(revocation_bytes) = serde_json::to_vec(&revocation_info) {
+                let sync_manager = crate::sync::state::SyncManager::new(&self.storage);
+                let _ = sync_manager.queue_validation_revocation(contact_id, revocation_bytes);
+            }
+        }
 
         Ok(deleted)
     }

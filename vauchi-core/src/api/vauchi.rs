@@ -1905,6 +1905,85 @@ impl<T: Transport> Vauchi<T> {
         Ok(validated)
     }
 
+    // === Incoming Validation Processing ===
+
+    /// Processes an incoming validation record from a contact.
+    ///
+    /// Verifies the Ed25519 signature against the sender's public key,
+    /// then stores the validation if valid. Idempotent — duplicate
+    /// deliveries are handled by the UNIQUE constraint on storage.
+    pub fn process_incoming_validation(
+        &self,
+        sender_contact_id: &str,
+        validation_bytes: &[u8],
+    ) -> VauchiResult<()> {
+        // 1. Deserialize the ProfileValidation from JSON bytes
+        let validation: crate::social::ProfileValidation = serde_json::from_slice(validation_bytes)
+            .map_err(|e| VauchiError::Serialization(e.to_string()))?;
+
+        // 2. Verify the validator_id matches the sender (prevents forwarding attacks)
+        if validation.validator_id() != sender_contact_id {
+            return Err(VauchiError::InvalidState(
+                "validator_id does not match sender contact".into(),
+            ));
+        }
+
+        // 3. Look up the sender contact to get their public key
+        let contact = self
+            .get_contact(sender_contact_id)?
+            .ok_or_else(|| VauchiError::ContactNotFound(sender_contact_id.to_string()))?;
+
+        // 4. Verify the Ed25519 signature against the sender's public key
+        if !validation.verify(contact.public_key()) {
+            return Err(VauchiError::SignatureInvalid);
+        }
+
+        // 5. Store the validation (save_validation is idempotent via INSERT OR REPLACE)
+        self.storage.save_validation(&validation)?;
+
+        Ok(())
+    }
+
+    /// Processes an incoming validation revocation from a contact.
+    ///
+    /// Verifies the sender matches the validator_id in the revocation,
+    /// then deletes the validation from storage.
+    ///
+    /// Returns `true` if a validation was deleted, `false` if none existed.
+    pub fn process_incoming_revocation(
+        &self,
+        sender_contact_id: &str,
+        revocation_bytes: &[u8],
+    ) -> VauchiResult<bool> {
+        // 1. Deserialize the revocation payload
+        let revocation: serde_json::Value = serde_json::from_slice(revocation_bytes)
+            .map_err(|e| VauchiError::Serialization(e.to_string()))?;
+
+        let contact_id = revocation["contact_id"]
+            .as_str()
+            .ok_or_else(|| VauchiError::Serialization("missing contact_id in revocation".into()))?;
+        let field_id = revocation["field_id"]
+            .as_str()
+            .ok_or_else(|| VauchiError::Serialization("missing field_id in revocation".into()))?;
+        let validator_id = revocation["validator_id"].as_str().ok_or_else(|| {
+            VauchiError::Serialization("missing validator_id in revocation".into())
+        })?;
+
+        // 2. Verify sender_contact_id matches the validator_id
+        if validator_id != sender_contact_id {
+            return Err(VauchiError::InvalidState(
+                "validator_id does not match sender contact".into(),
+            ));
+        }
+
+        // 3. Delete the validation from storage
+        let deleted = self
+            .storage
+            .delete_validation(contact_id, field_id, validator_id)?;
+
+        Ok(deleted)
+    }
+
     // === Aha Moments Operations ===
 
     /// Tries to trigger an aha moment of the given type.

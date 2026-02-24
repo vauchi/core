@@ -16,16 +16,10 @@ pub mod uri;
 #[cfg(not(feature = "testing"))]
 mod uri;
 
-#[cfg(feature = "testing")]
-pub mod validation;
-#[cfg(not(feature = "testing"))]
-mod validation;
-
 pub mod vcard;
 
-pub use field::{ContactField, FieldType};
+pub use field::{ContactField, FieldType, ValidationError};
 pub use uri::{is_allowed_scheme, is_blocked_scheme, is_safe_url, ContactAction};
-pub use validation::ValidationError;
 
 use ring::rand::SystemRandom;
 use serde::{Deserialize, Serialize};

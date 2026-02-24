@@ -6,8 +6,21 @@
 //!
 //! Handles individual contact fields like phone, email, social media, etc.
 
-use super::ValidationError;
 use serde::{Deserialize, Serialize};
+use thiserror::Error;
+
+/// Validation error types for contact field values.
+#[derive(Error, Debug)]
+pub enum ValidationError {
+    #[error("Invalid phone number format")]
+    InvalidPhone,
+    #[error("Invalid email format")]
+    InvalidEmail,
+    #[error("Value too long (max {max} characters)")]
+    ValueTooLong { max: usize },
+    #[error("Value cannot be empty")]
+    EmptyValue,
+}
 
 /// Maximum length for field values.
 pub const MAX_VALUE_LENGTH: usize = 1000;

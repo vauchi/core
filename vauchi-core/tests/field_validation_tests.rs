@@ -160,7 +160,7 @@ fn test_validate_email_field() {
 
 #[test]
 fn test_email_validation_trust_levels() {
-    // 3 validations should give partial confidence
+    // 3 validations with no metadata: 3 * 0.3 = 0.9 weighted score -> LowConfidence
     let validations: Vec<_> = (0..3)
         .map(|i| {
             ProfileValidation::new(
@@ -176,7 +176,8 @@ fn test_email_validation_trust_levels() {
         ValidationStatus::from_validations(&validations, "bob@example.com", None, &HashSet::new());
 
     assert_eq!(status.count, 3);
-    assert_eq!(status.trust_level, TrustLevel::PartialConfidence);
+    // With weighted scoring (no metadata = 0.3 per validator): 3 * 0.3 = 0.9 -> LowConfidence
+    assert_eq!(status.trust_level, TrustLevel::LowConfidence);
 }
 
 // === Phone Validation Tests ===
@@ -233,9 +234,11 @@ fn test_phone_validation_independent_of_email() {
     );
 
     assert_eq!(phone_status.count, 5);
-    assert_eq!(phone_status.trust_level, TrustLevel::HighConfidence);
+    // With weighted scoring (no metadata = 0.3 per validator): 5 * 0.3 = 1.5 -> PartialConfidence
+    assert_eq!(phone_status.trust_level, TrustLevel::PartialConfidence);
     assert_eq!(email_status.count, 2);
-    assert_eq!(email_status.trust_level, TrustLevel::PartialConfidence);
+    // 2 * 0.3 = 0.6 -> LowConfidence
+    assert_eq!(email_status.trust_level, TrustLevel::LowConfidence);
 }
 
 // === Website Validation Tests ===
@@ -371,7 +374,8 @@ fn test_validation_reset_on_field_change() {
     let status_old =
         ValidationStatus::from_validations(&validations, "@bob_old", None, &HashSet::new());
     assert_eq!(status_old.count, 5);
-    assert_eq!(status_old.trust_level, TrustLevel::HighConfidence);
+    // With weighted scoring (no metadata = 0.3 per validator): 5 * 0.3 = 1.5 -> PartialConfidence
+    assert_eq!(status_old.trust_level, TrustLevel::PartialConfidence);
 
     // New value has 0 validations (the old validations don't count)
     let status_new =
@@ -426,7 +430,8 @@ fn test_multiple_validators_same_field() {
     // Status should show all 5 validations
     let status = ValidationStatus::from_validations(&validations, "@alice", None, &HashSet::new());
     assert_eq!(status.count, 5);
-    assert_eq!(status.trust_level, TrustLevel::HighConfidence);
+    // With weighted scoring (no metadata = 0.3 per validator): 5 * 0.3 = 1.5 -> PartialConfidence
+    assert_eq!(status.trust_level, TrustLevel::PartialConfidence);
 }
 
 #[test]
@@ -1084,7 +1089,8 @@ fn test_cross_field_validation_status_independent() {
         None,
         &HashSet::new(),
     );
-    assert_eq!(phone_status.trust_level, TrustLevel::HighConfidence);
+    // With weighted scoring (no metadata = 0.3 per validator): 5 * 0.3 = 1.5 -> PartialConfidence
+    assert_eq!(phone_status.trust_level, TrustLevel::PartialConfidence);
 
     let email_status = ValidationStatus::from_validations(
         &email_validations,
@@ -1092,10 +1098,12 @@ fn test_cross_field_validation_status_independent() {
         None,
         &HashSet::new(),
     );
-    assert_eq!(email_status.trust_level, TrustLevel::PartialConfidence);
+    // 2 * 0.3 = 0.6 -> LowConfidence
+    assert_eq!(email_status.trust_level, TrustLevel::LowConfidence);
 
     let twitter_status =
         ValidationStatus::from_validations(&twitter_validations, "@bob", None, &HashSet::new());
+    // 1 * 0.3 = 0.3 -> LowConfidence
     assert_eq!(twitter_status.trust_level, TrustLevel::LowConfidence);
 }
 
@@ -1348,4 +1356,285 @@ fn test_get_field_validation_status_excludes_blocked_contacts() {
         TrustLevel::LowConfidence,
         "Trust level should reflect only 1 validation"
     );
+}
+
+// =============================================================================
+// Weighted Trust Level Tests
+// Traces to: _private/features/field_validation.feature @trust-weight
+// =============================================================================
+
+#[test]
+fn test_from_weighted_score_thresholds() {
+    // Below 0.1 → Unverified
+    assert_eq!(
+        TrustLevel::from_weighted_score(0.0),
+        TrustLevel::Unverified,
+        "Score 0.0 should be Unverified"
+    );
+    assert_eq!(
+        TrustLevel::from_weighted_score(0.09),
+        TrustLevel::Unverified,
+        "Score 0.09 should be Unverified"
+    );
+
+    // 0.1..1.0 → LowConfidence
+    assert_eq!(
+        TrustLevel::from_weighted_score(0.1),
+        TrustLevel::LowConfidence,
+        "Score 0.1 should be LowConfidence"
+    );
+    assert_eq!(
+        TrustLevel::from_weighted_score(0.5),
+        TrustLevel::LowConfidence,
+        "Score 0.5 should be LowConfidence"
+    );
+    assert_eq!(
+        TrustLevel::from_weighted_score(0.99),
+        TrustLevel::LowConfidence,
+        "Score 0.99 should be LowConfidence"
+    );
+
+    // 1.0..3.0 → PartialConfidence
+    assert_eq!(
+        TrustLevel::from_weighted_score(1.0),
+        TrustLevel::PartialConfidence,
+        "Score 1.0 should be PartialConfidence"
+    );
+    assert_eq!(
+        TrustLevel::from_weighted_score(2.5),
+        TrustLevel::PartialConfidence,
+        "Score 2.5 should be PartialConfidence"
+    );
+    assert_eq!(
+        TrustLevel::from_weighted_score(2.99),
+        TrustLevel::PartialConfidence,
+        "Score 2.99 should be PartialConfidence"
+    );
+
+    // 3.0+ → HighConfidence
+    assert_eq!(
+        TrustLevel::from_weighted_score(3.0),
+        TrustLevel::HighConfidence,
+        "Score 3.0 should be HighConfidence"
+    );
+    assert_eq!(
+        TrustLevel::from_weighted_score(10.0),
+        TrustLevel::HighConfidence,
+        "Score 10.0 should be HighConfidence"
+    );
+}
+
+#[test]
+fn test_from_validations_weighted_uses_contact_metadata() {
+    use std::collections::HashMap;
+
+    // Create 3 validations from different validators
+    let validations = vec![
+        ProfileValidation::new("field1", "@alice", "validator_old_verified", [0u8; 64]),
+        ProfileValidation::new("field1", "@alice", "validator_new_unverified", [0u8; 64]),
+        ProfileValidation::new("field1", "@alice", "validator_unknown", [0u8; 64]),
+    ];
+
+    // Build metadata: one old+verified contact, one new+unverified
+    let mut meta = HashMap::new();
+    meta.insert(
+        "validator_old_verified".to_string(),
+        ValidatorMeta {
+            contact_age_days: 60,
+            fingerprint_verified: true,
+        },
+    );
+    meta.insert(
+        "validator_new_unverified".to_string(),
+        ValidatorMeta {
+            contact_age_days: 0,
+            fingerprint_verified: false,
+        },
+    );
+    // validator_unknown is NOT in the map → should get default weight 0.3
+
+    let status_weighted = ValidationStatus::from_validations_weighted(
+        &validations,
+        "@alice",
+        None,
+        &HashSet::new(),
+        &meta,
+    );
+
+    // Raw count is still 3 (all validators counted)
+    assert_eq!(status_weighted.count, 3, "Raw count should be 3 validators");
+
+    // Weighted score:
+    // validator_old_verified: 60 days, fingerprint=true → weight = 1.0
+    // validator_new_unverified: 0 days, fingerprint=false → weight = 0.3
+    // validator_unknown: not in meta → default weight = 0.3
+    // Total = 1.0 + 0.3 + 0.3 = 1.6
+
+    // 1.6 is in [1.0, 3.0) → PartialConfidence
+    assert_eq!(
+        status_weighted.trust_level,
+        TrustLevel::PartialConfidence,
+        "Weighted score of 1.6 should give PartialConfidence"
+    );
+
+    // Compare with unweighted: 3 validators → from_count(3) → PartialConfidence
+    // Both happen to be PartialConfidence, so let's also check a case where they differ:
+    // With only the verified contact, weighted=1.0 → PartialConfidence,
+    // but from_count(1) → LowConfidence
+    let single_validation = vec![ProfileValidation::new(
+        "field1",
+        "@alice",
+        "validator_old_verified",
+        [0u8; 64],
+    )];
+
+    let status_single = ValidationStatus::from_validations_weighted(
+        &single_validation,
+        "@alice",
+        None,
+        &HashSet::new(),
+        &meta,
+    );
+
+    assert_eq!(status_single.count, 1, "Raw count should be 1");
+    // Weight = 1.0, so score = 1.0 → PartialConfidence (not LowConfidence like count-based)
+    assert_eq!(
+        status_single.trust_level,
+        TrustLevel::PartialConfidence,
+        "Single verified mature contact with weight 1.0 should give PartialConfidence"
+    );
+}
+
+#[test]
+fn test_from_validations_weighted_unknown_validators_get_minimum_weight() {
+    use std::collections::HashMap;
+
+    // 1 validation from an unknown validator (not in metadata)
+    let validations = vec![ProfileValidation::new(
+        "field1",
+        "@alice",
+        "unknown_validator",
+        [0u8; 64],
+    )];
+
+    let meta: HashMap<String, ValidatorMeta> = HashMap::new();
+
+    let status = ValidationStatus::from_validations_weighted(
+        &validations,
+        "@alice",
+        None,
+        &HashSet::new(),
+        &meta,
+    );
+
+    assert_eq!(status.count, 1, "Count should be 1");
+    // Weight for unknown = 0.3, score = 0.3 → [0.1, 1.0) → LowConfidence
+    assert_eq!(
+        status.trust_level,
+        TrustLevel::LowConfidence,
+        "Unknown validator with weight 0.3 should give LowConfidence"
+    );
+}
+
+#[test]
+fn test_from_validations_weighted_filters_blocked_and_mismatched_values() {
+    use std::collections::HashMap;
+
+    let validations = vec![
+        ProfileValidation::new("field1", "@alice", "bob", [0u8; 64]),
+        ProfileValidation::new("field1", "@alice", "mallory", [0u8; 64]),
+        ProfileValidation::new("field1", "@alice_old", "carol", [0u8; 64]), // wrong value
+    ];
+
+    let mut blocked = HashSet::new();
+    blocked.insert("mallory".to_string());
+
+    let mut meta = HashMap::new();
+    meta.insert(
+        "bob".to_string(),
+        ValidatorMeta {
+            contact_age_days: 60,
+            fingerprint_verified: true,
+        },
+    );
+    meta.insert(
+        "carol".to_string(),
+        ValidatorMeta {
+            contact_age_days: 60,
+            fingerprint_verified: true,
+        },
+    );
+
+    let status =
+        ValidationStatus::from_validations_weighted(&validations, "@alice", None, &blocked, &meta);
+
+    // mallory is blocked, carol's value doesn't match → only bob counts
+    assert_eq!(status.count, 1, "Only bob's validation should count");
+    assert!(
+        !status.validator_ids.contains(&"mallory".to_string()),
+        "Blocked validator should be excluded"
+    );
+    assert!(
+        !status.validator_ids.contains(&"carol".to_string()),
+        "Mismatched value validator should be excluded"
+    );
+}
+
+#[test]
+fn test_from_validations_backward_compat() {
+    // from_validations() should produce identical results to before
+    // (i.e., it delegates to from_validations_weighted with empty metadata,
+    //  but since unknown validators get weight 0.3, and from_count uses count,
+    //  we need to verify the behavior stays count-based)
+
+    // 0 validations → Unverified
+    let status_0 = ValidationStatus::from_validations(&[], "@alice", None, &HashSet::new());
+    assert_eq!(status_0.count, 0);
+    assert_eq!(status_0.trust_level, TrustLevel::Unverified);
+
+    // 1 validation → LowConfidence (weight 0.3 → LowConfidence, count 1 → LowConfidence: matches)
+    let validations_1 = vec![ProfileValidation::new("field1", "@alice", "bob", [0u8; 64])];
+    let status_1 =
+        ValidationStatus::from_validations(&validations_1, "@alice", None, &HashSet::new());
+    assert_eq!(status_1.count, 1);
+    assert_eq!(
+        status_1.trust_level,
+        TrustLevel::LowConfidence,
+        "1 validation should still be LowConfidence"
+    );
+
+    // 3 validations: 3 * 0.3 = 0.9 → LowConfidence (count-based was PartialConfidence)
+    // NOTE: This is the intentional behavioral change — weighted scoring uses metadata,
+    // and with empty metadata (all unknown at 0.3), 3 validators give 0.9 score = LowConfidence.
+    // The old from_count(3) gave PartialConfidence. This is expected with the new weighting.
+    let validations_3 = vec![
+        ProfileValidation::new("field1", "@alice", "bob", [0u8; 64]),
+        ProfileValidation::new("field1", "@alice", "carol", [0u8; 64]),
+        ProfileValidation::new("field1", "@alice", "dave", [0u8; 64]),
+    ];
+    let status_3 =
+        ValidationStatus::from_validations(&validations_3, "@alice", None, &HashSet::new());
+    assert_eq!(status_3.count, 3);
+    // 3 * 0.3 = 0.9, in [0.1, 1.0) → LowConfidence
+    assert_eq!(
+        status_3.trust_level,
+        TrustLevel::LowConfidence,
+        "3 unknown validators with weight 0.3 each = 0.9 → LowConfidence"
+    );
+
+    // validated_by_me should still work
+    let status_me =
+        ValidationStatus::from_validations(&validations_1, "@alice", Some("bob"), &HashSet::new());
+    assert!(status_me.validated_by_me, "Should detect own validation");
+
+    // Blocked filtering should still work
+    let mut blocked = HashSet::new();
+    blocked.insert("bob".to_string());
+    let status_blocked =
+        ValidationStatus::from_validations(&validations_1, "@alice", None, &blocked);
+    assert_eq!(
+        status_blocked.count, 0,
+        "Blocked validator should be excluded"
+    );
+    assert_eq!(status_blocked.trust_level, TrustLevel::Unverified);
 }

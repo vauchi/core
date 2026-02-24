@@ -34,7 +34,7 @@
 //! - **High Confidence** (5+ validations): Green indicator
 
 use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use crate::Identity;
 
@@ -185,6 +185,15 @@ impl ProfileValidation {
     }
 }
 
+/// Metadata about a validator used for trust weighting.
+#[derive(Debug, Clone, Default)]
+pub struct ValidatorMeta {
+    /// How many days this contact has been known.
+    pub contact_age_days: u64,
+    /// Whether the contact's fingerprint has been verified in-person.
+    pub fingerprint_verified: bool,
+}
+
 /// Trust level based on validation count.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum TrustLevel {
@@ -206,6 +215,28 @@ impl TrustLevel {
             1 => TrustLevel::LowConfidence,
             2..=4 => TrustLevel::PartialConfidence,
             _ => TrustLevel::HighConfidence,
+        }
+    }
+
+    /// Determines trust level from a weighted score.
+    ///
+    /// Unlike `from_count()` which uses raw validator count, this method
+    /// uses the sum of individual validator weights to determine trust.
+    ///
+    /// # Thresholds
+    /// - score < 0.1 -> Unverified
+    /// - 0.1 <= score < 1.0 -> LowConfidence
+    /// - 1.0 <= score < 3.0 -> PartialConfidence
+    /// - score >= 3.0 -> HighConfidence
+    pub fn from_weighted_score(score: f32) -> Self {
+        if score < 0.1 {
+            TrustLevel::Unverified
+        } else if score < 1.0 {
+            TrustLevel::LowConfidence
+        } else if score < 3.0 {
+            TrustLevel::PartialConfidence
+        } else {
+            TrustLevel::HighConfidence
         }
     }
 
@@ -258,12 +289,42 @@ impl ValidationStatus {
     }
 
     /// Updates the status from a list of validations.
+    ///
+    /// Delegates to [`from_validations_weighted`] with an empty metadata map,
+    /// which means all validators receive the minimum default weight (0.3).
     pub fn from_validations(
         validations: &[ProfileValidation],
         field_value: &str,
         my_id: Option<&str>,
         blocked_ids: &HashSet<String>,
     ) -> Self {
+        Self::from_validations_weighted(
+            validations,
+            field_value,
+            my_id,
+            blocked_ids,
+            &HashMap::new(),
+        )
+    }
+
+    /// Updates the status from a list of validations using weighted trust scoring.
+    ///
+    /// Each validator's contribution to the trust score is weighted by their
+    /// contact age and fingerprint verification status via [`calculate_trust_weight`].
+    /// Validators not found in `validator_meta` receive a minimum weight of 0.3.
+    ///
+    /// The raw `count` still reflects the actual number of validators (not weighted).
+    /// Only `trust_level` uses the weighted score.
+    pub fn from_validations_weighted(
+        validations: &[ProfileValidation],
+        field_value: &str,
+        my_id: Option<&str>,
+        blocked_ids: &HashSet<String>,
+        validator_meta: &HashMap<String, ValidatorMeta>,
+    ) -> Self {
+        // Default weight for validators with no metadata
+        const DEFAULT_WEIGHT: f32 = 0.3;
+
         // Filter to valid validations (matching field value, not blocked)
         let valid_validations: Vec<_> = validations
             .iter()
@@ -271,7 +332,21 @@ impl ValidationStatus {
             .collect();
 
         let count = valid_validations.len();
-        let trust_level = TrustLevel::from_count(count);
+
+        // Compute weighted score
+        let weighted_score: f32 = valid_validations
+            .iter()
+            .map(|v| {
+                validator_meta
+                    .get(&v.validator_id)
+                    .map(|meta| {
+                        calculate_trust_weight(meta.contact_age_days, meta.fingerprint_verified)
+                    })
+                    .unwrap_or(DEFAULT_WEIGHT)
+            })
+            .sum();
+
+        let trust_level = TrustLevel::from_weighted_score(weighted_score);
 
         let validator_ids: Vec<String> = valid_validations
             .iter()

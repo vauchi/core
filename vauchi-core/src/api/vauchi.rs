@@ -1795,20 +1795,42 @@ impl<T: Transport> Vauchi<T> {
             .as_ref()
             .map(|id| hex::encode(id.signing_public_key()));
 
+        let contacts = self.storage.list_contacts()?;
+
         // Load blocked contact IDs to exclude their validations
-        let blocked: std::collections::HashSet<String> = self
-            .storage
-            .list_contacts()?
+        let blocked: std::collections::HashSet<String> = contacts
             .iter()
             .filter(|c| c.is_blocked())
             .map(|c| c.id().to_string())
             .collect();
 
-        let status = crate::social::ValidationStatus::from_validations(
+        // Build validator metadata from contacts for trust weighting
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("system time before UNIX epoch")
+            .as_secs();
+
+        let validator_meta: std::collections::HashMap<String, crate::social::ValidatorMeta> =
+            contacts
+                .iter()
+                .map(|c| {
+                    let age_days = (now.saturating_sub(c.exchange_timestamp())) / 86400;
+                    (
+                        c.id().to_string(),
+                        crate::social::ValidatorMeta {
+                            contact_age_days: age_days,
+                            fingerprint_verified: c.is_fingerprint_verified(),
+                        },
+                    )
+                })
+                .collect();
+
+        let status = crate::social::ValidationStatus::from_validations_weighted(
             &validations,
             field_value,
             my_id.as_deref(),
             &blocked,
+            &validator_meta,
         );
 
         Ok(status)

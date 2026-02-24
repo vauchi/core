@@ -74,7 +74,7 @@ pub use recovery::{
 };
 pub use social::{
     calculate_trust_weight, check_sybil_resistance, filter_blocked_validations, ProfileValidation,
-    SocialNetwork, SocialNetworkRegistry, TrustLevel, ValidationStatus,
+    SocialNetwork, SocialNetworkRegistry, TrustLevel, ValidationStatus, ValidatorMeta,
 };
 pub use storage::{PendingUpdate, Storage, StorageError, UpdateStatus};
 pub use sync::{CardDelta, DeltaError, FieldChange, SyncError, SyncManager, SyncState};

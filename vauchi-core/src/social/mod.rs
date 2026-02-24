@@ -21,5 +21,5 @@ mod validation;
 pub use registry::{SocialNetwork, SocialNetworkRegistry};
 pub use validation::{
     calculate_trust_weight, check_sybil_resistance, filter_blocked_validations, ProfileValidation,
-    TrustLevel, ValidationStatus,
+    TrustLevel, ValidationStatus, ValidatorMeta,
 };

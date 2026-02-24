@@ -1259,3 +1259,93 @@ fn test_max_field_length_update_rejects_overlong() {
         "Current impl: value is set before validation (non-atomic)"
     );
 }
+
+// =============================================================================
+// API Integration: Blocked Contacts Excluded from Validation Status
+// Traces to: _private/features/field_validation.feature @blocked @trust
+// =============================================================================
+
+#[test]
+fn test_get_field_validation_status_excludes_blocked_contacts() {
+    use vauchi_core::contact_card::ContactCard;
+    use vauchi_core::crypto::SymmetricKey;
+    use vauchi_core::social::ProfileValidation;
+    use vauchi_core::{Contact, Identity, MockTransport, Vauchi};
+
+    // Create Vauchi instance with identity
+    let mut wb: Vauchi<MockTransport> = Vauchi::in_memory().unwrap();
+    wb.create_identity("Alice").unwrap();
+
+    // Create two validator identities
+    let bob_identity = Identity::create("Bob");
+    let mallory_identity = Identity::create("Mallory");
+
+    let bob_validator_id = hex::encode(bob_identity.signing_public_key());
+    let mallory_validator_id = hex::encode(mallory_identity.signing_public_key());
+
+    // Create a target contact (Charlie) whose field will be validated
+    let charlie_key = [42u8; 32];
+    let charlie_contact = Contact::from_exchange(
+        charlie_key,
+        ContactCard::new("Charlie"),
+        SymmetricKey::generate(),
+    );
+    let charlie_id = charlie_contact.id().to_string();
+    wb.add_contact(charlie_contact).unwrap();
+
+    // Create contacts for Bob and Mallory (using their signing public keys as contact IDs)
+    let bob_contact = Contact::from_exchange(
+        *bob_identity.signing_public_key(),
+        ContactCard::new("Bob"),
+        SymmetricKey::generate(),
+    );
+    let mallory_contact = Contact::from_exchange(
+        *mallory_identity.signing_public_key(),
+        ContactCard::new("Mallory"),
+        SymmetricKey::generate(),
+    );
+
+    // Verify contact IDs match validator IDs
+    assert_eq!(bob_contact.id(), bob_validator_id);
+    assert_eq!(mallory_contact.id(), mallory_validator_id);
+
+    wb.add_contact(bob_contact).unwrap();
+    wb.add_contact(mallory_contact).unwrap();
+
+    // Block Mallory
+    wb.block_contact(&mallory_validator_id).unwrap();
+
+    // Save validation records from both Bob and Mallory for Charlie's twitter field
+    let bob_validation =
+        ProfileValidation::create_signed(&bob_identity, "twitter", "@charlie", &charlie_id);
+    let mallory_validation =
+        ProfileValidation::create_signed(&mallory_identity, "twitter", "@charlie", &charlie_id);
+
+    wb.storage().save_validation(&bob_validation).unwrap();
+    wb.storage().save_validation(&mallory_validation).unwrap();
+
+    // Get validation status - should exclude Mallory's validation
+    let status = wb
+        .get_field_validation_status(&charlie_id, "twitter", "@charlie")
+        .unwrap();
+
+    // Bob's validation should count, Mallory's should NOT
+    assert_eq!(
+        status.count, 1,
+        "Only non-blocked validator's validation should count (got {})",
+        status.count
+    );
+    assert!(
+        status.validator_ids.contains(&bob_validator_id),
+        "Bob's validation should be included"
+    );
+    assert!(
+        !status.validator_ids.contains(&mallory_validator_id),
+        "Mallory's (blocked) validation should be excluded"
+    );
+    assert_eq!(
+        status.trust_level,
+        TrustLevel::LowConfidence,
+        "Trust level should reflect only 1 validation"
+    );
+}

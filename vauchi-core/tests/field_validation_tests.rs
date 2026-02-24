@@ -1820,3 +1820,361 @@ fn test_validate_field_queue_failure_does_not_fail_validation() {
         "Validation should be stored locally even if queue might fail"
     );
 }
+
+// =============================================================================
+// Incoming Validation Processing Tests
+// Traces to: _private/features/field_validation.feature @incoming @sync
+// =============================================================================
+
+#[test]
+fn test_process_incoming_validation_verifies_and_stores() {
+    use vauchi_core::contact_card::ContactCard;
+    use vauchi_core::crypto::SymmetricKey;
+    use vauchi_core::{Contact, Identity, MockTransport, Vauchi};
+
+    // Create Bob (the recipient) with identity
+    let mut bob: Vauchi<MockTransport> = Vauchi::in_memory().unwrap();
+    bob.create_identity("Bob").unwrap();
+
+    let bob_identity_id = hex::encode(bob.identity().unwrap().signing_public_key());
+
+    // Create Alice's identity (she will sign the validation)
+    let alice_identity = Identity::create("Alice");
+    let alice_pk = *alice_identity.signing_public_key();
+    let alice_contact = Contact::from_exchange(
+        alice_pk,
+        ContactCard::new("Alice"),
+        SymmetricKey::generate(),
+    );
+    let alice_contact_id = alice_contact.id().to_string();
+    bob.add_contact(alice_contact).unwrap();
+
+    // Alice creates a signed validation of Bob's twitter field
+    let validation = vauchi_core::social::ProfileValidation::create_signed(
+        &alice_identity,
+        "twitter",
+        "@bob",
+        &bob_identity_id,
+    );
+
+    // Serialize to bytes (as would be sent over the network)
+    let validation_bytes = serde_json::to_vec(&validation).unwrap();
+
+    // Bob processes the incoming validation from Alice
+    let result = bob.process_incoming_validation(&alice_contact_id, &validation_bytes);
+    assert!(
+        result.is_ok(),
+        "process_incoming_validation should succeed for valid signed validation: {:?}",
+        result.err()
+    );
+
+    // Verify it was stored
+    let status = bob
+        .get_field_validation_status(&bob_identity_id, "twitter", "@bob")
+        .unwrap();
+    assert_eq!(
+        status.count, 1,
+        "One validation should be stored after processing incoming validation"
+    );
+    assert!(
+        status.validator_ids.contains(&hex::encode(alice_pk)),
+        "The validator should be Alice"
+    );
+}
+
+#[test]
+fn test_process_incoming_validation_rejects_invalid_signature() {
+    use vauchi_core::contact_card::ContactCard;
+    use vauchi_core::crypto::SymmetricKey;
+    use vauchi_core::{Contact, Identity, MockTransport, Vauchi};
+
+    // Create Bob (the recipient) with identity
+    let mut bob: Vauchi<MockTransport> = Vauchi::in_memory().unwrap();
+    bob.create_identity("Bob").unwrap();
+
+    let bob_identity_id = hex::encode(bob.identity().unwrap().signing_public_key());
+
+    // Create Alice as a contact
+    let alice_identity = Identity::create("Alice");
+    let alice_pk = *alice_identity.signing_public_key();
+    let alice_contact = Contact::from_exchange(
+        alice_pk,
+        ContactCard::new("Alice"),
+        SymmetricKey::generate(),
+    );
+    let alice_contact_id = alice_contact.id().to_string();
+    bob.add_contact(alice_contact).unwrap();
+
+    // Craft a validation with a zeroed-out (invalid) signature
+    let validation = vauchi_core::social::ProfileValidation::new(
+        &format!("{}:twitter", bob_identity_id),
+        "@bob",
+        &hex::encode(alice_pk),
+        [0u8; 64], // invalid signature
+    );
+
+    let validation_bytes = serde_json::to_vec(&validation).unwrap();
+
+    // Bob processes the incoming validation — should reject due to invalid signature
+    let result = bob.process_incoming_validation(&alice_contact_id, &validation_bytes);
+    assert!(
+        result.is_err(),
+        "process_incoming_validation should reject invalid signature"
+    );
+
+    // Verify error is signature-related
+    let err = result.unwrap_err();
+    let err_msg = format!("{}", err);
+    assert!(
+        err_msg.contains("signature") || err_msg.contains("Signature"),
+        "Error should mention signature verification failure, got: {}",
+        err_msg
+    );
+}
+
+#[test]
+fn test_process_incoming_validation_rejects_validator_id_mismatch() {
+    use vauchi_core::contact_card::ContactCard;
+    use vauchi_core::crypto::SymmetricKey;
+    use vauchi_core::{Contact, Identity, MockTransport, Vauchi};
+
+    // Create Bob (the recipient) with identity
+    let mut bob: Vauchi<MockTransport> = Vauchi::in_memory().unwrap();
+    bob.create_identity("Bob").unwrap();
+
+    let bob_identity_id = hex::encode(bob.identity().unwrap().signing_public_key());
+
+    // Create Alice and Eve as contacts
+    let alice_identity = Identity::create("Alice");
+    let alice_pk = *alice_identity.signing_public_key();
+    let alice_contact = Contact::from_exchange(
+        alice_pk,
+        ContactCard::new("Alice"),
+        SymmetricKey::generate(),
+    );
+    bob.add_contact(alice_contact).unwrap();
+
+    let eve_identity = Identity::create("Eve");
+    let eve_pk = *eve_identity.signing_public_key();
+    let eve_contact =
+        Contact::from_exchange(eve_pk, ContactCard::new("Eve"), SymmetricKey::generate());
+    let eve_contact_id = eve_contact.id().to_string();
+    bob.add_contact(eve_contact).unwrap();
+
+    // Alice creates a valid signed validation
+    let validation = vauchi_core::social::ProfileValidation::create_signed(
+        &alice_identity,
+        "twitter",
+        "@bob",
+        &bob_identity_id,
+    );
+
+    let validation_bytes = serde_json::to_vec(&validation).unwrap();
+
+    // Eve tries to claim Alice's validation as her own (forwarding attack)
+    let result = bob.process_incoming_validation(&eve_contact_id, &validation_bytes);
+    assert!(
+        result.is_err(),
+        "process_incoming_validation should reject when validator_id doesn't match sender"
+    );
+
+    // Verify error mentions the mismatch
+    let err = result.unwrap_err();
+    let err_msg = format!("{}", err);
+    assert!(
+        err_msg.contains("mismatch") || err_msg.contains("does not match"),
+        "Error should mention validator ID mismatch, got: {}",
+        err_msg
+    );
+}
+
+#[test]
+fn test_process_incoming_validation_idempotent_on_duplicate() {
+    use vauchi_core::contact_card::ContactCard;
+    use vauchi_core::crypto::SymmetricKey;
+    use vauchi_core::{Contact, Identity, MockTransport, Vauchi};
+
+    // Create Bob (the recipient) with identity
+    let mut bob: Vauchi<MockTransport> = Vauchi::in_memory().unwrap();
+    bob.create_identity("Bob").unwrap();
+
+    let bob_identity_id = hex::encode(bob.identity().unwrap().signing_public_key());
+
+    // Create Alice as a contact
+    let alice_identity = Identity::create("Alice");
+    let alice_pk = *alice_identity.signing_public_key();
+    let alice_contact = Contact::from_exchange(
+        alice_pk,
+        ContactCard::new("Alice"),
+        SymmetricKey::generate(),
+    );
+    let alice_contact_id = alice_contact.id().to_string();
+    bob.add_contact(alice_contact).unwrap();
+
+    // Alice creates a signed validation
+    let validation = vauchi_core::social::ProfileValidation::create_signed(
+        &alice_identity,
+        "twitter",
+        "@bob",
+        &bob_identity_id,
+    );
+
+    let validation_bytes = serde_json::to_vec(&validation).unwrap();
+
+    // Process twice — second call should succeed (idempotent via UNIQUE constraint)
+    let result1 = bob.process_incoming_validation(&alice_contact_id, &validation_bytes);
+    assert!(result1.is_ok(), "First processing should succeed");
+
+    let result2 = bob.process_incoming_validation(&alice_contact_id, &validation_bytes);
+    assert!(
+        result2.is_ok(),
+        "Second (duplicate) processing should succeed (idempotent): {:?}",
+        result2.err()
+    );
+
+    // Should still be just 1 validation (not 2)
+    let status = bob
+        .get_field_validation_status(&bob_identity_id, "twitter", "@bob")
+        .unwrap();
+    assert_eq!(
+        status.count, 1,
+        "Duplicate delivery should not create duplicate validations"
+    );
+}
+
+#[test]
+fn test_process_incoming_revocation_deletes_validation() {
+    use vauchi_core::contact_card::ContactCard;
+    use vauchi_core::crypto::SymmetricKey;
+    use vauchi_core::{Contact, Identity, MockTransport, Vauchi};
+
+    // Create Bob (the recipient) with identity
+    let mut bob: Vauchi<MockTransport> = Vauchi::in_memory().unwrap();
+    bob.create_identity("Bob").unwrap();
+
+    let bob_identity_id = hex::encode(bob.identity().unwrap().signing_public_key());
+
+    // Create Alice as a contact
+    let alice_identity = Identity::create("Alice");
+    let alice_pk = *alice_identity.signing_public_key();
+    let alice_contact = Contact::from_exchange(
+        alice_pk,
+        ContactCard::new("Alice"),
+        SymmetricKey::generate(),
+    );
+    let alice_contact_id = alice_contact.id().to_string();
+    bob.add_contact(alice_contact).unwrap();
+
+    // Alice validates Bob's twitter field, Bob processes it
+    let validation = vauchi_core::social::ProfileValidation::create_signed(
+        &alice_identity,
+        "twitter",
+        "@bob",
+        &bob_identity_id,
+    );
+    let validation_bytes = serde_json::to_vec(&validation).unwrap();
+    bob.process_incoming_validation(&alice_contact_id, &validation_bytes)
+        .unwrap();
+
+    // Verify validation is stored
+    let status_before = bob
+        .get_field_validation_status(&bob_identity_id, "twitter", "@bob")
+        .unwrap();
+    assert_eq!(
+        status_before.count, 1,
+        "Validation should be stored before revocation"
+    );
+
+    // Alice sends a revocation
+    let revocation = serde_json::json!({
+        "contact_id": bob_identity_id,
+        "field_id": "twitter",
+        "validator_id": hex::encode(alice_pk),
+    });
+    let revocation_bytes = serde_json::to_vec(&revocation).unwrap();
+
+    let result = bob.process_incoming_revocation(&alice_contact_id, &revocation_bytes);
+    assert!(
+        result.is_ok(),
+        "process_incoming_revocation should succeed: {:?}",
+        result.err()
+    );
+    assert!(
+        result.unwrap(),
+        "Revocation should return true (validation was deleted)"
+    );
+
+    // Verify validation is gone
+    let status_after = bob
+        .get_field_validation_status(&bob_identity_id, "twitter", "@bob")
+        .unwrap();
+    assert_eq!(
+        status_after.count, 0,
+        "Validation should be deleted after revocation"
+    );
+}
+
+#[test]
+fn test_process_incoming_revocation_rejects_validator_id_mismatch() {
+    use vauchi_core::contact_card::ContactCard;
+    use vauchi_core::crypto::SymmetricKey;
+    use vauchi_core::{Contact, Identity, MockTransport, Vauchi};
+
+    // Create Bob (the recipient) with identity
+    let mut bob: Vauchi<MockTransport> = Vauchi::in_memory().unwrap();
+    bob.create_identity("Bob").unwrap();
+
+    let bob_identity_id = hex::encode(bob.identity().unwrap().signing_public_key());
+
+    // Create Alice and Eve as contacts
+    let alice_identity = Identity::create("Alice");
+    let alice_pk = *alice_identity.signing_public_key();
+    let alice_contact = Contact::from_exchange(
+        alice_pk,
+        ContactCard::new("Alice"),
+        SymmetricKey::generate(),
+    );
+    let alice_contact_id = alice_contact.id().to_string();
+    bob.add_contact(alice_contact).unwrap();
+
+    let eve_identity = Identity::create("Eve");
+    let eve_pk = *eve_identity.signing_public_key();
+    let eve_contact =
+        Contact::from_exchange(eve_pk, ContactCard::new("Eve"), SymmetricKey::generate());
+    let eve_contact_id = eve_contact.id().to_string();
+    bob.add_contact(eve_contact).unwrap();
+
+    // Alice validates Bob's twitter field, Bob processes it
+    let validation = vauchi_core::social::ProfileValidation::create_signed(
+        &alice_identity,
+        "twitter",
+        "@bob",
+        &bob_identity_id,
+    );
+    let validation_bytes = serde_json::to_vec(&validation).unwrap();
+    bob.process_incoming_validation(&alice_contact_id, &validation_bytes)
+        .unwrap();
+
+    // Eve tries to revoke Alice's validation (should fail)
+    let revocation = serde_json::json!({
+        "contact_id": bob_identity_id,
+        "field_id": "twitter",
+        "validator_id": hex::encode(alice_pk), // Alice's validator_id, but Eve is sending
+    });
+    let revocation_bytes = serde_json::to_vec(&revocation).unwrap();
+
+    let result = bob.process_incoming_revocation(&eve_contact_id, &revocation_bytes);
+    assert!(
+        result.is_err(),
+        "process_incoming_revocation should reject when sender doesn't match validator_id"
+    );
+
+    // Validation should still be present
+    let status = bob
+        .get_field_validation_status(&bob_identity_id, "twitter", "@bob")
+        .unwrap();
+    assert_eq!(
+        status.count, 1,
+        "Validation should not be deleted by unauthorized revocation"
+    );
+}

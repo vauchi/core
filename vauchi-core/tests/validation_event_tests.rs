@@ -11,7 +11,6 @@ mod common;
 
 use std::sync::{Arc, Mutex};
 use vauchi_core::api::*;
-use vauchi_core::*;
 
 use common::helpers::setup_alice_bob_exchange;
 

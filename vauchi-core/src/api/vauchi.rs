@@ -1941,6 +1941,13 @@ impl<T: Transport> Vauchi<T> {
         // 5. Store the validation (save_validation is idempotent via INSERT OR REPLACE)
         self.storage.save_validation(&validation)?;
 
+        // 6. Dispatch FieldValidated event
+        self.events.dispatch(VauchiEvent::FieldValidated {
+            contact_id: validation.contact_id().unwrap_or_default().to_string(),
+            field_id: validation.field_id().to_string(),
+            validator_id: validation.validator_id().to_string(),
+        });
+
         Ok(())
     }
 
@@ -1980,6 +1987,15 @@ impl<T: Transport> Vauchi<T> {
         let deleted = self
             .storage
             .delete_validation(contact_id, field_id, validator_id)?;
+
+        // 4. Dispatch FieldValidationRevoked event only if something was actually deleted
+        if deleted {
+            self.events.dispatch(VauchiEvent::FieldValidationRevoked {
+                contact_id: contact_id.to_string(),
+                field_id: field_id.to_string(),
+                validator_id: validator_id.to_string(),
+            });
+        }
 
         Ok(deleted)
     }

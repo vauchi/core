@@ -10,7 +10,7 @@
 mod common;
 
 use std::sync::{Arc, Mutex};
-use vauchi_core::api::events::{CallbackHandler, VauchiEvent};
+use vauchi_core::api::*;
 use vauchi_core::*;
 
 use common::helpers::setup_alice_bob_exchange;
@@ -190,11 +190,13 @@ fn test_field_validation_revoked_event_dispatched_on_incoming_revocation() {
         events_clone.lock().unwrap().push(event);
     })));
 
-    // Bob revokes his validation of Alice's field
-    let full_field_id = format!("{}:{}", alice_contact_id, "email");
+    // Bob revokes his validation of Alice's field.
+    // Note: field_id in revocation uses the short form ("email"), matching
+    // how revoke_field_validation() queues it. delete_validation() internally
+    // prepends contact_id to build the full field_id for the storage lookup.
     let revocation = serde_json::json!({
         "contact_id": alice_contact_id,
-        "field_id": full_field_id,
+        "field_id": "email",
         "validator_id": bob_contact_id,
     });
     let revocation_bytes = serde_json::to_vec(&revocation).expect("revocation should serialize");
@@ -229,8 +231,8 @@ fn test_field_validation_revoked_event_dispatched_on_incoming_revocation() {
             "contact_id should be Alice's contact ID"
         );
         assert_eq!(
-            field_id, &full_field_id,
-            "field_id should match the full field ID"
+            field_id, "email",
+            "field_id should match the short field name"
         );
         assert_eq!(
             validator_id, &bob_contact_id,
@@ -252,10 +254,9 @@ fn test_field_validation_revoked_event_not_dispatched_when_nothing_deleted() {
         events_clone.lock().unwrap().push(event);
     })));
 
-    let full_field_id = format!("{}:{}", alice_contact_id, "email");
     let revocation = serde_json::json!({
         "contact_id": alice_contact_id,
-        "field_id": full_field_id,
+        "field_id": "email",
         "validator_id": bob_contact_id,
     });
     let revocation_bytes = serde_json::to_vec(&revocation).expect("revocation should serialize");

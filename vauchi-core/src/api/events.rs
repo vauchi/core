@@ -213,6 +213,34 @@ pub enum VauchiEvent {
         /// Total number of trusted contacts in the config.
         total: usize,
     },
+
+    /// A contact's field was validated by someone.
+    FieldValidated {
+        /// The contact whose field was validated.
+        contact_id: String,
+        /// The field that was validated.
+        field_id: String,
+        /// The validator's contact ID.
+        validator_id: String,
+    },
+
+    /// A validation was revoked.
+    FieldValidationRevoked {
+        /// The contact whose field validation was revoked.
+        contact_id: String,
+        /// The field whose validation was revoked.
+        field_id: String,
+        /// The validator who revoked.
+        validator_id: String,
+    },
+
+    /// A validated field's value changed, resetting its validations.
+    FieldValidationReset {
+        /// The contact whose field changed.
+        contact_id: String,
+        /// The field that changed.
+        field_id: String,
+    },
 }
 
 /// Event handler trait.

@@ -35,5 +35,9 @@ dist/
 .sccache/
 .claude/
 
+# Mutation testing output (cargo-mutants)
+mutants.out/
+mutants.out.old/
+
 # Locale files loaded from sibling locales/ repo at runtime
 vauchi-core/locales/

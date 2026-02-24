@@ -332,6 +332,15 @@ pub fn check_password_strength(password: String) -> MobilePasswordCheck {
     }
 }
 
+/// Classify a device type from its name string.
+///
+/// Returns a device type for UI icon selection. The classification
+/// logic lives in core so all platforms produce consistent results.
+#[uniffi::export]
+pub fn classify_device_type(name: String) -> types::MobileDeviceType {
+    vauchi_core::identity::classify_device_type(&name).into()
+}
+
 // === Thread-safe state ===
 
 /// Serializable identity data for thread-safe storage.

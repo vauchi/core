@@ -1795,8 +1795,14 @@ impl<T: Transport> Vauchi<T> {
             .as_ref()
             .map(|id| hex::encode(id.signing_public_key()));
 
-        // Get blocked contacts (empty for now, could be extended)
-        let blocked = std::collections::HashSet::new();
+        // Load blocked contact IDs to exclude their validations
+        let blocked: std::collections::HashSet<String> = self
+            .storage
+            .list_contacts()?
+            .iter()
+            .filter(|c| c.is_blocked())
+            .map(|c| c.id().to_string())
+            .collect();
 
         let status = crate::social::ValidationStatus::from_validations(
             &validations,

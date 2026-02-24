@@ -20,8 +20,9 @@ pub mod password;
 
 pub use backup::IdentityBackup;
 pub use device::{
-    check_identity_collision, BroadcastDevice, DeviceError, DeviceInfo, DeviceRegistry,
-    DeviceRevocationCertificate, RegisteredDevice, RegistryBroadcast, MAX_DEVICES,
+    check_identity_collision, classify_device_type, BroadcastDevice, DeviceError, DeviceInfo,
+    DeviceRegistry, DeviceRevocationCertificate, DeviceType, RegisteredDevice, RegistryBroadcast,
+    MAX_DEVICES,
 };
 
 #[allow(deprecated)]

@@ -13,6 +13,42 @@ use serde::{Deserialize, Serialize};
 use std::time::{SystemTime, UNIX_EPOCH};
 use thiserror::Error;
 
+/// Device type classification based on device name.
+///
+/// Used by UI clients to select platform-appropriate icons.
+/// The classification logic lives in core so all platforms
+/// produce consistent results.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DeviceType {
+    Phone,
+    Tablet,
+    Laptop,
+    Watch,
+    Desktop,
+    Unknown,
+}
+
+/// Classify a device type from its name string.
+///
+/// Case-insensitive substring matching on common device name patterns.
+/// Returns [DeviceType::Unknown] if no pattern matches.
+pub fn classify_device_type(name: &str) -> DeviceType {
+    let lower = name.to_lowercase();
+    if lower.contains("iphone") || lower.contains("pixel") || lower.contains("galaxy s") {
+        DeviceType::Phone
+    } else if lower.contains("ipad") || lower.contains("tab") {
+        DeviceType::Tablet
+    } else if lower.contains("watch") {
+        DeviceType::Watch
+    } else if lower.contains("imac") || lower.contains("desktop") || lower.contains(" pc") {
+        DeviceType::Desktop
+    } else if lower.contains("mac") || lower.contains("laptop") || lower.contains("book") {
+        DeviceType::Laptop
+    } else {
+        DeviceType::Unknown
+    }
+}
+
 /// Domain separation constants for device key derivation.
 /// v2: Fixed HKDF parameter ordering (master_seed as IKM, index in info).
 const DEVICE_ID_INFO: &[u8] = b"Vauchi_Device_ID_v2";
@@ -740,5 +776,66 @@ impl RegistryBroadcast {
     /// Deserializes from JSON.
     pub fn from_json(json: &str) -> Result<Self, DeviceError> {
         serde_json::from_str(json).map_err(|_| DeviceError::InvalidRegistrySignature)
+    }
+}
+
+// INLINE_TEST_REQUIRED: classify_device_type is a standalone function with no external dependencies
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_classify_device_type_iphone_returns_phone() {
+        assert_eq!(classify_device_type("iPhone 15 Pro"), DeviceType::Phone);
+        assert_eq!(classify_device_type("iphone"), DeviceType::Phone);
+        assert_eq!(classify_device_type("My iPhone"), DeviceType::Phone);
+    }
+
+    #[test]
+    fn test_classify_device_type_android_phones_returns_phone() {
+        assert_eq!(classify_device_type("Pixel 8"), DeviceType::Phone);
+        assert_eq!(classify_device_type("Galaxy S24"), DeviceType::Phone);
+    }
+
+    #[test]
+    fn test_classify_device_type_ipad_returns_tablet() {
+        assert_eq!(classify_device_type("iPad Pro"), DeviceType::Tablet);
+        assert_eq!(classify_device_type("ipad"), DeviceType::Tablet);
+        assert_eq!(classify_device_type("Galaxy Tab S9"), DeviceType::Tablet);
+    }
+
+    #[test]
+    fn test_classify_device_type_mac_returns_laptop() {
+        assert_eq!(classify_device_type("MacBook Pro"), DeviceType::Laptop);
+        assert_eq!(classify_device_type("mac"), DeviceType::Laptop);
+        assert_eq!(classify_device_type("ThinkPad Laptop"), DeviceType::Laptop);
+        assert_eq!(classify_device_type("Chromebook"), DeviceType::Laptop);
+    }
+
+    #[test]
+    fn test_classify_device_type_watch_returns_watch() {
+        assert_eq!(classify_device_type("Apple Watch"), DeviceType::Watch);
+        assert_eq!(classify_device_type("watch"), DeviceType::Watch);
+    }
+
+    #[test]
+    fn test_classify_device_type_desktop_returns_desktop() {
+        assert_eq!(classify_device_type("Desktop PC"), DeviceType::Desktop);
+        assert_eq!(classify_device_type("My PC"), DeviceType::Desktop);
+        assert_eq!(classify_device_type("iMac"), DeviceType::Desktop);
+    }
+
+    #[test]
+    fn test_classify_device_type_unknown_returns_unknown() {
+        assert_eq!(classify_device_type(""), DeviceType::Unknown);
+        assert_eq!(classify_device_type("some device"), DeviceType::Unknown);
+        assert_eq!(classify_device_type("Primary Device"), DeviceType::Unknown);
+    }
+
+    #[test]
+    fn test_classify_device_type_case_insensitive() {
+        assert_eq!(classify_device_type("IPHONE"), DeviceType::Phone);
+        assert_eq!(classify_device_type("MacBook"), DeviceType::Laptop);
+        assert_eq!(classify_device_type("IPAD"), DeviceType::Tablet);
     }
 }

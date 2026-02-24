@@ -143,6 +143,8 @@ mod proptest_classify {
                 MessageType::DeviceSync => "device_sync",
                 MessageType::DeviceSyncAck => "device_sync_ack",
                 MessageType::AccountRevoked => "account_revoked",
+                MessageType::ValidationRecord => "validation_record",
+                MessageType::ValidationRevocation => "validation_revocation",
                 MessageType::Unknown => "unknown",
             };
         }

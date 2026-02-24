@@ -28,6 +28,10 @@ pub enum MessageType {
     DeviceSyncAck,
     /// Account revocation signal.
     AccountRevoked,
+    /// Signed field validation record.
+    ValidationRecord,
+    /// Field validation revocation.
+    ValidationRevocation,
     /// Unrecognized or unparseable message.
     Unknown,
 }
@@ -71,6 +75,8 @@ pub fn classify_message(data: &[u8]) -> MessageType {
         SimplePayload::DeviceSyncMessage(_) => MessageType::DeviceSync,
         SimplePayload::DeviceSyncAck(_) => MessageType::DeviceSyncAck,
         SimplePayload::AccountRevoked(_) => MessageType::AccountRevoked,
+        SimplePayload::ValidationRecord(_) => MessageType::ValidationRecord,
+        SimplePayload::ValidationRevocation(_) => MessageType::ValidationRevocation,
         SimplePayload::Unknown => MessageType::Unknown,
     }
 }

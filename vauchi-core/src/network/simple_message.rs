@@ -44,6 +44,10 @@ pub enum SimplePayload {
     DeviceSyncAck(SimpleDeviceSyncAck),
     /// Account revocation signal (signed, not encrypted).
     AccountRevoked(SimpleAccountRevoked),
+    /// Signed field validation record (encrypted in transit).
+    ValidationRecord(SimpleValidationRecord),
+    /// Field validation revocation (encrypted in transit).
+    ValidationRevocation(SimpleValidationRevocation),
     /// Unknown message type (for forward compatibility).
     #[serde(other)]
     Unknown,
@@ -284,6 +288,22 @@ pub struct SimpleDeviceSyncAck {
     pub synced_version: u64,
 }
 
+/// A signed validation record delivered to the validated contact.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SimpleValidationRecord {
+    /// Serialized ProfileValidation (JSON bytes).
+    pub validation_bytes: Vec<u8>,
+}
+
+/// A validation revocation notification.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SimpleValidationRevocation {
+    pub contact_id: String,
+    pub field_id: String,
+    pub validator_id: String,
+    pub timestamp: u64,
+}
+
 /// Create a device sync message envelope.
 pub fn create_device_sync_message(
     identity_id: &str,
@@ -314,6 +334,7 @@ pub fn create_device_sync_ack(message_id: &str, synced_version: u64) -> SimpleEn
 // Trace: codebase-review-tracker item #50
 // ===========================================================================
 
+// INLINE_TEST_REQUIRED: tests use private hex_encode and create_signed_handshake internals
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -465,6 +486,45 @@ mod tests {
             assert!(h.timestamp.is_none());
         } else {
             panic!("Expected Handshake payload");
+        }
+    }
+
+    #[test]
+    fn test_validation_record_payload_roundtrip() {
+        let validation_bytes = b"test validation data".to_vec();
+        let payload = SimplePayload::ValidationRecord(SimpleValidationRecord {
+            validation_bytes: validation_bytes.clone(),
+        });
+        let envelope = create_simple_envelope(payload);
+        let serialized = serde_json::to_vec(&envelope).unwrap();
+        let deserialized: SimpleEnvelope = serde_json::from_slice(&serialized).unwrap();
+        match deserialized.payload {
+            SimplePayload::ValidationRecord(record) => {
+                assert_eq!(record.validation_bytes, validation_bytes);
+            }
+            _ => panic!("Expected ValidationRecord payload"),
+        }
+    }
+
+    #[test]
+    fn test_validation_revocation_payload_roundtrip() {
+        let payload = SimplePayload::ValidationRevocation(SimpleValidationRevocation {
+            contact_id: "contact123".to_string(),
+            field_id: "email".to_string(),
+            validator_id: "abc123".to_string(),
+            timestamp: 1700000000,
+        });
+        let envelope = create_simple_envelope(payload);
+        let serialized = serde_json::to_vec(&envelope).unwrap();
+        let deserialized: SimpleEnvelope = serde_json::from_slice(&serialized).unwrap();
+        match deserialized.payload {
+            SimplePayload::ValidationRevocation(rev) => {
+                assert_eq!(rev.contact_id, "contact123");
+                assert_eq!(rev.field_id, "email");
+                assert_eq!(rev.validator_id, "abc123");
+                assert_eq!(rev.timestamp, 1700000000);
+            }
+            _ => panic!("Expected ValidationRevocation payload"),
         }
     }
 }

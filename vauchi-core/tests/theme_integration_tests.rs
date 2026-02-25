@@ -24,6 +24,7 @@ use vauchi_core::theme::{validate_hex_color, Theme, ThemeColors, ThemeMode};
 // ============================================================
 
 /// Test: Theme has required fields
+// @scenario: theming:Theme file contains required colors
 #[test]
 fn test_theme_has_required_fields() {
     let themes = all_themes();
@@ -37,6 +38,7 @@ fn test_theme_has_required_fields() {
 }
 
 /// Test: ThemeColors has all required color fields
+// @scenario: theming:Theme file contains required colors
 #[test]
 fn test_theme_colors_complete() {
     let themes = all_themes();
@@ -76,6 +78,7 @@ fn test_theme_colors_complete() {
 // ============================================================
 
 /// Test: Themes have correct mode (light/dark)
+// @scenario: theming:Theme file specifies light/dark mode
 #[test]
 fn test_theme_modes() {
     let themes = all_themes();
@@ -96,6 +99,7 @@ fn test_theme_modes() {
 /// Test: Default theme is dark mode
 /// Feature: theming.feature @selection
 /// Scenario: Default theme on fresh install
+// @scenario: theming:Default theme on fresh install
 #[test]
 fn test_default_theme_is_dark() {
     let default = theme_by_id("default-dark");
@@ -109,6 +113,7 @@ fn test_default_theme_is_dark() {
 // ============================================================
 
 /// Test: All themes pass WCAG contrast requirements
+// @scenario: theming:Theme colors meet minimum contrast
 #[test]
 fn test_all_themes_accessible() {
     let themes = all_themes();
@@ -125,6 +130,7 @@ fn test_all_themes_accessible() {
 }
 
 /// Test: Contrast ratio calculation
+// @scenario: theming:Theme colors meet minimum contrast
 #[test]
 fn test_contrast_ratio_calculation() {
     // White on black should have high contrast
@@ -163,6 +169,7 @@ fn test_contrast_ratio_calculation() {
 }
 
 /// Test: Low contrast should fail validation
+// @scenario: theming:Theme colors meet minimum contrast
 #[test]
 fn test_low_contrast_fails() {
     let gray1 = "#808080";
@@ -205,6 +212,7 @@ fn test_low_contrast_fails() {
 // ============================================================
 
 /// Test: Default themes exist
+// @scenario: theming:Bundled themes always available
 #[test]
 fn test_default_themes_exist() {
     assert!(theme_by_id("default-dark").is_some());
@@ -213,6 +221,7 @@ fn test_default_themes_exist() {
 
 /// Test: Catppuccin themes exist
 /// Feature: theming.feature @catppuccin
+// @scenario: theming:Catppuccin flavor themes available
 #[test]
 fn test_catppuccin_themes_exist() {
     assert!(
@@ -227,6 +236,7 @@ fn test_catppuccin_themes_exist() {
 
 /// Test: Catppuccin Mocha has correct colors
 /// Feature: theming.feature @catppuccin @dark
+// @scenario: theming:Apply Catppuccin Mocha (dark)
 #[test]
 fn test_catppuccin_mocha_colors() {
     let theme = theme_by_id("catppuccin-mocha").unwrap();
@@ -239,6 +249,7 @@ fn test_catppuccin_mocha_colors() {
 
 /// Test: Catppuccin Latte has correct colors
 /// Feature: theming.feature @catppuccin @light
+// @scenario: theming:Apply Catppuccin Latte (light)
 #[test]
 fn test_catppuccin_latte_colors() {
     let theme = theme_by_id("catppuccin-latte").unwrap();
@@ -250,6 +261,7 @@ fn test_catppuccin_latte_colors() {
 
 /// Test: Dracula theme exists and has correct colors
 /// Feature: theming.feature (implied)
+// @scenario: theming:Apply Dracula theme
 #[test]
 fn test_dracula_theme() {
     let theme = theme_by_id("dracula").unwrap();
@@ -261,6 +273,7 @@ fn test_dracula_theme() {
 }
 
 /// Test: Nord theme exists and has correct colors
+// @scenario: theming:Apply Nord theme
 #[test]
 fn test_nord_theme() {
     let theme = theme_by_id("nord").unwrap();
@@ -271,6 +284,7 @@ fn test_nord_theme() {
 }
 
 /// Test: Solarized themes exist
+// @scenario: theming:Solarized themes available
 #[test]
 fn test_solarized_themes() {
     assert!(theme_by_id("solarized-dark").is_some());
@@ -278,6 +292,7 @@ fn test_solarized_themes() {
 }
 
 /// Test: Gruvbox themes exist
+// @scenario: theming:Gruvbox themes available
 #[test]
 fn test_gruvbox_themes() {
     assert!(theme_by_id("gruvbox-dark").is_some());
@@ -322,6 +337,7 @@ fn test_valid_hex_colors() {
 }
 
 /// Test: Invalid hex colors fail validation
+// @scenario: theming:Invalid theme file rejected
 #[test]
 fn test_invalid_hex_colors() {
     assert!(validate_hex_color("ffffff").is_err(), "Missing #");

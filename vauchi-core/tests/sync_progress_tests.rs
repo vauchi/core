@@ -14,6 +14,7 @@ use std::sync::{Arc, Mutex};
 use vauchi_core::api::events::{CallbackHandler, EventDispatcher, VauchiEvent};
 
 /// Verify SyncProgress event variant exists and can be constructed.
+// @scenario: sync_updates:Large sync queue handling
 #[test]
 fn test_sync_progress_event_constructable() {
     let event = VauchiEvent::SyncProgress {
@@ -37,6 +38,7 @@ fn test_sync_progress_event_constructable() {
 }
 
 /// Verify SyncProgress events are dispatched correctly through EventDispatcher.
+// @scenario: sync_updates:Large sync queue handling
 #[test]
 fn test_sync_progress_dispatched_via_handler() {
     let received = Arc::new(Mutex::new(Vec::new()));
@@ -76,6 +78,7 @@ fn test_sync_progress_dispatched_via_handler() {
 }
 
 /// Verify SyncProgress events have correct total matching ready updates count.
+// @scenario: sync_updates:Large sync queue handling
 #[test]
 fn test_sync_progress_total_matches_ready_updates() {
     let received = Arc::new(Mutex::new(Vec::new()));

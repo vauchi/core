@@ -25,6 +25,7 @@ use vauchi_core::{
 
 /// Test: Card creation aha moment triggers on identity creation
 /// Feature: aha_moments.feature @card-creation
+// @scenario: aha_moments:Card creation shows completion message
 #[test]
 fn test_card_creation_aha_moment_triggers() {
     let mut tracker = AhaMomentTracker::new();
@@ -42,6 +43,7 @@ fn test_card_creation_aha_moment_triggers() {
 /// Test: Card creation celebration shown once only
 /// Feature: aha_moments.feature @card-creation
 /// Scenario: Card creation celebration is shown once
+// @scenario: aha_moments:Card creation celebration is shown once
 #[test]
 fn test_card_creation_shown_once() {
     let mut tracker = AhaMomentTracker::new();
@@ -62,6 +64,7 @@ fn test_card_creation_shown_once() {
 
 /// Test: First edit triggers feedback
 /// Feature: aha_moments.feature @first-edit
+// @scenario: aha_moments:First edit shows would-update feedback
 #[test]
 fn test_first_edit_triggers_feedback() {
     let mut tracker = AhaMomentTracker::new();
@@ -77,6 +80,7 @@ fn test_first_edit_triggers_feedback() {
 /// Test: First edit feedback shown only once
 /// Feature: aha_moments.feature @first-edit
 /// Scenario: First edit feedback shown only once
+// @scenario: aha_moments:First edit feedback shown only once
 #[test]
 fn test_first_edit_shown_once() {
     let mut tracker = AhaMomentTracker::new();
@@ -95,6 +99,7 @@ fn test_first_edit_shown_once() {
 
 /// Test: First contact triggers celebration with name
 /// Feature: aha_moments.feature @first-contact
+// @scenario: aha_moments:First contact added celebration
 #[test]
 fn test_first_contact_celebration_with_name() {
     let mut tracker = AhaMomentTracker::new();
@@ -114,6 +119,7 @@ fn test_first_contact_celebration_with_name() {
 /// Test: Subsequent contacts do not show celebration
 /// Feature: aha_moments.feature @first-contact
 /// Scenario: Subsequent contacts do not show celebration
+// @scenario: aha_moments:Subsequent contacts do not show celebration
 #[test]
 fn test_subsequent_contacts_no_celebration() {
     let mut tracker = AhaMomentTracker::new();
@@ -136,6 +142,7 @@ fn test_subsequent_contacts_no_celebration() {
 
 /// Test: First update received triggers with context
 /// Feature: aha_moments.feature @first-update
+// @scenario: aha_moments:First received update shows diff view
 #[test]
 fn test_first_update_received_with_context() {
     let mut tracker = AhaMomentTracker::new();
@@ -155,6 +162,7 @@ fn test_first_update_received_with_context() {
 /// Test: Subsequent updates do not show aha moment
 /// Feature: aha_moments.feature @first-update
 /// Scenario: Subsequent updates do not show aha moment
+// @scenario: aha_moments:Subsequent updates do not show aha moment
 #[test]
 fn test_subsequent_updates_no_aha_moment() {
     let mut tracker = AhaMomentTracker::new();
@@ -175,6 +183,7 @@ fn test_subsequent_updates_no_aha_moment() {
 
 /// Test: First outbound delivered shows count
 /// Feature: aha_moments.feature @first-outbound
+// @scenario: aha_moments:First outbound update shows delivery confirmation
 #[test]
 fn test_first_outbound_delivery_confirmation() {
     let mut tracker = AhaMomentTracker::new();
@@ -198,6 +207,7 @@ fn test_first_outbound_delivery_confirmation() {
 /// Test: Each moment type tracked independently
 /// Feature: aha_moments.feature @persistence
 /// Scenario: Aha moments are tracked per milestone
+// @scenario: aha_moments:Aha moments are tracked per milestone
 #[test]
 fn test_moments_tracked_per_milestone() {
     let mut tracker = AhaMomentTracker::new();
@@ -215,6 +225,7 @@ fn test_moments_tracked_per_milestone() {
 /// Test: Aha moments persist across app restarts (serialization)
 /// Feature: aha_moments.feature @persistence
 /// Scenario: Aha moments persist across app restarts
+// @scenario: aha_moments:Aha moments persist across app restarts
 #[test]
 fn test_moments_persist_across_restarts() {
     let mut tracker = AhaMomentTracker::new();
@@ -247,6 +258,12 @@ fn test_moments_persist_across_restarts() {
 
 /// Test: Full aha moment workflow through user journey
 /// Combines multiple scenarios into realistic user flow
+// @scenario: aha_moments:Card creation shows completion message
+// @scenario: aha_moments:First edit shows would-update feedback
+// @scenario: aha_moments:First contact added celebration
+// @scenario: aha_moments:First received update shows diff view
+// @scenario: aha_moments:First outbound update shows delivery confirmation
+// @scenario: aha_moments:Aha moments persist across app restarts
 #[test]
 fn test_full_user_journey_aha_moments() {
     let mut tracker = AhaMomentTracker::new();
@@ -306,6 +323,9 @@ fn test_full_user_journey_aha_moments() {
 // ============================================================
 
 /// Test: All context interpolation works correctly
+// @scenario: aha_moments:First contact added celebration
+// @scenario: aha_moments:First received update shows diff view
+// @scenario: aha_moments:First outbound update shows delivery confirmation
 #[test]
 fn test_context_interpolation() {
     // FirstContactAdded with name
@@ -333,6 +353,8 @@ fn test_context_interpolation() {
 
 /// Test: Aha moments integrate with Vauchi API
 /// This tests the full API integration
+// @scenario: aha_moments:Card creation shows completion message
+// @scenario: aha_moments:Card creation celebration is shown once
 #[test]
 fn test_vauchi_api_aha_moment_integration() {
     let mut wb: Vauchi<MockTransport> = Vauchi::in_memory().unwrap();
@@ -376,6 +398,7 @@ fn test_vauchi_api_aha_moment_integration() {
 }
 
 /// Test: Edit operation should check for first edit aha moment
+// @scenario: aha_moments:First edit shows would-update feedback
 #[test]
 fn test_edit_triggers_first_edit_moment() {
     let mut wb: Vauchi<MockTransport> = Vauchi::in_memory().unwrap();
@@ -398,6 +421,7 @@ fn test_edit_triggers_first_edit_moment() {
 }
 
 /// Test: Adding contact should check for first contact aha moment
+// @scenario: aha_moments:First contact added celebration
 #[test]
 fn test_add_contact_triggers_first_contact_moment() {
     let wb: Vauchi<MockTransport> = Vauchi::in_memory().unwrap();

@@ -29,6 +29,7 @@ use vauchi_core::ContactCard;
 /// Test: FieldType provides accessibility labels
 /// Feature: accessibility.feature
 /// Scenario: Contact details are fully announced
+// @scenario: accessibility:Contact details are fully announced
 #[test]
 fn test_field_type_has_accessibility_label() {
     // Each field type should have a semantic label for screen readers
@@ -61,6 +62,7 @@ fn test_field_type_has_accessibility_label() {
 /// Test: ContactField provides descriptive accessibility text
 /// Feature: accessibility.feature
 /// Scenario: Each field label should be announced before its value
+// @scenario: accessibility:Contact details are fully announced
 #[test]
 fn test_contact_field_accessibility_description() {
     let field = ContactField::new(FieldType::Email, "Work", "alice@example.com");
@@ -85,6 +87,7 @@ fn test_contact_field_accessibility_description() {
 /// Test: ContactCard provides accessibility summary
 /// Feature: accessibility.feature
 /// Scenario: Contact list is navigable with screen reader
+// @scenario: accessibility:Contact list is navigable with screen reader
 #[test]
 fn test_contact_card_accessibility_summary() {
     let mut card = ContactCard::new("Alice Smith");
@@ -113,6 +116,8 @@ fn test_contact_card_accessibility_summary() {
 /// Test: FieldType has localization key for screen readers
 /// Feature: accessibility.feature
 /// Scenario: All controls should have accessibility labels
+// @scenario: accessibility:iOS Accessibility requirements met
+// @scenario: accessibility:Android Accessibility requirements met
 #[test]
 fn test_field_type_has_localization_key() {
     let field_types = [
@@ -147,6 +152,7 @@ fn test_field_type_has_localization_key() {
 /// Test: Contact fields have logical tab order
 /// Feature: accessibility.feature
 /// Scenario: Full keyboard navigation on desktop
+// @scenario: accessibility:Full keyboard navigation on desktop
 #[test]
 fn test_keyboard_navigation_order() {
     let mut card = ContactCard::new("Test User");
@@ -188,6 +194,7 @@ fn test_keyboard_navigation_order() {
 /// Test: Reordered fields update tab order
 /// Feature: accessibility.feature
 /// Scenario: Arrow key navigation in lists
+// @scenario: accessibility:Arrow key navigation in lists
 #[test]
 fn test_reordered_fields_update_tab_order() {
     let mut card = ContactCard::new("Test User");
@@ -230,6 +237,7 @@ fn test_reordered_fields_update_tab_order() {
 /// Test: Focus order includes actionable elements
 /// Feature: accessibility.feature
 /// Scenario: Focus management during navigation
+// @scenario: accessibility:Focus management during navigation
 #[test]
 fn test_focusable_elements_order() {
     let field = ContactField::new(FieldType::Email, "Work", "test@example.com");
@@ -259,6 +267,7 @@ fn test_focusable_elements_order() {
 /// Test: All bundled themes meet WCAG AA contrast requirements
 /// Feature: accessibility.feature
 /// Scenario: Sufficient color contrast
+// @scenario: accessibility:Sufficient color contrast
 #[test]
 fn test_contrast_ratios_wcag_aa() {
     let themes = all_themes();
@@ -281,6 +290,7 @@ fn test_contrast_ratios_wcag_aa() {
 /// Test: Theme validates accessibility via validate_accessibility method
 /// Feature: accessibility.feature
 /// Scenario: WCAG 2.1 AA compliance on desktop
+// @scenario: accessibility:WCAG 2.1 AA compliance on desktop
 #[test]
 fn test_theme_validate_accessibility_method() {
     let themes = all_themes();
@@ -299,6 +309,7 @@ fn test_theme_validate_accessibility_method() {
 /// Test: Secondary text meets contrast requirements
 /// Feature: accessibility.feature
 /// Scenario: Text should remain readable
+// @scenario: accessibility:High contrast mode support
 #[test]
 fn test_secondary_text_contrast() {
     let themes = all_themes();
@@ -331,6 +342,7 @@ fn test_secondary_text_contrast() {
 /// We use a threshold of 2.5:1 for status colors, which still provides
 /// reasonable visibility while accommodating popular color schemes.
 /// Themes with ratios below 2.5:1 are flagged as warnings.
+// @scenario: accessibility:Information not conveyed by color alone
 #[test]
 fn test_status_colors_contrast() {
     let themes = all_themes();
@@ -377,6 +389,7 @@ fn test_status_colors_contrast() {
 /// Test: Custom theme with low contrast fails validation
 /// Feature: accessibility.feature
 /// Scenario: Contrast validation catches issues
+// @scenario: accessibility:Sufficient color contrast
 #[test]
 fn test_low_contrast_theme_fails() {
     let bad_colors = ThemeColors {
@@ -421,6 +434,9 @@ fn test_low_contrast_theme_fails() {
 /// Scenario: Dynamic type support on iOS
 /// Scenario: Font scaling support on Android
 /// Scenario: Text zoom support on desktop
+// @scenario: accessibility:Dynamic type support on iOS
+// @scenario: accessibility:Font scaling support on Android
+// @scenario: accessibility:Text zoom support on desktop
 #[test]
 fn test_font_scaling_100_percent() {
     let scale = FontScale::new(1.0);
@@ -428,6 +444,9 @@ fn test_font_scaling_100_percent() {
     assert!(scale.is_valid(), "100% scale should be valid");
 }
 
+// @scenario: accessibility:Dynamic type support on iOS
+// @scenario: accessibility:Font scaling support on Android
+// @scenario: accessibility:Text zoom support on desktop
 #[test]
 fn test_font_scaling_200_percent() {
     let scale = FontScale::new(2.0);
@@ -435,6 +454,9 @@ fn test_font_scaling_200_percent() {
     assert!(scale.is_valid(), "200% scale should be valid");
 }
 
+// @scenario: accessibility:Dynamic type support on iOS
+// @scenario: accessibility:Font scaling support on Android
+// @scenario: accessibility:Text zoom support on desktop
 #[test]
 fn test_font_scaling_intermediate_values() {
     // Test common accessibility scale factors
@@ -461,6 +483,9 @@ fn test_font_scaling_intermediate_values() {
     }
 }
 
+// @scenario: accessibility:Dynamic type support on iOS
+// @scenario: accessibility:Font scaling support on Android
+// @scenario: accessibility:Text zoom support on desktop
 #[test]
 fn test_font_scaling_bounds() {
     // Below 100% should clamp to minimum
@@ -481,6 +506,7 @@ fn test_font_scaling_bounds() {
 /// Test: Font scaling preserves readability
 /// Feature: accessibility.feature
 /// Scenario: All content should remain accessible
+// @scenario: accessibility:Touch targets are large enough
 #[test]
 fn test_font_scaling_preserves_minimum_size() {
     let scale = FontScale::new(1.0);
@@ -498,6 +524,8 @@ fn test_font_scaling_preserves_minimum_size() {
 /// Test: Display name scales correctly
 /// Feature: accessibility.feature
 /// Scenario: Layout should adapt without truncation
+// @scenario: accessibility:Dynamic type support on iOS
+// @scenario: accessibility:Font scaling support on Android
 #[test]
 fn test_display_name_scaling() {
     let card = ContactCard::new("Alice Smith");

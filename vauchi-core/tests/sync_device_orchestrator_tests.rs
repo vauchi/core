@@ -41,6 +41,7 @@ fn create_test_contact(name: &str) -> Contact {
 /// Scenario: Changes sync between devices
 /// "When I update my phone number on Device A
 ///  Then Device B should receive the update"
+// @scenario: device_management:Changes sync between devices
 #[test]
 fn test_orchestrator_record_local_change() {
     let storage = create_test_storage();
@@ -75,6 +76,7 @@ fn test_orchestrator_record_local_change() {
 }
 
 /// Test that pending items returns correct results
+// @scenario: device_management:Changes sync between devices
 #[test]
 fn test_orchestrator_pending_for_device() {
     let storage = create_test_storage();
@@ -120,6 +122,7 @@ fn test_orchestrator_pending_for_device() {
 /// "When Device B is newly linked
 ///  Then Device B should receive my complete contact card
 ///  And Device B should receive all my contacts"
+// @scenario: device_management:New device receives full state
 #[test]
 fn test_orchestrator_create_full_sync_payload() {
     let storage = create_test_storage();
@@ -151,6 +154,7 @@ fn test_orchestrator_create_full_sync_payload() {
 }
 
 /// Scenario: New device applies received state
+// @scenario: device_management:New device receives full state
 #[test]
 fn test_orchestrator_apply_full_sync() {
     let storage = create_test_storage();
@@ -181,6 +185,7 @@ fn test_orchestrator_apply_full_sync() {
 }
 
 /// Test marking items as synced clears pending queue
+// @scenario: device_management:Changes sync between devices
 #[test]
 fn test_orchestrator_mark_synced() {
     let storage = create_test_storage();
@@ -217,6 +222,7 @@ fn test_orchestrator_mark_synced() {
 }
 
 /// Test version vector is incremented on local changes
+// @scenario: device_management:Device registry version tracking
 #[test]
 fn test_orchestrator_version_vector_increment() {
     let storage = create_test_storage();
@@ -245,6 +251,7 @@ fn test_orchestrator_version_vector_increment() {
 }
 
 /// Test loading state from storage
+// @scenario: device_management:Offline changes sync when reconnected
 #[test]
 fn test_orchestrator_load_persisted_state() {
     let storage = create_test_storage();
@@ -296,6 +303,7 @@ fn test_orchestrator_load_persisted_state() {
 /// Test encrypting data for another device
 /// Uses ECDH: our_secret * their_public -> shared_secret
 /// Then HKDF to derive encryption key
+// @scenario: device_management:Device-specific keys
 #[test]
 fn test_encrypt_for_device() {
     let storage = create_test_storage();
@@ -326,6 +334,7 @@ fn test_encrypt_for_device() {
 }
 
 /// Test decrypting data from another device
+// @scenario: device_management:Device-specific keys
 #[test]
 fn test_decrypt_from_device() {
     let storage_a = create_test_storage();
@@ -371,6 +380,7 @@ fn test_decrypt_from_device() {
 }
 
 /// Test that wrong device cannot decrypt
+// @scenario: device_management:Device-specific keys
 #[test]
 fn test_wrong_device_cannot_decrypt() {
     let storage_a = create_test_storage();
@@ -423,6 +433,7 @@ fn test_wrong_device_cannot_decrypt() {
 /// Scenario: Conflict resolution between devices
 /// "Given I have made conflicting changes on Device A and Device B
 ///  Then the most recent change should win"
+// @scenario: device_management:Conflict resolution between devices
 #[test]
 fn test_conflict_resolution_last_write_wins() {
     let storage = create_test_storage();
@@ -462,6 +473,7 @@ fn test_conflict_resolution_last_write_wins() {
 }
 
 /// Test that older incoming changes are rejected
+// @scenario: device_management:Conflict resolution between devices
 #[test]
 fn test_conflict_resolution_rejects_older() {
     let storage = create_test_storage();
@@ -498,6 +510,7 @@ fn test_conflict_resolution_rejects_older() {
 /// "When I add a phone number on Device A
 ///  And I add an email on Device B
 ///  Then both devices should have both fields"
+// @scenario: device_management:Bidirectional sync
 #[test]
 fn test_concurrent_updates_different_fields_both_preserved() {
     let storage = create_test_storage();
@@ -548,6 +561,7 @@ fn test_concurrent_updates_different_fields_both_preserved() {
 
 /// Scenario: Bidirectional sync with merge
 /// Both devices add different fields; both should end up with both
+// @scenario: device_management:Bidirectional sync
 #[test]
 fn test_bidirectional_field_additions() {
     let storage_a = create_test_storage();
@@ -609,6 +623,7 @@ fn test_bidirectional_field_additions() {
 
 /// Scenario: Offline changes are queued
 /// Changes made while offline should be stored for later sync
+// @scenario: device_management:Offline changes sync when reconnected
 #[test]
 fn test_offline_changes_queue() {
     let storage = create_test_storage();
@@ -647,6 +662,7 @@ fn test_offline_changes_queue() {
 ///  When Device B makes changes offline
 ///  And Device B reconnects
 ///  Then those changes should sync to Device A"
+// @scenario: device_management:Offline changes sync when reconnected
 #[test]
 fn test_offline_changes_sync_on_reconnect() {
     let storage = create_test_storage();
@@ -695,6 +711,7 @@ fn test_offline_changes_sync_on_reconnect() {
 ///
 /// LWW strategy: `incoming_timestamp > local_timestamp` uses strict greater-than.
 /// Equal timestamps mean "no new information", so the local value is kept.
+// @scenario: device_management:Conflict resolution between devices
 #[test]
 fn test_conflict_equal_timestamp_rejects_incoming() {
     let storage = create_test_storage();
@@ -734,6 +751,7 @@ fn test_conflict_equal_timestamp_rejects_incoming() {
 ///
 /// Simulates a burst of changes (e.g., user typing fast) arriving in a batch.
 /// Only the highest-timestamp item should be applied.
+// @scenario: device_management:Conflict resolution between devices
 #[test]
 fn test_conflict_rapid_updates_only_latest_applied() {
     let storage = create_test_storage();
@@ -786,6 +804,7 @@ fn test_conflict_rapid_updates_only_latest_applied() {
 /// Test: Contact add followed by contact remove for the same contact_id (#193).
 ///
 /// Both use conflict_key "contact:{id}", so the later timestamp wins.
+// @scenario: device_management:Conflict resolution between devices
 #[test]
 fn test_conflict_contact_add_then_remove() {
     let storage = create_test_storage();
@@ -834,6 +853,7 @@ fn test_conflict_contact_add_then_remove() {
 /// DeletionScheduled and DeletionCancelled use different conflict keys,
 /// so both can coexist — this is the correct behavior since they represent
 /// different semantic operations.
+// @scenario: device_management:Conflict resolution between devices
 #[test]
 fn test_conflict_deletion_schedule_and_cancel_independent() {
     let storage = create_test_storage();

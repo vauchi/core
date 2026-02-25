@@ -16,6 +16,7 @@ fn create_test_contact() -> Contact {
     Contact::from_exchange(public_key, card, shared_key)
 }
 
+// @scenario: device_management:New device receives full state
 #[test]
 fn test_contact_sync_data_roundtrip() {
     let contact = create_test_contact();
@@ -27,6 +28,7 @@ fn test_contact_sync_data_roundtrip() {
     assert_eq!(restored.display_name(), contact.display_name());
 }
 
+// @scenario: device_management:New device receives full state
 #[test]
 fn test_contact_sync_data_serialization() {
     let contact = create_test_contact();
@@ -39,6 +41,7 @@ fn test_contact_sync_data_serialization() {
     assert_eq!(restored.public_key, sync_data.public_key);
 }
 
+// @scenario: device_management:New device receives full state
 #[test]
 fn test_device_sync_payload_roundtrip() {
     let contact1 = create_test_contact();
@@ -68,6 +71,7 @@ fn test_device_sync_payload_empty() {
 /// Scenario: Changes sync between devices
 /// "When I update my phone number on Device A
 ///  Then Device B should receive the update"
+// @scenario: device_management:Changes sync between devices
 #[test]
 fn test_sync_item_card_updated() {
     use vauchi_core::contact_card::{ContactField, FieldType};
@@ -92,6 +96,7 @@ fn test_sync_item_card_updated() {
 /// "When I add a field on Device A
 ///  And I add a different field on Device B
 ///  Then both fields should appear on both devices"
+// @scenario: device_management:Bidirectional sync
 #[test]
 fn test_sync_item_contact_added() {
     let contact = create_test_contact();
@@ -111,6 +116,7 @@ fn test_sync_item_contact_added() {
 ///  And I update my email to 'b@test.com' on Device B
 ///  And both come online
 ///  Then the later change should win"
+// @scenario: device_management:Conflict resolution between devices
 #[test]
 fn test_conflict_resolution_last_write_wins() {
     // Device A update at timestamp 1000
@@ -141,6 +147,7 @@ fn test_conflict_resolution_last_write_wins() {
 }
 
 /// Test SyncItem visibility change
+// @scenario: device_management:Some settings sync across devices
 #[test]
 fn test_sync_item_visibility_changed() {
     let item = SyncItem::VisibilityChanged {
@@ -167,6 +174,7 @@ fn test_sync_item_contact_removed() {
 }
 
 /// Test InterDeviceSyncState for tracking sync with other own devices
+// @scenario: device_management:Changes sync between devices
 #[test]
 fn test_inter_device_sync_state_creation() {
     let device_id = [0x42u8; 32];
@@ -179,6 +187,7 @@ fn test_inter_device_sync_state_creation() {
 }
 
 /// Test adding items to sync queue
+// @scenario: device_management:Offline changes sync when reconnected
 #[test]
 fn test_inter_device_sync_state_queue_item() {
     let device_id = [0x42u8; 32];
@@ -211,6 +220,7 @@ fn test_sync_item_serialization() {
 }
 
 /// Test version vector for causality tracking
+// @scenario: device_management:Device registry version tracking
 #[test]
 fn test_version_vector_increment() {
     let device_id = [0x42u8; 32];
@@ -224,6 +234,7 @@ fn test_version_vector_increment() {
 }
 
 /// Test version vector merge for conflict detection
+// @scenario: device_management:Conflict resolution between devices
 #[test]
 fn test_version_vector_merge() {
     let device_a = [0x41u8; 32];
@@ -245,6 +256,7 @@ fn test_version_vector_merge() {
 }
 
 /// Test version vector comparison for conflict detection
+// @scenario: device_management:Conflict resolution between devices
 #[test]
 fn test_version_vector_concurrent_detection() {
     let device_a = [0x41u8; 32];

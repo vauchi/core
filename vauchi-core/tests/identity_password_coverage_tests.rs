@@ -8,12 +8,14 @@
 use vauchi_core::identity::password::{password_feedback, validate_password, PasswordStrength};
 use zxcvbn::Score;
 
+// @scenario: identity_management:Password strength validation
 #[test]
 fn test_validate_strong_password() {
     let result = validate_password("correct-horse-battery-staple");
     assert!(result.is_ok());
 }
 
+// @scenario: identity_management:Password strength validation
 #[test]
 fn test_validate_very_strong_password() {
     let result = validate_password("Zq!9xK#mP$2vL&nW@4rT^8jYf");
@@ -25,30 +27,39 @@ fn test_validate_very_strong_password() {
     ));
 }
 
+// @scenario: identity_management:Backup password requirements
+// @scenario: identity_management:Password strength validation
 #[test]
 fn test_validate_weak_password() {
     let result = validate_password("password");
     assert!(result.is_err());
 }
 
+// @scenario: identity_management:Backup password requirements
+// @scenario: identity_management:Password strength validation
 #[test]
 fn test_validate_too_short() {
     let result = validate_password("Ab1!x");
     assert!(result.is_err());
 }
 
+// @scenario: identity_management:Backup password requirements
+// @scenario: identity_management:Password strength validation
 #[test]
 fn test_validate_common_password() {
     let result = validate_password("12345678");
     assert!(result.is_err());
 }
 
+// @scenario: identity_management:Backup password requirements
+// @scenario: identity_management:Password strength validation
 #[test]
 fn test_validate_exactly_min_length_but_weak() {
     let result = validate_password("aaaaaaaa");
     assert!(result.is_err());
 }
 
+// @scenario: identity_management:Password strength validation
 #[test]
 fn test_password_strength_from_score() {
     assert_eq!(

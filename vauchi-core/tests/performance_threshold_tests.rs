@@ -18,6 +18,7 @@ use vauchi_core::storage::Storage;
 
 /// Encrypt 64KB payload in under 100ms.
 /// Traces to: features/performance.feature @resources
+// @scenario: performance:Efficient cryptographic operations
 #[test]
 fn test_encryption_under_100ms() {
     let key = SymmetricKey::generate();
@@ -37,6 +38,7 @@ fn test_encryption_under_100ms() {
 
 /// Decrypt 64KB payload in under 100ms.
 /// Traces to: features/performance.feature @resources
+// @scenario: performance:Efficient cryptographic operations
 #[test]
 fn test_decryption_under_100ms() {
     let key = SymmetricKey::generate();
@@ -57,6 +59,8 @@ fn test_decryption_under_100ms() {
 
 /// Search 1000 contacts via search_contacts() in under 50ms.
 /// Traces to: features/performance.feature @resources
+// @scenario: performance:Efficient database queries
+// @scenario: performance:Search performance with many contacts
 #[test]
 fn test_query_under_50ms_with_1000_contacts() {
     let key = SymmetricKey::generate();
@@ -97,6 +101,7 @@ fn test_query_under_50ms_with_1000_contacts() {
 
 /// Paginate 500 contacts in pages of 50 — each page under 100ms.
 /// Traces to: features/performance.feature @pagination
+// @scenario: performance:Batch contact loading with pagination
 #[test]
 fn test_pagination_under_100ms_per_page() {
     let key = SymmetricKey::generate();
@@ -144,6 +149,7 @@ fn test_pagination_under_100ms_per_page() {
 
 /// Open a file-based Storage in under 500ms.
 /// Traces to: features/performance.feature @startup
+// @scenario: performance:Cold start time
 #[test]
 fn test_storage_open_under_500ms() {
     let tmp = NamedTempFile::new().unwrap();

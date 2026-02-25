@@ -20,6 +20,8 @@ fn create_test_vauchi() -> Vauchi<MockTransport> {
     wb
 }
 
+// @scenario: privacy_compliance:Consent collected on first launch
+// @scenario: privacy_compliance:Consent for optional features
 #[test]
 fn test_consent_grant_and_check() {
     let wb = create_test_vauchi();
@@ -36,6 +38,7 @@ fn test_consent_grant_and_check() {
     assert!(granted, "Consent should be granted after grant_consent()");
 }
 
+// @scenario: privacy_compliance:Withdraw consent for telemetry
 #[test]
 fn test_consent_revoke() {
     let wb = create_test_vauchi();
@@ -51,6 +54,8 @@ fn test_consent_revoke() {
     );
 }
 
+// @scenario: privacy_compliance:Consent for optional features
+// @scenario: privacy_compliance:Withdraw consent for telemetry
 #[test]
 fn test_consent_multiple_types_independent() {
     let wb = create_test_vauchi();
@@ -72,6 +77,7 @@ fn test_consent_multiple_types_independent() {
     );
 }
 
+// @scenario: privacy_compliance:View what I consented to
 #[test]
 fn test_consent_export_log() {
     let wb = create_test_vauchi();
@@ -112,6 +118,7 @@ fn test_consent_export_log() {
     );
 }
 
+// @scenario: privacy_compliance:Consent for optional features
 #[test]
 fn test_consent_grant_idempotent() {
     let wb = create_test_vauchi();

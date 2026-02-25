@@ -35,6 +35,7 @@ fn first_field_id(card: &ContactCard) -> String {
 // Coalescing Tests
 // ============================================================
 
+// @scenario: performance:Coalesce rapid edits before sync
 #[test]
 fn test_rapid_edits_coalesce_into_single_sync_payload() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
@@ -82,6 +83,7 @@ fn test_rapid_edits_coalesce_into_single_sync_payload() {
     );
 }
 
+// @scenario: performance:Coalesce rapid edits before sync
 #[test]
 fn test_coalesce_preserves_final_state() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
@@ -128,6 +130,7 @@ fn test_coalesce_preserves_final_state() {
     );
 }
 
+// @scenario: performance:Coalesce rapid edits before sync
 #[test]
 fn test_coalesce_skips_when_single_update() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
@@ -155,6 +158,7 @@ fn test_coalesce_skips_when_single_update() {
 // Batch Encryption Pipeline Tests
 // ============================================================
 
+// @scenario: performance:Batch encryption for multi-contact sync
 #[test]
 fn test_batch_encryption_50_contacts() {
     use vauchi_core::crypto::{encrypt, SymmetricKey};
@@ -179,6 +183,7 @@ fn test_batch_encryption_50_contacts() {
     );
 }
 
+// @scenario: performance:Batch encryption for multi-contact sync
 #[test]
 fn test_batch_sync_multiple_contacts_pending() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
@@ -208,6 +213,7 @@ fn test_batch_sync_multiple_contacts_pending() {
     );
 }
 
+// @scenario: performance:Coalesce rapid edits before sync
 #[test]
 fn test_coalesce_does_not_affect_other_update_types() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();

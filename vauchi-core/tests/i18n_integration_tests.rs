@@ -39,6 +39,7 @@ fn ensure_init() {
 // ============================================================
 
 /// Test: All target locales are available
+// @scenario: internationalization:Available languages are listed
 #[test]
 fn test_all_target_locales_available() {
     let locales = get_available_locales();
@@ -50,6 +51,7 @@ fn test_all_target_locales_available() {
 }
 
 /// Test: English is the default/source locale
+// @scenario: internationalization:App falls back to English for unsupported languages
 #[test]
 fn test_english_is_default() {
     let default = Locale::default();
@@ -66,6 +68,7 @@ fn test_locale_codes() {
 }
 
 /// Test: Locale can be parsed from code
+// @scenario: internationalization:App uses system language by default
 #[test]
 fn test_locale_from_code() {
     assert_eq!(Locale::from_code("en"), Some(Locale::English));
@@ -76,6 +79,7 @@ fn test_locale_from_code() {
 }
 
 /// Test: Locale info is available
+// @scenario: internationalization:Available languages are listed
 #[test]
 fn test_locale_info() {
     let info = get_locale_info(Locale::German);
@@ -90,6 +94,7 @@ fn test_locale_info() {
 // ============================================================
 
 /// Test: Basic strings are localized
+// @scenario: internationalization:Core languages are supported
 #[test]
 fn test_basic_string_localization() {
     ensure_init();
@@ -112,6 +117,7 @@ fn test_basic_string_localization() {
 }
 
 /// Test: All key sections have translations
+// @scenario: internationalization:No untranslated strings visible
 #[test]
 fn test_key_sections_exist() {
     ensure_init();
@@ -130,6 +136,7 @@ fn test_key_sections_exist() {
 }
 
 /// Test: Fallback to English for missing translations
+// @scenario: internationalization:App falls back to English for unsupported languages
 #[test]
 fn test_fallback_to_english() {
     ensure_init();
@@ -145,6 +152,7 @@ fn test_fallback_to_english() {
 }
 
 /// Test: Missing key returns identifiable string
+// @scenario: internationalization:App falls back to English for unsupported languages
 #[test]
 fn test_missing_key_handling() {
     ensure_init();
@@ -158,6 +166,7 @@ fn test_missing_key_handling() {
 // ============================================================
 
 /// Test: String interpolation with arguments
+// @scenario: internationalization:Correct pluralization
 #[test]
 fn test_string_interpolation() {
     ensure_init();
@@ -167,6 +176,7 @@ fn test_string_interpolation() {
 }
 
 /// Test: Multiple argument interpolation
+// @scenario: internationalization:Correct pluralization
 #[test]
 fn test_multiple_args_interpolation() {
     ensure_init();
@@ -181,6 +191,8 @@ fn test_multiple_args_interpolation() {
 }
 
 /// Test: Interpolation works across locales
+// @scenario: internationalization:Core languages are supported
+// @scenario: internationalization:Correct pluralization
 #[test]
 fn test_interpolation_across_locales() {
     ensure_init();
@@ -198,6 +210,7 @@ fn test_interpolation_across_locales() {
 // ============================================================
 
 /// Test: Navigation strings exist
+// @scenario: internationalization:No untranslated strings visible
 #[test]
 fn test_navigation_strings() {
     ensure_init();
@@ -215,6 +228,7 @@ fn test_navigation_strings() {
 }
 
 /// Test: Action strings exist
+// @scenario: internationalization:No untranslated strings visible
 #[test]
 fn test_action_strings() {
     ensure_init();
@@ -238,6 +252,7 @@ fn test_action_strings() {
 }
 
 /// Test: Error strings exist
+// @scenario: internationalization:Error messages are translated
 #[test]
 fn test_error_strings() {
     ensure_init();
@@ -259,6 +274,8 @@ fn test_error_strings() {
 // ============================================================
 
 /// Test: RTL detection for future locales
+// @scenario: internationalization:RTL layout for Arabic
+// @scenario: internationalization:RTL layout for Hebrew
 #[test]
 fn test_rtl_detection() {
     // Current locales are all LTR
@@ -288,6 +305,7 @@ fn test_locale_serialization() {
 // ============================================================
 
 /// Test: All English strings have German translations
+// @scenario: internationalization:Core languages are supported
 #[test]
 fn test_german_coverage() {
     ensure_init();
@@ -317,6 +335,7 @@ fn test_german_coverage() {
 }
 
 /// Test: French translations exist
+// @scenario: internationalization:Core languages are supported
 #[test]
 fn test_french_coverage() {
     ensure_init();
@@ -327,6 +346,7 @@ fn test_french_coverage() {
 }
 
 /// Test: Spanish translations exist
+// @scenario: internationalization:Core languages are supported
 #[test]
 fn test_spanish_coverage() {
     ensure_init();
@@ -344,6 +364,7 @@ fn test_spanish_coverage() {
 ///
 /// Reads raw JSON from the sibling locales/ repo and verifies that every
 /// non-English locale has exactly the same set of keys (excluding `_meta`).
+// @scenario: internationalization:Locale files are complete
 #[test]
 fn test_all_locale_files_have_same_keys_as_english() {
     use std::collections::BTreeSet;
@@ -409,6 +430,7 @@ fn test_all_locale_files_have_same_keys_as_english() {
 }
 
 /// Test: No locale has empty string values
+// @scenario: internationalization:Locale files are complete
 #[test]
 fn test_no_locale_has_empty_values() {
     let locales_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))

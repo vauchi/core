@@ -28,6 +28,7 @@ fn create_batch_items(count: usize) -> Vec<SyncItem> {
 // Device Sync Checkpoint Tests (V6 table)
 // ============================================================
 
+// @scenario: platform_edge_cases:Sync state persisted atomically
 #[test]
 fn test_checkpoint_save_and_load() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();

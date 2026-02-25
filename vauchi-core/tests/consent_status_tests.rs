@@ -12,6 +12,8 @@ fn create_test_vauchi() -> Vauchi<MockTransport> {
     Vauchi::in_memory().unwrap()
 }
 
+// @scenario: privacy_compliance:View what I consented to
+// @scenario: privacy_compliance:Consent collected on first launch
 #[test]
 fn test_get_consent_status_returns_granted_with_timestamp_after_grant() {
     let wb = create_test_vauchi();
@@ -39,6 +41,7 @@ fn test_get_consent_status_returns_granted_with_timestamp_after_grant() {
     );
 }
 
+// @scenario: privacy_compliance:Consent collected on first launch
 #[test]
 fn test_get_consent_status_returns_not_granted_when_never_set() {
     let wb = create_test_vauchi();
@@ -59,6 +62,7 @@ fn test_get_consent_status_returns_not_granted_when_never_set() {
     );
 }
 
+// @scenario: privacy_compliance:Withdraw consent for telemetry
 #[test]
 fn test_get_consent_status_returns_not_granted_after_revoke() {
     let wb = create_test_vauchi();
@@ -79,6 +83,8 @@ fn test_get_consent_status_returns_not_granted_after_revoke() {
     );
 }
 
+// @scenario: privacy_compliance:Consent records include policy version
+// @scenario: privacy_compliance:Re-consent required for major changes
 #[test]
 fn test_get_consent_status_includes_policy_version_when_granted_with_version() {
     let wb = create_test_vauchi();
@@ -99,6 +105,7 @@ fn test_get_consent_status_includes_policy_version_when_granted_with_version() {
     );
 }
 
+// @scenario: privacy_compliance:Consent for optional features
 #[test]
 fn test_get_consent_status_returns_different_statuses_for_different_types() {
     let wb = create_test_vauchi();

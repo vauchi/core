@@ -38,6 +38,7 @@ fn create_test_registry(master_seed: &[u8; 32], device: &DeviceInfo) -> DeviceRe
 // -- Version Vector Merge Correctness ----------------------------------
 
 /// Merge is commutative: merge(A, B) == merge(B, A)
+// @scenario: sync_updates:LWW merge for complex changes
 #[test]
 fn test_version_vector_merge_commutative() {
     let d1 = [0x11u8; 32];
@@ -63,6 +64,7 @@ fn test_version_vector_merge_commutative() {
 }
 
 /// Merge is associative: merge(merge(A, B), C) == merge(A, merge(B, C))
+// @scenario: sync_updates:LWW merge for complex changes
 #[test]
 fn test_version_vector_merge_associative() {
     let d1 = [0x11u8; 32];
@@ -91,6 +93,7 @@ fn test_version_vector_merge_associative() {
 }
 
 /// Merge is idempotent: merge(A, A) == A
+// @scenario: sync_updates:LWW merge for complex changes
 #[test]
 fn test_version_vector_merge_idempotent() {
     let d1 = [0x11u8; 32];
@@ -108,6 +111,7 @@ fn test_version_vector_merge_idempotent() {
 }
 
 /// Merge always takes the max of each device's counter.
+// @scenario: sync_updates:LWW merge for complex changes
 #[test]
 fn test_version_vector_merge_takes_max() {
     let d1 = [0x11u8; 32];
@@ -136,6 +140,7 @@ fn test_version_vector_merge_takes_max() {
 // -- Concurrent Detection Correctness ----------------------------------
 
 /// Two vectors with disjoint device sets are concurrent.
+// @scenario: sync_updates:Detect truly concurrent updates
 #[test]
 fn test_concurrent_disjoint_devices() {
     let d1 = [0x11u8; 32];
@@ -157,6 +162,7 @@ fn test_concurrent_disjoint_devices() {
 /// When one vector has strictly higher version for the only shared device,
 /// they should NOT be concurrent (one causally follows the other).
 /// This relies on the `is_concurrent_with` public API.
+// @scenario: sync_updates:Detect truly concurrent updates
 #[test]
 fn test_not_concurrent_when_one_dominates() {
     let d1 = [0x11u8; 32];
@@ -183,6 +189,8 @@ fn test_not_concurrent_when_one_dominates() {
 
 /// When two SyncItems have equal timestamps, device ID tie-breaks
 /// deterministically — higher device ID wins.
+// @scenario: sync_updates:Last-write-wins for single field
+// @scenario: sync_updates:Detect truly concurrent updates
 #[test]
 fn test_conflict_resolution_equal_timestamp_device_id_tiebreaker() {
     let item_a = SyncItem::CardUpdated {
@@ -229,6 +237,7 @@ fn test_conflict_resolution_equal_timestamp_device_id_tiebreaker() {
 
 /// When an incoming SyncItem has the same timestamp as a local item
 /// for the same field, the incoming item is rejected (local wins).
+// @scenario: sync_updates:Last-write-wins for single field
 #[test]
 fn test_process_incoming_rejects_equal_timestamp() {
     let storage = create_test_storage();
@@ -267,6 +276,8 @@ fn test_process_incoming_rejects_equal_timestamp() {
 
 /// Two devices update the same field concurrently. The newer update wins.
 /// This verifies the full flow: record_local → process_incoming → verify winner.
+// @scenario: sync_updates:Last-write-wins for single field
+// @scenario: sync_updates:Sync my own contact card across my devices
 #[test]
 fn test_concurrent_same_field_newer_wins() {
     let storage = create_test_storage();
@@ -312,6 +323,7 @@ fn test_concurrent_same_field_newer_wins() {
 }
 
 /// Two devices update different fields concurrently. Both are preserved.
+// @scenario: sync_updates:Concurrent updates to different fields
 #[test]
 fn test_concurrent_different_fields_both_accepted() {
     let storage = create_test_storage();
@@ -367,6 +379,7 @@ fn test_concurrent_different_fields_both_accepted() {
 // -- Checkpoint Persistence Through Orchestrator -----------------------
 
 /// Verify checkpoint round-trip: save → load → resume from sent_count.
+// @scenario: sync_updates:Network partition during sync
 #[test]
 fn test_checkpoint_save_load_roundtrip() {
     let storage = create_test_storage();
@@ -412,6 +425,7 @@ fn test_checkpoint_save_load_roundtrip() {
 }
 
 /// Clear checkpoint removes it completely.
+// @scenario: sync_updates:Network partition during sync
 #[test]
 fn test_checkpoint_clear() {
     let storage = create_test_storage();
@@ -447,6 +461,7 @@ fn test_checkpoint_clear() {
 }
 
 /// Checkpoint overwrites previous value for same device.
+// @scenario: sync_updates:Network partition during sync
 #[test]
 fn test_checkpoint_overwrite() {
     let storage = create_test_storage();
@@ -483,11 +498,13 @@ fn test_checkpoint_overwrite() {
 // -- Validate Timestamp ------------------------------------------------
 
 /// Timestamps must be non-zero and not too far in the future.
+// @scenario: sync_updates:Extreme clock skew detection
 #[test]
 fn test_validate_timestamp_rejects_zero() {
     assert!(!validate_timestamp(0), "Zero timestamp should be rejected");
 }
 
+// @scenario: sync_updates:Sync handles clock skew between devices
 #[test]
 fn test_validate_timestamp_accepts_recent() {
     let now = std::time::SystemTime::now()
@@ -502,6 +519,7 @@ fn test_validate_timestamp_accepts_recent() {
     );
 }
 
+// @scenario: sync_updates:Extreme clock skew detection
 #[test]
 fn test_validate_timestamp_rejects_far_future() {
     let now = std::time::SystemTime::now()

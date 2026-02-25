@@ -16,6 +16,7 @@ fn test_signing_keypair() -> SigningKeyPair {
     SigningKeyPair::from_seed(&test_master_seed())
 }
 
+// @scenario: device_management:Device-specific keys
 #[test]
 fn test_device_key_derivation_is_deterministic() {
     let seed = test_master_seed();
@@ -27,6 +28,7 @@ fn test_device_key_derivation_is_deterministic() {
     assert_eq!(device1.exchange_public_key(), device2.exchange_public_key());
 }
 
+// @scenario: device_management:Device-specific keys
 #[test]
 fn test_different_index_different_keys() {
     let seed = test_master_seed();
@@ -38,6 +40,7 @@ fn test_different_index_different_keys() {
     assert_ne!(device0.exchange_public_key(), device1.exchange_public_key());
 }
 
+// @scenario: device_management:Device-specific keys
 #[test]
 fn test_different_seed_different_keys() {
     let seed1 = [0x42u8; 32];
@@ -50,6 +53,7 @@ fn test_different_seed_different_keys() {
     assert_ne!(device1.exchange_public_key(), device2.exchange_public_key());
 }
 
+// @scenario: device_management:Device registry version tracking
 #[test]
 fn test_device_registry_creation() {
     let seed = test_master_seed();
@@ -63,6 +67,8 @@ fn test_device_registry_creation() {
     assert!(registry.verify(&signing_key.public_key()));
 }
 
+// @scenario: device_management:Link new device via QR code
+// @scenario: device_management:Device registry version tracking
 #[test]
 fn test_add_device_to_registry() {
     let seed = test_master_seed();
@@ -80,6 +86,7 @@ fn test_add_device_to_registry() {
     assert!(registry.verify(&signing_key.public_key()));
 }
 
+// @scenario: device_management:Maximum devices reached
 #[test]
 fn test_max_devices_limit() {
     let seed = test_master_seed();
@@ -104,6 +111,7 @@ fn test_max_devices_limit() {
     assert!(matches!(result, Err(DeviceError::MaxDevicesReached)));
 }
 
+// @scenario: device_management:Unlink a device remotely
 #[test]
 fn test_revoke_device() {
     let seed = test_master_seed();
@@ -127,6 +135,7 @@ fn test_revoke_device() {
     assert!(registry.verify(&signing_key.public_key()));
 }
 
+// @scenario: device_management:Cannot unlink last device
 #[test]
 fn test_cannot_revoke_last_device() {
     let seed = test_master_seed();
@@ -139,6 +148,7 @@ fn test_cannot_revoke_last_device() {
     assert!(matches!(result, Err(DeviceError::CannotRemoveLastDevice)));
 }
 
+// @scenario: device_management:View device details
 #[test]
 fn test_find_device() {
     let seed = test_master_seed();
@@ -156,6 +166,7 @@ fn test_find_device() {
     assert!(not_found.is_none());
 }
 
+// @scenario: device_management:Link same device twice
 #[test]
 fn test_duplicate_device_rejected() {
     let seed = test_master_seed();
@@ -184,6 +195,7 @@ fn test_registry_serialization() {
     assert!(restored.verify(&signing_key.public_key()));
 }
 
+// @scenario: device_management:Rename a device
 #[test]
 fn test_empty_device_name_rejected() {
     let seed = test_master_seed();
@@ -201,6 +213,7 @@ fn test_empty_device_name_rejected() {
 /// Scenario: Unlink a device remotely
 /// "Device B should no longer receive updates"
 /// "Device B should be notified of removal"
+// @scenario: device_management:Unlink a device remotely
 #[test]
 fn test_device_revocation_certificate_creation() {
     let seed = test_master_seed();
@@ -220,6 +233,7 @@ fn test_device_revocation_certificate_creation() {
 
 /// Scenario: Lost device revocation
 /// "Device B's device key should be revoked"
+// @scenario: device_management:Lost device revocation
 #[test]
 fn test_device_revocation_certificate_has_timestamp() {
     let seed = test_master_seed();
@@ -251,6 +265,7 @@ fn test_device_revocation_certificate_serialization() {
 }
 
 /// Scenario: contacts should be notified if necessary
+// @scenario: device_management:Lost device revocation
 #[test]
 fn test_registry_broadcast_message_creation() {
     let seed = test_master_seed();
@@ -267,6 +282,7 @@ fn test_registry_broadcast_message_creation() {
 }
 
 /// Test registry broadcast includes active device keys
+// @scenario: device_management:View list of linked devices
 #[test]
 fn test_registry_broadcast_contains_active_devices() {
     let seed = test_master_seed();
@@ -287,6 +303,7 @@ fn test_registry_broadcast_contains_active_devices() {
 }
 
 /// Test registry broadcast excludes revoked devices
+// @scenario: device_management:Unlinked device data wiped
 #[test]
 fn test_registry_broadcast_excludes_revoked() {
     let seed = test_master_seed();
@@ -327,6 +344,8 @@ fn test_registry_broadcast_serialization() {
 }
 
 /// Test applying revocation certificate to local knowledge of contact
+// @scenario: device_management:Lost device revocation
+// @scenario: device_management:Unlink a device remotely
 #[test]
 fn test_apply_revocation_to_contact_registry() {
     let seed = test_master_seed();
@@ -468,6 +487,7 @@ fn test_broadcast_rejects_future_timestamp() {
 // find_device_by_prefix tests
 // ============================================================
 
+// @scenario: device_management:View device details
 #[test]
 fn test_find_device_by_prefix_matches_hex_start() {
     let seed = test_master_seed();
@@ -505,6 +525,7 @@ fn test_find_device_by_prefix_returns_none_for_no_match() {
     );
 }
 
+// @scenario: device_management:Unlinked device data wiped
 #[test]
 fn test_find_device_by_prefix_only_matches_active_devices() {
     let seed = test_master_seed();

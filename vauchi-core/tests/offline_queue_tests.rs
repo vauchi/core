@@ -36,6 +36,7 @@ fn create_pending_update(id: &str, contact_id: &str) -> PendingUpdate {
 
 // === Queue Size Tests ===
 
+// @scenario: sync_updates:Update queued for offline contacts
 #[test]
 fn test_count_all_pending_updates() {
     let storage = test_storage();
@@ -53,6 +54,7 @@ fn test_count_all_pending_updates() {
     assert_eq!(storage.count_all_pending_updates().unwrap(), 5);
 }
 
+// @scenario: sync_updates:Large sync queue handling
 #[test]
 fn test_offline_queue_default_limit() {
     let queue = OfflineQueue::new();
@@ -61,12 +63,14 @@ fn test_offline_queue_default_limit() {
     assert_eq!(queue.max_queue_size(), 1000);
 }
 
+// @scenario: sync_updates:Large sync queue handling
 #[test]
 fn test_offline_queue_custom_limit() {
     let queue = OfflineQueue::with_max_size(500);
     assert_eq!(queue.max_queue_size(), 500);
 }
 
+// @scenario: sync_updates:Large sync queue handling
 #[test]
 fn test_is_queue_full() {
     let storage = test_storage();
@@ -89,6 +93,7 @@ fn test_is_queue_full() {
     assert!(queue.is_full(&storage).unwrap());
 }
 
+// @scenario: sync_updates:Large sync queue handling
 #[test]
 fn test_can_queue_update() {
     let storage = test_storage();
@@ -110,6 +115,7 @@ fn test_can_queue_update() {
     assert!(queue.can_queue(&storage).unwrap());
 }
 
+// @scenario: sync_updates:Large sync queue handling
 #[test]
 fn test_queue_size_remaining() {
     let storage = test_storage();
@@ -130,6 +136,7 @@ fn test_queue_size_remaining() {
 
 // === Queue Ordering Tests ===
 
+// @scenario: sync_updates:Queued updates delivered when contact comes online
 #[test]
 fn test_pending_updates_ordered_by_creation() {
     let storage = test_storage();
@@ -165,6 +172,7 @@ fn test_pending_updates_ordered_by_creation() {
 
 // === Flush Queue Tests ===
 
+// @scenario: sync_updates:Handle contact deletion during sync
 #[test]
 fn test_flush_pending_updates_for_contact() {
     let storage = test_storage();
@@ -189,6 +197,7 @@ fn test_flush_pending_updates_for_contact() {
     assert_eq!(storage.get_pending_updates("bob").unwrap().len(), 2);
 }
 
+// @scenario: sync_updates:Sync survives app restart
 #[test]
 fn test_clear_all_pending_updates() {
     let storage = test_storage();
@@ -210,6 +219,7 @@ fn test_clear_all_pending_updates() {
 
 // === Status Transition Tests ===
 
+// @scenario: sync_updates:View detailed sync status for a contact
 #[test]
 fn test_get_pending_by_status() {
     let storage = test_storage();

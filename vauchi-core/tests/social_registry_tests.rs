@@ -28,6 +28,7 @@ fn test_social_network_with_icon() {
     assert_eq!(network.icon(), Some("github-mark"));
 }
 
+// @scenario: contact_card_management:Generate profile URL from social field
 #[test]
 fn test_profile_url_generation() {
     let twitter = SocialNetwork::new("twitter", "Twitter", "https://twitter.com/{username}");
@@ -35,6 +36,7 @@ fn test_profile_url_generation() {
     assert_eq!(twitter.profile_url("alice"), "https://twitter.com/alice");
 }
 
+// @scenario: contact_card_management:Generate profile URL from social field
 #[test]
 fn test_profile_url_strips_at_symbol() {
     let twitter = SocialNetwork::new("twitter", "Twitter", "https://twitter.com/{username}");
@@ -57,6 +59,7 @@ fn test_profile_url_trims_whitespace() {
     assert_eq!(github.profile_url("  alice  "), "https://github.com/alice");
 }
 
+// @scenario: contact_card_management:Load social network configurations from remote repository
 #[test]
 fn test_registry_with_defaults() {
     let registry = SocialNetworkRegistry::with_defaults();
@@ -67,6 +70,7 @@ fn test_registry_with_defaults() {
     assert!(registry.get("linkedin").is_some());
 }
 
+// @scenario: contact_card_management:Load social network configurations from remote repository
 #[test]
 fn test_registry_get_case_insensitive() {
     let registry = SocialNetworkRegistry::with_defaults();
@@ -76,6 +80,7 @@ fn test_registry_get_case_insensitive() {
     assert!(registry.get("LinkedIn").is_some());
 }
 
+// @scenario: contact_card_management:Generate profile URL from social field
 #[test]
 fn test_registry_profile_url() {
     let registry = SocialNetworkRegistry::with_defaults();
@@ -88,6 +93,7 @@ fn test_registry_profile_url() {
     assert_eq!(registry.profile_url("nonexistent", "user"), None);
 }
 
+// @scenario: contact_card_management:Load social network configurations from remote repository
 #[test]
 fn test_registry_search() {
     let registry = SocialNetworkRegistry::with_defaults();
@@ -112,6 +118,7 @@ fn test_registry_add_and_remove() {
     assert!(registry.get("custom").is_none());
 }
 
+// @scenario: contact_card_management:Use cached social network config when offline
 #[test]
 fn test_registry_json_serialization() {
     let registry = SocialNetworkRegistry::with_defaults();
@@ -123,6 +130,7 @@ fn test_registry_json_serialization() {
     assert_eq!(registry.version(), restored.version());
 }
 
+// @scenario: contact_card_management:Load social network configurations from remote repository
 #[test]
 fn test_registry_all_sorted() {
     let registry = SocialNetworkRegistry::with_defaults();
@@ -134,6 +142,7 @@ fn test_registry_all_sorted() {
     }
 }
 
+// @scenario: contact_card_management:Generate profile URL from social field
 #[test]
 fn test_specific_url_formats() {
     let registry = SocialNetworkRegistry::with_defaults();
@@ -157,6 +166,8 @@ fn test_specific_url_formats() {
     );
 }
 
+// @scenario: contact_card_management:Generate profile URL from social field
+// @scenario: contact_card_management:View help text for finding social network ID
 #[test]
 fn test_mastodon_handles() {
     let mastodon = SocialNetwork::new(

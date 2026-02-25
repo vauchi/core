@@ -24,6 +24,7 @@ fn now() -> u64 {
 
 // === Device Delivery Record Tests ===
 
+// @scenario: message_delivery:Update delivered to all linked devices
 #[test]
 fn test_create_device_delivery_record() {
     let storage = test_storage();
@@ -48,6 +49,7 @@ fn test_create_device_delivery_record() {
     assert_eq!(retrieved.status, DeviceDeliveryStatus::Pending);
 }
 
+// @scenario: message_delivery:Update delivered to all linked devices
 #[test]
 fn test_track_multiple_devices_for_message() {
     let storage = test_storage();
@@ -74,6 +76,7 @@ fn test_track_multiple_devices_for_message() {
     assert_eq!(records.len(), 3);
 }
 
+// @scenario: message_delivery:Delivery status updates in real-time
 #[test]
 fn test_update_device_delivery_status() {
     let storage = test_storage();
@@ -106,6 +109,7 @@ fn test_update_device_delivery_status() {
     assert_eq!(retrieved.updated_at, timestamp + 1);
 }
 
+// @scenario: message_delivery:Partial delivery to devices
 #[test]
 fn test_get_delivery_summary() {
     let storage = test_storage();
@@ -136,6 +140,7 @@ fn test_get_delivery_summary() {
     assert!(!summary.is_fully_delivered());
 }
 
+// @scenario: message_delivery:Update delivered to all linked devices
 #[test]
 fn test_is_fully_delivered() {
     let storage = test_storage();
@@ -197,6 +202,8 @@ fn test_delete_device_deliveries_for_message() {
     );
 }
 
+// @scenario: message_delivery:Partial delivery to devices
+// @scenario: message_delivery:Device comes online later
 #[test]
 fn test_get_pending_device_deliveries() {
     let storage = test_storage();
@@ -226,6 +233,7 @@ fn test_get_pending_device_deliveries() {
     assert_eq!(pending.len(), 3); // 3 pending records
 }
 
+// @scenario: message_delivery:Device comes online later
 #[test]
 fn test_device_delivery_status_transitions() {
     let storage = test_storage();
@@ -273,6 +281,7 @@ fn test_device_delivery_status_transitions() {
     assert_eq!(r.status, DeviceDeliveryStatus::Delivered);
 }
 
+// @scenario: message_delivery:Partial delivery to devices
 #[test]
 fn test_count_device_deliveries_by_status() {
     let storage = test_storage();

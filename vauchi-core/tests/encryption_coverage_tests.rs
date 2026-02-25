@@ -7,6 +7,7 @@
 use vauchi_core::crypto::encryption::{encrypt_aes_gcm, encrypt_legacy_untagged};
 use vauchi_core::crypto::{decrypt, decrypt_with_ad, encrypt, encrypt_with_ad, SymmetricKey};
 
+// @scenario: security:Correct algorithms used
 #[test]
 fn test_aes_gcm_tagged_roundtrip() {
     let key = SymmetricKey::generate();
@@ -16,6 +17,7 @@ fn test_aes_gcm_tagged_roundtrip() {
     assert_eq!(plaintext.to_vec(), decrypted);
 }
 
+// @scenario: security:Correct algorithms used
 #[test]
 fn test_aes_gcm_tagged_starts_with_tag() {
     let key = SymmetricKey::generate();
@@ -23,6 +25,7 @@ fn test_aes_gcm_tagged_starts_with_tag() {
     assert_eq!(ciphertext[0], 0x01); // ALG_TAG_AES_GCM
 }
 
+// @scenario: security:Correct algorithms used
 #[test]
 fn test_xchacha20_tagged_starts_with_tag() {
     let key = SymmetricKey::generate();
@@ -30,6 +33,7 @@ fn test_xchacha20_tagged_starts_with_tag() {
     assert_eq!(ciphertext[0], 0x02); // ALG_TAG_XCHACHA20
 }
 
+// @scenario: security:Contact cards are encrypted at rest
 #[test]
 fn test_legacy_untagged_roundtrip() {
     let key = SymmetricKey::generate();
@@ -40,6 +44,7 @@ fn test_legacy_untagged_roundtrip() {
     assert_eq!(plaintext.to_vec(), decrypted);
 }
 
+// @scenario: security:Contact cards are encrypted at rest
 #[test]
 fn test_decrypt_empty_ciphertext() {
     let key = SymmetricKey::generate();
@@ -47,6 +52,7 @@ fn test_decrypt_empty_ciphertext() {
     assert!(result.is_err());
 }
 
+// @scenario: security:Contact cards are encrypted at rest
 #[test]
 fn test_decrypt_too_short_xchacha20() {
     let key = SymmetricKey::generate();
@@ -56,6 +62,7 @@ fn test_decrypt_too_short_xchacha20() {
     assert!(result.is_err());
 }
 
+// @scenario: security:Contact cards are encrypted at rest
 #[test]
 fn test_decrypt_too_short_aes_gcm() {
     let key = SymmetricKey::generate();
@@ -65,6 +72,7 @@ fn test_decrypt_too_short_aes_gcm() {
     assert!(result.is_err());
 }
 
+// @scenario: security:Server cannot access plaintext
 #[test]
 fn test_decrypt_wrong_key() {
     let key1 = SymmetricKey::generate();
@@ -74,6 +82,7 @@ fn test_decrypt_wrong_key() {
     assert!(result.is_err());
 }
 
+// @scenario: security:Contact cards are encrypted at rest
 #[test]
 fn test_decrypt_corrupted_data() {
     let key = SymmetricKey::generate();
@@ -85,6 +94,7 @@ fn test_decrypt_corrupted_data() {
     assert!(result.is_err());
 }
 
+// @scenario: security:Sufficient key lengths
 #[test]
 fn test_symmetric_key_generate() {
     let key1 = SymmetricKey::generate();
@@ -92,6 +102,7 @@ fn test_symmetric_key_generate() {
     assert_ne!(key1.as_bytes(), key2.as_bytes());
 }
 
+// @scenario: security:Sufficient key lengths
 #[test]
 fn test_symmetric_key_from_bytes() {
     let bytes = [0x42u8; 32];
@@ -99,6 +110,7 @@ fn test_symmetric_key_from_bytes() {
     assert_eq!(key.as_bytes(), &bytes);
 }
 
+// @scenario: security:Memory dump protection
 #[test]
 fn test_symmetric_key_debug_redacted() {
     let key = SymmetricKey::generate();
@@ -108,6 +120,7 @@ fn test_symmetric_key_debug_redacted() {
 }
 
 /// SP-9 #227: SymmetricKey::from_bytes rejects all-zeros (degenerate key).
+// @scenario: security:No weak cryptography
 #[test]
 #[should_panic(expected = "all-zeros key is degenerate")]
 fn test_symmetric_key_from_bytes_rejects_zeros() {
@@ -121,6 +134,7 @@ fn test_symmetric_key_from_bytes_unchecked_allows_zeros() {
     assert_eq!(key.as_bytes(), &[0u8; 32]);
 }
 
+// @scenario: security:Contact cards are encrypted at rest
 #[test]
 fn test_large_plaintext() {
     let key = SymmetricKey::generate();
@@ -130,6 +144,7 @@ fn test_large_plaintext() {
     assert_eq!(plaintext, decrypted);
 }
 
+// @scenario: security:Server cannot access plaintext
 #[test]
 fn test_aes_gcm_wrong_key() {
     let key1 = SymmetricKey::generate();
@@ -139,6 +154,7 @@ fn test_aes_gcm_wrong_key() {
     assert!(result.is_err());
 }
 
+// @scenario: security:Server cannot access plaintext
 #[test]
 fn test_legacy_untagged_wrong_key() {
     let key1 = SymmetricKey::generate();
@@ -150,6 +166,7 @@ fn test_legacy_untagged_wrong_key() {
 
 // --- AEAD associated data binding tests ---
 
+// @scenario: security:Contact cards are encrypted in transit
 #[test]
 fn test_encrypt_with_ad_roundtrip() {
     let key = SymmetricKey::generate();
@@ -160,6 +177,7 @@ fn test_encrypt_with_ad_roundtrip() {
     assert_eq!(plaintext.to_vec(), decrypted);
 }
 
+// @scenario: security:Correct algorithms used
 #[test]
 fn test_encrypt_with_ad_tag_is_0x03() {
     let key = SymmetricKey::generate();
@@ -167,6 +185,7 @@ fn test_encrypt_with_ad_tag_is_0x03() {
     assert_eq!(ciphertext[0], 0x03); // ALG_TAG_XCHACHA20_AD
 }
 
+// @scenario: security:Contact cards are encrypted in transit
 #[test]
 fn test_encrypt_with_ad_wrong_ad_fails() {
     let key = SymmetricKey::generate();
@@ -175,6 +194,7 @@ fn test_encrypt_with_ad_wrong_ad_fails() {
     assert!(result.is_err(), "Decryption with wrong AD must fail");
 }
 
+// @scenario: security:Contact cards are encrypted in transit
 #[test]
 fn test_encrypt_with_ad_empty_ad_fails_against_non_empty() {
     let key = SymmetricKey::generate();
@@ -186,6 +206,7 @@ fn test_encrypt_with_ad_empty_ad_fails_against_non_empty() {
     );
 }
 
+// @scenario: security:Contact cards are encrypted in transit
 #[test]
 fn test_encrypt_with_ad_cannot_decrypt_without_ad() {
     let key = SymmetricKey::generate();

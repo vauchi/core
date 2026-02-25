@@ -10,6 +10,7 @@ fn test_storage() -> Storage {
     Storage::in_memory(SymmetricKey::generate()).unwrap()
 }
 
+// @scenario: privacy_compliance:Consent collected on first launch
 #[test]
 fn test_consent_upsert_and_check() {
     let storage = test_storage();
@@ -21,6 +22,7 @@ fn test_consent_upsert_and_check() {
     assert!(granted);
 }
 
+// @scenario: privacy_compliance:Consent collected on first launch
 #[test]
 fn test_consent_check_not_granted() {
     let storage = test_storage();
@@ -32,6 +34,7 @@ fn test_consent_check_not_granted() {
     assert!(!granted);
 }
 
+// @scenario: privacy_compliance:Consent collected on first launch
 #[test]
 fn test_consent_check_nonexistent() {
     let storage = test_storage();
@@ -39,6 +42,7 @@ fn test_consent_check_nonexistent() {
     assert!(!granted);
 }
 
+// @scenario: privacy_compliance:Withdraw consent for telemetry
 #[test]
 fn test_consent_latest_wins() {
     let storage = test_storage();
@@ -53,6 +57,7 @@ fn test_consent_latest_wins() {
     assert!(!granted); // Latest record says false
 }
 
+// @scenario: privacy_compliance:View what I consented to
 #[test]
 fn test_list_consent_records() {
     let storage = test_storage();
@@ -78,6 +83,7 @@ fn test_list_consent_records() {
     assert_eq!(records[1].3, 2000);
 }
 
+// @scenario: privacy_compliance:View what I consented to
 #[test]
 fn test_list_consent_records_empty() {
     let storage = test_storage();
@@ -85,6 +91,7 @@ fn test_list_consent_records_empty() {
     assert!(records.is_empty());
 }
 
+// @scenario: privacy_compliance:Withdraw consent for telemetry
 #[test]
 fn test_consent_upsert_overwrites() {
     let storage = test_storage();
@@ -101,6 +108,7 @@ fn test_consent_upsert_overwrites() {
     assert!(!records[0].2);
 }
 
+// @scenario: privacy_compliance:View access log
 #[test]
 fn test_audit_log() {
     // allow(zero_assertions): Write-only interface — no read-back API to assert against

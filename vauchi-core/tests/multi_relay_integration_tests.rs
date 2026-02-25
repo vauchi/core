@@ -22,6 +22,7 @@ use vauchi_core::network::{MultiRelayConfig, RelayHealth, RelaySelector};
 // ============================================================
 
 /// Test: Configure multiple relay URLs
+// @scenario: relay_network:Multiple relay nodes for redundancy
 #[test]
 fn test_multi_relay_config_creation() {
     let config = MultiRelayConfig::builder()
@@ -39,6 +40,7 @@ fn test_multi_relay_config_creation() {
 }
 
 /// Test: At least one relay required
+// @scenario: relay_network:Multiple relay nodes for redundancy
 #[test]
 fn test_multi_relay_requires_at_least_one() {
     let result = MultiRelayConfig::builder().build();
@@ -46,6 +48,7 @@ fn test_multi_relay_requires_at_least_one() {
 }
 
 /// Test: Duplicate relays are deduplicated
+// @scenario: relay_network:Multiple relay nodes for redundancy
 #[test]
 fn test_multi_relay_deduplicates_urls() {
     let config = MultiRelayConfig::builder()
@@ -59,6 +62,7 @@ fn test_multi_relay_deduplicates_urls() {
 }
 
 /// Test: Primary relay preference
+// @scenario: relay_network:Prefer specific relay nodes
 #[test]
 fn test_primary_relay_preference() {
     let config = MultiRelayConfig::builder()
@@ -77,6 +81,7 @@ fn test_primary_relay_preference() {
 // ============================================================
 
 /// Test: Round-robin selection
+// @scenario: relay_network:Geographic distribution of relays
 #[test]
 fn test_round_robin_selection() {
     let config = MultiRelayConfig::builder()
@@ -98,6 +103,7 @@ fn test_round_robin_selection() {
 }
 
 /// Test: Random selection returns valid relays
+// @scenario: relay_network:Geographic distribution of relays
 #[test]
 fn test_random_selection() {
     let config = MultiRelayConfig::builder()
@@ -119,6 +125,7 @@ fn test_random_selection() {
 }
 
 /// Test: Primary-first selection
+// @scenario: relay_network:Prefer specific relay nodes
 #[test]
 fn test_primary_first_selection() {
     let config = MultiRelayConfig::builder()
@@ -140,6 +147,7 @@ fn test_primary_first_selection() {
 // ============================================================
 
 /// Test: Track relay health
+// @scenario: relay_network:Relay node health check
 #[test]
 fn test_relay_health_tracking() {
     let mut health = RelayHealth::new();
@@ -153,6 +161,7 @@ fn test_relay_health_tracking() {
 }
 
 /// Test: Unknown relay is healthy by default
+// @scenario: relay_network:Relay node health check
 #[test]
 fn test_unknown_relay_healthy() {
     let health = RelayHealth::new();
@@ -160,6 +169,7 @@ fn test_unknown_relay_healthy() {
 }
 
 /// Test: Unhealthy relay recovers after cooldown
+// @scenario: relay_network:Relay node health check
 #[test]
 fn test_relay_recovery_after_cooldown() {
     let mut health = RelayHealth::with_cooldown(Duration::from_millis(50));
@@ -186,6 +196,7 @@ fn test_relay_recovery_after_cooldown() {
 }
 
 /// Test: Consecutive failures increase cooldown
+// @scenario: relay_network:Relay node health check
 #[test]
 fn test_exponential_backoff_on_failures() {
     let mut health = RelayHealth::new();
@@ -202,6 +213,7 @@ fn test_exponential_backoff_on_failures() {
 }
 
 /// Test: Success resets failure count
+// @scenario: relay_network:Relay node health check
 #[test]
 fn test_success_resets_failures() {
     let mut health = RelayHealth::new();
@@ -255,6 +267,7 @@ fn test_selector_serialization() {
 use vauchi_core::network::MultiRelayClient;
 
 /// Test: Create multi-relay client
+// @scenario: relay_network:Multiple relay nodes for redundancy
 #[test]
 fn test_multi_relay_client_creation() {
     let config = MultiRelayConfig::builder()
@@ -269,6 +282,7 @@ fn test_multi_relay_client_creation() {
 }
 
 /// Test: Connect to primary relay
+// @scenario: relay_network:Prefer specific relay nodes
 #[test]
 fn test_connect_to_primary() {
     let config = MultiRelayConfig::builder()
@@ -290,6 +304,7 @@ fn test_connect_to_primary() {
 }
 
 /// Test: Failover to backup on primary failure
+// @scenario: relay_network:Partial relay network failure
 #[test]
 fn test_failover_to_backup() {
     let config = MultiRelayConfig::builder()
@@ -333,6 +348,7 @@ fn test_reconnect_after_disconnect() {
 }
 
 /// Test: Send message through active relay
+// @scenario: relay_network:Automatic fallback to relay
 #[test]
 fn test_send_message() {
     let config = MultiRelayConfig::builder()
@@ -348,6 +364,7 @@ fn test_send_message() {
 }
 
 /// Test: Receive pending messages
+// @scenario: relay_network:Relay stores messages for offline contacts
 #[test]
 fn test_receive_messages() {
     let config = MultiRelayConfig::builder()
@@ -366,6 +383,7 @@ fn test_receive_messages() {
 }
 
 /// Test: All relays down returns error
+// @scenario: relay_network:No relays available
 #[test]
 fn test_all_relays_down() {
     let config = MultiRelayConfig::builder()

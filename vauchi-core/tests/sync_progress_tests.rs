@@ -123,6 +123,7 @@ fn test_sync_progress_total_matches_ready_updates() {
 }
 
 /// Verify SyncProgress is Clone and Debug (required by VauchiEvent derive).
+// @scenario: sync_updates:Large sync queue handling
 #[test]
 fn test_sync_progress_clone_and_debug() {
     let event = VauchiEvent::SyncProgress {

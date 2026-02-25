@@ -119,6 +119,7 @@ fn test_consent_export_log() {
 }
 
 // @scenario: privacy_compliance:Consent for optional features
+// @scenario: privacy_compliance:Consent collected on first launch
 #[test]
 fn test_consent_grant_idempotent() {
     let wb = create_test_vauchi();

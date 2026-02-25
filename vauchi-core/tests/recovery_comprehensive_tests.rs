@@ -131,6 +131,7 @@ fn test_recovery_claim_expiration() {
 }
 
 /// Scenario: Invalid claim format
+// @scenario: contact_recovery:Generate recovery claim QR code
 #[test]
 fn test_invalid_claim_format() {
     // Too short
@@ -205,6 +206,7 @@ fn test_cannot_self_vouch() {
 }
 
 /// Scenario: Voucher serialization roundtrip
+// @scenario: contact_recovery:Create voucher after in-person verification
 #[test]
 fn test_voucher_roundtrip() {
     let old_pk = [0x01u8; 32];
@@ -239,6 +241,7 @@ fn test_voucher_tamper_detection() {
 }
 
 /// Scenario: Voucher does not recognize unknown identity
+// @scenario: contact_recovery:Voucher does not recognize the claimed identity
 // @scenario: contact_recovery:Voucher must have existing relationship
 #[test]
 fn test_voucher_requires_known_contact() {
@@ -336,6 +339,7 @@ fn test_reject_duplicate_vouchers() {
 }
 
 /// Scenario: Reject voucher with mismatched keys
+// @scenario: contact_recovery:Create voucher after in-person verification
 #[test]
 fn test_reject_mismatched_keys() {
     let old_pk = [0x01u8; 32];
@@ -354,6 +358,7 @@ fn test_reject_mismatched_keys() {
 }
 
 /// Scenario: Reject invalid voucher signature
+// @scenario: contact_recovery:Create voucher after in-person verification
 #[test]
 fn test_reject_invalid_signature() {
     let old_pk = [0x01u8; 32];
@@ -624,6 +629,7 @@ fn test_no_conflict_same_new_pk() {
 }
 
 /// Scenario: No conflict with empty proofs
+// @scenario: contact_recovery:Detect conflicting recovery claims
 #[test]
 fn test_no_conflict_empty() {
     let conflict = RecoveryConflict::detect(&[]);
@@ -899,6 +905,7 @@ fn test_threshold_only_counts_trusted_vouchers() {
 
 /// Scenario: Mixed trust-checked and unchecked voucher addition
 /// Verifies backward compat — add_voucher still works without trust check
+// @scenario: contact_recovery:Create voucher after in-person verification
 #[test]
 fn test_add_voucher_still_works_without_trust_check() {
     let old_pk = [0x01u8; 32];
@@ -914,6 +921,7 @@ fn test_add_voucher_still_works_without_trust_check() {
 }
 
 /// Scenario: Trust check still validates signature and keys
+// @scenario: contact_recovery:Create voucher after in-person verification
 #[test]
 fn test_trusted_voucher_still_validates_signature() {
     let old_pk = [0x01u8; 32];

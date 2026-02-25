@@ -213,6 +213,7 @@ fn test_low_contrast_fails() {
 
 /// Test: Default themes exist
 // @scenario: theming:Bundled themes always available
+// @scenario: theming:Default theme on fresh install
 #[test]
 fn test_default_themes_exist() {
     assert!(theme_by_id("default-dark").is_some());
@@ -304,6 +305,7 @@ fn test_gruvbox_themes() {
 // ============================================================
 
 /// Test: Have expected number of bundled themes
+// @scenario: theming:Select theme from settings
 #[test]
 fn test_bundled_theme_count() {
     let themes = all_themes();
@@ -313,6 +315,7 @@ fn test_bundled_theme_count() {
 }
 
 /// Test: All themes have unique IDs
+// @scenario: theming:Select theme from settings
 #[test]
 fn test_unique_theme_ids() {
     let themes = all_themes();
@@ -328,6 +331,7 @@ fn test_unique_theme_ids() {
 // ============================================================
 
 /// Test: Valid hex colors pass validation
+// @scenario: theming:Theme file contains required colors
 #[test]
 fn test_valid_hex_colors() {
     assert!(validate_hex_color("#ffffff").is_ok());
@@ -351,6 +355,7 @@ fn test_invalid_hex_colors() {
 // ============================================================
 
 /// Test: Themes can be serialized to JSON
+// @scenario: theming:Theme file contains required colors
 #[test]
 fn test_theme_serialization() {
     let theme = theme_by_id("catppuccin-mocha").unwrap();
@@ -369,6 +374,7 @@ fn test_theme_serialization() {
 // ============================================================
 
 /// Test: Third-party themes have attribution
+// @scenario: theming:Theme file contains required colors
 #[test]
 fn test_theme_attribution() {
     let catppuccin = theme_by_id("catppuccin-mocha").unwrap();

@@ -121,6 +121,7 @@ fn test_theme_preview_cancel_returns_to_original() {
 /// Test: Preview multiple themes in sequence
 /// Feature: theming.feature @selection
 // @scenario: theming:Select theme from settings
+// @scenario: theming:Preview theme before applying
 #[test]
 fn test_theme_preview_sequence() {
     let original_id = "default-light";

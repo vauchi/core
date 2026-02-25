@@ -29,6 +29,7 @@ fn create_test_ratchet() -> (DoubleRatchetState, DoubleRatchetState) {
     (alice, bob)
 }
 
+// @scenario: relay_network:Automatic fallback to relay
 #[test]
 fn test_relay_client_connect_disconnect() {
     let transport = MockTransport::new();
@@ -43,6 +44,7 @@ fn test_relay_client_connect_disconnect() {
     assert!(!client.is_connected());
 }
 
+// @scenario: relay_network:Relay stores messages for offline contacts
 #[test]
 fn test_relay_client_send_update() {
     let transport = MockTransport::new();
@@ -71,6 +73,7 @@ fn test_relay_client_send_update() {
     }
 }
 
+// @scenario: message_delivery:Receive acknowledgment when update is delivered
 #[test]
 fn test_relay_client_acknowledgment_tracking() {
     let mut transport = MockTransport::new();
@@ -96,6 +99,7 @@ fn test_relay_client_acknowledgment_tracking() {
     assert_eq!(client.in_flight_count(), 0);
 }
 
+// @scenario: message_delivery:Automatic retry on transient failure
 #[test]
 fn test_relay_client_timeout_detection() {
     let transport = MockTransport::new();
@@ -131,6 +135,7 @@ fn test_relay_client_timeout_detection() {
     assert_eq!(client.in_flight_count(), 0);
 }
 
+// @scenario: message_delivery:Handle quota exceeded
 #[test]
 fn test_relay_client_max_pending_limit() {
     let transport = MockTransport::new();
@@ -156,6 +161,7 @@ fn test_relay_client_max_pending_limit() {
     assert!(result.unwrap_err().to_string().contains("Too many pending"));
 }
 
+// @scenario: message_delivery:See delivery status for updates
 #[test]
 fn test_relay_client_in_flight_update_ids() {
     let transport = MockTransport::new();
@@ -177,6 +183,7 @@ fn test_relay_client_in_flight_update_ids() {
     assert!(ids.contains(&"update-b".to_string()));
 }
 
+// @scenario: message_delivery:See delivery status for updates
 #[test]
 fn test_relay_client_has_in_flight() {
     let transport = MockTransport::new();
@@ -193,6 +200,7 @@ fn test_relay_client_has_in_flight() {
     assert!(client.has_in_flight());
 }
 
+// @scenario: relay_network:Relay only sees encrypted blobs
 #[test]
 fn test_relay_client_send_raw_update() {
     let transport = MockTransport::new();
@@ -213,6 +221,7 @@ fn test_relay_client_send_raw_update() {
     assert_eq!(client.in_flight_count(), 1);
 }
 
+// @scenario: message_delivery:See delivery status for updates
 #[test]
 fn test_process_result_default() {
     let result = ProcessResult::default();
@@ -224,6 +233,7 @@ fn test_process_result_default() {
     assert!(result.errors.is_empty());
 }
 
+// @scenario: device_management:Changes sync between devices
 #[test]
 fn test_relay_client_send_device_sync_message() {
     let transport = MockTransport::new();
@@ -263,6 +273,7 @@ fn test_relay_client_send_device_sync_message() {
     }
 }
 
+// @scenario: relay_network:Automatic cleanup of stale blobs
 #[test]
 fn test_send_purge_request() {
     let transport = MockTransport::new();
@@ -291,6 +302,7 @@ fn test_send_purge_request() {
     }
 }
 
+// @scenario: relay_network:Automatic cleanup of stale blobs
 #[test]
 fn test_send_purge_request_send_error() {
     let transport = MockTransport::new();

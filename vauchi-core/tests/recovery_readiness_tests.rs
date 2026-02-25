@@ -50,6 +50,7 @@ fn test_get_recovery_readiness_returns_not_ready_below_threshold() {
 }
 
 // @scenario: contact_recovery:Recovery succeeds with trusted vouchers only
+// @scenario: contact_recovery:Mark contact as trusted for recovery
 #[test]
 fn test_get_recovery_readiness_returns_ready_at_threshold() {
     let wb = create_test_vauchi();
@@ -76,6 +77,7 @@ fn test_get_recovery_readiness_returns_ready_at_threshold() {
 }
 
 // @scenario: contact_recovery:Recovery succeeds with trusted vouchers only
+// @scenario: contact_recovery:Mark contact as trusted for recovery
 #[test]
 fn test_get_recovery_readiness_returns_ready_above_threshold() {
     let wb = create_test_vauchi();

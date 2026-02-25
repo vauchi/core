@@ -190,6 +190,7 @@ fn test_not_concurrent_when_one_dominates() {
 /// When two SyncItems have equal timestamps, device ID tie-breaks
 /// deterministically — higher device ID wins.
 // @scenario: sync_updates:Last-write-wins for single field
+// @scenario: sync_updates:LWW merge for complex changes
 // @scenario: sync_updates:Detect truly concurrent updates
 #[test]
 fn test_conflict_resolution_equal_timestamp_device_id_tiebreaker() {

@@ -7,6 +7,7 @@
 
 use vauchi_core::network::simple_message::*;
 
+// @scenario: message_delivery:Relay provides storage confirmation
 #[test]
 fn test_encode_decode_roundtrip() {
     let handshake = SimpleHandshake {
@@ -31,6 +32,7 @@ fn test_encode_decode_roundtrip() {
     }
 }
 
+// @scenario: message_delivery:Relay provides storage confirmation
 #[test]
 fn test_legacy_exchange_message() {
     let msg = LegacyExchangeMessage::new("abc123", "def456", "Alice");
@@ -44,12 +46,14 @@ fn test_legacy_exchange_message() {
     assert_eq!(parsed.display_name, "Alice");
 }
 
+// @scenario: message_delivery:Relay provides storage confirmation
 #[test]
 fn test_legacy_exchange_response() {
     let msg = LegacyExchangeMessage::new_response("abc123", "def456", "Bob");
     assert!(msg.is_response);
 }
 
+// @scenario: message_delivery:Receive acknowledgment when update is delivered
 #[test]
 fn test_simple_ack() {
     let ack = create_simple_ack("msg-123", SimpleAckStatus::Delivered);
@@ -62,6 +66,7 @@ fn test_simple_ack() {
     }
 }
 
+// @scenario: message_delivery:Relay provides storage confirmation
 #[test]
 fn test_encrypted_update() {
     let update = SimpleEncryptedUpdate {

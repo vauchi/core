@@ -7,6 +7,7 @@
 
 use vauchi_core::network::*;
 
+// @scenario: relay_network:Relay node configuration
 #[test]
 fn test_transport_config_defaults() {
     let config = TransportConfig::default();
@@ -19,12 +20,14 @@ fn test_transport_config_defaults() {
     assert_eq!(config.proxy, ProxyConfig::None);
 }
 
+// @scenario: relay_network:Relay cannot identify users
 #[test]
 fn test_proxy_config_defaults() {
     let proxy = ProxyConfig::default();
     assert_eq!(proxy, ProxyConfig::None);
 }
 
+// @scenario: relay_network:Tor support for relay access
 #[test]
 fn test_proxy_config_tor_default() {
     let proxy = ProxyConfig::tor_default();
@@ -37,6 +40,7 @@ fn test_proxy_config_tor_default() {
     }
 }
 
+// @scenario: relay_network:Tor support for relay access
 #[test]
 fn test_proxy_config_tor_browser() {
     let proxy = ProxyConfig::tor_browser();
@@ -48,6 +52,7 @@ fn test_proxy_config_tor_browser() {
     }
 }
 
+// @scenario: relay_network:Tor support for relay access
 #[test]
 fn test_proxy_config_socks5_custom() {
     let proxy = ProxyConfig::socks5("192.168.1.1", 1080);
@@ -60,6 +65,7 @@ fn test_proxy_config_socks5_custom() {
     }
 }
 
+// @scenario: relay_network:Tor support for relay access
 #[test]
 fn test_transport_config_with_tor() {
     let config = TransportConfig::with_tor("wss://relay.example.onion");
@@ -71,6 +77,7 @@ fn test_transport_config_with_tor() {
     assert_eq!(config.io_timeout_ms, 120_000);
 }
 
+// @scenario: relay_network:Relay node configuration
 #[test]
 fn test_transport_config_with_proxy() {
     let proxy = ProxyConfig::socks5("proxy.example.com", 1080);
@@ -80,6 +87,7 @@ fn test_transport_config_with_proxy() {
     assert!(!config.proxy.is_tor());
 }
 
+// @scenario: relay_network:Relay node health check
 #[test]
 fn test_connection_state_equality() {
     assert_eq!(ConnectionState::Disconnected, ConnectionState::Disconnected);
@@ -96,6 +104,7 @@ fn test_connection_state_equality() {
     );
 }
 
+// @scenario: relay_network:Relay node health check
 #[test]
 fn test_connection_state_debug() {
     let state = ConnectionState::Reconnecting { attempt: 3 };

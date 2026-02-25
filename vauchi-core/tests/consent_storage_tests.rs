@@ -92,6 +92,7 @@ fn test_list_consent_records_empty() {
 }
 
 // @scenario: privacy_compliance:Withdraw consent for telemetry
+// @scenario: privacy_compliance:Consent collected on first launch
 #[test]
 fn test_consent_upsert_overwrites() {
     let storage = test_storage();

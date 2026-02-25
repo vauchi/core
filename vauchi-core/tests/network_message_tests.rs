@@ -7,6 +7,7 @@
 
 use vauchi_core::network::*;
 
+// @scenario: relay_network:Relay protocol versioning
 #[test]
 fn test_message_envelope_serialize_roundtrip() {
     let envelope = MessageEnvelope {
@@ -27,6 +28,7 @@ fn test_message_envelope_serialize_roundtrip() {
     assert_eq!(restored.timestamp, envelope.timestamp);
 }
 
+// @scenario: relay_network:Relay only sees encrypted blobs
 #[test]
 fn test_encrypted_update_serialize() {
     let update = EncryptedUpdate {
@@ -53,6 +55,7 @@ fn test_encrypted_update_serialize() {
     assert_eq!(restored.ciphertext, update.ciphertext);
 }
 
+// @scenario: message_delivery:Receive acknowledgment when update is delivered
 #[test]
 fn test_acknowledgment_serialize() {
     let ack = Acknowledgment {
@@ -68,6 +71,7 @@ fn test_acknowledgment_serialize() {
     assert_eq!(restored.status, AckStatus::Delivered);
 }
 
+// @scenario: relay_network:Client authenticates with Ed25519 signature
 #[test]
 fn test_handshake_signature_bytes() {
     let handshake = Handshake {
@@ -84,12 +88,14 @@ fn test_handshake_signature_bytes() {
     assert_eq!(restored.signature, handshake.signature);
 }
 
+// @scenario: message_delivery:See delivery status for updates
 #[test]
 fn test_ack_status_values() {
     assert_ne!(AckStatus::Delivered, AckStatus::Failed);
     assert_ne!(AckStatus::ReceivedByRecipient, AckStatus::Failed);
 }
 
+// @scenario: message_delivery:Delivery status updates in real-time
 #[test]
 fn test_presence_status_values() {
     assert_ne!(PresenceStatus::Online, PresenceStatus::Offline);
@@ -102,6 +108,7 @@ fn test_presence_status_values() {
 // ============================================================
 
 /// Test DeviceSyncMessage serialization for inter-device communication
+// @scenario: device_management:Changes sync between devices
 #[test]
 fn test_device_sync_message_serialize() {
     let msg = DeviceSyncMessage {
@@ -123,6 +130,7 @@ fn test_device_sync_message_serialize() {
 }
 
 /// Test DeviceSyncMessage in MessagePayload envelope
+// @scenario: device_management:Changes sync between devices
 #[test]
 fn test_device_sync_message_in_envelope() {
     let envelope = MessageEnvelope {

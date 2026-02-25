@@ -37,6 +37,7 @@ fn create_pending_update(id: &str, contact_id: &str) -> PendingUpdate {
 // === Queue Size Tests ===
 
 // @scenario: sync_updates:Update queued for offline contacts
+// @scenario: sync_updates:View sync status for all contacts
 #[test]
 fn test_count_all_pending_updates() {
     let storage = test_storage();
@@ -55,6 +56,7 @@ fn test_count_all_pending_updates() {
 }
 
 // @scenario: sync_updates:Large sync queue handling
+// @scenario: message_delivery:Queue updates while offline
 #[test]
 fn test_offline_queue_default_limit() {
     let queue = OfflineQueue::new();
@@ -64,6 +66,7 @@ fn test_offline_queue_default_limit() {
 }
 
 // @scenario: sync_updates:Large sync queue handling
+// @scenario: message_delivery:Queue updates while offline
 #[test]
 fn test_offline_queue_custom_limit() {
     let queue = OfflineQueue::with_max_size(500);
@@ -71,6 +74,7 @@ fn test_offline_queue_custom_limit() {
 }
 
 // @scenario: sync_updates:Large sync queue handling
+// @scenario: message_delivery:Handle quota exceeded
 #[test]
 fn test_is_queue_full() {
     let storage = test_storage();
@@ -94,6 +98,7 @@ fn test_is_queue_full() {
 }
 
 // @scenario: sync_updates:Large sync queue handling
+// @scenario: message_delivery:Queue updates while offline
 #[test]
 fn test_can_queue_update() {
     let storage = test_storage();
@@ -116,6 +121,7 @@ fn test_can_queue_update() {
 }
 
 // @scenario: sync_updates:Large sync queue handling
+// @scenario: message_delivery:Queue updates while offline
 #[test]
 fn test_queue_size_remaining() {
     let storage = test_storage();
@@ -137,6 +143,7 @@ fn test_queue_size_remaining() {
 // === Queue Ordering Tests ===
 
 // @scenario: sync_updates:Queued updates delivered when contact comes online
+// @scenario: message_delivery:Sync queue when coming online
 #[test]
 fn test_pending_updates_ordered_by_creation() {
     let storage = test_storage();
@@ -173,6 +180,7 @@ fn test_pending_updates_ordered_by_creation() {
 // === Flush Queue Tests ===
 
 // @scenario: sync_updates:Handle contact deletion during sync
+// @scenario: sync_updates:Update queued for offline contacts
 #[test]
 fn test_flush_pending_updates_for_contact() {
     let storage = test_storage();
@@ -198,6 +206,7 @@ fn test_flush_pending_updates_for_contact() {
 }
 
 // @scenario: sync_updates:Sync survives app restart
+// @scenario: sync_updates:View sync status for all contacts
 #[test]
 fn test_clear_all_pending_updates() {
     let storage = test_storage();

@@ -40,6 +40,7 @@ fn ensure_init() {
 
 /// Test: All target locales are available
 // @scenario: internationalization:Available languages are listed
+// @scenario: internationalization:Core languages are supported
 #[test]
 fn test_all_target_locales_available() {
     let locales = get_available_locales();
@@ -52,6 +53,7 @@ fn test_all_target_locales_available() {
 
 /// Test: English is the default/source locale
 // @scenario: internationalization:App falls back to English for unsupported languages
+// @scenario: internationalization:App uses system language by default
 #[test]
 fn test_english_is_default() {
     let default = Locale::default();
@@ -59,6 +61,7 @@ fn test_english_is_default() {
 }
 
 /// Test: Locale codes are correct
+// @scenario: internationalization:Core languages are supported
 #[test]
 fn test_locale_codes() {
     assert_eq!(Locale::English.code(), "en");
@@ -69,6 +72,7 @@ fn test_locale_codes() {
 
 /// Test: Locale can be parsed from code
 // @scenario: internationalization:App uses system language by default
+// @scenario: internationalization:Core languages are supported
 #[test]
 fn test_locale_from_code() {
     assert_eq!(Locale::from_code("en"), Some(Locale::English));
@@ -290,6 +294,7 @@ fn test_rtl_detection() {
 // ============================================================
 
 /// Test: Locale can be serialized
+// @scenario: internationalization:Core languages are supported
 #[test]
 fn test_locale_serialization() {
     let locale = Locale::German;

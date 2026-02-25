@@ -7,6 +7,7 @@
 use vauchi_core::contact_card::vcard::{export_vcard, import_vcard};
 use vauchi_core::{ContactCard, ContactField, FieldType};
 
+// @scenario: contacts_management:Export contact to vCard
 #[test]
 fn test_export_basic_card() {
     let mut card = ContactCard::new("Alice Smith");
@@ -32,6 +33,7 @@ fn test_export_basic_card() {
     assert!(vcard.ends_with("END:VCARD"));
 }
 
+// @scenario: contacts_management:Export contact to vCard
 #[test]
 fn test_export_all_field_types() {
     let mut card = ContactCard::new("Bob");
@@ -65,6 +67,7 @@ fn test_export_all_field_types() {
     assert!(vcard.contains("NOTE;TYPE=notes:Some note"));
 }
 
+// @scenario: contacts_management:Export contact to vCard
 #[test]
 fn test_export_escaping() {
     let mut card = ContactCard::new("O'Brien, John");
@@ -76,6 +79,7 @@ fn test_export_escaping() {
     assert!(vcard.contains("line1\\nline2"));
 }
 
+// @scenario: contacts_management:Export contact to vCard
 #[test]
 fn test_import_basic_vcard() {
     let vcard = "BEGIN:VCARD\r\nVERSION:4.0\r\nFN:Alice Smith\r\nTEL;TYPE=mobile:+15551234567\r\nEMAIL;TYPE=work:alice@example.com\r\nEND:VCARD";
@@ -101,6 +105,7 @@ fn test_import_basic_vcard() {
     assert_eq!(email.label(), "work");
 }
 
+// @scenario: contacts_management:Export contact to vCard
 #[test]
 fn test_import_url_field() {
     let vcard = "BEGIN:VCARD\r\nVERSION:4.0\r\nFN:Bob\r\nURL:https://bob.dev\r\nEND:VCARD";
@@ -112,6 +117,7 @@ fn test_import_url_field() {
     assert_eq!(url_field.value(), "https://bob.dev");
 }
 
+// @scenario: contacts_management:Export contact to vCard
 #[test]
 fn test_import_address_field() {
     let vcard =
@@ -124,6 +130,7 @@ fn test_import_address_field() {
     assert_eq!(addr.label(), "home");
 }
 
+// @scenario: contacts_management:Export contact to vCard
 #[test]
 fn test_import_missing_begin() {
     let vcard = "VERSION:4.0\r\nFN:Alice\r\nEND:VCARD";
@@ -131,6 +138,7 @@ fn test_import_missing_begin() {
     assert!(result.is_err());
 }
 
+// @scenario: contacts_management:Export contact to vCard
 #[test]
 fn test_import_missing_fn() {
     let vcard = "BEGIN:VCARD\r\nVERSION:4.0\r\nTEL:+1234\r\nEND:VCARD";
@@ -138,12 +146,14 @@ fn test_import_missing_fn() {
     assert!(result.is_err());
 }
 
+// @scenario: contacts_management:Export contact to vCard
 #[test]
 fn test_import_empty_string() {
     let result = import_vcard("");
     assert!(result.is_err());
 }
 
+// @scenario: contacts_management:Export contact to vCard
 #[test]
 fn test_roundtrip_export_import() {
     let mut card = ContactCard::new("Roundtrip Test");
@@ -173,6 +183,7 @@ fn test_roundtrip_export_import() {
     assert_eq!(reimported.fields().len(), 3);
 }
 
+// @scenario: contacts_management:Export contact to vCard
 #[test]
 fn test_import_tel_without_type() {
     let vcard = "BEGIN:VCARD\r\nVERSION:4.0\r\nFN:NoType\r\nTEL:+15551234567\r\nEND:VCARD";
@@ -182,6 +193,7 @@ fn test_import_tel_without_type() {
     assert_eq!(phone.field_type(), FieldType::Phone);
 }
 
+// @scenario: contacts_management:Export contact to vCard
 #[test]
 fn test_export_empty_card() {
     let card = ContactCard::new("Empty");
@@ -191,6 +203,7 @@ fn test_export_empty_card() {
     assert!(vcard.contains("END:VCARD"));
 }
 
+// @scenario: contacts_management:Export contact to vCard
 #[test]
 fn test_import_with_escaped_chars() {
     let vcard = "BEGIN:VCARD\r\nVERSION:4.0\r\nFN:Smith\\, John\r\nEND:VCARD";

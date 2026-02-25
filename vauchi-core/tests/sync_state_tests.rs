@@ -45,6 +45,7 @@ fn test_sync_queue_card_update() {
     assert_eq!(pending[0].update_type, "card_update");
 }
 
+// @scenario: sync_updates:Only changed fields transmitted
 #[test]
 fn test_sync_no_changes() {
     let storage = create_test_storage();

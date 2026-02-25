@@ -331,6 +331,7 @@ fn test_validate_custom_field() {
     assert_eq!(validation.field_value(), "bob.42");
 }
 
+// @scenario: field_validation:Validate a custom field
 #[test]
 fn test_validate_custom_field_with_special_chars() {
     let validator = Identity::create("Validator");
@@ -492,6 +493,7 @@ fn test_validated_by_me_flag() {
 // Traces to: _private/features/field_validation.feature @validate @phone
 // =============================================================================
 
+// @scenario: field_validation:Validate a contact's phone number
 #[test]
 fn test_phone_international_format_e164_valid() {
     use vauchi_core::contact_card::{ContactField, FieldType};
@@ -518,6 +520,7 @@ fn test_phone_international_format_e164_valid() {
     }
 }
 
+// @scenario: field_validation:Validate a contact's phone number
 #[test]
 fn test_phone_international_format_with_formatting() {
     use vauchi_core::contact_card::{ContactField, FieldType};
@@ -544,6 +547,7 @@ fn test_phone_international_format_with_formatting() {
     }
 }
 
+// @scenario: field_validation:Validate a contact's phone number
 #[test]
 fn test_phone_international_format_invalid() {
     use vauchi_core::contact_card::{ContactField, FieldType, ValidationError};
@@ -578,6 +582,7 @@ fn test_phone_international_format_invalid() {
     }
 }
 
+// @scenario: field_validation:Validate a contact's phone number
 #[test]
 fn test_phone_e164_max_length() {
     use vauchi_core::contact_card::{ContactField, FieldType};
@@ -602,6 +607,7 @@ fn test_phone_e164_max_length() {
 // Traces to: _private/features/field_validation.feature @validate @email
 // =============================================================================
 
+// @scenario: field_validation:Validate a contact's email address
 #[test]
 fn test_email_rfc5322_basic_valid() {
     use vauchi_core::contact_card::{ContactField, FieldType};
@@ -640,6 +646,7 @@ fn test_email_rfc5322_basic_valid() {
     }
 }
 
+// @scenario: field_validation:Validate a contact's email address
 #[test]
 #[allow(unused_imports)]
 fn test_email_rfc5322_invalid() {
@@ -676,6 +683,7 @@ fn test_email_rfc5322_invalid() {
     }
 }
 
+// @scenario: field_validation:Validate a contact's email address
 #[test]
 fn test_email_local_part_length() {
     use vauchi_core::contact_card::{ContactField, FieldType};
@@ -695,6 +703,7 @@ fn test_email_local_part_length() {
     let _ = field.validate(); // Just exercising the code path
 }
 
+// @scenario: field_validation:Validate a contact's email address
 #[test]
 fn test_email_domain_part_length() {
     use vauchi_core::contact_card::{ContactField, FieldType};
@@ -705,6 +714,7 @@ fn test_email_domain_part_length() {
     assert!(field.validate().is_ok(), "Long domain should be valid");
 }
 
+// @scenario: field_validation:Validate a contact's email address
 #[test]
 fn test_email_internationalized_domain() {
     // allow(zero_assertions): IDN support is implementation-dependent — testing no-panic only
@@ -728,6 +738,7 @@ fn test_email_internationalized_domain() {
 // Traces to: _private/features/field_validation.feature @validate @social
 // =============================================================================
 
+// @scenario: field_validation:Validate a contact's social profile
 #[test]
 fn test_social_handle_platform_rules_twitter() {
     use vauchi_core::social::SocialNetworkRegistry;
@@ -755,6 +766,7 @@ fn test_social_handle_platform_rules_twitter() {
     }
 }
 
+// @scenario: field_validation:Validate a contact's social profile
 #[test]
 fn test_social_handle_platform_rules_instagram() {
     use vauchi_core::social::SocialNetworkRegistry;
@@ -776,6 +788,7 @@ fn test_social_handle_platform_rules_instagram() {
     }
 }
 
+// @scenario: field_validation:Validate a contact's social profile
 #[test]
 fn test_social_handle_platform_rules_github() {
     use vauchi_core::social::SocialNetworkRegistry;
@@ -797,6 +810,7 @@ fn test_social_handle_platform_rules_github() {
     }
 }
 
+// @scenario: field_validation:Validate a contact's social profile
 #[test]
 fn test_social_handle_platform_rules_mastodon() {
     use vauchi_core::social::SocialNetworkRegistry;
@@ -824,6 +838,7 @@ fn test_social_handle_platform_rules_mastodon() {
     );
 }
 
+// @scenario: field_validation:Validate a contact's social profile
 #[test]
 fn test_social_handle_platform_rules_linkedin() {
     use vauchi_core::social::SocialNetworkRegistry;
@@ -845,6 +860,7 @@ fn test_social_handle_platform_rules_linkedin() {
     }
 }
 
+// @scenario: field_validation:Validate a contact's social profile
 #[test]
 fn test_social_handle_preserves_full_urls() {
     use vauchi_core::social::SocialNetworkRegistry;
@@ -863,6 +879,7 @@ fn test_social_handle_preserves_full_urls() {
 // Traces to: _private/features/field_validation.feature @validate @custom
 // =============================================================================
 
+// @scenario: field_validation:Validate a custom field
 #[test]
 fn test_custom_field_special_characters_unicode() {
     use vauchi_core::contact_card::{ContactField, FieldType};
@@ -891,6 +908,7 @@ fn test_custom_field_special_characters_unicode() {
     }
 }
 
+// @scenario: field_validation:Validate a custom field
 #[test]
 fn test_custom_field_special_characters_emoji() {
     use vauchi_core::contact_card::{ContactField, FieldType};
@@ -917,6 +935,7 @@ fn test_custom_field_special_characters_emoji() {
     }
 }
 
+// @scenario: field_validation:Validate a custom field
 #[test]
 fn test_custom_field_special_characters_symbols() {
     use vauchi_core::contact_card::{ContactField, FieldType};
@@ -955,6 +974,7 @@ fn test_custom_field_special_characters_symbols() {
     }
 }
 
+// @scenario: field_validation:Validate a custom field
 #[test]
 fn test_custom_field_mixed_scripts() {
     use vauchi_core::contact_card::{ContactField, FieldType};
@@ -977,6 +997,7 @@ fn test_custom_field_mixed_scripts() {
     }
 }
 
+// @scenario: field_validation:Validate a custom field
 #[test]
 fn test_custom_field_control_characters() {
     use vauchi_core::contact_card::{ContactField, FieldType};
@@ -1024,6 +1045,7 @@ fn test_cross_field_dependencies_independent_validation() {
     assert_eq!(card.fields().len(), 6, "All 6 fields should be added");
 }
 
+// @scenario: field_validation:Each field type has independent validation
 #[test]
 fn test_cross_field_dependencies_validation_isolation() {
     use vauchi_core::contact_card::{ContactCard, ContactField, FieldType};
@@ -1044,6 +1066,7 @@ fn test_cross_field_dependencies_validation_isolation() {
     assert_eq!(card.fields()[0].label(), "Mobile");
 }
 
+// @scenario: field_validation:Validation persists when other fields change
 #[test]
 fn test_cross_field_dependencies_update_isolation() {
     use vauchi_core::contact_card::{ContactCard, ContactField, FieldType};
@@ -1142,6 +1165,7 @@ fn test_cross_field_validation_status_independent() {
 /// Defined here since the field module is private without the `testing` feature.
 const MAX_VALUE_LENGTH: usize = 1000;
 
+// @scenario: field_validation:Validate a custom field
 #[test]
 fn test_max_field_length_enforcement_at_limit() {
     use vauchi_core::contact_card::{ContactField, FieldType};
@@ -1156,6 +1180,7 @@ fn test_max_field_length_enforcement_at_limit() {
     );
 }
 
+// @scenario: field_validation:Validate a custom field
 #[test]
 fn test_max_field_length_enforcement_over_limit() {
     use vauchi_core::contact_card::{ContactField, FieldType, ValidationError};
@@ -1174,6 +1199,7 @@ fn test_max_field_length_enforcement_over_limit() {
     }
 }
 
+// @scenario: field_validation:Validate a custom field
 #[test]
 fn test_max_field_length_enforcement_unicode_chars() {
     use vauchi_core::contact_card::{ContactField, FieldType};
@@ -1192,6 +1218,7 @@ fn test_max_field_length_enforcement_unicode_chars() {
     );
 }
 
+// @scenario: field_validation:Validate a custom field
 #[test]
 fn test_max_field_length_enforcement_emoji() {
     use vauchi_core::contact_card::{ContactField, FieldType};
@@ -1209,6 +1236,7 @@ fn test_max_field_length_enforcement_emoji() {
     );
 }
 
+// @scenario: field_validation:Validate a custom field
 #[test]
 fn test_max_field_length_enforcement_per_field_type() {
     use vauchi_core::contact_card::{ContactField, FieldType, ValidationError};
@@ -1244,6 +1272,7 @@ fn test_max_field_length_enforcement_per_field_type() {
     }
 }
 
+// @scenario: field_validation:Validate a custom field
 #[test]
 fn test_max_field_length_card_rejects_overlong() {
     use vauchi_core::contact_card::{ContactCard, ContactField, FieldType};
@@ -1261,6 +1290,7 @@ fn test_max_field_length_card_rejects_overlong() {
     );
 }
 
+// @scenario: field_validation:Validate a custom field
 #[test]
 fn test_max_field_length_update_rejects_overlong() {
     use vauchi_core::contact_card::{ContactCard, ContactField, FieldType};
@@ -1612,6 +1642,7 @@ fn test_from_validations_weighted_filters_blocked_and_mismatched_values() {
     );
 }
 
+// @scenario: field_validation:Validation score determines trust level
 #[test]
 fn test_from_validations_backward_compat() {
     // from_validations() should produce identical results to before
@@ -1815,6 +1846,7 @@ fn test_revoke_field_validation_queues_revocation() {
     );
 }
 
+// @scenario: field_validation:Validation is stored locally
 #[test]
 fn test_validate_field_queue_failure_does_not_fail_validation() {
     use vauchi_core::contact_card::ContactCard;

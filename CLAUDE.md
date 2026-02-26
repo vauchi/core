@@ -19,11 +19,12 @@ See [README.md](README.md) for overview.
 ## Commands
 
 ```bash
-cargo test --workspace          # All tests
-cargo test -p vauchi-core       # Core tests only
-cargo test -p vauchi-mobile     # Mobile bindings tests
-cargo clippy -- -D warnings     # Lint (must pass)
-cargo fmt                       # Format
+just test core                  # All tests (workspace)
+just test-crate vauchi-core     # Core tests only
+just test-crate vauchi-mobile   # Mobile bindings tests
+just lint core                  # Lint (must pass)
+just fmt core                   # Format
+just check core                 # All of the above
 ```
 
 ## Crates

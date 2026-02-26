@@ -416,6 +416,217 @@ fn test_confirm_link_with_wrong_mac_rejected() {
 }
 
 // ---------------------------------------------------------------------------
+// DL-3: Cross-session replay rejection tests
+// ---------------------------------------------------------------------------
+
+// @scenario: device_management.feature:Cross-session replay attack prevented
+#[test]
+fn test_cross_session_replay_rejected() {
+    let master_seed = [0x42u8; 32];
+    let identity = Identity::create("Alice");
+    let registry = create_test_registry(&identity);
+
+    // Session A — get the valid challenge
+    let initiator_a = DeviceLinkInitiator::new(master_seed, &identity, registry.clone());
+    let challenge_a = initiator_a.proximity_challenge();
+
+    // Session B — different QR, different link_key
+    let initiator_b = DeviceLinkInitiator::new(master_seed, &identity, registry);
+
+    let qr_string_b = initiator_b.qr().to_data_string();
+    let scanned_qr_b = DeviceLinkQR::from_data_string(&qr_string_b).unwrap();
+    let mut responder_b = DeviceLinkResponder::from_qr(scanned_qr_b, "Phone".to_string()).unwrap();
+    let encrypted_request_b = responder_b.create_request().unwrap();
+    let (_confirmation_b, request_b) = initiator_b
+        .prepare_confirmation(&encrypted_request_b)
+        .unwrap();
+
+    // Replay Session A's proof in Session B
+    let proof_from_a = ProximityProof::Ultrasonic {
+        challenge_response: challenge_a,
+        verified_at: now_unix_secs(),
+    };
+
+    let result = initiator_b.confirm_link(&request_b, &proof_from_a);
+    assert!(
+        matches!(result, Err(ExchangeError::ProximityNotVerified)),
+        "Replaying a proof from Session A in Session B must be rejected, got: {:?}",
+        result.err()
+    );
+}
+
+// @scenario: device_management.feature:Cross-session replay attack prevented
+#[test]
+fn test_cross_session_manual_mac_replay_rejected() {
+    let master_seed = [0x42u8; 32];
+    let identity = Identity::create("Alice");
+    let registry = create_test_registry(&identity);
+
+    // Session A — compute a valid manual MAC
+    let initiator_a = DeviceLinkInitiator::new(master_seed, &identity, registry.clone());
+    let qr_string_a = initiator_a.qr().to_data_string();
+    let scanned_qr_a = DeviceLinkQR::from_data_string(&qr_string_a).unwrap();
+    let mut responder_a = DeviceLinkResponder::from_qr(scanned_qr_a, "Phone".to_string()).unwrap();
+    let encrypted_request_a = responder_a.create_request().unwrap();
+    let (confirmation_a, _request_a) = initiator_a
+        .prepare_confirmation(&encrypted_request_a)
+        .unwrap();
+    let mac_from_a = compute_confirmation_mac(
+        initiator_a.qr().link_key(),
+        &confirmation_a.confirmation_code,
+    );
+
+    // Session B — different link_key and different confirmation code
+    let initiator_b = DeviceLinkInitiator::new(master_seed, &identity, registry);
+    let qr_string_b = initiator_b.qr().to_data_string();
+    let scanned_qr_b = DeviceLinkQR::from_data_string(&qr_string_b).unwrap();
+    let mut responder_b = DeviceLinkResponder::from_qr(scanned_qr_b, "Phone".to_string()).unwrap();
+    let encrypted_request_b = responder_b.create_request().unwrap();
+    let (_confirmation_b, request_b) = initiator_b
+        .prepare_confirmation(&encrypted_request_b)
+        .unwrap();
+
+    // Replay Session A's MAC in Session B
+    let proof_from_a = ProximityProof::ManualConfirmation {
+        confirmation_code_mac: mac_from_a,
+        confirmed_at: now_unix_secs(),
+    };
+
+    let result = initiator_b.confirm_link(&request_b, &proof_from_a);
+    assert!(
+        matches!(result, Err(ExchangeError::ProximityNotVerified)),
+        "Replaying a manual MAC from Session A in Session B must be rejected, got: {:?}",
+        result.err()
+    );
+}
+
+// ---------------------------------------------------------------------------
+// DL-4: Boundary tests (60s/61s)
+// ---------------------------------------------------------------------------
+
+// @scenario: device_management.feature:Proximity proof boundary timing
+#[test]
+fn test_ultrasonic_proof_at_exactly_60_seconds_accepted() {
+    let master_seed = [0x42u8; 32];
+    let identity = Identity::create("Alice");
+    let registry = create_test_registry(&identity);
+
+    let initiator = DeviceLinkInitiator::new(master_seed, &identity, registry);
+    let challenge = initiator.proximity_challenge();
+
+    let qr_string = initiator.qr().to_data_string();
+    let scanned_qr = DeviceLinkQR::from_data_string(&qr_string).unwrap();
+    let mut responder = DeviceLinkResponder::from_qr(scanned_qr, "Phone".to_string()).unwrap();
+    let encrypted_request = responder.create_request().unwrap();
+    let (_confirmation, request) = initiator.prepare_confirmation(&encrypted_request).unwrap();
+
+    // Proof exactly at the 60-second boundary
+    let proof = ProximityProof::Ultrasonic {
+        challenge_response: challenge,
+        verified_at: now_unix_secs().saturating_sub(60),
+    };
+
+    let result = initiator.confirm_link(&request, &proof);
+    assert!(
+        result.is_ok(),
+        "Proof at exactly 60s should be accepted, got: {:?}",
+        result.err()
+    );
+}
+
+// @scenario: device_management.feature:Proximity proof boundary timing
+#[test]
+fn test_ultrasonic_proof_at_61_seconds_rejected() {
+    let master_seed = [0x42u8; 32];
+    let identity = Identity::create("Alice");
+    let registry = create_test_registry(&identity);
+
+    let initiator = DeviceLinkInitiator::new(master_seed, &identity, registry);
+    let challenge = initiator.proximity_challenge();
+
+    let qr_string = initiator.qr().to_data_string();
+    let scanned_qr = DeviceLinkQR::from_data_string(&qr_string).unwrap();
+    let mut responder = DeviceLinkResponder::from_qr(scanned_qr, "Phone".to_string()).unwrap();
+    let encrypted_request = responder.create_request().unwrap();
+    let (_confirmation, request) = initiator.prepare_confirmation(&encrypted_request).unwrap();
+
+    // Proof 1 second beyond the boundary
+    let proof = ProximityProof::Ultrasonic {
+        challenge_response: challenge,
+        verified_at: now_unix_secs().saturating_sub(61),
+    };
+
+    let result = initiator.confirm_link(&request, &proof);
+    assert!(
+        matches!(result, Err(ExchangeError::ProximityExpired)),
+        "Proof at 61s should be rejected, got: {:?}",
+        result.err()
+    );
+}
+
+// @scenario: device_management.feature:Proximity proof boundary timing
+#[test]
+fn test_manual_proof_at_exactly_60_seconds_accepted() {
+    let master_seed = [0x42u8; 32];
+    let identity = Identity::create("Alice");
+    let registry = create_test_registry(&identity);
+
+    let initiator = DeviceLinkInitiator::new(master_seed, &identity, registry);
+
+    let qr_string = initiator.qr().to_data_string();
+    let scanned_qr = DeviceLinkQR::from_data_string(&qr_string).unwrap();
+    let mut responder = DeviceLinkResponder::from_qr(scanned_qr, "Phone".to_string()).unwrap();
+    let encrypted_request = responder.create_request().unwrap();
+    let (confirmation, request) = initiator.prepare_confirmation(&encrypted_request).unwrap();
+
+    let proof = ProximityProof::ManualConfirmation {
+        confirmation_code_mac: compute_confirmation_mac(
+            initiator.qr().link_key(),
+            &confirmation.confirmation_code,
+        ),
+        confirmed_at: now_unix_secs().saturating_sub(60),
+    };
+
+    let result = initiator.confirm_link(&request, &proof);
+    assert!(
+        result.is_ok(),
+        "Manual proof at exactly 60s should be accepted, got: {:?}",
+        result.err()
+    );
+}
+
+// @scenario: device_management.feature:Proximity proof boundary timing
+#[test]
+fn test_manual_proof_at_61_seconds_rejected() {
+    let master_seed = [0x42u8; 32];
+    let identity = Identity::create("Alice");
+    let registry = create_test_registry(&identity);
+
+    let initiator = DeviceLinkInitiator::new(master_seed, &identity, registry);
+
+    let qr_string = initiator.qr().to_data_string();
+    let scanned_qr = DeviceLinkQR::from_data_string(&qr_string).unwrap();
+    let mut responder = DeviceLinkResponder::from_qr(scanned_qr, "Phone".to_string()).unwrap();
+    let encrypted_request = responder.create_request().unwrap();
+    let (confirmation, request) = initiator.prepare_confirmation(&encrypted_request).unwrap();
+
+    let proof = ProximityProof::ManualConfirmation {
+        confirmation_code_mac: compute_confirmation_mac(
+            initiator.qr().link_key(),
+            &confirmation.confirmation_code,
+        ),
+        confirmed_at: now_unix_secs().saturating_sub(61),
+    };
+
+    let result = initiator.confirm_link(&request, &proof);
+    assert!(
+        matches!(result, Err(ExchangeError::ProximityExpired)),
+        "Manual proof at 61s should be rejected, got: {:?}",
+        result.err()
+    );
+}
+
+// ---------------------------------------------------------------------------
 // Property-based tests (proptest)
 // ---------------------------------------------------------------------------
 

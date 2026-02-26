@@ -10,7 +10,7 @@
 use std::collections::HashSet;
 use std::time::{Duration, Instant};
 
-use super::{ExchangeError, ExchangeQR, ProximityVerifier, X3DHKeyPair};
+use super::{ExchangeError, ExchangeQR, ProximityConfidence, ProximityVerifier, X3DHKeyPair};
 use crate::contact::Contact;
 use crate::contact_card::ContactCard;
 use crate::crypto::kdf::HKDF;
@@ -104,6 +104,10 @@ pub enum ExchangeEvent {
     },
     /// BLE proximity verified (challenge-response passed).
     BleProximityVerified,
+
+    // --- Proximity events ---
+    /// Proximity check completed with a confidence level.
+    ProximityCheckCompleted { confidence: ProximityConfidence },
 }
 
 /// An exchange session managing the state of a contact exchange.
@@ -119,8 +123,9 @@ pub struct ExchangeSession<P: ProximityVerifier> {
     /// Our X3DH keypair for this session (fresh ephemeral)
     our_x3dh: X3DHKeyPair,
     /// Proximity verifier (used by NFC/BLE flows, not QR)
-    #[allow(dead_code)]
     proximity: P,
+    /// Proximity confidence result from the last proximity check.
+    proximity_confidence: ProximityConfidence,
     /// When the session started
     started_at: Instant,
     /// Whether the session was interrupted
@@ -145,6 +150,7 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
             our_card,
             our_x3dh,
             proximity,
+            proximity_confidence: ProximityConfidence::Unknown,
             started_at: Instant::now(),
             interrupted: false,
             used_qrs: HashSet::new(),
@@ -166,6 +172,7 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
             our_card,
             our_x3dh,
             proximity,
+            proximity_confidence: ProximityConfidence::Unknown,
             started_at: Instant::now(),
             interrupted: false,
             used_qrs: HashSet::new(),
@@ -186,6 +193,7 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
             our_card,
             our_x3dh,
             proximity,
+            proximity_confidence: ProximityConfidence::Unknown,
             started_at: Instant::now(),
             interrupted: false,
             used_qrs: HashSet::new(),
@@ -206,6 +214,7 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
             our_card,
             our_x3dh,
             proximity,
+            proximity_confidence: ProximityConfidence::Unknown,
             started_at: Instant::now(),
             interrupted: false,
             used_qrs: HashSet::new(),
@@ -292,7 +301,34 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
                 device_id,
             } => self.handle_ble_payload_exchanged(their_payload, device_id),
             ExchangeEvent::BleProximityVerified => self.handle_ble_proximity_verified(),
+            // Proximity
+            ExchangeEvent::ProximityCheckCompleted { confidence } => {
+                self.proximity_confidence = confidence;
+                Ok(())
+            }
         }
+    }
+
+    /// Runs a proximity check using the session's proximity verifier.
+    ///
+    /// Sets the proximity confidence based on the result:
+    /// - MockProximityVerifier success -> High
+    /// - ManualConfirmationVerifier confirmed -> Medium
+    /// - Failure or timeout -> Low
+    pub fn run_proximity_check(&mut self) {
+        let challenge = [0u8; 16]; // Simplified for now
+        let timeout = Duration::from_secs(5);
+        let confidence = match self.proximity.verify_proximity(&challenge, timeout) {
+            Ok(()) => {
+                // Check if this is a manual confirmation (Medium) vs hardware (High)
+                match self.proximity.listen_for_response(timeout) {
+                    Ok(response) if response.len() == 1 => ProximityConfidence::Medium,
+                    _ => ProximityConfidence::High,
+                }
+            }
+            Err(_) => ProximityConfidence::Low,
+        };
+        self.proximity_confidence = confidence;
     }
 
     fn handle_perform_key_agreement(&mut self) -> Result<(), ExchangeError> {
@@ -360,7 +396,12 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
                 }
             };
 
-        let contact = Contact::from_exchange(their_public_key, their_card, shared_key);
+        let contact = Contact::from_exchange_with_proximity(
+            their_public_key,
+            their_card,
+            shared_key,
+            self.proximity_confidence,
+        );
 
         self.state = ExchangeState::Complete {
             contact: contact.clone(),

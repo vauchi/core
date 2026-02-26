@@ -73,7 +73,9 @@ uniffi::setup_scaffolding!();
 
 // === Device Link Wrapper Objects ===
 
-use vauchi_core::exchange::{DeviceLinkInitiator, DeviceLinkRequest, DeviceLinkResponder};
+use vauchi_core::exchange::{
+    DeviceLinkInitiator, DeviceLinkRequest, DeviceLinkResponder, ProximityProof,
+};
 
 /// UniFFI-exposed wrapper around DeviceLinkInitiator.
 ///
@@ -121,15 +123,53 @@ impl MobileDeviceLinkInitiator {
         })
     }
 
-    /// Marks proximity as verified.
-    pub fn set_proximity_verified(&self) {
-        self.inner.lock().unwrap().set_proximity_verified();
+    /// After user confirms, creates the encrypted response with ultrasonic proof.
+    ///
+    /// Must call prepare_confirmation() first. The `challenge_response` is the
+    /// 16-byte proximity challenge echoed back, and `verified_at` is the Unix
+    /// timestamp (seconds) when verification completed.
+    pub fn confirm_link_ultrasonic(
+        &self,
+        challenge_response: Vec<u8>,
+        verified_at: u64,
+    ) -> Result<MobileDeviceLinkResult, MobileError> {
+        let response_bytes: [u8; 16] = challenge_response.try_into().map_err(|_| {
+            MobileError::ExchangeFailed("challenge_response must be exactly 16 bytes".into())
+        })?;
+        let proof = ProximityProof::Ultrasonic {
+            challenge_response: response_bytes,
+            verified_at,
+        };
+        self.confirm_link_with_proof(&proof)
     }
 
-    /// After user confirms, creates the encrypted response.
+    /// After user confirms, creates the encrypted response with manual confirmation proof.
     ///
-    /// Must call prepare_confirmation() and set_proximity_verified() first.
-    pub fn confirm_link(&self) -> Result<MobileDeviceLinkResult, MobileError> {
+    /// Must call prepare_confirmation() first. The `confirmation_code_mac` is the
+    /// HMAC-SHA256 over the confirmation code, and `confirmed_at` is the Unix
+    /// timestamp (seconds) when the user confirmed.
+    pub fn confirm_link_manual(
+        &self,
+        confirmation_code_mac: Vec<u8>,
+        confirmed_at: u64,
+    ) -> Result<MobileDeviceLinkResult, MobileError> {
+        let mac_bytes: [u8; 32] = confirmation_code_mac.try_into().map_err(|_| {
+            MobileError::ExchangeFailed("confirmation_code_mac must be exactly 32 bytes".into())
+        })?;
+        let proof = ProximityProof::ManualConfirmation {
+            confirmation_code_mac: mac_bytes,
+            confirmed_at,
+        };
+        self.confirm_link_with_proof(&proof)
+    }
+}
+
+impl MobileDeviceLinkInitiator {
+    /// Internal: confirms the link with the given proximity proof.
+    fn confirm_link_with_proof(
+        &self,
+        proof: &ProximityProof,
+    ) -> Result<MobileDeviceLinkResult, MobileError> {
         let request = self.pending_request.lock().unwrap().take().ok_or_else(|| {
             MobileError::ExchangeFailed(
                 "No pending request — call prepare_confirmation first".into(),
@@ -138,7 +178,7 @@ impl MobileDeviceLinkInitiator {
 
         let initiator = self.inner.lock().unwrap();
         let (encrypted_response, _registry, device_info) = initiator
-            .confirm_link(&request)
+            .confirm_link(&request, proof)
             .map_err(|e| MobileError::ExchangeFailed(e.to_string()))?;
 
         Ok(MobileDeviceLinkResult {
@@ -4132,9 +4172,15 @@ mod tests {
         // Codes should match
         assert_eq!(confirmation.confirmation_code, responder_code);
 
-        // Step 4: Existing device confirms (after proximity verification)
-        initiator.set_proximity_verified();
-        let result = initiator.confirm_link().unwrap();
+        // Step 4: Existing device confirms with ultrasonic proof
+        let challenge = initiator.proximity_challenge();
+        let verified_at = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+        let result = initiator
+            .confirm_link_ultrasonic(challenge, verified_at)
+            .unwrap();
         assert!(result.success);
         assert_eq!(result.device_name, "Bob's Phone");
         assert!(result.device_index > 0);
@@ -4164,8 +4210,13 @@ mod tests {
 
         let _confirmation = initiator.prepare_confirmation(request_bytes).unwrap();
 
-        // Should fail without set_proximity_verified
-        let result = initiator.confirm_link();
+        // Should fail with wrong proximity proof
+        let wrong_challenge = vec![0xFFu8; 16];
+        let verified_at = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+        let result = initiator.confirm_link_ultrasonic(wrong_challenge, verified_at);
         assert!(result.is_err());
     }
 

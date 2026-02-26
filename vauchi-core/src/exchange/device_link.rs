@@ -12,6 +12,7 @@ use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
 use ring::hmac;
 use ring::rand::SystemRandom;
 use std::time::{SystemTime, UNIX_EPOCH};
+use subtle::ConstantTimeEq;
 use zeroize::Zeroize;
 
 use super::ExchangeError;
@@ -31,7 +32,6 @@ const LINK_QR_EXPIRY_SECONDS: u64 = 300;
 const PROXIMITY_DOMAIN: &[u8] = b"vauchi-device-link-proximity-v1";
 
 /// Maximum age (seconds) of a proximity proof before it's considered expired.
-#[allow(dead_code)] // Used in upcoming proximity validation (Task 3)
 const PROXIMITY_PROOF_MAX_AGE_SECS: u64 = 60;
 
 /// Domain separator for confirmation code MAC.
@@ -630,8 +630,6 @@ pub struct DeviceLinkInitiator {
     qr: DeviceLinkQR,
     /// Current device registry
     registry: DeviceRegistry,
-    /// Whether proximity has been verified by the caller.
-    proximity_verified: bool,
 }
 
 impl DeviceLinkInitiator {
@@ -650,7 +648,6 @@ impl DeviceLinkInitiator {
             display_name: identity.display_name().to_string(),
             qr,
             registry,
-            proximity_verified: false,
         }
     }
 
@@ -666,14 +663,6 @@ impl DeviceLinkInitiator {
     /// verification (e.g., ultrasonic audio or manual confirmation).
     pub fn proximity_challenge(&self) -> [u8; 16] {
         derive_proximity_challenge(self.qr.link_key())
-    }
-
-    /// Marks proximity as verified.
-    ///
-    /// The caller (platform layer) runs proximity verification externally
-    /// and calls this method before `confirm_link()` / `build_response()`.
-    pub fn set_proximity_verified(&mut self) {
-        self.proximity_verified = true;
     }
 
     /// Decrypts a link request and returns confirmation details for the user.
@@ -713,8 +702,9 @@ impl DeviceLinkInitiator {
     pub fn confirm_link(
         &self,
         request: &DeviceLinkRequest,
+        proof: &ProximityProof,
     ) -> Result<(Vec<u8>, DeviceRegistry, DeviceInfo), ExchangeError> {
-        self.build_response(request, None)
+        self.build_response(request, None, proof)
     }
 
     /// After the user confirms the link, creates the encrypted response with the
@@ -725,8 +715,9 @@ impl DeviceLinkInitiator {
         &self,
         request: &DeviceLinkRequest,
         sync_payload_json: &str,
+        proof: &ProximityProof,
     ) -> Result<(Vec<u8>, DeviceRegistry, DeviceInfo), ExchangeError> {
-        self.build_response(request, Some(sync_payload_json))
+        self.build_response(request, Some(sync_payload_json), proof)
     }
 
     /// Processes a link request and creates a response.
@@ -736,6 +727,7 @@ impl DeviceLinkInitiator {
     pub fn process_request(
         &self,
         encrypted_request: &[u8],
+        proof: &ProximityProof,
     ) -> Result<(Vec<u8>, DeviceRegistry, DeviceInfo), ExchangeError> {
         let request = DeviceLinkRequest::decrypt(encrypted_request, self.qr.link_key())?;
 
@@ -743,7 +735,7 @@ impl DeviceLinkInitiator {
             return Err(ExchangeError::InvalidQRFormat);
         }
 
-        self.build_response(&request, None)
+        self.build_response(&request, None, proof)
     }
 
     /// Processes a link request and creates a response with sync payload.
@@ -756,6 +748,7 @@ impl DeviceLinkInitiator {
         &self,
         encrypted_request: &[u8],
         sync_payload_json: &str,
+        proof: &ProximityProof,
     ) -> Result<(Vec<u8>, DeviceRegistry, DeviceInfo), ExchangeError> {
         let request = DeviceLinkRequest::decrypt(encrypted_request, self.qr.link_key())?;
 
@@ -763,21 +756,23 @@ impl DeviceLinkInitiator {
             return Err(ExchangeError::InvalidQRFormat);
         }
 
-        self.build_response(&request, Some(sync_payload_json))
+        self.build_response(&request, Some(sync_payload_json), proof)
     }
 
     /// Internal helper to build the response from a validated request.
     ///
-    /// Returns `Err(ExchangeError::ProximityNotVerified)` if proximity
-    /// has not been verified via `set_proximity_verified()`.
+    /// Validates the proximity proof cryptographically before releasing the
+    /// master seed. Returns `Err(ExchangeError::ProximityExpired)` if the
+    /// proof is too old, or `Err(ExchangeError::ProximityNotVerified)` if
+    /// the proof data does not match.
     fn build_response(
         &self,
         request: &DeviceLinkRequest,
         sync_payload_json: Option<&str>,
+        proof: &ProximityProof,
     ) -> Result<(Vec<u8>, DeviceRegistry, DeviceInfo), ExchangeError> {
-        if !self.proximity_verified {
-            return Err(ExchangeError::ProximityNotVerified);
-        }
+        let confirmation_code = derive_confirmation_code(self.qr.link_key(), &request.nonce);
+        self.validate_proximity_proof(proof, &confirmation_code)?;
 
         let device_index = self.registry.next_device_index();
 
@@ -811,6 +806,51 @@ impl DeviceLinkInitiator {
 
         Ok((encrypted_response, updated_registry, new_device))
     }
+
+    /// Validates a proximity proof cryptographically.
+    ///
+    /// Checks both freshness (proof age within `PROXIMITY_PROOF_MAX_AGE_SECS`)
+    /// and correctness (challenge-response or confirmation MAC) using
+    /// constant-time comparison.
+    fn validate_proximity_proof(
+        &self,
+        proof: &ProximityProof,
+        confirmation_code: &str,
+    ) -> Result<(), ExchangeError> {
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map_err(|_| ExchangeError::CryptoError)?
+            .as_secs();
+
+        match proof {
+            ProximityProof::Ultrasonic {
+                challenge_response,
+                verified_at,
+            } => {
+                if now.saturating_sub(*verified_at) > PROXIMITY_PROOF_MAX_AGE_SECS {
+                    return Err(ExchangeError::ProximityExpired);
+                }
+                let expected = derive_proximity_challenge(self.qr.link_key());
+                if !bool::from(challenge_response.ct_eq(&expected)) {
+                    return Err(ExchangeError::ProximityNotVerified);
+                }
+                Ok(())
+            }
+            ProximityProof::ManualConfirmation {
+                confirmation_code_mac,
+                confirmed_at,
+            } => {
+                if now.saturating_sub(*confirmed_at) > PROXIMITY_PROOF_MAX_AGE_SECS {
+                    return Err(ExchangeError::ProximityExpired);
+                }
+                let expected_mac = compute_confirmation_mac(self.qr.link_key(), confirmation_code);
+                if !bool::from(confirmation_code_mac.ct_eq(&expected_mac)) {
+                    return Err(ExchangeError::ProximityNotVerified);
+                }
+                Ok(())
+            }
+        }
+    }
 }
 
 impl Drop for DeviceLinkInitiator {
@@ -832,8 +872,6 @@ pub struct DeviceLinkInitiatorRestored {
     qr: DeviceLinkQR,
     /// Current device registry
     registry: DeviceRegistry,
-    /// Whether proximity has been verified by the caller.
-    proximity_verified: bool,
 }
 
 impl DeviceLinkInitiatorRestored {
@@ -849,7 +887,6 @@ impl DeviceLinkInitiatorRestored {
             display_name: identity.display_name().to_string(),
             qr,
             registry,
-            proximity_verified: false,
         }
     }
 
@@ -863,13 +900,6 @@ impl DeviceLinkInitiatorRestored {
     /// See `DeviceLinkInitiator::proximity_challenge()` for details.
     pub fn proximity_challenge(&self) -> [u8; 16] {
         derive_proximity_challenge(self.qr.link_key())
-    }
-
-    /// Marks proximity as verified.
-    ///
-    /// See `DeviceLinkInitiator::set_proximity_verified()` for details.
-    pub fn set_proximity_verified(&mut self) {
-        self.proximity_verified = true;
     }
 
     /// Decrypts a link request and returns confirmation details for the user.
@@ -901,8 +931,9 @@ impl DeviceLinkInitiatorRestored {
     pub fn confirm_link(
         &self,
         request: &DeviceLinkRequest,
+        proof: &ProximityProof,
     ) -> Result<(Vec<u8>, DeviceRegistry, DeviceInfo), ExchangeError> {
-        self.build_response(request, None)
+        self.build_response(request, None, proof)
     }
 
     /// After the user confirms the link, creates the encrypted response with sync payload.
@@ -910,8 +941,9 @@ impl DeviceLinkInitiatorRestored {
         &self,
         request: &DeviceLinkRequest,
         sync_payload_json: &str,
+        proof: &ProximityProof,
     ) -> Result<(Vec<u8>, DeviceRegistry, DeviceInfo), ExchangeError> {
-        self.build_response(request, Some(sync_payload_json))
+        self.build_response(request, Some(sync_payload_json), proof)
     }
 
     /// Processes a link request and creates a response.
@@ -919,6 +951,7 @@ impl DeviceLinkInitiatorRestored {
     pub fn process_request(
         &self,
         encrypted_request: &[u8],
+        proof: &ProximityProof,
     ) -> Result<(Vec<u8>, DeviceRegistry, DeviceInfo), ExchangeError> {
         let request = DeviceLinkRequest::decrypt(encrypted_request, self.qr.link_key())?;
 
@@ -926,7 +959,7 @@ impl DeviceLinkInitiatorRestored {
             return Err(ExchangeError::InvalidQRFormat);
         }
 
-        self.build_response(&request, None)
+        self.build_response(&request, None, proof)
     }
 
     /// Processes a link request with sync payload and creates a response.
@@ -937,6 +970,7 @@ impl DeviceLinkInitiatorRestored {
         &self,
         encrypted_request: &[u8],
         sync_payload_json: &str,
+        proof: &ProximityProof,
     ) -> Result<(Vec<u8>, DeviceRegistry, DeviceInfo), ExchangeError> {
         let request = DeviceLinkRequest::decrypt(encrypted_request, self.qr.link_key())?;
 
@@ -944,21 +978,23 @@ impl DeviceLinkInitiatorRestored {
             return Err(ExchangeError::InvalidQRFormat);
         }
 
-        self.build_response(&request, Some(sync_payload_json))
+        self.build_response(&request, Some(sync_payload_json), proof)
     }
 
     /// Internal helper to build the response from a validated request.
     ///
-    /// Returns `Err(ExchangeError::ProximityNotVerified)` if proximity
-    /// has not been verified via `set_proximity_verified()`.
+    /// Validates the proximity proof cryptographically before releasing the
+    /// master seed. Returns `Err(ExchangeError::ProximityExpired)` if the
+    /// proof is too old, or `Err(ExchangeError::ProximityNotVerified)` if
+    /// the proof data does not match.
     fn build_response(
         &self,
         request: &DeviceLinkRequest,
         sync_payload_json: Option<&str>,
+        proof: &ProximityProof,
     ) -> Result<(Vec<u8>, DeviceRegistry, DeviceInfo), ExchangeError> {
-        if !self.proximity_verified {
-            return Err(ExchangeError::ProximityNotVerified);
-        }
+        let confirmation_code = derive_confirmation_code(self.qr.link_key(), &request.nonce);
+        self.validate_proximity_proof(proof, &confirmation_code)?;
 
         let device_index = self.registry.next_device_index();
 
@@ -991,6 +1027,51 @@ impl DeviceLinkInitiatorRestored {
             DeviceInfo::derive(&self.master_seed, device_index, request.device_name.clone());
 
         Ok((encrypted_response, updated_registry, new_device))
+    }
+
+    /// Validates a proximity proof cryptographically.
+    ///
+    /// Checks both freshness (proof age within `PROXIMITY_PROOF_MAX_AGE_SECS`)
+    /// and correctness (challenge-response or confirmation MAC) using
+    /// constant-time comparison.
+    fn validate_proximity_proof(
+        &self,
+        proof: &ProximityProof,
+        confirmation_code: &str,
+    ) -> Result<(), ExchangeError> {
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map_err(|_| ExchangeError::CryptoError)?
+            .as_secs();
+
+        match proof {
+            ProximityProof::Ultrasonic {
+                challenge_response,
+                verified_at,
+            } => {
+                if now.saturating_sub(*verified_at) > PROXIMITY_PROOF_MAX_AGE_SECS {
+                    return Err(ExchangeError::ProximityExpired);
+                }
+                let expected = derive_proximity_challenge(self.qr.link_key());
+                if !bool::from(challenge_response.ct_eq(&expected)) {
+                    return Err(ExchangeError::ProximityNotVerified);
+                }
+                Ok(())
+            }
+            ProximityProof::ManualConfirmation {
+                confirmation_code_mac,
+                confirmed_at,
+            } => {
+                if now.saturating_sub(*confirmed_at) > PROXIMITY_PROOF_MAX_AGE_SECS {
+                    return Err(ExchangeError::ProximityExpired);
+                }
+                let expected_mac = compute_confirmation_mac(self.qr.link_key(), confirmation_code);
+                if !bool::from(confirmation_code_mac.ct_eq(&expected_mac)) {
+                    return Err(ExchangeError::ProximityNotVerified);
+                }
+                Ok(())
+            }
+        }
     }
 }
 
@@ -1107,6 +1188,17 @@ mod tests {
         )
     }
 
+    /// Creates a valid ultrasonic proximity proof for testing.
+    fn create_valid_proof(initiator_challenge: [u8; 16]) -> ProximityProof {
+        ProximityProof::Ultrasonic {
+            challenge_response: initiator_challenge,
+            verified_at: SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_secs(),
+        }
+    }
+
     #[test]
     fn test_device_link_qr_generation() {
         let identity = create_test_identity();
@@ -1217,8 +1309,8 @@ mod tests {
         let registry_a = create_test_registry(&identity_a);
 
         // Device A creates link initiator
-        let mut initiator = DeviceLinkInitiator::new(master_seed_a, &identity_a, registry_a);
-        initiator.set_proximity_verified();
+        let initiator = DeviceLinkInitiator::new(master_seed_a, &identity_a, registry_a);
+        let proof = create_valid_proof(initiator.proximity_challenge());
         let qr = initiator.qr();
 
         // New device (Device B) scans QR
@@ -1231,8 +1323,9 @@ mod tests {
         let encrypted_request = responder.create_request().unwrap();
 
         // Device A processes request and creates response
-        let (encrypted_response, updated_registry, new_device) =
-            initiator.process_request(&encrypted_request).unwrap();
+        let (encrypted_response, updated_registry, new_device) = initiator
+            .process_request(&encrypted_request, &proof)
+            .unwrap();
 
         // Device B processes response
         let response = responder.process_response(&encrypted_response).unwrap();
@@ -1392,8 +1485,8 @@ mod tests {
         let master_seed = [0x42u8; 32];
         let identity = Identity::create("Alice");
         let registry = create_test_registry(&identity);
-        let mut initiator = DeviceLinkInitiator::new(master_seed, &identity, registry);
-        initiator.set_proximity_verified();
+        let initiator = DeviceLinkInitiator::new(master_seed, &identity, registry);
+        let proof = create_valid_proof(initiator.proximity_challenge());
 
         // Create a request with empty device name
         let request = DeviceLinkRequest {
@@ -1406,7 +1499,7 @@ mod tests {
         };
         let encrypted = request.encrypt(initiator.qr().link_key()).unwrap();
 
-        let result = initiator.process_request(&encrypted);
+        let result = initiator.process_request(&encrypted, &proof);
         assert!(matches!(result, Err(ExchangeError::InvalidQRFormat)));
     }
 
@@ -1525,8 +1618,8 @@ mod tests {
         let sync_json = serde_json::to_string(&sync_payload).unwrap();
 
         // Create initiator with sync payload
-        let mut initiator = DeviceLinkInitiator::new(master_seed, &identity, registry.clone());
-        initiator.set_proximity_verified();
+        let initiator = DeviceLinkInitiator::new(master_seed, &identity, registry.clone());
+        let proof = create_valid_proof(initiator.proximity_challenge());
 
         // New device scans QR
         let qr_string = initiator.qr().to_data_string();
@@ -1539,7 +1632,7 @@ mod tests {
 
         // Device A processes request with sync payload
         let (encrypted_response, _updated_registry, _new_device) = initiator
-            .process_request_with_sync(&encrypted_request, &sync_json)
+            .process_request_with_sync(&encrypted_request, &sync_json, &proof)
             .unwrap();
 
         // Device B processes response
@@ -1585,9 +1678,9 @@ mod tests {
 
         // Later, Device A restores the QR from saved string
         let restored_qr = DeviceLinkQR::from_data_string(&qr_string).unwrap();
-        let mut restored_initiator =
+        let restored_initiator =
             DeviceLinkInitiatorRestored::new(master_seed, &identity, registry, restored_qr);
-        restored_initiator.set_proximity_verified();
+        let proof = create_valid_proof(restored_initiator.proximity_challenge());
 
         // Device B scans the QR and creates request
         let scanned_qr = DeviceLinkQR::from_data_string(&qr_string).unwrap();
@@ -1597,7 +1690,7 @@ mod tests {
 
         // Device A processes request using restored initiator
         let (encrypted_response, updated_registry, new_device) = restored_initiator
-            .process_request(&encrypted_request)
+            .process_request(&encrypted_request, &proof)
             .unwrap();
 
         // Device B processes response
@@ -1674,7 +1767,7 @@ mod tests {
         let identity = Identity::create("Alice");
         let registry = create_test_registry(&identity);
 
-        let mut initiator = DeviceLinkInitiator::new(master_seed, &identity, registry);
+        let initiator = DeviceLinkInitiator::new(master_seed, &identity, registry);
 
         let qr_string = initiator.qr().to_data_string();
         let scanned_qr = DeviceLinkQR::from_data_string(&qr_string).unwrap();
@@ -1688,9 +1781,9 @@ mod tests {
         assert_eq!(confirmation.device_name, "My Phone");
 
         // Phase 2: Proximity verified, user confirms, complete the link
-        initiator.set_proximity_verified();
+        let proof = create_valid_proof(initiator.proximity_challenge());
         let (encrypted_response, updated_registry, new_device) =
-            initiator.confirm_link(&request).unwrap();
+            initiator.confirm_link(&request, &proof).unwrap();
 
         // Device B processes response
         let response = responder.process_response(&encrypted_response).unwrap();
@@ -1717,7 +1810,7 @@ mod tests {
         let sync_payload = orchestrator.create_full_sync_payload().unwrap();
         let sync_json = serde_json::to_string(&sync_payload).unwrap();
 
-        let mut initiator = DeviceLinkInitiator::new(master_seed, &identity, registry);
+        let initiator = DeviceLinkInitiator::new(master_seed, &identity, registry);
 
         let qr_string = initiator.qr().to_data_string();
         let scanned_qr = DeviceLinkQR::from_data_string(&qr_string).unwrap();
@@ -1728,9 +1821,9 @@ mod tests {
 
         let (_confirmation, request) = initiator.prepare_confirmation(&encrypted_request).unwrap();
 
-        initiator.set_proximity_verified();
+        let proof = create_valid_proof(initiator.proximity_challenge());
         let (encrypted_response, _updated_registry, _new_device) = initiator
-            .confirm_link_with_sync(&request, &sync_json)
+            .confirm_link_with_sync(&request, &sync_json, &proof)
             .unwrap();
 
         let response = responder.process_response(&encrypted_response).unwrap();
@@ -1802,8 +1895,8 @@ mod tests {
         let identity = Identity::create("Alice");
         let registry = create_test_registry(&identity);
 
-        let mut initiator = DeviceLinkInitiator::new(master_seed, &identity, registry);
-        initiator.set_proximity_verified();
+        let initiator = DeviceLinkInitiator::new(master_seed, &identity, registry);
+        let proof = create_valid_proof(initiator.proximity_challenge());
 
         let qr_string = initiator.qr().to_data_string();
         let scanned_qr = DeviceLinkQR::from_data_string(&qr_string).unwrap();
@@ -1812,9 +1905,10 @@ mod tests {
 
         let encrypted_request = responder.create_request().unwrap();
 
-        // Old API should still work (with proximity verified)
-        let (encrypted_response, updated_registry, new_device) =
-            initiator.process_request(&encrypted_request).unwrap();
+        // Old API should still work (with valid proximity proof)
+        let (encrypted_response, updated_registry, new_device) = initiator
+            .process_request(&encrypted_request, &proof)
+            .unwrap();
 
         let response = responder.process_response(&encrypted_response).unwrap();
 
@@ -1833,7 +1927,7 @@ mod tests {
         let qr_string = initiator.qr().to_data_string();
 
         let restored_qr = DeviceLinkQR::from_data_string(&qr_string).unwrap();
-        let mut restored_initiator =
+        let restored_initiator =
             DeviceLinkInitiatorRestored::new(master_seed, &identity, registry, restored_qr);
 
         let scanned_qr = DeviceLinkQR::from_data_string(&qr_string).unwrap();
@@ -1852,9 +1946,9 @@ mod tests {
         assert_eq!(confirmation.confirmation_code, responder_code);
 
         // Proximity verified, confirm and complete
-        restored_initiator.set_proximity_verified();
+        let proof = create_valid_proof(restored_initiator.proximity_challenge());
         let (encrypted_response, updated_registry, new_device) =
-            restored_initiator.confirm_link(&request).unwrap();
+            restored_initiator.confirm_link(&request, &proof).unwrap();
 
         let response = responder.process_response(&encrypted_response).unwrap();
         assert_eq!(response.master_seed(), &master_seed);

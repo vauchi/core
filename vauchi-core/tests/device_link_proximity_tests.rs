@@ -31,7 +31,7 @@ fn test_build_response_rejected_without_proximity() {
     let identity = Identity::create("Alice");
     let registry = create_test_registry(&identity);
 
-    // Initiator without proximity verification
+    // Initiator with a wrong proximity proof
     let initiator = DeviceLinkInitiator::new(master_seed, &identity, registry);
 
     let qr_string = initiator.qr().to_data_string();
@@ -42,8 +42,12 @@ fn test_build_response_rejected_without_proximity() {
 
     let (_confirmation, request) = initiator.prepare_confirmation(&encrypted_request).unwrap();
 
-    // confirm_link() should fail because proximity was never verified
-    let result = initiator.confirm_link(&request);
+    // confirm_link() should fail because the proof has a wrong challenge
+    let wrong_proof = ProximityProof::Ultrasonic {
+        challenge_response: [0xFFu8; 16],
+        verified_at: now_unix_secs(),
+    };
+    let result = initiator.confirm_link(&request, &wrong_proof);
     assert!(
         matches!(result, Err(ExchangeError::ProximityNotVerified)),
         "Expected ProximityNotVerified, got: {:?}",
@@ -58,7 +62,7 @@ fn test_build_response_succeeds_after_proximity_verified() {
     let identity = Identity::create("Alice");
     let registry = create_test_registry(&identity);
 
-    let mut initiator = DeviceLinkInitiator::new(master_seed, &identity, registry);
+    let initiator = DeviceLinkInitiator::new(master_seed, &identity, registry);
 
     let qr_string = initiator.qr().to_data_string();
     let scanned_qr = DeviceLinkQR::from_data_string(&qr_string).unwrap();
@@ -68,10 +72,13 @@ fn test_build_response_succeeds_after_proximity_verified() {
 
     let (_confirmation, request) = initiator.prepare_confirmation(&encrypted_request).unwrap();
 
-    // Set proximity verified, then confirm should succeed
-    initiator.set_proximity_verified();
+    // Valid proximity proof, then confirm should succeed
+    let proof = ProximityProof::Ultrasonic {
+        challenge_response: initiator.proximity_challenge(),
+        verified_at: now_unix_secs(),
+    };
     let (encrypted_response, updated_registry, new_device) =
-        initiator.confirm_link(&request).unwrap();
+        initiator.confirm_link(&request, &proof).unwrap();
 
     let response = responder.process_response(&encrypted_response).unwrap();
 
@@ -158,8 +165,12 @@ fn test_restored_initiator_requires_proximity() {
         .prepare_confirmation(&encrypted_request)
         .unwrap();
 
-    // Should fail without proximity verification
-    let result = restored_initiator.confirm_link(&request);
+    // Should fail with wrong proximity proof
+    let wrong_proof = ProximityProof::Ultrasonic {
+        challenge_response: [0xFFu8; 16],
+        verified_at: now_unix_secs(),
+    };
+    let result = restored_initiator.confirm_link(&request, &wrong_proof);
     assert!(
         matches!(result, Err(ExchangeError::ProximityNotVerified)),
         "Expected ProximityNotVerified on restored initiator, got: {:?}",
@@ -174,7 +185,7 @@ fn test_deprecated_process_request_requires_proximity() {
     let identity = Identity::create("Alice");
     let registry = create_test_registry(&identity);
 
-    // Initiator without proximity verification
+    // Initiator with wrong proximity proof
     let initiator = DeviceLinkInitiator::new(master_seed, &identity, registry);
 
     let qr_string = initiator.qr().to_data_string();
@@ -183,7 +194,11 @@ fn test_deprecated_process_request_requires_proximity() {
     let encrypted_request = responder.create_request().unwrap();
 
     // Deprecated process_request() should also enforce proximity
-    let result = initiator.process_request(&encrypted_request);
+    let wrong_proof = ProximityProof::Ultrasonic {
+        challenge_response: [0xFFu8; 16],
+        verified_at: now_unix_secs(),
+    };
+    let result = initiator.process_request(&encrypted_request, &wrong_proof);
     assert!(
         matches!(result, Err(ExchangeError::ProximityNotVerified)),
         "Expected ProximityNotVerified on deprecated API, got: {:?}",

@@ -406,7 +406,7 @@ fn test_all_locale_files_have_same_keys_as_english() {
             continue;
         }
         let filename = path.file_stem().unwrap().to_str().unwrap().to_string();
-        if filename == "en" {
+        if filename == "en" || filename.ends_with(".schema") {
             continue;
         }
 
@@ -450,6 +450,9 @@ fn test_no_locale_has_empty_values() {
             continue;
         }
         let filename = path.file_stem().unwrap().to_str().unwrap().to_string();
+        if filename.ends_with(".schema") {
+            continue;
+        }
 
         let content: serde_json::Value =
             serde_json::from_str(&std::fs::read_to_string(&path).expect("read locale file"))

@@ -1,6 +1,7 @@
 # Rust build artifacts
 /target/
 **/target/
+*.log
 
 # Cargo lock file (optional for libraries)
 # Cargo.lock
@@ -27,18 +28,19 @@ dist/
 # Swift build artifacts
 .build/
 
-# Sibling repositories (separate git repos)
-/vauchi-website/
-/vauchi-market/
-
 .cargo/
 .sccache/
 .claude/
-.gitlab-ci-local/
 
 # Mutation testing output (cargo-mutants)
 mutants.out/
 mutants.out.old/
+
+# Coverage artifacts
+*.profraw
+*.profdata
+lcov.info
+tarpaulin-report.*
 
 # Locale files loaded from sibling locales/ repo at runtime
 vauchi-core/locales/

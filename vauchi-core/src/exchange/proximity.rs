@@ -233,7 +233,7 @@ impl ProximityVerifier for ManualConfirmationVerifier {
 }
 
 /// Confidence level of physical proximity during contact exchange.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum ProximityConfidence {
     /// High confidence: verified by ultrasonic audio or NFC tap.
     High,
@@ -242,11 +242,6 @@ pub enum ProximityConfidence {
     /// Low confidence: proximity check failed or timed out.
     Low,
     /// Unknown: no proximity check was performed (legacy contacts).
+    #[default]
     Unknown,
-}
-
-impl Default for ProximityConfidence {
-    fn default() -> Self {
-        ProximityConfidence::Unknown
-    }
 }

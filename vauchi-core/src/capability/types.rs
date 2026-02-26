@@ -61,17 +61,12 @@ pub enum BiometricType {
 }
 
 /// Platform the app is running on.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Platform {
     Android,
     Ios,
     Desktop,
     Web,
+    #[default]
     Unknown,
-}
-
-impl Default for Platform {
-    fn default() -> Self {
-        Platform::Unknown
-    }
 }

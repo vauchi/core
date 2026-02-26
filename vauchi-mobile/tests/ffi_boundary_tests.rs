@@ -486,3 +486,74 @@ fn test_aha_moment_localized_french() {
     assert!(!moment.title.is_empty());
     assert!(!moment.message.contains("Missing"));
 }
+
+// ============================================================================
+// DL-5: UniFFI Contract Test — Proof Construction
+// Verifies: mobile binding computes same HMAC as core for identical inputs
+// Based on: device_management.feature - Linking requires proximity verification
+// ============================================================================
+
+// @scenario: device_management.feature:Linking requires proximity verification
+/// DL-5: Verify compute_confirmation_mac produces deterministic, non-trivial output
+/// and is accepted by core's validate_proximity_proof.
+///
+/// This is the contract test proving the mobile binding path (which calls
+/// compute_confirmation_mac internally) produces MACs that core validates correctly.
+#[test]
+fn test_confirmation_mac_contract_deterministic_and_accepted() {
+    use std::time::{SystemTime, UNIX_EPOCH};
+    use vauchi_core::exchange::{
+        compute_confirmation_mac, DeviceLinkInitiator, DeviceLinkQR, DeviceLinkResponder,
+        ProximityProof,
+    };
+    use vauchi_core::identity::{DeviceRegistry, Identity};
+
+    fn now_unix_secs() -> u64 {
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs()
+    }
+
+    let master_seed = [0x42u8; 32];
+    let identity = Identity::create("Alice");
+    let device_info = identity.device_info();
+    let registry = DeviceRegistry::new(
+        device_info.to_registered(&master_seed),
+        identity.signing_keypair(),
+    );
+
+    let initiator = DeviceLinkInitiator::new(master_seed, &identity, registry);
+
+    let qr_string = initiator.qr().to_data_string();
+    let scanned_qr = DeviceLinkQR::from_data_string(&qr_string).unwrap();
+    let mut responder = DeviceLinkResponder::from_qr(scanned_qr, "Phone".to_string()).unwrap();
+
+    let encrypted_request = responder.create_request().unwrap();
+    let (confirmation, request) = initiator.prepare_confirmation(&encrypted_request).unwrap();
+
+    let link_key = initiator.qr().link_key();
+    let code = &confirmation.confirmation_code;
+
+    // Contract property 1: deterministic — same inputs always produce same output
+    let mac1 = compute_confirmation_mac(link_key, code);
+    let mac2 = compute_confirmation_mac(link_key, code);
+    assert_eq!(mac1, mac2, "MAC must be deterministic for same inputs");
+
+    // Contract property 2: non-trivial — MAC is not all zeros
+    assert_ne!(mac1, [0u8; 32], "MAC must not be all zeros");
+
+    // Contract property 3: accepted by core — the MAC the mobile binding computes
+    // internally (via compute_confirmation_mac) must be accepted by confirm_link
+    let proof = ProximityProof::ManualConfirmation {
+        confirmation_code_mac: mac1,
+        confirmed_at: now_unix_secs(),
+    };
+
+    let result = initiator.confirm_link(&request, &proof);
+    assert!(
+        result.is_ok(),
+        "Core must accept MAC computed by compute_confirmation_mac (the same function mobile uses). Error: {:?}",
+        result.err()
+    );
+}

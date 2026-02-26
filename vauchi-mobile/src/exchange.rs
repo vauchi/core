@@ -46,6 +46,10 @@ pub(crate) struct ProximityBridge {
 }
 
 impl ProximityVerifier for ProximityBridge {
+    fn confidence_level(&self) -> vauchi_core::exchange::ProximityConfidence {
+        vauchi_core::exchange::ProximityConfidence::High
+    }
+
     fn emit_challenge(&self, _challenge: &[u8; 16]) -> Result<(), ProximityError> {
         Ok(())
     }
@@ -98,6 +102,10 @@ impl ManualConfirmationBridge {
 }
 
 impl ProximityVerifier for ManualConfirmationBridge {
+    fn confidence_level(&self) -> vauchi_core::exchange::ProximityConfidence {
+        self.inner.confidence_level()
+    }
+
     fn emit_challenge(&self, challenge: &[u8; 16]) -> Result<(), ProximityError> {
         self.inner.emit_challenge(challenge)
     }

@@ -405,6 +405,7 @@ impl AudioBackend for CpalAudioBackend {
     }
 }
 
+// INLINE_TEST_REQUIRED: Tests private Goertzel, FSK encode/decode, and preamble detection functions
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -440,6 +441,56 @@ mod tests {
 
         // Target frequency should have much higher power
         assert!(power_target > power_other * 5.0);
+    }
+
+    // AU-6: Goertzel boundary frequency discrimination test
+    // Verifies that Goertzel can distinguish the two FSK frequencies
+    // (carrier vs carrier+shift) which are only 200 Hz apart.
+    #[test]
+    fn test_goertzel_boundary_fsk_discrimination() {
+        let sample_rate = 44100.0;
+        let carrier = 18500.0; // FSK "0" frequency
+        let shift = 200.0;
+        let shifted = carrier + shift; // 18700 Hz, FSK "1" frequency
+
+        // Generate a signal at carrier frequency (18500 Hz)
+        let n_samples = 4410; // 100ms at 44100 Hz
+        let carrier_signal: Vec<f32> = (0..n_samples)
+            .map(|i| {
+                let t = i as f32 / sample_rate;
+                (2.0 * std::f32::consts::PI * carrier * t).sin()
+            })
+            .collect();
+
+        // Goertzel on carrier signal: should detect carrier, not shifted
+        let power_at_carrier = CpalAudioBackend::goertzel(&carrier_signal, carrier, sample_rate);
+        let power_at_shifted = CpalAudioBackend::goertzel(&carrier_signal, shifted, sample_rate);
+
+        assert!(
+            power_at_carrier > power_at_shifted * 3.0,
+            "Carrier signal (18500 Hz): carrier power {:.6} should be 3x+ shifted power {:.6}",
+            power_at_carrier,
+            power_at_shifted
+        );
+
+        // Generate a signal at shifted frequency (18700 Hz)
+        let shifted_signal: Vec<f32> = (0..n_samples)
+            .map(|i| {
+                let t = i as f32 / sample_rate;
+                (2.0 * std::f32::consts::PI * shifted * t).sin()
+            })
+            .collect();
+
+        // Goertzel on shifted signal: should detect shifted, not carrier
+        let power_at_carrier2 = CpalAudioBackend::goertzel(&shifted_signal, carrier, sample_rate);
+        let power_at_shifted2 = CpalAudioBackend::goertzel(&shifted_signal, shifted, sample_rate);
+
+        assert!(
+            power_at_shifted2 > power_at_carrier2 * 3.0,
+            "Shifted signal (18700 Hz): shifted power {:.6} should be 3x+ carrier power {:.6}",
+            power_at_shifted2,
+            power_at_carrier2
+        );
     }
 
     #[test]

@@ -418,7 +418,7 @@ fn test_biometric_type_serde_roundtrip() {
 // @scenario: device_capabilities.feature:Connection type variants
 #[test]
 fn test_connection_type_variants() {
-    let variants = vec![
+    let variants = [
         ConnectionType::WiFi,
         ConnectionType::Cellular,
         ConnectionType::Ethernet,

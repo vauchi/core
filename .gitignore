@@ -47,3 +47,6 @@ vauchi-core/locales/
 
 # CI local testing
 .gitlab-ci-local/
+
+# Git worktrees
+.worktrees/

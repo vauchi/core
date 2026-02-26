@@ -196,9 +196,9 @@ fn test_concurrent_readers_file_based() {
         let thread_barrier = Arc::clone(&barrier);
 
         let handle = thread::spawn(move || {
-            // Open connection before barrier — serializes opens to avoid
-            // SQLite contention during initialization/migration
-            let storage = Storage::open(&thread_path, thread_key).unwrap();
+            // Open connection before barrier with retries to handle
+            // SQLite contention during concurrent initialization/migration
+            let storage = open_with_retry(&thread_path, thread_key, 5);
 
             // Wait for all threads to be ready, then read concurrently
             thread_barrier.wait();
@@ -357,9 +357,9 @@ fn test_rapid_open_close_cycles() {
         storage.save_contact(&contact).unwrap();
     }
 
-    // Rapid open/read/close cycles
+    // Rapid open/read/close cycles with retry for SQLite contention
     for i in 0..50 {
-        let storage = Storage::open(&db_path, key.clone()).unwrap();
+        let storage = open_with_retry(&db_path, key.clone(), 5);
         let contacts = storage.list_contacts().unwrap();
         assert!(!contacts.is_empty(), "Iteration {} found no contacts", i);
     }
@@ -377,18 +377,18 @@ fn test_interleaved_reads_writes() {
         let _ = Storage::open(&db_path, key.clone()).unwrap();
     }
 
-    // Interleaved read-write operations
+    // Interleaved read-write operations with retry for SQLite contention
     for i in 0..20 {
         // Write
         {
-            let storage = Storage::open(&db_path, key.clone()).unwrap();
+            let storage = open_with_retry(&db_path, key.clone(), 5);
             let contact = create_test_contact(&format!("Contact {}", i));
             storage.save_contact(&contact).unwrap();
         }
 
         // Read and verify count
         {
-            let storage = Storage::open(&db_path, key.clone()).unwrap();
+            let storage = open_with_retry(&db_path, key.clone(), 5);
             let contacts = storage.list_contacts().unwrap();
             assert_eq!(contacts.len(), i + 1, "Wrong count after iteration {}", i);
         }

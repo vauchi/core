@@ -134,19 +134,19 @@ mod proptest_classify {
         fn classify_message_never_panics_on_arbitrary_bytes(data in proptest::collection::vec(any::<u8>(), 0..1024)) {
             // Must never panic, always returns a valid MessageType
             let result = vauchi_core::network::classify_message(&data);
-            // The result must be one of the enum variants (this is guaranteed by the type system,
-            // but we explicitly check it's a valid value)
-            let _ = match result {
-                MessageType::EncryptedUpdate => "encrypted_update",
-                MessageType::Acknowledgment => "acknowledgment",
-                MessageType::Handshake => "handshake",
-                MessageType::DeviceSync => "device_sync",
-                MessageType::DeviceSyncAck => "device_sync_ack",
-                MessageType::AccountRevoked => "account_revoked",
-                MessageType::ValidationRecord => "validation_record",
-                MessageType::ValidationRevocation => "validation_revocation",
-                MessageType::Unknown => "unknown",
-            };
+            // Must always return a valid variant without panicking
+            prop_assert!(matches!(
+                result,
+                MessageType::EncryptedUpdate
+                    | MessageType::Acknowledgment
+                    | MessageType::Handshake
+                    | MessageType::DeviceSync
+                    | MessageType::DeviceSyncAck
+                    | MessageType::AccountRevoked
+                    | MessageType::ValidationRecord
+                    | MessageType::ValidationRevocation
+                    | MessageType::Unknown
+            ));
         }
     }
 }

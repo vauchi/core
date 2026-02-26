@@ -74,7 +74,8 @@ uniffi::setup_scaffolding!();
 // === Device Link Wrapper Objects ===
 
 use vauchi_core::exchange::{
-    DeviceLinkInitiator, DeviceLinkRequest, DeviceLinkResponder, ProximityProof,
+    compute_confirmation_mac, DeviceLinkInitiator, DeviceLinkRequest, DeviceLinkResponder,
+    ProximityProof,
 };
 
 /// UniFFI-exposed wrapper around DeviceLinkInitiator.
@@ -143,21 +144,26 @@ impl MobileDeviceLinkInitiator {
         self.confirm_link_with_proof(&proof)
     }
 
-    /// After user confirms, creates the encrypted response with manual confirmation proof.
+    /// After user confirms codes match, creates the encrypted response.
     ///
-    /// Must call prepare_confirmation() first. The `confirmation_code_mac` is the
-    /// HMAC-SHA256 over the confirmation code, and `confirmed_at` is the Unix
-    /// timestamp (seconds) when the user confirmed.
+    /// For manual confirmation: pass the raw confirmation code string
+    /// (displayed during linking). Rust computes the HMAC internally
+    /// so the link key never crosses the FFI boundary.
+    ///
+    /// Must call prepare_confirmation() first. The `confirmation_code` is the
+    /// human-readable code (e.g. "123-456") displayed during linking, and
+    /// `confirmed_at` is the Unix timestamp (seconds) when the user confirmed.
     pub fn confirm_link_manual(
         &self,
-        confirmation_code_mac: Vec<u8>,
+        confirmation_code: String,
         confirmed_at: u64,
     ) -> Result<MobileDeviceLinkResult, MobileError> {
-        let mac_bytes: [u8; 32] = confirmation_code_mac.try_into().map_err(|_| {
-            MobileError::ExchangeFailed("confirmation_code_mac must be exactly 32 bytes".into())
-        })?;
+        let initiator = self.inner.lock().unwrap();
+        let mac = compute_confirmation_mac(initiator.qr().link_key(), &confirmation_code);
+        drop(initiator); // Release lock before calling confirm_link_with_proof
+
         let proof = ProximityProof::ManualConfirmation {
-            confirmation_code_mac: mac_bytes,
+            confirmation_code_mac: mac,
             confirmed_at,
         };
         self.confirm_link_with_proof(&proof)
@@ -4218,6 +4224,85 @@ mod tests {
             .as_secs();
         let result = initiator.confirm_link_ultrasonic(wrong_challenge, verified_at);
         assert!(result.is_err());
+    }
+
+    // @scenario: device_management:Link new device via manual confirmation
+    #[test]
+    fn test_device_link_manual_confirmation_succeeds() {
+        let (wb, _dir) = create_test_instance();
+        wb.create_identity("Alice".to_string()).unwrap();
+
+        // Step 1: Existing device creates initiator
+        let initiator = wb.start_device_link().unwrap();
+        let qr_data = initiator.qr_data();
+
+        // Step 2: New device scans QR and creates request
+        let (wb2, _dir2) = create_test_instance();
+        let responder = wb2
+            .start_device_join(qr_data, "Carol's Tablet".to_string())
+            .unwrap();
+        let request_bytes = responder.create_request().unwrap();
+        let responder_code = responder.compute_confirmation_code().unwrap();
+
+        // Step 3: Existing device prepares confirmation
+        let confirmation = initiator.prepare_confirmation(request_bytes).unwrap();
+        assert_eq!(confirmation.device_name, "Carol's Tablet");
+        assert_eq!(confirmation.confirmation_code, responder_code);
+
+        // Step 4: Existing device confirms with manual proof (raw code string)
+        let confirmed_at = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+        let result = initiator
+            .confirm_link_manual(confirmation.confirmation_code.clone(), confirmed_at)
+            .unwrap();
+        assert!(result.success);
+        assert_eq!(result.device_name, "Carol's Tablet");
+        assert!(result.device_index > 0);
+        assert!(
+            result.encrypted_response.is_some(),
+            "manual confirmation should produce encrypted response"
+        );
+
+        // Step 5: New device processes response
+        let response_bytes = result
+            .encrypted_response
+            .expect("should have response bytes");
+        let join_result = responder.finish_join(response_bytes).unwrap();
+        assert!(join_result.success);
+    }
+
+    // @scenario: device_management:Linking requires correct confirmation code
+    #[test]
+    fn test_device_link_manual_confirmation_wrong_code_fails() {
+        let (wb, _dir) = create_test_instance();
+        wb.create_identity("Alice".to_string()).unwrap();
+
+        // Step 1: Existing device creates initiator
+        let initiator = wb.start_device_link().unwrap();
+        let qr_data = initiator.qr_data();
+
+        // Step 2: New device scans QR and creates request
+        let (wb2, _dir2) = create_test_instance();
+        let responder = wb2
+            .start_device_join(qr_data, "Eve's Phone".to_string())
+            .unwrap();
+        let request_bytes = responder.create_request().unwrap();
+
+        // Step 3: Existing device prepares confirmation
+        let _confirmation = initiator.prepare_confirmation(request_bytes).unwrap();
+
+        // Step 4: Attempt manual confirmation with WRONG code
+        let confirmed_at = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+        let result = initiator.confirm_link_manual("000-000".to_string(), confirmed_at);
+        assert!(
+            result.is_err(),
+            "manual confirmation with wrong code must fail"
+        );
     }
 
     // =========================================================================

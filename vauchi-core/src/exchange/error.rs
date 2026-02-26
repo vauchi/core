@@ -121,4 +121,7 @@ pub enum ExchangeError {
 
     #[error("Proximity proof expired (older than 60 seconds)")]
     ProximityExpired,
+
+    #[error("Self-linking not allowed: device name already exists in registry")]
+    SelfLinkingNotAllowed,
 }

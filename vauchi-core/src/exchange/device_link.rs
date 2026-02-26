@@ -771,6 +771,18 @@ impl DeviceLinkInitiator {
         sync_payload_json: Option<&str>,
         proof: &ProximityProof,
     ) -> Result<(Vec<u8>, DeviceRegistry, DeviceInfo), ExchangeError> {
+        // DL-6: Reject self-linking — device name must not match any active device.
+        // Note: This is a name-based heuristic. Proper enforcement requires a
+        // protocol change to include device_id in DeviceLinkRequest.
+        if self
+            .registry
+            .active_devices()
+            .iter()
+            .any(|d| d.device_name == request.device_name)
+        {
+            return Err(ExchangeError::SelfLinkingNotAllowed);
+        }
+
         let confirmation_code = derive_confirmation_code(self.qr.link_key(), &request.nonce);
         self.validate_proximity_proof(proof, &confirmation_code)?;
 
@@ -993,6 +1005,18 @@ impl DeviceLinkInitiatorRestored {
         sync_payload_json: Option<&str>,
         proof: &ProximityProof,
     ) -> Result<(Vec<u8>, DeviceRegistry, DeviceInfo), ExchangeError> {
+        // DL-6: Reject self-linking — device name must not match any active device.
+        // Note: This is a name-based heuristic. Proper enforcement requires a
+        // protocol change to include device_id in DeviceLinkRequest.
+        if self
+            .registry
+            .active_devices()
+            .iter()
+            .any(|d| d.device_name == request.device_name)
+        {
+            return Err(ExchangeError::SelfLinkingNotAllowed);
+        }
+
         let confirmation_code = derive_confirmation_code(self.qr.link_key(), &request.nonce);
         self.validate_proximity_proof(proof, &confirmation_code)?;
 

@@ -627,6 +627,112 @@ fn test_manual_proof_at_61_seconds_rejected() {
 }
 
 // ---------------------------------------------------------------------------
+// DL-6: Self-linking prevention tests
+// ---------------------------------------------------------------------------
+
+// @scenario: device_management.feature:Self-linking prevention
+#[test]
+fn test_self_linking_same_device_name_rejected() {
+    let master_seed = [0x42u8; 32];
+    let identity = Identity::create("Alice");
+    let registry = create_test_registry(&identity);
+
+    let initiator = DeviceLinkInitiator::new(master_seed, &identity, registry);
+    let challenge = initiator.proximity_challenge();
+
+    let qr_string = initiator.qr().to_data_string();
+    let scanned_qr = DeviceLinkQR::from_data_string(&qr_string).unwrap();
+
+    // Responder uses the SAME device name as the primary device in the registry
+    let mut responder =
+        DeviceLinkResponder::from_qr(scanned_qr, "Primary Device".to_string()).unwrap();
+    let encrypted_request = responder.create_request().unwrap();
+    let (_confirmation, request) = initiator.prepare_confirmation(&encrypted_request).unwrap();
+
+    let proof = ProximityProof::Ultrasonic {
+        challenge_response: challenge,
+        verified_at: now_unix_secs(),
+    };
+
+    let result = initiator.confirm_link(&request, &proof);
+    assert!(
+        matches!(result, Err(ExchangeError::SelfLinkingNotAllowed)),
+        "Linking with same device name as existing device must be rejected, got err: {:?}",
+        result.err()
+    );
+}
+
+// @scenario: device_management.feature:Self-linking prevention
+#[test]
+fn test_self_linking_restored_initiator_rejected() {
+    let master_seed = [0x42u8; 32];
+    let identity = Identity::create("Alice");
+    let registry = create_test_registry(&identity);
+
+    let initiator = DeviceLinkInitiator::new(master_seed, &identity, registry.clone());
+    let qr_string = initiator.qr().to_data_string();
+
+    // Restore initiator from saved QR
+    let restored_qr = DeviceLinkQR::from_data_string(&qr_string).unwrap();
+    let restored_initiator =
+        DeviceLinkInitiatorRestored::new(master_seed, &identity, registry, restored_qr);
+
+    let challenge = restored_initiator.proximity_challenge();
+
+    let scanned_qr = DeviceLinkQR::from_data_string(&qr_string).unwrap();
+    let mut responder =
+        DeviceLinkResponder::from_qr(scanned_qr, "Primary Device".to_string()).unwrap();
+    let encrypted_request = responder.create_request().unwrap();
+    let (_confirmation, request) = restored_initiator
+        .prepare_confirmation(&encrypted_request)
+        .unwrap();
+
+    let proof = ProximityProof::Ultrasonic {
+        challenge_response: challenge,
+        verified_at: now_unix_secs(),
+    };
+
+    let result = restored_initiator.confirm_link(&request, &proof);
+    assert!(
+        matches!(result, Err(ExchangeError::SelfLinkingNotAllowed)),
+        "Restored initiator must also reject self-linking, got err: {:?}",
+        result.err()
+    );
+}
+
+// @scenario: device_management.feature:Self-linking prevention
+#[test]
+fn test_different_device_name_allowed() {
+    // Sanity check: a different device name should succeed
+    let master_seed = [0x42u8; 32];
+    let identity = Identity::create("Alice");
+    let registry = create_test_registry(&identity);
+
+    let initiator = DeviceLinkInitiator::new(master_seed, &identity, registry);
+    let challenge = initiator.proximity_challenge();
+
+    let qr_string = initiator.qr().to_data_string();
+    let scanned_qr = DeviceLinkQR::from_data_string(&qr_string).unwrap();
+
+    // Different device name — this should succeed
+    let mut responder = DeviceLinkResponder::from_qr(scanned_qr, "New Tablet".to_string()).unwrap();
+    let encrypted_request = responder.create_request().unwrap();
+    let (_confirmation, request) = initiator.prepare_confirmation(&encrypted_request).unwrap();
+
+    let proof = ProximityProof::Ultrasonic {
+        challenge_response: challenge,
+        verified_at: now_unix_secs(),
+    };
+
+    let result = initiator.confirm_link(&request, &proof);
+    assert!(
+        result.is_ok(),
+        "Different device name should be allowed, got: {:?}",
+        result.err()
+    );
+}
+
+// ---------------------------------------------------------------------------
 // Property-based tests (proptest)
 // ---------------------------------------------------------------------------
 

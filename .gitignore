@@ -34,6 +34,7 @@ dist/
 
 .sccache/
 .claude/
+.gitlab-ci-local/
 
 # Mutation testing output (cargo-mutants)
 mutants.out/
@@ -41,3 +42,6 @@ mutants.out.old/
 
 # Locale files loaded from sibling locales/ repo at runtime
 vauchi-core/locales/
+
+# CI local testing
+.gitlab-ci-local/

@@ -23,6 +23,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use crate::contact_card::ContactCard;
 use crate::crypto::cek::ContentEncryptionKey;
 use crate::crypto::SymmetricKey;
+use crate::exchange::ProximityConfidence;
 
 /// A contact obtained through exchange.
 ///
@@ -55,6 +56,10 @@ pub struct Contact {
     /// Only trusted contacts can vouch during social recovery.
     /// This is private — the contact is never told their trust status.
     recovery_trusted: bool,
+    /// Whether this contact is marked as a favorite (local-only, never shared).
+    favorite: bool,
+    /// Proximity confidence level from the exchange.
+    proximity_confidence: ProximityConfidence,
     /// Optional Content Encryption Key for crypto-shredding.
     /// When present, the card is encrypted at rest with this CEK (not the storage key).
     /// Destroying this key renders the card permanently unreadable.
@@ -87,8 +92,22 @@ impl Contact {
             hidden: false,
             blocked: false,
             recovery_trusted: false,
+            favorite: false,
+            proximity_confidence: ProximityConfidence::Unknown,
             cek: None,
         }
+    }
+
+    /// Creates a new contact from exchange data with proximity confidence.
+    pub fn from_exchange_with_proximity(
+        public_key: [u8; 32],
+        card: ContactCard,
+        shared_key: SymmetricKey,
+        proximity_confidence: ProximityConfidence,
+    ) -> Self {
+        let mut contact = Self::from_exchange(public_key, card, shared_key);
+        contact.proximity_confidence = proximity_confidence;
+        contact
     }
 
     /// Creates a contact from device sync data.
@@ -143,6 +162,8 @@ impl Contact {
             hidden,
             blocked,
             recovery_trusted,
+            favorite: false,
+            proximity_confidence: ProximityConfidence::Unknown,
             cek: None,
         }
     }
@@ -340,6 +361,40 @@ impl Contact {
     /// Sets the recovery trust status directly.
     pub fn set_recovery_trusted(&mut self, trusted: bool) {
         self.recovery_trusted = trusted;
+    }
+
+    // ========================================
+    // Favorite
+    // ========================================
+
+    /// Returns whether this contact is a favorite.
+    pub fn is_favorite(&self) -> bool {
+        self.favorite
+    }
+
+    /// Sets the favorite status for this contact.
+    pub fn set_favorite(&mut self, favorite: bool) {
+        self.favorite = favorite;
+    }
+
+    /// Returns a sort key that places favorites first, then alphabetical.
+    pub fn effective_sort_key(&self) -> String {
+        let prefix = if self.favorite { "0" } else { "1" };
+        format!("{}:{}", prefix, self.display_name.to_lowercase())
+    }
+
+    // ========================================
+    // Proximity Confidence
+    // ========================================
+
+    /// Returns the proximity confidence level from the exchange.
+    pub fn proximity_confidence(&self) -> &ProximityConfidence {
+        &self.proximity_confidence
+    }
+
+    /// Sets the proximity confidence level.
+    pub fn set_proximity_confidence(&mut self, confidence: ProximityConfidence) {
+        self.proximity_confidence = confidence;
     }
 
     // ========================================

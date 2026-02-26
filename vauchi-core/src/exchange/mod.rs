@@ -81,7 +81,8 @@ pub use error::ExchangeError;
 pub use nfc_active::apdu as nfc_apdu;
 pub use nfc_active::{ExchangeNfc, NFC_PAYLOAD_SIZE};
 pub use proximity::{
-    ManualConfirmationVerifier, MockProximityVerifier, ProximityError, ProximityVerifier,
+    ManualConfirmationVerifier, MockProximityVerifier, ProximityConfidence, ProximityError,
+    ProximityVerifier,
 };
 pub use qr::{check_clock_drift, ExchangeQR};
 pub use session::{

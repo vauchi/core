@@ -56,7 +56,7 @@ impl Default for AudioConfig {
 }
 
 /// Represents device audio capabilities.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum AudioCapability {
     /// Device supports full ultrasonic audio (speaker + microphone)
     Full,
@@ -66,6 +66,12 @@ pub enum AudioCapability {
     ReceiveOnly,
     /// Device does not support ultrasonic audio
     None,
+}
+
+impl Default for AudioCapability {
+    fn default() -> Self {
+        AudioCapability::None
+    }
 }
 
 /// Ultrasonic audio proximity verifier.

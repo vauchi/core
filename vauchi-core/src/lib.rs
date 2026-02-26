@@ -10,6 +10,7 @@
 pub mod aha_moments;
 #[cfg(any(feature = "network-native-tls", feature = "network-rustls"))]
 pub mod api;
+pub mod capability;
 pub mod contact;
 pub mod contact_card;
 pub mod content;
@@ -50,7 +51,8 @@ pub use demo_contact::{
 };
 pub use exchange::{
     EncryptedExchangeMessage, ExchangeError, ExchangeEvent, ExchangeQR, ExchangeSession,
-    MockProximityVerifier, ProximityError, ProximityVerifier, X3DHKeyPair, X3DH,
+    MockProximityVerifier, ProximityConfidence, ProximityError, ProximityVerifier, X3DHKeyPair,
+    X3DH,
 };
 pub use help::{
     get_faq_by_id, get_faq_by_id_localized, get_faqs, get_faqs_by_category,

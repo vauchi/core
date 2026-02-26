@@ -231,3 +231,22 @@ impl ProximityVerifier for ManualConfirmationVerifier {
         !response.is_empty() && response[0] == 0x01
     }
 }
+
+/// Confidence level of physical proximity during contact exchange.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub enum ProximityConfidence {
+    /// High confidence: verified by ultrasonic audio or NFC tap.
+    High,
+    /// Medium confidence: manual user confirmation.
+    Medium,
+    /// Low confidence: proximity check failed or timed out.
+    Low,
+    /// Unknown: no proximity check was performed (legacy contacts).
+    Unknown,
+}
+
+impl Default for ProximityConfidence {
+    fn default() -> Self {
+        ProximityConfidence::Unknown
+    }
+}

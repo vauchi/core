@@ -31,7 +31,7 @@ dist/
 /vauchi-website/
 /vauchi-market/
 
-
+.cargo/
 .sccache/
 .claude/
 .gitlab-ci-local/

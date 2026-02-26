@@ -334,7 +334,9 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
     /// - ManualConfirmationVerifier confirmed -> Medium
     /// - Failure or timeout -> Low
     pub fn run_proximity_check(&mut self) {
-        let challenge = [0u8; 16]; // Simplified for now
+        // AU-1: Use the challenge from the peer's QR code for session binding.
+        // Falls back to zeros only if no QR was processed (non-QR transports).
+        let challenge = self.their_audio_challenge.unwrap_or([0u8; 16]);
         let timeout = Duration::from_secs(5);
         let confidence = match self.proximity.verify_proximity(&challenge, timeout) {
             Ok(()) => {
@@ -392,6 +394,11 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
             their_public_key,
             shared_key,
         };
+
+        // AU-2: Auto-invoke proximity check after key agreement.
+        // This ensures proximity is always verified without relying on
+        // the platform layer to manually call run_proximity_check().
+        self.run_proximity_check();
 
         Ok(())
     }
@@ -478,6 +485,9 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
         if their_public_key == *self.identity.signing_public_key() {
             return Err(ExchangeError::SelfExchange);
         }
+
+        // AU-3: Store their audio challenge for session-bound proximity verification
+        self.their_audio_challenge = Some(*qr.audio_challenge());
 
         self.state = ExchangeState::PeerScanned {
             our_qr,

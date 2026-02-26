@@ -330,10 +330,12 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
     /// Runs a proximity check using the session's proximity verifier.
     ///
     /// Sets the proximity confidence based on the result:
-    /// - MockProximityVerifier success -> High
-    /// - ManualConfirmationVerifier confirmed -> Medium
-    /// - Failure or timeout -> Low
+    /// - Success -> verifier's confidence_level() (High, Medium, etc.)
+    /// - NotSupported -> Unknown (device can't verify, not a failure)
+    /// - Other errors (timeout, no response, hardware) -> Low
     pub fn run_proximity_check(&mut self) {
+        use super::ProximityError;
+
         // AU-1: Use the challenge from the peer's QR code for session binding.
         // Falls back to zeros only if no QR was processed (non-QR transports).
         let challenge = self.their_audio_challenge.unwrap_or([0u8; 16]);
@@ -341,6 +343,10 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
         let confidence = match self.proximity.verify_proximity(&challenge, timeout) {
             // AU-4: Use trait-based confidence level instead of response-length heuristic
             Ok(()) => self.proximity.confidence_level(),
+            // AU-5: Device doesn't support proximity verification — "can't check"
+            // is distinct from "checked and failed". Unknown preserves the absence
+            // of information rather than implying a negative result.
+            Err(ProximityError::NotSupported) => ProximityConfidence::Unknown,
             Err(_) => ProximityConfidence::Low,
         };
         self.proximity_confidence = confidence;

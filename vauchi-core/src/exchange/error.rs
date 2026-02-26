@@ -118,4 +118,7 @@ pub enum ExchangeError {
 
     #[error("Proximity verification required before device linking")]
     ProximityNotVerified,
+
+    #[error("Proximity proof expired (older than 60 seconds)")]
+    ProximityExpired,
 }

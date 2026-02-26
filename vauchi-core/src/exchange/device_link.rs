@@ -30,6 +30,51 @@ const LINK_QR_EXPIRY_SECONDS: u64 = 300;
 /// Domain separator for deriving the proximity challenge from the link key.
 const PROXIMITY_DOMAIN: &[u8] = b"vauchi-device-link-proximity-v1";
 
+/// Maximum age (seconds) of a proximity proof before it's considered expired.
+#[allow(dead_code)] // Used in upcoming proximity validation (Task 3)
+const PROXIMITY_PROOF_MAX_AGE_SECS: u64 = 60;
+
+/// Domain separator for confirmation code MAC.
+const CONFIRMATION_MAC_DOMAIN: &[u8] = b"vauchi-device-link-confirm-mac-v1";
+
+/// Evidence of proximity verification.
+///
+/// Platforms must construct this from real session data — not a bare boolean.
+/// Core validates the proof before releasing the master seed.
+#[derive(Debug, Clone)]
+pub enum ProximityProof {
+    /// Ultrasonic challenge-response completed successfully.
+    Ultrasonic {
+        /// The 16-byte challenge response received from the other device.
+        challenge_response: [u8; 16],
+        /// Unix timestamp (seconds) when verification completed.
+        verified_at: u64,
+    },
+    /// Manual confirmation: user compared codes on both screens.
+    /// Weaker than ultrasonic but time-bound and session-bound.
+    ManualConfirmation {
+        /// HMAC-SHA256(derived_key, confirmation_code) — proves the caller
+        /// had access to the real confirmation code from this specific session.
+        confirmation_code_mac: [u8; 32],
+        /// Unix timestamp (seconds) when user confirmed.
+        confirmed_at: u64,
+    },
+}
+
+/// Compute HMAC-SHA256 for manual confirmation proof.
+///
+/// Uses domain-separated key derivation: HKDF(link_key, domain) → HMAC key.
+/// Public so that platform layers can construct a valid `ManualConfirmation` proof.
+pub fn compute_confirmation_mac(link_key: &[u8; 32], confirmation_code: &str) -> [u8; 32] {
+    let derived_key = HKDF::derive(None, link_key, CONFIRMATION_MAC_DOMAIN, 32)
+        .expect("32 bytes is valid HKDF output length");
+    let hmac_key = hmac::Key::new(hmac::HMAC_SHA256, &derived_key);
+    let tag = hmac::sign(&hmac_key, confirmation_code.as_bytes());
+    let mut mac = [0u8; 32];
+    mac.copy_from_slice(tag.as_ref());
+    mac
+}
+
 /// Device link QR code data structure.
 ///
 /// Displayed on the existing device for a new device to scan.

@@ -41,10 +41,10 @@ fn test_proximity_confidence_variants_exist() {
 
 // @scenario: contact_exchange.feature:Proximity verification prevents remote exchange
 #[test]
-fn test_proximity_confidence_clone() {
+fn test_proximity_confidence_copy() {
     let confidence = ProximityConfidence::High;
-    let cloned = confidence.clone();
-    assert_eq!(confidence, cloned);
+    let copied = confidence; // Copy trait
+    assert_eq!(confidence, copied);
 }
 
 // @scenario: contact_exchange.feature:Proximity verification prevents remote exchange

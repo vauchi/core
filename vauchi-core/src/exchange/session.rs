@@ -132,6 +132,9 @@ pub struct ExchangeSession<P: ProximityVerifier> {
     interrupted: bool,
     /// Hashes of QR codes that have already been consumed (prevents reuse).
     used_qrs: HashSet<[u8; 32]>,
+    /// The audio challenge extracted from the peer's QR code.
+    /// Used for session-bound proximity verification (AU-3).
+    their_audio_challenge: Option<[u8; 16]>,
 }
 
 impl<P: ProximityVerifier> ExchangeSession<P> {
@@ -154,6 +157,7 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
             started_at: Instant::now(),
             interrupted: false,
             used_qrs: HashSet::new(),
+            their_audio_challenge: None,
         }
     }
 
@@ -176,6 +180,7 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
             started_at: Instant::now(),
             interrupted: false,
             used_qrs: HashSet::new(),
+            their_audio_challenge: None,
         }
     }
 
@@ -197,6 +202,7 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
             started_at: Instant::now(),
             interrupted: false,
             used_qrs: HashSet::new(),
+            their_audio_challenge: None,
         }
     }
 
@@ -218,6 +224,7 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
             started_at: Instant::now(),
             interrupted: false,
             used_qrs: HashSet::new(),
+            their_audio_challenge: None,
         }
     }
 
@@ -238,6 +245,17 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
             ExchangeState::PeerScanned { our_qr, .. } => Some(our_qr),
             _ => None,
         }
+    }
+
+    /// Returns the peer's audio challenge if one has been stored from their QR code.
+    pub fn their_audio_challenge(&self) -> Option<&[u8; 16]> {
+        self.their_audio_challenge.as_ref()
+    }
+
+    /// Returns a reference to the proximity verifier (test-only).
+    #[cfg(any(test, feature = "testing"))]
+    pub fn proximity_verifier(&self) -> &P {
+        &self.proximity
     }
 
     /// Checks whether a QR code hash has already been consumed.

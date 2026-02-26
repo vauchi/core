@@ -333,6 +333,230 @@ fn test_manual_confirmation_sets_medium_confidence() {
     }
 }
 
+// ===== AU-3: Audio challenge storage tests =====
+
+// @scenario: contact_exchange.feature:Proximity verification session binding
+#[test]
+fn test_session_stores_audio_challenge_from_qr() {
+    let alice_identity = Identity::create("Alice");
+    let alice_ephemeral = X3DHKeyPair::generate();
+    let bob_identity = Identity::create("Bob");
+
+    let alice_qr = ExchangeQR::generate(&alice_identity, &alice_ephemeral);
+    let expected_challenge = *alice_qr.audio_challenge();
+
+    let bob_card = ContactCard::new("Bob");
+    let proximity = MockProximityVerifier::success();
+    let mut bob_session = ExchangeSession::new_qr(bob_identity, bob_card, proximity);
+
+    // Before QR processing, no challenge stored
+    assert_eq!(bob_session.their_audio_challenge(), None);
+
+    bob_session.apply(ExchangeEvent::StartQR).unwrap();
+    bob_session
+        .apply(ExchangeEvent::ProcessQR(alice_qr))
+        .unwrap();
+
+    // AU-3: After QR processing, challenge should be stored
+    assert_eq!(
+        bob_session.their_audio_challenge(),
+        Some(&expected_challenge)
+    );
+}
+
+// @scenario: contact_exchange.feature:Proximity verification session binding
+#[test]
+fn test_stored_audio_challenge_is_not_zeros() {
+    let alice_identity = Identity::create("Alice");
+    let alice_ephemeral = X3DHKeyPair::generate();
+    let bob_identity = Identity::create("Bob");
+
+    let alice_qr = ExchangeQR::generate(&alice_identity, &alice_ephemeral);
+
+    let bob_card = ContactCard::new("Bob");
+    let proximity = MockProximityVerifier::success();
+    let mut bob_session = ExchangeSession::new_qr(bob_identity, bob_card, proximity);
+
+    bob_session.apply(ExchangeEvent::StartQR).unwrap();
+    bob_session
+        .apply(ExchangeEvent::ProcessQR(alice_qr))
+        .unwrap();
+
+    // Challenge from QR is cryptographically random, must not be all zeros
+    let stored = bob_session
+        .their_audio_challenge()
+        .expect("challenge should be stored after QR processing");
+    assert_ne!(*stored, [0u8; 16]);
+}
+
+// ===== AU-1: Challenge used in proximity check tests =====
+
+// @scenario: contact_exchange.feature:Proximity verification session binding
+#[test]
+fn test_proximity_check_uses_qr_challenge_not_zeros() {
+    let alice_identity = Identity::create("Alice");
+    let alice_ephemeral = X3DHKeyPair::generate();
+    let bob_identity = Identity::create("Bob");
+
+    let alice_qr = ExchangeQR::generate(&alice_identity, &alice_ephemeral);
+    let expected_challenge = *alice_qr.audio_challenge();
+
+    let bob_card = ContactCard::new("Bob");
+    let proximity = MockProximityVerifier::success();
+    let mut bob_session = ExchangeSession::new_qr(bob_identity, bob_card, proximity);
+
+    bob_session.apply(ExchangeEvent::StartQR).unwrap();
+    bob_session
+        .apply(ExchangeEvent::ProcessQR(alice_qr))
+        .unwrap();
+    bob_session.apply(ExchangeEvent::TheyScannedOurQR).unwrap();
+    bob_session
+        .apply(ExchangeEvent::PerformKeyAgreement)
+        .unwrap();
+
+    // Manually run proximity check
+    bob_session.run_proximity_check();
+
+    // AU-1: Verify the mock received the QR's challenge, not zeros
+    let emitted = bob_session.proximity_verifier().emitted_challenges();
+    assert!(
+        !emitted.is_empty(),
+        "proximity check should have emitted a challenge"
+    );
+    assert_eq!(emitted[0], expected_challenge);
+    assert_ne!(
+        emitted[0], [0u8; 16],
+        "challenge must not be hardcoded zeros"
+    );
+}
+
+// ===== AU-2: Auto-invoke proximity check tests =====
+
+// @scenario: contact_exchange.feature:Proximity auto-verification during exchange
+#[test]
+fn test_key_agreement_auto_runs_proximity_check_high() {
+    let alice_identity = Identity::create("Alice");
+    let alice_ephemeral = X3DHKeyPair::generate();
+    let bob_identity = Identity::create("Bob");
+
+    let alice_qr = ExchangeQR::generate(&alice_identity, &alice_ephemeral);
+
+    let bob_card = ContactCard::new("Bob");
+    let proximity = MockProximityVerifier::success();
+    let mut bob_session = ExchangeSession::new_qr(bob_identity, bob_card, proximity);
+
+    bob_session.apply(ExchangeEvent::StartQR).unwrap();
+    bob_session
+        .apply(ExchangeEvent::ProcessQR(alice_qr))
+        .unwrap();
+    bob_session.apply(ExchangeEvent::TheyScannedOurQR).unwrap();
+    bob_session
+        .apply(ExchangeEvent::PerformKeyAgreement)
+        .unwrap();
+
+    // AU-2: NO manual run_proximity_check() call!
+    // Proximity check should have run automatically during key agreement.
+
+    let alice_card = ContactCard::new("Alice");
+    bob_session
+        .apply(ExchangeEvent::CompleteExchange(alice_card))
+        .unwrap();
+
+    match bob_session.state() {
+        ExchangeState::Complete { contact } => {
+            assert_eq!(
+                *contact.proximity_confidence(),
+                ProximityConfidence::High,
+                "auto-invoked proximity check with successful mock should yield High"
+            );
+        }
+        other => panic!("Expected Complete state, got {:?}", other),
+    }
+}
+
+// @scenario: contact_exchange.feature:Proximity auto-verification during exchange
+#[test]
+fn test_key_agreement_auto_runs_proximity_check_medium() {
+    let alice_identity = Identity::create("Alice");
+    let alice_ephemeral = X3DHKeyPair::generate();
+    let bob_identity = Identity::create("Bob");
+
+    let alice_qr = ExchangeQR::generate(&alice_identity, &alice_ephemeral);
+
+    let bob_card = ContactCard::new("Bob");
+    let manual_verifier = ManualConfirmationVerifier::new();
+    manual_verifier.confirm();
+    let mut bob_session = ExchangeSession::new_qr(bob_identity, bob_card, manual_verifier);
+
+    bob_session.apply(ExchangeEvent::StartQR).unwrap();
+    bob_session
+        .apply(ExchangeEvent::ProcessQR(alice_qr))
+        .unwrap();
+    bob_session.apply(ExchangeEvent::TheyScannedOurQR).unwrap();
+    bob_session
+        .apply(ExchangeEvent::PerformKeyAgreement)
+        .unwrap();
+
+    // AU-2: NO manual run_proximity_check() call!
+
+    let alice_card = ContactCard::new("Alice");
+    bob_session
+        .apply(ExchangeEvent::CompleteExchange(alice_card))
+        .unwrap();
+
+    match bob_session.state() {
+        ExchangeState::Complete { contact } => {
+            assert_eq!(
+                *contact.proximity_confidence(),
+                ProximityConfidence::Medium,
+                "auto-invoked proximity check with manual verifier should yield Medium"
+            );
+        }
+        other => panic!("Expected Complete state, got {:?}", other),
+    }
+}
+
+// @scenario: contact_exchange.feature:Proximity auto-verification during exchange
+#[test]
+fn test_key_agreement_auto_runs_proximity_check_low_on_failure() {
+    let alice_identity = Identity::create("Alice");
+    let alice_ephemeral = X3DHKeyPair::generate();
+    let bob_identity = Identity::create("Bob");
+
+    let alice_qr = ExchangeQR::generate(&alice_identity, &alice_ephemeral);
+
+    let bob_card = ContactCard::new("Bob");
+    let proximity = MockProximityVerifier::failure();
+    let mut bob_session = ExchangeSession::new_qr(bob_identity, bob_card, proximity);
+
+    bob_session.apply(ExchangeEvent::StartQR).unwrap();
+    bob_session
+        .apply(ExchangeEvent::ProcessQR(alice_qr))
+        .unwrap();
+    bob_session.apply(ExchangeEvent::TheyScannedOurQR).unwrap();
+    bob_session
+        .apply(ExchangeEvent::PerformKeyAgreement)
+        .unwrap();
+
+    // AU-2: NO manual run_proximity_check() call!
+
+    let alice_card = ContactCard::new("Alice");
+    bob_session
+        .apply(ExchangeEvent::CompleteExchange(alice_card))
+        .unwrap();
+
+    match bob_session.state() {
+        ExchangeState::Complete { contact } => {
+            assert_eq!(
+                *contact.proximity_confidence(),
+                ProximityConfidence::Low,
+                "auto-invoked proximity check with failing mock should yield Low"
+            );
+        }
+        other => panic!("Expected Complete state, got {:?}", other),
+    }
+}
+
 // @scenario: contact_exchange.feature:Proximity verification prevents remote exchange
 #[test]
 fn test_complete_exchange_stores_proximity_confidence() {

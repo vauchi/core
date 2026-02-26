@@ -98,7 +98,7 @@ impl Storage {
                 Option::<i64>::None,
                 contact.is_blocked() as i32,
                 contact.is_hidden() as i32,
-                0i32, // favorite: not yet on Contact struct, default to false
+                contact.is_favorite() as i32,
                 contact.is_recovery_trusted() as i32,
                 cek_encrypted_param,
             ],
@@ -391,6 +391,25 @@ impl Storage {
         }
     }
 
+    /// Deletes personal notes for a contact.
+    ///
+    /// Sets the `personal_notes_encrypted` column to NULL.
+    pub fn delete_personal_notes(&self, contact_id: &str) -> Result<(), StorageError> {
+        let rows_affected = self.conn.execute(
+            "UPDATE contacts SET personal_notes_encrypted = NULL WHERE id = ?1",
+            params![contact_id],
+        )?;
+
+        if rows_affected == 0 {
+            return Err(StorageError::NotFound(format!(
+                "Contact not found: {}",
+                contact_id
+            )));
+        }
+
+        Ok(())
+    }
+
     // === Avatar Operations ===
 
     /// Saves an encrypted avatar for a contact.
@@ -536,6 +555,11 @@ impl Storage {
             row.blocked != 0,
             row.recovery_trusted != 0,
         );
+
+        // Restore favorite flag from storage
+        if row.favorite != 0 {
+            contact.set_favorite(true);
+        }
 
         // Attach CEK if this contact is CEK-protected
         if let Some(cek) = cek {

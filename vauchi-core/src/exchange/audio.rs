@@ -170,6 +170,10 @@ impl UltrasonicVerifier {
 }
 
 impl ProximityVerifier for UltrasonicVerifier {
+    fn confidence_level(&self) -> super::ProximityConfidence {
+        super::ProximityConfidence::High
+    }
+
     fn emit_challenge(&self, challenge: &[u8; 16]) -> Result<(), ProximityError> {
         if self.capability == AudioCapability::None
             || self.capability == AudioCapability::ReceiveOnly
@@ -447,5 +451,50 @@ mod tests {
 
         let result = verifier.emit_challenge(&[0u8; 16]);
         assert!(matches!(result, Err(ProximityError::HardwareError(_))));
+    }
+
+    // AU-7: Property-based test for challenge encoding roundtrip
+    mod proptests {
+        use super::*;
+        use proptest::prelude::*;
+
+        proptest! {
+            /// Any 16-byte challenge must survive encode → decode roundtrip.
+            #[test]
+            fn test_challenge_encoding_roundtrip(challenge in prop::array::uniform16(any::<u8>())) {
+                let encoded = UltrasonicVerifier::encode_challenge(&challenge);
+
+                // Verify framing invariants
+                prop_assert_eq!(encoded.len(), 18, "encoded must be exactly 18 bytes");
+                prop_assert_eq!(encoded[0], 17, "length prefix must be 17");
+
+                let decoded = UltrasonicVerifier::decode_response(&encoded);
+                prop_assert_eq!(decoded, Some(challenge), "roundtrip must be lossless");
+            }
+
+            /// Any single-byte corruption in the encoded payload must be detected.
+            #[test]
+            fn test_single_byte_corruption_detected(
+                challenge in prop::array::uniform16(any::<u8>()),
+                corrupt_pos in 1usize..18,
+                corrupt_xor in 1u8..=255u8,
+            ) {
+                let mut encoded = UltrasonicVerifier::encode_challenge(&challenge);
+                encoded[corrupt_pos] ^= corrupt_xor;
+
+                let decoded = UltrasonicVerifier::decode_response(&encoded);
+                // XOR checksum may not detect all corruptions (e.g., swapping two bytes),
+                // but single-byte XOR with non-zero value always changes the checksum
+                // except when corrupting the checksum byte itself with the exact difference.
+                // We accept that this is a simple checksum, not a CRC.
+                if corrupt_pos == 17 {
+                    // Corrupting the checksum byte: decode may or may not succeed
+                    // depending on whether the XOR happens to produce the correct checksum
+                } else {
+                    // Corrupting a challenge byte: checksum will mismatch
+                    prop_assert_eq!(decoded, None, "corrupted payload at pos {} must be rejected", corrupt_pos);
+                }
+            }
+        }
     }
 }

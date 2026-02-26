@@ -557,6 +557,31 @@ fn test_key_agreement_auto_runs_proximity_check_low_on_failure() {
     }
 }
 
+// ===== AU-4: Trait-based confidence level tests =====
+
+// @scenario: contact_exchange.feature:Proximity verifier confidence level
+#[test]
+fn test_mock_success_verifier_confidence_is_high() {
+    let verifier = MockProximityVerifier::success();
+    assert_eq!(verifier.confidence_level(), ProximityConfidence::High);
+}
+
+// @scenario: contact_exchange.feature:Proximity verifier confidence level
+#[test]
+fn test_mock_failure_verifier_confidence_is_high() {
+    // Mock failure verifier still has High intrinsic confidence level —
+    // confidence_level() reports the verifier's capability, not session result
+    let verifier = MockProximityVerifier::failure();
+    assert_eq!(verifier.confidence_level(), ProximityConfidence::High);
+}
+
+// @scenario: contact_exchange.feature:Proximity verifier confidence level
+#[test]
+fn test_manual_verifier_confidence_is_medium() {
+    let verifier = ManualConfirmationVerifier::new();
+    assert_eq!(verifier.confidence_level(), ProximityConfidence::Medium);
+}
+
 // @scenario: contact_exchange.feature:Proximity verification prevents remote exchange
 #[test]
 fn test_complete_exchange_stores_proximity_confidence() {

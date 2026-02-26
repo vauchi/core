@@ -54,6 +54,14 @@ pub trait ProximityVerifier: Send + Sync {
     /// Verifies that a received response matches the expected challenge.
     fn verify_response(&self, challenge: &[u8; 16], response: &[u8]) -> bool;
 
+    /// Returns the inherent confidence level of this verifier type.
+    ///
+    /// This reflects the verifier's capability, not the session result:
+    /// - Ultrasonic/hardware verifiers -> High
+    /// - Manual confirmation -> Medium
+    /// - No-op/mock verifiers -> varies
+    fn confidence_level(&self) -> super::ProximityConfidence;
+
     /// Performs a complete proximity verification cycle.
     ///
     /// Default implementation emits challenge, listens for response, and verifies.
@@ -119,6 +127,11 @@ impl MockProximityVerifier {
 }
 
 impl ProximityVerifier for MockProximityVerifier {
+    fn confidence_level(&self) -> super::ProximityConfidence {
+        // Mock simulates hardware-level proximity verification
+        super::ProximityConfidence::High
+    }
+
     fn emit_challenge(&self, challenge: &[u8; 16]) -> Result<(), ProximityError> {
         self.challenges
             .lock()
@@ -213,6 +226,10 @@ impl Default for ManualConfirmationVerifier {
 }
 
 impl ProximityVerifier for ManualConfirmationVerifier {
+    fn confidence_level(&self) -> super::ProximityConfidence {
+        super::ProximityConfidence::Medium
+    }
+
     fn emit_challenge(&self, _challenge: &[u8; 16]) -> Result<(), ProximityError> {
         // No-op for manual verification
         Ok(())

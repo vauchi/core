@@ -339,13 +339,8 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
         let challenge = self.their_audio_challenge.unwrap_or([0u8; 16]);
         let timeout = Duration::from_secs(5);
         let confidence = match self.proximity.verify_proximity(&challenge, timeout) {
-            Ok(()) => {
-                // Check if this is a manual confirmation (Medium) vs hardware (High)
-                match self.proximity.listen_for_response(timeout) {
-                    Ok(response) if response.len() == 1 => ProximityConfidence::Medium,
-                    _ => ProximityConfidence::High,
-                }
-            }
+            // AU-4: Use trait-based confidence level instead of response-length heuristic
+            Ok(()) => self.proximity.confidence_level(),
             Err(_) => ProximityConfidence::Low,
         };
         self.proximity_confidence = confidence;

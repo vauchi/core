@@ -155,6 +155,10 @@ impl MockBLEVerifier {
 }
 
 impl ProximityVerifier for MockBLEVerifier {
+    fn confidence_level(&self) -> super::ProximityConfidence {
+        super::ProximityConfidence::High
+    }
+
     fn emit_challenge(&self, _challenge: &[u8; 16]) -> Result<(), ProximityError> {
         if self.should_succeed {
             Ok(())

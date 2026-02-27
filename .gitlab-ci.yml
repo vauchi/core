@@ -597,6 +597,47 @@ mutation:incremental:
     when: always
 
 # ============================================================
+# Fuzz Testing (Nightly scheduled, T2-10)
+# ============================================================
+
+# Nightly fuzz run — cycles through all 11 fuzz targets for 5 minutes each
+fuzz:nightly:
+  extends: [.linux-runner, .timeout-extended]
+  stage: mutation
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule" && $FUZZ_ENABLED == "true"
+  allow_failure: true
+  script:
+    - |
+      # Install cargo-fuzz if not available
+      command -v cargo-fuzz >/dev/null 2>&1 || cargo install cargo-fuzz --locked
+
+      cd vauchi-core/fuzz
+      FUZZ_DURATION="${FUZZ_DURATION_SECS:-300}"
+      FAILED=0
+
+      for target in fuzz_decode_message fuzz_qr_payload fuzz_unpad fuzz_delta_decode \
+                     fuzz_recovery_claim fuzz_nfc_payload fuzz_ble_payload \
+                     fuzz_ble_advertisement fuzz_exchange_payload fuzz_encrypted_exchange \
+                     fuzz_ratchet_state; do
+        echo "=== Fuzzing $target for ${FUZZ_DURATION}s ==="
+        cargo fuzz run "$target" -- -max_total_time="$FUZZ_DURATION" 2>&1 || {
+          echo "CRASH FOUND in $target"
+          FAILED=$((FAILED + 1))
+        }
+        echo ""
+      done
+
+      echo "=== Fuzz Summary ==="
+      echo "Targets: 11, Crashes: $FAILED"
+      [ "$FAILED" -eq 0 ] || exit 1
+  artifacts:
+    paths:
+      - vauchi-core/fuzz/artifacts/
+    expire_in: 1 month
+    when: on_failure
+
+# ============================================================
 # Security Stage (MR only, gated by lint, parallel with test)
 # ============================================================
 

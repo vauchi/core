@@ -18,6 +18,7 @@ pub enum MobileFieldType {
     Website,
     Address,
     Social,
+    Birthday,
     Custom,
 }
 
@@ -29,6 +30,7 @@ impl From<FieldType> for MobileFieldType {
             FieldType::Website => MobileFieldType::Website,
             FieldType::Address => MobileFieldType::Address,
             FieldType::Social => MobileFieldType::Social,
+            FieldType::Birthday => MobileFieldType::Birthday,
             FieldType::Custom => MobileFieldType::Custom,
         }
     }
@@ -42,6 +44,7 @@ impl From<MobileFieldType> for FieldType {
             MobileFieldType::Website => FieldType::Website,
             MobileFieldType::Address => FieldType::Address,
             MobileFieldType::Social => FieldType::Social,
+            MobileFieldType::Birthday => FieldType::Birthday,
             MobileFieldType::Custom => FieldType::Custom,
         }
     }

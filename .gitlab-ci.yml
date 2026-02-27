@@ -739,6 +739,51 @@ package:android:
       - dist/vauchi-mobile-android-*.zip.sha256.sig
     expire_in: 1 week
 
+# Generate CycloneDX SBOM for supply-chain traceability (T0-2)
+package:sbom:
+  extends: [.linux-runner, .release-only]
+  stage: package
+  needs: [release:verify]
+  script:
+    - |
+      VERSION="${CI_COMMIT_TAG#v}"
+      echo "Generating SBOM for vauchi v${VERSION}..."
+
+      # Install cargo-cyclonedx
+      cargo install cargo-cyclonedx --locked
+
+      # Generate CycloneDX JSON for each crate
+      mkdir -p dist
+
+      cargo cyclonedx --manifest-path vauchi-core/Cargo.toml --format json \
+        --output-file dist/vauchi-core-${VERSION}.sbom.json
+      cargo cyclonedx --manifest-path vauchi-mobile/Cargo.toml --format json \
+        --output-file dist/vauchi-mobile-${VERSION}.sbom.json
+      cargo cyclonedx --manifest-path vauchi-protocol/Cargo.toml --format json \
+        --output-file dist/vauchi-protocol-${VERSION}.sbom.json
+
+      # Generate checksums
+      for f in dist/*.sbom.json; do
+        sha256sum "$f" | awk '{print $1}' > "${f}.sha256"
+      done
+
+      # Sign with cosign if available
+      if [[ -n "${COSIGN_KEY:-}" ]]; then
+        for f in dist/*.sbom.json.sha256; do
+          cosign sign-blob --yes --key "$COSIGN_KEY" \
+            --output-signature "${f}.sig" "$f"
+        done
+        echo "SBOMs signed"
+      fi
+
+      echo "SBOM generation complete"
+  artifacts:
+    paths:
+      - dist/*.sbom.json
+      - dist/*.sbom.json.sha256
+      - dist/*.sbom.json.sha256.sig
+    expire_in: 1 week
+
 # ============================================================
 # Publish Stage (Tags only)
 # ============================================================
@@ -746,7 +791,7 @@ package:android:
 publish:packages:
   extends: [.linux-runner, .release-only]
   stage: publish
-  needs: [package:xcframework, package:android]
+  needs: [package:xcframework, package:android, package:sbom]
   script:
     - ./scripts/publish-packages.sh "$CI_COMMIT_TAG"
 
@@ -873,7 +918,7 @@ release:create:
   tags:
     - docker
   interruptible: false
-  needs: [publish:packages, publish:core, publish:mobile]
+  needs: [publish:packages, publish:core, publish:mobile, package:sbom]
   script:
     - echo "Creating release $CI_COMMIT_TAG"
   release:
@@ -891,6 +936,12 @@ release:create:
 
       - [iOS XCFramework](${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/vauchi-mobile/${CI_COMMIT_TAG#v}/VauchiMobileFFI.xcframework.zip)
       - [Android](${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/vauchi-mobile/${CI_COMMIT_TAG#v}/vauchi-mobile-android-${CI_COMMIT_TAG#v}.zip)
+
+      ### Supply Chain
+
+      - [vauchi-core SBOM](${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/vauchi-core/${CI_COMMIT_TAG#v}/vauchi-core-${CI_COMMIT_TAG#v}.sbom.json) (CycloneDX)
+      - [vauchi-mobile SBOM](${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/vauchi-mobile/${CI_COMMIT_TAG#v}/vauchi-mobile-${CI_COMMIT_TAG#v}.sbom.json) (CycloneDX)
+      - [vauchi-protocol SBOM](${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/vauchi-protocol/${CI_COMMIT_TAG#v}/vauchi-protocol-${CI_COMMIT_TAG#v}.sbom.json) (CycloneDX)
 
       ### Integration
 

@@ -134,6 +134,16 @@ upload_file "$DIST_DIR/vauchi-mobile-android-$VERSION.zip" || UPLOAD_SUCCESS=fal
 upload_file "$DIST_DIR/vauchi-mobile-android-$VERSION.zip.sha256" || UPLOAD_SUCCESS=false
 upload_file "$DIST_DIR/vauchi-mobile-android-$VERSION.zip.sha256.sig" || UPLOAD_SUCCESS=false
 
+# Upload SBOM artifacts (T0-2)
+echo ""
+echo -e "${YELLOW}=== SBOM Artifacts ===${NC}"
+for sbom in "$DIST_DIR"/*.sbom.json; do
+    [ -f "$sbom" ] || continue
+    upload_file "$sbom" || UPLOAD_SUCCESS=false
+    upload_file "${sbom}.sha256" || UPLOAD_SUCCESS=false
+    upload_file "${sbom}.sha256.sig" || UPLOAD_SUCCESS=false
+done
+
 echo ""
 
 if $UPLOAD_SUCCESS; then

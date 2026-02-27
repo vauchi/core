@@ -9,6 +9,7 @@
 
 pub mod labels;
 pub mod merge;
+pub mod statistics;
 
 #[cfg(feature = "testing")]
 pub mod visibility;

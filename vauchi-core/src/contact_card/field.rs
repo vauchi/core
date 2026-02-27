@@ -34,7 +34,7 @@ pub const MAX_LABEL_LENGTH: usize = 64;
 /// The label field identifies the specific network (e.g., "Twitter", "LinkedIn").
 /// Future: A configurable social network registry will provide validation rules
 /// and identity verification methods for each network.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum FieldType {
     Phone,
     Email,

@@ -10,6 +10,7 @@
 pub mod labels;
 pub mod merge;
 pub mod statistics;
+pub mod warnings;
 
 #[cfg(feature = "testing")]
 pub mod visibility;

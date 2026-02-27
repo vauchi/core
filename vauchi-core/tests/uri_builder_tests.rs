@@ -313,61 +313,61 @@ fn test_blocked_data_scheme() {
     assert!(uri.is_none());
 }
 
-// @scenario: contact_actions:Allowed URI schemes whitelist
+// @scenario: contact_actions:Allowed URI schemes whitelist (#47)
 #[test]
 fn test_allowed_tel_scheme() {
     assert!(vauchi_core::contact_card::is_allowed_scheme("tel"));
 }
 
-// @scenario: contact_actions:Allowed URI schemes whitelist
+// @scenario: contact_actions:Allowed URI schemes whitelist (#47)
 #[test]
 fn test_allowed_mailto_scheme() {
     assert!(vauchi_core::contact_card::is_allowed_scheme("mailto"));
 }
 
-// @scenario: contact_actions:Allowed URI schemes whitelist
+// @scenario: contact_actions:Allowed URI schemes whitelist (#47)
 #[test]
 fn test_allowed_https_scheme() {
     assert!(vauchi_core::contact_card::is_allowed_scheme("https"));
 }
 
-// @scenario: contact_actions:Allowed URI schemes whitelist
+// @scenario: contact_actions:Allowed URI schemes whitelist (#47)
 #[test]
 fn test_allowed_http_scheme() {
     assert!(vauchi_core::contact_card::is_allowed_scheme("http"));
 }
 
-// @scenario: contact_actions:Allowed URI schemes whitelist
+// @scenario: contact_actions:Allowed URI schemes whitelist (#47)
 #[test]
 fn test_allowed_sms_scheme() {
     assert!(vauchi_core::contact_card::is_allowed_scheme("sms"));
 }
 
-// @scenario: contact_actions:Allowed URI schemes whitelist
+// @scenario: contact_actions:Allowed URI schemes whitelist (#47)
 #[test]
 fn test_allowed_geo_scheme() {
     assert!(vauchi_core::contact_card::is_allowed_scheme("geo"));
 }
 
-// @scenario: contact_actions:Allowed URI schemes whitelist
+// @scenario: contact_actions:Allowed URI schemes whitelist (#47)
 #[test]
 fn test_blocked_scheme_javascript() {
     assert!(!vauchi_core::contact_card::is_allowed_scheme("javascript"));
 }
 
-// @scenario: contact_actions:Allowed URI schemes whitelist
+// @scenario: contact_actions:Allowed URI schemes whitelist (#47)
 #[test]
 fn test_blocked_scheme_file() {
     assert!(!vauchi_core::contact_card::is_allowed_scheme("file"));
 }
 
-// @scenario: contact_actions:Allowed URI schemes whitelist
+// @scenario: contact_actions:Allowed URI schemes whitelist (#47)
 #[test]
 fn test_blocked_scheme_data() {
     assert!(!vauchi_core::contact_card::is_allowed_scheme("data"));
 }
 
-// @scenario: contact_actions:Allowed URI schemes whitelist
+// @scenario: contact_actions:Allowed URI schemes whitelist (#47)
 #[test]
 fn test_blocked_scheme_vbscript() {
     assert!(!vauchi_core::contact_card::is_allowed_scheme("vbscript"));
@@ -768,8 +768,8 @@ fn test_action_type_categorization() {
 // ============================================================
 
 /// Security test: XSS attempt in website field blocked
-/// Maps to: "URLs are validated before opening" scenario
-// @scenario: contact_actions:URLs are validated before opening
+/// Maps to: contact_actions.feature #45 — "URLs are validated before opening"
+// @scenario: contact_actions:URLs are validated before opening (#45)
 #[test]
 fn test_xss_in_website_blocked() {
     let malicious_values = vec![
@@ -787,8 +787,8 @@ fn test_xss_in_website_blocked() {
 }
 
 /// Security test: Data URI scheme blocked
-/// Maps to: "Only safe URI schemes are allowed" scenario
-// @scenario: contact_actions:Only safe URI schemes are allowed
+/// Maps to: contact_actions.feature #46 — "Only safe URI schemes are allowed"
+// @scenario: contact_actions:Only safe URI schemes are allowed (#46)
 #[test]
 fn test_data_uri_blocked() {
     let data_uris = vec![
@@ -805,7 +805,8 @@ fn test_data_uri_blocked() {
 }
 
 /// Security test: FTP scheme blocked
-// @scenario: contact_actions:Only safe URI schemes are allowed
+/// Maps to: contact_actions.feature #46 — "Only safe URI schemes are allowed"
+// @scenario: contact_actions:Only safe URI schemes are allowed (#46)
 #[test]
 fn test_ftp_scheme_blocked() {
     let field = ContactField::new(FieldType::Website, "FTP", "ftp://files.example.com");
@@ -814,7 +815,8 @@ fn test_ftp_scheme_blocked() {
 }
 
 /// Security test: Custom field with malicious content
-// @scenario: contact_actions:Only safe URI schemes are allowed
+/// Maps to: contact_actions.feature #46 — "Only safe URI schemes are allowed"
+// @scenario: contact_actions:Only safe URI schemes are allowed (#46)
 #[test]
 fn test_custom_field_malicious_url_blocked() {
     let field = ContactField::new(FieldType::Custom, "Link", "javascript:void(0)");

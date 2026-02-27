@@ -118,6 +118,23 @@ fn normalize_social_username(value: &str) -> &str {
     value.strip_prefix('@').unwrap_or(value)
 }
 
+/// Parse a Mastodon federated handle (user@instance) into a profile URL.
+///
+/// Returns `Some("https://{instance}/@{user}")` if the value contains `@` with
+/// valid user and instance parts. Returns `None` for plain usernames.
+fn parse_mastodon_federated(username: &str) -> Option<String> {
+    // After normalize_social_username, leading @ is stripped.
+    // So "@bob@mas.to" becomes "bob@mas.to" and "bob@mas.to" stays "bob@mas.to".
+    if let Some(at_pos) = username.find('@') {
+        let user = &username[..at_pos];
+        let instance = &username[at_pos + 1..];
+        if !user.is_empty() && !instance.is_empty() && instance.contains('.') {
+            return Some(format!("https://{}/@{}", instance, user));
+        }
+    }
+    None
+}
+
 /// URL encode a string for use in query parameters.
 fn url_encode(s: &str) -> String {
     let mut result = String::with_capacity(s.len() * 3);
@@ -204,9 +221,16 @@ impl ContactField {
         let template = social_url_template(self.label())?;
         let username = normalize_social_username(value);
 
+        // Handle Mastodon federated handles (@user@instance or user@instance)
+        if self.label().to_lowercase() == "mastodon" {
+            if let Some(profile_url) = parse_mastodon_federated(username) {
+                return Some(profile_url);
+            }
+            // Not a federated handle — fall through to template
+        }
+
         // Handle LinkedIn's special format (in/username)
         let username = if self.label().to_lowercase() == "linkedin" {
-            // If already has "in/", use as-is; otherwise just use the value
             if username.starts_with("in/") {
                 username.to_string()
             } else {

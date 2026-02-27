@@ -565,14 +565,45 @@ fn test_all_field_types_have_actions() {
 /// Maps to: Social media "@bob@mas.to" scenario
 // @scenario: contact_actions:Tap social media opens profile
 #[test]
-fn test_social_mastodon_handle() {
-    // Mastodon uses format @user@instance
-    let field = ContactField::new(FieldType::Social, "Mastodon", "@bob@mastodon.social");
+fn test_social_mastodon_handle_on_default_instance() {
+    let field = ContactField::new(FieldType::Social, "Mastodon", "@bob");
     let uri = field.to_uri();
-    // Should generate a profile URL
-    assert!(uri.is_some());
-    let uri_str = uri.unwrap();
-    assert!(uri_str.contains("mastodon.social") || uri_str.contains("bob"));
+    assert_eq!(uri, Some("https://mastodon.social/@bob".to_string()));
+}
+
+// @scenario: contact_actions:Mastodon federated handle resolves to correct instance
+#[test]
+fn test_social_mastodon_federated_handle_at_prefix() {
+    // @bob@mas.to → https://mas.to/@bob
+    let field = ContactField::new(FieldType::Social, "Mastodon", "@bob@mas.to");
+    let uri = field.to_uri();
+    assert_eq!(uri, Some("https://mas.to/@bob".to_string()));
+}
+
+// @scenario: contact_actions:Mastodon federated handle resolves to correct instance
+#[test]
+fn test_social_mastodon_federated_handle_no_prefix() {
+    // bob@fosstodon.org → https://fosstodon.org/@bob
+    let field = ContactField::new(FieldType::Social, "Mastodon", "bob@fosstodon.org");
+    let uri = field.to_uri();
+    assert_eq!(uri, Some("https://fosstodon.org/@bob".to_string()));
+}
+
+// @scenario: contact_actions:Mastodon federated handle resolves to correct instance
+#[test]
+fn test_social_mastodon_default_instance_handle() {
+    // @alice@mastodon.social → https://mastodon.social/@alice
+    let field = ContactField::new(FieldType::Social, "Mastodon", "@alice@mastodon.social");
+    let uri = field.to_uri();
+    assert_eq!(uri, Some("https://mastodon.social/@alice".to_string()));
+}
+
+// @scenario: contact_actions:Mastodon bare username without @ prefix
+#[test]
+fn test_social_mastodon_bare_username() {
+    let field = ContactField::new(FieldType::Social, "Mastodon", "bob");
+    let uri = field.to_uri();
+    assert_eq!(uri, Some("https://mastodon.social/@bob".to_string()));
 }
 
 /// Integration test: SMS action for phone numbers

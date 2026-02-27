@@ -338,6 +338,36 @@ impl ContactField {
         actions
     }
 
+    /// Generate a directions URI for this field.
+    ///
+    /// Returns a web maps URL with route planning for Address fields.
+    /// Returns `None` for non-address fields or empty values.
+    ///
+    /// Uses OpenStreetMap-based URL which works cross-platform without
+    /// requiring a specific maps provider.
+    pub fn to_directions_uri(&self) -> Option<String> {
+        let value = self.value().trim();
+        if value.is_empty() {
+            return None;
+        }
+
+        // For Custom fields, use heuristic detection
+        let effective_type = if self.field_type() == FieldType::Custom {
+            self.detect_value_type().unwrap_or(FieldType::Custom)
+        } else {
+            self.field_type()
+        };
+
+        if effective_type != FieldType::Address {
+            return None;
+        }
+
+        Some(format!(
+            "https://www.openstreetmap.org/directions?route=&to={}",
+            url_encode(value)
+        ))
+    }
+
     /// Detect the semantic type of the value using heuristics.
     ///
     /// Useful for Custom fields to determine if the value is

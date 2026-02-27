@@ -452,10 +452,13 @@ fn test_website_secondary_actions() {
 fn test_address_secondary_actions() {
     let field = ContactField::new(FieldType::Address, "Home", "123 Main St, City");
     let actions = field.to_secondary_actions();
-    assert_eq!(actions.len(), 3); // OpenMap, CopyToClipboard, and GetDirections (new)
+    assert_eq!(actions.len(), 3); // OpenMap, GetDirections, CopyToClipboard
     assert!(actions
         .iter()
         .any(|a| matches!(a, ContactAction::OpenMap(_))));
+    assert!(actions
+        .iter()
+        .any(|a| matches!(a, ContactAction::GetDirections(_))));
     assert!(actions.contains(&ContactAction::CopyToClipboard));
 }
 
@@ -487,6 +490,72 @@ fn test_empty_field_secondary_actions() {
     let actions = field.to_secondary_actions();
     assert_eq!(actions.len(), 1); // Only CopyToClipboard (copy empty)
     assert!(actions.contains(&ContactAction::CopyToClipboard));
+}
+
+// ============================================================
+// Directions URI (maps routing)
+// @scenario: contact_actions:Get directions to address
+// ============================================================
+
+// @scenario: contact_actions:Get directions generates web maps URL
+#[test]
+fn test_directions_uri_basic_address() {
+    let field = ContactField::new(FieldType::Address, "Home", "123 Main St, City, ST 12345");
+    let uri = field.to_directions_uri();
+    assert!(uri.is_some());
+    let uri_str = uri.unwrap();
+    // Should be a web maps directions URL (not geo:)
+    assert!(uri_str.starts_with("https://"));
+    assert!(uri_str.contains("directions"));
+    assert!(uri_str.contains("123")); // Address should be encoded in the URL
+}
+
+// @scenario: contact_actions:Get directions URL-encodes special characters
+#[test]
+fn test_directions_uri_special_chars_encoded() {
+    let field = ContactField::new(FieldType::Address, "Office", "123 O'Brien's Way, Suite #5");
+    let uri = field.to_directions_uri();
+    assert!(uri.is_some());
+    let uri_str = uri.unwrap();
+    // Apostrophe and # should be encoded
+    assert!(!uri_str.contains('\'') || uri_str.contains("%27"));
+    assert!(!uri_str.contains('#') || uri_str.contains("%23"));
+}
+
+// @scenario: contact_actions:Get directions handles empty address
+#[test]
+fn test_directions_uri_empty_returns_none() {
+    let field = ContactField::new(FieldType::Address, "Home", "");
+    let uri = field.to_directions_uri();
+    assert!(uri.is_none());
+}
+
+// @scenario: contact_actions:Get directions handles whitespace-only address
+#[test]
+fn test_directions_uri_whitespace_returns_none() {
+    let field = ContactField::new(FieldType::Address, "Home", "   ");
+    let uri = field.to_directions_uri();
+    assert!(uri.is_none());
+}
+
+// @scenario: contact_actions:Non-address fields return None for directions
+#[test]
+fn test_directions_uri_non_address_returns_none() {
+    let field = ContactField::new(FieldType::Phone, "Mobile", "+1-555-123-4567");
+    let uri = field.to_directions_uri();
+    assert!(uri.is_none());
+}
+
+// @scenario: contact_actions:Get directions with unicode address
+#[test]
+fn test_directions_uri_unicode_address() {
+    let field = ContactField::new(FieldType::Address, "Tokyo Office", "東京都渋谷区");
+    let uri = field.to_directions_uri();
+    assert!(uri.is_some());
+    let uri_str = uri.unwrap();
+    assert!(uri_str.starts_with("https://"));
+    // Unicode should be percent-encoded
+    assert!(uri_str.contains('%'));
 }
 
 // ============================================================

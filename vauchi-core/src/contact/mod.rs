@@ -23,7 +23,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use crate::contact_card::ContactCard;
 use crate::crypto::cek::ContentEncryptionKey;
 use crate::crypto::SymmetricKey;
-use crate::exchange::ProximityConfidence;
+use crate::exchange::{ExchangeTransport, ProximityConfidence};
 
 /// A contact obtained through exchange.
 ///
@@ -64,6 +64,15 @@ pub struct Contact {
     /// When present, the card is encrypted at rest with this CEK (not the storage key).
     /// Destroying this key renders the card permanently unreadable.
     cek: Option<ContentEncryptionKey>,
+    /// How this contact was established (QR, NFC, BLE).
+    /// Persisted in storage to provide trust context.
+    exchange_transport: ExchangeTransport,
+    /// Whether this contact has undergone identity recovery.
+    /// Set to true when `accept_recovery()` is called. Never reset.
+    has_recovered: bool,
+    /// Timestamp of the last card update (separate from exchange_timestamp).
+    /// None until the first `update_card()` call.
+    card_updated_at: Option<u64>,
 }
 
 impl Contact {
@@ -95,6 +104,9 @@ impl Contact {
             favorite: false,
             proximity_confidence: ProximityConfidence::Unknown,
             cek: None,
+            exchange_transport: ExchangeTransport::Qr,
+            has_recovered: false,
+            card_updated_at: None,
         }
     }
 
@@ -107,6 +119,20 @@ impl Contact {
     ) -> Self {
         let mut contact = Self::from_exchange(public_key, card, shared_key);
         contact.proximity_confidence = proximity_confidence;
+        contact
+    }
+
+    /// Creates a new contact from exchange data with proximity and transport.
+    pub fn from_exchange_full(
+        public_key: [u8; 32],
+        card: ContactCard,
+        shared_key: SymmetricKey,
+        proximity_confidence: ProximityConfidence,
+        exchange_transport: ExchangeTransport,
+    ) -> Self {
+        let mut contact = Self::from_exchange(public_key, card, shared_key);
+        contact.proximity_confidence = proximity_confidence;
+        contact.exchange_transport = exchange_transport;
         contact
     }
 
@@ -165,6 +191,9 @@ impl Contact {
             favorite: false,
             proximity_confidence: ProximityConfidence::Unknown,
             cek: None,
+            exchange_transport: ExchangeTransport::Qr,
+            has_recovered: false,
+            card_updated_at: None,
         }
     }
 
@@ -415,6 +444,40 @@ impl Contact {
     /// Clears the CEK (used after crypto-shredding / CEK deletion).
     pub fn clear_cek(&mut self) {
         self.cek = None;
+    }
+
+    // ========================================
+    // Trust Metrics
+    // ========================================
+
+    /// Returns the exchange transport method.
+    pub fn exchange_transport(&self) -> ExchangeTransport {
+        self.exchange_transport
+    }
+
+    /// Sets the exchange transport method.
+    pub fn set_exchange_transport(&mut self, transport: ExchangeTransport) {
+        self.exchange_transport = transport;
+    }
+
+    /// Returns whether this contact has undergone identity recovery.
+    pub fn has_recovered(&self) -> bool {
+        self.has_recovered
+    }
+
+    /// Sets the has_recovered flag.
+    pub fn set_has_recovered(&mut self, recovered: bool) {
+        self.has_recovered = recovered;
+    }
+
+    /// Returns the timestamp of the last card update, if any.
+    pub fn card_updated_at(&self) -> Option<u64> {
+        self.card_updated_at
+    }
+
+    /// Sets the card_updated_at timestamp.
+    pub fn set_card_updated_at(&mut self, timestamp: Option<u64>) {
+        self.card_updated_at = timestamp;
     }
 
     /// Returns true if this contact should be visible in the main contact list.

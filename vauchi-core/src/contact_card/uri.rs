@@ -22,6 +22,8 @@ pub enum ContactAction {
     OpenUrl(String),
     /// Open address in maps
     OpenMap(String),
+    /// Get directions to address (maps with route planning)
+    GetDirections(String),
     /// Copy value to clipboard (fallback)
     CopyToClipboard,
 }
@@ -245,6 +247,71 @@ impl ContactField {
             FieldType::Address => ContactAction::OpenMap(value.to_string()),
             FieldType::Custom => ContactAction::CopyToClipboard,
         }
+    }
+
+    /// Get all applicable actions for this field (for context menus).
+    ///
+    /// Returns a vector of actions that can be performed on this field.
+    /// Always includes `CopyToClipboard` as a fallback action.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use vauchi_core::contact_card::{ContactField, FieldType, ContactAction};
+    ///
+    /// let field = ContactField::new(FieldType::Phone, "Mobile", "+1-555-123-4567");
+    /// let actions = field.to_secondary_actions();
+    /// assert!(actions.contains(&ContactAction::Call("+1-555-123-4567".to_string())));
+    /// assert!(actions.contains(&ContactAction::SendSms("+1-555-123-4567".to_string())));
+    /// assert!(actions.contains(&ContactAction::CopyToClipboard));
+    /// ```
+    pub fn to_secondary_actions(&self) -> Vec<ContactAction> {
+        let value = self.value().trim();
+        let mut actions: Vec<ContactAction> = Vec::new();
+
+        // Empty values only offer copy
+        if value.is_empty() {
+            actions.push(ContactAction::CopyToClipboard);
+            return actions;
+        }
+
+        // For Custom fields, use heuristic detection
+        let effective_type = if self.field_type() == FieldType::Custom {
+            self.detect_value_type().unwrap_or(FieldType::Custom)
+        } else {
+            self.field_type()
+        };
+
+        match effective_type {
+            FieldType::Phone => {
+                actions.push(ContactAction::Call(value.to_string()));
+                actions.push(ContactAction::SendSms(value.to_string()));
+            }
+            FieldType::Email => {
+                actions.push(ContactAction::SendEmail(value.to_string()));
+            }
+            FieldType::Website => {
+                if let Some(uri) = self.to_uri() {
+                    actions.push(ContactAction::OpenUrl(uri));
+                }
+            }
+            FieldType::Social => {
+                if let Some(uri) = self.to_uri() {
+                    actions.push(ContactAction::OpenUrl(uri));
+                }
+            }
+            FieldType::Address => {
+                actions.push(ContactAction::OpenMap(value.to_string()));
+                actions.push(ContactAction::GetDirections(value.to_string()));
+            }
+            FieldType::Custom => {
+                // No primary action for plain custom text
+            }
+        }
+
+        // Always include copy as fallback
+        actions.push(ContactAction::CopyToClipboard);
+        actions
     }
 
     /// Detect the semantic type of the value using heuristics.

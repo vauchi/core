@@ -412,6 +412,84 @@ fn test_unicode_in_address_encoded() {
 }
 
 // ============================================================
+// Secondary Actions (Context Menus)
+// @scenario: contact_actions:Context menu shows all applicable actions
+// ============================================================
+
+// @scenario: contact_actions:Phone field offers Call and SMS actions in context menu
+#[test]
+fn test_phone_secondary_actions_call_and_sms() {
+    let field = ContactField::new(FieldType::Phone, "Mobile", "+1-555-123-4567");
+    let actions = field.to_secondary_actions();
+    assert_eq!(actions.len(), 3); // Call, SendSms, CopyToClipboard
+    assert!(actions.contains(&ContactAction::Call("+1-555-123-4567".to_string())));
+    assert!(actions.contains(&ContactAction::SendSms("+1-555-123-4567".to_string())));
+    assert!(actions.contains(&ContactAction::CopyToClipboard));
+}
+
+// @scenario: contact_actions:Email field offers Send Email and Copy actions
+#[test]
+fn test_email_secondary_actions() {
+    let field = ContactField::new(FieldType::Email, "Work", "bob@company.com");
+    let actions = field.to_secondary_actions();
+    assert_eq!(actions.len(), 2); // SendEmail, CopyToClipboard
+    assert!(actions.contains(&ContactAction::SendEmail("bob@company.com".to_string())));
+    assert!(actions.contains(&ContactAction::CopyToClipboard));
+}
+
+// @scenario: contact_actions:Website field offers Open URL and Copy actions
+#[test]
+fn test_website_secondary_actions() {
+    let field = ContactField::new(FieldType::Website, "Blog", "https://example.com");
+    let actions = field.to_secondary_actions();
+    assert_eq!(actions.len(), 2); // OpenUrl, CopyToClipboard
+    assert!(actions.contains(&ContactAction::OpenUrl("https://example.com".to_string())));
+    assert!(actions.contains(&ContactAction::CopyToClipboard));
+}
+
+// @scenario: contact_actions:Address field offers Get Directions and Open Map and Copy actions
+#[test]
+fn test_address_secondary_actions() {
+    let field = ContactField::new(FieldType::Address, "Home", "123 Main St, City");
+    let actions = field.to_secondary_actions();
+    assert_eq!(actions.len(), 3); // OpenMap, CopyToClipboard, and GetDirections (new)
+    assert!(actions
+        .iter()
+        .any(|a| matches!(a, ContactAction::OpenMap(_))));
+    assert!(actions.contains(&ContactAction::CopyToClipboard));
+}
+
+// @scenario: contact_actions:Social field offers Open Profile and Copy actions
+#[test]
+fn test_social_secondary_actions() {
+    let field = ContactField::new(FieldType::Social, "Twitter", "@bobsmith");
+    let actions = field.to_secondary_actions();
+    assert!(actions.len() >= 2); // At least OpenUrl and CopyToClipboard
+    assert!(actions.contains(&ContactAction::CopyToClipboard));
+}
+
+// @scenario: contact_actions:Custom field with actionable content offers actions
+#[test]
+fn test_custom_field_secondary_actions() {
+    let field = ContactField::new(FieldType::Custom, "Notes", "+1-555-987-6543");
+    let actions = field.to_secondary_actions();
+    // Detected as phone, should have Call, SMS, Copy
+    assert_eq!(actions.len(), 3);
+    assert!(actions.contains(&ContactAction::Call("+1-555-987-6543".to_string())));
+    assert!(actions.contains(&ContactAction::SendSms("+1-555-987-6543".to_string())));
+    assert!(actions.contains(&ContactAction::CopyToClipboard));
+}
+
+// @scenario: contact_actions:Empty field shows only Copy action
+#[test]
+fn test_empty_field_secondary_actions() {
+    let field = ContactField::new(FieldType::Phone, "Mobile", "");
+    let actions = field.to_secondary_actions();
+    assert_eq!(actions.len(), 1); // Only CopyToClipboard (copy empty)
+    assert!(actions.contains(&ContactAction::CopyToClipboard));
+}
+
+// ============================================================
 // Integration Tests: Contact Card with Actions
 // Reference: features/contact_actions.feature
 // ============================================================

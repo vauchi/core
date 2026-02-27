@@ -20,7 +20,7 @@ use crate::identity::Identity;
 const SESSION_TIMEOUT: Duration = Duration::from_secs(60);
 
 /// Transport mechanism used for this exchange session.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
 pub enum ExchangeTransport {
     /// QR exchange: both sides display and scan QR codes.
     /// Both use fresh ephemeral X25519 keys for full forward secrecy.

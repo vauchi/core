@@ -920,7 +920,25 @@ release:create:
   interruptible: false
   needs: [publish:packages, publish:core, publish:mobile, package:sbom]
   script:
-    - echo "Creating release $CI_COMMIT_TAG"
+    - |
+      echo "Creating release $CI_COMMIT_TAG"
+
+      # T1-6: GPG-sign release checksums if signing key is available
+      if [ -n "${GPG_SIGNING_KEY:-}" ]; then
+        echo "Importing GPG signing key..."
+        echo "$GPG_SIGNING_KEY" | gpg --batch --import 2>/dev/null
+        GPG_KEY_ID=$(gpg --list-secret-keys --keyid-format long 2>/dev/null | grep sec | head -1 | awk '{print $2}' | cut -d'/' -f2)
+
+        if [ -n "$GPG_KEY_ID" ]; then
+          echo "Signing release tag $CI_COMMIT_TAG with GPG key $GPG_KEY_ID..."
+          echo "$CI_COMMIT_TAG" | gpg --batch --yes --armor --detach-sign \
+            --local-user "$GPG_KEY_ID" > release-tag.sig 2>/dev/null && \
+          echo "Release tag signature created" || \
+          echo "WARNING: GPG signing failed (non-blocking)"
+        fi
+      elif [ -n "${CI:-}" ]; then
+        echo "WARNING: GPG_SIGNING_KEY not set — release will be unsigned"
+      fi
   release:
     tag_name: $CI_COMMIT_TAG
     name: "Release $CI_COMMIT_TAG"

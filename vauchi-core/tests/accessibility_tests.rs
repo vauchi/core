@@ -563,6 +563,7 @@ fn get_field_type_accessibility_label(field_type: &FieldType) -> String {
         FieldType::Social => "Social media profile".to_string(),
         FieldType::Address => "Physical address".to_string(),
         FieldType::Website => "Website URL".to_string(),
+        FieldType::Birthday => "Birthday".to_string(),
         FieldType::Custom => "Custom field".to_string(),
     }
 }
@@ -575,6 +576,7 @@ fn get_field_type_i18n_key(field_type: &FieldType) -> String {
         FieldType::Social => "field.type.social".to_string(),
         FieldType::Address => "field.type.address".to_string(),
         FieldType::Website => "field.type.website".to_string(),
+        FieldType::Birthday => "field.type.birthday".to_string(),
         FieldType::Custom => "field.type.custom".to_string(),
     }
 }
@@ -612,6 +614,7 @@ fn get_focusable_actions(field: &ContactField) -> Vec<&'static str> {
         FieldType::Social => vec!["open", "copy"],
         FieldType::Address => vec!["open", "copy"],
         FieldType::Website => vec!["open", "copy"],
+        FieldType::Birthday => vec!["copy"],
         FieldType::Custom => vec!["copy"],
     }
 }

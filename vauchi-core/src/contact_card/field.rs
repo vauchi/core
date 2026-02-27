@@ -227,7 +227,7 @@ impl ContactField {
         let day: u8 = day_str.parse().map_err(|_| ValidationError::InvalidEmail)?;
 
         // Validate month range
-        if month < 1 || month > 12 {
+        if !(1..=12).contains(&month) {
             return Err(ValidationError::InvalidEmail);
         }
 
@@ -236,13 +236,11 @@ impl ContactField {
             1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
             4 | 6 | 9 | 11 => 30,
             2 => {
-                // Check leap year: divisible by 4, except for centuries (divisible by 100)
-                // unless also divisible by 400
-                if year % 400 == 0 {
+                if year.is_multiple_of(400) {
                     29
-                } else if year % 100 == 0 {
+                } else if year.is_multiple_of(100) {
                     28
-                } else if year % 4 == 0 {
+                } else if year.is_multiple_of(4) {
                     29
                 } else {
                     28
@@ -251,7 +249,7 @@ impl ContactField {
             _ => return Err(ValidationError::InvalidEmail),
         };
 
-        if day < 1 || day > days_in_month {
+        if !(1..=days_in_month).contains(&day) {
             return Err(ValidationError::InvalidEmail);
         }
 

@@ -153,14 +153,13 @@ impl ContactCard {
         }
 
         // Enforce single birthday constraint (Phase 3)
-        if field.field_type() == FieldType::Birthday {
-            if self
+        if field.field_type() == FieldType::Birthday
+            && self
                 .fields
                 .iter()
                 .any(|f| f.field_type() == FieldType::Birthday)
-            {
-                return Err(ContactCardError::MaxFieldsReached); // Reuse error for now
-            }
+        {
+            return Err(ContactCardError::MaxFieldsReached);
         }
 
         // Validate the field before adding

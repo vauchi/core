@@ -422,11 +422,12 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
                 }
             };
 
-        let contact = Contact::from_exchange_with_proximity(
+        let contact = Contact::from_exchange_full(
             their_public_key,
             their_card,
             shared_key,
             self.proximity_confidence,
+            self.transport,
         );
 
         self.state = ExchangeState::Complete {

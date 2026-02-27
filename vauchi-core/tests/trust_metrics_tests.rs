@@ -12,7 +12,11 @@
 use vauchi_core::contact::Contact;
 use vauchi_core::contact_card::ContactCard;
 use vauchi_core::crypto::SymmetricKey;
-use vauchi_core::exchange::{ExchangeTransport, ProximityConfidence};
+use vauchi_core::exchange::{
+    ExchangeEvent, ExchangeQR, ExchangeSession, ExchangeState, ExchangeTransport,
+    MockProximityVerifier, ProximityConfidence, X3DHKeyPair,
+};
+use vauchi_core::Identity;
 
 /// Helper: create a test contact card.
 fn test_card() -> ContactCard {
@@ -209,5 +213,71 @@ fn test_update_card_timestamp_increases() {
     assert!(
         second_ts >= first_ts,
         "Second update timestamp must be >= first"
+    );
+}
+
+// ============================================================
+// Task 3: Exchange session wires transport to Contact
+// ============================================================
+
+/// Helper: run a full QR exchange ceremony and return the completed contact.
+fn run_full_qr_exchange() -> Contact {
+    let alice_identity = Identity::create("Alice");
+    let alice_ephemeral = X3DHKeyPair::generate();
+    let bob_identity = Identity::create("Bob");
+
+    let alice_qr = ExchangeQR::generate(&alice_identity, &alice_ephemeral);
+
+    let bob_card = ContactCard::new("Bob");
+    let proximity = MockProximityVerifier::success();
+    let mut bob_session = ExchangeSession::new_qr(bob_identity, bob_card, proximity);
+
+    bob_session.apply(ExchangeEvent::StartQR).unwrap();
+    bob_session
+        .apply(ExchangeEvent::ProcessQR(alice_qr))
+        .unwrap();
+    bob_session.apply(ExchangeEvent::TheyScannedOurQR).unwrap();
+    bob_session
+        .apply(ExchangeEvent::PerformKeyAgreement)
+        .unwrap();
+    bob_session.run_proximity_check();
+
+    let alice_card = ContactCard::new("Alice");
+    bob_session
+        .apply(ExchangeEvent::CompleteExchange(alice_card))
+        .unwrap();
+
+    match bob_session.state() {
+        ExchangeState::Complete { contact } => contact.clone(),
+        other => panic!("Expected Complete state, got {:?}", other),
+    }
+}
+
+#[test]
+fn test_qr_exchange_session_sets_qr_transport_on_contact() {
+    let contact = run_full_qr_exchange();
+    assert_eq!(
+        contact.exchange_transport(),
+        ExchangeTransport::Qr,
+        "QR exchange must produce contact with Qr transport"
+    );
+}
+
+#[test]
+fn test_qr_exchange_contact_has_recovered_is_false() {
+    let contact = run_full_qr_exchange();
+    assert!(
+        !contact.has_recovered(),
+        "Fresh exchange contact must not be marked as recovered"
+    );
+}
+
+#[test]
+fn test_qr_exchange_contact_card_updated_at_is_none() {
+    let contact = run_full_qr_exchange();
+    assert_eq!(
+        contact.card_updated_at(),
+        None,
+        "Fresh exchange contact must have no card_updated_at"
     );
 }

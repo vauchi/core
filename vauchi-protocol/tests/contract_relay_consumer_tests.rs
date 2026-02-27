@@ -55,6 +55,7 @@ fn provider_contract_all_relay_payload_variants_constructable() {
             protocol_version: 1,
             server_version: "1.0.0".to_string(),
             features: vec![],
+            supported_versions: None,
         }),
         MessagePayload::Acknowledgment(Acknowledgment {
             message_id: "m1".to_string(),
@@ -109,6 +110,7 @@ fn provider_contract_handshake_fields_accessible() {
         nonce: Some("nonce".to_string()),
         signature: Some("sig".to_string()),
         timestamp: Some(12345),
+        supported_versions: Some(vec![1]),
     };
     assert_eq!(h.client_id, "test");
     assert_eq!(h.device_id, Some("dev".to_string()));

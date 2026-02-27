@@ -97,6 +97,10 @@ pub struct Handshake {
     pub signature: Option<String>,
     #[serde(default)]
     pub timestamp: Option<u64>,
+    /// Protocol versions the client supports (e.g. [1] or [1, 2]).
+    /// Old clients omit this field; the server treats that as [1].
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub supported_versions: Option<Vec<u8>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -104,6 +108,9 @@ pub struct HandshakeAck {
     pub protocol_version: u8,
     pub server_version: String,
     pub features: Vec<String>,
+    /// Protocol versions the server supports, letting clients know about upgrades.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub supported_versions: Option<Vec<u8>>,
 }
 
 // =========================================================================
@@ -255,6 +262,26 @@ impl ForwardingHints {
         }
         data
     }
+}
+
+// =========================================================================
+// Version negotiation
+// =========================================================================
+
+/// Negotiates the highest protocol version supported by both client and server.
+///
+/// - `client_versions`: versions the client declared in `Handshake.supported_versions`.
+///   `None` means an old client that predates version negotiation (treated as `[1]`).
+/// - `server_versions`: versions the server supports (e.g. `[1]` or `[1, 2]`).
+///
+/// Returns `Some(version)` on success, `None` if no overlap exists.
+pub fn negotiate_version(client_versions: Option<&[u8]>, server_versions: &[u8]) -> Option<u8> {
+    let client = client_versions.unwrap_or(&[PROTOCOL_VERSION]);
+    client
+        .iter()
+        .filter(|v| server_versions.contains(v))
+        .max()
+        .copied()
 }
 
 // =========================================================================

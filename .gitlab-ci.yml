@@ -794,14 +794,13 @@ package:sbom:
       cargo install cargo-cyclonedx --locked
 
       # Generate CycloneDX JSON for each crate
+      # cargo-cyclonedx >=0.5.7 outputs next to Cargo.toml with .cdx.json suffix
       mkdir -p dist
 
-      cargo cyclonedx --manifest-path vauchi-core/Cargo.toml --format json \
-        --output-file dist/vauchi-core-${VERSION}.sbom.json
-      cargo cyclonedx --manifest-path vauchi-mobile/Cargo.toml --format json \
-        --output-file dist/vauchi-mobile-${VERSION}.sbom.json
-      cargo cyclonedx --manifest-path vauchi-protocol/Cargo.toml --format json \
-        --output-file dist/vauchi-protocol-${VERSION}.sbom.json
+      for crate in vauchi-core vauchi-mobile vauchi-protocol; do
+        cargo cyclonedx --manifest-path "${crate}/Cargo.toml" --format json
+        mv "${crate}/bom.cdx.json" "dist/${crate}-${VERSION}.sbom.json"
+      done
 
       # Generate checksums
       for f in dist/*.sbom.json; do

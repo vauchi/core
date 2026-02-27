@@ -250,13 +250,16 @@ echo "Save this checksum for Package.swift binaryTarget!"
 # Write checksum to file for CI
 echo "$CHECKSUM" > "$DIST_DIR/VauchiMobileFFI.xcframework.zip.sha256"
 
-# Sign checksum with cosign if COSIGN_KEY is available
+# Sign checksum with cosign (T1-5: required in CI, optional locally)
 if [[ -n "${COSIGN_KEY:-}" ]]; then
     echo -e "${YELLOW}Signing checksum with cosign...${NC}"
     cosign sign-blob --yes --key "$COSIGN_KEY" \
         --output-signature "$DIST_DIR/VauchiMobileFFI.xcframework.zip.sha256.sig" \
         "$DIST_DIR/VauchiMobileFFI.xcframework.zip.sha256"
     echo -e "${GREEN}Checksum signed${NC}"
+elif [[ -n "${CI:-}" ]]; then
+    echo -e "${RED}ERROR: COSIGN_KEY is required in CI for release signing${NC}"
+    exit 1
 else
-    echo -e "${YELLOW}COSIGN_KEY not set — skipping checksum signing${NC}"
+    echo -e "${YELLOW}COSIGN_KEY not set — skipping checksum signing (local build)${NC}"
 fi

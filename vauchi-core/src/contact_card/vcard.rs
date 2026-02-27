@@ -46,6 +46,9 @@ pub fn export_vcard(card: &ContactCard) -> String {
                     escape_vcard(field.value())
                 ));
             }
+            FieldType::Birthday => {
+                lines.push(format!("BDAY:{}", escape_vcard(field.value())));
+            }
             FieldType::Custom => {
                 lines.push(format!(
                     "NOTE;TYPE={}:{}",

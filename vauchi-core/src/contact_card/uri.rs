@@ -183,7 +183,8 @@ impl ContactField {
             FieldType::Website => self.website_to_uri(value),
             FieldType::Social => self.social_to_uri(value),
             FieldType::Address => Some(format!("geo:0,0?q={}", url_encode(value))),
-            FieldType::Custom => None, // No heuristic match, no URI
+            FieldType::Birthday => None, // Birthday dates don't have a direct URI action
+            FieldType::Custom => None,   // No heuristic match, no URI
         }
     }
 
@@ -269,6 +270,7 @@ impl ContactField {
                 }
             }
             FieldType::Address => ContactAction::OpenMap(value.to_string()),
+            FieldType::Birthday => ContactAction::CopyToClipboard, // Birthday dates copy to clipboard
             FieldType::Custom => ContactAction::CopyToClipboard,
         }
     }
@@ -327,6 +329,9 @@ impl ContactField {
             FieldType::Address => {
                 actions.push(ContactAction::OpenMap(value.to_string()));
                 actions.push(ContactAction::GetDirections(value.to_string()));
+            }
+            FieldType::Birthday => {
+                // No primary action for birthday dates
             }
             FieldType::Custom => {
                 // No primary action for plain custom text

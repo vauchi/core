@@ -71,6 +71,10 @@ pub struct ContactCard {
     #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     avatar: Option<Vec<u8>>,
+    /// Optional local nickname annotation (max 100 chars, never shared).
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    nickname: Option<String>,
 }
 
 impl ContactCard {
@@ -87,6 +91,7 @@ impl ContactCard {
             display_name: display_name.to_string(),
             fields: Vec::new(),
             avatar: None,
+            nickname: None,
         }
     }
 
@@ -112,6 +117,25 @@ impl ContactCard {
         Ok(())
     }
 
+    /// Returns the optional nickname annotation (local-only, never shared).
+    pub fn nickname(&self) -> Option<&str> {
+        self.nickname.as_deref()
+    }
+
+    /// Sets the local nickname annotation (max 100 chars). Empty string clears it.
+    pub fn set_nickname(&mut self, nickname: &str) {
+        if nickname.is_empty() {
+            self.nickname = None;
+        } else {
+            // Truncate to MAX_DISPLAY_NAME_LENGTH (100 chars)
+            let truncated = nickname
+                .chars()
+                .take(MAX_DISPLAY_NAME_LENGTH)
+                .collect::<String>();
+            self.nickname = Some(truncated);
+        }
+    }
+
     /// Returns all fields.
     pub fn fields(&self) -> &[ContactField] {
         &self.fields
@@ -126,6 +150,17 @@ impl ContactCard {
     pub fn add_field(&mut self, field: ContactField) -> Result<(), ContactCardError> {
         if self.fields.len() >= MAX_FIELDS {
             return Err(ContactCardError::MaxFieldsReached);
+        }
+
+        // Enforce single birthday constraint (Phase 3)
+        if field.field_type() == FieldType::Birthday {
+            if self
+                .fields
+                .iter()
+                .any(|f| f.field_type() == FieldType::Birthday)
+            {
+                return Err(ContactCardError::MaxFieldsReached); // Reuse error for now
+            }
         }
 
         // Validate the field before adding

@@ -41,6 +41,7 @@ pub enum FieldType {
     Social,
     Address,
     Website,
+    Birthday,
     Custom,
 }
 
@@ -141,6 +142,7 @@ impl ContactField {
         match self.field_type {
             FieldType::Phone => self.validate_phone(),
             FieldType::Email => self.validate_email(),
+            FieldType::Birthday => self.validate_birthday(),
             _ => Ok(()), // Other types accept any value
         }
     }
@@ -197,6 +199,60 @@ impl ContactField {
             if domain.is_empty() {
                 return Err(ValidationError::InvalidEmail);
             }
+        }
+
+        Ok(())
+    }
+
+    /// Validates ISO 8601 birthday format (YYYY-MM-DD) and checks date validity.
+    fn validate_birthday(&self) -> Result<(), ValidationError> {
+        let value = &self.value;
+
+        // Check format: YYYY-MM-DD
+        if value.len() != 10 || value.as_bytes()[4] != b'-' || value.as_bytes()[7] != b'-' {
+            return Err(ValidationError::InvalidEmail); // Reuse validation error for invalid birthday
+        }
+
+        // Parse components
+        let year_str = &value[0..4];
+        let month_str = &value[5..7];
+        let day_str = &value[8..10];
+
+        let year: u16 = year_str
+            .parse()
+            .map_err(|_| ValidationError::InvalidEmail)?;
+        let month: u8 = month_str
+            .parse()
+            .map_err(|_| ValidationError::InvalidEmail)?;
+        let day: u8 = day_str.parse().map_err(|_| ValidationError::InvalidEmail)?;
+
+        // Validate month range
+        if month < 1 || month > 12 {
+            return Err(ValidationError::InvalidEmail);
+        }
+
+        // Validate day range based on month
+        let days_in_month = match month {
+            1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
+            4 | 6 | 9 | 11 => 30,
+            2 => {
+                // Check leap year: divisible by 4, except for centuries (divisible by 100)
+                // unless also divisible by 400
+                if year % 400 == 0 {
+                    29
+                } else if year % 100 == 0 {
+                    28
+                } else if year % 4 == 0 {
+                    29
+                } else {
+                    28
+                }
+            }
+            _ => return Err(ValidationError::InvalidEmail),
+        };
+
+        if day < 1 || day > days_in_month {
+            return Err(ValidationError::InvalidEmail);
         }
 
         Ok(())

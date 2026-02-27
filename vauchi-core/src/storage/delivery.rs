@@ -151,6 +151,20 @@ impl Storage {
         Ok(rows_affected)
     }
 
+    /// Runs startup maintenance: cleans terminal delivery records older than 30 days (T2-12).
+    ///
+    /// Called automatically on `Storage::open()`. Deletes records with status
+    /// 'delivered', 'expired', or 'failed' whose `updated_at` is more than
+    /// 30 days in the past. Returns the number of rows deleted.
+    pub fn run_startup_maintenance(&self) -> Result<usize, StorageError> {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
+        let thirty_days_ago = now.saturating_sub(30 * 86400);
+        self.cleanup_old_deliveries(thirty_days_ago)
+    }
+
     /// Deletes terminal delivery records older than `cutoff` timestamp (#124/#158).
     ///
     /// Removes records with status 'delivered', 'expired', or 'failed' whose

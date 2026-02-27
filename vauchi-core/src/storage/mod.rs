@@ -149,6 +149,8 @@ impl Storage {
             db_path: Some(path_buf),
         };
         storage.run_migrations()?;
+        // T2-12: Clean up old terminal delivery records on startup
+        let _ = storage.run_startup_maintenance();
         Ok(storage)
     }
 

@@ -785,3 +785,97 @@ fn test_out_of_order_delivery_reordering() {
     // This ordering allows applying updates in correct sequence
     // despite network causing out-of-order delivery
 }
+
+// ============================================================
+// Automatic Cleanup (T2-12)
+// @scenario: message_delivery:Delivery records cleanup
+// ============================================================
+
+/// Test: startup maintenance cleans old terminal records but keeps recent ones
+#[test]
+fn test_startup_maintenance_cleans_old_terminal_records() {
+    let storage = test_storage();
+    let now_ts = now();
+    let thirty_one_days_ago = now_ts - (31 * 86400);
+    let ten_days_ago = now_ts - (10 * 86400);
+
+    // Old terminal records (should be cleaned)
+    for (id, status) in [
+        ("old-delivered", DeliveryStatus::Delivered),
+        ("old-expired", DeliveryStatus::Expired),
+        (
+            "old-failed",
+            DeliveryStatus::Failed {
+                reason: "timeout".to_string(),
+            },
+        ),
+    ] {
+        let record = DeliveryRecord {
+            message_id: id.to_string(),
+            recipient_id: "contact".to_string(),
+            status,
+            created_at: thirty_one_days_ago,
+            updated_at: thirty_one_days_ago,
+            expires_at: None,
+        };
+        storage.create_delivery_record(&record).unwrap();
+    }
+
+    // Recent terminal record (should be kept)
+    let record = DeliveryRecord {
+        message_id: "recent-delivered".to_string(),
+        recipient_id: "contact".to_string(),
+        status: DeliveryStatus::Delivered,
+        created_at: ten_days_ago,
+        updated_at: ten_days_ago,
+        expires_at: None,
+    };
+    storage.create_delivery_record(&record).unwrap();
+
+    // Non-terminal record (should be kept regardless of age)
+    let record = DeliveryRecord {
+        message_id: "old-queued".to_string(),
+        recipient_id: "contact".to_string(),
+        status: DeliveryStatus::Queued,
+        created_at: thirty_one_days_ago,
+        updated_at: thirty_one_days_ago,
+        expires_at: None,
+    };
+    storage.create_delivery_record(&record).unwrap();
+
+    // Run startup maintenance
+    let cleaned = storage.run_startup_maintenance();
+    assert!(
+        cleaned.is_ok(),
+        "Maintenance should succeed: {:?}",
+        cleaned.err()
+    );
+    let count = cleaned.unwrap();
+    assert_eq!(count, 3, "Should clean 3 old terminal records");
+
+    // Verify old terminal records are gone
+    assert!(storage
+        .get_delivery_record("old-delivered")
+        .unwrap()
+        .is_none());
+    assert!(storage
+        .get_delivery_record("old-expired")
+        .unwrap()
+        .is_none());
+    assert!(storage.get_delivery_record("old-failed").unwrap().is_none());
+
+    // Verify recent and non-terminal records kept
+    assert!(storage
+        .get_delivery_record("recent-delivered")
+        .unwrap()
+        .is_some());
+    assert!(storage.get_delivery_record("old-queued").unwrap().is_some());
+}
+
+/// Test: startup maintenance on empty database is a no-op
+#[test]
+fn test_startup_maintenance_empty_database() {
+    let storage = test_storage();
+    let count = storage.run_startup_maintenance().unwrap();
+    assert_eq!(count, 0, "Empty database should have nothing to clean");
+}

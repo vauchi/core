@@ -251,6 +251,12 @@ impl Contact {
     pub fn update_card(&mut self, card: ContactCard) {
         self.display_name = card.display_name().to_string();
         self.card = card;
+        self.card_updated_at = Some(
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .expect("Time went backwards")
+                .as_secs(),
+        );
     }
 
     /// Accepts a recovery, updating the contact's public key and shared secret.
@@ -262,6 +268,7 @@ impl Contact {
         self.id = hex::encode(new_public_key);
         self.shared_key = new_shared_key;
         self.fingerprint_verified = false;
+        self.has_recovered = true;
         // Update exchange timestamp to mark when recovery was accepted
         self.exchange_timestamp = SystemTime::now()
             .duration_since(UNIX_EPOCH)

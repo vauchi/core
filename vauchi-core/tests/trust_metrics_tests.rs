@@ -117,3 +117,97 @@ fn test_contact_from_exchange_defaults_to_qr_transport() {
     let contact = Contact::from_exchange(test_public_key(), test_card(), test_key());
     assert_eq!(contact.exchange_transport(), ExchangeTransport::Qr);
 }
+
+// ============================================================
+// Task 4: accept_recovery sets has_recovered
+// ============================================================
+
+#[test]
+fn test_accept_recovery_sets_has_recovered_flag() {
+    let mut contact = Contact::from_exchange_full(
+        test_public_key(),
+        test_card(),
+        test_key(),
+        ProximityConfidence::Unknown,
+        ExchangeTransport::Qr,
+    );
+    assert!(!contact.has_recovered());
+
+    let new_key = [99u8; 32];
+    contact.accept_recovery(new_key, test_key());
+
+    assert!(
+        contact.has_recovered(),
+        "Recovery flag must be set after accept_recovery()"
+    );
+    assert!(
+        !contact.is_fingerprint_verified(),
+        "Fingerprint must be reset after recovery"
+    );
+}
+
+#[test]
+fn test_has_recovered_is_permanent() {
+    let mut contact = Contact::from_exchange_full(
+        test_public_key(),
+        test_card(),
+        test_key(),
+        ProximityConfidence::Unknown,
+        ExchangeTransport::Qr,
+    );
+
+    contact.accept_recovery([99u8; 32], test_key());
+    assert!(contact.has_recovered());
+
+    // Verify fingerprint can be re-verified without clearing recovery flag
+    contact.mark_fingerprint_verified();
+    assert!(contact.has_recovered(), "Recovery flag must never be reset");
+    assert!(contact.is_fingerprint_verified());
+}
+
+// ============================================================
+// Task 5: update_card sets card_updated_at
+// ============================================================
+
+#[test]
+fn test_update_card_sets_card_updated_at() {
+    let mut contact = Contact::from_exchange_full(
+        test_public_key(),
+        test_card(),
+        test_key(),
+        ProximityConfidence::Unknown,
+        ExchangeTransport::Qr,
+    );
+    assert_eq!(contact.card_updated_at(), None);
+
+    let new_card = ContactCard::new("Updated Name");
+    contact.update_card(new_card);
+
+    assert!(
+        contact.card_updated_at().is_some(),
+        "card_updated_at must be set after update_card()"
+    );
+    assert_eq!(contact.display_name(), "Updated Name");
+}
+
+#[test]
+fn test_update_card_timestamp_increases() {
+    let mut contact = Contact::from_exchange_full(
+        test_public_key(),
+        test_card(),
+        test_key(),
+        ProximityConfidence::Unknown,
+        ExchangeTransport::Qr,
+    );
+
+    contact.update_card(ContactCard::new("First Update"));
+    let first_ts = contact.card_updated_at().unwrap();
+
+    contact.update_card(ContactCard::new("Second Update"));
+    let second_ts = contact.card_updated_at().unwrap();
+
+    assert!(
+        second_ts >= first_ts,
+        "Second update timestamp must be >= first"
+    );
+}

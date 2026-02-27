@@ -509,6 +509,100 @@ mod tests {
         assert!(decoded.signature.is_none());
     }
 
+    // =====================================================================
+    // Version negotiation tests (T1-4)
+    // =====================================================================
+
+    #[test]
+    fn test_negotiate_version_both_support_v1_returns_v1() {
+        let result = negotiate_version(Some(&[1]), &[1]);
+        assert_eq!(result, Some(1));
+    }
+
+    #[test]
+    fn test_negotiate_version_client_supports_v1_v2_server_v1_returns_v1() {
+        let result = negotiate_version(Some(&[1, 2]), &[1]);
+        assert_eq!(result, Some(1));
+    }
+
+    #[test]
+    fn test_negotiate_version_both_support_v1_v2_returns_v2() {
+        let result = negotiate_version(Some(&[1, 2]), &[1, 2]);
+        assert_eq!(result, Some(2));
+    }
+
+    #[test]
+    fn test_negotiate_version_no_overlap_returns_none() {
+        let result = negotiate_version(Some(&[2, 3]), &[1]);
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_negotiate_version_client_none_defaults_to_v1() {
+        // Old clients that don't send supported_versions
+        let result = negotiate_version(None, &[1, 2]);
+        assert_eq!(result, Some(1));
+    }
+
+    #[test]
+    fn test_negotiate_version_client_empty_returns_none() {
+        let result = negotiate_version(Some(&[]), &[1]);
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_negotiate_version_picks_highest_common() {
+        let result = negotiate_version(Some(&[1, 3, 5]), &[2, 3, 4, 5]);
+        assert_eq!(result, Some(5));
+    }
+
+    #[test]
+    fn test_handshake_supported_versions_serde_roundtrip() {
+        let hs = Handshake {
+            client_id: "abc".to_string(),
+            device_id: None,
+            routing_token: None,
+            suppress_presence: false,
+            identity_public_key: None,
+            nonce: None,
+            signature: None,
+            timestamp: None,
+            supported_versions: Some(vec![1, 2]),
+        };
+        let json = serde_json::to_string(&hs).unwrap();
+        let decoded: Handshake = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.supported_versions, Some(vec![1, 2]));
+    }
+
+    #[test]
+    fn test_handshake_supported_versions_backward_compat() {
+        // Old clients without supported_versions field
+        let json = r#"{"client_id":"abc"}"#;
+        let h: Handshake = serde_json::from_str(json).unwrap();
+        assert_eq!(h.supported_versions, None);
+    }
+
+    #[test]
+    fn test_handshake_ack_supported_versions_serde_roundtrip() {
+        let ack = HandshakeAck {
+            protocol_version: 1,
+            server_version: "1.1.0".to_string(),
+            features: vec!["routing_token".to_string()],
+            supported_versions: Some(vec![1, 2]),
+        };
+        let json = serde_json::to_string(&ack).unwrap();
+        let decoded: HandshakeAck = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.supported_versions, Some(vec![1, 2]));
+    }
+
+    #[test]
+    fn test_handshake_ack_backward_compat_without_supported_versions() {
+        let json = r#"{"protocol_version":1,"server_version":"1.0.0","features":[]}"#;
+        let ack: HandshakeAck = serde_json::from_str(json).unwrap();
+        assert_eq!(ack.protocol_version, 1);
+        assert_eq!(ack.supported_versions, None);
+    }
+
     #[test]
     fn test_device_link_relay_roundtrip() {
         let msg = DeviceLinkRelay {

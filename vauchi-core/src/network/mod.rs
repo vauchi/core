@@ -127,8 +127,8 @@ pub use relay_client::{ProcessResult, RelayClient, RelayClientConfig};
 
 // Multi-relay support
 pub use multi_relay::{
-    MultiRelayClient, MultiRelayConfig, MultiRelayConfigBuilder, MultiRelayError,
-    MultiRelayManager, RelayHealth, RelaySelector,
+    MultiRelayConfig, MultiRelayConfigBuilder, MultiRelayError, MultiRelayManager, RelayHealth,
+    RelaySelector,
 };
 
 // Anonymous sender identifiers

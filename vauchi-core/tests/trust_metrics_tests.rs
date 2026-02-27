@@ -16,7 +16,7 @@ use vauchi_core::exchange::{
     ExchangeEvent, ExchangeQR, ExchangeSession, ExchangeState, ExchangeTransport,
     MockProximityVerifier, ProximityConfidence, X3DHKeyPair,
 };
-use vauchi_core::Identity;
+use vauchi_core::{Identity, Storage};
 
 /// Helper: create a test contact card.
 fn test_card() -> ContactCard {
@@ -279,5 +279,102 @@ fn test_qr_exchange_contact_card_updated_at_is_none() {
         contact.card_updated_at(),
         None,
         "Fresh exchange contact must have no card_updated_at"
+    );
+}
+
+// ============================================================
+// Task 6-7: Storage roundtrip for trust metric fields
+// ============================================================
+
+#[test]
+fn test_storage_roundtrip_preserves_exchange_transport() {
+    let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
+    let contact = Contact::from_exchange_full(
+        test_public_key(),
+        test_card(),
+        test_key(),
+        ProximityConfidence::High,
+        ExchangeTransport::Nfc,
+    );
+    let id = contact.id().to_string();
+
+    storage.save_contact(&contact).unwrap();
+    let loaded = storage.load_contact(&id).unwrap().unwrap();
+
+    assert_eq!(
+        loaded.exchange_transport(),
+        ExchangeTransport::Nfc,
+        "Storage must preserve exchange_transport"
+    );
+}
+
+#[test]
+fn test_storage_roundtrip_preserves_has_recovered() {
+    let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
+    let mut contact = Contact::from_exchange_full(
+        test_public_key(),
+        test_card(),
+        test_key(),
+        ProximityConfidence::Unknown,
+        ExchangeTransport::Qr,
+    );
+    contact.accept_recovery([99u8; 32], test_key());
+    let id = contact.id().to_string();
+
+    storage.save_contact(&contact).unwrap();
+    let loaded = storage.load_contact(&id).unwrap().unwrap();
+
+    assert!(
+        loaded.has_recovered(),
+        "Storage must preserve has_recovered flag"
+    );
+}
+
+#[test]
+fn test_storage_roundtrip_preserves_card_updated_at() {
+    let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
+    let mut contact = Contact::from_exchange_full(
+        test_public_key(),
+        test_card(),
+        test_key(),
+        ProximityConfidence::Unknown,
+        ExchangeTransport::Qr,
+    );
+    contact.update_card(ContactCard::new("Updated"));
+    let id = contact.id().to_string();
+    let expected_ts = contact.card_updated_at().unwrap();
+
+    storage.save_contact(&contact).unwrap();
+    let loaded = storage.load_contact(&id).unwrap().unwrap();
+
+    assert_eq!(
+        loaded.card_updated_at(),
+        Some(expected_ts),
+        "Storage must preserve card_updated_at timestamp"
+    );
+}
+
+#[test]
+fn test_storage_roundtrip_default_trust_fields() {
+    let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
+    let contact = Contact::from_exchange(test_public_key(), test_card(), test_key());
+    let id = contact.id().to_string();
+
+    storage.save_contact(&contact).unwrap();
+    let loaded = storage.load_contact(&id).unwrap().unwrap();
+
+    assert_eq!(
+        loaded.exchange_transport(),
+        ExchangeTransport::Qr,
+        "Default transport must be Qr"
+    );
+    assert!(
+        !loaded.has_recovered(),
+        "Default has_recovered must be false"
+    );
+    assert_eq!(
+        loaded.card_updated_at(),
+        None,
+        "Default card_updated_at must be None"
     );
 }

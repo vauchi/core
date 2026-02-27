@@ -11,6 +11,7 @@ use crate::contact::Contact;
 use crate::contact_card::ContactCard;
 use crate::crypto::cek::ContentEncryptionKey;
 use crate::crypto::SymmetricKey;
+use crate::exchange::ExchangeTransport;
 
 /// Internal struct for database row data.
 #[allow(dead_code)] // Fields are used via destructuring in row_to_contact
@@ -29,6 +30,9 @@ pub(super) struct ContactRow {
     pub favorite: i32,
     pub recovery_trusted: i32,
     pub cek_encrypted: Option<Vec<u8>>,
+    pub exchange_transport: String,
+    pub has_recovered: i32,
+    pub card_updated_at: Option<i64>,
 }
 
 impl Storage {
@@ -80,12 +84,20 @@ impl Storage {
             crate::crypto::encrypt(&self.encryption_key, visibility_json.as_bytes())
                 .map_err(|e| StorageError::Encryption(e.to_string()))?;
 
+        // Serialize exchange_transport as its serde name ("Qr"/"Nfc"/"Ble")
+        let transport_str = serde_json::to_value(contact.exchange_transport())
+            .map_err(|e| StorageError::Serialization(e.to_string()))?
+            .as_str()
+            .unwrap_or("Qr")
+            .to_string();
+
         self.conn.execute(
             "INSERT OR REPLACE INTO contacts
              (id, public_key, display_name, card_encrypted, shared_key_encrypted,
               visibility_rules_encrypted, exchange_timestamp, fingerprint_verified, last_sync_at,
-              blocked, hidden, favorite, recovery_trusted, cek_encrypted)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)",
+              blocked, hidden, favorite, recovery_trusted, cek_encrypted,
+              exchange_transport, has_recovered, card_updated_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17)",
             params![
                 contact.id(),
                 contact.public_key().as_slice(),
@@ -101,6 +113,9 @@ impl Storage {
                 contact.is_favorite() as i32,
                 contact.is_recovery_trusted() as i32,
                 cek_encrypted_param,
+                transport_str,
+                contact.has_recovered() as i32,
+                contact.card_updated_at().map(|t| t as i64),
             ],
         )?;
 
@@ -113,7 +128,7 @@ impl Storage {
             "SELECT id, public_key, display_name, card_encrypted, shared_key_encrypted,
                     visibility_rules_json, visibility_rules_encrypted, exchange_timestamp,
                     fingerprint_verified, blocked, hidden, favorite, recovery_trusted,
-                    cek_encrypted
+                    cek_encrypted, exchange_transport, has_recovered, card_updated_at
              FROM contacts WHERE id = ?1",
         )?;
 
@@ -133,6 +148,9 @@ impl Storage {
                 favorite: row.get(11)?,
                 recovery_trusted: row.get(12)?,
                 cek_encrypted: row.get(13)?,
+                exchange_transport: row.get(14)?,
+                has_recovered: row.get(15)?,
+                card_updated_at: row.get(16)?,
             })
         });
 
@@ -149,7 +167,7 @@ impl Storage {
             "SELECT id, public_key, display_name, card_encrypted, shared_key_encrypted,
                     visibility_rules_json, visibility_rules_encrypted, exchange_timestamp,
                     fingerprint_verified, blocked, hidden, favorite, recovery_trusted,
-                    cek_encrypted
+                    cek_encrypted, exchange_transport, has_recovered, card_updated_at
              FROM contacts ORDER BY display_name",
         )?;
 
@@ -169,6 +187,9 @@ impl Storage {
                 favorite: row.get(11)?,
                 recovery_trusted: row.get(12)?,
                 cek_encrypted: row.get(13)?,
+                exchange_transport: row.get(14)?,
+                has_recovered: row.get(15)?,
+                card_updated_at: row.get(16)?,
             })
         })?;
 
@@ -198,7 +219,7 @@ impl Storage {
             "SELECT id, public_key, display_name, card_encrypted, shared_key_encrypted,
                     visibility_rules_json, visibility_rules_encrypted, exchange_timestamp,
                     fingerprint_verified, blocked, hidden, favorite, recovery_trusted,
-                    cek_encrypted
+                    cek_encrypted, exchange_transport, has_recovered, card_updated_at
              FROM contacts ORDER BY display_name
              LIMIT ?1 OFFSET ?2",
         )?;
@@ -219,6 +240,9 @@ impl Storage {
                 favorite: row.get(11)?,
                 recovery_trusted: row.get(12)?,
                 cek_encrypted: row.get(13)?,
+                exchange_transport: row.get(14)?,
+                has_recovered: row.get(15)?,
+                card_updated_at: row.get(16)?,
             })
         })?;
 
@@ -253,7 +277,7 @@ impl Storage {
             "SELECT id, public_key, display_name, card_encrypted, shared_key_encrypted,
                     visibility_rules_json, visibility_rules_encrypted, exchange_timestamp,
                     fingerprint_verified, blocked, hidden, favorite, recovery_trusted,
-                    cek_encrypted
+                    cek_encrypted, exchange_transport, has_recovered, card_updated_at
              FROM contacts
              WHERE display_name != '' AND display_name LIKE ?1 COLLATE NOCASE
              ORDER BY display_name",
@@ -275,6 +299,9 @@ impl Storage {
                 favorite: row.get(11)?,
                 recovery_trusted: row.get(12)?,
                 cek_encrypted: row.get(13)?,
+                exchange_transport: row.get(14)?,
+                has_recovered: row.get(15)?,
+                card_updated_at: row.get(16)?,
             })
         })?;
 
@@ -289,7 +316,7 @@ impl Storage {
             "SELECT id, public_key, display_name, card_encrypted, shared_key_encrypted,
                     visibility_rules_json, visibility_rules_encrypted, exchange_timestamp,
                     fingerprint_verified, blocked, hidden, favorite, recovery_trusted,
-                    cek_encrypted
+                    cek_encrypted, exchange_transport, has_recovered, card_updated_at
              FROM contacts
              WHERE display_name = ''",
         )?;
@@ -310,6 +337,9 @@ impl Storage {
                 favorite: row.get(11)?,
                 recovery_trusted: row.get(12)?,
                 cek_encrypted: row.get(13)?,
+                exchange_transport: row.get(14)?,
+                has_recovered: row.get(15)?,
+                card_updated_at: row.get(16)?,
             })
         })?;
 
@@ -565,6 +595,14 @@ impl Storage {
         if let Some(cek) = cek {
             contact.set_cek(cek);
         }
+
+        // Restore trust metric fields from storage
+        let transport: ExchangeTransport =
+            serde_json::from_value(serde_json::Value::String(row.exchange_transport))
+                .unwrap_or_default();
+        contact.set_exchange_transport(transport);
+        contact.set_has_recovered(row.has_recovered != 0);
+        contact.set_card_updated_at(row.card_updated_at.map(|t| t as u64));
 
         Ok(contact)
     }

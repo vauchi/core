@@ -403,6 +403,11 @@ pub fn all_migrations() -> Vec<Migration> {
             name: "recovery_settings",
             action: MigrationAction::Sql(MIGRATION_V26_RECOVERY_SETTINGS),
         },
+        Migration {
+            version: 27,
+            name: "trust_metric_fields",
+            action: MigrationAction::Sql(MIGRATION_V27_TRUST_METRICS),
+        },
     ]
 }
 
@@ -486,6 +491,17 @@ const MIGRATION_V26_RECOVERY_SETTINGS: &str = "
         settings_encrypted BLOB NOT NULL,
         updated_at INTEGER NOT NULL
     );
+";
+
+/// Migration v27: Add trust metric fields to contacts table.
+///
+/// - exchange_transport: TEXT (serde name: "Qr"/"Nfc"/"Ble"), default "Qr"
+/// - has_recovered: INTEGER (boolean), default 0
+/// - card_updated_at: INTEGER (unix timestamp), nullable
+const MIGRATION_V27_TRUST_METRICS: &str = "
+    ALTER TABLE contacts ADD COLUMN exchange_transport TEXT NOT NULL DEFAULT 'Qr';
+    ALTER TABLE contacts ADD COLUMN has_recovered INTEGER NOT NULL DEFAULT 0;
+    ALTER TABLE contacts ADD COLUMN card_updated_at INTEGER;
 ";
 
 /// Migration v2: Re-encrypt all AES-GCM encrypted data to XChaCha20-Poly1305.

@@ -8,7 +8,7 @@
 //! Phase 2: Local Annotations — nickname field
 //! Phase 3: Birthday Field — FieldType::Birthday with ISO 8601 validation
 
-use vauchi_core::contact_card::{ContactCard, FieldType, ValidationError};
+use vauchi_core::contact_card::{ContactCard, FieldType};
 
 #[test]
 fn test_contact_card_nickname_field_add_and_retrieve() {

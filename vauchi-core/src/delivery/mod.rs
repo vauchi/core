@@ -5,12 +5,14 @@
 //! Delivery service — bridges ACK events to delivery storage.
 
 pub mod diagnostics;
+pub mod error_messages;
 pub mod key_rotation;
 pub mod offline_manager;
 pub mod retry_scheduler;
 pub mod service;
 
 pub use diagnostics::{ConnectivityDiagnostics, ConnectivityReport};
+pub use error_messages::failure_to_user_message;
 pub use key_rotation::{KeyRotationDetector, KeyRotationError};
 pub use offline_manager::OfflineManager;
 pub use retry_scheduler::{RetryScheduler, RetryTickResult};

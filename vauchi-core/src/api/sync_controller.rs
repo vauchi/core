@@ -10,7 +10,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use crate::crypto::ratchet::DoubleRatchetState;
-use crate::delivery::{DeliveryAckStatus, DeliveryService};
+use crate::delivery::{DeliveryAckStatus, DeliveryService, OfflineManager, RetryScheduler};
 use crate::network::{ConnectionState, RelayClient, Transport};
 use crate::storage::Storage;
 use crate::sync::device_sync::SyncItem;
@@ -58,6 +58,8 @@ pub struct SyncController<'a, T: Transport> {
     relay: RelayClient<T>,
     sync_manager: SyncManager<'a>,
     delivery_service: DeliveryService,
+    retry_scheduler: RetryScheduler,
+    offline_manager: OfflineManager,
     storage: &'a Storage,
     config: SyncConfig,
     events: Arc<EventDispatcher>,
@@ -79,6 +81,8 @@ impl<'a, T: Transport> SyncController<'a, T> {
             relay,
             sync_manager: SyncManager::new(storage),
             delivery_service: DeliveryService::new(),
+            retry_scheduler: RetryScheduler::new(),
+            offline_manager: OfflineManager::new(),
             storage,
             config,
             events,
@@ -331,13 +335,62 @@ impl<'a, T: Transport> SyncController<'a, T> {
         &self.sync_manager
     }
 
+    /// Returns a reference to the retry scheduler.
+    pub fn retry_scheduler(&self) -> &RetryScheduler {
+        &self.retry_scheduler
+    }
+
+    /// Returns a reference to the offline manager.
+    pub fn offline_manager(&self) -> &OfflineManager {
+        &self.offline_manager
+    }
+
     /// Updates connection state and emits event if changed.
+    ///
+    /// When transitioning to `Connected`, triggers retry tick and
+    /// offline queue flush to process pending work.
     fn update_connection_state(&mut self) {
         let new_state = self.relay.connection().state();
         if new_state != self.last_connection_state {
+            let was_disconnected =
+                !matches!(self.last_connection_state, ConnectionState::Connected);
             self.last_connection_state = new_state.clone();
-            self.events
-                .dispatch(VauchiEvent::ConnectionStateChanged { state: new_state });
+            self.events.dispatch(VauchiEvent::ConnectionStateChanged {
+                state: new_state.clone(),
+            });
+
+            // On transition to Connected: flush offline queue and process retries
+            if was_disconnected && new_state == ConnectionState::Connected {
+                self.on_connectivity_restored();
+            }
+        }
+    }
+
+    /// Handles connectivity restoration — flushes offline queue and processes retries.
+    ///
+    /// Best-effort: errors are logged via events but don't propagate.
+    fn on_connectivity_restored(&mut self) {
+        // Process due retries
+        if let Ok(tick_result) = self.retry_scheduler.tick(self.storage) {
+            if tick_result.rescheduled > 0 || tick_result.expired > 0 {
+                self.events.dispatch(VauchiEvent::DeliveryStatusUpdate {
+                    message_id: String::new(),
+                    status: format!(
+                        "Retry tick: {} rescheduled, {} expired",
+                        tick_result.rescheduled, tick_result.expired
+                    ),
+                });
+            }
+        }
+
+        // Flush offline queue — returns updates ready for sending
+        if let Ok(flushed) = self.offline_manager.flush_queue(self.storage) {
+            if !flushed.is_empty() {
+                self.events.dispatch(VauchiEvent::DeliveryStatusUpdate {
+                    message_id: String::new(),
+                    status: format!("{} offline updates ready for send", flushed.len()),
+                });
+            }
         }
     }
 

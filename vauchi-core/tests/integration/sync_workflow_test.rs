@@ -76,6 +76,7 @@ fn test_relay_client_workflow() {
         max_pending_messages: 100,
         ack_timeout_ms: 30_000,
         max_retries: 3,
+        ..Default::default()
     };
 
     let mut client = RelayClient::new(transport, config, "test-identity".into());

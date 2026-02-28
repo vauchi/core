@@ -70,7 +70,7 @@ fn test_relay_config_to_relay_client_config() {
         ..Default::default()
     };
 
-    let client_config = relay.to_relay_client_config(true);
+    let client_config = relay.to_relay_client_config(true, false);
 
     assert_eq!(client_config.transport.server_url, "wss://test.com");
     assert_eq!(client_config.max_pending_messages, 50);

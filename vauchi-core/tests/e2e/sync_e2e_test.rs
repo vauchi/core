@@ -325,6 +325,7 @@ fn test_relay_update_delivery_happy_path() {
         max_pending_messages: 100,
         ack_timeout_ms: 30_000,
         max_retries: 3,
+        ..Default::default()
     };
 
     let mut client = RelayClient::new(transport, config, "alice-identity".into());

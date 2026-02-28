@@ -38,6 +38,10 @@ pub struct VauchiConfig {
     /// Whether to send delivery receipts for received messages.
     pub delivery_receipts_enabled: bool,
 
+    /// Whether to suppress presence (online/offline status) at the relay.
+    /// When true, the relay will not notify contacts of this client's online status.
+    pub suppress_presence: bool,
+
     /// Recovery configuration for social key recovery.
     pub recovery: RecoveryConfig,
 
@@ -57,6 +61,7 @@ impl Default for VauchiConfig {
             auto_save: true,
             storage_key: None,
             delivery_receipts_enabled: true,
+            suppress_presence: false,
             recovery: RecoveryConfig::default(),
             tor: TorConfig::default(),
             relay_list: None,
@@ -193,13 +198,18 @@ impl RelayConfig {
     }
 
     /// Converts to RelayClientConfig for the network layer.
-    pub fn to_relay_client_config(&self, delivery_receipts_enabled: bool) -> RelayClientConfig {
+    pub fn to_relay_client_config(
+        &self,
+        delivery_receipts_enabled: bool,
+        suppress_presence: bool,
+    ) -> RelayClientConfig {
         RelayClientConfig {
             transport: self.to_transport_config(),
             max_pending_messages: self.max_pending_messages,
             ack_timeout_ms: self.ack_timeout_ms,
             max_retries: self.max_retries,
             delivery_receipts_enabled,
+            suppress_presence,
         }
     }
 }

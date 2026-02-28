@@ -29,6 +29,7 @@ fn test_relay_connect_disconnect() {
         max_pending_messages: 100,
         ack_timeout_ms: 30_000,
         max_retries: 3,
+        ..Default::default()
     };
 
     let mut client = RelayClient::new(transport, config, "test-id".into());
@@ -54,6 +55,7 @@ fn test_relay_reconnection() {
         max_pending_messages: 100,
         ack_timeout_ms: 30_000,
         max_retries: 3,
+        ..Default::default()
     };
 
     let mut client = RelayClient::new(transport, config, "test-id".into());
@@ -83,6 +85,7 @@ fn test_relay_send_update() {
         max_pending_messages: 100,
         ack_timeout_ms: 30_000,
         max_retries: 3,
+        ..Default::default()
     };
 
     let mut client = RelayClient::new(transport, config, "sender-id".into());
@@ -118,6 +121,7 @@ fn test_relay_multiple_in_flight() {
         max_pending_messages: 100,
         ack_timeout_ms: 30_000,
         max_retries: 3,
+        ..Default::default()
     };
 
     let mut client = RelayClient::new(transport, config, "sender-id".into());
@@ -354,6 +358,7 @@ fn test_relay_config() {
         max_pending_messages: 50,
         ack_timeout_ms: 15_000,
         max_retries: 5,
+        ..Default::default()
     };
 
     let client = RelayClient::new(transport, config, "test-id".into());
@@ -384,6 +389,7 @@ fn test_relay_empty_payload() {
         max_pending_messages: 100,
         ack_timeout_ms: 30_000,
         max_retries: 3,
+        ..Default::default()
     };
 
     let mut client = RelayClient::new(transport, config, "sender-id".into());
@@ -409,6 +415,7 @@ fn test_relay_large_payload() {
         max_pending_messages: 100,
         ack_timeout_ms: 30_000,
         max_retries: 3,
+        ..Default::default()
     };
 
     let mut client = RelayClient::new(transport, config, "sender-id".into());

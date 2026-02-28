@@ -45,6 +45,7 @@ pub struct ConnectionManager<T: Transport> {
     config: TransportConfig,
     identity: Option<Identity>,
     reconnect_attempt: u32,
+    suppress_presence: bool,
 }
 
 impl<T: Transport> ConnectionManager<T> {
@@ -55,7 +56,13 @@ impl<T: Transport> ConnectionManager<T> {
             config,
             identity: None,
             reconnect_attempt: 0,
+            suppress_presence: false,
         }
+    }
+
+    /// Sets whether to suppress presence notifications at the relay.
+    pub fn set_suppress_presence(&mut self, suppress: bool) {
+        self.suppress_presence = suppress;
     }
 
     /// Sets the identity for authenticated connections.
@@ -210,6 +217,7 @@ impl<T: Transport> ConnectionManager<T> {
                 "nonce": bytes_to_hex(&nonce),
                 "signature": bytes_to_hex(signature.as_bytes()),
                 "timestamp": timestamp,
+                "suppress_presence": self.suppress_presence,
             }
         });
 

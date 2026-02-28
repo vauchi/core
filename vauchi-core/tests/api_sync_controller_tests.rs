@@ -24,6 +24,7 @@ fn create_test_relay() -> RelayClient<MockTransport> {
         max_pending_messages: 100,
         ack_timeout_ms: 30_000,
         max_retries: 3,
+        ..Default::default()
     };
     RelayClient::new(transport, config, "test-identity".into())
 }

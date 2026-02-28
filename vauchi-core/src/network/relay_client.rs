@@ -33,6 +33,9 @@ pub struct RelayClientConfig {
     /// Whether to send delivery receipts for received messages.
     /// When false, the client will not send ReceivedByRecipient ACKs.
     pub delivery_receipts_enabled: bool,
+    /// Whether to suppress presence (online/offline status) at the relay.
+    /// When true, the relay will not notify contacts of this client's online status.
+    pub suppress_presence: bool,
 }
 
 impl Default for RelayClientConfig {
@@ -43,6 +46,7 @@ impl Default for RelayClientConfig {
             ack_timeout_ms: 30_000,
             max_retries: 5,
             delivery_receipts_enabled: true,
+            suppress_presence: false,
         }
     }
 }
@@ -86,7 +90,8 @@ pub struct RelayClient<T: Transport> {
 impl<T: Transport> RelayClient<T> {
     /// Creates a new relay client.
     pub fn new(transport: T, config: RelayClientConfig, our_identity_id: String) -> Self {
-        let connection = ConnectionManager::new(transport, config.transport.clone());
+        let mut connection = ConnectionManager::new(transport, config.transport.clone());
+        connection.set_suppress_presence(config.suppress_presence);
 
         RelayClient {
             connection,

@@ -4351,4 +4351,48 @@ mod tests {
             "roundtrip via VauchiMobile + MobileMultipartDecoder must preserve data"
         );
     }
+
+    // === Privacy Indicator Tests (SP-12b Phase 2) ===
+
+    // @scenario: message_delivery:Delivery receipts enabled by default
+    #[test]
+    fn test_delivery_receipts_enabled_by_default() {
+        let (wb, _dir) = create_test_instance();
+        assert!(
+            wb.is_delivery_receipts_enabled(),
+            "Delivery receipts should be enabled by default"
+        );
+    }
+
+    // @scenario: message_delivery:User can disable delivery receipts
+    #[test]
+    fn test_set_delivery_receipts_disabled() {
+        let (wb, _dir) = create_test_instance();
+        wb.set_delivery_receipts_enabled(false);
+        assert!(
+            !wb.is_delivery_receipts_enabled(),
+            "Delivery receipts should be disabled after setting"
+        );
+    }
+
+    // @scenario: message_delivery:Suppress presence defaults to false
+    #[test]
+    fn test_suppress_presence_defaults_to_false() {
+        let (wb, _dir) = create_test_instance();
+        assert!(
+            !wb.is_suppress_presence_enabled(),
+            "Suppress presence should default to false"
+        );
+    }
+
+    // @scenario: message_delivery:User can enable suppress presence
+    #[test]
+    fn test_set_suppress_presence_enabled() {
+        let (wb, _dir) = create_test_instance();
+        wb.set_suppress_presence_enabled(true);
+        assert!(
+            wb.is_suppress_presence_enabled(),
+            "Suppress presence should be enabled after setting"
+        );
+    }
 }

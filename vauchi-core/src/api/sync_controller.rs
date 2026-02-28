@@ -138,8 +138,8 @@ impl<'a, T: Transport> SyncController<'a, T> {
 
         // Process incoming messages (acknowledgments)
         match self.relay.process_incoming() {
-            Ok(acked_ids) => {
-                for update_id in acked_ids {
+            Ok(incoming) => {
+                for update_id in incoming.acknowledged {
                     if let Err(e) = self.sync_manager.mark_delivered(&update_id) {
                         result.errors.push((update_id.clone(), e.to_string()));
                     } else {

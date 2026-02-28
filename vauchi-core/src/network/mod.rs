@@ -123,7 +123,7 @@ pub use websocket::WebSocketTransport;
 pub use connection::ConnectionManager;
 
 // Relay client
-pub use relay_client::{ProcessResult, RelayClient, RelayClientConfig};
+pub use relay_client::{AckEvent, IncomingResult, ProcessResult, RelayClient, RelayClientConfig};
 
 // Multi-relay support
 pub use multi_relay::{

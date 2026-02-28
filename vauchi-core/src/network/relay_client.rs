@@ -244,27 +244,33 @@ impl<T: Transport> RelayClient<T> {
 
     /// Processes incoming messages (acknowledgments, updates from others).
     ///
-    /// Returns a list of update IDs that have been successfully acknowledged.
-    pub fn process_incoming(&mut self) -> Result<Vec<String>, NetworkError> {
-        let mut acknowledged = Vec::new();
+    /// Returns an `IncomingResult` containing:
+    /// - `acknowledged`: Update IDs that were successfully acknowledged
+    /// - `ack_events`: All ACK events including failures, for delivery tracking
+    pub fn process_incoming(&mut self) -> Result<IncomingResult, NetworkError> {
+        let mut result = IncomingResult::default();
 
         while let Some(envelope) = self.connection.receive()? {
             match envelope.payload {
                 MessagePayload::Acknowledgment(ack) => {
                     if let Some(in_flight) = self.in_flight.remove(&ack.message_id) {
+                        // Record ACK event for delivery tracking
+                        result.ack_events.push(AckEvent {
+                            update_id: in_flight.update_id.clone(),
+                            status: ack.status,
+                            error: ack.error.clone(),
+                        });
+
                         if ack.status == AckStatus::Stored
                             || ack.status == AckStatus::Delivered
                             || ack.status == AckStatus::ReceivedByRecipient
                         {
-                            acknowledged.push(in_flight.update_id);
+                            result.acknowledged.push(in_flight.update_id);
                         }
-                        // For Failed status, the message stays removed but not acknowledged
-                        // The caller should handle retry logic
                     }
                 }
                 MessagePayload::EncryptedUpdate(_) => {
                     // Incoming updates from others - to be handled by application layer
-                    // Could emit via callback or store for later retrieval
                 }
                 _ => {
                     // Ignore other message types
@@ -272,7 +278,7 @@ impl<T: Transport> RelayClient<T> {
             }
         }
 
-        Ok(acknowledged)
+        Ok(result)
     }
 
     /// Checks for timed-out messages and returns their update IDs.
@@ -385,6 +391,29 @@ impl<T: Transport> crate::api::RevocationSender for RelayClient<T> {
             ))),
         }
     }
+}
+
+/// An ACK event received from the relay.
+///
+/// Captures the full acknowledgment status for delivery tracking,
+/// including failed ACKs that were previously silently dropped.
+#[derive(Debug, Clone)]
+pub struct AckEvent {
+    /// The application-level update ID (PendingUpdate.id / DeliveryRecord.message_id).
+    pub update_id: String,
+    /// The ACK status from the relay.
+    pub status: AckStatus,
+    /// Optional error message (for Failed status).
+    pub error: Option<String>,
+}
+
+/// Result of processing incoming messages from the relay.
+#[derive(Debug, Default)]
+pub struct IncomingResult {
+    /// Update IDs that were successfully acknowledged (Stored/Delivered/ReceivedByRecipient).
+    pub acknowledged: Vec<String>,
+    /// All ACK events including failures, for delivery tracking.
+    pub ack_events: Vec<AckEvent>,
 }
 
 /// Result of processing pending updates.

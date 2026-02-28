@@ -159,9 +159,28 @@ impl RetryQueue {
         backoff.min(self.max_backoff_secs)
     }
 
+    /// Calculates the backoff time with jitter to prevent thundering herd.
+    ///
+    /// Returns base backoff + random jitter in range [0, base * 0.25].
+    pub fn backoff_seconds_with_jitter(&self, attempt: u32) -> u64 {
+        use rand::Rng;
+        let base = self.backoff_seconds(attempt);
+        let jitter_range = base / 4; // 25% of base
+        if jitter_range == 0 {
+            return base;
+        }
+        let jitter = rand::thread_rng().gen_range(0..=jitter_range);
+        base + jitter
+    }
+
     /// Calculates the next retry timestamp.
     pub fn next_retry_time(&self, current_time: u64, attempt: u32) -> u64 {
         current_time + self.backoff_seconds(attempt)
+    }
+
+    /// Calculates the next retry timestamp with jitter.
+    pub fn next_retry_time_with_jitter(&self, current_time: u64, attempt: u32) -> u64 {
+        current_time + self.backoff_seconds_with_jitter(attempt)
     }
 }
 

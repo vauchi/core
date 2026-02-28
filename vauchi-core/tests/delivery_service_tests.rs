@@ -197,3 +197,138 @@ fn test_handle_ack_for_unknown_message_returns_error() {
         err_msg
     );
 }
+
+// === Expiration Cleanup Tests (Task 8) ===
+
+fn create_delivery_with_expiry(
+    storage: &Storage,
+    message_id: &str,
+    status: DeliveryStatus,
+    created_at: u64,
+    expires_at: Option<u64>,
+) {
+    let record = DeliveryRecord {
+        message_id: message_id.to_string(),
+        recipient_id: "test-recipient".to_string(),
+        status,
+        created_at,
+        updated_at: created_at,
+        expires_at,
+    };
+    storage.create_delivery_record(&record).unwrap();
+}
+
+// @scenario: message_delivery:Expired messages are cleaned up automatically
+#[test]
+fn test_run_cleanup_expires_old_records() {
+    let storage = test_storage();
+    let service = DeliveryService::new();
+    let ts = now();
+
+    // Record with expiry in the past — should be expired
+    create_delivery_with_expiry(
+        &storage,
+        "msg-expired",
+        DeliveryStatus::Sent,
+        ts - 3600,
+        Some(ts - 60),
+    );
+
+    // Record with expiry in the future — should survive
+    create_delivery_with_expiry(
+        &storage,
+        "msg-valid",
+        DeliveryStatus::Sent,
+        ts - 100,
+        Some(ts + 3600),
+    );
+
+    // Record with no expiry — should survive
+    create_delivery_with_expiry(
+        &storage,
+        "msg-no-expiry",
+        DeliveryStatus::Stored,
+        ts - 100,
+        None,
+    );
+
+    let result = service.run_cleanup(&storage).unwrap();
+    assert_eq!(result.expired, 1, "One record should be expired");
+    assert_eq!(result.cleaned_up, 0, "No records old enough for cleanup");
+
+    // Verify the expired record was marked
+    let expired = storage.get_delivery_record("msg-expired").unwrap().unwrap();
+    assert_eq!(
+        expired.status,
+        DeliveryStatus::Expired,
+        "Past-expiry record should be marked Expired"
+    );
+
+    // Verify others are untouched
+    let valid = storage.get_delivery_record("msg-valid").unwrap().unwrap();
+    assert_eq!(valid.status, DeliveryStatus::Sent);
+    let no_exp = storage
+        .get_delivery_record("msg-no-expiry")
+        .unwrap()
+        .unwrap();
+    assert_eq!(no_exp.status, DeliveryStatus::Stored);
+}
+
+// @scenario: message_delivery:Old terminal records are cleaned up
+#[test]
+fn test_run_cleanup_removes_old_terminal_records() {
+    let storage = test_storage();
+    let service = DeliveryService::new();
+    let ts = now();
+    let thirty_one_days_ago = ts - (31 * 24 * 3600);
+
+    // Old delivered record — should be cleaned up
+    create_delivery_with_expiry(
+        &storage,
+        "msg-old-delivered",
+        DeliveryStatus::Delivered,
+        thirty_one_days_ago,
+        None,
+    );
+    // Update its updated_at to be old
+    storage
+        .update_delivery_status(
+            "msg-old-delivered",
+            &DeliveryStatus::Delivered,
+            thirty_one_days_ago,
+        )
+        .unwrap();
+
+    // Recent delivered record — should survive
+    create_delivery_with_expiry(
+        &storage,
+        "msg-recent-delivered",
+        DeliveryStatus::Delivered,
+        ts - 3600,
+        None,
+    );
+
+    let result = service.run_cleanup(&storage).unwrap();
+    assert_eq!(
+        result.cleaned_up, 1,
+        "One old terminal record should be cleaned up"
+    );
+
+    // Old record should be removed
+    assert!(
+        storage
+            .get_delivery_record("msg-old-delivered")
+            .unwrap()
+            .is_none(),
+        "Old delivered record should be removed"
+    );
+
+    // Recent record should survive
+    assert!(
+        storage
+            .get_delivery_record("msg-recent-delivered")
+            .unwrap()
+            .is_some(),
+        "Recent delivered record should survive"
+    );
+}

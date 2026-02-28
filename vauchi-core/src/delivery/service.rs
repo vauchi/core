@@ -7,7 +7,7 @@
 //! Receives acknowledgment events from the transport layer and updates
 //! delivery records and retry entries in storage accordingly.
 
-use crate::storage::{RetryQueue, Storage, StorageError};
+use crate::storage::{DeliveryStatus, RetryEntry, RetryQueue, Storage, StorageError};
 
 /// ACK status received from the relay/transport layer.
 ///
@@ -55,11 +55,49 @@ impl DeliveryService {
     /// Returns an error if the message ID is not found in delivery records.
     pub fn handle_ack(
         &self,
-        _storage: &Storage,
-        _message_id: &str,
-        _status: DeliveryAckStatus,
+        storage: &Storage,
+        message_id: &str,
+        status: DeliveryAckStatus,
     ) -> Result<(), StorageError> {
-        todo!("DeliveryService::handle_ack not yet implemented")
+        let record = storage.get_delivery_record(message_id)?.ok_or_else(|| {
+            StorageError::NotFound(format!("Delivery record not found: {}", message_id))
+        })?;
+
+        let now = current_timestamp();
+
+        match status {
+            DeliveryAckStatus::Stored => {
+                storage.update_delivery_status(message_id, &DeliveryStatus::Stored, now)?;
+            }
+            DeliveryAckStatus::Delivered => {
+                storage.update_delivery_status(message_id, &DeliveryStatus::Delivered, now)?;
+                // Clean up any existing retry entry
+                let _ = storage.delete_retry_entry(message_id);
+            }
+            DeliveryAckStatus::Failed { reason } => {
+                storage.update_delivery_status(
+                    message_id,
+                    &DeliveryStatus::Failed {
+                        reason: reason.clone(),
+                    },
+                    now,
+                )?;
+
+                // Schedule a retry entry
+                let entry = RetryEntry {
+                    message_id: message_id.to_string(),
+                    recipient_id: record.recipient_id,
+                    payload: vec![],
+                    attempt: 0,
+                    next_retry: self.retry_queue.next_retry_time_with_jitter(now, 0),
+                    created_at: now,
+                    max_attempts: 10,
+                };
+                storage.create_retry_entry(&entry)?;
+            }
+        }
+
+        Ok(())
     }
 }
 
@@ -67,4 +105,11 @@ impl Default for DeliveryService {
     fn default() -> Self {
         Self::new()
     }
+}
+
+fn current_timestamp() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs()
 }

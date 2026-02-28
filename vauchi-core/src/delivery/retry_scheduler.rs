@@ -51,8 +51,10 @@ impl RetryScheduler {
         let now = current_timestamp();
         let due_entries = storage.get_due_retries(now)?;
 
-        let mut result = RetryTickResult::default();
-        result.due = due_entries.len();
+        let mut result = RetryTickResult {
+            due: due_entries.len(),
+            ..RetryTickResult::default()
+        };
 
         for entry in due_entries {
             if entry.is_max_attempts_exceeded() {

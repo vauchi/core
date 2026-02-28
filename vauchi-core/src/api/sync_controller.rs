@@ -10,6 +10,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use crate::crypto::ratchet::DoubleRatchetState;
+use crate::delivery::{DeliveryAckStatus, DeliveryService};
 use crate::network::{ConnectionState, RelayClient, Transport};
 use crate::storage::Storage;
 use crate::sync::device_sync::SyncItem;
@@ -56,6 +57,8 @@ impl SyncResult {
 pub struct SyncController<'a, T: Transport> {
     relay: RelayClient<T>,
     sync_manager: SyncManager<'a>,
+    delivery_service: DeliveryService,
+    storage: &'a Storage,
     config: SyncConfig,
     events: Arc<EventDispatcher>,
     /// Ratchet states per contact for encryption
@@ -75,6 +78,8 @@ impl<'a, T: Transport> SyncController<'a, T> {
         SyncController {
             relay,
             sync_manager: SyncManager::new(storage),
+            delivery_service: DeliveryService::new(),
+            storage,
             config,
             events,
             ratchets: HashMap::new(),
@@ -145,6 +150,19 @@ impl<'a, T: Transport> SyncController<'a, T> {
                     } else {
                         result.acknowledged += 1;
                     }
+                }
+
+                // Route ACK events to delivery service for status tracking
+                for event in &incoming.ack_events {
+                    let ack_status =
+                        DeliveryAckStatus::from_network_ack(event.status, event.error.as_deref());
+                    // Best-effort delivery tracking — don't fail the sync cycle
+                    // if a delivery record doesn't exist yet
+                    let _ = self.delivery_service.handle_ack(
+                        self.storage,
+                        &event.update_id,
+                        ack_status,
+                    );
                 }
             }
             Err(e) => {

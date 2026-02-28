@@ -23,6 +23,21 @@ pub enum DeliveryAckStatus {
     Failed { reason: String },
 }
 
+#[cfg(any(feature = "network-native-tls", feature = "network-rustls"))]
+impl DeliveryAckStatus {
+    /// Converts from network `AckStatus` to delivery-layer `DeliveryAckStatus`.
+    pub fn from_network_ack(status: crate::network::AckStatus, error: Option<&str>) -> Self {
+        use crate::network::AckStatus;
+        match status {
+            AckStatus::Stored => DeliveryAckStatus::Stored,
+            AckStatus::Delivered | AckStatus::ReceivedByRecipient => DeliveryAckStatus::Delivered,
+            AckStatus::Failed => DeliveryAckStatus::Failed {
+                reason: error.unwrap_or("unknown").to_string(),
+            },
+        }
+    }
+}
+
 /// Bridges ACK events from the transport layer to delivery storage.
 ///
 /// Handles the lifecycle of delivery records:

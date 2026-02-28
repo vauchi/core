@@ -91,12 +91,65 @@ fn test_relay_client_acknowledgment_tracking() {
 
     assert_eq!(client.in_flight_count(), 1);
 
-    // Process ack
-    let acked = client.process_incoming().unwrap();
+    // Process ack — returns IncomingResult with acknowledged IDs and ACK events
+    let result = client.process_incoming().unwrap();
 
-    assert_eq!(acked.len(), 1);
-    assert_eq!(acked[0], "update-1");
+    assert_eq!(result.acknowledged.len(), 1);
+    assert_eq!(result.acknowledged[0], "update-1");
     assert_eq!(client.in_flight_count(), 0);
+
+    // Verify ACK events include delivery status
+    assert_eq!(result.ack_events.len(), 1);
+    assert_eq!(result.ack_events[0].update_id, "update-1");
+    assert_eq!(result.ack_events[0].status, AckStatus::Delivered);
+}
+
+// @scenario: message_delivery:Failed ACK captured in ack_events
+#[test]
+fn test_process_incoming_captures_failed_ack_events() {
+    let transport = MockTransport::new();
+    let mut client = RelayClient::new(transport, create_test_config(), "sender-id".into());
+    client.connect().unwrap();
+
+    let (mut alice_ratchet, _) = create_test_ratchet();
+
+    // Send a message
+    let msg_id = client
+        .send_update("recipient-id", &mut alice_ratchet, b"test", "update-fail")
+        .unwrap();
+
+    // Manually queue a Failed ACK
+    let failed_ack = MessageEnvelope {
+        version: 1,
+        message_id: uuid::Uuid::new_v4().to_string(),
+        timestamp: 0,
+        payload: MessagePayload::Acknowledgment(Acknowledgment {
+            message_id: msg_id,
+            status: AckStatus::Failed,
+            error: Some("relay overloaded".to_string()),
+        }),
+    };
+    client
+        .connection_mut()
+        .transport_mut()
+        .queue_receive(failed_ack);
+
+    let result = client.process_incoming().unwrap();
+
+    // Failed ACKs should NOT appear in acknowledged list
+    assert!(
+        result.acknowledged.is_empty(),
+        "Failed ACK should not be in acknowledged list"
+    );
+
+    // But they SHOULD appear in ack_events for delivery tracking
+    assert_eq!(result.ack_events.len(), 1);
+    assert_eq!(result.ack_events[0].update_id, "update-fail");
+    assert_eq!(result.ack_events[0].status, AckStatus::Failed);
+    assert_eq!(
+        result.ack_events[0].error.as_deref(),
+        Some("relay overloaded")
+    );
 }
 
 // @scenario: message_delivery:Automatic retry on transient failure

@@ -10,4 +10,4 @@ pub mod service;
 
 pub use offline_manager::OfflineManager;
 pub use retry_scheduler::{RetryScheduler, RetryTickResult};
-pub use service::{DeliveryAckStatus, DeliveryService};
+pub use service::{CleanupResult, DeliveryAckStatus, DeliveryService};

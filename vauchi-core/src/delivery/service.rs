@@ -114,6 +114,32 @@ impl DeliveryService {
 
         Ok(())
     }
+
+    /// Runs periodic cleanup tasks:
+    /// 1. Marks records with `expires_at` in the past as `Expired`
+    /// 2. Removes old terminal records (delivered/expired/failed) older than 30 days
+    ///
+    /// Returns a `CleanupResult` with counts of affected records.
+    pub fn run_cleanup(&self, storage: &Storage) -> Result<CleanupResult, StorageError> {
+        let now = current_timestamp();
+
+        let expired = storage.expire_old_deliveries(now)?;
+        let cleaned_up = storage.run_startup_maintenance()?;
+
+        Ok(CleanupResult {
+            expired,
+            cleaned_up,
+        })
+    }
+}
+
+/// Result of a periodic cleanup run.
+#[derive(Debug, Default)]
+pub struct CleanupResult {
+    /// Number of records marked as expired (TTL exceeded).
+    pub expired: usize,
+    /// Number of old terminal records removed.
+    pub cleaned_up: usize,
 }
 
 impl Default for DeliveryService {

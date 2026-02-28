@@ -193,12 +193,13 @@ impl RelayConfig {
     }
 
     /// Converts to RelayClientConfig for the network layer.
-    pub fn to_relay_client_config(&self) -> RelayClientConfig {
+    pub fn to_relay_client_config(&self, delivery_receipts_enabled: bool) -> RelayClientConfig {
         RelayClientConfig {
             transport: self.to_transport_config(),
             max_pending_messages: self.max_pending_messages,
             ack_timeout_ms: self.ack_timeout_ms,
             max_retries: self.max_retries,
+            delivery_receipts_enabled,
         }
     }
 }

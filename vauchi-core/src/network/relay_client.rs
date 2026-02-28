@@ -30,6 +30,9 @@ pub struct RelayClientConfig {
     pub ack_timeout_ms: u64,
     /// Maximum message retries before giving up.
     pub max_retries: u32,
+    /// Whether to send delivery receipts for received messages.
+    /// When false, the client will not send ReceivedByRecipient ACKs.
+    pub delivery_receipts_enabled: bool,
 }
 
 impl Default for RelayClientConfig {
@@ -39,6 +42,7 @@ impl Default for RelayClientConfig {
             max_pending_messages: 100,
             ack_timeout_ms: 30_000,
             max_retries: 5,
+            delivery_receipts_enabled: true,
         }
     }
 }
@@ -322,6 +326,11 @@ impl<T: Transport> RelayClient<T> {
             .values()
             .map(|m| m.update_id.clone())
             .collect()
+    }
+
+    /// Returns a reference to the client configuration.
+    pub fn config(&self) -> &RelayClientConfig {
+        &self.config
     }
 
     /// Returns a reference to the connection manager.

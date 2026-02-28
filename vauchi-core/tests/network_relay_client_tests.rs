@@ -405,3 +405,42 @@ fn test_delivery_receipts_enabled_by_default() {
         "Delivery receipts should be enabled by default"
     );
 }
+
+// === Suppress Presence Privacy Tests (SP-12b Phase 2) ===
+
+// @scenario: message_delivery:Suppress presence hides online status from relay
+#[test]
+fn test_suppress_presence_included_in_handshake() {
+    use vauchi_core::identity::Identity;
+
+    let config = RelayClientConfig {
+        suppress_presence: true,
+        ..create_test_config()
+    };
+    let transport = MockTransport::new();
+    let mut client = RelayClient::new(transport, config, "sender-id".into());
+
+    let identity = Identity::create("Test User");
+    client.connection_mut().set_identity(identity);
+    client.connect().unwrap();
+
+    // Verify suppress_presence is in the handshake JSON
+    let sent_raw = client.connection().transport().sent_raw();
+    assert!(!sent_raw.is_empty(), "Handshake should have been sent");
+
+    let json: serde_json::Value = serde_json::from_slice(&sent_raw[0][4..]).unwrap();
+    assert_eq!(
+        json["payload"]["suppress_presence"], true,
+        "Handshake should include suppress_presence=true from config"
+    );
+}
+
+// @scenario: message_delivery:Suppress presence defaults to false
+#[test]
+fn test_suppress_presence_defaults_to_false() {
+    let config = RelayClientConfig::default();
+    assert!(
+        !config.suppress_presence,
+        "suppress_presence should default to false"
+    );
+}

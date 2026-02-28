@@ -49,6 +49,9 @@ pub enum StorageError {
 
     #[error("Migration error: {0}")]
     Migration(String),
+
+    #[error("Queue full: {0}")]
+    QueueFull(String),
 }
 
 /// Pending update status.

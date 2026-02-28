@@ -279,6 +279,77 @@ fn test_retry_entry_for_recipient() {
     assert_eq!(bob_entries.len(), 2);
 }
 
+// === Jitter Tests ===
+
+#[test]
+fn test_retry_backoff_with_jitter_varies() {
+    // Scenario: Exponential backoff with jitter prevents thundering herd (@retry)
+    // features/message_delivery.feature
+    let queue = RetryQueue::new();
+
+    let mut delays = Vec::new();
+    for _ in 0..20 {
+        delays.push(queue.backoff_seconds_with_jitter(3)); // attempt 3 => base 8s
+    }
+
+    // With jitter, not all delays should be identical
+    let first = delays[0];
+    let all_same = delays.iter().all(|d| *d == first);
+    assert!(
+        !all_same,
+        "20 backoff calculations at same attempt should not all be identical — jitter missing"
+    );
+}
+
+#[test]
+fn test_retry_backoff_with_jitter_stays_within_bounds() {
+    // Jitter should add 0-25% of base delay, never exceed max_backoff
+    let queue = RetryQueue::new();
+
+    for _ in 0..50 {
+        let delay = queue.backoff_seconds_with_jitter(3); // base = 8
+        assert!(delay >= 8, "Jitter should not reduce below base delay");
+        assert!(
+            delay <= 10,
+            "Jitter should add at most 25% of base (8 + 2 = 10)"
+        );
+    }
+}
+
+#[test]
+fn test_retry_backoff_with_jitter_respects_max_backoff() {
+    // At high attempt counts, jitter must not exceed max_backoff_secs
+    let queue = RetryQueue::with_max_backoff(100);
+
+    for _ in 0..50 {
+        let delay = queue.backoff_seconds_with_jitter(20); // base = 2^20 >> 100
+        assert!(
+            delay <= 125, // 100 + 25% = 125
+            "Jitter-added delay {} should not exceed max_backoff + 25%",
+            delay
+        );
+    }
+}
+
+#[test]
+fn test_next_retry_time_with_jitter_varies() {
+    // next_retry_time_with_jitter should produce varying timestamps
+    let queue = RetryQueue::new();
+    let base_time = 1000u64;
+
+    let mut times = Vec::new();
+    for _ in 0..20 {
+        times.push(queue.next_retry_time_with_jitter(base_time, 3));
+    }
+
+    let first = times[0];
+    let all_same = times.iter().all(|t| *t == first);
+    assert!(
+        !all_same,
+        "20 jittered retry times should not all be identical"
+    );
+}
+
 // === Integration Tests ===
 
 #[test]

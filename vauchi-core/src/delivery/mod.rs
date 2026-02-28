@@ -4,6 +4,8 @@
 
 //! Delivery service — bridges ACK events to delivery storage.
 
+pub mod retry_scheduler;
 pub mod service;
 
+pub use retry_scheduler::{RetryScheduler, RetryTickResult};
 pub use service::{DeliveryAckStatus, DeliveryService};

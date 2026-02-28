@@ -15,6 +15,7 @@ pub mod contact;
 pub mod contact_card;
 pub mod content;
 pub mod crypto;
+pub mod delivery;
 pub mod demo_contact;
 pub mod exchange;
 pub mod help;

@@ -138,6 +138,44 @@ fn test_handle_failed_ack_schedules_retry() {
     );
 }
 
+// === AckStatus Conversion Tests ===
+
+// @scenario: message_delivery:Network ACK status converts to delivery ACK status
+#[test]
+fn test_ack_status_conversion_from_network() {
+    use vauchi_core::network::AckStatus;
+
+    // Stored → Stored
+    let stored = DeliveryAckStatus::from_network_ack(AckStatus::Stored, None);
+    assert_eq!(stored, DeliveryAckStatus::Stored);
+
+    // Delivered → Delivered
+    let delivered = DeliveryAckStatus::from_network_ack(AckStatus::Delivered, None);
+    assert_eq!(delivered, DeliveryAckStatus::Delivered);
+
+    // ReceivedByRecipient → Delivered
+    let received = DeliveryAckStatus::from_network_ack(AckStatus::ReceivedByRecipient, None);
+    assert_eq!(received, DeliveryAckStatus::Delivered);
+
+    // Failed → Failed with reason
+    let failed = DeliveryAckStatus::from_network_ack(AckStatus::Failed, Some("timeout"));
+    assert_eq!(
+        failed,
+        DeliveryAckStatus::Failed {
+            reason: "timeout".to_string()
+        }
+    );
+
+    // Failed without error message → Failed with "unknown"
+    let failed_no_reason = DeliveryAckStatus::from_network_ack(AckStatus::Failed, None);
+    assert_eq!(
+        failed_no_reason,
+        DeliveryAckStatus::Failed {
+            reason: "unknown".to_string()
+        }
+    );
+}
+
 // @scenario: message_delivery:Unknown message ACK handled gracefully
 #[test]
 fn test_handle_ack_for_unknown_message_returns_error() {

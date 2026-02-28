@@ -772,6 +772,10 @@ pub struct VauchiMobile {
     sync_status: Mutex<MobileSyncStatus>,
     /// Platform keychain for crypto-shredding operations.
     platform_keychain: Mutex<Option<Arc<dyn MobilePlatformKeychain>>>,
+    /// Whether delivery receipts (ReceivedByRecipient ACKs) are enabled.
+    delivery_receipts_enabled: Mutex<bool>,
+    /// Whether to suppress presence (online status) at the relay.
+    suppress_presence: Mutex<bool>,
 }
 
 impl VauchiMobile {
@@ -946,6 +950,8 @@ impl VauchiMobile {
             social_registry: SocialNetworkRegistry::with_defaults(),
             sync_status: Mutex::new(MobileSyncStatus::Idle),
             platform_keychain: Mutex::new(None),
+            delivery_receipts_enabled: Mutex::new(true),
+            suppress_presence: Mutex::new(false),
         }))
     }
 
@@ -989,6 +995,8 @@ impl VauchiMobile {
             social_registry: SocialNetworkRegistry::with_defaults(),
             sync_status: Mutex::new(MobileSyncStatus::Idle),
             platform_keychain: Mutex::new(None),
+            delivery_receipts_enabled: Mutex::new(true),
+            suppress_presence: Mutex::new(false),
         }))
     }
 
@@ -1926,6 +1934,28 @@ impl VauchiMobile {
             total += pending.len() as u32;
         }
         Ok(total)
+    }
+
+    // === Delivery Privacy Settings ===
+
+    /// Returns whether delivery receipts (ReceivedByRecipient ACKs) are enabled.
+    pub fn is_delivery_receipts_enabled(&self) -> bool {
+        *self.delivery_receipts_enabled.lock().unwrap()
+    }
+
+    /// Sets whether delivery receipts are enabled.
+    pub fn set_delivery_receipts_enabled(&self, enabled: bool) {
+        *self.delivery_receipts_enabled.lock().unwrap() = enabled;
+    }
+
+    /// Returns whether presence suppression is enabled.
+    pub fn is_suppress_presence_enabled(&self) -> bool {
+        *self.suppress_presence.lock().unwrap()
+    }
+
+    /// Sets whether presence suppression is enabled.
+    pub fn set_suppress_presence_enabled(&self, enabled: bool) {
+        *self.suppress_presence.lock().unwrap() = enabled;
     }
 
     // === Delivery Status Operations ===

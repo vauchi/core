@@ -28,7 +28,8 @@ dist/
 # Swift build artifacts
 .build/
 
-.cargo/
+.cargo/*
+!.cargo/mutants.toml
 .sccache/
 .claude/
 

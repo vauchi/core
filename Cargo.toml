@@ -44,3 +44,8 @@ inherits = "release"
 lto = "thin"          # Faster than full LTO, still good optimization
 codegen-units = 16    # More parallelism during compilation
 incremental = false   # CI builds are fresh, no benefit from incremental
+
+# Mutation testing profile: fast incremental builds, no debug info needed
+[profile.mutants]
+inherits = "test"
+debug = "none"        # Skip debug symbols — mutants only need pass/fail

@@ -7,7 +7,14 @@
 //! Converts contact fields to actionable URIs (tel:, mailto:, https:, etc.)
 //! Implements security whitelist to block dangerous URI schemes.
 
+use std::sync::LazyLock;
+
 use super::{ContactField, FieldType};
+use crate::social::SocialNetworkRegistry;
+
+/// Default social network registry (loaded once, shared across calls).
+static DEFAULT_REGISTRY: LazyLock<SocialNetworkRegistry> =
+    LazyLock::new(SocialNetworkRegistry::with_defaults);
 
 /// Actions that can be performed on a contact field.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -93,24 +100,6 @@ pub fn is_safe_url(url: &str) -> bool {
 /// Extract scheme from a URI string.
 fn extract_scheme(uri: &str) -> Option<&str> {
     uri.split(':').next()
-}
-
-/// Social network URL templates.
-/// Maps lowercase label names to their profile URL templates.
-fn social_url_template(label: &str) -> Option<&'static str> {
-    match label.to_lowercase().as_str() {
-        "twitter" | "x" => Some("https://twitter.com/{username}"),
-        "github" => Some("https://github.com/{username}"),
-        "linkedin" => Some("https://linkedin.com/{username}"),
-        "instagram" => Some("https://instagram.com/{username}"),
-        "facebook" => Some("https://facebook.com/{username}"),
-        "mastodon" => Some("https://mastodon.social/@{username}"),
-        "youtube" => Some("https://youtube.com/@{username}"),
-        "tiktok" => Some("https://tiktok.com/@{username}"),
-        "reddit" => Some("https://reddit.com/u/{username}"),
-        "bluesky" => Some("https://bsky.app/profile/{username}"),
-        _ => None,
-    }
 }
 
 /// Normalize a social media username (remove @ prefix if present).
@@ -218,30 +207,33 @@ impl ContactField {
     }
 
     /// Generate profile URL for social field.
+    ///
+    /// Delegates to the `SocialNetworkRegistry` for URL templates, supporting
+    /// all registered networks (38+) rather than a hardcoded subset.
     fn social_to_uri(&self, value: &str) -> Option<String> {
-        let template = social_url_template(self.label())?;
+        // Normalize label aliases to registry IDs
+        let label_lower = match self.label().to_lowercase().as_str() {
+            "x" => "twitter".to_string(),
+            other => other.to_string(),
+        };
         let username = normalize_social_username(value);
 
         // Handle Mastodon federated handles (@user@instance or user@instance)
-        if self.label().to_lowercase() == "mastodon" {
+        if label_lower == "mastodon" {
             if let Some(profile_url) = parse_mastodon_federated(username) {
                 return Some(profile_url);
             }
-            // Not a federated handle — fall through to template
+            // Not a federated handle — fall through to registry
         }
 
-        // Handle LinkedIn's special format (in/username)
-        let username = if self.label().to_lowercase() == "linkedin" {
-            if username.starts_with("in/") {
-                username.to_string()
-            } else {
-                format!("in/{}", username)
-            }
+        // Strip LinkedIn "in/" prefix if user included it (template already has it)
+        let username = if label_lower == "linkedin" {
+            username.strip_prefix("in/").unwrap_or(username)
         } else {
-            username.to_string()
+            username
         };
 
-        Some(template.replace("{username}", &username))
+        DEFAULT_REGISTRY.profile_url(&label_lower, username)
     }
 
     /// Get the primary action for this field.

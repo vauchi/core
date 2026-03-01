@@ -221,6 +221,14 @@ fn test_social_spotify_generates_profile_url() {
 
 // @scenario: contact_actions:Tap social media opens profile
 #[test]
+fn test_social_x_alias_resolves_to_twitter() {
+    let field = ContactField::new(FieldType::Social, "X", "@alice");
+    let uri = field.to_uri();
+    assert_eq!(uri, Some("https://twitter.com/alice".to_string()));
+}
+
+// @scenario: contact_actions:Tap social media opens profile
+#[test]
 fn test_social_linkedin_with_in_prefix_no_duplication() {
     // User enters "in/johndoe" — should not produce "in/in/johndoe"
     let field = ContactField::new(FieldType::Social, "LinkedIn", "in/johndoe");

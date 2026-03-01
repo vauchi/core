@@ -9,7 +9,9 @@
 
 use vauchi_core::crypto::SymmetricKey;
 use vauchi_core::delivery::{DeliveryAckStatus, DeliveryService};
-use vauchi_core::storage::{DeliveryRecord, DeliveryStatus, RetryEntry, Storage};
+use vauchi_core::storage::{
+    DeliveryRecord, DeliveryStatus, DeviceDeliveryRecord, DeviceDeliveryStatus, RetryEntry, Storage,
+};
 
 fn test_storage() -> Storage {
     let key = SymmetricKey::generate();
@@ -330,5 +332,150 @@ fn test_run_cleanup_removes_old_terminal_records() {
             .unwrap()
             .is_some(),
         "Recent delivered record should survive"
+    );
+}
+
+// === Per-Device ACK Tracking Tests (SP-12b Task 21) ===
+
+fn create_device_record(storage: &Storage, message_id: &str, device_id: &str, recipient_id: &str) {
+    let record = DeviceDeliveryRecord {
+        message_id: message_id.to_string(),
+        device_id: device_id.to_string(),
+        recipient_id: recipient_id.to_string(),
+        status: DeviceDeliveryStatus::Pending,
+        updated_at: now(),
+    };
+    storage.create_device_delivery(&record).unwrap();
+}
+
+// @scenario: message_delivery:Per-device ACK tracking aggregates to full delivery
+#[test]
+fn test_handle_device_ack_tracks_per_device_delivery() {
+    let storage = test_storage();
+    let service = DeliveryService::new();
+
+    // Create message-level delivery record
+    create_test_delivery(&storage, "msg-multi", DeliveryStatus::Stored);
+
+    // Register 3 target devices
+    create_device_record(&storage, "msg-multi", "device-a", "recipient-1");
+    create_device_record(&storage, "msg-multi", "device-b", "recipient-1");
+    create_device_record(&storage, "msg-multi", "device-c", "recipient-1");
+
+    // ACK device-a → not fully delivered
+    let summary = service
+        .handle_device_ack(
+            &storage,
+            "msg-multi",
+            "device-a",
+            DeviceDeliveryStatus::Delivered,
+        )
+        .unwrap();
+    assert_eq!(summary.delivered_devices, 1);
+    assert_eq!(summary.total_devices, 3);
+    assert!(
+        !summary.is_fully_delivered(),
+        "1/3 devices — not fully delivered"
+    );
+
+    // Message-level status should still be Stored (not yet fully delivered)
+    let record = storage.get_delivery_record("msg-multi").unwrap().unwrap();
+    assert_eq!(record.status, DeliveryStatus::Stored);
+
+    // ACK device-b → still not fully delivered
+    let summary = service
+        .handle_device_ack(
+            &storage,
+            "msg-multi",
+            "device-b",
+            DeviceDeliveryStatus::Delivered,
+        )
+        .unwrap();
+    assert_eq!(summary.delivered_devices, 2);
+    assert!(
+        !summary.is_fully_delivered(),
+        "2/3 devices — not fully delivered"
+    );
+
+    // ACK device-c → fully delivered
+    let summary = service
+        .handle_device_ack(
+            &storage,
+            "msg-multi",
+            "device-c",
+            DeviceDeliveryStatus::Delivered,
+        )
+        .unwrap();
+    assert_eq!(summary.delivered_devices, 3);
+    assert!(
+        summary.is_fully_delivered(),
+        "3/3 devices — fully delivered"
+    );
+
+    // Message-level status should now be Delivered
+    let record = storage.get_delivery_record("msg-multi").unwrap().unwrap();
+    assert_eq!(
+        record.status,
+        DeliveryStatus::Delivered,
+        "Message-level status should be Delivered when all devices confirmed"
+    );
+}
+
+// @scenario: message_delivery:Device ACK for unknown message returns error
+#[test]
+fn test_handle_device_ack_unknown_message_returns_error() {
+    let storage = test_storage();
+    let service = DeliveryService::new();
+
+    let result = service.handle_device_ack(
+        &storage,
+        "nonexistent",
+        "device-a",
+        DeviceDeliveryStatus::Delivered,
+    );
+    assert!(
+        result.is_err(),
+        "Device ACK for unknown message should return error"
+    );
+}
+
+// @scenario: message_delivery:Failed device ACK does not mark message delivered
+#[test]
+fn test_handle_device_ack_failed_device_not_fully_delivered() {
+    let storage = test_storage();
+    let service = DeliveryService::new();
+
+    create_test_delivery(&storage, "msg-fail", DeliveryStatus::Stored);
+    create_device_record(&storage, "msg-fail", "device-a", "recipient-1");
+    create_device_record(&storage, "msg-fail", "device-b", "recipient-1");
+
+    // device-a delivered, device-b failed
+    service
+        .handle_device_ack(
+            &storage,
+            "msg-fail",
+            "device-a",
+            DeviceDeliveryStatus::Delivered,
+        )
+        .unwrap();
+    let summary = service
+        .handle_device_ack(
+            &storage,
+            "msg-fail",
+            "device-b",
+            DeviceDeliveryStatus::Failed,
+        )
+        .unwrap();
+
+    assert_eq!(summary.delivered_devices, 1);
+    assert_eq!(summary.failed_devices, 1);
+    assert!(!summary.is_fully_delivered());
+
+    // Message-level should NOT be Delivered
+    let record = storage.get_delivery_record("msg-fail").unwrap().unwrap();
+    assert_ne!(
+        record.status,
+        DeliveryStatus::Delivered,
+        "Message should not be marked Delivered when a device failed"
     );
 }

@@ -947,3 +947,66 @@ fn test_address_special_characters() {
     let uri_str = uri.unwrap();
     assert!(uri_str.contains("geo:") || uri_str.contains("maps"));
 }
+
+// ============================================================
+// Property tests: registry-backed social_to_uri (SP-20, CC-04)
+// ============================================================
+
+use proptest::prelude::*;
+
+/// All 38 bundled network IDs should produce a Some URI for any non-empty username.
+#[test]
+fn test_all_registry_networks_produce_uri() {
+    let registry = vauchi_core::social::SocialNetworkRegistry::with_defaults();
+    let networks = registry.all();
+    assert_eq!(networks.len(), 38, "Expected 38 bundled networks");
+
+    for network in &networks {
+        // Skip mastodon — federation handles tested separately
+        if network.id() == "mastodon" {
+            continue;
+        }
+
+        let field = ContactField::new(FieldType::Social, network.display_name(), "testuser123");
+        let uri = field.to_uri();
+        assert!(
+            uri.is_some(),
+            "Network '{}' (id='{}') should produce a URI for 'testuser123', got None",
+            network.display_name(),
+            network.id(),
+        );
+
+        let uri_str = uri.unwrap();
+        assert!(
+            uri_str.starts_with("https://"),
+            "Network '{}' URI should start with https://, got: {}",
+            network.display_name(),
+            uri_str,
+        );
+        assert!(
+            uri_str.contains("testuser123"),
+            "Network '{}' URI should contain 'testuser123', got: {}",
+            network.display_name(),
+            uri_str,
+        );
+    }
+}
+
+proptest! {
+    /// For any non-empty ASCII alphanumeric username and any known network,
+    /// social_to_uri should return a valid https URL containing the username.
+    #[test]
+    fn test_social_to_uri_valid_for_any_username(
+        username in "[a-zA-Z0-9_]{1,30}"
+    ) {
+        let field = ContactField::new(FieldType::Social, "GitHub", &username);
+        let uri = field.to_uri();
+        prop_assert!(uri.is_some(), "GitHub should produce URI for '{}'", username);
+        let uri_str = uri.unwrap();
+        prop_assert!(
+            uri_str.starts_with("https://github.com/"),
+            "Expected GitHub URL prefix, got: {}",
+            uri_str,
+        );
+    }
+}

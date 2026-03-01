@@ -208,9 +208,20 @@ impl SocialNetworkRegistry {
 
     /// Generates a profile URL for a given network and username.
     ///
+    /// Looks up by ID first, then falls back to display name match.
     /// Returns None if the network is not found.
     pub fn profile_url(&self, network_id: &str, username: &str) -> Option<String> {
-        self.get(network_id).map(|n| n.profile_url(username))
+        self.get(network_id)
+            .or_else(|| self.find_by_display_name(network_id))
+            .map(|n| n.profile_url(username))
+    }
+
+    /// Finds a network by its display name (case-insensitive exact match).
+    pub fn find_by_display_name(&self, name: &str) -> Option<&SocialNetwork> {
+        let name_lower = name.to_lowercase();
+        self.networks
+            .values()
+            .find(|n| n.display_name.to_lowercase() == name_lower)
     }
 
     /// Searches for networks by name (case-insensitive partial match).

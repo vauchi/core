@@ -50,8 +50,8 @@ fn test_contact_card_nickname_field_max_length() {
 
 #[test]
 fn test_birthday_field_type_exists() {
-    // RED: FieldType::Birthday doesn't exist yet
-    let _ = FieldType::Birthday;
+    let field_type = FieldType::Birthday;
+    assert_eq!(format!("{field_type:?}"), "Birthday");
 }
 
 #[test]

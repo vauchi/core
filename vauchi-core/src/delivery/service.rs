@@ -7,7 +7,10 @@
 //! Receives acknowledgment events from the transport layer and updates
 //! delivery records and retry entries in storage accordingly.
 
-use crate::storage::{DeliveryStatus, RetryEntry, RetryQueue, Storage, StorageError};
+use crate::storage::{
+    DeliveryStatus, DeliverySummary, DeviceDeliveryStatus, RetryEntry, RetryQueue, Storage,
+    StorageError,
+};
 
 /// ACK status received from the relay/transport layer.
 ///
@@ -113,6 +116,41 @@ impl DeliveryService {
         }
 
         Ok(())
+    }
+
+    /// Handles a per-device ACK, updating the device delivery record and
+    /// recomputing the aggregate message delivery status.
+    ///
+    /// When all devices confirm delivery, the message-level status is
+    /// automatically promoted to `Delivered`.
+    ///
+    /// Returns the updated `DeliverySummary` so callers can check progress.
+    pub fn handle_device_ack(
+        &self,
+        storage: &Storage,
+        message_id: &str,
+        device_id: &str,
+        status: DeviceDeliveryStatus,
+    ) -> Result<DeliverySummary, StorageError> {
+        // Verify the message-level record exists
+        storage.get_delivery_record(message_id)?.ok_or_else(|| {
+            StorageError::NotFound(format!("Delivery record not found: {}", message_id))
+        })?;
+
+        let now = current_timestamp();
+
+        // Update the individual device status
+        storage.update_device_delivery_status(message_id, device_id, status, now)?;
+
+        // Recompute aggregate
+        let summary = storage.get_delivery_summary(message_id)?;
+
+        // If all devices delivered, promote message-level status
+        if summary.is_fully_delivered() {
+            storage.update_delivery_status(message_id, &DeliveryStatus::Delivered, now)?;
+        }
+
+        Ok(summary)
     }
 
     /// Runs periodic cleanup tasks:

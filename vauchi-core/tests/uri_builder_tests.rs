@@ -164,6 +164,70 @@ fn test_social_facebook_generates_profile_url() {
     assert_eq!(uri, Some("https://facebook.com/bob.smith.123".to_string()));
 }
 
+// ---- Registry-backed social networks (SP-20 Phase 1) ----
+// These networks are in the SocialNetworkRegistry but were previously
+// not supported by the hardcoded social_url_template() function.
+
+// @scenario: contact_actions:Tap social media opens profile
+#[test]
+fn test_social_twitch_generates_profile_url() {
+    let field = ContactField::new(FieldType::Social, "Twitch", "streamer42");
+    let uri = field.to_uri();
+    assert_eq!(uri, Some("https://twitch.tv/streamer42".to_string()));
+}
+
+// @scenario: contact_actions:Tap social media opens profile
+#[test]
+fn test_social_gitlab_generates_profile_url() {
+    let field = ContactField::new(FieldType::Social, "GitLab", "devuser");
+    let uri = field.to_uri();
+    assert_eq!(uri, Some("https://gitlab.com/devuser".to_string()));
+}
+
+// @scenario: contact_actions:Tap social media opens profile
+#[test]
+fn test_social_telegram_generates_profile_url() {
+    let field = ContactField::new(FieldType::Social, "Telegram", "alice");
+    let uri = field.to_uri();
+    assert_eq!(uri, Some("https://t.me/alice".to_string()));
+}
+
+// @scenario: contact_actions:Tap social media opens profile
+#[test]
+fn test_social_discord_generates_profile_url() {
+    let field = ContactField::new(FieldType::Social, "Discord", "user123");
+    let uri = field.to_uri();
+    assert_eq!(uri, Some("https://discord.com/users/user123".to_string()));
+}
+
+// @scenario: contact_actions:Tap social media opens profile
+#[test]
+fn test_social_threads_generates_profile_url() {
+    let field = ContactField::new(FieldType::Social, "Threads", "@alice");
+    let uri = field.to_uri();
+    assert_eq!(uri, Some("https://threads.net/@alice".to_string()));
+}
+
+// @scenario: contact_actions:Tap social media opens profile
+#[test]
+fn test_social_spotify_generates_profile_url() {
+    let field = ContactField::new(FieldType::Social, "Spotify", "musicfan");
+    let uri = field.to_uri();
+    assert_eq!(
+        uri,
+        Some("https://open.spotify.com/user/musicfan".to_string())
+    );
+}
+
+// @scenario: contact_actions:Tap social media opens profile
+#[test]
+fn test_social_linkedin_with_in_prefix_no_duplication() {
+    // User enters "in/johndoe" — should not produce "in/in/johndoe"
+    let field = ContactField::new(FieldType::Social, "LinkedIn", "in/johndoe");
+    let uri = field.to_uri();
+    assert_eq!(uri, Some("https://linkedin.com/in/johndoe".to_string()));
+}
+
 #[test]
 fn test_social_unknown_network_returns_none() {
     let field = ContactField::new(FieldType::Social, "UnknownNetwork", "bobsmith");

@@ -52,7 +52,7 @@ Two distinct NFC features exist. Use these names consistently:
 ### "NFC Active" (phone-to-phone tap)
 
 - **Shorthand**: NFC Active, active NFC, device-to-device NFC
-- **Problem record**: `_private/docs/problems/2026-02-02-nfc-active-device-exchange/`
+- **Problem record**: `_private/docs/problems/done/2026-02-02-nfc-active-device-exchange/`
 - **Status**: `planning` (P2, post-MVP) — **0% code implemented**
 - **Planned module**: `vauchi-core/src/exchange/nfc_active.rs`
 - **Magic bytes**: `VNFC`

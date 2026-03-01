@@ -282,6 +282,7 @@ fn test_count_deliveries_by_status() {
 }
 
 // @scenario: message_delivery:Message expires after TTL
+// @scenario: message_delivery.feature:Message stored with TTL
 #[test]
 fn test_expire_old_deliveries() {
     let storage = test_storage();

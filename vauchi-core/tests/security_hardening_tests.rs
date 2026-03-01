@@ -337,6 +337,7 @@ fn test_exchange_succeeds_with_mutual_scan() {
 /// what the test actually verifies — Debug trait redaction, not memory zeroing.)
 // @scenario: security:Memory dump protection
 // @scenario: security:Private key memory protection
+// @scenario: identity_management.feature:Secure memory handling for keys
 #[test]
 fn test_debug_format_excludes_key_material() {
     let key = SymmetricKey::generate();
@@ -524,6 +525,7 @@ fn test_audit_log_no_sensitive_data() {
 
 /// Scenario: SymmetricKey Debug output is redacted
 // @scenario: security:Security events logged
+// @scenario: identity_management.feature:Private keys never exposed in logs
 #[test]
 fn test_key_material_never_logged() {
     let key = SymmetricKey::generate();

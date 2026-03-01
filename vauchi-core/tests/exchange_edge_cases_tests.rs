@@ -255,6 +255,7 @@ fn test_session_timeout_detection() {
 
 /// Scenario: Interrupted session can be resumed within window
 // @scenario: contact_exchange.feature:Exchange session timeout
+// @scenario: contact_exchange.feature:Resume interrupted exchange
 #[test]
 fn test_interrupted_session_resumable() {
     let alice = Identity::create("Alice");
@@ -450,6 +451,7 @@ fn test_valid_signature_accepted() {
 // =============================================================================
 
 /// Scenario: QR reuse is detected by check_qr_reuse
+// @scenario: contact_exchange.feature:Same QR scanned twice by same person
 #[test]
 fn test_qr_reuse_detected() {
     let alice = Identity::create("Alice");

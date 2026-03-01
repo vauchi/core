@@ -185,6 +185,7 @@ fn test_conflict_resolution_clock_independent() {
 
 /// Scenario: Version vectors handle extreme clock skew
 // @scenario: sync_updates.feature:Extreme clock skew detection
+// @scenario: device_management.feature:Backward clock jump (Clock Skew)
 #[test]
 fn test_extreme_clock_skew() {
     let device_a = [0x01u8; 32];

@@ -347,6 +347,7 @@ fn test_contact_trust_for_recovery() {
 }
 
 // @scenario: identity_management.feature:Social recovery setup
+// @scenario: contact_recovery.feature:Remove recovery trust from contact
 #[test]
 fn test_contact_untrust_for_recovery() {
     let mut contact = create_test_contact();
@@ -396,6 +397,7 @@ fn test_contact_from_sync_data_full_with_recovery_trusted() {
 }
 
 // @scenario: identity_management.feature:Social recovery setup
+// @scenario: contact_recovery.feature:Removing trust does not affect other contact properties
 #[test]
 fn test_recovery_trust_independent_of_blocked_hidden() {
     let mut contact = create_test_contact();

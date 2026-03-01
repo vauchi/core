@@ -26,6 +26,7 @@ fn add_contact_with_recovery_trust(wb: &Vauchi<MockTransport>, pk: [u8; 32], tru
 }
 
 // @scenario: contact_recovery:Warning when trusted contacts below threshold
+// @scenario: contact_recovery.feature:Warning when removing trust drops below threshold
 #[test]
 fn test_get_recovery_readiness_returns_not_ready_below_threshold() {
     let wb = create_test_vauchi();

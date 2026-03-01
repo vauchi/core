@@ -8,6 +8,7 @@
 use vauchi_core::delivery::{KeyRotationDetector, KeyRotationError};
 
 // @scenario: message_delivery:Key rotation detected during send
+// @scenario: message_delivery.feature:Handle recipient key rotation
 #[test]
 fn test_detect_key_rotation_on_key_mismatch() {
     let detector = KeyRotationDetector::new();

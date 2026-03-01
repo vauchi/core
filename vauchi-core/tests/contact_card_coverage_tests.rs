@@ -87,6 +87,7 @@ fn test_remove_field_not_found() {
 }
 
 // @scenario: contact_card_management:Exceed maximum fields
+// @scenario: contact_card_management.feature:Maximum number of fields
 #[test]
 fn test_max_fields_reached() {
     let mut card = ContactCard::new("Test");

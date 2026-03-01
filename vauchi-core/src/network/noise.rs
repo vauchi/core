@@ -153,6 +153,7 @@ impl NoiseTransport {
     }
 }
 
+// INLINE_TEST_REQUIRED: Tests access private Noise protocol internals (keypair generation, handshake state)
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -186,6 +187,7 @@ mod tests {
         assert_eq!(handshake_msg.len(), 48);
     }
 
+    // @scenario: noise_protocol.feature:V2 connection uses magic bytes prefix
     #[test]
     fn test_v2_message_has_correct_magic() {
         let (_priv, pub_key) = generate_test_relay_keypair();
@@ -198,6 +200,7 @@ mod tests {
         assert_eq!(&v2_msg[3..], &handshake_msg);
     }
 
+    // @scenario: noise_protocol.feature:Messages encrypted after handshake
     #[test]
     fn test_full_handshake_and_transport() {
         let (priv_key, pub_key) = generate_test_relay_keypair();
@@ -284,6 +287,7 @@ mod tests {
         assert!(result.is_err());
     }
 
+    // @scenario: noise_protocol.feature:Relay public key parsed from URL fragment
     #[test]
     fn test_parse_relay_noise_pubkey_valid() {
         let (_priv, pub_key) = generate_test_relay_keypair();
@@ -294,6 +298,7 @@ mod tests {
         assert_eq!(parsed, Some(pub_key));
     }
 
+    // @scenario: noise_protocol.feature:URL without fragment has no Noise key
     #[test]
     fn test_parse_relay_noise_pubkey_no_fragment() {
         assert_eq!(parse_relay_noise_pubkey("wss://relay.example.com"), None);
@@ -304,6 +309,7 @@ mod tests {
         assert_eq!(parse_relay_noise_pubkey("wss://relay.example.com#"), None);
     }
 
+    // @scenario: noise_protocol.feature:Invalid Noise key in URL fragment is rejected
     #[test]
     fn test_parse_relay_noise_pubkey_invalid_base64() {
         assert_eq!(
@@ -312,6 +318,7 @@ mod tests {
         );
     }
 
+    // @scenario: noise_protocol.feature:Wrong-length key in URL fragment is rejected
     #[test]
     fn test_parse_relay_noise_pubkey_wrong_length() {
         // Encode only 16 bytes instead of 32

@@ -156,6 +156,7 @@ fn test_nfc_too_short_payload() {
 }
 
 // @scenario: contact_exchange.feature:NFC exchange rejects expired payload
+// @scenario: contact_exchange.feature:NFC payload expires after 60 seconds
 #[test]
 fn test_nfc_expiry() {
     let identity = Identity::create("Alice");
@@ -202,6 +203,7 @@ fn test_nfc_clock_drift_tolerance() {
 }
 
 // @scenario: contact_exchange.feature:Mutual QR uses fresh ephemeral keys for forward secrecy
+// @scenario: contact_exchange.feature:NFC active uses fresh ephemeral keys for forward secrecy
 #[test]
 fn test_nfc_different_ephemerals() {
     let identity = Identity::create("Alice");
@@ -386,6 +388,7 @@ fn test_nfc_rejects_wrong_transport() {
 }
 
 // @scenario: contact_exchange.feature:Cannot exchange with yourself
+// @scenario: contact_exchange.feature:NFC exchange prevents self-exchange
 #[test]
 fn test_nfc_self_exchange_rejected() {
     let alice_identity = Identity::create("Alice");

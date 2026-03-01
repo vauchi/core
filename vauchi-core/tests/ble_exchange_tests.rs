@@ -641,6 +641,7 @@ fn test_ble_payload_size() {
 
 // @scenario: contact_exchange.feature:Mutual QR uses fresh ephemeral keys for forward secrecy
 // @scenario: security.feature:Forward secrecy via Double Ratchet
+// @scenario: contact_exchange.feature:BLE exchange uses fresh ephemeral keys
 #[test]
 fn test_ble_forward_secrecy() {
     // Both sides use fresh ephemeral keys — not identity-derived

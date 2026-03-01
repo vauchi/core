@@ -386,6 +386,7 @@ fn test_blocked_data_scheme() {
 }
 
 // @scenario: contact_actions:Allowed URI schemes whitelist (#47)
+// @scenario: contact_actions.feature:Allowed URI schemes whitelist
 #[test]
 fn test_allowed_tel_scheme() {
     assert!(vauchi_core::contact_card::is_allowed_scheme("tel"));
@@ -489,6 +490,7 @@ fn test_unicode_in_address_encoded() {
 // ============================================================
 
 // @scenario: contact_actions:Phone field offers Call and SMS actions in context menu
+// @scenario: contact_actions.feature:Long press phone number shows action menu
 #[test]
 fn test_phone_secondary_actions_call_and_sms() {
     let field = ContactField::new(FieldType::Phone, "Mobile", "+1-555-123-4567");
@@ -500,6 +502,7 @@ fn test_phone_secondary_actions_call_and_sms() {
 }
 
 // @scenario: contact_actions:Email field offers Send Email and Copy actions
+// @scenario: contact_actions.feature:Long press email shows action menu
 #[test]
 fn test_email_secondary_actions() {
     let field = ContactField::new(FieldType::Email, "Work", "bob@company.com");
@@ -510,6 +513,7 @@ fn test_email_secondary_actions() {
 }
 
 // @scenario: contact_actions:Website field offers Open URL and Copy actions
+// @scenario: contact_actions.feature:Long press website shows action menu
 #[test]
 fn test_website_secondary_actions() {
     let field = ContactField::new(FieldType::Website, "Blog", "https://example.com");
@@ -520,6 +524,7 @@ fn test_website_secondary_actions() {
 }
 
 // @scenario: contact_actions:Address field offers Get Directions and Open Map and Copy actions
+// @scenario: contact_actions.feature:Long press address shows action menu
 #[test]
 fn test_address_secondary_actions() {
     let field = ContactField::new(FieldType::Address, "Home", "123 Main St, City");
@@ -535,6 +540,7 @@ fn test_address_secondary_actions() {
 }
 
 // @scenario: contact_actions:Social field offers Open Profile and Copy actions
+// @scenario: contact_actions.feature:Long press social field shows action menu
 #[test]
 fn test_social_secondary_actions() {
     let field = ContactField::new(FieldType::Social, "Twitter", "@bobsmith");
@@ -544,6 +550,7 @@ fn test_social_secondary_actions() {
 }
 
 // @scenario: contact_actions:Custom field with actionable content offers actions
+// @scenario: contact_actions.feature:Long press custom field shows contextual menu
 #[test]
 fn test_custom_field_secondary_actions() {
     let field = ContactField::new(FieldType::Custom, "Notes", "+1-555-987-6543");
@@ -570,6 +577,7 @@ fn test_empty_field_secondary_actions() {
 // ============================================================
 
 // @scenario: contact_actions:Get directions generates web maps URL
+// @scenario: contact_actions.feature:Get directions to address
 #[test]
 fn test_directions_uri_basic_address() {
     let field = ContactField::new(FieldType::Address, "Home", "123 Main St, City, ST 12345");

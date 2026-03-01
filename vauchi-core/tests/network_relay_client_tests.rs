@@ -384,6 +384,7 @@ fn test_send_purge_request_send_error() {
 // === Delivery Receipts Privacy Tests (SP-12b Phase 2) ===
 
 // @scenario: message_delivery:Delivery receipts can be disabled by user
+// @scenario: message_delivery.feature:Delivery receipts are optional
 #[test]
 fn test_delivery_receipts_disabled_config() {
     let config = RelayClientConfig {

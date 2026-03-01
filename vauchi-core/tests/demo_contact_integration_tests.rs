@@ -174,6 +174,7 @@ fn test_all_tip_categories_exist() {
 /// Test: Tips rotate through all content
 /// Feature: demo_contact.feature @demo-content
 // @scenario: demo_contact.feature:Demo contact has rotating tips
+// @scenario: demo_contact.feature:Demo tips change over time
 #[test]
 fn test_demo_tips_rotate() {
     let mut state = DemoContactState::new_active();

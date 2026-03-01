@@ -1019,6 +1019,7 @@ fn test_custom_field_control_characters() {
 // =============================================================================
 
 // @scenario: field_validation:Each field type has independent validation
+// @scenario: field_validation.feature:Each social field has independent validation
 #[test]
 fn test_cross_field_dependencies_independent_validation() {
     use vauchi_core::contact_card::{ContactCard, ContactField, FieldType};

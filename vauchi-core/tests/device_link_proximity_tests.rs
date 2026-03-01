@@ -25,6 +25,7 @@ fn create_test_registry(identity: &Identity) -> DeviceRegistry {
 }
 
 // @scenario: device_management.feature:Linking requires proximity verification
+// @scenario: device_management.feature:Prevent unauthorized device linking
 #[test]
 fn test_build_response_rejected_without_proximity() {
     let master_seed = [0x42u8; 32];

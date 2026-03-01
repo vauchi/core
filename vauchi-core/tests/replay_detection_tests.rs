@@ -17,6 +17,7 @@ use vauchi_core::exchange::X3DHKeyPair;
 
 /// Scenario: Same message cannot be decrypted twice
 // @scenario: security.feature:Replay attack prevention
+// @scenario: sync_updates.feature:Reject replay attacks
 #[test]
 fn test_same_message_decrypted_once() {
     let x3dh_secret = SymmetricKey::generate();

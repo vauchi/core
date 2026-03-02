@@ -614,3 +614,138 @@ fn test_nfc_expired_payload_rejection() {
     let parsed = ExchangeNfc::from_bytes(&bytes).unwrap();
     assert!(parsed.is_expired());
 }
+
+// ============================================================
+// Additional NFC Edge Case Tests
+// ============================================================
+
+// @scenario: contact_exchange.feature:NFC exchange reports descriptive error on failure
+#[test]
+fn test_nfc_payload_with_different_identities() {
+    let alice = Identity::create("Alice");
+    let bob = Identity::create("Bob");
+
+    let eph1 = X3DHKeyPair::generate();
+    let eph2 = X3DHKeyPair::generate();
+
+    let alice_payload = ExchangeNfc::generate(&alice, &eph1);
+    let bob_payload = ExchangeNfc::generate(&bob, &eph2);
+
+    // Verify they have different identities but both are valid
+    assert_ne!(alice_payload.identity_key(), bob_payload.identity_key());
+    assert!(alice_payload.verify_signature());
+    assert!(bob_payload.verify_signature());
+}
+
+// @scenario: security.feature:Tampered exchange data is rejected
+#[test]
+fn test_nfc_signature_failure_with_wrong_key() {
+    let alice = Identity::create("Alice");
+    let _bob = Identity::create("Bob");
+
+    let ephemeral = X3DHKeyPair::generate();
+
+    // Create payload with Alice's identity
+    let alice_payload = ExchangeNfc::generate(&alice, &ephemeral);
+
+    // Try to forge with Bob's identity but Alice's signature
+    // (This would require Bob to have access to Alice's signing key, which is impossible)
+    // Instead, just verify that signature check catches tampering
+    let mut bytes = alice_payload.to_bytes();
+
+    // Tamper with identity key field
+    bytes[6] ^= 0xFF;
+
+    let tampered = ExchangeNfc::from_bytes(&bytes).expect("Should parse");
+    assert!(
+        !tampered.verify_signature(),
+        "Tampered identity should fail signature"
+    );
+}
+
+// @scenario: security.feature:Tampered exchange data is rejected
+#[test]
+fn test_nfc_payload_tampering_in_token_field() {
+    let identity = Identity::create("Alice");
+    let ephemeral = X3DHKeyPair::generate();
+
+    let payload = ExchangeNfc::generate(&identity, &ephemeral);
+    let mut bytes = payload.to_bytes();
+
+    // Tamper with token field (bytes 70-101)
+    bytes[75] ^= 0xFF;
+
+    let tampered = ExchangeNfc::from_bytes(&bytes).expect("Should parse");
+    assert!(
+        !tampered.verify_signature(),
+        "Tampered token should fail signature"
+    );
+}
+
+// @scenario: contact_exchange.feature:NFC exchange reports descriptive error on failure
+#[test]
+fn test_nfc_payload_tampering_in_exchange_key() {
+    let identity = Identity::create("Alice");
+    let ephemeral = X3DHKeyPair::generate();
+
+    let payload = ExchangeNfc::generate(&identity, &ephemeral);
+    let mut bytes = payload.to_bytes();
+
+    // Tamper with exchange key field (bytes 38-69)
+    bytes[50] ^= 0xFF;
+
+    let tampered = ExchangeNfc::from_bytes(&bytes).expect("Should parse");
+    assert!(
+        !tampered.verify_signature(),
+        "Tampered exchange key should fail signature"
+    );
+}
+
+// @scenario: contact_exchange.feature:NFC exchange reports descriptive error on failure
+#[test]
+fn test_nfc_payload_tampering_in_signature() {
+    let identity = Identity::create("Alice");
+    let ephemeral = X3DHKeyPair::generate();
+
+    let payload = ExchangeNfc::generate(&identity, &ephemeral);
+    let mut bytes = payload.to_bytes();
+
+    // Tamper with signature field (bytes 110-173)
+    bytes[140] ^= 0xFF;
+
+    let tampered = ExchangeNfc::from_bytes(&bytes).expect("Should parse");
+    assert!(
+        !tampered.verify_signature(),
+        "Tampered signature should fail verification"
+    );
+}
+
+// @scenario: contact_exchange.feature:NFC payload expires after 60 seconds
+#[test]
+fn test_nfc_payload_boundary_at_expiry_window() {
+    let identity = Identity::create("Alice");
+    let ephemeral = X3DHKeyPair::generate();
+
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+
+    // Just at the boundary (60 seconds) — considered NOT expired (now > timestamp + 60 is false when now == timestamp + 60)
+    let boundary = ExchangeNfc::generate_with_timestamp(&identity, &ephemeral, [0u8; 32], now - 60);
+    assert!(
+        !boundary.is_expired(),
+        "At exactly 60 seconds, payload should still be valid"
+    );
+
+    // Just after expiry (61 seconds)
+    let expired = ExchangeNfc::generate_with_timestamp(&identity, &ephemeral, [0u8; 32], now - 61);
+    assert!(
+        expired.is_expired(),
+        "After 60 seconds, payload should be expired"
+    );
+
+    // Just before expiry (59 seconds)
+    let fresh = ExchangeNfc::generate_with_timestamp(&identity, &ephemeral, [0u8; 32], now - 59);
+    assert!(!fresh.is_expired());
+}

@@ -149,17 +149,16 @@ lint:clippy:
 test:core:
   extends: [.linux-runner, .validation-rust, .timeout-standard]
   stage: test
+  parallel: 2
   needs:
     - job: lint:format
-      optional: true
-    - job: lint:clippy
       optional: true
   before_script:
     - !reference [.self-hosted, before_script]
     - !reference [.clone-locales, before_script]
     - !reference [.clone-themes, before_script]
   script:
-    - cargo nextest run -p vauchi-core
+    - cargo nextest run -p vauchi-core --partition slice:${CI_NODE_INDEX}/${CI_NODE_TOTAL}
 
 test:cucumber:
   extends: [.linux-runner, .validation-rust, .timeout-quick]
@@ -167,8 +166,6 @@ test:cucumber:
   allow_failure: true  # advisory: some feature files have parsing errors
   needs:
     - job: lint:format
-      optional: true
-    - job: lint:clippy
       optional: true
   before_script:
     - !reference [.self-hosted, before_script]
@@ -181,8 +178,6 @@ test:mobile:
   stage: test
   needs:
     - job: lint:format
-      optional: true
-    - job: lint:clippy
       optional: true
   before_script:
     - !reference [.self-hosted, before_script]
@@ -198,8 +193,6 @@ validate:content-contracts:
   stage: test
   needs:
     - job: lint:format
-      optional: true
-    - job: lint:clippy
       optional: true
   before_script:
     - !reference [.self-hosted, before_script]
@@ -306,7 +299,8 @@ bench:save-baseline:
     - job: lint:clippy
       optional: true
   rules:
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    # Run on schedule only (baseline up to 24h stale — acceptable given benchmark variance)
+    - if: $CI_PIPELINE_SOURCE == "schedule"
   script:
     - cargo bench -p vauchi-core --bench crypto_benchmarks --bench performance_regression -- --save-baseline main
   artifacts:

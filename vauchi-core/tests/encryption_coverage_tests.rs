@@ -239,3 +239,166 @@ fn test_decrypt_with_ad_backward_compat_tag_0x01() {
     let decrypted = decrypt_with_ad(&key, &ciphertext, b"ignored-ad").unwrap();
     assert_eq!(plaintext.to_vec(), decrypted);
 }
+
+// --- Additional coverage for edge cases and error paths ---
+
+// @scenario: security:Contact cards are encrypted at rest
+#[test]
+fn test_encrypt_with_ad_empty_plaintext() {
+    let key = SymmetricKey::generate();
+    let ad = b"some associated data";
+    let ciphertext = encrypt_with_ad(&key, b"", ad).unwrap();
+    let decrypted = decrypt_with_ad(&key, &ciphertext, ad).unwrap();
+    assert_eq!(decrypted, Vec::<u8>::new());
+}
+
+// @scenario: security:Contact cards are encrypted at rest
+#[test]
+fn test_encrypt_with_ad_large_associated_data() {
+    let key = SymmetricKey::generate();
+    let plaintext = b"secret message";
+    let large_ad = vec![0xAB; 10_000];
+    let ciphertext = encrypt_with_ad(&key, plaintext, &large_ad).unwrap();
+    let decrypted = decrypt_with_ad(&key, &ciphertext, &large_ad).unwrap();
+    assert_eq!(plaintext.to_vec(), decrypted);
+}
+
+// @scenario: security:Contact cards are encrypted at rest
+#[test]
+fn test_decrypt_with_ad_empty_ciphertext() {
+    let key = SymmetricKey::generate();
+    let result = decrypt_with_ad(&key, &[], b"ad");
+    assert!(result.is_err(), "Empty ciphertext must be rejected");
+}
+
+// @scenario: security:Contact cards are encrypted at rest
+#[test]
+fn test_decrypt_with_ad_too_short_xchacha20() {
+    let key = SymmetricKey::generate();
+    // Tag 0x02 + less than required minimum
+    let short = vec![0x02, 0, 0];
+    let result = decrypt_with_ad(&key, &short, b"ad");
+    assert!(result.is_err(), "Too-short ciphertext must be rejected");
+}
+
+// @scenario: security:Contact cards are encrypted at rest
+#[test]
+fn test_decrypt_with_ad_too_short_aes_gcm() {
+    let key = SymmetricKey::generate();
+    // Tag 0x01 + less than required minimum
+    let short = vec![0x01, 0, 0];
+    let result = decrypt_with_ad(&key, &short, b"ad");
+    assert!(result.is_err(), "Too-short ciphertext must be rejected");
+}
+
+// @scenario: security:Contact cards are encrypted at rest
+#[test]
+fn test_decrypt_with_ad_legacy_untagged() {
+    let key = SymmetricKey::generate();
+    // Legacy format (no tag): nonce || ciphertext || tag
+    let plaintext = b"legacy data";
+    let ciphertext = encrypt_legacy_untagged(&key, plaintext).unwrap();
+    // decrypt_with_ad should handle legacy format by ignoring AD
+    let decrypted = decrypt_with_ad(&key, &ciphertext, b"ignored-ad").unwrap();
+    assert_eq!(plaintext.to_vec(), decrypted);
+}
+
+// @scenario: security:Contact cards are encrypted in transit
+#[test]
+fn test_encrypt_with_ad_empty_ad() {
+    let key = SymmetricKey::generate();
+    let plaintext = b"message";
+    let ciphertext = encrypt_with_ad(&key, plaintext, b"").unwrap();
+    let decrypted = decrypt_with_ad(&key, &ciphertext, b"").unwrap();
+    assert_eq!(plaintext.to_vec(), decrypted);
+}
+
+// @scenario: security:Contact cards are encrypted at rest
+#[test]
+fn test_decrypt_aes_gcm_corrupted_tag() {
+    let key = SymmetricKey::generate();
+    let mut ciphertext = encrypt_aes_gcm(&key, b"test").unwrap();
+    // Corrupt the authentication tag (last 16 bytes)
+    let last = ciphertext.len() - 1;
+    ciphertext[last] ^= 0xFF;
+    let result = decrypt(&key, &ciphertext);
+    assert!(result.is_err(), "Corrupted AES-GCM tag must fail");
+}
+
+// @scenario: security:Contact cards are encrypted at rest
+#[test]
+fn test_decrypt_xchacha20_corrupted_tag() {
+    let key = SymmetricKey::generate();
+    let mut ciphertext = encrypt(&key, b"test").unwrap();
+    // Corrupt the authentication tag (last 16 bytes)
+    let last = ciphertext.len() - 1;
+    ciphertext[last] ^= 0xFF;
+    let result = decrypt(&key, &ciphertext);
+    assert!(result.is_err(), "Corrupted XChaCha20 tag must fail");
+}
+
+// @scenario: security:Contact cards are encrypted in transit
+#[test]
+fn test_decrypt_xchacha20_ad_corrupted_tag() {
+    let key = SymmetricKey::generate();
+    let mut ciphertext = encrypt_with_ad(&key, b"test", b"ad").unwrap();
+    // Corrupt the tag
+    let last = ciphertext.len() - 1;
+    ciphertext[last] ^= 0xFF;
+    let result = decrypt_with_ad(&key, &ciphertext, b"ad");
+    assert!(result.is_err(), "Corrupted XChaCha20-AD tag must fail");
+}
+
+// @scenario: security:Contact cards are encrypted in transit
+#[test]
+fn test_encrypt_with_ad_nonce_determinism() {
+    let key = SymmetricKey::generate();
+    let plaintext = b"test";
+    let ad = b"ad";
+    let ciphertext1 = encrypt_with_ad(&key, plaintext, ad).unwrap();
+    let ciphertext2 = encrypt_with_ad(&key, plaintext, ad).unwrap();
+    // Each encryption should produce a different ciphertext (due to random nonce)
+    assert_ne!(
+        ciphertext1, ciphertext2,
+        "Random nonces should produce different ciphertexts"
+    );
+}
+
+// @scenario: security:Contact cards are encrypted at rest
+#[test]
+fn test_legacy_format_detection_non_standard_tag() {
+    let key = SymmetricKey::generate();
+    // Create a "ciphertext" with a byte that's not a recognized tag (0x01, 0x02, 0x03)
+    // This should trigger legacy detection and be treated as untagged AES-GCM
+    let mut fake_ciphertext = vec![0xFF]; // Invalid tag
+                                          // Add 12 bytes for nonce + 16 bytes for tag + 1 byte ciphertext = 29 bytes minimum
+    fake_ciphertext.extend_from_slice(&vec![0; 12]); // nonce
+    fake_ciphertext.extend_from_slice(&vec![0; 16]); // tag placeholder
+    let result = decrypt(&key, &fake_ciphertext);
+    // This will fail during AES-GCM decryption (wrong key), which is expected
+    assert!(result.is_err());
+}
+
+// @scenario: security:Contact cards are encrypted at rest
+#[test]
+fn test_symmetric_key_from_bytes_single_bit_nonzero() {
+    // Test that a key with only a single bit set is accepted
+    let mut bytes = [0u8; 32];
+    bytes[0] = 1; // Single bit in first byte
+    let key = SymmetricKey::from_bytes(bytes);
+    assert_eq!(key.as_bytes()[0], 1);
+}
+
+// @scenario: security:Contact cards are encrypted at rest
+#[test]
+fn test_encrypt_decrypt_minimum_ciphertext_size() {
+    let key = SymmetricKey::generate();
+    // Minimum ciphertext for XChaCha20: 1 (tag) + 24 (nonce) + 16 (auth tag) = 41 bytes
+    let ciphertext = encrypt(&key, &[]).unwrap();
+    assert!(
+        ciphertext.len() >= 41,
+        "Minimum ciphertext size should be at least 41 bytes"
+    );
+    let decrypted = decrypt(&key, &ciphertext).unwrap();
+    assert_eq!(decrypted, Vec::<u8>::new());
+}

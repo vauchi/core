@@ -176,6 +176,37 @@ fn test_hkdf_different_salt_different_output() {
     assert_ne!(key1, key2);
 }
 
+/// K-S1: Verify that derive_key returns Zeroizing<[u8; 32]> whose inner value
+/// matches the equivalent derive() output. The Zeroizing wrapper ensures
+/// automatic zeroization when the caller's variable goes out of scope.
+/// @scenario: security.feature:Key material zeroized after use
+#[test]
+fn test_hkdf_derive_key_returns_zeroizing_wrapper() {
+    let ikm = b"test key material";
+    let salt = b"test salt";
+    let info = b"Vauchi_Test_Key";
+
+    let zeroizing_key = HKDF::derive_key(Some(salt), ikm, info);
+
+    // Verify Zeroizing wraps the same bytes as raw derive()
+    let raw_okm = HKDF::derive(Some(salt), ikm, info, 32).unwrap();
+    assert_eq!(
+        &*zeroizing_key,
+        raw_okm.as_slice(),
+        "Zeroizing wrapper must contain same derived bytes"
+    );
+
+    // Verify dereference to [u8; 32] works (type system proof)
+    let _: &[u8; 32] = &*zeroizing_key;
+    assert_eq!(zeroizing_key.len(), 32);
+
+    // Verify the key is non-trivial (not all zeros)
+    assert!(
+        zeroizing_key.iter().any(|&b| b != 0),
+        "derived key must be non-zero"
+    );
+}
+
 /// K-L3: Verify that HKDF expand() zeroizes tail bytes beyond the requested
 /// length. When length is not a multiple of HASH_LEN (32), the Vec contains
 /// extra derived key material bytes that must be zeroed before truncation.

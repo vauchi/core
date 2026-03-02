@@ -175,3 +175,30 @@ fn test_hkdf_different_salt_different_output() {
 
     assert_ne!(key1, key2);
 }
+
+/// K-L3: Verify that HKDF expand() zeroizes tail bytes beyond the requested
+/// length. When length is not a multiple of HASH_LEN (32), the Vec contains
+/// extra derived key material bytes that must be zeroed before truncation.
+/// @scenario: security.feature:Key material zeroized after use
+#[test]
+fn test_hkdf_expand_zeroizes_tail_bytes() {
+    let prk = [0x42u8; 32];
+    let info = b"test zeroize tail";
+    // Request 48 bytes: ceil(48/32)=2 blocks → 64 bytes allocated, 16 tail bytes
+    let okm = HKDF::expand(&prk, info, 48).unwrap();
+    assert_eq!(okm.len(), 48);
+
+    // The Vec's capacity should be at least 64 (2 * HASH_LEN)
+    assert!(okm.capacity() >= 64);
+
+    // Verify tail bytes in spare capacity are zeroed (security property).
+    // SAFETY: We're reading bytes within the Vec's allocated capacity.
+    // These bytes were written by extend_from_slice and should be zeroed
+    // before truncation to prevent key material leakage.
+    unsafe {
+        let ptr = okm.as_ptr();
+        for i in 48..64 {
+            assert_eq!(*ptr.add(i), 0, "tail byte at offset {} should be zeroed", i);
+        }
+    }
+}

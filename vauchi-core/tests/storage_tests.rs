@@ -679,3 +679,95 @@ fn test_last_delta_version_nonexistent_contact() {
     let result = storage.last_delta_version("nonexistent");
     assert!(result.is_err());
 }
+
+/// Test wipe_device_data clears device_info and sync state
+// @scenario: identity_management.feature:Account deletion
+#[test]
+fn test_wipe_device_data() {
+    let storage = create_test_storage();
+
+    // Save device info
+    let device_id = [0x42u8; 32];
+    storage
+        .save_device_info(&device_id, 0, "Test Device", 1000)
+        .unwrap();
+    assert!(storage.has_device_info().unwrap());
+
+    // Wipe
+    storage.wipe_device_data().unwrap();
+
+    // Device info should be gone
+    assert!(!storage.has_device_info().unwrap());
+}
+
+/// Test is_replay_nonce detects duplicates
+// @scenario: security.feature:Replay attack prevention
+#[test]
+fn test_is_replay_nonce() {
+    let storage = create_test_storage();
+
+    let nonce = [0xAAu8; 32];
+
+    // Fresh nonce is not a replay
+    assert!(!storage.is_replay_nonce("contact-1", &nonce).unwrap());
+
+    // Record the nonce
+    storage
+        .save_replay_nonce("contact-1", &nonce, 1000)
+        .unwrap();
+
+    // Now it's a replay
+    assert!(storage.is_replay_nonce("contact-1", &nonce).unwrap());
+
+    // Same nonce for different contact is NOT a replay
+    assert!(!storage.is_replay_nonce("contact-2", &nonce).unwrap());
+}
+
+/// Test cleanup_replay_nonces removes old entries
+// @scenario: security.feature:Replay attack prevention
+#[test]
+fn test_cleanup_replay_nonces() {
+    let storage = create_test_storage();
+
+    let old_nonce = [0x11u8; 32];
+    let new_nonce = [0x22u8; 32];
+
+    storage.save_replay_nonce("c1", &old_nonce, 1000).unwrap();
+    storage.save_replay_nonce("c1", &new_nonce, 5000).unwrap();
+
+    // Cleanup nonces older than 3000
+    let removed = storage.cleanup_replay_nonces(3000).unwrap();
+    assert_eq!(removed, 1);
+
+    // Old nonce should be gone
+    assert!(!storage.is_replay_nonce("c1", &old_nonce).unwrap());
+    // New nonce should remain
+    assert!(storage.is_replay_nonce("c1", &new_nonce).unwrap());
+}
+
+/// Test load_device_registry_json returns structured JSON
+// @scenario: identity_management.feature:GDPR data export
+#[test]
+fn test_load_device_registry_json() {
+    use vauchi_core::crypto::SigningKeyPair;
+    use vauchi_core::identity::device::{DeviceInfo, DeviceRegistry};
+
+    let storage = create_test_storage();
+
+    // No registry initially
+    let json = storage.load_device_registry_json().unwrap();
+    assert!(json.is_none());
+
+    // Create and save a registry
+    let master_seed = [0x42u8; 32];
+    let signing_key = SigningKeyPair::from_seed(&master_seed);
+    let device = DeviceInfo::derive(&master_seed, 0, "Test".to_string());
+    let registry = DeviceRegistry::new(device.to_registered(&master_seed), &signing_key);
+    storage.save_device_registry(&registry).unwrap();
+
+    // Load as JSON
+    let json = storage.load_device_registry_json().unwrap();
+    assert!(json.is_some());
+    let json_str = json.unwrap();
+    assert!(json_str.contains("device_id"));
+}

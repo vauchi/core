@@ -536,7 +536,7 @@ mod tests {
         let registry = create_test_registry(&identity);
 
         let initiator = DeviceLinkInitiator::new(master_seed, &identity, registry.clone());
-        let qr = initiator.qr().clone();
+        let qr = initiator.qr();
         let qr_string = qr.to_data_string();
 
         // Later, Device A restores the QR from saved string

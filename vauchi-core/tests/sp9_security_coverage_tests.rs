@@ -702,3 +702,29 @@ fn test_invalid_signature_qr_rejected_via_data_string() {
         "QR with tampered data should fail signature verification in from_data_string"
     );
 }
+
+/// K-L2: Verify that QR parser rejects data with trailing bytes.
+/// Accepting trailing bytes enables malleability in protocol versions.
+// @scenario: security:Contact card signatures verified
+#[test]
+fn test_qr_parser_rejects_trailing_bytes() {
+    use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
+
+    let alice_identity = vauchi_core::Identity::create("Alice");
+    let alice_ephemeral = X3DHKeyPair::generate();
+
+    let valid_qr = ExchangeQR::generate(&alice_identity, &alice_ephemeral);
+    let data_str = valid_qr.to_data_string();
+    let mut bytes = BASE64.decode(&data_str).unwrap();
+
+    // Append trailing bytes — parser should reject this
+    bytes.push(0xFF);
+    bytes.push(0x00);
+
+    let tampered_str = BASE64.encode(&bytes);
+    let result = ExchangeQR::from_data_string(&tampered_str);
+    assert!(
+        result.is_err(),
+        "QR with trailing bytes should be rejected to prevent malleability"
+    );
+}

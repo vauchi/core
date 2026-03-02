@@ -140,3 +140,143 @@ fn test_cek_each_encryption_produces_unique_ciphertext() {
     assert_eq!(cek.decrypt(&ct1).unwrap(), plaintext);
     assert_eq!(cek.decrypt(&ct2).unwrap(), plaintext);
 }
+
+// --- Additional CEK coverage tests ---
+
+// @scenario: security.feature:Contact cards are encrypted at rest
+#[test]
+fn test_cek_clone_preserves_functionality() {
+    let cek_original = ContentEncryptionKey::generate();
+    let cek_clone = cek_original.clone();
+
+    let plaintext = b"test data for clone";
+    let ciphertext = cek_original.encrypt(plaintext).unwrap();
+
+    // Cloned key should decrypt the same ciphertext
+    let decrypted = cek_clone.decrypt(&ciphertext).unwrap();
+    assert_eq!(decrypted, plaintext);
+}
+
+// @scenario: security.feature:Memory dump protection
+#[test]
+fn test_cek_debug_redacted() {
+    let cek = ContentEncryptionKey::generate();
+    let debug_str = format!("{:?}", cek);
+
+    // Key material should be redacted
+    assert!(debug_str.contains("REDACTED"));
+    assert!(debug_str.contains("ContentEncryptionKey"));
+    // Should not contain raw key bytes
+    assert!(!debug_str.contains("SymmetricKey"));
+}
+
+// @scenario: security.feature:Contact cards are encrypted at rest
+#[test]
+fn test_cek_from_bytes_reject_all_zeros() {
+    // from_bytes delegates to SymmetricKey::from_bytes which rejects all-zeros
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        ContentEncryptionKey::from_bytes([0u8; 32])
+    }));
+    assert!(result.is_err(), "CEK should reject all-zeros key");
+}
+
+// @scenario: security.feature:Contact cards are encrypted at rest
+#[test]
+fn test_cek_decrypt_corrupted_payload() {
+    let cek = ContentEncryptionKey::generate();
+    let plaintext = b"sensitive data";
+
+    let mut ciphertext = cek.encrypt(plaintext).unwrap();
+    // Corrupt a byte in the middle
+    let mid = ciphertext.len() / 2;
+    ciphertext[mid] ^= 0xFF;
+
+    let result = cek.decrypt(&ciphertext);
+    assert!(result.is_err(), "Corrupted ciphertext must fail to decrypt");
+}
+
+// @scenario: security.feature:Contact cards are encrypted at rest
+#[test]
+fn test_cek_decrypt_truncated_ciphertext() {
+    let cek = ContentEncryptionKey::generate();
+    let plaintext = b"test";
+
+    let mut ciphertext = cek.encrypt(plaintext).unwrap();
+    // Truncate the ciphertext
+    ciphertext.truncate(10);
+
+    let result = cek.decrypt(&ciphertext);
+    assert!(result.is_err(), "Truncated ciphertext must fail to decrypt");
+}
+
+// @scenario: security.feature:Contact cards are encrypted at rest
+#[test]
+fn test_cek_multiple_clones_independent() {
+    let cek1 = ContentEncryptionKey::generate();
+    let cek2 = cek1.clone();
+    let cek3 = cek1.clone();
+
+    let plaintext = b"test";
+    let ct1 = cek1.encrypt(plaintext).unwrap();
+    let ct2 = cek2.encrypt(plaintext).unwrap();
+
+    // All clones should decrypt both ciphertexts
+    assert_eq!(cek1.decrypt(&ct1).unwrap(), plaintext);
+    assert_eq!(cek2.decrypt(&ct1).unwrap(), plaintext);
+    assert_eq!(cek3.decrypt(&ct1).unwrap(), plaintext);
+
+    assert_eq!(cek1.decrypt(&ct2).unwrap(), plaintext);
+    assert_eq!(cek2.decrypt(&ct2).unwrap(), plaintext);
+    assert_eq!(cek3.decrypt(&ct2).unwrap(), plaintext);
+}
+
+// @scenario: security.feature:Contact cards are encrypted at rest
+#[test]
+fn test_cek_to_bytes_from_bytes_consistency() {
+    let cek1 = ContentEncryptionKey::generate();
+    let bytes = cek1.to_bytes();
+    let cek2 = ContentEncryptionKey::from_bytes(bytes);
+
+    let plaintext = b"consistency test";
+    let ct1 = cek1.encrypt(plaintext).unwrap();
+    let ct2 = cek2.encrypt(plaintext).unwrap();
+
+    // Both keys should decrypt ciphertexts from either key
+    assert_eq!(cek1.decrypt(&ct1).unwrap(), plaintext);
+    assert_eq!(cek1.decrypt(&ct2).unwrap(), plaintext);
+    assert_eq!(cek2.decrypt(&ct1).unwrap(), plaintext);
+    assert_eq!(cek2.decrypt(&ct2).unwrap(), plaintext);
+}
+
+// @scenario: security.feature:Contact cards are encrypted at rest
+#[test]
+fn test_cek_single_byte_plaintext() {
+    let cek = ContentEncryptionKey::generate();
+    let plaintext = b"X";
+
+    let ciphertext = cek.encrypt(plaintext).unwrap();
+    let decrypted = cek.decrypt(&ciphertext).unwrap();
+
+    assert_eq!(decrypted, plaintext);
+}
+
+// @scenario: security.feature:Contact cards are encrypted at rest
+#[test]
+fn test_cek_binary_plaintext_with_nulls() {
+    let cek = ContentEncryptionKey::generate();
+    let plaintext = vec![0x00, 0xFF, 0x00, 0x42, 0x00];
+
+    let ciphertext = cek.encrypt(&plaintext).unwrap();
+    let decrypted = cek.decrypt(&ciphertext).unwrap();
+
+    assert_eq!(decrypted, plaintext);
+}
+
+// @scenario: security.feature:Contact cards are encrypted at rest
+#[test]
+fn test_cek_decrypt_empty_ciphertext() {
+    let cek = ContentEncryptionKey::generate();
+    let result = cek.decrypt(&[]);
+
+    assert!(result.is_err(), "Empty ciphertext must fail");
+}

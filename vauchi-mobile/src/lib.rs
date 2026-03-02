@@ -42,7 +42,9 @@ mod sync;
 mod types;
 
 // Re-export public types
-pub use audio::{MobileProximityResult, MobileProximityVerifier, PlatformAudioHandler};
+pub use audio::{
+    MobileProximityResult, MobileProximityVerifier, PlatformAudioBackend, PlatformAudioHandler,
+};
 pub use content::{
     MobileApplyFailure, MobileApplyResult, MobileContentConfig, MobileContentType,
     MobileUpdateStatus,

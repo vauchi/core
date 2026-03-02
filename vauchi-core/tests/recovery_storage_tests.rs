@@ -117,3 +117,91 @@ fn test_multiple_recovery_responses() {
     assert!(storage.get_recovery_response("claim-2").unwrap().is_some());
     assert!(storage.get_recovery_response("claim-3").unwrap().is_some());
 }
+
+// ============================================================
+// Recovery Settings coverage tests
+// ============================================================
+
+use vauchi_core::recovery::RecoverySettings;
+
+/// Test load_recovery_settings returns None when not saved
+// @scenario: contact_recovery.feature:Recovery settings persistence
+#[test]
+fn test_load_recovery_settings_none() {
+    let storage = test_storage();
+    let settings = storage.load_recovery_settings().unwrap();
+    assert!(settings.is_none(), "No settings saved means None");
+}
+
+/// Test save and load recovery settings roundtrip
+// @scenario: contact_recovery.feature:Recovery settings persistence
+#[test]
+fn test_save_load_recovery_settings() {
+    let storage = test_storage();
+    let settings = RecoverySettings::new(5, 3).unwrap();
+
+    storage.save_recovery_settings(&settings).unwrap();
+
+    let loaded = storage
+        .load_recovery_settings()
+        .unwrap()
+        .expect("Should load settings");
+
+    assert_eq!(loaded.recovery_threshold(), 5);
+    assert_eq!(loaded.verification_threshold(), 3);
+}
+
+/// Test recovery settings overwrite
+// @scenario: contact_recovery.feature:Recovery settings persistence
+#[test]
+fn test_recovery_settings_overwrite() {
+    let storage = test_storage();
+
+    let settings1 = RecoverySettings::new(3, 2).unwrap();
+    storage.save_recovery_settings(&settings1).unwrap();
+
+    let settings2 = RecoverySettings::new(7, 4).unwrap();
+    storage.save_recovery_settings(&settings2).unwrap();
+
+    let loaded = storage.load_recovery_settings().unwrap().unwrap();
+    assert_eq!(loaded.recovery_threshold(), 7);
+    assert_eq!(loaded.verification_threshold(), 4);
+}
+
+/// Test recovery settings default roundtrip
+// @scenario: contact_recovery.feature:Recovery settings persistence
+#[test]
+fn test_recovery_settings_default_roundtrip() {
+    let storage = test_storage();
+    let defaults = RecoverySettings::default();
+
+    storage.save_recovery_settings(&defaults).unwrap();
+
+    let loaded = storage.load_recovery_settings().unwrap().unwrap();
+    assert_eq!(loaded.recovery_threshold(), defaults.recovery_threshold());
+    assert_eq!(
+        loaded.verification_threshold(),
+        defaults.verification_threshold()
+    );
+}
+
+/// Test rate limits are independent per identity PK
+// @scenario: contact_recovery.feature:Relay rate limits recovery queries
+#[test]
+fn test_recovery_rate_limit_independent_per_pk() {
+    let storage = test_storage();
+
+    let pk_a = b"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+    let pk_b = b"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+
+    storage.update_recovery_rate_limit(pk_a, 2, 1000).unwrap();
+    storage.update_recovery_rate_limit(pk_b, 5, 2000).unwrap();
+
+    let (count_a, window_a) = storage.check_recovery_rate_limit(pk_a).unwrap();
+    assert_eq!(count_a, 2);
+    assert_eq!(window_a, 1000);
+
+    let (count_b, window_b) = storage.check_recovery_rate_limit(pk_b).unwrap();
+    assert_eq!(count_b, 5);
+    assert_eq!(window_b, 2000);
+}

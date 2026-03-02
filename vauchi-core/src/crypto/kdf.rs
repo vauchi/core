@@ -91,6 +91,9 @@ impl HKDF {
         // Zeroize the last T(N) block
         t_prev.zeroize();
 
+        // Zeroize tail bytes beyond requested length before truncation.
+        // These are derived key material in the Vec's spare capacity.
+        okm[length..].zeroize();
         okm.truncate(length);
         Ok(okm)
     }

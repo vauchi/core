@@ -13,7 +13,9 @@ use zeroize::Zeroize;
 
 /// Ed25519 signing keypair for identity and message signing.
 ///
-/// Private key material is zeroed on drop for security.
+/// The stored `seed` (32 bytes) is zeroed on drop. Note: `ring::Ed25519KeyPair`
+/// retains expanded key material internally and does not implement `Zeroize`,
+/// so full zeroization coverage is limited to the seed.
 pub struct SigningKeyPair {
     keypair: Ed25519KeyPair,
     seed: [u8; 32],

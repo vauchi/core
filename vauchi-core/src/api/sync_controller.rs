@@ -427,12 +427,15 @@ impl<'a, T: Transport> SyncController<'a, T> {
             VauchiError::InvalidState(format!("Failed to serialize sync items: {}", e))
         })?;
 
-        // Encrypt for target device (returns nonce || ciphertext || tag)
+        // Encrypt for target device (returns 0x02 || nonce[24] || ciphertext || tag[16])
         let encrypted = orchestrator
             .encrypt_for_device(target_public_key, &payload)
             .map_err(VauchiError::DeviceSync)?;
 
-        // Split encrypted data into nonce (first 12 bytes) and ciphertext (rest)
+        // Split encrypted data for wire transport (first 12 bytes as "nonce" field,
+        // rest as "ciphertext" field). Note: actual XChaCha20 nonce is 24 bytes with
+        // algorithm tag — the receiver reassembles nonce++ciphertext before decryption.
+        // TODO(K-M1): Update wire format to pass encrypted blob as single opaque field
         const NONCE_SIZE: usize = 12;
         if encrypted.len() < NONCE_SIZE {
             return Err(VauchiError::InvalidState(

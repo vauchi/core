@@ -286,11 +286,11 @@ impl<'a> DeviceSyncOrchestrator<'a> {
     // Device-to-device encryption (Phase 4)
     // ============================================================
 
-    /// Encrypts data for another device using ECDH + AES-GCM.
+    /// Encrypts data for another device using ECDH + XChaCha20-Poly1305.
     ///
     /// Uses the current device's exchange key to perform ECDH with the target
     /// device's public key, derives an encryption key via HKDF, and encrypts
-    /// the data with AES-256-GCM.
+    /// the data with XChaCha20-Poly1305.
     pub fn encrypt_for_device(
         &self,
         target_public_key: &[u8; 32],
@@ -301,11 +301,12 @@ impl<'a> DeviceSyncOrchestrator<'a> {
             .map_err(|e| DeviceSyncError::Encryption(e.to_string()))
     }
 
-    /// Decrypts data from another device using ECDH + AES-GCM.
+    /// Decrypts data from another device using ECDH + XChaCha20-Poly1305.
     ///
     /// Uses the current device's exchange key to perform ECDH with the sender
     /// device's public key, derives a decryption key via HKDF, and decrypts
-    /// the data with AES-256-GCM.
+    /// the data. Supports both XChaCha20-Poly1305 and legacy AES-256-GCM
+    /// via algorithm tag dispatch.
     pub fn decrypt_from_device(
         &self,
         sender_public_key: &[u8; 32],

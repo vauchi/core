@@ -783,7 +783,7 @@ pub struct VauchiMobile {
 
 impl VauchiMobile {
     /// Opens a storage connection.
-    fn open_storage(&self) -> Result<Storage, MobileError> {
+    pub(crate) fn open_storage(&self) -> Result<Storage, MobileError> {
         Storage::open(&self.storage_path, self.storage_key.clone())
             .map_err(|e| MobileError::StorageError(e.to_string()))
     }
@@ -792,7 +792,7 @@ impl VauchiMobile {
     ///
     /// Use this for operations that must dispatch events (e.g. hide/unhide contact).
     /// Operations that only read data can continue using `open_storage()` directly.
-    fn open_vauchi(&self) -> Result<Vauchi, MobileError> {
+    pub(crate) fn open_vauchi(&self) -> Result<Vauchi, MobileError> {
         let config = VauchiConfig::with_storage_path(&self.storage_path)
             .with_relay_url(&self.relay_url)
             .with_storage_key(self.storage_key.clone());
@@ -800,7 +800,7 @@ impl VauchiMobile {
     }
 
     /// Returns the data directory (parent of the database file).
-    fn data_dir(&self) -> PathBuf {
+    pub(crate) fn data_dir(&self) -> PathBuf {
         self.storage_path
             .parent()
             .unwrap_or(&self.storage_path)
@@ -808,7 +808,7 @@ impl VauchiMobile {
     }
 
     /// Gets the platform keychain bridge for shred operations.
-    fn get_keychain_bridge(&self) -> Result<KeychainBridge, MobileError> {
+    pub(crate) fn get_keychain_bridge(&self) -> Result<KeychainBridge, MobileError> {
         let lock = self.platform_keychain.lock().unwrap();
         let callback = lock
             .as_ref()
@@ -822,7 +822,7 @@ impl VauchiMobile {
     }
 
     /// Gets the identity from stored data.
-    fn get_identity(&self) -> Result<Identity, MobileError> {
+    pub(crate) fn get_identity(&self) -> Result<Identity, MobileError> {
         let data = self.identity_data.lock().unwrap();
         let identity_data = data.as_ref().ok_or(MobileError::IdentityNotFound)?;
 
@@ -832,12 +832,15 @@ impl VauchiMobile {
     }
 
     /// Get pinned certificate if set.
-    fn get_pinned_cert(&self) -> Option<String> {
+    pub(crate) fn get_pinned_cert(&self) -> Option<String> {
         self.pinned_cert_pem.lock().unwrap().clone()
     }
 
     /// Get our contact card, or create a default one from the identity.
-    fn get_own_card_or_default(&self, identity: &Identity) -> Result<ContactCard, MobileError> {
+    pub(crate) fn get_own_card_or_default(
+        &self,
+        identity: &Identity,
+    ) -> Result<ContactCard, MobileError> {
         let storage = self.open_storage()?;
         Ok(storage
             .load_own_card()
@@ -847,7 +850,7 @@ impl VauchiMobile {
     }
 
     /// Get the path to the recovery proof file.
-    fn recovery_proof_path(&self) -> PathBuf {
+    pub(crate) fn recovery_proof_path(&self) -> PathBuf {
         self.storage_path
             .parent()
             .unwrap_or(&self.storage_path)
@@ -857,7 +860,7 @@ impl VauchiMobile {
     // === Aha Moments (internal helpers) ===
 
     /// Get the path to the aha moments state file.
-    fn aha_moments_path(&self) -> PathBuf {
+    pub(crate) fn aha_moments_path(&self) -> PathBuf {
         self.storage_path
             .parent()
             .unwrap_or(&self.storage_path)
@@ -865,7 +868,7 @@ impl VauchiMobile {
     }
 
     /// Load the aha moments tracker from storage.
-    fn load_aha_tracker(&self) -> vauchi_core::AhaMomentTracker {
+    pub(crate) fn load_aha_tracker(&self) -> vauchi_core::AhaMomentTracker {
         let path = self.aha_moments_path();
         if let Ok(data) = std::fs::read_to_string(&path) {
             vauchi_core::AhaMomentTracker::from_json(&data).unwrap_or_default()
@@ -875,7 +878,10 @@ impl VauchiMobile {
     }
 
     /// Save the aha moments tracker to storage.
-    fn save_aha_tracker(&self, tracker: &vauchi_core::AhaMomentTracker) -> Result<(), MobileError> {
+    pub(crate) fn save_aha_tracker(
+        &self,
+        tracker: &vauchi_core::AhaMomentTracker,
+    ) -> Result<(), MobileError> {
         let path = self.aha_moments_path();
         let data = tracker
             .to_json()
@@ -887,7 +893,7 @@ impl VauchiMobile {
     // === Demo Contact (internal helpers) ===
 
     /// Get the path to the demo contact state file.
-    fn demo_contact_path(&self) -> PathBuf {
+    pub(crate) fn demo_contact_path(&self) -> PathBuf {
         self.storage_path
             .parent()
             .unwrap_or(&self.storage_path)
@@ -895,7 +901,7 @@ impl VauchiMobile {
     }
 
     /// Load the demo contact state from storage.
-    fn load_demo_state(&self) -> vauchi_core::DemoContactState {
+    pub(crate) fn load_demo_state(&self) -> vauchi_core::DemoContactState {
         let path = self.demo_contact_path();
         if let Ok(data) = std::fs::read_to_string(&path) {
             vauchi_core::DemoContactState::from_json(&data).unwrap_or_default()
@@ -905,7 +911,10 @@ impl VauchiMobile {
     }
 
     /// Save the demo contact state to storage.
-    fn save_demo_state(&self, state: &vauchi_core::DemoContactState) -> Result<(), MobileError> {
+    pub(crate) fn save_demo_state(
+        &self,
+        state: &vauchi_core::DemoContactState,
+    ) -> Result<(), MobileError> {
         let path = self.demo_contact_path();
         let data = state
             .to_json()

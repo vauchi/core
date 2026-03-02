@@ -585,3 +585,97 @@ fn test_storage_recovery_trusted_persistence() {
     let loaded = storage.load_contact(&contact_id).unwrap().unwrap();
     assert!(!loaded.is_recovery_trusted());
 }
+
+// ============================================================
+// Coverage gap tests — avatar, contact_limit, delta_version
+// ============================================================
+
+/// Test save and load avatar roundtrip
+// @scenario: contacts_management.feature:Contact card display
+#[test]
+fn test_save_load_avatar() {
+    let storage = create_test_storage();
+    let contact = create_test_contact("Alice");
+    let contact_id = contact.id().to_string();
+    storage.save_contact(&contact).unwrap();
+
+    // No avatar initially
+    let loaded = storage.load_avatar(&contact_id).unwrap();
+    assert!(loaded.is_none());
+
+    // Save an avatar
+    let avatar_data = b"encrypted-png-data-here";
+    storage.save_avatar(&contact_id, avatar_data).unwrap();
+
+    // Load it back
+    let loaded = storage.load_avatar(&contact_id).unwrap();
+    assert_eq!(loaded.unwrap(), avatar_data);
+}
+
+/// Test save_avatar fails for nonexistent contact
+// @scenario: contacts_management.feature:Contact card display
+#[test]
+fn test_save_avatar_nonexistent_contact() {
+    let storage = create_test_storage();
+    let result = storage.save_avatar("nonexistent", b"data");
+    assert!(result.is_err());
+}
+
+/// Test load_avatar fails for nonexistent contact
+// @scenario: contacts_management.feature:Contact card display
+#[test]
+fn test_load_avatar_nonexistent_contact() {
+    let storage = create_test_storage();
+    let result = storage.load_avatar("nonexistent");
+    assert!(result.is_err());
+}
+
+/// Test get_contact_limit returns default 500
+// @scenario: contacts_management.feature:Contact limits
+#[test]
+fn test_get_contact_limit_default() {
+    let storage = create_test_storage();
+    let limit = storage.get_contact_limit().unwrap();
+    assert_eq!(limit, 500);
+}
+
+/// Test last_delta_version defaults to 0 for new contact
+// @scenario: sync_updates.feature:Delta sync versioning
+#[test]
+fn test_last_delta_version_default() {
+    let storage = create_test_storage();
+    let contact = create_test_contact("Alice");
+    let contact_id = contact.id().to_string();
+    storage.save_contact(&contact).unwrap();
+
+    let version = storage.last_delta_version(&contact_id).unwrap();
+    assert_eq!(version, 0);
+}
+
+/// Test record_delta_version and last_delta_version roundtrip
+// @scenario: sync_updates.feature:Delta sync versioning
+#[test]
+fn test_record_and_load_delta_version() {
+    let storage = create_test_storage();
+    let contact = create_test_contact("Alice");
+    let contact_id = contact.id().to_string();
+    storage.save_contact(&contact).unwrap();
+
+    storage.record_delta_version(&contact_id, 42).unwrap();
+    let version = storage.last_delta_version(&contact_id).unwrap();
+    assert_eq!(version, 42);
+
+    // Update to higher version
+    storage.record_delta_version(&contact_id, 100).unwrap();
+    let version = storage.last_delta_version(&contact_id).unwrap();
+    assert_eq!(version, 100);
+}
+
+/// Test last_delta_version fails for nonexistent contact
+// @scenario: sync_updates.feature:Delta sync versioning
+#[test]
+fn test_last_delta_version_nonexistent_contact() {
+    let storage = create_test_storage();
+    let result = storage.last_delta_version("nonexistent");
+    assert!(result.is_err());
+}

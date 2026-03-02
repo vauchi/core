@@ -179,9 +179,9 @@ impl ExchangeQR {
             .decode(data)
             .map_err(|_| ExchangeError::InvalidQRFormat)?;
 
-        // Check minimum length for v2 format
+        // Check exact length for v2 format
         // MAGIC(4) + version(1) + pubkey(32) + exchange_key(32) + token(32) + challenge(16) + timestamp(8) + sig(64) = 189
-        if bytes.len() < 189 {
+        if bytes.len() != 189 {
             return Err(ExchangeError::InvalidQRFormat);
         }
 

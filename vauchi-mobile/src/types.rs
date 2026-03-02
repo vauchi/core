@@ -1288,6 +1288,67 @@ pub enum MobileShredStatus {
 }
 
 // =============================================================================
+// Tor Privacy Mode Types
+// =============================================================================
+
+/// Current Tor connection status for mobile platforms.
+///
+/// Simplified from core's `TorStatus` — maps `Bootstrapping` to `Connecting`
+/// since mobile UIs don't need bootstrap percentage detail.
+#[derive(Debug, Clone, PartialEq, Eq, uniffi::Enum)]
+pub enum MobileTorStatus {
+    /// Tor is not enabled.
+    Disabled,
+    /// Tor client is connecting or bootstrapping.
+    Connecting,
+    /// Tor client is connected and ready.
+    Connected,
+    /// Tor client is disconnected.
+    Disconnected {
+        /// Reason for disconnection.
+        reason: String,
+    },
+}
+
+impl From<vauchi_core::tor_config::TorStatus> for MobileTorStatus {
+    fn from(status: vauchi_core::tor_config::TorStatus) -> Self {
+        match status {
+            vauchi_core::tor_config::TorStatus::Disabled => MobileTorStatus::Disabled,
+            vauchi_core::tor_config::TorStatus::Connecting => MobileTorStatus::Connecting,
+            vauchi_core::tor_config::TorStatus::Bootstrapping { .. } => MobileTorStatus::Connecting,
+            vauchi_core::tor_config::TorStatus::Connected => MobileTorStatus::Connected,
+            vauchi_core::tor_config::TorStatus::Disconnected { reason } => {
+                MobileTorStatus::Disconnected { reason }
+            }
+        }
+    }
+}
+
+/// Tor configuration for mobile platforms.
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct MobileTorConfig {
+    /// Whether Tor mode is enabled.
+    pub enabled: bool,
+    /// Whether to prefer .onion addresses when available.
+    pub prefer_onion: bool,
+    /// Bridge addresses for censored networks.
+    pub bridges: Vec<String>,
+    /// Circuit rotation interval in seconds.
+    pub circuit_rotation_secs: u64,
+}
+
+impl From<&vauchi_core::tor_config::TorConfig> for MobileTorConfig {
+    fn from(config: &vauchi_core::tor_config::TorConfig) -> Self {
+        MobileTorConfig {
+            enabled: config.enabled,
+            prefer_onion: config.prefer_onion,
+            bridges: config.bridges.clone(),
+            circuit_rotation_secs: config.circuit_rotation_secs,
+        }
+    }
+}
+
+// =============================================================================
 // Duress PIN Types
 // =============================================================================
 

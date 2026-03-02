@@ -13,7 +13,7 @@
 
 use ring::hmac;
 use thiserror::Error;
-use zeroize::Zeroize;
+use zeroize::{Zeroize, Zeroizing};
 
 /// KDF error types.
 #[derive(Error, Debug)]
@@ -114,11 +114,12 @@ impl HKDF {
         result
     }
 
-    /// Derives a fixed-size 32-byte key.
+    /// Derives a fixed-size 32-byte key, wrapped in `Zeroizing` for automatic
+    /// cleanup when the caller's variable goes out of scope.
     ///
     /// Convenience method for the common case of deriving a single symmetric key.
     /// The intermediate PRK and OKM buffer are zeroized after extraction.
-    pub fn derive_key(salt: Option<&[u8]>, ikm: &[u8], info: &[u8]) -> [u8; 32] {
+    pub fn derive_key(salt: Option<&[u8]>, ikm: &[u8], info: &[u8]) -> Zeroizing<[u8; 32]> {
         let mut prk = Self::extract(salt, ikm);
         // expand for exactly 32 bytes can't fail
         let mut okm = Self::expand(&prk, info, 32).expect("32 bytes is valid length");
@@ -126,7 +127,7 @@ impl HKDF {
         let mut key = [0u8; 32];
         key.copy_from_slice(&okm);
         okm.zeroize();
-        key
+        Zeroizing::new(key)
     }
 
     /// Derives two 32-byte keys from the same input.

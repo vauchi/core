@@ -128,7 +128,7 @@ impl Identity {
         let exchange_seed = HKDF::derive_key(None, &master_seed, b"Vauchi_Exchange_Seed_v2");
 
         // Create X25519 keypair and store the actual public key
-        let x3dh = X3DHKeyPair::from_bytes(exchange_seed);
+        let x3dh = X3DHKeyPair::from_bytes(*exchange_seed);
         let exchange_public_key = *x3dh.public_key();
 
         // Create device info for this device
@@ -181,7 +181,7 @@ impl Identity {
         // Derive X25519 secret from master_seed using HKDF
         // Uses same derivation as exchange_public_key for consistency
         let x25519_secret = HKDF::derive_key(None, &self.master_seed, b"Vauchi_Exchange_Seed_v2");
-        X3DHKeyPair::from_bytes(x25519_secret)
+        X3DHKeyPair::from_bytes(*x25519_secret)
     }
 
     /// Returns the public ID (hex fingerprint of signing key).

@@ -225,7 +225,7 @@ impl Storage {
     /// data without decryption (e.g., label name uniqueness checks).
     pub(crate) fn compute_lookup_hmac(&self, domain: &[u8], data: &[u8]) -> Vec<u8> {
         let hmac_key_bytes = HKDF::derive_key(None, self.encryption_key.as_bytes(), domain);
-        let key = hmac::Key::new(hmac::HMAC_SHA256, &hmac_key_bytes);
+        let key = hmac::Key::new(hmac::HMAC_SHA256, &*hmac_key_bytes);
         hmac::sign(&key, data).as_ref().to_vec()
     }
 
@@ -412,7 +412,7 @@ impl Storage {
                     let mut old_info = b"vauchi-ratchet-storage-v1:".to_vec();
                     old_info.extend_from_slice(contact_id.as_bytes());
                     let old_derived = HKDF::derive_key(None, old_key.as_bytes(), &old_info);
-                    let old_ratchet_key = SymmetricKey::from_bytes(old_derived);
+                    let old_ratchet_key = SymmetricKey::from_bytes(*old_derived);
 
                     let plain = decrypt(&old_ratchet_key, ratchet_enc).map_err(|e| {
                         StorageError::Migration(format!("Decrypt ratchet {}: {}", contact_id, e))
@@ -422,7 +422,7 @@ impl Storage {
                     let mut new_info = b"vauchi-ratchet-storage-v1:".to_vec();
                     new_info.extend_from_slice(contact_id.as_bytes());
                     let new_derived = HKDF::derive_key(None, new_key.as_bytes(), &new_info);
-                    let new_ratchet_key = SymmetricKey::from_bytes(new_derived);
+                    let new_ratchet_key = SymmetricKey::from_bytes(*new_derived);
 
                     let new_enc = encrypt(&new_ratchet_key, &plain).map_err(|e| {
                         StorageError::Migration(format!("Encrypt ratchet {}: {}", contact_id, e))
@@ -538,7 +538,7 @@ impl Storage {
                 // Derive HMAC keys for old and new SEK
                 let new_hmac_key_bytes =
                     HKDF::derive_key(None, new_key.as_bytes(), b"Vauchi_Label_Name_HMAC_v1");
-                let new_hmac_key = hmac::Key::new(hmac::HMAC_SHA256, &new_hmac_key_bytes);
+                let new_hmac_key = hmac::Key::new(hmac::HMAC_SHA256, &*new_hmac_key_bytes);
 
                 for (id, contacts_enc, fields_enc, name_enc) in &rows {
                     let contacts_new = if !contacts_enc.is_empty() {

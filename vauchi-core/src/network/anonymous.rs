@@ -51,7 +51,7 @@ pub fn compute_anonymous_id(shared_key: &[u8; 32], epoch: u64) -> [u8; 32] {
     // shared_key is IKM (high-entropy input), epoch embedded in info
     let mut info = b"Vauchi_AnonymousSender_v2".to_vec();
     info.extend_from_slice(&epoch_bytes);
-    HKDF::derive_key(None, shared_key, &info)
+    *HKDF::derive_key(None, shared_key, &info)
 }
 
 /// Returns the current epoch (unix_timestamp / 3600).

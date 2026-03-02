@@ -197,7 +197,7 @@ fn test_hkdf_derive_key_returns_zeroizing_wrapper() {
     );
 
     // Verify dereference to [u8; 32] works (type system proof)
-    let _: &[u8; 32] = &*zeroizing_key;
+    let _: &[u8; 32] = &zeroizing_key;
     assert_eq!(zeroizing_key.len(), 32);
 
     // Verify the key is non-trivial (not all zeros)

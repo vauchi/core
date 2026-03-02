@@ -23,7 +23,7 @@ impl Storage {
         let mut info = b"vauchi-ratchet-storage-v1:".to_vec();
         info.extend_from_slice(contact_id.as_bytes());
         let key_bytes = HKDF::derive_key(None, self.encryption_key.as_bytes(), &info);
-        SymmetricKey::from_bytes(key_bytes)
+        SymmetricKey::from_bytes(*key_bytes)
     }
 
     /// Saves a Double Ratchet state for a contact.

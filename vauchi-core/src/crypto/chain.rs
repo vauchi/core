@@ -95,12 +95,12 @@ impl ChainKey {
         let next_chain_key_bytes = HKDF::derive_key(None, &self.key, CHAIN_KEY_INFO);
 
         let message_key = MessageKey {
-            key: SymmetricKey::from_bytes(message_key_bytes),
+            key: SymmetricKey::from_bytes(*message_key_bytes),
             generation: self.generation,
         };
 
         let next_chain = ChainKey {
-            key: next_chain_key_bytes,
+            key: *next_chain_key_bytes,
             generation: self.generation + 1,
         };
 

@@ -1504,7 +1504,7 @@ fn migrate_v23_encrypt_label_names(
 
     // Derive HMAC key for label name lookups
     let hmac_key_bytes = HKDF::derive_key(None, key.as_bytes(), b"Vauchi_Label_Name_HMAC_v1");
-    let hmac_key = hmac::Key::new(hmac::HMAC_SHA256, &hmac_key_bytes);
+    let hmac_key = hmac::Key::new(hmac::HMAC_SHA256, &*hmac_key_bytes);
 
     // Encrypt existing plaintext names
     let mut stmt = conn
@@ -1576,7 +1576,7 @@ fn migrate_v24_per_contact_ratchet_keys(
         let mut info = b"vauchi-ratchet-storage-v1:".to_vec();
         info.extend_from_slice(contact_id.as_bytes());
         let derived_bytes = HKDF::derive_key(None, key.as_bytes(), &info);
-        let derived_key = SymmetricKey::from_bytes(derived_bytes);
+        let derived_key = SymmetricKey::from_bytes(*derived_bytes);
 
         // Re-encrypt with per-contact key
         let re_encrypted = crate::crypto::encrypt(&derived_key, &plaintext).map_err(|e| {

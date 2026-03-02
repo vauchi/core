@@ -106,7 +106,7 @@ impl DeviceInfo {
         let mut exchange_info = DEVICE_EXCHANGE_INFO.to_vec();
         exchange_info.extend_from_slice(&index_bytes);
         let exchange_seed = HKDF::derive_key(None, master_seed, &exchange_info);
-        let device_exchange_keypair = X3DHKeyPair::from_bytes(exchange_seed);
+        let device_exchange_keypair = X3DHKeyPair::from_bytes(*exchange_seed);
 
         let created_at = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -114,7 +114,7 @@ impl DeviceInfo {
             .as_secs();
 
         Self {
-            device_id,
+            device_id: *device_id,
             device_index,
             device_exchange_keypair,
             device_name,

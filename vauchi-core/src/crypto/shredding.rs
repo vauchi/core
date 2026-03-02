@@ -73,7 +73,7 @@ impl ShreddingMasterKey {
     /// The resulting SMK should be persisted to SecureStorage immediately.
     pub fn derive_from_seed(master_seed: &[u8; 32]) -> Self {
         let bytes = HKDF::derive_key(None, master_seed, SMK_INFO);
-        Self { bytes }
+        Self { bytes: *bytes }
     }
 
     /// Creates an SMK from raw bytes loaded from SecureStorage at boot.
@@ -92,7 +92,7 @@ impl ShreddingMasterKey {
     /// Called at boot after loading SMK from SecureStorage.
     pub fn derive_sek(&self) -> SymmetricKey {
         let bytes = HKDF::derive_key(None, &self.bytes, SEK_INFO);
-        SymmetricKey::from_bytes(bytes)
+        SymmetricKey::from_bytes(*bytes)
     }
 
     /// Derives the File Key Encryption Key (FKEK) from this SMK.
@@ -101,10 +101,11 @@ impl ShreddingMasterKey {
     /// Called at boot after loading SMK from SecureStorage.
     pub fn derive_fkek(&self) -> SymmetricKey {
         let bytes = HKDF::derive_key(None, &self.bytes, FKEK_INFO);
-        SymmetricKey::from_bytes(bytes)
+        SymmetricKey::from_bytes(*bytes)
     }
 }
 
+// INLINE_TEST_REQUIRED: tests need private access to ShreddingMasterKey internals and SMK_INFO constant
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -197,7 +198,7 @@ mod tests {
         );
         assert_ne!(
             smk.as_bytes(),
-            &exchange_key,
+            &*exchange_key,
             "SMK must differ from exchange key"
         );
     }

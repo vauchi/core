@@ -327,7 +327,7 @@ impl<'a> DeviceSyncOrchestrator<'a> {
 
         // HKDF to derive encryption key
         let key_bytes = HKDF::derive_key(None, &shared_secret, DEVICE_SYNC_INFO);
-        SymmetricKey::from_bytes(key_bytes)
+        SymmetricKey::from_bytes(*key_bytes)
     }
 
     // ============================================================

@@ -123,7 +123,7 @@ impl X3DH {
         ikm[32..].copy_from_slice(&dh2);
         let derived = HKDF::derive_key(None, &ikm, X3DH_KEY_INFO);
         ikm.zeroize();
-        let key = SymmetricKey::from_bytes(derived);
+        let key = SymmetricKey::from_bytes(*derived);
 
         Ok((key, *ephemeral_public.as_bytes()))
     }
@@ -153,7 +153,7 @@ impl X3DH {
         ikm[32..].copy_from_slice(&dh2);
         let derived = HKDF::derive_key(None, &ikm, X3DH_KEY_INFO);
         ikm.zeroize();
-        let key = SymmetricKey::from_bytes(derived);
+        let key = SymmetricKey::from_bytes(*derived);
 
         Ok(key)
     }

@@ -181,11 +181,13 @@ fn test_sync_result_default() {
 // @scenario: sync_updates.feature:Sync result tracks operation totals
 #[test]
 fn test_sync_result_total() {
-    let mut result = SyncResult::default();
-    result.sent = 3;
-    result.acknowledged = 2;
-    result.failed = 1;
-    result.timed_out = 1;
+    let result = SyncResult {
+        sent: 3,
+        acknowledged: 2,
+        failed: 1,
+        timed_out: 1,
+        ..Default::default()
+    };
     assert_eq!(result.total(), 7);
 }
 

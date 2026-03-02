@@ -557,3 +557,90 @@ fn test_confirmation_mac_contract_deterministic_and_accepted() {
         result.err()
     );
 }
+
+// ============================================================================
+// Tor UniFFI Type Conversion Tests
+// Based on: features/tor_mode.feature - Tor privacy mode
+// ============================================================================
+
+// @scenario: tor_mode.feature:Enable Tor privacy mode
+/// Test: MobileTorStatus maps all core TorStatus variants
+#[test]
+fn test_mobile_tor_status_from_core_disabled() {
+    let status = vauchi_core::tor_config::TorStatus::Disabled;
+    let mobile: vauchi_mobile::MobileTorStatus = status.into();
+    assert!(matches!(mobile, vauchi_mobile::MobileTorStatus::Disabled));
+}
+
+// @scenario: tor_mode.feature:Enable Tor privacy mode
+/// Test: MobileTorStatus maps Connected variant
+#[test]
+fn test_mobile_tor_status_from_core_connected() {
+    let status = vauchi_core::tor_config::TorStatus::Connected;
+    let mobile: vauchi_mobile::MobileTorStatus = status.into();
+    assert!(matches!(mobile, vauchi_mobile::MobileTorStatus::Connected));
+}
+
+// @scenario: tor_mode.feature:Enable Tor privacy mode
+/// Test: MobileTorStatus maps Connecting variant
+#[test]
+fn test_mobile_tor_status_from_core_connecting() {
+    let status = vauchi_core::tor_config::TorStatus::Connecting;
+    let mobile: vauchi_mobile::MobileTorStatus = status.into();
+    assert!(matches!(mobile, vauchi_mobile::MobileTorStatus::Connecting));
+}
+
+// @scenario: tor_mode.feature:Enable Tor privacy mode
+/// Test: MobileTorStatus maps Bootstrapping to Connecting (simplified for mobile)
+#[test]
+fn test_mobile_tor_status_from_core_bootstrapping() {
+    let status = vauchi_core::tor_config::TorStatus::Bootstrapping { percentage: 50 };
+    let mobile: vauchi_mobile::MobileTorStatus = status.into();
+    assert!(matches!(mobile, vauchi_mobile::MobileTorStatus::Connecting));
+}
+
+// @scenario: tor_mode.feature:Enable Tor privacy mode
+/// Test: MobileTorStatus maps Disconnected with reason
+#[test]
+fn test_mobile_tor_status_from_core_disconnected() {
+    let status = vauchi_core::tor_config::TorStatus::Disconnected {
+        reason: "timeout".to_string(),
+    };
+    let mobile: vauchi_mobile::MobileTorStatus = status.into();
+    match mobile {
+        vauchi_mobile::MobileTorStatus::Disconnected { reason } => {
+            assert_eq!(reason, "timeout");
+        }
+        other => panic!("Expected Disconnected, got {:?}", other),
+    }
+}
+
+// @scenario: tor_mode.feature:Configure Tor bridges
+/// Test: MobileTorConfig maps all fields from core TorConfig
+#[test]
+fn test_mobile_tor_config_from_core() {
+    let config = vauchi_core::tor_config::TorConfig {
+        enabled: true,
+        bridges: vec!["obfs4 198.51.100.1:443 cert=abc".to_string()],
+        prefer_onion: true,
+        circuit_rotation_secs: 300,
+    };
+    let mobile: vauchi_mobile::MobileTorConfig = (&config).into();
+    assert!(mobile.enabled);
+    assert_eq!(mobile.bridges.len(), 1);
+    assert_eq!(mobile.bridges[0], "obfs4 198.51.100.1:443 cert=abc");
+    assert!(mobile.prefer_onion);
+    assert_eq!(mobile.circuit_rotation_secs, 300);
+}
+
+// @scenario: tor_mode.feature:Configure Tor bridges
+/// Test: MobileTorConfig with default values
+#[test]
+fn test_mobile_tor_config_from_core_defaults() {
+    let config = vauchi_core::tor_config::TorConfig::default();
+    let mobile: vauchi_mobile::MobileTorConfig = (&config).into();
+    assert!(!mobile.enabled);
+    assert!(mobile.bridges.is_empty());
+    assert!(mobile.prefer_onion);
+    assert_eq!(mobile.circuit_rotation_secs, 600);
+}

@@ -985,3 +985,192 @@ fn test_migration_rejects_newer_schema_version() {
         err_msg
     );
 }
+
+// =============================================================================
+// MIGRATION RUNNER FRAMEWORK TESTS
+// =============================================================================
+
+use vauchi_core::storage::migration::{Migration, MigrationAction};
+
+/// current_version returns 0 on a fresh database with no schema_version table.
+#[test]
+fn test_current_version_fresh_db_returns_zero() {
+    let conn = Connection::open_in_memory().unwrap();
+    let version = MigrationRunner::current_version(&conn).unwrap();
+    assert_eq!(version, 0, "Fresh DB should have schema version 0");
+}
+
+/// Running with an empty migrations list is a no-op (returns Ok).
+#[test]
+fn test_migration_empty_list_is_noop() {
+    let conn = Connection::open_in_memory().unwrap();
+    let key = SymmetricKey::generate();
+    let empty: Vec<Migration> = vec![];
+
+    let result = MigrationRunner::run(&conn, &key, &empty, None);
+    assert!(result.is_ok(), "Empty migration list should succeed");
+
+    let version = MigrationRunner::current_version(&conn).unwrap();
+    assert_eq!(
+        version, 0,
+        "Version should remain 0 after empty migration list"
+    );
+}
+
+/// Out-of-order migrations are rejected before any SQL runs.
+#[test]
+fn test_migration_out_of_order_rejected() {
+    let conn = Connection::open_in_memory().unwrap();
+    let key = SymmetricKey::generate();
+
+    let migrations = vec![
+        Migration {
+            version: 2,
+            name: "second",
+            action: MigrationAction::Sql("CREATE TABLE t2 (id INTEGER);"),
+        },
+        Migration {
+            version: 1,
+            name: "first",
+            action: MigrationAction::Sql("CREATE TABLE t1 (id INTEGER);"),
+        },
+    ];
+
+    let result = MigrationRunner::run(&conn, &key, &migrations, None);
+    assert!(
+        result.is_err(),
+        "Out-of-order migrations should be rejected"
+    );
+
+    let err_msg = format!("{}", result.unwrap_err());
+    assert!(
+        err_msg.contains("not in order"),
+        "Error should mention ordering: {}",
+        err_msg
+    );
+}
+
+/// Duplicate version numbers are rejected (ordering check catches v==v).
+#[test]
+fn test_migration_duplicate_version_rejected() {
+    let conn = Connection::open_in_memory().unwrap();
+    let key = SymmetricKey::generate();
+
+    let migrations = vec![
+        Migration {
+            version: 1,
+            name: "first",
+            action: MigrationAction::Sql("CREATE TABLE t1 (id INTEGER);"),
+        },
+        Migration {
+            version: 1,
+            name: "duplicate",
+            action: MigrationAction::Sql("CREATE TABLE t2 (id INTEGER);"),
+        },
+    ];
+
+    let result = MigrationRunner::run(&conn, &key, &migrations, None);
+    assert!(
+        result.is_err(),
+        "Duplicate version migrations should be rejected"
+    );
+}
+
+/// A failed SQL migration rolls back the entire transaction.
+#[test]
+fn test_migration_sql_failure_rolls_back() {
+    let conn = Connection::open_in_memory().unwrap();
+    let key = SymmetricKey::generate();
+
+    let migrations = vec![
+        Migration {
+            version: 1,
+            name: "create_table",
+            action: MigrationAction::Sql("CREATE TABLE good_table (id INTEGER);"),
+        },
+        Migration {
+            version: 2,
+            name: "bad_sql",
+            action: MigrationAction::Sql("THIS IS NOT VALID SQL;"),
+        },
+    ];
+
+    let result = MigrationRunner::run(&conn, &key, &migrations, None);
+    assert!(result.is_err(), "Bad SQL should fail");
+
+    let err_msg = format!("{}", result.unwrap_err());
+    assert!(
+        err_msg.contains("bad_sql"),
+        "Error should reference the failed migration name: {}",
+        err_msg
+    );
+
+    // The good_table should NOT exist because the transaction was rolled back
+    let table_exists: bool = conn
+        .query_row(
+            "SELECT COUNT(*) > 0 FROM sqlite_master WHERE type='table' AND name='good_table'",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert!(!table_exists, "good_table should not exist after rollback");
+
+    // Schema version should still be 0
+    let version = MigrationRunner::current_version(&conn).unwrap();
+    assert_eq!(version, 0, "Version should be 0 after rollback");
+}
+
+/// A failed callback migration rolls back the entire transaction.
+#[test]
+fn test_migration_callback_failure_rolls_back() {
+    let conn = Connection::open_in_memory().unwrap();
+    let key = SymmetricKey::generate();
+
+    fn failing_callback(
+        _conn: &Connection,
+        _key: &SymmetricKey,
+    ) -> Result<(), vauchi_core::storage::StorageError> {
+        Err(vauchi_core::storage::StorageError::Migration(
+            "intentional test failure".to_string(),
+        ))
+    }
+
+    let migrations = vec![
+        Migration {
+            version: 1,
+            name: "create_table",
+            action: MigrationAction::Sql("CREATE TABLE cb_table (id INTEGER);"),
+        },
+        Migration {
+            version: 2,
+            name: "bad_callback",
+            action: MigrationAction::Callback(failing_callback),
+        },
+    ];
+
+    let result = MigrationRunner::run(&conn, &key, &migrations, None);
+    assert!(result.is_err(), "Failing callback should fail");
+
+    let err_msg = format!("{}", result.unwrap_err());
+    assert!(
+        err_msg.contains("bad_callback"),
+        "Error should reference the failed callback migration: {}",
+        err_msg
+    );
+
+    // cb_table should NOT exist because the transaction was rolled back
+    let table_exists: bool = conn
+        .query_row(
+            "SELECT COUNT(*) > 0 FROM sqlite_master WHERE type='table' AND name='cb_table'",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert!(
+        !table_exists,
+        "cb_table should not exist after callback rollback"
+    );
+
+    let version = MigrationRunner::current_version(&conn).unwrap();
+    assert_eq!(version, 0, "Version should be 0 after callback rollback");
+}

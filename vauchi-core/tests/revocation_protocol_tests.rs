@@ -247,3 +247,72 @@ fn test_update_after_revocation_discarded_via_tombstone() {
     // Tombstone should block future updates
     assert!(storage.is_sender_revoked("alice_id").unwrap());
 }
+
+// @scenario: privacy_compliance.feature:Account deletion sends revocation signal to all contacts
+#[test]
+fn test_revocation_only_deletes_matching_sender() {
+    let storage = test_storage();
+    let alice = Identity::create("Alice");
+    let bob = Identity::create("Bob");
+
+    let bob_pk = [0xBBu8; 32];
+    let bob_id = hex::encode(bob_pk);
+
+    // Store Alice (with Alice's public key)
+    let alice_contact = make_contact_with_pk(*alice.signing_public_key(), "Alice");
+    storage.save_contact(&alice_contact).unwrap();
+
+    // Bob revokes, using Alice's ID as recipient (Bob is the one sending revocation)
+    let revocation = AccountRevoked::create(&bob, &bob_id, 1700000000);
+
+    process_revocation(&revocation, &storage).unwrap();
+
+    // Alice should still be there (revocation was from unknown sender)
+    assert!(storage.load_contact(alice_contact.id()).unwrap().is_some());
+}
+
+// @scenario: security.feature:Tampered exchange data is rejected
+#[test]
+fn test_revocation_with_future_timestamp() {
+    let storage = test_storage();
+    let alice = Identity::create("Alice");
+    let bob_pk = [0xBBu8; 32];
+    let bob_id = hex::encode(bob_pk);
+
+    let alice_contact = make_contact_with_pk(*alice.signing_public_key(), "Alice");
+    storage.save_contact(&alice_contact).unwrap();
+
+    let exchange_ts = alice_contact.exchange_timestamp();
+    // Far future timestamp
+    let future_ts = exchange_ts + 10000;
+
+    let revocation = AccountRevoked::create(&alice, &bob_id, future_ts);
+
+    process_revocation(&revocation, &storage).unwrap();
+
+    // Alice contact should be deleted (revocation is valid)
+    assert!(storage.load_contact(alice_contact.id()).unwrap().is_none());
+}
+
+// @scenario: privacy_compliance.feature:Account deletion sends revocation signal to all contacts
+#[test]
+fn test_revocation_with_minimum_valid_timestamp() {
+    let storage = test_storage();
+    let alice = Identity::create("Alice");
+    let bob_pk = [0xBBu8; 32];
+    let bob_id = hex::encode(bob_pk);
+
+    let alice_contact = make_contact_with_pk(*alice.signing_public_key(), "Alice");
+    storage.save_contact(&alice_contact).unwrap();
+
+    let exchange_ts = alice_contact.exchange_timestamp();
+    // Minimum valid timestamp (equal to exchange_timestamp, not less than)
+    let min_valid_ts = exchange_ts;
+
+    let revocation = AccountRevoked::create(&alice, &bob_id, min_valid_ts);
+
+    process_revocation(&revocation, &storage).unwrap();
+
+    // Alice contact should be deleted (timestamp equals exchange_timestamp, so >= condition is true)
+    assert!(storage.load_contact(alice_contact.id()).unwrap().is_none());
+}

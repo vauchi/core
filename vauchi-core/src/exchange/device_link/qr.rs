@@ -19,7 +19,10 @@ use super::super::ExchangeError;
 ///
 /// Displayed on the existing device for a new device to scan.
 /// Contains a random link key used to encrypt the seed transfer.
-#[derive(Clone, Debug)]
+///
+/// Security: Clone intentionally omitted — cloning would create a second copy of
+/// `link_key` that is independently zeroized, defeating the zeroization guarantee.
+#[derive(Debug)]
 pub struct DeviceLinkQR {
     /// Protocol version
     pub(super) version: u8,

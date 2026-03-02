@@ -20,7 +20,8 @@ use super::super::ExchangeError;
 /// for ALL device indices (past and future). The intended mitigation is to
 /// replace this with a device-specific derived subkey (HKDF from master_seed
 /// with device_index binding), limiting a compromised device to its own keys.
-#[derive(Clone)]
+/// Security: Clone intentionally omitted — cloning would create a second copy of
+/// `master_seed` that is independently zeroized, defeating the zeroization guarantee.
 pub struct DeviceLinkResponse {
     /// The master seed (encrypted with link key before transmission)
     master_seed: [u8; 32],

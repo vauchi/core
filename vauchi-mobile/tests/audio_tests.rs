@@ -173,7 +173,7 @@ fn test_fsk_roundtrip_single_byte() {
         .expect("Should decode FSK samples");
 
     assert!(
-        decoded.len() >= 1,
+        !decoded.is_empty(),
         "Should decode at least 1 byte, got {}",
         decoded.len()
     );

@@ -630,13 +630,13 @@ fn test_load_avatar_nonexistent_contact() {
     assert!(result.is_err());
 }
 
-/// Test get_contact_limit returns default 500
+/// Test get_contact_limit returns default 10_000
 // @scenario: contacts_management.feature:Contact limits
 #[test]
 fn test_get_contact_limit_default() {
     let storage = create_test_storage();
     let limit = storage.get_contact_limit().unwrap();
-    assert_eq!(limit, 500);
+    assert_eq!(limit, 10_000);
 }
 
 /// Test last_delta_version defaults to 0 for new contact

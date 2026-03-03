@@ -602,12 +602,12 @@ package:sbom:
       cargo install cargo-cyclonedx --locked --force
 
       # Generate CycloneDX JSON for each crate
-      # cargo-cyclonedx >=0.5.7 outputs next to Cargo.toml with .cdx.json suffix
+      # cargo-cyclonedx v0.5.7 outputs bom.json next to each Cargo.toml
       mkdir -p dist
 
       for crate in vauchi-core vauchi-mobile vauchi-protocol; do
         cargo cyclonedx --manifest-path "${crate}/Cargo.toml" --format json
-        mv "${crate}/bom.cdx.json" "dist/${crate}-${VERSION}.sbom.json"
+        mv "${crate}/bom.json" "dist/${crate}-${VERSION}.sbom.json"
       done
 
       # Generate checksums

@@ -602,12 +602,32 @@ package:sbom:
       cargo install cargo-cyclonedx --locked --force
 
       # Generate CycloneDX JSON for each crate
-      # cargo-cyclonedx v0.5.7 outputs bom.json next to each Cargo.toml
       mkdir -p dist
 
       for crate in vauchi-core vauchi-mobile vauchi-protocol; do
-        cargo cyclonedx --manifest-path "${crate}/Cargo.toml" --format json
-        mv "${crate}/bom.json" "dist/${crate}-${VERSION}.sbom.json"
+        # Clean stale output from prior iteration
+        find . -maxdepth 2 -name "bom.json" -delete 2>/dev/null || true
+
+        echo "Generating SBOM for ${crate}..."
+        cargo cyclonedx --manifest-path "${crate}/Cargo.toml" --format json 2>&1 || true
+
+        # cargo-cyclonedx output location varies by version — check both
+        SBOM=""
+        for candidate in "${crate}/bom.json" "bom.json" "${crate}/bom.cdx.json" "bom.cdx.json"; do
+          if [ -f "$candidate" ]; then
+            SBOM="$candidate"
+            break
+          fi
+        done
+
+        if [ -z "$SBOM" ]; then
+          echo "ERROR: No SBOM generated for ${crate}. Listing bom files:"
+          find . -maxdepth 3 \( -name "bom.*" -o -name "*.cdx.*" -o -name "*.sbom.*" \) 2>/dev/null || true
+          exit 1
+        fi
+
+        echo "  Found SBOM at: $SBOM"
+        mv "$SBOM" "dist/${crate}-${VERSION}.sbom.json"
       done
 
       # Generate checksums

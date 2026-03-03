@@ -171,4 +171,28 @@ impl<T: Transport> Vauchi<T> {
             .save_ratchet_state(contact_id, &ratchet, false)?;
         Ok(())
     }
+
+    // === Personal Notes Operations ===
+
+    /// Saves encrypted personal notes for a contact.
+    pub fn save_personal_notes(
+        &self,
+        contact_id: &str,
+        notes_encrypted: &[u8],
+    ) -> VauchiResult<()> {
+        self.storage
+            .save_personal_notes(contact_id, notes_encrypted)?;
+        Ok(())
+    }
+
+    /// Loads encrypted personal notes for a contact.
+    pub fn load_personal_notes(&self, contact_id: &str) -> VauchiResult<Option<Vec<u8>>> {
+        Ok(self.storage.load_personal_notes(contact_id)?)
+    }
+
+    /// Deletes personal notes for a contact.
+    pub fn delete_personal_notes(&self, contact_id: &str) -> VauchiResult<()> {
+        self.storage.delete_personal_notes(contact_id)?;
+        Ok(())
+    }
 }

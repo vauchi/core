@@ -302,13 +302,28 @@ fn test_full_user_journey_aha_moments() {
     assert!(outbound.is_some());
     assert_eq!(tracker.seen_count(), 5);
 
+    // Step 6b: User edits a field
+    let field_edit = tracker.try_trigger(AhaMomentType::FirstFieldEdit);
+    assert!(field_edit.is_some());
+    assert_eq!(tracker.seen_count(), 6);
+
+    // Step 6c: User reaches 3 contacts
+    let three_contacts = tracker.try_trigger(AhaMomentType::ThreeContactsReached);
+    assert!(three_contacts.is_some());
+    assert_eq!(tracker.seen_count(), 7);
+
+    // Step 6d: User links a device
+    let device_linked = tracker.try_trigger(AhaMomentType::DeviceLinked);
+    assert!(device_linked.is_some());
+    assert_eq!(tracker.seen_count(), 8);
+
     // All aha moments have been seen
     assert_eq!(tracker.seen_count(), tracker.total_count());
 
     // Step 7: App restart - verify persistence
     let json = tracker.to_json().unwrap();
     let restored = AhaMomentTracker::from_json(&json).unwrap();
-    assert_eq!(restored.seen_count(), 5);
+    assert_eq!(restored.seen_count(), 8);
 
     // No more aha moments should trigger
     for moment_type in AhaMomentType::all() {

@@ -185,11 +185,18 @@ echo "  $CHECKSUM"
 echo "$CHECKSUM" > "$DIST_DIR/vauchi-mobile-android-$VERSION.zip.sha256"
 
 # Sign checksum with cosign (T1-5: required in CI, optional locally)
+# GitLab masked file variables store base64-encoded content — decode if needed.
 if [[ -n "${COSIGN_KEY:-}" ]]; then
+    COSIGN_KEY_FILE="$COSIGN_KEY"
+    if ! head -1 "$COSIGN_KEY" | grep -q -- "-----BEGIN"; then
+        COSIGN_KEY_FILE=$(mktemp)
+        base64 -d "$COSIGN_KEY" > "$COSIGN_KEY_FILE"
+    fi
     echo -e "${YELLOW}Signing checksum with cosign...${NC}"
-    cosign sign-blob --yes --key "$COSIGN_KEY" \
+    cosign sign-blob --yes --key "$COSIGN_KEY_FILE" \
         --output-signature "$DIST_DIR/vauchi-mobile-android-$VERSION.zip.sha256.sig" \
         "$DIST_DIR/vauchi-mobile-android-$VERSION.zip.sha256"
+    [[ "$COSIGN_KEY_FILE" != "$COSIGN_KEY" ]] && rm -f "$COSIGN_KEY_FILE"
     echo -e "${GREEN}Checksum signed${NC}"
 elif [[ -n "${CI:-}" ]]; then
     echo -e "${RED}ERROR: COSIGN_KEY is required in CI for release signing${NC}"

@@ -19,7 +19,7 @@ mod uri;
 pub mod vcard;
 
 pub use field::{ContactField, FieldType, ValidationError};
-pub use uri::{is_allowed_scheme, is_blocked_scheme, is_safe_url, ContactAction};
+pub use uri::{is_allowed_scheme, is_blocked_scheme, is_safe_url, is_valid_phone, ContactAction};
 
 use ring::rand::SystemRandom;
 use serde::{Deserialize, Serialize};

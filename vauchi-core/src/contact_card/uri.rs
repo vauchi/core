@@ -41,6 +41,43 @@ const ALLOWED_SCHEMES: &[&str] = &["tel", "mailto", "sms", "https", "http", "geo
 /// Blocked URI schemes (explicit blocklist for dangerous schemes).
 const BLOCKED_SCHEMES: &[&str] = &["javascript", "vbscript", "data", "file", "ftp", "blob"];
 
+/// Validate whether a phone number string is well-formed enough to dial.
+///
+/// Rules:
+/// - Strip all non-digit characters (except leading `+`)
+/// - Require at least 7 digits
+/// - Only allow digits, spaces, dashes, parentheses, dots, and leading `+`
+///
+/// # Examples
+///
+/// ```
+/// use vauchi_core::contact_card::is_valid_phone;
+///
+/// assert!(is_valid_phone("+1-555-123-4567"));
+/// assert!(is_valid_phone("(555) 123-4567"));
+/// assert!(!is_valid_phone("not-a-number"));
+/// assert!(!is_valid_phone("12"));
+/// ```
+pub fn is_valid_phone(value: &str) -> bool {
+    let value = value.trim();
+    if value.is_empty() {
+        return false;
+    }
+
+    // Count digits
+    let digit_count = value.chars().filter(|c| c.is_ascii_digit()).count();
+
+    // Must have at least 7 digits
+    if digit_count < 7 {
+        return false;
+    }
+
+    // All characters must be phone-valid: digits, spaces, dashes, parens, plus, dots
+    value.chars().all(|c| {
+        c.is_ascii_digit() || c == ' ' || c == '-' || c == '(' || c == ')' || c == '+' || c == '.'
+    })
+}
+
 /// Check if a URI scheme is allowed.
 pub fn is_allowed_scheme(scheme: &str) -> bool {
     let lower = scheme.to_lowercase();
@@ -167,7 +204,13 @@ impl ContactField {
         };
 
         match effective_type {
-            FieldType::Phone => Some(format!("tel:{}", value)),
+            FieldType::Phone => {
+                if is_valid_phone(value) {
+                    Some(format!("tel:{}", value))
+                } else {
+                    None
+                }
+            }
             FieldType::Email => Some(format!("mailto:{}", value)),
             FieldType::Website => self.website_to_uri(value),
             FieldType::Social => self.social_to_uri(value),
@@ -251,7 +294,13 @@ impl ContactField {
         };
 
         match effective_type {
-            FieldType::Phone => ContactAction::Call(value.to_string()),
+            FieldType::Phone => {
+                if is_valid_phone(value) {
+                    ContactAction::Call(value.to_string())
+                } else {
+                    ContactAction::CopyToClipboard
+                }
+            }
             FieldType::Email => ContactAction::SendEmail(value.to_string()),
             FieldType::Website => ContactAction::OpenUrl(value.to_string()),
             FieldType::Social => {
@@ -302,8 +351,11 @@ impl ContactField {
 
         match effective_type {
             FieldType::Phone => {
-                actions.push(ContactAction::Call(value.to_string()));
-                actions.push(ContactAction::SendSms(value.to_string()));
+                if is_valid_phone(value) {
+                    actions.push(ContactAction::Call(value.to_string()));
+                    actions.push(ContactAction::SendSms(value.to_string()));
+                }
+                // Invalid phones fall through to just CopyToClipboard below
             }
             FieldType::Email => {
                 actions.push(ContactAction::SendEmail(value.to_string()));

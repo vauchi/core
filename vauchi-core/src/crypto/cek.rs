@@ -50,6 +50,11 @@ impl ContentEncryptionKey {
     }
 }
 
+/// Security: Clone is required because `Contact` derives `Clone` and holds
+/// `Option<ContentEncryptionKey>`. Both copies are individually zeroized on drop
+/// via `ZeroizeOnDrop` on the inner `SymmetricKey`, but two copies exist in memory
+/// simultaneously while both are alive. Removing Clone from `Contact` is tracked
+/// as a future refactoring (#90).
 impl Clone for ContentEncryptionKey {
     fn clone(&self) -> Self {
         Self(self.0.clone())

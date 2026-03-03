@@ -172,6 +172,7 @@ impl RetryQueue {
         if jitter_range == 0 {
             return base;
         }
+        // Non-crypto RNG: jitter for backoff timing, not security-sensitive
         let jitter = rand::thread_rng().gen_range(0..=jitter_range);
         base + jitter
     }

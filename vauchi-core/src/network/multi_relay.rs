@@ -91,6 +91,7 @@ impl MultiRelayConfig {
                 self.relays[index % self.relays.len()].clone()
             }
             RelaySelector::Random => {
+                // Non-crypto RNG: relay load balancing, not security-sensitive
                 let mut rng = rand::thread_rng();
                 self.relays.choose(&mut rng).unwrap().clone()
             }
@@ -138,6 +139,7 @@ impl MultiRelayConfig {
                 if healthy.is_empty() {
                     None
                 } else {
+                    // Non-crypto RNG: relay load balancing, not security-sensitive
                     let mut rng = rand::thread_rng();
                     Some(healthy.choose(&mut rng).unwrap().to_string())
                 }
@@ -327,6 +329,7 @@ impl RelayHealth {
             return Duration::ZERO;
         }
         let half = max_ms / 2;
+        // Non-crypto RNG: cooldown jitter for thundering herd prevention
         let jittered = half + (rand::Rng::gen_range(&mut rand::thread_rng(), 0..=half));
         Duration::from_millis(jittered)
     }

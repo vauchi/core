@@ -233,6 +233,7 @@ coverage:core:
       optional: true
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_PIPELINE_SOURCE == "schedule"
   before_script:
     - !reference [.self-hosted, before_script]
     - !reference [.clone-locales, before_script]
@@ -267,6 +268,7 @@ coverage:mobile:
       optional: true
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_PIPELINE_SOURCE == "schedule"
   before_script:
     - !reference [.self-hosted, before_script]
     - !reference [.clone-locales, before_script]

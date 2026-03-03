@@ -233,7 +233,10 @@ coverage:core:
     - cargo llvm-cov -p vauchi-core --lcov --output-path lcov-core.info
     - cargo llvm-cov report -p vauchi-core --cobertura --output-path cobertura-core.xml
     - cargo llvm-cov report -p vauchi-core
-  coverage: '/Total:\s+(\d+(?:\.\d+)?%)/'
+    - mkdir -p /tmp/ci-${CI_PIPELINE_ID} && curl -sL -H "JOB-TOKEN:$CI_JOB_TOKEN" "$CI_API_V4_URL/projects/vauchi%2Fscripts/repository/files/scripts%2Fci%2Fpush-coverage.sh/raw?ref=main" -o /tmp/ci-${CI_PIPELINE_ID}/push-coverage.sh
+    - "bash /tmp/ci-${CI_PIPELINE_ID}/push-coverage.sh cobertura-core.xml core || echo WARNING: coverage push failed"
+    - rm -rf /tmp/ci-${CI_PIPELINE_ID}
+  coverage: '/TOTAL\s+\d+\s+\d+\s+\d+\.\d+%\s+\d+\s+\d+\s+\d+\.\d+%\s+\d+\s+\d+\s+(\d+\.\d+%)/'
   artifacts:
     reports:
       coverage_report:
@@ -264,7 +267,10 @@ coverage:mobile:
     - cargo llvm-cov -p vauchi-mobile --lcov --output-path lcov-mobile.info
     - cargo llvm-cov report -p vauchi-mobile --cobertura --output-path cobertura-mobile.xml
     - cargo llvm-cov report -p vauchi-mobile
-  coverage: '/Total:\s+(\d+(?:\.\d+)?%)/'
+    - mkdir -p /tmp/ci-${CI_PIPELINE_ID} && curl -sL -H "JOB-TOKEN:$CI_JOB_TOKEN" "$CI_API_V4_URL/projects/vauchi%2Fscripts/repository/files/scripts%2Fci%2Fpush-coverage.sh/raw?ref=main" -o /tmp/ci-${CI_PIPELINE_ID}/push-coverage.sh
+    - "bash /tmp/ci-${CI_PIPELINE_ID}/push-coverage.sh cobertura-mobile.xml mobile || echo WARNING: coverage push failed"
+    - rm -rf /tmp/ci-${CI_PIPELINE_ID}
+  coverage: '/TOTAL\s+\d+\s+\d+\s+\d+\.\d+%\s+\d+\s+\d+\s+\d+\.\d+%\s+\d+\s+\d+\s+(\d+\.\d+%)/'
   artifacts:
     reports:
       coverage_report:

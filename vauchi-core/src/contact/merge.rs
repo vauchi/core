@@ -9,7 +9,7 @@ use std::collections::HashSet;
 use crate::contact::Contact;
 
 /// A detected duplicate pair with similarity score.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct DuplicatePair {
     /// ID of the first contact.
     pub id1: String,

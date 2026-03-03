@@ -853,6 +853,20 @@ impl Storage {
         Ok(())
     }
 
+    /// Checks if a sender has been revoked.
+    pub fn is_sender_revoked(&self, sender_id: &str) -> Result<bool, StorageError> {
+        let result = self.conn.query_row(
+            "SELECT COUNT(*) > 0 FROM revoked_senders WHERE sender_id = ?1",
+            params![sender_id],
+            |row| row.get::<_, bool>(0),
+        );
+
+        match result {
+            Ok(revoked) => Ok(revoked),
+            Err(e) => Err(StorageError::Database(e)),
+        }
+    }
+
     // === Dismissed Duplicates Operations ===
 
     /// Records a dismissed duplicate pair.
@@ -900,19 +914,5 @@ impl Storage {
             params![norm_id1, norm_id2],
         )?;
         Ok(())
-    }
-
-    /// Checks if a sender has been revoked.
-    pub fn is_sender_revoked(&self, sender_id: &str) -> Result<bool, StorageError> {
-        let result = self.conn.query_row(
-            "SELECT COUNT(*) > 0 FROM revoked_senders WHERE sender_id = ?1",
-            params![sender_id],
-            |row| row.get::<_, bool>(0),
-        );
-
-        match result {
-            Ok(revoked) => Ok(revoked),
-            Err(e) => Err(StorageError::Database(e)),
-        }
     }
 }

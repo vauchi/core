@@ -10,8 +10,9 @@
 #
 # DAG execution order (MR pipelines):
 #   lint (< 2 min) ──┬── test (< 15 min)
-#                     ├── bench (advisory, change-based)
 #                     └── security (< 5 min)
+#
+# Nightly/release pipelines also run bench:save-baseline + bench:compare.
 #
 #   Lint must pass before tests or security run.
 #   Security runs parallel with tests.
@@ -47,6 +48,7 @@ include:
       - '/ci-templates/reuse.yml'
       - '/ci-templates/test-quality.yml'
       - '/ci-templates/mutation.yml'
+      - '/ci-templates/benchmark.yml'
 
 stages:
   - auto-tag
@@ -297,80 +299,20 @@ coverage:mobile:
 # Benchmark Stage — Performance Regression Gate (PI-10)
 # ============================================================
 # Criterion benchmarks with baseline comparison.
-# - merge to main: save baseline results
-# - MR: compare against saved baseline, warn on > 20% regression
+# Uses shared template from vauchi/scripts ci-templates/benchmark.yml.
+# Runs on nightly schedule + release tags (not per-MR).
 
-# Cache for benchmark baselines (shared between main and MR jobs)
-.bench-cache:
-  cache:
-    key: bench-baseline-main
-    paths:
-      - target/criterion/
-
-# Save baseline on merge to main
 bench:save-baseline:
-  extends: [.linux-runner, .timeout-standard, .bench-cache]
-  stage: test
-  needs:
-    - job: lint:format
-      optional: true
-    - job: lint:clippy
-      optional: true
-  rules:
-    # Run on schedule only (baseline up to 24h stale — acceptable given benchmark variance)
-    - if: $CI_PIPELINE_SOURCE == "schedule"
-  script:
-    - cargo bench -p vauchi-core --bench crypto_benchmarks --bench performance_regression -- --save-baseline main
-  artifacts:
-    paths:
-      - target/criterion/
-    expire_in: 30 days
+  extends: [.bench-save-baseline, .linux-runner, .timeout-standard, .bench-cache]
+  variables:
+    BENCH_PACKAGE: "vauchi-core"
+    BENCH_TARGETS: "--bench crypto_benchmarks --bench performance_regression"
 
-# Compare against baseline on MRs (advisory)
 bench:compare:
-  extends: [.linux-runner, .timeout-standard, .bench-cache]
-  stage: test
-  needs:
-    - job: lint:format
-      optional: true
-    - job: lint:clippy
-      optional: true
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-      changes:
-        compare_to: refs/heads/main
-        paths:
-          - "vauchi-core/src/**/*.rs"
-          - "vauchi-core/benches/**/*.rs"
-          - "vauchi-core/Cargo.toml"
-          - ".gitlab-ci.yml"
-  allow_failure: true
-  cache:
-    key: bench-baseline-main
-    paths:
-      - target/criterion/
-    policy: pull
-  script:
-    - |
-      if [ -d "target/criterion" ]; then
-        echo "Found baseline — comparing..."
-        cargo bench -p vauchi-core --bench crypto_benchmarks --bench performance_regression -- --baseline main 2>&1 | tee bench-results.txt
-        # Check for regressions > 20%
-        if grep -E 'regressed.*\+[2-9][0-9]\.' bench-results.txt || grep -E 'regressed.*\+[1-9][0-9][0-9]' bench-results.txt; then
-          echo "⚠ WARNING: Performance regression > 20% detected!"
-          echo "  Review bench-results.txt for details."
-        else
-          echo "✓ No significant regressions detected"
-        fi
-      else
-        echo "No baseline found — running benchmarks without comparison"
-        cargo bench -p vauchi-core --bench crypto_benchmarks --bench performance_regression 2>&1 | tee bench-results.txt
-      fi
-  artifacts:
-    paths:
-      - bench-results.txt
-    expire_in: 1 week
-    when: always
+  extends: [.bench-compare, .linux-runner, .timeout-standard, .bench-cache]
+  variables:
+    BENCH_PACKAGE: "vauchi-core"
+    BENCH_TARGETS: "--bench crypto_benchmarks --bench performance_regression"
 
 # ============================================================
 # Mutation Stage (uses shared template from vauchi/scripts)

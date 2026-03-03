@@ -6551,7 +6551,7 @@ checksum = "ba73ea9cf16a25df0c8caa16c51acb937d5712a8429db78a3ee29d5dcacd3a65"
 
 [[package]]
 name = "vauchi-core"
-version = "0.2.7"
+version = "0.2.8"
 dependencies = [
  "argon2",
  "arti-client",
@@ -6594,7 +6594,7 @@ dependencies = [
 
 [[package]]
 name = "vauchi-mobile"
-version = "0.2.7"
+version = "0.2.8"
 dependencies = [
  "base64",
  "crc32fast",
@@ -6622,7 +6622,7 @@ dependencies = [
 
 [[package]]
 name = "vauchi-protocol"
-version = "0.2.7"
+version = "0.2.8"
 dependencies = [
  "serde",
  "serde_json",

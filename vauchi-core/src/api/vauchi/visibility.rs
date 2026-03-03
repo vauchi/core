@@ -41,6 +41,22 @@ impl<T: Transport> Vauchi<T> {
         Ok(self.storage.load_label(label_id)?)
     }
 
+    /// Gets all contacts that are members of a visibility label.
+    ///
+    /// Loads the label, extracts its contact IDs, then loads the actual
+    /// `Contact` objects. Contacts that no longer exist in storage are
+    /// silently skipped.
+    pub fn get_label_members(&self, label_id: &str) -> VauchiResult<Vec<crate::contact::Contact>> {
+        let label = self.storage.load_label(label_id)?;
+        let mut members = Vec::new();
+        for contact_id in label.contacts() {
+            if let Some(contact) = self.storage.load_contact(contact_id)? {
+                members.push(contact);
+            }
+        }
+        Ok(members)
+    }
+
     /// Adds a contact to a visibility label.
     pub fn add_contact_to_label(&self, label_id: &str, contact_id: &str) -> VauchiResult<()> {
         Ok(self.storage.add_contact_to_label(label_id, contact_id)?)

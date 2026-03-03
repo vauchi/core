@@ -48,7 +48,11 @@ pub fn find_duplicates(contacts: &[Contact]) -> Vec<DuplicatePair> {
 }
 
 /// Computes similarity between two contacts (0.0 to 1.0).
-fn compute_similarity(a: &Contact, b: &Contact) -> f64 {
+///
+/// Uses weighted comparison of display name (weight 2.0) and shared field
+/// types (weight 1.0 each). Public so the API layer can expose individual
+/// pair scoring.
+pub fn compute_similarity(a: &Contact, b: &Contact) -> f64 {
     let mut score = 0.0;
     let mut max_score = 0.0;
 

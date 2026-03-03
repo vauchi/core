@@ -570,6 +570,12 @@ pub enum MobileAhaMomentType {
     FirstUpdateReceived,
     /// Shown when first outbound update is delivered
     FirstOutboundDelivered,
+    /// Shown when user edits a field for the first time
+    FirstFieldEdit,
+    /// Shown when user reaches 3 contacts
+    ThreeContactsReached,
+    /// Shown when user links a device
+    DeviceLinked,
 }
 
 impl From<vauchi_core::AhaMomentType> for MobileAhaMomentType {
@@ -586,6 +592,11 @@ impl From<vauchi_core::AhaMomentType> for MobileAhaMomentType {
             vauchi_core::AhaMomentType::FirstOutboundDelivered => {
                 MobileAhaMomentType::FirstOutboundDelivered
             }
+            vauchi_core::AhaMomentType::FirstFieldEdit => MobileAhaMomentType::FirstFieldEdit,
+            vauchi_core::AhaMomentType::ThreeContactsReached => {
+                MobileAhaMomentType::ThreeContactsReached
+            }
+            vauchi_core::AhaMomentType::DeviceLinked => MobileAhaMomentType::DeviceLinked,
         }
     }
 }
@@ -604,6 +615,11 @@ impl From<MobileAhaMomentType> for vauchi_core::AhaMomentType {
             MobileAhaMomentType::FirstOutboundDelivered => {
                 vauchi_core::AhaMomentType::FirstOutboundDelivered
             }
+            MobileAhaMomentType::FirstFieldEdit => vauchi_core::AhaMomentType::FirstFieldEdit,
+            MobileAhaMomentType::ThreeContactsReached => {
+                vauchi_core::AhaMomentType::ThreeContactsReached
+            }
+            MobileAhaMomentType::DeviceLinked => vauchi_core::AhaMomentType::DeviceLinked,
         }
     }
 }

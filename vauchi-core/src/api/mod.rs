@@ -145,7 +145,9 @@ pub use app_password::{AppPasswordConfig, AuthResult};
 pub use duress::{DuressAlert, DuressAlertType, DuressSettings};
 
 // Emergency Broadcast System
-pub use emergency::{BroadcastResult, EmergencyBroadcastConfig, MAX_TRUSTED_CONTACTS};
+pub use emergency::{
+    BroadcastResult, EmergencyBroadcastConfig, EmergencyWipeStatus, MAX_TRUSTED_CONTACTS,
+};
 
 // Vauchi
-pub use vauchi::{AuthMode, RecoveryReadiness, Vauchi, VauchiBuilder};
+pub use vauchi::{AuthMode, RecoveryReadiness, SetupProgress, Vauchi, VauchiBuilder};

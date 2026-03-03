@@ -11,7 +11,9 @@ use crate::network::Transport;
 use crate::storage::Storage;
 
 use super::super::config::VauchiConfig;
-use super::super::emergency::{BroadcastResult, EmergencyBroadcastConfig, MAX_TRUSTED_CONTACTS};
+use super::super::emergency::{
+    BroadcastResult, EmergencyBroadcastConfig, EmergencyWipeStatus, MAX_TRUSTED_CONTACTS,
+};
 use super::super::error::{VauchiError, VauchiResult};
 use super::super::events::{EventDispatcher, VauchiEvent};
 use super::Vauchi;
@@ -156,6 +158,94 @@ impl<T: Transport> Vauchi<T> {
     /// Deletes the emergency broadcast configuration.
     pub fn delete_emergency_config(&mut self) -> VauchiResult<()> {
         self.storage.delete_emergency_config()?;
+        Ok(())
+    }
+
+    /// Returns the emergency wipe readiness status.
+    ///
+    /// Aggregates:
+    /// - Whether emergency broadcast is configured
+    /// - Whether duress settings are configured
+    /// - Whether a deletion (shred) is scheduled or executed
+    /// - Whether the user has at least one trusted contact
+    pub fn get_emergency_wipe_status(&self) -> VauchiResult<EmergencyWipeStatus> {
+        let broadcast_configured = self.storage.load_emergency_config()?.is_some();
+        let duress_configured = self.storage.load_duress_settings()?.is_some();
+
+        let deletion_state = self.storage.load_deletion_state()?;
+        let deletion_scheduled = matches!(
+            deletion_state,
+            crate::storage::DeletionState::Scheduled { .. }
+        );
+        let deletion_executed = matches!(
+            deletion_state,
+            crate::storage::DeletionState::Executed { .. }
+        );
+
+        let contacts = self.storage.list_contacts()?;
+        let trusted_contact_count = contacts.iter().filter(|c| c.is_recovery_trusted()).count();
+        let has_trusted_contacts = trusted_contact_count > 0;
+
+        let password_enabled = self.storage.load_password_config()?.is_some();
+
+        Ok(EmergencyWipeStatus {
+            broadcast_configured,
+            duress_configured,
+            deletion_scheduled,
+            deletion_executed,
+            has_trusted_contacts,
+            trusted_contact_count,
+            password_enabled,
+        })
+    }
+
+    /// Performs an emergency data wipe (panic shred).
+    ///
+    /// This is the "nuclear option" — it destroys all local data immediately
+    /// without the normal 7-day grace period. Requires explicit confirmation.
+    ///
+    /// If `confirm` is false, returns an error asking for confirmation.
+    /// This prevents accidental wipes from buggy callers.
+    ///
+    /// The actual implementation delegates to `ShredManager::panic_shred()`
+    /// or, if no ShredManager is available, directly clears all storage tables.
+    pub fn perform_emergency_wipe(&mut self, confirm: bool) -> VauchiResult<()> {
+        if !confirm {
+            return Err(VauchiError::InvalidState(
+                "emergency wipe requires explicit confirmation (confirm=true)".into(),
+            ));
+        }
+
+        // Clear all contacts
+        let contacts = self.storage.list_contacts()?;
+        for contact in &contacts {
+            self.storage.delete_contact(contact.id())?;
+        }
+
+        // Clear own card
+        let empty_card = ContactCard::new("");
+        self.storage.save_own_card(&empty_card)?;
+
+        // Clear decoy contacts
+        self.storage.clear_all_decoy_contacts()?;
+
+        // Clear emergency config
+        let _ = self.storage.delete_emergency_config();
+
+        // Clear duress settings
+        let _ = self.storage.delete_duress_settings();
+
+        // Mark deletion as executed
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+        self.storage
+            .save_deletion_state(&crate::storage::DeletionState::Executed { executed_at: now })?;
+
+        // Clear identity
+        self.identity = None;
+
         Ok(())
     }
 

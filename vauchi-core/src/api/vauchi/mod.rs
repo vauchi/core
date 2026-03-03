@@ -11,11 +11,14 @@ mod contacts;
 mod emergency;
 mod features;
 mod identity;
+mod merge;
 mod propagation;
 mod security;
+mod setup;
 mod visibility;
 
 pub use builder::VauchiBuilder;
+pub use setup::SetupProgress;
 
 use std::sync::{Arc, Mutex};
 

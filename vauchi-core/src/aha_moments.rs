@@ -26,6 +26,13 @@ pub enum AhaMomentType {
     FirstUpdateReceived,
     /// Shown when first outbound update is delivered
     FirstOutboundDelivered,
+    /// Shown when the user edits a field on their card for the first time
+    /// (distinct from FirstEdit — triggers on field-level edit, not card creation)
+    FirstFieldEdit,
+    /// Shown when the user reaches three contacts
+    ThreeContactsReached,
+    /// Shown when a second device is linked
+    DeviceLinked,
 }
 
 impl AhaMomentType {
@@ -37,6 +44,9 @@ impl AhaMomentType {
             AhaMomentType::FirstContactAdded => "First contact added!",
             AhaMomentType::FirstUpdateReceived => "You received an update!",
             AhaMomentType::FirstOutboundDelivered => "Update delivered!",
+            AhaMomentType::FirstFieldEdit => "Field updated!",
+            AhaMomentType::ThreeContactsReached => "Growing network!",
+            AhaMomentType::DeviceLinked => "Device linked!",
         }
     }
 
@@ -56,6 +66,13 @@ impl AhaMomentType {
                 "This is the magic - they updated, you see it instantly."
             }
             AhaMomentType::FirstOutboundDelivered => "Your contacts now have your latest info.",
+            AhaMomentType::FirstFieldEdit => {
+                "Your contacts will see this change the next time the app syncs."
+            }
+            AhaMomentType::ThreeContactsReached => "Three contacts! Your network is taking shape.",
+            AhaMomentType::DeviceLinked => {
+                "Your contacts are now synced across devices. Changes appear everywhere."
+            }
         }
     }
 
@@ -67,6 +84,9 @@ impl AhaMomentType {
             AhaMomentType::FirstContactAdded => "aha.first_contact_added",
             AhaMomentType::FirstUpdateReceived => "aha.first_update_received",
             AhaMomentType::FirstOutboundDelivered => "aha.first_outbound_delivered",
+            AhaMomentType::FirstFieldEdit => "aha.first_field_edit",
+            AhaMomentType::ThreeContactsReached => "aha.three_contacts_reached",
+            AhaMomentType::DeviceLinked => "aha.device_linked",
         }
     }
 
@@ -88,6 +108,9 @@ impl AhaMomentType {
             AhaMomentType::FirstContactAdded => true,
             AhaMomentType::FirstUpdateReceived => true,
             AhaMomentType::FirstOutboundDelivered => false,
+            AhaMomentType::FirstFieldEdit => true, // ripple animation
+            AhaMomentType::ThreeContactsReached => true,
+            AhaMomentType::DeviceLinked => true,
         }
     }
 
@@ -99,6 +122,9 @@ impl AhaMomentType {
             AhaMomentType::FirstContactAdded,
             AhaMomentType::FirstUpdateReceived,
             AhaMomentType::FirstOutboundDelivered,
+            AhaMomentType::FirstFieldEdit,
+            AhaMomentType::ThreeContactsReached,
+            AhaMomentType::DeviceLinked,
         ]
     }
 }
@@ -277,7 +303,7 @@ mod tests {
     #[test]
     fn test_moment_type_all() {
         let all = AhaMomentType::all();
-        assert_eq!(all.len(), 5);
+        assert_eq!(all.len(), 8);
     }
 
     #[test]
@@ -292,7 +318,7 @@ mod tests {
     fn test_tracker_initial_state() {
         let tracker = AhaMomentTracker::new();
         assert_eq!(tracker.seen_count(), 0);
-        assert_eq!(tracker.total_count(), 5);
+        assert_eq!(tracker.total_count(), 8);
     }
 
     #[test]

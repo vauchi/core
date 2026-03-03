@@ -92,6 +92,7 @@ pub mod emergency;
 #[cfg(not(feature = "testing"))]
 mod emergency;
 
+pub mod local_keys;
 pub mod migration;
 pub mod secure;
 

@@ -260,7 +260,7 @@ if [[ -n "${COSIGN_KEY:-}" ]]; then
     fi
     echo -e "${YELLOW}Signing checksum with cosign...${NC}"
     cosign sign-blob --yes --key "$COSIGN_KEY_FILE" \
-        --output-signature "$DIST_DIR/VauchiMobileFFI.xcframework.zip.sha256.sig" \
+        --bundle "$DIST_DIR/VauchiMobileFFI.xcframework.zip.sha256.bundle" \
         "$DIST_DIR/VauchiMobileFFI.xcframework.zip.sha256"
     [[ "$COSIGN_KEY_FILE" != "$COSIGN_KEY" ]] && rm -f "$COSIGN_KEY_FILE"
     echo -e "${GREEN}Checksum signed${NC}"

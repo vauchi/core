@@ -124,7 +124,7 @@ UPLOAD_SUCCESS=true
 echo -e "${YELLOW}=== iOS Artifacts ===${NC}"
 upload_file "$DIST_DIR/VauchiMobileFFI.xcframework.zip" || UPLOAD_SUCCESS=false
 upload_file "$DIST_DIR/VauchiMobileFFI.xcframework.zip.sha256" || UPLOAD_SUCCESS=false
-upload_file "$DIST_DIR/VauchiMobileFFI.xcframework.zip.sha256.sig" || UPLOAD_SUCCESS=false
+upload_file "$DIST_DIR/VauchiMobileFFI.xcframework.zip.sha256.bundle" || UPLOAD_SUCCESS=false
 upload_file "$DIST_DIR/VauchiMobile-$VERSION.zip" || UPLOAD_SUCCESS=false
 
 # Upload Android artifacts
@@ -132,7 +132,7 @@ echo ""
 echo -e "${YELLOW}=== Android Artifacts ===${NC}"
 upload_file "$DIST_DIR/vauchi-mobile-android-$VERSION.zip" || UPLOAD_SUCCESS=false
 upload_file "$DIST_DIR/vauchi-mobile-android-$VERSION.zip.sha256" || UPLOAD_SUCCESS=false
-upload_file "$DIST_DIR/vauchi-mobile-android-$VERSION.zip.sha256.sig" || UPLOAD_SUCCESS=false
+upload_file "$DIST_DIR/vauchi-mobile-android-$VERSION.zip.sha256.bundle" || UPLOAD_SUCCESS=false
 
 # Upload SBOM artifacts (T0-2)
 echo ""
@@ -141,7 +141,7 @@ for sbom in "$DIST_DIR"/*.sbom.json; do
     [ -f "$sbom" ] || continue
     upload_file "$sbom" || UPLOAD_SUCCESS=false
     upload_file "${sbom}.sha256" || UPLOAD_SUCCESS=false
-    upload_file "${sbom}.sha256.sig" || UPLOAD_SUCCESS=false
+    upload_file "${sbom}.sha256.bundle" || UPLOAD_SUCCESS=false
 done
 
 echo ""

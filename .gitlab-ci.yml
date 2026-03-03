@@ -549,7 +549,7 @@ package:xcframework:
     paths:
       - dist/VauchiMobileFFI.xcframework.zip
       - dist/VauchiMobileFFI.xcframework.zip.sha256
-      - dist/VauchiMobileFFI.xcframework.zip.sha256.sig
+      - dist/VauchiMobileFFI.xcframework.zip.sha256.bundle
       - dist/VauchiMobile-*.zip
     expire_in: 1 week
 
@@ -563,7 +563,7 @@ package:android:
     paths:
       - dist/vauchi-mobile-android-*.zip
       - dist/vauchi-mobile-android-*.zip.sha256
-      - dist/vauchi-mobile-android-*.zip.sha256.sig
+      - dist/vauchi-mobile-android-*.zip.sha256.bundle
     expire_in: 1 week
 
 # Generate CycloneDX SBOM for supply-chain traceability (T0-2)
@@ -603,7 +603,7 @@ package:sbom:
         fi
         for f in dist/*.sbom.json.sha256; do
           cosign sign-blob --yes --key "$COSIGN_KEY_FILE" \
-            --output-signature "${f}.sig" "$f"
+            --bundle "${f}.bundle" "$f"
         done
         [[ "$COSIGN_KEY_FILE" != "$COSIGN_KEY" ]] && rm -f "$COSIGN_KEY_FILE"
         echo "SBOMs signed"
@@ -614,7 +614,7 @@ package:sbom:
     paths:
       - dist/*.sbom.json
       - dist/*.sbom.json.sha256
-      - dist/*.sbom.json.sha256.sig
+      - dist/*.sbom.json.sha256.bundle
     expire_in: 1 week
 
 # ============================================================

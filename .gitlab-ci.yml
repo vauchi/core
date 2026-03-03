@@ -135,12 +135,12 @@ lint:clippy:
 # Clone sibling locales repo (needed by build.rs and i18n tests)
 .clone-locales:
   before_script:
-    - if [ ! -d ../locales ]; then git clone --depth=1 https://gitlab.com/vauchi/locales.git ../locales; else git -C ../locales pull --ff-only 2>/dev/null || true; fi
+    - if [ ! -d ../locales ]; then git clone --depth=1 https://gitlab.com/vauchi/locales.git ../locales || (sleep 2 && git clone --depth=1 https://gitlab.com/vauchi/locales.git ../locales); else git -C ../locales pull --ff-only 2>/dev/null || true; fi
 
 # Clone sibling themes repo (needed by content contract validation)
 .clone-themes:
   before_script:
-    - if [ ! -d ../themes ]; then git clone --depth=1 https://gitlab.com/vauchi/themes.git ../themes; else git -C ../themes pull --ff-only 2>/dev/null || true; fi
+    - if [ ! -d ../themes ]; then git clone --depth=1 https://gitlab.com/vauchi/themes.git ../themes || (sleep 2 && git clone --depth=1 https://gitlab.com/vauchi/themes.git ../themes); else git -C ../themes pull --ff-only 2>/dev/null || true; fi
 
 # MR test jobs: use nextest for fast feedback (12x faster than cargo test,
 # avoids llvm-cov instrumentation rebuild). Coverage runs on main only.
@@ -342,7 +342,6 @@ bench:compare:
           - "vauchi-core/benches/**/*.rs"
           - "vauchi-core/Cargo.toml"
           - ".gitlab-ci.yml"
-      when: manual
   allow_failure: true
   cache:
     key: bench-baseline-main
@@ -455,6 +454,29 @@ security:deny:
   script:
     - command -v cargo-deny >/dev/null 2>&1 || cargo binstall cargo-deny --no-confirm 2>/dev/null || cargo install cargo-deny || true
     - cargo deny check
+
+# Refine semgrep-sast from security.yml: gate on lint, run only on Rust changes
+semgrep-sast:
+  needs:
+    - job: lint:format
+      optional: true
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "pipeline" || $CI_PIPELINE_SOURCE == "trigger" || $CI_PIPELINE_SOURCE == "api"
+      when: never
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes:
+        compare_to: refs/heads/main
+        paths:
+          - "**/*.rs"
+          - ".gitlab-ci.yml"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+
+# Refine secret_detection from security.yml: gate on lint
+secret_detection:
+  needs:
+    - job: lint:format
+      optional: true
 
 # ============================================================
 # Build Stage - Tags (release builds)
@@ -901,8 +923,8 @@ build:dev:
 
 cleanup:runner:
   extends: .cleanup-runner
-  # Run weekly via scheduled pipeline or manually
+  # Run weekly via scheduled pipeline (only when CLEANUP_ENABLED is set) or manually
   rules:
-    - if: $CI_PIPELINE_SOURCE == "schedule"
+    - if: $CI_PIPELINE_SOURCE == "schedule" && $CLEANUP_ENABLED == "true"
     - when: manual
       allow_failure: true

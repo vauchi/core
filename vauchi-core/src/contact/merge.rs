@@ -4,6 +4,8 @@
 
 //! Contact Duplicate Detection and Merge
 
+use std::collections::HashSet;
+
 use crate::contact::Contact;
 
 /// A detected duplicate pair with similarity score.
@@ -71,6 +73,70 @@ fn compute_similarity(a: &Contact, b: &Contact) -> f64 {
     }
 
     score / max_score
+}
+
+/// Merges two contacts, keeping the primary and incorporating fields from the secondary.
+///
+/// - The primary contact's display name is preserved.
+/// - Fields from the secondary that don't exist on the primary (by field type + label)
+///   are added to the merged card.
+/// - Visibility rules, favorite/hidden/blocked status come from the primary.
+/// - Returns the merged contact (based on primary) with the secondary's unique fields added.
+///
+/// The caller is responsible for deleting the secondary contact from storage.
+pub fn merge_contacts(primary: &Contact, secondary: &Contact) -> Contact {
+    let mut merged = primary.clone();
+
+    // Collect primary field signatures (type + label) for dedup
+    let primary_signatures: HashSet<(String, String)> = primary
+        .card()
+        .fields()
+        .iter()
+        .map(|f| (format!("{:?}", f.field_type()), f.label().to_string()))
+        .collect();
+
+    // Add unique fields from secondary
+    let mut merged_card = primary.card().clone();
+    for field in secondary.card().fields() {
+        let sig = (
+            format!("{:?}", field.field_type()),
+            field.label().to_string(),
+        );
+        if !primary_signatures.contains(&sig) {
+            // Ignore errors from max fields limit — best effort merge
+            let _ = merged_card.add_field(field.clone());
+        }
+    }
+
+    merged.update_card(merged_card);
+    merged
+}
+
+/// Filters duplicate pairs to exclude dismissed ones.
+///
+/// Takes a list of duplicate pairs and a set of dismissed pair IDs (as (id1, id2) tuples,
+/// normalized so id1 < id2 lexicographically), and returns only non-dismissed pairs.
+pub fn filter_dismissed(
+    duplicates: Vec<DuplicatePair>,
+    dismissed: &HashSet<(String, String)>,
+) -> Vec<DuplicatePair> {
+    duplicates
+        .into_iter()
+        .filter(|pair| {
+            let key = normalize_pair_key(&pair.id1, &pair.id2);
+            !dismissed.contains(&key)
+        })
+        .collect()
+}
+
+/// Normalizes a pair of IDs so that id1 < id2 lexicographically.
+/// This ensures (A, B) and (B, A) map to the same key.
+pub fn normalize_pair_key(id1: &str, id2: &str) -> (String, String) {
+    if id1 <= id2 {
+        (id1.to_string(), id2.to_string())
+    } else {
+        (id2.to_string(), id1.to_string())
+    }
 }
 
 /// Simple string similarity using normalized Levenshtein-like comparison.

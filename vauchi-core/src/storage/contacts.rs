@@ -499,7 +499,7 @@ impl Storage {
     /// Returns the maximum number of contacts allowed.
     ///
     /// Reads from the `contact_limits` table (created by migration v4).
-    /// Returns 500 as the default if no limit has been configured.
+    /// Returns 10,000 as the default if no limit has been configured.
     pub fn get_contact_limit(&self) -> Result<usize, StorageError> {
         let result = self.conn.query_row(
             "SELECT max_contacts FROM contact_limits WHERE id = 1",
@@ -509,9 +509,20 @@ impl Storage {
 
         match result {
             Ok(limit) => Ok(limit as usize),
-            Err(rusqlite::Error::QueryReturnedNoRows) => Ok(500), // Default limit
+            Err(rusqlite::Error::QueryReturnedNoRows) => Ok(10_000), // Default limit
             Err(e) => Err(StorageError::Database(e)),
         }
+    }
+
+    /// Sets the maximum number of contacts allowed.
+    ///
+    /// Updates the `contact_limits` table (created by migration v4).
+    pub fn set_contact_limit(&self, max_contacts: usize) -> Result<(), StorageError> {
+        self.conn.execute(
+            "INSERT OR REPLACE INTO contact_limits (id, max_contacts) VALUES (1, ?1)",
+            params![max_contacts as i64],
+        )?;
+        Ok(())
     }
 
     /// Converts a database row to a Contact.
@@ -838,6 +849,55 @@ impl Storage {
         self.conn.execute(
             "INSERT OR REPLACE INTO revoked_senders (sender_id, revoked_at) VALUES (?1, ?2)",
             params![sender_id, revoked_at as i64],
+        )?;
+        Ok(())
+    }
+
+    // === Dismissed Duplicates Operations ===
+
+    /// Records a dismissed duplicate pair.
+    ///
+    /// The pair is normalized so id1 < id2 lexicographically, ensuring
+    /// (A, B) and (B, A) are stored identically.
+    pub fn dismiss_duplicate(&self, id1: &str, id2: &str) -> Result<(), StorageError> {
+        let (norm_id1, norm_id2) = crate::contact::merge::normalize_pair_key(id1, id2);
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("system time before UNIX epoch")
+            .as_secs();
+        self.conn.execute(
+            "INSERT OR IGNORE INTO dismissed_duplicates (id1, id2, dismissed_at) VALUES (?1, ?2, ?3)",
+            params![norm_id1, norm_id2, now as i64],
+        )?;
+        Ok(())
+    }
+
+    /// Loads all dismissed duplicate pairs.
+    ///
+    /// Returns a set of (id1, id2) tuples where id1 < id2 lexicographically.
+    pub fn load_dismissed_duplicates(
+        &self,
+    ) -> Result<std::collections::HashSet<(String, String)>, StorageError> {
+        let mut stmt = self
+            .conn
+            .prepare("SELECT id1, id2 FROM dismissed_duplicates")?;
+        let rows = stmt.query_map([], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+        })?;
+
+        let mut dismissed = std::collections::HashSet::new();
+        for row_result in rows {
+            dismissed.insert(row_result?);
+        }
+        Ok(dismissed)
+    }
+
+    /// Removes a dismissed duplicate pair (e.g., when contacts are deleted).
+    pub fn undismiss_duplicate(&self, id1: &str, id2: &str) -> Result<(), StorageError> {
+        let (norm_id1, norm_id2) = crate::contact::merge::normalize_pair_key(id1, id2);
+        self.conn.execute(
+            "DELETE FROM dismissed_duplicates WHERE id1 = ?1 AND id2 = ?2",
+            params![norm_id1, norm_id2],
         )?;
         Ok(())
     }

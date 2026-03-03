@@ -230,6 +230,7 @@ impl<'a> ContactManager<'a> {
     /// Adds a new contact from an exchange.
     ///
     /// This is typically called after a successful key exchange.
+    /// Enforces the contact limit (from storage `contact_limits` table).
     pub fn add_contact(&self, contact: Contact) -> VauchiResult<()> {
         let contact_id = contact.id().to_string();
 
@@ -239,6 +240,13 @@ impl<'a> ContactManager<'a> {
                 "Contact {} already exists",
                 contact_id
             )));
+        }
+
+        // Enforce contact limit
+        let current_count = self.storage.count_contacts()?;
+        let max_contacts = self.storage.get_contact_limit()?;
+        if current_count >= max_contacts {
+            return Err(VauchiError::ContactLimitReached(max_contacts));
         }
 
         self.storage.save_contact(&contact)?;

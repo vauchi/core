@@ -85,6 +85,10 @@ pub enum VauchiError {
     /// Contact is blocked.
     #[error("contact is blocked: {0}")]
     ContactBlocked(String),
+
+    /// Contact limit reached.
+    #[error("contact limit reached: maximum {0} contacts allowed")]
+    ContactLimitReached(usize),
 }
 
 /// Result type for Vauchi operations.

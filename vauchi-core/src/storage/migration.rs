@@ -408,6 +408,11 @@ pub fn all_migrations() -> Vec<Migration> {
             name: "trust_metric_fields",
             action: MigrationAction::Sql(MIGRATION_V27_TRUST_METRICS),
         },
+        Migration {
+            version: 28,
+            name: "contact_limits_and_merge",
+            action: MigrationAction::Sql(MIGRATION_V28_LIMITS_AND_MERGE),
+        },
     ]
 }
 
@@ -502,6 +507,22 @@ const MIGRATION_V27_TRUST_METRICS: &str = "
     ALTER TABLE contacts ADD COLUMN exchange_transport TEXT NOT NULL DEFAULT 'Qr';
     ALTER TABLE contacts ADD COLUMN has_recovered INTEGER NOT NULL DEFAULT 0;
     ALTER TABLE contacts ADD COLUMN card_updated_at INTEGER;
+";
+
+/// Migration v28: Raise contact limit to 10,000 and add dismissed duplicates table.
+///
+/// - Updates the default contact limit from 500 to 10,000.
+/// - Creates `dismissed_duplicates` table to track which duplicate suggestions
+///   the user has dismissed, so they don't reappear.
+const MIGRATION_V28_LIMITS_AND_MERGE: &str = "
+    UPDATE contact_limits SET max_contacts = 10000 WHERE id = 1;
+
+    CREATE TABLE IF NOT EXISTS dismissed_duplicates (
+        id1 TEXT NOT NULL,
+        id2 TEXT NOT NULL,
+        dismissed_at INTEGER NOT NULL,
+        PRIMARY KEY (id1, id2)
+    );
 ";
 
 /// Migration v2: Re-encrypt all AES-GCM encrypted data to XChaCha20-Poly1305.

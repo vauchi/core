@@ -143,6 +143,7 @@ fn test_queue_size_remaining() {
 // === Queue Ordering Tests ===
 
 // @scenario: sync_updates:Queued updates delivered when contact comes online
+// @scenario: message_delivery.feature:Receive pending updates when coming online
 // @scenario: message_delivery:Sync queue when coming online
 #[test]
 fn test_pending_updates_ordered_by_creation() {
@@ -207,6 +208,7 @@ fn test_flush_pending_updates_for_contact() {
 
 // @scenario: sync_updates:Sync survives app restart
 // @scenario: sync_updates:View sync status for all contacts
+// @scenario: message_delivery.feature:Retry queue persists across app restarts
 #[test]
 fn test_clear_all_pending_updates() {
     let storage = test_storage();

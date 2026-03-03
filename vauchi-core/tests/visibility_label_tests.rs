@@ -68,6 +68,8 @@ fn create_manager_with_labels(names: &[&str]) -> (LabelManager, Vec<String>) {
 // @scenario: visibility_labels.feature:Cannot create duplicate label names
 // @scenario: visibility_labels.feature:Rename an existing label
 // @scenario: visibility_labels.feature:Delete a label
+// @scenario: contacts_management.feature:Delete a group
+// @scenario: contacts_management.feature:Rename a group
 #[test]
 fn test_label_crud_operations() {
     let mut manager = LabelManager::new();
@@ -264,6 +266,9 @@ fn test_label_max_limit() {
 // @scenario: visibility_labels.feature:Add a contact to a label
 // @scenario: visibility_labels.feature:Remove a contact from a label
 // @scenario: visibility_labels.feature:Contact in multiple labels
+// @scenario: contacts_management.feature:Contact in multiple groups
+// @scenario: contacts_management.feature:Remove contact from group
+// @scenario: contacts_management.feature:Filter contacts by group
 #[test]
 fn test_contact_assignment_to_label() {
     let (mut manager, label_ids) = create_manager_with_labels(&["Family", "Friends", "Colleagues"]);

@@ -484,6 +484,7 @@ fn test_exchange_message_wrong_key_fails_decrypt() {
 /// This is the critical security property - relay only sees opaque ciphertext.
 // @scenario: security.feature:Server cannot access plaintext
 // @scenario: relay_network.feature:Relay only sees encrypted blobs
+// @scenario: relay_network.feature:Relay cannot read offloaded blobs
 #[test]
 fn test_relay_cannot_read_exchange_message() {
     let alice = X3DHKeyPair::generate();

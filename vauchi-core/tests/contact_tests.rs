@@ -372,6 +372,7 @@ fn test_contact_set_recovery_trusted() {
 
 // @scenario: identity_management.feature:Social recovery setup
 // @scenario: sync_updates.feature:Receive contact update from relay
+// @scenario: contact_recovery.feature:Trust state syncs across linked devices
 #[test]
 fn test_contact_from_sync_data_full_with_recovery_trusted() {
     let public_key = [0x42u8; 32];

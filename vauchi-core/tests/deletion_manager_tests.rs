@@ -235,6 +235,7 @@ fn test_execute_deletion_requires_scheduled_state() {
 
 // === Edge Cases ===
 
+// @scenario: emergency_shred.feature:Shred with no contacts
 #[test]
 fn test_execute_deletion_no_contacts_returns_empty_revocations() {
     let storage = test_storage();

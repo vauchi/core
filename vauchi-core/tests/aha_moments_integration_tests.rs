@@ -499,6 +499,7 @@ fn test_vauchi_api_demo_contact_integration() {
 }
 
 /// Test: Demo contact not initialized when user has contacts
+// @scenario: demo_contact.feature:Demo contact does not appear if user has contacts
 #[test]
 fn test_demo_contact_skipped_with_contacts() {
     let wb: Vauchi<MockTransport> = Vauchi::in_memory().unwrap();

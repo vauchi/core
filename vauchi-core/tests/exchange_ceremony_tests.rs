@@ -181,6 +181,7 @@ fn test_tampered_ciphertext_causes_decrypt_failure() {
 
 /// Different identity keys (DH1) produce different shared secrets.
 // @scenario: contact_exchange.feature:Exchange verifies identity
+// @scenario: contact_exchange.feature:Identity mismatch detection
 #[test]
 fn test_identity_binding_changes_shared_secret() {
     let alice1 = X3DHKeyPair::generate();
@@ -344,6 +345,7 @@ fn test_encrypted_message_secret_matches_raw_x3dh() {
 /// preventing identity misbinding attacks where an attacker substitutes
 /// their identity key while keeping the same DH output.
 // @scenario: contact_exchange.feature:Exchange verifies identity
+// @scenario: contact_exchange.feature:Identity mismatch detection
 #[test]
 fn test_transcript_binding_includes_identity_keys() {
     let identity_a = Identity::create("Alice-A");

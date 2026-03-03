@@ -515,6 +515,7 @@ fn test_visibility_templates() {
 /// Feature: visibility_control.feature
 /// Scenario: Apply different templates to different contacts
 // @scenario: visibility_control.feature:Apply template visibility to new contact
+// @scenario: visibility_control.feature:View what a specific contact can see
 #[test]
 fn test_visibility_templates_per_contact() {
     let all_fields = vec![
@@ -556,6 +557,7 @@ fn test_visibility_templates_per_contact() {
 /// Feature: visibility_control.feature
 /// Scenario: Show a field only to specific contacts
 // @scenario: visibility_control.feature:Show a field only to specific contacts
+// @scenario: visibility_control.feature:Visibility audit shows all contacts for a field
 #[test]
 fn test_visibility_templates_with_contacts_list() {
     let mut rules = VisibilityRules::new();

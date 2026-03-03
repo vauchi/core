@@ -170,6 +170,8 @@ fn test_expired_qr_rejected_on_process() {
 
 /// Scenario: Exchange with existing contact detected
 // @scenario: contact_exchange.feature:Exchange with existing contact shows update option
+// @scenario: contact_exchange.feature:Update existing contact via exchange
+// @scenario: contact_exchange.feature:Keep existing contact without update
 #[test]
 fn test_duplicate_contact_detection() {
     let alice = Identity::create("Alice");

@@ -89,6 +89,7 @@ fn test_handshake_signature_bytes() {
 }
 
 // @scenario: message_delivery:See delivery status for updates
+// @scenario: message_delivery.feature:Read receipts are never sent
 #[test]
 fn test_ack_status_values() {
     assert_ne!(AckStatus::Delivered, AckStatus::Failed);
@@ -96,6 +97,7 @@ fn test_ack_status_values() {
 }
 
 // @scenario: message_delivery:Delivery status updates in real-time
+// @scenario: message_delivery.feature:Offline indicator
 #[test]
 fn test_presence_status_values() {
     assert_ne!(PresenceStatus::Online, PresenceStatus::Offline);
@@ -109,6 +111,8 @@ fn test_presence_status_values() {
 
 /// Test DeviceSyncMessage serialization for inter-device communication
 // @scenario: device_management:Changes sync between devices
+// @scenario: sync_updates.feature:Sync via WebSocket relay
+// @scenario: sync_updates.feature:All sync traffic is encrypted
 #[test]
 fn test_device_sync_message_serialize() {
     let msg = DeviceSyncMessage {

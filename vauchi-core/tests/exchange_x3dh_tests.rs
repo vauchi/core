@@ -72,6 +72,7 @@ fn test_x3dh_respond_key_differs_from_raw_dh() {
 /// Wrong identity key must produce a different shared secret.
 /// With full X3DH, DH1 binds the secret to both parties' identity keys.
 // @scenario: security.feature:Shared key derivation via X3DH
+// @scenario: contact_exchange.feature:Identity mismatch detection
 #[test]
 fn test_x3dh_identity_binding_wrong_key_fails() {
     let alice_keys = X3DHKeyPair::generate();

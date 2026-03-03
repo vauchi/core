@@ -204,6 +204,8 @@ fn test_delete_device_deliveries_for_message() {
 
 // @scenario: message_delivery:Partial delivery to devices
 // @scenario: message_delivery:Device comes online later
+// @scenario: message_delivery.feature:Manual retry option
+// @scenario: message_delivery.feature:Receive pending updates when coming online
 #[test]
 fn test_get_pending_device_deliveries() {
     let storage = test_storage();
@@ -234,6 +236,7 @@ fn test_get_pending_device_deliveries() {
 }
 
 // @scenario: message_delivery:Device comes online later
+// @scenario: message_delivery.feature:Expired messages can be resent
 #[test]
 fn test_device_delivery_status_transitions() {
     let storage = test_storage();

@@ -17,6 +17,7 @@ fn create_test_contact() -> Contact {
 }
 
 // @scenario: device_management:New device receives full state
+// @scenario: sync_updates.feature:New device receives full state
 #[test]
 fn test_contact_sync_data_roundtrip() {
     let contact = create_test_contact();
@@ -42,6 +43,7 @@ fn test_contact_sync_data_serialization() {
 }
 
 // @scenario: device_management:New device receives full state
+// @scenario: sync_updates.feature:New device receives full state
 #[test]
 fn test_device_sync_payload_roundtrip() {
     let contact1 = create_test_contact();

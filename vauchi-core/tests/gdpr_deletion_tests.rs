@@ -43,6 +43,7 @@ fn test_schedule_deletion_sets_grace_period() {
 }
 
 // @scenario: privacy_compliance.feature:Cancel deletion during grace period
+// @scenario: emergency_shred.feature:Cancel soft shred during grace period
 #[test]
 fn test_cancel_deletion_within_grace_period() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();

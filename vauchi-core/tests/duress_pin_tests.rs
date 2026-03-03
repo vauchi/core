@@ -183,6 +183,7 @@ fn test_save_load_app_password_roundtrip() {
 }
 
 // @scenario: duress_pin.feature:Enable duress PIN in settings
+// @scenario: duress_pin.feature:App update preserves duress configuration
 #[test]
 fn test_save_load_duress_password_roundtrip() {
     let storage =
@@ -291,6 +292,7 @@ fn test_load_decoy_contacts_empty_initially() {
 }
 
 // @scenario: duress_pin.feature:Configure decoy contacts
+// @scenario: duress_pin.feature:Decoy profile has separate database
 #[test]
 fn test_save_load_decoy_contact() {
     let storage =
@@ -508,6 +510,8 @@ fn test_list_contacts_normal_mode_returns_real() {
 
 // @scenario: duress_pin.feature:Duress PIN shows decoy contacts
 // @scenario: duress_pin.feature:Cannot access real contacts from duress mode
+// @scenario: duress_pin.feature:Duress mode looks identical to normal mode
+// @scenario: duress_pin.feature:Decoy profile functions normally
 #[test]
 fn test_list_contacts_duress_mode_returns_decoy() {
     let (mut alice_wb, _bob_wb, _secret, _bob_id, _alice_id) = setup_alice_bob_exchange();
@@ -559,6 +563,7 @@ fn test_load_duress_settings_returns_none_initially() {
 }
 
 // @scenario: duress_pin.feature:Configure trusted contacts for duress alerts
+// @scenario: duress_pin.feature:App update preserves duress configuration
 #[test]
 fn test_save_load_duress_settings_roundtrip() {
     let wb = create_vauchi_with_identity("Alice");
@@ -610,6 +615,8 @@ fn test_delete_duress_settings() {
 // =============================================================================
 
 // @scenario: duress_pin.feature:Duress unlock sends silent alert to trusted contacts
+// @scenario: duress_pin.feature:Duress alert looks like normal sync traffic
+// @scenario: duress_pin.feature:Duress alerts work offline
 #[test]
 fn test_queue_duress_alert_on_duress_authenticate() {
     let mut wb = create_vauchi_with_identity("Alice");

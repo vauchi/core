@@ -42,6 +42,8 @@ fn test_set_nobody() {
 
 // @scenario: visibility_control.feature:Show a field only to specific contacts
 // @scenario: visibility_control.feature:Make a field private (visible to none)
+// @scenario: contacts_management.feature:Contact shows only fields I can see
+// @scenario: visibility_control.feature:View what a specific contact can see
 #[test]
 fn test_visible_fields() {
     let mut rules = VisibilityRules::new();

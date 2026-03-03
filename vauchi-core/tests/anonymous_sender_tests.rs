@@ -267,6 +267,7 @@ fn test_epoch_boundary_handling() {
 /// unlinkable. An observer (e.g., relay) seeing IDs from different epochs
 /// cannot determine they originate from the same sender.
 // @scenario: anonymous_sender.feature:Relay cannot link sender across epochs
+// @scenario: relay_network.feature:Relay cannot correlate sender and recipient
 #[test]
 fn test_sender_unlinkability() {
     let key = [0x42u8; 32];
@@ -304,6 +305,7 @@ fn test_sender_unlinkability() {
 /// Tests that the same sender communicating with different contacts
 /// produces unlinkable anonymous IDs, even in the same epoch.
 // @scenario: anonymous_sender.feature:Relay cannot link sender across epochs
+// @scenario: relay_network.feature:Relay cannot correlate sender and recipient
 #[test]
 fn test_sender_unlinkability_across_contacts() {
     // Simulate shared keys with different contacts

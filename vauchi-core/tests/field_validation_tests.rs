@@ -319,6 +319,7 @@ fn test_validate_address_field() {
 // === Custom Field Validation Tests ===
 
 // @scenario: field_validation:Validate a custom field
+// @scenario: contact_card_management.feature:Add unlisted social network as custom field
 #[test]
 fn test_validate_custom_field() {
     let validator = Identity::create("Validator");

@@ -49,6 +49,7 @@ fn test_checkpoint_save_and_load() {
     assert_eq!(loaded_items.len(), 50, "All items should be preserved");
 }
 
+// @scenario: sync_updates.feature:Sync survives device reboot
 #[test]
 fn test_checkpoint_resume_from_correct_position() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();

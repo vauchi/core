@@ -95,6 +95,7 @@ fn test_demo_state_tracks_tip() {
 /// Test: Tips advance over time
 /// Feature: demo_contact.feature @demo-updates
 // @scenario: demo_contact.feature:Demo contact sends periodic updates
+// @scenario: demo_contact.feature:Demo updates demonstrate the update flow
 #[test]
 fn test_demo_tips_advance() {
     let mut state = DemoContactState::new_active();
@@ -175,6 +176,7 @@ fn test_all_tip_categories_exist() {
 /// Feature: demo_contact.feature @demo-content
 // @scenario: demo_contact.feature:Demo contact has rotating tips
 // @scenario: demo_contact.feature:Demo tips change over time
+// @scenario: demo_contact.feature:Demo updates demonstrate the update flow
 #[test]
 fn test_demo_tips_rotate() {
     let mut state = DemoContactState::new_active();
@@ -215,6 +217,7 @@ fn test_demo_contact_manual_dismiss() {
 /// Test: Auto-removal after first real exchange
 /// Feature: demo_contact.feature @demo-dismiss
 // @scenario: demo_contact.feature:Demo contact auto-removes after first real exchange
+// @scenario: demo_contact.feature:Demo contact does not appear if user has contacts
 #[test]
 fn test_demo_contact_auto_remove() {
     let mut state = DemoContactState::new_active();

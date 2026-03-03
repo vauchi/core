@@ -70,6 +70,8 @@ fn setup_widget_test_env() -> (tempfile::TempDir, MemoryKeyStorage) {
 ///
 /// Traces to: "Full panic shred per emergency_shred.feature"
 // @scenario: panic_widget:Widget triggers full panic shred
+// @scenario: emergency_shred.feature:Panic shred destroys everything immediately
+// @scenario: emergency_shred.feature:Database WAL and SHM files are cleaned up
 #[test]
 fn test_widget_panic_shred_destroys_database() {
     let (dir, secure_storage) = setup_widget_test_env();
@@ -99,6 +101,8 @@ fn test_widget_panic_shred_destroys_database() {
 ///
 /// Traces to: "Keys destroyed"
 // @scenario: panic_widget:Widget triggers full panic shred
+// @scenario: emergency_shred.feature:Panic shred destroys everything immediately
+// @scenario: emergency_shred.feature:Files are overwritten with zeros before deletion
 #[test]
 fn test_widget_panic_shred_destroys_keys() {
     let (dir, secure_storage) = setup_widget_test_env();
@@ -127,6 +131,8 @@ fn test_widget_panic_shred_destroys_keys() {
 ///
 /// Traces to: "Full panic shred per emergency_shred.feature"
 // @scenario: panic_widget:Widget triggers full panic shred
+// @scenario: emergency_shred.feature:Panic shred destroys everything immediately
+// @scenario: emergency_shred.feature:Files are overwritten with zeros before deletion
 #[test]
 fn test_widget_panic_shred_destroys_identity() {
     let (dir, secure_storage) = setup_widget_test_env();
@@ -156,6 +162,7 @@ fn test_widget_panic_shred_destroys_identity() {
 ///
 /// Traces to: "Full panic shred per emergency_shred.feature"
 // @scenario: panic_widget:Widget triggers full panic shred
+// @scenario: emergency_shred.feature:Shred report tracks what was destroyed
 #[test]
 fn test_widget_panic_shred_returns_report() {
     let (dir, secure_storage) = setup_widget_test_env();
@@ -255,6 +262,7 @@ fn test_widget_panic_shred_on_empty_directory_succeeds() {
 ///
 /// Traces to: "Keys destroyed"
 // @scenario: panic_widget:Widget triggers full panic shred
+// @scenario: emergency_shred.feature:Panic shred destroys everything immediately
 #[test]
 fn test_widget_panic_shred_destroys_smk() {
     let (dir, secure_storage) = setup_widget_test_env();
@@ -278,6 +286,7 @@ fn test_widget_panic_shred_destroys_smk() {
 ///
 /// Traces to: "Pre-signed messages sent FIRST"
 // @scenario: panic_widget:Widget shred sends pre-signed notifications
+// @scenario: emergency_shred.feature:Panic shred follows sign-before-destroy pattern
 #[test]
 fn test_widget_panic_shred_loads_pre_signed_before_destruction() {
     let (dir, secure_storage) = setup_widget_test_env();

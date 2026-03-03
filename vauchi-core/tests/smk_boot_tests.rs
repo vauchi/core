@@ -46,6 +46,7 @@ fn test_identity_derive_smk_differs_between_identities() {
 
 // === SMK → SecureStorage → SEK Boot Flow ===
 
+// @scenario: security.feature:Private keys stored in secure enclave
 #[test]
 fn test_smk_stored_and_loaded_from_secure_storage() {
     let identity = Identity::create("Alice");
@@ -66,6 +67,8 @@ fn test_smk_stored_and_loaded_from_secure_storage() {
     assert_eq!(sek1.as_bytes(), sek2.as_bytes());
 }
 
+// @scenario: security.feature:Private keys stored in secure enclave
+// @scenario: sync_updates.feature:Sync survives device reboot
 #[test]
 fn test_boot_with_smk_derived_sek_opens_storage() {
     let identity = Identity::create("Alice");
@@ -97,6 +100,7 @@ fn test_boot_with_smk_derived_sek_opens_storage() {
 
 // === Migration from Old Key to SMK-Derived SEK ===
 
+// @scenario: security.feature:Private keys on devices without secure enclave
 #[test]
 fn test_migrate_old_key_to_smk_preserves_data() {
     let old_key = SymmetricKey::generate();
@@ -232,6 +236,7 @@ fn test_smk_destruction_makes_data_irrecoverable() {
 
 // === Vauchi-Level Integration ===
 
+// @scenario: security.feature:Private keys stored in secure enclave
 #[test]
 fn test_vauchi_create_identity_stores_smk() {
     use vauchi_core::api::{Vauchi, VauchiConfig};
@@ -254,6 +259,8 @@ fn test_vauchi_create_identity_stores_smk() {
     assert_eq!(smk_bytes.len(), 32);
 }
 
+// @scenario: security.feature:Private keys stored in secure enclave
+// @scenario: sync_updates.feature:Sync survives device reboot
 #[test]
 fn test_vauchi_boot_with_smk_from_secure_storage() {
     use vauchi_core::api::{Vauchi, VauchiConfig};

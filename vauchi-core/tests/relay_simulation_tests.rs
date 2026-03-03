@@ -77,6 +77,7 @@ fn test_relay_reconnection() {
 
 /// Test: Sending update through relay
 // @scenario: relay_network:Automatic fallback to relay
+// @scenario: sync_updates.feature:Sync via WebSocket relay
 #[test]
 fn test_relay_send_update() {
     let transport = MockTransport::new();
@@ -253,6 +254,8 @@ fn test_sync_state_pending_count() {
 /// Test: Complete update propagation flow
 // @scenario: relay_network:Automatic fallback to relay
 // @scenario: relay_network:Relay only sees encrypted blobs
+// @scenario: sync_updates.feature:Sync via WebSocket relay
+// @scenario: sync_updates.feature:All sync traffic is encrypted
 #[test]
 fn test_full_update_propagation() {
     use vauchi_core::network::MockTransport;

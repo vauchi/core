@@ -20,6 +20,7 @@ use vauchi_core::{ContactCard, Identity};
 // ============================================================
 
 // @scenario: contact_exchange.feature:NFC exchange reports descriptive error on failure
+// @scenario: contact_exchange.feature:NFC tap too brief to complete exchange
 #[test]
 fn test_nfc_error_variants_exist() {
     // Verify the NFC error variants are usable
@@ -146,6 +147,7 @@ fn test_nfc_version_check() {
 }
 
 // @scenario: contact_exchange.feature:NFC exchange reports descriptive error on failure
+// @scenario: contact_exchange.feature:NFC tap too brief to complete exchange
 #[test]
 fn test_nfc_too_short_payload() {
     let result = ExchangeNfc::from_bytes(&[0u8; 50]);
@@ -321,6 +323,7 @@ fn test_nfc_tap_transitions_to_key_agreement() {
 }
 
 // @scenario: contact_exchange.feature:NFC exchange reports descriptive error on failure
+// @scenario: contact_exchange.feature:NFC tap too brief to complete exchange
 #[test]
 fn test_nfc_invalid_payload_rejected() {
     let identity = Identity::create("Alice");
@@ -418,6 +421,7 @@ fn test_nfc_self_exchange_rejected() {
 
 // @scenario: contact_exchange.feature:Successful NFC exchange with proximity
 // @scenario: contact_exchange.feature:Exchange creates mutual keys
+// @scenario: contact_exchange.feature:NFC active exchange platform compatibility
 #[test]
 fn test_nfc_full_exchange_via_session() {
     let alice_identity = Identity::create("Alice");
@@ -558,6 +562,7 @@ fn test_nfc_key_independence_from_qr() {
 
 // @scenario: contact_exchange.feature:Successful NFC exchange with proximity
 // @scenario: contact_exchange.feature:X3DH key agreement during exchange
+// @scenario: contact_exchange.feature:NFC active exchange platform compatibility
 #[test]
 fn test_nfc_apdu_round_trip_simulation() {
     let alice_identity = Identity::create("Alice");

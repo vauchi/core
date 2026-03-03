@@ -65,6 +65,7 @@ fn test_list_contacts_paginated_returns_correct_subset() {
 }
 
 // @scenario: performance:Batch contact loading with pagination
+// @scenario: contacts_management.feature:Sort contacts alphabetically
 #[test]
 fn test_list_contacts_paginated_respects_ordering() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();

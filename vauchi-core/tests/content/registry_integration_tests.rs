@@ -81,6 +81,7 @@ fn test_registry_generates_urls() {
     assert!(url.unwrap().contains("alice"));
 }
 
+// @scenario: contact_card_management.feature:Update social network config on app launch
 #[test]
 fn test_new_network_after_cache_update() {
     let temp = TempDir::new().unwrap();

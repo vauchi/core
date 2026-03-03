@@ -506,6 +506,7 @@ fn test_validate_timestamp_rejects_zero() {
 }
 
 // @scenario: sync_updates:Sync handles clock skew between devices
+// @scenario: sync_updates.feature:Timezone change during sync
 #[test]
 fn test_validate_timestamp_accepts_recent() {
     let now = std::time::SystemTime::now()

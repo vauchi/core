@@ -130,6 +130,7 @@ fn test_device_registry_stored_as_encrypted_blob() {
 
 // === Device Sync State Encryption ===
 
+// @scenario: sync_updates.feature:All sync traffic is encrypted
 #[test]
 fn test_device_sync_state_encrypted_roundtrip() {
     let (_dir, storage) = open_storage();
@@ -144,6 +145,7 @@ fn test_device_sync_state_encrypted_roundtrip() {
     assert_eq!(loaded.device_id(), state.device_id());
 }
 
+// @scenario: sync_updates.feature:All sync traffic is encrypted
 #[test]
 fn test_device_sync_state_stored_as_encrypted_blob() {
     let (dir, storage) = open_storage();

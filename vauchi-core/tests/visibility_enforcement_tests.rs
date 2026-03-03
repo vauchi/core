@@ -288,6 +288,7 @@ fn test_nobody_excludes_from_all_contacts() {
 /// others don't, display name always passes.
 // @scenario: visibility_control.feature:Hide a field from a specific contact
 // @scenario: visibility_control.feature:Encrypted updates reveal nothing about hidden fields
+// @scenario: contacts_management.feature:Contact shows only fields I can see
 #[test]
 fn test_mixed_visibility_propagation() {
     let wb = create_test_vauchi();

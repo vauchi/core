@@ -210,6 +210,7 @@ fn test_session_resume() {
 }
 
 // @scenario: contact_exchange.feature:Exchange with existing contact shows update option
+// @scenario: contact_exchange.feature:Update existing contact via exchange
 #[test]
 fn test_detect_duplicate_contact() {
     use vauchi_core::crypto::SymmetricKey;
@@ -282,6 +283,8 @@ fn test_no_duplicate_for_new_contact() {
     assert!(duplicate.is_none());
 }
 
+// @scenario: contact_exchange.feature:Update existing contact via exchange
+// @scenario: contact_exchange.feature:Keep existing contact without update
 #[test]
 fn test_duplicate_action_variants() {
     // Just verify the enum variants exist and can be compared

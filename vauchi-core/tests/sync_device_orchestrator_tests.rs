@@ -42,6 +42,7 @@ fn create_test_contact(name: &str) -> Contact {
 /// "When I update my phone number on Device A
 ///  Then Device B should receive the update"
 // @scenario: device_management:Changes sync between devices
+// @scenario: sync_updates.feature:Contact updates reach all my devices
 #[test]
 fn test_orchestrator_record_local_change() {
     let storage = create_test_storage();
@@ -77,6 +78,7 @@ fn test_orchestrator_record_local_change() {
 
 /// Test that pending items returns correct results
 // @scenario: device_management:Changes sync between devices
+// @scenario: sync_updates.feature:Contact updates reach all my devices
 #[test]
 fn test_orchestrator_pending_for_device() {
     let storage = create_test_storage();
@@ -123,6 +125,7 @@ fn test_orchestrator_pending_for_device() {
 ///  Then Device B should receive my complete contact card
 ///  And Device B should receive all my contacts"
 // @scenario: device_management:New device receives full state
+// @scenario: sync_updates.feature:New device receives full state
 #[test]
 fn test_orchestrator_create_full_sync_payload() {
     let storage = create_test_storage();
@@ -155,6 +158,7 @@ fn test_orchestrator_create_full_sync_payload() {
 
 /// Scenario: New device applies received state
 // @scenario: device_management:New device receives full state
+// @scenario: sync_updates.feature:New device receives full state
 #[test]
 fn test_orchestrator_apply_full_sync() {
     let storage = create_test_storage();
@@ -1242,6 +1246,7 @@ fn test_conflict_label_change() {
 
 /// Test conflict resolution with ContactTrustChanged items
 // @scenario: device_management:Conflict resolution between devices
+// @scenario: contact_recovery.feature:Trust state syncs across linked devices
 #[test]
 fn test_conflict_contact_trust_changed() {
     let storage = create_test_storage();

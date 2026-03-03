@@ -225,6 +225,7 @@ pub struct DeviceRegistry {
 mod signature_serde {
     use serde::{self, Deserialize, Deserializer, Serializer};
 
+    /// Serializes a 64-byte signature to a hex-encoded string for device registry persistence.
     pub fn serialize<S>(sig: &[u8; 64], serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -232,6 +233,7 @@ mod signature_serde {
         serializer.serialize_str(&hex::encode(sig))
     }
 
+    /// Deserializes a 64-byte signature from a hex-encoded string.
     pub fn deserialize<'de, D>(deserializer: D) -> Result<[u8; 64], D::Error>
     where
         D: Deserializer<'de>,

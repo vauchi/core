@@ -125,6 +125,7 @@ impl Default for MobileContentConfig {
 
 #[cfg(feature = "content-updates")]
 impl MobileContentConfig {
+    /// Converts this mobile content configuration into a core `ContentConfig` for the content update system.
     pub fn to_core_config(&self, storage_path: PathBuf) -> ContentConfig {
         let mut config = ContentConfig {
             storage_path,

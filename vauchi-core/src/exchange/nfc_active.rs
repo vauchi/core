@@ -140,8 +140,11 @@ pub mod apdu {
     pub const AID: &[u8] = &[0xF0, 0x56, 0x41, 0x55, 0x43, 0x48, 0x49, 0x01];
 
     // Status words
+    /// ISO 7816 status word indicating successful command execution (SW1=90, SW2=00).
     pub const SW_SUCCESS: [u8; 2] = [0x90, 0x00];
+    /// ISO 7816 status word indicating the requested AID was not found on the card (SW1=6A, SW2=82).
     pub const SW_AID_NOT_FOUND: [u8; 2] = [0x6A, 0x82];
+    /// ISO 7816 status word indicating conditions of use not satisfied (SW1=69, SW2=85).
     pub const SW_CONDITIONS_NOT_SATISFIED: [u8; 2] = [0x69, 0x85];
 
     // APDU instruction codes

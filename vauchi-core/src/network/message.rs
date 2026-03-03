@@ -398,6 +398,7 @@ mod bytes_array_32 {
     use base64::Engine;
     use serde::{Deserialize, Deserializer, Serializer};
 
+    /// Serializes a 32-byte array to a base64-encoded string for network message transmission.
     pub fn serialize<S>(bytes: &[u8; 32], serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -405,6 +406,7 @@ mod bytes_array_32 {
         serializer.serialize_str(&base64::engine::general_purpose::STANDARD.encode(bytes))
     }
 
+    /// Deserializes a 32-byte array from a base64-encoded string.
     pub fn deserialize<'de, D>(deserializer: D) -> Result<[u8; 32], D::Error>
     where
         D: Deserializer<'de>,
@@ -424,6 +426,7 @@ mod bytes_array_64 {
     use base64::Engine;
     use serde::{Deserialize, Deserializer, Serializer};
 
+    /// Serializes a 64-byte array to a base64-encoded string for network message transmission.
     pub fn serialize<S>(bytes: &[u8; 64], serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -431,6 +434,7 @@ mod bytes_array_64 {
         serializer.serialize_str(&base64::engine::general_purpose::STANDARD.encode(bytes))
     }
 
+    /// Deserializes a 64-byte array from a base64-encoded string.
     pub fn deserialize<'de, D>(deserializer: D) -> Result<[u8; 64], D::Error>
     where
         D: Deserializer<'de>,
@@ -450,6 +454,7 @@ mod bytes_array_12 {
     use base64::Engine;
     use serde::{Deserialize, Deserializer, Serializer};
 
+    /// Serializes a 12-byte AES-GCM nonce to a base64-encoded string.
     pub fn serialize<S>(bytes: &[u8; 12], serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -457,6 +462,7 @@ mod bytes_array_12 {
         serializer.serialize_str(&base64::engine::general_purpose::STANDARD.encode(bytes))
     }
 
+    /// Deserializes a 12-byte AES-GCM nonce from a base64-encoded string.
     pub fn deserialize<'de, D>(deserializer: D) -> Result<[u8; 12], D::Error>
     where
         D: Deserializer<'de>,
@@ -471,6 +477,7 @@ mod bytes_array_12 {
     }
 }
 
+// INLINE_TEST_REQUIRED: serde roundtrip tests need private access to byte-array helper modules
 #[cfg(test)]
 mod tests {
     use super::*;

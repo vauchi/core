@@ -100,6 +100,9 @@ pub enum AuthMode {
 /// Key name used to store SMK in SecureStorage.
 const SMK_KEY_NAME: &str = "smk";
 
+/// Main API entry point for the Vauchi contact card system.
+///
+/// Coordinates identity management, contact exchange, synchronization, and event dispatching.
 pub struct Vauchi<T: Transport = MockTransport> {
     config: VauchiConfig,
     identity: Option<Identity>,

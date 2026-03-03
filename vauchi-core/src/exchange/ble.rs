@@ -21,12 +21,14 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 mod hex_array_32 {
     use serde::{Deserialize, Deserializer, Serializer};
+    /// Serializes a 32-byte array to a hex-encoded string for BLE payload transmission.
     pub fn serialize<S>(bytes: &[u8; 32], serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
         serializer.serialize_str(&hex::encode(bytes))
     }
+    /// Deserializes a 32-byte array from a hex-encoded string.
     pub fn deserialize<'de, D>(deserializer: D) -> Result<[u8; 32], D::Error>
     where
         D: Deserializer<'de>,

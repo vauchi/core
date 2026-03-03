@@ -286,6 +286,7 @@ impl Default for MemoryKeyStorage {
 
 #[cfg(any(test, feature = "testing"))]
 impl MemoryKeyStorage {
+    /// Creates a new empty in-memory key storage for testing purposes.
     pub fn new() -> Self {
         Self {
             keys: std::sync::Mutex::new(std::collections::HashMap::new()),
@@ -313,6 +314,7 @@ impl SecureStorage for MemoryKeyStorage {
     }
 }
 
+// INLINE_TEST_REQUIRED: tests need private access to KeyStorage trait internals
 #[cfg(test)]
 mod tests {
     use super::*;

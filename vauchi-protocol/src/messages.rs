@@ -23,6 +23,7 @@ pub const FRAME_HEADER_SIZE: usize = 4;
 // Envelope
 // =========================================================================
 
+/// Top-level wire format wrapper for all relay protocol messages.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MessageEnvelope {
     pub version: u8,
@@ -31,6 +32,7 @@ pub struct MessageEnvelope {
     pub payload: MessagePayload,
 }
 
+/// Tagged union of all protocol message types, discriminated by `"type"` in JSON.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum MessagePayload {
@@ -68,6 +70,7 @@ pub struct Acknowledgment {
     pub status: AckStatus,
 }
 
+/// Delivery status reported in an [`Acknowledgment`] message.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum AckStatus {
     /// Message received by relay and stored for delivery.
@@ -103,6 +106,7 @@ pub struct Handshake {
     pub supported_versions: Option<Vec<u8>>,
 }
 
+/// Server response to a [`Handshake`], confirming connection and advertising capabilities.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HandshakeAck {
     pub protocol_version: u8,
@@ -128,11 +132,13 @@ pub struct RecoveryProofQuery {
     pub key_hashes: Vec<String>,
 }
 
+/// Server response to a [`RecoveryProofQuery`], returning matching stored proofs.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RecoveryProofResponse {
     pub proofs: Vec<RecoveryProofEntry>,
 }
 
+/// A single recovery proof keyed by its hash, returned inside [`RecoveryProofResponse`].
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RecoveryProofEntry {
     pub key_hash: String,
@@ -196,6 +202,7 @@ pub struct PurgeRequest {
     pub timestamp: Option<u64>,
 }
 
+/// Server response to a [`PurgeRequest`], reporting how many items were deleted.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PurgeResponse {
     pub blobs_deleted: usize,
@@ -208,6 +215,7 @@ pub struct PurgeResponse {
 // Account revocation
 // =========================================================================
 
+/// Signed notification that a sender's account has been revoked, invalidating their contact card.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AccountRevoked {
     pub sender_id: String,
@@ -238,6 +246,7 @@ pub struct ForwardingHints {
     pub signature: Option<String>,
 }
 
+/// A single forwarding hint directing a client to a federated relay holding a blob.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ForwardingHintInfo {
     pub blob_id: String,

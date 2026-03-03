@@ -129,6 +129,7 @@ pub fn get_all_strings(locale: Locale) -> HashMap<String, String> {
     get_strings_for_locale(locale)
 }
 
+/// Returns a localized string with named placeholders replaced by the provided arguments.
 pub fn get_string_with_args(locale: Locale, key: &str, args: &[(&str, &str)]) -> String {
     let mut result = get_string(locale, key);
 

@@ -535,6 +535,7 @@ impl VersionedPayload {
 mod nonce_serde {
     use serde::{Deserialize, Deserializer, Serializer};
 
+    /// Serializes a 32-byte nonce to a base64-encoded string for sync delta payloads.
     pub fn serialize<S>(bytes: &[u8; 32], serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -545,6 +546,7 @@ mod nonce_serde {
         ))
     }
 
+    /// Deserializes a 32-byte nonce from a base64-encoded string.
     pub fn deserialize<'de, D>(deserializer: D) -> Result<[u8; 32], D::Error>
     where
         D: Deserializer<'de>,
@@ -562,6 +564,7 @@ mod nonce_serde {
 mod signature_serde {
     use serde::{Deserialize, Deserializer, Serializer};
 
+    /// Serializes a 64-byte signature to a base64-encoded string for sync delta integrity.
     pub fn serialize<S>(bytes: &[u8; 64], serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -572,6 +575,7 @@ mod signature_serde {
         ))
     }
 
+    /// Deserializes a 64-byte signature from a base64-encoded string.
     pub fn deserialize<'de, D>(deserializer: D) -> Result<[u8; 64], D::Error>
     where
         D: Deserializer<'de>,

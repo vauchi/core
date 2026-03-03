@@ -18,6 +18,7 @@ mod bytes_array_32 {
     use base64::Engine;
     use serde::{Deserialize, Deserializer, Serializer};
 
+    /// Serializes a 32-byte array to a base64-encoded string for encrypted message exchange.
     pub fn serialize<S>(bytes: &[u8; 32], serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -25,6 +26,7 @@ mod bytes_array_32 {
         serializer.serialize_str(&base64::engine::general_purpose::STANDARD.encode(bytes))
     }
 
+    /// Deserializes a 32-byte array from a base64-encoded string.
     pub fn deserialize<'de, D>(deserializer: D) -> Result<[u8; 32], D::Error>
     where
         D: Deserializer<'de>,

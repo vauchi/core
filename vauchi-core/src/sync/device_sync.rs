@@ -515,6 +515,7 @@ mod bytes_array_32 {
     use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
     use serde::{Deserialize, Deserializer, Serializer};
 
+    /// Serializes a 32-byte array to a base64-encoded string for device sync payloads.
     pub fn serialize<S>(bytes: &[u8; 32], serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -522,6 +523,7 @@ mod bytes_array_32 {
         serializer.serialize_str(&BASE64.encode(bytes))
     }
 
+    /// Deserializes a 32-byte array from a base64-encoded string.
     pub fn deserialize<'de, D>(deserializer: D) -> Result<[u8; 32], D::Error>
     where
         D: Deserializer<'de>,
@@ -542,6 +544,7 @@ mod version_map_serde {
     use std::collections::HashMap;
     use std::fmt;
 
+    /// Serializes a version map with 32-byte device keys as hex-encoded strings.
     pub fn serialize<S>(map: &HashMap<[u8; 32], u64>, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -553,6 +556,7 @@ mod version_map_serde {
         ser_map.end()
     }
 
+    /// Deserializes a version map from hex-encoded 32-byte device keys.
     pub fn deserialize<'de, D>(deserializer: D) -> Result<HashMap<[u8; 32], u64>, D::Error>
     where
         D: Deserializer<'de>,

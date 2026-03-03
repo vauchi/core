@@ -55,8 +55,6 @@ cargo fmt                         # Format
 
 **Structure**: `src/` = production code only. `tests/` = tests only. Siblings, not nested.
 
-See [CLAUDE.md](../CLAUDE.md) for additional mandatory rules (crypto, coverage, planning docs).
-
 ## Documentation
 
 - **Architecture**: [vauchi/docs](https://gitlab.com/vauchi/docs) repository
@@ -74,7 +72,7 @@ See each platform repo for detailed setup instructions.
 
 ## Contributing
 
-1. Read [CLAUDE.md](../CLAUDE.md) for project structure and commit rules
+1. Read [`vauchi/vauchi:README.md`](https://gitlab.com/vauchi/vauchi) for project structure and commit rules
 2. Check [vauchi/docs](https://gitlab.com/vauchi/docs) for architecture decisions
 3. Follow TDD workflow strictly
 4. Ensure `cargo test --workspace` passes before submitting

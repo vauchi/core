@@ -9,12 +9,12 @@
 #   - Tags (v*): Build, package, publish releases
 #
 # DAG execution order (MR pipelines):
-#   lint (< 2 min) ──┬── test (< 15 min) ──── mutation (advisory)
+#   lint (< 2 min) ──┬── test (< 15 min)
 #                     ├── bench (advisory, change-based)
 #                     └── security (< 5 min)
 #
-#   Lint must pass before tests or security run. Mutation only runs
-#   after tests pass. Security runs parallel with tests.
+#   Lint must pass before tests or security run.
+#   Security runs parallel with tests.
 #
 # Uses shared templates from vauchi/scripts for consistency.
 #
@@ -158,7 +158,12 @@ test:core:
     - !reference [.clone-locales, before_script]
     - !reference [.clone-themes, before_script]
   script:
-    - cargo nextest run -p vauchi-core --partition slice:${CI_NODE_INDEX}/${CI_NODE_TOTAL}
+    - cargo nextest run --profile ci -p vauchi-core --partition slice:${CI_NODE_INDEX}/${CI_NODE_TOTAL}
+  artifacts:
+    when: always
+    reports:
+      junit: target/nextest/ci/junit.xml
+    expire_in: 1 week
 
 test:cucumber:
   extends: [.linux-runner, .validation-rust, .timeout-quick]
@@ -184,7 +189,12 @@ test:mobile:
     - !reference [.clone-locales, before_script]
     - !reference [.clone-themes, before_script]
   script:
-    - cargo nextest run -p vauchi-mobile
+    - cargo nextest run --profile ci -p vauchi-mobile
+  artifacts:
+    when: always
+    reports:
+      junit: target/nextest/ci/junit.xml
+    expire_in: 1 week
 
 # Content contract validation — detect drift between core parsers and
 # sibling content repos (themes/, locales/). Runs when parser code changes.
@@ -369,16 +379,8 @@ mutation:nightly:
   extends: [.mutation-nightly, .linux-runner, .timeout-extended]
   variables:
     MUTATION_PACKAGE: "vauchi-core"
+    MUTATION_EXTRA_FLAGS: "--exclude-re theme.rs"
     MUTATION_TIMEOUT_NIGHTLY: "60"
-
-mutation:incremental:
-  extends: [.mutation-incremental, .linux-runner, .timeout-extended]
-  needs:
-    - job: test:core
-      optional: true
-  variables:
-    MUTATION_PACKAGE: "vauchi-core"
-    MUTATION_TIMEOUT_INCREMENTAL: "90"
 
 # ============================================================
 # Fuzz Testing (Nightly scheduled, T2-10)

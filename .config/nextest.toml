@@ -9,3 +9,6 @@
 default-filter = "not binary(cucumber_tests)"
 # Per-test timeout: prevent deadlocked concurrency tests from hanging the pipeline.
 slow-timeout = { period = "60s", terminate-after = 3 }
+
+[profile.ci.junit]
+path = "target/nextest/ci/junit.xml"

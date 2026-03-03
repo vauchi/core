@@ -1010,3 +1010,99 @@ proptest! {
         );
     }
 }
+
+// ============================================================
+// Phone Number Validation (SP-12a)
+// @scenario: contact_actions:Malformed phone number shows error
+// ============================================================
+
+/// Feature: contact_actions.feature @error @malformed
+/// Malformed phone numbers must not produce a tel: URI.
+#[test]
+fn test_validate_phone_rejects_clearly_invalid() {
+    assert!(!vauchi_core::contact_card::is_valid_phone("not-a-number"));
+    assert!(!vauchi_core::contact_card::is_valid_phone("abc"));
+    assert!(!vauchi_core::contact_card::is_valid_phone(""));
+    assert!(!vauchi_core::contact_card::is_valid_phone("   "));
+    assert!(!vauchi_core::contact_card::is_valid_phone("12")); // too short (< 7 digits)
+}
+
+/// Feature: contact_actions.feature @error @malformed
+/// Valid phone formats must pass validation.
+#[test]
+fn test_validate_phone_accepts_valid_formats() {
+    assert!(vauchi_core::contact_card::is_valid_phone("+1234567890"));
+    assert!(vauchi_core::contact_card::is_valid_phone("555-1234567"));
+    assert!(vauchi_core::contact_card::is_valid_phone("(555) 123-4567"));
+    assert!(vauchi_core::contact_card::is_valid_phone("1234567")); // minimum 7 digits
+}
+
+/// Feature: contact_actions.feature @error @malformed
+/// to_uri() must return None for malformed phone numbers.
+// @scenario: contact_actions:Malformed phone number shows error
+#[test]
+fn test_malformed_phone_to_uri_returns_none() {
+    let field = ContactField::new(FieldType::Phone, "Mobile", "not-a-number");
+    assert!(
+        field.to_uri().is_none(),
+        "Malformed phone should not produce a tel: URI"
+    );
+}
+
+/// Feature: contact_actions.feature @error @malformed
+/// to_uri() must return None for phone with insufficient digits.
+// @scenario: contact_actions:Malformed phone number shows error
+#[test]
+fn test_short_phone_to_uri_returns_none() {
+    let field = ContactField::new(FieldType::Phone, "Mobile", "12");
+    assert!(
+        field.to_uri().is_none(),
+        "Phone with < 7 digits should not produce a tel: URI"
+    );
+}
+
+/// Feature: contact_actions.feature @error @malformed
+/// to_action() must return CopyToClipboard for malformed phone numbers.
+// @scenario: contact_actions:Malformed phone number shows error
+#[test]
+fn test_malformed_phone_to_action_returns_copy() {
+    let field = ContactField::new(FieldType::Phone, "Mobile", "not-a-number");
+    let action = field.to_action();
+    assert!(
+        matches!(action, ContactAction::CopyToClipboard),
+        "Malformed phone should fall back to CopyToClipboard, got {:?}",
+        action
+    );
+}
+
+/// Feature: contact_actions.feature @error @malformed
+/// Valid phone numbers must still produce a tel: URI after validation is wired in.
+// @scenario: contact_actions:Tap phone number opens dialer
+#[test]
+fn test_valid_phone_to_uri_still_works() {
+    let field = ContactField::new(FieldType::Phone, "Mobile", "+1-555-123-4567");
+    let uri = field.to_uri();
+    assert_eq!(uri, Some("tel:+1-555-123-4567".to_string()));
+}
+
+/// Edge case: phone with only whitespace should return None.
+// @scenario: contact_actions:Malformed phone number shows error
+#[test]
+fn test_whitespace_phone_to_uri_returns_none() {
+    let field = ContactField::new(FieldType::Phone, "Mobile", "   ");
+    assert!(
+        field.to_uri().is_none(),
+        "Whitespace-only phone should not produce a tel: URI"
+    );
+}
+
+/// Edge case: phone with letters mixed in should return None.
+// @scenario: contact_actions:Malformed phone number shows error
+#[test]
+fn test_phone_with_letters_to_uri_returns_none() {
+    let field = ContactField::new(FieldType::Phone, "Mobile", "555-CALL-ME");
+    assert!(
+        field.to_uri().is_none(),
+        "Phone with letters should not produce a tel: URI"
+    );
+}

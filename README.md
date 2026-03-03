@@ -74,7 +74,7 @@ See each platform repo for detailed setup instructions.
 
 ## Contributing
 
-1. Read [CLAUDE.md](CLAUDE.md) for project structure and commit rules
+1. Read [CLAUDE.md](../CLAUDE.md) for project structure and commit rules
 2. Check [vauchi/docs](https://gitlab.com/vauchi/docs) for architecture decisions
 3. Follow TDD workflow strictly
 4. Ensure `cargo test --workspace` passes before submitting

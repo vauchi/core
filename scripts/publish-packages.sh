@@ -32,6 +32,14 @@ DIST_DIR="$PROJECT_ROOT/dist"
 RAW_VERSION="${1:-$(grep -m1 'version = ' "$PROJECT_ROOT/Cargo.toml" | sed 's/.*"\(.*\)".*/\1/')}"
 VERSION="${RAW_VERSION#v}"
 
+# Guard: reject pre-release versions
+if echo "$VERSION" | grep -qE '-(dev|rc)\.'; then
+  echo -e "${RED}ERROR: Pre-release version $VERSION cannot be published${NC}"
+  echo "  Only PROD versions (e.g., 0.2.3) can be published to the package registry."
+  echo "  Create a PROD tag (v0.2.3) to publish."
+  exit 1
+fi
+
 # GitLab configuration
 GITLAB_URL="${CI_SERVER_URL:-https://gitlab.com}"
 PROJECT_ID="${CI_PROJECT_ID:-${GITLAB_PROJECT_ID:-}}"

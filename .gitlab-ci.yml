@@ -84,6 +84,14 @@ auto-tag:version:
       echo "Cargo.toml version: ${VERSION}"
       echo "Expected tag: ${TAG}"
 
+      # Guard: reject pre-release versions (dev/rc) from auto-tagging
+      # Pre-release tags must be created explicitly via just release-dev/rc
+      if echo "$VERSION" | grep -qE '-(dev|rc)\.'; then
+        echo "⚠ Pre-release version ${VERSION} detected — skipping auto-tag"
+        echo "  Use 'just release-dev' or 'just release-rc' to create pre-release tags"
+        exit 0
+      fi
+
       # Check if tag already exists
       if git ls-remote --tags origin "refs/tags/${TAG}" | grep -q "${TAG}"; then
         echo "✓ Tag ${TAG} already exists — nothing to do"
@@ -104,6 +112,91 @@ auto-tag:version:
       git tag -a "${TAG}" -m "Release ${TAG}"
       git push origin "${TAG}"
       echo "✓ Created and pushed tag ${TAG}"
+
+# ============================================================
+# Dev Tag Pipeline (lightweight — lint + test only)
+# ============================================================
+# Triggered by v0.2.3-dev.N tags. Fast feedback, no coverage/mutation/publish.
+
+dev:verify:
+  extends: [.linux-runner-nocache, .dev-verify]
+  stage: lint
+  needs: []
+
+dev:lint:format:
+  extends: [.linux-runner-nocache, .lint-format]
+  needs: [dev:verify]
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+-dev\.\d+$/
+
+dev:lint:clippy:
+  extends: [.linux-runner-readonly, .lint-clippy]
+  needs: [dev:verify]
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+-dev\.\d+$/
+
+dev:test:
+  extends: [.linux-runner, .timeout-standard]
+  stage: test
+  needs: [dev:lint:format]
+  script:
+    - cargo nextest run --profile ci --all-targets
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+-dev\.\d+$/
+  artifacts:
+    when: always
+    reports:
+      junit: target/nextest/ci/junit.xml
+    expire_in: 1 week
+
+# ============================================================
+# RC Tag Pipeline (full quality gate — no publish/deploy)
+# ============================================================
+# Triggered by v0.2.3-rc.N tags. Full coverage, mutation, bench.
+
+rc:verify:
+  extends: [.linux-runner-nocache, .rc-verify]
+  stage: lint
+  needs: []
+
+rc:lint:format:
+  extends: [.linux-runner-nocache, .lint-format]
+  needs: [rc:verify]
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+-rc\.\d+$/
+
+rc:lint:clippy:
+  extends: [.linux-runner-readonly, .lint-clippy]
+  needs: [rc:verify]
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+-rc\.\d+$/
+
+rc:test:
+  extends: [.coverage-job, .linux-runner, .timeout-long]
+  needs:
+    - job: rc:lint:format
+      optional: true
+    - job: rc:lint:clippy
+      optional: true
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+-rc\.\d+$/
+  variables:
+    COVERAGE_PACKAGE: "vauchi-core"
+    COVERAGE_REPO_LABEL: "core"
+
+rc:mutation:
+  extends: [.mutation-nightly, .linux-runner, .timeout-extended]
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+-rc\.\d+$/
+
+rc:security:audit:
+  extends: [.linux-runner-readonly, .security-audit, .timeout-quick]
+  needs: []
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+-rc\.\d+$/
+  before_script:
+    - !reference [.self-hosted, before_script]
+    - command -v cargo-audit >/dev/null 2>&1 || cargo binstall cargo-audit --no-confirm 2>/dev/null || cargo install cargo-audit
 
 # ============================================================
 # Lint Stage — Preflight Gate (MR only, change-based)

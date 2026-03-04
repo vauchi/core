@@ -241,8 +241,15 @@ if $BUILD_ANDROID; then
     echo -e "${YELLOW}Building native library for metadata extraction...${NC}"
     RUSTFLAGS="-Cstrip=none" cargo build -p vauchi-mobile --release
 
+    # Determine native library extension based on OS
+    if [[ "$(uname)" == "Darwin" ]]; then
+        NATIVE_LIB_EXT="dylib"
+    else
+        NATIVE_LIB_EXT="so"
+    fi
+
     cargo run -p vauchi-mobile --bin uniffi-bindgen --release -- generate \
-        --library target/release/libvauchi_mobile.so \
+        --library "target/release/libvauchi_mobile.${NATIVE_LIB_EXT}" \
         --language kotlin \
         --out-dir "$ANDROID_KOTLIN_DIR"
 

@@ -29,7 +29,7 @@ RAW_VERSION="${1:-$(grep -m1 'version = ' "$PROJECT_ROOT/Cargo.toml" | sed 's/.*
 VERSION="${RAW_VERSION#v}"
 
 # Guard: reject pre-release versions
-if echo "$VERSION" | grep -qE '-(dev|rc)\.'; then
+if echo "$VERSION" | grep -qE -- '-(dev|rc)\.'; then
   echo "ERROR: Pre-release version $VERSION cannot be packaged for distribution"
   echo "  Only PROD versions (e.g., 0.2.3) can be packaged."
   exit 1

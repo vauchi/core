@@ -101,6 +101,9 @@ pub enum FieldChange {
     Removed { field_id: String },
     /// The display name was changed.
     DisplayNameChanged { new_name: String },
+    /// The avatar was changed (added, updated, or removed).
+    /// `None` means the avatar was removed.
+    AvatarChanged { avatar: Option<Vec<u8>> },
 }
 
 /// Returns a zero nonce for deserializing legacy deltas without a nonce field.
@@ -161,6 +164,13 @@ impl CardDelta {
             }
         }
 
+        // Check for avatar changes
+        if old.avatar() != new.avatar() {
+            changes.push(FieldChange::AvatarChanged {
+                avatar: new.avatar().map(|a| a.to_vec()),
+            });
+        }
+
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .map(|d| d.as_secs())
@@ -186,6 +196,13 @@ impl CardDelta {
     /// the version is included in the signed payload.
     pub fn set_version(&mut self, version: u32) {
         self.version = version;
+    }
+
+    /// Returns true if this delta contains an avatar change.
+    pub fn has_avatar_change(&self) -> bool {
+        self.changes
+            .iter()
+            .any(|c| matches!(c, FieldChange::AvatarChanged { .. }))
     }
 
     /// Signs the delta with the given identity, binding to the recipient.
@@ -246,6 +263,15 @@ impl CardDelta {
                     // Ignore errors for removal - field might already be removed
                     let _ = card.remove_field(field_id);
                 }
+                FieldChange::AvatarChanged { avatar } => match avatar {
+                    Some(data) => {
+                        card.set_avatar(data.clone())
+                            .map_err(|e| DeltaError::ApplyError(e.to_string()))?;
+                    }
+                    None => {
+                        card.clear_avatar();
+                    }
+                },
             }
         }
 
@@ -266,6 +292,13 @@ impl CardDelta {
                 FieldChange::Modified { field_id, .. } => field_id.clone(),
                 FieldChange::Removed { field_id } => format!("{} (removed)", field_id),
                 FieldChange::DisplayNameChanged { new_name } => format!("name: {}", new_name),
+                FieldChange::AvatarChanged { avatar } => {
+                    if avatar.is_some() {
+                        "avatar (updated)".to_string()
+                    } else {
+                        "avatar (removed)".to_string()
+                    }
+                }
             })
             .collect()
     }
@@ -284,8 +317,9 @@ impl CardDelta {
             .iter()
             .filter(|change| {
                 match change {
-                    // Display name changes are always visible
+                    // Display name and avatar changes are always visible
                     FieldChange::DisplayNameChanged { .. } => true,
+                    FieldChange::AvatarChanged { .. } => true,
                     // For field changes, check visibility rules
                     FieldChange::Added { field } => rules.can_see(field.id(), contact_id),
                     FieldChange::Modified { field_id, .. } => rules.can_see(field_id, contact_id),
@@ -319,6 +353,7 @@ impl CardDelta {
             .iter()
             .filter(|change| match change {
                 FieldChange::DisplayNameChanged { .. } => true,
+                FieldChange::AvatarChanged { .. } => true,
                 FieldChange::Added { field } => can_see(field.id()),
                 FieldChange::Modified { field_id, .. } => can_see(field_id),
                 FieldChange::Removed { field_id } => can_see(field_id),

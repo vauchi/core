@@ -227,3 +227,6 @@ required-features = ["testing"]
 [[test]]
 name = "exchange_constraints_tests"
 required-features = ["testing"]
+
+[[test]]
+name = "contact_card_gaps_tests"

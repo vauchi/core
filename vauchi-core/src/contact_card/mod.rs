@@ -280,4 +280,41 @@ impl ContactCard {
     pub fn clear_avatar(&mut self) {
         self.avatar = None;
     }
+
+    /// Exports the card as human-readable shareable text (no exchange required).
+    ///
+    /// Does not include internal IDs or cryptographic data.
+    pub fn to_shareable_text(&self) -> String {
+        let mut lines = Vec::new();
+        lines.push(self.display_name.clone());
+
+        for field in &self.fields {
+            lines.push(format!("{}: {}", field.label(), field.value()));
+        }
+
+        lines.join("\n")
+    }
+
+    /// Exports the card as compact JSON suitable for QR code display.
+    ///
+    /// Contains only the display name and fields (no internal IDs or crypto).
+    pub fn to_shareable_qr_data(&self) -> String {
+        let fields: Vec<serde_json::Value> = self
+            .fields
+            .iter()
+            .map(|f| {
+                serde_json::json!({
+                    "type": format!("{:?}", f.field_type()),
+                    "label": f.label(),
+                    "value": f.value(),
+                })
+            })
+            .collect();
+
+        serde_json::json!({
+            "name": self.display_name,
+            "fields": fields,
+        })
+        .to_string()
+    }
 }

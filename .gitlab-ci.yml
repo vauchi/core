@@ -259,6 +259,10 @@ mutation:nightly:
   variables:
     MUTATION_PACKAGE: "vauchi-core"
     MUTATION_EXTRA_FLAGS: "--exclude-re theme.rs"
+  before_script:
+    - !reference [.self-hosted, before_script]
+    - !reference [.clone-locales, before_script]
+    - !reference [.clone-themes, before_script]
 
 # ============================================================
 # Fuzz Testing (Nightly scheduled, T2-10)

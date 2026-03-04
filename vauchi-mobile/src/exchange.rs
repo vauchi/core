@@ -187,6 +187,13 @@ impl SessionInner {
         }
     }
 
+    fn their_display_name(&self) -> Option<&str> {
+        match self {
+            SessionInner::Proximity(s) => s.their_display_name(),
+            SessionInner::Manual(s) => s.their_display_name(),
+        }
+    }
+
     fn qr(&self) -> Option<&ExchangeQR> {
         match self {
             SessionInner::Proximity(s) => s.qr(),
@@ -303,12 +310,29 @@ impl MobileExchangeSession {
             .map_err(|e| MobileError::ExchangeFailed(format!("{:?}", e)))
     }
 
+    /// Returns the display name of the peer from their QR code.
+    ///
+    /// Available after scanning their QR. Returns empty string if not yet scanned
+    /// or if the peer's QR did not include a display name.
+    pub fn peer_display_name(&self) -> String {
+        let inner = self.inner.lock().unwrap();
+        inner.their_display_name().unwrap_or("").to_string()
+    }
+
     /// Complete the card exchange. Transitions AwaitingCardExchange -> Complete.
     ///
-    /// The `their_card_name` is used to create a placeholder card for the contact.
-    /// The real card will be received via relay sync.
+    /// Uses the display name from the peer's QR code to create the contact card.
+    /// Falls back to `their_card_name` if QR display name is empty.
     pub fn complete_card_exchange(&self, their_card_name: String) -> Result<(), MobileError> {
-        let card = ContactCard::new(&their_card_name);
+        let inner_lock = self.inner.lock().unwrap();
+        let name_from_qr = inner_lock
+            .their_display_name()
+            .filter(|n| !n.is_empty())
+            .map(|n| n.to_string());
+        drop(inner_lock);
+
+        let name = name_from_qr.unwrap_or(their_card_name);
+        let card = ContactCard::new(&name);
         let mut inner = self.inner.lock().unwrap();
         inner
             .apply(ExchangeEvent::CompleteExchange(card))

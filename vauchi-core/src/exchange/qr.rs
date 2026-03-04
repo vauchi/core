@@ -17,13 +17,17 @@ use crate::identity::Identity;
 /// Protocol version for QR codes.
 /// v1: Original format (signing key only)
 /// v2: Added X25519 exchange key for X3DH
-const PROTOCOL_VERSION: u8 = 2;
+/// v3: Added display_name for immediate contact naming
+const PROTOCOL_VERSION: u8 = 3;
 
 /// QR code expiration time in seconds (5 minutes).
 const QR_EXPIRY_SECONDS: u64 = 300;
 
 /// QR code magic bytes to identify Vauchi QR codes.
 const MAGIC: &[u8; 4] = b"WBEX";
+
+/// Maximum display name length in QR payload (UTF-8 bytes).
+const MAX_DISPLAY_NAME_BYTES: usize = 100;
 
 /// Exchange QR code data structure.
 ///
@@ -42,6 +46,8 @@ pub struct ExchangeQR {
     audio_challenge: [u8; 16],
     /// Unix timestamp when QR was generated
     timestamp: u64,
+    /// Display name of the QR generator (shown during in-person exchange)
+    display_name: String,
     /// Signature over the above fields
     signature: [u8; 64],
 }
@@ -83,6 +89,9 @@ impl ExchangeQR {
         // Use the provided ephemeral key — NOT identity's static exchange key
         let exchange_key: [u8; 32] = *ephemeral.public_key();
 
+        // Truncate display name to max bytes (UTF-8 safe)
+        let display_name = truncate_utf8(identity.display_name(), MAX_DISPLAY_NAME_BYTES);
+
         let mut message = Vec::new();
         message.push(PROTOCOL_VERSION);
         message.extend_from_slice(&public_key);
@@ -90,6 +99,9 @@ impl ExchangeQR {
         message.extend_from_slice(&exchange_token);
         message.extend_from_slice(&audio_challenge);
         message.extend_from_slice(&timestamp.to_be_bytes());
+        // Include display name length + bytes in signed message
+        message.extend_from_slice(&(display_name.len() as u16).to_be_bytes());
+        message.extend_from_slice(display_name.as_bytes());
 
         let signature = identity.sign(&message);
 
@@ -100,6 +112,7 @@ impl ExchangeQR {
             exchange_token,
             audio_challenge,
             timestamp,
+            display_name,
             signature: *signature.as_bytes(),
         }
     }
@@ -129,6 +142,11 @@ impl ExchangeQR {
         self.timestamp
     }
 
+    /// Returns the display name of the QR generator.
+    pub fn display_name(&self) -> &str {
+        &self.display_name
+    }
+
     /// Checks if the QR code has expired.
     pub fn is_expired(&self) -> bool {
         let now = SystemTime::now()
@@ -149,6 +167,8 @@ impl ExchangeQR {
         message.extend_from_slice(&self.exchange_token);
         message.extend_from_slice(&self.audio_challenge);
         message.extend_from_slice(&self.timestamp.to_be_bytes());
+        message.extend_from_slice(&(self.display_name.len() as u16).to_be_bytes());
+        message.extend_from_slice(self.display_name.as_bytes());
 
         // Create public key for verification
         let public_key = PublicKey::from_bytes(self.public_key);
@@ -159,7 +179,7 @@ impl ExchangeQR {
 
     /// Encodes the QR data to a string for embedding in QR code.
     pub fn to_data_string(&self) -> String {
-        // Format: base64(MAGIC || version || public_key || exchange_key || token || challenge || timestamp || signature)
+        // Format: base64(MAGIC || version || fixed_fields || name_len(2) || name_bytes || signature)
         let mut data = Vec::new();
         data.extend_from_slice(MAGIC);
         data.push(self.version);
@@ -168,6 +188,8 @@ impl ExchangeQR {
         data.extend_from_slice(&self.exchange_token);
         data.extend_from_slice(&self.audio_challenge);
         data.extend_from_slice(&self.timestamp.to_be_bytes());
+        data.extend_from_slice(&(self.display_name.len() as u16).to_be_bytes());
+        data.extend_from_slice(self.display_name.as_bytes());
         data.extend_from_slice(&self.signature);
 
         BASE64.encode(&data)
@@ -179,9 +201,8 @@ impl ExchangeQR {
             .decode(data)
             .map_err(|_| ExchangeError::InvalidQRFormat)?;
 
-        // Check exact length for v2 format
-        // MAGIC(4) + version(1) + pubkey(32) + exchange_key(32) + token(32) + challenge(16) + timestamp(8) + sig(64) = 189
-        if bytes.len() != 189 {
+        // Minimum length: MAGIC(4) + version(1) + pubkey(32) + exchange_key(32) + token(32) + challenge(16) + timestamp(8) + name_len(2) + sig(64) = 191
+        if bytes.len() < 191 {
             return Err(ExchangeError::InvalidQRFormat);
         }
 
@@ -217,7 +238,30 @@ impl ExchangeQR {
                 .map_err(|_| ExchangeError::InvalidQRFormat)?,
         );
 
-        let signature: [u8; 64] = bytes[125..189]
+        let name_len = u16::from_be_bytes(
+            bytes[125..127]
+                .try_into()
+                .map_err(|_| ExchangeError::InvalidQRFormat)?,
+        ) as usize;
+
+        if name_len > MAX_DISPLAY_NAME_BYTES {
+            return Err(ExchangeError::InvalidQRFormat);
+        }
+
+        let name_end = 127 + name_len;
+        if bytes.len() < name_end + 64 {
+            return Err(ExchangeError::InvalidQRFormat);
+        }
+
+        let display_name = String::from_utf8(bytes[127..name_end].to_vec())
+            .map_err(|_| ExchangeError::InvalidQRFormat)?;
+
+        // Reject trailing bytes to prevent malleability (K-L2)
+        if bytes.len() != name_end + 64 {
+            return Err(ExchangeError::InvalidQRFormat);
+        }
+
+        let signature: [u8; 64] = bytes[name_end..name_end + 64]
             .try_into()
             .map_err(|_| ExchangeError::InvalidQRFormat)?;
 
@@ -228,6 +272,7 @@ impl ExchangeQR {
             exchange_token,
             audio_challenge,
             timestamp,
+            display_name,
             signature,
         };
 
@@ -278,6 +323,20 @@ pub fn check_clock_drift(qr_timestamp: u64) -> Result<(), ExchangeError> {
     Ok(())
 }
 
+/// Truncates a UTF-8 string to at most `max_bytes` bytes without splitting
+/// a multi-byte character.
+fn truncate_utf8(s: &str, max_bytes: usize) -> String {
+    if s.len() <= max_bytes {
+        return s.to_string();
+    }
+    // Find the largest char boundary <= max_bytes
+    let mut end = max_bytes;
+    while !s.is_char_boundary(end) {
+        end -= 1;
+    }
+    s[..end].to_string()
+}
+
 // INLINE_TEST_REQUIRED: Tests private PROTOCOL_VERSION constant and version field
 #[cfg(test)]
 mod tests {
@@ -292,6 +351,7 @@ mod tests {
         assert_eq!(qr.version, PROTOCOL_VERSION);
         assert_eq!(qr.public_key(), identity.signing_public_key());
         assert_eq!(qr.exchange_key(), ephemeral.public_key());
+        assert_eq!(qr.display_name(), "Alice");
     }
 
     #[test]
@@ -310,5 +370,62 @@ mod tests {
         let qr = ExchangeQR::generate(&identity, &ephemeral);
 
         assert!(!qr.is_expired());
+    }
+
+    #[test]
+    fn test_qr_roundtrip_preserves_display_name() {
+        let identity = Identity::create("Bob");
+        let ephemeral = X3DHKeyPair::generate();
+        let qr = ExchangeQR::generate(&identity, &ephemeral);
+
+        let data = qr.to_data_string();
+        let parsed = ExchangeQR::from_data_string(&data).unwrap();
+
+        assert_eq!(parsed.display_name(), "Bob");
+        assert_eq!(parsed.public_key(), qr.public_key());
+        assert_eq!(parsed.exchange_key(), qr.exchange_key());
+    }
+
+    #[test]
+    fn test_qr_display_name_empty() {
+        let identity = Identity::create("");
+        let ephemeral = X3DHKeyPair::generate();
+        let qr = ExchangeQR::generate(&identity, &ephemeral);
+
+        assert_eq!(qr.display_name(), "");
+
+        let data = qr.to_data_string();
+        let parsed = ExchangeQR::from_data_string(&data).unwrap();
+        assert_eq!(parsed.display_name(), "");
+    }
+
+    #[test]
+    fn test_qr_display_name_unicode() {
+        let identity = Identity::create("日本語テスト");
+        let ephemeral = X3DHKeyPair::generate();
+        let qr = ExchangeQR::generate(&identity, &ephemeral);
+
+        assert_eq!(qr.display_name(), "日本語テスト");
+
+        let data = qr.to_data_string();
+        let parsed = ExchangeQR::from_data_string(&data).unwrap();
+        assert_eq!(parsed.display_name(), "日本語テスト");
+    }
+
+    #[test]
+    fn test_truncate_utf8_ascii() {
+        assert_eq!(truncate_utf8("hello", 3), "hel");
+        assert_eq!(truncate_utf8("hello", 10), "hello");
+        assert_eq!(truncate_utf8("hello", 5), "hello");
+    }
+
+    #[test]
+    fn test_truncate_utf8_multibyte() {
+        // "日" is 3 bytes in UTF-8
+        let s = "日本語";
+        assert_eq!(truncate_utf8(s, 3), "日");
+        assert_eq!(truncate_utf8(s, 4), "日"); // can't fit partial char
+        assert_eq!(truncate_utf8(s, 6), "日本");
+        assert_eq!(truncate_utf8(s, 9), "日本語");
     }
 }

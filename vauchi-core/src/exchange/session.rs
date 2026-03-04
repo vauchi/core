@@ -49,16 +49,19 @@ pub enum ExchangeState {
         our_qr: ExchangeQR,
         their_public_key: [u8; 32],
         their_exchange_key: [u8; 32],
+        their_display_name: String,
     },
     /// Ready for key agreement (both parties have exchanged keys).
     AwaitingKeyAgreement {
         their_public_key: [u8; 32],
         their_exchange_key: [u8; 32],
+        their_display_name: String,
     },
     /// Key agreement complete, exchanging cards
     AwaitingCardExchange {
         their_public_key: [u8; 32],
         shared_key: crate::crypto::SymmetricKey,
+        their_display_name: String,
     },
     /// NFC: waiting for both devices to tap.
     AwaitingNfcTap,
@@ -355,11 +358,16 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
     }
 
     fn handle_perform_key_agreement(&mut self) -> Result<(), ExchangeError> {
-        let (their_public_key, their_exchange_key) = match &self.state {
+        let (their_public_key, their_exchange_key, their_display_name) = match &self.state {
             ExchangeState::AwaitingKeyAgreement {
                 their_public_key,
                 their_exchange_key,
-            } => (*their_public_key, *their_exchange_key),
+                their_display_name,
+            } => (
+                *their_public_key,
+                *their_exchange_key,
+                their_display_name.clone(),
+            ),
             _ => {
                 return Err(ExchangeError::InvalidState(
                     "Not in key agreement state".into(),
@@ -396,6 +404,7 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
         self.state = ExchangeState::AwaitingCardExchange {
             their_public_key,
             shared_key,
+            their_display_name,
         };
 
         // AU-2: Auto-invoke proximity check after key agreement.
@@ -415,6 +424,7 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
                 ExchangeState::AwaitingCardExchange {
                     their_public_key,
                     shared_key,
+                    ..
                 } => (their_public_key, shared_key),
                 other => {
                     self.state = other;
@@ -496,10 +506,13 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
         // AU-3: Store their audio challenge for session-bound proximity verification
         self.their_audio_challenge = Some(*qr.audio_challenge());
 
+        let their_display_name = qr.display_name().to_string();
+
         self.state = ExchangeState::PeerScanned {
             our_qr,
             their_public_key,
             their_exchange_key,
+            their_display_name,
         };
 
         Ok(())
@@ -512,12 +525,17 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
             ));
         }
 
-        let (their_public_key, their_exchange_key) = match &self.state {
+        let (their_public_key, their_exchange_key, their_display_name) = match &self.state {
             ExchangeState::PeerScanned {
                 their_public_key,
                 their_exchange_key,
+                their_display_name,
                 ..
-            } => (*their_public_key, *their_exchange_key),
+            } => (
+                *their_public_key,
+                *their_exchange_key,
+                their_display_name.clone(),
+            ),
             _ => {
                 return Err(ExchangeError::InvalidState(
                     "Can only confirm their scan from PeerScanned state".into(),
@@ -529,6 +547,7 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
         self.state = ExchangeState::AwaitingKeyAgreement {
             their_public_key,
             their_exchange_key,
+            their_display_name,
         };
         Ok(())
     }
@@ -568,6 +587,7 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
         self.state = ExchangeState::AwaitingKeyAgreement {
             their_public_key,
             their_exchange_key,
+            their_display_name: String::new(),
         };
         Ok(())
     }
@@ -657,8 +677,28 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
         self.state = ExchangeState::AwaitingKeyAgreement {
             their_public_key,
             their_exchange_key,
+            their_display_name: String::new(),
         };
         Ok(())
+    }
+
+    /// Returns the display name of the peer (from their QR code).
+    ///
+    /// Available after scanning their QR through to card exchange completion.
+    /// Returns `None` if no peer has been scanned yet.
+    pub fn their_display_name(&self) -> Option<&str> {
+        match &self.state {
+            ExchangeState::PeerScanned {
+                their_display_name, ..
+            }
+            | ExchangeState::AwaitingKeyAgreement {
+                their_display_name, ..
+            }
+            | ExchangeState::AwaitingCardExchange {
+                their_display_name, ..
+            } => Some(their_display_name),
+            _ => None,
+        }
     }
 
     /// Returns our card (for sending to the other party).
@@ -774,6 +814,7 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
                 ExchangeState::AwaitingCardExchange {
                     their_public_key,
                     shared_key,
+                    ..
                 } => (*their_public_key, shared_key.clone()),
                 _ => {
                     return Err(ExchangeError::InvalidState(

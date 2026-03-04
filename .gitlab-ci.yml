@@ -42,6 +42,7 @@ include:
     file:
       - '/ci-templates/rust-base.yml'
       - '/ci-templates/security.yml'
+      - '/ci-templates/coverage.yml'
       - '/ci-templates/mr-rules.yml'
       - '/ci-templates/release.yml'
       - '/ci-templates/downstream.yml'
@@ -111,38 +112,21 @@ auto-tag:version:
 # to pass before starting (PI-13 fail-fast DAG).
 
 lint:format:
-  extends: [.linux-runner-nocache, .validation-rust, .timeout-quick]
-  stage: lint
+  extends: [.linux-runner-nocache, .lint-format, .validation-rust, .timeout-quick]
   needs: []
-  script:
-    - cargo fmt --all -- --check
 
 lint:clippy:
-  extends: [.linux-runner, .validation-rust, .timeout-standard]
-  stage: lint
-  needs: []
+  extends: [.linux-runner, .lint-clippy, .validation-rust, .timeout-standard]
   before_script:
     - !reference [.self-hosted, before_script]
     - !reference [.clone-locales, before_script]
     - !reference [.clone-themes, before_script]
-  script:
-    - cargo clippy --all-targets -- -D warnings
 
 # REUSE compliance provided by vauchi/scripts ci-templates/reuse.yml
 
 # ============================================================
 # Test Stage (MR only, gated by lint)
 # ============================================================
-
-# Clone sibling locales repo (needed by build.rs and i18n tests)
-.clone-locales:
-  before_script:
-    - if [ ! -d ../locales ]; then git clone --depth=1 https://gitlab.com/vauchi/locales.git ../locales || (sleep 2 && git clone --depth=1 https://gitlab.com/vauchi/locales.git ../locales); else git -C ../locales pull --ff-only 2>/dev/null || true; fi
-
-# Clone sibling themes repo (needed by content contract validation)
-.clone-themes:
-  before_script:
-    - if [ ! -d ../themes ]; then git clone --depth=1 https://gitlab.com/vauchi/themes.git ../themes || (sleep 2 && git clone --depth=1 https://gitlab.com/vauchi/themes.git ../themes); else git -C ../themes pull --ff-only 2>/dev/null || true; fi
 
 # MR test jobs: use nextest for fast feedback (12x faster than cargo test,
 # avoids llvm-cov instrumentation rebuild). Coverage runs on main only.
@@ -226,74 +210,26 @@ validate:content-contracts:
 # Coverage jobs: run on main merges only (not MRs) — llvm-cov is too slow
 # for per-push feedback but still needed for coverage tracking/badges.
 coverage:core:
-  extends: [.linux-runner, .timeout-long]
-  stage: test
-  needs:
-    - job: lint:format
-      optional: true
-    - job: lint:clippy
-      optional: true
-  rules:
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-    - if: $CI_PIPELINE_SOURCE == "schedule"
+  extends: [.coverage-job, .linux-runner, .timeout-long]
   before_script:
     - !reference [.self-hosted, before_script]
     - !reference [.clone-locales, before_script]
     - !reference [.clone-themes, before_script]
     - rustup component add llvm-tools-preview 2>/dev/null || true
-    - command -v cargo-llvm-cov >/dev/null 2>&1 || cargo binstall cargo-llvm-cov --no-confirm 2>/dev/null || cargo install cargo-llvm-cov --locked || true
-  script:
-    - cargo llvm-cov -p vauchi-core --lcov --output-path lcov-core.info
-    - cargo llvm-cov report -p vauchi-core --cobertura --output-path cobertura-core.xml
-    - cargo llvm-cov report -p vauchi-core
-    - mkdir -p /tmp/ci-${CI_PIPELINE_ID} && curl -sL -H "JOB-TOKEN:$CI_JOB_TOKEN" "$CI_API_V4_URL/projects/vauchi%2Fscripts/repository/files/scripts%2Fci%2Fpush-coverage.sh/raw?ref=main" -o /tmp/ci-${CI_PIPELINE_ID}/push-coverage.sh
-    - "bash /tmp/ci-${CI_PIPELINE_ID}/push-coverage.sh cobertura-core.xml core || echo WARNING: coverage push failed"
-    - rm -rf /tmp/ci-${CI_PIPELINE_ID}
-  coverage: '/TOTAL\s+\d+\s+\d+\s+\d+\.\d+%\s+\d+\s+\d+\s+\d+\.\d+%\s+\d+\s+\d+\s+(\d+\.\d+%)/'
-  artifacts:
-    reports:
-      coverage_report:
-        coverage_format: cobertura
-        path: cobertura-core.xml
-    paths:
-      - lcov-core.info
-      - cobertura-core.xml
-    expire_in: 1 week
+  variables:
+    COVERAGE_PACKAGE: "vauchi-core"
+    COVERAGE_REPO_LABEL: "core"
 
 coverage:mobile:
-  extends: [.linux-runner, .timeout-long]
-  stage: test
-  needs:
-    - job: lint:format
-      optional: true
-    - job: lint:clippy
-      optional: true
-  rules:
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-    - if: $CI_PIPELINE_SOURCE == "schedule"
+  extends: [.coverage-job, .linux-runner, .timeout-long]
   before_script:
     - !reference [.self-hosted, before_script]
     - !reference [.clone-locales, before_script]
     - !reference [.clone-themes, before_script]
     - rustup component add llvm-tools-preview 2>/dev/null || true
-    - command -v cargo-llvm-cov >/dev/null 2>&1 || cargo binstall cargo-llvm-cov --no-confirm 2>/dev/null || cargo install cargo-llvm-cov --locked || true
-  script:
-    - cargo llvm-cov -p vauchi-mobile --lcov --output-path lcov-mobile.info
-    - cargo llvm-cov report -p vauchi-mobile --cobertura --output-path cobertura-mobile.xml
-    - cargo llvm-cov report -p vauchi-mobile
-    - mkdir -p /tmp/ci-${CI_PIPELINE_ID} && curl -sL -H "JOB-TOKEN:$CI_JOB_TOKEN" "$CI_API_V4_URL/projects/vauchi%2Fscripts/repository/files/scripts%2Fci%2Fpush-coverage.sh/raw?ref=main" -o /tmp/ci-${CI_PIPELINE_ID}/push-coverage.sh
-    - "bash /tmp/ci-${CI_PIPELINE_ID}/push-coverage.sh cobertura-mobile.xml mobile || echo WARNING: coverage push failed"
-    - rm -rf /tmp/ci-${CI_PIPELINE_ID}
-  coverage: '/TOTAL\s+\d+\s+\d+\s+\d+\.\d+%\s+\d+\s+\d+\s+\d+\.\d+%\s+\d+\s+\d+\s+(\d+\.\d+%)/'
-  artifacts:
-    reports:
-      coverage_report:
-        coverage_format: cobertura
-        path: cobertura-mobile.xml
-    paths:
-      - lcov-mobile.info
-      - cobertura-mobile.xml
-    expire_in: 1 week
+  variables:
+    COVERAGE_PACKAGE: "vauchi-mobile"
+    COVERAGE_REPO_LABEL: "mobile"
 
 # ============================================================
 # Benchmark Stage — Performance Regression Gate (PI-10)
@@ -323,7 +259,6 @@ mutation:nightly:
   variables:
     MUTATION_PACKAGE: "vauchi-core"
     MUTATION_EXTRA_FLAGS: "--exclude-re theme.rs"
-    MUTATION_TIMEOUT_NIGHTLY: "60"
 
 # ============================================================
 # Fuzz Testing (Nightly scheduled, T2-10)
@@ -372,21 +307,19 @@ fuzz:nightly:
 
 # Rust-specific security audit (runs on dependency changes)
 security:audit:
-  extends: [.linux-runner-readonly, .validation-deps, .timeout-quick]
-  stage: security
+  extends: [.linux-runner-readonly, .security-audit, .validation-deps, .timeout-quick]
   needs:
     - job: lint:format
       optional: true
     - job: lint:clippy
       optional: true
-  script:
-    - command -v cargo-audit >/dev/null 2>&1 || cargo binstall cargo-audit --no-confirm 2>/dev/null || cargo install cargo-audit || true
-    - cargo audit
+  before_script:
+    - !reference [.self-hosted, before_script]
+    - command -v cargo-audit >/dev/null 2>&1 || cargo binstall cargo-audit --no-confirm 2>/dev/null || cargo install cargo-audit
 
 # Full cargo-deny check: advisories, licenses, bans, sources (runs on all MRs)
 security:deny:
-  extends: [.linux-runner-readonly, .timeout-quick]
-  stage: security
+  extends: [.linux-runner-readonly, .security-deny, .timeout-quick]
   needs:
     - job: lint:format
       optional: true
@@ -395,9 +328,9 @@ security:deny:
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
     - if: $CI_PIPELINE_SOURCE == "schedule"
-  script:
-    - command -v cargo-deny >/dev/null 2>&1 || cargo binstall cargo-deny --no-confirm 2>/dev/null || cargo install cargo-deny || true
-    - cargo deny check
+  before_script:
+    - !reference [.self-hosted, before_script]
+    - command -v cargo-deny >/dev/null 2>&1 || cargo binstall cargo-deny --no-confirm 2>/dev/null || cargo install cargo-deny
 
 # Refine semgrep-sast from security.yml: gate on lint, run only on Rust changes
 semgrep-sast:

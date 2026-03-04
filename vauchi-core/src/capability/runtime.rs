@@ -45,3 +45,10 @@ pub enum ConnectionType {
     /// No network connection.
     Offline,
 }
+
+impl ConnectionType {
+    /// Returns true if the connection type is WiFi.
+    pub fn is_wifi(&self) -> bool {
+        matches!(self, ConnectionType::WiFi)
+    }
+}

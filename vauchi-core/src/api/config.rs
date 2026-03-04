@@ -232,6 +232,12 @@ pub struct SyncConfig {
     /// sent in subsequent sync cycles.
     /// `None` means no limit (send all pending).
     pub batch_size: Option<usize>,
+
+    /// Only sync over WiFi connections (skip cellular).
+    pub wifi_only_sync: bool,
+
+    /// Enable background sync (platform-dependent scheduling).
+    pub background_sync_enabled: bool,
 }
 
 impl Default for SyncConfig {
@@ -241,6 +247,8 @@ impl Default for SyncConfig {
             sync_interval_ms: 60_000, // 1 minute
             max_pending_updates: 50,
             batch_size: Some(20),
+            wifi_only_sync: false,
+            background_sync_enabled: true,
         }
     }
 }

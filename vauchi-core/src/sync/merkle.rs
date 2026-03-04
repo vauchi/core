@@ -36,6 +36,28 @@ impl MerkleTree {
         }
     }
 
+    /// Builds a Merkle tree from a list of contact cards.
+    ///
+    /// Each card is hashed (SHA-256 of its JSON serialization). The resulting
+    /// hashes are sorted for deterministic ordering regardless of input order.
+    pub fn from_contacts(contacts: &[&crate::contact_card::ContactCard]) -> Self {
+        let mut hashes: Vec<[u8; 32]> = contacts
+            .iter()
+            .map(|card| {
+                let json = serde_json::to_vec(*card).unwrap_or_default();
+                let d = digest::digest(&digest::SHA256, &json);
+                let mut h = [0u8; 32];
+                h.copy_from_slice(d.as_ref());
+                h
+            })
+            .collect();
+
+        // Sort for deterministic ordering regardless of input order
+        hashes.sort();
+
+        Self::from_contact_hashes(hashes)
+    }
+
     /// Returns a reference to the root hash.
     pub fn root_hash(&self) -> &[u8; 32] {
         &self.root

@@ -230,3 +230,6 @@ required-features = ["testing"]
 
 [[test]]
 name = "contact_card_gaps_tests"
+
+[[test]]
+name = "sync_integration_tests"

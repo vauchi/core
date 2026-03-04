@@ -18,8 +18,8 @@ pub use card_update::{process_card_updates, process_single_card_update, CardUpda
 pub use delta::{CardDelta, DeltaError, FieldChange, ValidationSummary};
 pub use device_orchestrator::{build_device_sync_envelopes, DeviceSyncOrchestrator};
 pub use device_sync::{
-    validate_timestamp, ContactSyncData, DeviceSyncError, DeviceSyncPayload, InterDeviceSyncState,
-    SyncItem, VersionVector,
+    detect_identity_key_change, validate_timestamp, ContactSyncData, DeviceSyncError,
+    DeviceSyncPayload, InterDeviceSyncState, SyncItem, VersionVector,
 };
 pub use merkle::MerkleTree;
 pub use state::{ReplayDetector, SyncError, SyncManager, SyncState};

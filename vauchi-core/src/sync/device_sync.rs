@@ -589,3 +589,11 @@ mod version_map_serde {
         deserializer.deserialize_map(VersionMapVisitor)
     }
 }
+
+/// Detects whether an incoming identity key differs from the stored key.
+///
+/// Used during device sync to flag potential identity key rotations.
+/// Returns true if the keys differ, false if they match.
+pub fn detect_identity_key_change(stored_key: &[u8; 32], incoming_key: &[u8; 32]) -> bool {
+    stored_key != incoming_key
+}

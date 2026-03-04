@@ -727,7 +727,7 @@ trigger:swift:
     branch: main
     strategy: depend
   rules:
-    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+/
+    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/
 
 trigger:android:
   stage: trigger
@@ -740,7 +740,7 @@ trigger:android:
     branch: main
     strategy: depend
   rules:
-    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+/
+    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/
 
 # ============================================================
 # Downstream Verification (main branch only)

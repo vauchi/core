@@ -371,6 +371,83 @@ pub fn ble_exchange_status() -> MobileBleExchangeStatus {
     }
 }
 
+// ============================================================
+// BLE Mesh Exchange Bindings
+// ============================================================
+
+/// Callback interface for platform-specific BLE operations.
+///
+/// Mobile apps (iOS/Android) implement this to provide BLE transport
+/// using platform-native APIs (CoreBluetooth on iOS, Android BLE on Android).
+#[uniffi::export(callback_interface)]
+pub trait MobileBLEHandler: Send + Sync {
+    /// Start BLE advertising with the given service data.
+    ///
+    /// service_data: serialized MeshAdvertisement bytes (16-byte session ID).
+    /// Returns empty string on success, error message on failure.
+    fn start_advertising(&self, service_data: Vec<u8>) -> String;
+
+    /// Start BLE scanning for nearby Vauchi devices.
+    ///
+    /// Returns empty string on success, error message on failure.
+    fn start_scanning(&self) -> String;
+
+    /// Stop all BLE advertising and scanning.
+    fn stop(&self);
+
+    /// Connect to a discovered BLE device by ID.
+    ///
+    /// Returns empty string on success, error message on failure.
+    fn connect(&self, device_id: String) -> String;
+
+    /// Write data to a GATT characteristic.
+    ///
+    /// Returns empty string on success, error message on failure.
+    fn write_characteristic(&self, uuid: String, data: Vec<u8>) -> String;
+
+    /// Read data from a GATT characteristic.
+    ///
+    /// Returns the read data on success, or empty vec on failure.
+    fn read_characteristic(&self, uuid: String) -> Vec<u8>;
+
+    /// Disconnect from the currently connected device.
+    fn disconnect(&self);
+
+    /// Returns the list of discovered device IDs since last scan start.
+    ///
+    /// Each entry is "device_id:rssi" (e.g., "ABC123:-55").
+    fn discovered_devices(&self) -> Vec<String>;
+}
+
+/// Mobile-friendly mesh exchange state.
+#[derive(Debug, Clone, uniffi::Enum)]
+pub enum MobileMeshState {
+    /// Mesh is not active.
+    Disabled,
+    /// Actively scanning and advertising.
+    Active {
+        /// Number of discovered peers.
+        discovered_count: u32,
+    },
+    /// Exchanging with a specific peer.
+    Exchanging {
+        /// Device ID of the peer.
+        peer_id: String,
+    },
+    /// Temporarily paused.
+    Paused,
+}
+
+/// Check if mesh BLE exchange is available on this device.
+///
+/// Returns NotAvailable until a MobileBLEHandler is registered.
+#[uniffi::export]
+pub fn mesh_exchange_status() -> MobileBleExchangeStatus {
+    MobileBleExchangeStatus::NotAvailable {
+        reason: "Native Bluetooth transport not yet implemented".into(),
+    }
+}
+
 // === Tests ===
 
 // INLINE_TEST_REQUIRED: tests use private ProximityBridge internals and create_qr_exchange_manual/proximity helpers

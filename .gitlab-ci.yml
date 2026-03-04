@@ -38,7 +38,7 @@
 # Include shared templates
 include:
   - project: 'vauchi/scripts'
-    ref: feat/3-tier-versioning
+    ref: main
     file:
       - '/ci-templates/rust-base.yml'
       - '/ci-templates/security.yml'

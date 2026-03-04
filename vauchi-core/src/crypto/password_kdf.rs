@@ -8,6 +8,10 @@
 //! for importing legacy data.
 //!
 //! Argon2id parameters: m=64MB, t=3, p=4 (OWASP recommended).
+//!
+//! When the `test-kdf` feature is enabled, memory cost is reduced to 8 MB and
+//! time cost to 1 iteration for faster test execution. This feature MUST NOT
+//! be enabled in production builds.
 
 use ring::pbkdf2;
 use std::num::NonZeroU32;
@@ -15,10 +19,18 @@ use zeroize::Zeroize;
 
 use super::SymmetricKey;
 
-/// Argon2id memory cost in KiB (64 MB).
-const ARGON2_M_COST: u32 = 65536;
+/// Argon2id memory cost in KiB.
+#[cfg(not(feature = "test-kdf"))]
+const ARGON2_M_COST: u32 = 65536; // 64 MB (OWASP recommended)
+#[cfg(feature = "test-kdf")]
+const ARGON2_M_COST: u32 = 8 * 1024; // 8 MB (reduced for fast tests)
+
 /// Argon2id time cost (iterations).
+#[cfg(not(feature = "test-kdf"))]
 const ARGON2_T_COST: u32 = 3;
+#[cfg(feature = "test-kdf")]
+const ARGON2_T_COST: u32 = 1; // 1 iteration (reduced for fast tests)
+
 /// Argon2id parallelism.
 const ARGON2_P_COST: u32 = 4;
 

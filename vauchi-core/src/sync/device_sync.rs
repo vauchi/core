@@ -594,6 +594,8 @@ mod version_map_serde {
 ///
 /// Used during device sync to flag potential identity key rotations.
 /// Returns true if the keys differ, false if they match.
+/// Uses constant-time comparison (via `subtle`) to avoid timing side-channels.
 pub fn detect_identity_key_change(stored_key: &[u8; 32], incoming_key: &[u8; 32]) -> bool {
-    stored_key != incoming_key
+    use subtle::ConstantTimeEq;
+    stored_key.ct_eq(incoming_key).unwrap_u8() == 0
 }

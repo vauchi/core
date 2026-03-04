@@ -699,16 +699,31 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
         their_key.and_then(|key| contacts.iter().find(|c| c.public_key() == key))
     }
 
-    /// Applies an event with platform constraint checks (battery, storage).
+    /// Applies an event with platform constraint checks (battery, storage)
+    /// and optional blocked-contact enforcement.
     ///
     /// Used for KEY AGREEMENT and COMPLETE EXCHANGE events where platform callbacks
     /// should verify device constraints before proceeding.
+    ///
+    /// When `blocked_keys` is non-empty and the event is `CompleteExchange`,
+    /// the peer's public key is checked against the blocked list. If blocked,
+    /// returns `ExchangeError::ContactBlocked`.
     ///
     /// For other events, use `apply()` directly (no constraint checks).
     pub fn apply_with_callbacks(
         &mut self,
         event: ExchangeEvent,
         callbacks: &dyn ExchangePlatformCallbacks,
+    ) -> Result<(), ExchangeError> {
+        self.apply_with_callbacks_and_blocked(event, callbacks, &[])
+    }
+
+    /// Applies an event with platform constraint checks and blocked-contact list.
+    pub fn apply_with_callbacks_and_blocked(
+        &mut self,
+        event: ExchangeEvent,
+        callbacks: &dyn ExchangePlatformCallbacks,
+        blocked_keys: &[[u8; 32]],
     ) -> Result<(), ExchangeError> {
         // Check constraints before processing events that consume device resources
         match &event {
@@ -719,6 +734,20 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
             _ => {}
         }
 
+        // Check if peer is blocked before completing exchange
+        if let ExchangeEvent::CompleteExchange(_) = &event {
+            if !blocked_keys.is_empty() {
+                if let ExchangeState::AwaitingCardExchange {
+                    their_public_key, ..
+                } = &self.state
+                {
+                    if blocked_keys.contains(their_public_key) {
+                        return Err(ExchangeError::ContactBlocked);
+                    }
+                }
+            }
+        }
+
         self.apply(event)
     }
 
@@ -726,7 +755,7 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
     ///
     /// Returns a contact marked as blocked if the peer is in the blocked_list.
     ///
-    /// #[cfg(test)] only.
+    /// Testing-only convenience method.
     #[cfg(any(test, feature = "testing"))]
     pub fn apply_with_blocked_list(
         &mut self,

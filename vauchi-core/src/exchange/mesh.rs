@@ -122,8 +122,8 @@ pub enum MeshState {
     Disabled,
     /// Actively scanning and advertising.
     Active {
-        /// Number of currently discovered peers.
-        discovered_count: usize,
+        /// Number of currently discovered peers (u32 for UniFFI compatibility).
+        discovered_count: u32,
     },
     /// Currently exchanging with a specific peer.
     Exchanging {
@@ -236,10 +236,18 @@ impl<T: BLETransport, P: ProximityVerifier> MeshExchangeManager<T, P> {
         &self.state
     }
 
-    /// Enables mesh exchange — starts advertising and scanning.
+    /// Enables mesh exchange — starts scanning for peers.
     ///
     /// Generates a new random session ID (privacy: prevents correlation
-    /// across enable/disable cycles).
+    /// across enable/disable cycles). The session ID is available via
+    /// `current_advertisement()` for the platform layer to pass to its
+    /// native BLE advertising API.
+    ///
+    /// Note: Advertising is handled by the platform layer (iOS/Android)
+    /// because `BLETransport::start_advertising` requires an `ExchangeBle`
+    /// payload with identity keys. Mesh advertising uses only the session ID
+    /// (no identity info), so the platform calls its native BLE advertiser
+    /// with the bytes from `current_advertisement().to_bytes()`.
     pub fn enable(&mut self) -> Result<(), super::ble::BLEError> {
         let ad = MeshAdvertisement::new();
         self.current_advertisement = Some(ad);
@@ -249,6 +257,13 @@ impl<T: BLETransport, P: ProximityVerifier> MeshExchangeManager<T, P> {
         };
         self.transport.start_scanning()?;
         Ok(())
+    }
+
+    /// Returns the current advertisement for the platform to broadcast.
+    ///
+    /// Returns `None` if mesh is disabled.
+    pub fn current_advertisement(&self) -> Option<&MeshAdvertisement> {
+        self.current_advertisement.as_ref()
     }
 
     /// Disables mesh exchange — stops advertising and scanning.
@@ -316,7 +331,7 @@ impl<T: BLETransport, P: ProximityVerifier> MeshExchangeManager<T, P> {
 
         self.discovered_peers.push(peer);
         self.state = MeshState::Active {
-            discovered_count: self.discovered_peers.len(),
+            discovered_count: self.discovered_peers.len() as u32,
         };
     }
 }

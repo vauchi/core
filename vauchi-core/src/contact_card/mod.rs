@@ -304,7 +304,7 @@ impl ContactCard {
             .iter()
             .map(|f| {
                 serde_json::json!({
-                    "type": format!("{:?}", f.field_type()),
+                    "type": serde_json::to_value(f.field_type()).unwrap_or_default(),
                     "label": f.label(),
                     "value": f.value(),
                 })

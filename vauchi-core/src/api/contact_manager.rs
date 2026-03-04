@@ -213,31 +213,22 @@ impl<'a> ContactManager<'a> {
 
         match sort {
             SortOrder::NameAsc => {
-                results.sort_by(|a, b| {
-                    a.display_name()
-                        .to_lowercase()
-                        .cmp(&b.display_name().to_lowercase())
-                });
+                results.sort_by_cached_key(|c| c.display_name().to_lowercase());
             }
             SortOrder::NameDesc => {
-                results.sort_by(|a, b| {
-                    b.display_name()
-                        .to_lowercase()
-                        .cmp(&a.display_name().to_lowercase())
-                });
+                results.sort_by_cached_key(|c| std::cmp::Reverse(c.display_name().to_lowercase()));
             }
             SortOrder::RecentFirst => {
                 results.sort_by_key(|c| std::cmp::Reverse(c.exchange_timestamp()));
             }
             SortOrder::VerificationStatus => {
-                results.sort_by(|a, b| {
-                    b.is_fingerprint_verified()
-                        .cmp(&a.is_fingerprint_verified())
-                        .then_with(|| {
-                            a.display_name()
-                                .to_lowercase()
-                                .cmp(&b.display_name().to_lowercase())
-                        })
+                // Pre-compute sort keys: (not-verified, lowercase name)
+                // false < true, so !verified puts verified first
+                results.sort_by_cached_key(|c| {
+                    (
+                        !c.is_fingerprint_verified(),
+                        c.display_name().to_lowercase(),
+                    )
                 });
             }
         }

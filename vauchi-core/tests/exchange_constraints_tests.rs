@@ -328,3 +328,86 @@ fn test_exchange_succeeds_for_unblocked_contact() {
         assert!(!contact.is_blocked());
     }
 }
+
+// ============================================================================
+// Production Blocked Contact Enforcement (apply_with_callbacks_and_blocked)
+// ============================================================================
+
+/// Feature: contact_exchange.feature @constraints @blocked
+/// Scenario: Production path rejects blocked contact via apply_with_callbacks_and_blocked
+#[test]
+fn test_production_blocked_contact_rejection() {
+    let alice_identity = Identity::create("Alice");
+    let alice_card = ContactCard::new("Alice");
+    let alice_ephemeral = X3DHKeyPair::generate();
+
+    let bob_identity = Identity::create("Bob");
+    let bob_card = ContactCard::new("Bob");
+
+    let proximity = MockProximityVerifier::success();
+    let platform_callbacks = MockPlatformCallbacks {
+        battery_ok: true,
+        storage_ok: true,
+    };
+
+    let alice_qr = ExchangeQR::generate(&alice_identity, &alice_ephemeral);
+
+    let mut bob_session = ExchangeSession::new_qr(bob_identity, bob_card, proximity);
+    bob_session.apply(ExchangeEvent::StartQR).unwrap();
+    bob_session
+        .apply(ExchangeEvent::ProcessQR(alice_qr))
+        .unwrap();
+    bob_session.apply(ExchangeEvent::TheyScannedOurQR).unwrap();
+    bob_session
+        .apply(ExchangeEvent::PerformKeyAgreement)
+        .unwrap();
+
+    // Use production method with blocked list
+    let result = bob_session.apply_with_callbacks_and_blocked(
+        ExchangeEvent::CompleteExchange(alice_card),
+        &platform_callbacks,
+        &[*alice_identity.signing_public_key()],
+    );
+
+    // Production path should return ContactBlocked error
+    assert!(matches!(result, Err(ExchangeError::ContactBlocked)));
+}
+
+/// Feature: contact_exchange.feature @constraints @blocked
+/// Scenario: Production path allows non-blocked contacts through
+#[test]
+fn test_production_unblocked_contact_succeeds() {
+    let alice_identity = Identity::create("Alice");
+    let alice_card = ContactCard::new("Alice");
+    let alice_ephemeral = X3DHKeyPair::generate();
+
+    let bob_identity = Identity::create("Bob");
+    let bob_card = ContactCard::new("Bob");
+
+    let proximity = MockProximityVerifier::success();
+    let platform_callbacks = MockPlatformCallbacks {
+        battery_ok: true,
+        storage_ok: true,
+    };
+
+    let alice_qr = ExchangeQR::generate(&alice_identity, &alice_ephemeral);
+
+    let mut bob_session = ExchangeSession::new_qr(bob_identity, bob_card, proximity);
+    bob_session.apply(ExchangeEvent::StartQR).unwrap();
+    bob_session
+        .apply(ExchangeEvent::ProcessQR(alice_qr))
+        .unwrap();
+    bob_session.apply(ExchangeEvent::TheyScannedOurQR).unwrap();
+    bob_session
+        .apply_with_callbacks(ExchangeEvent::PerformKeyAgreement, &platform_callbacks)
+        .unwrap();
+
+    // Production path with empty blocked list should succeed
+    let result = bob_session.apply_with_callbacks_and_blocked(
+        ExchangeEvent::CompleteExchange(alice_card),
+        &platform_callbacks,
+        &[], // No blocked contacts
+    );
+
+    assert!(result.is_ok());
+}

@@ -227,7 +227,7 @@ impl<'a> ContactManager<'a> {
                 });
             }
             SortOrder::RecentFirst => {
-                results.sort_by(|a, b| b.exchange_timestamp().cmp(&a.exchange_timestamp()));
+                results.sort_by_key(|c| std::cmp::Reverse(c.exchange_timestamp()));
             }
             SortOrder::VerificationStatus => {
                 results.sort_by(|a, b| {

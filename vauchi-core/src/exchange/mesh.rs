@@ -32,6 +32,12 @@ pub struct MeshAdvertisement {
     session_id: [u8; 16],
 }
 
+impl Default for MeshAdvertisement {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl MeshAdvertisement {
     /// Creates a new advertisement with a random session ID.
     pub fn new() -> Self {
@@ -202,6 +208,7 @@ impl DiscoveredPeer {
 /// Generic over BLE transport and proximity verifier for testability.
 pub struct MeshExchangeManager<T: BLETransport, P: ProximityVerifier> {
     transport: T,
+    #[allow(dead_code)]
     verifier: P,
     config: MeshConfig,
     state: MeshState,

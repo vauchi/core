@@ -14,8 +14,14 @@ pub(super) const DEVICE_LINK_MAGIC: &[u8; 4] = b"WBDL";
 /// Protocol version for device linking.
 pub(super) const DEVICE_LINK_VERSION: u8 = 1;
 
-/// Link QR expiration time in seconds (5 minutes).
+/// Link QR expiration time in seconds.
+///
+/// Production default: 300s (5 minutes).
+/// With `test-timings` feature: 5s (for fast e2e tests).
+#[cfg(not(feature = "test-timings"))]
 pub(super) const LINK_QR_EXPIRY_SECONDS: u64 = 300;
+#[cfg(feature = "test-timings")]
+pub(super) const LINK_QR_EXPIRY_SECONDS: u64 = 5;
 
 /// Domain separator for deriving the proximity challenge from the link key.
 pub(super) const PROXIMITY_DOMAIN: &[u8] = b"vauchi-device-link-proximity-v1";

@@ -682,6 +682,96 @@ pub struct MobileDemoContactState {
     pub update_count: u32,
 }
 
+// === Onboarding Types ===
+
+/// Steps in the onboarding wizard (UniFFI-compatible).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, uniffi::Enum)]
+pub enum MobileOnboardingStep {
+    /// Welcome screen showing value proposition
+    Welcome,
+    /// Identity creation (display name entry)
+    CreateIdentity,
+    /// Add optional contact fields (phone, email)
+    AddFields,
+    /// Preview the contact card before continuing
+    PreviewCard,
+    /// Security explanation screen
+    SecurityExplanation,
+    /// Prompt to set up backup
+    BackupPrompt,
+    /// Onboarding complete, ready to use
+    Ready,
+}
+
+impl From<vauchi_core::OnboardingStep> for MobileOnboardingStep {
+    fn from(step: vauchi_core::OnboardingStep) -> Self {
+        match step {
+            vauchi_core::OnboardingStep::Welcome => MobileOnboardingStep::Welcome,
+            vauchi_core::OnboardingStep::CreateIdentity => MobileOnboardingStep::CreateIdentity,
+            vauchi_core::OnboardingStep::AddFields => MobileOnboardingStep::AddFields,
+            vauchi_core::OnboardingStep::PreviewCard => MobileOnboardingStep::PreviewCard,
+            vauchi_core::OnboardingStep::SecurityExplanation => {
+                MobileOnboardingStep::SecurityExplanation
+            }
+            vauchi_core::OnboardingStep::BackupPrompt => MobileOnboardingStep::BackupPrompt,
+            vauchi_core::OnboardingStep::Ready => MobileOnboardingStep::Ready,
+        }
+    }
+}
+
+impl From<MobileOnboardingStep> for vauchi_core::OnboardingStep {
+    fn from(step: MobileOnboardingStep) -> Self {
+        match step {
+            MobileOnboardingStep::Welcome => vauchi_core::OnboardingStep::Welcome,
+            MobileOnboardingStep::CreateIdentity => vauchi_core::OnboardingStep::CreateIdentity,
+            MobileOnboardingStep::AddFields => vauchi_core::OnboardingStep::AddFields,
+            MobileOnboardingStep::PreviewCard => vauchi_core::OnboardingStep::PreviewCard,
+            MobileOnboardingStep::SecurityExplanation => {
+                vauchi_core::OnboardingStep::SecurityExplanation
+            }
+            MobileOnboardingStep::BackupPrompt => vauchi_core::OnboardingStep::BackupPrompt,
+            MobileOnboardingStep::Ready => vauchi_core::OnboardingStep::Ready,
+        }
+    }
+}
+
+/// Onboarding progress state (UniFFI-compatible).
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct MobileOnboardingProgress {
+    /// The step the user is currently on
+    pub current_step: MobileOnboardingStep,
+    /// Steps that have been completed
+    pub completed_steps: Vec<MobileOnboardingStep>,
+    /// Timestamp when onboarding was started (Unix epoch seconds)
+    pub started_at: Option<u64>,
+    /// Timestamp when onboarding was completed (Unix epoch seconds)
+    pub completed_at: Option<u64>,
+    /// Whether the user skipped the backup step
+    pub skipped_backup: bool,
+    /// Completion percentage (0-100)
+    pub completion_percentage: u8,
+    /// Whether onboarding is complete
+    pub is_complete: bool,
+}
+
+impl From<&vauchi_core::OnboardingProgress> for MobileOnboardingProgress {
+    fn from(progress: &vauchi_core::OnboardingProgress) -> Self {
+        MobileOnboardingProgress {
+            current_step: progress.current_step.into(),
+            completed_steps: progress
+                .completed_steps
+                .iter()
+                .map(|s| (*s).into())
+                .collect(),
+            started_at: progress.started_at,
+            completed_at: progress.completed_at,
+            skipped_backup: progress.skipped_backup,
+            completion_percentage: progress.completion_percentage(),
+            is_complete: progress.is_complete(),
+        }
+    }
+}
+
 // === Field Validation Types ===
 
 /// Trust level based on validation count.

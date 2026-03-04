@@ -36,6 +36,7 @@ mod mobile_device_link;
 mod mobile_exchange;
 mod mobile_gdpr;
 mod mobile_identity;
+mod mobile_onboarding;
 mod mobile_recovery;
 mod mobile_security;
 mod mobile_tor;
@@ -68,12 +69,12 @@ pub use types::{
     MobileDeviceLinkInfo, MobileDeviceLinkRequest, MobileDeviceLinkResult, MobileDuressSettings,
     MobileEmergencyConfig, MobileExchangeResult, MobileFaqItem, MobileFieldType,
     MobileFieldValidation, MobileGdprExport, MobileHelpCategory, MobileHelpCategoryInfo,
-    MobileLocale, MobileLocaleInfo, MobileRecoveryClaim, MobileRecoveryProgress,
-    MobileRecoveryVerification, MobileRecoveryVoucher, MobileRetryEntry, MobileShredReport,
-    MobileShredStatus, MobileShredToken, MobileShredVerification, MobileSocialNetwork,
-    MobileSyncResult, MobileSyncStatus, MobileTheme, MobileThemeColors, MobileThemeMode,
-    MobileTorConfig, MobileTorStatus, MobileTrustLevel, MobileValidationStatus,
-    MobileVisibilityLabel, MobileVisibilityLabelDetail,
+    MobileLocale, MobileLocaleInfo, MobileOnboardingProgress, MobileOnboardingStep,
+    MobileRecoveryClaim, MobileRecoveryProgress, MobileRecoveryVerification, MobileRecoveryVoucher,
+    MobileRetryEntry, MobileShredReport, MobileShredStatus, MobileShredToken,
+    MobileShredVerification, MobileSocialNetwork, MobileSyncResult, MobileSyncStatus, MobileTheme,
+    MobileThemeColors, MobileThemeMode, MobileTorConfig, MobileTorStatus, MobileTrustLevel,
+    MobileValidationStatus, MobileVisibilityLabel, MobileVisibilityLabelDetail,
 };
 
 uniffi::setup_scaffolding!();
@@ -1042,6 +1043,7 @@ impl VauchiMobile {
 
 // Methods extracted to child modules:
 // - mobile_identity.rs: Identity operations, aha moments, demo contact
+// - mobile_onboarding.rs: Onboarding progress, display name suggestions
 // - mobile_contacts.rs: Contact card/CRUD, hidden contacts, pagination, social networks, field validation
 // - mobile_security.rs: Password/duress, emergency broadcast, decoy contacts
 // - mobile_visibility.rs: Visibility operations and labels

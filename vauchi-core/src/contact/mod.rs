@@ -374,6 +374,14 @@ impl Contact {
         self.blocked = blocked;
     }
 
+    /// Builder method: sets blocked status and returns self.
+    ///
+    /// Used in test code and builder patterns.
+    pub fn with_blocked(mut self, blocked: bool) -> Self {
+        self.blocked = blocked;
+        self
+    }
+
     // ========================================
     // Recovery Trust
     // ========================================

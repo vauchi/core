@@ -223,3 +223,7 @@ required-features = ["testing"]
 [[test]]
 name = "proximity_confidence_tests"
 required-features = ["testing"]
+
+[[test]]
+name = "exchange_constraints_tests"
+required-features = ["testing"]

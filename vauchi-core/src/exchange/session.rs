@@ -482,6 +482,9 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
             return Err(ExchangeError::InvalidSignature);
         }
 
+        // Clock drift check: ensure peer's timestamp is within tolerance (±30 seconds)
+        super::qr::check_clock_drift(qr.timestamp())?;
+
         let their_public_key = *qr.public_key();
         let their_exchange_key = *qr.exchange_key();
 
@@ -694,6 +697,84 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
         };
 
         their_key.and_then(|key| contacts.iter().find(|c| c.public_key() == key))
+    }
+
+    /// Applies an event with platform constraint checks (battery, storage).
+    ///
+    /// Used for KEY AGREEMENT and COMPLETE EXCHANGE events where platform callbacks
+    /// should verify device constraints before proceeding.
+    ///
+    /// For other events, use `apply()` directly (no constraint checks).
+    pub fn apply_with_callbacks(
+        &mut self,
+        event: ExchangeEvent,
+        callbacks: &dyn ExchangePlatformCallbacks,
+    ) -> Result<(), ExchangeError> {
+        // Check constraints before processing events that consume device resources
+        match &event {
+            ExchangeEvent::PerformKeyAgreement | ExchangeEvent::CompleteExchange(_) => {
+                callbacks.check_battery_level()?;
+                callbacks.check_storage_available()?;
+            }
+            _ => {}
+        }
+
+        self.apply(event)
+    }
+
+    /// Applies an exchange completion event with blocked contact checking.
+    ///
+    /// Returns a contact marked as blocked if the peer is in the blocked_list.
+    ///
+    /// #[cfg(test)] only.
+    #[cfg(any(test, feature = "testing"))]
+    pub fn apply_with_blocked_list(
+        &mut self,
+        event: ExchangeEvent,
+        blocked_list: &[[u8; 32]],
+    ) -> Result<Contact, ExchangeError> {
+        // Check if peer is blocked before completing exchange
+        let card_to_check = if let ExchangeEvent::CompleteExchange(ref card) = event {
+            Some(card.clone())
+        } else {
+            None
+        };
+
+        if let Some(card) = &card_to_check {
+            let (their_key, shared_key) = match &self.state {
+                ExchangeState::AwaitingCardExchange {
+                    their_public_key,
+                    shared_key,
+                } => (*their_public_key, shared_key.clone()),
+                _ => {
+                    return Err(ExchangeError::InvalidState(
+                        "Not in card exchange state".into(),
+                    ))
+                }
+            };
+
+            if blocked_list.contains(&their_key) {
+                // Mark contact as blocked and return early
+                let contact = Contact::from_exchange_full(
+                    their_key,
+                    card.clone(),
+                    shared_key,
+                    self.proximity_confidence,
+                    self.transport,
+                );
+                return Ok(contact.with_blocked(true));
+            }
+        }
+
+        self.apply(event)?;
+
+        // Extract contact from state
+        match &self.state {
+            ExchangeState::Complete { contact } => Ok(contact.clone()),
+            _ => Err(ExchangeError::InvalidState(
+                "Exchange did not complete".into(),
+            )),
+        }
     }
 }
 

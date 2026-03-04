@@ -237,3 +237,7 @@ name = "sync_integration_tests"
 [[test]]
 name = "search_sort_tests"
 required-features = ["testing"]
+
+[[test]]
+name = "mesh_exchange_tests"
+required-features = ["testing"]

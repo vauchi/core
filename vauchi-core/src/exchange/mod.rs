@@ -20,6 +20,11 @@ pub mod ble;
 #[cfg(not(feature = "testing"))]
 mod ble;
 
+#[cfg(feature = "testing")]
+pub mod mesh;
+#[cfg(not(feature = "testing"))]
+mod mesh;
+
 pub mod device_link;
 
 #[cfg(feature = "testing")]

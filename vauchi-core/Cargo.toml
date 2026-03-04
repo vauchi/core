@@ -233,3 +233,7 @@ name = "contact_card_gaps_tests"
 
 [[test]]
 name = "sync_integration_tests"
+
+[[test]]
+name = "search_sort_tests"
+required-features = ["testing"]

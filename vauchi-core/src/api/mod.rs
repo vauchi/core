@@ -133,7 +133,7 @@ pub use config::{RecoveryConfig, RelayConfig, SyncConfig, VauchiConfig};
 pub use events::{CallbackHandler, EventDispatcher, EventHandler, HandlerId, VauchiEvent};
 
 // Contact Manager
-pub use contact_manager::ContactManager;
+pub use contact_manager::{ContactManager, SearchFilter, SortOrder};
 
 // Sync Controller
 pub use sync_controller::{SyncController, SyncResult};

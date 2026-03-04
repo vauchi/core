@@ -69,6 +69,19 @@ impl<T: Transport> Vauchi<T> {
         manager.search_contacts(query)
     }
 
+    /// Searches contacts with filter criteria and sorting.
+    ///
+    /// Combines text search with structured filters and configurable sort order.
+    pub fn search_contacts_filtered(
+        &self,
+        query: &str,
+        filter: &super::super::contact_manager::SearchFilter,
+        sort: super::super::contact_manager::SortOrder,
+    ) -> VauchiResult<Vec<Contact>> {
+        let manager = ContactManager::new(&self.storage, self.events.clone());
+        manager.search_contacts_filtered(query, filter, sort)
+    }
+
     /// Finds contacts by fuzzy matching on display name or ID prefix.
     ///
     /// Combines case-insensitive name substring matching with ID prefix matching.

@@ -15,6 +15,26 @@ use crate::storage::Storage;
 use super::error::{VauchiError, VauchiResult};
 use super::events::{EventDispatcher, VauchiEvent};
 
+/// Filter criteria for advanced contact search.
+#[derive(Debug, Clone, Default)]
+pub struct SearchFilter {
+    /// Only return contacts with verified fingerprints.
+    pub verified_only: bool,
+}
+
+/// Sort order for contact search results.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SortOrder {
+    /// Sort by display name A-Z.
+    NameAsc,
+    /// Sort by display name Z-A.
+    NameDesc,
+    /// Sort by exchange timestamp, newest first.
+    RecentFirst,
+    /// Sort verified contacts first, then by name.
+    VerificationStatus,
+}
+
 /// Manages contacts and the user's own contact card.
 ///
 /// Provides high-level operations for:
@@ -157,6 +177,72 @@ impl<'a> ContactManager<'a> {
             .into_iter()
             .filter(|c| !c.is_hidden() && c.display_name().to_lowercase().contains(&query_lower))
             .collect())
+    }
+
+    /// Searches contacts with filter criteria and sorting.
+    ///
+    /// Combines text search (case-insensitive display name substring) with
+    /// structured filters (verified only) and configurable sort order.
+    /// Hidden contacts are always excluded.
+    pub fn search_contacts_filtered(
+        &self,
+        query: &str,
+        filter: &SearchFilter,
+        sort: SortOrder,
+    ) -> VauchiResult<Vec<Contact>> {
+        let query_lower = query.to_lowercase();
+        let contacts = self.storage.list_contacts()?;
+
+        let mut results: Vec<Contact> = contacts
+            .into_iter()
+            .filter(|c| {
+                if c.is_hidden() {
+                    return false;
+                }
+                if !query_lower.is_empty()
+                    && !c.display_name().to_lowercase().contains(&query_lower)
+                {
+                    return false;
+                }
+                if filter.verified_only && !c.is_fingerprint_verified() {
+                    return false;
+                }
+                true
+            })
+            .collect();
+
+        match sort {
+            SortOrder::NameAsc => {
+                results.sort_by(|a, b| {
+                    a.display_name()
+                        .to_lowercase()
+                        .cmp(&b.display_name().to_lowercase())
+                });
+            }
+            SortOrder::NameDesc => {
+                results.sort_by(|a, b| {
+                    b.display_name()
+                        .to_lowercase()
+                        .cmp(&a.display_name().to_lowercase())
+                });
+            }
+            SortOrder::RecentFirst => {
+                results.sort_by(|a, b| b.exchange_timestamp().cmp(&a.exchange_timestamp()));
+            }
+            SortOrder::VerificationStatus => {
+                results.sort_by(|a, b| {
+                    b.is_fingerprint_verified()
+                        .cmp(&a.is_fingerprint_verified())
+                        .then_with(|| {
+                            a.display_name()
+                                .to_lowercase()
+                                .cmp(&b.display_name().to_lowercase())
+                        })
+                });
+            }
+        }
+
+        Ok(results)
     }
 
     /// Finds contacts by fuzzy matching on display name or ID prefix.

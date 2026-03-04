@@ -199,7 +199,7 @@ validate:content-contracts:
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       changes:
-        compare_to: refs/heads/main
+        compare_to: refs/heads/$CI_DEFAULT_BRANCH
         paths:
           - "vauchi-core/src/theme.rs"
           - "vauchi-core/src/i18n.rs"
@@ -347,7 +347,7 @@ semgrep-sast:
       when: never
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       changes:
-        compare_to: refs/heads/main
+        compare_to: refs/heads/$CI_DEFAULT_BRANCH
         paths:
           - "**/*.rs"
           - ".gitlab-ci.yml"

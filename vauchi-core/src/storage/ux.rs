@@ -4,13 +4,15 @@
 
 //! User Experience storage operations.
 //!
-//! Handles persistence for aha moments tracking and demo contact state.
+//! Handles persistence for aha moments tracking, demo contact state,
+//! and onboarding progress.
 
 use rusqlite::params;
 
 use super::{Storage, StorageError};
 use crate::aha_moments::AhaMomentTracker;
 use crate::demo_contact::DemoContactState;
+use crate::onboarding::OnboardingProgress;
 use crate::tor_config::TorConfig;
 
 impl Storage {
@@ -217,6 +219,70 @@ impl Storage {
         }
     }
 
+    // === Onboarding Progress Operations ===
+
+    /// Saves the onboarding progress (encrypted).
+    pub fn save_onboarding_progress(
+        &self,
+        progress: &OnboardingProgress,
+    ) -> Result<(), StorageError> {
+        let json = progress
+            .to_json()
+            .map_err(|e| StorageError::Serialization(e.to_string()))?;
+
+        let encrypted = crate::crypto::encrypt(&self.encryption_key, json.as_bytes())
+            .map_err(|e| StorageError::Encryption(e.to_string()))?;
+
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("system time before UNIX epoch")
+            .as_secs();
+
+        self.conn.execute(
+            "INSERT OR REPLACE INTO ux_state (id, onboarding_progress_encrypted, updated_at)
+             VALUES (1, ?1, ?2)
+             ON CONFLICT(id) DO UPDATE SET onboarding_progress_encrypted = ?1, updated_at = ?2",
+            params![encrypted, now as i64],
+        )?;
+
+        Ok(())
+    }
+
+    /// Loads the onboarding progress (decrypted).
+    pub fn load_onboarding_progress(&self) -> Result<Option<OnboardingProgress>, StorageError> {
+        let result = self.conn.query_row(
+            "SELECT onboarding_progress_encrypted FROM ux_state WHERE id = 1",
+            [],
+            |row| {
+                let encrypted: Option<Vec<u8>> = row.get(0)?;
+                Ok(encrypted)
+            },
+        );
+
+        match result {
+            Ok(Some(encrypted)) if !encrypted.is_empty() => {
+                let decrypted = crate::crypto::decrypt(&self.encryption_key, &encrypted)
+                    .map_err(|e| StorageError::Encryption(e.to_string()))?;
+                let json = String::from_utf8(decrypted)
+                    .map_err(|e| StorageError::Serialization(e.to_string()))?;
+                let progress = OnboardingProgress::from_json(&json)
+                    .map_err(|e| StorageError::Serialization(e.to_string()))?;
+                Ok(Some(progress))
+            }
+            Ok(_) => Ok(None),
+            Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+            Err(e) => Err(StorageError::Database(e)),
+        }
+    }
+
+    /// Loads onboarding progress or creates a new one if none exists.
+    pub fn load_or_create_onboarding_progress(&self) -> Result<OnboardingProgress, StorageError> {
+        match self.load_onboarding_progress()? {
+            Some(progress) => Ok(progress),
+            None => Ok(OnboardingProgress::new()),
+        }
+    }
+
     // === Combined UX State Operations ===
 
     /// Saves both aha tracker and demo contact state atomically (encrypted).
@@ -259,6 +325,7 @@ impl Storage {
     }
 }
 
+// INLINE_TEST_REQUIRED: tests need direct access to Storage::in_memory and private encryption internals
 #[cfg(test)]
 mod tests {
     use super::*;

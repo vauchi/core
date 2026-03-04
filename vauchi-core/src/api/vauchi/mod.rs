@@ -12,6 +12,7 @@ mod emergency;
 mod features;
 mod identity;
 mod merge;
+mod onboarding;
 mod propagation;
 mod security;
 mod setup;

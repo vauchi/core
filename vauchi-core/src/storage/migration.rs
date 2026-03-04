@@ -413,6 +413,11 @@ pub fn all_migrations() -> Vec<Migration> {
             name: "contact_limits_and_merge",
             action: MigrationAction::Sql(MIGRATION_V28_LIMITS_AND_MERGE),
         },
+        Migration {
+            version: 29,
+            name: "onboarding_progress",
+            action: MigrationAction::Sql(MIGRATION_V29_ONBOARDING_PROGRESS),
+        },
     ]
 }
 
@@ -523,6 +528,14 @@ const MIGRATION_V28_LIMITS_AND_MERGE: &str = "
         dismissed_at INTEGER NOT NULL,
         PRIMARY KEY (id1, id2)
     );
+";
+
+/// Migration v29: Add onboarding progress column to ux_state table.
+///
+/// Stores encrypted onboarding progress (current step, completed steps,
+/// timestamps) alongside other UX state.
+const MIGRATION_V29_ONBOARDING_PROGRESS: &str = "
+    ALTER TABLE ux_state ADD COLUMN onboarding_progress_encrypted BLOB;
 ";
 
 /// Migration v2: Re-encrypt all AES-GCM encrypted data to XChaCha20-Poly1305.

@@ -23,6 +23,7 @@ pub mod i18n;
 pub mod identity;
 #[cfg(any(feature = "network-native-tls", feature = "network-rustls"))]
 pub mod network;
+pub mod onboarding;
 pub mod recovery;
 pub mod social;
 pub mod storage;
@@ -72,6 +73,7 @@ pub use network::{
     classify_message, ConnectionState, EmergencyAlert, GeoLocation, MessageEnvelope, MessageType,
     MockTransport, NetworkError, RelayClient, RelayClientConfig, Transport, WebSocketTransport,
 };
+pub use onboarding::{display_name_suggestions, OnboardingProgress, OnboardingStep};
 pub use recovery::{
     ConflictingClaim, RecoveryClaim, RecoveryConflict, RecoveryError, RecoveryProof,
     RecoveryRateLimiter, RecoveryReminder, RecoveryResponse, RecoveryRevocation, RecoverySettings,

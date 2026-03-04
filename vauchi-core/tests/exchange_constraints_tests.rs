@@ -177,13 +177,13 @@ fn test_process_qr_rejects_large_clock_drift() {
     let alice_identity = Identity::create("Alice");
     let alice_ephemeral = X3DHKeyPair::generate();
 
-    // Create a QR with a timestamp far in the future (>30 seconds ahead)
-    // This simulates Alice's device having a clock 60 seconds ahead of Bob's
+    // Create a QR with a timestamp far in the future (>120 seconds ahead)
+    // This simulates Alice's device having a clock 180 seconds ahead of Bob's
     let future_timestamp = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap()
         .as_secs()
-        + 60; // 60 seconds in the future (> 30s max drift tolerance)
+        + 180; // 180 seconds in the future (> 120s max drift tolerance)
 
     let alice_qr =
         ExchangeQR::generate_with_timestamp(&alice_identity, &alice_ephemeral, future_timestamp);
@@ -204,7 +204,7 @@ fn test_process_qr_rejects_large_clock_drift() {
 }
 
 /// Feature: contact_exchange.feature @constraints @clock
-/// Scenario: QR is accepted if clock drift is within tolerance (±30 seconds)
+/// Scenario: QR is accepted if clock drift is within tolerance (±120 seconds)
 #[test]
 fn test_process_qr_accepts_small_clock_drift() {
     use std::time::{SystemTime, UNIX_EPOCH};

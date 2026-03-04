@@ -300,13 +300,15 @@ impl ExchangeQR {
 }
 
 /// Maximum allowed clock drift in seconds between local time and QR timestamp.
-const MAX_CLOCK_DRIFT_SECONDS: u64 = 30;
+/// 120 seconds accommodates mobile devices without SIM (no carrier time sync)
+/// while still rejecting replayed or pre-generated QR codes.
+const MAX_CLOCK_DRIFT_SECONDS: u64 = 120;
 
 /// Checks whether the local clock and the QR timestamp are within an
 /// acceptable drift window.
 ///
 /// Returns `Ok(())` if the absolute difference is at most
-/// [`MAX_CLOCK_DRIFT_SECONDS`] (30 seconds). Otherwise returns
+/// [`MAX_CLOCK_DRIFT_SECONDS`] (120 seconds). Otherwise returns
 /// `ExchangeError::ClockDrift` with the signed delta.
 pub fn check_clock_drift(qr_timestamp: u64) -> Result<(), ExchangeError> {
     let now = SystemTime::now()

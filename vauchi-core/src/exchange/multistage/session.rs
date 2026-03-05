@@ -192,11 +192,16 @@ impl MultiStageSession {
             ProtocolState::Verifying => {
                 let qr_data =
                     qr_codec::format_verify_qr(&self.session_id, self.commitment.reveal_key());
-                Some(QrPayload {
+                let qr = QrPayload {
                     data: qr_data,
                     error_correction: "M".to_string(),
                     display_duration_ms: 0,
-                })
+                };
+                // If we stashed the peer's reveal key (received VRFY while still
+                // Transferring), process it now that we've generated our own VRFY
+                // for the peer to scan.
+                self.try_process_stashed_reveal_key();
+                Some(qr)
             }
             ProtocolState::Confirming => {
                 // CONF contains hash of our original plaintext card
@@ -304,9 +309,15 @@ impl MultiStageSession {
         ack_bitmap_bytes: Vec<u8>,
         encrypted_payload: Vec<u8>,
     ) -> ProtocolState {
+        // Accept DATA in Transferring, Discovered, or Verifying.
+        // In Verifying, we still need to process the peer's ACK bitmap updates
+        // so they learn which of their chunks we received (asymmetric payload sizes
+        // can cause one side to reach Verifying before the other finishes transfer).
         if !matches!(
             self.state,
-            ProtocolState::Transferring { .. } | ProtocolState::Discovered
+            ProtocolState::Transferring { .. }
+                | ProtocolState::Discovered
+                | ProtocolState::Verifying
         ) {
             return self.state.clone();
         }
@@ -341,15 +352,39 @@ impl MultiStageSession {
             self.outbound_total,
         ));
 
-        self.update_transfer_state();
+        // Only advance transfer state if not already past Transferring.
+        // In Verifying, we accept DATA only for the ACK bitmap update.
+        if !matches!(self.state, ProtocolState::Verifying) {
+            self.update_transfer_state();
+        }
         self.state.clone()
     }
 
     fn handle_verify(&mut self, reveal_key: [u8; 32]) -> ProtocolState {
+        // Accept VRFY in Verifying or Transferring.
+        // With asymmetric payload sizes one side may reach Verifying while the other
+        // is still Transferring. Receiving VRFY while Transferring means the peer
+        // has all our chunks and has moved to Verifying; we stash the reveal key and
+        // fast-track to Verifying so we can send our own VRFY in the next display cycle.
+        if matches!(self.state, ProtocolState::Transferring { .. }) {
+            self.peer_reveal_key = Some(reveal_key);
+            // Fast-track: peer sending VRFY proves they have all our chunks.
+            // Move to Verifying so we send our own VRFY to the peer.
+            self.state = ProtocolState::Verifying;
+            return self.state.clone();
+        }
+
         if !matches!(self.state, ProtocolState::Verifying) {
             return self.state.clone();
         }
 
+        // Process the reveal key (either just received, or stashed earlier)
+        self.process_reveal_key(reveal_key)
+    }
+
+    /// Attempt to verify and decrypt peer data using the given reveal key.
+    /// Called from handle_verify and from try_process_stashed_reveal_key.
+    fn process_reveal_key(&mut self, reveal_key: [u8; 32]) -> ProtocolState {
         // Reassemble received chunks into full ciphertext
         let ciphertext = match self.inbound_buffer.as_ref().and_then(|b| b.assemble()) {
             Some(ct) => ct,
@@ -386,6 +421,18 @@ impl MultiStageSession {
         }
 
         self.state.clone()
+    }
+
+    /// If we received the peer's reveal key while still Transferring, it was
+    /// stashed in `peer_reveal_key` without decryption. Once we reach Verifying
+    /// and have displayed our own VRFY, process the stashed key.
+    fn try_process_stashed_reveal_key(&mut self) {
+        if self.received_data.is_some() {
+            return; // Already processed
+        }
+        if let Some(key) = self.peer_reveal_key {
+            self.process_reveal_key(key);
+        }
     }
 
     fn handle_confirm(&mut self, payload_hash: [u8; 32]) -> ProtocolState {
@@ -475,8 +522,23 @@ impl MultiStageSession {
             }
         }
 
-        // All chunks ACK'd, return None (shouldn't normally happen — state should advance)
-        None
+        // All our chunks are ACK'd, but we may still need to send our ACK bitmap
+        // so the peer knows which of their chunks we've received. Resend chunk 0
+        // as a carrier for the updated bitmap.
+        let ack_bytes = self
+            .inbound_bitmap
+            .as_ref()
+            .map(|b| b.to_bytes())
+            .unwrap_or_default();
+
+        let chunk_data = &self.outbound_chunks[0];
+        let qr_data = qr_codec::format_data_qr(&self.session_id, 0, total, &ack_bytes, chunk_data);
+
+        Some(QrPayload {
+            data: qr_data,
+            error_correction: "L".to_string(),
+            display_duration_ms: 500,
+        })
     }
 
     fn update_transfer_state(&mut self) {

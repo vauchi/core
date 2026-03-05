@@ -5,13 +5,13 @@
 //! QR codec for multi-stage exchange protocol.
 //!
 //! Formats and parses QR strings for all 4 displayed stages:
-//! - `INIT:<session_id>:<pubkey>:<ephemeral>:<commitment_hash>:<display_name>`
-//! - `DATA:<session_id>:<chunk_idx>/<total>:<ack_bitmap>:<crc16>:<payload>`
-//! - `VRFY:<session_id>:<reveal_key>`
-//! - `CONF:<session_id>:<payload_hash>`
+//! - `INIT|<session_id>|<pubkey>|<ephemeral>|<commitment_hash>|<display_name>`
+//! - `DATA|<session_id>|<chunk_idx>/<total>|<ack_bitmap>|<crc16>|<payload>`
+//! - `VRFY|<session_id>|<reveal_key>`
+//! - `CONF|<session_id>|<payload_hash>`
 //!
-//! All binary fields are base45-encoded. The colon separator is in the
-//! QR Alphanumeric charset.
+//! All binary fields are base45-encoded. The pipe separator (`|`) is NOT in the
+//! base45 charset, preventing field-splitting ambiguity.
 
 use super::base45;
 use super::crc16;
@@ -59,7 +59,10 @@ pub enum StageQr {
     },
 }
 
-const SEP: char = ':';
+/// Field separator — must NOT be in the base45 charset
+/// `0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ $%*+-./:`
+/// to avoid ambiguity when splitting QR strings.
+const SEP: char = '|';
 
 fn decode_fixed<const N: usize>(encoded: &str) -> Result<[u8; N], QrCodecError> {
     let bytes = base45::decode(encoded)?;

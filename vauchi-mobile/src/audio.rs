@@ -499,4 +499,28 @@ mod tests {
         assert_eq!(config.carrier_frequency + config.frequency_shift, 19500);
         assert_eq!(config.symbol_duration_ms, 20);
     }
+
+    mod proptests {
+        use super::*;
+        use proptest::prelude::*;
+
+        proptest! {
+            /// Any 16-byte challenge must survive encode → FSK generate → FSK decode roundtrip.
+            #[test]
+            fn test_fsk_roundtrip_any_challenge(challenge in prop::array::uniform16(any::<u8>())) {
+                // Encode challenge with length prefix and checksum (same as UltrasonicVerifier::encode_challenge)
+                let checksum: u8 = challenge.iter().fold(0, |acc, &b| acc ^ b);
+                let mut encoded = Vec::with_capacity(18);
+                encoded.push(17u8);
+                encoded.extend_from_slice(&challenge);
+                encoded.push(checksum);
+
+                let config = AudioConfig::default();
+                let samples = PlatformAudioBackend::generate_fsk_samples(&encoded, &config);
+                let decoded = PlatformAudioBackend::decode_fsk_samples(&samples, &config)
+                    .expect("decode must succeed for clean signal");
+                prop_assert_eq!(decoded, encoded, "FSK roundtrip must be lossless");
+            }
+        }
+    }
 }

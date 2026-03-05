@@ -232,3 +232,7 @@ required-features = ["testing"]
 [[test]]
 name = "multistage_session_tests"
 required-features = ["testing"]
+
+[[test]]
+name = "multistage_e2e_tests"
+required-features = ["testing"]

@@ -10,6 +10,7 @@
 use std::collections::HashSet;
 use std::time::{Duration, Instant};
 
+use super::nfc_handshake::NfcHandshakeSession;
 use super::{ExchangeError, ExchangeQR, ProximityConfidence, ProximityVerifier, X3DHKeyPair};
 use crate::contact::Contact;
 use crate::contact_card::ContactCard;
@@ -141,6 +142,8 @@ pub struct ExchangeSession<P: ProximityVerifier> {
     our_audio_challenge: Option<[u8; 16]>,
     /// The display name extracted from the peer's QR code.
     their_display_name: Option<String>,
+    /// NFC handshake session (only populated for NFC transport).
+    nfc_handshake: Option<NfcHandshakeSession>,
 }
 
 impl<P: ProximityVerifier> ExchangeSession<P> {
@@ -166,6 +169,7 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
             their_audio_challenge: None,
             our_audio_challenge: None,
             their_display_name: None,
+            nfc_handshake: None,
         }
     }
 
@@ -191,6 +195,7 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
             their_audio_challenge: None,
             our_audio_challenge: None,
             their_display_name: None,
+            nfc_handshake: None,
         }
     }
 
@@ -201,6 +206,8 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
     /// The session starts in `AwaitingNfcTap` — ready to receive a tap event.
     pub fn new_nfc(identity: Identity, our_card: ContactCard, proximity: P) -> Self {
         let our_x3dh = X3DHKeyPair::generate();
+        let display_name = our_card.display_name().to_string();
+        let nfc_handshake = NfcHandshakeSession::new_initiator(&identity, display_name);
         ExchangeSession {
             state: ExchangeState::AwaitingNfcTap,
             transport: ExchangeTransport::Nfc,
@@ -215,6 +222,7 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
             their_audio_challenge: None,
             our_audio_challenge: None,
             their_display_name: None,
+            nfc_handshake: Some(nfc_handshake),
         }
     }
 
@@ -239,6 +247,7 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
             their_audio_challenge: None,
             our_audio_challenge: None,
             their_display_name: None,
+            nfc_handshake: None,
         }
     }
 
@@ -259,6 +268,16 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
             ExchangeState::PeerScanned { our_qr, .. } => Some(our_qr),
             _ => None,
         }
+    }
+
+    /// Returns the NFC handshake session (only for NFC transport).
+    pub fn nfc_handshake(&self) -> Option<&NfcHandshakeSession> {
+        self.nfc_handshake.as_ref()
+    }
+
+    /// Returns mutable access to the NFC handshake session.
+    pub fn nfc_handshake_mut(&mut self) -> Option<&mut NfcHandshakeSession> {
+        self.nfc_handshake.as_mut()
     }
 
     /// Returns the peer's audio challenge if one has been stored from their QR code.

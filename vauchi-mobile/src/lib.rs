@@ -79,6 +79,14 @@ pub use types::{
 
 uniffi::setup_scaffolding!();
 
+/// Return the Rust core library version (compile-time constant).
+///
+/// Mobile apps log this at startup to detect mismatched builds.
+#[uniffi::export]
+pub fn core_version() -> String {
+    env!("CARGO_PKG_VERSION").to_string()
+}
+
 // === Device Link Wrapper Objects ===
 
 use vauchi_core::exchange::{

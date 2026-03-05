@@ -86,6 +86,10 @@ pub struct MultiStageSession {
 
     // Current outbound chunk index for round-robin display
     current_chunk_idx: u8,
+
+    // Display cycle counter — every Nth cycle, re-show INIT so a slower
+    // peer still in Advertising can discover us.
+    display_cycle: u32,
 }
 
 impl MultiStageSession {
@@ -138,6 +142,7 @@ impl MultiStageSession {
             received_data: None,
             init_qr_cache: None,
             current_chunk_idx: 0,
+            display_cycle: 0,
         }
     }
 
@@ -186,10 +191,31 @@ impl MultiStageSession {
             ProtocolState::Discovered => {
                 // Transient state — should move to Transferring quickly
                 // Return first data chunk if available
+                self.display_cycle += 1;
                 self.get_data_chunk_qr()
             }
-            ProtocolState::Transferring { .. } => self.get_data_chunk_qr(),
+            ProtocolState::Transferring { .. } => {
+                self.display_cycle += 1;
+                // Every 4th cycle, re-show INIT so a slower peer still in
+                // Advertising can discover us (fixes the race condition where
+                // one device transitions to Transferring before the other
+                // scans our INIT).
+                if self.display_cycle % 4 == 0 {
+                    let qr_data = self
+                        .init_qr_cache
+                        .clone()
+                        .unwrap_or_else(|| self.build_init_qr());
+                    Some(QrPayload {
+                        data: qr_data,
+                        error_correction: "M".to_string(),
+                        display_duration_ms: 500,
+                    })
+                } else {
+                    self.get_data_chunk_qr()
+                }
+            }
             ProtocolState::Verifying => {
+                self.display_cycle += 1;
                 let qr_data =
                     qr_codec::format_verify_qr(&self.session_id, self.commitment.reveal_key());
                 let qr = QrPayload {
@@ -204,16 +230,47 @@ impl MultiStageSession {
                 Some(qr)
             }
             ProtocolState::Confirming => {
-                // CONF contains hash of our original plaintext card
-                let card_hash = self.compute_card_hash(&self.local_card);
-                let qr_data = qr_codec::format_confirm_qr(&self.session_id, &card_hash);
-                Some(QrPayload {
-                    data: qr_data,
-                    error_correction: "M".to_string(),
-                    display_duration_ms: 500,
-                })
+                self.display_cycle += 1;
+                // Every 3rd cycle, re-show VRFY so a slower peer still in
+                // Verifying can process our reveal key before seeing CONF.
+                if self.display_cycle % 3 == 0 {
+                    let qr_data =
+                        qr_codec::format_verify_qr(&self.session_id, self.commitment.reveal_key());
+                    Some(QrPayload {
+                        data: qr_data,
+                        error_correction: "M".to_string(),
+                        display_duration_ms: 500,
+                    })
+                } else {
+                    // CONF contains hash of our original plaintext card
+                    let card_hash = self.compute_card_hash(&self.local_card);
+                    let qr_data = qr_codec::format_confirm_qr(&self.session_id, &card_hash);
+                    Some(QrPayload {
+                        data: qr_data,
+                        error_correction: "M".to_string(),
+                        display_duration_ms: 500,
+                    })
+                }
             }
-            ProtocolState::Complete | ProtocolState::Failed(_) => None,
+            ProtocolState::Complete => {
+                // Keep showing CONF for a few more cycles so the slower peer
+                // can scan it and also reach Complete. Without this, the faster
+                // device stops displaying immediately and the peer gets stuck
+                // in Confirming.
+                self.display_cycle += 1;
+                if self.display_cycle < 40 {
+                    let card_hash = self.compute_card_hash(&self.local_card);
+                    let qr_data = qr_codec::format_confirm_qr(&self.session_id, &card_hash);
+                    Some(QrPayload {
+                        data: qr_data,
+                        error_correction: "M".to_string(),
+                        display_duration_ms: 500,
+                    })
+                } else {
+                    None
+                }
+            }
+            ProtocolState::Failed(_) => None,
         }
     }
 

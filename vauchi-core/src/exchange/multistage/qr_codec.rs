@@ -4,14 +4,20 @@
 
 //! QR codec for multi-stage exchange protocol.
 //!
-//! Formats and parses QR strings for all 4 displayed stages:
-//! - `INIT|<session_id>|<pubkey>|<ephemeral>|<commitment_hash>|<display_name>`
-//! - `DATA|<session_id>|<chunk_idx>/<total>|<ack_bitmap>|<crc16>|<payload>`
-//! - `VRFY|<session_id>|<reveal_key>`
-//! - `CONF|<session_id>|<payload_hash>`
+//! Formats and parses QR strings for all 4 displayed stages using
+//! **positional fixed-width** fields (no separator character). This keeps
+//! the entire QR payload in the QR alphanumeric charset, resulting in
+//! smaller/less-dense QR codes that scan more reliably on front cameras.
 //!
-//! All binary fields are base45-encoded. The pipe separator (`|`) is NOT in the
-//! base45 charset, preventing field-splitting ambiguity.
+//! Layout:
+//! - `INIT<sid:24><pk:48><eph:48><ch:48><display_name>`
+//! - `DATA<sid:24><idx:3>/<total:3><ack_len:2><ack:variable><crc:3><payload>`
+//! - `VRFY<sid:24><rk:48>`
+//! - `CONF<sid:24><ph:48>`
+//!
+//! All binary fields are base45-encoded (fixed-width for known-size inputs).
+//! The only non-positional field is `display_name` at the tail of INIT,
+//! and `ack`+`payload` in DATA (variable-length, delimited by `ack_len`).
 
 use super::base45;
 use super::crc16;
@@ -29,6 +35,8 @@ pub enum QrCodecError {
     InvalidFieldLength { expected: usize, got: usize },
     #[error("CRC mismatch: expected {expected:#06x}, got {got:#06x}")]
     CrcMismatch { expected: u16, got: u16 },
+    #[error("QR string too short")]
+    TooShort,
 }
 
 /// Parsed stage QR payload.
@@ -59,10 +67,15 @@ pub enum StageQr {
     },
 }
 
-/// Field separator — must NOT be in the base45 charset
-/// `0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ $%*+-./:`
-/// to avoid ambiguity when splitting QR strings.
-const SEP: char = '|';
+/// Base45-encoded widths for fixed-size binary fields.
+const SID_LEN: usize = 24; // base45(16 bytes) = 8 pairs × 3
+const F32_LEN: usize = 48; // base45(32 bytes) = 16 pairs × 3
+const CRC_LEN: usize = 3; // base45(2 bytes) = 1 pair × 3
+const IDX_LEN: usize = 3; // zero-padded decimal "000"–"255"
+const ACK_LEN_LEN: usize = 2; // zero-padded decimal length of ack field "00"–"99"
+
+/// Stage prefixes (4 chars each).
+const PREFIX_LEN: usize = 4;
 
 fn decode_fixed<const N: usize>(encoded: &str) -> Result<[u8; N], QrCodecError> {
     let bytes = base45::decode(encoded)?;
@@ -77,7 +90,28 @@ fn decode_fixed<const N: usize>(encoded: &str) -> Result<[u8; N], QrCodecError> 
     Ok(arr)
 }
 
-/// Format an INIT stage QR string.
+/// Take `len` chars from `s` at `pos`, advance `pos`.
+fn take<'a>(s: &'a str, pos: &mut usize, len: usize) -> Result<&'a str, QrCodecError> {
+    if *pos + len > s.len() {
+        return Err(QrCodecError::TooShort);
+    }
+    let slice = &s[*pos..*pos + len];
+    *pos += len;
+    Ok(slice)
+}
+
+/// Take remaining chars from `pos` to end.
+fn take_rest(s: &str, pos: usize) -> &str {
+    if pos >= s.len() {
+        ""
+    } else {
+        &s[pos..]
+    }
+}
+
+// ── Formatting ──────────────────────────────────────────────────────────
+
+/// Format an INIT stage QR string (positional, no separators).
 pub fn format_init_qr(
     session_id: &[u8; 16],
     pubkey: &[u8; 32],
@@ -86,8 +120,7 @@ pub fn format_init_qr(
     display_name: &str,
 ) -> String {
     format!(
-        "INIT{sep}{sid}{sep}{pk}{sep}{eph}{sep}{ch}{sep}{name}",
-        sep = SEP,
+        "INIT{sid}{pk}{eph}{ch}{name}",
         sid = base45::encode(session_id),
         pk = base45::encode(pubkey),
         eph = base45::encode(ephemeral),
@@ -97,6 +130,8 @@ pub fn format_init_qr(
 }
 
 /// Format a DATA stage QR string with CRC-16 integrity check.
+///
+/// Layout: `DATA<sid:24><idx:3>/<total:3><ack_len:2><ack:variable><crc:3><payload>`
 pub fn format_data_qr(
     session_id: &[u8; 16],
     chunk_idx: u8,
@@ -105,13 +140,14 @@ pub fn format_data_qr(
     payload: &[u8],
 ) -> String {
     let crc = crc16::compute(payload);
+    let ack_encoded = base45::encode(ack_bitmap);
     format!(
-        "DATA{sep}{sid}{sep}{idx}/{total}{sep}{ack}{sep}{crc}{sep}{data}",
-        sep = SEP,
+        "DATA{sid}{idx:03}/{total:03}{ack_len:02}{ack}{crc}{data}",
         sid = base45::encode(session_id),
         idx = chunk_idx,
         total = chunk_total,
-        ack = base45::encode(ack_bitmap),
+        ack_len = ack_encoded.len(),
+        ack = ack_encoded,
         crc = base45::encode(&crc.to_be_bytes()),
         data = base45::encode(payload),
     )
@@ -120,8 +156,7 @@ pub fn format_data_qr(
 /// Format a VRFY (verify) stage QR string.
 pub fn format_verify_qr(session_id: &[u8; 16], reveal_key: &[u8; 32]) -> String {
     format!(
-        "VRFY{sep}{sid}{sep}{rk}",
-        sep = SEP,
+        "VRFY{sid}{rk}",
         sid = base45::encode(session_id),
         rk = base45::encode(reveal_key),
     )
@@ -130,65 +165,82 @@ pub fn format_verify_qr(session_id: &[u8; 16], reveal_key: &[u8; 32]) -> String 
 /// Format a CONF (confirm) stage QR string.
 pub fn format_confirm_qr(session_id: &[u8; 16], payload_hash: &[u8; 32]) -> String {
     format!(
-        "CONF{sep}{sid}{sep}{ph}",
-        sep = SEP,
+        "CONF{sid}{ph}",
         sid = base45::encode(session_id),
         ph = base45::encode(payload_hash),
     )
 }
 
+// ── Parsing ─────────────────────────────────────────────────────────────
+
 /// Parse a QR string into a [`StageQr`] variant.
 pub fn parse_qr(raw: &str) -> Result<StageQr, QrCodecError> {
-    let prefix_end = raw.find(SEP).ok_or(QrCodecError::UnknownPrefix)?;
-    let prefix = &raw[..prefix_end];
-    let rest = &raw[prefix_end + 1..];
+    if raw.len() < PREFIX_LEN {
+        return Err(QrCodecError::UnknownPrefix);
+    }
+    let prefix = &raw[..PREFIX_LEN];
+    let body = &raw[PREFIX_LEN..];
 
     match prefix {
-        "INIT" => parse_init(rest),
-        "DATA" => parse_data(rest),
-        "VRFY" => parse_verify(rest),
-        "CONF" => parse_confirm(rest),
+        "INIT" => parse_init(body),
+        "DATA" => parse_data(body),
+        "VRFY" => parse_verify(body),
+        "CONF" => parse_confirm(body),
         _ => Err(QrCodecError::UnknownPrefix),
     }
 }
 
-fn parse_init(rest: &str) -> Result<StageQr, QrCodecError> {
-    let parts: Vec<&str> = rest.splitn(5, SEP).collect();
-    if parts.len() != 5 {
-        return Err(QrCodecError::InvalidFieldCount);
-    }
+fn parse_init(body: &str) -> Result<StageQr, QrCodecError> {
+    let mut pos = 0;
+    let sid = take(body, &mut pos, SID_LEN)?;
+    let pk = take(body, &mut pos, F32_LEN)?;
+    let eph = take(body, &mut pos, F32_LEN)?;
+    let ch = take(body, &mut pos, F32_LEN)?;
+    let name = take_rest(body, pos);
+
     Ok(StageQr::Init {
-        session_id: decode_fixed(parts[0])?,
-        pubkey: decode_fixed(parts[1])?,
-        ephemeral: decode_fixed(parts[2])?,
-        commitment_hash: decode_fixed(parts[3])?,
-        display_name: parts[4].to_string(),
+        session_id: decode_fixed(sid)?,
+        pubkey: decode_fixed(pk)?,
+        ephemeral: decode_fixed(eph)?,
+        commitment_hash: decode_fixed(ch)?,
+        display_name: name.to_string(),
     })
 }
 
-fn parse_data(rest: &str) -> Result<StageQr, QrCodecError> {
-    let parts: Vec<&str> = rest.splitn(5, SEP).collect();
-    if parts.len() != 5 {
+fn parse_data(body: &str) -> Result<StageQr, QrCodecError> {
+    let mut pos = 0;
+    let sid = take(body, &mut pos, SID_LEN)?;
+
+    // idx(3) + "/" + total(3)
+    let idx_str = take(body, &mut pos, IDX_LEN)?;
+    let slash = take(body, &mut pos, 1)?;
+    if slash != "/" {
         return Err(QrCodecError::InvalidFieldCount);
     }
-    let session_id: [u8; 16] = decode_fixed(parts[0])?;
+    let total_str = take(body, &mut pos, IDX_LEN)?;
 
-    // Parse "idx/total"
-    let idx_parts: Vec<&str> = parts[1].split('/').collect();
-    if idx_parts.len() != 2 {
-        return Err(QrCodecError::InvalidFieldCount);
-    }
-    let chunk_idx: u8 = idx_parts[0]
+    let chunk_idx: u8 = idx_str
         .parse()
         .map_err(|_| QrCodecError::InvalidFieldCount)?;
-    let chunk_total: u8 = idx_parts[1]
+    let chunk_total: u8 = total_str
         .parse()
         .map_err(|_| QrCodecError::InvalidFieldCount)?;
 
-    let ack_bitmap = base45::decode(parts[2])?;
-    let crc_bytes: [u8; 2] = decode_fixed(parts[3])?;
+    // ack_len(2) + ack(variable)
+    let ack_len_str = take(body, &mut pos, ACK_LEN_LEN)?;
+    let ack_len: usize = ack_len_str
+        .parse()
+        .map_err(|_| QrCodecError::InvalidFieldCount)?;
+    let ack_encoded = take(body, &mut pos, ack_len)?;
+
+    // crc(3) + payload(rest)
+    let crc_encoded = take(body, &mut pos, CRC_LEN)?;
+    let payload_encoded = take_rest(body, pos);
+
+    let ack_bitmap = base45::decode(ack_encoded)?;
+    let crc_bytes: [u8; 2] = decode_fixed(crc_encoded)?;
     let crc = u16::from_be_bytes(crc_bytes);
-    let payload = base45::decode(parts[4])?;
+    let payload = base45::decode(payload_encoded)?;
 
     // Verify CRC
     let computed_crc = crc16::compute(&payload);
@@ -200,7 +252,7 @@ fn parse_data(rest: &str) -> Result<StageQr, QrCodecError> {
     }
 
     Ok(StageQr::Data {
-        session_id,
+        session_id: decode_fixed(sid)?,
         chunk_idx,
         chunk_total,
         ack_bitmap,
@@ -209,24 +261,24 @@ fn parse_data(rest: &str) -> Result<StageQr, QrCodecError> {
     })
 }
 
-fn parse_verify(rest: &str) -> Result<StageQr, QrCodecError> {
-    let parts: Vec<&str> = rest.splitn(2, SEP).collect();
-    if parts.len() != 2 {
-        return Err(QrCodecError::InvalidFieldCount);
-    }
+fn parse_verify(body: &str) -> Result<StageQr, QrCodecError> {
+    let mut pos = 0;
+    let sid = take(body, &mut pos, SID_LEN)?;
+    let rk = take(body, &mut pos, F32_LEN)?;
+
     Ok(StageQr::Verify {
-        session_id: decode_fixed(parts[0])?,
-        reveal_key: decode_fixed(parts[1])?,
+        session_id: decode_fixed(sid)?,
+        reveal_key: decode_fixed(rk)?,
     })
 }
 
-fn parse_confirm(rest: &str) -> Result<StageQr, QrCodecError> {
-    let parts: Vec<&str> = rest.splitn(2, SEP).collect();
-    if parts.len() != 2 {
-        return Err(QrCodecError::InvalidFieldCount);
-    }
+fn parse_confirm(body: &str) -> Result<StageQr, QrCodecError> {
+    let mut pos = 0;
+    let sid = take(body, &mut pos, SID_LEN)?;
+    let ph = take(body, &mut pos, F32_LEN)?;
+
     Ok(StageQr::Confirm {
-        session_id: decode_fixed(parts[0])?,
-        payload_hash: decode_fixed(parts[1])?,
+        session_id: decode_fixed(sid)?,
+        payload_hash: decode_fixed(ph)?,
     })
 }

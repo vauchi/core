@@ -320,7 +320,13 @@ fn test_e2e_no_qr_after_complete() {
     assert_eq!(alice.get_state(), ProtocolState::Complete);
     assert_eq!(bob.get_state(), ProtocolState::Complete);
 
-    // After completion, get_display_qr returns None
+    // After completion, CONF is shown for a grace period so the slower peer
+    // can also reach Complete. Eventually returns None.
+    assert!(alice.get_display_qr().is_some());
+    for _ in 0..50 {
+        alice.get_display_qr();
+        bob.get_display_qr();
+    }
     assert!(alice.get_display_qr().is_none());
     assert!(bob.get_display_qr().is_none());
 }

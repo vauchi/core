@@ -33,24 +33,27 @@ use subtle::ConstantTimeEq;
 pub struct AudioConfig {
     /// Base carrier frequency in Hz (default: 18500 Hz)
     pub carrier_frequency: u32,
-    /// Frequency shift for FSK modulation in Hz (default: 200 Hz)
+    /// Frequency shift for FSK modulation in Hz (default: 1000 Hz)
     pub frequency_shift: u32,
     /// Sample rate in Hz (default: 44100 Hz)
     pub sample_rate: u32,
-    /// Minimum signal-to-noise ratio for detection (default: 10.0 dB)
+    /// Minimum signal-to-noise ratio for detection (default: 15.0 dB)
     pub min_snr_db: f32,
     /// Maximum detection distance in meters (default: 3.0)
     pub max_distance_meters: f32,
+    /// Duration of each FSK symbol in milliseconds (default: 20)
+    pub symbol_duration_ms: u32,
 }
 
 impl Default for AudioConfig {
     fn default() -> Self {
         AudioConfig {
             carrier_frequency: 18500,
-            frequency_shift: 200,
+            frequency_shift: 1000,
             sample_rate: 44100,
-            min_snr_db: 10.0,
+            min_snr_db: 15.0,
             max_distance_meters: 3.0,
+            symbol_duration_ms: 20,
         }
     }
 }
@@ -312,7 +315,11 @@ mod tests {
     fn test_audio_config_defaults() {
         let config = AudioConfig::default();
         assert_eq!(config.carrier_frequency, 18500);
+        assert_eq!(config.frequency_shift, 1000);
         assert_eq!(config.sample_rate, 44100);
+        assert_eq!(config.min_snr_db, 15.0);
+        assert_eq!(config.max_distance_meters, 3.0);
+        assert_eq!(config.symbol_duration_ms, 20);
         assert!(config.carrier_frequency > 18000); // Above human hearing
     }
 

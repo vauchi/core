@@ -13,4 +13,5 @@ pub mod chunker;
 pub mod commitment;
 pub mod crc16;
 pub mod qr_codec;
+pub mod session;
 pub mod types;

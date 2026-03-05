@@ -460,6 +460,44 @@ mod tests {
         assert!(matches!(result, Err(ProximityError::HardwareError(_))));
     }
 
+    #[test]
+    fn test_two_way_verification_as_initiator() {
+        let backend = MockAudioBackend::new();
+        let our_challenge = [1u8; 16];
+        let their_challenge = [2u8; 16];
+        // As initiator: we emit their_challenge, then listen. Mock returns our_challenge encoded.
+        backend.simulate_valid_response(&our_challenge);
+
+        let verifier = UltrasonicVerifier::new(Box::new(backend));
+
+        let result = verifier.verify_proximity_two_way(
+            &their_challenge,
+            &our_challenge,
+            Duration::from_secs(5),
+            true, // is_initiator
+        );
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_two_way_verification_as_responder() {
+        let backend = MockAudioBackend::new();
+        let our_challenge = [1u8; 16];
+        let their_challenge = [2u8; 16];
+        // As responder: we listen first (hear our_challenge), then emit their_challenge
+        backend.simulate_valid_response(&our_challenge);
+
+        let verifier = UltrasonicVerifier::new(Box::new(backend));
+
+        let result = verifier.verify_proximity_two_way(
+            &their_challenge,
+            &our_challenge,
+            Duration::from_secs(5),
+            false, // is_responder
+        );
+        assert!(result.is_ok());
+    }
+
     // AU-7: Property-based test for challenge encoding roundtrip
     mod proptests {
         use super::*;

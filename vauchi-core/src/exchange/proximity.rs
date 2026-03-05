@@ -78,6 +78,38 @@ pub trait ProximityVerifier: Send + Sync {
             Err(ProximityError::InvalidResponse)
         }
     }
+
+    /// Performs two-way proximity verification.
+    ///
+    /// - `emit_challenge`: the challenge to emit (from peer's QR)
+    /// - `listen_challenge`: the challenge to listen for (our challenge, sent via encrypted channel)
+    /// - `is_initiator`: if true, emit first then listen; if false, listen first then emit
+    fn verify_proximity_two_way(
+        &self,
+        emit_challenge: &[u8; 16],
+        listen_challenge: &[u8; 16],
+        timeout: Duration,
+        is_initiator: bool,
+    ) -> Result<(), ProximityError> {
+        if is_initiator {
+            // Emit their challenge, then listen for ours
+            self.emit_challenge(emit_challenge)?;
+            let response = self.listen_for_response(timeout)?;
+            if self.verify_response(listen_challenge, &response) {
+                Ok(())
+            } else {
+                Err(ProximityError::InvalidResponse)
+            }
+        } else {
+            // Listen for ours first, then emit theirs
+            let response = self.listen_for_response(timeout)?;
+            if !self.verify_response(listen_challenge, &response) {
+                return Err(ProximityError::InvalidResponse);
+            }
+            self.emit_challenge(emit_challenge)?;
+            Ok(())
+        }
+    }
 }
 
 /// Mock proximity verifier for testing.

@@ -461,7 +461,7 @@ secret_detection:
 # Overrides .self-hosted SSH clone — tag pipelines need HTTPS checkout
 # since the runner may not have gitlab.com in known_hosts
 release:verify:
-  extends: [.linux-runner, .release-only]
+  extends: [.linux-runner, .release-or-dev]
   stage: build
   needs: []
   interruptible: false
@@ -482,7 +482,7 @@ release:verify:
       fi
 
 build:ios:
-  extends: [.macos-runner, .release-only, .timeout-extended]
+  extends: [.macos-runner, .release-or-dev, .timeout-extended]
   stage: build
   needs: [release:verify]
   script:
@@ -493,7 +493,7 @@ build:ios:
     expire_in: 1 day
 
 build:android:
-  extends: [.linux-runner, .release-only, .timeout-long]
+  extends: [.linux-runner, .release-or-dev, .timeout-long]
   stage: build
   needs: [release:verify]
   before_script:
@@ -521,7 +521,7 @@ build:android:
 
 # Validate generated bindings have all expected types
 build:validate-bindings:
-  extends: [.linux-runner, .release-only]
+  extends: [.linux-runner, .release-or-dev]
   stage: build
   needs:
     - job: build:ios
@@ -537,7 +537,7 @@ build:validate-bindings:
 # ============================================================
 
 package:xcframework:
-  extends: [.macos-runner, .release-only]
+  extends: [.macos-runner, .release-or-dev]
   stage: package
   needs: [build:ios, build:validate-bindings]
   script:
@@ -551,7 +551,7 @@ package:xcframework:
     expire_in: 1 week
 
 package:android:
-  extends: [.linux-runner, .release-only]
+  extends: [.linux-runner, .release-or-dev]
   stage: package
   needs: [build:android, build:validate-bindings]
   script:
@@ -619,9 +619,13 @@ package:sbom:
 # ============================================================
 
 publish:packages:
-  extends: [.linux-runner, .release-only]
+  extends: [.linux-runner, .release-or-dev]
   stage: publish
-  needs: [package:xcframework, package:android, package:sbom]
+  needs:
+    - package:xcframework
+    - package:android
+    - job: package:sbom
+      optional: true
   script:
     - ./scripts/publish-packages.sh "$CI_COMMIT_TAG"
 
@@ -695,7 +699,7 @@ publish:core:
 
 # Publish vauchi-mobile crate to GitLab package registry
 publish:mobile:
-  extends: [.linux-runner, .release-only]
+  extends: [.linux-runner, .release-or-dev]
   stage: publish
   needs: [release:verify]
   interruptible: false
@@ -811,7 +815,10 @@ release:create:
 
 trigger:swift:
   stage: trigger
-  needs: [release:create]
+  needs:
+    - publish:packages
+    - job: release:create
+      optional: true
   interruptible: false
   variables:
     UPSTREAM_VERSION: $CI_COMMIT_TAG
@@ -821,10 +828,14 @@ trigger:swift:
     strategy: depend
   rules:
     - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/
+    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+-dev\.\d+$/
 
 trigger:android:
   stage: trigger
-  needs: [release:create]
+  needs:
+    - publish:packages
+    - job: release:create
+      optional: true
   interruptible: false
   variables:
     UPSTREAM_VERSION: $CI_COMMIT_TAG
@@ -834,6 +845,7 @@ trigger:android:
     strategy: depend
   rules:
     - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/
+    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+-dev\.\d+$/
 
 # ============================================================
 # Downstream Verification (main branch only)

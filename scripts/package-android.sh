@@ -28,12 +28,8 @@ WORKSPACE_ROOT="$(dirname "$PROJECT_ROOT")"
 RAW_VERSION="${1:-$(grep -m1 'version = ' "$PROJECT_ROOT/Cargo.toml" | sed 's/.*"\(.*\)".*/\1/')}"
 VERSION="${RAW_VERSION#v}"
 
-# Guard: reject pre-release versions
-if echo "$VERSION" | grep -qE -- '-(dev|rc)\.'; then
-  echo "ERROR: Pre-release version $VERSION cannot be packaged for distribution"
-  echo "  Only PROD versions (e.g., 0.2.3) can be packaged."
-  exit 1
-fi
+# Note: pre-release versions (dev/rc) are allowed — CI rules control which tags
+# reach this job. Dev tags need packaging for test bindings.
 
 # Paths — read from target/bindings/ (output of build-bindings.sh)
 BINDINGS_DIR="$PROJECT_ROOT/target/bindings"

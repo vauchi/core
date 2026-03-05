@@ -44,13 +44,8 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m'
 
-# Guard: reject pre-release versions
-if echo "$VERSION" | grep -qE -- '-(dev|rc)\.'; then
-  echo -e "${RED}ERROR: Pre-release version $VERSION cannot be published${NC}"
-  echo "  Only PROD versions (e.g., 0.2.3) can be published to the package registry."
-  echo "  Create a PROD tag (v0.2.3) to publish."
-  exit 1
-fi
+# Note: pre-release versions (dev/rc) are allowed — CI rules control which tags
+# reach this job. Dev tags need publishing for test bindings.
 
 echo -e "${YELLOW}╔════════════════════════════════════════╗${NC}"
 echo -e "${YELLOW}║     Publish Packages v$VERSION            ${NC}"

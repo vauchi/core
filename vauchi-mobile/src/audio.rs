@@ -142,6 +142,19 @@ impl PlatformAudioBackend {
                 break;
             }
 
+            let dominant_freq = if power_shift > power_carrier {
+                carrier + shift
+            } else {
+                carrier
+            };
+            let snr = Self::compute_snr_db(chunk, dominant_freq, sample_rate, config);
+            if snr < config.min_snr_db {
+                return Err(ProximityError::HardwareError(format!(
+                    "SNR too low: {:.1} dB < {:.1} dB threshold",
+                    snr, config.min_snr_db
+                )));
+            }
+
             let bit = if power_shift > power_carrier { 1 } else { 0 };
 
             current_byte = (current_byte << 1) | bit;
@@ -179,6 +192,41 @@ impl PlatformAudioBackend {
         }
 
         Err(ProximityError::NoResponse)
+    }
+
+    /// Compute SNR in dB for a target frequency against noise frequencies.
+    fn compute_snr_db(
+        chunk: &[f32],
+        target_freq: f32,
+        sample_rate: f32,
+        config: &AudioConfig,
+    ) -> f32 {
+        let target_power = Self::goertzel(chunk, target_freq, sample_rate);
+        let carrier = config.carrier_frequency as f32;
+        let shift = config.frequency_shift as f32;
+        let noise_freqs = [
+            carrier - 2000.0,
+            carrier - 1000.0,
+            carrier + shift + 1000.0,
+            carrier + shift + 2000.0,
+        ];
+        let valid_noise: Vec<f32> = noise_freqs
+            .iter()
+            .filter(|&&f| f > 0.0 && f < sample_rate / 2.0)
+            .map(|&f| Self::goertzel(chunk, f, sample_rate))
+            .collect();
+        let noise_power = if valid_noise.is_empty() {
+            0.0
+        } else {
+            valid_noise.iter().sum::<f32>() / valid_noise.len() as f32
+        };
+        if noise_power > 0.0 && target_power > 0.0 {
+            20.0 * (target_power / noise_power).log10()
+        } else if target_power > 0.0 {
+            60.0
+        } else {
+            -120.0
+        }
     }
 
     fn goertzel(samples: &[f32], target_freq: f32, sample_rate: f32) -> f32 {
@@ -421,6 +469,27 @@ mod tests {
         let samples = PlatformAudioBackend::generate_fsk_samples(&encoded, &config);
         let decoded = PlatformAudioBackend::decode_fsk_samples(&samples, &config).unwrap();
         assert_eq!(decoded, encoded);
+    }
+
+    #[test]
+    fn test_fsk_decode_enforces_snr() {
+        let config = AudioConfig::default();
+        // A clean generated signal should pass SNR check
+        let challenge = [42u8; 16];
+        let checksum: u8 = challenge.iter().fold(0, |acc, &b| acc ^ b);
+        let mut data = Vec::with_capacity(18);
+        data.push(17u8);
+        data.extend_from_slice(&challenge);
+        data.push(checksum);
+
+        let samples = PlatformAudioBackend::generate_fsk_samples(&data, &config);
+        let decoded = PlatformAudioBackend::decode_fsk_samples(&samples, &config);
+        assert!(
+            decoded.is_ok(),
+            "Clean signal should pass SNR enforcement: {:?}",
+            decoded.err()
+        );
+        assert_eq!(decoded.unwrap(), data);
     }
 
     #[test]

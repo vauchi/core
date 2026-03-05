@@ -74,9 +74,9 @@ impl PlatformAudioBackend {
         let carrier = config.carrier_frequency as f32;
         let shift = config.frequency_shift as f32;
 
-        let samples_per_bit = (sample_rate * 0.01) as usize;
+        let samples_per_bit = (sample_rate * config.symbol_duration_ms as f32 / 1000.0) as usize;
         let preamble_samples = (sample_rate * 0.05) as usize;
-        let preamble_freq = 19000.0;
+        let preamble_freq = carrier + shift / 2.0;
 
         let mut samples = Vec::new();
 
@@ -117,9 +117,9 @@ impl PlatformAudioBackend {
         let sample_rate = config.sample_rate as f32;
         let carrier = config.carrier_frequency as f32;
         let shift = config.frequency_shift as f32;
-        let samples_per_bit = (sample_rate * 0.01) as usize;
+        let samples_per_bit = (sample_rate * config.symbol_duration_ms as f32 / 1000.0) as usize;
 
-        let preamble_start = Self::find_preamble(samples, sample_rate)?;
+        let preamble_start = Self::find_preamble(samples, config)?;
         let data_start = preamble_start + (sample_rate * 0.055) as usize;
 
         if data_start >= samples.len() {
@@ -163,9 +163,10 @@ impl PlatformAudioBackend {
         Ok(data)
     }
 
-    fn find_preamble(samples: &[f32], sample_rate: f32) -> Result<usize, ProximityError> {
-        let preamble_freq = 19000.0;
-        let window_size = (sample_rate * 0.01) as usize;
+    fn find_preamble(samples: &[f32], config: &AudioConfig) -> Result<usize, ProximityError> {
+        let sample_rate = config.sample_rate as f32;
+        let preamble_freq = config.carrier_frequency as f32 + config.frequency_shift as f32 / 2.0;
+        let window_size = (sample_rate * config.symbol_duration_ms as f32 / 1000.0) as usize;
         let threshold = 0.05;
 
         for start in (0..samples.len().saturating_sub(window_size)).step_by(window_size / 2) {
@@ -398,5 +399,35 @@ impl Default for MobileProximityVerifier {
             backend: Mutex::new(None),
             config: AudioConfig::default(),
         }
+    }
+}
+
+// INLINE_TEST_REQUIRED: Tests private FSK generate/decode/find_preamble functions
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_fsk_roundtrip_with_updated_config() {
+        let config = AudioConfig::default();
+        // Manually encode: length prefix (17) + 16 challenge bytes + XOR checksum
+        let challenge = [1u8, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16];
+        let checksum: u8 = challenge.iter().fold(0, |acc, &b| acc ^ b);
+        let mut encoded = Vec::with_capacity(18);
+        encoded.push(17u8);
+        encoded.extend_from_slice(&challenge);
+        encoded.push(checksum);
+
+        let samples = PlatformAudioBackend::generate_fsk_samples(&encoded, &config);
+        let decoded = PlatformAudioBackend::decode_fsk_samples(&samples, &config).unwrap();
+        assert_eq!(decoded, encoded);
+    }
+
+    #[test]
+    fn test_fsk_uses_correct_frequencies() {
+        let config = AudioConfig::default();
+        assert_eq!(config.carrier_frequency, 18500);
+        assert_eq!(config.carrier_frequency + config.frequency_shift, 19500);
+        assert_eq!(config.symbol_duration_ms, 20);
     }
 }

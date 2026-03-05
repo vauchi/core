@@ -137,6 +137,8 @@ pub struct ExchangeSession<P: ProximityVerifier> {
     /// The audio challenge extracted from the peer's QR code.
     /// Used for session-bound proximity verification (AU-3).
     their_audio_challenge: Option<[u8; 16]>,
+    /// Our audio challenge from our QR code (for two-way verification).
+    our_audio_challenge: Option<[u8; 16]>,
 }
 
 impl<P: ProximityVerifier> ExchangeSession<P> {
@@ -160,6 +162,7 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
             interrupted: false,
             used_qrs: HashSet::new(),
             their_audio_challenge: None,
+            our_audio_challenge: None,
         }
     }
 
@@ -183,6 +186,7 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
             interrupted: false,
             used_qrs: HashSet::new(),
             their_audio_challenge: None,
+            our_audio_challenge: None,
         }
     }
 
@@ -205,6 +209,7 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
             interrupted: false,
             used_qrs: HashSet::new(),
             their_audio_challenge: None,
+            our_audio_challenge: None,
         }
     }
 
@@ -227,6 +232,7 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
             interrupted: false,
             used_qrs: HashSet::new(),
             their_audio_challenge: None,
+            our_audio_challenge: None,
         }
     }
 
@@ -338,16 +344,22 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
     pub fn run_proximity_check(&mut self) {
         use super::ProximityError;
 
-        // AU-1: Use the challenge from the peer's QR code for session binding.
-        // Falls back to zeros only if no QR was processed (non-QR transports).
-        let challenge = self.their_audio_challenge.unwrap_or([0u8; 16]);
+        // AU-1: Use challenges from QR codes for session-bound verification.
+        let their_challenge = self.their_audio_challenge.unwrap_or([0u8; 16]);
+        let our_challenge = self.our_audio_challenge.unwrap_or([0u8; 16]);
         let timeout = Duration::from_secs(5);
-        let confidence = match self.proximity.verify_proximity(&challenge, timeout) {
-            // AU-4: Use trait-based confidence level instead of response-length heuristic
+        // Scanner (initiator) emits first; displayer (responder) listens first
+        let is_initiator = self.their_audio_challenge.is_some();
+
+        let confidence = match self.proximity.verify_proximity_two_way(
+            &their_challenge,
+            &our_challenge,
+            timeout,
+            is_initiator,
+        ) {
+            // AU-4: Use trait-based confidence level
             Ok(()) => self.proximity.confidence_level(),
-            // AU-5: Device doesn't support proximity verification — "can't check"
-            // is distinct from "checked and failed". Unknown preserves the absence
-            // of information rather than implying a negative result.
+            // AU-5: Device doesn't support proximity verification
             Err(ProximityError::NotSupported) => ProximityConfidence::Unknown,
             Err(_) => ProximityConfidence::Low,
         };
@@ -454,6 +466,7 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
         }
 
         let our_qr = ExchangeQR::generate(&self.identity, &self.our_x3dh);
+        self.our_audio_challenge = Some(*our_qr.audio_challenge());
         self.state = ExchangeState::DisplayingQr { our_qr };
         Ok(())
     }

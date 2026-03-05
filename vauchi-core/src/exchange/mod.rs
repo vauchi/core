@@ -53,6 +53,11 @@ pub mod nfc_handshake;
 mod nfc_handshake;
 
 #[cfg(feature = "testing")]
+pub mod nfc_rollback;
+#[cfg(not(feature = "testing"))]
+mod nfc_rollback;
+
+#[cfg(feature = "testing")]
 pub mod encrypted_message;
 #[cfg(not(feature = "testing"))]
 mod encrypted_message;
@@ -105,6 +110,7 @@ pub use nfc_apdu_chaining::{
 };
 pub use nfc_card_payload::NfcCardPayload;
 pub use nfc_handshake::{NfcExchangeResult, NfcHandshakeSession, NfcHandshakeState};
+pub use nfc_rollback::{NfcRollback, NoopNfcRollback};
 pub use proximity::{
     ManualConfirmationVerifier, MockProximityVerifier, ProximityConfidence, ProximityError,
     ProximityVerifier,

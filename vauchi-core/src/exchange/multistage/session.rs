@@ -253,19 +253,33 @@ impl MultiStageSession {
                 }
             }
             ProtocolState::Complete => {
-                // Keep showing CONF for a few more cycles so the slower peer
-                // can scan it and also reach Complete. Without this, the faster
-                // device stops displaying immediately and the peer gets stuck
-                // in Confirming.
+                // Keep showing QR codes for a grace period so the slower peer
+                // can catch up from any state. Cycle between VRFY and CONF:
+                // - Peer in Verifying needs our VRFY to advance to Confirming
+                // - Peer in Confirming needs our CONF to advance to Complete
                 self.display_cycle += 1;
-                if self.display_cycle < 40 {
-                    let card_hash = self.compute_card_hash(&self.local_card);
-                    let qr_data = qr_codec::format_confirm_qr(&self.session_id, &card_hash);
-                    Some(QrPayload {
-                        data: qr_data,
-                        error_correction: "M".to_string(),
-                        display_duration_ms: 500,
-                    })
+                if self.display_cycle < 60 {
+                    if self.display_cycle % 3 == 0 {
+                        // Show VRFY for peers still in Verifying
+                        let qr_data = qr_codec::format_verify_qr(
+                            &self.session_id,
+                            self.commitment.reveal_key(),
+                        );
+                        Some(QrPayload {
+                            data: qr_data,
+                            error_correction: "M".to_string(),
+                            display_duration_ms: 500,
+                        })
+                    } else {
+                        // Show CONF for peers in Confirming
+                        let card_hash = self.compute_card_hash(&self.local_card);
+                        let qr_data = qr_codec::format_confirm_qr(&self.session_id, &card_hash);
+                        Some(QrPayload {
+                            data: qr_data,
+                            error_correction: "M".to_string(),
+                            display_duration_ms: 500,
+                        })
+                    }
                 } else {
                     None
                 }

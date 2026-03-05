@@ -200,7 +200,7 @@ impl MultiStageSession {
                 // Advertising can discover us (fixes the race condition where
                 // one device transitions to Transferring before the other
                 // scans our INIT).
-                if self.display_cycle % 4 == 0 {
+                if self.display_cycle.is_multiple_of(4) {
                     let qr_data = self
                         .init_qr_cache
                         .clone()
@@ -233,7 +233,7 @@ impl MultiStageSession {
                 self.display_cycle += 1;
                 // Every 3rd cycle, re-show VRFY so a slower peer still in
                 // Verifying can process our reveal key before seeing CONF.
-                if self.display_cycle % 3 == 0 {
+                if self.display_cycle.is_multiple_of(3) {
                     let qr_data =
                         qr_codec::format_verify_qr(&self.session_id, self.commitment.reveal_key());
                     Some(QrPayload {
@@ -258,8 +258,8 @@ impl MultiStageSession {
                 // - Peer in Verifying needs our VRFY to advance to Confirming
                 // - Peer in Confirming needs our CONF to advance to Complete
                 self.display_cycle += 1;
-                if self.display_cycle < 60 {
-                    if self.display_cycle % 3 == 0 {
+                if self.display_cycle < 20 {
+                    if self.display_cycle.is_multiple_of(3) {
                         // Show VRFY for peers still in Verifying
                         let qr_data = qr_codec::format_verify_qr(
                             &self.session_id,
@@ -524,6 +524,10 @@ impl MultiStageSession {
 
         if payload_hash == expected_hash {
             self.state = ProtocolState::Complete;
+            // Reset display_cycle so the grace period starts from 0.
+            // Without this, display_cycle accumulated during Transferring/
+            // Verifying/Confirming would already exceed the grace limit.
+            self.display_cycle = 0;
         } else {
             self.state = ProtocolState::Failed("confirmation mismatch".to_string());
         }

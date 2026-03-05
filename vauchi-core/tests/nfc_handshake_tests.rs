@@ -2,8 +2,9 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+use proptest::prelude::*;
 use vauchi_core::exchange::{
-    ExchangeError, ExchangeNfc, NfcHandshakeSession, NfcHandshakeState, X3DHKeyPair,
+    ExchangeError, ExchangeNfc, NfcCardPayload, NfcHandshakeSession, NfcHandshakeState, X3DHKeyPair,
 };
 use vauchi_core::identity::Identity;
 
@@ -258,4 +259,52 @@ fn test_exchange_preserves_identity_keys() {
         bob_result.local_card.identity_key,
         *bob_id.signing_public_key()
     );
+}
+
+// ============================================================
+// Property-Based Tests
+// ============================================================
+
+proptest! {
+    #[test]
+    fn prop_handshake_succeeds_with_any_display_names(
+        alice_name in "[a-zA-Z0-9 ]{1,100}",
+        bob_name in "[a-zA-Z0-9 ]{1,100}",
+    ) {
+        let alice_id = make_test_identity();
+        let bob_id = make_test_identity();
+
+        let mut alice = NfcHandshakeSession::new_initiator(&alice_id, alice_name.clone());
+        let mut bob = NfcHandshakeSession::new_responder(&bob_id, bob_name.clone());
+
+        let offer = alice.create_key_offer(&alice_id).unwrap();
+        let (ack, bob_card) = bob.process_key_offer(&bob_id, &offer).unwrap();
+        let alice_card = alice.process_key_ack(&ack, &bob_card).unwrap();
+        let bob_result = bob.process_encrypted_card(&alice_card).unwrap();
+        let alice_result = alice.confirm_send_success().unwrap();
+
+        prop_assert_eq!(&alice_result.remote_card.display_name, &bob_name);
+        prop_assert_eq!(&bob_result.remote_card.display_name, &alice_name);
+        prop_assert!(alice_result.remote_card.verify_crc16());
+        prop_assert!(bob_result.remote_card.verify_crc16());
+    }
+
+    #[test]
+    fn prop_card_payload_roundtrip(
+        name in "[\\w]{0,200}",
+        key_byte in 0u8..=255u8,
+        ex_byte in 0u8..=255u8,
+    ) {
+        let payload = NfcCardPayload::new(
+            [key_byte; 32],
+            name.clone(),
+            [ex_byte; 32],
+        );
+        let bytes = payload.to_bytes().unwrap();
+        let restored = NfcCardPayload::from_bytes(&bytes).unwrap();
+        prop_assert_eq!(restored.identity_key, [key_byte; 32]);
+        prop_assert_eq!(&restored.display_name, &name);
+        prop_assert_eq!(restored.exchange_key, [ex_byte; 32]);
+        prop_assert!(restored.verify_crc16());
+    }
 }

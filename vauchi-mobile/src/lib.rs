@@ -36,6 +36,7 @@ mod mobile_device_link;
 mod mobile_exchange;
 mod mobile_gdpr;
 mod mobile_identity;
+mod mobile_nfc;
 mod mobile_onboarding;
 mod mobile_recovery;
 mod mobile_security;
@@ -58,6 +59,10 @@ pub use content::{
 pub use error::{KeychainError, MobileError};
 pub use exchange::{
     MobileBleExchangeStatus, MobileExchangeSession, MobileExchangeState, MobileProximityHandler,
+};
+pub use mobile_nfc::{
+    MobileNfcExchangeResult, MobileNfcHandshake, MobileNfcKeyAckResult, MobileNfcState,
+    MobileNfcTransport, MobileNfcTransportError,
 };
 pub use multipart_qr::{encode_multipart, MobileMultipartDecoder, MultipartDecoder};
 pub use types::{

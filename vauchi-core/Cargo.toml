@@ -230,7 +230,35 @@ name = "proximity_confidence_tests"
 required-features = ["testing"]
 
 [[test]]
+name = "multistage_base45_tests"
+required-features = ["testing"]
+
+[[test]]
+name = "multistage_crc16_tests"
+required-features = ["testing"]
+
+[[test]]
+name = "multistage_types_tests"
+required-features = ["testing"]
+
+[[test]]
+name = "multistage_qr_codec_tests"
+required-features = ["testing"]
+
+[[test]]
+name = "multistage_chunker_tests"
+required-features = ["testing"]
+
+[[test]]
+name = "multistage_commitment_tests"
+required-features = ["testing"]
+
+[[test]]
 name = "multistage_session_tests"
+required-features = ["testing"]
+
+[[test]]
+name = "multistage_proptest"
 required-features = ["testing"]
 
 [[test]]

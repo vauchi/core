@@ -72,6 +72,7 @@ impl Commitment {
     }
 
     /// Decrypt using the held reveal key.
+    #[allow(dead_code)]
     pub fn open(&self) -> Result<Vec<u8>, CommitmentError> {
         Self::open_with_key(&self.reveal_key, &self.ciphertext)
     }

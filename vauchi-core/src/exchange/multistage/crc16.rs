@@ -25,6 +25,7 @@ pub fn compute(data: &[u8]) -> u16 {
 }
 
 /// Verify that data matches expected CRC16.
+#[allow(dead_code)]
 pub fn verify(data: &[u8], expected: u16) -> bool {
     compute(data) == expected
 }

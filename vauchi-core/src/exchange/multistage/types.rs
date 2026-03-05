@@ -21,8 +21,9 @@ pub struct QrPayload {
 }
 
 /// Protocol state machine states.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub enum ProtocolState {
+    #[default]
     Idle,
     Advertising,
     Discovered,
@@ -38,12 +39,6 @@ pub enum ProtocolState {
     Failed(String),
 }
 
-impl Default for ProtocolState {
-    fn default() -> Self {
-        ProtocolState::Idle
-    }
-}
-
 /// Bitmap tracking which chunks have been received.
 #[derive(Debug, Clone)]
 pub struct ChunkBitmap {
@@ -53,13 +48,14 @@ pub struct ChunkBitmap {
 
 impl ChunkBitmap {
     pub fn new(total: u8) -> Self {
-        let byte_count = ((total as usize) + 7) / 8;
+        let byte_count = (total as usize).div_ceil(8);
         ChunkBitmap {
             bits: vec![0u8; byte_count],
             total,
         }
     }
 
+    #[allow(dead_code)]
     pub fn total(&self) -> u8 {
         self.total
     }
@@ -86,6 +82,7 @@ impl ChunkBitmap {
     }
 
     /// Next un-received chunk index, or `None` if all received.
+    #[allow(dead_code)]
     pub fn next_missing(&self) -> Option<u8> {
         (0..self.total).find(|&i| !self.has(i))
     }
@@ -95,7 +92,7 @@ impl ChunkBitmap {
     }
 
     pub fn from_bytes(bytes: &[u8], total: u8) -> Self {
-        let byte_count = ((total as usize) + 7) / 8;
+        let byte_count = (total as usize).div_ceil(8);
         let mut bits = vec![0u8; byte_count];
         let copy_len = bits.len().min(bytes.len());
         bits[..copy_len].copy_from_slice(&bytes[..copy_len]);

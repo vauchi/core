@@ -25,7 +25,7 @@ impl<'a> Chunker<'a> {
         if self.data.is_empty() {
             return 1;
         }
-        ((self.data.len() + self.chunk_size - 1) / self.chunk_size) as u8
+        self.data.len().div_ceil(self.chunk_size) as u8
     }
 
     pub fn chunk(&self, index: u8) -> Option<&[u8]> {
@@ -61,6 +61,7 @@ impl ReassemblyBuffer {
         }
     }
 
+    #[allow(dead_code)]
     pub fn has(&self, index: u8) -> bool {
         index < self.total && self.chunks[index as usize].is_some()
     }

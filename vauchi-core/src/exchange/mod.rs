@@ -95,3 +95,7 @@ pub use session::{
     ExchangeSession, ExchangeState, ExchangeTransport,
 };
 pub use x3dh::{X3DHKeyPair, X3DH};
+
+// Multi-stage exchange re-exports
+pub use multistage::session::MultiStageSession;
+pub use multistage::types::{ProtocolState, QrPayload};

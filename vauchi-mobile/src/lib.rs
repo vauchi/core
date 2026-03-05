@@ -42,6 +42,7 @@ mod mobile_security;
 mod mobile_tor;
 mod mobile_visibility;
 mod multipart_qr;
+mod multistage_exchange;
 mod protocol;
 mod sync;
 mod types;

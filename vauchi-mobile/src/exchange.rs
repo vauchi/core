@@ -193,6 +193,13 @@ impl SessionInner {
             SessionInner::Manual(s) => s.qr(),
         }
     }
+
+    fn their_display_name(&self) -> Option<String> {
+        match self {
+            SessionInner::Proximity(s) => s.their_display_name().map(String::from),
+            SessionInner::Manual(s) => s.their_display_name().map(String::from),
+        }
+    }
 }
 
 /// Mobile exchange session wrapping the core `ExchangeSession` state machine.
@@ -332,6 +339,13 @@ impl MobileExchangeSession {
     /// Check if the session has timed out.
     pub fn is_timed_out(&self) -> bool {
         self.inner.lock().unwrap().is_timed_out()
+    }
+
+    /// Returns the peer's display name extracted from their QR code.
+    ///
+    /// Available after `process_qr()` has been called successfully.
+    pub fn peer_display_name(&self) -> Option<String> {
+        self.inner.lock().unwrap().their_display_name()
     }
 }
 

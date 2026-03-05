@@ -5,19 +5,14 @@
 //! Contact exchange operations for mobile.
 
 use std::sync::Arc;
-use std::time::Duration;
-
-use futures_util::SinkExt;
-use tokio_tungstenite::tungstenite::Message;
 
 use vauchi_core::crypto::ratchet::DoubleRatchetState;
-use vauchi_core::exchange::EncryptedExchangeMessage;
 
 use super::error::MobileError;
 use super::exchange::MobileExchangeSession;
 use super::exchange::MobileProximityHandler;
 use super::types::MobileExchangeResult;
-use super::{cert_pinning, protocol, VauchiMobile};
+use super::VauchiMobile;
 
 #[uniffi::export]
 impl VauchiMobile {
@@ -50,7 +45,8 @@ impl VauchiMobile {
     /// Finalize a completed exchange session.
     ///
     /// Extracts the contact from the session's Complete state, saves it to storage,
-    /// initializes the double ratchet, and sends the encrypted exchange message via relay.
+    /// and initializes the double ratchet. No relay notification is sent — face-to-face
+    /// exchange completes locally on both devices.
     ///
     /// The session must be in the Complete state (i.e., the state machine has been
     /// driven through all steps).
@@ -59,7 +55,6 @@ impl VauchiMobile {
         session: &MobileExchangeSession,
     ) -> Result<MobileExchangeResult, MobileError> {
         let contact = session.extract_contact()?;
-        let identity = self.get_identity()?;
         let storage = self.open_storage()?;
 
         let contact_id = contact.id().to_string();
@@ -80,65 +75,6 @@ impl VauchiMobile {
         let their_exchange_key = *contact.public_key();
         let ratchet = DoubleRatchetState::initialize_initiator(&shared_key, their_exchange_key);
         storage.save_ratchet_state(&contact_id, &ratchet, true)?;
-
-        // Send encrypted exchange message via relay (async, uses block_on)
-        {
-            let our_x3dh = identity.x3dh_keypair();
-            let (encrypted_msg, _) = EncryptedExchangeMessage::create(
-                &our_x3dh,
-                &their_exchange_key,
-                identity.signing_public_key(),
-                identity.display_name(),
-            )
-            .map_err(|e| MobileError::ExchangeFailed(format!("Key agreement failed: {:?}", e)))?;
-
-            let our_id = identity.public_id();
-            let pinned_cert = self.get_pinned_cert();
-            let relay_url = self.relay_url.clone();
-
-            let update = protocol::EncryptedUpdate {
-                recipient_id: contact_id.clone(),
-                sender_id: our_id,
-                ciphertext: encrypted_msg.to_bytes(),
-            };
-
-            let envelope =
-                protocol::create_envelope(protocol::MessagePayload::EncryptedUpdate(update));
-            let data = protocol::encode_message(&envelope).map_err(MobileError::SyncFailed)?;
-
-            let rt = tokio::runtime::Builder::new_current_thread()
-                .enable_all()
-                .build()
-                .map_err(|e| MobileError::Internal(format!("Runtime error: {}", e)))?;
-
-            rt.block_on(async {
-                let mut socket =
-                    cert_pinning::connect_with_pinning(&relay_url, pinned_cert.as_deref())
-                        .await
-                        .map_err(MobileError::NetworkError)?;
-
-                let handshake =
-                    vauchi_core::network::simple_message::create_signed_handshake(&identity, None);
-                let hs_envelope =
-                    protocol::create_envelope(protocol::MessagePayload::Handshake(handshake));
-                let hs_data = protocol::encode_message(&hs_envelope)
-                    .map_err(|e| MobileError::SyncFailed(format!("Encode error: {}", e)))?;
-                socket
-                    .send(Message::Binary(hs_data))
-                    .await
-                    .map_err(|e| MobileError::NetworkError(e.to_string()))?;
-
-                socket
-                    .send(Message::Binary(data))
-                    .await
-                    .map_err(|e| MobileError::NetworkError(e.to_string()))?;
-
-                tokio::time::sleep(Duration::from_millis(100)).await;
-                let _ = socket.close(None).await;
-
-                Ok::<(), MobileError>(())
-            })?;
-        }
 
         Ok(MobileExchangeResult {
             contact_id,

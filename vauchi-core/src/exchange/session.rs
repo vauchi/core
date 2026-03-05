@@ -139,6 +139,8 @@ pub struct ExchangeSession<P: ProximityVerifier> {
     their_audio_challenge: Option<[u8; 16]>,
     /// Our audio challenge from our QR code (for two-way verification).
     our_audio_challenge: Option<[u8; 16]>,
+    /// The display name extracted from the peer's QR code.
+    their_display_name: Option<String>,
 }
 
 impl<P: ProximityVerifier> ExchangeSession<P> {
@@ -163,6 +165,7 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
             used_qrs: HashSet::new(),
             their_audio_challenge: None,
             our_audio_challenge: None,
+            their_display_name: None,
         }
     }
 
@@ -187,6 +190,7 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
             used_qrs: HashSet::new(),
             their_audio_challenge: None,
             our_audio_challenge: None,
+            their_display_name: None,
         }
     }
 
@@ -210,6 +214,7 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
             used_qrs: HashSet::new(),
             their_audio_challenge: None,
             our_audio_challenge: None,
+            their_display_name: None,
         }
     }
 
@@ -233,6 +238,7 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
             used_qrs: HashSet::new(),
             their_audio_challenge: None,
             our_audio_challenge: None,
+            their_display_name: None,
         }
     }
 
@@ -258,6 +264,11 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
     /// Returns the peer's audio challenge if one has been stored from their QR code.
     pub fn their_audio_challenge(&self) -> Option<&[u8; 16]> {
         self.their_audio_challenge.as_ref()
+    }
+
+    /// Returns the peer's display name if one has been extracted from their QR code.
+    pub fn their_display_name(&self) -> Option<&str> {
+        self.their_display_name.as_deref()
     }
 
     /// Returns a reference to the proximity verifier (test-only).
@@ -505,6 +516,8 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
 
         // AU-3: Store their audio challenge for session-bound proximity verification
         self.their_audio_challenge = Some(*qr.audio_challenge());
+        // Store their display name from the QR code
+        self.their_display_name = Some(qr.display_name().to_string());
 
         self.state = ExchangeState::PeerScanned {
             our_qr,

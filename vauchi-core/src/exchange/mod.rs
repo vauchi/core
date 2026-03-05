@@ -48,6 +48,11 @@ pub mod nfc_card_payload;
 mod nfc_card_payload;
 
 #[cfg(feature = "testing")]
+pub mod nfc_handshake;
+#[cfg(not(feature = "testing"))]
+mod nfc_handshake;
+
+#[cfg(feature = "testing")]
 pub mod encrypted_message;
 #[cfg(not(feature = "testing"))]
 mod encrypted_message;
@@ -99,6 +104,7 @@ pub use nfc_apdu_chaining::{
     extract_data, is_chained, reassemble_chain, split_into_chain, MAX_APDU_DATA,
 };
 pub use nfc_card_payload::NfcCardPayload;
+pub use nfc_handshake::{NfcExchangeResult, NfcHandshakeSession, NfcHandshakeState};
 pub use proximity::{
     ManualConfirmationVerifier, MockProximityVerifier, ProximityConfidence, ProximityError,
     ProximityVerifier,

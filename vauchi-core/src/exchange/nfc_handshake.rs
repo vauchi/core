@@ -1,0 +1,405 @@
+// SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+//
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+//! NFC Handshake Session
+//!
+//! Three-phase state machine for bidirectional encrypted NFC exchange.
+//! Manages ephemeral key generation, X3DH symmetric key agreement,
+//! encryption/decryption of card payloads, CRC16 validation, and
+//! idempotency caching.
+//!
+//! ## Protocol
+//!
+//! Phase 1 (Initiator → Responder): Key offer (ExchangeNfc payload)
+//! Phase 2 (Responder → Initiator): Key ack + encrypted card
+//! Phase 3 (Initiator → Responder): Encrypted card response
+
+use std::collections::HashMap;
+
+use super::error::ExchangeError;
+use super::nfc_active::ExchangeNfc;
+use super::nfc_card_payload::NfcCardPayload;
+use super::x3dh::X3DHKeyPair;
+use crate::crypto::encryption::{self, SymmetricKey};
+use crate::crypto::kdf::HKDF;
+use crate::identity::Identity;
+
+/// HKDF info prefix for NFC handshake key derivation.
+const NFC_HANDSHAKE_INFO: &[u8] = b"vauchi-nfc-handshake-v1";
+
+/// State of an NFC handshake session.
+#[derive(Debug)]
+pub enum NfcHandshakeState {
+    /// Session created, no action taken yet.
+    Idle,
+    /// Initiator has sent key offer, awaiting responder's key ack + encrypted card.
+    KeyOfferSent { exchange_id: [u8; 32] },
+    /// Responder has received key offer, derived shared key, sent ack + encrypted card.
+    KeyAckReceived { exchange_id: [u8; 32] },
+    /// Initiator has sent encrypted card response (final phase).
+    PayloadSent { exchange_id: [u8; 32] },
+    /// Exchange completed successfully.
+    Complete {
+        local_card: NfcCardPayload,
+        remote_card: NfcCardPayload,
+    },
+    /// Exchange failed.
+    Failed { reason: ExchangeError },
+    /// Tap dropped after key exchange — fall back to relay.
+    RelayFallback { exchange_id: [u8; 32] },
+}
+
+/// Result of a completed NFC exchange.
+#[derive(Debug, Clone)]
+pub struct NfcExchangeResult {
+    pub local_card: NfcCardPayload,
+    pub remote_card: NfcCardPayload,
+    pub shared_key: SymmetricKey,
+}
+
+/// Manages the three-phase NFC encrypted handshake.
+pub struct NfcHandshakeSession {
+    state: NfcHandshakeState,
+    our_x3dh: X3DHKeyPair,
+    our_display_name: String,
+    our_identity_key: [u8; 32],
+    shared_key: Option<SymmetricKey>,
+    their_card: Option<NfcCardPayload>,
+    completed_cache: HashMap<[u8; 32], NfcExchangeResult>,
+}
+
+impl NfcHandshakeSession {
+    /// Creates a new initiator session (reader side).
+    pub fn new_initiator(identity: &Identity, display_name: String) -> Self {
+        Self {
+            state: NfcHandshakeState::Idle,
+            our_x3dh: X3DHKeyPair::generate(),
+            our_display_name: display_name,
+            our_identity_key: *identity.signing_public_key(),
+            shared_key: None,
+            their_card: None,
+            completed_cache: HashMap::new(),
+        }
+    }
+
+    /// Creates a new responder session (HCE side).
+    pub fn new_responder(identity: &Identity, display_name: String) -> Self {
+        Self::new_initiator(identity, display_name)
+    }
+
+    /// Returns the current state.
+    pub fn state(&self) -> &NfcHandshakeState {
+        &self.state
+    }
+
+    /// Returns our X3DH public key for relay fallback message creation.
+    pub fn our_exchange_key(&self) -> &[u8; 32] {
+        self.our_x3dh.public_key()
+    }
+
+    /// Returns our identity key.
+    pub fn our_identity_key(&self) -> &[u8; 32] {
+        &self.our_identity_key
+    }
+
+    /// Phase 1 (Initiator): Create key offer payload.
+    ///
+    /// Generates a fresh ExchangeNfc payload containing our ephemeral X25519
+    /// public key and identity key.
+    pub fn create_key_offer(&mut self, identity: &Identity) -> Result<Vec<u8>, ExchangeError> {
+        if !matches!(self.state, NfcHandshakeState::Idle) {
+            return Err(ExchangeError::InvalidState(
+                "Expected Idle state for key offer".into(),
+            ));
+        }
+
+        let nfc_payload = ExchangeNfc::generate(identity, &self.our_x3dh);
+        let exchange_id = *nfc_payload.token();
+        let bytes = nfc_payload.to_bytes();
+
+        self.state = NfcHandshakeState::KeyOfferSent { exchange_id };
+        Ok(bytes.to_vec())
+    }
+
+    /// Phase 2 (Responder): Process key offer, return key ack + encrypted card.
+    ///
+    /// Receives the initiator's ExchangeNfc payload, derives the shared key
+    /// via symmetric DH + HKDF, encrypts our card payload.
+    /// Returns (our ExchangeNfc bytes, encrypted card bytes).
+    pub fn process_key_offer(
+        &mut self,
+        identity: &Identity,
+        their_offer_bytes: &[u8],
+    ) -> Result<(Vec<u8>, Vec<u8>), ExchangeError> {
+        if !matches!(self.state, NfcHandshakeState::Idle) {
+            return Err(ExchangeError::InvalidState(
+                "Expected Idle state for processing key offer".into(),
+            ));
+        }
+
+        let their_nfc = ExchangeNfc::from_bytes(their_offer_bytes)?;
+        if their_nfc.is_expired() {
+            return Err(ExchangeError::NfcExpired);
+        }
+        if !their_nfc.verify_signature() {
+            return Err(ExchangeError::InvalidSignature);
+        }
+
+        let exchange_id = *their_nfc.token();
+
+        // Check idempotency cache
+        if self.completed_cache.contains_key(&exchange_id) {
+            return Err(ExchangeError::InvalidState(
+                "Exchange already processed".into(),
+            ));
+        }
+
+        // Symmetric DH: our_ephemeral x their_ephemeral
+        let shared_key =
+            derive_symmetric_key(&self.our_x3dh, their_nfc.exchange_key(), &exchange_id);
+
+        // Create our NFC payload (key ack)
+        let our_nfc = ExchangeNfc::generate(identity, &self.our_x3dh);
+        let our_nfc_bytes = our_nfc.to_bytes().to_vec();
+
+        // Encrypt our card
+        let encrypted = encrypt_card(
+            &shared_key,
+            &self.our_identity_key,
+            &self.our_display_name,
+            self.our_x3dh.public_key(),
+        )?;
+
+        self.shared_key = Some(shared_key);
+        self.state = NfcHandshakeState::KeyAckReceived { exchange_id };
+
+        Ok((our_nfc_bytes, encrypted))
+    }
+
+    /// Phase 2 (Initiator): Process key ack + encrypted card from responder.
+    ///
+    /// Derives the shared key, decrypts and validates the responder's card.
+    /// Returns our encrypted card for Phase 3.
+    pub fn process_key_ack(
+        &mut self,
+        their_ack_bytes: &[u8],
+        their_encrypted_card: &[u8],
+    ) -> Result<Vec<u8>, ExchangeError> {
+        let exchange_id = match &self.state {
+            NfcHandshakeState::KeyOfferSent { exchange_id } => *exchange_id,
+            _ => {
+                return Err(ExchangeError::InvalidState(
+                    "Expected KeyOfferSent state".into(),
+                ))
+            }
+        };
+
+        let their_nfc = ExchangeNfc::from_bytes(their_ack_bytes)?;
+        if their_nfc.is_expired() {
+            return Err(ExchangeError::NfcExpired);
+        }
+        if !their_nfc.verify_signature() {
+            return Err(ExchangeError::InvalidSignature);
+        }
+
+        // Symmetric DH: our_ephemeral x their_ephemeral
+        let shared_key =
+            derive_symmetric_key(&self.our_x3dh, their_nfc.exchange_key(), &exchange_id);
+
+        // Decrypt their card
+        let their_card = decrypt_and_validate_card(&shared_key, their_encrypted_card)?;
+
+        // Encrypt our card with same key, fresh nonce
+        let encrypted = encrypt_card(
+            &shared_key,
+            &self.our_identity_key,
+            &self.our_display_name,
+            self.our_x3dh.public_key(),
+        )?;
+
+        self.shared_key = Some(shared_key);
+        self.their_card = Some(their_card);
+        self.state = NfcHandshakeState::PayloadSent { exchange_id };
+
+        Ok(encrypted)
+    }
+
+    /// Phase 3 (Responder): Process encrypted card from initiator.
+    ///
+    /// Decrypts the initiator's card, validates CRC16, and completes the exchange.
+    pub fn process_encrypted_card(
+        &mut self,
+        their_encrypted_card: &[u8],
+    ) -> Result<NfcExchangeResult, ExchangeError> {
+        let exchange_id = match &self.state {
+            NfcHandshakeState::KeyAckReceived { exchange_id } => *exchange_id,
+            _ => {
+                return Err(ExchangeError::InvalidState(
+                    "Expected KeyAckReceived state".into(),
+                ))
+            }
+        };
+
+        let shared_key = self
+            .shared_key
+            .as_ref()
+            .ok_or_else(|| ExchangeError::InvalidState("No shared key".into()))?;
+
+        let their_card = decrypt_and_validate_card(shared_key, their_encrypted_card)?;
+
+        let our_card = NfcCardPayload::new(
+            self.our_identity_key,
+            self.our_display_name.clone(),
+            *self.our_x3dh.public_key(),
+        );
+
+        let result = NfcExchangeResult {
+            local_card: our_card,
+            remote_card: their_card,
+            shared_key: shared_key.clone(),
+        };
+
+        self.completed_cache.insert(exchange_id, result.clone());
+        self.state = NfcHandshakeState::Complete {
+            local_card: result.local_card.clone(),
+            remote_card: result.remote_card.clone(),
+        };
+
+        Ok(result)
+    }
+
+    /// Marks the session as complete for the initiator after Phase 3 send is confirmed.
+    pub fn confirm_send_success(&mut self) -> Result<NfcExchangeResult, ExchangeError> {
+        let exchange_id = match &self.state {
+            NfcHandshakeState::PayloadSent { exchange_id } => *exchange_id,
+            _ => {
+                return Err(ExchangeError::InvalidState(
+                    "Expected PayloadSent state".into(),
+                ))
+            }
+        };
+
+        let their_card = self
+            .their_card
+            .take()
+            .ok_or_else(|| ExchangeError::InvalidState("No peer card".into()))?;
+        let shared_key = self
+            .shared_key
+            .as_ref()
+            .ok_or_else(|| ExchangeError::InvalidState("No shared key".into()))?;
+
+        let our_card = NfcCardPayload::new(
+            self.our_identity_key,
+            self.our_display_name.clone(),
+            *self.our_x3dh.public_key(),
+        );
+
+        let result = NfcExchangeResult {
+            local_card: our_card,
+            remote_card: their_card,
+            shared_key: shared_key.clone(),
+        };
+
+        self.completed_cache.insert(exchange_id, result.clone());
+        self.state = NfcHandshakeState::Complete {
+            local_card: result.local_card.clone(),
+            remote_card: result.remote_card.clone(),
+        };
+
+        Ok(result)
+    }
+
+    /// Transitions to relay fallback state.
+    ///
+    /// Called when the tap drops after key exchange but before card exchange.
+    pub fn enter_relay_fallback(&mut self) -> Result<([u8; 32], SymmetricKey), ExchangeError> {
+        let exchange_id = match &self.state {
+            NfcHandshakeState::KeyOfferSent { exchange_id }
+            | NfcHandshakeState::KeyAckReceived { exchange_id }
+            | NfcHandshakeState::PayloadSent { exchange_id } => *exchange_id,
+            _ => {
+                return Err(ExchangeError::InvalidState(
+                    "Cannot enter relay fallback from current state".into(),
+                ))
+            }
+        };
+
+        let shared_key = self
+            .shared_key
+            .as_ref()
+            .ok_or_else(|| ExchangeError::InvalidState("No shared key for relay fallback".into()))?
+            .clone();
+
+        self.state = NfcHandshakeState::RelayFallback { exchange_id };
+
+        Ok((exchange_id, shared_key))
+    }
+}
+
+impl Drop for NfcHandshakeSession {
+    fn drop(&mut self) {
+        // SymmetricKey has ZeroizeOnDrop; clear our Option explicitly
+        self.shared_key = None;
+    }
+}
+
+/// Derives a symmetric key from DH shared secret + HKDF with sorted public keys.
+fn derive_symmetric_key(
+    our_keys: &X3DHKeyPair,
+    their_pub: &[u8; 32],
+    exchange_id: &[u8; 32],
+) -> SymmetricKey {
+    let dh_secret = our_keys.diffie_hellman(their_pub);
+
+    let our_pub = our_keys.public_key();
+    let info = build_hkdf_info(our_pub, their_pub, exchange_id);
+    let derived = HKDF::derive_key(None, &dh_secret, &info);
+    SymmetricKey::from_bytes(*derived)
+}
+
+/// Builds HKDF info string with sorted keys for symmetric derivation.
+fn build_hkdf_info(our_pub: &[u8; 32], their_pub: &[u8; 32], exchange_id: &[u8; 32]) -> Vec<u8> {
+    let mut info = NFC_HANDSHAKE_INFO.to_vec();
+    // Sort keys lexicographically so both sides derive the same key
+    if our_pub <= their_pub {
+        info.extend_from_slice(our_pub);
+        info.extend_from_slice(their_pub);
+    } else {
+        info.extend_from_slice(their_pub);
+        info.extend_from_slice(our_pub);
+    }
+    info.extend_from_slice(exchange_id);
+    info
+}
+
+/// Encrypts a card payload with the shared key.
+fn encrypt_card(
+    key: &SymmetricKey,
+    identity_key: &[u8; 32],
+    display_name: &str,
+    exchange_key: &[u8; 32],
+) -> Result<Vec<u8>, ExchangeError> {
+    let payload = NfcCardPayload::new(*identity_key, display_name.to_string(), *exchange_key);
+    let plaintext = payload
+        .to_bytes()
+        .map_err(|_| ExchangeError::SerializationFailed)?;
+    encryption::encrypt(key, &plaintext).map_err(|_| ExchangeError::CryptoError)
+}
+
+/// Decrypts and validates a card payload.
+fn decrypt_and_validate_card(
+    key: &SymmetricKey,
+    ciphertext: &[u8],
+) -> Result<NfcCardPayload, ExchangeError> {
+    let plaintext =
+        encryption::decrypt(key, ciphertext).map_err(|_| ExchangeError::NfcDecryptionFailed)?;
+    let card =
+        NfcCardPayload::from_bytes(&plaintext).map_err(|_| ExchangeError::SerializationFailed)?;
+
+    if !card.verify_crc16() {
+        return Err(ExchangeError::NfcCrcMismatch);
+    }
+
+    Ok(card)
+}

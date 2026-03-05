@@ -66,6 +66,9 @@ pub fn decode(data: &str) -> Result<Vec<u8>, Base45Error> {
             let b = char_to_val(chunk[1])?;
             let c = char_to_val(chunk[2])?;
             let n = a + b * 45 + c * 45 * 45;
+            if n > 65535 {
+                return Err(Base45Error::Overflow);
+            }
             result.push((n >> 8) as u8);
             result.push((n & 0xFF) as u8);
         } else if chunk.len() == 2 {

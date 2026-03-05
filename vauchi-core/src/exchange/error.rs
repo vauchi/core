@@ -100,6 +100,15 @@ pub enum ExchangeError {
     #[error("NFC not supported on this device")]
     NfcNotSupported,
 
+    #[error("NFC APDU chain reassembly failed")]
+    NfcChainReassemblyFailed,
+
+    #[error("NFC decryption failed: authentication tag verification failure")]
+    NfcDecryptionFailed,
+
+    #[error("NFC CRC16 mismatch after decryption")]
+    NfcCrcMismatch,
+
     // BLE errors
     #[error("Invalid BLE payload format")]
     InvalidBleFormat,

@@ -38,6 +38,16 @@ pub mod nfc_active;
 mod nfc_active;
 
 #[cfg(feature = "testing")]
+pub mod nfc_apdu_chaining;
+#[cfg(not(feature = "testing"))]
+mod nfc_apdu_chaining;
+
+#[cfg(feature = "testing")]
+pub mod nfc_card_payload;
+#[cfg(not(feature = "testing"))]
+mod nfc_card_payload;
+
+#[cfg(feature = "testing")]
 pub mod encrypted_message;
 #[cfg(not(feature = "testing"))]
 mod encrypted_message;
@@ -85,6 +95,10 @@ pub use encrypted_message::{DecryptedExchangePayload, EncryptedExchangeMessage};
 pub use error::ExchangeError;
 pub use nfc_active::apdu as nfc_apdu;
 pub use nfc_active::{ExchangeNfc, NFC_PAYLOAD_SIZE};
+pub use nfc_apdu_chaining::{
+    extract_data, is_chained, reassemble_chain, split_into_chain, MAX_APDU_DATA,
+};
+pub use nfc_card_payload::NfcCardPayload;
 pub use proximity::{
     ManualConfirmationVerifier, MockProximityVerifier, ProximityConfidence, ProximityError,
     ProximityVerifier,

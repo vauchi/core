@@ -20,6 +20,11 @@ pub mod ble;
 #[cfg(not(feature = "testing"))]
 mod ble;
 
+#[cfg(feature = "testing")]
+pub mod multistage;
+#[cfg(not(feature = "testing"))]
+mod multistage;
+
 pub mod device_link;
 
 #[cfg(feature = "testing")]

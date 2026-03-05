@@ -169,7 +169,7 @@ impl MultiStageSession {
                 Some(QrPayload {
                     data: qr_data,
                     error_correction: "M".to_string(),
-                    display_duration_ms: 0,
+                    display_duration_ms: 1000,
                 })
             }
             ProtocolState::Advertising => {
@@ -180,7 +180,7 @@ impl MultiStageSession {
                 Some(QrPayload {
                     data: qr_data,
                     error_correction: "M".to_string(),
-                    display_duration_ms: 0,
+                    display_duration_ms: 1000,
                 })
             }
             ProtocolState::Discovered => {
@@ -195,7 +195,7 @@ impl MultiStageSession {
                 let qr = QrPayload {
                     data: qr_data,
                     error_correction: "M".to_string(),
-                    display_duration_ms: 0,
+                    display_duration_ms: 500,
                 };
                 // If we stashed the peer's reveal key (received VRFY while still
                 // Transferring), process it now that we've generated our own VRFY
@@ -210,7 +210,7 @@ impl MultiStageSession {
                 Some(QrPayload {
                     data: qr_data,
                     error_correction: "M".to_string(),
-                    display_duration_ms: 0,
+                    display_duration_ms: 500,
                 })
             }
             ProtocolState::Complete | ProtocolState::Failed(_) => None,

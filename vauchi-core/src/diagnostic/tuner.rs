@@ -68,3 +68,28 @@ pub struct SweepMatrix {
     pub camera_configs: Vec<CameraConfig>,
     pub qr_configs: Vec<QrConfig>,
 }
+
+/// Score a tuning result for ranking camera configurations.
+///
+/// Weights: decode_rate 50%, latency 30%, jitter 20%.
+/// Thermal events incur a flat penalty of -0.1 each.
+/// Latency and jitter are clamped to a minimum of 1.0 ms to avoid division by zero.
+pub fn score_config(result: &TuningResult) -> f32 {
+    let thermal_penalty = result.thermal_events as f32 * -0.1;
+    (result.decode_rate * 0.50)
+        + ((1.0 / result.avg_latency_ms.max(1.0)) * 300.0 * 0.30)
+        + ((1.0 / result.jitter_ms.max(1.0)) * 30.0 * 0.20)
+        + thermal_penalty
+}
+
+/// Rank camera configurations by score (highest first).
+///
+/// Returns a list of `(camera_config_id, score)` pairs sorted in descending order.
+pub fn rank_configs(results: &[TuningResult]) -> Vec<(u32, f32)> {
+    let mut scored: Vec<(u32, f32)> = results
+        .iter()
+        .map(|r| (r.camera_config_id, score_config(r)))
+        .collect();
+    scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+    scored
+}

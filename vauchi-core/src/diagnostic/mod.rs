@@ -9,6 +9,6 @@ pub mod tuner;
 pub use log_event::{LogEvent, LogEventKind};
 pub use snapshot::{BoundingBox, SnapshotMetadata};
 pub use tuner::{
-    CameraConfig, DeviceCapabilityProfile, ErrorCorrectionLevel, Platform, QrConfig, SweepMatrix,
-    TuningResult,
+    rank_configs, score_config, CameraConfig, DeviceCapabilityProfile, ErrorCorrectionLevel,
+    Platform, QrConfig, SweepMatrix, TuningResult,
 };

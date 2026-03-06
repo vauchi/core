@@ -258,7 +258,7 @@ impl MultiStageSession {
                 // - Peer in Verifying needs our VRFY to advance to Confirming
                 // - Peer in Confirming needs our CONF to advance to Complete
                 self.display_cycle += 1;
-                if self.display_cycle < 20 {
+                if self.display_cycle < 6 {
                     if self.display_cycle.is_multiple_of(3) {
                         // Show VRFY for peers still in Verifying
                         let qr_data = qr_codec::format_verify_qr(

@@ -21,6 +21,11 @@ pub mod ble;
 mod ble;
 
 #[cfg(feature = "testing")]
+pub mod ble_payload;
+#[cfg(not(feature = "testing"))]
+mod ble_payload;
+
+#[cfg(feature = "testing")]
 pub mod multistage;
 #[cfg(not(feature = "testing"))]
 mod multistage;
@@ -96,6 +101,7 @@ pub use ble::{
     BLE_PAYLOAD_SIZE, CHAR_CARD_EXCHANGE, CHAR_CHALLENGE, CHAR_EXCHANGE_PAYLOAD,
     VAUCHI_BLE_SERVICE_UUID,
 };
+pub use ble_payload::BleCardPayload;
 pub use device_link::{
     compute_confirmation_mac, generate_numeric_code, DeviceLinkConfirmation, DeviceLinkInitiator,
     DeviceLinkInitiatorRestored, DeviceLinkQR, DeviceLinkRequest, DeviceLinkResponder,

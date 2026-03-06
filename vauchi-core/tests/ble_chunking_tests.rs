@@ -31,7 +31,7 @@ fn test_chunker_multiple_chunks() {
     let data = vec![0xCC; 500];
     let mtu_usable = 178;
     let max_data_per_chunk = mtu_usable - BLE_CHUNK_OVERHEAD; // 174
-    let expected_chunks: u16 = ((500 + max_data_per_chunk - 1) / max_data_per_chunk) as u16; // ceil(500/174) = 3
+    let expected_chunks: u16 = 500_usize.div_ceil(max_data_per_chunk) as u16; // ceil(500/174) = 3
 
     let chunker = BleChunker::new(&data, mtu_usable);
     assert_eq!(chunker.total_chunks(), expected_chunks);

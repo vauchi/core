@@ -36,6 +36,11 @@ pub mod ble_payload;
 mod ble_payload;
 
 #[cfg(feature = "testing")]
+pub mod ble_rollback;
+#[cfg(not(feature = "testing"))]
+mod ble_rollback;
+
+#[cfg(feature = "testing")]
 pub mod multistage;
 #[cfg(not(feature = "testing"))]
 mod multistage;
@@ -108,8 +113,9 @@ pub use audio_cpal::CpalAudioBackend;
 pub use ble::{
     BLEAdvertisement, BLEDevice, BLEError, BLEExchangeSession, BLEExchangeState,
     BLEProximityVerifier, BLETransport, ExchangeBle, MockBLETransport, MockBLEVerifier,
-    BLE_PAYLOAD_SIZE, CHAR_CARD_EXCHANGE, CHAR_CHALLENGE, CHAR_EXCHANGE_PAYLOAD,
-    VAUCHI_BLE_SERVICE_UUID,
+    BLE_DEFAULT_USABLE, BLE_MIN_MTU, BLE_PAYLOAD_SIZE, CHAR_CARD_EXCHANGE, CHAR_CHALLENGE,
+    CHAR_DATA_NOTIFY, CHAR_DATA_WRITE, CHAR_EXCHANGE_PAYLOAD, CHAR_HANDSHAKE_NOTIFY,
+    CHAR_HANDSHAKE_WRITE, VAUCHI_BLE_DIAGNOSTIC_SERVICE_UUID, VAUCHI_BLE_SERVICE_UUID,
 };
 pub use ble_chunking::{BleChunker, BleReassembler, BLE_CHUNK_OVERHEAD};
 pub use ble_handshake::{
@@ -117,6 +123,7 @@ pub use ble_handshake::{
     BLE_HANDSHAKE_VERSION,
 };
 pub use ble_payload::BleCardPayload;
+pub use ble_rollback::BleRollback;
 pub use device_link::{
     compute_confirmation_mac, generate_numeric_code, DeviceLinkConfirmation, DeviceLinkInitiator,
     DeviceLinkInitiatorRestored, DeviceLinkQR, DeviceLinkRequest, DeviceLinkResponder,

@@ -17,6 +17,7 @@ pub mod content;
 pub mod crypto;
 pub mod delivery;
 pub mod demo_contact;
+pub mod diagnostic;
 pub mod exchange;
 pub mod help;
 pub mod i18n;

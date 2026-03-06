@@ -591,24 +591,39 @@ fn ble_result_to_mobile(result: &BleExchangeResult) -> MobileBleExchangeResult {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::sync::Mutex as StdMutex;
+    use std::sync::{Arc, Mutex as StdMutex};
+
+    type SharedStates = Arc<StdMutex<Vec<String>>>;
+    type SharedError = Arc<StdMutex<Option<String>>>;
 
     /// Mock delegate that records all calls.
     struct MockBleDelegate {
         sent_data: StdMutex<Vec<(String, Vec<u8>)>>,
-        states: StdMutex<Vec<String>>,
+        states: SharedStates,
         result: StdMutex<Option<MobileBleExchangeResult>>,
-        error: StdMutex<Option<String>>,
+        error: SharedError,
     }
 
     impl MockBleDelegate {
         fn new() -> Self {
             Self {
                 sent_data: StdMutex::new(Vec::new()),
-                states: StdMutex::new(Vec::new()),
+                states: Arc::new(StdMutex::new(Vec::new())),
                 result: StdMutex::new(None),
-                error: StdMutex::new(None),
+                error: Arc::new(StdMutex::new(None)),
             }
+        }
+
+        fn new_shared() -> (Self, SharedStates, SharedError) {
+            let states = Arc::new(StdMutex::new(Vec::new()));
+            let error = Arc::new(StdMutex::new(None));
+            let delegate = Self {
+                sent_data: StdMutex::new(Vec::new()),
+                states: Arc::clone(&states),
+                result: StdMutex::new(None),
+                error: Arc::clone(&error),
+            };
+            (delegate, states, error)
         }
     }
 
@@ -726,10 +741,14 @@ mod tests {
 
     #[test]
     fn test_cancel_notifies_delegate() {
-        let delegate = Box::new(MockBleDelegate::new());
-        let session = make_session("Alice", delegate);
+        let (delegate, states, _error) = MockBleDelegate::new_shared();
+        let session = make_session("Alice", Box::new(delegate));
         session.cancel();
-        // cancel should set Failed state — verified by states vector
+        let recorded = states.lock().unwrap();
+        assert!(
+            recorded.iter().any(|s| s.contains("Failed")),
+            "cancel should notify delegate with Failed state, got: {recorded:?}"
+        );
     }
 
     #[test]
@@ -838,9 +857,13 @@ mod tests {
 
     #[test]
     fn test_on_disconnected_when_not_complete_reports_failure() {
-        let delegate = Box::new(MockBleDelegate::new());
-        let session = make_session("Alice", delegate);
+        let (delegate, _states, error) = MockBleDelegate::new_shared();
+        let session = make_session("Alice", Box::new(delegate));
         session.on_disconnected();
-        // Should have called on_exchange_failed since state is Idle (not Complete)
+        let recorded_error = error.lock().unwrap();
+        assert!(
+            recorded_error.is_some(),
+            "on_disconnected when not complete should call on_exchange_failed"
+        );
     }
 }

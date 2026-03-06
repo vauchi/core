@@ -496,6 +496,31 @@ pub const CHAR_CARD_EXCHANGE: &str = "a1b2c3d4-e5f6-7890-abcd-ef1234567892";
 /// GATT characteristic UUID for challenge-response (Write+Notify).
 pub const CHAR_CHALLENGE: &str = "a1b2c3d4-e5f6-7890-abcd-ef1234567893";
 
+/// BLE handshake write characteristic (Write with Response).
+/// Used for KeyOffer and committed payloads from initiator to responder.
+pub const CHAR_HANDSHAKE_WRITE: &str = "a1b2c3d4-e5f6-7890-abcd-ef1234567894";
+
+/// BLE handshake notify characteristic (Notify).
+/// Used for KeyAck, committed payloads, and reveal from responder to initiator.
+pub const CHAR_HANDSHAKE_NOTIFY: &str = "a1b2c3d4-e5f6-7890-abcd-ef1234567895";
+
+/// BLE data write characteristic (Write without Response).
+/// Used for chunked encrypted card data from initiator to responder.
+pub const CHAR_DATA_WRITE: &str = "a1b2c3d4-e5f6-7890-abcd-ef1234567896";
+
+/// BLE data notify characteristic (Notify).
+/// Used for chunked encrypted card data from responder to initiator.
+pub const CHAR_DATA_NOTIFY: &str = "a1b2c3d4-e5f6-7890-abcd-ef1234567897";
+
+/// BLE diagnostic service UUID (separate from exchange service).
+pub const VAUCHI_BLE_DIAGNOSTIC_SERVICE_UUID: &str = "a1b2c3d4-e5f6-7890-abcd-ef12345678a0";
+
+/// Minimum MTU required for BLE exchange (handshake packet = 113 bytes + ATT overhead).
+pub const BLE_MIN_MTU: usize = 120;
+
+/// Default conservative MTU usable bytes (185 MTU - 3 ATT header - 4 chunk overhead).
+pub const BLE_DEFAULT_USABLE: usize = 178;
+
 /// BLE exchange payload.
 ///
 /// 174-byte payload exchanged during BLE GATT connection:

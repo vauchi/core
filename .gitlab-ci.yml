@@ -68,6 +68,7 @@ stages:
 # ============================================================
 # When Cargo.toml version is bumped and merged to main,
 # automatically create a v{version} tag to trigger the release pipeline.
+# Works for all version types: stable (0.4.0), dev (0.4.0-dev.0), rc (0.4.0-rc.1).
 
 auto-tag:version:
   extends: [.linux-runner-nocache, .main-only]
@@ -83,14 +84,6 @@ auto-tag:version:
       TAG="v${VERSION}"
       echo "Cargo.toml version: ${VERSION}"
       echo "Expected tag: ${TAG}"
-
-      # Guard: reject pre-release versions (dev/rc) from auto-tagging
-      # Pre-release tags must be created explicitly via just release-dev/rc
-      if echo "$VERSION" | grep -qE -- '-(dev|rc)\.'; then
-        echo "⚠ Pre-release version ${VERSION} detected — skipping auto-tag"
-        echo "  Use 'just release-dev' or 'just release-rc' to create pre-release tags"
-        exit 0
-      fi
 
       # Check if tag already exists
       if git ls-remote --tags origin "refs/tags/${TAG}" | grep -q "${TAG}"; then

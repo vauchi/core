@@ -178,8 +178,27 @@ impl BleHandshakeSession {
         Self::new(identity, card)
     }
 
+    /// Creates an initiator session from a raw 32-byte identity key.
+    ///
+    /// Used by mobile bindings that don't have access to a full `Identity` object.
+    pub fn new_initiator_from_key(identity_key: [u8; 32], card: BleCardPayload) -> Self {
+        Self::new_from_key(identity_key, card)
+    }
+
+    /// Creates a responder session from a raw 32-byte identity key.
+    ///
+    /// Used by mobile bindings that don't have access to a full `Identity` object.
+    pub fn new_responder_from_key(identity_key: [u8; 32], card: BleCardPayload) -> Self {
+        Self::new_from_key(identity_key, card)
+    }
+
     /// Internal constructor shared by initiator and responder.
     fn new(identity: &Identity, card: BleCardPayload) -> Self {
+        Self::new_from_key(*identity.signing_public_key(), card)
+    }
+
+    /// Internal constructor from raw identity key bytes.
+    fn new_from_key(identity_key: [u8; 32], card: BleCardPayload) -> Self {
         let rng = SystemRandom::new();
         let mut nonce = [0u8; NONCE_SIZE];
         rng.fill(&mut nonce)
@@ -194,7 +213,7 @@ impl BleHandshakeSession {
             state: BleHandshakeState::Idle,
             our_x3dh: X3DHKeyPair::generate(),
             our_nonce: nonce,
-            our_identity_key: *identity.signing_public_key(),
+            our_identity_key: identity_key,
             our_card: card,
             our_timestamp: timestamp,
             session_key: None,

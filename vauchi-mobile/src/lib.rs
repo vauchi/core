@@ -30,6 +30,7 @@ mod device_link_relay;
 mod diagnostic;
 mod error;
 mod exchange;
+mod mobile_ble;
 mod mobile_contacts;
 mod mobile_content;
 mod mobile_delivery;
@@ -66,6 +67,10 @@ pub use diagnostic::{
 pub use error::{KeychainError, MobileError};
 pub use exchange::{
     MobileBleExchangeStatus, MobileExchangeSession, MobileExchangeState, MobileProximityHandler,
+};
+pub use mobile_ble::{
+    MobileBleDelegate, MobileBleError, MobileBleExchangeResult, MobileBleExchangeSession,
+    MobileBleField, MobileBleState, MobileBleTransportError,
 };
 pub use mobile_nfc::{
     MobileNfcExchangeResult, MobileNfcHandshake, MobileNfcKeyAckResult, MobileNfcState,

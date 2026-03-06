@@ -26,6 +26,11 @@ pub mod ble_chunking;
 mod ble_chunking;
 
 #[cfg(feature = "testing")]
+pub mod ble_handshake;
+#[cfg(not(feature = "testing"))]
+mod ble_handshake;
+
+#[cfg(feature = "testing")]
 pub mod ble_payload;
 #[cfg(not(feature = "testing"))]
 mod ble_payload;
@@ -107,6 +112,7 @@ pub use ble::{
     VAUCHI_BLE_SERVICE_UUID,
 };
 pub use ble_chunking::{BleChunker, BleReassembler, BLE_CHUNK_OVERHEAD};
+pub use ble_handshake::{BleExchangeResult, BleHandshakeSession, BleHandshakeState};
 pub use ble_payload::BleCardPayload;
 pub use device_link::{
     compute_confirmation_mac, generate_numeric_code, DeviceLinkConfirmation, DeviceLinkInitiator,

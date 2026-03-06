@@ -10,6 +10,8 @@
 use std::collections::HashSet;
 use std::time::{Duration, Instant};
 
+use super::ble_handshake::BleHandshakeSession;
+use super::ble_payload::BleCardPayload;
 use super::nfc_handshake::NfcHandshakeSession;
 use super::{ExchangeError, ExchangeQR, ProximityConfidence, ProximityVerifier, X3DHKeyPair};
 use crate::contact::Contact;
@@ -144,6 +146,8 @@ pub struct ExchangeSession<P: ProximityVerifier> {
     their_display_name: Option<String>,
     /// NFC handshake session (only populated for NFC transport).
     nfc_handshake: Option<NfcHandshakeSession>,
+    /// BLE encrypted handshake session (only populated for BLE transport).
+    ble_handshake: Option<BleHandshakeSession>,
 }
 
 impl<P: ProximityVerifier> ExchangeSession<P> {
@@ -170,6 +174,7 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
             our_audio_challenge: None,
             their_display_name: None,
             nfc_handshake: None,
+            ble_handshake: None,
         }
     }
 
@@ -196,6 +201,7 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
             our_audio_challenge: None,
             their_display_name: None,
             nfc_handshake: None,
+            ble_handshake: None,
         }
     }
 
@@ -223,6 +229,7 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
             our_audio_challenge: None,
             their_display_name: None,
             nfc_handshake: Some(nfc_handshake),
+            ble_handshake: None,
         }
     }
 
@@ -233,6 +240,18 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
     /// The session starts in `AwaitingBleConnection` — ready to receive a BLE event.
     pub fn new_ble(identity: Identity, our_card: ContactCard, proximity: P) -> Self {
         let our_x3dh = X3DHKeyPair::generate();
+        let card = our_card.clone();
+        let ble_card = BleCardPayload::new(
+            *identity.signing_public_key(),
+            card.display_name().to_string(),
+            *our_x3dh.public_key(),
+            card.fields()
+                .iter()
+                .map(|f| (f.label().to_string(), f.value().to_string()))
+                .collect(),
+            card.avatar().map(|a| a.to_vec()),
+        );
+        let ble_handshake = BleHandshakeSession::new_initiator(&identity, ble_card);
         ExchangeSession {
             state: ExchangeState::AwaitingBleConnection,
             transport: ExchangeTransport::Ble,
@@ -248,6 +267,7 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
             our_audio_challenge: None,
             their_display_name: None,
             nfc_handshake: None,
+            ble_handshake: Some(ble_handshake),
         }
     }
 
@@ -278,6 +298,16 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
     /// Returns mutable access to the NFC handshake session.
     pub fn nfc_handshake_mut(&mut self) -> Option<&mut NfcHandshakeSession> {
         self.nfc_handshake.as_mut()
+    }
+
+    /// Returns the BLE encrypted handshake session (only for BLE transport).
+    pub fn ble_handshake(&self) -> Option<&BleHandshakeSession> {
+        self.ble_handshake.as_ref()
+    }
+
+    /// Returns mutable access to the BLE encrypted handshake session.
+    pub fn ble_handshake_mut(&mut self) -> Option<&mut BleHandshakeSession> {
+        self.ble_handshake.as_mut()
     }
 
     /// Returns the peer's audio challenge if one has been stored from their QR code.

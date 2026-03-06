@@ -295,9 +295,9 @@ if [[ -z "${CI:-}" ]]; then
     if $BUILD_ANDROID && [[ -d "$LOCAL_ANDROID_DIR" ]]; then
         echo -e "${YELLOW}Copying Android bindings to $LOCAL_ANDROID_DIR/...${NC}"
         mkdir -p "$LOCAL_ANDROID_DIR/app/src/main/jniLibs"
-        mkdir -p "$LOCAL_ANDROID_DIR/app/src/main/kotlin"
+        mkdir -p "$LOCAL_ANDROID_DIR/app/src/local-bindings/kotlin"
         cp -r "$ANDROID_JNI_DIR/"* "$LOCAL_ANDROID_DIR/app/src/main/jniLibs/" 2>/dev/null || true
-        cp -r "$ANDROID_KOTLIN_DIR/"* "$LOCAL_ANDROID_DIR/app/src/main/kotlin/" 2>/dev/null || true
-        echo -e "${GREEN}  Installed to $LOCAL_ANDROID_DIR/app/src/main/${NC}"
+        cp -r "$ANDROID_KOTLIN_DIR/"* "$LOCAL_ANDROID_DIR/app/src/local-bindings/kotlin/" 2>/dev/null || true
+        echo -e "${GREEN}  Installed to $LOCAL_ANDROID_DIR/app/src/{main/jniLibs,local-bindings/kotlin}/${NC}"
     fi
 fi

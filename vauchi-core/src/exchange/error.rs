@@ -125,6 +125,26 @@ pub enum ExchangeError {
     #[error("BLE not available on this device")]
     BleNotAvailable,
 
+    /// BLE encrypted payload failed AEAD authentication (tampered or wrong key)
+    #[error("BLE decryption failed")]
+    BleDecryptionFailed,
+
+    /// BLE key exchange handshake did not complete
+    #[error("BLE handshake failed: {0}")]
+    BleHandshakeFailed(String),
+
+    /// BLE ECDH or HKDF key derivation error
+    #[error("BLE key derivation failed")]
+    BleKeyDerivationFailed,
+
+    /// SHA-256 commitment does not match received encrypted blob
+    #[error("BLE commitment mismatch")]
+    BleCommitmentMismatch,
+
+    /// Negotiated BLE MTU is below the minimum viable threshold
+    #[error("BLE MTU too small")]
+    BleMtuTooSmall,
+
     #[error("Proximity verification required before device linking")]
     ProximityNotVerified,
 
@@ -133,4 +153,7 @@ pub enum ExchangeError {
 
     #[error("Self-linking not allowed: device name already exists in registry")]
     SelfLinkingNotAllowed,
+
+    #[error("BLE chunk reassembly failed: {0}")]
+    BleChunkReassemblyFailed(String),
 }

@@ -266,4 +266,13 @@ name = "multistage_e2e_tests"
 required-features = ["testing"]
 
 [[test]]
+name = "diagnostic_snapshot_tests"
+
+[[test]]
 name = "diagnostic_tuner_tests"
+
+[[test]]
+name = "diagnostic_log_event_tests"
+
+[[test]]
+name = "diagnostic_report_tests"

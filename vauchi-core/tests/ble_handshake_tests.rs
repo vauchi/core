@@ -11,13 +11,11 @@
 use ring::digest::{digest, SHA256};
 use vauchi_core::crypto::encryption::{self, SymmetricKey};
 use vauchi_core::crypto::kdf::HKDF;
-use vauchi_core::exchange::ble_handshake::{
-    BleHandshakeSession, BleHandshakeState, BLE_HANDSHAKE_VERSION,
+use vauchi_core::exchange::{
+    BleCardPayload, BleHandshakeSession, BleHandshakeState, X3DHKeyPair, BLE_HANDSHAKE_VERSION,
 };
-use vauchi_core::exchange::ble_payload::BleCardPayload;
-use vauchi_core::exchange::error::ExchangeError;
-use vauchi_core::exchange::x3dh::X3DHKeyPair;
 use vauchi_core::identity::Identity;
+use vauchi_core::ExchangeError;
 
 fn make_test_identity() -> Identity {
     Identity::create("Test")

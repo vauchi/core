@@ -112,7 +112,10 @@ pub use ble::{
     VAUCHI_BLE_SERVICE_UUID,
 };
 pub use ble_chunking::{BleChunker, BleReassembler, BLE_CHUNK_OVERHEAD};
-pub use ble_handshake::{BleExchangeResult, BleHandshakeSession, BleHandshakeState};
+pub use ble_handshake::{
+    BleExchangeResult, BleHandshakeSession, BleHandshakeState, BLE_HANDSHAKE_INFO,
+    BLE_HANDSHAKE_VERSION,
+};
 pub use ble_payload::BleCardPayload;
 pub use device_link::{
     compute_confirmation_mac, generate_numeric_code, DeviceLinkConfirmation, DeviceLinkInitiator,

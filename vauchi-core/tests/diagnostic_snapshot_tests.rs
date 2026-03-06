@@ -33,7 +33,7 @@ fn snapshot_metadata_roundtrips_json() {
     let json = serde_json::to_string_pretty(&meta).expect("serialize");
     let back: SnapshotMetadata = serde_json::from_str(&json).expect("deserialize");
     assert_eq!(back.config_id, 42);
-    assert_eq!(back.decode_result, true);
+    assert!(back.decode_result);
     assert_eq!(back.actual_iso, Some(200));
     assert!(!back.redacted);
 }

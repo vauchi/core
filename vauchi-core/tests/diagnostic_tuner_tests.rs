@@ -116,7 +116,7 @@ fn generate_sweep_matrix_respects_iso_range() {
     let matrix = generate_sweep_matrix(&profile);
     for config in &matrix.camera_configs {
         if let Some(iso) = config.iso {
-            assert!(iso >= 100 && iso <= 400, "ISO {iso} outside range");
+            assert!((100..=400).contains(&iso), "ISO {iso} outside range");
         }
     }
     assert!(!matrix.camera_configs.is_empty());

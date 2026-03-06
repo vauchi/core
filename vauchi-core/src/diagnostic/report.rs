@@ -29,6 +29,13 @@ impl From<std::fmt::Error> for ReportError {
     }
 }
 
+fn html_escape(s: &str) -> String {
+    s.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+}
+
 /// Generate a self-contained HTML diagnostic report.
 ///
 /// The report includes device info, a ranked config table, an SVG bar chart,
@@ -109,7 +116,7 @@ fn write_device_section(
     writeln!(
         html,
         "<tr><th>Model</th><td>{}</td></tr>",
-        profile.device_model
+        html_escape(&profile.device_model)
     )?;
     writeln!(
         html,
@@ -117,7 +124,11 @@ fn write_device_section(
         platform_name(&profile.platform)
     )?;
     if let Some(ref hw) = profile.hardware_level {
-        writeln!(html, "<tr><th>Hardware Level</th><td>{}</td></tr>", hw)?;
+        writeln!(
+            html,
+            "<tr><th>Hardware Level</th><td>{}</td></tr>",
+            html_escape(hw)
+        )?;
     }
     writeln!(
         html,
@@ -294,7 +305,7 @@ fn write_event_log(html: &mut String, events: &[LogEvent]) -> Result<(), ReportE
 
     for event in display_events {
         if let Ok(json) = serde_json::to_string(event) {
-            writeln!(html, "{}", json)?;
+            writeln!(html, "{}", html_escape(&json))?;
         }
     }
 

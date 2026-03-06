@@ -27,6 +27,7 @@ mod audio;
 mod cert_pinning;
 mod content;
 mod device_link_relay;
+mod diagnostic;
 mod error;
 mod exchange;
 mod mobile_contacts;
@@ -55,6 +56,12 @@ pub use audio::{
 pub use content::{
     MobileApplyFailure, MobileApplyResult, MobileContentConfig, MobileContentType,
     MobileUpdateStatus,
+};
+pub use diagnostic::{
+    diagnostic_generate_qr_test_patterns, diagnostic_generate_sweep_matrix,
+    diagnostic_rank_configs, diagnostic_score_config, MobileCameraConfig,
+    MobileDeviceCapabilityProfile, MobileErrorCorrectionLevel, MobileFpsRange, MobilePlatform,
+    MobileQrConfig, MobileQrTestPattern, MobileScoredConfig, MobileSweepMatrix, MobileTuningResult,
 };
 pub use error::{KeychainError, MobileError};
 pub use exchange::{

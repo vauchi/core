@@ -30,7 +30,7 @@ impl BleChunker {
         let total = if data.is_empty() {
             1
         } else {
-            ((data.len() + chunk_data_size - 1) / chunk_data_size) as u16
+            data.len().div_ceil(chunk_data_size) as u16
         };
         Self {
             data: data.to_vec(),

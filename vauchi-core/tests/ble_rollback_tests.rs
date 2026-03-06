@@ -4,7 +4,7 @@
 
 //! Tests for BLE exchange rollback tracking.
 
-use vauchi_core::exchange::ble_rollback::BleRollback;
+use vauchi_core::exchange::BleRollback;
 use vauchi_core::ExchangeError;
 
 #[test]

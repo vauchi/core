@@ -99,3 +99,94 @@ fn rank_configs_empty_input() {
     let ranked = rank_configs(&[]);
     assert!(ranked.is_empty());
 }
+
+#[test]
+fn generate_sweep_matrix_respects_iso_range() {
+    let profile = DeviceCapabilityProfile {
+        platform: Platform::Android,
+        device_model: "Pixel 7".into(),
+        hardware_level: Some("FULL".into()),
+        iso_range: Some((100, 400)),
+        exposure_ev_range: Some((-2, 2)),
+        af_modes: vec!["FIXED".into(), "CONTINUOUS_PICTURE".into()],
+        awb_modes: vec!["AUTO".into(), "DAYLIGHT".into()],
+        fps_ranges: vec![(15, 15), (30, 30)],
+        max_resolution: (1920, 1080),
+    };
+    let matrix = generate_sweep_matrix(&profile);
+    for config in &matrix.camera_configs {
+        if let Some(iso) = config.iso {
+            assert!(iso >= 100 && iso <= 400, "ISO {iso} outside range");
+        }
+    }
+    assert!(!matrix.camera_configs.is_empty());
+}
+
+#[test]
+fn generate_sweep_matrix_skips_unsupported_iso() {
+    let profile = DeviceCapabilityProfile {
+        platform: Platform::Ios,
+        device_model: "iPhone SE".into(),
+        hardware_level: None,
+        iso_range: None,
+        exposure_ev_range: Some((-2, 2)),
+        af_modes: vec!["auto".into()],
+        awb_modes: vec!["auto".into()],
+        fps_ranges: vec![(30, 30)],
+        max_resolution: (1920, 1440),
+    };
+    let matrix = generate_sweep_matrix(&profile);
+    for config in &matrix.camera_configs {
+        assert!(config.iso.is_none(), "ISO should be None when unsupported");
+    }
+    assert!(!matrix.camera_configs.is_empty());
+}
+
+#[test]
+fn generate_sweep_matrix_includes_qr_configs() {
+    let profile = DeviceCapabilityProfile {
+        platform: Platform::Android,
+        device_model: "Test".into(),
+        hardware_level: Some("FULL".into()),
+        iso_range: Some((100, 800)),
+        exposure_ev_range: Some((-2, 2)),
+        af_modes: vec!["FIXED".into()],
+        awb_modes: vec!["AUTO".into()],
+        fps_ranges: vec![(30, 30)],
+        max_resolution: (1920, 1080),
+    };
+    let matrix = generate_sweep_matrix(&profile);
+    assert!(
+        matrix.qr_configs.len() >= 4,
+        "should have at least one per EC level"
+    );
+    let has_all_ec = [
+        ErrorCorrectionLevel::L,
+        ErrorCorrectionLevel::M,
+        ErrorCorrectionLevel::Q,
+        ErrorCorrectionLevel::H,
+    ]
+    .iter()
+    .all(|ec| matrix.qr_configs.iter().any(|q| q.error_correction == *ec));
+    assert!(has_all_ec, "should cover all EC levels");
+}
+
+#[test]
+fn generate_sweep_matrix_legacy_android_minimal() {
+    let profile = DeviceCapabilityProfile {
+        platform: Platform::Android,
+        device_model: "Old Phone".into(),
+        hardware_level: Some("LEGACY".into()),
+        iso_range: None,
+        exposure_ev_range: Some((-1, 1)),
+        af_modes: vec!["CONTINUOUS_PICTURE".into()],
+        awb_modes: vec!["AUTO".into()],
+        fps_ranges: vec![(30, 30)],
+        max_resolution: (1280, 720),
+    };
+    let matrix = generate_sweep_matrix(&profile);
+    assert!(!matrix.camera_configs.is_empty());
+    for config in &matrix.camera_configs {
+        assert!(config.iso.is_none());
+    }
+}

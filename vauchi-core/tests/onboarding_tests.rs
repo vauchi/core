@@ -736,6 +736,35 @@ fn test_api_current_onboarding_step() {
     );
 }
 
+// @scenario: onboarding:create_suggested_groups
+#[test]
+fn test_create_suggested_groups() {
+    let vauchi = create_test_vauchi();
+
+    let created = vauchi
+        .create_suggested_groups(&["Family", "Friends"])
+        .unwrap();
+    assert_eq!(created.len(), 2);
+    assert_eq!(created[0].name(), "Family");
+    assert_eq!(created[1].name(), "Friends");
+}
+
+// @scenario: onboarding:create_suggested_groups_skips_duplicates
+#[test]
+fn test_create_suggested_groups_skips_duplicates() {
+    let vauchi = create_test_vauchi();
+
+    // Create Family first
+    vauchi.create_suggested_groups(&["Family"]).unwrap();
+
+    // Create again with overlap — should skip Family, create Friends
+    let created = vauchi
+        .create_suggested_groups(&["Family", "Friends"])
+        .unwrap();
+    assert_eq!(created.len(), 1);
+    assert_eq!(created[0].name(), "Friends");
+}
+
 // @scenario: onboarding:api_skip_to_finish (#skip_gate)
 #[test]
 fn test_api_skip_onboarding_to_finish() {

@@ -15,7 +15,7 @@ use std::collections::{HashMap, HashSet};
 pub const MAX_LABELS: usize = 50;
 
 /// Suggested default labels for new users.
-pub const SUGGESTED_LABELS: &[&str] = &["Family", "Friends", "Professional"];
+pub const SUGGESTED_LABELS: &[&str] = &["Family", "Friends", "Coworkers", "Business"];
 
 /// Error type for label operations.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -772,6 +772,14 @@ mod tests {
             .set_display_name_override(None)
             .expect("clearing should succeed");
         assert_eq!(label.resolve_display_name("Mattia Egloff"), "Mattia Egloff");
+    }
+
+    #[test]
+    fn test_suggested_labels_updated() {
+        assert_eq!(
+            SUGGESTED_LABELS,
+            &["Family", "Friends", "Coworkers", "Business"]
+        );
     }
 
     #[test]

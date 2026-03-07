@@ -473,6 +473,7 @@ impl LabelManager {
     }
 }
 
+// INLINE_TEST_REQUIRED: tests access private VisibilityLabel fields and LabelManager internals
 #[cfg(test)]
 mod tests {
     use super::*;

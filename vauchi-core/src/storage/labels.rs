@@ -552,6 +552,7 @@ impl Storage {
     }
 }
 
+// INLINE_TEST_REQUIRED: tests access private storage internals and require in-memory DB setup
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -11,6 +11,7 @@
 mod action;
 mod component;
 mod engine;
+mod onboarding;
 mod screen;
 
 pub use action::{ActionResult, UserAction};
@@ -19,4 +20,5 @@ pub use component::{
     UiFieldVisibility, VisibilityMode,
 };
 pub use engine::WorkflowEngine;
+pub use onboarding::{FieldSetup, GroupSetup, OnboardingData, OnboardingEngine};
 pub use screen::{ActionStyle, Progress, ScreenAction, ScreenModel};

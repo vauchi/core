@@ -789,3 +789,201 @@ fn test_api_skip_onboarding_to_finish() {
         OnboardingStep::SecurityExplanation
     );
 }
+
+// =============================================================================
+// End-to-End Onboarding Flow Tests
+// =============================================================================
+
+// @scenario: onboarding:e2e_full_flow_with_skip
+#[test]
+fn test_full_onboarding_flow_with_skip() {
+    let mut vauchi = create_test_vauchi();
+
+    // Step 1: Welcome
+    assert_eq!(
+        vauchi.current_onboarding_step().unwrap(),
+        OnboardingStep::Welcome
+    );
+    vauchi.advance_onboarding().unwrap();
+
+    // Step 2: DefaultName — create identity then advance
+    assert_eq!(
+        vauchi.current_onboarding_step().unwrap(),
+        OnboardingStep::DefaultName
+    );
+    vauchi.create_identity("Alice").unwrap();
+    assert!(
+        vauchi.has_identity(),
+        "Identity should exist after create_identity"
+    );
+    assert_eq!(
+        vauchi.public_id().unwrap().len(),
+        64,
+        "Public ID should be a 64-char hex string"
+    );
+    vauchi.advance_onboarding().unwrap();
+
+    // Step 3: SkipGate — skip to finish
+    assert_eq!(
+        vauchi.current_onboarding_step().unwrap(),
+        OnboardingStep::SkipGate
+    );
+    vauchi.skip_onboarding_to_finish().unwrap();
+
+    // Should jump to SecurityExplanation, skipping GroupsSetup/ContactInfo/PreviewCard
+    assert_eq!(
+        vauchi.current_onboarding_step().unwrap(),
+        OnboardingStep::SecurityExplanation
+    );
+
+    // Verify skipped steps are not marked completed
+    let progress = vauchi.get_onboarding_progress().unwrap();
+    assert!(
+        !progress
+            .completed_steps
+            .contains(&OnboardingStep::GroupsSetup),
+        "GroupsSetup should not be completed after skip"
+    );
+    assert!(
+        !progress
+            .completed_steps
+            .contains(&OnboardingStep::ContactInfo),
+        "ContactInfo should not be completed after skip"
+    );
+    assert!(
+        !progress
+            .completed_steps
+            .contains(&OnboardingStep::PreviewCard),
+        "PreviewCard should not be completed after skip"
+    );
+
+    // Can continue normally from SecurityExplanation
+    vauchi.advance_onboarding().unwrap();
+    assert_eq!(
+        vauchi.current_onboarding_step().unwrap(),
+        OnboardingStep::BackupPrompt
+    );
+
+    vauchi.advance_onboarding().unwrap();
+    assert_eq!(
+        vauchi.current_onboarding_step().unwrap(),
+        OnboardingStep::Ready
+    );
+
+    // Final advance completes onboarding
+    vauchi.advance_onboarding().unwrap();
+    assert!(
+        vauchi.is_onboarding_complete().unwrap(),
+        "Onboarding should be complete after final advance"
+    );
+}
+
+// @scenario: onboarding:e2e_full_flow_without_skip
+#[test]
+fn test_full_onboarding_flow_without_skip() {
+    let mut vauchi = create_test_vauchi();
+
+    // Welcome → DefaultName
+    vauchi.advance_onboarding().unwrap();
+
+    // DefaultName → SkipGate (create identity first)
+    assert_eq!(
+        vauchi.current_onboarding_step().unwrap(),
+        OnboardingStep::DefaultName
+    );
+    vauchi.create_identity("Alice").unwrap();
+    vauchi.advance_onboarding().unwrap();
+
+    // SkipGate → GroupsSetup (continue, don't skip)
+    assert_eq!(
+        vauchi.current_onboarding_step().unwrap(),
+        OnboardingStep::SkipGate
+    );
+    vauchi.advance_onboarding().unwrap();
+
+    // GroupsSetup: create some groups
+    assert_eq!(
+        vauchi.current_onboarding_step().unwrap(),
+        OnboardingStep::GroupsSetup
+    );
+    let created = vauchi
+        .create_suggested_groups(&["Family", "Friends"])
+        .unwrap();
+    assert_eq!(created.len(), 2, "Should create 2 groups");
+    assert_eq!(created[0].name(), "Family");
+    assert_eq!(created[1].name(), "Friends");
+
+    // GroupsSetup → ContactInfo
+    vauchi.advance_onboarding().unwrap();
+    assert_eq!(
+        vauchi.current_onboarding_step().unwrap(),
+        OnboardingStep::ContactInfo
+    );
+
+    // ContactInfo → PreviewCard
+    vauchi.advance_onboarding().unwrap();
+    assert_eq!(
+        vauchi.current_onboarding_step().unwrap(),
+        OnboardingStep::PreviewCard
+    );
+
+    // Verify card exists (created during identity creation)
+    let card = vauchi.own_card().unwrap();
+    assert!(
+        card.is_some(),
+        "Own card should exist after identity creation"
+    );
+    assert_eq!(
+        card.unwrap().display_name(),
+        "Alice",
+        "Card display name should match identity"
+    );
+
+    // PreviewCard → SecurityExplanation
+    vauchi.advance_onboarding().unwrap();
+    assert_eq!(
+        vauchi.current_onboarding_step().unwrap(),
+        OnboardingStep::SecurityExplanation
+    );
+
+    // SecurityExplanation → BackupPrompt
+    vauchi.advance_onboarding().unwrap();
+    assert_eq!(
+        vauchi.current_onboarding_step().unwrap(),
+        OnboardingStep::BackupPrompt
+    );
+
+    // BackupPrompt → Ready
+    vauchi.advance_onboarding().unwrap();
+    assert_eq!(
+        vauchi.current_onboarding_step().unwrap(),
+        OnboardingStep::Ready
+    );
+
+    // Verify completion percentage before final advance
+    assert_eq!(
+        vauchi.onboarding_completion_percentage().unwrap(),
+        88,
+        "Should be 88% (8/9 steps completed) before final advance"
+    );
+
+    // Final advance: Ready → complete
+    vauchi.advance_onboarding().unwrap();
+    assert!(
+        vauchi.is_onboarding_complete().unwrap(),
+        "Onboarding should be complete"
+    );
+    assert_eq!(
+        vauchi.onboarding_completion_percentage().unwrap(),
+        100,
+        "Should be 100% after completion"
+    );
+
+    // Verify all steps completed
+    let progress = vauchi.get_onboarding_progress().unwrap();
+    assert_eq!(
+        progress.completed_steps.len(),
+        9,
+        "All 9 steps should be completed"
+    );
+}

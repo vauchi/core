@@ -21,6 +21,8 @@ pub mod vcard;
 pub use field::{ContactField, FieldType, ValidationError};
 pub use uri::{is_allowed_scheme, is_blocked_scheme, is_safe_url, is_valid_phone, ContactAction};
 
+use std::collections::HashSet;
+
 use ring::rand::SystemRandom;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -75,6 +77,11 @@ pub struct ContactCard {
     #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     nickname: Option<String>,
+    /// Field IDs marked as "shown" in no-group mode.
+    /// When no visibility labels exist, this set determines which fields
+    /// are visible to all contacts. Empty = all hidden (privacy-first default).
+    #[serde(default)]
+    shown_fields: HashSet<String>,
 }
 
 impl ContactCard {
@@ -92,6 +99,7 @@ impl ContactCard {
             fields: Vec::new(),
             avatar: None,
             nickname: None,
+            shown_fields: HashSet::new(),
         }
     }
 
@@ -211,6 +219,7 @@ impl ContactCard {
             .ok_or(ContactCardError::FieldNotFound)?;
 
         self.fields.remove(index);
+        self.shown_fields.remove(field_id);
         Ok(())
     }
 
@@ -279,5 +288,25 @@ impl ContactCard {
     /// Clears the avatar image data.
     pub fn clear_avatar(&mut self) {
         self.avatar = None;
+    }
+
+    /// Returns the set of field IDs marked as "shown" (no-group mode).
+    pub fn shown_fields(&self) -> &HashSet<String> {
+        &self.shown_fields
+    }
+
+    /// Returns whether a field is shown in no-group mode.
+    pub fn is_field_shown(&self, field_id: &str) -> bool {
+        self.shown_fields.contains(field_id)
+    }
+
+    /// Sets whether a field is shown (no-group mode).
+    /// When true, all contacts see this field. When false, no one sees it.
+    pub fn set_field_shown(&mut self, field_id: &str, shown: bool) {
+        if shown {
+            self.shown_fields.insert(field_id.to_string());
+        } else {
+            self.shown_fields.remove(field_id);
+        }
     }
 }

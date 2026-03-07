@@ -301,6 +301,11 @@ impl LabelManager {
         self.labels.len()
     }
 
+    /// Returns true if no labels exist.
+    pub fn is_empty(&self) -> bool {
+        self.labels.is_empty()
+    }
+
     /// Gets a label by ID.
     pub fn get_label(&self, label_id: &str) -> Option<&VisibilityLabel> {
         self.labels.get(label_id)
@@ -527,6 +532,28 @@ impl LabelManager {
         }
 
         visible
+    }
+}
+
+/// Resolves which fields a given contact can see.
+///
+/// Two modes:
+/// - No-group mode (no labels exist): returns fields in `card.shown_fields()`
+/// - Groups mode (labels exist): returns union of `visible_fields` across
+///   all labels the contact belongs to. Per-contact overrides still apply.
+///
+/// Ungrouped contacts in groups mode see no fields (default-closed).
+pub fn resolve_visible_fields(
+    card: &crate::contact_card::ContactCard,
+    label_manager: &LabelManager,
+    contact_id: &str,
+) -> HashSet<String> {
+    if label_manager.is_empty() {
+        // No-group mode: use card's shown_fields
+        card.shown_fields().clone()
+    } else {
+        // Groups mode: use label-based visibility
+        label_manager.visible_fields_via_labels(contact_id)
     }
 }
 

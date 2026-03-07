@@ -17,7 +17,9 @@ pub mod visibility;
 #[cfg(not(feature = "testing"))]
 mod visibility;
 
-pub use labels::{LabelError, LabelManager, VisibilityLabel, MAX_LABELS, SUGGESTED_LABELS};
+pub use labels::{
+    resolve_visible_fields, LabelError, LabelManager, VisibilityLabel, MAX_LABELS, SUGGESTED_LABELS,
+};
 pub use visibility::{FieldVisibility, VisibilityRules};
 
 use std::time::{SystemTime, UNIX_EPOCH};

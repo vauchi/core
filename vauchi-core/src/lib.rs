@@ -31,6 +31,7 @@ pub mod storage;
 pub mod sync;
 pub mod theme;
 pub mod tor_config;
+pub mod ui;
 
 pub use aha_moments::{AhaMoment, AhaMomentTracker, AhaMomentType};
 #[cfg(any(feature = "network-native-tls", feature = "network-rustls"))]

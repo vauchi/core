@@ -60,6 +60,12 @@ pub struct VisibilityLabel {
     contacts: HashSet<String>,
     /// IDs of fields visible to contacts in this label.
     visible_fields: HashSet<String>,
+    /// Optional display name override for this label's contacts.
+    ///
+    /// When set, contacts in this label see this name instead of the
+    /// user's default display name.
+    #[serde(default)]
+    display_name_override: Option<String>,
     /// Timestamp when the label was created.
     created_at: u64,
     /// Timestamp when the label was last modified.
@@ -79,6 +85,7 @@ impl VisibilityLabel {
             name: name.to_string(),
             contacts: HashSet::new(),
             visible_fields: HashSet::new(),
+            display_name_override: None,
             created_at: now,
             modified_at: now,
         }
@@ -90,6 +97,7 @@ impl VisibilityLabel {
         name: String,
         contacts: HashSet<String>,
         visible_fields: HashSet<String>,
+        display_name_override: Option<String>,
         created_at: u64,
         modified_at: u64,
     ) -> Self {
@@ -98,6 +106,7 @@ impl VisibilityLabel {
             name,
             contacts,
             visible_fields,
+            display_name_override,
             created_at,
             modified_at,
         }
@@ -117,6 +126,54 @@ impl VisibilityLabel {
     pub fn set_name(&mut self, name: &str) {
         self.name = name.to_string();
         self.touch();
+    }
+
+    /// Returns the display name override, if set.
+    pub fn display_name_override(&self) -> Option<&str> {
+        self.display_name_override.as_deref()
+    }
+
+    /// Sets or clears the display name override.
+    ///
+    /// When set, contacts in this label see this name instead of the
+    /// user's default display name. Pass `None` to clear the override.
+    ///
+    /// Validates that the name is non-empty, not whitespace-only, and
+    /// at most 100 characters (after trimming).
+    pub fn set_display_name_override(&mut self, name: Option<&str>) -> Result<(), LabelError> {
+        match name {
+            None => {
+                self.display_name_override = None;
+                self.touch();
+                Ok(())
+            }
+            Some(raw) => {
+                let trimmed = raw.trim();
+                if trimmed.is_empty() {
+                    return Err(LabelError::InvalidName(
+                        "Display name override cannot be empty".to_string(),
+                    ));
+                }
+                if trimmed.len() > 100 {
+                    return Err(LabelError::InvalidName(
+                        "Display name override cannot exceed 100 characters".to_string(),
+                    ));
+                }
+                self.display_name_override = Some(trimmed.to_string());
+                self.touch();
+                Ok(())
+            }
+        }
+    }
+
+    /// Resolves the display name for contacts in this label.
+    ///
+    /// Returns the override if set, otherwise the provided default name.
+    pub fn resolve_display_name<'a>(&'a self, default_name: &'a str) -> &'a str {
+        match &self.display_name_override {
+            Some(override_name) => override_name.as_str(),
+            None => default_name,
+        }
     }
 
     /// Returns the set of contact IDs in this label.
@@ -644,6 +701,77 @@ mod tests {
 
         let result = manager.create_label("OneMore");
         assert!(matches!(result, Err(LabelError::MaxLabelsReached)));
+    }
+
+    #[test]
+    fn test_label_display_name_override() {
+        let mut label = VisibilityLabel::new("Family");
+
+        // Initially None
+        assert_eq!(label.display_name_override(), None);
+
+        // Set override
+        label
+            .set_display_name_override(Some("Matt"))
+            .expect("valid name should succeed");
+        assert_eq!(label.display_name_override(), Some("Matt"));
+
+        // Clear override
+        label
+            .set_display_name_override(None)
+            .expect("clearing should succeed");
+        assert_eq!(label.display_name_override(), None);
+    }
+
+    #[test]
+    fn test_label_display_name_override_validation() {
+        let mut label = VisibilityLabel::new("Friends");
+
+        // Empty string should fail
+        let result = label.set_display_name_override(Some(""));
+        assert!(matches!(result, Err(LabelError::InvalidName(_))));
+
+        // Whitespace-only should fail
+        let result = label.set_display_name_override(Some("   "));
+        assert!(matches!(result, Err(LabelError::InvalidName(_))));
+
+        // Too long (>100 chars) should fail
+        let long_name = "a".repeat(101);
+        let result = label.set_display_name_override(Some(&long_name));
+        assert!(matches!(result, Err(LabelError::InvalidName(_))));
+
+        // Exactly 100 chars should succeed
+        let max_name = "b".repeat(100);
+        label
+            .set_display_name_override(Some(&max_name))
+            .expect("100 chars should succeed");
+        assert_eq!(label.display_name_override(), Some(max_name.as_str()));
+
+        // Whitespace trimming
+        label
+            .set_display_name_override(Some("  Dr. Egloff  "))
+            .expect("trimmed name should succeed");
+        assert_eq!(label.display_name_override(), Some("Dr. Egloff"));
+    }
+
+    #[test]
+    fn test_label_resolve_display_name() {
+        let mut label = VisibilityLabel::new("Business");
+
+        // Without override, returns default
+        assert_eq!(label.resolve_display_name("Mattia Egloff"), "Mattia Egloff");
+
+        // With override, returns override
+        label
+            .set_display_name_override(Some("Dr. Egloff"))
+            .expect("valid name");
+        assert_eq!(label.resolve_display_name("Mattia Egloff"), "Dr. Egloff");
+
+        // After clearing, returns default again
+        label
+            .set_display_name_override(None)
+            .expect("clearing should succeed");
+        assert_eq!(label.resolve_display_name("Mattia Egloff"), "Mattia Egloff");
     }
 
     #[test]

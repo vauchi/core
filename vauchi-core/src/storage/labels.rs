@@ -102,6 +102,7 @@ impl Storage {
             name,
             contacts,
             visible_fields,
+            None,
             label.4 as u64,
             label.5 as u64,
         ))
@@ -158,6 +159,7 @@ impl Storage {
                 name,
                 contacts,
                 visible_fields,
+                None,
                 row.4 as u64,
                 row.5 as u64,
             ));

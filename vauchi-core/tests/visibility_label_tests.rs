@@ -911,6 +911,7 @@ fn test_label_sync_across_devices() {
             label_name,
             contacts.into_iter().collect(),
             visible_fields.into_iter().collect(),
+            None,
             timestamp,
             timestamp,
         );

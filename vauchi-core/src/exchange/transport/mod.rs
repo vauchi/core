@@ -10,9 +10,13 @@
 pub mod animated_qr;
 pub mod caps;
 pub mod channel;
+pub mod mock;
 pub mod negotiation;
+pub mod orchestrator;
 pub mod wifi_aware;
 
 pub use caps::TransportCaps;
 pub use channel::{PeerInfo, TransportChannel, TransportError, TransportType};
+pub use mock::MockTransportChannel;
 pub use negotiation::negotiate_transport;
+pub use orchestrator::{FallbackPolicy, TransportChain};

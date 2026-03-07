@@ -34,26 +34,30 @@ fn create_test_vauchi() -> Vauchi<MockTransport> {
 #[test]
 fn test_step_ordering_matches_wizard_flow() {
     let all = OnboardingStep::all();
-    assert_eq!(all.len(), 7, "There should be 7 onboarding steps");
+    assert_eq!(all.len(), 9, "There should be 9 onboarding steps");
     assert_eq!(all[0], OnboardingStep::Welcome);
-    assert_eq!(all[1], OnboardingStep::CreateIdentity);
-    assert_eq!(all[2], OnboardingStep::AddFields);
-    assert_eq!(all[3], OnboardingStep::PreviewCard);
-    assert_eq!(all[4], OnboardingStep::SecurityExplanation);
-    assert_eq!(all[5], OnboardingStep::BackupPrompt);
-    assert_eq!(all[6], OnboardingStep::Ready);
+    assert_eq!(all[1], OnboardingStep::DefaultName);
+    assert_eq!(all[2], OnboardingStep::SkipGate);
+    assert_eq!(all[3], OnboardingStep::GroupsSetup);
+    assert_eq!(all[4], OnboardingStep::ContactInfo);
+    assert_eq!(all[5], OnboardingStep::PreviewCard);
+    assert_eq!(all[6], OnboardingStep::SecurityExplanation);
+    assert_eq!(all[7], OnboardingStep::BackupPrompt);
+    assert_eq!(all[8], OnboardingStep::Ready);
 }
 
 // @scenario: onboarding:step_index
 #[test]
 fn test_step_index_is_zero_based() {
     assert_eq!(OnboardingStep::Welcome.index(), 0);
-    assert_eq!(OnboardingStep::CreateIdentity.index(), 1);
-    assert_eq!(OnboardingStep::AddFields.index(), 2);
-    assert_eq!(OnboardingStep::PreviewCard.index(), 3);
-    assert_eq!(OnboardingStep::SecurityExplanation.index(), 4);
-    assert_eq!(OnboardingStep::BackupPrompt.index(), 5);
-    assert_eq!(OnboardingStep::Ready.index(), 6);
+    assert_eq!(OnboardingStep::DefaultName.index(), 1);
+    assert_eq!(OnboardingStep::SkipGate.index(), 2);
+    assert_eq!(OnboardingStep::GroupsSetup.index(), 3);
+    assert_eq!(OnboardingStep::ContactInfo.index(), 4);
+    assert_eq!(OnboardingStep::PreviewCard.index(), 5);
+    assert_eq!(OnboardingStep::SecurityExplanation.index(), 6);
+    assert_eq!(OnboardingStep::BackupPrompt.index(), 7);
+    assert_eq!(OnboardingStep::Ready.index(), 8);
 }
 
 // @scenario: onboarding:step_navigation
@@ -63,16 +67,16 @@ fn test_step_next_and_previous() {
     assert_eq!(OnboardingStep::Welcome.previous(), None);
     assert_eq!(
         OnboardingStep::Welcome.next(),
-        Some(OnboardingStep::CreateIdentity)
+        Some(OnboardingStep::DefaultName)
     );
 
     // Middle step has both
     assert_eq!(
-        OnboardingStep::AddFields.previous(),
-        Some(OnboardingStep::CreateIdentity)
+        OnboardingStep::ContactInfo.previous(),
+        Some(OnboardingStep::GroupsSetup)
     );
     assert_eq!(
-        OnboardingStep::AddFields.next(),
+        OnboardingStep::ContactInfo.next(),
         Some(OnboardingStep::PreviewCard)
     );
 
@@ -125,17 +129,23 @@ fn test_new_progress_starts_at_welcome() {
 fn test_advance_through_all_steps() {
     let mut progress = OnboardingProgress::new();
 
-    // Advance from Welcome to CreateIdentity
+    // Advance from Welcome to DefaultName
     let step = progress.advance();
-    assert_eq!(step, OnboardingStep::CreateIdentity);
+    assert_eq!(step, OnboardingStep::DefaultName);
     assert!(progress.completed_steps.contains(&OnboardingStep::Welcome));
 
     // Advance through remaining steps
     let step = progress.advance();
-    assert_eq!(step, OnboardingStep::AddFields);
+    assert_eq!(step, OnboardingStep::SkipGate);
     assert!(progress
         .completed_steps
-        .contains(&OnboardingStep::CreateIdentity));
+        .contains(&OnboardingStep::DefaultName));
+
+    let step = progress.advance();
+    assert_eq!(step, OnboardingStep::GroupsSetup);
+
+    let step = progress.advance();
+    assert_eq!(step, OnboardingStep::ContactInfo);
 
     let step = progress.advance();
     assert_eq!(step, OnboardingStep::PreviewCard);
@@ -165,7 +175,7 @@ fn test_advance_through_all_steps() {
     );
 
     // Verify all steps are completed
-    assert_eq!(progress.completed_steps.len(), 7);
+    assert_eq!(progress.completed_steps.len(), 9);
 }
 
 // @scenario: onboarding:skip_step (#24)
@@ -177,8 +187,8 @@ fn test_skip_step_does_not_mark_completed() {
     let step = progress.skip_step();
     assert_eq!(
         step,
-        OnboardingStep::CreateIdentity,
-        "Should advance to CreateIdentity"
+        OnboardingStep::DefaultName,
+        "Should advance to DefaultName"
     );
     assert!(
         !progress.completed_steps.contains(&OnboardingStep::Welcome),
@@ -192,9 +202,11 @@ fn test_skip_backup_records_flag() {
     let mut progress = OnboardingProgress::new();
 
     // Advance to BackupPrompt
-    progress.advance(); // Welcome -> CreateIdentity
-    progress.advance(); // CreateIdentity -> AddFields
-    progress.advance(); // AddFields -> PreviewCard
+    progress.advance(); // Welcome -> DefaultName
+    progress.advance(); // DefaultName -> SkipGate
+    progress.advance(); // SkipGate -> GroupsSetup
+    progress.advance(); // GroupsSetup -> ContactInfo
+    progress.advance(); // ContactInfo -> PreviewCard
     progress.advance(); // PreviewCard -> SecurityExplanation
     progress.advance(); // SecurityExplanation -> BackupPrompt
 
@@ -221,24 +233,26 @@ fn test_skip_backup_records_flag() {
 fn test_completion_percentage() {
     let mut progress = OnboardingProgress::new();
 
-    // 0 completed out of 7 total = 0%
+    // 0 completed out of 9 total = 0%
     assert_eq!(progress.completion_percentage(), 0);
 
-    // Complete 1 step: 1/7 = 14%
-    progress.advance(); // Welcome -> CreateIdentity, Welcome completed
-    assert_eq!(progress.completion_percentage(), 14);
+    // Complete 1 step: 1/9 = 11%
+    progress.advance(); // Welcome -> DefaultName, Welcome completed
+    assert_eq!(progress.completion_percentage(), 11);
 
     // Complete all steps
-    progress.advance(); // CreateIdentity -> AddFields
-    progress.advance(); // AddFields -> PreviewCard
+    progress.advance(); // DefaultName -> SkipGate
+    progress.advance(); // SkipGate -> GroupsSetup
+    progress.advance(); // GroupsSetup -> ContactInfo
+    progress.advance(); // ContactInfo -> PreviewCard
     progress.advance(); // PreviewCard -> SecurityExplanation
     progress.advance(); // SecurityExplanation -> BackupPrompt
     progress.advance(); // BackupPrompt -> Ready
-    assert_eq!(progress.completion_percentage(), 85); // 6/7
+    assert_eq!(progress.completion_percentage(), 88); // 8/9
 
     // Final advance completes Ready
     progress.advance();
-    assert_eq!(progress.completion_percentage(), 100); // 7/7
+    assert_eq!(progress.completion_percentage(), 100); // 9/9
 }
 
 // @scenario: onboarding:idempotent_advance_at_final (#26)
@@ -247,7 +261,7 @@ fn test_idempotent_advance_at_final_step() {
     let mut progress = OnboardingProgress::new();
 
     // Advance through all steps
-    for _ in 0..7 {
+    for _ in 0..9 {
         progress.advance();
     }
 
@@ -290,13 +304,71 @@ fn test_reset_clears_all_progress() {
     assert!(!progress.is_complete());
 }
 
+// @scenario: onboarding:skip_to_finish (#skip_gate)
+#[test]
+fn test_skip_to_finish_jumps_to_security() {
+    let mut progress = OnboardingProgress::new();
+
+    // Advance to SkipGate
+    progress.advance(); // Welcome -> DefaultName
+    progress.advance(); // DefaultName -> SkipGate
+
+    assert_eq!(progress.current_step(), OnboardingStep::SkipGate);
+
+    // Skip to finish jumps directly to SecurityExplanation
+    progress.skip_to_finish();
+    assert_eq!(progress.current_step(), OnboardingStep::SecurityExplanation);
+
+    // Intermediate steps (GroupsSetup, ContactInfo, PreviewCard) should NOT be completed
+    assert!(
+        !progress
+            .completed_steps
+            .contains(&OnboardingStep::GroupsSetup),
+        "GroupsSetup should not be completed after skip_to_finish"
+    );
+    assert!(
+        !progress
+            .completed_steps
+            .contains(&OnboardingStep::ContactInfo),
+        "ContactInfo should not be completed after skip_to_finish"
+    );
+    assert!(
+        !progress
+            .completed_steps
+            .contains(&OnboardingStep::PreviewCard),
+        "PreviewCard should not be completed after skip_to_finish"
+    );
+
+    // SkipGate itself should NOT be completed (skip_to_finish doesn't mark it)
+    assert!(
+        !progress.completed_steps.contains(&OnboardingStep::SkipGate),
+        "SkipGate should not be completed after skip_to_finish"
+    );
+
+    // Can continue from SecurityExplanation normally
+    let step = progress.advance();
+    assert_eq!(step, OnboardingStep::BackupPrompt);
+}
+
+// @scenario: onboarding:serde_backward_compat
+#[test]
+fn test_serde_backward_compat_aliases() {
+    // JSON with old variant names should deserialize correctly
+    let old_json = r#"{"current_step":"CreateIdentity","completed_steps":["AddFields"],"started_at":1000,"completed_at":null,"skipped_backup":false}"#;
+    let progress = OnboardingProgress::from_json(old_json).expect("Old JSON should deserialize");
+    assert_eq!(progress.current_step(), OnboardingStep::DefaultName);
+    assert!(progress
+        .completed_steps
+        .contains(&OnboardingStep::ContactInfo));
+}
+
 // @scenario: onboarding:json_serialization_roundtrip (#25)
 #[test]
 fn test_json_serialization_roundtrip() {
     let mut progress = OnboardingProgress::new();
-    progress.advance(); // Welcome -> CreateIdentity
-    progress.advance(); // CreateIdentity -> AddFields
-    progress.skip_step(); // Skip AddFields -> PreviewCard
+    progress.advance(); // Welcome -> DefaultName
+    progress.advance(); // DefaultName -> SkipGate
+    progress.skip_step(); // Skip SkipGate -> GroupsSetup
 
     let json = progress.to_json().expect("Serialization should succeed");
     let restored = OnboardingProgress::from_json(&json).expect("Deserialization should succeed");
@@ -319,7 +391,7 @@ fn test_json_roundtrip_preserves_option_timestamps() {
     assert_eq!(restored.started_at, progress.started_at);
 
     // Complete and verify completed_at is preserved
-    for _ in 0..7 {
+    for _ in 0..9 {
         progress.advance();
     }
     assert!(progress.completed_at.is_some());
@@ -356,18 +428,18 @@ fn test_storage_save_load_roundtrip() {
     let storage = vauchi_core::Storage::in_memory(vauchi_core::SymmetricKey::generate()).unwrap();
 
     let mut progress = OnboardingProgress::new();
-    progress.advance(); // Welcome -> CreateIdentity
-    progress.advance(); // CreateIdentity -> AddFields
+    progress.advance(); // Welcome -> DefaultName
+    progress.advance(); // DefaultName -> SkipGate
 
     storage.save_onboarding_progress(&progress).unwrap();
     let loaded = storage.load_onboarding_progress().unwrap().unwrap();
 
-    assert_eq!(loaded.current_step(), OnboardingStep::AddFields);
+    assert_eq!(loaded.current_step(), OnboardingStep::SkipGate);
     assert_eq!(loaded.completed_steps.len(), 2);
     assert!(loaded.completed_steps.contains(&OnboardingStep::Welcome));
     assert!(loaded
         .completed_steps
-        .contains(&OnboardingStep::CreateIdentity));
+        .contains(&OnboardingStep::DefaultName));
 }
 
 // @scenario: onboarding:storage_load_empty
@@ -394,7 +466,7 @@ fn test_storage_load_or_create() {
     storage.save_onboarding_progress(&progress).unwrap();
 
     let loaded = storage.load_or_create_onboarding_progress().unwrap();
-    assert_eq!(loaded.current_step(), OnboardingStep::CreateIdentity);
+    assert_eq!(loaded.current_step(), OnboardingStep::DefaultName);
 }
 
 // @scenario: onboarding:storage_overwrite
@@ -415,7 +487,7 @@ fn test_storage_overwrite_replaces_previous() {
     let loaded = storage.load_onboarding_progress().unwrap().unwrap();
     assert_eq!(
         loaded.current_step(),
-        OnboardingStep::PreviewCard,
+        OnboardingStep::GroupsSetup,
         "Should have the latest saved state"
     );
 }
@@ -538,11 +610,11 @@ fn test_api_get_and_advance_onboarding() {
 
     // Advance
     let progress = vauchi.advance_onboarding().unwrap();
-    assert_eq!(progress.current_step(), OnboardingStep::CreateIdentity);
+    assert_eq!(progress.current_step(), OnboardingStep::DefaultName);
 
     // Progress persists
     let progress = vauchi.get_onboarding_progress().unwrap();
-    assert_eq!(progress.current_step(), OnboardingStep::CreateIdentity);
+    assert_eq!(progress.current_step(), OnboardingStep::DefaultName);
 }
 
 // @scenario: onboarding:api_skip (#24)
@@ -551,7 +623,7 @@ fn test_api_skip_onboarding_step() {
     let vauchi = create_test_vauchi();
 
     let progress = vauchi.skip_onboarding_step().unwrap();
-    assert_eq!(progress.current_step(), OnboardingStep::CreateIdentity);
+    assert_eq!(progress.current_step(), OnboardingStep::DefaultName);
 
     // Skipped step should not be in completed_steps
     assert!(
@@ -588,7 +660,7 @@ fn test_api_is_onboarding_complete() {
     );
 
     // Advance through all steps
-    for _ in 0..7 {
+    for _ in 0..9 {
         vauchi.advance_onboarding().unwrap();
     }
 
@@ -606,10 +678,10 @@ fn test_api_completion_percentage() {
     assert_eq!(vauchi.onboarding_completion_percentage().unwrap(), 0);
 
     vauchi.advance_onboarding().unwrap();
-    assert_eq!(vauchi.onboarding_completion_percentage().unwrap(), 14); // 1/7
+    assert_eq!(vauchi.onboarding_completion_percentage().unwrap(), 11); // 1/9
 
     // Advance through all
-    for _ in 0..6 {
+    for _ in 0..8 {
         vauchi.advance_onboarding().unwrap();
     }
     assert_eq!(vauchi.onboarding_completion_percentage().unwrap(), 100);
@@ -628,6 +700,31 @@ fn test_api_current_onboarding_step() {
     vauchi.advance_onboarding().unwrap();
     assert_eq!(
         vauchi.current_onboarding_step().unwrap(),
-        OnboardingStep::CreateIdentity
+        OnboardingStep::DefaultName
+    );
+}
+
+// @scenario: onboarding:api_skip_to_finish (#skip_gate)
+#[test]
+fn test_api_skip_onboarding_to_finish() {
+    let vauchi = create_test_vauchi();
+
+    // Advance to SkipGate
+    vauchi.advance_onboarding().unwrap(); // Welcome -> DefaultName
+    vauchi.advance_onboarding().unwrap(); // DefaultName -> SkipGate
+
+    assert_eq!(
+        vauchi.current_onboarding_step().unwrap(),
+        OnboardingStep::SkipGate
+    );
+
+    // Skip to finish
+    let progress = vauchi.skip_onboarding_to_finish().unwrap();
+    assert_eq!(progress.current_step(), OnboardingStep::SecurityExplanation);
+
+    // Verify it persisted
+    assert_eq!(
+        vauchi.current_onboarding_step().unwrap(),
+        OnboardingStep::SecurityExplanation
     );
 }

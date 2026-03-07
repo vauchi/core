@@ -27,7 +27,7 @@ enum Step {
 // ── Public data types ───────────────────────────────────────────────
 
 /// Data collected during onboarding.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
 pub struct OnboardingData {
     pub display_name: String,
     pub selected_groups: Vec<GroupSetup>,
@@ -35,7 +35,7 @@ pub struct OnboardingData {
 }
 
 /// A group the user can toggle during onboarding.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct GroupSetup {
     pub name: String,
     pub selected: bool,
@@ -43,7 +43,7 @@ pub struct GroupSetup {
 }
 
 /// A contact field configured during onboarding.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct FieldSetup {
     pub field_type: String,
     pub label: String,

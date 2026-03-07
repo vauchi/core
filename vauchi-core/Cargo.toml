@@ -67,6 +67,9 @@ rand = "0.8"
 # Base64 encoding for keys/backups
 base64 = "0.22"
 
+# CRC32 checksums for animated QR frame validation
+crc32fast = "1.4"
+
 # Hex encoding for fingerprints
 hex = "0.4"
 
@@ -210,6 +213,10 @@ name = "transport_channel_tests"
 required-features = ["testing"]
 
 [[test]]
+name = "transport_negotiation_tests"
+required-features = ["testing"]
+
+[[test]]
 name = "exchange_tests"
 required-features = ["testing"]
 
@@ -273,6 +280,10 @@ name = "multistage_e2e_tests"
 required-features = ["testing"]
 
 [[test]]
+name = "animated_qr_transport_tests"
+required-features = ["testing"]
+
+[[test]]
 name = "diagnostic_snapshot_tests"
 
 [[test]]
@@ -283,3 +294,7 @@ name = "diagnostic_log_event_tests"
 
 [[test]]
 name = "diagnostic_report_tests"
+
+[[test]]
+name = "transport_orchestrator_tests"
+required-features = ["testing"]

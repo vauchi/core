@@ -560,6 +560,9 @@ name = "bitflags"
 version = "2.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "843867be96c8daad0d758b57df9392b6d8d271134fce549de6ce169ff98a92af"
+dependencies = [
+ "serde_core",
+]
 
 [[package]]
 name = "bitvec"
@@ -6551,14 +6554,16 @@ checksum = "ba73ea9cf16a25df0c8caa16c51acb937d5712a8429db78a3ee29d5dcacd3a65"
 
 [[package]]
 name = "vauchi-core"
-version = "0.3.2-dev.0"
+version = "0.4.1-dev.0"
 dependencies = [
  "argon2",
  "arti-client",
  "async-trait",
  "base64",
+ "bitflags 2.11.0",
  "chacha20poly1305",
  "cpal",
+ "crc32fast",
  "criterion",
  "cucumber",
  "flate2",
@@ -6594,7 +6599,7 @@ dependencies = [
 
 [[package]]
 name = "vauchi-mobile"
-version = "0.3.2-dev.0"
+version = "0.4.1-dev.0"
 dependencies = [
  "base64",
  "crc32fast",
@@ -6622,7 +6627,7 @@ dependencies = [
 
 [[package]]
 name = "vauchi-protocol"
-version = "0.3.2-dev.0"
+version = "0.4.1-dev.0"
 dependencies = [
  "serde",
  "serde_json",

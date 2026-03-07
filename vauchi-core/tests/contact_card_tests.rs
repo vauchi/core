@@ -68,5 +68,5 @@ fn test_remove_field_cleans_up_shown_fields() {
 
     card.remove_field(&field_id).unwrap();
     assert!(!card.is_field_shown(&field_id));
-    assert!(!card.shown_fields().contains(&field_id));
+    assert!(card.shown_fields().is_empty());
 }

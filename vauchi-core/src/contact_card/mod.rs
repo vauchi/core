@@ -80,7 +80,7 @@ pub struct ContactCard {
     /// Field IDs marked as "shown" in no-group mode.
     /// When no visibility labels exist, this set determines which fields
     /// are visible to all contacts. Empty = all hidden (privacy-first default).
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "HashSet::is_empty")]
     shown_fields: HashSet<String>,
 }
 
@@ -303,6 +303,11 @@ impl ContactCard {
     /// Sets whether a field is shown (no-group mode).
     /// When true, all contacts see this field. When false, no one sees it.
     pub fn set_field_shown(&mut self, field_id: &str, shown: bool) {
+        debug_assert!(
+            !shown || self.fields.iter().any(|f| f.id() == field_id),
+            "set_field_shown called with nonexistent field_id: {}",
+            field_id
+        );
         if shown {
             self.shown_fields.insert(field_id.to_string());
         } else {

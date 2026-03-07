@@ -88,6 +88,19 @@ fn test_step_next_and_previous() {
     assert_eq!(OnboardingStep::Ready.next(), None);
 }
 
+// @scenario: onboarding:step_index_consistency
+#[test]
+fn test_step_index_consistent_with_all() {
+    for (expected_idx, step) in OnboardingStep::all().iter().enumerate() {
+        assert_eq!(
+            step.index(),
+            expected_idx,
+            "{:?}.index() does not match its position in all()",
+            step
+        );
+    }
+}
+
 // =============================================================================
 // OnboardingProgress Tests
 // =============================================================================
@@ -360,6 +373,25 @@ fn test_serde_backward_compat_aliases() {
     assert!(progress
         .completed_steps
         .contains(&OnboardingStep::ContactInfo));
+
+    // Re-serialization must use canonical names, not aliases
+    let re_serialized = progress.to_json().expect("Re-serialization should succeed");
+    assert!(
+        re_serialized.contains("DefaultName"),
+        "Canonical name must be serialized"
+    );
+    assert!(
+        re_serialized.contains("ContactInfo"),
+        "Canonical name must be serialized"
+    );
+    assert!(
+        !re_serialized.contains("CreateIdentity"),
+        "Old alias must not appear in new JSON"
+    );
+    assert!(
+        !re_serialized.contains("AddFields"),
+        "Old alias must not appear in new JSON"
+    );
 }
 
 // @scenario: onboarding:json_serialization_roundtrip (#25)

@@ -689,10 +689,14 @@ pub struct MobileDemoContactState {
 pub enum MobileOnboardingStep {
     /// Welcome screen showing value proposition
     Welcome,
-    /// Identity creation (display name entry)
-    CreateIdentity,
-    /// Add optional contact fields (phone, email)
-    AddFields,
+    /// Default display name entry
+    DefaultName,
+    /// Skip gate: user can skip to finish or continue setup
+    SkipGate,
+    /// Groups setup: create contact groups
+    GroupsSetup,
+    /// Contact info fields (phone, email)
+    ContactInfo,
     /// Preview the contact card before continuing
     PreviewCard,
     /// Security explanation screen
@@ -707,8 +711,10 @@ impl From<vauchi_core::OnboardingStep> for MobileOnboardingStep {
     fn from(step: vauchi_core::OnboardingStep) -> Self {
         match step {
             vauchi_core::OnboardingStep::Welcome => MobileOnboardingStep::Welcome,
-            vauchi_core::OnboardingStep::CreateIdentity => MobileOnboardingStep::CreateIdentity,
-            vauchi_core::OnboardingStep::AddFields => MobileOnboardingStep::AddFields,
+            vauchi_core::OnboardingStep::DefaultName => MobileOnboardingStep::DefaultName,
+            vauchi_core::OnboardingStep::SkipGate => MobileOnboardingStep::SkipGate,
+            vauchi_core::OnboardingStep::GroupsSetup => MobileOnboardingStep::GroupsSetup,
+            vauchi_core::OnboardingStep::ContactInfo => MobileOnboardingStep::ContactInfo,
             vauchi_core::OnboardingStep::PreviewCard => MobileOnboardingStep::PreviewCard,
             vauchi_core::OnboardingStep::SecurityExplanation => {
                 MobileOnboardingStep::SecurityExplanation
@@ -723,8 +729,10 @@ impl From<MobileOnboardingStep> for vauchi_core::OnboardingStep {
     fn from(step: MobileOnboardingStep) -> Self {
         match step {
             MobileOnboardingStep::Welcome => vauchi_core::OnboardingStep::Welcome,
-            MobileOnboardingStep::CreateIdentity => vauchi_core::OnboardingStep::CreateIdentity,
-            MobileOnboardingStep::AddFields => vauchi_core::OnboardingStep::AddFields,
+            MobileOnboardingStep::DefaultName => vauchi_core::OnboardingStep::DefaultName,
+            MobileOnboardingStep::SkipGate => vauchi_core::OnboardingStep::SkipGate,
+            MobileOnboardingStep::GroupsSetup => vauchi_core::OnboardingStep::GroupsSetup,
+            MobileOnboardingStep::ContactInfo => vauchi_core::OnboardingStep::ContactInfo,
             MobileOnboardingStep::PreviewCard => vauchi_core::OnboardingStep::PreviewCard,
             MobileOnboardingStep::SecurityExplanation => {
                 vauchi_core::OnboardingStep::SecurityExplanation

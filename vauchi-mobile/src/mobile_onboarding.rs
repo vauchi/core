@@ -53,6 +53,23 @@ impl VauchiMobile {
         Ok(MobileOnboardingProgress::from(&progress))
     }
 
+    /// Skip from SkipGate directly to SecurityExplanation.
+    ///
+    /// Called when the user chooses "Skip to finish" at the skip gate,
+    /// bypassing GroupsSetup, ContactInfo, and PreviewCard.
+    /// Returns the updated progress.
+    pub fn skip_onboarding_to_finish(&self) -> Result<MobileOnboardingProgress, MobileError> {
+        let storage = self.open_storage()?;
+        let mut progress = storage
+            .load_or_create_onboarding_progress()
+            .map_err(|e| MobileError::StorageError(e.to_string()))?;
+        progress.skip_to_finish();
+        storage
+            .save_onboarding_progress(&progress)
+            .map_err(|e| MobileError::StorageError(e.to_string()))?;
+        Ok(MobileOnboardingProgress::from(&progress))
+    }
+
     /// Reset onboarding to the beginning.
     ///
     /// Useful for "replay onboarding" from settings.

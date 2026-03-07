@@ -48,7 +48,12 @@ impl<T: Transport> Vauchi<T> {
         Ok(progress)
     }
 
-    /// Skips from SkipGate to SecurityExplanation (skip gate "Skip to finish").
+    /// Skips from SkipGate directly to SecurityExplanation.
+    ///
+    /// Called when the user chooses "Skip to finish" at the skip gate,
+    /// bypassing GroupsSetup, ContactInfo, and PreviewCard.
+    /// Persists the updated progress to storage.
+    /// Returns the updated progress.
     pub fn skip_onboarding_to_finish(&self) -> VauchiResult<OnboardingProgress> {
         let mut progress = self.storage.load_or_create_onboarding_progress()?;
         progress.skip_to_finish();

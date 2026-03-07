@@ -21,10 +21,16 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 pub enum OnboardingStep {
     /// Welcome screen showing value proposition
     Welcome,
-    /// Identity creation (display name entry)
-    CreateIdentity,
-    /// Add optional contact fields (phone, email)
-    AddFields,
+    /// Default display name entry (renamed from CreateIdentity)
+    #[serde(alias = "CreateIdentity")]
+    DefaultName,
+    /// Skip gate: user can skip to finish or continue setup
+    SkipGate,
+    /// Groups setup: create contact groups
+    GroupsSetup,
+    /// Contact info fields (phone, email) (renamed from AddFields)
+    #[serde(alias = "AddFields")]
+    ContactInfo,
     /// Preview the contact card before continuing
     PreviewCard,
     /// Security explanation screen
@@ -40,8 +46,10 @@ impl OnboardingStep {
     pub fn all() -> &'static [OnboardingStep] {
         &[
             OnboardingStep::Welcome,
-            OnboardingStep::CreateIdentity,
-            OnboardingStep::AddFields,
+            OnboardingStep::DefaultName,
+            OnboardingStep::SkipGate,
+            OnboardingStep::GroupsSetup,
+            OnboardingStep::ContactInfo,
             OnboardingStep::PreviewCard,
             OnboardingStep::SecurityExplanation,
             OnboardingStep::BackupPrompt,
@@ -53,12 +61,14 @@ impl OnboardingStep {
     pub fn index(&self) -> usize {
         match self {
             OnboardingStep::Welcome => 0,
-            OnboardingStep::CreateIdentity => 1,
-            OnboardingStep::AddFields => 2,
-            OnboardingStep::PreviewCard => 3,
-            OnboardingStep::SecurityExplanation => 4,
-            OnboardingStep::BackupPrompt => 5,
-            OnboardingStep::Ready => 6,
+            OnboardingStep::DefaultName => 1,
+            OnboardingStep::SkipGate => 2,
+            OnboardingStep::GroupsSetup => 3,
+            OnboardingStep::ContactInfo => 4,
+            OnboardingStep::PreviewCard => 5,
+            OnboardingStep::SecurityExplanation => 6,
+            OnboardingStep::BackupPrompt => 7,
+            OnboardingStep::Ready => 8,
         }
     }
 
@@ -180,6 +190,12 @@ impl OnboardingProgress {
         }
 
         self.current_step
+    }
+
+    /// Skips from SkipGate directly to SecurityExplanation.
+    /// Called when user chooses "Skip to finish" at the skip gate.
+    pub fn skip_to_finish(&mut self) {
+        self.current_step = OnboardingStep::SecurityExplanation;
     }
 
     /// Returns whether onboarding is complete (reached and passed `Ready`).

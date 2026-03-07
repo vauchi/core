@@ -48,6 +48,14 @@ impl<T: Transport> Vauchi<T> {
         Ok(progress)
     }
 
+    /// Skips from SkipGate to SecurityExplanation (skip gate "Skip to finish").
+    pub fn skip_onboarding_to_finish(&self) -> VauchiResult<OnboardingProgress> {
+        let mut progress = self.storage.load_or_create_onboarding_progress()?;
+        progress.skip_to_finish();
+        self.storage.save_onboarding_progress(&progress)?;
+        Ok(progress)
+    }
+
     /// Resets onboarding to the beginning.
     ///
     /// Clears all progress and starts fresh. Useful for "replay onboarding"

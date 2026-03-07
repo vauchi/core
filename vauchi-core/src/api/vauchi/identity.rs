@@ -224,4 +224,18 @@ impl<T: Transport> Vauchi<T> {
         let manager = ContactManager::new(&self.storage, self.events.clone());
         manager.remove_field_from_own_card(label)
     }
+
+    /// Sets whether a field is shown in no-group visibility mode.
+    ///
+    /// When no groups exist, this controls field visibility directly.
+    /// Persists the updated card to storage.
+    pub fn set_field_shown(&self, field_id: &str, shown: bool) -> VauchiResult<()> {
+        let mut card = self
+            .storage
+            .load_own_card()?
+            .ok_or_else(|| VauchiError::InvalidState("No own card found".into()))?;
+        card.set_field_shown(field_id, shown);
+        self.storage.save_own_card(&card)?;
+        Ok(())
+    }
 }

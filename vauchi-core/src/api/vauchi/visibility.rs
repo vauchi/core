@@ -50,8 +50,32 @@ impl<T: Transport> Vauchi<T> {
     ///
     /// Contacts in the label remain in the contact list; they just lose
     /// their label membership.
+    ///
+    /// When deleting the last label (transition to no-group mode), visible
+    /// fields from the deleted label are migrated to `shown_fields` on the
+    /// own card so field visibility is preserved.
     pub fn delete_label(&self, label_id: &str) -> VauchiResult<()> {
-        Ok(self.storage.delete_label(label_id)?)
+        // Load the label before deletion to capture its visible fields
+        let label = self.storage.load_label(label_id)?;
+        let visible_fields = label.visible_fields().clone();
+
+        // Delete the label from storage
+        self.storage.delete_label(label_id)?;
+
+        // Check if this was the last label
+        let remaining_labels = self.storage.load_all_labels()?;
+        if remaining_labels.is_empty() && !visible_fields.is_empty() {
+            // Transitioning to no-group mode:
+            // Migrate visible fields from the deleted label to shown_fields
+            if let Some(mut card) = self.storage.load_own_card()? {
+                for field_id in &visible_fields {
+                    card.set_field_shown(field_id, true);
+                }
+                self.storage.save_own_card(&card)?;
+            }
+        }
+
+        Ok(())
     }
 
     /// Gets a visibility label by ID.

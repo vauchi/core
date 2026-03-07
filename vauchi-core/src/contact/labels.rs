@@ -154,7 +154,7 @@ impl VisibilityLabel {
                         "Display name override cannot be empty".to_string(),
                     ));
                 }
-                if trimmed.len() > 100 {
+                if trimmed.chars().count() > 100 {
                     return Err(LabelError::InvalidName(
                         "Display name override cannot exceed 100 characters".to_string(),
                     ));

@@ -208,7 +208,10 @@ fn test_label_crud_operations() {
     // Verify suggested labels constant
     // =========================================================================
     use vauchi_core::contact::SUGGESTED_LABELS;
-    assert_eq!(SUGGESTED_LABELS, &["Family", "Friends", "Professional"]);
+    assert_eq!(
+        SUGGESTED_LABELS,
+        &["Family", "Friends", "Coworkers", "Business"]
+    );
 }
 
 /// Tests that the maximum number of labels is enforced.

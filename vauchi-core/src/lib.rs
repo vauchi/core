@@ -42,8 +42,8 @@ pub use api::{
 };
 pub use contact::merge::DuplicatePair;
 pub use contact::{
-    Contact, FieldVisibility, LabelError, LabelManager, VisibilityLabel, VisibilityRules,
-    MAX_LABELS, SUGGESTED_LABELS,
+    resolve_visible_fields, Contact, FieldVisibility, LabelError, LabelManager, VisibilityLabel,
+    VisibilityRules, MAX_LABELS, SUGGESTED_LABELS,
 };
 pub use contact_card::{
     is_allowed_scheme, is_blocked_scheme, is_safe_url, ContactCard, ContactField, FieldType,

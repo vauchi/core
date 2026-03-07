@@ -58,6 +58,69 @@ pub struct ThemeColors {
     pub border: String,
 }
 
+/// Design tokens for consistent cross-platform rendering.
+///
+/// Provides spacing, typography, and border radius values that
+/// all platform clients use for layout consistency.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DesignTokens {
+    pub spacing: SpacingTokens,
+    pub typography: TypographyTokens,
+    pub border_radius: BorderRadiusTokens,
+}
+
+/// Spacing scale for margins, padding, and gaps.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SpacingTokens {
+    pub xs: u16,
+    pub sm: u16,
+    pub md: u16,
+    pub lg: u16,
+    pub xl: u16,
+}
+
+/// Font size tokens for text hierarchy.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TypographyTokens {
+    pub title_size: u16,
+    pub subtitle_size: u16,
+    pub body_size: u16,
+    pub caption_size: u16,
+}
+
+/// Border radius tokens for rounded corners.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct BorderRadiusTokens {
+    pub sm: u16,
+    pub md: u16,
+    pub lg: u16,
+}
+
+impl Default for DesignTokens {
+    fn default() -> Self {
+        Self {
+            spacing: SpacingTokens {
+                xs: 4,
+                sm: 8,
+                md: 16,
+                lg: 24,
+                xl: 32,
+            },
+            typography: TypographyTokens {
+                title_size: 24,
+                subtitle_size: 18,
+                body_size: 16,
+                caption_size: 14,
+            },
+            border_radius: BorderRadiusTokens {
+                sm: 4,
+                md: 8,
+                lg: 16,
+            },
+        }
+    }
+}
+
 /// A complete theme definition
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Theme {
@@ -72,6 +135,9 @@ pub struct Theme {
     pub source: Option<String>,
     pub mode: ThemeMode,
     pub colors: ThemeColors,
+    /// Design tokens for layout consistency. Falls back to defaults if absent in JSON.
+    #[serde(default)]
+    pub tokens: DesignTokens,
 }
 
 impl Theme {
@@ -179,6 +245,7 @@ fn default_dark() -> Theme {
             warning: "#fab387".to_string(),
             border: "#45475a".to_string(),
         },
+        tokens: DesignTokens::default(),
     }
 }
 
@@ -371,5 +438,66 @@ mod tests {
             "Contract check passed: core parsed {} themes from {path}",
             themes.len()
         );
+    }
+
+    #[test]
+    fn test_design_tokens_default_spacing() {
+        let tokens = DesignTokens::default();
+        assert_eq!(tokens.spacing.xs, 4);
+        assert_eq!(tokens.spacing.sm, 8);
+        assert_eq!(tokens.spacing.md, 16);
+        assert_eq!(tokens.spacing.lg, 24);
+        assert_eq!(tokens.spacing.xl, 32);
+    }
+
+    #[test]
+    fn test_design_tokens_default_typography() {
+        let tokens = DesignTokens::default();
+        assert_eq!(tokens.typography.title_size, 24);
+        assert_eq!(tokens.typography.subtitle_size, 18);
+        assert_eq!(tokens.typography.body_size, 16);
+        assert_eq!(tokens.typography.caption_size, 14);
+    }
+
+    #[test]
+    fn test_design_tokens_default_border_radius() {
+        let tokens = DesignTokens::default();
+        assert_eq!(tokens.border_radius.sm, 4);
+        assert_eq!(tokens.border_radius.md, 8);
+        assert_eq!(tokens.border_radius.lg, 16);
+    }
+
+    #[test]
+    fn test_design_tokens_serde_roundtrip() {
+        let tokens = DesignTokens::default();
+        let json = serde_json::to_string(&tokens).unwrap();
+        let restored: DesignTokens = serde_json::from_str(&json).unwrap();
+        assert_eq!(restored, tokens);
+    }
+
+    #[test]
+    fn test_theme_includes_default_tokens() {
+        let theme = default_theme();
+        assert_eq!(theme.tokens.spacing.md, 16);
+        assert_eq!(theme.tokens.typography.body_size, 16);
+        assert_eq!(theme.tokens.border_radius.md, 8);
+    }
+
+    #[test]
+    fn test_theme_json_without_tokens_uses_defaults() {
+        let json = r##"[{
+            "id": "no-tokens",
+            "name": "No Tokens",
+            "version": "1.0.0",
+            "mode": "dark",
+            "colors": {
+                "bg-primary": "#000000","bg-secondary": "#111111","bg-tertiary": "#222222",
+                "text-primary": "#ffffff","text-secondary": "#cccccc",
+                "accent": "#0000ff","accent-dark": "#000099",
+                "success": "#00ff00","error": "#ff0000","warning": "#ffff00","border": "#333333"
+            }
+        }]"##;
+        let themes = load_themes_from_json(json.as_bytes()).unwrap();
+        assert_eq!(themes[0].tokens, DesignTokens::default());
     }
 }

@@ -18,7 +18,7 @@ mod common;
 
 use common::helpers::all_themes;
 use vauchi_core::contact_card::{ContactField, FieldType};
-use vauchi_core::theme::{Theme, ThemeColors, ThemeMode};
+use vauchi_core::theme::{DesignTokens, Theme, ThemeColors, ThemeMode};
 use vauchi_core::ContactCard;
 
 // ============================================================
@@ -415,6 +415,7 @@ fn test_low_contrast_theme_fails() {
         source: None,
         mode: ThemeMode::Dark,
         colors: bad_colors,
+        tokens: DesignTokens::default(),
     };
 
     let result = bad_theme.validate_accessibility();

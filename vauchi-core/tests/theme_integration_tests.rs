@@ -16,7 +16,7 @@
 mod common;
 
 use common::helpers::{all_themes, theme_by_id};
-use vauchi_core::theme::{validate_hex_color, Theme, ThemeColors, ThemeMode};
+use vauchi_core::theme::{validate_hex_color, DesignTokens, Theme, ThemeColors, ThemeMode};
 
 // ============================================================
 // Theme Structure
@@ -160,6 +160,7 @@ fn test_contrast_ratio_calculation() {
         source: None,
         mode: ThemeMode::Dark,
         colors,
+        tokens: DesignTokens::default(),
     };
 
     assert!(
@@ -198,6 +199,7 @@ fn test_low_contrast_fails() {
         source: None,
         mode: ThemeMode::Dark,
         colors,
+        tokens: DesignTokens::default(),
     };
 
     assert!(

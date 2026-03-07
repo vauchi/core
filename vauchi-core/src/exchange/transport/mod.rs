@@ -10,9 +10,12 @@
 pub mod animated_qr;
 pub mod caps;
 pub mod channel;
+pub mod diagnostics;
 pub mod mock;
 pub mod negotiation;
 pub mod orchestrator;
+pub mod protocol;
+pub mod trace;
 pub mod wifi_aware;
 
 pub use caps::TransportCaps;

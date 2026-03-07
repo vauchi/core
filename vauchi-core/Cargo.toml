@@ -298,3 +298,7 @@ name = "diagnostic_report_tests"
 [[test]]
 name = "transport_orchestrator_tests"
 required-features = ["testing"]
+
+[[test]]
+name = "transport_trace_tests"
+required-features = ["testing"]

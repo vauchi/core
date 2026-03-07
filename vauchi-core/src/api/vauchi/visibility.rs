@@ -28,6 +28,24 @@ impl<T: Transport> Vauchi<T> {
         Ok(self.storage.rename_label(label_id, new_name)?)
     }
 
+    /// Sets or clears the per-group display name override.
+    ///
+    /// When set, contacts in this group see this name instead of the
+    /// user's default display name. Pass `None` to clear.
+    /// Persists the updated label to storage.
+    pub fn set_label_display_name_override(
+        &self,
+        label_id: &str,
+        name_override: Option<&str>,
+    ) -> VauchiResult<()> {
+        let mut label = self.storage.load_label(label_id)?;
+        label
+            .set_display_name_override(name_override)
+            .map_err(|e| VauchiError::InvalidState(e.to_string()))?;
+        self.storage.save_label(&label)?;
+        Ok(())
+    }
+
     /// Deletes a visibility label.
     ///
     /// Contacts in the label remain in the contact list; they just lose

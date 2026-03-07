@@ -34,12 +34,23 @@ impl Storage {
         let name_hmac =
             self.compute_lookup_hmac(b"Vauchi_Label_Name_HMAC_v1", label.name().as_bytes());
 
+        // Encrypt display_name_override if present, NULL otherwise
+        let display_name_override_encrypted: Option<Vec<u8>> = match label.display_name_override() {
+            Some(override_name) => {
+                let encrypted =
+                    crate::crypto::encrypt(&self.encryption_key, override_name.as_bytes())
+                        .map_err(|e| StorageError::Encryption(e.to_string()))?;
+                Some(encrypted)
+            }
+            None => None,
+        };
+
         // Store label id in plaintext `name` column to satisfy UNIQUE constraint
         // without leaking the actual name (which is in name_encrypted).
         self.conn.execute(
             "INSERT OR REPLACE INTO visibility_labels
-             (id, name, name_encrypted, name_hmac, contacts_json, visible_fields_json, contacts_json_encrypted, visible_fields_json_encrypted, created_at, modified_at)
-             VALUES (?1, ?2, ?3, ?4, '[]', '[]', ?5, ?6, ?7, ?8)",
+             (id, name, name_encrypted, name_hmac, contacts_json, visible_fields_json, contacts_json_encrypted, visible_fields_json_encrypted, created_at, modified_at, display_name_override_encrypted)
+             VALUES (?1, ?2, ?3, ?4, '[]', '[]', ?5, ?6, ?7, ?8, ?9)",
             rusqlite::params![
                 label.id(),
                 label.id(),
@@ -49,6 +60,7 @@ impl Storage {
                 fields_encrypted,
                 label.created_at() as i64,
                 label.modified_at() as i64,
+                display_name_override_encrypted,
             ],
         )?;
 
@@ -58,7 +70,7 @@ impl Storage {
     /// Loads a visibility label by ID (decrypted).
     pub fn load_label(&self, label_id: &str) -> Result<VisibilityLabel, StorageError> {
         let mut stmt = self.conn.prepare(
-            "SELECT id, name, contacts_json, visible_fields_json, created_at, modified_at, contacts_json_encrypted, visible_fields_json_encrypted, name_encrypted
+            "SELECT id, name, contacts_json, visible_fields_json, created_at, modified_at, contacts_json_encrypted, visible_fields_json_encrypted, name_encrypted, display_name_override_encrypted
              FROM visibility_labels WHERE id = ?1",
         )?;
 
@@ -72,6 +84,7 @@ impl Storage {
             let contacts_encrypted: Option<Vec<u8>> = row.get(6)?;
             let fields_encrypted: Option<Vec<u8>> = row.get(7)?;
             let name_encrypted: Option<Vec<u8>> = row.get(8)?;
+            let display_name_override_encrypted: Option<Vec<u8>> = row.get(9)?;
 
             Ok((
                 id,
@@ -83,6 +96,7 @@ impl Storage {
                 contacts_encrypted,
                 fields_encrypted,
                 name_encrypted,
+                display_name_override_encrypted,
             ))
         })?;
 
@@ -91,6 +105,9 @@ impl Storage {
 
         let contacts_json = self.decrypt_or_fallback(label.6.as_deref(), &label.2)?;
         let fields_json = self.decrypt_or_fallback(label.7.as_deref(), &label.3)?;
+
+        // Decrypt display_name_override if present
+        let display_name_override = self.decrypt_optional_blob(label.9.as_deref())?;
 
         let contacts: HashSet<String> = serde_json::from_str(&contacts_json)
             .map_err(|e| StorageError::Serialization(e.to_string()))?;
@@ -102,7 +119,7 @@ impl Storage {
             name,
             contacts,
             visible_fields,
-            None,
+            display_name_override,
             label.4 as u64,
             label.5 as u64,
         ))
@@ -114,7 +131,7 @@ impl Storage {
     /// cannot be sorted in SQL (#128).
     pub fn load_all_labels(&self) -> Result<Vec<VisibilityLabel>, StorageError> {
         let mut stmt = self.conn.prepare(
-            "SELECT id, name, contacts_json, visible_fields_json, created_at, modified_at, contacts_json_encrypted, visible_fields_json_encrypted, name_encrypted
+            "SELECT id, name, contacts_json, visible_fields_json, created_at, modified_at, contacts_json_encrypted, visible_fields_json_encrypted, name_encrypted, display_name_override_encrypted
              FROM visibility_labels",
         )?;
 
@@ -128,6 +145,7 @@ impl Storage {
             let contacts_encrypted: Option<Vec<u8>> = row.get(6)?;
             let fields_encrypted: Option<Vec<u8>> = row.get(7)?;
             let name_encrypted: Option<Vec<u8>> = row.get(8)?;
+            let display_name_override_encrypted: Option<Vec<u8>> = row.get(9)?;
 
             Ok((
                 id,
@@ -139,6 +157,7 @@ impl Storage {
                 contacts_encrypted,
                 fields_encrypted,
                 name_encrypted,
+                display_name_override_encrypted,
             ))
         })?;
 
@@ -148,6 +167,7 @@ impl Storage {
             let name = self.decrypt_or_fallback(row.8.as_deref(), &row.1)?;
             let contacts_json = self.decrypt_or_fallback(row.6.as_deref(), &row.2)?;
             let fields_json = self.decrypt_or_fallback(row.7.as_deref(), &row.3)?;
+            let display_name_override = self.decrypt_optional_blob(row.9.as_deref())?;
 
             let contacts: HashSet<String> = serde_json::from_str(&contacts_json)
                 .map_err(|e| StorageError::Serialization(e.to_string()))?;
@@ -159,7 +179,7 @@ impl Storage {
                 name,
                 contacts,
                 visible_fields,
-                None,
+                display_name_override,
                 row.4 as u64,
                 row.5 as u64,
             ));
@@ -169,6 +189,25 @@ impl Storage {
         labels.sort_by(|a, b| a.name().cmp(b.name()));
 
         Ok(labels)
+    }
+
+    /// Decrypts an optional encrypted blob, returning None if the blob is NULL.
+    ///
+    /// Used for nullable encrypted columns like `display_name_override_encrypted`.
+    fn decrypt_optional_blob(
+        &self,
+        encrypted: Option<&[u8]>,
+    ) -> Result<Option<String>, StorageError> {
+        match encrypted {
+            Some(enc) if !enc.is_empty() => {
+                let decrypted = crate::crypto::decrypt(&self.encryption_key, enc)
+                    .map_err(|e| StorageError::Encryption(e.to_string()))?;
+                let s = String::from_utf8(decrypted)
+                    .map_err(|e| StorageError::Serialization(e.to_string()))?;
+                Ok(Some(s))
+            }
+            _ => Ok(None),
+        }
     }
 
     /// Decrypts an encrypted blob, falling back to plaintext only for
@@ -781,6 +820,82 @@ mod tests {
         let loaded = storage.load_label(label.id()).unwrap();
         assert!(!loaded.is_field_visible("phone"));
         assert!(loaded.is_field_visible("address"));
+    }
+
+    #[test]
+    fn test_save_and_load_label_with_display_name_override() {
+        let storage = test_storage();
+
+        let mut label = VisibilityLabel::new("Professional");
+        label.add_contact("alice-id");
+        label.add_visible_field("work-email");
+        label.set_display_name_override(Some("Dr. Egloff")).unwrap();
+
+        storage.save_label(&label).unwrap();
+
+        let loaded = storage.load_label(label.id()).unwrap();
+
+        assert_eq!(loaded.name(), "Professional");
+        assert!(loaded.contains_contact("alice-id"));
+        assert!(loaded.is_field_visible("work-email"));
+        assert_eq!(loaded.display_name_override(), Some("Dr. Egloff"));
+    }
+
+    #[test]
+    fn test_save_and_load_label_without_display_name_override() {
+        let storage = test_storage();
+
+        let label = VisibilityLabel::new("Friends");
+        storage.save_label(&label).unwrap();
+
+        let loaded = storage.load_label(label.id()).unwrap();
+        assert_eq!(loaded.display_name_override(), None);
+    }
+
+    #[test]
+    fn test_load_all_labels_preserves_display_name_override() {
+        let storage = test_storage();
+
+        let mut label1 = VisibilityLabel::new("Family");
+        label1.set_display_name_override(Some("Matt")).unwrap();
+
+        let label2 = VisibilityLabel::new("Work");
+        // label2 has no override
+
+        storage.save_label(&label1).unwrap();
+        storage.save_label(&label2).unwrap();
+
+        let labels = storage.load_all_labels().unwrap();
+        assert_eq!(labels.len(), 2);
+
+        let family = labels.iter().find(|l| l.name() == "Family").unwrap();
+        let work = labels.iter().find(|l| l.name() == "Work").unwrap();
+
+        assert_eq!(family.display_name_override(), Some("Matt"));
+        assert_eq!(work.display_name_override(), None);
+    }
+
+    #[test]
+    fn test_display_name_override_roundtrip_update() {
+        let storage = test_storage();
+
+        // Create label with override
+        let mut label = VisibilityLabel::new("Colleagues");
+        label.set_display_name_override(Some("Dr. Egloff")).unwrap();
+        storage.save_label(&label).unwrap();
+
+        // Verify override persists
+        let loaded = storage.load_label(label.id()).unwrap();
+        assert_eq!(loaded.display_name_override(), Some("Dr. Egloff"));
+
+        // Clear override and re-save
+        let mut updated = loaded;
+        updated.set_display_name_override(None).unwrap();
+        storage.save_label(&updated).unwrap();
+
+        // Verify override is cleared
+        let reloaded = storage.load_label(label.id()).unwrap();
+        assert_eq!(reloaded.display_name_override(), None);
     }
 
     #[test]

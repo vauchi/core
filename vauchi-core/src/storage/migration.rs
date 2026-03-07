@@ -418,6 +418,11 @@ pub fn all_migrations() -> Vec<Migration> {
             name: "onboarding_progress",
             action: MigrationAction::Sql(MIGRATION_V29_ONBOARDING_PROGRESS),
         },
+        Migration {
+            version: 30,
+            name: "label_display_name_override",
+            action: MigrationAction::Sql(MIGRATION_V30_LABEL_DISPLAY_NAME_OVERRIDE),
+        },
     ]
 }
 
@@ -536,6 +541,15 @@ const MIGRATION_V28_LIMITS_AND_MERGE: &str = "
 /// timestamps) alongside other UX state.
 const MIGRATION_V29_ONBOARDING_PROGRESS: &str = "
     ALTER TABLE ux_state ADD COLUMN onboarding_progress_encrypted BLOB;
+";
+
+/// Migration v30: Add display_name_override_encrypted column to visibility_labels.
+///
+/// Stores an optional encrypted display name override per label.
+/// When set, contacts in this label see this name instead of the
+/// user's default display name. NULL means no override (use default).
+const MIGRATION_V30_LABEL_DISPLAY_NAME_OVERRIDE: &str = "
+    ALTER TABLE visibility_labels ADD COLUMN display_name_override_encrypted BLOB;
 ";
 
 /// Migration v2: Re-encrypt all AES-GCM encrypted data to XChaCha20-Poly1305.

@@ -550,3 +550,67 @@ fn test_get_label_members_skips_deleted_contacts() {
     );
     assert_eq!(members[0].display_name(), "Bob");
 }
+
+// ================================================================
+// Label Display Name Override API Tests
+// ================================================================
+
+#[test]
+fn test_set_label_display_name_override_api() {
+    let wb = create_vauchi_with_identity("Matthew Egloff");
+    let label = wb.create_label("Friends").unwrap();
+
+    wb.set_label_display_name_override(label.id(), Some("Matt"))
+        .unwrap();
+
+    let loaded = wb.get_label(label.id()).unwrap();
+    assert_eq!(loaded.display_name_override(), Some("Matt"));
+    assert_eq!(loaded.resolve_display_name("Matthew Egloff"), "Matt");
+}
+
+#[test]
+fn test_clear_label_display_name_override_api() {
+    let wb = create_vauchi_with_identity("Matthew Egloff");
+    let label = wb.create_label("Friends").unwrap();
+
+    wb.set_label_display_name_override(label.id(), Some("Matt"))
+        .unwrap();
+    wb.set_label_display_name_override(label.id(), None)
+        .unwrap();
+
+    let loaded = wb.get_label(label.id()).unwrap();
+    assert_eq!(loaded.display_name_override(), None);
+    assert_eq!(
+        loaded.resolve_display_name("Matthew Egloff"),
+        "Matthew Egloff"
+    );
+}
+
+#[test]
+fn test_set_label_display_name_override_empty_rejected() {
+    let wb = create_vauchi_with_identity("Alice");
+    let label = wb.create_label("Work").unwrap();
+
+    let result = wb.set_label_display_name_override(label.id(), Some(""));
+    assert!(result.is_err(), "empty override should be rejected");
+}
+
+#[test]
+fn test_set_label_display_name_override_whitespace_rejected() {
+    let wb = create_vauchi_with_identity("Alice");
+    let label = wb.create_label("Work").unwrap();
+
+    let result = wb.set_label_display_name_override(label.id(), Some("   "));
+    assert!(
+        result.is_err(),
+        "whitespace-only override should be rejected"
+    );
+}
+
+#[test]
+fn test_set_label_display_name_override_nonexistent_label() {
+    let wb = create_vauchi_with_identity("Alice");
+
+    let result = wb.set_label_display_name_override("nonexistent-id", Some("Matt"));
+    assert!(result.is_err(), "nonexistent label should fail");
+}

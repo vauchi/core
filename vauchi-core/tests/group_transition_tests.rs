@@ -1,0 +1,262 @@
+// SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+//
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+//! Tests for group transition logic (no-group <-> groups mode).
+//!
+//! When the last group is deleted, visible fields migrate to shown_fields
+//! on ContactCard (transition to no-group mode). When the first group is
+//! created, shown_fields are preserved for the user to explicitly reassign.
+
+use vauchi_core::network::MockTransport;
+use vauchi_core::{ContactField, FieldType, Vauchi};
+
+fn create_vauchi_with_identity(name: &str) -> Vauchi<MockTransport> {
+    let mut wb: Vauchi<MockTransport> = Vauchi::in_memory().unwrap();
+    wb.create_identity(name).unwrap();
+    wb
+}
+
+// @scenario: visibility_control.feature:Delete last group migrates fields to shown_fields
+#[test]
+fn test_transition_to_no_group_mode() {
+    let wb = create_vauchi_with_identity("Alice");
+
+    // Add a field to own card
+    let field = ContactField::new(FieldType::Email, "Email", "alice@example.com");
+    wb.add_own_field(field).unwrap();
+
+    let card = wb.own_card().unwrap().unwrap();
+    let field_id = card.fields()[0].id().to_string();
+
+    // Create a label and set the field visible in it
+    let label = wb.create_label("Friends").unwrap();
+    let label_id = label.id().to_string();
+    wb.set_label_field_visibility(&label_id, &field_id, true)
+        .unwrap();
+
+    // Verify field is visible in label
+    let label = wb.get_label(&label_id).unwrap();
+    assert!(
+        label.is_field_visible(&field_id),
+        "field should be visible in label before deletion"
+    );
+
+    // Verify field is NOT in shown_fields before deletion
+    let card = wb.own_card().unwrap().unwrap();
+    assert!(
+        !card.is_field_shown(&field_id),
+        "field should not be in shown_fields while groups exist"
+    );
+
+    // Delete the last label — triggers transition to no-group mode
+    wb.delete_label(&label_id).unwrap();
+
+    // Verify no labels remain
+    let labels = wb.list_labels().unwrap();
+    assert_eq!(labels.len(), 0, "all labels should be deleted");
+
+    // Verify field has been migrated to shown_fields on the card
+    let card = wb.own_card().unwrap().unwrap();
+    assert!(
+        card.is_field_shown(&field_id),
+        "field should be migrated to shown_fields after last group deleted"
+    );
+}
+
+// @scenario: visibility_control.feature:Creating first group preserves shown_fields
+#[test]
+fn test_transition_preserves_shown_fields_when_adding_first_group() {
+    let wb = create_vauchi_with_identity("Alice");
+
+    // Add a field to own card
+    let field = ContactField::new(FieldType::Email, "Email", "alice@example.com");
+    wb.add_own_field(field).unwrap();
+
+    let card = wb.own_card().unwrap().unwrap();
+    let field_id = card.fields()[0].id().to_string();
+
+    // Set field as shown (no-group mode)
+    wb.set_field_shown(&field_id, true).unwrap();
+
+    // Verify field is in shown_fields
+    let card = wb.own_card().unwrap().unwrap();
+    assert!(
+        card.is_field_shown(&field_id),
+        "field should be shown in no-group mode"
+    );
+
+    // Create first group — shown_fields should be preserved
+    let _label = wb.create_label("Work").unwrap();
+
+    // Verify shown_fields still has the field (user must manually reassign)
+    let card = wb.own_card().unwrap().unwrap();
+    assert!(
+        card.is_field_shown(&field_id),
+        "shown_fields should be preserved when first group is created"
+    );
+}
+
+// @scenario: visibility_control.feature:Delete non-last group does not migrate
+#[test]
+fn test_delete_non_last_label_no_migration() {
+    let wb = create_vauchi_with_identity("Alice");
+
+    // Add a field to own card
+    let field = ContactField::new(FieldType::Email, "Email", "alice@example.com");
+    wb.add_own_field(field).unwrap();
+
+    let card = wb.own_card().unwrap().unwrap();
+    let field_id = card.fields()[0].id().to_string();
+
+    // Create two labels
+    let label1 = wb.create_label("Friends").unwrap();
+    let label1_id = label1.id().to_string();
+    let _label2 = wb.create_label("Work").unwrap();
+
+    // Set field visible in label1
+    wb.set_label_field_visibility(&label1_id, &field_id, true)
+        .unwrap();
+
+    // Verify field is NOT in shown_fields
+    let card = wb.own_card().unwrap().unwrap();
+    assert!(
+        !card.is_field_shown(&field_id),
+        "field should not be in shown_fields while groups exist"
+    );
+
+    // Delete label1 (not the last one — label2 still exists)
+    wb.delete_label(&label1_id).unwrap();
+
+    // Verify no migration to shown_fields (still in groups mode)
+    let card = wb.own_card().unwrap().unwrap();
+    assert!(
+        !card.is_field_shown(&field_id),
+        "should not migrate to shown_fields when other groups still exist"
+    );
+
+    // Verify label2 still exists
+    let labels = wb.list_labels().unwrap();
+    assert_eq!(labels.len(), 1, "one label should remain");
+}
+
+// @scenario: visibility_control.feature:set_field_shown API persists changes
+#[test]
+fn test_set_field_shown_api() {
+    let wb = create_vauchi_with_identity("Alice");
+
+    // Add a field to own card
+    let field = ContactField::new(FieldType::Email, "Email", "alice@example.com");
+    wb.add_own_field(field).unwrap();
+
+    let card = wb.own_card().unwrap().unwrap();
+    let field_id = card.fields()[0].id().to_string();
+
+    // Initially not shown
+    assert!(
+        !card.is_field_shown(&field_id),
+        "field should not be shown initially"
+    );
+
+    // Set field shown
+    wb.set_field_shown(&field_id, true).unwrap();
+
+    // Verify it's shown (reload from storage)
+    let card = wb.own_card().unwrap().unwrap();
+    assert!(
+        card.is_field_shown(&field_id),
+        "field should be shown after set_field_shown(true)"
+    );
+
+    // Set field hidden again
+    wb.set_field_shown(&field_id, false).unwrap();
+
+    // Verify it's hidden
+    let card = wb.own_card().unwrap().unwrap();
+    assert!(
+        !card.is_field_shown(&field_id),
+        "field should not be shown after set_field_shown(false)"
+    );
+}
+
+// @scenario: visibility_control.feature:Delete last group with multiple visible fields
+#[test]
+fn test_transition_migrates_all_visible_fields() {
+    let wb = create_vauchi_with_identity("Alice");
+
+    // Add multiple fields
+    wb.add_own_field(ContactField::new(
+        FieldType::Email,
+        "Email",
+        "alice@example.com",
+    ))
+    .unwrap();
+    wb.add_own_field(ContactField::new(FieldType::Phone, "Phone", "+1234567890"))
+        .unwrap();
+
+    let card = wb.own_card().unwrap().unwrap();
+    let email_id = card.fields()[0].id().to_string();
+    let phone_id = card.fields()[1].id().to_string();
+
+    // Create label and set both fields visible
+    let label = wb.create_label("Friends").unwrap();
+    let label_id = label.id().to_string();
+    wb.set_label_field_visibility(&label_id, &email_id, true)
+        .unwrap();
+    wb.set_label_field_visibility(&label_id, &phone_id, true)
+        .unwrap();
+
+    // Delete last label
+    wb.delete_label(&label_id).unwrap();
+
+    // Both fields should be migrated to shown_fields
+    let card = wb.own_card().unwrap().unwrap();
+    assert!(
+        card.is_field_shown(&email_id),
+        "email should be migrated to shown_fields"
+    );
+    assert!(
+        card.is_field_shown(&phone_id),
+        "phone should be migrated to shown_fields"
+    );
+}
+
+// @scenario: visibility_control.feature:Delete last group does not migrate hidden fields
+#[test]
+fn test_transition_does_not_migrate_hidden_fields() {
+    let wb = create_vauchi_with_identity("Alice");
+
+    // Add two fields
+    wb.add_own_field(ContactField::new(
+        FieldType::Email,
+        "Email",
+        "alice@example.com",
+    ))
+    .unwrap();
+    wb.add_own_field(ContactField::new(FieldType::Phone, "Phone", "+1234567890"))
+        .unwrap();
+
+    let card = wb.own_card().unwrap().unwrap();
+    let email_id = card.fields()[0].id().to_string();
+    let phone_id = card.fields()[1].id().to_string();
+
+    // Create label but only set email visible (phone stays hidden)
+    let label = wb.create_label("Friends").unwrap();
+    let label_id = label.id().to_string();
+    wb.set_label_field_visibility(&label_id, &email_id, true)
+        .unwrap();
+
+    // Delete last label
+    wb.delete_label(&label_id).unwrap();
+
+    // Only email should be migrated; phone was never visible
+    let card = wb.own_card().unwrap().unwrap();
+    assert!(
+        card.is_field_shown(&email_id),
+        "visible email should be migrated to shown_fields"
+    );
+    assert!(
+        !card.is_field_shown(&phone_id),
+        "hidden phone should NOT be migrated to shown_fields"
+    );
+}

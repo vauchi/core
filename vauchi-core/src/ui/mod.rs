@@ -24,7 +24,7 @@ mod settings;
 pub use action::{ActionResult, UserAction};
 pub use component::{
     ActionListItem, Component, ContactItem, FieldDisplay, GroupCardView, InfoItem, InputType,
-    SettingsItem, SettingsItemKind, Status, TextStyle, ToggleItem, UiFieldVisibility,
+    QrMode, SettingsItem, SettingsItemKind, Status, TextStyle, ToggleItem, UiFieldVisibility,
     VisibilityMode,
 };
 pub use contact_edit::{ContactEditEngine, EditableContact, EditableField};

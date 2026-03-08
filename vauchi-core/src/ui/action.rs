@@ -72,4 +72,8 @@ pub enum ActionResult {
         title: String,
         message: String,
     },
+    /// Frontend should open the camera for QR scanning.
+    RequestCamera,
+    /// All data has been wiped — frontend should reset to initial state.
+    WipeComplete,
 }

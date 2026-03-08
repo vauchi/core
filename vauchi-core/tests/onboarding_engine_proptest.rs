@@ -488,8 +488,10 @@ proptest! {
                 }
                 ActionResult::OpenContact { .. }
                 | ActionResult::OpenUrl { .. }
-                | ActionResult::ShowAlert { .. } => {
-                    // Valid external navigation results
+                | ActionResult::ShowAlert { .. }
+                | ActionResult::RequestCamera
+                | ActionResult::WipeComplete => {
+                    // Valid external navigation/action results
                 }
             }
         }

@@ -73,6 +73,19 @@ pub enum Component {
         masked: bool,
         validation_error: Option<String>,
     },
+    QrCode {
+        id: String,
+        data: String,
+        mode: QrMode,
+        label: Option<String>,
+    },
+    ConfirmationDialog {
+        id: String,
+        title: String,
+        message: String,
+        confirm_text: String,
+        destructive: bool,
+    },
     Divider,
 }
 
@@ -203,4 +216,12 @@ pub enum Status {
     Success,
     Failed,
     Warning,
+}
+
+/// QR code display mode.
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum QrMode {
+    Display,
+    Scan,
 }

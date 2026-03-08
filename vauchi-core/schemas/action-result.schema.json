@@ -56,6 +56,20 @@
         }
       },
       "additionalProperties": false
+    },
+    {
+      "description": "Frontend should switch to the device linking flow.",
+      "type": "string",
+      "enum": [
+        "StartDeviceLink"
+      ]
+    },
+    {
+      "description": "Frontend should switch to the backup import flow.",
+      "type": "string",
+      "enum": [
+        "StartBackupImport"
+      ]
     }
   ],
   "definitions": {

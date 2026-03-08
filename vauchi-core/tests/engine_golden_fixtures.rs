@@ -210,7 +210,7 @@ fn contact_edit_fields_fixture_is_fresh() {
 #[test]
 fn contact_edit_visibility_fixture_is_fresh() {
     let mut engine = ContactEditEngine::new(sample_editable_contact(), sample_edit_groups());
-    engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "continue".into(),
     });
     assert_fixture_fresh(&engine.current_screen(), "contact_edit_visibility.json");
@@ -219,10 +219,10 @@ fn contact_edit_visibility_fixture_is_fresh() {
 #[test]
 fn contact_edit_preview_fixture_is_fresh() {
     let mut engine = ContactEditEngine::new(sample_editable_contact(), sample_edit_groups());
-    engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "continue".into(),
     });
-    engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "continue".into(),
     });
     assert_fixture_fresh(&engine.current_screen(), "contact_edit_preview.json");
@@ -346,17 +346,17 @@ fn regenerate_all_engine_fixtures() {
         ),
         {
             let mut e = ContactEditEngine::new(sample_editable_contact(), sample_edit_groups());
-            e.handle_action(UserAction::ActionPressed {
+            let _ = e.handle_action(UserAction::ActionPressed {
                 action_id: "continue".into(),
             });
             ("contact_edit_visibility.json", e.current_screen())
         },
         {
             let mut e = ContactEditEngine::new(sample_editable_contact(), sample_edit_groups());
-            e.handle_action(UserAction::ActionPressed {
+            let _ = e.handle_action(UserAction::ActionPressed {
                 action_id: "continue".into(),
             });
-            e.handle_action(UserAction::ActionPressed {
+            let _ = e.handle_action(UserAction::ActionPressed {
                 action_id: "continue".into(),
             });
             ("contact_edit_preview.json", e.current_screen())

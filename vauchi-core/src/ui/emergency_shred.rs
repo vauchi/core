@@ -21,6 +21,12 @@ enum ShredStep {
     Complete,
 }
 
+impl Default for EmergencyShredEngine {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl EmergencyShredEngine {
     pub fn new() -> Self {
         Self {

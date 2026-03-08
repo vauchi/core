@@ -99,7 +99,7 @@ fn contact_list_search_empty_restores_all() {
     let mut engine = ContactListEngine::new(sample_contacts());
 
     // First filter down
-    engine.handle_action(UserAction::SearchChanged {
+    let _ = engine.handle_action(UserAction::SearchChanged {
         component_id: "contacts".into(),
         query: "Ali".into(),
     });

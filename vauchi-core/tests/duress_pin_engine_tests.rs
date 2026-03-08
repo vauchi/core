@@ -118,7 +118,7 @@ fn duress_configure_goes_to_pin() {
 fn duress_enter_pin_validation() {
     let mut engine = DuressPinEngine::new(default_config());
     // Navigate to EnterPin
-    engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "configure".into(),
     });
 
@@ -163,19 +163,19 @@ fn duress_enter_pin_validation() {
 fn duress_pin_mismatch_error() {
     let mut engine = DuressPinEngine::new(default_config());
     // Navigate to EnterPin, enter PIN, advance to ConfirmPin
-    engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "configure".into(),
     });
-    engine.handle_action(UserAction::TextChanged {
+    let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "pin".into(),
         value: "123456".into(),
     });
-    engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "continue".into(),
     });
 
     // Enter a different confirm PIN
-    engine.handle_action(UserAction::TextChanged {
+    let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "confirm_pin".into(),
         value: "654321".into(),
     });
@@ -198,17 +198,17 @@ fn duress_pin_mismatch_error() {
 fn duress_pin_match_to_alerts() {
     let mut engine = DuressPinEngine::new(default_config());
     // Navigate through EnterPin → ConfirmPin with matching PINs
-    engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "configure".into(),
     });
-    engine.handle_action(UserAction::TextChanged {
+    let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "pin".into(),
         value: "123456".into(),
     });
-    engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "continue".into(),
     });
-    engine.handle_action(UserAction::TextChanged {
+    let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "confirm_pin".into(),
         value: "123456".into(),
     });
@@ -230,33 +230,33 @@ fn duress_alerts_save_enables() {
     assert!(!engine.config().enabled, "should start disabled");
 
     // Navigate all the way to ConfigureAlerts
-    engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "configure".into(),
     });
-    engine.handle_action(UserAction::TextChanged {
+    let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "pin".into(),
         value: "123456".into(),
     });
-    engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "continue".into(),
     });
-    engine.handle_action(UserAction::TextChanged {
+    let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "confirm_pin".into(),
         value: "123456".into(),
     });
-    engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "continue".into(),
     });
 
     // Update alert message
-    engine.handle_action(UserAction::TextChanged {
+    let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "alert_message".into(),
         value: "I need help".into(),
     });
     assert_eq!(engine.config().alert_message, "I need help");
 
     // Toggle include_location
-    engine.handle_action(UserAction::ItemToggled {
+    let _ = engine.handle_action(UserAction::ItemToggled {
         component_id: "alerts".into(),
         item_id: "include_location".into(),
     });
@@ -301,7 +301,7 @@ fn duress_back_navigation() {
     let mut engine = DuressPinEngine::new(default_config());
 
     // Overview → EnterPin
-    engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "configure".into(),
     });
     assert_eq!(engine.current_screen().screen_id, "duress_enter_pin");
@@ -318,14 +318,14 @@ fn duress_back_navigation() {
     }
 
     // Navigate forward to ConfirmPin
-    engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "configure".into(),
     });
-    engine.handle_action(UserAction::TextChanged {
+    let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "pin".into(),
         value: "123456".into(),
     });
-    engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "continue".into(),
     });
     assert_eq!(engine.current_screen().screen_id, "duress_confirm_pin");
@@ -342,18 +342,18 @@ fn duress_back_navigation() {
     }
 
     // Navigate forward again to ConfigureAlerts
-    engine.handle_action(UserAction::TextChanged {
+    let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "pin".into(),
         value: "123456".into(),
     });
-    engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "continue".into(),
     });
-    engine.handle_action(UserAction::TextChanged {
+    let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "confirm_pin".into(),
         value: "123456".into(),
     });
-    engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "continue".into(),
     });
     assert_eq!(engine.current_screen().screen_id, "duress_alerts");

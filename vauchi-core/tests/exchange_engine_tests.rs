@@ -69,7 +69,7 @@ fn exchange_continue_to_scan() {
 fn exchange_scan_receives_data() {
     let mut engine = make_engine();
     // Move to scan step
-    engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "continue".to_string(),
     });
 
@@ -96,10 +96,10 @@ fn exchange_scan_receives_data() {
 fn exchange_mark_success() {
     let mut engine = make_engine();
     // Move to scan → verifying
-    engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "continue".to_string(),
     });
-    engine.handle_action(UserAction::TextChanged {
+    let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "scanned_data".to_string(),
         value: "bob-qr-payload".to_string(),
     });
@@ -122,10 +122,10 @@ fn exchange_mark_success() {
 #[test]
 fn exchange_mark_failed() {
     let mut engine = make_engine();
-    engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "continue".to_string(),
     });
-    engine.handle_action(UserAction::TextChanged {
+    let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "scanned_data".to_string(),
         value: "bob-qr-payload".to_string(),
     });
@@ -154,10 +154,10 @@ fn exchange_mark_failed() {
 #[test]
 fn exchange_success_done_completes() {
     let mut engine = make_engine();
-    engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "continue".to_string(),
     });
-    engine.handle_action(UserAction::TextChanged {
+    let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "scanned_data".to_string(),
         value: "bob-qr-payload".to_string(),
     });
@@ -173,10 +173,10 @@ fn exchange_success_done_completes() {
 #[test]
 fn exchange_failed_retry_restarts() {
     let mut engine = make_engine();
-    engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "continue".to_string(),
     });
-    engine.handle_action(UserAction::TextChanged {
+    let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "scanned_data".to_string(),
         value: "bob-qr-payload".to_string(),
     });
@@ -201,7 +201,7 @@ fn exchange_failed_retry_restarts() {
 #[test]
 fn exchange_back_from_scan() {
     let mut engine = make_engine();
-    engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "continue".to_string(),
     });
 
@@ -222,10 +222,10 @@ fn exchange_back_from_scan() {
 #[test]
 fn exchange_failed_cancel_completes() {
     let mut engine = make_engine();
-    engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "continue".to_string(),
     });
-    engine.handle_action(UserAction::TextChanged {
+    let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "scanned_data".to_string(),
         value: "bob-qr-payload".to_string(),
     });

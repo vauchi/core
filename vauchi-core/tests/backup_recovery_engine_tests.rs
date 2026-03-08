@@ -83,16 +83,16 @@ fn backup_confirm_password_mismatch() {
     let mut engine = BackupRecoveryEngine::new(Some(BackupMode::Create));
 
     // Enter password
-    engine.handle_action(UserAction::TextChanged {
+    let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "password".into(),
         value: "my-secret".into(),
     });
-    engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "continue".into(),
     });
 
     // Enter mismatching confirmation
-    engine.handle_action(UserAction::TextChanged {
+    let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "confirm_password".into(),
         value: "wrong".into(),
     });
@@ -117,16 +117,16 @@ fn backup_confirm_match_to_processing() {
     let mut engine = BackupRecoveryEngine::new(Some(BackupMode::Create));
 
     // Enter password
-    engine.handle_action(UserAction::TextChanged {
+    let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "password".into(),
         value: "my-secret".into(),
     });
-    engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "continue".into(),
     });
 
     // Enter matching confirmation
-    engine.handle_action(UserAction::TextChanged {
+    let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "confirm_password".into(),
         value: "my-secret".into(),
     });
@@ -154,7 +154,7 @@ fn backup_restore_skips_confirm() {
     let mut engine = BackupRecoveryEngine::new(Some(BackupMode::Restore));
 
     // Enter password
-    engine.handle_action(UserAction::TextChanged {
+    let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "password".into(),
         value: "my-secret".into(),
     });
@@ -178,18 +178,18 @@ fn backup_processing_complete() {
     let mut engine = BackupRecoveryEngine::new(Some(BackupMode::Create));
 
     // Navigate to processing
-    engine.handle_action(UserAction::TextChanged {
+    let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "password".into(),
         value: "pw".into(),
     });
-    engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "continue".into(),
     });
-    engine.handle_action(UserAction::TextChanged {
+    let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "confirm_password".into(),
         value: "pw".into(),
     });
-    engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "continue".into(),
     });
 
@@ -208,18 +208,18 @@ fn backup_processing_complete() {
 
     // Done should complete
     let mut engine_done = BackupRecoveryEngine::new(Some(BackupMode::Create));
-    engine_done.handle_action(UserAction::TextChanged {
+    let _ = engine_done.handle_action(UserAction::TextChanged {
         component_id: "password".into(),
         value: "pw".into(),
     });
-    engine_done.handle_action(UserAction::ActionPressed {
+    let _ = engine_done.handle_action(UserAction::ActionPressed {
         action_id: "continue".into(),
     });
-    engine_done.handle_action(UserAction::TextChanged {
+    let _ = engine_done.handle_action(UserAction::TextChanged {
         component_id: "confirm_password".into(),
         value: "pw".into(),
     });
-    engine_done.handle_action(UserAction::ActionPressed {
+    let _ = engine_done.handle_action(UserAction::ActionPressed {
         action_id: "continue".into(),
     });
     engine_done.processing_complete();
@@ -234,11 +234,11 @@ fn backup_processing_failed() {
     let mut engine = BackupRecoveryEngine::new(Some(BackupMode::Restore));
 
     // Navigate to processing
-    engine.handle_action(UserAction::TextChanged {
+    let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "password".into(),
         value: "pw".into(),
     });
-    engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "continue".into(),
     });
 
@@ -273,7 +273,7 @@ fn backup_back_navigation() {
     let mut engine = BackupRecoveryEngine::new(None);
 
     // Go to create password
-    engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "create".into(),
     });
     assert_eq!(engine.current_screen().screen_id, "backup_password");
@@ -290,14 +290,14 @@ fn backup_back_navigation() {
     }
 
     // Go to create, enter password, go to confirm, then back to password
-    engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "create".into(),
     });
-    engine.handle_action(UserAction::TextChanged {
+    let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "password".into(),
         value: "pw".into(),
     });
-    engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "continue".into(),
     });
     assert_eq!(engine.current_screen().screen_id, "backup_confirm");

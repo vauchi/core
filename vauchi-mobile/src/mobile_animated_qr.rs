@@ -91,7 +91,7 @@ impl MobileAnimatedQrSender {
             .unwrap()
             .frame_at(index as usize)
             .map_err(|e| MobileAnimatedQrError::FrameError {
-                message: format!("{}", e),
+                reason: format!("{}", e),
             })
     }
 }
@@ -122,7 +122,7 @@ impl MobileAnimatedQrReceiver {
             .process_frame(frame)
             .map(MobileAnimatedQrProgress::from)
             .map_err(|e| MobileAnimatedQrError::FrameError {
-                message: format!("{}", e),
+                reason: format!("{}", e),
             })
     }
 
@@ -130,7 +130,7 @@ impl MobileAnimatedQrReceiver {
     pub fn reassemble(&self) -> Result<Vec<u8>, MobileAnimatedQrError> {
         self.session.lock().unwrap().reassemble().map_err(|e| {
             MobileAnimatedQrError::ReassemblyFailed {
-                message: format!("{}", e),
+                reason: format!("{}", e),
             }
         })
     }
@@ -139,8 +139,8 @@ impl MobileAnimatedQrReceiver {
 /// Errors from animated QR operations.
 #[derive(Debug, thiserror::Error, uniffi::Error)]
 pub enum MobileAnimatedQrError {
-    #[error("frame error: {message}")]
-    FrameError { message: String },
-    #[error("reassembly failed: {message}")]
-    ReassemblyFailed { message: String },
+    #[error("frame error: {reason}")]
+    FrameError { reason: String },
+    #[error("reassembly failed: {reason}")]
+    ReassemblyFailed { reason: String },
 }

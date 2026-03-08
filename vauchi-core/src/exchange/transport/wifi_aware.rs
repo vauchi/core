@@ -138,6 +138,12 @@ pub struct MockWifiAwareBackend {
     state: Arc<Mutex<MockState>>,
 }
 
+impl Default for MockWifiAwareBackend {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl MockWifiAwareBackend {
     /// Create a new mock backend (unavailable by default, no peers).
     pub fn new() -> Self {

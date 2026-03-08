@@ -612,11 +612,12 @@ impl OnboardingEngine {
                 group_id,
                 visible,
             } => {
-                if let Some(idx) = field_id
+                let idx = field_id
                     .strip_prefix("field_")
-                    .and_then(|s| s.parse::<usize>().ok())
-                {
-                    if let Some(field) = self.data.fields.get_mut(idx) {
+                    .and_then(|s| s.parse::<usize>().ok());
+
+                match idx.and_then(|i| self.data.fields.get_mut(i)) {
+                    Some(field) => {
                         match group_id {
                             Some(group) => {
                                 if *visible {
@@ -631,9 +632,13 @@ impl OnboardingEngine {
                                 field.shown = *visible;
                             }
                         }
+                        ActionResult::UpdateScreen(self.current_screen())
                     }
+                    None => ActionResult::ValidationError {
+                        component_id: field_id.clone(),
+                        message: "Unknown field".into(),
+                    },
                 }
-                ActionResult::UpdateScreen(self.current_screen())
             }
             UserAction::ActionPressed { action_id }
                 if action_id == "continue" || action_id == "skip" =>

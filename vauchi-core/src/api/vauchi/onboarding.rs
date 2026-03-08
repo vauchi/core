@@ -101,7 +101,8 @@ impl<T: Transport> Vauchi<T> {
         for name in names {
             match self.storage.create_label(name) {
                 Ok(label) => created.push(label),
-                Err(_) => continue, // skip duplicates
+                Err(crate::StorageError::AlreadyExists(_)) => continue,
+                Err(e) => return Err(e.into()),
             }
         }
         Ok(created)

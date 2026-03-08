@@ -194,12 +194,11 @@ impl OnboardingProgress {
 
     /// Skips from SkipGate directly to SecurityExplanation.
     /// Called when user chooses "Skip to finish" at the skip gate.
+    /// No-op if not currently at SkipGate (prevents state corruption).
     pub fn skip_to_finish(&mut self) {
-        debug_assert_eq!(
-            self.current_step,
-            OnboardingStep::SkipGate,
-            "skip_to_finish called from non-SkipGate step"
-        );
+        if self.current_step != OnboardingStep::SkipGate {
+            return;
+        }
         self.current_step = OnboardingStep::SecurityExplanation;
     }
 

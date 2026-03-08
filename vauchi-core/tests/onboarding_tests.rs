@@ -878,6 +878,59 @@ fn test_full_onboarding_flow_with_skip() {
     );
 }
 
+// @scenario: onboarding:skip_step_at_ready_completes
+#[test]
+fn test_skip_step_at_ready_marks_complete() {
+    let mut vauchi = create_test_vauchi();
+
+    // Advance to DefaultName, create identity
+    vauchi.advance_onboarding().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+
+    // Advance through all steps to Ready
+    for _ in 0..7 {
+        vauchi.advance_onboarding().unwrap();
+    }
+    assert_eq!(
+        vauchi.current_onboarding_step().unwrap(),
+        OnboardingStep::Ready
+    );
+    assert!(
+        !vauchi.is_onboarding_complete().unwrap(),
+        "Should not be complete before skip_step at Ready"
+    );
+
+    // skip_step at Ready should complete onboarding (else branch in skip_step)
+    vauchi.skip_onboarding_step().unwrap();
+    assert_eq!(
+        vauchi.current_onboarding_step().unwrap(),
+        OnboardingStep::Ready,
+        "Should stay at Ready"
+    );
+    assert!(
+        vauchi.is_onboarding_complete().unwrap(),
+        "skip_step at Ready should mark onboarding complete"
+    );
+}
+
+// @scenario: onboarding:skip_to_finish_wrong_step_is_noop
+#[test]
+fn test_skip_to_finish_from_wrong_step_is_noop() {
+    let vauchi = create_test_vauchi();
+
+    // At Welcome — skip_to_finish should be a no-op
+    assert_eq!(
+        vauchi.current_onboarding_step().unwrap(),
+        OnboardingStep::Welcome
+    );
+    vauchi.skip_onboarding_to_finish().unwrap();
+    assert_eq!(
+        vauchi.current_onboarding_step().unwrap(),
+        OnboardingStep::Welcome,
+        "skip_to_finish from Welcome should be a no-op"
+    );
+}
+
 // @scenario: onboarding:e2e_full_flow_without_skip
 #[test]
 fn test_full_onboarding_flow_without_skip() {

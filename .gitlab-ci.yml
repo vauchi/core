@@ -268,6 +268,25 @@ test:mobile:
       junit: target/nextest/ci/junit.xml
     expire_in: 1 week
 
+# Schema contract validation — detect drift between core UI types and
+# generated JSON schemas. Runs when UI type definitions change.
+validate:schema:
+  extends: [.linux-runner, .timeout-quick]
+  stage: test
+  needs:
+    - job: lint:format
+      optional: true
+  script:
+    - cargo test --features schema-gen -p vauchi-core --test schema_gen
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes:
+        compare_to: refs/heads/$CI_DEFAULT_BRANCH
+        paths:
+          - "vauchi-core/src/ui/**/*.rs"
+          - "vauchi-core/schemas/**"
+          - "vauchi-core/Cargo.toml"
+
 # Content contract validation — detect drift between core parsers and
 # sibling content repos (themes/, locales/). Runs when parser code changes.
 validate:content-contracts:

@@ -687,6 +687,10 @@ pub struct MobileDemoContactState {
 /// Steps in the onboarding wizard (UniFFI-compatible).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, uniffi::Enum)]
 pub enum MobileOnboardingStep {
+    /// Identity check gate
+    IdentityCheck,
+    /// Link choice (device link or backup import)
+    LinkChoice,
     /// Welcome screen showing value proposition
     Welcome,
     /// Default display name entry
@@ -710,6 +714,8 @@ pub enum MobileOnboardingStep {
 impl From<vauchi_core::OnboardingStep> for MobileOnboardingStep {
     fn from(step: vauchi_core::OnboardingStep) -> Self {
         match step {
+            vauchi_core::OnboardingStep::IdentityCheck => MobileOnboardingStep::IdentityCheck,
+            vauchi_core::OnboardingStep::LinkChoice => MobileOnboardingStep::LinkChoice,
             vauchi_core::OnboardingStep::Welcome => MobileOnboardingStep::Welcome,
             vauchi_core::OnboardingStep::DefaultName => MobileOnboardingStep::DefaultName,
             vauchi_core::OnboardingStep::SkipGate => MobileOnboardingStep::SkipGate,
@@ -728,6 +734,8 @@ impl From<vauchi_core::OnboardingStep> for MobileOnboardingStep {
 impl From<MobileOnboardingStep> for vauchi_core::OnboardingStep {
     fn from(step: MobileOnboardingStep) -> Self {
         match step {
+            MobileOnboardingStep::IdentityCheck => vauchi_core::OnboardingStep::IdentityCheck,
+            MobileOnboardingStep::LinkChoice => vauchi_core::OnboardingStep::LinkChoice,
             MobileOnboardingStep::Welcome => vauchi_core::OnboardingStep::Welcome,
             MobileOnboardingStep::DefaultName => vauchi_core::OnboardingStep::DefaultName,
             MobileOnboardingStep::SkipGate => vauchi_core::OnboardingStep::SkipGate,

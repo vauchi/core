@@ -47,10 +47,7 @@ mod multistage;
 
 pub mod device_link;
 
-#[cfg(feature = "testing")]
 pub mod transport;
-#[cfg(not(feature = "testing"))]
-pub(crate) mod transport;
 
 #[cfg(feature = "testing")]
 pub mod exchange_payload;

@@ -30,6 +30,7 @@ mod device_link_relay;
 mod diagnostic;
 mod error;
 mod exchange;
+mod mobile_animated_qr;
 mod mobile_ble;
 mod mobile_contacts;
 mod mobile_content;
@@ -44,6 +45,7 @@ mod mobile_recovery;
 mod mobile_security;
 mod mobile_tor;
 mod mobile_visibility;
+mod mobile_wifi_aware;
 mod multipart_qr;
 mod multistage_exchange;
 mod protocol;
@@ -68,6 +70,10 @@ pub use error::{KeychainError, MobileError};
 pub use exchange::{
     MobileBleExchangeStatus, MobileExchangeSession, MobileExchangeState, MobileProximityHandler,
 };
+pub use mobile_animated_qr::{
+    MobileAnimatedQrConfig, MobileAnimatedQrError, MobileAnimatedQrProgress,
+    MobileAnimatedQrReceiver, MobileAnimatedQrSender,
+};
 pub use mobile_ble::{
     MobileBleDelegate, MobileBleError, MobileBleExchangeResult, MobileBleExchangeSession,
     MobileBleField, MobileBleState, MobileBleTransportError,
@@ -76,6 +82,7 @@ pub use mobile_nfc::{
     MobileNfcExchangeResult, MobileNfcHandshake, MobileNfcKeyAckResult, MobileNfcState,
     MobileNfcTransport, MobileNfcTransportError,
 };
+pub use mobile_wifi_aware::{wifi_aware_check_availability, MobileWifiAwareStatus};
 pub use multipart_qr::{encode_multipart, MobileMultipartDecoder, MultipartDecoder};
 pub use types::{
     MobileAhaMoment, MobileAhaMomentType, MobileAuthMode, MobileBroadcastResult,

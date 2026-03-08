@@ -636,7 +636,6 @@ impl OnboardingEngine {
             UserAction::ActionPressed { action_id } if action_id == "get_started" => {
                 self.navigate_to(Step::DefaultName)
             }
-            // restore_backup would be handled externally; return the screen unchanged
             _ => ActionResult::UpdateScreen(self.current_screen()),
         }
     }

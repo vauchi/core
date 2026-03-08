@@ -1,0 +1,499 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ScreenModel",
+  "description": "Describes a full screen to render.",
+  "type": "object",
+  "required": [
+    "actions",
+    "components",
+    "screen_id",
+    "title"
+  ],
+  "properties": {
+    "actions": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/ScreenAction"
+      }
+    },
+    "components": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/Component"
+      }
+    },
+    "progress": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/Progress"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "screen_id": {
+      "type": "string"
+    },
+    "subtitle": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "title": {
+      "type": "string"
+    }
+  },
+  "definitions": {
+    "ActionStyle": {
+      "description": "Visual style for a screen action.",
+      "type": "string",
+      "enum": [
+        "Primary",
+        "Secondary",
+        "Destructive"
+      ]
+    },
+    "Component": {
+      "description": "A UI component that core tells frontends to render.",
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": [
+            "Divider"
+          ]
+        },
+        {
+          "type": "object",
+          "required": [
+            "Text"
+          ],
+          "properties": {
+            "Text": {
+              "type": "object",
+              "required": [
+                "content",
+                "id",
+                "style"
+              ],
+              "properties": {
+                "content": {
+                  "type": "string"
+                },
+                "id": {
+                  "type": "string"
+                },
+                "style": {
+                  "$ref": "#/definitions/TextStyle"
+                }
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "TextInput"
+          ],
+          "properties": {
+            "TextInput": {
+              "type": "object",
+              "required": [
+                "id",
+                "input_type",
+                "label",
+                "value"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "input_type": {
+                  "$ref": "#/definitions/InputType"
+                },
+                "label": {
+                  "type": "string"
+                },
+                "max_length": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "format": "uint",
+                  "minimum": 0.0
+                },
+                "placeholder": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "validation_error": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "value": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "ToggleList"
+          ],
+          "properties": {
+            "ToggleList": {
+              "type": "object",
+              "required": [
+                "id",
+                "items",
+                "label"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "items": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/definitions/ToggleItem"
+                  }
+                },
+                "label": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "FieldList"
+          ],
+          "properties": {
+            "FieldList": {
+              "type": "object",
+              "required": [
+                "available_groups",
+                "fields",
+                "id",
+                "visibility_mode"
+              ],
+              "properties": {
+                "available_groups": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "fields": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/definitions/FieldDisplay"
+                  }
+                },
+                "id": {
+                  "type": "string"
+                },
+                "visibility_mode": {
+                  "$ref": "#/definitions/VisibilityMode"
+                }
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "CardPreview"
+          ],
+          "properties": {
+            "CardPreview": {
+              "type": "object",
+              "required": [
+                "fields",
+                "group_views",
+                "name"
+              ],
+              "properties": {
+                "fields": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/definitions/FieldDisplay"
+                  }
+                },
+                "group_views": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/definitions/GroupCardView"
+                  }
+                },
+                "name": {
+                  "type": "string"
+                },
+                "selected_group": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "InfoPanel"
+          ],
+          "properties": {
+            "InfoPanel": {
+              "type": "object",
+              "required": [
+                "id",
+                "items",
+                "title"
+              ],
+              "properties": {
+                "icon": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "id": {
+                  "type": "string"
+                },
+                "items": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/definitions/InfoItem"
+                  }
+                },
+                "title": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "FieldDisplay": {
+      "description": "A contact field as displayed in the UI.",
+      "type": "object",
+      "required": [
+        "field_type",
+        "id",
+        "label",
+        "value",
+        "visibility"
+      ],
+      "properties": {
+        "field_type": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "value": {
+          "type": "string"
+        },
+        "visibility": {
+          "$ref": "#/definitions/UiFieldVisibility"
+        }
+      }
+    },
+    "GroupCardView": {
+      "description": "How a card looks to a specific group.",
+      "type": "object",
+      "required": [
+        "display_name",
+        "group_name",
+        "visible_fields"
+      ],
+      "properties": {
+        "display_name": {
+          "type": "string"
+        },
+        "group_name": {
+          "type": "string"
+        },
+        "visible_fields": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/FieldDisplay"
+          }
+        }
+      }
+    },
+    "InfoItem": {
+      "description": "An item in an info panel.",
+      "type": "object",
+      "required": [
+        "detail",
+        "title"
+      ],
+      "properties": {
+        "detail": {
+          "type": "string"
+        },
+        "icon": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "title": {
+          "type": "string"
+        }
+      }
+    },
+    "InputType": {
+      "description": "Input field type hint for frontends.",
+      "type": "string",
+      "enum": [
+        "Text",
+        "Phone",
+        "Email"
+      ]
+    },
+    "Progress": {
+      "description": "Step progress indicator.",
+      "type": "object",
+      "required": [
+        "current_step",
+        "total_steps"
+      ],
+      "properties": {
+        "current_step": {
+          "type": "integer",
+          "format": "uint8",
+          "minimum": 0.0
+        },
+        "label": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "total_steps": {
+          "type": "integer",
+          "format": "uint8",
+          "minimum": 0.0
+        }
+      }
+    },
+    "ScreenAction": {
+      "description": "A button or action the user can take on the screen.",
+      "type": "object",
+      "required": [
+        "enabled",
+        "id",
+        "label",
+        "style"
+      ],
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "id": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "style": {
+          "$ref": "#/definitions/ActionStyle"
+        }
+      }
+    },
+    "TextStyle": {
+      "description": "Text rendering style.",
+      "type": "string",
+      "enum": [
+        "Title",
+        "Subtitle",
+        "Body",
+        "Caption"
+      ]
+    },
+    "ToggleItem": {
+      "description": "A toggleable item in a list.",
+      "type": "object",
+      "required": [
+        "id",
+        "label",
+        "selected"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "selected": {
+          "type": "boolean"
+        },
+        "subtitle": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "UiFieldVisibility": {
+      "description": "UI-level field visibility state.\n\nNamed `UiFieldVisibility` to distinguish from `contact::FieldVisibility` which is the storage-level visibility model.",
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": [
+            "Shown",
+            "Hidden"
+          ]
+        },
+        {
+          "type": "object",
+          "required": [
+            "Groups"
+          ],
+          "properties": {
+            "Groups": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "VisibilityMode": {
+      "description": "How field visibility is controlled in the UI.",
+      "type": "string",
+      "enum": [
+        "ShowHide",
+        "PerGroup"
+      ]
+    }
+  }
+}

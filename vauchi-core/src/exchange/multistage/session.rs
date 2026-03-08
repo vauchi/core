@@ -156,6 +156,15 @@ impl MultiStageSession {
         self.received_data.clone()
     }
 
+    /// Returns the transport key derived during the ECDH key exchange.
+    ///
+    /// Available after the Discovered state (once both sides have exchanged
+    /// ephemeral public keys). Used by the mobile layer to derive the shared
+    /// secret for the double ratchet after exchange completion.
+    pub fn get_transport_key(&self) -> Option<[u8; 32]> {
+        self.transport_key
+    }
+
     /// Cancel the session, transitioning to Failed and clearing sensitive data.
     pub fn cancel(&mut self) {
         self.state = ProtocolState::Failed("cancelled".to_string());

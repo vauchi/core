@@ -114,6 +114,15 @@ impl MobileMultiStageSession {
         session.get_received_data()
     }
 
+    /// Returns the ECDH transport key established during the exchange.
+    ///
+    /// Used by `VauchiMobile::finalize_multistage_exchange` to derive
+    /// the shared secret for the double ratchet.
+    pub fn get_transport_key(&self) -> Option<Vec<u8>> {
+        let session = self.inner.lock().unwrap();
+        session.get_transport_key().map(|k| k.to_vec())
+    }
+
     /// Abort and wipe session.
     pub fn cancel(&self) {
         let mut session = self.inner.lock().unwrap();

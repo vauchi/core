@@ -18,7 +18,11 @@
 
 use std::sync::Mutex;
 
-use vauchi_core::ui::{ActionResult, OnboardingEngine, ScreenModel, UserAction, WorkflowEngine};
+use vauchi_core::ui::{
+    ActionResult, ContactItem, ContactListEngine, DeliveryItem, DeliveryStatusEngine, HelpEngine,
+    HelpItem, HomeEngine, HomeProgress, LockScreenEngine, OnboardingEngine, ScreenModel,
+    SettingsConfig, SettingsEngine, UserAction, WorkflowEngine,
+};
 
 use super::error::MobileError;
 
@@ -144,5 +148,121 @@ impl MobileOnboardingWorkflow {
             .map_err(|e| MobileError::Internal(format!("Failed to lock onboarding engine: {e}")))?;
         serde_json::to_string(engine.data())
             .map_err(|e| MobileError::Internal(format!("Failed to serialize OnboardingData: {e}")))
+    }
+}
+
+// ── Helper macro for boilerplate ──────────────────────────────────
+
+/// Generates a Mobile*Workflow struct with `current_screen_json` and `handle_action_json`.
+macro_rules! mobile_workflow {
+    (
+        $name:ident wraps $engine:ty {
+            constructor($($param:ident : $ptype:ty),*) -> $parse:expr
+        }
+    ) => {
+        #[derive(uniffi::Object)]
+        pub struct $name {
+            engine: Mutex<$engine>,
+        }
+
+        #[uniffi::export]
+        impl $name {
+            #[uniffi::constructor]
+            pub fn new($($param: $ptype),*) -> Result<Self, MobileError> {
+                let engine = $parse;
+                Ok(Self {
+                    engine: Mutex::new(engine),
+                })
+            }
+
+            pub fn current_screen_json(&self) -> Result<String, MobileError> {
+                let engine = self
+                    .engine
+                    .lock()
+                    .map_err(|e| MobileError::Internal(format!("Lock failed: {e}")))?;
+                screen_to_json(&engine.current_screen())
+            }
+
+            pub fn handle_action_json(&self, action_json: String) -> Result<String, MobileError> {
+                let action = user_action_from_json(&action_json)?;
+                let mut engine = self
+                    .engine
+                    .lock()
+                    .map_err(|e| MobileError::Internal(format!("Lock failed: {e}")))?;
+                action_result_to_json(&engine.handle_action(action))
+            }
+        }
+    };
+}
+
+// ── MobileHomeWorkflow ────────────────────────────────────────────
+
+mobile_workflow! {
+    MobileHomeWorkflow wraps HomeEngine {
+        constructor(contacts_json: String, progress_json: String) -> {
+            let contacts: Vec<ContactItem> = serde_json::from_str(&contacts_json)
+                .map_err(|e| MobileError::InvalidInput(format!("Failed to parse contacts: {e}")))?;
+            let progress: HomeProgress = serde_json::from_str(&progress_json)
+                .map_err(|e| MobileError::InvalidInput(format!("Failed to parse progress: {e}")))?;
+            HomeEngine::new(contacts, progress)
+        }
+    }
+}
+
+// ── MobileContactListWorkflow ─────────────────────────────────────
+
+mobile_workflow! {
+    MobileContactListWorkflow wraps ContactListEngine {
+        constructor(contacts_json: String) -> {
+            let contacts: Vec<ContactItem> = serde_json::from_str(&contacts_json)
+                .map_err(|e| MobileError::InvalidInput(format!("Failed to parse contacts: {e}")))?;
+            ContactListEngine::new(contacts)
+        }
+    }
+}
+
+// ── MobileSettingsWorkflow ────────────────────────────────────────
+
+mobile_workflow! {
+    MobileSettingsWorkflow wraps SettingsEngine {
+        constructor(config_json: String) -> {
+            let config: SettingsConfig = serde_json::from_str(&config_json)
+                .map_err(|e| MobileError::InvalidInput(format!("Failed to parse config: {e}")))?;
+            SettingsEngine::new(config)
+        }
+    }
+}
+
+// ── MobileHelpWorkflow ────────────────────────────────────────────
+
+mobile_workflow! {
+    MobileHelpWorkflow wraps HelpEngine {
+        constructor(items_json: String) -> {
+            let items: Vec<HelpItem> = serde_json::from_str(&items_json)
+                .map_err(|e| MobileError::InvalidInput(format!("Failed to parse help items: {e}")))?;
+            HelpEngine::new(items)
+        }
+    }
+}
+
+// ── MobileDeliveryStatusWorkflow ──────────────────────────────────
+
+mobile_workflow! {
+    MobileDeliveryStatusWorkflow wraps DeliveryStatusEngine {
+        constructor(items_json: String) -> {
+            let items: Vec<DeliveryItem> = serde_json::from_str(&items_json)
+                .map_err(|e| MobileError::InvalidInput(format!("Failed to parse delivery items: {e}")))?;
+            DeliveryStatusEngine::new(items)
+        }
+    }
+}
+
+// ── MobileLockScreenWorkflow ──────────────────────────────────────
+
+mobile_workflow! {
+    MobileLockScreenWorkflow wraps LockScreenEngine {
+        constructor(max_attempts: u32) -> {
+            LockScreenEngine::new(max_attempts as usize)
+        }
     }
 }

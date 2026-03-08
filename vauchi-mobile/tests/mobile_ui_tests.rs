@@ -7,7 +7,10 @@
 //! Verifies that the JSON transport layer correctly serializes/deserializes
 //! the core UI types across the FFI boundary.
 
-use vauchi_mobile::MobileOnboardingWorkflow;
+use vauchi_mobile::{
+    MobileContactListWorkflow, MobileDeliveryStatusWorkflow, MobileHelpWorkflow,
+    MobileHomeWorkflow, MobileLockScreenWorkflow, MobileOnboardingWorkflow, MobileSettingsWorkflow,
+};
 
 // ============================================================================
 // MobileOnboardingWorkflow — construction and initial screen
@@ -205,4 +208,138 @@ fn workflow_rejects_unknown_action_variant() {
 
     let result = workflow.handle_action_json(r#"{"UnknownAction": {}}"#.into());
     assert!(result.is_err(), "should reject unknown action variant");
+}
+
+// ============================================================================
+// MobileHomeWorkflow
+// ============================================================================
+
+#[test]
+fn home_workflow_returns_home_screen() {
+    let workflow = MobileHomeWorkflow::new(
+        r#"[{"id":"c1","name":"Alice","subtitle":null,"avatar_initials":"A","status":null}]"#
+            .into(),
+        r#"{"completed_steps":3,"total_steps":6}"#.into(),
+    )
+    .expect("should construct");
+
+    let json = workflow.current_screen_json().expect("should serialize");
+    let screen: serde_json::Value = serde_json::from_str(&json).expect("should parse");
+    assert_eq!(screen["screen_id"], "home");
+}
+
+#[test]
+fn home_workflow_handles_action() {
+    let workflow = MobileHomeWorkflow::new(
+        "[]".into(),
+        r#"{"completed_steps":6,"total_steps":6}"#.into(),
+    )
+    .expect("should construct");
+
+    let result_json = workflow
+        .handle_action_json(
+            r#"{"ListItemSelected":{"component_id":"recent_contacts","item_id":"c1"}}"#.into(),
+        )
+        .expect("should handle action");
+    let result: serde_json::Value = serde_json::from_str(&result_json).expect("should parse");
+    assert!(
+        result["OpenContact"].is_object(),
+        "expected OpenContact, got: {result}"
+    );
+}
+
+// ============================================================================
+// MobileContactListWorkflow
+// ============================================================================
+
+#[test]
+fn contact_list_workflow_returns_screen() {
+    let workflow = MobileContactListWorkflow::new(
+        r#"[{"id":"c1","name":"Alice","subtitle":null,"avatar_initials":"A","status":null}]"#
+            .into(),
+    )
+    .expect("should construct");
+
+    let json = workflow.current_screen_json().expect("should serialize");
+    let screen: serde_json::Value = serde_json::from_str(&json).expect("should parse");
+    assert_eq!(screen["screen_id"], "contact_list");
+}
+
+// ============================================================================
+// MobileSettingsWorkflow
+// ============================================================================
+
+#[test]
+fn settings_workflow_returns_screen() {
+    let config = r#"{
+        "display_name": "Alice",
+        "delivery_receipts_enabled": true,
+        "suppress_presence": false,
+        "relay_url": "wss://relay.vauchi.app",
+        "device_count": 2,
+        "password_set": true
+    }"#;
+    let workflow = MobileSettingsWorkflow::new(config.into()).expect("should construct");
+
+    let json = workflow.current_screen_json().expect("should serialize");
+    let screen: serde_json::Value = serde_json::from_str(&json).expect("should parse");
+    assert_eq!(screen["screen_id"], "settings");
+}
+
+// ============================================================================
+// MobileHelpWorkflow
+// ============================================================================
+
+#[test]
+fn help_workflow_returns_screen() {
+    let items = r#"[{"id":"faq1","question":"How?","answer_url":"https://example.com","category":"General"}]"#;
+    let workflow = MobileHelpWorkflow::new(items.into()).expect("should construct");
+
+    let json = workflow.current_screen_json().expect("should serialize");
+    let screen: serde_json::Value = serde_json::from_str(&json).expect("should parse");
+    assert_eq!(screen["screen_id"], "help");
+}
+
+// ============================================================================
+// MobileDeliveryStatusWorkflow
+// ============================================================================
+
+#[test]
+fn delivery_workflow_returns_screen() {
+    let items = r#"[{"contact_id":"c1","contact_name":"Alice","status":"Success","detail":null,"retryable":false}]"#;
+    let workflow = MobileDeliveryStatusWorkflow::new(items.into()).expect("should construct");
+
+    let json = workflow.current_screen_json().expect("should serialize");
+    let screen: serde_json::Value = serde_json::from_str(&json).expect("should parse");
+    assert_eq!(screen["screen_id"], "delivery_status");
+}
+
+// ============================================================================
+// MobileLockScreenWorkflow
+// ============================================================================
+
+#[test]
+fn lock_screen_workflow_returns_screen() {
+    let workflow = MobileLockScreenWorkflow::new(5).expect("should construct");
+
+    let json = workflow.current_screen_json().expect("should serialize");
+    let screen: serde_json::Value = serde_json::from_str(&json).expect("should parse");
+    assert_eq!(screen["screen_id"], "lock_screen");
+}
+
+#[test]
+fn lock_screen_workflow_unlock_flow() {
+    let workflow = MobileLockScreenWorkflow::new(5).expect("should construct");
+
+    // Enter PIN
+    workflow
+        .handle_action_json(r#"{"TextChanged":{"component_id":"pin","value":"123456"}}"#.into())
+        .expect("should handle text change");
+
+    // Submit
+    let result_json = workflow
+        .handle_action_json(r#"{"ActionPressed":{"action_id":"unlock"}}"#.into())
+        .expect("should handle unlock");
+
+    assert_eq!(result_json.trim_matches('"'), "Complete");
 }

@@ -14,17 +14,26 @@ use vauchi_mobile::MobileOnboardingWorkflow;
 // ============================================================================
 
 #[test]
-fn workflow_new_returns_welcome_screen() {
+fn workflow_new_returns_identity_check_screen() {
     let workflow = MobileOnboardingWorkflow::new();
     let json = workflow.current_screen_json().expect("should serialize");
     let screen: serde_json::Value = serde_json::from_str(&json).expect("should parse JSON");
 
-    assert_eq!(screen["screen_id"], "welcome");
+    assert_eq!(screen["screen_id"], "identity_check");
     assert_eq!(screen["title"], "Welcome to Vauchi");
     assert!(screen["components"].is_array());
     assert!(screen["actions"].is_array());
-    assert_eq!(screen["progress"]["current_step"], 1);
-    assert_eq!(screen["progress"]["total_steps"], 9);
+    assert!(
+        screen["progress"].is_null(),
+        "Pre-gate screens have no progress"
+    );
+}
+
+/// Helper: navigate past IdentityCheck to Welcome.
+fn advance_to_welcome(workflow: &MobileOnboardingWorkflow) {
+    workflow
+        .handle_action_json(r#"{"ActionPressed": {"action_id": "create_new"}}"#.into())
+        .unwrap();
 }
 
 // ============================================================================
@@ -34,6 +43,7 @@ fn workflow_new_returns_welcome_screen() {
 #[test]
 fn workflow_handle_action_navigates_to_default_name() {
     let workflow = MobileOnboardingWorkflow::new();
+    advance_to_welcome(&workflow);
 
     let action_json = r#"{"ActionPressed": {"action_id": "get_started"}}"#;
     let result_json = workflow
@@ -52,6 +62,7 @@ fn workflow_handle_action_navigates_to_default_name() {
 #[test]
 fn workflow_text_changed_updates_screen() {
     let workflow = MobileOnboardingWorkflow::new();
+    advance_to_welcome(&workflow);
 
     // Navigate to default_name
     let nav = r#"{"ActionPressed": {"action_id": "get_started"}}"#;
@@ -71,6 +82,7 @@ fn workflow_text_changed_updates_screen() {
 #[test]
 fn workflow_validation_error_on_empty_name() {
     let workflow = MobileOnboardingWorkflow::new();
+    advance_to_welcome(&workflow);
 
     // Navigate to default_name
     let nav = r#"{"ActionPressed": {"action_id": "get_started"}}"#;
@@ -97,6 +109,7 @@ fn workflow_validation_error_on_empty_name() {
 #[test]
 fn workflow_skip_flow_reaches_complete() {
     let workflow = MobileOnboardingWorkflow::new();
+    advance_to_welcome(&workflow);
 
     // Welcome -> DefaultName
     workflow
@@ -145,6 +158,7 @@ fn workflow_skip_flow_reaches_complete() {
 #[test]
 fn workflow_onboarding_data_json_returns_valid_data() {
     let workflow = MobileOnboardingWorkflow::new();
+    advance_to_welcome(&workflow);
 
     // Navigate and set a name
     workflow

@@ -10,6 +10,8 @@ use vauchi_core::ui::*;
 // ── Constants ───────────────────────────────────────────────────────
 
 const ALL_SCREEN_IDS: &[&str] = &[
+    "identity_check",
+    "link_choice",
     "welcome",
     "default_name",
     "skip_gate",
@@ -27,8 +29,12 @@ const GROUP_NAMES: &[&str] = &["Family", "Friends", "Coworkers", "Business"];
 
 fn arb_action_id() -> impl Strategy<Value = String> {
     prop_oneof![
-        Just("get_started".to_string()),
+        Just("have_identity".to_string()),
+        Just("create_new".to_string()),
+        Just("link_device".to_string()),
         Just("restore_backup".to_string()),
+        Just("back".to_string()),
+        Just("get_started".to_string()),
         Just("continue".to_string()),
         Just("continue_setup".to_string()),
         Just("skip_to_finish".to_string()),
@@ -105,8 +111,13 @@ fn arb_user_action() -> impl Strategy<Value = UserAction> {
 }
 
 /// Sequence of "continue/advance" actions that take the engine from
-/// Welcome all the way to Ready (full path, no skipping).
+/// IdentityCheck all the way to Ready (full path, no skipping).
 fn advance_to_ready(engine: &mut OnboardingEngine, name: &str) {
+    // IdentityCheck → Welcome
+    let _ = engine.handle_action(UserAction::ActionPressed {
+        action_id: "create_new".into(),
+    });
+    // Welcome → DefaultName
     let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "get_started".into(),
     });
@@ -171,7 +182,10 @@ proptest! {
     fn screen_stability(actions in prop::collection::vec(arb_user_action(), 0..30)) {
         let mut engine = OnboardingEngine::new();
 
-        // Set a name so we can get past DefaultName
+        // Navigate past IdentityCheck to Welcome, then to DefaultName
+        let _ = engine.handle_action(UserAction::ActionPressed {
+            action_id: "create_new".into(),
+        });
         let _ = engine.handle_action(UserAction::ActionPressed {
             action_id: "get_started".into(),
         });
@@ -206,13 +220,17 @@ proptest! {
     ) {
         // Filter out IDs that happen to be real action IDs
         let real_ids = [
-            "get_started", "restore_backup", "continue", "continue_setup",
+            "have_identity", "create_new", "link_device", "restore_backup",
+            "back", "get_started", "continue", "continue_setup",
             "skip_to_finish", "skip", "edit", "setup_backup", "start",
         ];
         prop_assume!(!real_ids.contains(&bogus_id.as_str()));
 
         let mut engine = OnboardingEngine::new();
-        // Set name first so navigation can proceed
+        // Navigate past IdentityCheck to Welcome, then set name
+        let _ = engine.handle_action(UserAction::ActionPressed {
+            action_id: "create_new".into(),
+        });
         let _ = engine.handle_action(UserAction::ActionPressed {
             action_id: "get_started".into(),
         });
@@ -256,6 +274,9 @@ proptest! {
 
         let mut engine = OnboardingEngine::new();
         let _ = engine.handle_action(UserAction::ActionPressed {
+            action_id: "create_new".into(),
+        });
+        let _ = engine.handle_action(UserAction::ActionPressed {
             action_id: "get_started".into(),
         });
         let _ = engine.handle_action(UserAction::TextChanged {
@@ -285,6 +306,9 @@ proptest! {
         prop_assume!(!name.trim().is_empty());
 
         let mut engine = OnboardingEngine::new();
+        let _ = engine.handle_action(UserAction::ActionPressed {
+            action_id: "create_new".into(),
+        });
         let _ = engine.handle_action(UserAction::ActionPressed {
             action_id: "get_started".into(),
         });
@@ -316,6 +340,9 @@ proptest! {
         let mut engine = OnboardingEngine::new();
 
         // Navigate to groups_setup
+        let _ = engine.handle_action(UserAction::ActionPressed {
+            action_id: "create_new".into(),
+        });
         let _ = engine.handle_action(UserAction::ActionPressed {
             action_id: "get_started".into(),
         });
@@ -374,6 +401,9 @@ proptest! {
         let group_name = GROUP_NAMES[group_idx];
         let mut engine = OnboardingEngine::new();
 
+        let _ = engine.handle_action(UserAction::ActionPressed {
+            action_id: "create_new".into(),
+        });
         let _ = engine.handle_action(UserAction::ActionPressed {
             action_id: "get_started".into(),
         });
@@ -453,6 +483,9 @@ proptest! {
                 ActionResult::Complete => {
                     // Complete is valid — engine reached the end
                 }
+                ActionResult::StartDeviceLink | ActionResult::StartBackupImport => {
+                    // External handoff — valid from LinkChoice step
+                }
             }
         }
 
@@ -482,9 +515,15 @@ proptest! {
         }
 
         let screen = engine.current_screen();
-        let progress = screen.progress.as_ref().expect("every screen must have progress");
-        prop_assert_eq!(progress.total_steps, 9);
-        prop_assert!(progress.current_step >= 1 && progress.current_step <= 9,
-            "current_step {} out of range", progress.current_step);
+        // Pre-gate screens (identity_check, link_choice) have no progress bar
+        if screen.screen_id == "identity_check" || screen.screen_id == "link_choice" {
+            prop_assert!(screen.progress.is_none(),
+                "Pre-gate screen {} should have no progress", screen.screen_id);
+        } else {
+            let progress = screen.progress.as_ref().expect("main screens must have progress");
+            prop_assert_eq!(progress.total_steps, 9);
+            prop_assert!(progress.current_step >= 1 && progress.current_step <= 9,
+                "current_step {} out of range", progress.current_step);
+        }
     }
 }

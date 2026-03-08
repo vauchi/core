@@ -430,6 +430,21 @@ fn test_serde_backward_compat_aliases() {
     );
 }
 
+// @scenario: onboarding:serde_backward_compat_no_identity_check
+#[test]
+fn test_serde_backward_compat_old_json_without_identity_check() {
+    // Users who started onboarding before IdentityCheck was added have
+    // persisted JSON with "current_step": "Welcome". This must still work.
+    let old_json = r#"{"current_step":"Welcome","completed_steps":[],"started_at":1000,"completed_at":null,"skipped_backup":false}"#;
+    let progress = OnboardingProgress::from_json(old_json).expect("Old JSON should deserialize");
+    assert_eq!(
+        progress.current_step(),
+        OnboardingStep::Welcome,
+        "Old JSON starting at Welcome must still deserialize correctly"
+    );
+    assert!(progress.completed_steps.is_empty());
+}
+
 // @scenario: onboarding:json_serialization_roundtrip (#25)
 #[test]
 fn test_json_serialization_roundtrip() {

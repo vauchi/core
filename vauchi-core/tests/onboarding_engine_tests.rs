@@ -6,7 +6,14 @@ use vauchi_core::ui::*;
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
+fn advance_to_welcome(engine: &mut OnboardingEngine) {
+    let _ = engine.handle_action(UserAction::ActionPressed {
+        action_id: "create_new".into(),
+    });
+}
+
 fn advance_to_default_name(engine: &mut OnboardingEngine) {
+    advance_to_welcome(engine);
     let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "get_started".into(),
     });
@@ -65,19 +72,21 @@ fn advance_to_ready(engine: &mut OnboardingEngine) {
     });
 }
 
-// ── Screen 1: Welcome ───────────────────────────────────────────────
+// ── Pre-gate: IdentityCheck ─────────────────────────────────────────
 
 #[test]
-fn starts_at_welcome() {
+fn starts_at_identity_check() {
     let engine = OnboardingEngine::new();
     let screen = engine.current_screen();
-    assert_eq!(screen.screen_id, "welcome");
-    assert_eq!(screen.progress.as_ref().unwrap().current_step, 1);
-    assert_eq!(screen.progress.as_ref().unwrap().total_steps, 9);
+    assert_eq!(screen.screen_id, "identity_check");
+    assert!(
+        screen.progress.is_none(),
+        "Pre-gate screens have no progress bar"
+    );
 }
 
 #[test]
-fn welcome_has_info_panel_and_two_actions() {
+fn identity_check_has_info_panel_and_two_actions() {
     let engine = OnboardingEngine::new();
     let screen = engine.current_screen();
 
@@ -86,18 +95,138 @@ fn welcome_has_info_panel_and_two_actions() {
             .components
             .iter()
             .any(|c| matches!(c, Component::InfoPanel { .. })),
-        "Welcome screen should have an InfoPanel"
+        "IdentityCheck should have an InfoPanel"
     );
     assert_eq!(screen.actions.len(), 2);
+    assert_eq!(screen.actions[0].id, "have_identity");
+    assert!(matches!(screen.actions[0].style, ActionStyle::Primary));
+    assert_eq!(screen.actions[1].id, "create_new");
+    assert!(matches!(screen.actions[1].style, ActionStyle::Secondary));
+}
+
+#[test]
+fn identity_check_create_new_goes_to_welcome() {
+    let mut engine = OnboardingEngine::new();
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "create_new".into(),
+    });
+    match result {
+        ActionResult::NavigateTo(screen) => {
+            assert_eq!(screen.screen_id, "welcome");
+            assert_eq!(screen.progress.as_ref().unwrap().current_step, 1);
+        }
+        other => panic!("Expected NavigateTo welcome, got {other:?}"),
+    }
+}
+
+#[test]
+fn identity_check_have_identity_goes_to_link_choice() {
+    let mut engine = OnboardingEngine::new();
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "have_identity".into(),
+    });
+    match result {
+        ActionResult::NavigateTo(screen) => {
+            assert_eq!(screen.screen_id, "link_choice");
+            assert!(
+                screen.progress.is_none(),
+                "Pre-gate screens have no progress bar"
+            );
+        }
+        other => panic!("Expected NavigateTo link_choice, got {other:?}"),
+    }
+}
+
+// ── Pre-gate: LinkChoice ────────────────────────────────────────────
+
+#[test]
+fn link_choice_link_device_returns_start_device_link() {
+    let mut engine = OnboardingEngine::new();
+    let _ = engine.handle_action(UserAction::ActionPressed {
+        action_id: "have_identity".into(),
+    });
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "link_device".into(),
+    });
+    assert!(
+        matches!(result, ActionResult::StartDeviceLink),
+        "Expected StartDeviceLink, got {result:?}"
+    );
+}
+
+#[test]
+fn link_choice_restore_backup_returns_start_backup_import() {
+    let mut engine = OnboardingEngine::new();
+    let _ = engine.handle_action(UserAction::ActionPressed {
+        action_id: "have_identity".into(),
+    });
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "restore_backup".into(),
+    });
+    assert!(
+        matches!(result, ActionResult::StartBackupImport),
+        "Expected StartBackupImport, got {result:?}"
+    );
+}
+
+#[test]
+fn link_choice_back_returns_to_identity_check() {
+    let mut engine = OnboardingEngine::new();
+    let _ = engine.handle_action(UserAction::ActionPressed {
+        action_id: "have_identity".into(),
+    });
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "back".into(),
+    });
+    match result {
+        ActionResult::NavigateTo(screen) => {
+            assert_eq!(screen.screen_id, "identity_check");
+        }
+        other => panic!("Expected NavigateTo identity_check, got {other:?}"),
+    }
+}
+
+#[test]
+fn identity_check_unknown_action_returns_update_screen() {
+    let mut engine = OnboardingEngine::new();
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "nonexistent".into(),
+    });
+    match result {
+        ActionResult::UpdateScreen(screen) => {
+            assert_eq!(screen.screen_id, "identity_check");
+        }
+        other => panic!("Expected UpdateScreen for unknown action, got {other:?}"),
+    }
+}
+
+// ── Screen 1: Welcome ───────────────────────────────────────────────
+
+#[test]
+fn welcome_has_info_panel_and_one_action() {
+    let mut engine = OnboardingEngine::new();
+    advance_to_welcome(&mut engine);
+    let screen = engine.current_screen();
+
+    assert_eq!(screen.screen_id, "welcome");
+    assert_eq!(screen.progress.as_ref().unwrap().current_step, 1);
+    assert_eq!(screen.progress.as_ref().unwrap().total_steps, 9);
+    assert!(
+        screen
+            .components
+            .iter()
+            .any(|c| matches!(c, Component::InfoPanel { .. })),
+        "Welcome screen should have an InfoPanel"
+    );
+    assert_eq!(screen.actions.len(), 1);
     assert_eq!(screen.actions[0].id, "get_started");
     assert!(matches!(screen.actions[0].style, ActionStyle::Primary));
-    assert_eq!(screen.actions[1].id, "restore_backup");
-    assert!(matches!(screen.actions[1].style, ActionStyle::Secondary));
 }
 
 #[test]
 fn welcome_to_default_name() {
     let mut engine = OnboardingEngine::new();
+    advance_to_welcome(&mut engine);
     let result = engine.handle_action(UserAction::ActionPressed {
         action_id: "get_started".into(),
     });
@@ -609,6 +738,10 @@ fn ready_start_completes() {
 fn full_flow_to_completion() {
     let mut engine = OnboardingEngine::new();
 
+    // IdentityCheck -> Welcome
+    let _ = engine.handle_action(UserAction::ActionPressed {
+        action_id: "create_new".into(),
+    });
     // Welcome -> DefaultName
     let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "get_started".into(),
@@ -657,6 +790,10 @@ fn full_flow_to_completion() {
 fn skip_flow_bypasses_groups_and_fields() {
     let mut engine = OnboardingEngine::new();
 
+    // IdentityCheck -> Welcome
+    let _ = engine.handle_action(UserAction::ActionPressed {
+        action_id: "create_new".into(),
+    });
     // Welcome -> DefaultName
     let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "get_started".into(),
@@ -698,6 +835,9 @@ fn skip_flow_bypasses_groups_and_fields() {
 #[test]
 fn data_accessor_returns_collected_data() {
     let mut engine = OnboardingEngine::new();
+    let _ = engine.handle_action(UserAction::ActionPressed {
+        action_id: "create_new".into(),
+    });
     let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "get_started".into(),
     });

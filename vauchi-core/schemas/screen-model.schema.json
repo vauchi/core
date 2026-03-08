@@ -670,7 +670,8 @@
       "enum": [
         "Text",
         "Phone",
-        "Email"
+        "Email",
+        "Password"
       ]
     },
     "Progress": {

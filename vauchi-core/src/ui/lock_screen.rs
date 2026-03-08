@@ -5,6 +5,7 @@
 //! Lock screen engine — PIN entry screen with attempt tracking.
 
 use crate::ui::*;
+use zeroize::Zeroize;
 
 /// Lock screen engine — prompts for a password and tracks failed attempts.
 #[derive(Clone, Debug)]
@@ -12,6 +13,12 @@ pub struct LockScreenEngine {
     entered_pin: String,
     max_attempts: usize,
     attempts: usize,
+}
+
+impl Drop for LockScreenEngine {
+    fn drop(&mut self) {
+        self.entered_pin.zeroize();
+    }
 }
 
 impl LockScreenEngine {

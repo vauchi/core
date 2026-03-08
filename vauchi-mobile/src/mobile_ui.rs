@@ -295,6 +295,38 @@ mobile_workflow! {
     }
 }
 
+#[uniffi::export]
+impl MobileExchangeWorkflow {
+    /// Signal that exchange verification succeeded.
+    pub fn mark_success(&self) -> Result<String, MobileError> {
+        let mut engine = self
+            .engine
+            .lock()
+            .map_err(|e| MobileError::Internal(format!("Lock failed: {e}")))?;
+        engine.mark_success();
+        screen_to_json(&engine.current_screen())
+    }
+
+    /// Signal that exchange verification failed.
+    pub fn mark_failed(&self) -> Result<String, MobileError> {
+        let mut engine = self
+            .engine
+            .lock()
+            .map_err(|e| MobileError::Internal(format!("Lock failed: {e}")))?;
+        engine.mark_failed();
+        screen_to_json(&engine.current_screen())
+    }
+
+    /// Returns the scanned QR data, if any.
+    pub fn scanned_data(&self) -> Result<Option<String>, MobileError> {
+        let engine = self
+            .engine
+            .lock()
+            .map_err(|e| MobileError::Internal(format!("Lock failed: {e}")))?;
+        Ok(engine.scanned_data().map(|s| s.to_string()))
+    }
+}
+
 // ── MobileDeviceLinkingWorkflow ─────────────────────────────────
 
 mobile_workflow! {
@@ -302,6 +334,29 @@ mobile_workflow! {
         constructor(qr_data: String) -> {
             DeviceLinkingEngine::new(qr_data)
         }
+    }
+}
+
+#[uniffi::export]
+impl MobileDeviceLinkingWorkflow {
+    /// Signal that a peer device has connected with a verification code.
+    pub fn peer_connected(&self, verification_code: String) -> Result<String, MobileError> {
+        let mut engine = self
+            .engine
+            .lock()
+            .map_err(|e| MobileError::Internal(format!("Lock failed: {e}")))?;
+        engine.peer_connected(verification_code);
+        screen_to_json(&engine.current_screen())
+    }
+
+    /// Signal that data sync has completed.
+    pub fn sync_complete(&self) -> Result<String, MobileError> {
+        let mut engine = self
+            .engine
+            .lock()
+            .map_err(|e| MobileError::Internal(format!("Lock failed: {e}")))?;
+        engine.sync_complete();
+        screen_to_json(&engine.current_screen())
     }
 }
 
@@ -317,6 +372,29 @@ mobile_workflow! {
     }
 }
 
+#[uniffi::export]
+impl MobileBackupRecoveryWorkflow {
+    /// Signal that async processing completed successfully.
+    pub fn processing_complete(&self) -> Result<String, MobileError> {
+        let mut engine = self
+            .engine
+            .lock()
+            .map_err(|e| MobileError::Internal(format!("Lock failed: {e}")))?;
+        engine.processing_complete();
+        screen_to_json(&engine.current_screen())
+    }
+
+    /// Signal that async processing failed.
+    pub fn processing_failed(&self) -> Result<String, MobileError> {
+        let mut engine = self
+            .engine
+            .lock()
+            .map_err(|e| MobileError::Internal(format!("Lock failed: {e}")))?;
+        engine.processing_failed();
+        screen_to_json(&engine.current_screen())
+    }
+}
+
 // ── MobileDuressPinWorkflow ─────────────────────────────────────
 
 mobile_workflow! {
@@ -329,6 +407,19 @@ mobile_workflow! {
     }
 }
 
+#[uniffi::export]
+impl MobileDuressPinWorkflow {
+    /// Returns the current duress config as JSON.
+    pub fn config_json(&self) -> Result<String, MobileError> {
+        let engine = self
+            .engine
+            .lock()
+            .map_err(|e| MobileError::Internal(format!("Lock failed: {e}")))?;
+        serde_json::to_string(engine.config())
+            .map_err(|e| MobileError::Internal(format!("Failed to serialize DuressConfig: {e}")))
+    }
+}
+
 // ── MobileEmergencyShredWorkflow ────────────────────────────────
 
 mobile_workflow! {
@@ -336,5 +427,34 @@ mobile_workflow! {
         constructor() -> {
             EmergencyShredEngine::new()
         }
+    }
+}
+
+#[uniffi::export]
+impl MobileEmergencyShredWorkflow {
+    /// Signal that the wipe operation has finished.
+    pub fn wipe_complete(&self) -> Result<String, MobileError> {
+        let mut engine = self
+            .engine
+            .lock()
+            .map_err(|e| MobileError::Internal(format!("Lock failed: {e}")))?;
+        engine.wipe_complete();
+        screen_to_json(&engine.current_screen())
+    }
+}
+
+// ── MobileLockScreenWorkflow extra methods ──────────────────────
+
+#[uniffi::export]
+impl MobileLockScreenWorkflow {
+    /// Record a failed unlock attempt. Returns the updated screen JSON.
+    /// Check the response for lockout state.
+    pub fn record_failed_attempt(&self) -> Result<String, MobileError> {
+        let mut engine = self
+            .engine
+            .lock()
+            .map_err(|e| MobileError::Internal(format!("Lock failed: {e}")))?;
+        let _locked_out = engine.record_failed_attempt();
+        screen_to_json(&engine.current_screen())
     }
 }

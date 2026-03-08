@@ -147,11 +147,11 @@ impl BackupRecoveryEngine {
             components: vec![Component::TextInput {
                 id: "password".into(),
                 label: label.into(),
-                value: self.password.clone(),
+                value: String::new(),
                 placeholder: None,
                 max_length: None,
                 validation_error: None,
-                input_type: InputType::Text,
+                input_type: InputType::Password,
             }],
             actions: vec![
                 ScreenAction {
@@ -179,11 +179,11 @@ impl BackupRecoveryEngine {
             components: vec![Component::TextInput {
                 id: "confirm_password".into(),
                 label: "Confirm your backup password".into(),
-                value: self.confirm_password.clone(),
+                value: String::new(),
                 placeholder: None,
                 max_length: None,
                 validation_error: None,
-                input_type: InputType::Text,
+                input_type: InputType::Password,
             }],
             actions: vec![
                 ScreenAction {
@@ -393,6 +393,8 @@ impl WorkflowEngine for BackupRecoveryEngine {
             (BackupStep::Failed, UserAction::ActionPressed { action_id })
                 if action_id == "retry" =>
             {
+                self.password.zeroize();
+                self.confirm_password.zeroize();
                 self.step = BackupStep::EnterPassword;
                 ActionResult::NavigateTo(self.current_screen())
             }

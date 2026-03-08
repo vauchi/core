@@ -106,6 +106,7 @@ pub enum InputType {
     Text,
     Phone,
     Email,
+    Password,
 }
 
 /// How field visibility is controlled in the UI.

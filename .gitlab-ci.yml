@@ -107,9 +107,10 @@ auto-tag:version:
       echo "✓ Created and pushed tag ${TAG}"
 
 # ============================================================
-# Dev Tag Pipeline (lightweight — lint + test only)
+# Dev Tag Pipeline (lint + test + binding build)
 # ============================================================
-# Triggered by v0.2.3-dev.N tags. Fast feedback, no coverage/mutation/publish.
+# Triggered by v0.2.3-dev.N tags. Runs lint + test (dev-specific jobs below),
+# plus build/package/publish/trigger via .release-or-rc (shared with stable/RC).
 
 dev:verify:
   extends: [.linux-runner-nocache, .dev-verify]
@@ -466,8 +467,8 @@ secret_detection:
       optional: true
 
 # ============================================================
-# Build Stage — Stable + RC tags only (no dev tags)
-# Dev tags skip binding builds — use `just bindings-local` for dev.
+# Build Stage — All version tags (stable, RC, dev)
+# Builds mobile bindings for iOS and Android on every version tag.
 # ============================================================
 
 # Verify tag is on main branch before proceeding with release
@@ -842,6 +843,7 @@ trigger:swift:
   rules:
     - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/
     - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+-rc\.\d+$/
+    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+-dev\.\d+$/
 
 trigger:android:
   stage: trigger
@@ -859,6 +861,7 @@ trigger:android:
   rules:
     - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/
     - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+-rc\.\d+$/
+    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+-dev\.\d+$/
 
 # ============================================================
 # Downstream Verification (main branch only)

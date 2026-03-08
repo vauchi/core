@@ -24,6 +24,8 @@ test-timings = []
 # Reduces Argon2id KDF cost parameters for faster test execution (~5x speedup).
 # MUST NOT be enabled in production builds — only for test/dev profiles.
 test-kdf = []
+# JSON Schema generation for UI types (dev tooling only)
+schema-gen = ["schemars"]
 # Tor anonymity layer (embedded arti client)
 tor = ["arti-client", "tor-rtcompat", "tokio-util"]
 # Remote content updates (requires HTTP client)
@@ -78,6 +80,9 @@ subtle = "2.6"
 
 # Zeroize sensitive data in memory
 zeroize = { version = "1.8", features = ["derive"] }
+
+# JSON Schema generation (optional, behind schema-gen feature)
+schemars = { version = "0.8", optional = true }
 
 # Password strength estimation
 zxcvbn = "3"

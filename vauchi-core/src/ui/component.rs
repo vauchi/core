@@ -5,6 +5,7 @@
 use serde::{Deserialize, Serialize};
 
 /// A UI component that core tells frontends to render.
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum Component {
     Text {
@@ -48,6 +49,7 @@ pub enum Component {
 }
 
 /// Text rendering style.
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum TextStyle {
     Title,
@@ -57,6 +59,7 @@ pub enum TextStyle {
 }
 
 /// Input field type hint for frontends.
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum InputType {
     Text,
@@ -65,6 +68,7 @@ pub enum InputType {
 }
 
 /// How field visibility is controlled in the UI.
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum VisibilityMode {
     ShowHide,
@@ -72,6 +76,7 @@ pub enum VisibilityMode {
 }
 
 /// A toggleable item in a list.
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct ToggleItem {
     pub id: String,
@@ -81,6 +86,7 @@ pub struct ToggleItem {
 }
 
 /// A contact field as displayed in the UI.
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct FieldDisplay {
     pub id: String,
@@ -94,6 +100,7 @@ pub struct FieldDisplay {
 ///
 /// Named `UiFieldVisibility` to distinguish from `contact::FieldVisibility`
 /// which is the storage-level visibility model.
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum UiFieldVisibility {
     Shown,
@@ -102,6 +109,7 @@ pub enum UiFieldVisibility {
 }
 
 /// How a card looks to a specific group.
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct GroupCardView {
     pub group_name: String,
@@ -110,6 +118,7 @@ pub struct GroupCardView {
 }
 
 /// An item in an info panel.
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct InfoItem {
     pub icon: Option<String>,

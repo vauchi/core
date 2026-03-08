@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 use super::screen::ScreenModel;
 
 /// An action the user performed in the UI.
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum UserAction {
     TextChanged {
@@ -31,6 +32,7 @@ pub enum UserAction {
 }
 
 /// The result of handling a user action.
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[must_use]
 pub enum ActionResult {

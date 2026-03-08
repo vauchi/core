@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 use super::component::Component;
 
 /// Describes a full screen to render.
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct ScreenModel {
     pub screen_id: String,
@@ -18,6 +19,7 @@ pub struct ScreenModel {
 }
 
 /// Step progress indicator.
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Progress {
     pub current_step: u8,
@@ -26,6 +28,7 @@ pub struct Progress {
 }
 
 /// A button or action the user can take on the screen.
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ScreenAction {
     pub id: String,
@@ -35,6 +38,7 @@ pub struct ScreenAction {
 }
 
 /// Visual style for a screen action.
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ActionStyle {
     Primary,

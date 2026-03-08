@@ -147,10 +147,11 @@ fn link_done_completes() {
         action_id: "done".to_string(),
     });
 
-    match result {
-        ActionResult::Complete => {}
-        other => panic!("expected Complete, got {:?}", other),
-    }
+    assert!(
+        matches!(result, ActionResult::Complete),
+        "expected Complete, got {:?}",
+        result
+    );
 }
 
 #[test]
@@ -161,8 +162,9 @@ fn link_cancel_from_show_qr() {
         action_id: "cancel".to_string(),
     });
 
-    match result {
-        ActionResult::Complete => {}
-        other => panic!("expected Complete, got {:?}", other),
-    }
+    assert!(
+        matches!(result, ActionResult::Complete),
+        "expected Complete, got {:?}",
+        result
+    );
 }

@@ -211,7 +211,6 @@ fn ready_fixture_is_fresh() {
 
 /// Regenerate all golden fixtures.
 /// Run with: `cargo test -p vauchi-core --test golden_fixtures -- --ignored`
-// allow(zero_assertions)
 #[test]
 #[ignore]
 fn regenerate_all_fixtures() {
@@ -219,6 +218,8 @@ fn regenerate_all_fixtures() {
     fs::create_dir_all(&dir).unwrap();
 
     let screens = walk_all_screens();
+    assert_eq!(screens.len(), 9, "expected 9 onboarding screens");
+
     for (name, screen) in &screens {
         let filename = format!("{name}.json");
         let json = screen_to_json(screen);

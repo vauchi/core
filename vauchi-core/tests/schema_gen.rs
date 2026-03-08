@@ -27,43 +27,44 @@ fn assert_schema_fresh<T: schemars::JsonSchema>(filename: &str) {
     let json = generate_schema_json::<T>();
     let path = schemas_dir().join(filename);
 
-    if path.exists() {
-        let existing = fs::read_to_string(&path).unwrap();
-        assert_eq!(
-            existing.trim(),
-            json.trim(),
-            "Schema `{}` is stale! Regenerate with:\n  cargo test --features schema-gen -p vauchi-core --test schema_gen -- regenerate --ignored",
-            filename
-        );
-    } else {
-        // First run — generate the schema
-        fs::create_dir_all(schemas_dir()).unwrap();
-        fs::write(&path, &json).unwrap();
-        // Still pass so CI can bootstrap
-    }
+    assert!(
+        path.exists(),
+        "Schema file `{}` missing! Generate with:\n  cargo test --features schema-gen -p vauchi-core --test schema_gen -- regenerate --ignored",
+        filename
+    );
+
+    let existing = fs::read_to_string(&path).unwrap();
+    assert_eq!(
+        existing.trim(),
+        json.trim(),
+        "Schema `{}` is stale! Regenerate with:\n  cargo test --features schema-gen -p vauchi-core --test schema_gen -- regenerate --ignored",
+        filename
+    );
 }
 
-// allow(zero_assertions)
 #[test]
 fn screen_model_schema_is_fresh() {
+    let json = generate_schema_json::<ScreenModel>();
+    assert!(!json.is_empty(), "ScreenModel schema must not be empty");
     assert_schema_fresh::<ScreenModel>("screen-model.schema.json");
 }
 
-// allow(zero_assertions)
 #[test]
 fn user_action_schema_is_fresh() {
+    let json = generate_schema_json::<UserAction>();
+    assert!(!json.is_empty(), "UserAction schema must not be empty");
     assert_schema_fresh::<UserAction>("user-action.schema.json");
 }
 
-// allow(zero_assertions)
 #[test]
 fn action_result_schema_is_fresh() {
+    let json = generate_schema_json::<ActionResult>();
+    assert!(!json.is_empty(), "ActionResult schema must not be empty");
     assert_schema_fresh::<ActionResult>("action-result.schema.json");
 }
 
 /// Regenerate all schemas. Run with `--ignored`:
 /// `cargo test --features schema-gen -p vauchi-core --test schema_gen -- --ignored`
-// allow(zero_assertions)
 #[test]
 #[ignore]
 fn regenerate_all_schemas() {
@@ -89,4 +90,6 @@ fn regenerate_all_schemas() {
         fs::write(dir.join(filename), json).unwrap();
         println!("Generated {}", filename);
     }
+
+    assert_eq!(schemas.len(), 3, "expected 3 schemas to be generated");
 }

@@ -9,11 +9,16 @@
 //! User interactions flow back as UserAction.
 
 mod action;
+mod backup_recovery;
 mod component;
 mod contact_edit;
 mod contact_list;
 mod delivery;
+mod device_linking;
+mod duress_pin;
+mod emergency_shred;
 mod engine;
+mod exchange;
 mod help;
 mod home;
 mod lock_screen;
@@ -22,6 +27,7 @@ mod screen;
 mod settings;
 
 pub use action::{ActionResult, UserAction};
+pub use backup_recovery::{BackupMode, BackupRecoveryEngine};
 pub use component::{
     ActionListItem, Component, ContactItem, FieldDisplay, GroupCardView, InfoItem, InputType,
     QrMode, SettingsItem, SettingsItemKind, Status, TextStyle, ToggleItem, UiFieldVisibility,
@@ -30,7 +36,11 @@ pub use component::{
 pub use contact_edit::{ContactEditEngine, EditableContact, EditableField};
 pub use contact_list::ContactListEngine;
 pub use delivery::{DeliveryItem, DeliveryStatusEngine};
+pub use device_linking::DeviceLinkingEngine;
+pub use duress_pin::{DuressConfig, DuressPinEngine};
+pub use emergency_shred::EmergencyShredEngine;
 pub use engine::WorkflowEngine;
+pub use exchange::{ExchangeConfig, ExchangeEngine};
 pub use help::{HelpEngine, HelpItem};
 pub use home::{HomeEngine, HomeProgress};
 pub use lock_screen::LockScreenEngine;

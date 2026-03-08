@@ -1,0 +1,314 @@
+// SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+//
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+use vauchi_core::ui::*;
+
+#[test]
+fn backup_starts_at_choose() {
+    let engine = BackupRecoveryEngine::new(None);
+    let screen = engine.current_screen();
+    assert_eq!(screen.screen_id, "backup_choose");
+    assert!(screen.progress.is_none());
+    assert_eq!(screen.actions.len(), 2);
+    assert_eq!(screen.actions[0].id, "create");
+    assert_eq!(screen.actions[0].style, ActionStyle::Primary);
+    assert_eq!(screen.actions[1].id, "restore");
+    assert_eq!(screen.actions[1].style, ActionStyle::Secondary);
+}
+
+#[test]
+fn backup_create_flow_to_password() {
+    let mut engine = BackupRecoveryEngine::new(None);
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "create".into(),
+    });
+
+    match result {
+        ActionResult::NavigateTo(screen) => {
+            assert_eq!(screen.screen_id, "backup_password");
+            let progress = screen.progress.as_ref().expect("should have progress");
+            assert_eq!(progress.total_steps, 4);
+            assert_eq!(progress.current_step, 1);
+        }
+        other => panic!("Expected NavigateTo, got {:?}", other),
+    }
+}
+
+#[test]
+fn backup_restore_flow_to_password() {
+    let mut engine = BackupRecoveryEngine::new(None);
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "restore".into(),
+    });
+
+    match result {
+        ActionResult::NavigateTo(screen) => {
+            assert_eq!(screen.screen_id, "backup_password");
+            let progress = screen.progress.as_ref().expect("should have progress");
+            assert_eq!(progress.total_steps, 3);
+            assert_eq!(progress.current_step, 1);
+        }
+        other => panic!("Expected NavigateTo, got {:?}", other),
+    }
+}
+
+#[test]
+fn backup_password_validation() {
+    let mut engine = BackupRecoveryEngine::new(Some(BackupMode::Create));
+
+    // Continue with empty password should fail
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "continue".into(),
+    });
+    match result {
+        ActionResult::ValidationError {
+            component_id,
+            message,
+        } => {
+            assert_eq!(component_id, "password");
+            assert_eq!(message, "Password is required");
+        }
+        other => panic!("Expected ValidationError, got {:?}", other),
+    }
+
+    // The continue button should be disabled when password is empty
+    let screen = engine.current_screen();
+    let continue_action = screen.actions.iter().find(|a| a.id == "continue").unwrap();
+    assert!(!continue_action.enabled);
+}
+
+#[test]
+fn backup_confirm_password_mismatch() {
+    let mut engine = BackupRecoveryEngine::new(Some(BackupMode::Create));
+
+    // Enter password
+    engine.handle_action(UserAction::TextChanged {
+        component_id: "password".into(),
+        value: "my-secret".into(),
+    });
+    engine.handle_action(UserAction::ActionPressed {
+        action_id: "continue".into(),
+    });
+
+    // Enter mismatching confirmation
+    engine.handle_action(UserAction::TextChanged {
+        component_id: "confirm_password".into(),
+        value: "wrong".into(),
+    });
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "continue".into(),
+    });
+
+    match result {
+        ActionResult::ValidationError {
+            component_id,
+            message,
+        } => {
+            assert_eq!(component_id, "confirm_password");
+            assert_eq!(message, "Passwords do not match");
+        }
+        other => panic!("Expected ValidationError, got {:?}", other),
+    }
+}
+
+#[test]
+fn backup_confirm_match_to_processing() {
+    let mut engine = BackupRecoveryEngine::new(Some(BackupMode::Create));
+
+    // Enter password
+    engine.handle_action(UserAction::TextChanged {
+        component_id: "password".into(),
+        value: "my-secret".into(),
+    });
+    engine.handle_action(UserAction::ActionPressed {
+        action_id: "continue".into(),
+    });
+
+    // Enter matching confirmation
+    engine.handle_action(UserAction::TextChanged {
+        component_id: "confirm_password".into(),
+        value: "my-secret".into(),
+    });
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "continue".into(),
+    });
+
+    match result {
+        ActionResult::NavigateTo(screen) => {
+            assert_eq!(screen.screen_id, "backup_processing");
+            assert!(screen.actions.is_empty());
+            match &screen.components[0] {
+                Component::StatusIndicator { status, .. } => {
+                    assert_eq!(*status, Status::InProgress);
+                }
+                other => panic!("Expected StatusIndicator, got {:?}", other),
+            }
+        }
+        other => panic!("Expected NavigateTo, got {:?}", other),
+    }
+}
+
+#[test]
+fn backup_restore_skips_confirm() {
+    let mut engine = BackupRecoveryEngine::new(Some(BackupMode::Restore));
+
+    // Enter password
+    engine.handle_action(UserAction::TextChanged {
+        component_id: "password".into(),
+        value: "my-secret".into(),
+    });
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "continue".into(),
+    });
+
+    // Should go directly to processing, skipping confirm
+    match result {
+        ActionResult::NavigateTo(screen) => {
+            assert_eq!(screen.screen_id, "backup_processing");
+            let progress = screen.progress.as_ref().expect("should have progress");
+            assert_eq!(progress.total_steps, 3);
+        }
+        other => panic!("Expected NavigateTo, got {:?}", other),
+    }
+}
+
+#[test]
+fn backup_processing_complete() {
+    let mut engine = BackupRecoveryEngine::new(Some(BackupMode::Create));
+
+    // Navigate to processing
+    engine.handle_action(UserAction::TextChanged {
+        component_id: "password".into(),
+        value: "pw".into(),
+    });
+    engine.handle_action(UserAction::ActionPressed {
+        action_id: "continue".into(),
+    });
+    engine.handle_action(UserAction::TextChanged {
+        component_id: "confirm_password".into(),
+        value: "pw".into(),
+    });
+    engine.handle_action(UserAction::ActionPressed {
+        action_id: "continue".into(),
+    });
+
+    // Signal completion
+    engine.processing_complete();
+    let screen = engine.current_screen();
+    assert_eq!(screen.screen_id, "backup_complete");
+    match &screen.components[0] {
+        Component::StatusIndicator { status, .. } => {
+            assert_eq!(*status, Status::Success);
+        }
+        other => panic!("Expected StatusIndicator, got {:?}", other),
+    }
+    assert_eq!(screen.actions.len(), 1);
+    assert_eq!(screen.actions[0].id, "done");
+
+    // Done should complete
+    let mut engine_done = BackupRecoveryEngine::new(Some(BackupMode::Create));
+    engine_done.handle_action(UserAction::TextChanged {
+        component_id: "password".into(),
+        value: "pw".into(),
+    });
+    engine_done.handle_action(UserAction::ActionPressed {
+        action_id: "continue".into(),
+    });
+    engine_done.handle_action(UserAction::TextChanged {
+        component_id: "confirm_password".into(),
+        value: "pw".into(),
+    });
+    engine_done.handle_action(UserAction::ActionPressed {
+        action_id: "continue".into(),
+    });
+    engine_done.processing_complete();
+    let result = engine_done.handle_action(UserAction::ActionPressed {
+        action_id: "done".into(),
+    });
+    assert_eq!(result, ActionResult::Complete);
+}
+
+#[test]
+fn backup_processing_failed() {
+    let mut engine = BackupRecoveryEngine::new(Some(BackupMode::Restore));
+
+    // Navigate to processing
+    engine.handle_action(UserAction::TextChanged {
+        component_id: "password".into(),
+        value: "pw".into(),
+    });
+    engine.handle_action(UserAction::ActionPressed {
+        action_id: "continue".into(),
+    });
+
+    // Signal failure
+    engine.processing_failed();
+    let screen = engine.current_screen();
+    assert_eq!(screen.screen_id, "backup_failed");
+    match &screen.components[0] {
+        Component::StatusIndicator { status, .. } => {
+            assert_eq!(*status, Status::Failed);
+        }
+        other => panic!("Expected StatusIndicator, got {:?}", other),
+    }
+    assert_eq!(screen.actions.len(), 2);
+    assert_eq!(screen.actions[0].id, "retry");
+    assert_eq!(screen.actions[1].id, "cancel");
+
+    // Retry should go back to password
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "retry".into(),
+    });
+    match result {
+        ActionResult::NavigateTo(screen) => {
+            assert_eq!(screen.screen_id, "backup_password");
+        }
+        other => panic!("Expected NavigateTo, got {:?}", other),
+    }
+}
+
+#[test]
+fn backup_back_navigation() {
+    let mut engine = BackupRecoveryEngine::new(None);
+
+    // Go to create password
+    engine.handle_action(UserAction::ActionPressed {
+        action_id: "create".into(),
+    });
+    assert_eq!(engine.current_screen().screen_id, "backup_password");
+
+    // Back to choose
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "back".into(),
+    });
+    match result {
+        ActionResult::NavigateTo(screen) => {
+            assert_eq!(screen.screen_id, "backup_choose");
+        }
+        other => panic!("Expected NavigateTo, got {:?}", other),
+    }
+
+    // Go to create, enter password, go to confirm, then back to password
+    engine.handle_action(UserAction::ActionPressed {
+        action_id: "create".into(),
+    });
+    engine.handle_action(UserAction::TextChanged {
+        component_id: "password".into(),
+        value: "pw".into(),
+    });
+    engine.handle_action(UserAction::ActionPressed {
+        action_id: "continue".into(),
+    });
+    assert_eq!(engine.current_screen().screen_id, "backup_confirm");
+
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "back".into(),
+    });
+    match result {
+        ActionResult::NavigateTo(screen) => {
+            assert_eq!(screen.screen_id, "backup_password");
+        }
+        other => panic!("Expected NavigateTo, got {:?}", other),
+    }
+}

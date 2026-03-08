@@ -10,6 +10,7 @@
 
 mod action;
 mod component;
+mod contact_edit;
 mod contact_list;
 mod delivery;
 mod engine;
@@ -26,6 +27,7 @@ pub use component::{
     SettingsItem, SettingsItemKind, Status, TextStyle, ToggleItem, UiFieldVisibility,
     VisibilityMode,
 };
+pub use contact_edit::{ContactEditEngine, EditableContact, EditableField};
 pub use contact_list::ContactListEngine;
 pub use delivery::{DeliveryItem, DeliveryStatusEngine};
 pub use engine::WorkflowEngine;

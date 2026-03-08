@@ -122,6 +122,8 @@ tor-rtcompat = { version = "0.27", optional = true, features = ["tokio", "native
 tokio-util = { version = "0.7", optional = true, features = ["io", "io-util"] }
 
 [dev-dependencies]
+# JSON Schema validation for contract tests
+jsonschema = "0.28"
 # Temporary directories for storage tests
 tempfile = "3.0"
 # Async runtime for async sync tests

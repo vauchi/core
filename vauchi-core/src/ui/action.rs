@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use super::screen::ScreenModel;
 
 /// An action the user performed in the UI.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum UserAction {
     TextChanged {
         component_id: String,
@@ -31,7 +31,7 @@ pub enum UserAction {
 }
 
 /// The result of handling a user action.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[must_use]
 pub enum ActionResult {
     UpdateScreen(ScreenModel),

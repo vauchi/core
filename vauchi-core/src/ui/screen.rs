@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use super::component::Component;
 
 /// Describes a full screen to render.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct ScreenModel {
     pub screen_id: String,
     pub title: String,
@@ -18,7 +18,7 @@ pub struct ScreenModel {
 }
 
 /// Step progress indicator.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Progress {
     pub current_step: u8,
     pub total_steps: u8,
@@ -26,7 +26,7 @@ pub struct Progress {
 }
 
 /// A button or action the user can take on the screen.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ScreenAction {
     pub id: String,
     pub label: String,
@@ -35,7 +35,7 @@ pub struct ScreenAction {
 }
 
 /// Visual style for a screen action.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ActionStyle {
     Primary,
     Secondary,

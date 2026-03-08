@@ -5,7 +5,7 @@
 use serde::{Deserialize, Serialize};
 
 /// A UI component that core tells frontends to render.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum Component {
     Text {
         id: String,
@@ -72,7 +72,7 @@ pub enum VisibilityMode {
 }
 
 /// A toggleable item in a list.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct ToggleItem {
     pub id: String,
     pub label: String,
@@ -81,7 +81,7 @@ pub struct ToggleItem {
 }
 
 /// A contact field as displayed in the UI.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct FieldDisplay {
     pub id: String,
     pub field_type: String,
@@ -102,7 +102,7 @@ pub enum UiFieldVisibility {
 }
 
 /// How a card looks to a specific group.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct GroupCardView {
     pub group_name: String,
     pub display_name: String,
@@ -110,7 +110,7 @@ pub struct GroupCardView {
 }
 
 /// An item in an info panel.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct InfoItem {
     pub icon: Option<String>,
     pub title: String,

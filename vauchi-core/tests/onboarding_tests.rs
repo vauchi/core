@@ -987,6 +987,179 @@ fn test_skip_to_finish_from_wrong_step_is_noop() {
     );
 }
 
+// =============================================================================
+// Identity Check Tests
+// =============================================================================
+
+// @scenario: onboarding:identity_check_create_new
+#[test]
+fn test_identity_check_create_new_goes_to_welcome() {
+    use vauchi_core::ui::{ActionResult, OnboardingEngine, UserAction, WorkflowEngine};
+
+    let mut engine = OnboardingEngine::new();
+    let screen = engine.current_screen();
+    assert_eq!(screen.screen_id, "identity_check");
+    assert!(
+        screen.progress.is_none(),
+        "IdentityCheck should have no progress indicator"
+    );
+
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "create_new".into(),
+    });
+    match result {
+        ActionResult::NavigateTo(screen) => {
+            assert_eq!(screen.screen_id, "welcome");
+            let progress = screen
+                .progress
+                .as_ref()
+                .expect("Welcome should have progress");
+            assert_eq!(progress.current_step, 1);
+            assert_eq!(progress.total_steps, 9);
+        }
+        other => panic!("Expected NavigateTo, got {other:?}"),
+    }
+}
+
+// @scenario: onboarding:identity_check_have_identity
+#[test]
+fn test_identity_check_have_identity_goes_to_link_choice() {
+    use vauchi_core::ui::{ActionResult, OnboardingEngine, UserAction, WorkflowEngine};
+
+    let mut engine = OnboardingEngine::new();
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "have_identity".into(),
+    });
+    match result {
+        ActionResult::NavigateTo(screen) => {
+            assert_eq!(screen.screen_id, "link_choice");
+            assert!(
+                screen.progress.is_none(),
+                "LinkChoice should have no progress indicator"
+            );
+        }
+        other => panic!("Expected NavigateTo, got {other:?}"),
+    }
+}
+
+// @scenario: onboarding:link_choice_link_device
+#[test]
+fn test_link_choice_link_device_returns_start_device_link() {
+    use vauchi_core::ui::{ActionResult, OnboardingEngine, UserAction, WorkflowEngine};
+
+    let mut engine = OnboardingEngine::new();
+    // Navigate to LinkChoice
+    let _ = engine.handle_action(UserAction::ActionPressed {
+        action_id: "have_identity".into(),
+    });
+
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "link_device".into(),
+    });
+    assert!(
+        matches!(result, ActionResult::StartDeviceLink),
+        "Expected StartDeviceLink, got {result:?}"
+    );
+}
+
+// @scenario: onboarding:link_choice_restore_backup
+#[test]
+fn test_link_choice_restore_backup_returns_start_backup_import() {
+    use vauchi_core::ui::{ActionResult, OnboardingEngine, UserAction, WorkflowEngine};
+
+    let mut engine = OnboardingEngine::new();
+    // Navigate to LinkChoice
+    let _ = engine.handle_action(UserAction::ActionPressed {
+        action_id: "have_identity".into(),
+    });
+
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "restore_backup".into(),
+    });
+    assert!(
+        matches!(result, ActionResult::StartBackupImport),
+        "Expected StartBackupImport, got {result:?}"
+    );
+}
+
+// @scenario: onboarding:link_choice_back
+#[test]
+fn test_link_choice_back_returns_to_identity_check() {
+    use vauchi_core::ui::{ActionResult, OnboardingEngine, UserAction, WorkflowEngine};
+
+    let mut engine = OnboardingEngine::new();
+    // Navigate to LinkChoice
+    let _ = engine.handle_action(UserAction::ActionPressed {
+        action_id: "have_identity".into(),
+    });
+
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "back".into(),
+    });
+    match result {
+        ActionResult::NavigateTo(screen) => {
+            assert_eq!(screen.screen_id, "identity_check");
+        }
+        other => panic!("Expected NavigateTo, got {other:?}"),
+    }
+}
+
+// @scenario: onboarding:welcome_no_restore_backup
+#[test]
+fn test_welcome_screen_has_no_restore_backup_action() {
+    use vauchi_core::ui::{OnboardingEngine, UserAction, WorkflowEngine};
+
+    let mut engine = OnboardingEngine::new();
+    // Navigate to Welcome via create_new
+    let _ = engine.handle_action(UserAction::ActionPressed {
+        action_id: "create_new".into(),
+    });
+
+    let screen = engine.current_screen();
+    assert_eq!(screen.screen_id, "welcome");
+    assert_eq!(
+        screen.actions.len(),
+        1,
+        "Welcome should have exactly 1 action"
+    );
+    assert_eq!(screen.actions[0].id, "get_started");
+}
+
+// @scenario: onboarding:identity_check_unknown_action
+#[test]
+fn test_identity_check_unknown_action_returns_update_screen() {
+    use vauchi_core::ui::{ActionResult, OnboardingEngine, UserAction, WorkflowEngine};
+
+    let mut engine = OnboardingEngine::new();
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "nonexistent".into(),
+    });
+    assert!(
+        matches!(result, ActionResult::UpdateScreen(_)),
+        "Expected UpdateScreen for unknown action, got {result:?}"
+    );
+}
+
+// @scenario: onboarding:link_choice_unknown_action
+#[test]
+fn test_link_choice_unknown_action_returns_update_screen() {
+    use vauchi_core::ui::{ActionResult, OnboardingEngine, UserAction, WorkflowEngine};
+
+    let mut engine = OnboardingEngine::new();
+    // Navigate to LinkChoice
+    let _ = engine.handle_action(UserAction::ActionPressed {
+        action_id: "have_identity".into(),
+    });
+
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "nonexistent".into(),
+    });
+    assert!(
+        matches!(result, ActionResult::UpdateScreen(_)),
+        "Expected UpdateScreen for unknown action, got {result:?}"
+    );
+}
+
 // @scenario: onboarding:e2e_full_flow_without_skip
 #[test]
 fn test_full_onboarding_flow_without_skip() {

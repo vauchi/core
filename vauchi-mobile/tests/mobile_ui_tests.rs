@@ -8,8 +8,9 @@
 //! the core UI types across the FFI boundary.
 
 use vauchi_mobile::{
-    MobileContactListWorkflow, MobileDeliveryStatusWorkflow, MobileHelpWorkflow,
-    MobileHomeWorkflow, MobileLockScreenWorkflow, MobileOnboardingWorkflow, MobileSettingsWorkflow,
+    MobileContactEditWorkflow, MobileContactListWorkflow, MobileDeliveryStatusWorkflow,
+    MobileHelpWorkflow, MobileHomeWorkflow, MobileLockScreenWorkflow, MobileOnboardingWorkflow,
+    MobileSettingsWorkflow,
 };
 
 // ============================================================================
@@ -342,4 +343,48 @@ fn lock_screen_workflow_unlock_flow() {
         .expect("should handle unlock");
 
     assert_eq!(result_json.trim_matches('"'), "Complete");
+}
+
+// ============================================================================
+// MobileContactEditWorkflow
+// ============================================================================
+
+#[test]
+fn contact_edit_workflow_returns_screen() {
+    let contact = r#"{"display_name":"Alice","fields":[{"id":"f1","field_type":"Phone","label":"Mobile","value":"+1-555-0100","visible_to_groups":["Family"],"shown":true}]}"#;
+    let groups = r#"["Family","Friends"]"#;
+    let workflow =
+        MobileContactEditWorkflow::new(contact.into(), groups.into()).expect("should construct");
+
+    let json = workflow.current_screen_json().expect("should serialize");
+    let screen: serde_json::Value = serde_json::from_str(&json).expect("should parse");
+    assert_eq!(screen["screen_id"], "edit_fields");
+}
+
+#[test]
+fn contact_edit_workflow_full_flow() {
+    let contact = r#"{"display_name":"Alice","fields":[]}"#;
+    let groups = r#"["Family"]"#;
+    let workflow =
+        MobileContactEditWorkflow::new(contact.into(), groups.into()).expect("should construct");
+
+    // EditFields -> EditVisibility
+    let result = workflow
+        .handle_action_json(r#"{"ActionPressed":{"action_id":"continue"}}"#.into())
+        .expect("should navigate");
+    let r: serde_json::Value = serde_json::from_str(&result).expect("parse");
+    assert!(r["NavigateTo"].is_object(), "expected NavigateTo, got: {r}");
+
+    // EditVisibility -> Preview
+    let result = workflow
+        .handle_action_json(r#"{"ActionPressed":{"action_id":"continue"}}"#.into())
+        .expect("should navigate");
+    let r: serde_json::Value = serde_json::from_str(&result).expect("parse");
+    assert!(r["NavigateTo"].is_object(), "expected NavigateTo, got: {r}");
+
+    // Save
+    let result = workflow
+        .handle_action_json(r#"{"ActionPressed":{"action_id":"save"}}"#.into())
+        .expect("should complete");
+    assert_eq!(result.trim_matches('"'), "Complete");
 }

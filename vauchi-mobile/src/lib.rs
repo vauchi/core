@@ -84,8 +84,9 @@ pub use mobile_nfc::{
     MobileNfcTransport, MobileNfcTransportError,
 };
 pub use mobile_ui::{
-    MobileContactListWorkflow, MobileDeliveryStatusWorkflow, MobileHelpWorkflow,
-    MobileHomeWorkflow, MobileLockScreenWorkflow, MobileOnboardingWorkflow, MobileSettingsWorkflow,
+    MobileContactEditWorkflow, MobileContactListWorkflow, MobileDeliveryStatusWorkflow,
+    MobileHelpWorkflow, MobileHomeWorkflow, MobileLockScreenWorkflow, MobileOnboardingWorkflow,
+    MobileSettingsWorkflow,
 };
 pub use mobile_wifi_aware::{wifi_aware_check_availability, MobileWifiAwareStatus};
 pub use multipart_qr::{encode_multipart, MobileMultipartDecoder, MultipartDecoder};

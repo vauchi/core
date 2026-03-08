@@ -1,0 +1,68 @@
+{
+  "screen_id": "edit_fields",
+  "title": "Edit Contact",
+  "subtitle": null,
+  "components": [
+    {
+      "TextInput": {
+        "id": "display_name",
+        "label": "Display Name",
+        "value": "Alice",
+        "placeholder": "Enter name",
+        "max_length": null,
+        "validation_error": null,
+        "input_type": "Text"
+      }
+    },
+    "Divider",
+    {
+      "FieldList": {
+        "id": "fields",
+        "fields": [
+          {
+            "id": "f1",
+            "field_type": "Phone",
+            "label": "Mobile",
+            "value": "+1-555-0100",
+            "visibility": {
+              "Groups": [
+                "Family"
+              ]
+            }
+          },
+          {
+            "id": "f2",
+            "field_type": "Email",
+            "label": "Work",
+            "value": "alice@example.com",
+            "visibility": {
+              "Groups": [
+                "Friends",
+                "Work"
+              ]
+            }
+          }
+        ],
+        "visibility_mode": "ShowHide",
+        "available_groups": [
+          "Family",
+          "Friends",
+          "Work"
+        ]
+      }
+    }
+  ],
+  "actions": [
+    {
+      "id": "continue",
+      "label": "Continue",
+      "style": "Primary",
+      "enabled": true
+    }
+  ],
+  "progress": {
+    "current_step": 1,
+    "total_steps": 3,
+    "label": null
+  }
+}

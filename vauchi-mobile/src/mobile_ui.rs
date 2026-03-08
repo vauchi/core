@@ -19,9 +19,10 @@
 use std::sync::Mutex;
 
 use vauchi_core::ui::{
-    ActionResult, ContactItem, ContactListEngine, DeliveryItem, DeliveryStatusEngine, HelpEngine,
-    HelpItem, HomeEngine, HomeProgress, LockScreenEngine, OnboardingEngine, ScreenModel,
-    SettingsConfig, SettingsEngine, UserAction, WorkflowEngine,
+    ActionResult, ContactEditEngine, ContactItem, ContactListEngine, DeliveryItem,
+    DeliveryStatusEngine, EditableContact, HelpEngine, HelpItem, HomeEngine, HomeProgress,
+    LockScreenEngine, OnboardingEngine, ScreenModel, SettingsConfig, SettingsEngine, UserAction,
+    WorkflowEngine,
 };
 
 use super::error::MobileError;
@@ -263,6 +264,20 @@ mobile_workflow! {
     MobileLockScreenWorkflow wraps LockScreenEngine {
         constructor(max_attempts: u32) -> {
             LockScreenEngine::new(max_attempts as usize)
+        }
+    }
+}
+
+// ── MobileContactEditWorkflow ─────────────────────────────────────
+
+mobile_workflow! {
+    MobileContactEditWorkflow wraps ContactEditEngine {
+        constructor(contact_json: String, groups_json: String) -> {
+            let contact: EditableContact = serde_json::from_str(&contact_json)
+                .map_err(|e| MobileError::InvalidInput(format!("Failed to parse contact: {e}")))?;
+            let groups: Vec<String> = serde_json::from_str(&groups_json)
+                .map_err(|e| MobileError::InvalidInput(format!("Failed to parse groups: {e}")))?;
+            ContactEditEngine::new(contact, groups)
         }
     }
 }

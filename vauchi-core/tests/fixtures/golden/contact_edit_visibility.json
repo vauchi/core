@@ -1,0 +1,78 @@
+{
+  "screen_id": "edit_visibility",
+  "title": "Field Visibility",
+  "subtitle": null,
+  "components": [
+    {
+      "ToggleList": {
+        "id": "vis_f1",
+        "label": "Mobile",
+        "items": [
+          {
+            "id": "Family",
+            "label": "Family",
+            "selected": true,
+            "subtitle": null
+          },
+          {
+            "id": "Friends",
+            "label": "Friends",
+            "selected": false,
+            "subtitle": null
+          },
+          {
+            "id": "Work",
+            "label": "Work",
+            "selected": false,
+            "subtitle": null
+          }
+        ]
+      }
+    },
+    {
+      "ToggleList": {
+        "id": "vis_f2",
+        "label": "Work",
+        "items": [
+          {
+            "id": "Family",
+            "label": "Family",
+            "selected": false,
+            "subtitle": null
+          },
+          {
+            "id": "Friends",
+            "label": "Friends",
+            "selected": true,
+            "subtitle": null
+          },
+          {
+            "id": "Work",
+            "label": "Work",
+            "selected": true,
+            "subtitle": null
+          }
+        ]
+      }
+    }
+  ],
+  "actions": [
+    {
+      "id": "back",
+      "label": "Back",
+      "style": "Secondary",
+      "enabled": true
+    },
+    {
+      "id": "continue",
+      "label": "Preview",
+      "style": "Primary",
+      "enabled": true
+    }
+  ],
+  "progress": {
+    "current_step": 2,
+    "total_steps": 3,
+    "label": null
+  }
+}

@@ -1,0 +1,112 @@
+{
+  "screen_id": "edit_preview",
+  "title": "Preview Card",
+  "subtitle": null,
+  "components": [
+    {
+      "CardPreview": {
+        "name": "Alice",
+        "fields": [
+          {
+            "id": "f1",
+            "field_type": "Phone",
+            "label": "Mobile",
+            "value": "+1-555-0100",
+            "visibility": {
+              "Groups": [
+                "Family"
+              ]
+            }
+          },
+          {
+            "id": "f2",
+            "field_type": "Email",
+            "label": "Work",
+            "value": "alice@example.com",
+            "visibility": {
+              "Groups": [
+                "Friends",
+                "Work"
+              ]
+            }
+          }
+        ],
+        "group_views": [
+          {
+            "group_name": "Family",
+            "display_name": "Alice",
+            "visible_fields": [
+              {
+                "id": "f1",
+                "field_type": "Phone",
+                "label": "Mobile",
+                "value": "+1-555-0100",
+                "visibility": {
+                  "Groups": [
+                    "Family"
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "group_name": "Friends",
+            "display_name": "Alice",
+            "visible_fields": [
+              {
+                "id": "f2",
+                "field_type": "Email",
+                "label": "Work",
+                "value": "alice@example.com",
+                "visibility": {
+                  "Groups": [
+                    "Friends",
+                    "Work"
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "group_name": "Work",
+            "display_name": "Alice",
+            "visible_fields": [
+              {
+                "id": "f2",
+                "field_type": "Email",
+                "label": "Work",
+                "value": "alice@example.com",
+                "visibility": {
+                  "Groups": [
+                    "Friends",
+                    "Work"
+                  ]
+                }
+              }
+            ]
+          }
+        ],
+        "selected_group": null
+      }
+    }
+  ],
+  "actions": [
+    {
+      "id": "back",
+      "label": "Back",
+      "style": "Secondary",
+      "enabled": true
+    },
+    {
+      "id": "save",
+      "label": "Save Changes",
+      "style": "Primary",
+      "enabled": true
+    }
+  ],
+  "progress": {
+    "current_step": 3,
+    "total_steps": 3,
+    "label": null
+  }
+}

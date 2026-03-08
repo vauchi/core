@@ -171,6 +171,63 @@ fn lock_screen_fixture_is_fresh() {
     assert_fixture_fresh(&engine.current_screen(), "lock_screen.json");
 }
 
+// ── ContactEditEngine fixtures ───────────────────────────────────
+
+fn sample_editable_contact() -> EditableContact {
+    EditableContact {
+        display_name: "Alice".into(),
+        fields: vec![
+            EditableField {
+                id: "f1".into(),
+                field_type: "Phone".into(),
+                label: "Mobile".into(),
+                value: "+1-555-0100".into(),
+                visible_to_groups: vec!["Family".into()],
+                shown: true,
+            },
+            EditableField {
+                id: "f2".into(),
+                field_type: "Email".into(),
+                label: "Work".into(),
+                value: "alice@example.com".into(),
+                visible_to_groups: vec!["Friends".into(), "Work".into()],
+                shown: true,
+            },
+        ],
+    }
+}
+
+fn sample_edit_groups() -> Vec<String> {
+    vec!["Family".into(), "Friends".into(), "Work".into()]
+}
+
+#[test]
+fn contact_edit_fields_fixture_is_fresh() {
+    let engine = ContactEditEngine::new(sample_editable_contact(), sample_edit_groups());
+    assert_fixture_fresh(&engine.current_screen(), "contact_edit_fields.json");
+}
+
+#[test]
+fn contact_edit_visibility_fixture_is_fresh() {
+    let mut engine = ContactEditEngine::new(sample_editable_contact(), sample_edit_groups());
+    engine.handle_action(UserAction::ActionPressed {
+        action_id: "continue".into(),
+    });
+    assert_fixture_fresh(&engine.current_screen(), "contact_edit_visibility.json");
+}
+
+#[test]
+fn contact_edit_preview_fixture_is_fresh() {
+    let mut engine = ContactEditEngine::new(sample_editable_contact(), sample_edit_groups());
+    engine.handle_action(UserAction::ActionPressed {
+        action_id: "continue".into(),
+    });
+    engine.handle_action(UserAction::ActionPressed {
+        action_id: "continue".into(),
+    });
+    assert_fixture_fresh(&engine.current_screen(), "contact_edit_preview.json");
+}
+
 // ── Regenerate all fixtures (run with --ignored) ─────────────────
 
 #[test]
@@ -226,9 +283,31 @@ fn regenerate_all_engine_fixtures() {
             "lock_screen.json",
             LockScreenEngine::new(5).current_screen(),
         ),
+        (
+            "contact_edit_fields.json",
+            ContactEditEngine::new(sample_editable_contact(), sample_edit_groups())
+                .current_screen(),
+        ),
+        {
+            let mut e = ContactEditEngine::new(sample_editable_contact(), sample_edit_groups());
+            e.handle_action(UserAction::ActionPressed {
+                action_id: "continue".into(),
+            });
+            ("contact_edit_visibility.json", e.current_screen())
+        },
+        {
+            let mut e = ContactEditEngine::new(sample_editable_contact(), sample_edit_groups());
+            e.handle_action(UserAction::ActionPressed {
+                action_id: "continue".into(),
+            });
+            e.handle_action(UserAction::ActionPressed {
+                action_id: "continue".into(),
+            });
+            ("contact_edit_preview.json", e.current_screen())
+        },
     ];
 
-    assert_eq!(fixtures.len(), 8, "expected 8 engine fixtures");
+    assert_eq!(fixtures.len(), 11, "expected 11 engine fixtures");
 
     for (filename, screen) in &fixtures {
         let json = screen_to_json(screen);

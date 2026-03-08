@@ -54,6 +54,13 @@ impl<T: Transport> Vauchi<T> {
     /// When deleting the last label (transition to no-group mode), visible
     /// fields from the deleted label are migrated to `shown_fields` on the
     /// own card so field visibility is preserved.
+    ///
+    /// Note: Only the *last-deleted* label's fields are migrated. If labels
+    /// are deleted sequentially, fields assigned only to earlier-deleted
+    /// labels won't carry over. This is intentional — deleting a label
+    /// removes its field assignments. To preserve all field visibility when
+    /// transitioning, delete all labels in a single operation or re-assign
+    /// fields before deletion.
     pub fn delete_label(&self, label_id: &str) -> VauchiResult<()> {
         // Load the label before deletion to capture its visible fields
         let label = self.storage.load_label(label_id)?;

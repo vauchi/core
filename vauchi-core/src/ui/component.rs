@@ -45,6 +45,27 @@ pub enum Component {
         title: String,
         items: Vec<InfoItem>,
     },
+    ContactList {
+        id: String,
+        contacts: Vec<ContactItem>,
+        searchable: bool,
+    },
+    SettingsGroup {
+        id: String,
+        label: String,
+        items: Vec<SettingsItem>,
+    },
+    ActionList {
+        id: String,
+        items: Vec<ActionListItem>,
+    },
+    StatusIndicator {
+        id: String,
+        icon: Option<String>,
+        title: String,
+        detail: Option<String>,
+        status: Status,
+    },
     Divider,
 }
 
@@ -124,4 +145,55 @@ pub struct InfoItem {
     pub icon: Option<String>,
     pub title: String,
     pub detail: String,
+}
+
+/// A lightweight contact summary for list display.
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ContactItem {
+    pub id: String,
+    pub name: String,
+    pub subtitle: Option<String>,
+    pub avatar_initials: String,
+    pub status: Option<String>,
+}
+
+/// An item in a settings group.
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SettingsItem {
+    pub id: String,
+    pub label: String,
+    pub kind: SettingsItemKind,
+}
+
+/// The kind of a settings item.
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum SettingsItemKind {
+    Toggle { enabled: bool },
+    Value { value: String },
+    Link { detail: Option<String> },
+    Destructive { label: String },
+}
+
+/// An item in an action list.
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ActionListItem {
+    pub id: String,
+    pub label: String,
+    pub icon: Option<String>,
+    pub detail: Option<String>,
+}
+
+/// Status for a status indicator component.
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum Status {
+    Pending,
+    InProgress,
+    Success,
+    Failed,
+    Warning,
 }

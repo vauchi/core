@@ -16,8 +16,9 @@ mod screen;
 
 pub use action::{ActionResult, UserAction};
 pub use component::{
-    Component, FieldDisplay, GroupCardView, InfoItem, InputType, TextStyle, ToggleItem,
-    UiFieldVisibility, VisibilityMode,
+    ActionListItem, Component, ContactItem, FieldDisplay, GroupCardView, InfoItem, InputType,
+    SettingsItem, SettingsItemKind, Status, TextStyle, ToggleItem, UiFieldVisibility,
+    VisibilityMode,
 };
 pub use engine::WorkflowEngine;
 pub use onboarding::{FieldSetup, GroupSetup, OnboardingData, OnboardingEngine};

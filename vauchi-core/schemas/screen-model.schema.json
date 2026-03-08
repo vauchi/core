@@ -46,6 +46,34 @@
     }
   },
   "definitions": {
+    "ActionListItem": {
+      "description": "An item in an action list.",
+      "type": "object",
+      "required": [
+        "id",
+        "label"
+      ],
+      "properties": {
+        "detail": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "icon": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "id": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        }
+      }
+    },
     "ActionStyle": {
       "description": "Visual style for a screen action.",
       "type": "string",
@@ -289,8 +317,169 @@
             }
           },
           "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "ContactList"
+          ],
+          "properties": {
+            "ContactList": {
+              "type": "object",
+              "required": [
+                "contacts",
+                "id",
+                "searchable"
+              ],
+              "properties": {
+                "contacts": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/definitions/ContactItem"
+                  }
+                },
+                "id": {
+                  "type": "string"
+                },
+                "searchable": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "SettingsGroup"
+          ],
+          "properties": {
+            "SettingsGroup": {
+              "type": "object",
+              "required": [
+                "id",
+                "items",
+                "label"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "items": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/definitions/SettingsItem"
+                  }
+                },
+                "label": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "ActionList"
+          ],
+          "properties": {
+            "ActionList": {
+              "type": "object",
+              "required": [
+                "id",
+                "items"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "items": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/definitions/ActionListItem"
+                  }
+                }
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "StatusIndicator"
+          ],
+          "properties": {
+            "StatusIndicator": {
+              "type": "object",
+              "required": [
+                "id",
+                "status",
+                "title"
+              ],
+              "properties": {
+                "detail": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "icon": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "id": {
+                  "type": "string"
+                },
+                "status": {
+                  "$ref": "#/definitions/Status"
+                },
+                "title": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "additionalProperties": false
         }
       ]
+    },
+    "ContactItem": {
+      "description": "A lightweight contact summary for list display.",
+      "type": "object",
+      "required": [
+        "avatar_initials",
+        "id",
+        "name"
+      ],
+      "properties": {
+        "avatar_initials": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "status": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "subtitle": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
     },
     "FieldDisplay": {
       "description": "A contact field as displayed in the UI.",
@@ -423,6 +612,122 @@
           "$ref": "#/definitions/ActionStyle"
         }
       }
+    },
+    "SettingsItem": {
+      "description": "An item in a settings group.",
+      "type": "object",
+      "required": [
+        "id",
+        "kind",
+        "label"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/definitions/SettingsItemKind"
+        },
+        "label": {
+          "type": "string"
+        }
+      }
+    },
+    "SettingsItemKind": {
+      "description": "The kind of a settings item.",
+      "oneOf": [
+        {
+          "type": "object",
+          "required": [
+            "Toggle"
+          ],
+          "properties": {
+            "Toggle": {
+              "type": "object",
+              "required": [
+                "enabled"
+              ],
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "Value"
+          ],
+          "properties": {
+            "Value": {
+              "type": "object",
+              "required": [
+                "value"
+              ],
+              "properties": {
+                "value": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "Link"
+          ],
+          "properties": {
+            "Link": {
+              "type": "object",
+              "properties": {
+                "detail": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "Destructive"
+          ],
+          "properties": {
+            "Destructive": {
+              "type": "object",
+              "required": [
+                "label"
+              ],
+              "properties": {
+                "label": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "Status": {
+      "description": "Status for a status indicator component.",
+      "type": "string",
+      "enum": [
+        "Pending",
+        "InProgress",
+        "Success",
+        "Failed",
+        "Warning"
+      ]
     },
     "TextStyle": {
       "description": "Text rendering style.",

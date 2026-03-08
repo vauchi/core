@@ -29,6 +29,18 @@ pub enum UserAction {
     GroupViewSelected {
         group_name: Option<String>,
     },
+    SearchChanged {
+        component_id: String,
+        query: String,
+    },
+    ListItemSelected {
+        component_id: String,
+        item_id: String,
+    },
+    SettingsToggled {
+        component_id: String,
+        item_id: String,
+    },
 }
 
 /// The result of handling a user action.
@@ -47,4 +59,17 @@ pub enum ActionResult {
     StartDeviceLink,
     /// Frontend should switch to the backup import flow.
     StartBackupImport,
+    /// Frontend should open the contact detail view.
+    OpenContact {
+        contact_id: String,
+    },
+    /// Frontend should open the given URL in an external browser.
+    OpenUrl {
+        url: String,
+    },
+    /// Frontend should display an alert dialog.
+    ShowAlert {
+        title: String,
+        message: String,
+    },
 }

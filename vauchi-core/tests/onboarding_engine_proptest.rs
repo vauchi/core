@@ -486,6 +486,11 @@ proptest! {
                 ActionResult::StartDeviceLink | ActionResult::StartBackupImport => {
                     // External handoff — valid from LinkChoice step
                 }
+                ActionResult::OpenContact { .. }
+                | ActionResult::OpenUrl { .. }
+                | ActionResult::ShowAlert { .. } => {
+                    // Valid external navigation results
+                }
             }
         }
 

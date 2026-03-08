@@ -120,6 +120,78 @@
         }
       },
       "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
+        "SearchChanged"
+      ],
+      "properties": {
+        "SearchChanged": {
+          "type": "object",
+          "required": [
+            "component_id",
+            "query"
+          ],
+          "properties": {
+            "component_id": {
+              "type": "string"
+            },
+            "query": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
+        "ListItemSelected"
+      ],
+      "properties": {
+        "ListItemSelected": {
+          "type": "object",
+          "required": [
+            "component_id",
+            "item_id"
+          ],
+          "properties": {
+            "component_id": {
+              "type": "string"
+            },
+            "item_id": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
+        "SettingsToggled"
+      ],
+      "properties": {
+        "SettingsToggled": {
+          "type": "object",
+          "required": [
+            "component_id",
+            "item_id"
+          ],
+          "properties": {
+            "component_id": {
+              "type": "string"
+            },
+            "item_id": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "additionalProperties": false
     }
   ]
 }

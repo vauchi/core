@@ -110,6 +110,27 @@ fn user_action_variants_validate_against_schema() {
                 group_name: Some("Family".into()),
             },
         ),
+        (
+            "SearchChanged",
+            UserAction::SearchChanged {
+                component_id: "search".into(),
+                query: "alice".into(),
+            },
+        ),
+        (
+            "ListItemSelected",
+            UserAction::ListItemSelected {
+                component_id: "contact_list".into(),
+                item_id: "contact-1".into(),
+            },
+        ),
+        (
+            "SettingsToggled",
+            UserAction::SettingsToggled {
+                component_id: "settings".into(),
+                item_id: "notifications".into(),
+            },
+        ),
     ];
 
     for (variant_name, action) in &actions {
@@ -154,6 +175,25 @@ fn action_result_variants_validate_against_schema() {
             },
         ),
         ("Complete", ActionResult::Complete),
+        (
+            "OpenContact",
+            ActionResult::OpenContact {
+                contact_id: "contact-123".into(),
+            },
+        ),
+        (
+            "OpenUrl",
+            ActionResult::OpenUrl {
+                url: "https://example.com".into(),
+            },
+        ),
+        (
+            "ShowAlert",
+            ActionResult::ShowAlert {
+                title: "Alert".into(),
+                message: "Something happened".into(),
+            },
+        ),
     ];
 
     for (variant_name, result) in &results {

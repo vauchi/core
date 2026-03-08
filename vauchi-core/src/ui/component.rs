@@ -66,6 +66,13 @@ pub enum Component {
         detail: Option<String>,
         status: Status,
     },
+    PinInput {
+        id: String,
+        label: String,
+        length: usize,
+        masked: bool,
+        validation_error: Option<String>,
+    },
     Divider,
 }
 

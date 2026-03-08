@@ -43,16 +43,19 @@ fn assert_schema_fresh<T: schemars::JsonSchema>(filename: &str) {
     }
 }
 
+// allow(zero_assertions)
 #[test]
 fn screen_model_schema_is_fresh() {
     assert_schema_fresh::<ScreenModel>("screen-model.schema.json");
 }
 
+// allow(zero_assertions)
 #[test]
 fn user_action_schema_is_fresh() {
     assert_schema_fresh::<UserAction>("user-action.schema.json");
 }
 
+// allow(zero_assertions)
 #[test]
 fn action_result_schema_is_fresh() {
     assert_schema_fresh::<ActionResult>("action-result.schema.json");
@@ -60,6 +63,7 @@ fn action_result_schema_is_fresh() {
 
 /// Regenerate all schemas. Run with `--ignored`:
 /// `cargo test --features schema-gen -p vauchi-core --test schema_gen -- --ignored`
+// allow(zero_assertions)
 #[test]
 #[ignore]
 fn regenerate_all_schemas() {

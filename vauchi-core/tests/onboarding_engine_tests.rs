@@ -7,60 +7,60 @@ use vauchi_core::ui::*;
 // ── Helpers ──────────────────────────────────────────────────────────
 
 fn advance_to_default_name(engine: &mut OnboardingEngine) {
-    engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "get_started".into(),
     });
 }
 
 fn advance_to_skip_gate(engine: &mut OnboardingEngine) {
     advance_to_default_name(engine);
-    engine.handle_action(UserAction::TextChanged {
+    let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "display_name".into(),
         value: "Alice".into(),
     });
-    engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "continue".into(),
     });
 }
 
 fn advance_to_groups_setup(engine: &mut OnboardingEngine) {
     advance_to_skip_gate(engine);
-    engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "continue_setup".into(),
     });
 }
 
 fn advance_to_contact_info(engine: &mut OnboardingEngine) {
     advance_to_groups_setup(engine);
-    engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "continue".into(),
     });
 }
 
 fn advance_to_preview_card(engine: &mut OnboardingEngine) {
     advance_to_contact_info(engine);
-    engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "continue".into(),
     });
 }
 
 fn advance_to_security_explanation(engine: &mut OnboardingEngine) {
     advance_to_preview_card(engine);
-    engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "continue".into(),
     });
 }
 
 fn advance_to_backup_prompt(engine: &mut OnboardingEngine) {
     advance_to_security_explanation(engine);
-    engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "continue".into(),
     });
 }
 
 fn advance_to_ready(engine: &mut OnboardingEngine) {
     advance_to_backup_prompt(engine);
-    engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "skip".into(),
     });
 }
@@ -157,7 +157,7 @@ fn default_name_validation_rejects_whitespace_only() {
     let mut engine = OnboardingEngine::new();
     advance_to_default_name(&mut engine);
 
-    engine.handle_action(UserAction::TextChanged {
+    let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "display_name".into(),
         value: "   ".into(),
     });
@@ -195,7 +195,7 @@ fn default_name_continue_navigates_to_skip_gate() {
     let mut engine = OnboardingEngine::new();
     advance_to_default_name(&mut engine);
 
-    engine.handle_action(UserAction::TextChanged {
+    let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "display_name".into(),
         value: "Alice".into(),
     });
@@ -386,15 +386,15 @@ fn contact_info_visibility_mode_depends_on_groups() {
     // With groups selected
     let mut engine = OnboardingEngine::new();
     advance_to_skip_gate(&mut engine);
-    engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "continue_setup".into(),
     });
     // Select Family
-    engine.handle_action(UserAction::ItemToggled {
+    let _ = engine.handle_action(UserAction::ItemToggled {
         component_id: "groups".into(),
         item_id: "Family".into(),
     });
-    engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "continue".into(),
     });
 
@@ -412,18 +412,18 @@ fn contact_info_visibility_mode_depends_on_groups() {
 fn contact_info_available_groups_from_selected() {
     let mut engine = OnboardingEngine::new();
     advance_to_skip_gate(&mut engine);
-    engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "continue_setup".into(),
     });
-    engine.handle_action(UserAction::ItemToggled {
+    let _ = engine.handle_action(UserAction::ItemToggled {
         component_id: "groups".into(),
         item_id: "Family".into(),
     });
-    engine.handle_action(UserAction::ItemToggled {
+    let _ = engine.handle_action(UserAction::ItemToggled {
         component_id: "groups".into(),
         item_id: "Friends".into(),
     });
-    engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "continue".into(),
     });
 
@@ -610,40 +610,40 @@ fn full_flow_to_completion() {
     let mut engine = OnboardingEngine::new();
 
     // Welcome -> DefaultName
-    engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "get_started".into(),
     });
     // Enter name
-    engine.handle_action(UserAction::TextChanged {
+    let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "display_name".into(),
         value: "Alice".into(),
     });
     // DefaultName -> SkipGate
-    engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "continue".into(),
     });
     // SkipGate -> GroupsSetup
-    engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "continue_setup".into(),
     });
     // GroupsSetup -> ContactInfo
-    engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "continue".into(),
     });
     // ContactInfo -> PreviewCard
-    engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "continue".into(),
     });
     // PreviewCard -> SecurityExplanation
-    engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "continue".into(),
     });
     // SecurityExplanation -> BackupPrompt
-    engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "continue".into(),
     });
     // BackupPrompt -> Ready
-    engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "skip".into(),
     });
     // Ready -> Complete
@@ -658,15 +658,15 @@ fn skip_flow_bypasses_groups_and_fields() {
     let mut engine = OnboardingEngine::new();
 
     // Welcome -> DefaultName
-    engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "get_started".into(),
     });
-    engine.handle_action(UserAction::TextChanged {
+    let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "display_name".into(),
         value: "Bob".into(),
     });
     // DefaultName -> SkipGate
-    engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "continue".into(),
     });
     // SkipGate -> SecurityExplanation (skip)
@@ -679,11 +679,11 @@ fn skip_flow_bypasses_groups_and_fields() {
     }
 
     // SecurityExplanation -> BackupPrompt
-    engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "continue".into(),
     });
     // BackupPrompt -> Ready
-    engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "skip".into(),
     });
     // Ready -> Complete
@@ -698,10 +698,10 @@ fn skip_flow_bypasses_groups_and_fields() {
 #[test]
 fn data_accessor_returns_collected_data() {
     let mut engine = OnboardingEngine::new();
-    engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "get_started".into(),
     });
-    engine.handle_action(UserAction::TextChanged {
+    let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "display_name".into(),
         value: "Alice".into(),
     });
@@ -714,11 +714,11 @@ fn data_reflects_selected_groups() {
     let mut engine = OnboardingEngine::new();
     advance_to_groups_setup(&mut engine);
 
-    engine.handle_action(UserAction::ItemToggled {
+    let _ = engine.handle_action(UserAction::ItemToggled {
         component_id: "groups".into(),
         item_id: "Family".into(),
     });
-    engine.handle_action(UserAction::ItemToggled {
+    let _ = engine.handle_action(UserAction::ItemToggled {
         component_id: "groups".into(),
         item_id: "Friends".into(),
     });
@@ -739,17 +739,17 @@ fn data_reflects_selected_groups() {
 fn preview_card_group_view_selected() {
     let mut engine = OnboardingEngine::new();
     advance_to_skip_gate(&mut engine);
-    engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "continue_setup".into(),
     });
-    engine.handle_action(UserAction::ItemToggled {
+    let _ = engine.handle_action(UserAction::ItemToggled {
         component_id: "groups".into(),
         item_id: "Family".into(),
     });
-    engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "continue".into(),
     });
-    engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "continue".into(),
     });
 

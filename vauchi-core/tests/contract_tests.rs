@@ -39,7 +39,7 @@ fn golden_fixtures_validate_against_screen_model_schema() {
         .filter_map(|entry| {
             let entry = entry.ok()?;
             let path = entry.path();
-            if path.extension().map_or(false, |ext| ext == "json") {
+            if path.extension().is_some_and(|ext| ext == "json") {
                 Some(path)
             } else {
                 None

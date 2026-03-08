@@ -211,6 +211,7 @@ fn ready_fixture_is_fresh() {
 
 /// Regenerate all golden fixtures.
 /// Run with: `cargo test -p vauchi-core --test golden_fixtures -- --ignored`
+// allow(zero_assertions)
 #[test]
 #[ignore]
 fn regenerate_all_fixtures() {

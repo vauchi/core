@@ -107,32 +107,32 @@ fn arb_user_action() -> impl Strategy<Value = UserAction> {
 /// Sequence of "continue/advance" actions that take the engine from
 /// Welcome all the way to Ready (full path, no skipping).
 fn advance_to_ready(engine: &mut OnboardingEngine, name: &str) {
-    engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "get_started".into(),
     });
-    engine.handle_action(UserAction::TextChanged {
+    let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "display_name".into(),
         value: name.into(),
     });
-    engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "continue".into(),
     });
-    engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "continue_setup".into(),
     });
-    engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "continue".into(),
     });
-    engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "continue".into(),
     });
-    engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "continue".into(),
     });
-    engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "continue".into(),
     });
-    engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "skip".into(),
     });
 }
@@ -172,16 +172,16 @@ proptest! {
         let mut engine = OnboardingEngine::new();
 
         // Set a name so we can get past DefaultName
-        engine.handle_action(UserAction::ActionPressed {
+        let _ = engine.handle_action(UserAction::ActionPressed {
             action_id: "get_started".into(),
         });
-        engine.handle_action(UserAction::TextChanged {
+        let _ = engine.handle_action(UserAction::TextChanged {
             component_id: "display_name".into(),
             value: "Test".into(),
         });
 
         for action in actions {
-            engine.handle_action(action);
+            let _ = engine.handle_action(action);
         }
 
         let s1 = engine.current_screen();
@@ -213,16 +213,16 @@ proptest! {
 
         let mut engine = OnboardingEngine::new();
         // Set name first so navigation can proceed
-        engine.handle_action(UserAction::ActionPressed {
+        let _ = engine.handle_action(UserAction::ActionPressed {
             action_id: "get_started".into(),
         });
-        engine.handle_action(UserAction::TextChanged {
+        let _ = engine.handle_action(UserAction::TextChanged {
             component_id: "display_name".into(),
             value: "Test".into(),
         });
 
         for action in pre_actions {
-            engine.handle_action(action);
+            let _ = engine.handle_action(action);
         }
 
         let screen_before = engine.current_screen().screen_id.clone();
@@ -255,10 +255,10 @@ proptest! {
         prop_assume!(name.trim().is_empty());
 
         let mut engine = OnboardingEngine::new();
-        engine.handle_action(UserAction::ActionPressed {
+        let _ = engine.handle_action(UserAction::ActionPressed {
             action_id: "get_started".into(),
         });
-        engine.handle_action(UserAction::TextChanged {
+        let _ = engine.handle_action(UserAction::TextChanged {
             component_id: "display_name".into(),
             value: name,
         });
@@ -285,10 +285,10 @@ proptest! {
         prop_assume!(!name.trim().is_empty());
 
         let mut engine = OnboardingEngine::new();
-        engine.handle_action(UserAction::ActionPressed {
+        let _ = engine.handle_action(UserAction::ActionPressed {
             action_id: "get_started".into(),
         });
-        engine.handle_action(UserAction::TextChanged {
+        let _ = engine.handle_action(UserAction::TextChanged {
             component_id: "display_name".into(),
             value: name,
         });
@@ -316,17 +316,17 @@ proptest! {
         let mut engine = OnboardingEngine::new();
 
         // Navigate to groups_setup
-        engine.handle_action(UserAction::ActionPressed {
+        let _ = engine.handle_action(UserAction::ActionPressed {
             action_id: "get_started".into(),
         });
-        engine.handle_action(UserAction::TextChanged {
+        let _ = engine.handle_action(UserAction::TextChanged {
             component_id: "display_name".into(),
             value: "Test".into(),
         });
-        engine.handle_action(UserAction::ActionPressed {
+        let _ = engine.handle_action(UserAction::ActionPressed {
             action_id: "continue".into(),
         });
-        engine.handle_action(UserAction::ActionPressed {
+        let _ = engine.handle_action(UserAction::ActionPressed {
             action_id: "continue_setup".into(),
         });
 
@@ -339,7 +339,7 @@ proptest! {
             .selected;
 
         // Toggle once
-        engine.handle_action(UserAction::ItemToggled {
+        let _ = engine.handle_action(UserAction::ItemToggled {
             component_id: "groups".into(),
             item_id: group_name.into(),
         });
@@ -352,7 +352,7 @@ proptest! {
         prop_assert_ne!(after_first, original);
 
         // Toggle again
-        engine.handle_action(UserAction::ItemToggled {
+        let _ = engine.handle_action(UserAction::ItemToggled {
             component_id: "groups".into(),
             item_id: group_name.into(),
         });
@@ -374,17 +374,17 @@ proptest! {
         let group_name = GROUP_NAMES[group_idx];
         let mut engine = OnboardingEngine::new();
 
-        engine.handle_action(UserAction::ActionPressed {
+        let _ = engine.handle_action(UserAction::ActionPressed {
             action_id: "get_started".into(),
         });
-        engine.handle_action(UserAction::TextChanged {
+        let _ = engine.handle_action(UserAction::TextChanged {
             component_id: "display_name".into(),
             value: "Test".into(),
         });
-        engine.handle_action(UserAction::ActionPressed {
+        let _ = engine.handle_action(UserAction::ActionPressed {
             action_id: "continue".into(),
         });
-        engine.handle_action(UserAction::ActionPressed {
+        let _ = engine.handle_action(UserAction::ActionPressed {
             action_id: "continue_setup".into(),
         });
 
@@ -396,7 +396,7 @@ proptest! {
             .selected;
 
         for _ in 0..n {
-            engine.handle_action(UserAction::ItemToggled {
+            let _ = engine.handle_action(UserAction::ItemToggled {
                 component_id: "groups".into(),
                 item_id: group_name.into(),
             });
@@ -478,7 +478,7 @@ proptest! {
         let mut engine = OnboardingEngine::new();
 
         for action in actions {
-            engine.handle_action(action);
+            let _ = engine.handle_action(action);
         }
 
         let screen = engine.current_screen();

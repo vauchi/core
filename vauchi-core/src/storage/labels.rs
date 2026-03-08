@@ -368,26 +368,9 @@ impl Storage {
 
         let mut manager = LabelManager::new();
 
-        // Add labels through internal reconstruction
+        // Reconstruct labels preserving stored IDs and all fields
         for label in labels {
-            // We need to create the label in the manager
-            // First create with the same name, then update it
-            let _ = manager.create_label(label.name());
-
-            // Get the created label and update it with stored data
-            if let Some(created) = manager.get_label_by_name(label.name()) {
-                let id = created.id().to_string();
-                if let Some(l) = manager.get_label_mut(&id) {
-                    // Add contacts
-                    for contact_id in label.contacts() {
-                        l.add_contact(contact_id);
-                    }
-                    // Add visible fields
-                    for field_id in label.visible_fields() {
-                        l.add_visible_field(field_id);
-                    }
-                }
-            }
+            manager.insert_loaded_label(label);
         }
 
         // Add per-contact overrides
@@ -411,7 +394,7 @@ impl Storage {
                 "Label name cannot be empty".to_string(),
             ));
         }
-        if name.len() > 50 {
+        if name.chars().count() > 50 {
             return Err(StorageError::Serialization(
                 "Label name cannot exceed 50 characters".to_string(),
             ));
@@ -460,7 +443,7 @@ impl Storage {
                 "Label name cannot be empty".to_string(),
             ));
         }
-        if new_name.len() > 50 {
+        if new_name.chars().count() > 50 {
             return Err(StorageError::Serialization(
                 "Label name cannot exceed 50 characters".to_string(),
             ));

@@ -7,22 +7,8 @@
 //! persists results when [`ActionResult::Complete`] is returned.
 
 use crate::contact::labels::SUGGESTED_LABELS;
+use crate::onboarding::OnboardingStep as Step;
 use crate::ui::*;
-
-// ── Internal step enum (private) ────────────────────────────────────
-
-#[derive(Clone, Debug)]
-enum Step {
-    Welcome,
-    DefaultName,
-    SkipGate,
-    GroupsSetup,
-    ContactInfo,
-    PreviewCard,
-    SecurityExplanation,
-    BackupPrompt,
-    Ready,
-}
 
 // ── Public data types ───────────────────────────────────────────────
 

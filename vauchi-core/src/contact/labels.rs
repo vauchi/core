@@ -291,6 +291,14 @@ impl LabelManager {
         }
     }
 
+    /// Inserts a label loaded from storage, preserving its original ID and all fields.
+    ///
+    /// This bypasses validation (name length, duplicates) because the data was
+    /// already validated when first created.
+    pub fn insert_loaded_label(&mut self, label: VisibilityLabel) {
+        self.labels.insert(label.id().to_string(), label);
+    }
+
     /// Returns all labels.
     pub fn all_labels(&self) -> Vec<&VisibilityLabel> {
         self.labels.values().collect()
@@ -328,7 +336,7 @@ impl LabelManager {
         if name.is_empty() {
             return Err(LabelError::InvalidName("Name cannot be empty".to_string()));
         }
-        if name.len() > 50 {
+        if name.chars().count() > 50 {
             return Err(LabelError::InvalidName(
                 "Name cannot exceed 50 characters".to_string(),
             ));
@@ -360,7 +368,7 @@ impl LabelManager {
         if new_name.is_empty() {
             return Err(LabelError::InvalidName("Name cannot be empty".to_string()));
         }
-        if new_name.len() > 50 {
+        if new_name.chars().count() > 50 {
             return Err(LabelError::InvalidName(
                 "Name cannot exceed 50 characters".to_string(),
             ));

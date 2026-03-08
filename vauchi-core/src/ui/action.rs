@@ -32,6 +32,7 @@ pub enum UserAction {
 
 /// The result of handling a user action.
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[must_use]
 pub enum ActionResult {
     UpdateScreen(ScreenModel),
     NavigateTo(ScreenModel),

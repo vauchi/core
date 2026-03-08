@@ -118,7 +118,7 @@ impl ContactCard {
         if name.is_empty() {
             return Err(ContactCardError::EmptyDisplayName);
         }
-        if name.len() > MAX_DISPLAY_NAME_LENGTH {
+        if name.chars().count() > MAX_DISPLAY_NAME_LENGTH {
             return Err(ContactCardError::DisplayNameTooLong);
         }
         self.display_name = name.to_string();
@@ -302,12 +302,14 @@ impl ContactCard {
 
     /// Sets whether a field is shown (no-group mode).
     /// When true, all contacts see this field. When false, no one sees it.
+    ///
+    /// Silently ignores the operation if `field_id` does not exist on this card
+    /// (e.g. stale ID after field deletion). This prevents orphaned IDs in
+    /// `shown_fields`.
     pub fn set_field_shown(&mut self, field_id: &str, shown: bool) {
-        debug_assert!(
-            !shown || self.fields.iter().any(|f| f.id() == field_id),
-            "set_field_shown called with nonexistent field_id: {}",
-            field_id
-        );
+        if shown && !self.fields.iter().any(|f| f.id() == field_id) {
+            return;
+        }
         if shown {
             self.shown_fields.insert(field_id.to_string());
         } else {

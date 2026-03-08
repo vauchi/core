@@ -43,4 +43,8 @@ pub enum ActionResult {
         message: String,
     },
     Complete,
+    /// Frontend should switch to the device linking flow.
+    StartDeviceLink,
+    /// Frontend should switch to the backup import flow.
+    StartBackupImport,
 }

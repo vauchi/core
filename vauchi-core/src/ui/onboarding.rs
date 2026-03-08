@@ -2,9 +2,10 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! Onboarding workflow engine — a pure state machine for the 9-screen
-//! onboarding flow.  No Storage or Vauchi dependency; the caller
-//! persists results when [`ActionResult::Complete`] is returned.
+//! Onboarding workflow engine — a pure state machine for the 11-step
+//! onboarding flow (2 pre-gate + 9 main).  No Storage or Vauchi
+//! dependency; the caller persists results when [`ActionResult::Complete`]
+//! is returned.
 
 use crate::contact::labels::SUGGESTED_LABELS;
 use crate::onboarding::OnboardingStep as Step;
@@ -43,7 +44,7 @@ pub struct FieldSetup {
 
 // ── OnboardingEngine ────────────────────────────────────────────────
 
-/// Pure state-machine driving the 9-screen onboarding flow.
+/// Pure state-machine driving the 11-step onboarding flow.
 #[derive(Clone, Debug)]
 pub struct OnboardingEngine {
     step: Step,
@@ -58,7 +59,7 @@ impl Default for OnboardingEngine {
 }
 
 impl OnboardingEngine {
-    /// Creates a new engine starting at the Welcome screen.
+    /// Creates a new engine starting at the IdentityCheck screen.
     pub fn new() -> Self {
         let groups = SUGGESTED_LABELS
             .iter()
@@ -70,7 +71,7 @@ impl OnboardingEngine {
             .collect();
 
         Self {
-            step: Step::Welcome,
+            step: Step::IdentityCheck,
             data: OnboardingData {
                 display_name: String::new(),
                 selected_groups: groups,
@@ -93,6 +94,93 @@ impl OnboardingEngine {
             total_steps: 9,
             label: None,
         })
+    }
+
+    fn build_identity_check(&self) -> ScreenModel {
+        ScreenModel {
+            screen_id: "identity_check".into(),
+            title: "Welcome to Vauchi".into(),
+            subtitle: Some("Privacy-focused contact cards.".into()),
+            components: vec![Component::InfoPanel {
+                id: "identity_check_info".into(),
+                icon: None,
+                title: "".into(),
+                items: vec![
+                    InfoItem {
+                        icon: Some("lock".into()),
+                        title: "Private by design".into(),
+                        detail: "Your data is end-to-end encrypted and never leaves your control."
+                            .into(),
+                    },
+                    InfoItem {
+                        icon: Some("devices".into()),
+                        title: "Multi-device".into(),
+                        detail: "Use Vauchi on all your devices with seamless sync.".into(),
+                    },
+                ],
+            }],
+            actions: vec![
+                ScreenAction {
+                    id: "have_identity".into(),
+                    label: "I already have an identity".into(),
+                    style: ActionStyle::Primary,
+                    enabled: true,
+                },
+                ScreenAction {
+                    id: "create_new".into(),
+                    label: "Create new identity".into(),
+                    style: ActionStyle::Secondary,
+                    enabled: true,
+                },
+            ],
+            progress: None,
+        }
+    }
+
+    fn build_link_choice(&self) -> ScreenModel {
+        ScreenModel {
+            screen_id: "link_choice".into(),
+            title: "Restore your identity".into(),
+            subtitle: Some("Choose how to restore your existing identity.".into()),
+            components: vec![Component::InfoPanel {
+                id: "link_choice_info".into(),
+                icon: None,
+                title: "".into(),
+                items: vec![
+                    InfoItem {
+                        icon: Some("link".into()),
+                        title: "Link from another device".into(),
+                        detail: "Scan a QR code on your other device to link this one.".into(),
+                    },
+                    InfoItem {
+                        icon: Some("backup".into()),
+                        title: "Restore from backup".into(),
+                        detail: "Import your identity from a backup file.".into(),
+                    },
+                ],
+            }],
+            actions: vec![
+                ScreenAction {
+                    id: "link_device".into(),
+                    label: "Link from another device".into(),
+                    style: ActionStyle::Primary,
+                    enabled: true,
+                },
+                ScreenAction {
+                    id: "restore_backup".into(),
+                    label: "Restore from backup".into(),
+                    style: ActionStyle::Secondary,
+                    enabled: true,
+                },
+                ScreenAction {
+                    id: "back".into(),
+                    label: "Back".into(),
+                    style: ActionStyle::Secondary,
+                    enabled: true,
+                },
+            ],
+            progress: None,
+        }
     }
 
     fn build_welcome(&self) -> ScreenModel {
@@ -122,20 +210,12 @@ impl OnboardingEngine {
                     },
                 ],
             }],
-            actions: vec![
-                ScreenAction {
-                    id: "get_started".into(),
-                    label: "Get Started".into(),
-                    style: ActionStyle::Primary,
-                    enabled: true,
-                },
-                ScreenAction {
-                    id: "restore_backup".into(),
-                    label: "Restore Backup".into(),
-                    style: ActionStyle::Secondary,
-                    enabled: true,
-                },
-            ],
+            actions: vec![ScreenAction {
+                id: "get_started".into(),
+                label: "Get Started".into(),
+                style: ActionStyle::Primary,
+                enabled: true,
+            }],
             progress: self.progress(1),
         }
     }
@@ -524,6 +604,33 @@ impl OnboardingEngine {
         ActionResult::NavigateTo(self.current_screen())
     }
 
+    fn handle_identity_check(&mut self, action: &UserAction) -> ActionResult {
+        match action {
+            UserAction::ActionPressed { action_id } if action_id == "have_identity" => {
+                self.navigate_to(Step::LinkChoice)
+            }
+            UserAction::ActionPressed { action_id } if action_id == "create_new" => {
+                self.navigate_to(Step::Welcome)
+            }
+            _ => ActionResult::UpdateScreen(self.current_screen()),
+        }
+    }
+
+    fn handle_link_choice(&mut self, action: &UserAction) -> ActionResult {
+        match action {
+            UserAction::ActionPressed { action_id } if action_id == "link_device" => {
+                ActionResult::StartDeviceLink
+            }
+            UserAction::ActionPressed { action_id } if action_id == "restore_backup" => {
+                ActionResult::StartBackupImport
+            }
+            UserAction::ActionPressed { action_id } if action_id == "back" => {
+                self.navigate_to(Step::IdentityCheck)
+            }
+            _ => ActionResult::UpdateScreen(self.current_screen()),
+        }
+    }
+
     fn handle_welcome(&mut self, action: &UserAction) -> ActionResult {
         match action {
             UserAction::ActionPressed { action_id } if action_id == "get_started" => {
@@ -701,6 +808,8 @@ impl OnboardingEngine {
 impl WorkflowEngine for OnboardingEngine {
     fn current_screen(&self) -> ScreenModel {
         match self.step {
+            Step::IdentityCheck => self.build_identity_check(),
+            Step::LinkChoice => self.build_link_choice(),
             Step::Welcome => self.build_welcome(),
             Step::DefaultName => self.build_default_name(),
             Step::SkipGate => self.build_skip_gate(),
@@ -715,6 +824,8 @@ impl WorkflowEngine for OnboardingEngine {
 
     fn handle_action(&mut self, action: UserAction) -> ActionResult {
         match self.step {
+            Step::IdentityCheck => self.handle_identity_check(&action),
+            Step::LinkChoice => self.handle_link_choice(&action),
             Step::Welcome => self.handle_welcome(&action),
             Step::DefaultName => self.handle_default_name(&action),
             Step::SkipGate => self.handle_skip_gate(&action),

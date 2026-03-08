@@ -19,6 +19,10 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 /// transitions are always allowed and some steps can be skipped.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
 pub enum OnboardingStep {
+    /// Pre-gate: does the user already have an identity?
+    IdentityCheck,
+    /// Pre-gate: choose how to restore (link device or import backup)
+    LinkChoice,
     /// Welcome screen showing value proposition
     Welcome,
     /// Default display name entry (renamed from CreateIdentity)
@@ -45,6 +49,8 @@ impl OnboardingStep {
     /// Returns all steps in order.
     pub fn all() -> &'static [OnboardingStep] {
         &[
+            OnboardingStep::IdentityCheck,
+            OnboardingStep::LinkChoice,
             OnboardingStep::Welcome,
             OnboardingStep::DefaultName,
             OnboardingStep::SkipGate,
@@ -60,15 +66,17 @@ impl OnboardingStep {
     /// Returns the zero-based index of this step in the wizard.
     pub fn index(&self) -> usize {
         match self {
-            OnboardingStep::Welcome => 0,
-            OnboardingStep::DefaultName => 1,
-            OnboardingStep::SkipGate => 2,
-            OnboardingStep::GroupsSetup => 3,
-            OnboardingStep::ContactInfo => 4,
-            OnboardingStep::PreviewCard => 5,
-            OnboardingStep::SecurityExplanation => 6,
-            OnboardingStep::BackupPrompt => 7,
-            OnboardingStep::Ready => 8,
+            OnboardingStep::IdentityCheck => 0,
+            OnboardingStep::LinkChoice => 1,
+            OnboardingStep::Welcome => 2,
+            OnboardingStep::DefaultName => 3,
+            OnboardingStep::SkipGate => 4,
+            OnboardingStep::GroupsSetup => 5,
+            OnboardingStep::ContactInfo => 6,
+            OnboardingStep::PreviewCard => 7,
+            OnboardingStep::SecurityExplanation => 8,
+            OnboardingStep::BackupPrompt => 9,
+            OnboardingStep::Ready => 10,
         }
     }
 
@@ -121,7 +129,7 @@ impl Default for OnboardingProgress {
 }
 
 impl OnboardingProgress {
-    /// Creates a new onboarding progress starting at `Welcome`.
+    /// Creates a new onboarding progress starting at `IdentityCheck`.
     pub fn new() -> Self {
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -129,7 +137,7 @@ impl OnboardingProgress {
             .as_secs();
 
         Self {
-            current_step: OnboardingStep::Welcome,
+            current_step: OnboardingStep::IdentityCheck,
             completed_steps: HashSet::new(),
             started_at: Some(now),
             completed_at: None,
@@ -216,7 +224,7 @@ impl OnboardingProgress {
             .unwrap_or(Duration::ZERO)
             .as_secs();
 
-        self.current_step = OnboardingStep::Welcome;
+        self.current_step = OnboardingStep::IdentityCheck;
         self.completed_steps.clear();
         self.started_at = Some(now);
         self.completed_at = None;

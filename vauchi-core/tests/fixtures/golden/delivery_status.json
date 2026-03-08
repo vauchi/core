@@ -1,0 +1,34 @@
+{
+  "screen_id": "delivery_status",
+  "title": "Delivery Status",
+  "subtitle": null,
+  "components": [
+    {
+      "StatusIndicator": {
+        "id": "c1",
+        "icon": null,
+        "title": "Alice",
+        "detail": "Delivered 2 min ago",
+        "status": "Success"
+      }
+    },
+    {
+      "StatusIndicator": {
+        "id": "c2",
+        "icon": null,
+        "title": "Bob",
+        "detail": "Relay unreachable",
+        "status": "Failed"
+      }
+    }
+  ],
+  "actions": [
+    {
+      "id": "retry_all",
+      "label": "Retry Failed",
+      "style": "Primary",
+      "enabled": true
+    }
+  ],
+  "progress": null
+}

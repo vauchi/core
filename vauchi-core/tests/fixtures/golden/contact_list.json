@@ -1,0 +1,38 @@
+{
+  "screen_id": "contact_list",
+  "title": "Contacts",
+  "subtitle": null,
+  "components": [
+    {
+      "ContactList": {
+        "id": "contacts",
+        "contacts": [
+          {
+            "id": "c1",
+            "name": "Alice",
+            "subtitle": "Friend",
+            "avatar_initials": "A",
+            "status": null
+          },
+          {
+            "id": "c2",
+            "name": "Bob",
+            "subtitle": null,
+            "avatar_initials": "B",
+            "status": "Updated"
+          }
+        ],
+        "searchable": true
+      }
+    }
+  ],
+  "actions": [
+    {
+      "id": "add_contact",
+      "label": "Add Contact",
+      "style": "Primary",
+      "enabled": true
+    }
+  ],
+  "progress": null
+}

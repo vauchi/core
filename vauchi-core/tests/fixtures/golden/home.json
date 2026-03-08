@@ -1,0 +1,53 @@
+{
+  "screen_id": "home",
+  "title": "Home",
+  "subtitle": null,
+  "components": [
+    {
+      "StatusIndicator": {
+        "id": "setup_progress",
+        "icon": "setup",
+        "title": "Complete your setup",
+        "detail": "3 of 6 steps done",
+        "status": "InProgress"
+      }
+    },
+    {
+      "ContactList": {
+        "id": "recent_contacts",
+        "contacts": [
+          {
+            "id": "c1",
+            "name": "Alice",
+            "subtitle": "Friend",
+            "avatar_initials": "A",
+            "status": null
+          },
+          {
+            "id": "c2",
+            "name": "Bob",
+            "subtitle": null,
+            "avatar_initials": "B",
+            "status": "Updated"
+          }
+        ],
+        "searchable": false
+      }
+    }
+  ],
+  "actions": [
+    {
+      "id": "add_contact",
+      "label": "Add Contact",
+      "style": "Primary",
+      "enabled": true
+    },
+    {
+      "id": "view_all",
+      "label": "View All Contacts",
+      "style": "Secondary",
+      "enabled": true
+    }
+  ],
+  "progress": null
+}

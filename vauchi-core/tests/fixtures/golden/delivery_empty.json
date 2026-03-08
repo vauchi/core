@@ -1,0 +1,17 @@
+{
+  "screen_id": "delivery_status",
+  "title": "Delivery Status",
+  "subtitle": null,
+  "components": [
+    {
+      "InfoPanel": {
+        "id": "empty",
+        "icon": "checkmark",
+        "title": "All Delivered",
+        "items": []
+      }
+    }
+  ],
+  "actions": [],
+  "progress": null
+}

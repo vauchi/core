@@ -446,6 +446,46 @@
             }
           },
           "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "PinInput"
+          ],
+          "properties": {
+            "PinInput": {
+              "type": "object",
+              "required": [
+                "id",
+                "label",
+                "length",
+                "masked"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "label": {
+                  "type": "string"
+                },
+                "length": {
+                  "type": "integer",
+                  "format": "uint",
+                  "minimum": 0.0
+                },
+                "masked": {
+                  "type": "boolean"
+                },
+                "validation_error": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              }
+            }
+          },
+          "additionalProperties": false
         }
       ]
     },

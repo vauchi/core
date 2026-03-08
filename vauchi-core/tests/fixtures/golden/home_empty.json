@@ -1,0 +1,23 @@
+{
+  "screen_id": "home",
+  "title": "Home",
+  "subtitle": null,
+  "components": [
+    {
+      "ContactList": {
+        "id": "recent_contacts",
+        "contacts": [],
+        "searchable": false
+      }
+    }
+  ],
+  "actions": [
+    {
+      "id": "add_contact",
+      "label": "Add Contact",
+      "style": "Primary",
+      "enabled": true
+    }
+  ],
+  "progress": null
+}

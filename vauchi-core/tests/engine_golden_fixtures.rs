@@ -1,0 +1,238 @@
+// SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+//
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+//! Golden JSON fixtures for Phase 1 workflow engine screens.
+//!
+//! Generates canonical JSON for each engine's default screen, consumed
+//! by frontend contract tests.
+//!
+//! Verify freshness: `cargo test -p vauchi-core --test engine_golden_fixtures`
+//! Regenerate all:   `cargo test -p vauchi-core --test engine_golden_fixtures -- --ignored`
+
+use std::fs;
+use std::path::PathBuf;
+use vauchi_core::ui::*;
+
+fn fixtures_dir() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/golden")
+}
+
+fn screen_to_json(screen: &ScreenModel) -> String {
+    serde_json::to_string_pretty(screen).expect("ScreenModel serialization failed")
+}
+
+fn assert_fixture_fresh(screen: &ScreenModel, filename: &str) {
+    let json = screen_to_json(screen);
+    let path = fixtures_dir().join(filename);
+
+    if path.exists() {
+        let existing = fs::read_to_string(&path).unwrap();
+        assert_eq!(
+            existing.trim(),
+            json.trim(),
+            "Golden fixture `{}` is stale! Regenerate with:\n  \
+             cargo test -p vauchi-core --test engine_golden_fixtures -- --ignored",
+            filename
+        );
+    } else {
+        fs::create_dir_all(fixtures_dir()).unwrap();
+        fs::write(&path, &json).unwrap();
+    }
+}
+
+// ── Sample data builders ─────────────────────────────────────────
+
+fn sample_contacts() -> Vec<ContactItem> {
+    vec![
+        ContactItem {
+            id: "c1".into(),
+            name: "Alice".into(),
+            subtitle: Some("Friend".into()),
+            avatar_initials: "A".into(),
+            status: None,
+        },
+        ContactItem {
+            id: "c2".into(),
+            name: "Bob".into(),
+            subtitle: None,
+            avatar_initials: "B".into(),
+            status: Some("Updated".into()),
+        },
+    ]
+}
+
+fn sample_settings_config() -> SettingsConfig {
+    SettingsConfig {
+        display_name: "Alice".into(),
+        delivery_receipts_enabled: true,
+        suppress_presence: false,
+        relay_url: "wss://relay.vauchi.app".into(),
+        device_count: 2,
+        password_set: true,
+    }
+}
+
+fn sample_help_items() -> Vec<HelpItem> {
+    vec![
+        HelpItem {
+            id: "faq1".into(),
+            question: "How do I exchange contacts?".into(),
+            answer_url: Some("https://docs.vauchi.app/faq/exchange".into()),
+            category: "Getting Started".into(),
+        },
+        HelpItem {
+            id: "faq2".into(),
+            question: "What is a duress PIN?".into(),
+            answer_url: Some("https://docs.vauchi.app/faq/duress".into()),
+            category: "Security".into(),
+        },
+    ]
+}
+
+fn sample_delivery_items() -> Vec<DeliveryItem> {
+    vec![
+        DeliveryItem {
+            contact_id: "c1".into(),
+            contact_name: "Alice".into(),
+            status: Status::Success,
+            detail: Some("Delivered 2 min ago".into()),
+            retryable: false,
+        },
+        DeliveryItem {
+            contact_id: "c2".into(),
+            contact_name: "Bob".into(),
+            status: Status::Failed,
+            detail: Some("Relay unreachable".into()),
+            retryable: true,
+        },
+    ]
+}
+
+// ── Per-engine freshness tests ───────────────────────────────────
+
+#[test]
+fn home_fixture_is_fresh() {
+    let engine = HomeEngine::new(
+        sample_contacts(),
+        HomeProgress {
+            completed_steps: 3,
+            total_steps: 6,
+        },
+    );
+    assert_fixture_fresh(&engine.current_screen(), "home.json");
+}
+
+#[test]
+fn home_empty_fixture_is_fresh() {
+    let engine = HomeEngine::new(
+        vec![],
+        HomeProgress {
+            completed_steps: 6,
+            total_steps: 6,
+        },
+    );
+    assert_fixture_fresh(&engine.current_screen(), "home_empty.json");
+}
+
+#[test]
+fn contact_list_fixture_is_fresh() {
+    let engine = ContactListEngine::new(sample_contacts());
+    assert_fixture_fresh(&engine.current_screen(), "contact_list.json");
+}
+
+#[test]
+fn settings_fixture_is_fresh() {
+    let engine = SettingsEngine::new(sample_settings_config());
+    assert_fixture_fresh(&engine.current_screen(), "settings.json");
+}
+
+#[test]
+fn help_fixture_is_fresh() {
+    let engine = HelpEngine::new(sample_help_items());
+    assert_fixture_fresh(&engine.current_screen(), "help.json");
+}
+
+#[test]
+fn delivery_status_fixture_is_fresh() {
+    let engine = DeliveryStatusEngine::new(sample_delivery_items());
+    assert_fixture_fresh(&engine.current_screen(), "delivery_status.json");
+}
+
+#[test]
+fn delivery_empty_fixture_is_fresh() {
+    let engine = DeliveryStatusEngine::new(vec![]);
+    assert_fixture_fresh(&engine.current_screen(), "delivery_empty.json");
+}
+
+#[test]
+fn lock_screen_fixture_is_fresh() {
+    let engine = LockScreenEngine::new(5);
+    assert_fixture_fresh(&engine.current_screen(), "lock_screen.json");
+}
+
+// ── Regenerate all fixtures (run with --ignored) ─────────────────
+
+#[test]
+#[ignore]
+fn regenerate_all_engine_fixtures() {
+    let dir = fixtures_dir();
+    fs::create_dir_all(&dir).unwrap();
+
+    let fixtures: Vec<(&str, ScreenModel)> = vec![
+        (
+            "home.json",
+            HomeEngine::new(
+                sample_contacts(),
+                HomeProgress {
+                    completed_steps: 3,
+                    total_steps: 6,
+                },
+            )
+            .current_screen(),
+        ),
+        (
+            "home_empty.json",
+            HomeEngine::new(
+                vec![],
+                HomeProgress {
+                    completed_steps: 6,
+                    total_steps: 6,
+                },
+            )
+            .current_screen(),
+        ),
+        (
+            "contact_list.json",
+            ContactListEngine::new(sample_contacts()).current_screen(),
+        ),
+        (
+            "settings.json",
+            SettingsEngine::new(sample_settings_config()).current_screen(),
+        ),
+        (
+            "help.json",
+            HelpEngine::new(sample_help_items()).current_screen(),
+        ),
+        (
+            "delivery_status.json",
+            DeliveryStatusEngine::new(sample_delivery_items()).current_screen(),
+        ),
+        (
+            "delivery_empty.json",
+            DeliveryStatusEngine::new(vec![]).current_screen(),
+        ),
+        (
+            "lock_screen.json",
+            LockScreenEngine::new(5).current_screen(),
+        ),
+    ];
+
+    assert_eq!(fixtures.len(), 8, "expected 8 engine fixtures");
+
+    for (filename, screen) in &fixtures {
+        let json = screen_to_json(screen);
+        fs::write(dir.join(filename), &json).unwrap();
+        println!("Generated {filename}");
+    }
+}

@@ -14,7 +14,7 @@ fn link_starts_at_show_qr() {
         screen.progress,
         Some(Progress {
             current_step: 1,
-            total_steps: 5,
+            total_steps: 4,
             label: None,
         })
     );

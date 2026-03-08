@@ -5,6 +5,7 @@
 //! Backup & recovery workflow engine.
 
 use crate::ui::*;
+use zeroize::Zeroize;
 
 /// Whether the user is creating or restoring a backup.
 #[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
@@ -20,6 +21,13 @@ pub struct BackupRecoveryEngine {
     mode: BackupMode,
     password: String,
     confirm_password: String,
+}
+
+impl Drop for BackupRecoveryEngine {
+    fn drop(&mut self) {
+        self.password.zeroize();
+        self.confirm_password.zeroize();
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -51,13 +59,21 @@ impl BackupRecoveryEngine {
     }
 
     /// Signals that async processing completed successfully.
+    ///
+    /// Only transitions from `Processing` state; no-op otherwise.
     pub fn processing_complete(&mut self) {
-        self.step = BackupStep::Complete;
+        if self.step == BackupStep::Processing {
+            self.step = BackupStep::Complete;
+        }
     }
 
     /// Signals that async processing failed.
+    ///
+    /// Only transitions from `Processing` state; no-op otherwise.
     pub fn processing_failed(&mut self) {
-        self.step = BackupStep::Failed;
+        if self.step == BackupStep::Processing {
+            self.step = BackupStep::Failed;
+        }
     }
 
     fn total_steps(&self) -> u8 {
@@ -180,7 +196,7 @@ impl BackupRecoveryEngine {
                     id: "continue".into(),
                     label: "Continue".into(),
                     style: ActionStyle::Primary,
-                    enabled: true,
+                    enabled: !self.confirm_password.is_empty(),
                 },
             ],
             progress: self.progress(),

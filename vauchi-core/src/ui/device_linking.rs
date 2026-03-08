@@ -10,7 +10,6 @@ use crate::ui::*;
 #[derive(Clone, Debug, PartialEq)]
 enum DeviceLinkStep {
     ShowQr,
-    WaitForPeer,
     VerifyCode,
     Syncing,
     Complete,
@@ -36,10 +35,9 @@ impl DeviceLinkingEngine {
 
     /// Signal that a peer device has connected, providing the verification code.
     ///
-    /// Transitions from `ShowQr` or `WaitForPeer` to `VerifyCode`.
-    /// A peer may connect while the QR is still displayed, so both states are accepted.
+    /// Transitions from `ShowQr` to `VerifyCode`.
     pub fn peer_connected(&mut self, verification_code: String) {
-        if self.step == DeviceLinkStep::ShowQr || self.step == DeviceLinkStep::WaitForPeer {
+        if self.step == DeviceLinkStep::ShowQr {
             self.verification_code = Some(verification_code);
             self.step = DeviceLinkStep::VerifyCode;
         }
@@ -55,17 +53,16 @@ impl DeviceLinkingEngine {
     fn step_number(&self) -> u8 {
         match self.step {
             DeviceLinkStep::ShowQr => 1,
-            DeviceLinkStep::WaitForPeer => 2,
-            DeviceLinkStep::VerifyCode => 3,
-            DeviceLinkStep::Syncing => 4,
-            DeviceLinkStep::Complete => 5,
+            DeviceLinkStep::VerifyCode => 2,
+            DeviceLinkStep::Syncing => 3,
+            DeviceLinkStep::Complete => 4,
         }
     }
 
     fn progress(&self) -> Option<Progress> {
         Some(Progress {
             current_step: self.step_number(),
-            total_steps: 5,
+            total_steps: 4,
             label: None,
         })
     }
@@ -81,25 +78,6 @@ impl DeviceLinkingEngine {
                     data: self.qr_data.clone(),
                     mode: QrMode::Display,
                     label: Some("Scan on new device".to_string()),
-                }],
-                actions: vec![ScreenAction {
-                    id: "cancel".to_string(),
-                    label: "Cancel".to_string(),
-                    style: ActionStyle::Secondary,
-                    enabled: true,
-                }],
-                progress: self.progress(),
-            },
-            DeviceLinkStep::WaitForPeer => ScreenModel {
-                screen_id: "link_waiting".to_string(),
-                title: "Link Device".to_string(),
-                subtitle: None,
-                components: vec![Component::StatusIndicator {
-                    id: "waiting".to_string(),
-                    icon: None,
-                    title: "Waiting for device...".to_string(),
-                    detail: None,
-                    status: Status::Pending,
                 }],
                 actions: vec![ScreenAction {
                     id: "cancel".to_string(),
@@ -195,7 +173,6 @@ impl WorkflowEngine for DeviceLinkingEngine {
         match action {
             UserAction::ActionPressed { action_id } => match self.step {
                 DeviceLinkStep::ShowQr if action_id == "cancel" => ActionResult::Complete,
-                DeviceLinkStep::WaitForPeer if action_id == "cancel" => ActionResult::Complete,
                 DeviceLinkStep::VerifyCode if action_id == "confirm" => {
                     self.step = DeviceLinkStep::Syncing;
                     ActionResult::NavigateTo(self.build_screen())

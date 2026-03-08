@@ -312,3 +312,16 @@ fn backup_back_navigation() {
         other => panic!("Expected NavigateTo, got {:?}", other),
     }
 }
+
+#[test]
+fn backup_processing_complete_guard_ignores_wrong_step() {
+    let mut engine = BackupRecoveryEngine::new(None);
+
+    // Calling processing_complete from ChooseMode should be a no-op
+    engine.processing_complete();
+    assert_eq!(engine.current_screen().screen_id, "backup_choose");
+
+    // Calling processing_failed from ChooseMode should be a no-op
+    engine.processing_failed();
+    assert_eq!(engine.current_screen().screen_id, "backup_choose");
+}

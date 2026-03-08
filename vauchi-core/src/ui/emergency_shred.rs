@@ -167,7 +167,12 @@ impl EmergencyShredEngine {
                 detail: None,
                 status: Status::Success,
             }],
-            actions: vec![],
+            actions: vec![ScreenAction {
+                id: "done".into(),
+                label: "Done".into(),
+                style: ActionStyle::Primary,
+                enabled: true,
+            }],
             progress: Some(Progress {
                 current_step: 3,
                 total_steps: 3,
@@ -189,7 +194,10 @@ impl WorkflowEngine for EmergencyShredEngine {
 
     fn handle_action(&mut self, action: UserAction) -> ActionResult {
         match action {
-            UserAction::ActionPressed { action_id } if action_id == "cancel" => {
+            UserAction::ActionPressed { action_id }
+                if action_id == "cancel"
+                    && (self.step == ShredStep::Warning || self.step == ShredStep::Confirm) =>
+            {
                 ActionResult::Complete
             }
             UserAction::ActionPressed { action_id } if action_id == "continue" => {
@@ -222,13 +230,12 @@ impl WorkflowEngine for EmergencyShredEngine {
                     ActionResult::UpdateScreen(self.current_screen())
                 }
             }
-            _ => {
-                if self.step == ShredStep::Complete {
-                    ActionResult::WipeComplete
-                } else {
-                    ActionResult::UpdateScreen(self.current_screen())
-                }
+            UserAction::ActionPressed { action_id }
+                if action_id == "done" && self.step == ShredStep::Complete =>
+            {
+                ActionResult::WipeComplete
             }
+            _ => ActionResult::UpdateScreen(self.current_screen()),
         }
     }
 }

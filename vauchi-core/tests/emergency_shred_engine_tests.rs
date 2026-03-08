@@ -176,7 +176,8 @@ fn shred_wipe_complete() {
 
     let screen = engine.current_screen();
     assert_eq!(screen.screen_id, "shred_complete");
-    assert!(screen.actions.is_empty());
+    assert_eq!(screen.actions.len(), 1);
+    assert_eq!(screen.actions[0].id, "done");
 
     match &screen.components[0] {
         Component::StatusIndicator { status, title, .. } => {
@@ -185,6 +186,12 @@ fn shred_wipe_complete() {
         }
         other => panic!("expected StatusIndicator, got {:?}", other),
     }
+
+    // Pressing done returns WipeComplete
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "done".into(),
+    });
+    assert_eq!(result, ActionResult::WipeComplete);
 }
 
 #[test]

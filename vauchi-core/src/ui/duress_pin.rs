@@ -6,6 +6,7 @@
 
 use crate::ui::*;
 use serde::{Deserialize, Serialize};
+use zeroize::Zeroize;
 
 /// Configuration for the duress PIN feature.
 #[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
@@ -23,6 +24,13 @@ pub struct DuressPinEngine {
     config: DuressConfig,
     new_pin: String,
     confirm_pin: String,
+}
+
+impl Drop for DuressPinEngine {
+    fn drop(&mut self) {
+        self.new_pin.zeroize();
+        self.confirm_pin.zeroize();
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]

@@ -34,12 +34,6 @@
       "label": "Get Started",
       "style": "Primary",
       "enabled": true
-    },
-    {
-      "id": "restore_backup",
-      "label": "Restore Backup",
-      "style": "Secondary",
-      "enabled": true
     }
   ],
   "progress": {

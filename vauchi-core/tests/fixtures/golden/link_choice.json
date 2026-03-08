@@ -1,0 +1,47 @@
+{
+  "screen_id": "link_choice",
+  "title": "Restore your identity",
+  "subtitle": "Choose how to restore your existing identity.",
+  "components": [
+    {
+      "InfoPanel": {
+        "id": "link_choice_info",
+        "icon": null,
+        "title": "",
+        "items": [
+          {
+            "icon": "link",
+            "title": "Link from another device",
+            "detail": "Scan a QR code on your other device to link this one."
+          },
+          {
+            "icon": "backup",
+            "title": "Restore from backup",
+            "detail": "Import your identity from a backup file."
+          }
+        ]
+      }
+    }
+  ],
+  "actions": [
+    {
+      "id": "link_device",
+      "label": "Link from another device",
+      "style": "Primary",
+      "enabled": true
+    },
+    {
+      "id": "restore_backup",
+      "label": "Restore from backup",
+      "style": "Secondary",
+      "enabled": true
+    },
+    {
+      "id": "back",
+      "label": "Back",
+      "style": "Secondary",
+      "enabled": true
+    }
+  ],
+  "progress": null
+}

@@ -1,0 +1,41 @@
+{
+  "screen_id": "identity_check",
+  "title": "Welcome to Vauchi",
+  "subtitle": "Privacy-focused contact cards.",
+  "components": [
+    {
+      "InfoPanel": {
+        "id": "identity_check_info",
+        "icon": null,
+        "title": "",
+        "items": [
+          {
+            "icon": "lock",
+            "title": "Private by design",
+            "detail": "Your data is end-to-end encrypted and never leaves your control."
+          },
+          {
+            "icon": "devices",
+            "title": "Multi-device",
+            "detail": "Use Vauchi on all your devices with seamless sync."
+          }
+        ]
+      }
+    }
+  ],
+  "actions": [
+    {
+      "id": "have_identity",
+      "label": "I already have an identity",
+      "style": "Primary",
+      "enabled": true
+    },
+    {
+      "id": "create_new",
+      "label": "Create new identity",
+      "style": "Secondary",
+      "enabled": true
+    }
+  ],
+  "progress": null
+}

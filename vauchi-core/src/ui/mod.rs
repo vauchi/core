@@ -11,6 +11,7 @@
 mod action;
 mod component;
 mod engine;
+mod home;
 mod onboarding;
 mod screen;
 
@@ -21,5 +22,6 @@ pub use component::{
     VisibilityMode,
 };
 pub use engine::WorkflowEngine;
+pub use home::{HomeEngine, HomeProgress};
 pub use onboarding::{FieldSetup, GroupSetup, OnboardingData, OnboardingEngine};
 pub use screen::{ActionStyle, Progress, ScreenAction, ScreenModel};

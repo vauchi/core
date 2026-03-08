@@ -34,37 +34,51 @@ fn create_test_vauchi() -> Vauchi<MockTransport> {
 #[test]
 fn test_step_ordering_matches_wizard_flow() {
     let all = OnboardingStep::all();
-    assert_eq!(all.len(), 9, "There should be 9 onboarding steps");
-    assert_eq!(all[0], OnboardingStep::Welcome);
-    assert_eq!(all[1], OnboardingStep::DefaultName);
-    assert_eq!(all[2], OnboardingStep::SkipGate);
-    assert_eq!(all[3], OnboardingStep::GroupsSetup);
-    assert_eq!(all[4], OnboardingStep::ContactInfo);
-    assert_eq!(all[5], OnboardingStep::PreviewCard);
-    assert_eq!(all[6], OnboardingStep::SecurityExplanation);
-    assert_eq!(all[7], OnboardingStep::BackupPrompt);
-    assert_eq!(all[8], OnboardingStep::Ready);
+    assert_eq!(all.len(), 11, "There should be 11 onboarding steps");
+    assert_eq!(all[0], OnboardingStep::IdentityCheck);
+    assert_eq!(all[1], OnboardingStep::LinkChoice);
+    assert_eq!(all[2], OnboardingStep::Welcome);
+    assert_eq!(all[3], OnboardingStep::DefaultName);
+    assert_eq!(all[4], OnboardingStep::SkipGate);
+    assert_eq!(all[5], OnboardingStep::GroupsSetup);
+    assert_eq!(all[6], OnboardingStep::ContactInfo);
+    assert_eq!(all[7], OnboardingStep::PreviewCard);
+    assert_eq!(all[8], OnboardingStep::SecurityExplanation);
+    assert_eq!(all[9], OnboardingStep::BackupPrompt);
+    assert_eq!(all[10], OnboardingStep::Ready);
 }
 
 // @scenario: onboarding:step_index
 #[test]
 fn test_step_index_is_zero_based() {
-    assert_eq!(OnboardingStep::Welcome.index(), 0);
-    assert_eq!(OnboardingStep::DefaultName.index(), 1);
-    assert_eq!(OnboardingStep::SkipGate.index(), 2);
-    assert_eq!(OnboardingStep::GroupsSetup.index(), 3);
-    assert_eq!(OnboardingStep::ContactInfo.index(), 4);
-    assert_eq!(OnboardingStep::PreviewCard.index(), 5);
-    assert_eq!(OnboardingStep::SecurityExplanation.index(), 6);
-    assert_eq!(OnboardingStep::BackupPrompt.index(), 7);
-    assert_eq!(OnboardingStep::Ready.index(), 8);
+    assert_eq!(OnboardingStep::IdentityCheck.index(), 0);
+    assert_eq!(OnboardingStep::LinkChoice.index(), 1);
+    assert_eq!(OnboardingStep::Welcome.index(), 2);
+    assert_eq!(OnboardingStep::DefaultName.index(), 3);
+    assert_eq!(OnboardingStep::SkipGate.index(), 4);
+    assert_eq!(OnboardingStep::GroupsSetup.index(), 5);
+    assert_eq!(OnboardingStep::ContactInfo.index(), 6);
+    assert_eq!(OnboardingStep::PreviewCard.index(), 7);
+    assert_eq!(OnboardingStep::SecurityExplanation.index(), 8);
+    assert_eq!(OnboardingStep::BackupPrompt.index(), 9);
+    assert_eq!(OnboardingStep::Ready.index(), 10);
 }
 
 // @scenario: onboarding:step_navigation
 #[test]
 fn test_step_next_and_previous() {
-    // Welcome has no previous
-    assert_eq!(OnboardingStep::Welcome.previous(), None);
+    // IdentityCheck has no previous
+    assert_eq!(OnboardingStep::IdentityCheck.previous(), None);
+    assert_eq!(
+        OnboardingStep::IdentityCheck.next(),
+        Some(OnboardingStep::LinkChoice)
+    );
+
+    // Welcome.previous() = LinkChoice
+    assert_eq!(
+        OnboardingStep::Welcome.previous(),
+        Some(OnboardingStep::LinkChoice)
+    );
     assert_eq!(
         OnboardingStep::Welcome.next(),
         Some(OnboardingStep::DefaultName)
@@ -107,13 +121,13 @@ fn test_step_index_consistent_with_all() {
 
 // @scenario: onboarding:new_progress (#1)
 #[test]
-fn test_new_progress_starts_at_welcome() {
+fn test_new_progress_starts_at_identity_check() {
     let progress = OnboardingProgress::new();
 
     assert_eq!(
         progress.current_step(),
-        OnboardingStep::Welcome,
-        "New progress should start at Welcome"
+        OnboardingStep::IdentityCheck,
+        "New progress should start at IdentityCheck"
     );
     assert!(
         progress.started_at.is_some(),
@@ -141,6 +155,20 @@ fn test_new_progress_starts_at_welcome() {
 #[test]
 fn test_advance_through_all_steps() {
     let mut progress = OnboardingProgress::new();
+
+    // Advance from IdentityCheck to LinkChoice
+    let step = progress.advance();
+    assert_eq!(step, OnboardingStep::LinkChoice);
+    assert!(progress
+        .completed_steps
+        .contains(&OnboardingStep::IdentityCheck));
+
+    // Advance from LinkChoice to Welcome
+    let step = progress.advance();
+    assert_eq!(step, OnboardingStep::Welcome);
+    assert!(progress
+        .completed_steps
+        .contains(&OnboardingStep::LinkChoice));
 
     // Advance from Welcome to DefaultName
     let step = progress.advance();
@@ -188,7 +216,7 @@ fn test_advance_through_all_steps() {
     );
 
     // Verify all steps are completed
-    assert_eq!(progress.completed_steps.len(), 9);
+    assert_eq!(progress.completed_steps.len(), 11);
 }
 
 // @scenario: onboarding:skip_step (#24)
@@ -196,15 +224,17 @@ fn test_advance_through_all_steps() {
 fn test_skip_step_does_not_mark_completed() {
     let mut progress = OnboardingProgress::new();
 
-    // Skip Welcome step
+    // Skip IdentityCheck step
     let step = progress.skip_step();
     assert_eq!(
         step,
-        OnboardingStep::DefaultName,
-        "Should advance to DefaultName"
+        OnboardingStep::LinkChoice,
+        "Should advance to LinkChoice"
     );
     assert!(
-        !progress.completed_steps.contains(&OnboardingStep::Welcome),
+        !progress
+            .completed_steps
+            .contains(&OnboardingStep::IdentityCheck),
         "Skipped step should not be in completed_steps"
     );
 }
@@ -215,6 +245,8 @@ fn test_skip_backup_records_flag() {
     let mut progress = OnboardingProgress::new();
 
     // Advance to BackupPrompt
+    progress.advance(); // IdentityCheck -> LinkChoice
+    progress.advance(); // LinkChoice -> Welcome
     progress.advance(); // Welcome -> DefaultName
     progress.advance(); // DefaultName -> SkipGate
     progress.advance(); // SkipGate -> GroupsSetup
@@ -246,14 +278,16 @@ fn test_skip_backup_records_flag() {
 fn test_completion_percentage() {
     let mut progress = OnboardingProgress::new();
 
-    // 0 completed out of 9 total = 0%
+    // 0 completed out of 11 total = 0%
     assert_eq!(progress.completion_percentage(), 0);
 
-    // Complete 1 step: 1/9 = 11%
-    progress.advance(); // Welcome -> DefaultName, Welcome completed
-    assert_eq!(progress.completion_percentage(), 11);
+    // Complete 1 step: 1/11 = 9%
+    progress.advance(); // IdentityCheck -> LinkChoice, IdentityCheck completed
+    assert_eq!(progress.completion_percentage(), 9);
 
     // Complete all steps
+    progress.advance(); // LinkChoice -> Welcome
+    progress.advance(); // Welcome -> DefaultName
     progress.advance(); // DefaultName -> SkipGate
     progress.advance(); // SkipGate -> GroupsSetup
     progress.advance(); // GroupsSetup -> ContactInfo
@@ -261,11 +295,11 @@ fn test_completion_percentage() {
     progress.advance(); // PreviewCard -> SecurityExplanation
     progress.advance(); // SecurityExplanation -> BackupPrompt
     progress.advance(); // BackupPrompt -> Ready
-    assert_eq!(progress.completion_percentage(), 88); // 8/9
+    assert_eq!(progress.completion_percentage(), 90); // 10/11
 
     // Final advance completes Ready
     progress.advance();
-    assert_eq!(progress.completion_percentage(), 100); // 9/9
+    assert_eq!(progress.completion_percentage(), 100); // 11/11
 }
 
 // @scenario: onboarding:idempotent_advance_at_final (#26)
@@ -274,7 +308,7 @@ fn test_idempotent_advance_at_final_step() {
     let mut progress = OnboardingProgress::new();
 
     // Advance through all steps
-    for _ in 0..9 {
+    for _ in 0..11 {
         progress.advance();
     }
 
@@ -306,7 +340,7 @@ fn test_reset_clears_all_progress() {
     // Reset
     progress.reset();
 
-    assert_eq!(progress.current_step(), OnboardingStep::Welcome);
+    assert_eq!(progress.current_step(), OnboardingStep::IdentityCheck);
     assert!(progress.completed_steps.is_empty());
     assert!(!progress.skipped_backup);
     assert!(progress.started_at.is_some(), "started_at should be reset");
@@ -323,6 +357,8 @@ fn test_skip_to_finish_jumps_to_security() {
     let mut progress = OnboardingProgress::new();
 
     // Advance to SkipGate
+    progress.advance(); // IdentityCheck -> LinkChoice
+    progress.advance(); // LinkChoice -> Welcome
     progress.advance(); // Welcome -> DefaultName
     progress.advance(); // DefaultName -> SkipGate
 
@@ -398,9 +434,9 @@ fn test_serde_backward_compat_aliases() {
 #[test]
 fn test_json_serialization_roundtrip() {
     let mut progress = OnboardingProgress::new();
-    progress.advance(); // Welcome -> DefaultName
-    progress.advance(); // DefaultName -> SkipGate
-    progress.skip_step(); // Skip SkipGate -> GroupsSetup
+    progress.advance(); // IdentityCheck -> LinkChoice
+    progress.advance(); // LinkChoice -> Welcome
+    progress.skip_step(); // Skip Welcome -> DefaultName
 
     let json = progress.to_json().expect("Serialization should succeed");
     let restored = OnboardingProgress::from_json(&json).expect("Deserialization should succeed");
@@ -423,7 +459,7 @@ fn test_json_roundtrip_preserves_option_timestamps() {
     assert_eq!(restored.started_at, progress.started_at);
 
     // Complete and verify completed_at is preserved
-    for _ in 0..9 {
+    for _ in 0..11 {
         progress.advance();
     }
     assert!(progress.completed_at.is_some());
@@ -460,18 +496,18 @@ fn test_storage_save_load_roundtrip() {
     let storage = vauchi_core::Storage::in_memory(vauchi_core::SymmetricKey::generate()).unwrap();
 
     let mut progress = OnboardingProgress::new();
-    progress.advance(); // Welcome -> DefaultName
-    progress.advance(); // DefaultName -> SkipGate
+    progress.advance(); // IdentityCheck -> LinkChoice
+    progress.advance(); // LinkChoice -> Welcome
 
     storage.save_onboarding_progress(&progress).unwrap();
     let loaded = storage.load_onboarding_progress().unwrap().unwrap();
 
-    assert_eq!(loaded.current_step(), OnboardingStep::SkipGate);
+    assert_eq!(loaded.current_step(), OnboardingStep::Welcome);
     assert_eq!(loaded.completed_steps.len(), 2);
-    assert!(loaded.completed_steps.contains(&OnboardingStep::Welcome));
     assert!(loaded
         .completed_steps
-        .contains(&OnboardingStep::DefaultName));
+        .contains(&OnboardingStep::IdentityCheck));
+    assert!(loaded.completed_steps.contains(&OnboardingStep::LinkChoice));
 }
 
 // @scenario: onboarding:storage_load_empty
@@ -490,7 +526,7 @@ fn test_storage_load_or_create() {
 
     // First call creates new
     let progress = storage.load_or_create_onboarding_progress().unwrap();
-    assert_eq!(progress.current_step(), OnboardingStep::Welcome);
+    assert_eq!(progress.current_step(), OnboardingStep::IdentityCheck);
 
     // Save and reload
     let mut progress = progress;
@@ -498,7 +534,7 @@ fn test_storage_load_or_create() {
     storage.save_onboarding_progress(&progress).unwrap();
 
     let loaded = storage.load_or_create_onboarding_progress().unwrap();
-    assert_eq!(loaded.current_step(), OnboardingStep::DefaultName);
+    assert_eq!(loaded.current_step(), OnboardingStep::LinkChoice);
 }
 
 // @scenario: onboarding:storage_overwrite
@@ -519,7 +555,7 @@ fn test_storage_overwrite_replaces_previous() {
     let loaded = storage.load_onboarding_progress().unwrap().unwrap();
     assert_eq!(
         loaded.current_step(),
-        OnboardingStep::GroupsSetup,
+        OnboardingStep::DefaultName,
         "Should have the latest saved state"
     );
 }
@@ -638,15 +674,15 @@ fn test_api_get_and_advance_onboarding() {
 
     // Get initial progress
     let progress = vauchi.get_onboarding_progress().unwrap();
-    assert_eq!(progress.current_step(), OnboardingStep::Welcome);
+    assert_eq!(progress.current_step(), OnboardingStep::IdentityCheck);
 
     // Advance
     let progress = vauchi.advance_onboarding().unwrap();
-    assert_eq!(progress.current_step(), OnboardingStep::DefaultName);
+    assert_eq!(progress.current_step(), OnboardingStep::LinkChoice);
 
     // Progress persists
     let progress = vauchi.get_onboarding_progress().unwrap();
-    assert_eq!(progress.current_step(), OnboardingStep::DefaultName);
+    assert_eq!(progress.current_step(), OnboardingStep::LinkChoice);
 }
 
 // @scenario: onboarding:api_skip (#24)
@@ -655,12 +691,14 @@ fn test_api_skip_onboarding_step() {
     let vauchi = create_test_vauchi();
 
     let progress = vauchi.skip_onboarding_step().unwrap();
-    assert_eq!(progress.current_step(), OnboardingStep::DefaultName);
+    assert_eq!(progress.current_step(), OnboardingStep::LinkChoice);
 
     // Skipped step should not be in completed_steps
     assert!(
-        !progress.completed_steps.contains(&OnboardingStep::Welcome),
-        "Skipped Welcome should not be completed"
+        !progress
+            .completed_steps
+            .contains(&OnboardingStep::IdentityCheck),
+        "Skipped IdentityCheck should not be completed"
     );
 }
 
@@ -677,7 +715,7 @@ fn test_api_reset_onboarding() {
     vauchi.reset_onboarding().unwrap();
 
     let progress = vauchi.get_onboarding_progress().unwrap();
-    assert_eq!(progress.current_step(), OnboardingStep::Welcome);
+    assert_eq!(progress.current_step(), OnboardingStep::IdentityCheck);
     assert!(progress.completed_steps.is_empty());
 }
 
@@ -692,7 +730,7 @@ fn test_api_is_onboarding_complete() {
     );
 
     // Advance through all steps
-    for _ in 0..9 {
+    for _ in 0..11 {
         vauchi.advance_onboarding().unwrap();
     }
 
@@ -710,10 +748,10 @@ fn test_api_completion_percentage() {
     assert_eq!(vauchi.onboarding_completion_percentage().unwrap(), 0);
 
     vauchi.advance_onboarding().unwrap();
-    assert_eq!(vauchi.onboarding_completion_percentage().unwrap(), 11); // 1/9
+    assert_eq!(vauchi.onboarding_completion_percentage().unwrap(), 9); // 1/11
 
     // Advance through all
-    for _ in 0..8 {
+    for _ in 0..10 {
         vauchi.advance_onboarding().unwrap();
     }
     assert_eq!(vauchi.onboarding_completion_percentage().unwrap(), 100);
@@ -726,13 +764,13 @@ fn test_api_current_onboarding_step() {
 
     assert_eq!(
         vauchi.current_onboarding_step().unwrap(),
-        OnboardingStep::Welcome
+        OnboardingStep::IdentityCheck
     );
 
     vauchi.advance_onboarding().unwrap();
     assert_eq!(
         vauchi.current_onboarding_step().unwrap(),
-        OnboardingStep::DefaultName
+        OnboardingStep::LinkChoice
     );
 }
 
@@ -771,6 +809,8 @@ fn test_api_skip_onboarding_to_finish() {
     let vauchi = create_test_vauchi();
 
     // Advance to SkipGate
+    vauchi.advance_onboarding().unwrap(); // IdentityCheck -> LinkChoice
+    vauchi.advance_onboarding().unwrap(); // LinkChoice -> Welcome
     vauchi.advance_onboarding().unwrap(); // Welcome -> DefaultName
     vauchi.advance_onboarding().unwrap(); // DefaultName -> SkipGate
 
@@ -799,14 +839,28 @@ fn test_api_skip_onboarding_to_finish() {
 fn test_full_onboarding_flow_with_skip() {
     let mut vauchi = create_test_vauchi();
 
-    // Step 1: Welcome
+    // Step 1: IdentityCheck
+    assert_eq!(
+        vauchi.current_onboarding_step().unwrap(),
+        OnboardingStep::IdentityCheck
+    );
+    vauchi.advance_onboarding().unwrap();
+
+    // Step 2: LinkChoice
+    assert_eq!(
+        vauchi.current_onboarding_step().unwrap(),
+        OnboardingStep::LinkChoice
+    );
+    vauchi.advance_onboarding().unwrap();
+
+    // Step 3: Welcome
     assert_eq!(
         vauchi.current_onboarding_step().unwrap(),
         OnboardingStep::Welcome
     );
     vauchi.advance_onboarding().unwrap();
 
-    // Step 2: DefaultName — create identity then advance
+    // Step 4: DefaultName — create identity then advance
     assert_eq!(
         vauchi.current_onboarding_step().unwrap(),
         OnboardingStep::DefaultName
@@ -823,7 +877,7 @@ fn test_full_onboarding_flow_with_skip() {
     );
     vauchi.advance_onboarding().unwrap();
 
-    // Step 3: SkipGate — skip to finish
+    // Step 5: SkipGate — skip to finish
     assert_eq!(
         vauchi.current_onboarding_step().unwrap(),
         OnboardingStep::SkipGate
@@ -883,7 +937,9 @@ fn test_full_onboarding_flow_with_skip() {
 fn test_skip_step_at_ready_marks_complete() {
     let mut vauchi = create_test_vauchi();
 
-    // Advance to DefaultName, create identity
+    // Advance to DefaultName (IdentityCheck -> LinkChoice -> Welcome -> DefaultName)
+    vauchi.advance_onboarding().unwrap();
+    vauchi.advance_onboarding().unwrap();
     vauchi.advance_onboarding().unwrap();
     vauchi.create_identity("Alice").unwrap();
 
@@ -918,16 +974,16 @@ fn test_skip_step_at_ready_marks_complete() {
 fn test_skip_to_finish_from_wrong_step_is_noop() {
     let vauchi = create_test_vauchi();
 
-    // At Welcome — skip_to_finish should be a no-op
+    // At IdentityCheck — skip_to_finish should be a no-op
     assert_eq!(
         vauchi.current_onboarding_step().unwrap(),
-        OnboardingStep::Welcome
+        OnboardingStep::IdentityCheck
     );
     vauchi.skip_onboarding_to_finish().unwrap();
     assert_eq!(
         vauchi.current_onboarding_step().unwrap(),
-        OnboardingStep::Welcome,
-        "skip_to_finish from Welcome should be a no-op"
+        OnboardingStep::IdentityCheck,
+        "skip_to_finish from IdentityCheck should be a no-op"
     );
 }
 
@@ -935,6 +991,12 @@ fn test_skip_to_finish_from_wrong_step_is_noop() {
 #[test]
 fn test_full_onboarding_flow_without_skip() {
     let mut vauchi = create_test_vauchi();
+
+    // IdentityCheck → LinkChoice
+    vauchi.advance_onboarding().unwrap();
+
+    // LinkChoice → Welcome
+    vauchi.advance_onboarding().unwrap();
 
     // Welcome → DefaultName
     vauchi.advance_onboarding().unwrap();
@@ -1016,8 +1078,8 @@ fn test_full_onboarding_flow_without_skip() {
     // Verify completion percentage before final advance
     assert_eq!(
         vauchi.onboarding_completion_percentage().unwrap(),
-        88,
-        "Should be 88% (8/9 steps completed) before final advance"
+        90,
+        "Should be 90% (10/11 steps completed) before final advance"
     );
 
     // Final advance: Ready → complete
@@ -1036,7 +1098,7 @@ fn test_full_onboarding_flow_without_skip() {
     let progress = vauchi.get_onboarding_progress().unwrap();
     assert_eq!(
         progress.completed_steps.len(),
-        9,
-        "All 9 steps should be completed"
+        11,
+        "All 11 steps should be completed"
     );
 }

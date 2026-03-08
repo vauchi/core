@@ -8,9 +8,10 @@
 //! the core UI types across the FFI boundary.
 
 use vauchi_mobile::{
-    MobileContactEditWorkflow, MobileContactListWorkflow, MobileDeliveryStatusWorkflow,
-    MobileHelpWorkflow, MobileHomeWorkflow, MobileLockScreenWorkflow, MobileOnboardingWorkflow,
-    MobileSettingsWorkflow,
+    MobileBackupRecoveryWorkflow, MobileContactEditWorkflow, MobileContactListWorkflow,
+    MobileDeliveryStatusWorkflow, MobileDeviceLinkingWorkflow, MobileDuressPinWorkflow,
+    MobileEmergencyShredWorkflow, MobileExchangeWorkflow, MobileHelpWorkflow, MobileHomeWorkflow,
+    MobileLockScreenWorkflow, MobileOnboardingWorkflow, MobileSettingsWorkflow,
 };
 
 // ============================================================================
@@ -387,4 +388,77 @@ fn contact_edit_workflow_full_flow() {
         .handle_action_json(r#"{"ActionPressed":{"action_id":"save"}}"#.into())
         .expect("should complete");
     assert_eq!(result.trim_matches('"'), "Complete");
+}
+
+// ============================================================================
+// MobileExchangeWorkflow
+// ============================================================================
+
+#[test]
+fn exchange_workflow_returns_screen() {
+    let config = r#"{"own_name":"Alice","own_qr_data":"vauchi://exchange?token=abc"}"#;
+    let workflow = MobileExchangeWorkflow::new(config.into()).expect("should construct");
+    let json = workflow.current_screen_json().expect("should serialize");
+    let screen: serde_json::Value = serde_json::from_str(&json).expect("should parse");
+    assert_eq!(screen["screen_id"], "exchange_show_qr");
+}
+
+// ============================================================================
+// MobileDeviceLinkingWorkflow
+// ============================================================================
+
+#[test]
+fn device_linking_workflow_returns_screen() {
+    let workflow = MobileDeviceLinkingWorkflow::new("vauchi://link?token=abc".into())
+        .expect("should construct");
+    let json = workflow.current_screen_json().expect("should serialize");
+    let screen: serde_json::Value = serde_json::from_str(&json).expect("should parse");
+    assert_eq!(screen["screen_id"], "link_show_qr");
+}
+
+// ============================================================================
+// MobileBackupRecoveryWorkflow
+// ============================================================================
+
+#[test]
+fn backup_workflow_returns_screen() {
+    let workflow = MobileBackupRecoveryWorkflow::new("null".into()).expect("should construct");
+    let json = workflow.current_screen_json().expect("should serialize");
+    let screen: serde_json::Value = serde_json::from_str(&json).expect("should parse");
+    assert_eq!(screen["screen_id"], "backup_choose");
+}
+
+#[test]
+fn backup_workflow_create_mode() {
+    let workflow =
+        MobileBackupRecoveryWorkflow::new(r#""Create""#.into()).expect("should construct");
+    let json = workflow.current_screen_json().expect("should serialize");
+    let screen: serde_json::Value = serde_json::from_str(&json).expect("should parse");
+    assert_eq!(screen["screen_id"], "backup_password");
+}
+
+// ============================================================================
+// MobileDuressPinWorkflow
+// ============================================================================
+
+#[test]
+fn duress_pin_workflow_returns_screen() {
+    let config =
+        r#"{"enabled":false,"alert_contacts":[],"alert_message":"Help","include_location":true}"#;
+    let workflow = MobileDuressPinWorkflow::new(config.into()).expect("should construct");
+    let json = workflow.current_screen_json().expect("should serialize");
+    let screen: serde_json::Value = serde_json::from_str(&json).expect("should parse");
+    assert_eq!(screen["screen_id"], "duress_overview");
+}
+
+// ============================================================================
+// MobileEmergencyShredWorkflow
+// ============================================================================
+
+#[test]
+fn emergency_shred_workflow_returns_screen() {
+    let workflow = MobileEmergencyShredWorkflow::new().expect("should construct");
+    let json = workflow.current_screen_json().expect("should serialize");
+    let screen: serde_json::Value = serde_json::from_str(&json).expect("should parse");
+    assert_eq!(screen["screen_id"], "shred_warning");
 }

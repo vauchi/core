@@ -1,0 +1,28 @@
+{
+  "screen_id": "link_show_qr",
+  "title": "Link Device",
+  "subtitle": null,
+  "components": [
+    {
+      "QrCode": {
+        "id": "qr",
+        "data": "vauchi://link?token=abc123",
+        "mode": "Display",
+        "label": "Scan on new device"
+      }
+    }
+  ],
+  "actions": [
+    {
+      "id": "cancel",
+      "label": "Cancel",
+      "style": "Secondary",
+      "enabled": true
+    }
+  ],
+  "progress": {
+    "current_step": 1,
+    "total_steps": 4,
+    "label": null
+  }
+}

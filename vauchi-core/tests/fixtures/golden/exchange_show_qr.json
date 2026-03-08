@@ -1,0 +1,28 @@
+{
+  "screen_id": "exchange_show_qr",
+  "title": "Share Your Code",
+  "subtitle": null,
+  "components": [
+    {
+      "QrCode": {
+        "id": "own_qr",
+        "data": "vauchi://exchange?token=abc123",
+        "mode": "Display",
+        "label": "Alice"
+      }
+    }
+  ],
+  "actions": [
+    {
+      "id": "continue",
+      "label": "Scan Their Code",
+      "style": "Primary",
+      "enabled": true
+    }
+  ],
+  "progress": {
+    "current_step": 1,
+    "total_steps": 5,
+    "label": null
+  }
+}

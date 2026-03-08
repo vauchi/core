@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! Golden JSON fixtures for Phase 1 workflow engine screens.
+//! Golden JSON fixtures for Phase 1–3 workflow engine screens.
 //!
 //! Generates canonical JSON for each engine's default screen, consumed
 //! by frontend contract tests.
@@ -228,6 +228,62 @@ fn contact_edit_preview_fixture_is_fresh() {
     assert_fixture_fresh(&engine.current_screen(), "contact_edit_preview.json");
 }
 
+// ── Phase 3 sample data builders ─────────────────────────────────
+
+fn sample_exchange_config() -> ExchangeConfig {
+    ExchangeConfig {
+        own_name: "Alice".into(),
+        own_qr_data: "vauchi://exchange?token=abc123".into(),
+    }
+}
+
+fn sample_duress_config() -> DuressConfig {
+    DuressConfig {
+        enabled: false,
+        alert_contacts: vec![ContactItem {
+            id: "c1".into(),
+            name: "Emergency Contact".into(),
+            subtitle: None,
+            avatar_initials: "E".into(),
+            status: None,
+        }],
+        alert_message: "I may be in danger".into(),
+        include_location: true,
+    }
+}
+
+// ── Phase 3 per-engine freshness tests ──────────────────────────
+
+#[test]
+fn exchange_show_qr_fixture_is_fresh() {
+    let engine = ExchangeEngine::new(sample_exchange_config());
+    assert_fixture_fresh(&engine.current_screen(), "exchange_show_qr.json");
+}
+
+#[test]
+fn device_linking_fixture_is_fresh() {
+    let engine = DeviceLinkingEngine::new("vauchi://link?token=abc123".to_string());
+    assert_fixture_fresh(&engine.current_screen(), "device_linking.json");
+}
+
+#[test]
+fn backup_choose_fixture_is_fresh() {
+    let engine = BackupRecoveryEngine::new(None);
+    assert_fixture_fresh(&engine.current_screen(), "backup_choose.json");
+}
+
+#[test]
+fn duress_overview_fixture_is_fresh() {
+    let engine = DuressPinEngine::new(sample_duress_config());
+    assert_fixture_fresh(&engine.current_screen(), "duress_overview.json");
+}
+
+#[test]
+fn emergency_shred_fixture_is_fresh() {
+    let engine = EmergencyShredEngine::new();
+    assert_fixture_fresh(&engine.current_screen(), "emergency_shred.json");
+}
+
 // ── Regenerate all fixtures (run with --ignored) ─────────────────
 
 #[test]
@@ -305,9 +361,30 @@ fn regenerate_all_engine_fixtures() {
             });
             ("contact_edit_preview.json", e.current_screen())
         },
+        // Phase 3 engines
+        (
+            "exchange_show_qr.json",
+            ExchangeEngine::new(sample_exchange_config()).current_screen(),
+        ),
+        (
+            "device_linking.json",
+            DeviceLinkingEngine::new("vauchi://link?token=abc123".to_string()).current_screen(),
+        ),
+        (
+            "backup_choose.json",
+            BackupRecoveryEngine::new(None).current_screen(),
+        ),
+        (
+            "duress_overview.json",
+            DuressPinEngine::new(sample_duress_config()).current_screen(),
+        ),
+        (
+            "emergency_shred.json",
+            EmergencyShredEngine::new().current_screen(),
+        ),
     ];
 
-    assert_eq!(fixtures.len(), 11, "expected 11 engine fixtures");
+    assert_eq!(fixtures.len(), 16, "expected 16 engine fixtures");
 
     for (filename, screen) in &fixtures {
         let json = screen_to_json(screen);

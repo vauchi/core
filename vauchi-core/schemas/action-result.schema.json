@@ -137,6 +137,20 @@
         }
       },
       "additionalProperties": false
+    },
+    {
+      "description": "Frontend should open the camera for QR scanning.",
+      "type": "string",
+      "enum": [
+        "RequestCamera"
+      ]
+    },
+    {
+      "description": "All data has been wiped — frontend should reset to initial state.",
+      "type": "string",
+      "enum": [
+        "WipeComplete"
+      ]
     }
   ],
   "definitions": {
@@ -580,6 +594,76 @@
             }
           },
           "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "QrCode"
+          ],
+          "properties": {
+            "QrCode": {
+              "type": "object",
+              "required": [
+                "data",
+                "id",
+                "mode"
+              ],
+              "properties": {
+                "data": {
+                  "type": "string"
+                },
+                "id": {
+                  "type": "string"
+                },
+                "label": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "mode": {
+                  "$ref": "#/definitions/QrMode"
+                }
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "ConfirmationDialog"
+          ],
+          "properties": {
+            "ConfirmationDialog": {
+              "type": "object",
+              "required": [
+                "confirm_text",
+                "destructive",
+                "id",
+                "message",
+                "title"
+              ],
+              "properties": {
+                "confirm_text": {
+                  "type": "string"
+                },
+                "destructive": {
+                  "type": "boolean"
+                },
+                "id": {
+                  "type": "string"
+                },
+                "message": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "additionalProperties": false
         }
       ]
     },
@@ -722,6 +806,14 @@
           "minimum": 0.0
         }
       }
+    },
+    "QrMode": {
+      "description": "QR code display mode.",
+      "type": "string",
+      "enum": [
+        "Display",
+        "Scan"
+      ]
     },
     "ScreenAction": {
       "description": "A button or action the user can take on the screen.",

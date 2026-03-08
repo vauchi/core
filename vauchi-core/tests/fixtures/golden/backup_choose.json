@@ -1,0 +1,36 @@
+{
+  "screen_id": "backup_choose",
+  "title": "Backup & Recovery",
+  "subtitle": null,
+  "components": [
+    {
+      "InfoPanel": {
+        "id": "backup_info",
+        "icon": "backup",
+        "title": "Protect your data",
+        "items": [
+          {
+            "icon": null,
+            "title": "Backup",
+            "detail": "Create an encrypted backup of your identity and contacts."
+          }
+        ]
+      }
+    }
+  ],
+  "actions": [
+    {
+      "id": "create",
+      "label": "Create Backup",
+      "style": "Primary",
+      "enabled": true
+    },
+    {
+      "id": "restore",
+      "label": "Restore Backup",
+      "style": "Secondary",
+      "enabled": true
+    }
+  ],
+  "progress": null
+}

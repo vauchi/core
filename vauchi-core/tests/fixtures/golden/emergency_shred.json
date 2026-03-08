@@ -1,0 +1,50 @@
+{
+  "screen_id": "shred_warning",
+  "title": "Emergency Data Wipe",
+  "subtitle": null,
+  "components": [
+    {
+      "InfoPanel": {
+        "id": "warning_info",
+        "icon": "warning",
+        "title": "Emergency Data Wipe",
+        "items": [
+          {
+            "icon": "delete",
+            "title": "All contacts will be deleted",
+            "detail": "Your contact cards and exchange history will be permanently removed."
+          },
+          {
+            "icon": "key",
+            "title": "All keys will be destroyed",
+            "detail": "Encryption keys will be securely shredded and cannot be recovered."
+          },
+          {
+            "icon": "warning",
+            "title": "This action is irreversible",
+            "detail": "There is no way to undo this operation."
+          }
+        ]
+      }
+    }
+  ],
+  "actions": [
+    {
+      "id": "continue",
+      "label": "I Understand",
+      "style": "Destructive",
+      "enabled": true
+    },
+    {
+      "id": "cancel",
+      "label": "Cancel",
+      "style": "Secondary",
+      "enabled": true
+    }
+  ],
+  "progress": {
+    "current_step": 1,
+    "total_steps": 3,
+    "label": null
+  }
+}

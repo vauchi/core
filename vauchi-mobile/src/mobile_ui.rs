@@ -19,10 +19,11 @@
 use std::sync::Mutex;
 
 use vauchi_core::ui::{
-    ActionResult, ContactEditEngine, ContactItem, ContactListEngine, DeliveryItem,
-    DeliveryStatusEngine, EditableContact, HelpEngine, HelpItem, HomeEngine, HomeProgress,
-    LockScreenEngine, OnboardingEngine, ScreenModel, SettingsConfig, SettingsEngine, UserAction,
-    WorkflowEngine,
+    ActionResult, BackupMode, BackupRecoveryEngine, ContactEditEngine, ContactItem,
+    ContactListEngine, DeliveryItem, DeliveryStatusEngine, DeviceLinkingEngine, DuressConfig,
+    DuressPinEngine, EditableContact, EmergencyShredEngine, ExchangeConfig, ExchangeEngine,
+    HelpEngine, HelpItem, HomeEngine, HomeProgress, LockScreenEngine, OnboardingEngine,
+    ScreenModel, SettingsConfig, SettingsEngine, UserAction, WorkflowEngine,
 };
 
 use super::error::MobileError;
@@ -278,6 +279,62 @@ mobile_workflow! {
             let groups: Vec<String> = serde_json::from_str(&groups_json)
                 .map_err(|e| MobileError::InvalidInput(format!("Failed to parse groups: {e}")))?;
             ContactEditEngine::new(contact, groups)
+        }
+    }
+}
+
+// ── MobileExchangeWorkflow ──────────────────────────────────────
+
+mobile_workflow! {
+    MobileExchangeWorkflow wraps ExchangeEngine {
+        constructor(config_json: String) -> {
+            let config: ExchangeConfig = serde_json::from_str(&config_json)
+                .map_err(|e| MobileError::InvalidInput(format!("Failed to parse exchange config: {e}")))?;
+            ExchangeEngine::new(config)
+        }
+    }
+}
+
+// ── MobileDeviceLinkingWorkflow ─────────────────────────────────
+
+mobile_workflow! {
+    MobileDeviceLinkingWorkflow wraps DeviceLinkingEngine {
+        constructor(qr_data: String) -> {
+            DeviceLinkingEngine::new(qr_data)
+        }
+    }
+}
+
+// ── MobileBackupRecoveryWorkflow ────────────────────────────────
+
+mobile_workflow! {
+    MobileBackupRecoveryWorkflow wraps BackupRecoveryEngine {
+        constructor(mode_json: String) -> {
+            let mode: Option<BackupMode> = serde_json::from_str(&mode_json)
+                .map_err(|e| MobileError::InvalidInput(format!("Failed to parse backup mode: {e}")))?;
+            BackupRecoveryEngine::new(mode)
+        }
+    }
+}
+
+// ── MobileDuressPinWorkflow ─────────────────────────────────────
+
+mobile_workflow! {
+    MobileDuressPinWorkflow wraps DuressPinEngine {
+        constructor(config_json: String) -> {
+            let config: DuressConfig = serde_json::from_str(&config_json)
+                .map_err(|e| MobileError::InvalidInput(format!("Failed to parse duress config: {e}")))?;
+            DuressPinEngine::new(config)
+        }
+    }
+}
+
+// ── MobileEmergencyShredWorkflow ────────────────────────────────
+
+mobile_workflow! {
+    MobileEmergencyShredWorkflow wraps EmergencyShredEngine {
+        constructor() -> {
+            EmergencyShredEngine::new()
         }
     }
 }

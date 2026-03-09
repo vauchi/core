@@ -469,3 +469,90 @@ fn navigate_to_settings_without_identity() {
     let screen = engine.navigate_to(AppScreen::Settings);
     assert!(!screen.screen_id.is_empty());
 }
+
+// ── engine cache tests ──────────────────────────────────────────────
+
+#[test]
+fn navigate_away_and_back_preserves_engine_state() {
+    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    let mut engine = AppEngine::new(vauchi);
+
+    // Navigate to Exchange — starts on exchange_show_qr
+    let first_visit = engine.navigate_to(AppScreen::Exchange);
+    assert_eq!(first_visit.screen_id, "exchange_show_qr");
+
+    // Advance the Exchange engine to the scan step
+    let _ = engine.handle_action(UserAction::ActionPressed {
+        action_id: "continue".into(),
+    });
+    let scan_screen = engine.current_screen();
+    assert_eq!(
+        scan_screen.screen_id, "exchange_scan_qr",
+        "exchange engine should advance to scan step"
+    );
+
+    // Navigate away to Home — Exchange engine should be cached at scan step
+    let home = engine.navigate_to(AppScreen::Home);
+    assert_eq!(home.screen_id, "home");
+
+    // Navigate back to Exchange — should restore cached engine on scan step
+    let restored = engine.navigate_to(AppScreen::Exchange);
+    assert_eq!(
+        restored.screen_id, "exchange_scan_qr",
+        "cached engine should preserve internal state (scan step, not show_qr)"
+    );
+}
+
+#[test]
+fn onboarding_engine_not_cached() {
+    let vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    let mut engine = AppEngine::new(vauchi);
+
+    // Start on Onboarding, navigate away
+    assert_eq!(engine.current_app_screen(), &AppScreen::Onboarding);
+    let _ = engine.navigate_to(AppScreen::Home);
+
+    // Navigate back to Onboarding — should always be fresh (identity_check)
+    let screen = engine.navigate_to(AppScreen::Onboarding);
+    assert_eq!(
+        screen.screen_id, "identity_check",
+        "Onboarding should always start fresh, not be restored from cache"
+    );
+}
+
+#[test]
+fn lock_screen_engine_not_cached() {
+    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    let mut engine = AppEngine::new(vauchi);
+
+    // Navigate to Lock, then away
+    let lock = engine.navigate_to(AppScreen::Lock);
+    assert_eq!(lock.screen_id, "lock_screen");
+    let _ = engine.navigate_to(AppScreen::Home);
+
+    // Navigate back to Lock — should always be fresh
+    let lock2 = engine.navigate_to(AppScreen::Lock);
+    assert_eq!(
+        lock2.screen_id, "lock_screen",
+        "Lock should always start fresh, not be restored from cache"
+    );
+}
+
+#[test]
+fn navigate_creates_fresh_engine_first_time() {
+    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    let mut engine = AppEngine::new(vauchi);
+
+    // First navigation to each screen should create a fresh engine
+    let contacts = engine.navigate_to(AppScreen::Contacts);
+    assert_eq!(contacts.screen_id, "contact_list");
+
+    let help = engine.navigate_to(AppScreen::Help);
+    assert_eq!(help.screen_id, "help");
+
+    let settings = engine.navigate_to(AppScreen::Settings);
+    assert_eq!(settings.screen_id, "settings");
+}

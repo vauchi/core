@@ -8,6 +8,8 @@
 //! handles navigation routing, and implements `WorkflowEngine` so
 //! frontends see a single uniform interface.
 
+use std::collections::HashMap;
+
 use crate::api::Vauchi;
 use crate::network::Transport;
 
@@ -31,7 +33,7 @@ use super::screen::ScreenModel;
 use super::settings::{SettingsConfig, SettingsEngine};
 
 /// Top-level screens in the application.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum AppScreen {
     Onboarding,
     Home,
@@ -54,6 +56,7 @@ pub struct AppEngine<T: Transport> {
     vauchi: Vauchi<T>,
     screen: AppScreen,
     engine: Box<dyn WorkflowEngine>,
+    engine_cache: HashMap<AppScreen, Box<dyn WorkflowEngine>>,
     /// Captured from onboarding TextChanged events for identity persistence.
     pending_display_name: Option<String>,
 }
@@ -72,6 +75,7 @@ impl<T: Transport> AppEngine<T> {
             vauchi,
             screen,
             engine,
+            engine_cache: HashMap::new(),
             pending_display_name: None,
         }
     }
@@ -85,9 +89,29 @@ impl<T: Transport> AppEngine<T> {
     }
 
     pub fn navigate_to(&mut self, screen: AppScreen) -> ScreenModel {
-        self.screen = screen;
-        self.engine = Self::create_engine(&self.vauchi, &self.screen);
+        // Swap in the new screen, get the old one back
+        let old_screen = std::mem::replace(&mut self.screen, screen.clone());
+
+        // Build or restore the engine for the new screen
+        let new_engine = self
+            .engine_cache
+            .remove(&screen)
+            .unwrap_or_else(|| Self::create_engine(&self.vauchi, &screen));
+
+        // Swap in the new engine, get the old one back
+        let old_engine = std::mem::replace(&mut self.engine, new_engine);
+
+        // Cache the old engine if its screen is cacheable
+        if Self::is_cacheable(&old_screen) {
+            self.engine_cache.insert(old_screen, old_engine);
+        }
+
         self.engine.current_screen()
+    }
+
+    /// Screens that should never be cached — always start fresh.
+    fn is_cacheable(screen: &AppScreen) -> bool {
+        !matches!(screen, AppScreen::Onboarding | AppScreen::Lock)
     }
 
     pub fn available_screens(&self) -> Vec<AppScreen> {

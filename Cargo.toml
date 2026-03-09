@@ -5,6 +5,7 @@
 [workspace]
 resolver = "2"
 members = [
+    "vauchi-cabi",
     "vauchi-core",
     "vauchi-mobile",
     "vauchi-protocol",

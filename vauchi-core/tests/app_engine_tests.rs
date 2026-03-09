@@ -10,29 +10,88 @@ use vauchi_core::network::MockTransport;
 use vauchi_core::ui::{ActionResult, AppEngine, AppScreen, UserAction, WorkflowEngine};
 
 /// Drive through the full onboarding flow, returning the final ActionResult.
+/// Each intermediate step is asserted to produce the expected ActionResult variant (T-12).
 fn drive_onboarding(engine: &mut AppEngine<MockTransport>) -> ActionResult {
-    let _ = engine.handle_action(UserAction::ActionPressed {
+    // Step 1: create_new -> navigates to welcome
+    let r = engine.handle_action(UserAction::ActionPressed {
         action_id: "create_new".into(),
     });
-    let _ = engine.handle_action(UserAction::ActionPressed {
+    let ActionResult::NavigateTo(screen) = r else {
+        panic!("Step 1 (create_new) expected NavigateTo, got {r:?}");
+    };
+    assert_eq!(
+        screen.screen_id, "welcome",
+        "create_new should navigate to welcome"
+    );
+
+    // Step 2: get_started -> navigates to default_name
+    let r = engine.handle_action(UserAction::ActionPressed {
         action_id: "get_started".into(),
     });
-    let _ = engine.handle_action(UserAction::TextChanged {
+    let ActionResult::NavigateTo(screen) = r else {
+        panic!("Step 2 (get_started) expected NavigateTo, got {r:?}");
+    };
+    assert_eq!(
+        screen.screen_id, "default_name",
+        "get_started should navigate to default_name"
+    );
+
+    // Step 3: enter display name -> updates screen
+    let r = engine.handle_action(UserAction::TextChanged {
         component_id: "display_name".into(),
         value: "Alice".into(),
     });
-    let _ = engine.handle_action(UserAction::ActionPressed {
+    assert!(
+        matches!(r, ActionResult::UpdateScreen(_)),
+        "Step 3 (TextChanged display_name) expected UpdateScreen, got {r:?}"
+    );
+
+    // Step 4: continue -> navigates to skip_gate
+    let r = engine.handle_action(UserAction::ActionPressed {
         action_id: "continue".into(),
     });
-    let _ = engine.handle_action(UserAction::ActionPressed {
+    let ActionResult::NavigateTo(screen) = r else {
+        panic!("Step 4 (continue) expected NavigateTo, got {r:?}");
+    };
+    assert_eq!(
+        screen.screen_id, "skip_gate",
+        "continue should navigate to skip_gate"
+    );
+
+    // Step 5: skip_to_finish -> navigates to security_explanation
+    let r = engine.handle_action(UserAction::ActionPressed {
         action_id: "skip_to_finish".into(),
     });
-    let _ = engine.handle_action(UserAction::ActionPressed {
+    let ActionResult::NavigateTo(screen) = r else {
+        panic!("Step 5 (skip_to_finish) expected NavigateTo, got {r:?}");
+    };
+    assert_eq!(
+        screen.screen_id, "security_explanation",
+        "skip_to_finish should navigate to security_explanation"
+    );
+
+    // Step 6: continue -> navigates to backup_prompt
+    let r = engine.handle_action(UserAction::ActionPressed {
         action_id: "continue".into(),
     });
-    let _ = engine.handle_action(UserAction::ActionPressed {
+    let ActionResult::NavigateTo(screen) = r else {
+        panic!("Step 6 (continue) expected NavigateTo, got {r:?}");
+    };
+    assert_eq!(
+        screen.screen_id, "backup_prompt",
+        "continue should navigate to backup_prompt"
+    );
+
+    // Step 7: skip -> navigates to ready
+    let r = engine.handle_action(UserAction::ActionPressed {
         action_id: "skip".into(),
     });
+    let ActionResult::NavigateTo(screen) = r else {
+        panic!("Step 7 (skip) expected NavigateTo, got {r:?}");
+    };
+    assert_eq!(screen.screen_id, "ready", "skip should navigate to ready");
+
+    // Step 8: start -> Complete -> AppEngine routes to Home
     engine.handle_action(UserAction::ActionPressed {
         action_id: "start".into(),
     })
@@ -186,12 +245,20 @@ fn available_screens_with_identity_has_main_nav() {
 /// Drive onboarding to the name step and attempt to continue without entering a name.
 /// Returns the result of pressing "continue" without a display name.
 fn drive_onboarding_without_name(engine: &mut AppEngine<MockTransport>) -> ActionResult {
-    let _ = engine.handle_action(UserAction::ActionPressed {
+    let r = engine.handle_action(UserAction::ActionPressed {
         action_id: "create_new".into(),
     });
-    let _ = engine.handle_action(UserAction::ActionPressed {
+    assert!(
+        matches!(r, ActionResult::NavigateTo(_)),
+        "create_new should produce NavigateTo, got {r:?}"
+    );
+    let r = engine.handle_action(UserAction::ActionPressed {
         action_id: "get_started".into(),
     });
+    assert!(
+        matches!(r, ActionResult::NavigateTo(_)),
+        "get_started should produce NavigateTo, got {r:?}"
+    );
     // Attempt to continue without setting display_name
     engine.handle_action(UserAction::ActionPressed {
         action_id: "continue".into(),
@@ -207,11 +274,13 @@ fn onboarding_complete_navigates_to_home() {
 
     let result = drive_onboarding(&mut engine);
 
-    // Should navigate to Home after onboarding completes
-    assert!(
-        matches!(result, ActionResult::NavigateTo(_)),
-        "expected NavigateTo, got {:?}",
-        result
+    // Should navigate to Home after onboarding completes (T-1: verify screen_id)
+    let ActionResult::NavigateTo(screen) = result else {
+        panic!("expected NavigateTo, got {result:?}");
+    };
+    assert_eq!(
+        screen.screen_id, "home",
+        "onboarding completion should navigate to home"
     );
     assert_eq!(engine.current_app_screen(), &AppScreen::Home);
 }
@@ -364,52 +433,58 @@ fn onboarding_complete_creates_identity_in_vauchi() {
 // ── home screen contact limit tests ─────────────────────────────────
 
 #[test]
-fn home_screen_limits_displayed_contacts() {
+fn home_screen_limits_displayed_contacts_to_five() {
     let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
-    // Home screen should show max 5 contacts
+
+    // Add 7 contacts to exceed the home-screen limit of 5 (T-3)
+    for i in 0..7 {
+        let card = ContactCard::new(&format!("Contact {i}"));
+        let mut key_bytes = [0u8; 32];
+        key_bytes[0] = i + 10; // unique public keys
+        let shared_key = SymmetricKey::generate();
+        let contact = Contact::from_exchange(key_bytes, card, shared_key);
+        vauchi.add_contact(contact).unwrap();
+    }
+
+    let engine = AppEngine::new(vauchi);
+    let screen = engine.current_screen();
+    assert_eq!(screen.screen_id, "home");
+
+    // Find the ContactList component and verify it has at most 5 contacts
+    let contact_list = screen
+        .components
+        .iter()
+        .find_map(|c| match c {
+            vauchi_core::ui::Component::ContactList { contacts, .. } => Some(contacts),
+            _ => None,
+        })
+        .expect("home screen should have a ContactList component");
+
+    assert_eq!(
+        contact_list.len(),
+        5,
+        "home screen should display at most 5 contacts, but found {}",
+        contact_list.len()
+    );
+}
+
+#[test]
+fn home_screen_with_zero_contacts_renders_safely() {
+    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
     // With 0 contacts, truncate(5) is a no-op — verify it doesn't break
     let engine = AppEngine::new(vauchi);
     let screen = engine.current_screen();
     assert_eq!(screen.screen_id, "home");
-    // Verify the screen renders successfully (truncate of empty list is safe)
     assert!(!screen.title.is_empty(), "home screen should have a title");
 }
 
 // ── contact detail / edit wiring tests ──────────────────────────────
 
-#[test]
-fn contact_detail_does_not_show_empty_list() {
-    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
-    vauchi.create_identity("Alice").unwrap();
-    let mut engine = AppEngine::new(vauchi);
-
-    let screen = engine.navigate_to(AppScreen::ContactDetail {
-        contact_id: "nonexistent".into(),
-    });
-    // Should not crash, and should not show the contact_list screen
-    assert!(!screen.screen_id.is_empty());
-    assert_ne!(
-        screen.screen_id, "contact_list",
-        "ContactDetail should not fall back to contact_list"
-    );
-}
-
-#[test]
-fn contact_edit_does_not_show_empty_list() {
-    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
-    vauchi.create_identity("Alice").unwrap();
-    let mut engine = AppEngine::new(vauchi);
-
-    let screen = engine.navigate_to(AppScreen::ContactEdit {
-        contact_id: "nonexistent".into(),
-    });
-    assert!(!screen.screen_id.is_empty());
-    assert_ne!(
-        screen.screen_id, "contact_list",
-        "ContactEdit should not fall back to contact_list"
-    );
-}
+// NOTE: contact_detail_does_not_show_empty_list and contact_edit_does_not_show_empty_list
+// were removed — they were subsumed by the stronger *_nonexistent_shows_not_found tests below
+// which assert the exact screen_id ("contact_not_found") rather than just != "contact_list".
 
 #[test]
 fn contact_detail_nonexistent_shows_not_found() {
@@ -439,18 +514,8 @@ fn contact_edit_nonexistent_shows_not_found() {
 
 // ── failure-path tests for create_engine edge cases ─────────────────
 
-#[test]
-fn navigate_to_contact_detail_with_nonexistent_id() {
-    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
-    vauchi.create_identity("Alice").unwrap();
-    let mut engine = AppEngine::new(vauchi);
-
-    let screen = engine.navigate_to(AppScreen::ContactDetail {
-        contact_id: "nonexistent-id".into(),
-    });
-    // Should render without panic
-    assert!(!screen.screen_id.is_empty());
-}
+// NOTE: navigate_to_contact_detail_with_nonexistent_id was removed —
+// subsumed by contact_detail_nonexistent_shows_not_found which asserts exact screen_id.
 
 #[test]
 fn navigate_to_exchange_without_identity_card() {
@@ -735,11 +800,13 @@ fn lock_screen_correct_pin_unlocks() {
         action_id: "unlock".into(),
     });
 
-    // Should navigate to Home
-    assert!(
-        matches!(result, ActionResult::NavigateTo(_)),
-        "correct PIN should navigate to Home, got {:?}",
-        result
+    // Should navigate to Home (T-1: verify screen_id)
+    let ActionResult::NavigateTo(screen) = result else {
+        panic!("correct PIN should navigate to Home, got {result:?}");
+    };
+    assert_eq!(
+        screen.screen_id, "home",
+        "correct PIN should navigate to home screen"
     );
     assert_eq!(
         engine.current_app_screen(),
@@ -827,10 +894,12 @@ fn lock_screen_correct_pin_after_failed_attempt_unlocks() {
         action_id: "unlock".into(),
     });
 
-    assert!(
-        matches!(result, ActionResult::NavigateTo(_)),
-        "correct PIN after failed attempt should unlock, got {:?}",
-        result
+    let ActionResult::NavigateTo(screen) = result else {
+        panic!("correct PIN after failed attempt should unlock, got {result:?}");
+    };
+    assert_eq!(
+        screen.screen_id, "home",
+        "correct PIN after failed attempt should navigate to home"
     );
     assert_eq!(engine.current_app_screen(), &AppScreen::Home);
 }
@@ -886,11 +955,13 @@ fn contact_detail_edit_navigates_to_edit_screen() {
         action_id: "edit".into(),
     });
 
-    // Should navigate to ContactEdit, not re-open ContactDetail
-    assert!(
-        matches!(result, ActionResult::NavigateTo(_)),
-        "expected NavigateTo for edit button, got {:?}",
-        result
+    // Should navigate to ContactEdit, not re-open ContactDetail (T-1: verify screen_id)
+    let ActionResult::NavigateTo(screen) = result else {
+        panic!("expected NavigateTo for edit button, got {result:?}");
+    };
+    assert_eq!(
+        screen.screen_id, "edit_fields",
+        "edit button should navigate to edit_fields screen"
     );
     assert_eq!(
         engine.current_app_screen(),
@@ -919,14 +990,16 @@ fn back_from_contact_detail_returns_to_contacts() {
         }
     );
 
-    // Press back (Complete) — should go to Contacts, not Home
+    // Press back (Complete) — should go to Contacts, not Home (T-1: verify screen_id)
     let result = engine.handle_action(UserAction::ActionPressed {
         action_id: "back".into(),
     });
-    assert!(
-        matches!(result, ActionResult::NavigateTo(_)),
-        "expected NavigateTo, got {:?}",
-        result
+    let ActionResult::NavigateTo(screen) = result else {
+        panic!("expected NavigateTo, got {result:?}");
+    };
+    assert_eq!(
+        screen.screen_id, "contact_list",
+        "back should navigate to contact_list screen"
     );
     assert_eq!(
         engine.current_app_screen(),

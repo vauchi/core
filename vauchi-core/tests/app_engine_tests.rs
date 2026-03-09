@@ -179,6 +179,23 @@ fn available_screens_with_identity_has_main_nav() {
     assert!(!screens.contains(&AppScreen::Onboarding));
 }
 
+// ── helper: onboarding without setting display name ─────────────────
+
+/// Drive onboarding to the name step and attempt to continue without entering a name.
+/// Returns the result of pressing "continue" without a display name.
+fn drive_onboarding_without_name(engine: &mut AppEngine<MockTransport>) -> ActionResult {
+    let _ = engine.handle_action(UserAction::ActionPressed {
+        action_id: "create_new".into(),
+    });
+    let _ = engine.handle_action(UserAction::ActionPressed {
+        action_id: "get_started".into(),
+    });
+    // Attempt to continue without setting display_name
+    engine.handle_action(UserAction::ActionPressed {
+        action_id: "continue".into(),
+    })
+}
+
 // ── completion routing tests ────────────────────────────────────────
 
 #[test]
@@ -203,6 +220,79 @@ fn app_engine_starts_on_home_with_identity() {
     vauchi.create_identity("Alice").unwrap();
     let engine = AppEngine::new(vauchi);
     assert_eq!(engine.current_app_screen(), &AppScreen::Home);
+}
+
+#[test]
+fn onboarding_completion_without_name_returns_validation_error() {
+    let vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    let mut engine = AppEngine::new(vauchi);
+
+    let result = drive_onboarding_without_name(&mut engine);
+
+    match result {
+        ActionResult::ValidationError {
+            component_id,
+            message,
+        } => {
+            assert_eq!(component_id, "display_name");
+            assert!(
+                !message.is_empty(),
+                "validation message should not be empty"
+            );
+        }
+        other => panic!("expected ValidationError, got {:?}", other),
+    }
+    assert_eq!(
+        engine.current_app_screen(),
+        &AppScreen::Onboarding,
+        "should remain on Onboarding when name is missing"
+    );
+    assert!(
+        !engine.has_identity(),
+        "no identity should be created without a name"
+    );
+}
+
+/// Verify that a whitespace-only name is also rejected.
+#[test]
+fn onboarding_completion_with_empty_name_returns_validation_error() {
+    let vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    let mut engine = AppEngine::new(vauchi);
+
+    // Navigate to name step
+    let _ = engine.handle_action(UserAction::ActionPressed {
+        action_id: "create_new".into(),
+    });
+    let _ = engine.handle_action(UserAction::ActionPressed {
+        action_id: "get_started".into(),
+    });
+    // Set a whitespace-only name
+    let _ = engine.handle_action(UserAction::TextChanged {
+        component_id: "display_name".into(),
+        value: "   ".into(),
+    });
+    // Try to continue — onboarding engine should reject it
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "continue".into(),
+    });
+
+    match result {
+        ActionResult::ValidationError {
+            component_id,
+            message,
+        } => {
+            assert_eq!(component_id, "display_name");
+            assert!(
+                !message.is_empty(),
+                "validation message should not be empty"
+            );
+        }
+        other => panic!("expected ValidationError, got {:?}", other),
+    }
+    assert!(
+        !engine.has_identity(),
+        "no identity should be created with whitespace-only name"
+    );
 }
 
 #[test]

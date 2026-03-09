@@ -104,11 +104,25 @@ impl<T: Transport> AppEngine<T> {
     fn handle_completion(&mut self) -> ActionResult {
         match &self.screen {
             AppScreen::Onboarding => {
-                if let Some(name) = self.pending_display_name.take() {
-                    let _ = self.vauchi.create_identity(&name);
+                let name = match self.pending_display_name.take() {
+                    Some(n) if !n.trim().is_empty() => n,
+                    _ => {
+                        return ActionResult::ValidationError {
+                            component_id: "display_name".into(),
+                            message: "Please enter a display name".into(),
+                        };
+                    }
+                };
+                match self.vauchi.create_identity(&name) {
+                    Ok(()) => {
+                        let screen = self.navigate_to(AppScreen::Home);
+                        ActionResult::NavigateTo(screen)
+                    }
+                    Err(e) => ActionResult::ShowAlert {
+                        title: "Error".into(),
+                        message: format!("Failed to create identity: {e}"),
+                    },
                 }
-                let screen = self.navigate_to(AppScreen::Home);
-                ActionResult::NavigateTo(screen)
             }
             AppScreen::Lock => {
                 let screen = self.navigate_to(AppScreen::Home);

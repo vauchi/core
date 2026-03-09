@@ -358,3 +358,64 @@ fn onboarding_complete_creates_identity_in_vauchi() {
         "should have full nav after identity created"
     );
 }
+
+// ── contact detail / edit wiring tests ──────────────────────────────
+
+#[test]
+fn contact_detail_does_not_show_empty_list() {
+    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    let mut engine = AppEngine::new(vauchi);
+
+    let screen = engine.navigate_to(AppScreen::ContactDetail {
+        contact_id: "nonexistent".into(),
+    });
+    // Should not crash, and should not show the contact_list screen
+    assert!(!screen.screen_id.is_empty());
+    assert_ne!(
+        screen.screen_id, "contact_list",
+        "ContactDetail should not fall back to contact_list"
+    );
+}
+
+#[test]
+fn contact_edit_does_not_show_empty_list() {
+    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    let mut engine = AppEngine::new(vauchi);
+
+    let screen = engine.navigate_to(AppScreen::ContactEdit {
+        contact_id: "nonexistent".into(),
+    });
+    assert!(!screen.screen_id.is_empty());
+    assert_ne!(
+        screen.screen_id, "contact_list",
+        "ContactEdit should not fall back to contact_list"
+    );
+}
+
+#[test]
+fn contact_detail_nonexistent_shows_not_found() {
+    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    let mut engine = AppEngine::new(vauchi);
+
+    let screen = engine.navigate_to(AppScreen::ContactDetail {
+        contact_id: "nonexistent".into(),
+    });
+    assert_eq!(screen.screen_id, "contact_not_found");
+}
+
+#[test]
+fn contact_edit_nonexistent_shows_not_found() {
+    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    let mut engine = AppEngine::new(vauchi);
+
+    let screen = engine.navigate_to(AppScreen::ContactEdit {
+        contact_id: "nonexistent".into(),
+    });
+    // Non-existent contact should show edit_fields (empty) or not_found
+    // ContactEditEngine starts on edit_fields, but with nonexistent we show not_found
+    assert_eq!(screen.screen_id, "contact_not_found");
+}

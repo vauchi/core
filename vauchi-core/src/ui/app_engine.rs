@@ -13,7 +13,9 @@ use crate::network::Transport;
 
 use super::action::{ActionResult, UserAction};
 use super::backup_recovery::BackupRecoveryEngine;
-use super::component::ContactItem;
+use super::component::{ContactItem, FieldDisplay, UiFieldVisibility};
+use super::contact_detail::{ContactDetailEngine, ContactNotFoundEngine};
+use super::contact_edit::{ContactEditEngine, EditableContact, EditableField};
 use super::contact_list::ContactListEngine;
 use super::delivery::DeliveryStatusEngine;
 use super::device_linking::DeviceLinkingEngine;
@@ -227,9 +229,54 @@ impl<T: Transport> AppEngine<T> {
             }
             AppScreen::EmergencyShred => Box::new(EmergencyShredEngine::new()),
             AppScreen::DeliveryStatus => Box::new(DeliveryStatusEngine::new(vec![])),
-            AppScreen::ContactDetail { .. } | AppScreen::ContactEdit { .. } => {
-                Box::new(ContactListEngine::new(vec![]))
-            }
+            AppScreen::ContactDetail { contact_id } => match vauchi.get_contact(contact_id) {
+                Ok(Some(contact)) => {
+                    let fields = contact
+                        .card()
+                        .fields()
+                        .iter()
+                        .map(|f| FieldDisplay {
+                            id: f.id().to_string(),
+                            field_type: format!("{:?}", f.field_type()),
+                            label: f.label().to_string(),
+                            value: f.value().to_string(),
+                            visibility: UiFieldVisibility::Shown,
+                        })
+                        .collect();
+                    let item = ContactItem {
+                        id: contact.id().to_string(),
+                        name: contact.display_name().to_string(),
+                        subtitle: None,
+                        avatar_initials: initials(contact.display_name()),
+                        status: None,
+                    };
+                    Box::new(ContactDetailEngine::new(item, fields))
+                }
+                _ => Box::new(ContactNotFoundEngine::new(contact_id.clone())),
+            },
+            AppScreen::ContactEdit { contact_id } => match vauchi.get_contact(contact_id) {
+                Ok(Some(contact)) => {
+                    let fields = contact
+                        .card()
+                        .fields()
+                        .iter()
+                        .map(|f| EditableField {
+                            id: f.id().to_string(),
+                            field_type: format!("{:?}", f.field_type()),
+                            label: f.label().to_string(),
+                            value: f.value().to_string(),
+                            visible_to_groups: vec![],
+                            shown: true,
+                        })
+                        .collect();
+                    let editable = EditableContact {
+                        display_name: contact.display_name().to_string(),
+                        fields,
+                    };
+                    Box::new(ContactEditEngine::new(editable, vec![]))
+                }
+                _ => Box::new(ContactNotFoundEngine::new(contact_id.clone())),
+            },
         }
     }
 

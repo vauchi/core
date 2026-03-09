@@ -12,6 +12,7 @@ mod action;
 mod app_engine;
 mod backup_recovery;
 mod component;
+mod contact_detail;
 mod contact_edit;
 mod contact_list;
 mod delivery;
@@ -35,6 +36,7 @@ pub use component::{
     QrMode, SettingsItem, SettingsItemKind, Status, TextStyle, ToggleItem, UiFieldVisibility,
     VisibilityMode,
 };
+pub use contact_detail::{ContactDetailEngine, ContactNotFoundEngine};
 pub use contact_edit::{ContactEditEngine, EditableContact, EditableField};
 pub use contact_list::ContactListEngine;
 pub use delivery::{DeliveryItem, DeliveryStatusEngine};

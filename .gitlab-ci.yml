@@ -118,30 +118,13 @@ dev:verify:
   needs: []
 
 dev:lint:format:
-  extends: [.linux-runner-nocache, .lint-format]
-  needs: [dev:verify]
-  rules:
-    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+-dev\.\d+$/
+  extends: [.linux-runner-nocache, .dev-lint-format]
 
 dev:lint:clippy:
-  extends: [.linux-runner-readonly, .lint-clippy]
-  needs: [dev:verify]
-  rules:
-    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+-dev\.\d+$/
+  extends: [.linux-runner-readonly, .dev-lint-clippy]
 
 dev:test:
-  extends: [.linux-runner, .timeout-standard]
-  stage: test
-  needs: [dev:lint:format]
-  script:
-    - cargo nextest run --profile ci --all-targets
-  rules:
-    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+-dev\.\d+$/
-  artifacts:
-    when: always
-    reports:
-      junit: target/nextest/ci/junit.xml
-    expire_in: 1 week
+  extends: [.linux-runner, .dev-test-nextest, .timeout-standard]
 
 # ============================================================
 # RC Tag Pipeline (full quality gate — no publish/deploy)
@@ -154,16 +137,10 @@ rc:verify:
   needs: []
 
 rc:lint:format:
-  extends: [.linux-runner-nocache, .lint-format]
-  needs: [rc:verify]
-  rules:
-    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+-rc\.\d+$/
+  extends: [.linux-runner-nocache, .rc-lint-format]
 
 rc:lint:clippy:
-  extends: [.linux-runner-readonly, .lint-clippy]
-  needs: [rc:verify]
-  rules:
-    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+-rc\.\d+$/
+  extends: [.linux-runner-readonly, .rc-lint-clippy]
 
 rc:test:
   extends: [.coverage-job, .linux-runner, .timeout-long]
@@ -184,13 +161,7 @@ rc:mutation:
     - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+-rc\.\d+$/
 
 rc:security:audit:
-  extends: [.linux-runner-readonly, .security-audit, .timeout-quick]
-  needs: []
-  rules:
-    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+-rc\.\d+$/
-  before_script:
-    - !reference [.self-hosted, before_script]
-    - command -v cargo-audit >/dev/null 2>&1 || cargo binstall cargo-audit --no-confirm 2>/dev/null || cargo install cargo-audit
+  extends: [.linux-runner-readonly, .rc-security-audit]
 
 # ============================================================
 # Lint Stage — Preflight Gate (MR only, change-based)

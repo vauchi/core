@@ -1099,6 +1099,68 @@ fn navigate_back_does_not_create_circular_history() {
 
 use proptest::prelude::*;
 
+// ── Wave 6 Phase A: new engine navigation tests ──────────────────────
+
+#[test]
+fn navigate_to_sync_shows_sync_status() {
+    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    let mut engine = AppEngine::new(vauchi);
+    let screen = engine.navigate_to(AppScreen::Sync);
+    assert_eq!(screen.screen_id, "sync_status");
+    assert_eq!(screen.title, "Sync");
+}
+
+#[test]
+fn navigate_to_tor_settings_shows_tor() {
+    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    let mut engine = AppEngine::new(vauchi);
+    let screen = engine.navigate_to(AppScreen::TorSettings);
+    assert_eq!(screen.screen_id, "tor_settings");
+    assert_eq!(screen.title, "Tor Privacy");
+}
+
+#[test]
+fn navigate_to_recovery_shows_recovery_status() {
+    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    let mut engine = AppEngine::new(vauchi);
+    let screen = engine.navigate_to(AppScreen::Recovery);
+    assert_eq!(screen.screen_id, "recovery_status");
+    assert_eq!(screen.title, "Social Recovery");
+}
+
+#[test]
+fn navigate_to_groups_shows_groups_list() {
+    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    let mut engine = AppEngine::new(vauchi);
+    let screen = engine.navigate_to(AppScreen::Groups);
+    assert_eq!(screen.screen_id, "groups_list");
+    assert_eq!(screen.title, "Contact Groups");
+}
+
+#[test]
+fn navigate_to_privacy_shows_privacy_settings() {
+    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    let mut engine = AppEngine::new(vauchi);
+    let screen = engine.navigate_to(AppScreen::Privacy);
+    assert_eq!(screen.screen_id, "privacy_settings");
+    assert_eq!(screen.title, "Privacy & Data");
+}
+
+#[test]
+fn navigate_to_support_shows_support() {
+    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    let mut engine = AppEngine::new(vauchi);
+    let screen = engine.navigate_to(AppScreen::Support);
+    assert_eq!(screen.screen_id, "support");
+    assert_eq!(screen.title, "Support Vauchi");
+}
+
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(128))]
 

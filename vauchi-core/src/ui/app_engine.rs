@@ -25,12 +25,18 @@ use super::duress_pin::{DuressConfig, DuressPinEngine};
 use super::emergency_shred::EmergencyShredEngine;
 use super::engine::WorkflowEngine;
 use super::exchange::{ExchangeConfig, ExchangeEngine};
+use super::gdpr::GdprEngine;
+use super::groups_list::GroupsEngine;
 use super::help::{HelpEngine, HelpItem};
 use super::home::{HomeEngine, HomeProgress};
 use super::lock_screen::LockScreenEngine;
 use super::onboarding::OnboardingEngine;
+use super::recovery_status::RecoveryEngine;
 use super::screen::ScreenModel;
 use super::settings::{SettingsConfig, SettingsEngine};
+use super::support::SupportEngine;
+use super::sync_status::SyncStatusEngine;
+use super::tor_settings::TorSettingsEngine;
 
 /// Top-level screens in the application.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -49,6 +55,12 @@ pub enum AppScreen {
     DuressPin,
     EmergencyShred,
     DeliveryStatus,
+    Sync,
+    TorSettings,
+    Recovery,
+    Groups,
+    Privacy,
+    Support,
 }
 
 /// Unified orchestrator for all frontends.
@@ -301,6 +313,21 @@ impl<T: Transport> AppEngine<T> {
             }
             AppScreen::EmergencyShred => Box::new(EmergencyShredEngine::new()),
             AppScreen::DeliveryStatus => Box::new(DeliveryStatusEngine::new(vec![])),
+            AppScreen::Sync => {
+                let relay_url = vauchi.config().relay.server_url.clone();
+                let contact_count = vauchi.list_contacts().map(|c| c.len()).unwrap_or(0);
+                Box::new(SyncStatusEngine::new(relay_url, contact_count, 0))
+            }
+            AppScreen::TorSettings => Box::new(TorSettingsEngine::new(false, false)),
+            AppScreen::Recovery => {
+                let contacts = Self::load_contact_items(vauchi);
+                Box::new(RecoveryEngine::new(contacts, 3))
+            }
+            AppScreen::Groups => Box::new(GroupsEngine::new(vec![])),
+            AppScreen::Privacy => {
+                Box::new(GdprEngine::new(None, "No data export requested".into()))
+            }
+            AppScreen::Support => Box::new(SupportEngine::new()),
             AppScreen::ContactDetail { contact_id } => match vauchi.get_contact(contact_id) {
                 Ok(Some(contact)) => {
                     let fields = contact

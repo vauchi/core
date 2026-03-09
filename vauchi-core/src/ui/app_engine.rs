@@ -114,6 +114,17 @@ impl<T: Transport> AppEngine<T> {
         !matches!(screen, AppScreen::Onboarding | AppScreen::Lock)
     }
 
+    /// Invalidates a cached engine for a specific screen.
+    /// Next navigation to this screen will create a fresh engine.
+    pub fn invalidate_screen(&mut self, screen: &AppScreen) {
+        self.engine_cache.remove(screen);
+    }
+
+    /// Invalidates all cached engines. Use after bulk mutations.
+    pub fn invalidate_all(&mut self) {
+        self.engine_cache.clear();
+    }
+
     pub fn available_screens(&self) -> Vec<AppScreen> {
         if !self.vauchi.has_identity() {
             return vec![AppScreen::Onboarding];

@@ -556,3 +556,44 @@ fn navigate_creates_fresh_engine_first_time() {
     let settings = engine.navigate_to(AppScreen::Settings);
     assert_eq!(settings.screen_id, "settings");
 }
+
+// ── cache invalidation tests ─────────────────────────────────────────
+
+#[test]
+fn invalidate_screen_removes_cached_engine() {
+    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    let mut engine = AppEngine::new(vauchi);
+
+    // Navigate to Contacts, then Home (caches Contacts engine)
+    engine.navigate_to(AppScreen::Contacts);
+    engine.navigate_to(AppScreen::Home);
+
+    // Invalidate Contacts cache
+    engine.invalidate_screen(&AppScreen::Contacts);
+
+    // Navigate back — should get fresh engine (not the cached one)
+    let screen = engine.navigate_to(AppScreen::Contacts);
+    assert_eq!(screen.screen_id, "contact_list");
+}
+
+#[test]
+fn invalidate_all_clears_entire_cache() {
+    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    let mut engine = AppEngine::new(vauchi);
+
+    // Cache multiple screens
+    engine.navigate_to(AppScreen::Contacts);
+    engine.navigate_to(AppScreen::Settings);
+    engine.navigate_to(AppScreen::Home);
+
+    // Invalidate all
+    engine.invalidate_all();
+
+    // Both should get fresh engines
+    let contacts = engine.navigate_to(AppScreen::Contacts);
+    assert_eq!(contacts.screen_id, "contact_list");
+    let settings = engine.navigate_to(AppScreen::Settings);
+    assert_eq!(settings.screen_id, "settings");
+}

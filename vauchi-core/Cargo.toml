@@ -26,14 +26,17 @@ test-timings = []
 test-kdf = []
 # JSON Schema generation for UI types (dev tooling only)
 schema-gen = ["schemars"]
+# WASM crypto backend (pure Rust, no C dependencies)
+crypto-wasm = ["dep:ed25519-dalek", "dep:aes-gcm", "dep:sha2", "dep:hmac", "dep:hkdf", "dep:pbkdf2", "dep:getrandom", "dep:rand"]
 # Tor anonymity layer (embedded arti client)
 tor = ["arti-client", "tor-rtcompat", "tokio-util"]
 # Remote content updates (requires HTTP client)
 content-updates = ["reqwest", "tokio"]
 
 [dependencies]
-# Cryptography (audited library)
+# Cryptography (audited libraries)
 ring = "0.17.14"
+aws-lc-rs = "1.16"
 x25519-dalek = { version = "2.0.1", features = ["static_secrets"] }
 
 # XChaCha20-Poly1305 (spec-mandated cipher, documented exception to ring-only rule)
@@ -120,6 +123,17 @@ tokio = { version = "1.0", features = ["rt"], optional = true }
 arti-client = { version = "0.27", optional = true, default-features = false, features = ["tokio", "native-tls"] }
 tor-rtcompat = { version = "0.27", optional = true, features = ["tokio", "native-tls"] }
 tokio-util = { version = "0.7", optional = true, features = ["io", "io-util"] }
+
+# WASM crypto backend (pure Rust, no C dependencies — behind crypto-wasm feature)
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+ed25519-dalek = { version = "2.1", features = ["rand_core"], optional = true }
+aes-gcm = { version = "0.10", optional = true }
+sha2 = { version = "0.10", optional = true }
+hmac = { version = "0.12", optional = true }
+hkdf = { version = "0.12", optional = true }
+pbkdf2 = { version = "0.12", features = ["hmac"], optional = true }
+getrandom = { version = "0.2", features = ["js"], optional = true }
+rand = { version = "0.8", optional = true }
 
 [dev-dependencies]
 # JSON Schema validation for contract tests

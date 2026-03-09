@@ -9,6 +9,7 @@
 //! User interactions flow back as UserAction.
 
 mod action;
+mod app_engine;
 mod backup_recovery;
 mod component;
 mod contact_edit;
@@ -27,6 +28,7 @@ mod screen;
 mod settings;
 
 pub use action::{ActionResult, UserAction};
+pub use app_engine::{AppEngine, AppScreen};
 pub use backup_recovery::{BackupMode, BackupRecoveryEngine};
 pub use component::{
     ActionListItem, Component, ContactItem, FieldDisplay, GroupCardView, InfoItem, InputType,

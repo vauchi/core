@@ -1081,3 +1081,44 @@ fn navigate_back_does_not_create_circular_history() {
     engine.navigate_back();
     assert_eq!(engine.current_app_screen(), &AppScreen::Home);
 }
+
+// ── stateful proptest: onboarding random actions (CC-13) ─────────────
+
+use proptest::prelude::*;
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(128))]
+
+    /// Random sequences of UserActions fired at a fresh AppEngine never
+    /// panic and always produce a non-empty screen_id. This satisfies
+    /// CC-13 (stateful property tests for state machines).
+    #[test]
+    fn onboarding_random_actions_never_panic(
+        actions in prop::collection::vec(
+            prop_oneof![
+                Just(UserAction::ActionPressed { action_id: "create_new".into() }),
+                Just(UserAction::ActionPressed { action_id: "have_identity".into() }),
+                Just(UserAction::ActionPressed { action_id: "get_started".into() }),
+                Just(UserAction::ActionPressed { action_id: "continue".into() }),
+                Just(UserAction::ActionPressed { action_id: "skip".into() }),
+                Just(UserAction::ActionPressed { action_id: "back".into() }),
+                Just(UserAction::ActionPressed { action_id: "start".into() }),
+                Just(UserAction::ActionPressed { action_id: "skip_to_finish".into() }),
+                ".*".prop_map(|s| UserAction::TextChanged {
+                    component_id: "display_name".into(),
+                    value: s,
+                }),
+            ],
+            0..30
+        )
+    ) {
+        let vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+        let mut engine = AppEngine::new(vauchi);
+        for action in actions {
+            let _ = engine.handle_action(action);
+            let screen = engine.current_screen();
+            prop_assert!(!screen.screen_id.is_empty(),
+                "screen_id must never be empty");
+        }
+    }
+}

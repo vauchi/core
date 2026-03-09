@@ -61,6 +61,10 @@ impl<T: Transport> Vauchi<T> {
             })?;
         }
 
+        // Persist identity to storage so it survives restart
+        self.storage
+            .save_identity(&identity.to_storage_bytes(), identity.display_name())?;
+
         self.identity = Some(identity);
         Ok(())
     }

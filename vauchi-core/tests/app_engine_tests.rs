@@ -2,7 +2,8 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-use vauchi_core::api::Vauchi;
+use vauchi_core::api::{Vauchi, VauchiConfig};
+use vauchi_core::crypto::SymmetricKey;
 use vauchi_core::network::MockTransport;
 use vauchi_core::ui::{ActionResult, AppEngine, AppScreen, UserAction, WorkflowEngine};
 
@@ -121,6 +122,39 @@ fn navigate_to_backup_shows_backup() {
     let mut engine = AppEngine::new(vauchi);
     let screen = engine.navigate_to(AppScreen::Backup);
     assert_eq!(screen.screen_id, "backup_choose");
+}
+
+// ── persistence tests ───────────────────────────────────────────────
+
+#[test]
+fn app_engine_detects_persisted_identity() {
+    let dir = tempfile::tempdir().unwrap();
+    let storage_key = SymmetricKey::generate();
+    let db_path = dir.path().join("vauchi.db");
+
+    // Create identity with file-backed storage, then drop it
+    {
+        let config =
+            VauchiConfig::with_storage_path(&db_path).with_storage_key(storage_key.clone());
+        let mut vauchi = Vauchi::<MockTransport>::new(config).unwrap();
+        vauchi.create_identity("Persisted User").unwrap();
+        assert!(vauchi.has_identity());
+    }
+
+    // Open a fresh Vauchi from the same path — identity should be loaded
+    let config2 = VauchiConfig::with_storage_path(&db_path).with_storage_key(storage_key);
+    let vauchi2 = Vauchi::<MockTransport>::new(config2).unwrap();
+    assert!(
+        vauchi2.has_identity(),
+        "Vauchi should detect persisted identity on reopen"
+    );
+
+    let engine = AppEngine::new(vauchi2);
+    assert_eq!(
+        engine.current_app_screen(),
+        &AppScreen::Home,
+        "AppEngine should start on Home when identity exists in storage"
+    );
 }
 
 // ── available_screens tests ─────────────────────────────────────────

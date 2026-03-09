@@ -258,6 +258,36 @@ impl Identity {
         crate::exchange::DeviceLinkInitiatorRestored::new(self.master_seed, self, registry, qr)
     }
 
+    /// Serializes the identity to bytes for storage persistence.
+    ///
+    /// Unlike `export_backup`, this does NOT password-encrypt the data.
+    /// The caller (Storage) is responsible for encrypting with the storage key.
+    ///
+    /// Format: same as backup plaintext — `name_len (4) || name || master_seed (32)
+    /// || device_index (4) || device_name_len (4) || device_name`
+    pub fn to_storage_bytes(&self) -> Vec<u8> {
+        let name_bytes = self.display_name.as_bytes();
+        let name_len = (name_bytes.len() as u32).to_le_bytes();
+        let device_name_bytes = self.device_info.device_name().as_bytes();
+        let device_name_len = (device_name_bytes.len() as u32).to_le_bytes();
+        let device_index = self.device_info.device_index().to_le_bytes();
+
+        let mut buf =
+            Vec::with_capacity(4 + name_bytes.len() + 32 + 4 + 4 + device_name_bytes.len());
+        buf.extend_from_slice(&name_len);
+        buf.extend_from_slice(name_bytes);
+        buf.extend_from_slice(&self.master_seed);
+        buf.extend_from_slice(&device_index);
+        buf.extend_from_slice(&device_name_len);
+        buf.extend_from_slice(device_name_bytes);
+        buf
+    }
+
+    /// Restores an identity from storage bytes (inverse of `to_storage_bytes`).
+    pub fn from_storage_bytes(data: &[u8]) -> Result<Self, IdentityError> {
+        Self::parse_backup_plaintext(data)
+    }
+
     /// Exports identity as encrypted backup (v2: Argon2id + XChaCha20-Poly1305).
     ///
     /// The backup contains the master seed encrypted with a key derived from the password.

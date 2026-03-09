@@ -180,9 +180,15 @@ impl<T: Transport> Vauchi<T> {
 
         let events = Arc::new(EventDispatcher::new());
 
+        // Try to load a persisted identity from storage
+        let identity = match storage.load_identity() {
+            Ok(Some((bytes, _display_name))) => Identity::from_storage_bytes(&bytes).ok(),
+            _ => None,
+        };
+
         Ok(Vauchi {
             config,
-            identity: None,
+            identity,
             storage,
             events,
             secure_storage,

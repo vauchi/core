@@ -434,3 +434,38 @@ fn contact_edit_nonexistent_shows_not_found() {
     // ContactEditEngine starts on edit_fields, but with nonexistent we show not_found
     assert_eq!(screen.screen_id, "contact_not_found");
 }
+
+// ── failure-path tests for create_engine edge cases ─────────────────
+
+#[test]
+fn navigate_to_contact_detail_with_nonexistent_id() {
+    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    let mut engine = AppEngine::new(vauchi);
+
+    let screen = engine.navigate_to(AppScreen::ContactDetail {
+        contact_id: "nonexistent-id".into(),
+    });
+    // Should render without panic
+    assert!(!screen.screen_id.is_empty());
+}
+
+#[test]
+fn navigate_to_exchange_without_identity_card() {
+    // Create Vauchi but don't create identity — own_card() returns None
+    let vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    let mut engine = AppEngine::new(vauchi);
+
+    // Should be on onboarding, navigate to exchange anyway
+    let screen = engine.navigate_to(AppScreen::Exchange);
+    assert!(!screen.screen_id.is_empty());
+}
+
+#[test]
+fn navigate_to_settings_without_identity() {
+    let vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    let mut engine = AppEngine::new(vauchi);
+
+    let screen = engine.navigate_to(AppScreen::Settings);
+    assert!(!screen.screen_id.is_empty());
+}

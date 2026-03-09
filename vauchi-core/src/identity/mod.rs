@@ -7,9 +7,8 @@
 //! Handles user identity creation, backup, and restoration.
 //! Each identity has a unique Ed25519 signing keypair and X25519 exchange keypair.
 //!
-//! Backup format versions:
+//! Backup format:
 //! - v2 (current): Argon2id KDF + XChaCha20-Poly1305 encryption
-//! - v1 / legacy: PBKDF2 KDF + AES-256-GCM encryption
 
 #[cfg(feature = "testing")]
 pub mod backup;
@@ -25,8 +24,6 @@ pub use device::{
     MAX_DEVICES,
 };
 
-#[allow(deprecated)]
-use crate::crypto::password_kdf::derive_key_pbkdf2;
 use crate::crypto::{decrypt, derive_key_argon2id, encrypt, Signature, SigningKeyPair, HKDF};
 use crate::exchange::X3DHKeyPair;
 use aws_lc_rs::rand::SystemRandom;
@@ -48,11 +45,6 @@ pub enum IdentityError {
 
 /// Backup format version byte for Argon2id + XChaCha20.
 const BACKUP_VERSION_V2: u8 = 0x02;
-
-/// PBKDF2 iterations for legacy key derivation.
-/// The canonical constant is in crypto::password_kdf. This matches the legacy
-/// value for backward compatibility with v1 backup decryption.
-const PBKDF2_LEGACY_ITERATIONS: u32 = 100_000;
 
 /// User identity containing cryptographic keys and metadata.
 pub struct Identity {
@@ -319,11 +311,7 @@ impl Identity {
         Ok(IdentityBackup::new(backup_data))
     }
 
-    /// Imports identity from encrypted backup.
-    ///
-    /// Auto-detects backup version:
-    /// - v2 (0x02): Argon2id + XChaCha20-Poly1305
-    /// - v1/legacy: PBKDF2 + AES-256-GCM (tagged or untagged)
+    /// Imports identity from encrypted v2 backup (Argon2id + XChaCha20-Poly1305).
     ///
     /// ## Security Note (Tracker #69)
     ///
@@ -342,7 +330,7 @@ impl Identity {
 
         match data[0] {
             BACKUP_VERSION_V2 => Self::import_backup_v2(&data[1..], password),
-            _ => Self::import_backup_legacy(data, password),
+            _ => Err(IdentityError::RestoreFailed),
         }
     }
 
@@ -364,35 +352,6 @@ impl Identity {
             .map_err(|_| IdentityError::RestoreFailed)?;
 
         // Decrypt (auto-detects tagged XChaCha20-Poly1305)
-        // Wrap in Zeroizing to ensure plaintext (containing master_seed) is zeroized on drop
-        let plaintext = Zeroizing::new(
-            decrypt(&decryption_key, &data[16..]).map_err(|_| IdentityError::RestoreFailed)?,
-        );
-
-        Self::parse_backup_plaintext(&plaintext)
-    }
-
-    /// Imports legacy backup (PBKDF2 + AES-256-GCM).
-    ///
-    /// Data format: `salt (16 bytes) || ciphertext`
-    fn import_backup_legacy(data: &[u8], password: &str) -> Result<Self, IdentityError> {
-        // Minimum size: salt (16) + nonce (12) + tag (16) + min data
-        if data.len() < 16 + 12 + 16 + 4 + 32 {
-            return Err(IdentityError::RestoreFailed);
-        }
-
-        let salt: [u8; 16] = data[..16]
-            .try_into()
-            .map_err(|_| IdentityError::RestoreFailed)?;
-
-        // Derive decryption key using PBKDF2 (legacy backup format).
-        // Try legacy iterations (100K) since v1 backups were created with this count.
-        #[allow(deprecated)]
-        let decryption_key =
-            derive_key_pbkdf2(password.as_bytes(), &salt, PBKDF2_LEGACY_ITERATIONS)
-                .map_err(|_| IdentityError::RestoreFailed)?;
-
-        // Decrypt (auto-detects tagged or untagged AES-256-GCM)
         // Wrap in Zeroizing to ensure plaintext (containing master_seed) is zeroized on drop
         let plaintext = Zeroizing::new(
             decrypt(&decryption_key, &data[16..]).map_err(|_| IdentityError::RestoreFailed)?,

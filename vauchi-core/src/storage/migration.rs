@@ -281,7 +281,7 @@ pub fn all_migrations() -> Vec<Migration> {
         Migration {
             version: 2,
             name: "re_encrypt_aes_gcm_to_xchacha20",
-            action: MigrationAction::Callback(migrate_v2_re_encrypt),
+            action: MigrationAction::Callback(migrate_v2_noop),
         },
         Migration {
             version: 3,
@@ -552,115 +552,11 @@ const MIGRATION_V30_LABEL_DISPLAY_NAME_OVERRIDE: &str = "
     ALTER TABLE visibility_labels ADD COLUMN display_name_override_encrypted BLOB;
 ";
 
-/// Migration v2: Re-encrypt all AES-GCM encrypted data to XChaCha20-Poly1305.
+/// Migration v2: Originally re-encrypted AES-GCM data to XChaCha20-Poly1305.
 ///
-/// Reads each encrypted blob, decrypts with AES-GCM, re-encrypts with XChaCha20,
-/// and writes it back. This is safe because the migration runs in a transaction.
-fn migrate_v2_re_encrypt(conn: &Connection, key: &SymmetricKey) -> Result<(), StorageError> {
-    use crate::crypto::{decrypt, encrypt};
-
-    // Re-encrypt contacts: card_encrypted and shared_key_encrypted columns
-    {
-        let mut stmt = conn
-            .prepare("SELECT id, card_encrypted, shared_key_encrypted FROM contacts")
-            .map_err(|e| StorageError::Migration(format!("Failed to read contacts: {}", e)))?;
-
-        let rows: Vec<(String, Vec<u8>, Vec<u8>)> = stmt
-            .query_map([], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)))
-            .map_err(|e| StorageError::Migration(format!("Failed to query contacts: {}", e)))?
-            .collect::<Result<Vec<_>, _>>()
-            .map_err(|e| StorageError::Migration(format!("Failed to collect contacts: {}", e)))?;
-
-        for (id, card_enc, key_enc) in &rows {
-            // Skip rows already in XChaCha20 format (tag 0x02) (#167)
-            let card_already_xchacha = card_enc.first() == Some(&0x02);
-            let key_already_xchacha = key_enc.first() == Some(&0x02);
-
-            if card_already_xchacha && key_already_xchacha {
-                continue; // Both already migrated
-            }
-
-            // Decrypt with legacy format (handled by decrypt's auto-detect)
-            let card_plain = decrypt(key, card_enc)
-                .map_err(|e| StorageError::Migration(format!("Decrypt card for {}: {}", id, e)))?;
-            let key_plain = decrypt(key, key_enc).map_err(|e| {
-                StorageError::Migration(format!("Decrypt shared_key for {}: {}", id, e))
-            })?;
-
-            // Re-encrypt with XChaCha20-Poly1305
-            let card_new = encrypt(key, &card_plain).map_err(|e| {
-                StorageError::Migration(format!("Re-encrypt card for {}: {}", id, e))
-            })?;
-            let key_new = encrypt(key, &key_plain).map_err(|e| {
-                StorageError::Migration(format!("Re-encrypt shared_key for {}: {}", id, e))
-            })?;
-
-            conn.execute(
-                "UPDATE contacts SET card_encrypted = ?1, shared_key_encrypted = ?2 WHERE id = ?3",
-                rusqlite::params![card_new, key_new, id],
-            )
-            .map_err(|e| StorageError::Migration(format!("Update contact {}: {}", id, e)))?;
-        }
-    }
-
-    // Re-encrypt identity: backup_data_encrypted column
-    {
-        let result: Result<(i64, Vec<u8>), _> = conn.query_row(
-            "SELECT id, backup_data_encrypted FROM identity WHERE id = 1",
-            [],
-            |row| Ok((row.get(0)?, row.get(1)?)),
-        );
-
-        if let Ok((id, backup_enc)) = result {
-            // Skip if already XChaCha20 (#167)
-            if backup_enc.first() != Some(&0x02) {
-                let plain = decrypt(key, &backup_enc)
-                    .map_err(|e| StorageError::Migration(format!("Decrypt identity: {}", e)))?;
-                let new_enc = encrypt(key, &plain)
-                    .map_err(|e| StorageError::Migration(format!("Re-encrypt identity: {}", e)))?;
-                conn.execute(
-                    "UPDATE identity SET backup_data_encrypted = ?1 WHERE id = ?2",
-                    rusqlite::params![new_enc, id],
-                )
-                .map_err(|e| StorageError::Migration(format!("Update identity: {}", e)))?;
-            }
-        }
-    }
-
-    // Re-encrypt ratchet state: ratchet_state_encrypted column
-    {
-        let mut stmt = conn
-            .prepare("SELECT contact_id, ratchet_state_encrypted FROM contact_ratchets")
-            .map_err(|e| StorageError::Migration(format!("Failed to read ratchets: {}", e)))?;
-
-        let rows: Vec<(String, Vec<u8>)> = stmt
-            .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))
-            .map_err(|e| StorageError::Migration(format!("Failed to query ratchets: {}", e)))?
-            .collect::<Result<Vec<_>, _>>()
-            .map_err(|e| StorageError::Migration(format!("Failed to collect ratchets: {}", e)))?;
-
-        for (contact_id, ratchet_enc) in &rows {
-            // Skip if already XChaCha20 (#167)
-            if ratchet_enc.first() == Some(&0x02) {
-                continue;
-            }
-
-            let plain = decrypt(key, ratchet_enc).map_err(|e| {
-                StorageError::Migration(format!("Decrypt ratchet for {}: {}", contact_id, e))
-            })?;
-            let new_enc = encrypt(key, &plain).map_err(|e| {
-                StorageError::Migration(format!("Re-encrypt ratchet for {}: {}", contact_id, e))
-            })?;
-            conn.execute(
-                "UPDATE contact_ratchets SET ratchet_state_encrypted = ?1 WHERE contact_id = ?2",
-                rusqlite::params![new_enc, contact_id],
-            )
-            .map_err(|e| {
-                StorageError::Migration(format!("Update ratchet {}: {}", contact_id, e))
-            })?;
-        }
-    }
-
+/// Now a no-op — AES-GCM support has been removed. This migration already ran
+/// on all existing databases; new databases never had AES-GCM data.
+fn migrate_v2_noop(_conn: &Connection, _key: &SymmetricKey) -> Result<(), StorageError> {
     Ok(())
 }
 

@@ -166,7 +166,7 @@ pub struct DeviceSyncMessage {
     pub sender_device_id: [u8; 32],
     /// Encrypted sync payload (SyncItems encrypted with device exchange key).
     pub ciphertext: Vec<u8>,
-    /// Nonce for AES-GCM decryption.
+    /// Nonce for XChaCha20-Poly1305 decryption.
     #[serde(with = "bytes_array_12")]
     pub nonce: [u8; 12],
     /// Sync version number for ordering/deduplication.
@@ -449,12 +449,12 @@ mod bytes_array_64 {
     }
 }
 
-/// Serde helper for 12-byte arrays (AES-GCM nonce).
+/// Serde helper for 12-byte arrays.
 mod bytes_array_12 {
     use base64::Engine;
     use serde::{Deserialize, Deserializer, Serializer};
 
-    /// Serializes a 12-byte AES-GCM nonce to a base64-encoded string.
+    /// Serializes a 12-byte array to a base64-encoded string.
     pub fn serialize<S>(bytes: &[u8; 12], serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -462,7 +462,7 @@ mod bytes_array_12 {
         serializer.serialize_str(&base64::engine::general_purpose::STANDARD.encode(bytes))
     }
 
-    /// Deserializes a 12-byte AES-GCM nonce from a base64-encoded string.
+    /// Deserializes a 12-byte array from a base64-encoded string.
     pub fn deserialize<'de, D>(deserializer: D) -> Result<[u8; 12], D::Error>
     where
         D: Deserializer<'de>,

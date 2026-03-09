@@ -17,14 +17,13 @@ const BACKUP_VERSION_V2: u8 = 0x02;
 // V1 FORMAT AUTO-DETECTION
 // =============================================================================
 
-/// Tests that legacy v1 backups are auto-detected by absence of v2 magic byte.
+/// Tests that non-v2 backups are rejected.
 ///
 /// Feature: backup_format_versioning.feature
-/// Scenario: Legacy backup format auto-detection
-// @scenario: backup_format_versioning.feature:Legacy backup format auto-detection
-// @scenario: backup_format_versioning.feature:Unknown version byte falls back to legacy
+/// Scenario: Non-v2 backup format rejected
+// @scenario: backup_format_versioning.feature:Non-v2 backup format rejected
 #[test]
-fn test_v1_format_auto_detection() {
+fn test_non_v2_format_rejected() {
     // Create a v2 backup first to get valid identity data
     let identity = Identity::create("Legacy User");
     let password = "SecureP@ssw0rd!2024";
@@ -37,34 +36,26 @@ fn test_v1_format_auto_detection() {
         "New backups should use v2 format"
     );
 
-    // Simulate a v1 backup by using the same password to create a PBKDF2-based backup
-    // v1 format: salt (16 bytes) || ciphertext (no version byte prefix)
-    // The first byte will NOT be 0x02, so import_backup should detect legacy format
+    // Non-v2 backup data should be rejected
+    let mock_data = vec![0x00u8; 100]; // First byte is 0x00, not 0x02
+    let mock_backup = IdentityBackup::new(mock_data);
 
-    // Create mock v1 backup data (just verify the detection logic)
-    // A v1 backup would start with a 16-byte salt, not the version byte
-    let mock_v1_data = vec![0x00u8; 100]; // First byte is 0x00, not 0x02
-    let mock_v1_backup = IdentityBackup::new(mock_v1_data);
+    let result = Identity::import_backup(&mock_backup, password);
+    assert!(result.is_err(), "Non-v2 data should fail to restore");
 
-    // Import should attempt legacy PBKDF2 path (will fail due to invalid data,
-    // but this proves the detection logic routes to legacy path)
-    let result = Identity::import_backup(&mock_v1_backup, password);
-    assert!(result.is_err(), "Mock v1 data should fail to decrypt");
-
-    // Verify error is RestoreFailed (not format detection error)
+    // Verify error is RestoreFailed
     match result {
-        Err(IdentityError::RestoreFailed) => (), // Expected - routed to legacy, then failed
+        Err(IdentityError::RestoreFailed) => (), // Expected — rejected immediately
         Err(e) => panic!("Expected RestoreFailed, got error: {:?}", e),
         Ok(_) => panic!("Expected RestoreFailed, but got success"),
     }
 
-    // Now test with a byte that's definitely not 0x02
+    // All non-0x02 first bytes should be rejected
     for first_byte in [0x00u8, 0x01, 0x03, 0xFF, 0x10] {
         let mut test_data = vec![first_byte];
         test_data.extend_from_slice(&[0u8; 99]);
         let test_backup = IdentityBackup::new(test_data);
         let result = Identity::import_backup(&test_backup, password);
-        // All non-0x02 first bytes should be treated as legacy
         assert!(result.is_err(), "Non-v2 data should fail to restore");
     }
 }
@@ -278,14 +269,14 @@ fn test_version_upgrade_path() {
 /// Tests that unknown/future backup versions are rejected gracefully.
 ///
 /// Feature: backup_format_versioning.feature
-/// Scenario: Unknown version byte falls back to legacy
-// @scenario: backup_format_versioning.feature:Unknown version byte falls back to legacy
+/// Scenario: Unknown version byte is rejected
+// @scenario: backup_format_versioning.feature:Unknown version byte is rejected
 #[test]
 fn test_future_version_rejection() {
     let password = "SecureP@ssw0rd!2024";
 
     // Test future version bytes (0x03 through 0xFF)
-    // These should be treated as legacy format and fail gracefully
+    // These should be rejected immediately (only v2 = 0x02 is accepted)
     for future_version in [0x03u8, 0x04, 0x10, 0x20, 0x7F, 0x80, 0xFE, 0xFF] {
         let mut mock_future_backup = vec![future_version];
         // Add enough data to pass minimum length checks
@@ -294,8 +285,6 @@ fn test_future_version_rejection() {
         let future_backup = IdentityBackup::new(mock_future_backup);
         let result = Identity::import_backup(&future_backup, password);
 
-        // Future versions should fall back to legacy path and fail
-        // (they won't decrypt because the data is garbage)
         assert!(
             matches!(result, Err(IdentityError::RestoreFailed)),
             "Future version 0x{:02X} should fail gracefully",
@@ -303,15 +292,14 @@ fn test_future_version_rejection() {
         );
     }
 
-    // Edge case: version byte 0x01 (could be confused with AES-GCM tag)
-    // Should be treated as legacy and fail
+    // Edge case: version byte 0x01 — should be rejected
     let mut v1_like = vec![0x01u8];
     v1_like.extend_from_slice(&[0u8; 200]);
     let v1_backup = IdentityBackup::new(v1_like);
     let result = Identity::import_backup(&v1_backup, password);
     assert!(
         matches!(result, Err(IdentityError::RestoreFailed)),
-        "Version 0x01 should be treated as legacy and fail"
+        "Version 0x01 should be rejected"
     );
 
     // Verify actual v2 still works after testing future versions

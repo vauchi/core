@@ -2,28 +2,9 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! Additional encryption tests for coverage of AES-GCM and legacy paths
+//! Encryption coverage tests for XChaCha20-Poly1305 paths
 
-use vauchi_core::crypto::encryption::{encrypt_aes_gcm, encrypt_legacy_untagged};
 use vauchi_core::crypto::{decrypt, decrypt_with_ad, encrypt, encrypt_with_ad, SymmetricKey};
-
-// @scenario: security:Correct algorithms used
-#[test]
-fn test_aes_gcm_tagged_roundtrip() {
-    let key = SymmetricKey::generate();
-    let plaintext = b"AES-GCM tagged data";
-    let ciphertext = encrypt_aes_gcm(&key, plaintext).unwrap();
-    let decrypted = decrypt(&key, &ciphertext).unwrap();
-    assert_eq!(plaintext.to_vec(), decrypted);
-}
-
-// @scenario: security:Correct algorithms used
-#[test]
-fn test_aes_gcm_tagged_starts_with_tag() {
-    let key = SymmetricKey::generate();
-    let ciphertext = encrypt_aes_gcm(&key, b"test").unwrap();
-    assert_eq!(ciphertext[0], 0x01); // ALG_TAG_AES_GCM
-}
 
 // @scenario: security:Correct algorithms used
 #[test]
@@ -31,17 +12,6 @@ fn test_xchacha20_tagged_starts_with_tag() {
     let key = SymmetricKey::generate();
     let ciphertext = encrypt(&key, b"test").unwrap();
     assert_eq!(ciphertext[0], 0x02); // ALG_TAG_XCHACHA20
-}
-
-// @scenario: security:Contact cards are encrypted at rest
-#[test]
-fn test_legacy_untagged_roundtrip() {
-    let key = SymmetricKey::generate();
-    let plaintext = b"legacy untagged data";
-    let ciphertext = encrypt_legacy_untagged(&key, plaintext).unwrap();
-    // Legacy format starts directly with nonce bytes (not 0x01 or 0x02)
-    let decrypted = decrypt(&key, &ciphertext).unwrap();
-    assert_eq!(plaintext.to_vec(), decrypted);
 }
 
 // @scenario: security:Contact cards are encrypted at rest
@@ -64,12 +34,12 @@ fn test_decrypt_too_short_xchacha20() {
 
 // @scenario: security:Contact cards are encrypted at rest
 #[test]
-fn test_decrypt_too_short_aes_gcm() {
+fn test_decrypt_unknown_tag_rejected() {
     let key = SymmetricKey::generate();
-    // Tag 0x01 + less than 12 (nonce) + 16 (tag) bytes
+    // Tag 0x01 (former AES-GCM) should now be rejected
     let short = vec![0x01, 0, 0, 0, 0];
     let result = decrypt(&key, &short);
-    assert!(result.is_err());
+    assert!(result.is_err(), "Unknown algorithm tag must be rejected");
 }
 
 // @scenario: security:Server cannot access plaintext
@@ -144,26 +114,6 @@ fn test_large_plaintext() {
     assert_eq!(plaintext, decrypted);
 }
 
-// @scenario: security:Server cannot access plaintext
-#[test]
-fn test_aes_gcm_wrong_key() {
-    let key1 = SymmetricKey::generate();
-    let key2 = SymmetricKey::generate();
-    let ciphertext = encrypt_aes_gcm(&key1, b"test").unwrap();
-    let result = decrypt(&key2, &ciphertext);
-    assert!(result.is_err());
-}
-
-// @scenario: security:Server cannot access plaintext
-#[test]
-fn test_legacy_untagged_wrong_key() {
-    let key1 = SymmetricKey::generate();
-    let key2 = SymmetricKey::generate();
-    let ciphertext = encrypt_legacy_untagged(&key1, b"test").unwrap();
-    let result = decrypt(&key2, &ciphertext);
-    assert!(result.is_err());
-}
-
 // --- AEAD associated data binding tests ---
 
 // @scenario: security:Contact cards are encrypted in transit
@@ -230,16 +180,6 @@ fn test_decrypt_with_ad_backward_compat_tag_0x02() {
     assert_eq!(plaintext.to_vec(), decrypted);
 }
 
-#[test]
-fn test_decrypt_with_ad_backward_compat_tag_0x01() {
-    let key = SymmetricKey::generate();
-    let plaintext = b"aes message";
-    let ciphertext = encrypt_aes_gcm(&key, plaintext).unwrap();
-    // decrypt_with_ad should handle tag 0x01 by ignoring AD
-    let decrypted = decrypt_with_ad(&key, &ciphertext, b"ignored-ad").unwrap();
-    assert_eq!(plaintext.to_vec(), decrypted);
-}
-
 // --- Additional coverage for edge cases and error paths ---
 
 // @scenario: security:Contact cards are encrypted at rest
@@ -283,24 +223,15 @@ fn test_decrypt_with_ad_too_short_xchacha20() {
 
 // @scenario: security:Contact cards are encrypted at rest
 #[test]
-fn test_decrypt_with_ad_too_short_aes_gcm() {
+fn test_decrypt_with_ad_unknown_tag_rejected() {
     let key = SymmetricKey::generate();
-    // Tag 0x01 + less than required minimum
+    // Tag 0x01 (former AES-GCM) should now be rejected
     let short = vec![0x01, 0, 0];
     let result = decrypt_with_ad(&key, &short, b"ad");
-    assert!(result.is_err(), "Too-short ciphertext must be rejected");
-}
-
-// @scenario: security:Contact cards are encrypted at rest
-#[test]
-fn test_decrypt_with_ad_legacy_untagged() {
-    let key = SymmetricKey::generate();
-    // Legacy format (no tag): nonce || ciphertext || tag
-    let plaintext = b"legacy data";
-    let ciphertext = encrypt_legacy_untagged(&key, plaintext).unwrap();
-    // decrypt_with_ad should handle legacy format by ignoring AD
-    let decrypted = decrypt_with_ad(&key, &ciphertext, b"ignored-ad").unwrap();
-    assert_eq!(plaintext.to_vec(), decrypted);
+    assert!(
+        result.is_err(),
+        "Unknown algorithm tag must be rejected in decrypt_with_ad"
+    );
 }
 
 // @scenario: security:Contact cards are encrypted in transit
@@ -311,18 +242,6 @@ fn test_encrypt_with_ad_empty_ad() {
     let ciphertext = encrypt_with_ad(&key, plaintext, b"").unwrap();
     let decrypted = decrypt_with_ad(&key, &ciphertext, b"").unwrap();
     assert_eq!(plaintext.to_vec(), decrypted);
-}
-
-// @scenario: security:Contact cards are encrypted at rest
-#[test]
-fn test_decrypt_aes_gcm_corrupted_tag() {
-    let key = SymmetricKey::generate();
-    let mut ciphertext = encrypt_aes_gcm(&key, b"test").unwrap();
-    // Corrupt the authentication tag (last 16 bytes)
-    let last = ciphertext.len() - 1;
-    ciphertext[last] ^= 0xFF;
-    let result = decrypt(&key, &ciphertext);
-    assert!(result.is_err(), "Corrupted AES-GCM tag must fail");
 }
 
 // @scenario: security:Contact cards are encrypted at rest
@@ -366,17 +285,14 @@ fn test_encrypt_with_ad_nonce_determinism() {
 
 // @scenario: security:Contact cards are encrypted at rest
 #[test]
-fn test_legacy_format_detection_non_standard_tag() {
+fn test_unrecognized_tag_rejected() {
     let key = SymmetricKey::generate();
-    // Create a "ciphertext" with a byte that's not a recognized tag (0x01, 0x02, 0x03)
-    // This should trigger legacy detection and be treated as untagged AES-GCM
+    // Create a "ciphertext" with an unrecognized tag byte
     let mut fake_ciphertext = vec![0xFF]; // Invalid tag
-                                          // Add 12 bytes for nonce + 16 bytes for tag + 1 byte ciphertext = 29 bytes minimum
-    fake_ciphertext.extend_from_slice(&vec![0; 12]); // nonce
-    fake_ciphertext.extend_from_slice(&vec![0; 16]); // tag placeholder
+    fake_ciphertext.extend_from_slice(&vec![0; 12]); // padding
+    fake_ciphertext.extend_from_slice(&vec![0; 16]); // padding
     let result = decrypt(&key, &fake_ciphertext);
-    // This will fail during AES-GCM decryption (wrong key), which is expected
-    assert!(result.is_err());
+    assert!(result.is_err(), "Unrecognized tag must be rejected");
 }
 
 // @scenario: security:Contact cards are encrypted at rest

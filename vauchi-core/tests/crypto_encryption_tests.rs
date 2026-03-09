@@ -45,11 +45,11 @@ fn test_symmetric_key_accepts_nonzero() {
     assert_eq!(key.as_bytes()[31], 1);
 }
 
-// --- SP-9 #231: Algorithm tag swap does not produce valid decryption ---
+// --- SP-9 #231: Unknown algorithm tags are rejected ---
 
 // @scenario: security.feature:Correct algorithms used
 #[test]
-fn test_algorithm_tag_swap_fails_decryption() {
+fn test_unknown_algorithm_tag_rejected() {
     let key = SymmetricKey::generate();
     let data = b"secret data";
 
@@ -57,13 +57,20 @@ fn test_algorithm_tag_swap_fails_decryption() {
     // encrypted[0] should be 0x02 (XChaCha20-Poly1305)
     assert_eq!(encrypted[0], 0x02, "Default encrypt uses XChaCha20 tag");
 
-    // Swap algorithm tag to AES-GCM (0x01) — nonce size mismatch makes this fail
+    // Change algorithm tag to an unrecognized value — must be rejected
     let mut tampered = encrypted.clone();
     tampered[0] = 0x01;
     let result = decrypt(&key, &tampered);
     assert!(
         result.is_err(),
-        "Swapping algorithm tag from XChaCha20 to AES-GCM must fail"
+        "Unrecognized algorithm tag must be rejected"
+    );
+
+    tampered[0] = 0xFF;
+    let result = decrypt(&key, &tampered);
+    assert!(
+        result.is_err(),
+        "Unrecognized algorithm tag must be rejected"
     );
 }
 

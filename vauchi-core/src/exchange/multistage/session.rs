@@ -11,9 +11,10 @@
 //! encryption, an Ed25519 identity keypair, and a commitment scheme that
 //! ensures atomicity (neither side can decrypt until both reveal keys are exchanged).
 
-use aws_lc_rs::aead::{Aad, LessSafeKey, Nonce, UnboundKey, AES_256_GCM};
 use aws_lc_rs::digest::{digest, SHA256};
 use aws_lc_rs::rand::{SecureRandom, SystemRandom};
+use chacha20poly1305::aead::{Aead, KeyInit, Payload};
+use chacha20poly1305::ChaCha20Poly1305;
 use rand::rngs::OsRng;
 use x25519_dalek::{PublicKey as X25519Public, StaticSecret as X25519Secret};
 use zeroize::Zeroize;
@@ -24,7 +25,7 @@ use super::qr_codec::{self, StageQr};
 use super::types::{ChunkBitmap, ProtocolState, QrPayload};
 
 /// Maximum raw payload bytes per chunk (before transport encryption overhead).
-/// Transport encryption adds 12 (nonce) + 16 (GCM tag) = 28 bytes overhead,
+/// Transport encryption adds 12 (nonce) + 16 (Poly1305 tag) = 28 bytes overhead,
 /// so with 500-byte QR chunk budget the usable payload is 472 bytes.
 const CHUNK_PAYLOAD_SIZE: usize = 472;
 
@@ -676,19 +677,19 @@ impl MultiStageSession {
         let mut nonce_bytes = [0u8; 12];
         rng.fill(&mut nonce_bytes).expect("RNG failed");
 
-        let unbound = UnboundKey::new(&AES_256_GCM, key).expect("invalid key");
-        let sealing_key = LessSafeKey::new(unbound);
-        let nonce = Nonce::assume_unique_for_key(nonce_bytes);
+        let cipher = ChaCha20Poly1305::new(key.into());
+        let nonce = chacha20poly1305::Nonce::from_slice(&nonce_bytes);
 
-        let mut in_out = plaintext.to_vec();
-        sealing_key
-            .seal_in_place_append_tag(nonce, Aad::from(&[chunk_idx]), &mut in_out)
-            .expect("encryption failed");
+        let payload = Payload {
+            msg: plaintext,
+            aad: &[chunk_idx],
+        };
+        let ciphertext = cipher.encrypt(nonce, payload).expect("encryption failed");
 
         // nonce || ciphertext+tag
-        let mut result = Vec::with_capacity(12 + in_out.len());
+        let mut result = Vec::with_capacity(12 + ciphertext.len());
         result.extend_from_slice(&nonce_bytes);
-        result.extend_from_slice(&in_out);
+        result.extend_from_slice(&ciphertext);
         result
     }
 
@@ -702,18 +703,15 @@ impl MultiStageSession {
             return None;
         }
         let (nonce_bytes, encrypted) = ciphertext.split_at(12);
-        let mut nonce_arr = [0u8; 12];
-        nonce_arr.copy_from_slice(nonce_bytes);
 
-        let unbound = UnboundKey::new(&AES_256_GCM, key).ok()?;
-        let opening_key = LessSafeKey::new(unbound);
-        let nonce = Nonce::assume_unique_for_key(nonce_arr);
+        let cipher = ChaCha20Poly1305::new(key.into());
+        let nonce = chacha20poly1305::Nonce::from_slice(nonce_bytes);
 
-        let mut in_out = encrypted.to_vec();
-        let plaintext = opening_key
-            .open_in_place(nonce, Aad::from(&[chunk_idx]), &mut in_out)
-            .ok()?;
-        Some(plaintext.to_vec())
+        let payload = Payload {
+            msg: encrypted,
+            aad: &[chunk_idx],
+        };
+        cipher.decrypt(nonce, payload).ok()
     }
 
     fn compute_card_hash(&self, data: &[u8]) -> [u8; 32] {

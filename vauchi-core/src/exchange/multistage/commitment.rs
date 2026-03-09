@@ -4,14 +4,15 @@
 
 //! Commitment scheme for the multi-stage atomic QR exchange protocol.
 //!
-//! Creates an encrypted payload (AES-256-GCM with a random reveal key) and a
+//! Creates an encrypted payload (ChaCha20-Poly1305 with a random reveal key) and a
 //! binding hash (SHA-256(reveal_key || ciphertext)). The reveal key is withheld
 //! until Stage 3 (VERIFY), ensuring neither side can decrypt until both parties
 //! exchange reveal keys.
 
-use aws_lc_rs::aead::{Aad, LessSafeKey, Nonce, UnboundKey, AES_256_GCM};
 use aws_lc_rs::digest::{digest, SHA256};
 use aws_lc_rs::rand::{SecureRandom, SystemRandom};
+use chacha20poly1305::aead::{Aead, KeyInit};
+use chacha20poly1305::ChaCha20Poly1305;
 use subtle::ConstantTimeEq;
 use thiserror::Error;
 use zeroize::Zeroize;
@@ -39,7 +40,7 @@ pub struct Commitment {
 impl Commitment {
     /// Create a new commitment for the given plaintext.
     ///
-    /// Generates a random reveal key and encrypts with AES-256-GCM.
+    /// Generates a random reveal key and encrypts with ChaCha20-Poly1305.
     /// The commitment hash binds the reveal key to the ciphertext.
     pub fn create(plaintext: &[u8]) -> Self {
         let rng = SystemRandom::new();
@@ -110,19 +111,16 @@ impl Commitment {
         rng.fill(&mut nonce_bytes)
             .map_err(|_| CommitmentError::EncryptionFailed)?;
 
-        let unbound =
-            UnboundKey::new(&AES_256_GCM, key).map_err(|_| CommitmentError::EncryptionFailed)?;
-        let sealing_key = LessSafeKey::new(unbound);
-        let nonce = Nonce::assume_unique_for_key(nonce_bytes);
+        let cipher = ChaCha20Poly1305::new(key.into());
+        let nonce = chacha20poly1305::Nonce::from_slice(&nonce_bytes);
 
-        let mut in_out = plaintext.to_vec();
-        sealing_key
-            .seal_in_place_append_tag(nonce, Aad::empty(), &mut in_out)
+        let ciphertext = cipher
+            .encrypt(nonce, plaintext)
             .map_err(|_| CommitmentError::EncryptionFailed)?;
 
-        let mut result = Vec::with_capacity(12 + in_out.len());
+        let mut result = Vec::with_capacity(12 + ciphertext.len());
         result.extend_from_slice(&nonce_bytes);
-        result.extend_from_slice(&in_out);
+        result.extend_from_slice(&ciphertext);
         Ok(result)
     }
 
@@ -131,19 +129,13 @@ impl Commitment {
             return Err(CommitmentError::DecryptionFailed);
         }
         let (nonce_bytes, encrypted) = ciphertext.split_at(12);
-        let mut nonce_arr = [0u8; 12];
-        nonce_arr.copy_from_slice(nonce_bytes);
 
-        let unbound =
-            UnboundKey::new(&AES_256_GCM, key).map_err(|_| CommitmentError::DecryptionFailed)?;
-        let opening_key = LessSafeKey::new(unbound);
-        let nonce = Nonce::assume_unique_for_key(nonce_arr);
+        let cipher = ChaCha20Poly1305::new(key.into());
+        let nonce = chacha20poly1305::Nonce::from_slice(nonce_bytes);
 
-        let mut in_out = encrypted.to_vec();
-        let plaintext = opening_key
-            .open_in_place(nonce, Aad::empty(), &mut in_out)
-            .map_err(|_| CommitmentError::DecryptionFailed)?;
-        Ok(plaintext.to_vec())
+        cipher
+            .decrypt(nonce, encrypted)
+            .map_err(|_| CommitmentError::DecryptionFailed)
     }
 }
 

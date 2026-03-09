@@ -15,22 +15,21 @@
 
 use js_sys::{ArrayBuffer, Object, Reflect, Uint8Array};
 use wasm_bindgen::prelude::*;
+use wasm_bindgen::JsCast;
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{Crypto, CryptoKey, SubtleCrypto};
 
-fn get_subtle() -> SubtleCrypto {
-    web_sys::window()
-        .expect("no window")
-        .crypto()
-        .expect("no crypto")
-        .subtle()
+fn get_crypto() -> Crypto {
+    // Try window (main thread) first, fall back to WorkerGlobalScope (Web Workers)
+    if let Some(window) = web_sys::window() {
+        return window.crypto().expect("no crypto on window");
+    }
+    let global: web_sys::WorkerGlobalScope = js_sys::global().unchecked_into();
+    global.crypto().expect("no crypto on worker")
 }
 
-fn get_crypto() -> Crypto {
-    web_sys::window()
-        .expect("no window")
-        .crypto()
-        .expect("no crypto")
+fn get_subtle() -> SubtleCrypto {
+    get_crypto().subtle()
 }
 
 /// Fill buffer with cryptographically secure random bytes.
@@ -96,11 +95,6 @@ pub async fn hmac_sha256(key: &[u8], data: &[u8]) -> [u8; 32] {
     array.copy_to(&mut output);
     output
 }
-
-// Note: Full implementations of HKDF, PBKDF2, Ed25519, X25519 follow the same
-// pattern: import key -> call SubtleCrypto method -> await promise -> extract result.
-// These are stubs that will be fleshed out when the WASM build pipeline is tested
-// end-to-end in a browser environment.
 
 /// HKDF-SHA256 derive.
 pub async fn hkdf_derive(salt: &[u8], ikm: &[u8], info: &[u8], length: usize) -> Vec<u8> {

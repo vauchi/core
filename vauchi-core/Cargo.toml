@@ -38,10 +38,10 @@ content-updates = ["reqwest", "tokio"]
 aws-lc-rs = "1.16"
 x25519-dalek = { version = "2.0.1", features = ["static_secrets"] }
 
-# XChaCha20-Poly1305 (spec-mandated cipher, documented exception to ring-only rule)
+# XChaCha20-Poly1305 (spec-mandated cipher, documented exception to aws-lc-rs-only rule)
 chacha20poly1305 = "0.10.1"
 
-# Argon2id password KDF (spec-mandated, documented exception to ring-only rule)
+# Argon2id password KDF (spec-mandated, documented exception to aws-lc-rs-only rule)
 argon2 = "0.5.3"
 
 # Async trait support for async sync pipeline
@@ -129,8 +129,8 @@ wasm-bindgen = { version = "0.2", optional = true }
 wasm-bindgen-futures = { version = "0.4", optional = true }
 web-sys = { version = "0.3", features = [
     "Crypto", "SubtleCrypto", "CryptoKey", "CryptoKeyPair",
-    "AesGcmParams", "HmacImportParams", "HkdfParams", "Pbkdf2Params",
-    "Algorithm"
+    "HmacImportParams", "HkdfParams", "Pbkdf2Params",
+    "Algorithm", "WorkerGlobalScope"
 ], optional = true }
 js-sys = { version = "0.3", optional = true }
 getrandom = { version = "0.2", features = ["js"], optional = true }

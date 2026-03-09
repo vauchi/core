@@ -48,7 +48,8 @@ void vauchi_workflow_destroy(struct VauchiWorkflow *handle);
 /**
  * Get the current screen as a JSON string.
  *
- * Returns null if the handle is null. The caller must free the returned
+ * Returns null if the handle is null. Returns an error JSON object if
+ * the internal lock is poisoned. The caller must free the returned
  * string with `vauchi_string_free`.
  *
  * # Safety

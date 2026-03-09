@@ -331,6 +331,16 @@ fn onboarding_completion_with_empty_name_returns_validation_error() {
 }
 
 #[test]
+fn duress_pin_screen_renders_with_defaults() {
+    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    let mut engine = AppEngine::new(vauchi);
+    let screen = engine.navigate_to(AppScreen::DuressPin);
+    assert_eq!(screen.screen_id, "duress_overview");
+    assert_eq!(screen.title, "Duress PIN");
+}
+
+#[test]
 fn onboarding_complete_creates_identity_in_vauchi() {
     let vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
     let mut engine = AppEngine::new(vauchi);

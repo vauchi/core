@@ -10,7 +10,7 @@ use zeroize::Zeroize;
 
 /// Configuration for the duress PIN feature.
 #[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct DuressConfig {
     pub enabled: bool,
     pub alert_contacts: Vec<ContactItem>,

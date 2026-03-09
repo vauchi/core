@@ -197,12 +197,32 @@ impl<T: Transport> AppEngine<T> {
                 Box::new(DeviceLinkingEngine::new(qr))
             }
             AppScreen::DuressPin => {
-                let config = DuressConfig {
-                    enabled: false,
-                    alert_contacts: vec![],
-                    alert_message: String::new(),
-                    include_location: false,
-                };
+                let config = vauchi
+                    .load_duress_settings()
+                    .ok()
+                    .flatten()
+                    .map(|s| {
+                        let alert_contacts = s
+                            .alert_contact_ids
+                            .iter()
+                            .filter_map(|id| {
+                                vauchi.get_contact(id).ok().flatten().map(|c| ContactItem {
+                                    id: c.id().to_string(),
+                                    name: c.display_name().to_string(),
+                                    subtitle: None,
+                                    avatar_initials: initials(c.display_name()),
+                                    status: None,
+                                })
+                            })
+                            .collect();
+                        DuressConfig {
+                            enabled: true,
+                            alert_contacts,
+                            alert_message: s.alert_message.clone(),
+                            include_location: s.include_location,
+                        }
+                    })
+                    .unwrap_or_default();
                 Box::new(DuressPinEngine::new(config))
             }
             AppScreen::EmergencyShred => Box::new(EmergencyShredEngine::new()),

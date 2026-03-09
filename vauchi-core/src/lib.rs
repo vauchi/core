@@ -5,7 +5,7 @@
 //! Vauchi Core Library
 //!
 //! Privacy-focused contact card exchange library.
-//! All cryptographic operations use the audited `ring` crate.
+//! All cryptographic operations use the audited `aws-lc-rs` crate (FIPS 140-3 certified).
 
 pub mod aha_moments;
 #[cfg(any(feature = "network-native-tls", feature = "network-rustls"))]

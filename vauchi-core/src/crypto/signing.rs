@@ -5,7 +5,7 @@
 //! Ed25519 Digital Signatures
 //!
 //! Provides signing keypair generation and signature operations using the
-//! audited `ring` cryptographic library.
+//! audited `aws-lc-rs` cryptographic library (FIPS 140-3).
 
 use aws_lc_rs::rand::SystemRandom;
 use aws_lc_rs::signature::{Ed25519KeyPair, KeyPair as RingKeyPair};

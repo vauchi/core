@@ -388,7 +388,7 @@ mod tests {
         signed_data.extend_from_slice(&nonce_bytes);
         signed_data.extend_from_slice(&timestamp.to_be_bytes());
 
-        // Verify with ring (as the relay does)
+        // Verify with aws-lc-rs (as the relay does)
         let public_key =
             aws_lc_rs::signature::UnparsedPublicKey::new(&aws_lc_rs::signature::ED25519, &pk_bytes);
         assert!(public_key.verify(&signed_data, &sig_bytes).is_ok());

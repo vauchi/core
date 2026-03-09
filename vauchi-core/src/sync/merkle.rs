@@ -4,7 +4,7 @@
 
 //! Merkle Tree for Efficient Sync
 //!
-//! A simple Merkle tree implementation using SHA-256 (via `ring`) for
+//! A simple Merkle tree implementation using SHA-256 (via `aws-lc-rs`) for
 //! efficient comparison of contact state between devices. By comparing
 //! root hashes, two devices can quickly determine if they are in sync.
 //! If not, the `diff` method identifies which leaf indices differ.

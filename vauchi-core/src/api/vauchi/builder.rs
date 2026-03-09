@@ -15,7 +15,7 @@ use super::Vauchi;
 ///
 /// This is a deterministic mapping used only for display purposes — decoy
 /// contacts don't have real cryptographic keys. The resulting bytes are
-/// derived by hashing the ID with ring's SHA-256, ensuring consistent
+/// derived by hashing the ID with aws-lc-rs SHA-256, ensuring consistent
 /// IDs across sessions.
 pub(super) fn decoy_id_to_fake_pk(id: &str) -> [u8; 32] {
     use aws_lc_rs::digest;

@@ -241,7 +241,7 @@ mod tests {
         message.push(stage_byte);
         message.extend_from_slice(&notice.timestamp.to_be_bytes());
 
-        // Verify using ring directly
+        // Verify using aws-lc-rs directly
         let peer_key = signature::UnparsedPublicKey::new(&signature::ED25519, &notice.public_key);
         peer_key
             .verify(&message, &notice.signature)
@@ -261,7 +261,7 @@ mod tests {
         message.extend_from_slice(&purge.purge_token);
         message.extend_from_slice(&purge.timestamp.to_be_bytes());
 
-        // Verify using ring directly
+        // Verify using aws-lc-rs directly
         let peer_key = signature::UnparsedPublicKey::new(&signature::ED25519, &purge.public_key);
         peer_key
             .verify(&message, &purge.signature)

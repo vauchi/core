@@ -301,7 +301,7 @@ fn test_orchestrator_load_persisted_state() {
 
 // ============================================================
 // Phase 4: Encryption Layer Tests (TDD)
-// Device-to-device encryption using ECDH + AES-GCM
+// Device-to-device encryption using ECDH + XChaCha20-Poly1305
 // ============================================================
 
 /// Test encrypting data for another device

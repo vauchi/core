@@ -166,7 +166,8 @@ pub struct DeviceSyncMessage {
     pub sender_device_id: [u8; 32],
     /// Encrypted sync payload (SyncItems encrypted with device exchange key).
     pub ciphertext: Vec<u8>,
-    /// Nonce for XChaCha20-Poly1305 decryption.
+    /// First 12 bytes of the encrypted blob, split for wire transport.
+    /// Reassembled with ciphertext before decryption.
     #[serde(with = "bytes_array_12")]
     pub nonce: [u8; 12],
     /// Sync version number for ordering/deduplication.

@@ -396,7 +396,10 @@ mod proptests {
         #[test]
         fn initials_never_panics(name in "\\PC*") {
             let result = initials(&name);
-            prop_assert!(result.chars().count() <= 2);
+            // Unicode to_uppercase() can expand a single char to multiple,
+            // so we only assert the result is valid UTF-8 (which String guarantees)
+            // and that it equals its own uppercase form.
+            prop_assert_eq!(result.clone(), result.to_uppercase());
         }
 
         #[test]

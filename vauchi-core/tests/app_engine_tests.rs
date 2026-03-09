@@ -253,6 +253,41 @@ fn onboarding_completion_without_name_returns_validation_error() {
     );
 }
 
+// ── setup progress tests ────────────────────────────────────────────
+
+#[test]
+fn home_screen_shows_real_setup_progress() {
+    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    let engine = AppEngine::new(vauchi);
+
+    let screen = engine.current_screen();
+    assert_eq!(screen.screen_id, "home");
+
+    // Find the setup_progress StatusIndicator component
+    let progress_component = screen
+        .components
+        .iter()
+        .find(|c| matches!(c, vauchi_core::ui::Component::StatusIndicator { id, .. } if id == "setup_progress"))
+        .expect("home screen should have a setup_progress component");
+
+    // After create_identity, identity_created and card_has_fields are true (2/6),
+    // NOT the old hardcoded 3/3
+    if let vauchi_core::ui::Component::StatusIndicator { detail, .. } = progress_component {
+        let detail = detail.as_ref().expect("should have detail text");
+        assert!(
+            detail.contains("of 6"),
+            "total_steps should be 6 (from get_setup_progress), got: {detail}"
+        );
+        assert!(
+            !detail.contains("of 3"),
+            "should not have old hardcoded total of 3, got: {detail}"
+        );
+    } else {
+        panic!("expected StatusIndicator");
+    }
+}
+
 /// Verify that a whitespace-only name is also rejected.
 #[test]
 fn onboarding_completion_with_empty_name_returns_validation_error() {

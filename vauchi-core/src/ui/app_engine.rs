@@ -148,11 +148,16 @@ impl<T: Transport> AppEngine<T> {
             AppScreen::Onboarding => Box::new(OnboardingEngine::new()),
             AppScreen::Home => {
                 let contacts = Self::load_contact_items(vauchi);
-                let has_identity = vauchi.has_identity();
-                let progress = HomeProgress {
-                    completed_steps: if has_identity { 3 } else { 0 },
-                    total_steps: 3,
-                };
+                let progress = vauchi
+                    .get_setup_progress()
+                    .map(|sp| HomeProgress {
+                        completed_steps: sp.completed_steps,
+                        total_steps: sp.total_steps,
+                    })
+                    .unwrap_or(HomeProgress {
+                        completed_steps: 0,
+                        total_steps: 6,
+                    });
                 Box::new(HomeEngine::new(contacts, progress))
             }
             AppScreen::Contacts => {

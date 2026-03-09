@@ -239,8 +239,9 @@ mod tests {
 
     #[test]
     fn destroy_null_handle_is_safe() {
+        // allow(zero_assertions) — this test verifies no crash/UB on null input
         unsafe {
-            vauchi_workflow_destroy(std::ptr::null_mut()); // should not crash
+            vauchi_workflow_destroy(std::ptr::null_mut());
         }
     }
 

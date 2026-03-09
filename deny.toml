@@ -47,6 +47,7 @@ allow = [
     "Unicode-3.0",
     "MPL-2.0",
     "CDLA-Permissive-2.0",  # webpki-roots (Mozilla CA certs)
+    "OpenSSL",              # aws-lc-sys (BoringSSL fork, FIPS 140-3)
 ]
 confidence-threshold = 0.8
 

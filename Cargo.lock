@@ -6825,7 +6825,6 @@ dependencies = [
  "qrcode",
  "rand 0.8.5",
  "reqwest",
- "ring",
  "rusqlite",
  "rustls",
  "schemars 0.8.22",

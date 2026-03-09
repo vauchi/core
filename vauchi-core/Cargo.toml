@@ -35,7 +35,6 @@ content-updates = ["reqwest", "tokio"]
 
 [dependencies]
 # Cryptography (audited libraries)
-ring = "0.17.14"
 aws-lc-rs = "1.16"
 x25519-dalek = { version = "2.0.1", features = ["static_secrets"] }
 

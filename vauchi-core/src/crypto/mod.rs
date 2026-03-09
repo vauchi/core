@@ -11,6 +11,8 @@ pub mod password_kdf;
 pub mod ratchet;
 pub mod shredding;
 pub mod signing;
+#[cfg(feature = "crypto-wasm")]
+pub mod wasm;
 
 pub use chain::{ChainError, ChainKey, MessageKey};
 pub use encryption::{decrypt, decrypt_with_ad, encrypt, encrypt_with_ad, SymmetricKey};

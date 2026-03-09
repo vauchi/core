@@ -148,6 +148,7 @@ fn validate_result(
         | ActionResult::StartDeviceLink
         | ActionResult::StartBackupImport
         | ActionResult::OpenContact { .. }
+        | ActionResult::EditContact { .. }
         | ActionResult::OpenUrl { .. }
         | ActionResult::ShowAlert { .. } => {}
     }

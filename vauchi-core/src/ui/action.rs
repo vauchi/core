@@ -63,6 +63,10 @@ pub enum ActionResult {
     OpenContact {
         contact_id: String,
     },
+    /// Frontend should open the contact edit view.
+    EditContact {
+        contact_id: String,
+    },
     /// Frontend should open the given URL in an external browser.
     OpenUrl {
         url: String,

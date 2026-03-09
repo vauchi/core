@@ -93,6 +93,27 @@
       "additionalProperties": false
     },
     {
+      "description": "Frontend should open the contact edit view.",
+      "type": "object",
+      "required": [
+        "EditContact"
+      ],
+      "properties": {
+        "EditContact": {
+          "type": "object",
+          "required": [
+            "contact_id"
+          ],
+          "properties": {
+            "contact_id": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    {
       "description": "Frontend should open the given URL in an external browser.",
       "type": "object",
       "required": [
@@ -564,12 +585,18 @@
             "PinInput": {
               "type": "object",
               "required": [
+                "filled",
                 "id",
                 "label",
                 "length",
                 "masked"
               ],
               "properties": {
+                "filled": {
+                  "type": "integer",
+                  "format": "uint",
+                  "minimum": 0.0
+                },
                 "id": {
                   "type": "string"
                 },

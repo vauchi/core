@@ -59,6 +59,8 @@ pub struct AppEngine<T: Transport> {
     engine_cache: HashMap<AppScreen, Box<dyn WorkflowEngine>>,
     /// Captured from onboarding TextChanged events for identity persistence.
     pending_display_name: Option<String>,
+    /// Navigation history stack for back-button support.
+    nav_history: Vec<AppScreen>,
 }
 
 impl<T: Transport> AppEngine<T> {
@@ -77,6 +79,7 @@ impl<T: Transport> AppEngine<T> {
             engine,
             engine_cache: HashMap::new(),
             pending_display_name: None,
+            nav_history: Vec::new(),
         }
     }
 
@@ -89,6 +92,13 @@ impl<T: Transport> AppEngine<T> {
     }
 
     pub fn navigate_to(&mut self, screen: AppScreen) -> ScreenModel {
+        // Push the current screen to nav history before switching
+        self.nav_history.push(self.screen.clone());
+        self.navigate_to_internal(screen)
+    }
+
+    /// Navigate without pushing to history (used by back-navigation and completion routing).
+    fn navigate_to_internal(&mut self, screen: AppScreen) -> ScreenModel {
         // Swap in the new screen, get the old one back
         let old_screen = std::mem::replace(&mut self.screen, screen.clone());
 
@@ -107,6 +117,12 @@ impl<T: Transport> AppEngine<T> {
         }
 
         self.engine.current_screen()
+    }
+
+    /// Navigate back using the history stack. Falls back to Home if empty.
+    pub fn navigate_back(&mut self) -> ScreenModel {
+        let target = self.nav_history.pop().unwrap_or(AppScreen::Home);
+        self.navigate_to_internal(target)
     }
 
     /// Screens that should never be cached — always start fresh.
@@ -152,7 +168,7 @@ impl<T: Transport> AppEngine<T> {
                 };
                 match self.vauchi.create_identity(&name) {
                     Ok(()) => {
-                        let screen = self.navigate_to(AppScreen::Home);
+                        let screen = self.navigate_to_internal(AppScreen::Home);
                         ActionResult::NavigateTo(screen)
                     }
                     Err(e) => ActionResult::ShowAlert {
@@ -173,7 +189,7 @@ impl<T: Transport> AppEngine<T> {
                 };
                 match self.vauchi.authenticate(&pin) {
                     Ok(_auth_mode) => {
-                        let screen = self.navigate_to(AppScreen::Home);
+                        let screen = self.navigate_to_internal(AppScreen::Home);
                         ActionResult::NavigateTo(screen)
                     }
                     Err(_) => {
@@ -186,15 +202,15 @@ impl<T: Transport> AppEngine<T> {
                 }
             }
             AppScreen::Exchange => {
-                let screen = self.navigate_to(AppScreen::Contacts);
+                let screen = self.navigate_to_internal(AppScreen::Contacts);
                 ActionResult::NavigateTo(screen)
             }
             AppScreen::EmergencyShred => {
-                let screen = self.navigate_to(AppScreen::Onboarding);
+                let screen = self.navigate_to_internal(AppScreen::Onboarding);
                 ActionResult::NavigateTo(screen)
             }
             _ => {
-                let screen = self.navigate_to(AppScreen::Home);
+                let screen = self.navigate_back();
                 ActionResult::NavigateTo(screen)
             }
         }
@@ -510,6 +526,10 @@ impl<T: Transport> WorkflowEngine for AppEngine<T> {
         let result = self.engine.handle_action(action);
         match result {
             ActionResult::Complete => self.handle_completion(),
+            ActionResult::EditContact { contact_id } => {
+                let screen = self.navigate_to(AppScreen::ContactEdit { contact_id });
+                ActionResult::NavigateTo(screen)
+            }
             other => other,
         }
     }

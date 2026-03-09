@@ -3,6 +3,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 use vauchi_core::api::{Vauchi, VauchiConfig};
+use vauchi_core::contact::Contact;
+use vauchi_core::contact_card::ContactCard;
 use vauchi_core::crypto::SymmetricKey;
 use vauchi_core::network::MockTransport;
 use vauchi_core::ui::{ActionResult, AppEngine, AppScreen, UserAction, WorkflowEngine};
@@ -852,4 +854,157 @@ fn invalidate_all_clears_entire_cache() {
     assert_eq!(contacts.screen_id, "contact_list");
     let settings = engine.navigate_to(AppScreen::Settings);
     assert_eq!(settings.screen_id, "settings");
+}
+
+// ── edit routing tests (HIGH-2) ──────────────────────────────────────
+
+#[test]
+fn contact_detail_edit_navigates_to_edit_screen() {
+    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    // Add a contact
+    let card = ContactCard::new("Bob");
+    let shared_key = SymmetricKey::generate();
+    let contact = Contact::from_exchange([2u8; 32], card, shared_key);
+    let bob_id = contact.id().to_string();
+    vauchi.add_contact(contact).unwrap();
+
+    let mut engine = AppEngine::new(vauchi);
+    // Navigate to ContactDetail for Bob
+    engine.navigate_to(AppScreen::ContactDetail {
+        contact_id: bob_id.clone(),
+    });
+    assert_eq!(
+        engine.current_app_screen(),
+        &AppScreen::ContactDetail {
+            contact_id: bob_id.clone()
+        }
+    );
+
+    // Press the "edit" button
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "edit".into(),
+    });
+
+    // Should navigate to ContactEdit, not re-open ContactDetail
+    assert!(
+        matches!(result, ActionResult::NavigateTo(_)),
+        "expected NavigateTo for edit button, got {:?}",
+        result
+    );
+    assert_eq!(
+        engine.current_app_screen(),
+        &AppScreen::ContactEdit { contact_id: bob_id },
+        "edit button should route to ContactEdit, not ContactDetail"
+    );
+}
+
+// ── navigation history tests (HIGH-5) ────────────────────────────────
+
+#[test]
+fn back_from_contact_detail_returns_to_contacts() {
+    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    let mut engine = AppEngine::new(vauchi);
+
+    // Navigate: Home -> Contacts -> ContactDetail
+    engine.navigate_to(AppScreen::Contacts);
+    engine.navigate_to(AppScreen::ContactDetail {
+        contact_id: "nonexistent".into(),
+    });
+    assert_eq!(
+        engine.current_app_screen(),
+        &AppScreen::ContactDetail {
+            contact_id: "nonexistent".into()
+        }
+    );
+
+    // Press back (Complete) — should go to Contacts, not Home
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "back".into(),
+    });
+    assert!(
+        matches!(result, ActionResult::NavigateTo(_)),
+        "expected NavigateTo, got {:?}",
+        result
+    );
+    assert_eq!(
+        engine.current_app_screen(),
+        &AppScreen::Contacts,
+        "back from ContactDetail should return to Contacts, not Home"
+    );
+}
+
+#[test]
+fn navigate_back_from_duress_pin_returns_to_settings() {
+    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    let mut engine = AppEngine::new(vauchi);
+
+    // Navigate: Home -> Settings -> DuressPin
+    engine.navigate_to(AppScreen::Settings);
+    engine.navigate_to(AppScreen::DuressPin);
+    assert_eq!(engine.current_app_screen(), &AppScreen::DuressPin);
+
+    // Navigate back — should go to Settings, not Home
+    engine.navigate_back();
+    assert_eq!(
+        engine.current_app_screen(),
+        &AppScreen::Settings,
+        "navigate_back from DuressPin should return to Settings, not Home"
+    );
+}
+
+#[test]
+fn navigate_back_from_settings_returns_to_home() {
+    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    let mut engine = AppEngine::new(vauchi);
+
+    // Navigate: Home -> Settings
+    engine.navigate_to(AppScreen::Settings);
+    assert_eq!(engine.current_app_screen(), &AppScreen::Settings);
+
+    // Use navigate_back() directly (Settings has no "back" action button)
+    engine.navigate_back();
+    assert_eq!(
+        engine.current_app_screen(),
+        &AppScreen::Home,
+        "navigate_back from Settings should return to Home"
+    );
+}
+
+#[test]
+fn back_with_empty_history_returns_to_home() {
+    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    let mut engine = AppEngine::new(vauchi);
+
+    // Without any navigation, back should go to Home (fallback)
+    let screen = engine.navigate_back();
+    assert_eq!(screen.screen_id, "home");
+    assert_eq!(engine.current_app_screen(), &AppScreen::Home);
+}
+
+#[test]
+fn navigate_back_does_not_create_circular_history() {
+    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    let mut engine = AppEngine::new(vauchi);
+
+    // Navigate: Home -> Contacts -> Settings
+    engine.navigate_to(AppScreen::Contacts);
+    engine.navigate_to(AppScreen::Settings);
+
+    // Back: Settings -> Contacts
+    engine.navigate_back();
+    assert_eq!(engine.current_app_screen(), &AppScreen::Contacts);
+
+    // Back: Contacts -> Home
+    engine.navigate_back();
+    assert_eq!(engine.current_app_screen(), &AppScreen::Home);
+
+    // Back again: empty history -> Home (fallback)
+    engine.navigate_back();
+    assert_eq!(engine.current_app_screen(), &AppScreen::Home);
 }

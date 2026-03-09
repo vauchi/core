@@ -456,12 +456,18 @@
             "PinInput": {
               "type": "object",
               "required": [
+                "filled",
                 "id",
                 "label",
                 "length",
                 "masked"
               ],
               "properties": {
+                "filled": {
+                  "type": "integer",
+                  "format": "uint",
+                  "minimum": 0.0
+                },
                 "id": {
                   "type": "string"
                 },

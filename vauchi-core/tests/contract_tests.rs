@@ -182,6 +182,12 @@ fn action_result_variants_validate_against_schema() {
             },
         ),
         (
+            "EditContact",
+            ActionResult::EditContact {
+                contact_id: "contact-456".into(),
+            },
+        ),
+        (
             "OpenUrl",
             ActionResult::OpenUrl {
                 url: "https://example.com".into(),

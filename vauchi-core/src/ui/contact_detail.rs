@@ -65,7 +65,7 @@ impl WorkflowEngine for ContactDetailEngine {
     fn handle_action(&mut self, action: UserAction) -> ActionResult {
         match action {
             UserAction::ActionPressed { action_id } if action_id == "edit" => {
-                ActionResult::OpenContact {
+                ActionResult::EditContact {
                     contact_id: self.contact.id.clone(),
                 }
             }

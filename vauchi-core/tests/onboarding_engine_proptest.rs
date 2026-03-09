@@ -487,6 +487,7 @@ proptest! {
                     // External handoff — valid from LinkChoice step
                 }
                 ActionResult::OpenContact { .. }
+                | ActionResult::EditContact { .. }
                 | ActionResult::OpenUrl { .. }
                 | ActionResult::ShowAlert { .. }
                 | ActionResult::RequestCamera

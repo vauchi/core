@@ -214,18 +214,22 @@ impl<T: Transport> AppEngine<T> {
     }
 
     fn load_contact_items(vauchi: &Vauchi<T>) -> Vec<ContactItem> {
-        vauchi
-            .list_contacts()
-            .unwrap_or_default()
-            .iter()
-            .map(|c| ContactItem {
-                id: c.id().to_string(),
-                name: c.display_name().to_string(),
-                subtitle: None,
-                avatar_initials: initials(c.display_name()),
-                status: None,
-            })
-            .collect()
+        match vauchi.list_contacts() {
+            Ok(contacts) => contacts
+                .iter()
+                .map(|c| ContactItem {
+                    id: c.id().to_string(),
+                    name: c.display_name().to_string(),
+                    subtitle: None,
+                    avatar_initials: initials(c.display_name()),
+                    status: None,
+                })
+                .collect(),
+            Err(e) => {
+                eprintln!("[WARN] Failed to load contacts: {e}");
+                vec![]
+            }
+        }
     }
 
     fn default_help_items() -> Vec<HelpItem> {

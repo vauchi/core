@@ -28,8 +28,8 @@
 #   - Test and coverage combined in single pass
 #   - DAG execution: needs: with optional:true for cross-rule compatibility
 #   - Parallel build jobs (iOS + Android)
-#   - Parallel test jobs (core + mobile)
-#   - Parallel publish jobs (core + mobile)
+#   - Parallel test jobs (core + platform)
+#   - Parallel publish jobs (core + platform)
 #   - CARGO_INCREMENTAL=0 to reduce target/ size and cache overhead
 #   - No-cache/read-only cache for lint/security jobs (skip expensive upload)
 #   - mold linker on Linux (2-5x faster linking)
@@ -251,7 +251,7 @@ test:cucumber:
   script:
     - cargo test --test cucumber_tests -- --tags "not @wip"
 
-test:mobile:
+test:platform:
   extends: [.linux-runner, .validation-mobile, .timeout-standard]
   stage: test
   needs:
@@ -327,7 +327,7 @@ coverage:core:
     COVERAGE_REPO_LABEL: "core"
     COVERAGE_EXTRA_FLAGS: "--features test-kdf"
 
-coverage:mobile:
+coverage:platform:
   extends: [.coverage-job, .linux-runner, .timeout-long]
   before_script:
     - !reference [.self-hosted, before_script]
@@ -336,7 +336,7 @@ coverage:mobile:
     - rustup component add llvm-tools-preview 2>/dev/null || true
   variables:
     COVERAGE_PACKAGE: "vauchi-platform"
-    COVERAGE_REPO_LABEL: "mobile"
+    COVERAGE_REPO_LABEL: "platform"
 
 # ============================================================
 # Benchmark Stage — Performance Regression Gate (PI-10)
@@ -468,7 +468,7 @@ secret_detection:
 
 # ============================================================
 # Build Stage — All version tags (stable, RC, dev)
-# Builds mobile bindings for iOS and Android on every version tag.
+# Builds platform bindings for iOS and Android on every version tag.
 # ============================================================
 
 # Verify tag is on main branch before proceeding with release
@@ -495,7 +495,7 @@ release:verify:
         exit 1
       fi
 
-build:ios:
+build:apple:
   extends: [.macos-runner, .release-or-rc, .timeout-extended]
   stage: build
   needs: [release:verify]
@@ -539,7 +539,7 @@ build:validate-bindings:
   extends: [.linux-runner, .release-or-rc]
   stage: build
   needs:
-    - job: build:ios
+    - job: build:apple
       artifacts: true
     - job: build:android
       artifacts: true
@@ -554,7 +554,7 @@ build:validate-bindings:
 package:xcframework:
   extends: [.macos-runner, .release-or-rc]
   stage: package
-  needs: [build:ios, build:validate-bindings]
+  needs: [build:apple, build:validate-bindings]
   script:
     - ./scripts/package-xcframework.sh "$CI_COMMIT_TAG"
   artifacts:
@@ -713,7 +713,7 @@ publish:core:
       echo "✓ Published vauchi-core $VERSION"
 
 # Publish vauchi-platform crate to GitLab package registry
-publish:mobile:
+publish:platform:
   extends: [.linux-runner, .release-or-rc]
   stage: publish
   needs: [release:verify]
@@ -767,7 +767,7 @@ release:create:
   tags:
     - docker
   interruptible: false
-  needs: [publish:packages, publish:core, publish:mobile, package:sbom]
+  needs: [publish:packages, publish:core, publish:platform, package:sbom]
   script:
     - |
       echo "Creating release $CI_COMMIT_TAG"
@@ -846,7 +846,7 @@ trigger:swift:
     - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+-rc\.\d+$/
     - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+-dev\.\d+$/
 
-trigger:android:
+trigger:kotlin:
   stage: trigger
   needs:
     - publish:packages
@@ -867,8 +867,8 @@ trigger:android:
 # ============================================================
 # Downstream Verification (main branch only)
 # ============================================================
-# When core merges to main, verify that Rust consumer repos (desktop, cli,
-# tui) still build and pass tests against the updated core. This catches
+# When core merges to main, verify that Rust consumer repos (cli,
+# tui, e2e, relay, linux-gtk) still build and pass tests. This catches
 # API breaks early — before a release is even considered.
 #
 # Uses GitLab's trigger: keyword which creates linked child pipelines
@@ -880,7 +880,7 @@ verify:downstream-rust:
   extends: .trigger-parallel
   parallel:
     matrix:
-      - DOWNSTREAM: [vauchi/desktop, vauchi/cli, vauchi/tui]
+      - DOWNSTREAM: [vauchi/cli, vauchi/tui, vauchi/e2e, vauchi/relay, vauchi/linux-gtk]
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
 
@@ -889,7 +889,7 @@ verify:downstream-dev:
   extends: .trigger-parallel-prerelease
   parallel:
     matrix:
-      - DOWNSTREAM: [vauchi/desktop, vauchi/cli, vauchi/tui, vauchi/e2e]
+      - DOWNSTREAM: [vauchi/cli, vauchi/tui, vauchi/e2e, vauchi/relay, vauchi/linux-gtk]
   rules:
     - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+-dev\.\d+$/
 
@@ -898,7 +898,7 @@ verify:downstream-rc:
   extends: .trigger-parallel-prerelease
   parallel:
     matrix:
-      - DOWNSTREAM: [vauchi/desktop, vauchi/cli, vauchi/tui, vauchi/e2e]
+      - DOWNSTREAM: [vauchi/cli, vauchi/tui, vauchi/e2e, vauchi/relay, vauchi/linux-gtk]
   rules:
     - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+-rc\.\d+$/
 

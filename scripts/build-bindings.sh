@@ -203,12 +203,12 @@ if $BUILD_MACOS; then
 
         # Build for ARM64 (Apple Silicon)
         echo -e "${YELLOW}Building for aarch64-apple-darwin (Apple Silicon)...${NC}"
-        cargo build -p vauchi-mobile --target aarch64-apple-darwin --release
+        cargo build -p vauchi-platform --target aarch64-apple-darwin --release
         echo -e "${GREEN}macOS ARM64 build complete${NC}"
 
         # Build for x86_64 (Intel)
         echo -e "${YELLOW}Building for x86_64-apple-darwin (Intel)...${NC}"
-        cargo build -p vauchi-mobile --target x86_64-apple-darwin --release
+        cargo build -p vauchi-platform --target x86_64-apple-darwin --release
         echo -e "${GREEN}macOS x86_64 build complete${NC}"
 
         # Create universal macOS library
@@ -216,9 +216,9 @@ if $BUILD_MACOS; then
         mkdir -p "$MACOS_LIBS_DIR"
 
         lipo -create \
-            target/aarch64-apple-darwin/release/libvauchi_mobile.a \
-            target/x86_64-apple-darwin/release/libvauchi_mobile.a \
-            -output "$MACOS_LIBS_DIR/libvauchi_mobile_macos.a"
+            target/aarch64-apple-darwin/release/libvauchi_platform.a \
+            target/x86_64-apple-darwin/release/libvauchi_platform.a \
+            -output "$MACOS_LIBS_DIR/libvauchi_platform_macos.a"
 
         echo -e "${GREEN}macOS libraries:${NC}"
         ls -lh "$MACOS_LIBS_DIR/"

@@ -11,6 +11,8 @@ use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
 use std::sync::Mutex;
 
+use vauchi_core::api::Vauchi;
+use vauchi_core::network::MockTransport;
 use vauchi_core::ui::*;
 
 // ── Type-erased engine wrapper ──────────────────────────────────────
@@ -167,6 +169,185 @@ pub unsafe extern "C" fn vauchi_workflow_handle_action(
     let workflow = &*handle;
     match workflow.engine.lock() {
         Ok(mut engine) => to_c_string(&engine.handle_action_json(&json)),
+        Err(_) => to_c_string(r#"{"error":"lock poisoned"}"#),
+    }
+}
+
+// ── AppEngine functions ─────────────────────────────────────────────
+
+/// Opaque handle to an AppEngine instance.
+pub struct VauchiApp {
+    engine: Mutex<AppEngine<MockTransport>>,
+}
+
+/// Create a new AppEngine with in-memory storage.
+///
+/// Returns null on initialization failure.
+///
+/// # Safety
+/// No special requirements.
+#[no_mangle]
+pub unsafe extern "C" fn vauchi_app_create() -> *mut VauchiApp {
+    let vauchi = match Vauchi::<MockTransport>::in_memory() {
+        Ok(v) => v,
+        Err(_) => return std::ptr::null_mut(),
+    };
+    Box::into_raw(Box::new(VauchiApp {
+        engine: Mutex::new(AppEngine::new(vauchi)),
+    }))
+}
+
+/// Destroy an AppEngine instance.
+///
+/// # Safety
+/// `handle` must be a pointer returned by `vauchi_app_create`, or null.
+#[no_mangle]
+pub unsafe extern "C" fn vauchi_app_destroy(handle: *mut VauchiApp) {
+    if !handle.is_null() {
+        drop(Box::from_raw(handle));
+    }
+}
+
+/// Get the current screen as a JSON string.
+///
+/// # Safety
+/// `handle` must be a valid app handle or null.
+#[no_mangle]
+pub unsafe extern "C" fn vauchi_app_current_screen(handle: *mut VauchiApp) -> *mut c_char {
+    if handle.is_null() {
+        return std::ptr::null_mut();
+    }
+    let app = &*handle;
+    match app.engine.lock() {
+        Ok(engine) => {
+            let screen = engine.current_screen();
+            match serde_json::to_string(&screen) {
+                Ok(json) => to_c_string(&json),
+                Err(e) => to_c_string(&format!(r#"{{"error":"{}"}}"#, e)),
+            }
+        }
+        Err(_) => to_c_string(r#"{"error":"lock poisoned"}"#),
+    }
+}
+
+/// Handle a user action (JSON) and return the result as JSON.
+///
+/// # Safety
+/// `handle` must be a valid app handle or null.
+/// `action_json` must be a valid null-terminated C string, or null.
+#[no_mangle]
+pub unsafe extern "C" fn vauchi_app_handle_action(
+    handle: *mut VauchiApp,
+    action_json: *const c_char,
+) -> *mut c_char {
+    if handle.is_null() {
+        return std::ptr::null_mut();
+    }
+    let json = match from_c_str(action_json) {
+        Some(s) => s,
+        None => return to_c_string(r#"{"error":"null action JSON"}"#),
+    };
+    let app = &*handle;
+    match app.engine.lock() {
+        Ok(mut engine) => match serde_json::from_str::<UserAction>(&json) {
+            Ok(action) => {
+                let result = engine.handle_action(action);
+                serde_json::to_string(&result).map_or_else(
+                    |e| to_c_string(&format!(r#"{{"error":"{}"}}"#, e)),
+                    |j| to_c_string(&j),
+                )
+            }
+            Err(e) => to_c_string(&format!(r#"{{"error":"{}"}}"#, e)),
+        },
+        Err(_) => to_c_string(r#"{"error":"lock poisoned"}"#),
+    }
+}
+
+/// Navigate to a screen by name. Returns the new screen as JSON.
+///
+/// Supported screen names: "home", "contacts", "exchange", "settings",
+/// "help", "backup", "lock", "onboarding", "emergency_shred",
+/// "device_linking", "duress_pin", "delivery_status".
+///
+/// # Safety
+/// `handle` must be a valid app handle or null.
+/// `screen_name` must be a valid null-terminated C string, or null.
+#[no_mangle]
+pub unsafe extern "C" fn vauchi_app_navigate_to(
+    handle: *mut VauchiApp,
+    screen_name: *const c_char,
+) -> *mut c_char {
+    if handle.is_null() {
+        return std::ptr::null_mut();
+    }
+    let name = match from_c_str(screen_name) {
+        Some(s) => s,
+        None => return to_c_string(r#"{"error":"null screen name"}"#),
+    };
+    let screen = match name.as_str() {
+        "onboarding" => AppScreen::Onboarding,
+        "home" => AppScreen::Home,
+        "contacts" => AppScreen::Contacts,
+        "exchange" => AppScreen::Exchange,
+        "settings" => AppScreen::Settings,
+        "help" => AppScreen::Help,
+        "backup" => AppScreen::Backup,
+        "lock" => AppScreen::Lock,
+        "device_linking" => AppScreen::DeviceLinking,
+        "duress_pin" => AppScreen::DuressPin,
+        "emergency_shred" => AppScreen::EmergencyShred,
+        "delivery_status" => AppScreen::DeliveryStatus,
+        _ => return to_c_string(&format!(r#"{{"error":"unknown screen: {}"}}"#, name)),
+    };
+    let app = &*handle;
+    match app.engine.lock() {
+        Ok(mut engine) => {
+            let model = engine.navigate_to(screen);
+            serde_json::to_string(&model).map_or_else(
+                |e| to_c_string(&format!(r#"{{"error":"{}"}}"#, e)),
+                |j| to_c_string(&j),
+            )
+        }
+        Err(_) => to_c_string(r#"{"error":"lock poisoned"}"#),
+    }
+}
+
+/// Get available screens as a JSON array of strings.
+///
+/// # Safety
+/// `handle` must be a valid app handle or null.
+#[no_mangle]
+pub unsafe extern "C" fn vauchi_app_available_screens(handle: *mut VauchiApp) -> *mut c_char {
+    if handle.is_null() {
+        return std::ptr::null_mut();
+    }
+    let app = &*handle;
+    match app.engine.lock() {
+        Ok(engine) => {
+            let screens: Vec<&str> = engine
+                .available_screens()
+                .iter()
+                .map(|s| match s {
+                    AppScreen::Onboarding => "onboarding",
+                    AppScreen::Home => "home",
+                    AppScreen::Contacts => "contacts",
+                    AppScreen::Exchange => "exchange",
+                    AppScreen::Settings => "settings",
+                    AppScreen::Help => "help",
+                    AppScreen::Backup => "backup",
+                    AppScreen::Lock => "lock",
+                    AppScreen::DeviceLinking => "device_linking",
+                    AppScreen::DuressPin => "duress_pin",
+                    AppScreen::EmergencyShred => "emergency_shred",
+                    AppScreen::DeliveryStatus => "delivery_status",
+                    _ => "unknown",
+                })
+                .collect();
+            serde_json::to_string(&screens).map_or_else(
+                |e| to_c_string(&format!(r#"{{"error":"{}"}}"#, e)),
+                |j| to_c_string(&j),
+            )
+        }
         Err(_) => to_c_string(r#"{"error":"lock poisoned"}"#),
     }
 }
@@ -356,6 +537,81 @@ mod tests {
 
             vauchi_string_free(result_ptr);
             vauchi_workflow_destroy(handle);
+        }
+    }
+
+    // ── AppEngine tests ─────────────────────────────────────────────
+
+    #[test]
+    fn app_create_returns_non_null_handle() {
+        unsafe {
+            let handle = vauchi_app_create();
+            assert!(!handle.is_null(), "app engine should create successfully");
+            vauchi_app_destroy(handle);
+        }
+    }
+
+    #[test]
+    fn app_destroy_null_is_safe() {
+        unsafe {
+            vauchi_app_destroy(std::ptr::null_mut());
+        }
+    }
+
+    #[test]
+    fn app_current_screen_returns_onboarding() {
+        unsafe {
+            let handle = vauchi_app_create();
+            let json_ptr = vauchi_app_current_screen(handle);
+            assert!(!json_ptr.is_null());
+            let json = CStr::from_ptr(json_ptr).to_str().unwrap();
+            let screen: serde_json::Value = serde_json::from_str(json).unwrap();
+            assert_eq!(screen["screen_id"], "identity_check");
+            vauchi_string_free(json_ptr);
+            vauchi_app_destroy(handle);
+        }
+    }
+
+    #[test]
+    fn app_available_screens_starts_with_onboarding() {
+        unsafe {
+            let handle = vauchi_app_create();
+            let json_ptr = vauchi_app_available_screens(handle);
+            assert!(!json_ptr.is_null());
+            let json = CStr::from_ptr(json_ptr).to_str().unwrap();
+            let screens: Vec<String> = serde_json::from_str(json).unwrap();
+            assert_eq!(screens, vec!["onboarding"]);
+            vauchi_string_free(json_ptr);
+            vauchi_app_destroy(handle);
+        }
+    }
+
+    #[test]
+    fn app_handle_action_advances_onboarding() {
+        unsafe {
+            let handle = vauchi_app_create();
+            let action = CString::new(r#"{"ActionPressed":{"action_id":"create_new"}}"#).unwrap();
+            let result_ptr = vauchi_app_handle_action(handle, action.as_ptr());
+            assert!(!result_ptr.is_null());
+            let result = CStr::from_ptr(result_ptr).to_str().unwrap();
+            let _: serde_json::Value =
+                serde_json::from_str(result).expect("result should be valid JSON");
+            vauchi_string_free(result_ptr);
+            vauchi_app_destroy(handle);
+        }
+    }
+
+    #[test]
+    fn app_navigate_to_unknown_screen_returns_error() {
+        unsafe {
+            let handle = vauchi_app_create();
+            let screen = CString::new("nonexistent").unwrap();
+            let json_ptr = vauchi_app_navigate_to(handle, screen.as_ptr());
+            assert!(!json_ptr.is_null());
+            let json = CStr::from_ptr(json_ptr).to_str().unwrap();
+            assert!(json.contains("error"), "unknown screen should return error");
+            vauchi_string_free(json_ptr);
+            vauchi_app_destroy(handle);
         }
     }
 }

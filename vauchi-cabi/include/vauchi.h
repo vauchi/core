@@ -10,6 +10,11 @@
 #include <stdlib.h>
 
 /**
+ * Opaque handle to an AppEngine instance.
+ */
+typedef struct VauchiApp VauchiApp;
+
+/**
  * Opaque handle to a workflow engine instance.
  */
 typedef struct VauchiWorkflow VauchiWorkflow;
@@ -69,5 +74,61 @@ char *vauchi_workflow_current_screen(struct VauchiWorkflow *handle);
  * `action_json` must be a valid null-terminated C string, or null.
  */
 char *vauchi_workflow_handle_action(struct VauchiWorkflow *handle, const char *action_json);
+
+/**
+ * Create a new AppEngine with in-memory storage.
+ *
+ * Returns null on initialization failure.
+ *
+ * # Safety
+ * No special requirements.
+ */
+struct VauchiApp *vauchi_app_create(void);
+
+/**
+ * Destroy an AppEngine instance.
+ *
+ * # Safety
+ * `handle` must be a pointer returned by `vauchi_app_create`, or null.
+ */
+void vauchi_app_destroy(struct VauchiApp *handle);
+
+/**
+ * Get the current screen as a JSON string.
+ *
+ * # Safety
+ * `handle` must be a valid app handle or null.
+ */
+char *vauchi_app_current_screen(struct VauchiApp *handle);
+
+/**
+ * Handle a user action (JSON) and return the result as JSON.
+ *
+ * # Safety
+ * `handle` must be a valid app handle or null.
+ * `action_json` must be a valid null-terminated C string, or null.
+ */
+char *vauchi_app_handle_action(struct VauchiApp *handle, const char *action_json);
+
+/**
+ * Navigate to a screen by name. Returns the new screen as JSON.
+ *
+ * Supported screen names: "home", "contacts", "exchange", "settings",
+ * "help", "backup", "lock", "onboarding", "emergency_shred",
+ * "device_linking", "duress_pin", "delivery_status".
+ *
+ * # Safety
+ * `handle` must be a valid app handle or null.
+ * `screen_name` must be a valid null-terminated C string, or null.
+ */
+char *vauchi_app_navigate_to(struct VauchiApp *handle, const char *screen_name);
+
+/**
+ * Get available screens as a JSON array of strings.
+ *
+ * # Safety
+ * `handle` must be a valid app handle or null.
+ */
+char *vauchi_app_available_screens(struct VauchiApp *handle);
 
 #endif  /* VAUCHI_CABI_H */

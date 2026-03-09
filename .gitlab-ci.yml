@@ -500,10 +500,11 @@ build:ios:
   stage: build
   needs: [release:verify]
   script:
-    - ./scripts/build-bindings.sh --ios
+    - ./scripts/build-bindings.sh --apple
   artifacts:
     paths:
       - target/bindings/ios/
+      - target/bindings/macos/
     expire_in: 1 day
 
 build:android:

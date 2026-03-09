@@ -31,9 +31,13 @@ IOS_LIBS_DIR="$BINDINGS_DIR/ios/libs"
 ANDROID_JNI_DIR="$BINDINGS_DIR/android/jniLibs"
 ANDROID_KOTLIN_DIR="$BINDINGS_DIR/android/kotlin"
 
+# macOS output directory
+MACOS_LIBS_DIR="$BINDINGS_DIR/macos/libs"
+
 # Optional local install directories (sibling repos for local dev)
 LOCAL_IOS_DIR="$WORKSPACE_ROOT/ios"
 LOCAL_ANDROID_DIR="$WORKSPACE_ROOT/android"
+LOCAL_MACOS_DIR="$WORKSPACE_ROOT/macos"
 
 # NDK paths (for Android)
 NDK_HOME="${ANDROID_NDK_HOME:-$HOME/Library/Android/sdk/ndk/26.1.10909125}"
@@ -50,6 +54,7 @@ cd "$PROJECT_ROOT"
 # Parse arguments
 BUILD_IOS=false
 BUILD_ANDROID=false
+BUILD_MACOS=false
 BUILD_ALL=true
 
 while [[ $# -gt 0 ]]; do
@@ -64,13 +69,26 @@ while [[ $# -gt 0 ]]; do
             BUILD_ALL=false
             shift
             ;;
+        --macos)
+            BUILD_MACOS=true
+            BUILD_ALL=false
+            shift
+            ;;
+        --apple)
+            BUILD_IOS=true
+            BUILD_MACOS=true
+            BUILD_ALL=false
+            shift
+            ;;
         --help|-h)
-            echo "Usage: $0 [--ios] [--android]"
+            echo "Usage: $0 [--ios] [--android] [--macos] [--apple]"
             echo ""
             echo "Options:"
             echo "  --ios      Build iOS bindings only"
             echo "  --android  Build Android bindings only"
-            echo "  (no args)  Build both platforms"
+            echo "  --macos    Build macOS bindings only"
+            echo "  --apple    Build iOS + macOS bindings"
+            echo "  (no args)  Build all platforms"
             exit 0
             ;;
         *)
@@ -83,6 +101,7 @@ done
 if $BUILD_ALL; then
     BUILD_IOS=true
     BUILD_ANDROID=true
+    BUILD_MACOS=true
 fi
 
 # === iOS Build ===
@@ -161,6 +180,48 @@ if $BUILD_IOS; then
 
         echo -e "${GREEN}iOS libraries:${NC}"
         ls -lh "$IOS_LIBS_DIR/"
+    fi
+fi
+
+# === macOS Build ===
+if $BUILD_MACOS; then
+    echo ""
+    echo -e "${BLUE}=== Building macOS Bindings ===${NC}"
+
+    if [[ "$(uname)" != "Darwin" ]]; then
+        echo -e "${YELLOW}SKIPPED: macOS build requires macOS${NC}"
+    else
+        # Disable sccache for cross-compilation
+        unset RUSTC_WRAPPER
+
+        # Set deployment target to match project.yml
+        export MACOSX_DEPLOYMENT_TARGET="14.0"
+
+        # Ensure targets are installed
+        echo "Checking macOS targets..."
+        rustup target add aarch64-apple-darwin x86_64-apple-darwin 2>/dev/null || true
+
+        # Build for ARM64 (Apple Silicon)
+        echo -e "${YELLOW}Building for aarch64-apple-darwin (Apple Silicon)...${NC}"
+        cargo build -p vauchi-mobile --target aarch64-apple-darwin --release
+        echo -e "${GREEN}macOS ARM64 build complete${NC}"
+
+        # Build for x86_64 (Intel)
+        echo -e "${YELLOW}Building for x86_64-apple-darwin (Intel)...${NC}"
+        cargo build -p vauchi-mobile --target x86_64-apple-darwin --release
+        echo -e "${GREEN}macOS x86_64 build complete${NC}"
+
+        # Create universal macOS library
+        echo -e "${YELLOW}Creating universal macOS library...${NC}"
+        mkdir -p "$MACOS_LIBS_DIR"
+
+        lipo -create \
+            target/aarch64-apple-darwin/release/libvauchi_mobile.a \
+            target/x86_64-apple-darwin/release/libvauchi_mobile.a \
+            -output "$MACOS_LIBS_DIR/libvauchi_mobile_macos.a"
+
+        echo -e "${GREEN}macOS libraries:${NC}"
+        ls -lh "$MACOS_LIBS_DIR/"
     fi
 fi
 
@@ -278,6 +339,12 @@ if $BUILD_IOS && [[ "$(uname)" == "Darwin" ]]; then
     echo "  Libraries:      $IOS_LIBS_DIR/"
 fi
 
+if $BUILD_MACOS && [[ "$(uname)" == "Darwin" ]]; then
+    echo -e "${GREEN}macOS:${NC}"
+    echo "  Libraries:      $MACOS_LIBS_DIR/"
+    echo "  (Swift bindings shared with iOS)"
+fi
+
 if $BUILD_ANDROID; then
     echo -e "${GREEN}Android:${NC}"
     echo "  Kotlin bindings: $ANDROID_KOTLIN_DIR/"
@@ -296,6 +363,16 @@ if [[ -z "${CI:-}" ]]; then
         cp -r "$IOS_GENERATED_DIR/"* "$LOCAL_IOS_DIR/Vauchi/Generated/" 2>/dev/null || true
         cp -r "$IOS_LIBS_DIR/"* "$LOCAL_IOS_DIR/Vauchi/Libs/" 2>/dev/null || true
         echo -e "${GREEN}  Installed to $LOCAL_IOS_DIR/Vauchi/${NC}"
+    fi
+
+    if $BUILD_MACOS && [[ -d "$LOCAL_MACOS_DIR" ]]; then
+        echo -e "${YELLOW}Copying macOS bindings to $LOCAL_MACOS_DIR/...${NC}"
+        mkdir -p "$LOCAL_MACOS_DIR/Vauchi/Generated"
+        mkdir -p "$LOCAL_MACOS_DIR/Vauchi/Libs"
+        # macOS shares Swift bindings with iOS (same UniFFI output)
+        cp -r "$IOS_GENERATED_DIR/"* "$LOCAL_MACOS_DIR/Vauchi/Generated/" 2>/dev/null || true
+        cp -r "$MACOS_LIBS_DIR/"* "$LOCAL_MACOS_DIR/Vauchi/Libs/" 2>/dev/null || true
+        echo -e "${GREEN}  Installed to $LOCAL_MACOS_DIR/Vauchi/${NC}"
     fi
 
     if $BUILD_ANDROID && [[ -d "$LOCAL_ANDROID_DIR" ]]; then

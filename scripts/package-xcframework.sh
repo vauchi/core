@@ -36,6 +36,7 @@ VERSION="${RAW_VERSION#v}"
 BINDINGS_DIR="$PROJECT_ROOT/target/bindings"
 IOS_LIBS_DIR="$BINDINGS_DIR/ios/libs"
 IOS_GENERATED_DIR="$BINDINGS_DIR/ios/generated"
+MACOS_LIBS_DIR="$BINDINGS_DIR/macos/libs"
 DIST_DIR="$PROJECT_ROOT/dist"
 BUILD_DIR="$PROJECT_ROOT/target/xcframework-build"
 
@@ -149,6 +150,32 @@ mkdir -p "$SIM_DIR/VauchiMobileFFI.framework/Modules"
 cp "$HEADERS_DIR/module.modulemap" "$SIM_DIR/VauchiMobileFFI.framework/Modules/"
 cp "$DEVICE_DIR/VauchiMobileFFI.framework/Info.plist" "$SIM_DIR/VauchiMobileFFI.framework/Info.plist"
 
+# Create XCFramework structure for macOS (if macOS libs exist)
+MACOS_FRAMEWORK_ARG=""
+if [[ -f "$MACOS_LIBS_DIR/libvauchi_mobile_macos.a" ]]; then
+    echo -e "${YELLOW}Preparing macOS slice (versioned bundle)...${NC}"
+    MACOS_DIR="$BUILD_DIR/macos-arm64_x86_64"
+    MACOS_FW="$MACOS_DIR/VauchiMobileFFI.framework"
+    # macOS requires versioned framework bundles (not flat iOS-style)
+    mkdir -p "$MACOS_FW/Versions/A/Headers"
+    mkdir -p "$MACOS_FW/Versions/A/Modules"
+    mkdir -p "$MACOS_FW/Versions/A/Resources"
+    cp "$MACOS_LIBS_DIR/libvauchi_mobile_macos.a" "$MACOS_FW/Versions/A/VauchiMobileFFI"
+    cp "$HEADERS_DIR/vauchi_mobileFFI.h" "$MACOS_FW/Versions/A/Headers/"
+    cp "$HEADERS_DIR/module.modulemap" "$MACOS_FW/Versions/A/Headers/"
+    cp "$HEADERS_DIR/module.modulemap" "$MACOS_FW/Versions/A/Modules/"
+    cp "$DEVICE_DIR/VauchiMobileFFI.framework/Info.plist" "$MACOS_FW/Versions/A/Resources/"
+    # Create required symlinks
+    (cd "$MACOS_FW/Versions" && ln -sf A Current)
+    (cd "$MACOS_FW" && ln -sf Versions/Current/Headers Headers)
+    (cd "$MACOS_FW" && ln -sf Versions/Current/Modules Modules)
+    (cd "$MACOS_FW" && ln -sf Versions/Current/Resources Resources)
+    (cd "$MACOS_FW" && ln -sf Versions/Current/VauchiMobileFFI VauchiMobileFFI)
+    MACOS_FRAMEWORK_ARG="-framework $MACOS_FW"
+else
+    echo -e "${YELLOW}No macOS libraries found — XCFramework will be iOS-only${NC}"
+fi
+
 # Create XCFramework
 echo -e "${YELLOW}Creating XCFramework...${NC}"
 XCFRAMEWORK_PATH="$BUILD_DIR/VauchiMobileFFI.xcframework"
@@ -156,6 +183,7 @@ XCFRAMEWORK_PATH="$BUILD_DIR/VauchiMobileFFI.xcframework"
 xcodebuild -create-xcframework \
     -framework "$DEVICE_DIR/VauchiMobileFFI.framework" \
     -framework "$SIM_DIR/VauchiMobileFFI.framework" \
+    $MACOS_FRAMEWORK_ARG \
     -output "$XCFRAMEWORK_PATH"
 
 echo -e "${GREEN}XCFramework created at: $XCFRAMEWORK_PATH${NC}"
@@ -194,7 +222,7 @@ UniFFI bindings for Vauchi iOS apps.
 
 ## Contents
 
-- \`VauchiMobileFFI.xcframework/\` - Native library (device + simulator)
+- \`VauchiMobileFFI.xcframework/\` - Native library (iOS device + simulator + macOS)
 - \`Sources/vauchi_mobile.swift\` - Swift bindings
 
 ## Integration

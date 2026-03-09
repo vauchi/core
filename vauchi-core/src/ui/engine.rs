@@ -14,4 +14,12 @@ pub trait WorkflowEngine {
 
     /// Handles a user action and returns the result.
     fn handle_action(&mut self, action: UserAction) -> ActionResult;
+
+    /// Returns sensitive input collected by this engine (e.g. a PIN).
+    ///
+    /// Used by `AppEngine` to extract credentials before processing
+    /// `ActionResult::Complete`. Default returns `None`.
+    fn collected_input(&self) -> Option<String> {
+        None
+    }
 }

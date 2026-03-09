@@ -80,6 +80,14 @@ impl WorkflowEngine for LockScreenEngine {
         }
     }
 
+    fn collected_input(&self) -> Option<String> {
+        if self.entered_pin.is_empty() {
+            None
+        } else {
+            Some(self.entered_pin.clone())
+        }
+    }
+
     fn handle_action(&mut self, action: UserAction) -> ActionResult {
         match action {
             UserAction::TextChanged {
@@ -109,6 +117,12 @@ impl WorkflowEngine for LockScreenEngine {
                 } else {
                     ActionResult::Complete
                 }
+            }
+            UserAction::ActionPressed { action_id } if action_id == "auth_failed" => {
+                self.record_failed_attempt();
+                self.entered_pin.zeroize();
+                self.entered_pin.clear();
+                ActionResult::UpdateScreen(self.current_screen())
             }
             _ => ActionResult::UpdateScreen(self.current_screen()),
         }

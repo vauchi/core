@@ -577,6 +577,165 @@ fn invalidate_screen_removes_cached_engine() {
     assert_eq!(screen.screen_id, "contact_list");
 }
 
+// ── lock screen password verification tests (CRIT-3) ─────────────────
+
+/// Helper: create an AppEngine with identity + password set, starting on Lock screen.
+fn engine_with_password(password: &str) -> AppEngine<MockTransport> {
+    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    vauchi.setup_app_password(password).unwrap();
+    assert!(
+        vauchi.is_password_enabled().unwrap(),
+        "password should be enabled after setup"
+    );
+    AppEngine::new(vauchi)
+}
+
+/// Helper: enter a PIN into the lock screen engine.
+fn enter_pin(engine: &mut AppEngine<MockTransport>, pin: &str) {
+    for ch in pin.chars() {
+        let _ = engine.handle_action(UserAction::TextChanged {
+            component_id: "pin".into(),
+            value: ch.to_string(),
+        });
+    }
+}
+
+#[test]
+fn lock_screen_wrong_pin_stays_locked() {
+    let mut engine = engine_with_password("123456");
+    assert_eq!(engine.current_app_screen(), &AppScreen::Lock);
+
+    // Enter wrong PIN and press unlock
+    enter_pin(&mut engine, "999999");
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "unlock".into(),
+    });
+
+    // Should NOT navigate to Home — should show error or stay on lock
+    assert_ne!(
+        engine.current_app_screen(),
+        &AppScreen::Home,
+        "wrong PIN must NOT unlock the app"
+    );
+    assert!(
+        !matches!(result, ActionResult::NavigateTo(_)),
+        "wrong PIN should not produce NavigateTo, got {:?}",
+        result
+    );
+}
+
+#[test]
+fn lock_screen_correct_pin_unlocks() {
+    let mut engine = engine_with_password("123456");
+    assert_eq!(engine.current_app_screen(), &AppScreen::Lock);
+
+    // Enter correct PIN and press unlock
+    enter_pin(&mut engine, "123456");
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "unlock".into(),
+    });
+
+    // Should navigate to Home
+    assert!(
+        matches!(result, ActionResult::NavigateTo(_)),
+        "correct PIN should navigate to Home, got {:?}",
+        result
+    );
+    assert_eq!(
+        engine.current_app_screen(),
+        &AppScreen::Home,
+        "should be on Home after correct PIN"
+    );
+}
+
+#[test]
+fn lock_screen_empty_pin_does_not_unlock() {
+    let mut engine = engine_with_password("123456");
+    assert_eq!(engine.current_app_screen(), &AppScreen::Lock);
+
+    // Press unlock without entering any PIN
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "unlock".into(),
+    });
+
+    assert_ne!(
+        engine.current_app_screen(),
+        &AppScreen::Home,
+        "empty PIN must NOT unlock the app"
+    );
+    assert!(
+        !matches!(result, ActionResult::NavigateTo(_)),
+        "empty PIN should not produce NavigateTo, got {:?}",
+        result
+    );
+}
+
+#[test]
+fn lock_screen_tracks_failed_attempts() {
+    let mut engine = engine_with_password("123456");
+
+    // Enter wrong PIN twice
+    for _ in 0..2 {
+        enter_pin(&mut engine, "000000");
+        let _ = engine.handle_action(UserAction::ActionPressed {
+            action_id: "unlock".into(),
+        });
+        // Clear PIN for next attempt — navigate back to lock to get fresh engine
+        // Actually LockScreenEngine should still be active, but PIN persists.
+        // We need to clear the entered PIN for the next attempt.
+        // The lock screen should show remaining attempts in the validation error.
+    }
+
+    // Should still be on Lock screen
+    assert_eq!(
+        engine.current_app_screen(),
+        &AppScreen::Lock,
+        "should remain locked after failed attempts"
+    );
+
+    // The screen should show attempt tracking info
+    let screen = engine.current_screen();
+    let has_validation_error = screen.components.iter().any(|c| {
+        matches!(
+            c,
+            vauchi_core::ui::Component::PinInput {
+                validation_error: Some(_),
+                ..
+            }
+        )
+    });
+    assert!(
+        has_validation_error,
+        "lock screen should show remaining attempts after failures"
+    );
+}
+
+#[test]
+fn lock_screen_correct_pin_after_failed_attempt_unlocks() {
+    let mut engine = engine_with_password("123456");
+
+    // First attempt: wrong PIN
+    enter_pin(&mut engine, "000000");
+    let _ = engine.handle_action(UserAction::ActionPressed {
+        action_id: "unlock".into(),
+    });
+    assert_eq!(engine.current_app_screen(), &AppScreen::Lock);
+
+    // Second attempt: correct PIN
+    enter_pin(&mut engine, "123456");
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "unlock".into(),
+    });
+
+    assert!(
+        matches!(result, ActionResult::NavigateTo(_)),
+        "correct PIN after failed attempt should unlock, got {:?}",
+        result
+    );
+    assert_eq!(engine.current_app_screen(), &AppScreen::Home);
+}
+
 #[test]
 fn invalidate_all_clears_entire_cache() {
     let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();

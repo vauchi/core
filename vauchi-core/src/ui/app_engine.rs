@@ -162,8 +162,28 @@ impl<T: Transport> AppEngine<T> {
                 }
             }
             AppScreen::Lock => {
-                let screen = self.navigate_to(AppScreen::Home);
-                ActionResult::NavigateTo(screen)
+                let pin = match self.engine.collected_input() {
+                    Some(p) => p,
+                    None => {
+                        return ActionResult::ValidationError {
+                            component_id: "pin".into(),
+                            message: "Please enter your password".into(),
+                        };
+                    }
+                };
+                match self.vauchi.authenticate(&pin) {
+                    Ok(_auth_mode) => {
+                        let screen = self.navigate_to(AppScreen::Home);
+                        ActionResult::NavigateTo(screen)
+                    }
+                    Err(_) => {
+                        // Notify lock engine of failed auth so it tracks attempts
+                        // and clears the entered PIN.
+                        self.engine.handle_action(UserAction::ActionPressed {
+                            action_id: "auth_failed".into(),
+                        })
+                    }
+                }
             }
             AppScreen::Exchange => {
                 let screen = self.navigate_to(AppScreen::Contacts);

@@ -13,6 +13,7 @@ use crate::network::Transport;
 
 use super::action::{ActionResult, UserAction};
 use super::backup_recovery::BackupRecoveryEngine;
+use super::component::ContactItem;
 use super::contact_list::ContactListEngine;
 use super::delivery::DeliveryStatusEngine;
 use super::device_linking::DeviceLinkingEngine;
@@ -20,7 +21,7 @@ use super::duress_pin::{DuressConfig, DuressPinEngine};
 use super::emergency_shred::EmergencyShredEngine;
 use super::engine::WorkflowEngine;
 use super::exchange::{ExchangeConfig, ExchangeEngine};
-use super::help::HelpEngine;
+use super::help::{HelpEngine, HelpItem};
 use super::home::{HomeEngine, HomeProgress};
 use super::lock_screen::LockScreenEngine;
 use super::onboarding::OnboardingEngine;
@@ -132,12 +133,16 @@ impl<T: Transport> AppEngine<T> {
         match screen {
             AppScreen::Onboarding => Box::new(OnboardingEngine::new()),
             AppScreen::Home => {
-                let contacts = vec![];
-                let progress = HomeProgress::default();
+                let contacts = Self::load_contact_items(vauchi);
+                let has_identity = vauchi.has_identity();
+                let progress = HomeProgress {
+                    completed_steps: if has_identity { 3 } else { 0 },
+                    total_steps: 3,
+                };
                 Box::new(HomeEngine::new(contacts, progress))
             }
             AppScreen::Contacts => {
-                let contacts = vec![];
+                let contacts = Self::load_contact_items(vauchi);
                 Box::new(ContactListEngine::new(contacts))
             }
             AppScreen::Settings => {
@@ -165,7 +170,7 @@ impl<T: Transport> AppEngine<T> {
                 };
                 Box::new(ExchangeEngine::new(config))
             }
-            AppScreen::Help => Box::new(HelpEngine::new(vec![])),
+            AppScreen::Help => Box::new(HelpEngine::new(Self::default_help_items())),
             AppScreen::Backup => Box::new(BackupRecoveryEngine::new(None)),
             AppScreen::Lock => Box::new(LockScreenEngine::new(5)),
             AppScreen::DeviceLinking => {
@@ -188,6 +193,70 @@ impl<T: Transport> AppEngine<T> {
             }
         }
     }
+
+    fn load_contact_items(vauchi: &Vauchi<T>) -> Vec<ContactItem> {
+        vauchi
+            .list_contacts()
+            .unwrap_or_default()
+            .iter()
+            .map(|c| ContactItem {
+                id: c.id().to_string(),
+                name: c.display_name().to_string(),
+                subtitle: None,
+                avatar_initials: initials(c.display_name()),
+                status: None,
+            })
+            .collect()
+    }
+
+    fn default_help_items() -> Vec<HelpItem> {
+        vec![
+            HelpItem {
+                id: "add-contact".into(),
+                question: "How do I add a contact?".into(),
+                answer_url: Some("https://docs.vauchi.app/faq/add-contact".into()),
+                category: "Getting Started".into(),
+            },
+            HelpItem {
+                id: "e2e-encryption".into(),
+                question: "What is end-to-end encryption?".into(),
+                answer_url: Some("https://docs.vauchi.app/faq/e2e".into()),
+                category: "Security".into(),
+            },
+            HelpItem {
+                id: "create-backup".into(),
+                question: "How do I create a backup?".into(),
+                answer_url: Some("https://docs.vauchi.app/faq/backup".into()),
+                category: "Getting Started".into(),
+            },
+            HelpItem {
+                id: "recovery".into(),
+                question: "How does social recovery work?".into(),
+                answer_url: Some("https://docs.vauchi.app/faq/recovery".into()),
+                category: "Security".into(),
+            },
+            HelpItem {
+                id: "exchange-qr".into(),
+                question: "How do I exchange contact cards?".into(),
+                answer_url: Some("https://docs.vauchi.app/faq/exchange".into()),
+                category: "Getting Started".into(),
+            },
+            HelpItem {
+                id: "tor-privacy".into(),
+                question: "How does Tor routing protect my privacy?".into(),
+                answer_url: Some("https://docs.vauchi.app/faq/tor".into()),
+                category: "Privacy".into(),
+            },
+        ]
+    }
+}
+
+fn initials(name: &str) -> String {
+    name.split_whitespace()
+        .filter_map(|w| w.chars().next())
+        .take(2)
+        .collect::<String>()
+        .to_uppercase()
 }
 
 impl<T: Transport> WorkflowEngine for AppEngine<T> {

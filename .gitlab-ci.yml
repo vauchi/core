@@ -252,7 +252,7 @@ test:cucumber:
     - cargo test --test cucumber_tests -- --tags "not @wip"
 
 test:platform:
-  extends: [.linux-runner, .validation-mobile, .timeout-standard]
+  extends: [.linux-runner, .validation-platform, .timeout-standard]
   stage: test
   needs:
     - job: lint:format
@@ -799,7 +799,7 @@ release:create:
       - [vauchi-core](${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/vauchi-core/${CI_COMMIT_TAG#v}/vauchi-core-${CI_COMMIT_TAG#v}.crate)
       - [vauchi-platform](${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/vauchi-platform/${CI_COMMIT_TAG#v}/vauchi-platform-${CI_COMMIT_TAG#v}.crate)
 
-      ### Mobile Bindings
+      ### Platform Bindings
 
       - [iOS XCFramework](${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/vauchi-platform/${CI_COMMIT_TAG#v}/VauchiPlatformFFI.xcframework.zip)
       - [Android](${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/vauchi-platform/${CI_COMMIT_TAG#v}/vauchi-platform-kotlin-${CI_COMMIT_TAG#v}.zip)
@@ -815,7 +815,7 @@ release:create:
       See [documentation](https://gitlab.com/vauchi/core/-/blob/main/README.md) for integration instructions.
 
 # ============================================================
-# Trigger Stage (Tags only) — Mobile Distribution
+# Trigger Stage (Tags only) — Platform Distribution
 # ============================================================
 # Trigger vauchi-platform-swift and vauchi-platform-kotlin to rebuild
 # and publish bindings for this release version.

@@ -19,13 +19,16 @@ use super::component::{ContactItem, FieldDisplay, UiFieldVisibility};
 use super::contact_detail::{ContactDetailEngine, ContactNotFoundEngine};
 use super::contact_edit::{ContactEditEngine, EditableContact, EditableField};
 use super::contact_list::ContactListEngine;
+use super::contact_visibility::ContactVisibilityEngine;
 use super::delivery::DeliveryStatusEngine;
 use super::device_linking::DeviceLinkingEngine;
 use super::duress_pin::{DuressConfig, DuressPinEngine};
 use super::emergency_shred::EmergencyShredEngine;
 use super::engine::WorkflowEngine;
 use super::exchange::{ExchangeConfig, ExchangeEngine};
+use super::form_dialog::{FormDialogEngine, FormDialogType};
 use super::gdpr::GdprEngine;
+use super::group_detail::GroupDetailEngine;
 use super::groups_list::GroupsEngine;
 use super::help::{HelpEngine, HelpItem};
 use super::home::{HomeEngine, HomeProgress};
@@ -46,6 +49,7 @@ pub enum AppScreen {
     Contacts,
     ContactDetail { contact_id: String },
     ContactEdit { contact_id: String },
+    ContactVisibility { contact_id: String },
     Exchange,
     Settings,
     Help,
@@ -59,8 +63,10 @@ pub enum AppScreen {
     TorSettings,
     Recovery,
     Groups,
+    GroupDetail { group_id: String },
     Privacy,
     Support,
+    FormDialog { dialog_type: FormDialogType },
 }
 
 /// Unified orchestrator for all frontends.
@@ -326,10 +332,18 @@ impl<T: Transport> AppEngine<T> {
                 Box::new(RecoveryEngine::new(contacts, 3))
             }
             AppScreen::Groups => Box::new(GroupsEngine::new(vec![])),
+            AppScreen::GroupDetail { group_id } => Box::new(GroupDetailEngine::new(
+                group_id.clone(),
+                "Group".into(),
+                vec![],
+            )),
             AppScreen::Privacy => {
                 Box::new(GdprEngine::new(None, "No data export requested".into()))
             }
             AppScreen::Support => Box::new(SupportEngine::new()),
+            AppScreen::FormDialog { dialog_type } => {
+                Box::new(FormDialogEngine::new(dialog_type.clone()))
+            }
             AppScreen::ContactDetail { contact_id } => match vauchi.get_contact(contact_id) {
                 Ok(Some(contact)) => {
                     let fields = contact
@@ -355,6 +369,34 @@ impl<T: Transport> AppEngine<T> {
                 }
                 _ => Box::new(ContactNotFoundEngine::new(contact_id.clone())),
             },
+            AppScreen::ContactVisibility { contact_id } => {
+                let (name, fields) = match vauchi.get_contact(contact_id) {
+                    Ok(Some(contact)) => {
+                        let name = contact.display_name().to_string();
+                        let items = contact
+                            .card()
+                            .fields()
+                            .iter()
+                            .map(|f| super::component::ToggleItem {
+                                id: f.id().to_string(),
+                                label: f.label().to_string(),
+                                selected: true,
+                                subtitle: None,
+                            })
+                            .collect();
+                        (name, items)
+                    }
+                    _ => (
+                        format!("Contact {}", &contact_id[..8.min(contact_id.len())]),
+                        vec![],
+                    ),
+                };
+                Box::new(ContactVisibilityEngine::new(
+                    contact_id.clone(),
+                    name,
+                    fields,
+                ))
+            }
             AppScreen::ContactEdit { contact_id } => match vauchi.get_contact(contact_id) {
                 Ok(Some(contact)) => {
                     let fields = contact

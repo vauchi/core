@@ -8,7 +8,7 @@ use vauchi_core::contact_card::ContactCard;
 use vauchi_core::crypto::SymmetricKey;
 use vauchi_core::network::MockTransport;
 use vauchi_core::ui::{
-    ActionResult, ActionStyle, AppEngine, AppScreen, UserAction, WorkflowEngine,
+    ActionResult, ActionStyle, AppEngine, AppScreen, Component, UserAction, WorkflowEngine,
 };
 
 /// Drive through the full onboarding flow, returning the final ActionResult.
@@ -1226,6 +1226,137 @@ fn privacy_engine_text_changed_is_noop() {
             assert_eq!(screen.screen_id, "privacy_settings");
         }
         other => panic!("Expected UpdateScreen, got {other:?}"),
+    }
+}
+
+#[test]
+fn navigate_to_group_detail_shows_group() {
+    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    let mut engine = AppEngine::new(vauchi);
+    let screen = engine.navigate_to(AppScreen::GroupDetail {
+        group_id: "g1".into(),
+    });
+    assert_eq!(screen.screen_id, "group_detail");
+    assert!(
+        screen
+            .actions
+            .iter()
+            .any(|a| a.id == "delete_group" && a.style == ActionStyle::Destructive),
+        "GroupDetail must have destructive delete action"
+    );
+}
+
+// ── contact visibility tests ─────────────────────────────────────────
+
+#[test]
+fn navigate_to_contact_visibility_shows_toggles() {
+    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    let mut engine = AppEngine::new(vauchi);
+    // No real contact exists, so engine shows empty field list
+    let screen = engine.navigate_to(AppScreen::ContactVisibility {
+        contact_id: "fake-id".into(),
+    });
+    assert_eq!(screen.screen_id, "contact_visibility");
+    assert!(
+        screen.actions.iter().any(|a| a.id == "save"),
+        "Visibility screen must have save action"
+    );
+}
+
+#[test]
+fn contact_visibility_toggle_updates_field() {
+    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    let mut engine = AppEngine::new(vauchi);
+    engine.navigate_to(AppScreen::ContactVisibility {
+        contact_id: "fake-id".into(),
+    });
+    // Toggle a nonexistent field — should not panic, just return screen
+    let result = engine.handle_action(UserAction::ItemToggled {
+        component_id: "field_toggles".into(),
+        item_id: "nonexistent".into(),
+    });
+    match result {
+        ActionResult::UpdateScreen(screen) => {
+            assert_eq!(screen.screen_id, "contact_visibility");
+        }
+        other => panic!("Expected UpdateScreen, got {other:?}"),
+    }
+}
+
+// ── FormDialogEngine tests ────────────────────────────────────────────
+
+use vauchi_core::ui::FormDialogType;
+
+#[test]
+fn form_dialog_add_field_shows_two_inputs() {
+    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    let mut engine = AppEngine::new(vauchi);
+    let screen = engine.navigate_to(AppScreen::FormDialog {
+        dialog_type: FormDialogType::AddField,
+    });
+    assert_eq!(screen.screen_id, "form_add_field");
+    // AddField has 2 TextInput components (label + value)
+    let text_inputs: Vec<_> = screen
+        .components
+        .iter()
+        .filter(|c| matches!(c, Component::TextInput { .. }))
+        .collect();
+    assert_eq!(text_inputs.len(), 2, "AddField must have 2 text inputs");
+}
+
+#[test]
+fn form_dialog_edit_name_tracks_text_changes() {
+    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    let mut engine = AppEngine::new(vauchi);
+    engine.navigate_to(AppScreen::FormDialog {
+        dialog_type: FormDialogType::EditName {
+            current_name: "Old Name".into(),
+        },
+    });
+    // Change the display name
+    let result = engine.handle_action(UserAction::TextChanged {
+        component_id: "display_name".into(),
+        value: "New Name".into(),
+    });
+    match result {
+        ActionResult::UpdateScreen(screen) => {
+            assert_eq!(screen.screen_id, "form_edit_name");
+            // Verify the TextInput now shows "New Name"
+            let has_new_value = screen.components.iter().any(|c| {
+                matches!(c, Component::TextInput { id, value, .. } if id == "display_name" && value == "New Name")
+            });
+            assert!(has_new_value, "TextInput should reflect updated value");
+        }
+        other => panic!("Expected UpdateScreen, got {other:?}"),
+    }
+}
+
+#[test]
+fn form_dialog_submit_navigates_back() {
+    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    let mut engine = AppEngine::new(vauchi);
+    // Navigate to Home first, then to the form — so back goes to Home
+    engine.navigate_to(AppScreen::Home);
+    engine.navigate_to(AppScreen::FormDialog {
+        dialog_type: FormDialogType::EditRelayUrl {
+            current_url: "wss://old.relay".into(),
+        },
+    });
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "submit".into(),
+    });
+    // AppEngine intercepts Complete and navigates back
+    match result {
+        ActionResult::NavigateTo(screen) => {
+            assert_eq!(screen.screen_id, "home");
+        }
+        other => panic!("Expected NavigateTo(home), got {other:?}"),
     }
 }
 

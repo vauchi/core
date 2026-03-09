@@ -22,7 +22,10 @@ trait WorkflowEngineAny: Send {
 
 impl<T: WorkflowEngine + Send> WorkflowEngineAny for T {
     fn current_screen_json(&self) -> String {
-        serde_json::to_string(&self.current_screen()).unwrap_or_default()
+        match serde_json::to_string(&self.current_screen()) {
+            Ok(json) => json,
+            Err(e) => format!(r#"{{"error":"serialization failed: {}"}}"#, e),
+        }
     }
 
     fn handle_action_json(&mut self, json: &str) -> String {
@@ -117,7 +120,8 @@ pub unsafe extern "C" fn vauchi_workflow_destroy(handle: *mut VauchiWorkflow) {
 
 /// Get the current screen as a JSON string.
 ///
-/// Returns null if the handle is null. The caller must free the returned
+/// Returns null if the handle is null. Returns an error JSON object if
+/// the internal lock is poisoned. The caller must free the returned
 /// string with `vauchi_string_free`.
 ///
 /// # Safety
@@ -133,7 +137,7 @@ pub unsafe extern "C" fn vauchi_workflow_current_screen(
     let workflow = &*handle;
     match workflow.engine.lock() {
         Ok(engine) => to_c_string(&engine.current_screen_json()),
-        Err(_) => std::ptr::null_mut(),
+        Err(_) => to_c_string(r#"{"error":"lock poisoned"}"#),
     }
 }
 

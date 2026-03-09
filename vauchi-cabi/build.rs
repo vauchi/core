@@ -4,7 +4,12 @@
 
 fn main() {
     let crate_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap();
-    if let Ok(bindings) = cbindgen::generate(&crate_dir) {
-        bindings.write_to_file("include/vauchi.h");
+    match cbindgen::generate(&crate_dir) {
+        Ok(bindings) => {
+            bindings.write_to_file("include/vauchi.h");
+        }
+        Err(e) => {
+            println!("cargo:warning=cbindgen failed: {}", e);
+        }
     }
 }

@@ -286,6 +286,15 @@ impl<T: Transport> Vauchi<T> {
         &self.config
     }
 
+    /// Returns a mutable reference to the configuration.
+    ///
+    /// Used by `AppEngine` to persist settings toggles (e.g. delivery
+    /// receipts, suppress presence) so that freshly created engines
+    /// pick up the latest values.
+    pub fn config_mut(&mut self) -> &mut VauchiConfig {
+        &mut self.config
+    }
+
     /// Returns a reference to the storage.
     pub fn storage(&self) -> &Storage {
         &self.storage

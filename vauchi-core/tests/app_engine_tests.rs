@@ -557,6 +557,103 @@ fn navigate_creates_fresh_engine_first_time() {
     assert_eq!(settings.screen_id, "settings");
 }
 
+// ── settings toggle persistence tests (HIGH-4) ──────────────────────
+
+/// Helper: find a toggle's enabled state in a settings screen.
+fn find_settings_toggle(
+    screen: &vauchi_core::ui::ScreenModel,
+    group_id: &str,
+    item_id: &str,
+) -> bool {
+    use vauchi_core::ui::{Component, SettingsItemKind};
+    screen
+        .components
+        .iter()
+        .find_map(|c| match c {
+            Component::SettingsGroup { id, items, .. } if id == group_id => {
+                items.iter().find_map(|item| match &item.kind {
+                    SettingsItemKind::Toggle { enabled } if item.id == item_id => Some(*enabled),
+                    _ => None,
+                })
+            }
+            _ => None,
+        })
+        .unwrap_or_else(|| panic!("Toggle '{item_id}' not found in group '{group_id}'"))
+}
+
+#[test]
+fn settings_toggle_persists_after_navigate_away_and_back() {
+    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    let mut engine = AppEngine::new(vauchi);
+
+    // Navigate to Settings
+    let screen = engine.navigate_to(AppScreen::Settings);
+    assert!(
+        find_settings_toggle(&screen, "privacy", "delivery_receipts"),
+        "delivery_receipts should default to enabled"
+    );
+
+    // Toggle delivery_receipts off
+    let result = engine.handle_action(UserAction::SettingsToggled {
+        component_id: "privacy".into(),
+        item_id: "delivery_receipts".into(),
+    });
+    match &result {
+        ActionResult::UpdateScreen(s) => {
+            assert!(
+                !find_settings_toggle(s, "privacy", "delivery_receipts"),
+                "delivery_receipts should be disabled after toggle"
+            );
+        }
+        other => panic!("Expected UpdateScreen, got {other:?}"),
+    }
+
+    // Navigate away to Home
+    engine.navigate_to(AppScreen::Home);
+
+    // Invalidate Settings cache to force fresh engine from vauchi.config()
+    engine.invalidate_screen(&AppScreen::Settings);
+
+    // Navigate back to Settings — toggle should still be off
+    let restored = engine.navigate_to(AppScreen::Settings);
+    assert!(
+        !find_settings_toggle(&restored, "privacy", "delivery_receipts"),
+        "delivery_receipts toggle should persist after navigating away and back (even with cache invalidated)"
+    );
+}
+
+#[test]
+fn settings_toggle_suppress_presence_persists() {
+    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    let mut engine = AppEngine::new(vauchi);
+
+    // Navigate to Settings
+    let screen = engine.navigate_to(AppScreen::Settings);
+    assert!(
+        !find_settings_toggle(&screen, "privacy", "suppress_presence"),
+        "suppress_presence should default to disabled"
+    );
+
+    // Toggle suppress_presence on
+    let _ = engine.handle_action(UserAction::SettingsToggled {
+        component_id: "privacy".into(),
+        item_id: "suppress_presence".into(),
+    });
+
+    // Navigate away and invalidate
+    engine.navigate_to(AppScreen::Home);
+    engine.invalidate_screen(&AppScreen::Settings);
+
+    // Navigate back — should still be on
+    let restored = engine.navigate_to(AppScreen::Settings);
+    assert!(
+        find_settings_toggle(&restored, "privacy", "suppress_presence"),
+        "suppress_presence toggle should persist after navigating away and back"
+    );
+}
+
 // ── cache invalidation tests ─────────────────────────────────────────
 
 #[test]

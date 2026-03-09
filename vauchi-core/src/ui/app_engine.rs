@@ -484,6 +484,29 @@ impl<T: Transport> WorkflowEngine for AppEngine<T> {
             }
         }
 
+        // Persist settings toggles to Vauchi config so fresh engines
+        // pick up the latest values (fixes HIGH-4).
+        if self.screen == AppScreen::Settings {
+            if let UserAction::SettingsToggled {
+                ref component_id,
+                ref item_id,
+            } = action
+            {
+                if component_id == "privacy" {
+                    let config = self.vauchi.config_mut();
+                    match item_id.as_str() {
+                        "delivery_receipts" => {
+                            config.delivery_receipts_enabled = !config.delivery_receipts_enabled;
+                        }
+                        "suppress_presence" => {
+                            config.suppress_presence = !config.suppress_presence;
+                        }
+                        _ => {}
+                    }
+                }
+            }
+        }
+
         let result = self.engine.handle_action(action);
         match result {
             ActionResult::Complete => self.handle_completion(),

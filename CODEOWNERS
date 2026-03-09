@@ -15,5 +15,5 @@
 /.gitlab-ci.yml @megloff1
 /deny.toml @megloff1
 
-# Mobile bindings - affects all platforms
-/vauchi-mobile/ @megloff1
+# Platform bindings - affects all platforms
+/vauchi-platform/ @megloff1

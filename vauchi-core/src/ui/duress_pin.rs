@@ -18,6 +18,8 @@ pub struct DuressConfig {
     pub include_location: bool,
 }
 
+const PIN_LENGTH: usize = 6;
+
 /// Engine that drives the duress PIN setup workflow.
 pub struct DuressPinEngine {
     step: DuressPinStep,
@@ -133,7 +135,8 @@ impl DuressPinEngine {
             components: vec![Component::PinInput {
                 id: "pin".into(),
                 label: "Enter Duress PIN".into(),
-                length: 6,
+                length: PIN_LENGTH,
+                filled: self.new_pin.len(),
                 masked: true,
                 validation_error: None,
             }],
@@ -163,7 +166,8 @@ impl DuressPinEngine {
             components: vec![Component::PinInput {
                 id: "confirm_pin".into(),
                 label: "Confirm Duress PIN".into(),
-                length: 6,
+                length: PIN_LENGTH,
+                filled: self.confirm_pin.len(),
                 masked: true,
                 validation_error: None,
             }],
@@ -266,7 +270,15 @@ impl WorkflowEngine for DuressPinEngine {
                     value,
                 },
             ) if component_id == "pin" => {
-                self.new_pin = value;
+                if value.is_empty() {
+                    self.new_pin.pop();
+                } else if value.len() == 1 {
+                    if self.new_pin.len() < PIN_LENGTH {
+                        self.new_pin.push_str(&value);
+                    }
+                } else {
+                    self.new_pin = value;
+                }
                 ActionResult::UpdateScreen(self.current_screen())
             }
             (DuressPinStep::EnterPin, UserAction::ActionPressed { action_id })
@@ -297,7 +309,15 @@ impl WorkflowEngine for DuressPinEngine {
                     value,
                 },
             ) if component_id == "confirm_pin" => {
-                self.confirm_pin = value;
+                if value.is_empty() {
+                    self.confirm_pin.pop();
+                } else if value.len() == 1 {
+                    if self.confirm_pin.len() < PIN_LENGTH {
+                        self.confirm_pin.push_str(&value);
+                    }
+                } else {
+                    self.confirm_pin = value;
+                }
                 ActionResult::UpdateScreen(self.current_screen())
             }
             (DuressPinStep::ConfirmPin, UserAction::ActionPressed { action_id })

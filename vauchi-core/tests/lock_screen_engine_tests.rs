@@ -140,3 +140,143 @@ fn lock_screen_max_attempts_lockout() {
         "should return true when max attempts reached"
     ); // 3 of 3
 }
+
+#[test]
+fn lock_screen_pin_accumulates_single_chars() {
+    let mut engine = LockScreenEngine::new(3);
+
+    // Type "1", "2", "3", "4" one char at a time (simulating TUI key presses)
+    for ch in ['1', '2', '3', '4'] {
+        let _ = engine.handle_action(UserAction::TextChanged {
+            component_id: "pin".into(),
+            value: ch.to_string(),
+        });
+    }
+
+    // The unlock button should be enabled (pin is non-empty)
+    let screen = engine.current_screen();
+    let unlock = screen
+        .actions
+        .iter()
+        .find(|a| a.id == "unlock")
+        .expect("should have unlock action");
+    assert!(
+        unlock.enabled,
+        "unlock should be enabled after typing 4 chars"
+    );
+
+    // The PinInput should report 4 filled positions
+    let pin = screen
+        .components
+        .iter()
+        .find(|c| matches!(c, Component::PinInput { id, .. } if id == "pin"))
+        .expect("should have PinInput");
+    match pin {
+        Component::PinInput { filled, .. } => {
+            assert_eq!(
+                *filled, 4,
+                "should have 4 filled positions after typing 1234"
+            );
+        }
+        _ => unreachable!(),
+    }
+}
+
+#[test]
+fn lock_screen_pin_backspace_removes_last_char() {
+    let mut engine = LockScreenEngine::new(3);
+
+    // Type "1", "2", "3"
+    for ch in ['1', '2', '3'] {
+        let _ = engine.handle_action(UserAction::TextChanged {
+            component_id: "pin".into(),
+            value: ch.to_string(),
+        });
+    }
+
+    // Backspace (empty value = delete last char)
+    let _ = engine.handle_action(UserAction::TextChanged {
+        component_id: "pin".into(),
+        value: String::new(),
+    });
+
+    let screen = engine.current_screen();
+    let pin = screen
+        .components
+        .iter()
+        .find(|c| matches!(c, Component::PinInput { id, .. } if id == "pin"))
+        .expect("should have PinInput");
+    match pin {
+        Component::PinInput { filled, .. } => {
+            assert_eq!(
+                *filled, 2,
+                "should have 2 filled positions after typing 123 then backspace"
+            );
+        }
+        _ => unreachable!(),
+    }
+}
+
+#[test]
+fn lock_screen_pin_backspace_on_empty_is_noop() {
+    let mut engine = LockScreenEngine::new(3);
+
+    // Backspace on empty PIN
+    let _ = engine.handle_action(UserAction::TextChanged {
+        component_id: "pin".into(),
+        value: String::new(),
+    });
+
+    let screen = engine.current_screen();
+    let pin = screen
+        .components
+        .iter()
+        .find(|c| matches!(c, Component::PinInput { id, .. } if id == "pin"))
+        .expect("should have PinInput");
+    match pin {
+        Component::PinInput { filled, .. } => {
+            assert_eq!(
+                *filled, 0,
+                "should have 0 filled positions after backspace on empty"
+            );
+        }
+        _ => unreachable!(),
+    }
+
+    let unlock = screen
+        .actions
+        .iter()
+        .find(|a| a.id == "unlock")
+        .expect("should have unlock action");
+    assert!(
+        !unlock.enabled,
+        "unlock should be disabled when pin is empty"
+    );
+}
+
+#[test]
+fn lock_screen_pin_does_not_exceed_length() {
+    let mut engine = LockScreenEngine::new(3);
+
+    // Type 8 chars (length is 6)
+    for ch in ['1', '2', '3', '4', '5', '6', '7', '8'] {
+        let _ = engine.handle_action(UserAction::TextChanged {
+            component_id: "pin".into(),
+            value: ch.to_string(),
+        });
+    }
+
+    let screen = engine.current_screen();
+    let pin = screen
+        .components
+        .iter()
+        .find(|c| matches!(c, Component::PinInput { id, .. } if id == "pin"))
+        .expect("should have PinInput");
+    match pin {
+        Component::PinInput { filled, length, .. } => {
+            assert_eq!(*filled, 6, "filled should be capped at length");
+            assert_eq!(*length, 6);
+        }
+        _ => unreachable!(),
+    }
+}

@@ -11,6 +11,7 @@ use zeroize::Zeroize;
 #[derive(Clone, Debug)]
 pub struct LockScreenEngine {
     entered_pin: String,
+    pin_length: usize,
     max_attempts: usize,
     attempts: usize,
 }
@@ -25,6 +26,7 @@ impl LockScreenEngine {
     pub fn new(max_attempts: usize) -> Self {
         Self {
             entered_pin: String::new(),
+            pin_length: 6,
             max_attempts,
             attempts: 0,
         }
@@ -55,7 +57,8 @@ impl WorkflowEngine for LockScreenEngine {
         let components = vec![Component::PinInput {
             id: "pin".into(),
             label: "Password".into(),
-            length: 6,
+            length: self.pin_length,
+            filled: self.entered_pin.len(),
             masked: true,
             validation_error: self.pin_validation_error(),
         }];
@@ -83,7 +86,18 @@ impl WorkflowEngine for LockScreenEngine {
                 component_id,
                 value,
             } if component_id == "pin" => {
-                self.entered_pin = value;
+                if value.is_empty() {
+                    // Backspace: remove last character
+                    self.entered_pin.pop();
+                } else if value.len() == 1 {
+                    // Single character: accumulate (ignore if at max length)
+                    if self.entered_pin.len() < self.pin_length {
+                        self.entered_pin.push_str(&value);
+                    }
+                } else {
+                    // Full value (e.g. from programmatic input): replace
+                    self.entered_pin = value;
+                }
                 ActionResult::UpdateScreen(self.current_screen())
             }
             UserAction::ActionPressed { action_id } if action_id == "unlock" => {

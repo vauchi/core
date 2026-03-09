@@ -369,3 +369,95 @@ fn duress_back_navigation() {
         other => panic!("expected NavigateTo confirm_pin, got {:?}", other),
     }
 }
+
+#[test]
+fn duress_pin_accumulates_single_chars() {
+    let mut engine = DuressPinEngine::new(default_config());
+    // Navigate to EnterPin
+    let _ = engine.handle_action(UserAction::ActionPressed {
+        action_id: "configure".into(),
+    });
+
+    // Type "1", "2", "3", "4", "5", "6" one char at a time
+    for ch in ['1', '2', '3', '4', '5', '6'] {
+        let _ = engine.handle_action(UserAction::TextChanged {
+            component_id: "pin".into(),
+            value: ch.to_string(),
+        });
+    }
+
+    // Continue should succeed (PIN is non-empty)
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "continue".into(),
+    });
+    match result {
+        ActionResult::NavigateTo(screen) => {
+            assert_eq!(
+                screen.screen_id, "duress_confirm_pin",
+                "should advance to confirm after accumulating 6 chars"
+            );
+        }
+        other => panic!("expected NavigateTo, got {:?}", other),
+    }
+
+    // Now type the same PIN in confirm step, one char at a time
+    for ch in ['1', '2', '3', '4', '5', '6'] {
+        let _ = engine.handle_action(UserAction::TextChanged {
+            component_id: "confirm_pin".into(),
+            value: ch.to_string(),
+        });
+    }
+
+    // Continue should succeed (PINs match)
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "continue".into(),
+    });
+    match result {
+        ActionResult::NavigateTo(screen) => {
+            assert_eq!(
+                screen.screen_id, "duress_alerts",
+                "should advance to alerts when accumulated PINs match"
+            );
+        }
+        other => panic!("expected NavigateTo alerts, got {:?}", other),
+    }
+}
+
+#[test]
+fn duress_pin_backspace_removes_last_char() {
+    let mut engine = DuressPinEngine::new(default_config());
+    // Navigate to EnterPin
+    let _ = engine.handle_action(UserAction::ActionPressed {
+        action_id: "configure".into(),
+    });
+
+    // Type "1", "2", "3"
+    for ch in ['1', '2', '3'] {
+        let _ = engine.handle_action(UserAction::TextChanged {
+            component_id: "pin".into(),
+            value: ch.to_string(),
+        });
+    }
+
+    // Backspace
+    let _ = engine.handle_action(UserAction::TextChanged {
+        component_id: "pin".into(),
+        value: String::new(),
+    });
+
+    let screen = engine.current_screen();
+    let pin = screen
+        .components
+        .iter()
+        .find(|c| matches!(c, Component::PinInput { id, .. } if id == "pin"))
+        .expect("should have PinInput");
+    match pin {
+        Component::PinInput { filled, .. } => {
+            assert_eq!(
+                *filled, 2,
+                "should have 2 filled positions after typing 123 then backspace"
+            );
+        }
+        _ => unreachable!(),
+    }
+}

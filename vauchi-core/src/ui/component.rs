@@ -70,6 +70,7 @@ pub enum Component {
         id: String,
         label: String,
         length: usize,
+        filled: usize,
         masked: bool,
         validation_error: Option<String>,
     },

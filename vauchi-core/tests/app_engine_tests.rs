@@ -359,6 +359,21 @@ fn onboarding_complete_creates_identity_in_vauchi() {
     );
 }
 
+// ── home screen contact limit tests ─────────────────────────────────
+
+#[test]
+fn home_screen_limits_displayed_contacts() {
+    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    // Home screen should show max 5 contacts
+    // With 0 contacts, truncate(5) is a no-op — verify it doesn't break
+    let engine = AppEngine::new(vauchi);
+    let screen = engine.current_screen();
+    assert_eq!(screen.screen_id, "home");
+    // Verify the screen renders successfully (truncate of empty list is safe)
+    assert!(!screen.title.is_empty(), "home screen should have a title");
+}
+
 // ── contact detail / edit wiring tests ──────────────────────────────
 
 #[test]

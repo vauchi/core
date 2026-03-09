@@ -149,7 +149,8 @@ impl<T: Transport> AppEngine<T> {
         match screen {
             AppScreen::Onboarding => Box::new(OnboardingEngine::new()),
             AppScreen::Home => {
-                let contacts = Self::load_contact_items(vauchi);
+                let mut contacts = Self::load_contact_items(vauchi);
+                contacts.truncate(5); // Home shows recent contacts only
                 let progress = vauchi
                     .get_setup_progress()
                     .map(|sp| HomeProgress {

@@ -6,6 +6,35 @@ use vauchi_core::api::Vauchi;
 use vauchi_core::network::MockTransport;
 use vauchi_core::ui::{ActionResult, AppEngine, AppScreen, UserAction, WorkflowEngine};
 
+/// Drive through the full onboarding flow, returning the final ActionResult.
+fn drive_onboarding(engine: &mut AppEngine<MockTransport>) -> ActionResult {
+    let _ = engine.handle_action(UserAction::ActionPressed {
+        action_id: "create_new".into(),
+    });
+    let _ = engine.handle_action(UserAction::ActionPressed {
+        action_id: "get_started".into(),
+    });
+    let _ = engine.handle_action(UserAction::TextChanged {
+        component_id: "display_name".into(),
+        value: "Alice".into(),
+    });
+    let _ = engine.handle_action(UserAction::ActionPressed {
+        action_id: "continue".into(),
+    });
+    let _ = engine.handle_action(UserAction::ActionPressed {
+        action_id: "skip_to_finish".into(),
+    });
+    let _ = engine.handle_action(UserAction::ActionPressed {
+        action_id: "continue".into(),
+    });
+    let _ = engine.handle_action(UserAction::ActionPressed {
+        action_id: "skip".into(),
+    });
+    engine.handle_action(UserAction::ActionPressed {
+        action_id: "start".into(),
+    })
+}
+
 #[test]
 fn app_engine_starts_on_onboarding_without_identity() {
     let vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
@@ -123,32 +152,7 @@ fn onboarding_complete_navigates_to_home() {
     let vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
     let mut engine = AppEngine::new(vauchi);
 
-    // Drive through onboarding: identity_check → welcome → name → skip → security → backup → ready
-    engine.handle_action(UserAction::ActionPressed {
-        action_id: "create_new".into(),
-    });
-    engine.handle_action(UserAction::ActionPressed {
-        action_id: "get_started".into(),
-    });
-    engine.handle_action(UserAction::TextChanged {
-        component_id: "display_name".into(),
-        value: "Alice".into(),
-    });
-    engine.handle_action(UserAction::ActionPressed {
-        action_id: "continue".into(),
-    });
-    engine.handle_action(UserAction::ActionPressed {
-        action_id: "skip_to_finish".into(),
-    });
-    engine.handle_action(UserAction::ActionPressed {
-        action_id: "continue".into(),
-    });
-    engine.handle_action(UserAction::ActionPressed {
-        action_id: "skip".into(),
-    });
-    let result = engine.handle_action(UserAction::ActionPressed {
-        action_id: "start".into(),
-    });
+    let result = drive_onboarding(&mut engine);
 
     // Should navigate to Home after onboarding completes
     assert!(
@@ -174,32 +178,7 @@ fn onboarding_complete_creates_identity_in_vauchi() {
 
     assert!(!engine.has_identity());
 
-    // Drive through onboarding
-    engine.handle_action(UserAction::ActionPressed {
-        action_id: "create_new".into(),
-    });
-    engine.handle_action(UserAction::ActionPressed {
-        action_id: "get_started".into(),
-    });
-    engine.handle_action(UserAction::TextChanged {
-        component_id: "display_name".into(),
-        value: "Alice".into(),
-    });
-    engine.handle_action(UserAction::ActionPressed {
-        action_id: "continue".into(),
-    });
-    engine.handle_action(UserAction::ActionPressed {
-        action_id: "skip_to_finish".into(),
-    });
-    engine.handle_action(UserAction::ActionPressed {
-        action_id: "continue".into(),
-    });
-    engine.handle_action(UserAction::ActionPressed {
-        action_id: "skip".into(),
-    });
-    engine.handle_action(UserAction::ActionPressed {
-        action_id: "start".into(),
-    });
+    let _ = drive_onboarding(&mut engine);
 
     assert!(
         engine.has_identity(),

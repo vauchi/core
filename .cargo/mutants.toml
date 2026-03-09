@@ -8,6 +8,11 @@
 # Exclude test infrastructure, generated code, and benchmarks from mutation
 exclude_globs = ["tests/**", "benches/**", "fuzz/**"]
 
+# Exclude functions that use include_bytes! with cross-repo relative paths
+# (themes.json from sibling themes/ repo). cargo-mutants copies source to
+# a temp dir where these paths break.
+exclude_re = ["test_themes_json_not_empty", "test_theme_by_id_found_in_json", "test_theme_by_id_not_found_in_json"]
+
 # Allow 1.5x the normal test timeout per mutant
 timeout_multiplier = 1.5
 

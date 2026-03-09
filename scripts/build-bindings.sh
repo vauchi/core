@@ -96,6 +96,12 @@ if $BUILD_IOS; then
         # Disable sccache for iOS cross-compilation (causes issues with target discovery)
         unset RUSTC_WRAPPER
 
+        # Set iOS deployment target to match Rust's default (10.0) to prevent
+        # ___chkstk_darwin linker errors. Without this, the cc crate picks up
+        # the Xcode SDK version (e.g. 26.2), causing clang to emit stack probe
+        # calls that don't exist at the Rust-side deployment target.
+        export IPHONEOS_DEPLOYMENT_TARGET="10.0"
+
         # Show toolchain info for debugging
         echo "Active Rust toolchain:"
         rustup show active-toolchain

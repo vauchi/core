@@ -553,6 +553,7 @@ mod tests {
 
     #[test]
     fn app_destroy_null_is_safe() {
+        // allow(zero_assertions): No-panic boundary test — validates null input doesn't crash
         unsafe {
             vauchi_app_destroy(std::ptr::null_mut());
         }

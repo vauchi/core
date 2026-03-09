@@ -153,6 +153,8 @@ impl<T: Transport> AppEngine<T> {
         self.engine_cache.clear();
     }
 
+    /// Returns top-level navigation screens. Sub-screens (Sync, TorSettings,
+    /// Recovery, Groups, Privacy, Support) are reached via `navigate_to`.
     pub fn available_screens(&self) -> Vec<AppScreen> {
         if !self.vauchi.has_identity() {
             return vec![AppScreen::Onboarding];

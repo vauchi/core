@@ -9,11 +9,11 @@ use crate::ui::*;
 /// Engine that displays contact groups.
 #[derive(Clone, Debug)]
 pub struct GroupsEngine {
-    groups: Vec<ContactItem>,
+    groups: Vec<ActionListItem>,
 }
 
 impl GroupsEngine {
-    pub fn new(groups: Vec<ContactItem>) -> Self {
+    pub fn new(groups: Vec<ActionListItem>) -> Self {
         Self { groups }
     }
 
@@ -22,10 +22,9 @@ impl GroupsEngine {
             screen_id: "groups_list".into(),
             title: "Contact Groups".into(),
             subtitle: None,
-            components: vec![Component::ContactList {
+            components: vec![Component::ActionList {
                 id: "groups".into(),
-                contacts: self.groups.clone(),
-                searchable: true,
+                items: self.groups.clone(),
             }],
             actions: vec![ScreenAction {
                 id: "create_group".into(),

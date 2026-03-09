@@ -7,7 +7,9 @@ use vauchi_core::contact::Contact;
 use vauchi_core::contact_card::ContactCard;
 use vauchi_core::crypto::SymmetricKey;
 use vauchi_core::network::MockTransport;
-use vauchi_core::ui::{ActionResult, AppEngine, AppScreen, UserAction, WorkflowEngine};
+use vauchi_core::ui::{
+    ActionResult, ActionStyle, AppEngine, AppScreen, UserAction, WorkflowEngine,
+};
 
 /// Drive through the full onboarding flow, returning the final ActionResult.
 /// Each intermediate step is asserted to produce the expected ActionResult variant (T-12).
@@ -1109,6 +1111,10 @@ fn navigate_to_sync_shows_sync_status() {
     let screen = engine.navigate_to(AppScreen::Sync);
     assert_eq!(screen.screen_id, "sync_status");
     assert_eq!(screen.title, "Sync");
+    assert!(
+        screen.actions.iter().any(|a| a.id == "sync_now"),
+        "Sync screen must have sync_now action"
+    );
 }
 
 #[test]
@@ -1119,6 +1125,10 @@ fn navigate_to_tor_settings_shows_tor() {
     let screen = engine.navigate_to(AppScreen::TorSettings);
     assert_eq!(screen.screen_id, "tor_settings");
     assert_eq!(screen.title, "Tor Privacy");
+    assert!(
+        !screen.components.is_empty(),
+        "Tor screen must have at least one component"
+    );
 }
 
 #[test]
@@ -1129,6 +1139,11 @@ fn navigate_to_recovery_shows_recovery_status() {
     let screen = engine.navigate_to(AppScreen::Recovery);
     assert_eq!(screen.screen_id, "recovery_status");
     assert_eq!(screen.title, "Social Recovery");
+    // Fresh identity has 0 contacts, quorum not met — Start Recovery disabled
+    assert!(
+        screen.actions.iter().any(|a| a.id == "claim" && !a.enabled),
+        "Recovery claim action must be disabled when quorum not met"
+    );
 }
 
 #[test]
@@ -1139,6 +1154,10 @@ fn navigate_to_groups_shows_groups_list() {
     let screen = engine.navigate_to(AppScreen::Groups);
     assert_eq!(screen.screen_id, "groups_list");
     assert_eq!(screen.title, "Contact Groups");
+    assert!(
+        screen.actions.iter().any(|a| a.id == "create_group"),
+        "Groups screen must have create_group action"
+    );
 }
 
 #[test]
@@ -1149,6 +1168,14 @@ fn navigate_to_privacy_shows_privacy_settings() {
     let screen = engine.navigate_to(AppScreen::Privacy);
     assert_eq!(screen.screen_id, "privacy_settings");
     assert_eq!(screen.title, "Privacy & Data");
+    // GDPR delete action must be Destructive style
+    assert!(
+        screen
+            .actions
+            .iter()
+            .any(|a| a.id == "delete" && a.style == ActionStyle::Destructive),
+        "Privacy screen must have destructive delete action"
+    );
 }
 
 #[test]
@@ -1159,6 +1186,47 @@ fn navigate_to_support_shows_support() {
     let screen = engine.navigate_to(AppScreen::Support);
     assert_eq!(screen.screen_id, "support");
     assert_eq!(screen.title, "Support Vauchi");
+    assert!(
+        !screen.components.is_empty(),
+        "Support screen must have at least one component"
+    );
+}
+
+// ── Wave 6 failure-path tests (CC-11) ────────────────────────────────
+
+#[test]
+fn sync_engine_unknown_action_returns_screen() {
+    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    let mut engine = AppEngine::new(vauchi);
+    engine.navigate_to(AppScreen::Sync);
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "nonexistent".into(),
+    });
+    match result {
+        ActionResult::UpdateScreen(screen) => {
+            assert_eq!(screen.screen_id, "sync_status");
+        }
+        other => panic!("Expected UpdateScreen, got {other:?}"),
+    }
+}
+
+#[test]
+fn privacy_engine_text_changed_is_noop() {
+    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    let mut engine = AppEngine::new(vauchi);
+    engine.navigate_to(AppScreen::Privacy);
+    let result = engine.handle_action(UserAction::TextChanged {
+        component_id: "bogus".into(),
+        value: "test".into(),
+    });
+    match result {
+        ActionResult::UpdateScreen(screen) => {
+            assert_eq!(screen.screen_id, "privacy_settings");
+        }
+        other => panic!("Expected UpdateScreen, got {other:?}"),
+    }
 }
 
 proptest! {

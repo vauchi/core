@@ -102,8 +102,8 @@ snow = { version = "0.9", optional = true }
 tungstenite = { version = "0.24", default-features = false, optional = true }
 native-tls = { version = "0.2", optional = true }
 
-# TLS for rustls feature (pure Rust with ring backend - works on Android/iOS)
-rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"], optional = true }
+# TLS for rustls feature (aws-lc-rs backend - works on Android/iOS)
+rustls = { version = "0.23", default-features = false, features = ["aws_lc_rs", "std", "tls12"], optional = true }
 webpki-roots = { version = "0.26", optional = true }
 
 # Platform keychain access (optional, for desktop apps)

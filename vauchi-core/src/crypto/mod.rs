@@ -2,7 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-pub mod backend;
 pub mod cek;
 pub mod chain;
 pub mod encryption;

@@ -116,6 +116,9 @@ impl WebSocketTransport {
         host: &str,
         tcp_stream: TcpStream,
     ) -> Result<MaybeTlsStream<TcpStream>, NetworkError> {
+        // Ensure aws-lc-rs crypto provider is installed (idempotent)
+        let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
+
         // Create root certificate store from webpki roots
         let mut root_store = rustls::RootCertStore::empty();
         root_store.extend(webpki_roots::TLS_SERVER_ROOTS.iter().cloned());

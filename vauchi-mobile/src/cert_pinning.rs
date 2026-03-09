@@ -48,8 +48,14 @@ fn parse_pem_certs(pem: &str) -> Result<Vec<CertificateDer<'static>>, String> {
     Ok(certs)
 }
 
+/// Ensure the aws-lc-rs crypto provider is installed (idempotent).
+fn ensure_crypto_provider() {
+    let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
+}
+
 /// Create a rustls ClientConfig with certificate pinning.
 fn create_pinned_config(pinned_cert_pem: &str) -> Result<Arc<ClientConfig>, String> {
+    ensure_crypto_provider();
     let certs = parse_pem_certs(pinned_cert_pem)?;
 
     let mut root_store = rustls::RootCertStore::empty();
@@ -68,6 +74,7 @@ fn create_pinned_config(pinned_cert_pem: &str) -> Result<Arc<ClientConfig>, Stri
 
 /// Create a rustls ClientConfig using system/webpki roots (no pinning).
 fn create_default_config() -> Result<Arc<ClientConfig>, String> {
+    ensure_crypto_provider();
     let mut root_store = rustls::RootCertStore::empty();
     root_store.extend(webpki_roots::TLS_SERVER_ROOTS.iter().cloned());
 

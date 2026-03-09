@@ -302,6 +302,63 @@ fn initials(name: &str) -> String {
         .to_uppercase()
 }
 
+// INLINE_TEST_REQUIRED: initials() is module-private, cannot be tested from external tests/
+#[cfg(test)]
+mod tests {
+    use super::initials;
+
+    #[test]
+    fn initials_single_word() {
+        assert_eq!(initials("Alice"), "A");
+    }
+
+    #[test]
+    fn initials_two_words() {
+        assert_eq!(initials("Alice Smith"), "AS");
+    }
+
+    #[test]
+    fn initials_three_words_takes_first_two() {
+        assert_eq!(initials("Alice B Smith"), "AB");
+    }
+
+    #[test]
+    fn initials_empty_string() {
+        assert_eq!(initials(""), "");
+    }
+
+    #[test]
+    fn initials_unicode() {
+        assert_eq!(initials("Ägidius Ölmann"), "ÄÖ");
+    }
+
+    #[test]
+    fn initials_extra_whitespace() {
+        assert_eq!(initials("  Alice   Smith  "), "AS");
+    }
+}
+
+// INLINE_TEST_REQUIRED: initials() is module-private, cannot be tested from external tests/
+#[cfg(test)]
+mod proptests {
+    use super::initials;
+    use proptest::prelude::*;
+
+    proptest! {
+        #[test]
+        fn initials_never_panics(name in "\\PC*") {
+            let result = initials(&name);
+            prop_assert!(result.chars().count() <= 2);
+        }
+
+        #[test]
+        fn initials_are_uppercase(name in "[a-z]+ [a-z]+") {
+            let result = initials(&name);
+            prop_assert_eq!(result.clone(), result.to_uppercase());
+        }
+    }
+}
+
 impl<T: Transport> WorkflowEngine for AppEngine<T> {
     fn current_screen(&self) -> ScreenModel {
         self.engine.current_screen()

@@ -13,7 +13,7 @@
 //! time cost to 1 iteration for faster test execution. This feature MUST NOT
 //! be enabled in production builds.
 
-use ring::pbkdf2;
+use aws_lc_rs::pbkdf2;
 use std::num::NonZeroU32;
 use zeroize::Zeroize;
 

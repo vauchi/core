@@ -371,7 +371,7 @@ pub struct BLEExchangeSession {
 impl BLEExchangeSession {
     /// Create a new exchange session.
     pub fn new(_keypair: &SigningKeyPair) -> Self {
-        use ring::rand::{SecureRandom, SystemRandom};
+        use aws_lc_rs::rand::{SecureRandom, SystemRandom};
         let rng = SystemRandom::new();
         let mut exchange_token = [0u8; 32];
         rng.fill(&mut exchange_token).expect("RNG failed");
@@ -540,10 +540,10 @@ pub struct ExchangeBle {
 impl ExchangeBle {
     /// Generates a new BLE exchange payload.
     pub fn generate(identity: &Identity, ephemeral: &X3DHKeyPair) -> Self {
-        use ring::rand::SystemRandom;
+        use aws_lc_rs::rand::SystemRandom;
 
         let rng = SystemRandom::new();
-        let token = ring::rand::generate::<[u8; 32]>(&rng)
+        let token = aws_lc_rs::rand::generate::<[u8; 32]>(&rng)
             .expect("RNG should not fail")
             .expose();
 

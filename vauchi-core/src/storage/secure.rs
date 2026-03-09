@@ -172,8 +172,8 @@ impl FileKeyStorage {
             })?;
 
         // Pass 1: Overwrite with random data
-        use ring::rand::SecureRandom;
-        let rng = ring::rand::SystemRandom::new();
+        use aws_lc_rs::rand::SecureRandom;
+        let rng = aws_lc_rs::rand::SystemRandom::new();
         let mut random = vec![0u8; size];
         rng.fill(&mut random).map_err(|_| {
             StorageError::Encryption("Failed to generate random data for overwrite".to_string())

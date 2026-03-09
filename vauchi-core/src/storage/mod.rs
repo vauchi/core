@@ -109,7 +109,7 @@ pub use secure::MemoryKeyStorage;
 #[cfg(feature = "secure-storage")]
 pub use secure::PlatformKeyring;
 
-use ring::hmac;
+use aws_lc_rs::hmac;
 use rusqlite::Connection;
 use std::path::Path;
 

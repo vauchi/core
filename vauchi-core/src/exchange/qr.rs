@@ -75,15 +75,15 @@ impl ExchangeQR {
         ephemeral: &X3DHKeyPair,
         timestamp: u64,
     ) -> Self {
-        use ring::rand::SystemRandom;
+        use aws_lc_rs::rand::SystemRandom;
 
         let rng = SystemRandom::new();
 
-        let exchange_token = ring::rand::generate::<[u8; 32]>(&rng)
+        let exchange_token = aws_lc_rs::rand::generate::<[u8; 32]>(&rng)
             .expect("RNG should not fail")
             .expose();
 
-        let audio_challenge = ring::rand::generate::<[u8; 16]>(&rng)
+        let audio_challenge = aws_lc_rs::rand::generate::<[u8; 16]>(&rng)
             .expect("RNG should not fail")
             .expose();
 

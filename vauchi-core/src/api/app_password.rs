@@ -11,7 +11,7 @@
 //! timing side-channel attacks. Both the normal hash and duress hash
 //! are always checked (even if one matches) to ensure uniform timing.
 
-use ring::rand::{SecureRandom, SystemRandom};
+use aws_lc_rs::rand::{SecureRandom, SystemRandom};
 use subtle::ConstantTimeEq;
 
 use super::error::{VauchiError, VauchiResult};

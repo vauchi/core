@@ -8,7 +8,7 @@
 //! saved to the local cache. This ensures content has not been tampered
 //! with during transit.
 
-use ring::digest::{Context, SHA256};
+use aws_lc_rs::digest::{Context, SHA256};
 use thiserror::Error;
 
 /// Verify SHA-256 checksum of content
@@ -160,6 +160,7 @@ pub enum IntegrityError {
     SignatureVerificationFailed(String),
 }
 
+// INLINE_TEST_REQUIRED: tests access private internals
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -4,7 +4,7 @@
 
 //! Device link request (from new device).
 
-use ring::rand::SystemRandom;
+use aws_lc_rs::rand::SystemRandom;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::crypto::{decrypt, encrypt, SymmetricKey};
@@ -26,7 +26,7 @@ impl DeviceLinkRequest {
     /// Creates a new device link request.
     pub fn new(device_name: String) -> Self {
         let rng = SystemRandom::new();
-        let nonce = ring::rand::generate::<[u8; 32]>(&rng)
+        let nonce = aws_lc_rs::rand::generate::<[u8; 32]>(&rng)
             .expect("RNG should not fail")
             .expose();
 

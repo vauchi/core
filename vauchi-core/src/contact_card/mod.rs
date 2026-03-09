@@ -23,7 +23,7 @@ pub use uri::{is_allowed_scheme, is_blocked_scheme, is_safe_url, is_valid_phone,
 
 use std::collections::HashSet;
 
-use ring::rand::SystemRandom;
+use aws_lc_rs::rand::SystemRandom;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -88,7 +88,7 @@ impl ContactCard {
     /// Creates a new contact card with the given display name.
     pub fn new(display_name: &str) -> Self {
         let rng = SystemRandom::new();
-        let random_bytes = ring::rand::generate::<[u8; 16]>(&rng)
+        let random_bytes = aws_lc_rs::rand::generate::<[u8; 16]>(&rng)
             .expect("System RNG should not fail")
             .expose();
         let id = hex::encode(random_bytes);

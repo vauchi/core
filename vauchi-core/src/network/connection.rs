@@ -6,7 +6,7 @@
 //!
 //! Manages connection lifecycle with automatic reconnection and handshake.
 
-use ring::rand::{SecureRandom, SystemRandom};
+use aws_lc_rs::rand::{SecureRandom, SystemRandom};
 
 use super::error::NetworkError;
 use super::message::MessageEnvelope;

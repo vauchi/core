@@ -222,9 +222,9 @@ pub fn create_signed_handshake(
     let client_id = identity.public_id();
 
     // Generate random 32-byte nonce
-    let rng = ring::rand::SystemRandom::new();
+    let rng = aws_lc_rs::rand::SystemRandom::new();
     let mut nonce_bytes = [0u8; 32];
-    ring::rand::SecureRandom::fill(&rng, &mut nonce_bytes).expect("RNG failure");
+    aws_lc_rs::rand::SecureRandom::fill(&rng, &mut nonce_bytes).expect("RNG failure");
 
     let timestamp = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -390,7 +390,7 @@ mod tests {
 
         // Verify with ring (as the relay does)
         let public_key =
-            ring::signature::UnparsedPublicKey::new(&ring::signature::ED25519, &pk_bytes);
+            aws_lc_rs::signature::UnparsedPublicKey::new(&aws_lc_rs::signature::ED25519, &pk_bytes);
         assert!(public_key.verify(&signed_data, &sig_bytes).is_ok());
     }
 

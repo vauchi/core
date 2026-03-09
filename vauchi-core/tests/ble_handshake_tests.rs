@@ -8,7 +8,7 @@
 //! Covers crypto primitives, state machine transitions, commitment scheme,
 //! and error paths.
 
-use ring::digest::{digest, SHA256};
+use aws_lc_rs::digest::{digest, SHA256};
 use vauchi_core::crypto::encryption::{self, SymmetricKey};
 use vauchi_core::crypto::kdf::HKDF;
 use vauchi_core::exchange::{

@@ -10,7 +10,7 @@
 //!   - (revocation of pre-signed operations — DP-2 compliance)
 //!   - "Pre-signed messages stored unencrypted" (offline storage)
 
-use ring::signature;
+use aws_lc_rs::signature;
 use std::time::{SystemTime, UNIX_EPOCH};
 use vauchi_core::api::PreSignedShredMessages;
 use vauchi_core::identity::Identity;

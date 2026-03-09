@@ -7,7 +7,7 @@
 //! Manages the synchronization state for each contact and coordinates
 //! update delivery with offline queuing and retry logic.
 
-use ring::rand::SecureRandom;
+use aws_lc_rs::rand::SecureRandom;
 use std::collections::{HashMap, HashSet};
 use thiserror::Error;
 use uuid::Uuid;
@@ -417,7 +417,7 @@ impl<'a> SyncManager<'a> {
 
         // Generate random nonce for replay detection
         let mut nonce = [0u8; 32];
-        ring::rand::SystemRandom::new()
+        aws_lc_rs::rand::SystemRandom::new()
             .fill(&mut nonce)
             .expect("System RNG should not fail");
 

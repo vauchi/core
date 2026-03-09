@@ -14,7 +14,7 @@
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use ring::rand::{SecureRandom, SystemRandom};
+use aws_lc_rs::rand::{SecureRandom, SystemRandom};
 use serde::{Deserialize, Serialize};
 
 use crate::identity::Identity;
@@ -199,10 +199,11 @@ impl std::fmt::Display for PreSignedError {
 
 impl std::error::Error for PreSignedError {}
 
+// INLINE_TEST_REQUIRED: tests access private internals
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ring::signature;
+    use aws_lc_rs::signature;
 
     #[test]
     fn test_generate_pre_signed_messages() {

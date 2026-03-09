@@ -105,7 +105,7 @@ impl ContentFetcher {
         }
 
         // Stream-verify: download in chunks with incremental SHA-256 hash (#146)
-        let mut hasher = ring::digest::Context::new(&ring::digest::SHA256);
+        let mut hasher = aws_lc_rs::digest::Context::new(&aws_lc_rs::digest::SHA256);
         let mut data = Vec::new();
         let mut total: u64 = 0;
 
@@ -192,6 +192,7 @@ pub enum FetchError {
     FeatureDisabled,
 }
 
+// INLINE_TEST_REQUIRED: tests access private internals
 #[cfg(test)]
 mod tests {
     use super::*;

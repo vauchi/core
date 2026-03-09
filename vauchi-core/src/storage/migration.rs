@@ -28,7 +28,7 @@ use rusqlite::Connection;
 
 use crate::crypto::SymmetricKey;
 
-use ring::hmac;
+use aws_lc_rs::hmac;
 
 use super::StorageError;
 

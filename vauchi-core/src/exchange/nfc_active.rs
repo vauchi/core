@@ -50,10 +50,10 @@ pub struct ExchangeNfc {
 impl ExchangeNfc {
     /// Generates a new NFC exchange payload.
     pub fn generate(identity: &Identity, ephemeral: &X3DHKeyPair) -> Self {
-        use ring::rand::SystemRandom;
+        use aws_lc_rs::rand::SystemRandom;
 
         let rng = SystemRandom::new();
-        let token = ring::rand::generate::<[u8; 32]>(&rng)
+        let token = aws_lc_rs::rand::generate::<[u8; 32]>(&rng)
             .expect("RNG should not fail")
             .expose();
 

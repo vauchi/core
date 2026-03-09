@@ -7,13 +7,13 @@
 //! Provides signing keypair generation and signature operations using the
 //! audited `ring` cryptographic library.
 
-use ring::rand::SystemRandom;
-use ring::signature::{Ed25519KeyPair, KeyPair as RingKeyPair};
+use aws_lc_rs::rand::SystemRandom;
+use aws_lc_rs::signature::{Ed25519KeyPair, KeyPair as RingKeyPair};
 use zeroize::Zeroize;
 
 /// Ed25519 signing keypair for identity and message signing.
 ///
-/// The stored `seed` (32 bytes) is zeroed on drop. Note: `ring::Ed25519KeyPair`
+/// The stored `seed` (32 bytes) is zeroed on drop. Note: `aws_lc_rs::Ed25519KeyPair`
 /// retains expanded key material internally and does not implement `Zeroize`,
 /// so full zeroization coverage is limited to the seed.
 pub struct SigningKeyPair {
@@ -33,7 +33,7 @@ impl SigningKeyPair {
     /// Uses system random number generator for key material.
     pub fn generate() -> Self {
         let rng = SystemRandom::new();
-        let seed = ring::rand::generate::<[u8; 32]>(&rng)
+        let seed = aws_lc_rs::rand::generate::<[u8; 32]>(&rng)
             .expect("System RNG should not fail")
             .expose();
 
@@ -105,7 +105,7 @@ impl PublicKey {
 
     /// Verifies a signature against a message using this public key.
     pub fn verify(&self, message: &[u8], signature: &Signature) -> bool {
-        use ring::signature::{UnparsedPublicKey, ED25519};
+        use aws_lc_rs::signature::{UnparsedPublicKey, ED25519};
 
         let public_key = UnparsedPublicKey::new(&ED25519, &self.bytes);
         public_key.verify(message, &signature.bytes).is_ok()

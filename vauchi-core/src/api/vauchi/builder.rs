@@ -18,7 +18,7 @@ use super::Vauchi;
 /// derived by hashing the ID with ring's SHA-256, ensuring consistent
 /// IDs across sessions.
 pub(super) fn decoy_id_to_fake_pk(id: &str) -> [u8; 32] {
-    use ring::digest;
+    use aws_lc_rs::digest;
     let hash = digest::digest(&digest::SHA256, id.as_bytes());
     let mut pk = [0u8; 32];
     pk.copy_from_slice(hash.as_ref());

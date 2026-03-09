@@ -16,10 +16,10 @@
 //! Legacy (untagged) ciphertext: `nonce (12 bytes) || ciphertext || tag`
 //! is auto-detected when the first byte is NOT a known algorithm tag.
 
+use aws_lc_rs::aead::{Aad, LessSafeKey, Nonce, UnboundKey, AES_256_GCM};
+use aws_lc_rs::rand::{SecureRandom, SystemRandom};
 use chacha20poly1305::aead::{Aead, KeyInit, Payload};
 use chacha20poly1305::XChaCha20Poly1305;
-use ring::aead::{Aad, LessSafeKey, Nonce, UnboundKey, AES_256_GCM};
-use ring::rand::{SecureRandom, SystemRandom};
 use thiserror::Error;
 use zeroize::Zeroize;
 
@@ -72,7 +72,7 @@ impl SymmetricKey {
     /// Generates a new random symmetric key.
     pub fn generate() -> Self {
         let rng = SystemRandom::new();
-        let key = ring::rand::generate::<[u8; 32]>(&rng)
+        let key = aws_lc_rs::rand::generate::<[u8; 32]>(&rng)
             .expect("System RNG should not fail")
             .expose();
         SymmetricKey { bytes: key }
@@ -112,7 +112,7 @@ impl SymmetricKey {
 /// # Nonce Security (Tracker #226)
 ///
 /// Each encryption generates a fresh 24-byte (192-bit) nonce from
-/// `ring::rand::SystemRandom` (OS CSPRNG). The 192-bit nonce space of
+/// `aws_lc_rs::rand::SystemRandom` (OS CSPRNG). The 192-bit nonce space of
 /// XChaCha20-Poly1305 makes random collision negligible even at high
 /// volume (~2^96 encryptions before birthday-bound concern). This is
 /// why XChaCha20 was chosen over AES-GCM (96-bit nonce, birthday-bound

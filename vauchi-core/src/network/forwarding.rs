@@ -96,7 +96,8 @@ pub fn verify_hint_signature(
     let sig_bytes =
         hex::decode(signature_hex).map_err(|e| format!("invalid signature hex: {}", e))?;
 
-    let public_key = ring::signature::UnparsedPublicKey::new(&ring::signature::ED25519, &pk_bytes);
+    let public_key =
+        aws_lc_rs::signature::UnparsedPublicKey::new(&aws_lc_rs::signature::ED25519, &pk_bytes);
 
     let canonical = hints.canonical_data();
     public_key
@@ -104,6 +105,7 @@ pub fn verify_hint_signature(
         .map_err(|_| "signature verification failed".to_string())
 }
 
+// INLINE_TEST_REQUIRED: tests access private internals
 #[cfg(test)]
 mod tests {
     use super::*;

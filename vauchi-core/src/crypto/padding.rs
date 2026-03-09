@@ -29,7 +29,7 @@
 //! The first 4 bytes are the big-endian original plaintext length.
 //! This allows the receiver to strip padding after decryption.
 
-use ring::rand::{SecureRandom, SystemRandom};
+use aws_lc_rs::rand::{SecureRandom, SystemRandom};
 
 /// Bucket sizes in bytes (including the 4-byte length prefix).
 const BUCKET_SMALL: usize = 256;
@@ -120,6 +120,7 @@ fn select_bucket(size: usize) -> usize {
     }
 }
 
+// INLINE_TEST_REQUIRED: tests access private internals
 #[cfg(test)]
 mod tests {
     use super::*;

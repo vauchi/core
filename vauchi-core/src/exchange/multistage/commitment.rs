@@ -9,9 +9,9 @@
 //! until Stage 3 (VERIFY), ensuring neither side can decrypt until both parties
 //! exchange reveal keys.
 
-use ring::aead::{Aad, LessSafeKey, Nonce, UnboundKey, AES_256_GCM};
-use ring::digest::{digest, SHA256};
-use ring::rand::{SecureRandom, SystemRandom};
+use aws_lc_rs::aead::{Aad, LessSafeKey, Nonce, UnboundKey, AES_256_GCM};
+use aws_lc_rs::digest::{digest, SHA256};
+use aws_lc_rs::rand::{SecureRandom, SystemRandom};
 use subtle::ConstantTimeEq;
 use thiserror::Error;
 use zeroize::Zeroize;

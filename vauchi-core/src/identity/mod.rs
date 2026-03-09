@@ -29,7 +29,7 @@ pub use device::{
 use crate::crypto::password_kdf::derive_key_pbkdf2;
 use crate::crypto::{decrypt, derive_key_argon2id, encrypt, Signature, SigningKeyPair, HKDF};
 use crate::exchange::X3DHKeyPair;
-use ring::rand::SystemRandom;
+use aws_lc_rs::rand::SystemRandom;
 use thiserror::Error;
 use zeroize::{Zeroize, Zeroizing};
 
@@ -84,7 +84,7 @@ impl Identity {
         let rng = SystemRandom::new();
 
         // Generate random master seed
-        let master_seed = ring::rand::generate::<[u8; 32]>(&rng)
+        let master_seed = aws_lc_rs::rand::generate::<[u8; 32]>(&rng)
             .expect("System RNG should not fail")
             .expose();
 
@@ -278,7 +278,7 @@ impl Identity {
 
         // Generate random salt
         let rng = SystemRandom::new();
-        let salt = ring::rand::generate::<[u8; 16]>(&rng)
+        let salt = aws_lc_rs::rand::generate::<[u8; 16]>(&rng)
             .map_err(|_| IdentityError::BackupFailed)?
             .expose();
 

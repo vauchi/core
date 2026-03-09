@@ -55,8 +55,8 @@
 use std::collections::HashMap;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use ring::digest::{digest, SHA256};
-use ring::rand::{SecureRandom, SystemRandom};
+use aws_lc_rs::digest::{digest, SHA256};
+use aws_lc_rs::rand::{SecureRandom, SystemRandom};
 use zeroize::Zeroize;
 
 use super::ble_payload::BleCardPayload;

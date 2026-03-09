@@ -11,10 +11,10 @@
 //! encryption, an Ed25519 identity keypair, and a commitment scheme that
 //! ensures atomicity (neither side can decrypt until both reveal keys are exchanged).
 
+use aws_lc_rs::aead::{Aad, LessSafeKey, Nonce, UnboundKey, AES_256_GCM};
+use aws_lc_rs::digest::{digest, SHA256};
+use aws_lc_rs::rand::{SecureRandom, SystemRandom};
 use rand::rngs::OsRng;
-use ring::aead::{Aad, LessSafeKey, Nonce, UnboundKey, AES_256_GCM};
-use ring::digest::{digest, SHA256};
-use ring::rand::{SecureRandom, SystemRandom};
 use x25519_dalek::{PublicKey as X25519Public, StaticSecret as X25519Secret};
 use zeroize::Zeroize;
 

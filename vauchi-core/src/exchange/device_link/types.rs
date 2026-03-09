@@ -4,7 +4,7 @@
 
 //! Constants, enums, and helper functions for the device linking protocol.
 
-use ring::hmac;
+use aws_lc_rs::hmac;
 
 use crate::crypto::HKDF;
 
@@ -93,9 +93,9 @@ pub fn compute_confirmation_mac(link_key: &[u8; 32], confirmation_code: &str) ->
 /// available (e.g., accessibility needs, camera failure). The code is derived
 /// from secure random bytes and formatted as XXX-XXX.
 pub fn generate_numeric_code() -> String {
-    use ring::rand::SystemRandom;
+    use aws_lc_rs::rand::SystemRandom;
     let rng = SystemRandom::new();
-    let bytes = ring::rand::generate::<[u8; 4]>(&rng)
+    let bytes = aws_lc_rs::rand::generate::<[u8; 4]>(&rng)
         .expect("RNG should not fail")
         .expose();
     let value = u32::from_be_bytes(bytes) % 1_000_000;

@@ -11,7 +11,7 @@
 //! All intermediate key material (PRK, T(i) blocks) is zeroized after use
 //! to prevent key extraction from memory dumps (#234).
 
-use ring::hmac;
+use aws_lc_rs::hmac;
 use thiserror::Error;
 use zeroize::{Zeroize, Zeroizing};
 

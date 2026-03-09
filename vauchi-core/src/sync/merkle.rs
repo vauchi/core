@@ -9,7 +9,7 @@
 //! root hashes, two devices can quickly determine if they are in sync.
 //! If not, the `diff` method identifies which leaf indices differ.
 
-use ring::digest;
+use aws_lc_rs::digest;
 
 /// A Merkle tree built from contact hashes.
 ///
@@ -120,10 +120,11 @@ impl MerkleTree {
     }
 }
 
+// INLINE_TEST_REQUIRED: tests access private internals
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ring::digest;
+    use aws_lc_rs::digest;
 
     fn hash_bytes(data: &[u8]) -> [u8; 32] {
         let d = digest::digest(&digest::SHA256, data);

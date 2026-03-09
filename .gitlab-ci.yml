@@ -262,7 +262,7 @@ test:mobile:
     - !reference [.clone-locales, before_script]
     - !reference [.clone-themes, before_script]
   script:
-    - cargo nextest run --profile ci -p vauchi-mobile
+    - cargo nextest run --profile ci -p vauchi-platform
   artifacts:
     when: always
     reports:
@@ -335,7 +335,7 @@ coverage:mobile:
     - !reference [.clone-themes, before_script]
     - rustup component add llvm-tools-preview 2>/dev/null || true
   variables:
-    COVERAGE_PACKAGE: "vauchi-mobile"
+    COVERAGE_PACKAGE: "vauchi-platform"
     COVERAGE_REPO_LABEL: "mobile"
 
 # ============================================================
@@ -559,10 +559,10 @@ package:xcframework:
     - ./scripts/package-xcframework.sh "$CI_COMMIT_TAG"
   artifacts:
     paths:
-      - dist/VauchiMobileFFI.xcframework.zip
-      - dist/VauchiMobileFFI.xcframework.zip.sha256
-      - dist/VauchiMobileFFI.xcframework.zip.sha256.bundle
-      - dist/VauchiMobile-*.zip
+      - dist/VauchiPlatformFFI.xcframework.zip
+      - dist/VauchiPlatformFFI.xcframework.zip.sha256
+      - dist/VauchiPlatformFFI.xcframework.zip.sha256.bundle
+      - dist/VauchiPlatform-*.zip
     expire_in: 1 week
 
 package:android:
@@ -573,9 +573,9 @@ package:android:
     - ./scripts/package-android.sh "$CI_COMMIT_TAG"
   artifacts:
     paths:
-      - dist/vauchi-mobile-android-*.zip
-      - dist/vauchi-mobile-android-*.zip.sha256
-      - dist/vauchi-mobile-android-*.zip.sha256.bundle
+      - dist/vauchi-platform-kotlin-*.zip
+      - dist/vauchi-platform-kotlin-*.zip.sha256
+      - dist/vauchi-platform-kotlin-*.zip.sha256.bundle
     expire_in: 1 week
 
 # Generate CycloneDX SBOM for supply-chain traceability (T0-2)
@@ -596,7 +596,7 @@ package:sbom:
       mkdir -p dist
       cargo cyclonedx --all --format json
 
-      for crate in vauchi-core vauchi-mobile vauchi-protocol; do
+      for crate in vauchi-core vauchi-platform vauchi-protocol; do
         mv "${crate}/${crate}.cdx.json" "dist/${crate}-${VERSION}.sbom.json"
       done
 
@@ -712,7 +712,7 @@ publish:core:
 
       echo "✓ Published vauchi-core $VERSION"
 
-# Publish vauchi-mobile crate to GitLab package registry
+# Publish vauchi-platform crate to GitLab package registry
 publish:mobile:
   extends: [.linux-runner, .release-or-rc]
   stage: publish
@@ -721,7 +721,7 @@ publish:mobile:
   script:
     - |
       VERSION="${CI_COMMIT_TAG#v}"
-      echo "Publishing vauchi-mobile $VERSION to GitLab package registry..."
+      echo "Publishing vauchi-platform $VERSION to GitLab package registry..."
 
       # Ensure Cargo.toml version matches the tag
       MANIFEST_VERSION=$(grep -A5 '^\[workspace\.package\]' Cargo.toml | grep '^version' | sed 's/.*"\(.*\)"/\1/')
@@ -736,29 +736,29 @@ publish:mobile:
       # Create tarball manually (cargo package requires vauchi-core on crates.io)
       # Use temp directory to get correct archive structure
       TMPDIR=$(mktemp -d)
-      PKG_DIR="$TMPDIR/vauchi-mobile-${VERSION}"
+      PKG_DIR="$TMPDIR/vauchi-platform-${VERSION}"
       mkdir -p "$PKG_DIR"
 
-      cp vauchi-mobile/Cargo.toml "$PKG_DIR/"
+      cp vauchi-platform/Cargo.toml "$PKG_DIR/"
       # Replace workspace version reference with actual version for standalone crate
       sed -i "s/^version\.workspace = true/version = \"${VERSION}\"/" "$PKG_DIR/Cargo.toml"
-      cp vauchi-mobile/uniffi-bindgen.rs "$PKG_DIR/"
-      cp vauchi-mobile/README.md "$PKG_DIR/"
-      cp -r vauchi-mobile/src "$PKG_DIR/"
-      cp -r vauchi-mobile/benches "$PKG_DIR/"
+      cp vauchi-platform/uniffi-bindgen.rs "$PKG_DIR/"
+      cp vauchi-platform/README.md "$PKG_DIR/"
+      cp -r vauchi-platform/src "$PKG_DIR/"
+      cp -r vauchi-platform/benches "$PKG_DIR/"
       cp -r LICENSES "$PKG_DIR/"
 
       mkdir -p target/package
-      CRATE_FILE="target/package/vauchi-mobile-${VERSION}.crate"
-      tar czf "$CRATE_FILE" -C "$TMPDIR" "vauchi-mobile-${VERSION}"
+      CRATE_FILE="target/package/vauchi-platform-${VERSION}.crate"
+      tar czf "$CRATE_FILE" -C "$TMPDIR" "vauchi-platform-${VERSION}"
       rm -rf "$TMPDIR"
 
       # Upload to GitLab generic packages registry
       curl --header "JOB-TOKEN: ${CI_JOB_TOKEN}" \
            --upload-file "$CRATE_FILE" \
-           "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/vauchi-mobile/${VERSION}/vauchi-mobile-${VERSION}.crate"
+           "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/vauchi-platform/${VERSION}/vauchi-platform-${VERSION}.crate"
 
-      echo "✓ Published vauchi-mobile $VERSION"
+      echo "✓ Published vauchi-platform $VERSION"
 
 release:create:
   extends: .release-only
@@ -797,17 +797,17 @@ release:create:
       ### Rust Crates
 
       - [vauchi-core](${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/vauchi-core/${CI_COMMIT_TAG#v}/vauchi-core-${CI_COMMIT_TAG#v}.crate)
-      - [vauchi-mobile](${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/vauchi-mobile/${CI_COMMIT_TAG#v}/vauchi-mobile-${CI_COMMIT_TAG#v}.crate)
+      - [vauchi-platform](${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/vauchi-platform/${CI_COMMIT_TAG#v}/vauchi-platform-${CI_COMMIT_TAG#v}.crate)
 
       ### Mobile Bindings
 
-      - [iOS XCFramework](${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/vauchi-mobile/${CI_COMMIT_TAG#v}/VauchiMobileFFI.xcframework.zip)
-      - [Android](${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/vauchi-mobile/${CI_COMMIT_TAG#v}/vauchi-mobile-android-${CI_COMMIT_TAG#v}.zip)
+      - [iOS XCFramework](${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/vauchi-platform/${CI_COMMIT_TAG#v}/VauchiPlatformFFI.xcframework.zip)
+      - [Android](${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/vauchi-platform/${CI_COMMIT_TAG#v}/vauchi-platform-kotlin-${CI_COMMIT_TAG#v}.zip)
 
       ### Supply Chain
 
       - [vauchi-core SBOM](${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/vauchi-core/${CI_COMMIT_TAG#v}/vauchi-core-${CI_COMMIT_TAG#v}.sbom.json) (CycloneDX)
-      - [vauchi-mobile SBOM](${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/vauchi-mobile/${CI_COMMIT_TAG#v}/vauchi-mobile-${CI_COMMIT_TAG#v}.sbom.json) (CycloneDX)
+      - [vauchi-platform SBOM](${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/vauchi-platform/${CI_COMMIT_TAG#v}/vauchi-platform-${CI_COMMIT_TAG#v}.sbom.json) (CycloneDX)
       - [vauchi-protocol SBOM](${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/vauchi-protocol/${CI_COMMIT_TAG#v}/vauchi-protocol-${CI_COMMIT_TAG#v}.sbom.json) (CycloneDX)
 
       ### Integration
@@ -817,7 +817,7 @@ release:create:
 # ============================================================
 # Trigger Stage (Tags only) — Mobile Distribution
 # ============================================================
-# Trigger vauchi-mobile-swift and vauchi-mobile-android to rebuild
+# Trigger vauchi-platform-swift and vauchi-platform-kotlin to rebuild
 # and publish bindings for this release version.
 #
 # Uses GitLab's native trigger: keyword instead of the Pipeline API
@@ -838,7 +838,7 @@ trigger:swift:
   variables:
     UPSTREAM_VERSION: $CI_COMMIT_TAG
   trigger:
-    project: vauchi/vauchi-mobile-swift
+    project: vauchi/vauchi-platform-swift
     branch: main
     strategy: depend
   rules:
@@ -856,7 +856,7 @@ trigger:android:
   variables:
     UPSTREAM_VERSION: $CI_COMMIT_TAG
   trigger:
-    project: vauchi/vauchi-mobile-android
+    project: vauchi/vauchi-platform-kotlin
     branch: main
     strategy: depend
   rules:

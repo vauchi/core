@@ -9,10 +9,10 @@ use vauchi_core::content::{ContentConfig, ContentManager};
 
 use super::content;
 use super::types::MobileSocialNetwork;
-use super::VauchiMobile;
+use super::VauchiPlatform;
 
 #[uniffi::export]
-impl VauchiMobile {
+impl VauchiPlatform {
     // === Content Updates ===
 
     /// Check if remote content updates are supported.
@@ -69,7 +69,7 @@ impl VauchiMobile {
 
 // Internal implementation methods for content updates (feature-gated)
 #[cfg(feature = "content-updates")]
-impl VauchiMobile {
+impl VauchiPlatform {
     fn check_content_updates_impl(&self) -> content::MobileUpdateStatus {
         use content::MobileUpdateStatus;
 

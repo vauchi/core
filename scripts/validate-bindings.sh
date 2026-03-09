@@ -43,7 +43,7 @@ EXPECTED_TYPES=(
     "MobileVisibilityLabelDetail"
     "MobileFieldType"
     "MobileError"
-    "VauchiMobile"
+    "VauchiPlatform"
     "MobileProximityVerifier"
     "PlatformAudioHandler"
 )
@@ -54,15 +54,15 @@ MIN_KOTLIN_LINES=5000
 
 # Primary: check target/bindings/ (CI and local build output)
 BINDINGS_DIR="$PROJECT_ROOT/target/bindings"
-IOS_BINDINGS="$BINDINGS_DIR/ios/generated/vauchi_mobile.swift"
-ANDROID_BINDINGS="$BINDINGS_DIR/android/kotlin/uniffi/vauchi_mobile/vauchi_mobile.kt"
+IOS_BINDINGS="$BINDINGS_DIR/ios/generated/vauchi_platform.swift"
+ANDROID_BINDINGS="$BINDINGS_DIR/android/kotlin/uniffi/vauchi_platform/vauchi_platform.kt"
 
 # Fallback: check sibling repos (legacy local dev paths)
-if [[ ! -f "$IOS_BINDINGS" && -f "$WORKSPACE_ROOT/ios/Vauchi/Generated/vauchi_mobile.swift" ]]; then
-    IOS_BINDINGS="$WORKSPACE_ROOT/ios/Vauchi/Generated/vauchi_mobile.swift"
+if [[ ! -f "$IOS_BINDINGS" && -f "$WORKSPACE_ROOT/ios/Vauchi/Generated/vauchi_platform.swift" ]]; then
+    IOS_BINDINGS="$WORKSPACE_ROOT/ios/Vauchi/Generated/vauchi_platform.swift"
 fi
-if [[ ! -f "$ANDROID_BINDINGS" && -f "$WORKSPACE_ROOT/android/app/src/main/kotlin/uniffi/vauchi_mobile/vauchi_mobile.kt" ]]; then
-    ANDROID_BINDINGS="$WORKSPACE_ROOT/android/app/src/main/kotlin/uniffi/vauchi_mobile/vauchi_mobile.kt"
+if [[ ! -f "$ANDROID_BINDINGS" && -f "$WORKSPACE_ROOT/android/app/src/main/kotlin/uniffi/vauchi_platform/vauchi_platform.kt" ]]; then
+    ANDROID_BINDINGS="$WORKSPACE_ROOT/android/app/src/main/kotlin/uniffi/vauchi_platform/vauchi_platform.kt"
 fi
 
 echo -e "${YELLOW}╔════════════════════════════════════════╗${NC}"
@@ -91,7 +91,7 @@ check_bindings() {
     if [[ $lines -lt $min_lines ]]; then
         echo -e "${RED}  ERROR: File has $lines lines, expected at least $min_lines${NC}"
         echo -e "${RED}  This suggests bindings were generated from incomplete metadata.${NC}"
-        echo -e "${RED}  Run: RUSTFLAGS=\"-Cstrip=none\" cargo build -p vauchi-mobile --release${NC}"
+        echo -e "${RED}  Run: RUSTFLAGS=\"-Cstrip=none\" cargo build -p vauchi-platform --release${NC}"
         ERRORS=$((ERRORS + 1))
     else
         echo -e "${GREEN}  Line count OK: $lines lines${NC}"
@@ -175,12 +175,12 @@ check_bindings "$ANDROID_BINDINGS" "Android (Kotlin)" "$MIN_KOTLIN_LINES"
 echo -e "${YELLOW}Checking library metadata...${NC}"
 cd "$PROJECT_ROOT"
 
-if [[ -f "target/release/libvauchi_mobile.so" ]]; then
-    metadata_count=$(cargo run -p vauchi-mobile --bin uniffi-bindgen --release -- print-repr target/release/libvauchi_mobile.so 2>/dev/null | grep -c "Record\|Enum\|Object\|Interface" || true)
+if [[ -f "target/release/libvauchi_platform.so" ]]; then
+    metadata_count=$(cargo run -p vauchi-platform --bin uniffi-bindgen --release -- print-repr target/release/libvauchi_platform.so 2>/dev/null | grep -c "Record\|Enum\|Object\|Interface" || true)
     if [[ $metadata_count -lt 20 ]]; then
         echo -e "${RED}  WARNING: Library has only $metadata_count metadata entries${NC}"
         echo -e "${RED}  Library may have been built with symbol stripping.${NC}"
-        echo -e "${RED}  Rebuild with: RUSTFLAGS=\"-Cstrip=none\" cargo build -p vauchi-mobile --release${NC}"
+        echo -e "${RED}  Rebuild with: RUSTFLAGS=\"-Cstrip=none\" cargo build -p vauchi-platform --release${NC}"
     else
         echo -e "${GREEN}  Library metadata OK: $metadata_count entries${NC}"
     fi
@@ -189,7 +189,7 @@ else
 fi
 
 # Check XCFramework structure (if packaged)
-XCFRAMEWORK_PATH="$PROJECT_ROOT/target/xcframework-build/VauchiMobileFFI.xcframework"
+XCFRAMEWORK_PATH="$PROJECT_ROOT/target/xcframework-build/VauchiPlatformFFI.xcframework"
 if [[ -d "$XCFRAMEWORK_PATH" ]]; then
     check_xcframework "$XCFRAMEWORK_PATH"
 fi
@@ -204,7 +204,7 @@ if [[ $ERRORS -gt 0 ]]; then
     echo ""
     echo "To fix:"
     echo "  1. cd $PROJECT_ROOT"
-    echo "  2. RUSTFLAGS=\"-Cstrip=none\" cargo build -p vauchi-mobile --release"
+    echo "  2. RUSTFLAGS=\"-Cstrip=none\" cargo build -p vauchi-platform --release"
     echo "  3. ./scripts/build-bindings.sh"
     exit 1
 else

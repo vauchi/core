@@ -10,12 +10,12 @@
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use std::sync::Arc;
 use tempfile::TempDir;
-use vauchi_mobile::VauchiMobile;
+use vauchi_platform::VauchiPlatform;
 
 /// Setup helper to create a test instance
-fn create_test_instance() -> (Arc<VauchiMobile>, TempDir) {
+fn create_test_instance() -> (Arc<VauchiPlatform>, TempDir) {
     let dir = TempDir::new().unwrap();
-    let instance = VauchiMobile::new(
+    let instance = VauchiPlatform::new(
         dir.path().to_string_lossy().to_string(),
         "ws://localhost:8080".to_string(),
     )
@@ -24,7 +24,7 @@ fn create_test_instance() -> (Arc<VauchiMobile>, TempDir) {
 }
 
 /// Setup helper to create an instance with identity
-fn create_instance_with_identity(name: &str) -> (Arc<VauchiMobile>, TempDir) {
+fn create_instance_with_identity(name: &str) -> (Arc<VauchiPlatform>, TempDir) {
     let (instance, dir) = create_test_instance();
     instance.create_identity(name.to_string()).unwrap();
     (instance, dir)
@@ -86,7 +86,7 @@ fn bench_card_operations(c: &mut Criterion) {
             |(instance, _dir)| {
                 let _: () = instance
                     .add_field(
-                        vauchi_mobile::MobileFieldType::Email,
+                        vauchi_platform::MobileFieldType::Email,
                         "work".to_string(),
                         "test@example.com".to_string(),
                     )
@@ -102,7 +102,7 @@ fn bench_card_operations(c: &mut Criterion) {
                 let (instance, dir) = create_instance_with_identity("Test User");
                 instance
                     .add_field(
-                        vauchi_mobile::MobileFieldType::Email,
+                        vauchi_platform::MobileFieldType::Email,
                         "work".to_string(),
                         "old@example.com".to_string(),
                     )
@@ -288,7 +288,7 @@ fn bench_password_check(c: &mut Criterion) {
 
     group.bench_function("check_weak", |b| {
         b.iter(|| {
-            black_box(vauchi_mobile::check_password_strength(
+            black_box(vauchi_platform::check_password_strength(
                 "password".to_string(),
             ));
         })
@@ -296,7 +296,7 @@ fn bench_password_check(c: &mut Criterion) {
 
     group.bench_function("check_strong", |b| {
         b.iter(|| {
-            black_box(vauchi_mobile::check_password_strength(
+            black_box(vauchi_platform::check_password_strength(
                 "correct-horse-battery-staple".to_string(),
             ));
         })

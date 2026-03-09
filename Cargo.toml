@@ -7,7 +7,7 @@ resolver = "2"
 members = [
     "vauchi-cabi",
     "vauchi-core",
-    "vauchi-mobile",
+    "vauchi-platform",
     "vauchi-protocol",
 ]
 

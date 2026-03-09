@@ -6,7 +6,7 @@
 ## Module Organization
 
 ```
-vauchi-mobile/
+vauchi-platform/
 ├── src/
 │   └── lib.rs           # All mobile bindings in one file
 ├── uniffi-bindgen.rs    # UniFFI CLI binary
@@ -23,7 +23,7 @@ Single file containing all UniFFI-exposed types and implementations.
 |---------|---------|
 | Error Types | `MobileError` enum for mobile-friendly errors |
 | Data Types | Records for fields, cards, contacts |
-| `VauchiMobile` | Main interface object with all operations |
+| `VauchiPlatform` | Main interface object with all operations |
 | Tests | Unit tests for mobile API |
 
 ### Key Types
@@ -39,9 +39,9 @@ Single file containing all UniFFI-exposed types and implementations.
 | `MobileExchangeResult` | `uniffi::Record` | Exchange result |
 | `MobileSyncStatus` | `uniffi::Enum` | Sync state |
 | `MobileSocialNetwork` | `uniffi::Record` | Social network info |
-| `VauchiMobile` | `uniffi::Object` | Main interface |
+| `VauchiPlatform` | `uniffi::Object` | Main interface |
 
-### `VauchiMobile` Methods
+### `VauchiPlatform` Methods
 
 | Category | Methods |
 |----------|---------|

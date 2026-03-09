@@ -7,7 +7,7 @@
 //! Verifies that the JSON transport layer correctly serializes/deserializes
 //! the core UI types across the FFI boundary.
 
-use vauchi_mobile::{
+use vauchi_platform::{
     MobileBackupRecoveryWorkflow, MobileContactEditWorkflow, MobileContactListWorkflow,
     MobileDeliveryStatusWorkflow, MobileDeviceLinkingWorkflow, MobileDuressPinWorkflow,
     MobileEmergencyShredWorkflow, MobileExchangeWorkflow, MobileHelpWorkflow, MobileHomeWorkflow,

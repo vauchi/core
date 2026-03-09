@@ -16,7 +16,7 @@ use super::exchange::MobileExchangeSession;
 use super::exchange::MobileProximityHandler;
 use super::multistage_exchange::MobileMultiStageSession;
 use super::types::MobileExchangeResult;
-use super::VauchiMobile;
+use super::VauchiPlatform;
 
 /// Exchange payload format version byte.
 const EXCHANGE_PAYLOAD_VERSION: u8 = 1;
@@ -56,7 +56,7 @@ fn deserialize_exchange_payload(data: &[u8]) -> Result<([u8; 32], ContactCard), 
 }
 
 #[uniffi::export]
-impl VauchiMobile {
+impl VauchiPlatform {
     // === Exchange Operations ===
 
     /// Create a QR exchange session with proximity verification.

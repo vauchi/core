@@ -14,11 +14,11 @@ use super::types::{
     MobileDeviceInfo, MobileDeviceLinkData, MobileDeviceLinkInfo, MobileDeviceLinkRequest,
 };
 use super::{
-    device_link_relay, MobileDeviceLinkInitiator, MobileDeviceLinkResponder, VauchiMobile,
+    device_link_relay, MobileDeviceLinkInitiator, MobileDeviceLinkResponder, VauchiPlatform,
 };
 
 #[uniffi::export]
-impl VauchiMobile {
+impl VauchiPlatform {
     // === Device Linking Operations ===
 
     /// Get list of linked devices.

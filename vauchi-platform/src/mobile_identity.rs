@@ -10,10 +10,10 @@ use super::error::MobileError;
 use super::types::{
     MobileAhaMoment, MobileAhaMomentType, MobileDemoContact, MobileDemoContactState,
 };
-use super::{IdentityData, VauchiMobile};
+use super::{IdentityData, VauchiPlatform};
 
 #[uniffi::export]
-impl VauchiMobile {
+impl VauchiPlatform {
     // === Identity Operations ===
 
     /// Check if identity exists.

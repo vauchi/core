@@ -19,15 +19,15 @@ This crate wraps `vauchi-core` with a mobile-friendly API via UniFFI. It provide
 ```bash
 # Build for Android
 rustup target add aarch64-linux-android armv7-linux-androideabi x86_64-linux-android
-cargo build -p vauchi-mobile --target aarch64-linux-android --release
+cargo build -p vauchi-platform --target aarch64-linux-android --release
 
 # Build for iOS
 rustup target add aarch64-apple-ios x86_64-apple-ios
-cargo build -p vauchi-mobile --target aarch64-apple-ios --release
+cargo build -p vauchi-platform --target aarch64-apple-ios --release
 
 # Generate bindings
-cargo run -p vauchi-mobile --bin uniffi-bindgen generate \
-    --library target/release/libvauchi_mobile.so \
+cargo run -p vauchi-platform --bin uniffi-bindgen generate \
+    --library target/release/libvauchi_platform.so \
     --language kotlin --out-dir ./generated
 ```
 
@@ -35,7 +35,7 @@ cargo run -p vauchi-mobile --bin uniffi-bindgen generate \
 
 ```kotlin
 // Kotlin usage example
-val vauchi = VauchiMobile("path/to/data", "ws://relay.example.com:8080")
+val vauchi = VauchiPlatform("path/to/data", "ws://relay.example.com:8080")
 
 // Create identity
 vauchi.createIdentity("Alice")
@@ -59,7 +59,7 @@ val contacts = vauchi.listContacts()
 
 | Type | Description |
 |------|-------------|
-| `VauchiMobile` | Main interface object |
+| `VauchiPlatform` | Main interface object |
 | `MobileContactCard` | User's contact card |
 | `MobileContactField` | Single contact field |
 | `MobileContact` | Contact with card and metadata |
@@ -72,7 +72,7 @@ val contacts = vauchi.listContacts()
 
 The API is designed for mobile environments where UI and background threads interact:
 
-- `VauchiMobile` is `Send + Sync`
+- `VauchiPlatform` is `Send + Sync`
 - Storage connections are created on-demand per operation
 - Identity data cached in memory with mutex protection
 - Storage encryption key persisted across sessions

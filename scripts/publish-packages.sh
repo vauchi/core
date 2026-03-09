@@ -36,7 +36,7 @@ VERSION="${RAW_VERSION#v}"
 GITLAB_URL="${CI_SERVER_URL:-https://gitlab.com}"
 PROJECT_ID="${CI_PROJECT_ID:-${GITLAB_PROJECT_ID:-}}"
 TOKEN="${CI_JOB_TOKEN:-${GITLAB_TOKEN:-}}"
-PACKAGE_NAME="vauchi-mobile"
+PACKAGE_NAME="vauchi-platform"
 
 # Colors
 RED='\033[0;31m'
@@ -125,17 +125,17 @@ UPLOAD_SUCCESS=true
 
 # Upload iOS artifacts
 echo -e "${YELLOW}=== iOS Artifacts ===${NC}"
-upload_file "$DIST_DIR/VauchiMobileFFI.xcframework.zip" || UPLOAD_SUCCESS=false
-upload_file "$DIST_DIR/VauchiMobileFFI.xcframework.zip.sha256" || UPLOAD_SUCCESS=false
-upload_file "$DIST_DIR/VauchiMobileFFI.xcframework.zip.sha256.bundle" || UPLOAD_SUCCESS=false
-upload_file "$DIST_DIR/VauchiMobile-$VERSION.zip" || UPLOAD_SUCCESS=false
+upload_file "$DIST_DIR/VauchiPlatformFFI.xcframework.zip" || UPLOAD_SUCCESS=false
+upload_file "$DIST_DIR/VauchiPlatformFFI.xcframework.zip.sha256" || UPLOAD_SUCCESS=false
+upload_file "$DIST_DIR/VauchiPlatformFFI.xcframework.zip.sha256.bundle" || UPLOAD_SUCCESS=false
+upload_file "$DIST_DIR/VauchiPlatform-$VERSION.zip" || UPLOAD_SUCCESS=false
 
 # Upload Android artifacts
 echo ""
 echo -e "${YELLOW}=== Android Artifacts ===${NC}"
-upload_file "$DIST_DIR/vauchi-mobile-android-$VERSION.zip" || UPLOAD_SUCCESS=false
-upload_file "$DIST_DIR/vauchi-mobile-android-$VERSION.zip.sha256" || UPLOAD_SUCCESS=false
-upload_file "$DIST_DIR/vauchi-mobile-android-$VERSION.zip.sha256.bundle" || UPLOAD_SUCCESS=false
+upload_file "$DIST_DIR/vauchi-platform-kotlin-$VERSION.zip" || UPLOAD_SUCCESS=false
+upload_file "$DIST_DIR/vauchi-platform-kotlin-$VERSION.zip.sha256" || UPLOAD_SUCCESS=false
+upload_file "$DIST_DIR/vauchi-platform-kotlin-$VERSION.zip.sha256.bundle" || UPLOAD_SUCCESS=false
 
 # Upload SBOM artifacts (T0-2)
 echo ""
@@ -159,10 +159,10 @@ if $UPLOAD_SUCCESS; then
     echo ""
     echo "Direct download URLs:"
     echo "  iOS XCFramework:"
-    echo "    $PACKAGE_URL/VauchiMobileFFI.xcframework.zip"
+    echo "    $PACKAGE_URL/VauchiPlatformFFI.xcframework.zip"
     echo ""
     echo "  Android:"
-    echo "    $PACKAGE_URL/vauchi-mobile-android-$VERSION.zip"
+    echo "    $PACKAGE_URL/vauchi-platform-kotlin-$VERSION.zip"
 else
     echo -e "${RED}╔════════════════════════════════════════╗${NC}"
     echo -e "${RED}║         Publish Failed                 ║${NC}"

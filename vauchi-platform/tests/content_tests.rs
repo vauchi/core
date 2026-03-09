@@ -4,7 +4,7 @@
 
 //! Tests for mobile content type conversions and config defaults (content.rs).
 
-use vauchi_mobile::{MobileContentConfig, MobileContentType};
+use vauchi_platform::{MobileContentConfig, MobileContentType};
 
 #[test]
 fn test_content_type_networks_roundtrip() {

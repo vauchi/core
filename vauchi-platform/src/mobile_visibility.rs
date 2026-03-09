@@ -6,10 +6,10 @@
 
 use super::error::MobileError;
 use super::types::{MobileVisibilityLabel, MobileVisibilityLabelDetail};
-use super::VauchiMobile;
+use super::VauchiPlatform;
 
 #[uniffi::export]
-impl VauchiMobile {
+impl VauchiPlatform {
     // === Visibility Operations ===
 
     /// Hide field from contact.

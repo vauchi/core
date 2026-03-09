@@ -6,10 +6,10 @@
 
 use super::error::MobileError;
 use super::types::{MobileOnboardingProgress, MobileOnboardingStep};
-use super::VauchiMobile;
+use super::VauchiPlatform;
 
 #[uniffi::export]
-impl VauchiMobile {
+impl VauchiPlatform {
     // === Onboarding Operations ===
 
     /// Get the current onboarding progress.

@@ -63,7 +63,7 @@ cargo fmt                         # Format
 
 ## Mobile Development
 
-The `vauchi-mobile` crate produces UniFFI bindings consumed by:
+The `vauchi-platform` crate produces UniFFI bindings consumed by:
 
 - **Android**: Clone [vauchi/android](https://gitlab.com/vauchi/android), run `./gradlew build`
 - **iOS**: Clone [vauchi/ios](https://gitlab.com/vauchi/ios), open in Xcode

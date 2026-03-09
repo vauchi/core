@@ -40,7 +40,7 @@ We will keep you informed of our progress throughout the process.
 **In Scope:**
 
 - `vauchi-core` - Cryptographic implementation, key management, data storage
-- `vauchi-mobile` - UniFFI bindings, mobile-specific security
+- `vauchi-platform` - UniFFI bindings, mobile-specific security
 
 **Out of Scope:**
 

@@ -16,7 +16,7 @@ use vauchi_core::exchange::{
 use vauchi_core::identity::Identity;
 
 use crate::error::MobileError;
-use crate::VauchiMobile;
+use crate::VauchiPlatform;
 
 // === Callback Interface ===
 
@@ -181,10 +181,10 @@ impl MobileNfcHandshake {
     }
 }
 
-// === VauchiMobile Factory Methods ===
+// === VauchiPlatform Factory Methods ===
 
 #[uniffi::export]
-impl VauchiMobile {
+impl VauchiPlatform {
     /// Create an NFC exchange session as the initiator (reader side).
     ///
     /// Used by iOS (CoreNFC reader) and Android (NfcAdapter reader).

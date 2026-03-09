@@ -12,10 +12,10 @@ use super::types::{
     MobileGdprExport, MobileShredReport, MobileShredStatus, MobileShredToken,
     MobileShredVerification,
 };
-use super::{MobilePlatformKeychain, MobileRevocationSender, VauchiMobile};
+use super::{MobilePlatformKeychain, MobileRevocationSender, VauchiPlatform};
 
 #[uniffi::export]
-impl VauchiMobile {
+impl VauchiPlatform {
     // === GDPR Operations ===
 
     /// Export all user data for GDPR compliance.

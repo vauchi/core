@@ -8,8 +8,8 @@
 # This script is for local/manual triggering when needed.
 #
 # This script triggers CI pipelines in:
-# - vauchi/vauchi-mobile-swift
-# - vauchi/vauchi-mobile-android
+# - vauchi/vauchi-platform-swift
+# - vauchi/vauchi-platform-kotlin
 #
 # Authentication:
 #   - CI: Uses CI_JOB_TOKEN (auto-provisioned, zero management)
@@ -35,8 +35,8 @@ fi
 GITLAB_URL="${CI_SERVER_URL:-https://gitlab.com}"
 
 # Project IDs
-SWIFT_PROJECT_ID="77955316"   # vauchi/vauchi-mobile-swift
-ANDROID_PROJECT_ID="77955319" # vauchi/vauchi-mobile-android
+SWIFT_PROJECT_ID="77955316"   # vauchi/vauchi-platform-swift
+ANDROID_PROJECT_ID="77955319" # vauchi/vauchi-platform-kotlin
 
 # Colors
 RED='\033[0;31m'
@@ -101,8 +101,8 @@ trigger_pipeline() {
 # Trigger both repos
 FAILED=false
 
-trigger_pipeline "$SWIFT_PROJECT_ID" "vauchi-mobile-swift" || FAILED=true
-trigger_pipeline "$ANDROID_PROJECT_ID" "vauchi-mobile-android" || FAILED=true
+trigger_pipeline "$SWIFT_PROJECT_ID" "vauchi-platform-swift" || FAILED=true
+trigger_pipeline "$ANDROID_PROJECT_ID" "vauchi-platform-kotlin" || FAILED=true
 
 echo ""
 

@@ -10,7 +10,7 @@
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use vauchi_core::exchange::{AudioBackend, AudioCapability, AudioConfig};
-use vauchi_mobile::{MobileProximityVerifier, PlatformAudioBackend, PlatformAudioHandler};
+use vauchi_platform::{MobileProximityVerifier, PlatformAudioBackend, PlatformAudioHandler};
 
 /// Mock audio handler that captures emitted samples and returns them on receive.
 /// This enables FSK encode→decode roundtrip testing without platform audio.

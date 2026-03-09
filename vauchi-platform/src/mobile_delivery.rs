@@ -13,10 +13,10 @@ use super::types::{
     MobileDeliveryRecord, MobileDeliveryStatus, MobileDeliverySummary, MobileDeviceDeliveryRecord,
     MobileRetryEntry, MobileSyncResult, MobileSyncStatus,
 };
-use super::{sync, IdentityData, VauchiMobile};
+use super::{sync, IdentityData, VauchiPlatform};
 
 #[uniffi::export]
-impl VauchiMobile {
+impl VauchiPlatform {
     // === Sync Operations ===
 
     /// Sync with relay server.
@@ -365,7 +365,7 @@ impl VauchiMobile {
 // Feature-gated behind `async-sync` (default) which pulls in tokio.
 #[cfg(feature = "async-sync")]
 #[uniffi::export(async_runtime = "tokio")]
-impl VauchiMobile {
+impl VauchiPlatform {
     /// Async version of sync using native async WebSocket.
     ///
     /// Use this from mobile UI threads to prevent freezing.

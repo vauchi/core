@@ -679,7 +679,7 @@ pub fn search_faqs_localized(query: String, locale: MobileLocale) -> Vec<MobileF
 ///
 /// Returns the title, message, and animation flag for display.
 /// This is a stateless helper — it doesn't check whether the moment
-/// has been seen. Use `try_trigger_aha_moment` on VauchiMobile for
+/// has been seen. Use `try_trigger_aha_moment` on VauchiPlatform for
 /// state-tracked triggering.
 #[uniffi::export]
 pub fn get_aha_moment_localized(
@@ -809,7 +809,7 @@ impl vauchi_core::api::RevocationSender for MobileRevocationSender {
 ///
 /// Uses on-demand storage connections for thread safety.
 #[derive(uniffi::Object)]
-pub struct VauchiMobile {
+pub struct VauchiPlatform {
     storage_path: PathBuf,
     storage_key: SymmetricKey,
     relay_url: String,
@@ -826,7 +826,7 @@ pub struct VauchiMobile {
     suppress_presence: Mutex<bool>,
 }
 
-impl VauchiMobile {
+impl VauchiPlatform {
     /// Opens a storage connection.
     pub(crate) fn open_storage(&self) -> Result<Storage, MobileError> {
         Storage::open(&self.storage_path, self.storage_key.clone())
@@ -970,8 +970,8 @@ impl VauchiMobile {
 }
 
 #[uniffi::export]
-impl VauchiMobile {
-    /// Create a new VauchiMobile instance with a platform-provided secure key.
+impl VauchiPlatform {
+    /// Create a new VauchiPlatform instance with a platform-provided secure key.
     ///
     /// This is the recommended constructor. The platform (iOS/Android) should:
     /// 1. Generate a 32-byte key if one doesn't exist in secure storage
@@ -998,7 +998,7 @@ impl VauchiMobile {
         let _storage = Storage::open(&storage_path, storage_key.clone())
             .map_err(|e| MobileError::StorageError(e.to_string()))?;
 
-        Ok(Arc::new(VauchiMobile {
+        Ok(Arc::new(VauchiPlatform {
             storage_path,
             storage_key,
             relay_url,
@@ -1012,7 +1012,7 @@ impl VauchiMobile {
         }))
     }
 
-    /// Create a new VauchiMobile instance (legacy constructor).
+    /// Create a new VauchiPlatform instance (legacy constructor).
     ///
     /// WARNING: This constructor stores the encryption key in a plaintext file.
     /// Use `new_with_secure_key` instead for production.
@@ -1043,7 +1043,7 @@ impl VauchiMobile {
         let _storage = Storage::open(&storage_path, storage_key.clone())
             .map_err(|e| MobileError::StorageError(e.to_string()))?;
 
-        Ok(Arc::new(VauchiMobile {
+        Ok(Arc::new(VauchiPlatform {
             storage_path,
             storage_key,
             relay_url,
@@ -1095,16 +1095,16 @@ impl VauchiMobile {
 // - mobile_device_link.rs: Device linking, relay transport, multipart QR
 // - mobile_content.rs: Content updates (feature-gated)
 
-// INLINE_TEST_REQUIRED: Tests require tempfile for VauchiMobile instance creation
-// and access to internal Arc<VauchiMobile> which cannot be accessed from external tests.
+// INLINE_TEST_REQUIRED: Tests require tempfile for VauchiPlatform instance creation
+// and access to internal Arc<VauchiPlatform> which cannot be accessed from external tests.
 #[cfg(test)]
 mod tests {
     use super::*;
     use tempfile::TempDir;
 
-    fn create_test_instance() -> (Arc<VauchiMobile>, TempDir) {
+    fn create_test_instance() -> (Arc<VauchiPlatform>, TempDir) {
         let dir = TempDir::new().unwrap();
-        let wb = VauchiMobile::new(
+        let wb = VauchiPlatform::new(
             dir.path().to_string_lossy().to_string(),
             "ws://localhost:8080".to_string(),
         )
@@ -1232,7 +1232,7 @@ mod tests {
         assert!(!backup.is_empty());
 
         let dir2 = TempDir::new().unwrap();
-        let wb2 = VauchiMobile::new(
+        let wb2 = VauchiPlatform::new(
             dir2.path().to_string_lossy().to_string(),
             "ws://localhost:8080".to_string(),
         )
@@ -1760,7 +1760,7 @@ mod tests {
     }
 
     // =========================================================================
-    // Multipart QR via VauchiMobile
+    // Multipart QR via VauchiPlatform
     // =========================================================================
 
     #[test]
@@ -1789,7 +1789,7 @@ mod tests {
     #[test]
     fn test_encode_multipart_qr_roundtrip_with_mobile_decoder() {
         let (wb, _dir) = create_test_instance();
-        let original = b"End-to-end test: VauchiMobile encodes, MobileMultipartDecoder decodes.";
+        let original = b"End-to-end test: VauchiPlatform encodes, MobileMultipartDecoder decodes.";
         let chunks = wb.encode_multipart_qr(original.to_vec());
 
         let decoder = multipart_qr::MobileMultipartDecoder::new();
@@ -1802,7 +1802,7 @@ mod tests {
         assert_eq!(
             assembled,
             original.to_vec(),
-            "roundtrip via VauchiMobile + MobileMultipartDecoder must preserve data"
+            "roundtrip via VauchiPlatform + MobileMultipartDecoder must preserve data"
         );
     }
 

@@ -11,10 +11,10 @@ use super::types::{
     MobileContact, MobileContactCard, MobileFieldType, MobileFieldValidation, MobileSocialNetwork,
     MobileValidationStatus,
 };
-use super::VauchiMobile;
+use super::VauchiPlatform;
 
 #[uniffi::export]
-impl VauchiMobile {
+impl VauchiPlatform {
     // === Contact Card Operations ===
 
     /// Get own contact card.

@@ -10,10 +10,10 @@ use super::error::MobileError;
 use super::types::{
     MobileRecoveryClaim, MobileRecoveryProgress, MobileRecoveryVerification, MobileRecoveryVoucher,
 };
-use super::VauchiMobile;
+use super::VauchiPlatform;
 
 #[uniffi::export]
-impl VauchiMobile {
+impl VauchiPlatform {
     // === Recovery ===
 
     /// Create a recovery claim for a lost identity.

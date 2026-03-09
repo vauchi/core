@@ -11,10 +11,10 @@ use super::types::{
     MobileAuthMode, MobileBroadcastResult, MobileDecoyContact, MobileDuressSettings,
     MobileEmergencyConfig,
 };
-use super::VauchiMobile;
+use super::VauchiPlatform;
 
 #[uniffi::export]
-impl VauchiMobile {
+impl VauchiPlatform {
     // === App Password / Duress PIN ===
 
     /// Sets up an app password (PIN).

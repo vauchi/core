@@ -16,7 +16,7 @@
 #   ./package-android.sh [version]
 #
 # Output:
-#   dist/vauchi-mobile-android-{version}.zip
+#   dist/vauchi-platform-kotlin-{version}.zip
 
 set -euo pipefail
 
@@ -67,7 +67,7 @@ mkdir -p "$DIST_DIR"
 
 # Create package structure
 echo -e "${YELLOW}Creating package structure...${NC}"
-PACKAGE_DIR="$BUILD_DIR/vauchi-mobile-android-$VERSION"
+PACKAGE_DIR="$BUILD_DIR/vauchi-platform-kotlin-$VERSION"
 mkdir -p "$PACKAGE_DIR/jniLibs"
 mkdir -p "$PACKAGE_DIR/kotlin"
 
@@ -75,10 +75,10 @@ mkdir -p "$PACKAGE_DIR/kotlin"
 echo -e "${YELLOW}Copying JNI libraries...${NC}"
 for arch_dir in "$ANDROID_JNI_DIR"/*/; do
     arch=$(basename "$arch_dir")
-    if [[ -f "$arch_dir/libvauchi_mobile.so" ]]; then
+    if [[ -f "$arch_dir/libvauchi_platform.so" ]]; then
         mkdir -p "$PACKAGE_DIR/jniLibs/$arch"
-        cp "$arch_dir/libvauchi_mobile.so" "$PACKAGE_DIR/jniLibs/$arch/"
-        echo "  - $arch: $(ls -lh "$arch_dir/libvauchi_mobile.so" | awk '{print $5}')"
+        cp "$arch_dir/libvauchi_platform.so" "$PACKAGE_DIR/jniLibs/$arch/"
+        echo "  - $arch: $(ls -lh "$arch_dir/libvauchi_platform.so" | awk '{print $5}')"
     fi
 done
 
@@ -87,12 +87,12 @@ echo -e "${YELLOW}Copying Kotlin bindings...${NC}"
 cp -r "$ANDROID_KOTLIN_DIR/uniffi" "$PACKAGE_DIR/kotlin/"
 
 # Count lines in Kotlin bindings
-KOTLIN_LINES=$(wc -l < "$PACKAGE_DIR/kotlin/uniffi/vauchi_mobile/vauchi_mobile.kt" 2>/dev/null || echo "0")
-echo "  - vauchi_mobile.kt: $KOTLIN_LINES lines"
+KOTLIN_LINES=$(wc -l < "$PACKAGE_DIR/kotlin/uniffi/vauchi_platform/vauchi_platform.kt" 2>/dev/null || echo "0")
+echo "  - vauchi_platform.kt: $KOTLIN_LINES lines"
 
 # Create README
 cat > "$PACKAGE_DIR/README.md" << EOF
-# VauchiMobile Android v$VERSION
+# VauchiPlatform Android v$VERSION
 
 UniFFI bindings for Vauchi Android apps.
 
@@ -101,7 +101,7 @@ UniFFI bindings for Vauchi Android apps.
 - \`jniLibs/\` - Native libraries per ABI
   - \`arm64-v8a/\` - ARM64 (most modern devices)
   - \`x86_64/\` - x86_64 (emulators)
-- \`kotlin/uniffi/vauchi_mobile/\` - Kotlin bindings
+- \`kotlin/uniffi/vauchi_platform/\` - Kotlin bindings
 
 ## Integration
 
@@ -112,14 +112,14 @@ UniFFI bindings for Vauchi Android apps.
 dependencyResolutionManagement {
     repositories {
         maven {
-            url = uri("https://gitlab.com/api/v4/projects/vauchi%2Fvauchi-mobile-android/packages/maven")
+            url = uri("https://gitlab.com/api/v4/projects/vauchi%2Fvauchi-platform-kotlin/packages/maven")
         }
     }
 }
 
 // app/build.gradle.kts
 dependencies {
-    implementation("com.vauchi:vauchi-mobile:$VERSION")
+    implementation("com.vauchi:vauchi-platform:$VERSION")
 }
 \`\`\`
 
@@ -137,7 +137,7 @@ dependencies {
        }
    }
    \`\`\`
-4. Import and use: \`import uniffi.vauchi_mobile.*\`
+4. Import and use: \`import uniffi.vauchi_platform.*\`
 
 ## ABI Support
 
@@ -160,9 +160,9 @@ EOF
 
 # Create zip archive
 echo -e "${YELLOW}Creating zip archive...${NC}"
-ZIP_PATH="$DIST_DIR/vauchi-mobile-android-$VERSION.zip"
+ZIP_PATH="$DIST_DIR/vauchi-platform-kotlin-$VERSION.zip"
 cd "$BUILD_DIR"
-zip -r "$ZIP_PATH" "vauchi-mobile-android-$VERSION"
+zip -r "$ZIP_PATH" "vauchi-platform-kotlin-$VERSION"
 
 # Calculate checksum (cross-platform: shasum on macOS, sha256sum on Linux)
 if command -v sha256sum >/dev/null 2>&1; then
@@ -185,7 +185,7 @@ echo "Checksum (SHA-256):"
 echo "  $CHECKSUM"
 
 # Write checksum to file for CI
-echo "$CHECKSUM" > "$DIST_DIR/vauchi-mobile-android-$VERSION.zip.sha256"
+echo "$CHECKSUM" > "$DIST_DIR/vauchi-platform-kotlin-$VERSION.zip.sha256"
 
 # Sign checksum with cosign (T1-5: required in CI, optional locally)
 # GitLab masked file variables store base64-encoded content — decode if needed.
@@ -197,8 +197,8 @@ if [[ -n "${COSIGN_KEY:-}" ]]; then
     fi
     echo -e "${YELLOW}Signing checksum with cosign...${NC}"
     cosign sign-blob --yes --key "$COSIGN_KEY_FILE" \
-        --bundle "$DIST_DIR/vauchi-mobile-android-$VERSION.zip.sha256.bundle" \
-        "$DIST_DIR/vauchi-mobile-android-$VERSION.zip.sha256"
+        --bundle "$DIST_DIR/vauchi-platform-kotlin-$VERSION.zip.sha256.bundle" \
+        "$DIST_DIR/vauchi-platform-kotlin-$VERSION.zip.sha256"
     [[ "$COSIGN_KEY_FILE" != "$COSIGN_KEY" ]] && rm -f "$COSIGN_KEY_FILE"
     echo -e "${GREEN}Checksum signed${NC}"
 elif [[ -n "${CI:-}" ]]; then

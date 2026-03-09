@@ -5,7 +5,7 @@
 //! Tests for mobile error type conversions (error.rs).
 
 use vauchi_core::{StorageError, VauchiError};
-use vauchi_mobile::MobileError;
+use vauchi_platform::MobileError;
 
 #[test]
 fn test_storage_error_conversion() {

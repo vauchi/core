@@ -7,10 +7,10 @@
 use super::error::MobileError;
 use super::types::MobileTorConfig;
 use super::types::MobileTorStatus;
-use super::VauchiMobile;
+use super::VauchiPlatform;
 
 #[uniffi::export]
-impl VauchiMobile {
+impl VauchiPlatform {
     // === Tor Privacy Mode ===
 
     /// Enables Tor with the current configuration.

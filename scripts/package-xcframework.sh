@@ -17,7 +17,7 @@
 #   ./package-xcframework.sh [version]
 #
 # Output:
-#   dist/VauchiMobileFFI.xcframework.zip
+#   dist/VauchiPlatformFFI.xcframework.zip
 
 set -euo pipefail
 
@@ -57,12 +57,12 @@ if [[ "$(uname)" != "Darwin" ]]; then
     exit 1
 fi
 
-if [[ ! -f "$IOS_LIBS_DIR/libvauchi_mobile_device.a" ]]; then
+if [[ ! -f "$IOS_LIBS_DIR/libvauchi_platform_device.a" ]]; then
     echo -e "${RED}Error: iOS libraries not found. Run build-bindings.sh --ios first${NC}"
     exit 1
 fi
 
-if [[ ! -f "$IOS_GENERATED_DIR/vauchi_mobile.swift" ]]; then
+if [[ ! -f "$IOS_GENERATED_DIR/vauchi_platform.swift" ]]; then
     echo -e "${RED}Error: Swift bindings not found. Run build-bindings.sh --ios first${NC}"
     exit 1
 fi
@@ -78,16 +78,16 @@ HEADERS_DIR="$BUILD_DIR/Headers"
 mkdir -p "$HEADERS_DIR"
 
 # Copy the generated C header (UniFFI generates this)
-if [[ -f "$IOS_GENERATED_DIR/vauchi_mobileFFI.h" ]]; then
-    cp "$IOS_GENERATED_DIR/vauchi_mobileFFI.h" "$HEADERS_DIR/"
+if [[ -f "$IOS_GENERATED_DIR/vauchi_platformFFI.h" ]]; then
+    cp "$IOS_GENERATED_DIR/vauchi_platformFFI.h" "$HEADERS_DIR/"
 else
     # Generate a minimal header if not present
-    cat > "$HEADERS_DIR/vauchi_mobileFFI.h" << 'EOF'
-// VauchiMobileFFI - UniFFI generated C bindings
+    cat > "$HEADERS_DIR/vauchi_platformFFI.h" << 'EOF'
+// VauchiPlatformFFI - UniFFI generated C bindings
 // This header is auto-generated. Do not edit.
 
-#ifndef VAUCHI_MOBILE_FFI_H
-#define VAUCHI_MOBILE_FFI_H
+#ifndef VAUCHI_PLATFORM_FFI_H
+#define VAUCHI_PLATFORM_FFI_H
 
 #include <stdint.h>
 #include <stdbool.h>
@@ -95,41 +95,41 @@ else
 // UniFFI scaffolding types are defined in the Swift bindings
 // This header exists for XCFramework module map requirements
 
-#endif // VAUCHI_MOBILE_FFI_H
+#endif // VAUCHI_PLATFORM_FFI_H
 EOF
 fi
 
 # Create module map
 cat > "$HEADERS_DIR/module.modulemap" << 'EOF'
-framework module VauchiMobileFFI {
-    umbrella header "vauchi_mobileFFI.h"
+framework module VauchiPlatformFFI {
+    umbrella header "vauchi_platformFFI.h"
     export *
     module * { export * }
-    link "vauchi_mobile"
+    link "vauchi_platform"
 }
 EOF
 
 # Create XCFramework structure for device
 echo -e "${YELLOW}Preparing device slice...${NC}"
 DEVICE_DIR="$BUILD_DIR/ios-arm64"
-mkdir -p "$DEVICE_DIR/VauchiMobileFFI.framework"
-cp "$IOS_LIBS_DIR/libvauchi_mobile_device.a" "$DEVICE_DIR/VauchiMobileFFI.framework/VauchiMobileFFI"
-cp -r "$HEADERS_DIR" "$DEVICE_DIR/VauchiMobileFFI.framework/Headers"
-mkdir -p "$DEVICE_DIR/VauchiMobileFFI.framework/Modules"
-cp "$HEADERS_DIR/module.modulemap" "$DEVICE_DIR/VauchiMobileFFI.framework/Modules/"
+mkdir -p "$DEVICE_DIR/VauchiPlatformFFI.framework"
+cp "$IOS_LIBS_DIR/libvauchi_platform_device.a" "$DEVICE_DIR/VauchiPlatformFFI.framework/VauchiPlatformFFI"
+cp -r "$HEADERS_DIR" "$DEVICE_DIR/VauchiPlatformFFI.framework/Headers"
+mkdir -p "$DEVICE_DIR/VauchiPlatformFFI.framework/Modules"
+cp "$HEADERS_DIR/module.modulemap" "$DEVICE_DIR/VauchiPlatformFFI.framework/Modules/"
 
 # Create Info.plist for device framework
-cat > "$DEVICE_DIR/VauchiMobileFFI.framework/Info.plist" << EOF
+cat > "$DEVICE_DIR/VauchiPlatformFFI.framework/Info.plist" << EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
     <key>CFBundleExecutable</key>
-    <string>VauchiMobileFFI</string>
+    <string>VauchiPlatformFFI</string>
     <key>CFBundleIdentifier</key>
-    <string>com.vauchi.VauchiMobileFFI</string>
+    <string>com.vauchi.VauchiPlatformFFI</string>
     <key>CFBundleName</key>
-    <string>VauchiMobileFFI</string>
+    <string>VauchiPlatformFFI</string>
     <key>CFBundleVersion</key>
     <string>$VERSION</string>
     <key>CFBundleShortVersionString</key>
@@ -143,34 +143,34 @@ EOF
 # Create XCFramework structure for simulator
 echo -e "${YELLOW}Preparing simulator slice...${NC}"
 SIM_DIR="$BUILD_DIR/ios-arm64_x86_64-simulator"
-mkdir -p "$SIM_DIR/VauchiMobileFFI.framework"
-cp "$IOS_LIBS_DIR/libvauchi_mobile_sim.a" "$SIM_DIR/VauchiMobileFFI.framework/VauchiMobileFFI"
-cp -r "$HEADERS_DIR" "$SIM_DIR/VauchiMobileFFI.framework/Headers"
-mkdir -p "$SIM_DIR/VauchiMobileFFI.framework/Modules"
-cp "$HEADERS_DIR/module.modulemap" "$SIM_DIR/VauchiMobileFFI.framework/Modules/"
-cp "$DEVICE_DIR/VauchiMobileFFI.framework/Info.plist" "$SIM_DIR/VauchiMobileFFI.framework/Info.plist"
+mkdir -p "$SIM_DIR/VauchiPlatformFFI.framework"
+cp "$IOS_LIBS_DIR/libvauchi_platform_sim.a" "$SIM_DIR/VauchiPlatformFFI.framework/VauchiPlatformFFI"
+cp -r "$HEADERS_DIR" "$SIM_DIR/VauchiPlatformFFI.framework/Headers"
+mkdir -p "$SIM_DIR/VauchiPlatformFFI.framework/Modules"
+cp "$HEADERS_DIR/module.modulemap" "$SIM_DIR/VauchiPlatformFFI.framework/Modules/"
+cp "$DEVICE_DIR/VauchiPlatformFFI.framework/Info.plist" "$SIM_DIR/VauchiPlatformFFI.framework/Info.plist"
 
 # Create XCFramework structure for macOS (if macOS libs exist)
 MACOS_FRAMEWORK_ARG=""
-if [[ -f "$MACOS_LIBS_DIR/libvauchi_mobile_macos.a" ]]; then
+if [[ -f "$MACOS_LIBS_DIR/libvauchi_platform_macos.a" ]]; then
     echo -e "${YELLOW}Preparing macOS slice (versioned bundle)...${NC}"
     MACOS_DIR="$BUILD_DIR/macos-arm64_x86_64"
-    MACOS_FW="$MACOS_DIR/VauchiMobileFFI.framework"
+    MACOS_FW="$MACOS_DIR/VauchiPlatformFFI.framework"
     # macOS requires versioned framework bundles (not flat iOS-style)
     mkdir -p "$MACOS_FW/Versions/A/Headers"
     mkdir -p "$MACOS_FW/Versions/A/Modules"
     mkdir -p "$MACOS_FW/Versions/A/Resources"
-    cp "$MACOS_LIBS_DIR/libvauchi_mobile_macos.a" "$MACOS_FW/Versions/A/VauchiMobileFFI"
-    cp "$HEADERS_DIR/vauchi_mobileFFI.h" "$MACOS_FW/Versions/A/Headers/"
+    cp "$MACOS_LIBS_DIR/libvauchi_platform_macos.a" "$MACOS_FW/Versions/A/VauchiPlatformFFI"
+    cp "$HEADERS_DIR/vauchi_platformFFI.h" "$MACOS_FW/Versions/A/Headers/"
     cp "$HEADERS_DIR/module.modulemap" "$MACOS_FW/Versions/A/Headers/"
     cp "$HEADERS_DIR/module.modulemap" "$MACOS_FW/Versions/A/Modules/"
-    cp "$DEVICE_DIR/VauchiMobileFFI.framework/Info.plist" "$MACOS_FW/Versions/A/Resources/"
+    cp "$DEVICE_DIR/VauchiPlatformFFI.framework/Info.plist" "$MACOS_FW/Versions/A/Resources/"
     # Create required symlinks
     (cd "$MACOS_FW/Versions" && ln -sf A Current)
     (cd "$MACOS_FW" && ln -sf Versions/Current/Headers Headers)
     (cd "$MACOS_FW" && ln -sf Versions/Current/Modules Modules)
     (cd "$MACOS_FW" && ln -sf Versions/Current/Resources Resources)
-    (cd "$MACOS_FW" && ln -sf Versions/Current/VauchiMobileFFI VauchiMobileFFI)
+    (cd "$MACOS_FW" && ln -sf Versions/Current/VauchiPlatformFFI VauchiPlatformFFI)
     MACOS_FRAMEWORK_ARG="-framework $MACOS_FW"
 else
     echo -e "${YELLOW}No macOS libraries found — XCFramework will be iOS-only${NC}"
@@ -178,11 +178,11 @@ fi
 
 # Create XCFramework
 echo -e "${YELLOW}Creating XCFramework...${NC}"
-XCFRAMEWORK_PATH="$BUILD_DIR/VauchiMobileFFI.xcframework"
+XCFRAMEWORK_PATH="$BUILD_DIR/VauchiPlatformFFI.xcframework"
 
 xcodebuild -create-xcframework \
-    -framework "$DEVICE_DIR/VauchiMobileFFI.framework" \
-    -framework "$SIM_DIR/VauchiMobileFFI.framework" \
+    -framework "$DEVICE_DIR/VauchiPlatformFFI.framework" \
+    -framework "$SIM_DIR/VauchiPlatformFFI.framework" \
     $MACOS_FRAMEWORK_ARG \
     -output "$XCFRAMEWORK_PATH"
 
@@ -195,16 +195,16 @@ echo -e "${YELLOW}Post-processing: Ensuring CFBundleExecutable in framework slic
 while IFS= read -r plist; do
     if ! /usr/libexec/PlistBuddy -c "Print :CFBundleExecutable" "$plist" 2>/dev/null; then
         echo "  Adding CFBundleExecutable to: $plist"
-        /usr/libexec/PlistBuddy -c "Add :CFBundleExecutable string VauchiMobileFFI" "$plist"
+        /usr/libexec/PlistBuddy -c "Add :CFBundleExecutable string VauchiPlatformFFI" "$plist"
     else
         echo "  CFBundleExecutable already present in: $plist"
     fi
-done < <(find "$XCFRAMEWORK_PATH" -name "Info.plist" -path "*/VauchiMobileFFI.framework/*")
+done < <(find "$XCFRAMEWORK_PATH" -name "Info.plist" -path "*/VauchiPlatformFFI.framework/*")
 echo -e "${GREEN}Post-processing complete${NC}"
 
 # Create distribution package
 echo -e "${YELLOW}Creating distribution package...${NC}"
-PACKAGE_DIR="$BUILD_DIR/VauchiMobile-$VERSION"
+PACKAGE_DIR="$BUILD_DIR/VauchiPlatform-$VERSION"
 mkdir -p "$PACKAGE_DIR"
 
 # Copy XCFramework
@@ -212,18 +212,18 @@ cp -r "$XCFRAMEWORK_PATH" "$PACKAGE_DIR/"
 
 # Copy Swift bindings
 mkdir -p "$PACKAGE_DIR/Sources"
-cp "$IOS_GENERATED_DIR/vauchi_mobile.swift" "$PACKAGE_DIR/Sources/"
+cp "$IOS_GENERATED_DIR/vauchi_platform.swift" "$PACKAGE_DIR/Sources/"
 
 # Create README
 cat > "$PACKAGE_DIR/README.md" << EOF
-# VauchiMobile v$VERSION
+# VauchiPlatform v$VERSION
 
 UniFFI bindings for Vauchi iOS apps.
 
 ## Contents
 
-- \`VauchiMobileFFI.xcframework/\` - Native library (iOS device + simulator + macOS)
-- \`Sources/vauchi_mobile.swift\` - Swift bindings
+- \`VauchiPlatformFFI.xcframework/\` - Native library (iOS device + simulator + macOS)
+- \`Sources/vauchi_platform.swift\` - Swift bindings
 
 ## Integration
 
@@ -231,17 +231,17 @@ UniFFI bindings for Vauchi iOS apps.
 
 \`\`\`swift
 .binaryTarget(
-    name: "VauchiMobileFFI",
-    url: "https://gitlab.com/api/v4/projects/vauchi%2Fcore/packages/generic/vauchi-mobile/$VERSION/VauchiMobileFFI.xcframework.zip",
+    name: "VauchiPlatformFFI",
+    url: "https://gitlab.com/api/v4/projects/vauchi%2Fcore/packages/generic/vauchi-platform/$VERSION/VauchiPlatformFFI.xcframework.zip",
     checksum: "CHECKSUM_HERE"
 )
 \`\`\`
 
 ### Manual Integration
 
-1. Drag \`VauchiMobileFFI.xcframework\` into your Xcode project
-2. Add \`Sources/vauchi_mobile.swift\` to your target
-3. Import and use: \`import VauchiMobile\`
+1. Drag \`VauchiPlatformFFI.xcframework\` into your Xcode project
+2. Add \`Sources/vauchi_platform.swift\` to your target
+3. Import and use: \`import VauchiPlatform\`
 
 ## License
 
@@ -249,14 +249,14 @@ MIT License - see https://gitlab.com/vauchi/core
 EOF
 
 # Create zip archive
-ZIP_PATH="$DIST_DIR/VauchiMobile-$VERSION.zip"
+ZIP_PATH="$DIST_DIR/VauchiPlatform-$VERSION.zip"
 cd "$BUILD_DIR"
-zip -r "$ZIP_PATH" "VauchiMobile-$VERSION"
+zip -r "$ZIP_PATH" "VauchiPlatform-$VERSION"
 
 # Also create framework-only zip for SPM binary target
-XCFRAMEWORK_ZIP="$DIST_DIR/VauchiMobileFFI.xcframework.zip"
+XCFRAMEWORK_ZIP="$DIST_DIR/VauchiPlatformFFI.xcframework.zip"
 cd "$BUILD_DIR"
-zip -r "$XCFRAMEWORK_ZIP" "VauchiMobileFFI.xcframework"
+zip -r "$XCFRAMEWORK_ZIP" "VauchiPlatformFFI.xcframework"
 
 # Calculate checksums
 echo -e "${YELLOW}Calculating checksums...${NC}"
@@ -279,7 +279,7 @@ echo ""
 echo "Save this checksum for Package.swift binaryTarget!"
 
 # Write checksum to file for CI
-echo "$CHECKSUM" > "$DIST_DIR/VauchiMobileFFI.xcframework.zip.sha256"
+echo "$CHECKSUM" > "$DIST_DIR/VauchiPlatformFFI.xcframework.zip.sha256"
 
 # Sign checksum with cosign (T1-5: required in CI, optional locally)
 # GitLab masked file variables store base64-encoded content — decode if needed.
@@ -291,8 +291,8 @@ if [[ -n "${COSIGN_KEY:-}" ]]; then
     fi
     echo -e "${YELLOW}Signing checksum with cosign...${NC}"
     cosign sign-blob --yes --key "$COSIGN_KEY_FILE" \
-        --bundle "$DIST_DIR/VauchiMobileFFI.xcframework.zip.sha256.bundle" \
-        "$DIST_DIR/VauchiMobileFFI.xcframework.zip.sha256"
+        --bundle "$DIST_DIR/VauchiPlatformFFI.xcframework.zip.sha256.bundle" \
+        "$DIST_DIR/VauchiPlatformFFI.xcframework.zip.sha256"
     [[ "$COSIGN_KEY_FILE" != "$COSIGN_KEY" ]] && rm -f "$COSIGN_KEY_FILE"
     echo -e "${GREEN}Checksum signed${NC}"
 elif [[ -n "${CI:-}" ]]; then

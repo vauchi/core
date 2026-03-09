@@ -5,8 +5,8 @@
 # Build UniFFI bindings for iOS and Android
 #
 # This script:
-# 1. Builds vauchi-mobile for iOS targets (ARM64, x86_64 simulator)
-# 2. Builds vauchi-mobile for Android targets (ARM64, x86_64)
+# 1. Builds vauchi-platform for iOS targets (ARM64, x86_64 simulator)
+# 2. Builds vauchi-platform for Android targets (ARM64, x86_64)
 # 3. Generates Swift bindings for iOS
 # 4. Generates Kotlin bindings for Android
 # 5. Copies artifacts to platform directories
@@ -142,25 +142,25 @@ if $BUILD_IOS; then
 
         # Build for iOS device (ARM64)
         echo -e "${YELLOW}Building for aarch64-apple-ios (device)...${NC}"
-        cargo build -p vauchi-mobile --target aarch64-apple-ios --release
+        cargo build -p vauchi-platform --target aarch64-apple-ios --release
         echo -e "${GREEN}iOS device build complete${NC}"
 
         # Build for iOS simulator (ARM64 - Apple Silicon)
         echo -e "${YELLOW}Building for aarch64-apple-ios-sim (simulator ARM64)...${NC}"
-        cargo build -p vauchi-mobile --target aarch64-apple-ios-sim --release
+        cargo build -p vauchi-platform --target aarch64-apple-ios-sim --release
         echo -e "${GREEN}iOS simulator ARM64 build complete${NC}"
 
         # Build for iOS simulator (x86_64 - Intel)
         echo -e "${YELLOW}Building for x86_64-apple-ios (simulator x86_64)...${NC}"
-        cargo build -p vauchi-mobile --target x86_64-apple-ios --release
+        cargo build -p vauchi-platform --target x86_64-apple-ios --release
         echo -e "${GREEN}iOS simulator x86_64 build complete${NC}"
 
         # Generate Swift bindings
         echo -e "${YELLOW}Generating Swift bindings...${NC}"
         mkdir -p "$IOS_GENERATED_DIR"
 
-        cargo run -p vauchi-mobile --bin uniffi-bindgen -- generate \
-            --library target/aarch64-apple-ios/release/libvauchi_mobile.a \
+        cargo run -p vauchi-platform --bin uniffi-bindgen -- generate \
+            --library target/aarch64-apple-ios/release/libvauchi_platform.a \
             --language swift \
             --out-dir "$IOS_GENERATED_DIR"
 
@@ -171,12 +171,12 @@ if $BUILD_IOS; then
         mkdir -p "$IOS_LIBS_DIR"
 
         lipo -create \
-            target/aarch64-apple-ios-sim/release/libvauchi_mobile.a \
-            target/x86_64-apple-ios/release/libvauchi_mobile.a \
-            -output "$IOS_LIBS_DIR/libvauchi_mobile_sim.a"
+            target/aarch64-apple-ios-sim/release/libvauchi_platform.a \
+            target/x86_64-apple-ios/release/libvauchi_platform.a \
+            -output "$IOS_LIBS_DIR/libvauchi_platform_sim.a"
 
         # Copy device library
-        cp target/aarch64-apple-ios/release/libvauchi_mobile.a "$IOS_LIBS_DIR/libvauchi_mobile_device.a"
+        cp target/aarch64-apple-ios/release/libvauchi_platform.a "$IOS_LIBS_DIR/libvauchi_platform_device.a"
 
         echo -e "${GREEN}iOS libraries:${NC}"
         ls -lh "$IOS_LIBS_DIR/"
@@ -278,7 +278,7 @@ if $BUILD_ANDROID; then
     export CC_aarch64_linux_android="$NDK_TOOLCHAIN/aarch64-linux-android24-clang"
     export AR_aarch64_linux_android="$NDK_TOOLCHAIN/llvm-ar"
     export CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER="$NDK_TOOLCHAIN/aarch64-linux-android24-clang"
-    cargo build -p vauchi-mobile --target aarch64-linux-android --release
+    cargo build -p vauchi-platform --target aarch64-linux-android --release
     echo -e "${GREEN}ARM64 build complete${NC}"
 
     # Build for x86_64 (emulator)
@@ -286,15 +286,15 @@ if $BUILD_ANDROID; then
     export CC_x86_64_linux_android="$NDK_TOOLCHAIN/x86_64-linux-android24-clang"
     export AR_x86_64_linux_android="$NDK_TOOLCHAIN/llvm-ar"
     export CARGO_TARGET_X86_64_LINUX_ANDROID_LINKER="$NDK_TOOLCHAIN/x86_64-linux-android24-clang"
-    cargo build -p vauchi-mobile --target x86_64-linux-android --release
+    cargo build -p vauchi-platform --target x86_64-linux-android --release
     echo -e "${GREEN}x86_64 build complete${NC}"
 
     # Copy native libraries
     echo -e "${YELLOW}Copying native libraries...${NC}"
     mkdir -p "$ANDROID_JNI_DIR/arm64-v8a"
     mkdir -p "$ANDROID_JNI_DIR/x86_64"
-    cp target/aarch64-linux-android/release/libvauchi_mobile.so "$ANDROID_JNI_DIR/arm64-v8a/"
-    cp target/x86_64-linux-android/release/libvauchi_mobile.so "$ANDROID_JNI_DIR/x86_64/"
+    cp target/aarch64-linux-android/release/libvauchi_platform.so "$ANDROID_JNI_DIR/arm64-v8a/"
+    cp target/x86_64-linux-android/release/libvauchi_platform.so "$ANDROID_JNI_DIR/x86_64/"
 
     # Generate Kotlin bindings
     # Note: uniffi-bindgen can't read metadata from cross-compiled libraries,
@@ -306,16 +306,16 @@ if $BUILD_ANDROID; then
 
     # Build native library for binding generation (without stripping to preserve metadata)
     echo -e "${YELLOW}Building native library for metadata extraction...${NC}"
-    RUSTFLAGS="-Cstrip=none" cargo build -p vauchi-mobile --release
+    RUSTFLAGS="-Cstrip=none" cargo build -p vauchi-platform --release
 
     # Determine native library extension (.so on Linux, .dylib on macOS)
     if [[ "$(uname)" == "Darwin" ]]; then
-        NATIVE_LIB="target/release/libvauchi_mobile.dylib"
+        NATIVE_LIB="target/release/libvauchi_platform.dylib"
     else
-        NATIVE_LIB="target/release/libvauchi_mobile.so"
+        NATIVE_LIB="target/release/libvauchi_platform.so"
     fi
 
-    cargo run -p vauchi-mobile --bin uniffi-bindgen --release -- generate \
+    cargo run -p vauchi-platform --bin uniffi-bindgen --release -- generate \
         --library "$NATIVE_LIB" \
         --language kotlin \
         --out-dir "$ANDROID_KOTLIN_DIR"
@@ -323,7 +323,7 @@ if $BUILD_ANDROID; then
     echo -e "${GREEN}Kotlin bindings generated at: $ANDROID_KOTLIN_DIR${NC}"
 
     echo -e "${GREEN}Android libraries:${NC}"
-    ls -lh "$ANDROID_JNI_DIR"/*/libvauchi_mobile.so
+    ls -lh "$ANDROID_JNI_DIR"/*/libvauchi_platform.so
 fi
 
 # === Summary ===

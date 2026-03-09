@@ -2,10 +2,10 @@
 # SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
-# Run all tests for vauchi-core and vauchi-mobile
+# Run all tests for vauchi-core and vauchi-platform
 #
 # This script runs:
-# 1. Rust workspace tests (vauchi-core, vauchi-mobile)
+# 1. Rust workspace tests (vauchi-core, vauchi-platform)
 # 2. Android unit + instrumented tests
 # 3. iOS unit + UI tests
 # 4. Coverage report generation

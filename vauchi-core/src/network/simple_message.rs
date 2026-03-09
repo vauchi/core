@@ -9,7 +9,7 @@
 //! in the wire format (it's embedded in the ciphertext instead).
 //!
 //! This module provides a common definition to avoid duplication across
-//! vauchi-mobile, vauchi-cli, and vauchi-relay.
+//! vauchi-platform, vauchi-cli, and vauchi-relay.
 
 use serde::{Deserialize, Serialize};
 

@@ -41,9 +41,12 @@ fn drive_onboarding(engine: &mut AppEngine<MockTransport>) -> ActionResult {
         component_id: "display_name".into(),
         value: "Alice".into(),
     });
-    assert!(
-        matches!(r, ActionResult::UpdateScreen(_)),
-        "Step 3 (TextChanged display_name) expected UpdateScreen, got {r:?}"
+    let ActionResult::UpdateScreen(screen) = r else {
+        panic!("Step 3 (TextChanged display_name) expected UpdateScreen, got {r:?}");
+    };
+    assert_eq!(
+        screen.screen_id, "default_name",
+        "TextChanged should update the default_name screen"
     );
 
     // Step 4: continue -> navigates to skip_gate
@@ -248,16 +251,22 @@ fn drive_onboarding_without_name(engine: &mut AppEngine<MockTransport>) -> Actio
     let r = engine.handle_action(UserAction::ActionPressed {
         action_id: "create_new".into(),
     });
-    assert!(
-        matches!(r, ActionResult::NavigateTo(_)),
-        "create_new should produce NavigateTo, got {r:?}"
+    let ActionResult::NavigateTo(screen) = r else {
+        panic!("create_new should produce NavigateTo, got {r:?}");
+    };
+    assert_eq!(
+        screen.screen_id, "welcome",
+        "create_new should navigate to welcome"
     );
     let r = engine.handle_action(UserAction::ActionPressed {
         action_id: "get_started".into(),
     });
-    assert!(
-        matches!(r, ActionResult::NavigateTo(_)),
-        "get_started should produce NavigateTo, got {r:?}"
+    let ActionResult::NavigateTo(screen) = r else {
+        panic!("get_started should produce NavigateTo, got {r:?}");
+    };
+    assert_eq!(
+        screen.screen_id, "default_name",
+        "get_started should navigate to default_name"
     );
     // Attempt to continue without setting display_name
     engine.handle_action(UserAction::ActionPressed {
@@ -365,14 +374,14 @@ fn onboarding_completion_with_empty_name_returns_validation_error() {
     let vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
     let mut engine = AppEngine::new(vauchi);
 
-    // Navigate to name step
+    // Intermediate navigation steps — final validation asserted below
     let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "create_new".into(),
     });
     let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "get_started".into(),
     });
-    // Set a whitespace-only name
+    // Intermediate step: set a whitespace-only name — validation asserted below
     let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "display_name".into(),
         value: "   ".into(),
@@ -418,6 +427,7 @@ fn onboarding_complete_creates_identity_in_vauchi() {
 
     assert!(!engine.has_identity());
 
+    // Intermediate step: drive full onboarding — identity persistence asserted below
     let _ = drive_onboarding(&mut engine);
 
     assert!(
@@ -549,7 +559,7 @@ fn navigate_away_and_back_preserves_engine_state() {
     let first_visit = engine.navigate_to(AppScreen::Exchange);
     assert_eq!(first_visit.screen_id, "exchange_show_qr");
 
-    // Advance the Exchange engine to the scan step
+    // Intermediate step — advance to scan; screen_id asserted on next line
     let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "continue".into(),
     });
@@ -576,7 +586,7 @@ fn onboarding_engine_not_cached() {
     let vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
     let mut engine = AppEngine::new(vauchi);
 
-    // Start on Onboarding, navigate away
+    // Start on Onboarding, navigate away — intermediate step; fresh start asserted below
     assert_eq!(engine.current_app_screen(), &AppScreen::Onboarding);
     let _ = engine.navigate_to(AppScreen::Home);
 
@@ -597,6 +607,7 @@ fn lock_screen_engine_not_cached() {
     // Navigate to Lock, then away
     let lock = engine.navigate_to(AppScreen::Lock);
     assert_eq!(lock.screen_id, "lock_screen");
+    // Intermediate step: navigate away — fresh lock screen asserted below
     let _ = engine.navigate_to(AppScreen::Home);
 
     // Navigate back to Lock — should always be fresh
@@ -703,7 +714,7 @@ fn settings_toggle_suppress_presence_persists() {
         "suppress_presence should default to disabled"
     );
 
-    // Toggle suppress_presence on
+    // Intermediate step: toggle on — persistence asserted after navigate-away-and-back
     let _ = engine.handle_action(UserAction::SettingsToggled {
         component_id: "privacy".into(),
         item_id: "suppress_presence".into(),
@@ -758,6 +769,7 @@ fn engine_with_password(password: &str) -> AppEngine<MockTransport> {
 /// Helper: enter a PIN into the lock screen engine.
 fn enter_pin(engine: &mut AppEngine<MockTransport>, pin: &str) {
     for ch in pin.chars() {
+        // Intermediate step: accumulate PIN digits — unlock result asserted by caller
         let _ = engine.handle_action(UserAction::TextChanged {
             component_id: "pin".into(),
             value: ch.to_string(),
@@ -844,6 +856,7 @@ fn lock_screen_tracks_failed_attempts() {
     // Enter wrong PIN twice
     for _ in 0..2 {
         enter_pin(&mut engine, "000000");
+        // Intermediate step: trigger failed attempt — attempt count asserted below
         let _ = engine.handle_action(UserAction::ActionPressed {
             action_id: "unlock".into(),
         });
@@ -881,7 +894,7 @@ fn lock_screen_tracks_failed_attempts() {
 fn lock_screen_correct_pin_after_failed_attempt_unlocks() {
     let mut engine = engine_with_password("123456");
 
-    // First attempt: wrong PIN
+    // First attempt: wrong PIN — intermediate step; correct PIN unlock asserted below
     enter_pin(&mut engine, "000000");
     let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "unlock".into(),
@@ -1115,6 +1128,7 @@ proptest! {
         let vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
         let mut engine = AppEngine::new(vauchi);
         for action in actions {
+            // Result intentionally discarded — proptest asserts no-panic + non-empty screen_id
             let _ = engine.handle_action(action);
             let screen = engine.current_screen();
             prop_assert!(!screen.screen_id.is_empty(),

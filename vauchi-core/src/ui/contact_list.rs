@@ -23,6 +23,9 @@ impl ContactListEngine {
 
     fn filtered_contacts(&self) -> Vec<ContactItem> {
         if self.search_query.is_empty() {
+            // Clone is required: ScreenModel owns its components, so ContactList
+            // needs an owned Vec<ContactItem>. Caching would add complexity for
+            // a list that is small in practice (< 1000 contacts).
             return self.all_contacts.clone();
         }
         let query_lower = self.search_query.to_lowercase();

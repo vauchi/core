@@ -695,7 +695,9 @@ impl OnboardingEngine {
                 component_id,
                 value,
             } if component_id.starts_with("group_name_override_") => {
-                let id = component_id.strip_prefix("group_name_override_").unwrap();
+                let Some(id) = component_id.strip_prefix("group_name_override_") else {
+                    return ActionResult::UpdateScreen(self.current_screen());
+                };
                 if let Some(group) = self.data.selected_groups.iter_mut().find(|g| g.name == id) {
                     group.name_override = if value.trim().is_empty() {
                         None

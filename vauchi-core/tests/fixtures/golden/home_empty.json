@@ -13,8 +13,8 @@
   ],
   "actions": [
     {
-      "id": "add_contact",
-      "label": "Add Contact",
+      "id": "add_field",
+      "label": "Add Entry",
       "style": "Primary",
       "enabled": true
     }

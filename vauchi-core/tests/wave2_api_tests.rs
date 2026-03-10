@@ -9,7 +9,7 @@
 //! - Setup/onboarding progress API
 //! - Emergency wipe status and perform APIs
 //! - New aha moment types
-//! - Label members (get_label_members) API
+//! - Label members (get_group_members) API
 
 mod common;
 
@@ -487,15 +487,15 @@ fn test_new_aha_moments_animations() {
 }
 
 // ================================================================
-// Label Members (get_label_members) API Tests
+// Label Members (get_group_members) API Tests
 // ================================================================
 
 #[test]
 fn test_get_label_members_empty_label() {
     let wb = create_vauchi_with_identity("Alice");
-    let label = wb.create_label("Friends").unwrap();
+    let label = wb.create_group("Friends").unwrap();
 
-    let members = wb.get_label_members(label.id()).unwrap();
+    let members = wb.get_group_members(label.id()).unwrap();
     assert_eq!(members.len(), 0);
 }
 
@@ -511,13 +511,13 @@ fn test_get_label_members_returns_contacts() {
     let c2_id = c2.id().to_string();
     wb.add_contact(c2).unwrap();
 
-    let label = wb.create_label("Friends").unwrap();
+    let label = wb.create_group("Friends").unwrap();
     let label_id = label.id().to_string();
 
-    wb.add_contact_to_label(&label_id, &c1_id).unwrap();
-    wb.add_contact_to_label(&label_id, &c2_id).unwrap();
+    wb.add_contact_to_group(&label_id, &c1_id).unwrap();
+    wb.add_contact_to_group(&label_id, &c2_id).unwrap();
 
-    let members = wb.get_label_members(&label_id).unwrap();
+    let members = wb.get_group_members(&label_id).unwrap();
     assert_eq!(members.len(), 2);
 
     let member_names: Vec<&str> = members.iter().map(|c| c.display_name()).collect();
@@ -533,16 +533,16 @@ fn test_get_label_members_skips_deleted_contacts() {
     let c1_id = c1.id().to_string();
     wb.add_contact(c1).unwrap();
 
-    let label = wb.create_label("Friends").unwrap();
+    let label = wb.create_group("Friends").unwrap();
     let label_id = label.id().to_string();
 
-    wb.add_contact_to_label(&label_id, &c1_id).unwrap();
+    wb.add_contact_to_group(&label_id, &c1_id).unwrap();
     // Also add a non-existent contact ID to the label
     // (this simulates a deleted contact that was in the label)
-    wb.add_contact_to_label(&label_id, "nonexistent-id")
+    wb.add_contact_to_group(&label_id, "nonexistent-id")
         .unwrap();
 
-    let members = wb.get_label_members(&label_id).unwrap();
+    let members = wb.get_group_members(&label_id).unwrap();
     assert_eq!(
         members.len(),
         1,
@@ -558,12 +558,12 @@ fn test_get_label_members_skips_deleted_contacts() {
 #[test]
 fn test_set_label_display_name_override_api() {
     let wb = create_vauchi_with_identity("Matthew Egloff");
-    let label = wb.create_label("Friends").unwrap();
+    let label = wb.create_group("Friends").unwrap();
 
-    wb.set_label_display_name_override(label.id(), Some("Matt"))
+    wb.set_group_display_name_override(label.id(), Some("Matt"))
         .unwrap();
 
-    let loaded = wb.get_label(label.id()).unwrap();
+    let loaded = wb.get_group(label.id()).unwrap();
     assert_eq!(loaded.display_name_override(), Some("Matt"));
     assert_eq!(loaded.resolve_display_name("Matthew Egloff"), "Matt");
 }
@@ -571,14 +571,14 @@ fn test_set_label_display_name_override_api() {
 #[test]
 fn test_clear_label_display_name_override_api() {
     let wb = create_vauchi_with_identity("Matthew Egloff");
-    let label = wb.create_label("Friends").unwrap();
+    let label = wb.create_group("Friends").unwrap();
 
-    wb.set_label_display_name_override(label.id(), Some("Matt"))
+    wb.set_group_display_name_override(label.id(), Some("Matt"))
         .unwrap();
-    wb.set_label_display_name_override(label.id(), None)
+    wb.set_group_display_name_override(label.id(), None)
         .unwrap();
 
-    let loaded = wb.get_label(label.id()).unwrap();
+    let loaded = wb.get_group(label.id()).unwrap();
     assert_eq!(loaded.display_name_override(), None);
     assert_eq!(
         loaded.resolve_display_name("Matthew Egloff"),
@@ -589,18 +589,18 @@ fn test_clear_label_display_name_override_api() {
 #[test]
 fn test_set_label_display_name_override_empty_rejected() {
     let wb = create_vauchi_with_identity("Alice");
-    let label = wb.create_label("Work").unwrap();
+    let label = wb.create_group("Work").unwrap();
 
-    let result = wb.set_label_display_name_override(label.id(), Some(""));
+    let result = wb.set_group_display_name_override(label.id(), Some(""));
     assert!(result.is_err(), "empty override should be rejected");
 }
 
 #[test]
 fn test_set_label_display_name_override_whitespace_rejected() {
     let wb = create_vauchi_with_identity("Alice");
-    let label = wb.create_label("Work").unwrap();
+    let label = wb.create_group("Work").unwrap();
 
-    let result = wb.set_label_display_name_override(label.id(), Some("   "));
+    let result = wb.set_group_display_name_override(label.id(), Some("   "));
     assert!(
         result.is_err(),
         "whitespace-only override should be rejected"
@@ -611,6 +611,6 @@ fn test_set_label_display_name_override_whitespace_rejected() {
 fn test_set_label_display_name_override_nonexistent_label() {
     let wb = create_vauchi_with_identity("Alice");
 
-    let result = wb.set_label_display_name_override("nonexistent-id", Some("Matt"));
+    let result = wb.set_group_display_name_override("nonexistent-id", Some("Matt"));
     assert!(result.is_err(), "nonexistent label should fail");
 }

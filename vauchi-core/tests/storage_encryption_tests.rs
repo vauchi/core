@@ -7,7 +7,7 @@
 //! Verifies that own_card, device_sync_state, device_registry, and
 //! visibility_labels store data encrypted and roundtrip correctly.
 
-use vauchi_core::contact::VisibilityLabel;
+use vauchi_core::contact::Group;
 use vauchi_core::contact_card::ContactCard;
 use vauchi_core::crypto::{SigningKeyPair, SymmetricKey};
 use vauchi_core::identity::{DeviceRegistry, RegisteredDevice};
@@ -189,10 +189,10 @@ fn test_list_device_sync_states_encrypted() {
 fn test_visibility_label_encrypted_roundtrip() {
     let (_dir, storage) = open_storage();
 
-    let label = VisibilityLabel::new("Close Friends");
-    storage.save_label(&label).unwrap();
+    let label = Group::new("Close Friends");
+    storage.save_group(&label).unwrap();
 
-    let loaded = storage.load_label(label.id()).unwrap();
+    let loaded = storage.load_group(label.id()).unwrap();
     assert_eq!(loaded.name(), "Close Friends");
     assert_eq!(loaded.contacts(), label.contacts());
 }
@@ -201,8 +201,8 @@ fn test_visibility_label_encrypted_roundtrip() {
 fn test_visibility_label_stored_as_encrypted_blob() {
     let (dir, storage) = open_storage();
 
-    let label = VisibilityLabel::new("Work Colleagues");
-    storage.save_label(&label).unwrap();
+    let label = Group::new("Work Colleagues");
+    storage.save_group(&label).unwrap();
 
     let db_path = dir.path().join("vauchi.db");
     let raw_conn = rusqlite::Connection::open(&db_path).unwrap();
@@ -234,13 +234,13 @@ fn test_visibility_label_stored_as_encrypted_blob() {
 fn test_load_all_labels_encrypted() {
     let (_dir, storage) = open_storage();
 
-    let label1 = VisibilityLabel::new("Group A");
-    let label2 = VisibilityLabel::new("Group B");
+    let label1 = Group::new("Group A");
+    let label2 = Group::new("Group B");
 
-    storage.save_label(&label1).unwrap();
-    storage.save_label(&label2).unwrap();
+    storage.save_group(&label1).unwrap();
+    storage.save_group(&label2).unwrap();
 
-    let all = storage.load_all_labels().unwrap();
+    let all = storage.load_all_groups().unwrap();
     assert_eq!(all.len(), 2);
 }
 
@@ -406,13 +406,13 @@ fn test_rekey_preserves_device_sync_state() {
 fn test_rekey_preserves_visibility_labels() {
     let (_dir, mut storage) = open_storage();
 
-    let label = VisibilityLabel::new("Rekey Group");
-    storage.save_label(&label).unwrap();
+    let label = Group::new("Rekey Group");
+    storage.save_group(&label).unwrap();
 
     let new_key = SymmetricKey::generate();
     storage.rekey(new_key).unwrap();
 
-    let loaded = storage.load_label(label.id()).unwrap();
+    let loaded = storage.load_group(label.id()).unwrap();
     assert_eq!(loaded.name(), "Rekey Group");
 }
 

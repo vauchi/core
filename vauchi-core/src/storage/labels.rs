@@ -8,7 +8,7 @@
 
 use std::collections::{HashMap, HashSet};
 
-use crate::contact::{LabelManager, VisibilityLabel};
+use crate::contact::{Group, GroupManager};
 
 use super::{Storage, StorageError};
 
@@ -16,7 +16,7 @@ impl Storage {
     /// Saves a visibility label to storage (encrypted).
     ///
     /// Label name is encrypted at rest with HMAC for lookups (#128).
-    pub fn save_label(&self, label: &VisibilityLabel) -> Result<(), StorageError> {
+    pub fn save_group(&self, label: &Group) -> Result<(), StorageError> {
         let contacts_json = serde_json::to_string(label.contacts())
             .map_err(|e| StorageError::Serialization(e.to_string()))?;
         let fields_json = serde_json::to_string(label.visible_fields())
@@ -68,7 +68,7 @@ impl Storage {
     }
 
     /// Loads a visibility label by ID (decrypted).
-    pub fn load_label(&self, label_id: &str) -> Result<VisibilityLabel, StorageError> {
+    pub fn load_group(&self, label_id: &str) -> Result<Group, StorageError> {
         let mut stmt = self.conn.prepare(
             "SELECT id, name, contacts_json, visible_fields_json, created_at, modified_at, contacts_json_encrypted, visible_fields_json_encrypted, name_encrypted, display_name_override_encrypted
              FROM visibility_labels WHERE id = ?1",
@@ -114,7 +114,7 @@ impl Storage {
         let visible_fields: HashSet<String> = serde_json::from_str(&fields_json)
             .map_err(|e| StorageError::Serialization(e.to_string()))?;
 
-        Ok(VisibilityLabel::from_storage(
+        Ok(Group::from_storage(
             label.0,
             name,
             contacts,
@@ -129,7 +129,7 @@ impl Storage {
     ///
     /// Labels are sorted by decrypted name in Rust since encrypted names
     /// cannot be sorted in SQL (#128).
-    pub fn load_all_labels(&self) -> Result<Vec<VisibilityLabel>, StorageError> {
+    pub fn load_all_groups(&self) -> Result<Vec<Group>, StorageError> {
         let mut stmt = self.conn.prepare(
             "SELECT id, name, contacts_json, visible_fields_json, created_at, modified_at, contacts_json_encrypted, visible_fields_json_encrypted, name_encrypted, display_name_override_encrypted
              FROM visibility_labels",
@@ -174,7 +174,7 @@ impl Storage {
             let visible_fields: HashSet<String> = serde_json::from_str(&fields_json)
                 .map_err(|e| StorageError::Serialization(e.to_string()))?;
 
-            labels.push(VisibilityLabel::from_storage(
+            labels.push(Group::from_storage(
                 row.0,
                 name,
                 contacts,
@@ -238,7 +238,7 @@ impl Storage {
     }
 
     /// Deletes a visibility label.
-    pub fn delete_label(&self, label_id: &str) -> Result<(), StorageError> {
+    pub fn delete_group(&self, label_id: &str) -> Result<(), StorageError> {
         let changes = self
             .conn
             .execute("DELETE FROM visibility_labels WHERE id = ?1", [label_id])?;
@@ -344,13 +344,13 @@ impl Storage {
         Ok(())
     }
 
-    /// Saves a complete LabelManager to storage.
+    /// Saves a complete GroupManager to storage.
     ///
     /// This saves all labels and all per-contact overrides.
-    pub fn save_label_manager(&self, manager: &LabelManager) -> Result<(), StorageError> {
+    pub fn save_group_manager(&self, manager: &GroupManager) -> Result<(), StorageError> {
         // Save all labels
         for label in manager.all_labels() {
-            self.save_label(label)?;
+            self.save_group(label)?;
         }
 
         // Note: Per-contact overrides are saved individually as they're set
@@ -359,14 +359,14 @@ impl Storage {
         Ok(())
     }
 
-    /// Loads a complete LabelManager from storage.
+    /// Loads a complete GroupManager from storage.
     ///
     /// This loads all labels and all per-contact overrides.
-    pub fn load_label_manager(&self) -> Result<LabelManager, StorageError> {
-        let labels = self.load_all_labels()?;
+    pub fn load_group_manager(&self) -> Result<GroupManager, StorageError> {
+        let labels = self.load_all_groups()?;
         let overrides = self.load_all_contact_overrides()?;
 
-        let mut manager = LabelManager::new();
+        let mut manager = GroupManager::new();
 
         // Reconstruct labels preserving stored IDs and all fields
         for label in labels {
@@ -386,7 +386,7 @@ impl Storage {
     /// Creates a label in storage.
     ///
     /// Returns the created label.
-    pub fn create_label(&self, name: &str) -> Result<VisibilityLabel, StorageError> {
+    pub fn create_group(&self, name: &str) -> Result<Group, StorageError> {
         // Validate name
         let name = name.trim();
         if name.is_empty() {
@@ -427,14 +427,14 @@ impl Storage {
         }
 
         // Create and save
-        let label = VisibilityLabel::new(name);
-        self.save_label(&label)?;
+        let label = Group::new(name);
+        self.save_group(&label)?;
 
         Ok(label)
     }
 
     /// Renames a label in storage.
-    pub fn rename_label(&self, label_id: &str, new_name: &str) -> Result<(), StorageError> {
+    pub fn rename_group(&self, label_id: &str, new_name: &str) -> Result<(), StorageError> {
         let new_name = new_name.trim();
 
         // Validate new name
@@ -485,37 +485,37 @@ impl Storage {
     }
 
     /// Adds a contact to a label in storage.
-    pub fn add_contact_to_label(
+    pub fn add_contact_to_group(
         &self,
         label_id: &str,
         contact_id: &str,
     ) -> Result<(), StorageError> {
         // Load the label
-        let mut label = self.load_label(label_id)?;
+        let mut label = self.load_group(label_id)?;
 
         // Add the contact
         label.add_contact(contact_id);
 
         // Save back
-        self.save_label(&label)?;
+        self.save_group(&label)?;
 
         Ok(())
     }
 
     /// Removes a contact from a label in storage.
-    pub fn remove_contact_from_label(
+    pub fn remove_contact_from_group(
         &self,
         label_id: &str,
         contact_id: &str,
     ) -> Result<(), StorageError> {
         // Load the label
-        let mut label = self.load_label(label_id)?;
+        let mut label = self.load_group(label_id)?;
 
         // Remove the contact
         label.remove_contact(contact_id);
 
         // Save back
-        self.save_label(&label)?;
+        self.save_group(&label)?;
 
         Ok(())
     }
@@ -523,13 +523,13 @@ impl Storage {
     /// Removes a contact from all labels in storage.
     ///
     /// Call this when deleting a contact.
-    pub fn remove_contact_from_all_labels(&self, contact_id: &str) -> Result<(), StorageError> {
-        let labels = self.load_all_labels()?;
+    pub fn remove_contact_from_all_groups(&self, contact_id: &str) -> Result<(), StorageError> {
+        let labels = self.load_all_groups()?;
 
         for mut label in labels {
             if label.contains_contact(contact_id) {
                 label.remove_contact(contact_id);
-                self.save_label(&label)?;
+                self.save_group(&label)?;
             }
         }
 
@@ -540,14 +540,14 @@ impl Storage {
     }
 
     /// Sets a field's visibility for a label in storage.
-    pub fn set_label_field_visibility(
+    pub fn set_group_field_visibility(
         &self,
         label_id: &str,
         field_id: &str,
         is_visible: bool,
     ) -> Result<(), StorageError> {
         // Load the label
-        let mut label = self.load_label(label_id)?;
+        let mut label = self.load_group(label_id)?;
 
         // Update visibility
         if is_visible {
@@ -557,17 +557,14 @@ impl Storage {
         }
 
         // Save back
-        self.save_label(&label)?;
+        self.save_group(&label)?;
 
         Ok(())
     }
 
     /// Gets all labels that contain a specific contact.
-    pub fn get_labels_for_contact(
-        &self,
-        contact_id: &str,
-    ) -> Result<Vec<VisibilityLabel>, StorageError> {
-        let labels = self.load_all_labels()?;
+    pub fn get_groups_for_contact(&self, contact_id: &str) -> Result<Vec<Group>, StorageError> {
+        let labels = self.load_all_groups()?;
 
         Ok(labels
             .into_iter()
@@ -591,15 +588,15 @@ mod tests {
     fn test_save_and_load_label() {
         let storage = test_storage();
 
-        let mut label = VisibilityLabel::new("Family");
+        let mut label = Group::new("Family");
         label.add_contact("alice-id");
         label.add_contact("bob-id");
         label.add_visible_field("phone");
         label.add_visible_field("address");
 
-        storage.save_label(&label).unwrap();
+        storage.save_group(&label).unwrap();
 
-        let loaded = storage.load_label(label.id()).unwrap();
+        let loaded = storage.load_group(label.id()).unwrap();
 
         assert_eq!(loaded.name(), "Family");
         assert!(loaded.contains_contact("alice-id"));
@@ -612,15 +609,15 @@ mod tests {
     fn test_load_all_labels() {
         let storage = test_storage();
 
-        let label1 = VisibilityLabel::new("Family");
-        let label2 = VisibilityLabel::new("Friends");
-        let label3 = VisibilityLabel::new("Work");
+        let label1 = Group::new("Family");
+        let label2 = Group::new("Friends");
+        let label3 = Group::new("Work");
 
-        storage.save_label(&label1).unwrap();
-        storage.save_label(&label2).unwrap();
-        storage.save_label(&label3).unwrap();
+        storage.save_group(&label1).unwrap();
+        storage.save_group(&label2).unwrap();
+        storage.save_group(&label3).unwrap();
 
-        let labels = storage.load_all_labels().unwrap();
+        let labels = storage.load_all_groups().unwrap();
 
         assert_eq!(labels.len(), 3);
         // Ordered by name
@@ -633,12 +630,12 @@ mod tests {
     fn test_delete_label() {
         let storage = test_storage();
 
-        let label = VisibilityLabel::new("Temporary");
-        storage.save_label(&label).unwrap();
+        let label = Group::new("Temporary");
+        storage.save_group(&label).unwrap();
 
-        storage.delete_label(label.id()).unwrap();
+        storage.delete_group(label.id()).unwrap();
 
-        let result = storage.load_label(label.id());
+        let result = storage.load_group(label.id());
         assert!(result.is_err());
     }
 
@@ -702,11 +699,11 @@ mod tests {
     fn test_create_label() {
         let storage = test_storage();
 
-        let label = storage.create_label("New Label").unwrap();
+        let label = storage.create_group("New Label").unwrap();
         assert_eq!(label.name(), "New Label");
 
         // Should be persisted
-        let loaded = storage.load_label(label.id()).unwrap();
+        let loaded = storage.load_group(label.id()).unwrap();
         assert_eq!(loaded.name(), "New Label");
     }
 
@@ -714,8 +711,8 @@ mod tests {
     fn test_create_duplicate_label() {
         let storage = test_storage();
 
-        storage.create_label("Unique").unwrap();
-        let result = storage.create_label("Unique");
+        storage.create_group("Unique").unwrap();
+        let result = storage.create_group("Unique");
 
         assert!(matches!(result, Err(StorageError::AlreadyExists(_))));
     }
@@ -724,10 +721,10 @@ mod tests {
     fn test_rename_label() {
         let storage = test_storage();
 
-        let label = storage.create_label("Old Name").unwrap();
-        storage.rename_label(label.id(), "New Name").unwrap();
+        let label = storage.create_group("Old Name").unwrap();
+        storage.rename_group(label.id(), "New Name").unwrap();
 
-        let loaded = storage.load_label(label.id()).unwrap();
+        let loaded = storage.load_group(label.id()).unwrap();
         assert_eq!(loaded.name(), "New Name");
     }
 
@@ -735,19 +732,19 @@ mod tests {
     fn test_add_remove_contact_from_label() {
         let storage = test_storage();
 
-        let label = storage.create_label("Test").unwrap();
+        let label = storage.create_group("Test").unwrap();
         storage
-            .add_contact_to_label(label.id(), "alice-id")
+            .add_contact_to_group(label.id(), "alice-id")
             .unwrap();
 
-        let loaded = storage.load_label(label.id()).unwrap();
+        let loaded = storage.load_group(label.id()).unwrap();
         assert!(loaded.contains_contact("alice-id"));
 
         storage
-            .remove_contact_from_label(label.id(), "alice-id")
+            .remove_contact_from_group(label.id(), "alice-id")
             .unwrap();
 
-        let loaded = storage.load_label(label.id()).unwrap();
+        let loaded = storage.load_group(label.id()).unwrap();
         assert!(!loaded.contains_contact("alice-id"));
     }
 
@@ -755,23 +752,23 @@ mod tests {
     fn test_remove_contact_from_all_labels() {
         let storage = test_storage();
 
-        let label1 = storage.create_label("Label1").unwrap();
-        let label2 = storage.create_label("Label2").unwrap();
+        let label1 = storage.create_group("Label1").unwrap();
+        let label2 = storage.create_group("Label2").unwrap();
 
         storage
-            .add_contact_to_label(label1.id(), "alice-id")
+            .add_contact_to_group(label1.id(), "alice-id")
             .unwrap();
         storage
-            .add_contact_to_label(label2.id(), "alice-id")
+            .add_contact_to_group(label2.id(), "alice-id")
             .unwrap();
         storage
             .save_contact_override("alice-id", "phone", true)
             .unwrap();
 
-        storage.remove_contact_from_all_labels("alice-id").unwrap();
+        storage.remove_contact_from_all_groups("alice-id").unwrap();
 
-        let loaded1 = storage.load_label(label1.id()).unwrap();
-        let loaded2 = storage.load_label(label2.id()).unwrap();
+        let loaded1 = storage.load_group(label1.id()).unwrap();
+        let loaded2 = storage.load_group(label2.id()).unwrap();
         let overrides = storage.load_contact_overrides("alice-id").unwrap();
 
         assert!(!loaded1.contains_contact("alice-id"));
@@ -783,24 +780,24 @@ mod tests {
     fn test_set_label_field_visibility() {
         let storage = test_storage();
 
-        let label = storage.create_label("Test").unwrap();
+        let label = storage.create_group("Test").unwrap();
 
         storage
-            .set_label_field_visibility(label.id(), "phone", true)
+            .set_group_field_visibility(label.id(), "phone", true)
             .unwrap();
         storage
-            .set_label_field_visibility(label.id(), "address", true)
+            .set_group_field_visibility(label.id(), "address", true)
             .unwrap();
 
-        let loaded = storage.load_label(label.id()).unwrap();
+        let loaded = storage.load_group(label.id()).unwrap();
         assert!(loaded.is_field_visible("phone"));
         assert!(loaded.is_field_visible("address"));
 
         storage
-            .set_label_field_visibility(label.id(), "phone", false)
+            .set_group_field_visibility(label.id(), "phone", false)
             .unwrap();
 
-        let loaded = storage.load_label(label.id()).unwrap();
+        let loaded = storage.load_group(label.id()).unwrap();
         assert!(!loaded.is_field_visible("phone"));
         assert!(loaded.is_field_visible("address"));
     }
@@ -809,14 +806,14 @@ mod tests {
     fn test_save_and_load_label_with_display_name_override() {
         let storage = test_storage();
 
-        let mut label = VisibilityLabel::new("Professional");
+        let mut label = Group::new("Professional");
         label.add_contact("alice-id");
         label.add_visible_field("work-email");
         label.set_display_name_override(Some("Dr. Egloff")).unwrap();
 
-        storage.save_label(&label).unwrap();
+        storage.save_group(&label).unwrap();
 
-        let loaded = storage.load_label(label.id()).unwrap();
+        let loaded = storage.load_group(label.id()).unwrap();
 
         assert_eq!(loaded.name(), "Professional");
         assert!(loaded.contains_contact("alice-id"));
@@ -828,10 +825,10 @@ mod tests {
     fn test_save_and_load_label_without_display_name_override() {
         let storage = test_storage();
 
-        let label = VisibilityLabel::new("Friends");
-        storage.save_label(&label).unwrap();
+        let label = Group::new("Friends");
+        storage.save_group(&label).unwrap();
 
-        let loaded = storage.load_label(label.id()).unwrap();
+        let loaded = storage.load_group(label.id()).unwrap();
         assert_eq!(loaded.display_name_override(), None);
     }
 
@@ -839,16 +836,16 @@ mod tests {
     fn test_load_all_labels_preserves_display_name_override() {
         let storage = test_storage();
 
-        let mut label1 = VisibilityLabel::new("Family");
+        let mut label1 = Group::new("Family");
         label1.set_display_name_override(Some("Matt")).unwrap();
 
-        let label2 = VisibilityLabel::new("Work");
+        let label2 = Group::new("Work");
         // label2 has no override
 
-        storage.save_label(&label1).unwrap();
-        storage.save_label(&label2).unwrap();
+        storage.save_group(&label1).unwrap();
+        storage.save_group(&label2).unwrap();
 
-        let labels = storage.load_all_labels().unwrap();
+        let labels = storage.load_all_groups().unwrap();
         assert_eq!(labels.len(), 2);
 
         let family = labels.iter().find(|l| l.name() == "Family").unwrap();
@@ -863,21 +860,21 @@ mod tests {
         let storage = test_storage();
 
         // Create label with override
-        let mut label = VisibilityLabel::new("Colleagues");
+        let mut label = Group::new("Colleagues");
         label.set_display_name_override(Some("Dr. Egloff")).unwrap();
-        storage.save_label(&label).unwrap();
+        storage.save_group(&label).unwrap();
 
         // Verify override persists
-        let loaded = storage.load_label(label.id()).unwrap();
+        let loaded = storage.load_group(label.id()).unwrap();
         assert_eq!(loaded.display_name_override(), Some("Dr. Egloff"));
 
         // Clear override and re-save
         let mut updated = loaded;
         updated.set_display_name_override(None).unwrap();
-        storage.save_label(&updated).unwrap();
+        storage.save_group(&updated).unwrap();
 
         // Verify override is cleared
-        let reloaded = storage.load_label(label.id()).unwrap();
+        let reloaded = storage.load_group(label.id()).unwrap();
         assert_eq!(reloaded.display_name_override(), None);
     }
 
@@ -885,18 +882,18 @@ mod tests {
     fn test_get_labels_for_contact() {
         let storage = test_storage();
 
-        let label1 = storage.create_label("Family").unwrap();
-        let label2 = storage.create_label("Friends").unwrap();
-        let _label3 = storage.create_label("Work").unwrap();
+        let label1 = storage.create_group("Family").unwrap();
+        let label2 = storage.create_group("Friends").unwrap();
+        let _label3 = storage.create_group("Work").unwrap();
 
         storage
-            .add_contact_to_label(label1.id(), "alice-id")
+            .add_contact_to_group(label1.id(), "alice-id")
             .unwrap();
         storage
-            .add_contact_to_label(label2.id(), "alice-id")
+            .add_contact_to_group(label2.id(), "alice-id")
             .unwrap();
 
-        let alice_labels = storage.get_labels_for_contact("alice-id").unwrap();
+        let alice_labels = storage.get_groups_for_contact("alice-id").unwrap();
         assert_eq!(alice_labels.len(), 2);
 
         let names: Vec<_> = alice_labels.iter().map(|l| l.name()).collect();

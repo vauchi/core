@@ -1,8 +1,15 @@
 {
   "screen_id": "groups_setup",
   "title": "Choose your groups",
-  "subtitle": "Groups let you share different info with different people.",
+  "subtitle": "Groups let you share different info with different people. Use [Space] to select.",
   "components": [
+    {
+      "Text": {
+        "id": "groups_recommendation",
+        "content": "Groups are optional, but we strongly recommend them. They let you control exactly who sees what on your card.",
+        "style": "Body"
+      }
+    },
     {
       "ToggleList": {
         "id": "groups",
@@ -33,6 +40,17 @@
             "subtitle": null
           }
         ]
+      }
+    },
+    {
+      "TextInput": {
+        "id": "custom_group",
+        "label": "Add a custom group",
+        "value": "",
+        "placeholder": "Type a group name and press Enter",
+        "max_length": 50,
+        "validation_error": null,
+        "input_type": "Text"
       }
     }
   ],

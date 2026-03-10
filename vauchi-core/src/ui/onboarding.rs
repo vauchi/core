@@ -50,6 +50,7 @@ pub struct OnboardingEngine {
     step: Step,
     data: OnboardingData,
     selected_preview_group: Option<String>,
+    custom_group_input: String,
 }
 
 impl Default for OnboardingEngine {
@@ -78,6 +79,7 @@ impl OnboardingEngine {
                 fields: Vec::new(),
             },
             selected_preview_group: None,
+            custom_group_input: String::new(),
         }
     }
 
@@ -121,14 +123,14 @@ impl OnboardingEngine {
             }],
             actions: vec![
                 ScreenAction {
-                    id: "have_identity".into(),
-                    label: "I already have an identity".into(),
+                    id: "create_new".into(),
+                    label: "Create new identity".into(),
                     style: ActionStyle::Primary,
                     enabled: true,
                 },
                 ScreenAction {
-                    id: "create_new".into(),
-                    label: "Create new identity".into(),
+                    id: "have_identity".into(),
+                    label: "I already have an identity".into(),
                     style: ActionStyle::Secondary,
                     enabled: true,
                 },
@@ -313,12 +315,34 @@ impl OnboardingEngine {
         ScreenModel {
             screen_id: "groups_setup".into(),
             title: "Choose your groups".into(),
-            subtitle: Some("Groups let you share different info with different people.".into()),
-            components: vec![Component::ToggleList {
-                id: "groups".into(),
-                label: "Suggested groups".into(),
-                items,
-            }],
+            subtitle: Some(
+                "Groups let you share different info with different people. \
+                 Use [Space] to select."
+                    .into(),
+            ),
+            components: vec![
+                Component::Text {
+                    id: "groups_recommendation".into(),
+                    content: "Groups are optional, but we strongly recommend them. \
+                              They let you control exactly who sees what on your card."
+                        .into(),
+                    style: TextStyle::Body,
+                },
+                Component::ToggleList {
+                    id: "groups".into(),
+                    label: "Suggested groups".into(),
+                    items,
+                },
+                Component::TextInput {
+                    id: "custom_group".into(),
+                    label: "Add a custom group".into(),
+                    value: self.custom_group_input.clone(),
+                    placeholder: Some("Type a group name and press Enter".into()),
+                    max_length: Some(50),
+                    validation_error: None,
+                    input_type: InputType::Text,
+                },
+            ],
             actions: vec![
                 ScreenAction {
                     id: "continue".into(),
@@ -649,7 +673,9 @@ impl OnboardingEngine {
                 self.data.display_name = value.clone();
                 ActionResult::UpdateScreen(self.current_screen())
             }
-            UserAction::ActionPressed { action_id } if action_id == "continue" => {
+            UserAction::ActionPressed { action_id }
+                if action_id == "continue" || action_id == "submit_display_name" =>
+            {
                 if self.data.display_name.trim().is_empty() {
                     ActionResult::ValidationError {
                         component_id: "display_name".into(),
@@ -694,6 +720,13 @@ impl OnboardingEngine {
             UserAction::TextChanged {
                 component_id,
                 value,
+            } if component_id == "custom_group" => {
+                self.custom_group_input = value.clone();
+                ActionResult::UpdateScreen(self.current_screen())
+            }
+            UserAction::TextChanged {
+                component_id,
+                value,
             } if component_id.starts_with("group_name_override_") => {
                 let Some(id) = component_id.strip_prefix("group_name_override_") else {
                     return ActionResult::UpdateScreen(self.current_screen());
@@ -705,6 +738,24 @@ impl OnboardingEngine {
                         Some(value.clone())
                     };
                 }
+                ActionResult::UpdateScreen(self.current_screen())
+            }
+            UserAction::ActionPressed { action_id } if action_id == "submit_custom_group" => {
+                let name = self.custom_group_input.trim().to_string();
+                if !name.is_empty()
+                    && !self
+                        .data
+                        .selected_groups
+                        .iter()
+                        .any(|g| g.name.eq_ignore_ascii_case(&name))
+                {
+                    self.data.selected_groups.push(GroupSetup {
+                        name,
+                        selected: true,
+                        name_override: None,
+                    });
+                }
+                self.custom_group_input.clear();
                 ActionResult::UpdateScreen(self.current_screen())
             }
             UserAction::ActionPressed { action_id }

@@ -2,8 +2,8 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! Tests for find_label_fuzzy API
-//! Trace: ADR-021 Tier 1 — find_label_fuzzy
+//! Tests for find_group_fuzzy API
+//! Trace: ADR-021 Tier 1 — find_group_fuzzy
 
 use vauchi_core::api::*;
 use vauchi_core::*;
@@ -16,9 +16,9 @@ fn create_test_vauchi() -> Vauchi<MockTransport> {
 fn test_find_label_fuzzy_matches_case_insensitive_name() {
     let wb = create_test_vauchi();
 
-    let label = wb.create_label("Family").unwrap();
+    let label = wb.create_group("Family").unwrap();
 
-    let found = wb.find_label_fuzzy("family").unwrap();
+    let found = wb.find_group_fuzzy("family").unwrap();
 
     assert!(
         found.is_some(),
@@ -33,9 +33,9 @@ fn test_find_label_fuzzy_matches_case_insensitive_name() {
 fn test_find_label_fuzzy_matches_exact_name() {
     let wb = create_test_vauchi();
 
-    let label = wb.create_label("Professional").unwrap();
+    let label = wb.create_group("Professional").unwrap();
 
-    let found = wb.find_label_fuzzy("Professional").unwrap();
+    let found = wb.find_group_fuzzy("Professional").unwrap();
 
     assert!(found.is_some());
     assert_eq!(found.unwrap().id(), label.id());
@@ -45,12 +45,12 @@ fn test_find_label_fuzzy_matches_exact_name() {
 fn test_find_label_fuzzy_matches_id_prefix() {
     let wb = create_test_vauchi();
 
-    let label = wb.create_label("Work").unwrap();
+    let label = wb.create_group("Work").unwrap();
     let label_id = label.id().to_string();
 
     // Use the first 8 characters of the label's ID
     let prefix = &label_id[..8];
-    let found = wb.find_label_fuzzy(prefix).unwrap();
+    let found = wb.find_group_fuzzy(prefix).unwrap();
 
     assert!(
         found.is_some(),
@@ -64,10 +64,10 @@ fn test_find_label_fuzzy_matches_id_prefix() {
 fn test_find_label_fuzzy_returns_none_for_no_match() {
     let wb = create_test_vauchi();
 
-    wb.create_label("Family").unwrap();
-    wb.create_label("Work").unwrap();
+    wb.create_group("Family").unwrap();
+    wb.create_group("Work").unwrap();
 
-    let found = wb.find_label_fuzzy("zzz_no_match").unwrap();
+    let found = wb.find_group_fuzzy("zzz_no_match").unwrap();
 
     assert!(found.is_none(), "should return None for non-matching query");
 }
@@ -76,7 +76,7 @@ fn test_find_label_fuzzy_returns_none_for_no_match() {
 fn test_find_label_fuzzy_returns_none_when_no_labels_exist() {
     let wb = create_test_vauchi();
 
-    let found = wb.find_label_fuzzy("anything").unwrap();
+    let found = wb.find_group_fuzzy("anything").unwrap();
 
     assert!(found.is_none(), "should return None when no labels exist");
 }
@@ -86,11 +86,11 @@ fn test_find_label_fuzzy_prefers_name_match_over_id_prefix() {
     let wb = create_test_vauchi();
 
     // Create two labels
-    let label1 = wb.create_label("Friends").unwrap();
-    wb.create_label("Colleagues").unwrap();
+    let label1 = wb.create_group("Friends").unwrap();
+    wb.create_group("Colleagues").unwrap();
 
     // Search by name should find the right one
-    let found = wb.find_label_fuzzy("friends").unwrap();
+    let found = wb.find_group_fuzzy("friends").unwrap();
 
     assert!(found.is_some());
     assert_eq!(found.unwrap().id(), label1.id());
@@ -100,9 +100,9 @@ fn test_find_label_fuzzy_prefers_name_match_over_id_prefix() {
 fn test_find_label_fuzzy_mixed_case_name() {
     let wb = create_test_vauchi();
 
-    let label = wb.create_label("Close Friends").unwrap();
+    let label = wb.create_group("Close Friends").unwrap();
 
-    let found = wb.find_label_fuzzy("CLOSE FRIENDS").unwrap();
+    let found = wb.find_group_fuzzy("CLOSE FRIENDS").unwrap();
 
     assert!(found.is_some());
     assert_eq!(found.unwrap().id(), label.id());

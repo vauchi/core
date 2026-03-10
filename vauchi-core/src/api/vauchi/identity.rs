@@ -124,6 +124,45 @@ impl<T: Transport> Vauchi<T> {
         Ok(())
     }
 
+    /// Exports the identity as an encrypted backup.
+    ///
+    /// Returns the backup data as a hex-encoded string.
+    pub fn export_backup(&self, password: &str) -> VauchiResult<String> {
+        let identity = self
+            .identity
+            .as_ref()
+            .ok_or(VauchiError::IdentityNotInitialized)?;
+        let backup = identity
+            .export_backup(password)
+            .map_err(|e| VauchiError::Configuration(format!("Export failed: {:?}", e)))?;
+        Ok(hex::encode(backup.as_bytes()))
+    }
+
+    /// Imports an identity from an encrypted backup.
+    ///
+    /// The backup_data should be a hex-encoded string from `export_backup`.
+    pub fn import_backup(&mut self, backup_data: &str, password: &str) -> VauchiResult<()> {
+        let bytes = hex::decode(backup_data.trim())
+            .map_err(|e| VauchiError::Configuration(format!("Invalid hex data: {}", e)))?;
+        let backup = crate::identity::IdentityBackup::new(bytes.clone());
+        let identity = Identity::import_backup(&backup, password)
+            .map_err(|e| VauchiError::Configuration(format!("Import failed: {:?}", e)))?;
+
+        let name = identity.display_name().to_string();
+
+        // Persist to storage
+        self.storage.save_identity(&bytes, &name)?;
+
+        // Create contact card if none exists
+        if self.storage.load_own_card()?.is_none() {
+            let card = crate::contact_card::ContactCard::new(&name);
+            self.storage.save_own_card(&card)?;
+        }
+
+        self.identity = Some(identity);
+        Ok(())
+    }
+
     /// Returns the current identity, if set.
     pub fn identity(&self) -> Option<&Identity> {
         self.identity.as_ref()
@@ -223,10 +262,28 @@ impl<T: Transport> Vauchi<T> {
         manager.add_field_to_own_card(field)
     }
 
-    /// Removes a field from the user's own card.
+    /// Removes a field from the user's own card by label.
     pub fn remove_own_field(&self, label: &str) -> VauchiResult<bool> {
         let manager = ContactManager::new(&self.storage, self.events.clone());
         manager.remove_field_from_own_card(label)
+    }
+
+    /// Removes a field from the user's own card by field ID.
+    pub fn remove_own_field_by_id(&self, field_id: &str) -> VauchiResult<bool> {
+        let card = self
+            .storage
+            .load_own_card()?
+            .ok_or_else(|| VauchiError::InvalidState("No own card found".into()))?;
+        let label = card
+            .fields()
+            .iter()
+            .find(|f| f.id() == field_id)
+            .map(|f| f.label().to_string());
+        let Some(label) = label else {
+            return Ok(false);
+        };
+        let manager = ContactManager::new(&self.storage, self.events.clone());
+        manager.remove_field_from_own_card(&label)
     }
 
     /// Sets whether a field is shown in no-group visibility mode.

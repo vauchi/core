@@ -43,7 +43,7 @@ pub use api::{
 };
 pub use contact::merge::DuplicatePair;
 pub use contact::{
-    resolve_visible_fields, Contact, FieldVisibility, LabelError, LabelManager, VisibilityLabel,
+    resolve_visible_fields, Contact, FieldVisibility, Group, GroupManager, LabelError,
     VisibilityRules, MAX_LABELS, SUGGESTED_LABELS,
 };
 pub use contact_card::{

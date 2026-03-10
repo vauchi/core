@@ -8,7 +8,7 @@
 //! progress. The state machine lives in `crate::onboarding`; this module
 //! wires it to storage and events.
 
-use crate::contact::VisibilityLabel;
+use crate::contact::Group;
 use crate::network::Transport;
 use crate::onboarding::{OnboardingProgress, OnboardingStep};
 
@@ -96,10 +96,10 @@ impl<T: Transport> Vauchi<T> {
     /// Used during onboarding step 4 (Groups Setup). Skips names that
     /// already exist as labels. Persists each label to storage.
     /// Returns the list of newly created labels.
-    pub fn create_suggested_groups(&self, names: &[&str]) -> VauchiResult<Vec<VisibilityLabel>> {
+    pub fn create_suggested_groups(&self, names: &[&str]) -> VauchiResult<Vec<Group>> {
         let mut created = Vec::new();
         for name in names {
-            match self.storage.create_label(name) {
+            match self.storage.create_group(name) {
                 Ok(label) => created.push(label),
                 Err(crate::StorageError::AlreadyExists(_)) => continue,
                 Err(e) => return Err(e.into()),

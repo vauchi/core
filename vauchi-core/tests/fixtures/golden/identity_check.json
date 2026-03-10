@@ -25,14 +25,14 @@
   ],
   "actions": [
     {
-      "id": "have_identity",
-      "label": "I already have an identity",
+      "id": "create_new",
+      "label": "Create new identity",
       "style": "Primary",
       "enabled": true
     },
     {
-      "id": "create_new",
-      "label": "Create new identity",
+      "id": "have_identity",
+      "label": "I already have an identity",
       "style": "Secondary",
       "enabled": true
     }

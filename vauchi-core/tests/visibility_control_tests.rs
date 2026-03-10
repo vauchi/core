@@ -14,7 +14,7 @@
 
 use std::collections::HashSet;
 
-use vauchi_core::contact::{FieldVisibility, LabelManager, VisibilityRules};
+use vauchi_core::contact::{FieldVisibility, GroupManager, VisibilityRules};
 use vauchi_core::crypto::SymmetricKey;
 use vauchi_core::storage::{OfflineQueue, PendingUpdate, Storage, UpdateStatus};
 
@@ -67,21 +67,21 @@ fn create_visibility_update(id: &str, contact_id: &str, field_id: &str) -> Pendi
 // @scenario: visibility_control.feature:Remove contact from group updates their visibility
 #[test]
 fn test_visibility_group_add_remove() {
-    let mut manager = LabelManager::new();
+    let mut manager = GroupManager::new();
 
     // Create visibility groups
-    let work_label = manager.create_label("Work Contacts").unwrap();
+    let work_label = manager.create_group("Work Contacts").unwrap();
     let work_id = work_label.id().to_string();
 
-    let friends_label = manager.create_label("Close Friends").unwrap();
+    let friends_label = manager.create_group("Close Friends").unwrap();
     let friends_id = friends_label.id().to_string();
 
     // Add visible fields to each group
-    let work_label = manager.get_label_mut(&work_id).unwrap();
+    let work_label = manager.get_group_mut(&work_id).unwrap();
     work_label.add_visible_field("work-email");
     work_label.add_visible_field("work-phone");
 
-    let friends_label = manager.get_label_mut(&friends_id).unwrap();
+    let friends_label = manager.get_group_mut(&friends_id).unwrap();
     friends_label.add_visible_field("personal-email");
     friends_label.add_visible_field("home-address");
 
@@ -95,7 +95,7 @@ fn test_visibility_group_add_remove() {
     assert_eq!(manager.can_see_via_labels(carol_id, "personal-email"), None);
 
     // Add Bob to Work Contacts
-    manager.add_contact_to_label(&work_id, bob_id).unwrap();
+    manager.add_contact_to_group(&work_id, bob_id).unwrap();
 
     // Bob should now see work fields
     assert_eq!(
@@ -117,8 +117,8 @@ fn test_visibility_group_add_remove() {
     );
 
     // Add Carol to both groups
-    manager.add_contact_to_label(&work_id, carol_id).unwrap();
-    manager.add_contact_to_label(&friends_id, carol_id).unwrap();
+    manager.add_contact_to_group(&work_id, carol_id).unwrap();
+    manager.add_contact_to_group(&friends_id, carol_id).unwrap();
 
     // Carol should see fields from both groups (union)
     let carol_visible = manager.visible_fields_via_labels(carol_id);
@@ -140,7 +140,7 @@ fn test_visibility_group_add_remove() {
     );
 
     // Remove Bob from Work Contacts
-    manager.remove_contact_from_label(&work_id, bob_id).unwrap();
+    manager.remove_contact_from_group(&work_id, bob_id).unwrap();
 
     // Bob should no longer see work fields
     assert_eq!(
@@ -150,7 +150,7 @@ fn test_visibility_group_add_remove() {
     );
 
     // Verify label contents
-    let work_label = manager.get_label(&work_id).unwrap();
+    let work_label = manager.get_group(&work_id).unwrap();
     assert!(!work_label.contains_contact(bob_id));
     assert!(work_label.contains_contact(carol_id));
 }
@@ -162,13 +162,13 @@ fn test_visibility_group_add_remove() {
 // @scenario: visibility_control.feature:Add contact to group updates their visibility
 #[test]
 fn test_visibility_group_grants_all_fields() {
-    let mut manager = LabelManager::new();
+    let mut manager = GroupManager::new();
 
     // Create a group with multiple fields
-    let family_label = manager.create_label("Family").unwrap();
+    let family_label = manager.create_group("Family").unwrap();
     let family_id = family_label.id().to_string();
 
-    let family_label = manager.get_label_mut(&family_id).unwrap();
+    let family_label = manager.get_group_mut(&family_id).unwrap();
     family_label.add_visible_field("home-phone");
     family_label.add_visible_field("home-address");
     family_label.add_visible_field("personal-email");
@@ -185,7 +185,7 @@ fn test_visibility_group_grants_all_fields() {
 
     // Add contact to group
     manager
-        .add_contact_to_label(&family_id, contact_id)
+        .add_contact_to_group(&family_id, contact_id)
         .unwrap();
 
     // After joining: contact sees all group fields
@@ -208,20 +208,20 @@ fn test_visibility_group_grants_all_fields() {
 // @scenario: visibility_control.feature:Hide a field from a specific contact
 #[test]
 fn test_visibility_group_with_per_contact_override() {
-    let mut manager = LabelManager::new();
+    let mut manager = GroupManager::new();
 
     // Create group
-    let label = manager.create_label("Friends").unwrap();
+    let label = manager.create_group("Friends").unwrap();
     let label_id = label.id().to_string();
 
     // Add field to group
-    let label = manager.get_label_mut(&label_id).unwrap();
+    let label = manager.get_group_mut(&label_id).unwrap();
     label.add_visible_field("personal-phone");
 
     let contact_id = "special-friend";
 
     // Add contact to group
-    manager.add_contact_to_label(&label_id, contact_id).unwrap();
+    manager.add_contact_to_group(&label_id, contact_id).unwrap();
 
     // Contact should see the field via group
     assert_eq!(
@@ -706,10 +706,10 @@ fn test_visibility_bulk_reset_to_default() {
 // @scenario: visibility_control.feature:Apply visibility group to a field
 #[test]
 fn test_visibility_bulk_label_operations() {
-    let mut manager = LabelManager::new();
+    let mut manager = GroupManager::new();
 
     // Create a label
-    let label = manager.create_label("Work").unwrap();
+    let label = manager.create_group("Work").unwrap();
     let label_id = label.id().to_string();
 
     // Bulk add multiple fields to the label
@@ -721,13 +721,13 @@ fn test_visibility_bulk_label_operations() {
         "company-name",
     ];
 
-    let label = manager.get_label_mut(&label_id).unwrap();
+    let label = manager.get_group_mut(&label_id).unwrap();
     for field in &work_fields {
         label.add_visible_field(field);
     }
 
     // Verify all fields are in the label
-    let label = manager.get_label(&label_id).unwrap();
+    let label = manager.get_group(&label_id).unwrap();
     assert_eq!(label.visible_fields().len(), 5);
     for field in &work_fields {
         assert!(
@@ -740,7 +740,7 @@ fn test_visibility_bulk_label_operations() {
     // Bulk add multiple contacts to the label
     let contacts = vec!["alice", "bob", "carol", "dave"];
     for contact in &contacts {
-        manager.add_contact_to_label(&label_id, contact).unwrap();
+        manager.add_contact_to_group(&label_id, contact).unwrap();
     }
 
     // Verify all contacts see all work fields
@@ -750,13 +750,13 @@ fn test_visibility_bulk_label_operations() {
     }
 
     // Bulk remove fields from the label
-    let label = manager.get_label_mut(&label_id).unwrap();
+    let label = manager.get_group_mut(&label_id).unwrap();
     for field in &["work-address", "company-name"] {
         label.remove_visible_field(field);
     }
 
     // Verify fields were removed
-    let label = manager.get_label(&label_id).unwrap();
+    let label = manager.get_group(&label_id).unwrap();
     assert_eq!(label.visible_fields().len(), 3);
     assert!(!label.is_field_visible("work-address"));
     assert!(!label.is_field_visible("company-name"));
@@ -775,7 +775,7 @@ fn test_visibility_bulk_label_operations() {
 // @scenario: visibility_control.feature:Hide a field from a specific contact
 #[test]
 fn test_visibility_bulk_clear_overrides() {
-    let mut manager = LabelManager::new();
+    let mut manager = GroupManager::new();
 
     let contact_id = "special-contact";
 
@@ -815,19 +815,19 @@ fn test_visibility_bulk_clear_overrides() {
 // @scenario: visibility_control.feature:Delete contact removes their visibility rules
 #[test]
 fn test_visibility_bulk_remove_contact_from_all_labels() {
-    let mut manager = LabelManager::new();
+    let mut manager = GroupManager::new();
 
     // Create multiple labels
-    let family = manager.create_label("Family").unwrap().id().to_string();
-    let friends = manager.create_label("Friends").unwrap().id().to_string();
-    let work = manager.create_label("Work").unwrap().id().to_string();
+    let family = manager.create_group("Family").unwrap().id().to_string();
+    let friends = manager.create_group("Friends").unwrap().id().to_string();
+    let work = manager.create_group("Work").unwrap().id().to_string();
 
     let contact_id = "departing-contact";
 
     // Add contact to all labels
-    manager.add_contact_to_label(&family, contact_id).unwrap();
-    manager.add_contact_to_label(&friends, contact_id).unwrap();
-    manager.add_contact_to_label(&work, contact_id).unwrap();
+    manager.add_contact_to_group(&family, contact_id).unwrap();
+    manager.add_contact_to_group(&friends, contact_id).unwrap();
+    manager.add_contact_to_group(&work, contact_id).unwrap();
 
     // Also set some per-contact overrides
     manager.set_contact_override(contact_id, "special-field", true);
@@ -837,7 +837,7 @@ fn test_visibility_bulk_remove_contact_from_all_labels() {
     assert_eq!(contact_labels.len(), 3);
 
     // Bulk remove contact from all labels (e.g., when deleting the contact)
-    manager.remove_contact_from_all_labels(contact_id);
+    manager.remove_contact_from_all_groups(contact_id);
 
     // Verify contact is removed from all labels
     let contact_labels = manager.labels_for_contact(contact_id);

@@ -192,11 +192,8 @@ impl<'a> ContactManager<'a> {
     /// First tries case-insensitive name matching (exact match on the full name).
     /// If no name match is found, tries matching on label ID prefix.
     /// Returns the first match, or `None` if no label matches.
-    pub fn find_label_fuzzy(
-        &self,
-        query: &str,
-    ) -> VauchiResult<Option<crate::contact::VisibilityLabel>> {
-        let labels = self.storage.load_all_labels()?;
+    pub fn find_group_fuzzy(&self, query: &str) -> VauchiResult<Option<crate::contact::Group>> {
+        let labels = self.storage.load_all_groups()?;
         let query_lower = query.to_lowercase();
 
         // First: try case-insensitive name match

@@ -1290,21 +1290,51 @@ fn contact_visibility_toggle_updates_field() {
 // ── FormDialogEngine tests ────────────────────────────────────────────
 
 #[test]
-fn form_dialog_add_field_shows_two_inputs() {
+fn form_dialog_add_field_shows_type_picker_first() {
     let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
     let mut engine = AppEngine::new(vauchi);
     let screen = engine.navigate_to(AppScreen::FormDialog {
         dialog_type: FormDialogType::AddField,
     });
-    assert_eq!(screen.screen_id, "form_add_field");
-    // AddField has 2 TextInput components (label + value)
-    let text_inputs: Vec<_> = screen
+    // Step 1: type picker with ActionList
+    assert_eq!(screen.screen_id, "form_add_field_type");
+    let has_action_list = screen
         .components
         .iter()
-        .filter(|c| matches!(c, Component::TextInput { .. }))
-        .collect();
-    assert_eq!(text_inputs.len(), 2, "AddField must have 2 text inputs");
+        .any(|c| matches!(c, Component::ActionList { .. }));
+    assert!(has_action_list, "Type picker must have an ActionList");
+}
+
+#[test]
+fn form_dialog_add_field_type_selection_shows_value_inputs() {
+    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    let mut engine = AppEngine::new(vauchi);
+    engine.navigate_to(AppScreen::FormDialog {
+        dialog_type: FormDialogType::AddField,
+    });
+    // Select "email" type
+    let result = engine.handle_action(UserAction::ListItemSelected {
+        component_id: "entry_types".into(),
+        item_id: "email".into(),
+    });
+    match result {
+        ActionResult::UpdateScreen(screen) => {
+            assert_eq!(screen.screen_id, "form_add_field");
+            let text_inputs: Vec<_> = screen
+                .components
+                .iter()
+                .filter(|c| matches!(c, Component::TextInput { .. }))
+                .collect();
+            assert_eq!(
+                text_inputs.len(),
+                2,
+                "Value step must have 2 text inputs (value + note)"
+            );
+        }
+        other => panic!("Expected UpdateScreen, got {other:?}"),
+    }
 }
 
 #[test]
@@ -1494,7 +1524,7 @@ fn form_dialog_add_field_saves_to_own_card() {
 }
 
 #[test]
-fn form_dialog_add_field_empty_label_returns_validation_error() {
+fn form_dialog_add_field_empty_value_returns_validation_error() {
     let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
     let mut engine = AppEngine::new(vauchi);
@@ -1503,12 +1533,13 @@ fn form_dialog_add_field_empty_label_returns_validation_error() {
         dialog_type: FormDialogType::AddField,
     });
 
-    // Leave label empty, set only value
-    let _ = engine.handle_action(UserAction::TextChanged {
-        component_id: "field_value".into(),
-        value: "some-value".into(),
+    // Select a type first (step 1 → step 2)
+    let _ = engine.handle_action(UserAction::ListItemSelected {
+        component_id: "entry_types".into(),
+        item_id: "phone".into(),
     });
 
+    // Leave value empty, submit
     let result = engine.handle_action(UserAction::ActionPressed {
         action_id: "submit".into(),
     });
@@ -1519,9 +1550,9 @@ fn form_dialog_add_field_empty_label_returns_validation_error() {
             ActionResult::ValidationError {
                 ref component_id,
                 ..
-            } if component_id == "field_label"
+            } if component_id == "field_value"
         ),
-        "Empty label should return ValidationError, got {result:?}"
+        "Empty value should return ValidationError, got {result:?}"
     );
 }
 
@@ -1590,4 +1621,320 @@ fn form_dialog_edit_relay_url_navigates_back() {
         matches!(result, ActionResult::NavigateTo(_)),
         "EditRelayUrl submit should navigate back, got {result:?}"
     );
+}
+
+// =============================================================================
+// SP-12a: Duplicate Detection, Merge Preview, Contact Limit
+// =============================================================================
+
+#[test]
+fn duplicate_detection_navigate_shows_screen() {
+    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    let mut engine = AppEngine::new(vauchi);
+    let screen = engine.navigate_to(AppScreen::ContactDuplicates);
+    assert_eq!(screen.screen_id, "duplicate_detection");
+    assert_eq!(screen.title, "Duplicate Detection");
+}
+
+#[test]
+fn duplicate_detection_empty_shows_no_duplicates() {
+    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    let mut engine = AppEngine::new(vauchi);
+    let screen = engine.navigate_to(AppScreen::ContactDuplicates);
+    // With no pairs, should show "no duplicates" text
+    assert!(
+        screen.components.iter().any(|c| matches!(c,
+            Component::Text { content, .. } if content.contains("No duplicate")
+        )),
+        "Empty pairs should show 'No duplicate' message, got {:?}",
+        screen.components
+    );
+}
+
+#[test]
+fn duplicate_detection_merge_navigates_back() {
+    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    let mut engine = AppEngine::new(vauchi);
+    engine.navigate_to(AppScreen::ContactDuplicates);
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "merge".into(),
+    });
+    // Engine returns Complete, AppEngine intercepts and navigates back
+    assert!(
+        matches!(result, ActionResult::NavigateTo(_)),
+        "merge action should navigate back, got {result:?}"
+    );
+}
+
+#[test]
+fn duplicate_detection_dismiss_navigates_back() {
+    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    let mut engine = AppEngine::new(vauchi);
+    engine.navigate_to(AppScreen::ContactDuplicates);
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "dismiss".into(),
+    });
+    // Engine returns Complete, AppEngine intercepts and navigates back
+    assert!(
+        matches!(result, ActionResult::NavigateTo(_)),
+        "dismiss action should navigate back, got {result:?}"
+    );
+}
+
+#[test]
+fn contact_merge_navigate_shows_screen() {
+    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    let mut engine = AppEngine::new(vauchi);
+    let screen = engine.navigate_to(AppScreen::ContactMerge {
+        primary_name: "Alice".into(),
+        primary_fields: vec!["email: alice@example.com".into()],
+        secondary_name: "Bob".into(),
+        secondary_fields: vec!["phone: +1234567890".into()],
+    });
+    assert_eq!(screen.screen_id, "contact_merge");
+    assert_eq!(screen.title, "Merge Contacts");
+}
+
+#[test]
+fn contact_merge_shows_both_contacts() {
+    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    let mut engine = AppEngine::new(vauchi);
+    let screen = engine.navigate_to(AppScreen::ContactMerge {
+        primary_name: "Alice".into(),
+        primary_fields: vec!["email: alice@example.com".into()],
+        secondary_name: "Bob".into(),
+        secondary_fields: vec!["phone: +1234567890".into()],
+    });
+    // Should have subtitle text with both names
+    assert!(
+        screen.components.iter().any(|c| matches!(c,
+            Component::Text { content, .. } if content.contains("Alice") && content.contains("Bob")
+        )),
+        "Merge screen should show both contact names"
+    );
+}
+
+#[test]
+fn contact_merge_confirm_navigates_back() {
+    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    let mut engine = AppEngine::new(vauchi);
+    engine.navigate_to(AppScreen::ContactMerge {
+        primary_name: "Alice".into(),
+        primary_fields: vec![],
+        secondary_name: "Bob".into(),
+        secondary_fields: vec![],
+    });
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "confirm".into(),
+    });
+    assert!(
+        matches!(result, ActionResult::NavigateTo(_)),
+        "confirm should navigate back, got {result:?}"
+    );
+}
+
+#[test]
+fn contact_merge_cancel_navigates_back() {
+    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    let mut engine = AppEngine::new(vauchi);
+    engine.navigate_to(AppScreen::ContactMerge {
+        primary_name: "Alice".into(),
+        primary_fields: vec![],
+        secondary_name: "Bob".into(),
+        secondary_fields: vec![],
+    });
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "cancel".into(),
+    });
+    assert!(
+        matches!(result, ActionResult::NavigateTo(_)),
+        "cancel should navigate back, got {result:?}"
+    );
+}
+
+#[test]
+fn contact_limit_navigate_shows_screen() {
+    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    let mut engine = AppEngine::new(vauchi);
+    let screen = engine.navigate_to(AppScreen::ContactLimit);
+    assert_eq!(screen.screen_id, "contact_limit");
+    assert_eq!(screen.title, "Contact Limit");
+}
+
+#[test]
+fn contact_limit_shows_text_input() {
+    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    let mut engine = AppEngine::new(vauchi);
+    let screen = engine.navigate_to(AppScreen::ContactLimit);
+    assert!(
+        screen
+            .components
+            .iter()
+            .any(|c| matches!(c, Component::TextInput { id, .. } if id == "limit_input")),
+        "Should have limit_input TextInput component"
+    );
+}
+
+#[test]
+fn contact_limit_edit_then_save() {
+    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    let mut engine = AppEngine::new(vauchi);
+    engine.navigate_to(AppScreen::ContactLimit);
+
+    // Enter edit mode
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "edit".into(),
+    });
+    assert!(
+        matches!(result, ActionResult::UpdateScreen(_)),
+        "edit should update screen, got {result:?}"
+    );
+
+    // Type a number
+    let _ = engine.handle_action(UserAction::TextChanged {
+        component_id: "limit_input".into(),
+        value: "100".into(),
+    });
+
+    // Save — engine returns Complete, AppEngine routes back
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "save".into(),
+    });
+    assert!(
+        matches!(result, ActionResult::NavigateTo(_)),
+        "save with valid number should navigate back, got {result:?}"
+    );
+}
+
+#[test]
+fn contact_limit_save_invalid_returns_validation_error() {
+    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    let mut engine = AppEngine::new(vauchi);
+    engine.navigate_to(AppScreen::ContactLimit);
+
+    // Enter edit mode
+    let _ = engine.handle_action(UserAction::ActionPressed {
+        action_id: "edit".into(),
+    });
+
+    // Type invalid input
+    let _ = engine.handle_action(UserAction::TextChanged {
+        component_id: "limit_input".into(),
+        value: "not_a_number".into(),
+    });
+
+    // Save should fail
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "save".into(),
+    });
+    assert!(
+        matches!(result, ActionResult::ValidationError { .. }),
+        "save with invalid number should return ValidationError, got {result:?}"
+    );
+}
+
+#[test]
+fn contact_limit_cancel_edit_restores_value() {
+    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    let mut engine = AppEngine::new(vauchi);
+    engine.navigate_to(AppScreen::ContactLimit);
+
+    // Enter edit mode
+    let _ = engine.handle_action(UserAction::ActionPressed {
+        action_id: "edit".into(),
+    });
+
+    // Type something
+    let _ = engine.handle_action(UserAction::TextChanged {
+        component_id: "limit_input".into(),
+        value: "999".into(),
+    });
+
+    // Cancel
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "cancel_edit".into(),
+    });
+    assert!(
+        matches!(result, ActionResult::UpdateScreen(_)),
+        "cancel_edit should update screen, got {result:?}"
+    );
+
+    // Screen should show edit action (not save) — meaning we exited edit mode
+    let screen = engine.current_screen();
+    assert!(
+        screen.actions.iter().any(|a| a.id == "edit"),
+        "After cancel_edit, should show 'edit' action again"
+    );
+}
+
+/// Reproduce the "identity not initialized" bug:
+/// After onboarding creates identity via vauchi.create_identity(),
+/// navigating to AddField form and completing it should succeed.
+#[test]
+fn add_field_after_onboarding_identity_creation() {
+    // Create Vauchi (no identity) + AppEngine — same as TUI startup
+    let vauchi: Vauchi<MockTransport> = Vauchi::in_memory().unwrap();
+    let mut engine = AppEngine::new(vauchi);
+
+    // Simulate TUI onboarding: create identity directly on vauchi
+    // (TUI navigation.rs does this, not AppEngine.handle_completion)
+    engine.vauchi_mut().create_identity("TestUser").unwrap();
+
+    // Navigate to Home (TUI does this after onboarding)
+    engine.navigate_to(AppScreen::Home);
+
+    // Navigate to AddField form (TUI does this on 'a' key)
+    engine.navigate_to(AppScreen::FormDialog {
+        dialog_type: FormDialogType::AddField,
+    });
+
+    // Step 1: Select type (two-step form)
+    let screen = engine.current_screen();
+    assert_eq!(screen.screen_id, "form_add_field_type");
+
+    let result = engine.handle_action(UserAction::ListItemSelected {
+        component_id: "entry_types".into(),
+        item_id: "email".into(),
+    });
+    assert!(
+        matches!(result, ActionResult::UpdateScreen(_)),
+        "Type selection should update screen, got {result:?}"
+    );
+
+    // Step 2: Enter value
+    let screen = engine.current_screen();
+    assert_eq!(screen.screen_id, "form_add_field");
+
+    // Type a value
+    let _ = engine.handle_action(UserAction::TextChanged {
+        component_id: "field_value".into(),
+        value: "test@example.com".into(),
+    });
+
+    // Submit
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "submit".into(),
+    });
+
+    // Should succeed (navigate back), NOT show "identity not initialized"
+    match &result {
+        ActionResult::NavigateTo(_) => {} // Success
+        ActionResult::ShowAlert { message, .. } => {
+            panic!("AddField failed with: {message}");
+        }
+        other => panic!("Unexpected result: {other:?}"),
+    }
 }

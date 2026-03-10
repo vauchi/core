@@ -51,7 +51,7 @@ impl std::error::Error for LabelError {}
 /// For example, a "Family" label might show personal phone and home address,
 /// while "Professional" shows only work email and phone.
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct VisibilityLabel {
+pub struct Group {
     /// Unique identifier for this label (UUID).
     id: String,
     /// Human-readable name.
@@ -72,7 +72,7 @@ pub struct VisibilityLabel {
     modified_at: u64,
 }
 
-impl VisibilityLabel {
+impl Group {
     /// Creates a new label with the given name.
     pub fn new(name: &str) -> Self {
         let now = std::time::SystemTime::now()
@@ -80,7 +80,7 @@ impl VisibilityLabel {
             .expect("Time went backwards")
             .as_secs();
 
-        VisibilityLabel {
+        Group {
             id: uuid::Uuid::new_v4().to_string(),
             name: name.to_string(),
             contacts: HashSet::new(),
@@ -101,7 +101,7 @@ impl VisibilityLabel {
         created_at: u64,
         modified_at: u64,
     ) -> Self {
-        VisibilityLabel {
+        Group {
             id,
             name,
             contacts,
@@ -274,18 +274,18 @@ impl VisibilityLabel {
 ///
 /// Labels are organized in a collection with efficient lookup by ID and name.
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
-pub struct LabelManager {
+pub struct GroupManager {
     /// Labels indexed by ID.
-    labels: HashMap<String, VisibilityLabel>,
+    labels: HashMap<String, Group>,
     /// Per-contact overrides: contact_id -> (field_id -> is_visible).
     /// These take precedence over label-based visibility.
     per_contact_overrides: HashMap<String, HashMap<String, bool>>,
 }
 
-impl LabelManager {
+impl GroupManager {
     /// Creates a new empty label manager.
     pub fn new() -> Self {
-        LabelManager {
+        GroupManager {
             labels: HashMap::new(),
             per_contact_overrides: HashMap::new(),
         }
@@ -295,12 +295,12 @@ impl LabelManager {
     ///
     /// This bypasses validation (name length, duplicates) because the data was
     /// already validated when first created.
-    pub fn insert_loaded_label(&mut self, label: VisibilityLabel) {
+    pub fn insert_loaded_label(&mut self, label: Group) {
         self.labels.insert(label.id().to_string(), label);
     }
 
     /// Returns all labels.
-    pub fn all_labels(&self) -> Vec<&VisibilityLabel> {
+    pub fn all_labels(&self) -> Vec<&Group> {
         self.labels.values().collect()
     }
 
@@ -315,22 +315,22 @@ impl LabelManager {
     }
 
     /// Gets a label by ID.
-    pub fn get_label(&self, label_id: &str) -> Option<&VisibilityLabel> {
+    pub fn get_group(&self, label_id: &str) -> Option<&Group> {
         self.labels.get(label_id)
     }
 
     /// Gets a mutable reference to a label by ID.
-    pub fn get_label_mut(&mut self, label_id: &str) -> Option<&mut VisibilityLabel> {
+    pub fn get_group_mut(&mut self, label_id: &str) -> Option<&mut Group> {
         self.labels.get_mut(label_id)
     }
 
     /// Gets a label by name.
-    pub fn get_label_by_name(&self, name: &str) -> Option<&VisibilityLabel> {
+    pub fn get_group_by_name(&self, name: &str) -> Option<&Group> {
         self.labels.values().find(|l| l.name == name)
     }
 
     /// Creates a new label.
-    pub fn create_label(&mut self, name: &str) -> Result<&VisibilityLabel, LabelError> {
+    pub fn create_group(&mut self, name: &str) -> Result<&Group, LabelError> {
         // Validate name
         let name = name.trim();
         if name.is_empty() {
@@ -343,7 +343,7 @@ impl LabelManager {
         }
 
         // Check for duplicate
-        if self.get_label_by_name(name).is_some() {
+        if self.get_group_by_name(name).is_some() {
             return Err(LabelError::DuplicateName(name.to_string()));
         }
 
@@ -353,7 +353,7 @@ impl LabelManager {
         }
 
         // Create label
-        let label = VisibilityLabel::new(name);
+        let label = Group::new(name);
         let id = label.id.clone();
         self.labels.insert(id.clone(), label);
 
@@ -361,7 +361,7 @@ impl LabelManager {
     }
 
     /// Renames a label.
-    pub fn rename_label(&mut self, label_id: &str, new_name: &str) -> Result<(), LabelError> {
+    pub fn rename_group(&mut self, label_id: &str, new_name: &str) -> Result<(), LabelError> {
         let new_name = new_name.trim();
 
         // Validate new name
@@ -375,7 +375,7 @@ impl LabelManager {
         }
 
         // Check for duplicate (excluding this label)
-        if let Some(existing) = self.get_label_by_name(new_name) {
+        if let Some(existing) = self.get_group_by_name(new_name) {
             if existing.id != label_id {
                 return Err(LabelError::DuplicateName(new_name.to_string()));
             }
@@ -395,14 +395,14 @@ impl LabelManager {
     ///
     /// Contacts in the label remain in the contact list; they just lose
     /// their label membership.
-    pub fn delete_label(&mut self, label_id: &str) -> Result<VisibilityLabel, LabelError> {
+    pub fn delete_group(&mut self, label_id: &str) -> Result<Group, LabelError> {
         self.labels
             .remove(label_id)
             .ok_or_else(|| LabelError::NotFound(label_id.to_string()))
     }
 
     /// Returns all labels that contain a specific contact.
-    pub fn labels_for_contact(&self, contact_id: &str) -> Vec<&VisibilityLabel> {
+    pub fn labels_for_contact(&self, contact_id: &str) -> Vec<&Group> {
         self.labels
             .values()
             .filter(|l| l.contains_contact(contact_id))
@@ -419,7 +419,7 @@ impl LabelManager {
     }
 
     /// Adds a contact to a label.
-    pub fn add_contact_to_label(
+    pub fn add_contact_to_group(
         &mut self,
         label_id: &str,
         contact_id: &str,
@@ -433,7 +433,7 @@ impl LabelManager {
     }
 
     /// Removes a contact from a label.
-    pub fn remove_contact_from_label(
+    pub fn remove_contact_from_group(
         &mut self,
         label_id: &str,
         contact_id: &str,
@@ -447,7 +447,7 @@ impl LabelManager {
     }
 
     /// Removes a contact from all labels (e.g., when deleting the contact).
-    pub fn remove_contact_from_all_labels(&mut self, contact_id: &str) {
+    pub fn remove_contact_from_all_groups(&mut self, contact_id: &str) {
         for label in self.labels.values_mut() {
             label.remove_contact(contact_id);
         }
@@ -553,7 +553,7 @@ impl LabelManager {
 /// Ungrouped contacts in groups mode see no fields (default-closed).
 pub fn resolve_visible_fields(
     card: &crate::contact_card::ContactCard,
-    label_manager: &LabelManager,
+    label_manager: &GroupManager,
     contact_id: &str,
 ) -> HashSet<String> {
     if label_manager.is_empty() {
@@ -565,15 +565,15 @@ pub fn resolve_visible_fields(
     }
 }
 
-// INLINE_TEST_REQUIRED: tests access private VisibilityLabel fields and LabelManager internals
+// INLINE_TEST_REQUIRED: tests access private Group fields and GroupManager internals
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
     fn test_create_label() {
-        let mut manager = LabelManager::new();
-        let label = manager.create_label("Family").unwrap();
+        let mut manager = GroupManager::new();
+        let label = manager.create_group("Family").unwrap();
 
         assert_eq!(label.name(), "Family");
         assert_eq!(label.contact_count(), 0);
@@ -582,50 +582,50 @@ mod tests {
 
     #[test]
     fn test_create_duplicate_label() {
-        let mut manager = LabelManager::new();
-        manager.create_label("Friends").unwrap();
+        let mut manager = GroupManager::new();
+        manager.create_group("Friends").unwrap();
 
-        let result = manager.create_label("Friends");
+        let result = manager.create_group("Friends");
         assert!(matches!(result, Err(LabelError::DuplicateName(_))));
     }
 
     #[test]
     fn test_add_contact_to_label() {
-        let mut manager = LabelManager::new();
-        let label = manager.create_label("Family").unwrap();
+        let mut manager = GroupManager::new();
+        let label = manager.create_group("Family").unwrap();
         let label_id = label.id().to_string();
 
-        manager.add_contact_to_label(&label_id, "bob-id").unwrap();
+        manager.add_contact_to_group(&label_id, "bob-id").unwrap();
 
-        let label = manager.get_label(&label_id).unwrap();
+        let label = manager.get_group(&label_id).unwrap();
         assert!(label.contains_contact("bob-id"));
         assert_eq!(label.contact_count(), 1);
     }
 
     #[test]
     fn test_remove_contact_from_label() {
-        let mut manager = LabelManager::new();
-        let label = manager.create_label("Family").unwrap();
+        let mut manager = GroupManager::new();
+        let label = manager.create_group("Family").unwrap();
         let label_id = label.id().to_string();
 
-        manager.add_contact_to_label(&label_id, "bob-id").unwrap();
+        manager.add_contact_to_group(&label_id, "bob-id").unwrap();
         manager
-            .remove_contact_from_label(&label_id, "bob-id")
+            .remove_contact_from_group(&label_id, "bob-id")
             .unwrap();
 
-        let label = manager.get_label(&label_id).unwrap();
+        let label = manager.get_group(&label_id).unwrap();
         assert!(!label.contains_contact("bob-id"));
     }
 
     #[test]
     fn test_label_field_visibility() {
-        let mut manager = LabelManager::new();
-        let label = manager.create_label("Family").unwrap();
+        let mut manager = GroupManager::new();
+        let label = manager.create_group("Family").unwrap();
         let label_id = label.id().to_string();
 
         // Add contact and field
-        manager.add_contact_to_label(&label_id, "bob-id").unwrap();
-        let label = manager.get_label_mut(&label_id).unwrap();
+        manager.add_contact_to_group(&label_id, "bob-id").unwrap();
+        let label = manager.get_group_mut(&label_id).unwrap();
         label.add_visible_field("personal-phone");
 
         // Bob should see the field
@@ -643,13 +643,13 @@ mod tests {
 
     #[test]
     fn test_per_contact_override() {
-        let mut manager = LabelManager::new();
-        let label = manager.create_label("Friends").unwrap();
+        let mut manager = GroupManager::new();
+        let label = manager.create_group("Friends").unwrap();
         let label_id = label.id().to_string();
 
         // Add Bob to Friends and set personal-phone as visible
-        manager.add_contact_to_label(&label_id, "bob-id").unwrap();
-        let label = manager.get_label_mut(&label_id).unwrap();
+        manager.add_contact_to_group(&label_id, "bob-id").unwrap();
+        let label = manager.get_group_mut(&label_id).unwrap();
         label.add_visible_field("personal-phone");
 
         // Bob should see personal-phone via label
@@ -670,27 +670,27 @@ mod tests {
 
     #[test]
     fn test_contact_in_multiple_labels() {
-        let mut manager = LabelManager::new();
+        let mut manager = GroupManager::new();
 
-        let family = manager.create_label("Family").unwrap();
+        let family = manager.create_group("Family").unwrap();
         let family_id = family.id().to_string();
 
-        let friends = manager.create_label("Friends").unwrap();
+        let friends = manager.create_group("Friends").unwrap();
         let friends_id = friends.id().to_string();
 
         // Add Carol to both labels
         manager
-            .add_contact_to_label(&family_id, "carol-id")
+            .add_contact_to_group(&family_id, "carol-id")
             .unwrap();
         manager
-            .add_contact_to_label(&friends_id, "carol-id")
+            .add_contact_to_group(&friends_id, "carol-id")
             .unwrap();
 
         // Set different fields for each label
-        let family = manager.get_label_mut(&family_id).unwrap();
+        let family = manager.get_group_mut(&family_id).unwrap();
         family.add_visible_field("home-address");
 
-        let friends = manager.get_label_mut(&friends_id).unwrap();
+        let friends = manager.get_group_mut(&friends_id).unwrap();
         friends.add_visible_field("phone");
 
         // Carol should see both fields (union of labels)
@@ -701,46 +701,46 @@ mod tests {
 
     #[test]
     fn test_rename_label() {
-        let mut manager = LabelManager::new();
-        let label = manager.create_label("Work").unwrap();
+        let mut manager = GroupManager::new();
+        let label = manager.create_group("Work").unwrap();
         let label_id = label.id().to_string();
 
-        manager.rename_label(&label_id, "Colleagues").unwrap();
+        manager.rename_group(&label_id, "Colleagues").unwrap();
 
-        let label = manager.get_label(&label_id).unwrap();
+        let label = manager.get_group(&label_id).unwrap();
         assert_eq!(label.name(), "Colleagues");
     }
 
     #[test]
     fn test_delete_label() {
-        let mut manager = LabelManager::new();
-        let label = manager.create_label("Temporary").unwrap();
+        let mut manager = GroupManager::new();
+        let label = manager.create_group("Temporary").unwrap();
         let label_id = label.id().to_string();
 
-        manager.add_contact_to_label(&label_id, "bob-id").unwrap();
+        manager.add_contact_to_group(&label_id, "bob-id").unwrap();
 
-        let deleted = manager.delete_label(&label_id).unwrap();
+        let deleted = manager.delete_group(&label_id).unwrap();
         assert_eq!(deleted.name(), "Temporary");
 
-        assert!(manager.get_label(&label_id).is_none());
+        assert!(manager.get_group(&label_id).is_none());
         assert_eq!(manager.label_count(), 0);
     }
 
     #[test]
     fn test_max_labels() {
-        let mut manager = LabelManager::new();
+        let mut manager = GroupManager::new();
 
         for i in 0..MAX_LABELS {
-            manager.create_label(&format!("Label{}", i)).unwrap();
+            manager.create_group(&format!("Label{}", i)).unwrap();
         }
 
-        let result = manager.create_label("OneMore");
+        let result = manager.create_group("OneMore");
         assert!(matches!(result, Err(LabelError::MaxLabelsReached)));
     }
 
     #[test]
     fn test_label_display_name_override() {
-        let mut label = VisibilityLabel::new("Family");
+        let mut label = Group::new("Family");
 
         // Initially None
         assert_eq!(label.display_name_override(), None);
@@ -760,7 +760,7 @@ mod tests {
 
     #[test]
     fn test_label_display_name_override_validation() {
-        let mut label = VisibilityLabel::new("Friends");
+        let mut label = Group::new("Friends");
 
         // Empty string should fail
         let result = label.set_display_name_override(Some(""));
@@ -791,7 +791,7 @@ mod tests {
 
     #[test]
     fn test_label_resolve_display_name() {
-        let mut label = VisibilityLabel::new("Business");
+        let mut label = Group::new("Business");
 
         // Without override, returns default
         assert_eq!(label.resolve_display_name("Mattia Egloff"), "Mattia Egloff");
@@ -819,9 +819,9 @@ mod tests {
 
     #[test]
     fn test_labels_are_local() {
-        // Labels exist only in LabelManager, not in Contact
+        // Labels exist only in GroupManager, not in Contact
         // This test verifies the design doesn't leak labels to contacts
-        let label = VisibilityLabel::new("Secret Name");
+        let label = Group::new("Secret Name");
 
         // The label name is never serialized in a way that would be sent to contacts
         // Label data should only be synced to the user's own devices

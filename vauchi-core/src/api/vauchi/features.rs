@@ -196,6 +196,25 @@ impl<T: Transport> Vauchi<T> {
         Ok(())
     }
 
+    /// Toggles the prefer-onion setting.
+    ///
+    /// Returns the new prefer_onion state.
+    pub fn toggle_prefer_onion(&mut self) -> VauchiResult<bool> {
+        self.config.tor.prefer_onion = !self.config.tor.prefer_onion;
+        self.storage.save_tor_config(&self.config.tor)?;
+        Ok(self.config.tor.prefer_onion)
+    }
+
+    /// Clears all Tor bridge addresses.
+    ///
+    /// Returns the number of bridges that were cleared.
+    pub fn clear_tor_bridges(&mut self) -> VauchiResult<usize> {
+        let count = self.config.tor.bridges.len();
+        self.config.tor.bridges.clear();
+        self.storage.save_tor_config(&self.config.tor)?;
+        Ok(count)
+    }
+
     /// Requests a new Tor circuit rotation.
     ///
     /// Without the `tor` feature, this is a no-op that returns Ok.
@@ -439,42 +458,42 @@ impl<T: Transport> Vauchi<T> {
     /// Adds a contact to a label and re-propagates the card to that contact.
     ///
     /// The contact receives an updated card reflecting their new label membership.
-    pub fn add_contact_to_label_and_repropagate(
+    pub fn add_contact_to_group_and_repropagate(
         &self,
         label_id: &str,
         contact_id: &str,
     ) -> VauchiResult<()> {
-        self.storage.add_contact_to_label(label_id, contact_id)?;
+        self.storage.add_contact_to_group(label_id, contact_id)?;
         self.repropagate_to_contact(contact_id)
     }
 
     /// Removes a contact from a label and re-propagates the card to that contact.
     ///
     /// The contact receives an updated card with fields they can no longer see removed.
-    pub fn remove_contact_from_label_and_repropagate(
+    pub fn remove_contact_from_group_and_repropagate(
         &self,
         label_id: &str,
         contact_id: &str,
     ) -> VauchiResult<()> {
         self.storage
-            .remove_contact_from_label(label_id, contact_id)?;
+            .remove_contact_from_group(label_id, contact_id)?;
         self.repropagate_to_contact(contact_id)
     }
 
     /// Sets field visibility for a label and re-propagates to all contacts in that label.
     ///
     /// All contacts in the label receive updated cards reflecting the visibility change.
-    pub fn set_label_field_visibility_and_repropagate(
+    pub fn set_group_field_visibility_and_repropagate(
         &self,
         label_id: &str,
         field_id: &str,
         is_visible: bool,
     ) -> VauchiResult<()> {
         self.storage
-            .set_label_field_visibility(label_id, field_id, is_visible)?;
+            .set_group_field_visibility(label_id, field_id, is_visible)?;
 
         // Re-propagate to all contacts in this label
-        let label = self.storage.load_label(label_id)?;
+        let label = self.storage.load_group(label_id)?;
         for contact_id in label.contacts() {
             self.repropagate_to_contact(contact_id)?;
         }

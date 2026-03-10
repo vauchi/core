@@ -30,13 +30,13 @@ fn test_transition_to_no_group_mode() {
     let field_id = card.fields()[0].id().to_string();
 
     // Create a label and set the field visible in it
-    let label = wb.create_label("Friends").unwrap();
+    let label = wb.create_group("Friends").unwrap();
     let label_id = label.id().to_string();
-    wb.set_label_field_visibility(&label_id, &field_id, true)
+    wb.set_group_field_visibility(&label_id, &field_id, true)
         .unwrap();
 
     // Verify field is visible in label
-    let label = wb.get_label(&label_id).unwrap();
+    let label = wb.get_group(&label_id).unwrap();
     assert!(
         label.is_field_visible(&field_id),
         "field should be visible in label before deletion"
@@ -50,10 +50,10 @@ fn test_transition_to_no_group_mode() {
     );
 
     // Delete the last label — triggers transition to no-group mode
-    wb.delete_label(&label_id).unwrap();
+    wb.delete_group(&label_id).unwrap();
 
     // Verify no labels remain
-    let labels = wb.list_labels().unwrap();
+    let labels = wb.list_groups().unwrap();
     assert_eq!(labels.len(), 0, "all labels should be deleted");
 
     // Verify field has been migrated to shown_fields on the card
@@ -87,7 +87,7 @@ fn test_transition_preserves_shown_fields_when_adding_first_group() {
     );
 
     // Create first group — shown_fields should be preserved
-    let _label = wb.create_label("Work").unwrap();
+    let _label = wb.create_group("Work").unwrap();
 
     // Verify shown_fields still has the field (user must manually reassign)
     let card = wb.own_card().unwrap().unwrap();
@@ -110,12 +110,12 @@ fn test_delete_non_last_label_no_migration() {
     let field_id = card.fields()[0].id().to_string();
 
     // Create two labels
-    let label1 = wb.create_label("Friends").unwrap();
+    let label1 = wb.create_group("Friends").unwrap();
     let label1_id = label1.id().to_string();
-    let _label2 = wb.create_label("Work").unwrap();
+    let _label2 = wb.create_group("Work").unwrap();
 
     // Set field visible in label1
-    wb.set_label_field_visibility(&label1_id, &field_id, true)
+    wb.set_group_field_visibility(&label1_id, &field_id, true)
         .unwrap();
 
     // Verify field is NOT in shown_fields
@@ -126,7 +126,7 @@ fn test_delete_non_last_label_no_migration() {
     );
 
     // Delete label1 (not the last one — label2 still exists)
-    wb.delete_label(&label1_id).unwrap();
+    wb.delete_group(&label1_id).unwrap();
 
     // Verify no migration to shown_fields (still in groups mode)
     let card = wb.own_card().unwrap().unwrap();
@@ -136,7 +136,7 @@ fn test_delete_non_last_label_no_migration() {
     );
 
     // Verify label2 still exists
-    let labels = wb.list_labels().unwrap();
+    let labels = wb.list_groups().unwrap();
     assert_eq!(labels.len(), 1, "one label should remain");
 }
 
@@ -199,15 +199,15 @@ fn test_transition_migrates_all_visible_fields() {
     let phone_id = card.fields()[1].id().to_string();
 
     // Create label and set both fields visible
-    let label = wb.create_label("Friends").unwrap();
+    let label = wb.create_group("Friends").unwrap();
     let label_id = label.id().to_string();
-    wb.set_label_field_visibility(&label_id, &email_id, true)
+    wb.set_group_field_visibility(&label_id, &email_id, true)
         .unwrap();
-    wb.set_label_field_visibility(&label_id, &phone_id, true)
+    wb.set_group_field_visibility(&label_id, &phone_id, true)
         .unwrap();
 
     // Delete last label
-    wb.delete_label(&label_id).unwrap();
+    wb.delete_group(&label_id).unwrap();
 
     // Both fields should be migrated to shown_fields
     let card = wb.own_card().unwrap().unwrap();
@@ -241,13 +241,13 @@ fn test_transition_does_not_migrate_hidden_fields() {
     let phone_id = card.fields()[1].id().to_string();
 
     // Create label but only set email visible (phone stays hidden)
-    let label = wb.create_label("Friends").unwrap();
+    let label = wb.create_group("Friends").unwrap();
     let label_id = label.id().to_string();
-    wb.set_label_field_visibility(&label_id, &email_id, true)
+    wb.set_group_field_visibility(&label_id, &email_id, true)
         .unwrap();
 
     // Delete last label
-    wb.delete_label(&label_id).unwrap();
+    wb.delete_group(&label_id).unwrap();
 
     // Only email should be migrated; phone was never visible
     let card = wb.own_card().unwrap().unwrap();

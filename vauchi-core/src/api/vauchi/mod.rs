@@ -8,7 +8,9 @@
 
 mod builder;
 mod contacts;
+mod devices;
 mod emergency;
+mod exchange;
 mod features;
 mod identity;
 mod merge;
@@ -19,6 +21,8 @@ mod setup;
 mod visibility;
 
 pub use builder::VauchiBuilder;
+pub use devices::{DeviceInfo, DeviceLinkResult};
+pub use exchange::ExchangeQrData;
 pub use setup::SetupProgress;
 
 use std::sync::{Arc, Mutex};

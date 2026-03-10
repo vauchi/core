@@ -54,8 +54,8 @@ impl WorkflowEngine for HomeEngine {
         });
 
         let mut actions = vec![ScreenAction {
-            id: "add_contact".into(),
-            label: "Add Contact".into(),
+            id: "add_field".into(),
+            label: "Add Entry".into(),
             style: ActionStyle::Primary,
             enabled: true,
         }];
@@ -83,7 +83,7 @@ impl WorkflowEngine for HomeEngine {
             UserAction::ListItemSelected { item_id, .. } => ActionResult::OpenContact {
                 contact_id: item_id,
             },
-            UserAction::ActionPressed { action_id } if action_id == "add_contact" => {
+            UserAction::ActionPressed { action_id } if action_id == "add_field" => {
                 ActionResult::NavigateTo(self.current_screen()) // caller handles navigation
             }
             _ => ActionResult::UpdateScreen(self.current_screen()),

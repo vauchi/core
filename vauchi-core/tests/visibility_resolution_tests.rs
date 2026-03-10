@@ -6,7 +6,7 @@
 //!
 //! Tests for the two-mode visibility resolution logic:
 //! - No-group mode (no labels): uses card's shown_fields
-//! - Groups mode (labels exist): uses label-based visibility via LabelManager
+//! - Groups mode (labels exist): uses label-based visibility via GroupManager
 //!
 //! Traces to: features/visibility_labels.feature
 //! - @no-group-mode: shown_fields-based visibility
@@ -14,7 +14,7 @@
 //! - @ungrouped-contact: default-closed for ungrouped contacts in groups mode
 
 use vauchi_core::contact::labels::resolve_visible_fields;
-use vauchi_core::contact::LabelManager;
+use vauchi_core::contact::GroupManager;
 use vauchi_core::contact_card::{ContactCard, ContactField, FieldType};
 
 #[test]
@@ -30,7 +30,7 @@ fn test_visible_fields_no_groups_mode() {
     // Mark only field1 as shown
     card.set_field_shown(&field1_id, true);
 
-    let label_manager = LabelManager::new();
+    let label_manager = GroupManager::new();
     let visible = resolve_visible_fields(&card, &label_manager, "contact-123");
 
     assert!(visible.contains(&field1_id));
@@ -45,7 +45,7 @@ fn test_visible_fields_no_groups_mode_empty() {
     card.add_field(field1).unwrap();
 
     // No fields marked as shown
-    let label_manager = LabelManager::new();
+    let label_manager = GroupManager::new();
     let visible = resolve_visible_fields(&card, &label_manager, "contact-123");
 
     assert!(visible.is_empty(), "No shown fields means no visibility");
@@ -59,15 +59,15 @@ fn test_visible_fields_groups_mode() {
     card.add_field(field1).unwrap();
     card.set_field_shown(&field1_id, true); // shown in no-group mode
 
-    let mut label_manager = LabelManager::new();
-    let label = label_manager.create_label("Friends").unwrap();
+    let mut label_manager = GroupManager::new();
+    let label = label_manager.create_group("Friends").unwrap();
     let label_id = label.id().to_string();
 
     // Add contact to Friends and make field1 visible via label
     label_manager
-        .add_contact_to_label(&label_id, "contact-123")
+        .add_contact_to_group(&label_id, "contact-123")
         .unwrap();
-    let label = label_manager.get_label_mut(&label_id).unwrap();
+    let label = label_manager.get_group_mut(&label_id).unwrap();
     label.add_visible_field(&field1_id);
 
     let visible = resolve_visible_fields(&card, &label_manager, "contact-123");
@@ -82,8 +82,8 @@ fn test_visible_fields_ungrouped_contact_in_groups_mode() {
     card.add_field(field1).unwrap();
     card.set_field_shown(&field1_id, true);
 
-    let mut label_manager = LabelManager::new();
-    label_manager.create_label("Friends").unwrap();
+    let mut label_manager = GroupManager::new();
+    label_manager.create_group("Friends").unwrap();
 
     // "ungrouped-contact" is not in any label
     let visible = resolve_visible_fields(&card, &label_manager, "ungrouped-contact");
@@ -107,16 +107,16 @@ fn test_visible_fields_groups_mode_ignores_shown_fields() {
     card.set_field_shown(&field1_id, true);
     card.set_field_shown(&field2_id, true);
 
-    let mut label_manager = LabelManager::new();
-    let label = label_manager.create_label("Friends").unwrap();
+    let mut label_manager = GroupManager::new();
+    let label = label_manager.create_group("Friends").unwrap();
     let label_id = label.id().to_string();
 
     // Only make field1 visible via label — field2 should NOT be visible
     // even though it's in shown_fields
     label_manager
-        .add_contact_to_label(&label_id, "contact-123")
+        .add_contact_to_group(&label_id, "contact-123")
         .unwrap();
-    let label = label_manager.get_label_mut(&label_id).unwrap();
+    let label = label_manager.get_group_mut(&label_id).unwrap();
     label.add_visible_field(&field1_id);
 
     let visible = resolve_visible_fields(&card, &label_manager, "contact-123");
@@ -138,14 +138,14 @@ fn test_visible_fields_groups_mode_with_per_contact_override() {
     card.add_field(field1).unwrap();
     card.add_field(field2).unwrap();
 
-    let mut label_manager = LabelManager::new();
-    let label = label_manager.create_label("Friends").unwrap();
+    let mut label_manager = GroupManager::new();
+    let label = label_manager.create_group("Friends").unwrap();
     let label_id = label.id().to_string();
 
     label_manager
-        .add_contact_to_label(&label_id, "contact-123")
+        .add_contact_to_group(&label_id, "contact-123")
         .unwrap();
-    let label = label_manager.get_label_mut(&label_id).unwrap();
+    let label = label_manager.get_group_mut(&label_id).unwrap();
     label.add_visible_field(&field1_id);
 
     // Per-contact override: hide field1, show field2
@@ -165,9 +165,9 @@ fn test_visible_fields_groups_mode_with_per_contact_override() {
 
 #[test]
 fn test_is_empty_label_manager() {
-    let mut manager = LabelManager::new();
+    let mut manager = GroupManager::new();
     assert!(manager.is_empty());
 
-    manager.create_label("Friends").unwrap();
+    manager.create_group("Friends").unwrap();
     assert!(!manager.is_empty());
 }

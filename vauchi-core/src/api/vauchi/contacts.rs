@@ -10,7 +10,7 @@ use crate::crypto::SymmetricKey;
 use crate::network::Transport;
 
 use super::super::contact_manager::ContactManager;
-use super::super::error::VauchiResult;
+use super::super::error::{VauchiError, VauchiResult};
 use super::builder::decoy_id_to_fake_pk;
 use super::{AuthMode, Vauchi};
 
@@ -82,12 +82,9 @@ impl<T: Transport> Vauchi<T> {
     ///
     /// First tries case-insensitive name matching, then ID prefix matching.
     /// Returns the first match, or `None` if no label matches.
-    pub fn find_label_fuzzy(
-        &self,
-        query: &str,
-    ) -> VauchiResult<Option<crate::contact::VisibilityLabel>> {
+    pub fn find_group_fuzzy(&self, query: &str) -> VauchiResult<Option<crate::contact::Group>> {
         let manager = ContactManager::new(&self.storage, self.events.clone());
-        manager.find_label_fuzzy(query)
+        manager.find_group_fuzzy(query)
     }
 
     /// Returns the number of contacts.
@@ -112,6 +109,37 @@ impl<T: Transport> Vauchi<T> {
     pub fn update_contact(&self, contact: &Contact) -> VauchiResult<()> {
         self.storage.save_contact(contact)?;
         Ok(())
+    }
+
+    /// Returns the contact limit.
+    pub fn get_contact_limit(&self) -> VauchiResult<usize> {
+        Ok(self.storage.get_contact_limit()?)
+    }
+
+    /// Toggles recovery trust for a contact.
+    ///
+    /// Returns the new trust state (true = now trusted, false = now untrusted).
+    pub fn toggle_recovery_trust(&self, contact_id: &str) -> VauchiResult<bool> {
+        let mut contact = self
+            .storage
+            .load_contact(contact_id)?
+            .ok_or_else(|| VauchiError::InvalidState("Contact not found".into()))?;
+
+        if contact.is_blocked() {
+            return Err(VauchiError::InvalidState(
+                "Blocked contacts cannot be trusted for recovery".into(),
+            ));
+        }
+
+        let new_state = !contact.is_recovery_trusted();
+        if new_state {
+            contact.trust_for_recovery();
+        } else {
+            contact.untrust_for_recovery();
+        }
+
+        self.storage.save_contact(&contact)?;
+        Ok(new_state)
     }
 
     /// Verifies a contact's fingerprint.

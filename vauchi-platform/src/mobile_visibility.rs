@@ -101,72 +101,72 @@ impl VauchiPlatform {
     /// List all visibility labels.
     pub fn list_labels(&self) -> Result<Vec<MobileVisibilityLabel>, MobileError> {
         let storage = self.open_storage()?;
-        let labels = storage.load_all_labels()?;
+        let labels = storage.load_all_groups()?;
         Ok(labels.iter().map(MobileVisibilityLabel::from).collect())
     }
 
     /// Create a new visibility label.
     pub fn create_label(&self, name: String) -> Result<MobileVisibilityLabel, MobileError> {
         let storage = self.open_storage()?;
-        let label = storage.create_label(&name)?;
+        let label = storage.create_group(&name)?;
         Ok(MobileVisibilityLabel::from(&label))
     }
 
     /// Get a label by ID with full details.
     pub fn get_label(&self, label_id: String) -> Result<MobileVisibilityLabelDetail, MobileError> {
         let storage = self.open_storage()?;
-        let label = storage.load_label(&label_id)?;
+        let label = storage.load_group(&label_id)?;
         Ok(MobileVisibilityLabelDetail::from(&label))
     }
 
     /// Rename a label.
     pub fn rename_label(&self, label_id: String, new_name: String) -> Result<(), MobileError> {
         let storage = self.open_storage()?;
-        storage.rename_label(&label_id, &new_name)?;
+        storage.rename_group(&label_id, &new_name)?;
         Ok(())
     }
 
     /// Delete a label.
     pub fn delete_label(&self, label_id: String) -> Result<(), MobileError> {
         let storage = self.open_storage()?;
-        storage.delete_label(&label_id)?;
+        storage.delete_group(&label_id)?;
         Ok(())
     }
 
     /// Add a contact to a label.
-    pub fn add_contact_to_label(
+    pub fn add_contact_to_group(
         &self,
         label_id: String,
         contact_id: String,
     ) -> Result<(), MobileError> {
         let storage = self.open_storage()?;
-        storage.add_contact_to_label(&label_id, &contact_id)?;
+        storage.add_contact_to_group(&label_id, &contact_id)?;
         Ok(())
     }
 
     /// Remove a contact from a label.
-    pub fn remove_contact_from_label(
+    pub fn remove_contact_from_group(
         &self,
         label_id: String,
         contact_id: String,
     ) -> Result<(), MobileError> {
         let storage = self.open_storage()?;
-        storage.remove_contact_from_label(&label_id, &contact_id)?;
+        storage.remove_contact_from_group(&label_id, &contact_id)?;
         Ok(())
     }
 
     /// Get all labels that contain a contact.
-    pub fn get_labels_for_contact(
+    pub fn get_groups_for_contact(
         &self,
         contact_id: String,
     ) -> Result<Vec<MobileVisibilityLabel>, MobileError> {
         let storage = self.open_storage()?;
-        let labels = storage.get_labels_for_contact(&contact_id)?;
+        let labels = storage.get_groups_for_contact(&contact_id)?;
         Ok(labels.iter().map(MobileVisibilityLabel::from).collect())
     }
 
     /// Set whether a field is visible to contacts in a label.
-    pub fn set_label_field_visibility(
+    pub fn set_group_field_visibility(
         &self,
         label_id: String,
         field_label: String,
@@ -185,7 +185,7 @@ impl VauchiPlatform {
                 MobileError::InvalidInput(format!("Field not found: {}", field_label))
             })?;
 
-        storage.set_label_field_visibility(&label_id, field.id(), is_visible)?;
+        storage.set_group_field_visibility(&label_id, field.id(), is_visible)?;
         Ok(())
     }
 

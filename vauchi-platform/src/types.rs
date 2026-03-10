@@ -229,8 +229,8 @@ pub struct MobileVisibilityLabel {
     pub modified_at: u64,
 }
 
-impl From<&vauchi_core::VisibilityLabel> for MobileVisibilityLabel {
-    fn from(label: &vauchi_core::VisibilityLabel) -> Self {
+impl From<&vauchi_core::Group> for MobileVisibilityLabel {
+    fn from(label: &vauchi_core::Group) -> Self {
         MobileVisibilityLabel {
             id: label.id().to_string(),
             name: label.name().to_string(),
@@ -256,8 +256,8 @@ pub struct MobileVisibilityLabelDetail {
     pub modified_at: u64,
 }
 
-impl From<&vauchi_core::VisibilityLabel> for MobileVisibilityLabelDetail {
-    fn from(label: &vauchi_core::VisibilityLabel) -> Self {
+impl From<&vauchi_core::Group> for MobileVisibilityLabelDetail {
+    fn from(label: &vauchi_core::Group) -> Self {
         MobileVisibilityLabelDetail {
             id: label.id().to_string(),
             name: label.name().to_string(),

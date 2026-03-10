@@ -188,17 +188,17 @@ fn test_add_contact_to_label_triggers_repropagate() {
     .unwrap();
 
     let bob_id = add_contact_with_ratchet(&wb, "Bob");
-    let label = wb.create_label("Work").unwrap();
+    let label = wb.create_group("Work").unwrap();
 
     // Set field visible in this label
-    wb.set_label_field_visibility(label.id(), "work", true)
+    wb.set_group_field_visibility(label.id(), "work", true)
         .unwrap();
 
     let pending_before = wb.storage().get_pending_updates(&bob_id).unwrap();
     assert!(pending_before.is_empty());
 
     // Add contact to label AND repropagate
-    wb.add_contact_to_label_and_repropagate(label.id(), &bob_id)
+    wb.add_contact_to_group_and_repropagate(label.id(), &bob_id)
         .unwrap();
 
     let pending_after = wb.storage().get_pending_updates(&bob_id).unwrap();
@@ -221,13 +221,13 @@ fn test_remove_contact_from_label_triggers_repropagate() {
     .unwrap();
 
     let bob_id = add_contact_with_ratchet(&wb, "Bob");
-    let label = wb.create_label("Work").unwrap();
+    let label = wb.create_group("Work").unwrap();
 
     // Add contact to label first (without repropagate to keep pending clean)
-    wb.add_contact_to_label(label.id(), &bob_id).unwrap();
+    wb.add_contact_to_group(label.id(), &bob_id).unwrap();
 
     // Now remove and repropagate
-    wb.remove_contact_from_label_and_repropagate(label.id(), &bob_id)
+    wb.remove_contact_from_group_and_repropagate(label.id(), &bob_id)
         .unwrap();
 
     let pending = wb.storage().get_pending_updates(&bob_id).unwrap();
@@ -252,12 +252,12 @@ fn test_set_label_field_visibility_repropagates_to_all_members() {
     let bob_id = add_contact_with_ratchet(&wb, "Bob");
     let carol_id = add_contact_with_ratchet(&wb, "Carol");
 
-    let label = wb.create_label("Team").unwrap();
-    wb.add_contact_to_label(label.id(), &bob_id).unwrap();
-    wb.add_contact_to_label(label.id(), &carol_id).unwrap();
+    let label = wb.create_group("Team").unwrap();
+    wb.add_contact_to_group(label.id(), &bob_id).unwrap();
+    wb.add_contact_to_group(label.id(), &carol_id).unwrap();
 
     // Set field visibility for the label and repropagate to all members
-    wb.set_label_field_visibility_and_repropagate(label.id(), "work", true)
+    wb.set_group_field_visibility_and_repropagate(label.id(), "work", true)
         .unwrap();
 
     let bob_pending = wb.storage().get_pending_updates(&bob_id).unwrap();
@@ -324,12 +324,12 @@ fn test_repropagate_uses_effective_visibility() {
     let bob_id = add_contact_with_ratchet(&wb, "Bob");
 
     // Create a label that shows only work email
-    let label = wb.create_label("Work").unwrap();
-    wb.set_label_field_visibility(label.id(), "work", true)
+    let label = wb.create_group("Work").unwrap();
+    wb.set_group_field_visibility(label.id(), "work", true)
         .unwrap();
 
     // Add bob to the label and set personal-phone to hidden via override
-    wb.add_contact_to_label(label.id(), &bob_id).unwrap();
+    wb.add_contact_to_group(label.id(), &bob_id).unwrap();
     wb.set_contact_visibility_override(&bob_id, "personal-phone", false)
         .unwrap();
 

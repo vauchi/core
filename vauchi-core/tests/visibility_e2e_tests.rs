@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-use vauchi_core::{api::Vauchi, contact::LabelManager};
+use vauchi_core::{api::Vauchi, contact::GroupManager};
 
 #[cfg(test)]
 mod visibility_e2e_tests {
@@ -16,10 +16,10 @@ mod visibility_e2e_tests {
         let mut vauchi = create_test_vauchi();
         vauchi.create_identity("Test User").unwrap();
 
-        let mut label_manager = LabelManager::new();
-        let work_id = label_manager.create_label("Work").unwrap().id().to_string();
+        let mut label_manager = GroupManager::new();
+        let work_id = label_manager.create_group("Work").unwrap().id().to_string();
         let personal_id = label_manager
-            .create_label("Personal")
+            .create_group("Personal")
             .unwrap()
             .id()
             .to_string();
@@ -35,17 +35,17 @@ mod visibility_e2e_tests {
     #[test]
     fn test_visibility_logic_e2e() {
         let (_vauchi, _work_id, _personal_id) = setup_vauchi_with_labels();
-        let mut label_manager = LabelManager::new();
-        label_manager.create_label("Work").unwrap();
-        label_manager.create_label("Personal").unwrap();
+        let mut label_manager = GroupManager::new();
+        label_manager.create_group("Work").unwrap();
+        label_manager.create_group("Personal").unwrap();
 
         let work_label_id = label_manager
-            .get_label_by_name("Work")
+            .get_group_by_name("Work")
             .unwrap()
             .id()
             .to_string();
         let personal_label_id = label_manager
-            .get_label_by_name("Personal")
+            .get_group_by_name("Personal")
             .unwrap()
             .id()
             .to_string();
@@ -56,17 +56,17 @@ mod visibility_e2e_tests {
 
         // Assign fields to labels
         label_manager
-            .get_label_mut(&work_label_id)
+            .get_group_mut(&work_label_id)
             .unwrap()
             .add_visible_field(email_field_id);
         label_manager
-            .get_label_mut(&personal_label_id)
+            .get_group_mut(&personal_label_id)
             .unwrap()
             .add_visible_field(phone_field_id);
 
         // Assign Bob to Work label
         label_manager
-            .add_contact_to_label(&work_label_id, contact_id)
+            .add_contact_to_group(&work_label_id, contact_id)
             .unwrap();
 
         // Bob should see email but not phone
@@ -81,7 +81,7 @@ mod visibility_e2e_tests {
 
         // Assign Bob to Personal label too
         label_manager
-            .add_contact_to_label(&personal_label_id, contact_id)
+            .add_contact_to_group(&personal_label_id, contact_id)
             .unwrap();
 
         // Now Bob should see both

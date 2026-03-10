@@ -512,28 +512,28 @@ impl<T: Transport> Vauchi<T> {
                     ..
                 } => {
                     if is_deleted {
-                        self.storage.delete_label(label_id).map_err(|e| e.into())
+                        self.storage.delete_group(label_id).map_err(|e| e.into())
                     } else {
                         // Create or update label
-                        match self.storage.load_label(label_id) {
+                        match self.storage.load_group(label_id) {
                             Ok(_existing) => {
                                 // Update existing: rename, re-assign contacts and fields
-                                let _ = self.storage.rename_label(label_id, label_name);
+                                let _ = self.storage.rename_group(label_id, label_name);
                                 // Re-apply contacts (simplified: just ensure they're assigned)
                                 for cid in contacts {
-                                    let _ = self.storage.add_contact_to_label(label_id, cid);
+                                    let _ = self.storage.add_contact_to_group(label_id, cid);
                                 }
                                 // Re-apply field visibility
                                 for fid in visible_fields {
                                     let _ = self
                                         .storage
-                                        .set_label_field_visibility(label_id, fid, true);
+                                        .set_group_field_visibility(label_id, fid, true);
                                 }
                                 Ok(())
                             }
                             Err(_) => {
                                 // Create new label
-                                let _ = self.storage.create_label(label_name);
+                                let _ = self.storage.create_group(label_name);
                                 Ok(())
                             }
                         }

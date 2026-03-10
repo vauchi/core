@@ -19,10 +19,13 @@ use super::backup_recovery::BackupRecoveryEngine;
 use super::component::{ContactItem, FieldDisplay, UiFieldVisibility};
 use super::contact_detail::{ContactDetailEngine, ContactNotFoundEngine};
 use super::contact_edit::{ContactEditEngine, EditableContact, EditableField};
+use super::contact_limit::ContactLimitEngine;
 use super::contact_list::ContactListEngine;
+use super::contact_merge::{ContactMergeEngine, MergePreview};
 use super::contact_visibility::ContactVisibilityEngine;
 use super::delivery::DeliveryStatusEngine;
 use super::device_linking::DeviceLinkingEngine;
+use super::duplicate_detection::DuplicateDetectionEngine;
 use super::duress_pin::{DuressConfig, DuressPinEngine};
 use super::emergency_shred::EmergencyShredEngine;
 use super::engine::WorkflowEngine;
@@ -48,9 +51,15 @@ pub enum AppScreen {
     Onboarding,
     Home,
     Contacts,
-    ContactDetail { contact_id: String },
-    ContactEdit { contact_id: String },
-    ContactVisibility { contact_id: String },
+    ContactDetail {
+        contact_id: String,
+    },
+    ContactEdit {
+        contact_id: String,
+    },
+    ContactVisibility {
+        contact_id: String,
+    },
     Exchange,
     Settings,
     Help,
@@ -64,10 +73,22 @@ pub enum AppScreen {
     TorSettings,
     Recovery,
     Groups,
-    GroupDetail { group_id: String },
+    GroupDetail {
+        group_id: String,
+    },
     Privacy,
     Support,
-    FormDialog { dialog_type: FormDialogType },
+    FormDialog {
+        dialog_type: FormDialogType,
+    },
+    ContactDuplicates,
+    ContactMerge {
+        primary_name: String,
+        primary_fields: Vec<String>,
+        secondary_name: String,
+        secondary_fields: Vec<String>,
+    },
+    ContactLimit,
 }
 
 /// Unified orchestrator for all frontends.
@@ -83,6 +104,16 @@ pub struct AppEngine<T: Transport> {
 }
 
 impl<T: Transport> AppEngine<T> {
+    /// Returns a reference to the inner Vauchi instance.
+    pub fn vauchi(&self) -> &Vauchi<T> {
+        &self.vauchi
+    }
+
+    /// Returns a mutable reference to the inner Vauchi instance.
+    pub fn vauchi_mut(&mut self) -> &mut Vauchi<T> {
+        &mut self.vauchi
+    }
+
     pub fn new(vauchi: Vauchi<T>) -> Self {
         let screen = if !vauchi.has_identity() {
             AppScreen::Onboarding
@@ -266,16 +297,37 @@ impl<T: Transport> AppEngine<T> {
                     }
                     FormDialogType::AddField => {
                         let raw = input.unwrap_or_default();
-                        let mut lines = raw.splitn(2, '\n');
-                        let label = lines.next().unwrap_or("").trim();
+                        // Format: type\nnote\nvalue
+                        let mut lines = raw.splitn(3, '\n');
+                        let entry_type = lines.next().unwrap_or("custom").trim();
+                        let note = lines.next().unwrap_or("").trim();
                         let value = lines.next().unwrap_or("").trim();
-                        if label.is_empty() {
+                        if value.is_empty() {
                             return ActionResult::ValidationError {
-                                component_id: "field_label".into(),
-                                message: "Label cannot be empty".into(),
+                                component_id: "field_value".into(),
+                                message: "Value cannot be empty".into(),
                             };
                         }
-                        let field = ContactField::new(FieldType::Custom, label, value);
+                        let field_type = match entry_type {
+                            "phone" => FieldType::Phone,
+                            "email" => FieldType::Email,
+                            "social" => FieldType::Social,
+                            "address" => FieldType::Address,
+                            "website" => FieldType::Website,
+                            "birthday" => FieldType::Birthday,
+                            _ => FieldType::Custom,
+                        };
+                        // Use note as label if provided, otherwise use type name
+                        let label = if note.is_empty() {
+                            entry_type
+                                .chars()
+                                .next()
+                                .map(|c| c.to_uppercase().to_string() + &entry_type[1..])
+                                .unwrap_or_else(|| "Custom".into())
+                        } else {
+                            note.to_string()
+                        };
+                        let field = ContactField::new(field_type, &label, value);
                         self.vauchi.add_own_field(field)
                     }
                     FormDialogType::EditRelayUrl { .. } => {
@@ -490,6 +542,22 @@ impl<T: Transport> AppEngine<T> {
                 }
                 _ => Box::new(ContactNotFoundEngine::new(contact_id.clone())),
             },
+            AppScreen::ContactDuplicates => Box::new(DuplicateDetectionEngine::new(vec![])),
+            AppScreen::ContactMerge {
+                ref primary_name,
+                ref primary_fields,
+                ref secondary_name,
+                ref secondary_fields,
+            } => Box::new(ContactMergeEngine::new(MergePreview {
+                primary_name: primary_name.clone(),
+                primary_fields: primary_fields.clone(),
+                secondary_name: secondary_name.clone(),
+                secondary_fields: secondary_fields.clone(),
+            })),
+            AppScreen::ContactLimit => {
+                let contact_count = vauchi.list_contacts().map(|c| c.len()).unwrap_or(0);
+                Box::new(ContactLimitEngine::new(contact_count, 0))
+            }
         }
     }
 

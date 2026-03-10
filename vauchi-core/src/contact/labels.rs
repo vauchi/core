@@ -519,6 +519,42 @@ impl GroupManager {
         None
     }
 
+    /// Merges the source group into the target group.
+    ///
+    /// Union of members and visible fields. The source group is deleted.
+    /// Per-contact overrides are preserved (they're contact-scoped, not group-scoped).
+    /// The target group keeps its name and display_name_override.
+    pub fn merge_groups(&mut self, target_id: &str, source_id: &str) -> Result<(), LabelError> {
+        if target_id == source_id {
+            return Err(LabelError::InvalidName(
+                "Cannot merge a group with itself".to_string(),
+            ));
+        }
+
+        // Remove source first to avoid double-borrow
+        let source = self
+            .labels
+            .remove(source_id)
+            .ok_or_else(|| LabelError::NotFound(source_id.to_string()))?;
+
+        let target = self
+            .labels
+            .get_mut(target_id)
+            .ok_or_else(|| LabelError::NotFound(target_id.to_string()))?;
+
+        // Union of contacts
+        for contact_id in source.contacts() {
+            target.add_contact(contact_id);
+        }
+
+        // Union of visible fields
+        for field_id in source.visible_fields() {
+            target.add_visible_field(field_id);
+        }
+
+        Ok(())
+    }
+
     /// Returns all fields that a contact can see via labels.
     pub fn visible_fields_via_labels(&self, contact_id: &str) -> HashSet<String> {
         let mut visible = HashSet::new();
@@ -828,5 +864,115 @@ mod tests {
         // Label data should only be synced to the user's own devices
         assert_eq!(label.name(), "Secret Name");
         // The contact sees field visibility, not labels
+    }
+
+    #[test]
+    fn test_merge_groups_union_members_and_fields() {
+        let mut manager = GroupManager::new();
+        let target = manager.create_group("Family").unwrap().id().to_string();
+        let source = manager
+            .create_group("Close Friends")
+            .unwrap()
+            .id()
+            .to_string();
+
+        // Add different contacts and fields to each
+        manager.add_contact_to_group(&target, "alice").unwrap();
+        manager.add_contact_to_group(&source, "bob").unwrap();
+        manager.add_contact_to_group(&source, "alice").unwrap(); // overlap
+
+        manager
+            .get_group_mut(&target)
+            .unwrap()
+            .add_visible_field("phone");
+        manager
+            .get_group_mut(&source)
+            .unwrap()
+            .add_visible_field("email");
+        manager
+            .get_group_mut(&source)
+            .unwrap()
+            .add_visible_field("phone"); // overlap
+
+        manager.merge_groups(&target, &source).unwrap();
+
+        // Target has union of members
+        let merged = manager.get_group(&target).unwrap();
+        assert!(merged.contains_contact("alice"));
+        assert!(merged.contains_contact("bob"));
+        assert_eq!(merged.contact_count(), 2);
+
+        // Target has union of visible fields
+        assert!(merged.is_field_visible("phone"));
+        assert!(merged.is_field_visible("email"));
+
+        // Source group is deleted
+        assert!(manager.get_group(&source).is_none());
+        assert_eq!(manager.label_count(), 1);
+    }
+
+    #[test]
+    fn test_merge_groups_source_not_found() {
+        let mut manager = GroupManager::new();
+        let target = manager.create_group("Family").unwrap().id().to_string();
+
+        let result = manager.merge_groups(&target, "nonexistent");
+        assert!(matches!(result, Err(LabelError::NotFound(_))));
+    }
+
+    #[test]
+    fn test_merge_groups_target_not_found() {
+        let mut manager = GroupManager::new();
+        let source = manager.create_group("Friends").unwrap().id().to_string();
+
+        let result = manager.merge_groups("nonexistent", &source);
+        assert!(matches!(result, Err(LabelError::NotFound(_))));
+    }
+
+    #[test]
+    fn test_merge_groups_same_group() {
+        let mut manager = GroupManager::new();
+        let group = manager.create_group("Family").unwrap().id().to_string();
+
+        let result = manager.merge_groups(&group, &group);
+        assert!(matches!(result, Err(LabelError::InvalidName(_))));
+    }
+
+    #[test]
+    fn test_merge_groups_preserves_display_name_override() {
+        let mut manager = GroupManager::new();
+        let target = manager.create_group("Family").unwrap().id().to_string();
+        let source = manager
+            .create_group("Close Friends")
+            .unwrap()
+            .id()
+            .to_string();
+
+        manager
+            .get_group_mut(&target)
+            .unwrap()
+            .set_display_name_override(Some("Mom's Son"))
+            .unwrap();
+
+        manager.merge_groups(&target, &source).unwrap();
+
+        let merged = manager.get_group(&target).unwrap();
+        assert_eq!(merged.resolve_display_name("Default"), "Mom's Son");
+    }
+
+    #[test]
+    fn test_merge_groups_source_overrides_transferred() {
+        let mut manager = GroupManager::new();
+        let target = manager.create_group("Family").unwrap().id().to_string();
+        let source = manager.create_group("Friends").unwrap().id().to_string();
+
+        // Bob is only in source, has an override
+        manager.add_contact_to_group(&source, "bob").unwrap();
+        manager.set_contact_override("bob", "phone", false);
+
+        manager.merge_groups(&target, &source).unwrap();
+
+        // Bob's override is preserved
+        assert_eq!(manager.get_contact_override("bob", "phone"), Some(false));
     }
 }

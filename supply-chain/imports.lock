@@ -1634,6 +1634,10 @@ user-id = 3618
 user-login = "dtolnay"
 user-name = "David Tolnay"
 
+[audits.actix.audits]
+
+[audits.ariel-os.audits]
+
 [[audits.bytecode-alliance.wildcard-audits.bumpalo]]
 who = "Nick Fitzgerald <fitzgen@gmail.com>"
 criteria = "safe-to-deploy"
@@ -2235,6 +2239,8 @@ who = "Johan Andersson <opensource@embark-studios.com>"
 criteria = "safe-to-deploy"
 version = "0.1.0"
 notes = "No unsafe usage or ambient capabilities, sane build script"
+
+[audits.fermyon.audits]
 
 [[audits.google.audits.adler2]]
 who = "Lukasz Anforowicz <lukasza@chromium.org>"

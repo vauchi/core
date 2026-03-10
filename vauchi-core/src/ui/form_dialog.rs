@@ -69,7 +69,7 @@ impl FormDialogEngine {
             }
         };
         let catalog_entries = if dialog_type == FormDialogType::AddField {
-            let registry = SocialNetworkRegistry::new();
+            let registry = SocialNetworkRegistry::with_defaults();
             let catalog = FieldTypeCatalog::new(&registry);
             catalog.all().to_vec()
         } else {

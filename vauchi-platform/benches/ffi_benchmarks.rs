@@ -239,7 +239,7 @@ fn bench_labels(c: &mut Criterion) {
         b.iter_with_setup(
             || create_instance_with_identity("Test User"),
             |(instance, _dir)| {
-                black_box(instance.create_group("Test Label".to_string()).unwrap());
+                black_box(instance.create_label("Test Label".to_string()).unwrap());
             },
         )
     });

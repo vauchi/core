@@ -178,6 +178,10 @@ pub struct ContactItem {
     pub subtitle: Option<String>,
     pub avatar_initials: String,
     pub status: Option<String>,
+    /// Field values available for search (phone numbers, emails, etc.).
+    /// Not displayed directly — used by ContactListEngine for full-text search.
+    #[serde(default)]
+    pub searchable_fields: Vec<String>,
 }
 
 /// An item in a settings group.

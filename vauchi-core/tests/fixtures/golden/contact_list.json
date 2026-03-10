@@ -12,14 +12,16 @@
             "name": "Alice",
             "subtitle": "Friend",
             "avatar_initials": "A",
-            "status": null
+            "status": null,
+            "searchable_fields": []
           },
           {
             "id": "c2",
             "name": "Bob",
             "subtitle": null,
             "avatar_initials": "B",
-            "status": "Updated"
+            "status": "Updated",
+            "searchable_fields": []
           }
         ],
         "searchable": true

@@ -12,6 +12,7 @@ fn sample_contacts() -> Vec<ContactItem> {
             subtitle: Some("Friend".into()),
             avatar_initials: "A".into(),
             status: None,
+            searchable_fields: vec![],
         },
         ContactItem {
             id: "c2".into(),
@@ -19,6 +20,7 @@ fn sample_contacts() -> Vec<ContactItem> {
             subtitle: None,
             avatar_initials: "B".into(),
             status: Some("Updated".into()),
+            searchable_fields: vec![],
         },
     ]
 }
@@ -55,6 +57,7 @@ fn home_limits_recent_to_five() {
             subtitle: None,
             avatar_initials: format!("{i}"),
             status: None,
+            searchable_fields: vec![],
         })
         .collect();
     let engine = HomeEngine::new(

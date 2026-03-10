@@ -378,7 +378,29 @@ impl<T: Transport> AppEngine<T> {
             }
             AppScreen::Contacts => {
                 let contacts = Self::load_contact_items(vauchi);
-                Box::new(ContactListEngine::new(contacts))
+                let all_groups = vauchi.list_groups().unwrap_or_default();
+                if all_groups.is_empty() {
+                    Box::new(ContactListEngine::new(contacts))
+                } else {
+                    let groups: Vec<(String, String)> = all_groups
+                        .iter()
+                        .map(|g| (g.id().to_string(), g.name().to_string()))
+                        .collect();
+                    let mut memberships = HashMap::new();
+                    for g in &all_groups {
+                        let member_ids: Vec<String> = contacts
+                            .iter()
+                            .filter(|c| g.contains_contact(&c.id))
+                            .map(|c| c.id.clone())
+                            .collect();
+                        memberships.insert(g.id().to_string(), member_ids);
+                    }
+                    Box::new(ContactListEngine::with_groups(
+                        contacts,
+                        groups,
+                        memberships,
+                    ))
+                }
             }
             AppScreen::Settings => {
                 let card = vauchi.own_card().ok().flatten();
@@ -428,6 +450,7 @@ impl<T: Transport> AppEngine<T> {
                                     subtitle: None,
                                     avatar_initials: initials(c.display_name()),
                                     status: None,
+                                    searchable_fields: vec![],
                                 })
                             })
                             .collect();
@@ -486,6 +509,12 @@ impl<T: Transport> AppEngine<T> {
                         subtitle: None,
                         avatar_initials: initials(contact.display_name()),
                         status: None,
+                        searchable_fields: contact
+                            .card()
+                            .fields()
+                            .iter()
+                            .map(|f| f.value().to_string())
+                            .collect(),
                     };
                     Box::new(ContactDetailEngine::new(item, fields))
                 }
@@ -565,12 +594,22 @@ impl<T: Transport> AppEngine<T> {
         match vauchi.list_contacts() {
             Ok(contacts) => contacts
                 .iter()
-                .map(|c| ContactItem {
-                    id: c.id().to_string(),
-                    name: c.display_name().to_string(),
-                    subtitle: None,
-                    avatar_initials: initials(c.display_name()),
-                    status: None,
+                .map(|c| {
+                    let fields: Vec<String> = c
+                        .card()
+                        .fields()
+                        .iter()
+                        .map(|f| f.value().to_string())
+                        .collect();
+                    let subtitle = fields.first().cloned();
+                    ContactItem {
+                        id: c.id().to_string(),
+                        name: c.display_name().to_string(),
+                        subtitle,
+                        avatar_initials: initials(c.display_name()),
+                        status: None,
+                        searchable_fields: fields,
+                    }
                 })
                 .collect(),
             Err(e) => {

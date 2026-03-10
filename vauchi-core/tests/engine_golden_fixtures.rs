@@ -51,6 +51,7 @@ fn sample_contacts() -> Vec<ContactItem> {
             subtitle: Some("Friend".into()),
             avatar_initials: "A".into(),
             status: None,
+            searchable_fields: vec![],
         },
         ContactItem {
             id: "c2".into(),
@@ -58,6 +59,7 @@ fn sample_contacts() -> Vec<ContactItem> {
             subtitle: None,
             avatar_initials: "B".into(),
             status: Some("Updated".into()),
+            searchable_fields: vec![],
         },
     ]
 }
@@ -248,6 +250,7 @@ fn sample_duress_config() -> DuressConfig {
             subtitle: None,
             avatar_initials: "E".into(),
             status: None,
+            searchable_fields: vec![],
         }],
         alert_message: "I may be in danger".into(),
         include_location: true,

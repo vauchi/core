@@ -13,6 +13,7 @@ fn sample_contact() -> ContactItem {
         subtitle: Some("alice@example.com".into()),
         avatar_initials: "AL".into(),
         status: None,
+        searchable_fields: vec![],
     }
 }
 

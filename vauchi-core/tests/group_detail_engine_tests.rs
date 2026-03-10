@@ -12,6 +12,7 @@ fn sample_members() -> Vec<ContactItem> {
             subtitle: None,
             avatar_initials: "AL".into(),
             status: None,
+            searchable_fields: vec![],
         },
         ContactItem {
             id: "c2".into(),
@@ -19,6 +20,7 @@ fn sample_members() -> Vec<ContactItem> {
             subtitle: None,
             avatar_initials: "BO".into(),
             status: None,
+            searchable_fields: vec![],
         },
     ]
 }

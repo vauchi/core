@@ -6,27 +6,9 @@
 //!
 //! Controls which contacts can see which fields on your contact card.
 
-use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 
-/// Visibility setting for a single field.
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub enum FieldVisibility {
-    /// Visible to everyone (default for new fields)
-    #[default]
-    Everyone,
-    /// Visible only to specific contacts
-    Contacts(HashSet<String>),
-    /// Visible to no one (private)
-    Nobody,
-}
-
-/// Visibility rules for all fields in a contact card.
-#[derive(Clone, Debug, Default, Serialize, Deserialize)]
-pub struct VisibilityRules {
-    /// Map from field ID to visibility setting
-    rules: HashMap<String, FieldVisibility>,
-}
+pub use crate::types::{FieldVisibility, VisibilityRules};
 
 impl VisibilityRules {
     /// Creates a new empty visibility rules set.

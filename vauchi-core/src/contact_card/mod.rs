@@ -26,7 +26,7 @@ pub use uri::{is_allowed_scheme, is_blocked_scheme, is_safe_url, is_valid_phone,
 use aws_lc_rs::rand::SystemRandom;
 use serde::{Deserialize, Serialize};
 
-use crate::contact::VisibilityRules;
+use crate::types::VisibilityRules;
 use thiserror::Error;
 
 /// Maximum number of fields per contact card.

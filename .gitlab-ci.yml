@@ -185,6 +185,10 @@ lint:clippy:
 lint:duplicates:
   extends: [.linux-runner-nocache, .lint-duplicates-job, .timeout-quick]
 
+# Unused dependency check (advisory — detects unused crates via cargo-machete)
+lint:machete:
+  extends: [.linux-runner-nocache, .lint-machete-job, .timeout-quick]
+
 # REUSE compliance provided by vauchi/scripts ci-templates/reuse.yml
 
 # ============================================================

@@ -130,7 +130,7 @@ use crate::crypto::{SymmetricKey, HKDF};
 pub struct Storage {
     conn: Connection,
     /// Encryption key derived from user's master key
-    pub(crate) encryption_key: SymmetricKey,
+    pub(super) encryption_key: SymmetricKey,
     /// Database file path (None for in-memory databases).
     db_path: Option<std::path::PathBuf>,
 }
@@ -224,7 +224,7 @@ impl Storage {
     /// Derives a dedicated HMAC key from the SEK via HKDF, then computes
     /// HMAC-SHA256(hmac_key, data). This allows equality lookups on encrypted
     /// data without decryption (e.g., label name uniqueness checks).
-    pub(crate) fn compute_lookup_hmac(&self, domain: &[u8], data: &[u8]) -> Vec<u8> {
+    pub(super) fn compute_lookup_hmac(&self, domain: &[u8], data: &[u8]) -> Vec<u8> {
         let hmac_key_bytes = HKDF::derive_key(None, self.encryption_key.as_bytes(), domain);
         let key = hmac::Key::new(hmac::HMAC_SHA256, &*hmac_key_bytes);
         hmac::sign(&key, data).as_ref().to_vec()

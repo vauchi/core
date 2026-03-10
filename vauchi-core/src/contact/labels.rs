@@ -546,7 +546,8 @@ impl GroupManager {
 /// Resolves which fields a given contact can see.
 ///
 /// Two modes:
-/// - No-group mode (no labels exist): returns fields in `card.shown_fields()`
+/// - No-group mode (no labels exist): returns fields where `field_visibility`
+///   is `Everyone` on the card.
 /// - Groups mode (labels exist): returns union of `visible_fields` across
 ///   all labels the contact belongs to. Per-contact overrides still apply.
 ///
@@ -557,8 +558,8 @@ pub fn resolve_visible_fields(
     contact_id: &str,
 ) -> HashSet<String> {
     if label_manager.is_empty() {
-        // No-group mode: use card's shown_fields
-        card.shown_fields().clone()
+        // No-group mode: use card's field_visibility rules
+        card.field_visibility().everyone_field_ids()
     } else {
         // Groups mode: use label-based visibility
         label_manager.visible_fields_via_labels(contact_id)

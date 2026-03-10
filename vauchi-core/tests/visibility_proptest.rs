@@ -72,7 +72,7 @@ proptest! {
         let label_manager = GroupManager::new();
         let visible = resolve_visible_fields(&card, &label_manager, "any-contact");
 
-        // Every visible field must be in shown_fields
+        // Every visible field must be marked as shown
         for fid in &visible {
             prop_assert!(
                 card.is_field_shown(fid),
@@ -82,7 +82,8 @@ proptest! {
         }
 
         // Every shown field must be visible
-        for fid in card.shown_fields() {
+        let shown = card.field_visibility().everyone_field_ids();
+        for fid in &shown {
             prop_assert!(
                 visible.contains(fid),
                 "Field {} is shown but not in visible set",
@@ -90,8 +91,8 @@ proptest! {
             );
         }
 
-        // Visible set equals shown_fields exactly
-        prop_assert_eq!(&visible, card.shown_fields());
+        // Visible set equals shown fields exactly
+        prop_assert_eq!(&visible, &shown);
     }
 
     /// Fields not marked shown are never visible in no-group mode.

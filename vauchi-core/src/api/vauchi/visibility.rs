@@ -52,7 +52,7 @@ impl<T: Transport> Vauchi<T> {
     /// their label membership.
     ///
     /// When deleting the last label (transition to no-group mode), visible
-    /// fields from the deleted label are migrated to `shown_fields` on the
+    /// fields from the deleted label are migrated to `field_visibility` on the
     /// own card so field visibility is preserved.
     ///
     /// Note: Only the *last-deleted* label's fields are migrated. If labels
@@ -73,7 +73,7 @@ impl<T: Transport> Vauchi<T> {
         let remaining_labels = self.storage.load_all_groups()?;
         if remaining_labels.is_empty() && !visible_fields.is_empty() {
             // Transitioning to no-group mode:
-            // Migrate visible fields from the deleted label to shown_fields
+            // Migrate visible fields from the deleted label to field_visibility
             if let Some(mut card) = self.storage.load_own_card()? {
                 for field_id in &visible_fields {
                     card.set_field_shown(field_id, true);

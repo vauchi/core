@@ -5,11 +5,11 @@
 //! Visibility Resolution Tests
 //!
 //! Tests for the two-mode visibility resolution logic:
-//! - No-group mode (no labels): uses card's shown_fields
+//! - No-group mode (no labels): uses card's field_visibility rules
 //! - Groups mode (labels exist): uses label-based visibility via GroupManager
 //!
 //! Traces to: features/visibility_labels.feature
-//! - @no-group-mode: shown_fields-based visibility
+//! - @no-group-mode: field_visibility-based visibility
 //! - @groups-mode: label-based visibility
 //! - @ungrouped-contact: default-closed for ungrouped contacts in groups mode
 
@@ -94,7 +94,7 @@ fn test_visible_fields_ungrouped_contact_in_groups_mode() {
 }
 
 #[test]
-fn test_visible_fields_groups_mode_ignores_shown_fields() {
+fn test_visible_fields_groups_mode_ignores_field_visibility() {
     let mut card = ContactCard::new("Alice");
     let field1 = ContactField::new(FieldType::Email, "Work", "alice@example.com");
     let field1_id = field1.id().to_string();
@@ -112,7 +112,7 @@ fn test_visible_fields_groups_mode_ignores_shown_fields() {
     let label_id = label.id().to_string();
 
     // Only make field1 visible via label — field2 should NOT be visible
-    // even though it's in shown_fields
+    // even though it's marked as shown in field_visibility
     label_manager
         .add_contact_to_group(&label_id, "contact-123")
         .unwrap();
@@ -123,7 +123,7 @@ fn test_visible_fields_groups_mode_ignores_shown_fields() {
     assert!(visible.contains(&field1_id));
     assert!(
         !visible.contains(&field2_id),
-        "Groups mode should use label visibility, not shown_fields"
+        "Groups mode should use label visibility, not field_visibility"
     );
     assert_eq!(visible.len(), 1);
 }

@@ -4,9 +4,9 @@
 
 //! Tests for group transition logic (no-group <-> groups mode).
 //!
-//! When the last group is deleted, visible fields migrate to shown_fields
+//! When the last group is deleted, visible fields migrate to field_visibility
 //! on ContactCard (transition to no-group mode). When the first group is
-//! created, shown_fields are preserved for the user to explicitly reassign.
+//! created, field_visibility are preserved for the user to explicitly reassign.
 
 use vauchi_core::network::MockTransport;
 use vauchi_core::{ContactField, FieldType, Vauchi};
@@ -17,7 +17,7 @@ fn create_vauchi_with_identity(name: &str) -> Vauchi<MockTransport> {
     wb
 }
 
-// @scenario: visibility_control.feature:Delete last group migrates fields to shown_fields
+// @scenario: visibility_control.feature:Delete last group migrates fields to field_visibility
 #[test]
 fn test_transition_to_no_group_mode() {
     let wb = create_vauchi_with_identity("Alice");
@@ -42,11 +42,11 @@ fn test_transition_to_no_group_mode() {
         "field should be visible in label before deletion"
     );
 
-    // Verify field is NOT in shown_fields before deletion
+    // Verify field is NOT in field_visibility before deletion
     let card = wb.own_card().unwrap().unwrap();
     assert!(
         !card.is_field_shown(&field_id),
-        "field should not be in shown_fields while groups exist"
+        "field should not be in field_visibility while groups exist"
     );
 
     // Delete the last label — triggers transition to no-group mode
@@ -56,17 +56,17 @@ fn test_transition_to_no_group_mode() {
     let labels = wb.list_groups().unwrap();
     assert_eq!(labels.len(), 0, "all labels should be deleted");
 
-    // Verify field has been migrated to shown_fields on the card
+    // Verify field has been migrated to field_visibility on the card
     let card = wb.own_card().unwrap().unwrap();
     assert!(
         card.is_field_shown(&field_id),
-        "field should be migrated to shown_fields after last group deleted"
+        "field should be migrated to field_visibility after last group deleted"
     );
 }
 
-// @scenario: visibility_control.feature:Creating first group preserves shown_fields
+// @scenario: visibility_control.feature:Creating first group preserves field_visibility
 #[test]
-fn test_transition_preserves_shown_fields_when_adding_first_group() {
+fn test_transition_preserves_field_visibility_when_adding_first_group() {
     let wb = create_vauchi_with_identity("Alice");
 
     // Add a field to own card
@@ -79,21 +79,21 @@ fn test_transition_preserves_shown_fields_when_adding_first_group() {
     // Set field as shown (no-group mode)
     wb.set_field_shown(&field_id, true).unwrap();
 
-    // Verify field is in shown_fields
+    // Verify field is in field_visibility
     let card = wb.own_card().unwrap().unwrap();
     assert!(
         card.is_field_shown(&field_id),
         "field should be shown in no-group mode"
     );
 
-    // Create first group — shown_fields should be preserved
+    // Create first group — field_visibility should be preserved
     let _label = wb.create_group("Work").unwrap();
 
-    // Verify shown_fields still has the field (user must manually reassign)
+    // Verify field_visibility still has the field (user must manually reassign)
     let card = wb.own_card().unwrap().unwrap();
     assert!(
         card.is_field_shown(&field_id),
-        "shown_fields should be preserved when first group is created"
+        "field_visibility should be preserved when first group is created"
     );
 }
 
@@ -118,21 +118,21 @@ fn test_delete_non_last_label_no_migration() {
     wb.set_group_field_visibility(&label1_id, &field_id, true)
         .unwrap();
 
-    // Verify field is NOT in shown_fields
+    // Verify field is NOT in field_visibility
     let card = wb.own_card().unwrap().unwrap();
     assert!(
         !card.is_field_shown(&field_id),
-        "field should not be in shown_fields while groups exist"
+        "field should not be in field_visibility while groups exist"
     );
 
     // Delete label1 (not the last one — label2 still exists)
     wb.delete_group(&label1_id).unwrap();
 
-    // Verify no migration to shown_fields (still in groups mode)
+    // Verify no migration to field_visibility (still in groups mode)
     let card = wb.own_card().unwrap().unwrap();
     assert!(
         !card.is_field_shown(&field_id),
-        "should not migrate to shown_fields when other groups still exist"
+        "should not migrate to field_visibility when other groups still exist"
     );
 
     // Verify label2 still exists
@@ -209,15 +209,15 @@ fn test_transition_migrates_all_visible_fields() {
     // Delete last label
     wb.delete_group(&label_id).unwrap();
 
-    // Both fields should be migrated to shown_fields
+    // Both fields should be migrated to field_visibility
     let card = wb.own_card().unwrap().unwrap();
     assert!(
         card.is_field_shown(&email_id),
-        "email should be migrated to shown_fields"
+        "email should be migrated to field_visibility"
     );
     assert!(
         card.is_field_shown(&phone_id),
-        "phone should be migrated to shown_fields"
+        "phone should be migrated to field_visibility"
     );
 }
 
@@ -253,10 +253,10 @@ fn test_transition_does_not_migrate_hidden_fields() {
     let card = wb.own_card().unwrap().unwrap();
     assert!(
         card.is_field_shown(&email_id),
-        "visible email should be migrated to shown_fields"
+        "visible email should be migrated to field_visibility"
     );
     assert!(
         !card.is_field_shown(&phone_id),
-        "hidden phone should NOT be migrated to shown_fields"
+        "hidden phone should NOT be migrated to field_visibility"
     );
 }

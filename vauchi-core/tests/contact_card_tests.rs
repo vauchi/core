@@ -29,11 +29,11 @@ fn test_add_and_remove_field() {
     assert!(card.fields().is_empty());
 }
 
-// @scenario: onboarding_workflow.feature:Shown fields default empty (privacy-first)
+// @scenario: onboarding_workflow.feature:Field visibility default empty (privacy-first)
 #[test]
-fn test_contact_card_shown_fields_default_empty() {
+fn test_contact_card_field_visibility_default_empty() {
     let card = ContactCard::new("Alice");
-    assert!(card.shown_fields().is_empty());
+    assert!(card.field_visibility().is_empty());
 }
 
 // @scenario: onboarding_workflow.feature:Show and hide field in no-group mode
@@ -44,7 +44,7 @@ fn test_contact_card_show_hide_field() {
     let field_id = field.id().to_string();
     card.add_field(field).unwrap();
 
-    // Default: hidden (not in shown_fields)
+    // Default: hidden (no explicit visibility rule)
     assert!(!card.is_field_shown(&field_id));
 
     // Show it
@@ -56,9 +56,9 @@ fn test_contact_card_show_hide_field() {
     assert!(!card.is_field_shown(&field_id));
 }
 
-// @scenario: onboarding_workflow.feature:Remove field cleans up shown_fields
+// @scenario: onboarding_workflow.feature:Remove field cleans up field_visibility
 #[test]
-fn test_remove_field_cleans_up_shown_fields() {
+fn test_remove_field_cleans_up_field_visibility() {
     let mut card = ContactCard::new("Alice");
     let field = ContactField::new(FieldType::Phone, "Mobile", "+1234567890");
     let field_id = field.id().to_string();
@@ -68,5 +68,5 @@ fn test_remove_field_cleans_up_shown_fields() {
 
     card.remove_field(&field_id).unwrap();
     assert!(!card.is_field_shown(&field_id));
-    assert!(card.shown_fields().is_empty());
+    assert!(card.field_visibility().is_empty());
 }

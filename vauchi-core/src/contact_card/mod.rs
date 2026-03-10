@@ -21,10 +21,10 @@ pub mod vcard;
 pub use field::{ContactField, FieldType, ValidationError};
 pub use uri::{is_allowed_scheme, is_blocked_scheme, is_safe_url, is_valid_phone, ContactAction};
 
-use std::collections::HashSet;
-
 use aws_lc_rs::rand::SystemRandom;
 use serde::{Deserialize, Serialize};
+
+use crate::contact::VisibilityRules;
 use thiserror::Error;
 
 /// Maximum number of fields per contact card.
@@ -77,11 +77,12 @@ pub struct ContactCard {
     #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     nickname: Option<String>,
-    /// Field IDs marked as "shown" in no-group mode.
-    /// When no visibility labels exist, this set determines which fields
-    /// are visible to all contacts. Empty = all hidden (privacy-first default).
-    #[serde(default, skip_serializing_if = "HashSet::is_empty")]
-    shown_fields: HashSet<String>,
+    /// Per-field visibility rules for the own card.
+    /// In no-group mode: `Everyone` = visible, `Nobody` = hidden.
+    /// In groups mode: group membership determines visibility (this is ignored).
+    /// Default: all fields hidden (privacy-first).
+    #[serde(default, skip_serializing_if = "VisibilityRules::is_empty")]
+    field_visibility: VisibilityRules,
 }
 
 impl ContactCard {
@@ -99,7 +100,7 @@ impl ContactCard {
             fields: Vec::new(),
             avatar: None,
             nickname: None,
-            shown_fields: HashSet::new(),
+            field_visibility: VisibilityRules::new(),
         }
     }
 
@@ -219,7 +220,7 @@ impl ContactCard {
             .ok_or(ContactCardError::FieldNotFound)?;
 
         self.fields.remove(index);
-        self.shown_fields.remove(field_id);
+        self.field_visibility.remove(field_id);
         Ok(())
     }
 
@@ -290,30 +291,37 @@ impl ContactCard {
         self.avatar = None;
     }
 
-    /// Returns the set of field IDs marked as "shown" (no-group mode).
-    pub fn shown_fields(&self) -> &HashSet<String> {
-        &self.shown_fields
+    /// Returns the per-field visibility rules.
+    pub fn field_visibility(&self) -> &VisibilityRules {
+        &self.field_visibility
     }
 
-    /// Returns whether a field is shown in no-group mode.
+    /// Returns mutable access to per-field visibility rules.
+    pub fn field_visibility_mut(&mut self) -> &mut VisibilityRules {
+        &mut self.field_visibility
+    }
+
+    /// Returns whether a field is visible to everyone (no-group mode).
+    ///
+    /// Uses privacy-first default: fields without an explicit rule are hidden.
     pub fn is_field_shown(&self, field_id: &str) -> bool {
-        self.shown_fields.contains(field_id)
+        self.field_visibility.is_explicitly_everyone(field_id)
     }
 
-    /// Sets whether a field is shown (no-group mode).
-    /// When true, all contacts see this field. When false, no one sees it.
+    /// Sets whether a field is shown to everyone (no-group mode).
+    /// When true, sets `Everyone`. When false, sets `Nobody`.
     ///
     /// Silently ignores the operation if `field_id` does not exist on this card
     /// (e.g. stale ID after field deletion). This prevents orphaned IDs in
-    /// `shown_fields`.
+    /// `field_visibility`.
     pub fn set_field_shown(&mut self, field_id: &str, shown: bool) {
         if shown && !self.fields.iter().any(|f| f.id() == field_id) {
             return;
         }
         if shown {
-            self.shown_fields.insert(field_id.to_string());
+            self.field_visibility.set_everyone(field_id);
         } else {
-            self.shown_fields.remove(field_id);
+            self.field_visibility.set_nobody(field_id);
         }
     }
 }

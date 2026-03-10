@@ -68,6 +68,30 @@ impl VisibilityRules {
         self.rules.remove(field_id);
     }
 
+    /// Returns true if no visibility rules are set.
+    pub fn is_empty(&self) -> bool {
+        self.rules.is_empty()
+    }
+
+    /// Returns true only if the field has an explicit `Everyone` rule.
+    ///
+    /// Returns false if no rule is set (privacy-first default) or if set to
+    /// `Nobody`/`Contacts(...)`.
+    pub fn is_explicitly_everyone(&self, field_id: &str) -> bool {
+        self.rules
+            .get(field_id)
+            .is_some_and(|v| matches!(v, FieldVisibility::Everyone))
+    }
+
+    /// Returns all field IDs that have an explicit `Everyone` visibility rule.
+    pub fn everyone_field_ids(&self) -> HashSet<String> {
+        self.rules
+            .iter()
+            .filter(|(_, v)| matches!(v, FieldVisibility::Everyone))
+            .map(|(k, _)| k.clone())
+            .collect()
+    }
+
     /// Checks if a specific contact can see a field.
     pub fn can_see(&self, field_id: &str, contact_id: &str) -> bool {
         match self.get(field_id) {

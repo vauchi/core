@@ -45,6 +45,7 @@ pub mod multistage;
 #[cfg(not(feature = "testing"))]
 mod multistage;
 
+pub mod capability;
 pub mod device_link;
 
 pub mod transport;

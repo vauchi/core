@@ -51,7 +51,7 @@ fn form_dialog_add_field_select_type_shows_value_input() {
     let mut engine = FormDialogEngine::new(FormDialogType::AddField);
 
     // Select category
-    engine.handle_action(UserAction::ListItemSelected {
+    let _ = engine.handle_action(UserAction::ListItemSelected {
         component_id: "entry_categories".into(),
         item_id: "contact".into(),
     });
@@ -81,15 +81,15 @@ fn form_dialog_add_field_submit_completes() {
     let mut engine = FormDialogEngine::new(FormDialogType::AddField);
 
     // Select category, type, enter value
-    engine.handle_action(UserAction::ListItemSelected {
+    let _ = engine.handle_action(UserAction::ListItemSelected {
         component_id: "entry_categories".into(),
         item_id: "contact".into(),
     });
-    engine.handle_action(UserAction::ListItemSelected {
+    let _ = engine.handle_action(UserAction::ListItemSelected {
         component_id: "entry_types".into(),
         item_id: "email".into(),
     });
-    engine.handle_action(UserAction::TextChanged {
+    let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "field_value".into(),
         value: "test@example.com".into(),
     });
@@ -105,11 +105,11 @@ fn form_dialog_add_field_cancel_from_value_goes_to_type_picker() {
     let mut engine = FormDialogEngine::new(FormDialogType::AddField);
 
     // Navigate to value input
-    engine.handle_action(UserAction::ListItemSelected {
+    let _ = engine.handle_action(UserAction::ListItemSelected {
         component_id: "entry_categories".into(),
         item_id: "contact".into(),
     });
-    engine.handle_action(UserAction::ListItemSelected {
+    let _ = engine.handle_action(UserAction::ListItemSelected {
         component_id: "entry_types".into(),
         item_id: "email".into(),
     });
@@ -140,7 +140,7 @@ fn form_dialog_add_field_back_to_categories() {
     let mut engine = FormDialogEngine::new(FormDialogType::AddField);
 
     // Select category first
-    engine.handle_action(UserAction::ListItemSelected {
+    let _ = engine.handle_action(UserAction::ListItemSelected {
         component_id: "entry_categories".into(),
         item_id: "contact".into(),
     });
@@ -170,19 +170,19 @@ fn form_dialog_add_field_collected_input_format() {
     let mut engine = FormDialogEngine::new(FormDialogType::AddField);
 
     // Select category and type
-    engine.handle_action(UserAction::ListItemSelected {
+    let _ = engine.handle_action(UserAction::ListItemSelected {
         component_id: "entry_categories".into(),
         item_id: "contact".into(),
     });
-    engine.handle_action(UserAction::ListItemSelected {
+    let _ = engine.handle_action(UserAction::ListItemSelected {
         component_id: "entry_types".into(),
         item_id: "email".into(),
     });
-    engine.handle_action(UserAction::TextChanged {
+    let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "field_value".into(),
         value: "test@example.com".into(),
     });
-    engine.handle_action(UserAction::TextChanged {
+    let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "field_note".into(),
         value: "work".into(),
     });
@@ -215,7 +215,7 @@ fn form_dialog_edit_field_submit_completes() {
         field_id: "f1".into(),
         field_label: "Email".into(),
     });
-    engine.handle_action(UserAction::TextChanged {
+    let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "field_value".into(),
         value: "new@example.com".into(),
     });
@@ -231,7 +231,7 @@ fn form_dialog_edit_field_collected_input() {
         field_id: "f1".into(),
         field_label: "Email".into(),
     });
-    engine.handle_action(UserAction::TextChanged {
+    let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "field_value".into(),
         value: "updated@example.com".into(),
     });
@@ -275,7 +275,7 @@ fn form_dialog_edit_name_collected_input() {
     let mut engine = FormDialogEngine::new(FormDialogType::EditName {
         current_name: "Alice".into(),
     });
-    engine.handle_action(UserAction::TextChanged {
+    let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "display_name".into(),
         value: "Bob".into(),
     });
@@ -301,7 +301,7 @@ fn form_dialog_edit_relay_url_collected_input() {
     let mut engine = FormDialogEngine::new(FormDialogType::EditRelayUrl {
         current_url: "wss://relay.vauchi.app".into(),
     });
-    engine.handle_action(UserAction::TextChanged {
+    let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "relay_url".into(),
         value: "wss://custom.relay.example".into(),
     });

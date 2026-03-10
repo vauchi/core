@@ -69,7 +69,7 @@ fn test_relay_disconnect_clears_state() {
     let bob_dh = X3DHKeyPair::generate();
     let shared_secret = SymmetricKey::generate();
     let mut ratchet =
-        DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key());
+        DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key()).unwrap();
 
     client
         .send_update("recipient-id", &mut ratchet, b"test payload", "update-1")
@@ -128,7 +128,7 @@ fn test_decrypt_fails_with_wrong_ratchet() {
     let bob_dh2 = X3DHKeyPair::generate();
 
     let mut alice_ratchet =
-        DoubleRatchetState::initialize_initiator(&shared_secret1, *bob_dh1.public_key());
+        DoubleRatchetState::initialize_initiator(&shared_secret1, *bob_dh1.public_key()).unwrap();
     let mut wrong_bob_ratchet = DoubleRatchetState::initialize_responder(&shared_secret2, bob_dh2);
 
     // Alice encrypts with secret1
@@ -147,7 +147,7 @@ fn test_decrypt_fails_with_corrupted_ciphertext() {
     let bob_dh = X3DHKeyPair::generate();
 
     let mut alice_ratchet =
-        DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key());
+        DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key()).unwrap();
     let mut bob_ratchet = DoubleRatchetState::initialize_responder(&shared_secret, bob_dh);
 
     // Alice encrypts

@@ -132,8 +132,8 @@ fn test_symmetric_dh_produces_matching_keys() {
     let alice_keys = X3DHKeyPair::generate();
     let bob_keys = X3DHKeyPair::generate();
 
-    let alice_shared = alice_keys.diffie_hellman(bob_keys.public_key());
-    let bob_shared = bob_keys.diffie_hellman(alice_keys.public_key());
+    let alice_shared = alice_keys.diffie_hellman(bob_keys.public_key()).unwrap();
+    let bob_shared = bob_keys.diffie_hellman(alice_keys.public_key()).unwrap();
 
     assert_eq!(
         alice_shared, bob_shared,
@@ -355,10 +355,10 @@ fn test_wrong_dh_key_produces_different_secret() {
     let eve_keys = X3DHKeyPair::generate();
 
     // Alice computes shared with Bob
-    let alice_shared = alice_keys.diffie_hellman(bob_keys.public_key());
+    let alice_shared = alice_keys.diffie_hellman(bob_keys.public_key()).unwrap();
 
     // Alice computes shared with Eve (wrong party)
-    let alice_eve_shared = alice_keys.diffie_hellman(eve_keys.public_key());
+    let alice_eve_shared = alice_keys.diffie_hellman(eve_keys.public_key()).unwrap();
 
     // Keys should NOT match
     assert_ne!(

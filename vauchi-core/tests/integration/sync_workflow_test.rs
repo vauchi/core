@@ -89,7 +89,7 @@ fn test_relay_client_workflow() {
     let bob_dh = X3DHKeyPair::generate();
     let shared_secret = SymmetricKey::generate();
     let mut ratchet =
-        DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key());
+        DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key()).unwrap();
 
     // Send an update
     let msg_id = client
@@ -213,7 +213,7 @@ fn test_field_modification_and_removal_propagation() {
         // Set up ratchets
         let bob_dh = X3DHKeyPair::generate();
         let alice_ratchet =
-            DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key());
+            DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key()).unwrap();
         let bob_ratchet = DoubleRatchetState::initialize_responder(&shared_secret, bob_dh);
 
         alice_wb

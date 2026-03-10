@@ -162,7 +162,7 @@ fn test_process_cek_wrapped_update_saves_cek() {
 
     // Bob creates a CEK-wrapped update
     let mut bob_ratchet =
-        DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key());
+        DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key()).unwrap();
 
     // Create a delta
     let old_card = ContactCard::new("Bob");
@@ -213,7 +213,7 @@ fn test_process_legacy_update_backward_compat() {
 
     // Bob sends a legacy (non-CEK) update — existing behavior must keep working
     let mut bob_ratchet =
-        DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key());
+        DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key()).unwrap();
 
     let old_card = ContactCard::new("Bob");
     let mut new_card = ContactCard::new("Bob");
@@ -253,7 +253,7 @@ fn test_process_update_from_revoked_sender_rejected() {
 
     // Bob sends an update (after being revoked)
     let mut bob_ratchet =
-        DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key());
+        DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key()).unwrap();
 
     let old_card = ContactCard::new("Bob");
     let new_card = ContactCard::new("Bob Evil");
@@ -279,7 +279,7 @@ fn test_process_cek_wrapped_update_applies_delta() {
     let alice_pk = alice.identity().unwrap().signing_public_key();
 
     let mut bob_ratchet =
-        DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key());
+        DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key()).unwrap();
 
     // Bob's delta: add email field
     let old_card = ContactCard::new("Bob");
@@ -331,7 +331,7 @@ fn test_cek_wrapped_forged_signature_rejected() {
     let alice_pk = alice.identity().unwrap().signing_public_key();
 
     let mut bob_ratchet =
-        DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key());
+        DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key()).unwrap();
 
     // Create a valid delta
     let old_card = ContactCard::new("Bob");

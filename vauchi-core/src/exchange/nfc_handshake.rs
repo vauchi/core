@@ -157,7 +157,7 @@ impl NfcHandshakeSession {
 
         // Symmetric DH: our_ephemeral x their_ephemeral
         let shared_key =
-            derive_symmetric_key(&self.our_x3dh, their_nfc.exchange_key(), &exchange_id);
+            derive_symmetric_key(&self.our_x3dh, their_nfc.exchange_key(), &exchange_id)?;
 
         // Create our NFC payload (key ack)
         let our_nfc = ExchangeNfc::generate(identity, &self.our_x3dh);
@@ -205,7 +205,7 @@ impl NfcHandshakeSession {
 
         // Symmetric DH: our_ephemeral x their_ephemeral
         let shared_key =
-            derive_symmetric_key(&self.our_x3dh, their_nfc.exchange_key(), &exchange_id);
+            derive_symmetric_key(&self.our_x3dh, their_nfc.exchange_key(), &exchange_id)?;
 
         // Decrypt their card
         let their_card = decrypt_and_validate_card(&shared_key, their_encrypted_card)?;
@@ -349,13 +349,13 @@ fn derive_symmetric_key(
     our_keys: &X3DHKeyPair,
     their_pub: &[u8; 32],
     exchange_id: &[u8; 32],
-) -> SymmetricKey {
-    let dh_secret = our_keys.diffie_hellman(their_pub);
+) -> Result<SymmetricKey, ExchangeError> {
+    let dh_secret = our_keys.diffie_hellman(their_pub)?;
 
     let our_pub = our_keys.public_key();
     let info = build_hkdf_info(our_pub, their_pub, exchange_id);
     let derived = HKDF::derive_key(None, &dh_secret, &info);
-    SymmetricKey::from_bytes(*derived)
+    Ok(SymmetricKey::from_bytes(*derived))
 }
 
 /// Builds HKDF info string with sorted keys for symmetric derivation.

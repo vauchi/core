@@ -32,7 +32,7 @@ fn create_test_relay() -> RelayClient<MockTransport> {
 fn create_test_ratchet() -> DoubleRatchetState {
     let bob_dh = X3DHKeyPair::generate();
     let shared_secret = SymmetricKey::generate();
-    DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key())
+    DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key()).unwrap()
 }
 
 #[test]

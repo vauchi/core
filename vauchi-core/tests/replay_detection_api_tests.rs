@@ -43,7 +43,7 @@ fn setup_alice_receiving_from_bob() -> (Vauchi<MockTransport>, String, Identity,
 
     // Bob is initiator (sends to Alice)
     let bob_ratchet =
-        DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key());
+        DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key()).unwrap();
 
     (alice, bob_id, bob_identity, bob_ratchet)
 }

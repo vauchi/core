@@ -17,7 +17,7 @@ fn create_test_pair() -> (DoubleRatchetState, DoubleRatchetState) {
     let bob_public = *bob_dh.public_key();
 
     // Alice initializes as initiator with Bob's public key
-    let alice = DoubleRatchetState::initialize_initiator(&shared_secret, bob_public);
+    let alice = DoubleRatchetState::initialize_initiator(&shared_secret, bob_public).unwrap();
 
     // Bob initializes as responder with his keypair
     let bob = DoubleRatchetState::initialize_responder(&shared_secret, bob_dh);

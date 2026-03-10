@@ -24,7 +24,7 @@ fn test_same_message_decrypted_once() {
     let bob_keypair = X3DHKeyPair::generate();
     let bob_public = *bob_keypair.public_key();
 
-    let mut alice = DoubleRatchetState::initialize_initiator(&x3dh_secret, bob_public);
+    let mut alice = DoubleRatchetState::initialize_initiator(&x3dh_secret, bob_public).unwrap();
     let mut bob = DoubleRatchetState::initialize_responder(&x3dh_secret, bob_keypair);
 
     // Alice sends a message
@@ -54,7 +54,7 @@ fn test_replay_after_chain_advance() {
     let bob_keypair = X3DHKeyPair::generate();
     let bob_public = *bob_keypair.public_key();
 
-    let mut alice = DoubleRatchetState::initialize_initiator(&x3dh_secret, bob_public);
+    let mut alice = DoubleRatchetState::initialize_initiator(&x3dh_secret, bob_public).unwrap();
     let mut bob = DoubleRatchetState::initialize_responder(&x3dh_secret, bob_keypair);
 
     // Alice sends message 0
@@ -87,7 +87,7 @@ fn test_out_of_order_vs_duplicate() {
     let bob_keypair = X3DHKeyPair::generate();
     let bob_public = *bob_keypair.public_key();
 
-    let mut alice = DoubleRatchetState::initialize_initiator(&x3dh_secret, bob_public);
+    let mut alice = DoubleRatchetState::initialize_initiator(&x3dh_secret, bob_public).unwrap();
     let mut bob = DoubleRatchetState::initialize_responder(&x3dh_secret, bob_keypair);
 
     // Alice sends 3 messages
@@ -124,7 +124,7 @@ fn test_old_dh_generation_rejected() {
     let bob_keypair = X3DHKeyPair::generate();
     let bob_public = *bob_keypair.public_key();
 
-    let mut alice = DoubleRatchetState::initialize_initiator(&x3dh_secret, bob_public);
+    let mut alice = DoubleRatchetState::initialize_initiator(&x3dh_secret, bob_public).unwrap();
     let mut bob = DoubleRatchetState::initialize_responder(&x3dh_secret, bob_keypair);
 
     // Alice sends (DH gen 0)
@@ -163,7 +163,7 @@ fn test_skipped_keys_deleted_after_use() {
     let bob_keypair = X3DHKeyPair::generate();
     let bob_public = *bob_keypair.public_key();
 
-    let mut alice = DoubleRatchetState::initialize_initiator(&x3dh_secret, bob_public);
+    let mut alice = DoubleRatchetState::initialize_initiator(&x3dh_secret, bob_public).unwrap();
     let mut bob = DoubleRatchetState::initialize_responder(&x3dh_secret, bob_keypair);
 
     // Alice sends 3 messages
@@ -198,7 +198,7 @@ fn test_too_many_skipped_messages() {
     let bob_keypair = X3DHKeyPair::generate();
     let bob_public = *bob_keypair.public_key();
 
-    let mut alice = DoubleRatchetState::initialize_initiator(&x3dh_secret, bob_public);
+    let mut alice = DoubleRatchetState::initialize_initiator(&x3dh_secret, bob_public).unwrap();
     let mut bob = DoubleRatchetState::initialize_responder(&x3dh_secret, bob_keypair);
 
     // Alice sends many messages
@@ -228,7 +228,7 @@ fn test_replay_detection_timestamp_independent() {
     let bob_keypair = X3DHKeyPair::generate();
     let bob_public = *bob_keypair.public_key();
 
-    let mut alice = DoubleRatchetState::initialize_initiator(&x3dh_secret, bob_public);
+    let mut alice = DoubleRatchetState::initialize_initiator(&x3dh_secret, bob_public).unwrap();
     let mut bob = DoubleRatchetState::initialize_responder(&x3dh_secret, bob_keypair);
 
     // Alice sends a message
@@ -258,7 +258,7 @@ fn test_cross_chain_replay_prevention() {
     let bob_keypair = X3DHKeyPair::generate();
     let bob_public = *bob_keypair.public_key();
 
-    let mut alice = DoubleRatchetState::initialize_initiator(&x3dh_secret, bob_public);
+    let mut alice = DoubleRatchetState::initialize_initiator(&x3dh_secret, bob_public).unwrap();
     let mut bob = DoubleRatchetState::initialize_responder(&x3dh_secret, bob_keypair);
 
     // Exchange messages to advance DH ratchet multiple times

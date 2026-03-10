@@ -22,4 +22,4 @@ pub use password_kdf::{derive_key_argon2id, PasswordKdfError};
 pub use ratchet::{DoubleRatchetState, RatchetError, RatchetMessage, RATCHET_STATE_VERSION};
 pub use shredding::ShreddingMasterKey;
 pub use signing::{PublicKey, Signature, SigningKeyPair};
-pub use x3dh::X3DHKeyPair;
+pub use x3dh::{DhError, X3DHKeyPair};

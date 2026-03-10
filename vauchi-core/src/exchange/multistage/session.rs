@@ -368,6 +368,10 @@ impl MultiStageSession {
         if let Some(secret) = self.ephemeral_secret.take() {
             let peer_public = X25519Public::from(ephemeral);
             let shared_secret = secret.diffie_hellman(&peer_public);
+            if !shared_secret.was_contributory() {
+                self.state = ProtocolState::Failed("non-contributory DH output".to_string());
+                return self.state.clone();
+            }
             let transport_key = self.derive_transport_key(shared_secret.as_bytes());
             self.transport_key = Some(transport_key);
         } else {

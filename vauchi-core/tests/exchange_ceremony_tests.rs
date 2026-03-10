@@ -327,7 +327,7 @@ fn test_encrypted_message_secret_matches_raw_x3dh() {
     );
 
     // The secret should be HKDF-derived (not raw DH)
-    let raw_dh = bob.diffie_hellman(&msg.ephemeral_public_key);
+    let raw_dh = bob.diffie_hellman(&msg.ephemeral_public_key).unwrap();
     assert_ne!(
         alice_secret.as_bytes(),
         &raw_dh,

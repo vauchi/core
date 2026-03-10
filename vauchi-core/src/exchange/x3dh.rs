@@ -64,12 +64,14 @@ impl X3DH {
         let their_public_key = PublicKey::from(*their_public);
 
         // DH1: our_static × their_static (identity binding)
-        let dh1 = our_keys.diffie_hellman(their_public);
+        let dh1 = our_keys.diffie_hellman(their_public)?;
 
         // DH2: ephemeral × their_static (forward secrecy)
-        let dh2 = *ephemeral_secret
-            .diffie_hellman(&their_public_key)
-            .as_bytes();
+        let dh2_shared = ephemeral_secret.diffie_hellman(&their_public_key);
+        if !dh2_shared.was_contributory() {
+            return Err(ExchangeError::InvalidDhOutput(crate::crypto::DhError));
+        }
+        let dh2 = *dh2_shared.as_bytes();
 
         // Concatenate DH1 ‖ DH2 and derive via HKDF
         let mut ikm = [0u8; 64];
@@ -96,10 +98,10 @@ impl X3DH {
         let their_ephemeral = PublicKey::from(*their_ephemeral_public);
 
         // DH1: our_static × their_static (identity binding — mirrors initiator)
-        let dh1 = our_keys.diffie_hellman(their_identity_public);
+        let dh1 = our_keys.diffie_hellman(their_identity_public)?;
 
         // DH2: our_static × their_ephemeral (forward secrecy)
-        let dh2 = our_keys.diffie_hellman_raw(&their_ephemeral);
+        let dh2 = our_keys.diffie_hellman_raw(&their_ephemeral)?;
 
         // Concatenate DH1 ‖ DH2 and derive via HKDF
         let mut ikm = [0u8; 64];

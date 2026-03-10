@@ -331,7 +331,7 @@ impl BleHandshakeSession {
             &their_ephemeral,
             &self.our_nonce,
             &their_nonce,
-        );
+        )?;
 
         // Build AAD: sender_identity || receiver_identity || timestamp
         let aad = build_aad(&self.our_identity_key, &their_identity, self.our_timestamp);
@@ -426,7 +426,7 @@ impl BleHandshakeSession {
             &their_ephemeral,
             &self.our_nonce,
             &their_nonce,
-        );
+        )?;
 
         // Decrypt their card
         let their_aad = build_aad(&their_identity, &self.our_identity_key, self.our_timestamp);
@@ -622,8 +622,8 @@ fn derive_session_key(
     their_ephemeral: &[u8; 32],
     our_nonce: &[u8; NONCE_SIZE],
     their_nonce: &[u8; NONCE_SIZE],
-) -> SymmetricKey {
-    let dh_secret = our_keys.diffie_hellman(their_ephemeral);
+) -> Result<SymmetricKey, ExchangeError> {
+    let dh_secret = our_keys.diffie_hellman(their_ephemeral)?;
 
     // Salt: sorted nonces for deterministic derivation
     let mut salt = [0u8; NONCE_SIZE * 2];
@@ -647,7 +647,7 @@ fn derive_session_key(
     }
 
     let derived = HKDF::derive_key(Some(&salt), &dh_secret, &info);
-    SymmetricKey::from_bytes(*derived)
+    Ok(SymmetricKey::from_bytes(*derived))
 }
 
 /// Computes SHA-256 commitment over encrypted card bytes.

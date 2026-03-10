@@ -25,7 +25,8 @@ fn create_test_ratchet() -> (DoubleRatchetState, DoubleRatchetState) {
     let bob_dh = X3DHKeyPair::generate();
     let shared_secret = SymmetricKey::generate();
 
-    let alice = DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key());
+    let alice =
+        DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key()).unwrap();
     let bob = DoubleRatchetState::initialize_responder(&shared_secret, bob_dh);
 
     (alice, bob)

@@ -181,7 +181,8 @@ impl<T: Transport> Vauchi<T> {
         shared_secret: &SymmetricKey,
         their_dh_public: [u8; 32],
     ) -> VauchiResult<()> {
-        let ratchet = DoubleRatchetState::initialize_initiator(shared_secret, their_dh_public);
+        let ratchet = DoubleRatchetState::initialize_initiator(shared_secret, their_dh_public)
+            .map_err(|e| crate::api::VauchiError::Crypto(e.to_string()))?;
         self.storage
             .save_ratchet_state(contact_id, &ratchet, true)?;
         Ok(())

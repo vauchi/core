@@ -20,7 +20,7 @@ fn test_ratchet_messages_in_order() {
     let bob_dh = X3DHKeyPair::generate();
 
     let mut alice_ratchet =
-        DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key());
+        DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key()).unwrap();
     let mut bob_ratchet = DoubleRatchetState::initialize_responder(&shared_secret, bob_dh);
 
     // Send multiple messages
@@ -49,7 +49,7 @@ fn test_ratchet_handles_message_skip() {
     let bob_dh = X3DHKeyPair::generate();
 
     let mut alice_ratchet =
-        DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key());
+        DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key()).unwrap();
     let mut bob_ratchet = DoubleRatchetState::initialize_responder(&shared_secret, bob_dh);
 
     // Alice sends 3 messages
@@ -84,7 +84,7 @@ fn test_ratchet_rejects_duplicate_message() {
     let bob_dh = X3DHKeyPair::generate();
 
     let mut alice_ratchet =
-        DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key());
+        DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key()).unwrap();
     let mut bob_ratchet = DoubleRatchetState::initialize_responder(&shared_secret, bob_dh);
 
     // Alice sends one message
@@ -116,7 +116,7 @@ fn test_ratchet_fails_on_corrupted_dh_key() {
     let bob_dh = X3DHKeyPair::generate();
 
     let mut alice_ratchet =
-        DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key());
+        DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key()).unwrap();
     let mut bob_ratchet = DoubleRatchetState::initialize_responder(&shared_secret, bob_dh);
 
     let plaintext = b"Secret message";
@@ -136,7 +136,7 @@ fn test_ratchet_handles_empty_plaintext() {
     let bob_dh = X3DHKeyPair::generate();
 
     let mut alice_ratchet =
-        DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key());
+        DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key()).unwrap();
     let mut bob_ratchet = DoubleRatchetState::initialize_responder(&shared_secret, bob_dh);
 
     // Encrypt empty message
@@ -154,7 +154,7 @@ fn test_ratchet_handles_large_plaintext() {
     let bob_dh = X3DHKeyPair::generate();
 
     let mut alice_ratchet =
-        DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key());
+        DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key()).unwrap();
     let mut bob_ratchet = DoubleRatchetState::initialize_responder(&shared_secret, bob_dh);
 
     // Large message (1MB)
@@ -177,8 +177,10 @@ fn test_different_secrets_produce_different_ratchets() {
     let secret2 = SymmetricKey::generate();
     let bob_dh = X3DHKeyPair::generate();
 
-    let mut ratchet1 = DoubleRatchetState::initialize_initiator(&secret1, *bob_dh.public_key());
-    let mut ratchet2 = DoubleRatchetState::initialize_initiator(&secret2, *bob_dh.public_key());
+    let mut ratchet1 =
+        DoubleRatchetState::initialize_initiator(&secret1, *bob_dh.public_key()).unwrap();
+    let mut ratchet2 =
+        DoubleRatchetState::initialize_initiator(&secret2, *bob_dh.public_key()).unwrap();
 
     let plaintext = b"Same message";
     let enc1 = ratchet1.encrypt(plaintext).unwrap();
@@ -199,7 +201,7 @@ fn test_same_plaintext_different_ciphertext() {
     let bob_dh = X3DHKeyPair::generate();
 
     let mut alice_ratchet =
-        DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key());
+        DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key()).unwrap();
 
     let plaintext = b"Same message";
     let enc1 = alice_ratchet.encrypt(plaintext).unwrap();
@@ -224,7 +226,7 @@ fn test_bidirectional_conversation() {
     let bob_dh = X3DHKeyPair::generate();
 
     let mut alice_ratchet =
-        DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key());
+        DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key()).unwrap();
     let mut bob_ratchet = DoubleRatchetState::initialize_responder(&shared_secret, bob_dh);
 
     // Alice -> Bob
@@ -259,7 +261,7 @@ fn test_consecutive_messages_same_party() {
     let bob_dh = X3DHKeyPair::generate();
 
     let mut alice_ratchet =
-        DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key());
+        DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key()).unwrap();
     let mut bob_ratchet = DoubleRatchetState::initialize_responder(&shared_secret, bob_dh);
 
     // Alice sends 5 consecutive messages
@@ -317,7 +319,7 @@ fn test_ratchet_state_serialization() {
 
     // Initialize ratchets
     let alice_ratchet =
-        DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key());
+        DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key()).unwrap();
     let bob_ratchet = DoubleRatchetState::initialize_responder(&shared_secret, bob_dh);
 
     // Save to storage
@@ -363,7 +365,7 @@ fn test_ratchet_message_serialization() {
     let bob_dh = X3DHKeyPair::generate();
 
     let mut alice_ratchet =
-        DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key());
+        DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key()).unwrap();
 
     let plaintext = b"Test message";
     let encrypted = alice_ratchet.encrypt(plaintext).unwrap();

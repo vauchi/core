@@ -92,7 +92,7 @@ pub fn setup_alice_bob_exchange() -> (
 pub fn setup_ratchets(shared_secret: &SymmetricKey) -> (DoubleRatchetState, DoubleRatchetState) {
     let bob_dh = X3DHKeyPair::generate();
     let alice_ratchet =
-        DoubleRatchetState::initialize_initiator(shared_secret, *bob_dh.public_key());
+        DoubleRatchetState::initialize_initiator(shared_secret, *bob_dh.public_key()).unwrap();
     let bob_ratchet = DoubleRatchetState::initialize_responder(shared_secret, bob_dh);
     (alice_ratchet, bob_ratchet)
 }

@@ -45,6 +45,9 @@ pub enum RatchetError {
 
     #[error("Deserialization error: {0}")]
     Deserialization(String),
+
+    #[error("DH validation failed: {0}")]
+    DhValidation(#[from] super::DhError),
 }
 
 /// Current serialization format version for ratchet state (#236).
@@ -213,16 +216,19 @@ impl DoubleRatchetState {
     ///
     /// The initiator has performed X3DH and knows Bob's public key.
     /// They will send the first message.
-    pub fn initialize_initiator(x3dh_secret: &SymmetricKey, their_dh_public: [u8; 32]) -> Self {
+    pub fn initialize_initiator(
+        x3dh_secret: &SymmetricKey,
+        their_dh_public: [u8; 32],
+    ) -> Result<Self, RatchetError> {
         // Generate our first DH keypair
         let our_dh = X3DHKeyPair::generate();
 
         // Perform initial DH to get first root key and send chain
-        let dh_output = our_dh.diffie_hellman(&their_dh_public);
+        let dh_output = our_dh.diffie_hellman(&their_dh_public)?;
         let (root_key, send_chain_key) =
             HKDF::derive_key_pair(Some(x3dh_secret.as_bytes()), &dh_output, ROOT_RATCHET_INFO);
 
-        DoubleRatchetState {
+        Ok(DoubleRatchetState {
             root_key,
             our_dh,
             their_dh: Some(their_dh_public),
@@ -233,7 +239,7 @@ impl DoubleRatchetState {
             recv_message_count: 0,
             previous_send_chain_length: 0,
             skipped_keys: HashMap::new(),
-        }
+        })
     }
 
     /// Initialize as the responder (Bob) after X3DH.
@@ -397,7 +403,7 @@ impl DoubleRatchetState {
         self.their_dh = Some(*their_new_public);
 
         // DH with their new key and our current key -> new receiving chain
-        let dh_recv = self.our_dh.diffie_hellman(their_new_public);
+        let dh_recv = self.our_dh.diffie_hellman(their_new_public)?;
         let (root_key, recv_chain_key) =
             HKDF::derive_key_pair(Some(&self.root_key), &dh_recv, ROOT_RATCHET_INFO);
         self.root_key = root_key;
@@ -409,7 +415,7 @@ impl DoubleRatchetState {
         self.our_dh = X3DHKeyPair::generate();
 
         // DH with their key and our NEW key -> new sending chain
-        let dh_send = self.our_dh.diffie_hellman(their_new_public);
+        let dh_send = self.our_dh.diffie_hellman(their_new_public)?;
         let (root_key, send_chain_key) =
             HKDF::derive_key_pair(Some(&self.root_key), &dh_send, ROOT_RATCHET_INFO);
         self.root_key = root_key;

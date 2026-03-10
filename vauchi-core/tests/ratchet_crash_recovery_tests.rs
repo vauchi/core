@@ -24,7 +24,7 @@ fn test_ratchet_state_serialization_roundtrip() {
     let bob_public = *bob_keypair.public_key();
 
     // Alice initializes as initiator
-    let mut alice = DoubleRatchetState::initialize_initiator(&x3dh_secret, bob_public);
+    let mut alice = DoubleRatchetState::initialize_initiator(&x3dh_secret, bob_public).unwrap();
 
     // Alice sends a message (advances state)
     let msg1 = alice.encrypt(b"Hello Bob!").unwrap();
@@ -52,7 +52,7 @@ fn test_both_parties_restore_state() {
     let bob_public = *bob_keypair.public_key();
 
     // Initialize both parties
-    let mut alice = DoubleRatchetState::initialize_initiator(&x3dh_secret, bob_public);
+    let mut alice = DoubleRatchetState::initialize_initiator(&x3dh_secret, bob_public).unwrap();
     let mut bob = DoubleRatchetState::initialize_responder(&x3dh_secret, bob_keypair);
 
     // Alice sends, Bob receives
@@ -91,7 +91,7 @@ fn test_restore_mid_conversation() {
     let bob_keypair = X3DHKeyPair::generate();
     let bob_public = *bob_keypair.public_key();
 
-    let mut alice = DoubleRatchetState::initialize_initiator(&x3dh_secret, bob_public);
+    let mut alice = DoubleRatchetState::initialize_initiator(&x3dh_secret, bob_public).unwrap();
     let mut bob = DoubleRatchetState::initialize_responder(&x3dh_secret, bob_keypair);
 
     // Exchange several messages
@@ -123,7 +123,7 @@ fn test_dh_ratchet_state_survives() {
     let bob_keypair = X3DHKeyPair::generate();
     let bob_public = *bob_keypair.public_key();
 
-    let mut alice = DoubleRatchetState::initialize_initiator(&x3dh_secret, bob_public);
+    let mut alice = DoubleRatchetState::initialize_initiator(&x3dh_secret, bob_public).unwrap();
     let mut bob = DoubleRatchetState::initialize_responder(&x3dh_secret, bob_keypair);
 
     // Alice -> Bob (first DH generation)
@@ -163,7 +163,7 @@ fn test_skipped_keys_survive_serialization() {
     let bob_keypair = X3DHKeyPair::generate();
     let bob_public = *bob_keypair.public_key();
 
-    let mut alice = DoubleRatchetState::initialize_initiator(&x3dh_secret, bob_public);
+    let mut alice = DoubleRatchetState::initialize_initiator(&x3dh_secret, bob_public).unwrap();
     let mut bob = DoubleRatchetState::initialize_responder(&x3dh_secret, bob_keypair);
 
     // Alice sends 3 messages
@@ -212,7 +212,7 @@ fn test_responder_restore_before_first_message() {
     let mut bob = DoubleRatchetState::deserialize(bob_state).unwrap();
 
     // Alice sends first message
-    let mut alice = DoubleRatchetState::initialize_initiator(&x3dh_secret, bob_public);
+    let mut alice = DoubleRatchetState::initialize_initiator(&x3dh_secret, bob_public).unwrap();
     let msg = alice.encrypt(b"Hello!").unwrap();
 
     // Bob should be able to decrypt
@@ -231,7 +231,7 @@ fn test_invalid_send_chain_rejected() {
     let bob_keypair = X3DHKeyPair::generate();
     let bob_public = *bob_keypair.public_key();
 
-    let alice = DoubleRatchetState::initialize_initiator(&x3dh_secret, bob_public);
+    let alice = DoubleRatchetState::initialize_initiator(&x3dh_secret, bob_public).unwrap();
     let mut state = alice.serialize();
 
     // Corrupt the send chain
@@ -256,7 +256,7 @@ fn test_many_serialization_cycles() {
     let bob_keypair = X3DHKeyPair::generate();
     let bob_public = *bob_keypair.public_key();
 
-    let mut alice = DoubleRatchetState::initialize_initiator(&x3dh_secret, bob_public);
+    let mut alice = DoubleRatchetState::initialize_initiator(&x3dh_secret, bob_public).unwrap();
     let mut bob = DoubleRatchetState::initialize_responder(&x3dh_secret, bob_keypair);
 
     for i in 0..20 {

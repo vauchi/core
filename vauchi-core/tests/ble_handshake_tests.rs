@@ -41,8 +41,8 @@ fn test_x25519_shared_secret_symmetry() {
     let alice = X3DHKeyPair::generate();
     let bob = X3DHKeyPair::generate();
 
-    let alice_shared = alice.diffie_hellman(bob.public_key());
-    let bob_shared = bob.diffie_hellman(alice.public_key());
+    let alice_shared = alice.diffie_hellman(bob.public_key()).unwrap();
+    let bob_shared = bob.diffie_hellman(alice.public_key()).unwrap();
 
     assert_eq!(
         alice_shared, bob_shared,

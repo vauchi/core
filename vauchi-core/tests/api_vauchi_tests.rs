@@ -456,7 +456,7 @@ fn test_process_incoming_card_update() {
 
     // Bob creates and encrypts an update
     let mut bob_ratchet =
-        DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key());
+        DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key()).unwrap();
 
     // Create a delta (Bob adds an email field)
     let old_card = ContactCard::new("Bob");
@@ -579,7 +579,7 @@ fn test_process_update_rejects_invalid_signature() {
     // Create update signed by WRONG identity (not Bob)
     let wrong_identity = Identity::create("Eve");
     let mut bob_ratchet =
-        DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key());
+        DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key()).unwrap();
 
     let old_card = ContactCard::new("Bob");
     let mut new_card = ContactCard::new("Bob");
@@ -691,7 +691,7 @@ fn test_process_card_update_malformed_json_in_ratchet() {
 
     // Encrypt malformed JSON inside a valid ratchet message
     let mut bob_ratchet =
-        DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key());
+        DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key()).unwrap();
     let garbage_json = b"{ this is not valid json }}}";
     let ratchet_msg = bob_ratchet.encrypt(garbage_json).unwrap();
     let encrypted = serde_json::to_vec(&ratchet_msg).unwrap();

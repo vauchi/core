@@ -142,6 +142,9 @@ impl ExchangeProtocol {
 
         // X25519 Diffie-Hellman
         let dh_secret = self.ephemeral_secret.diffie_hellman(&peer_ephemeral);
+        if !dh_secret.was_contributory() {
+            return Err(ExchangeError::InvalidDhOutput(crate::crypto::DhError));
+        }
 
         // Build sorted salt from both nonces
         let mut salt = [0u8; NONCE_SIZE * 2];

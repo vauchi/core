@@ -11,6 +11,12 @@
 use rand::rngs::OsRng;
 use x25519_dalek::{PublicKey, StaticSecret};
 
+/// Error returned when a Diffie-Hellman computation produces a non-contributory output
+/// (e.g., the all-zero shared secret from a small-subgroup public key).
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[error("Non-contributory DH output (possible small-subgroup attack)")]
+pub struct DhError;
+
 /// X25519 keypair for X3DH key agreement.
 ///
 /// Used for establishing shared secrets during contact exchange.
@@ -50,8 +56,9 @@ impl X3DHKeyPair {
 
     /// Performs Diffie-Hellman key agreement with a public key (from bytes).
     ///
-    /// Returns the 32-byte shared secret.
-    pub fn diffie_hellman(&self, their_public: &[u8; 32]) -> [u8; 32] {
+    /// Returns the 32-byte shared secret, or `DhError` if the output is
+    /// non-contributory (e.g., peer sent a small-subgroup point).
+    pub fn diffie_hellman(&self, their_public: &[u8; 32]) -> Result<[u8; 32], DhError> {
         let their_public_key = PublicKey::from(*their_public);
         self.diffie_hellman_raw(&their_public_key)
     }
@@ -59,8 +66,12 @@ impl X3DHKeyPair {
     /// Performs Diffie-Hellman key agreement with an x25519 PublicKey directly.
     ///
     /// Used by the X3DH protocol where the peer key is already parsed.
-    pub(crate) fn diffie_hellman_raw(&self, their_public: &PublicKey) -> [u8; 32] {
+    /// Returns `DhError` if the shared secret is non-contributory.
+    pub(crate) fn diffie_hellman_raw(&self, their_public: &PublicKey) -> Result<[u8; 32], DhError> {
         let shared = self.secret.diffie_hellman(their_public);
-        *shared.as_bytes()
+        if !shared.was_contributory() {
+            return Err(DhError);
+        }
+        Ok(*shared.as_bytes())
     }
 }

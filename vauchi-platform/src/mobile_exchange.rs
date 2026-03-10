@@ -114,7 +114,8 @@ impl VauchiPlatform {
         // Initialize double ratchet
         let shared_key = contact.shared_key().clone();
         let their_exchange_key = *contact.public_key();
-        let ratchet = DoubleRatchetState::initialize_initiator(&shared_key, their_exchange_key);
+        let ratchet = DoubleRatchetState::initialize_initiator(&shared_key, their_exchange_key)
+            .map_err(|e| MobileError::ExchangeFailed(e.to_string()))?;
         storage.save_ratchet_state(&contact_id, &ratchet, true)?;
 
         Ok(MobileExchangeResult {
@@ -179,7 +180,8 @@ impl VauchiPlatform {
         storage.save_contact(&contact)?;
 
         // Initialize double ratchet with transport-derived shared key
-        let ratchet = DoubleRatchetState::initialize_initiator(&shared_key, public_key);
+        let ratchet = DoubleRatchetState::initialize_initiator(&shared_key, public_key)
+            .map_err(|e| MobileError::ExchangeFailed(e.to_string()))?;
         storage.save_ratchet_state(&contact_id, &ratchet, true)?;
 
         Ok(MobileExchangeResult {

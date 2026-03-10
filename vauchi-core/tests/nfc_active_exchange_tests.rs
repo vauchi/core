@@ -525,8 +525,10 @@ fn test_nfc_full_exchange_payload_crypto() {
     assert!(bob_parsed.verify_signature());
 
     // Symmetric DH
-    let alice_shared = alice_eph.diffie_hellman(alice_parsed.exchange_key());
-    let bob_shared = bob_eph.diffie_hellman(bob_parsed.exchange_key());
+    let alice_shared = alice_eph
+        .diffie_hellman(alice_parsed.exchange_key())
+        .unwrap();
+    let bob_shared = bob_eph.diffie_hellman(bob_parsed.exchange_key()).unwrap();
 
     assert_eq!(alice_shared, bob_shared, "NFC symmetric DH should match");
 
@@ -547,12 +549,16 @@ fn test_nfc_key_independence_from_qr() {
     // NFC path: fresh ephemerals
     let alice_nfc_eph = X3DHKeyPair::generate();
     let bob_nfc_eph = X3DHKeyPair::generate();
-    let nfc_shared = alice_nfc_eph.diffie_hellman(bob_nfc_eph.public_key());
+    let nfc_shared = alice_nfc_eph
+        .diffie_hellman(bob_nfc_eph.public_key())
+        .unwrap();
 
     // QR path: also uses fresh ephemerals (mutual QR)
     let alice_qr_eph = X3DHKeyPair::generate();
     let bob_qr_eph = X3DHKeyPair::generate();
-    let qr_shared = alice_qr_eph.diffie_hellman(bob_qr_eph.public_key());
+    let qr_shared = alice_qr_eph
+        .diffie_hellman(bob_qr_eph.public_key())
+        .unwrap();
 
     assert_ne!(
         nfc_shared, qr_shared,
@@ -588,8 +594,10 @@ fn test_nfc_apdu_round_trip_simulation() {
     assert!(alice_received.verify_signature());
 
     // Both compute shared secret
-    let alice_secret = alice_eph.diffie_hellman(alice_received.exchange_key());
-    let bob_secret = bob_eph.diffie_hellman(bob_received.exchange_key());
+    let alice_secret = alice_eph
+        .diffie_hellman(alice_received.exchange_key())
+        .unwrap();
+    let bob_secret = bob_eph.diffie_hellman(bob_received.exchange_key()).unwrap();
 
     assert_eq!(alice_secret, bob_secret);
 }

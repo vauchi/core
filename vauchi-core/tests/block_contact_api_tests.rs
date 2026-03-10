@@ -181,7 +181,7 @@ fn test_blocked_contact_update_rejected() {
         .unwrap();
 
     let mut bob_ratchet =
-        DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key());
+        DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key()).unwrap();
 
     // Create a valid encrypted update from Bob
     let old_card = ContactCard::new("Bob");

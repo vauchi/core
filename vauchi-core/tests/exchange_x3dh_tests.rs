@@ -48,7 +48,7 @@ fn test_x3dh_respond_key_differs_from_raw_dh() {
     .unwrap();
 
     // Compute the raw DH output (what respond would get without HKDF)
-    let raw_dh = responder_keys.diffie_hellman(&ephemeral_public);
+    let raw_dh = responder_keys.diffie_hellman(&ephemeral_public).unwrap();
 
     // The derived key MUST NOT equal the raw DH output — HKDF transforms it
     assert_ne!(
@@ -99,21 +99,34 @@ fn test_x3dh_identity_binding_wrong_key_fails() {
     );
 }
 
-/// Zero identity key must not produce a matching secret.
+/// Zero identity key must be rejected (non-contributory DH output).
 // @scenario: security.feature:Shared key derivation via X3DH
 #[test]
-fn test_x3dh_zero_identity_does_not_match() {
+fn test_x3dh_zero_identity_rejected() {
+    let bob_keys = X3DHKeyPair::generate();
+
+    // DH with zero public key must return error
+    let result = bob_keys.diffie_hellman(&[0u8; 32]);
+    assert!(
+        result.is_err(),
+        "Zero public key must be rejected as non-contributory"
+    );
+}
+
+/// X3DH respond with zero identity key must fail.
+// @scenario: security.feature:Shared key derivation via X3DH
+#[test]
+fn test_x3dh_respond_zero_identity_rejected() {
     let alice_keys = X3DHKeyPair::generate();
     let bob_keys = X3DHKeyPair::generate();
 
-    let (alice_secret, ephemeral) = X3DH::initiate(&alice_keys, bob_keys.public_key()).unwrap();
+    let (_alice_secret, ephemeral) = X3DH::initiate(&alice_keys, bob_keys.public_key()).unwrap();
 
-    // Bob responds with zero identity key
-    let bob_secret_zero = X3DH::respond(&bob_keys, &[0u8; 32], &ephemeral).unwrap();
-    assert_ne!(
-        alice_secret.as_bytes(),
-        bob_secret_zero.as_bytes(),
-        "Zero identity key must not produce matching secret"
+    // Bob responds with zero identity key — must fail at DH validation
+    let result = X3DH::respond(&bob_keys, &[0u8; 32], &ephemeral);
+    assert!(
+        result.is_err(),
+        "X3DH respond with zero identity key must be rejected"
     );
 }
 

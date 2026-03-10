@@ -4,6 +4,7 @@
 
 //! Exchange Error Types
 
+use crate::crypto::DhError;
 use thiserror::Error;
 
 /// Errors that can occur during contact exchange.
@@ -156,4 +157,7 @@ pub enum ExchangeError {
 
     #[error("BLE chunk reassembly failed: {0}")]
     BleChunkReassemblyFailed(String),
+
+    #[error("Non-contributory DH output: {0}")]
+    InvalidDhOutput(#[from] DhError),
 }

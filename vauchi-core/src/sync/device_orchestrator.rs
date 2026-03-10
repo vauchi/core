@@ -296,7 +296,7 @@ impl<'a> DeviceSyncOrchestrator<'a> {
         target_public_key: &[u8; 32],
         plaintext: &[u8],
     ) -> Result<Vec<u8>, DeviceSyncError> {
-        let encryption_key = self.derive_shared_key(target_public_key);
+        let encryption_key = self.derive_shared_key(target_public_key)?;
         encryption::encrypt(&encryption_key, plaintext)
             .map_err(|e| DeviceSyncError::Encryption(e.to_string()))
     }
@@ -312,22 +312,25 @@ impl<'a> DeviceSyncOrchestrator<'a> {
         sender_public_key: &[u8; 32],
         ciphertext: &[u8],
     ) -> Result<Vec<u8>, DeviceSyncError> {
-        let decryption_key = self.derive_shared_key(sender_public_key);
+        let decryption_key = self.derive_shared_key(sender_public_key)?;
         encryption::decrypt(&decryption_key, ciphertext)
             .map_err(|e| DeviceSyncError::Decryption(e.to_string()))
     }
 
     /// Derives a shared symmetric key from ECDH with another device.
-    fn derive_shared_key(&self, their_public_key: &[u8; 32]) -> SymmetricKey {
+    fn derive_shared_key(
+        &self,
+        their_public_key: &[u8; 32],
+    ) -> Result<SymmetricKey, DeviceSyncError> {
         // ECDH: our_secret * their_public -> shared_secret
         let shared_secret = self
             .current_device
             .exchange_keypair()
-            .diffie_hellman(their_public_key);
+            .diffie_hellman(their_public_key)?;
 
         // HKDF to derive encryption key
         let key_bytes = HKDF::derive_key(None, &shared_secret, DEVICE_SYNC_INFO);
-        SymmetricKey::from_bytes(*key_bytes)
+        Ok(SymmetricKey::from_bytes(*key_bytes))
     }
 
     // ============================================================

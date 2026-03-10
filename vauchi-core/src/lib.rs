@@ -9,7 +9,7 @@
 
 // --- future vauchi-crypto ---
 pub mod crypto;
-pub use crypto::{decrypt, encrypt, PublicKey, Signature, SigningKeyPair, SymmetricKey};
+pub use crypto::{decrypt, encrypt, DhError, PublicKey, Signature, SigningKeyPair, SymmetricKey};
 
 // --- future vauchi-i18n ---
 pub mod i18n;

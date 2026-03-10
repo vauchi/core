@@ -202,7 +202,8 @@ fn test_storage_save_load_ratchet_state() {
     // Create ratchet state (as initiator)
     let shared_secret = SymmetricKey::generate();
     let their_dh = X3DHKeyPair::generate();
-    let ratchet = DoubleRatchetState::initialize_initiator(&shared_secret, *their_dh.public_key());
+    let ratchet =
+        DoubleRatchetState::initialize_initiator(&shared_secret, *their_dh.public_key()).unwrap();
 
     // Save ratchet state
     storage
@@ -230,7 +231,7 @@ fn test_storage_ratchet_state_encryption() {
     let shared_secret = SymmetricKey::generate();
     let their_dh = X3DHKeyPair::generate();
     let mut ratchet =
-        DoubleRatchetState::initialize_initiator(&shared_secret, *their_dh.public_key());
+        DoubleRatchetState::initialize_initiator(&shared_secret, *their_dh.public_key()).unwrap();
 
     // Encrypt a message to advance the ratchet
     let _msg = ratchet.encrypt(b"test message").unwrap();
@@ -259,7 +260,8 @@ fn test_storage_ratchet_deleted_with_contact() {
 
     let shared_secret = SymmetricKey::generate();
     let their_dh = X3DHKeyPair::generate();
-    let ratchet = DoubleRatchetState::initialize_initiator(&shared_secret, *their_dh.public_key());
+    let ratchet =
+        DoubleRatchetState::initialize_initiator(&shared_secret, *their_dh.public_key()).unwrap();
 
     storage
         .save_ratchet_state(&contact_id, &ratchet, true)
@@ -306,7 +308,8 @@ fn test_storage_ratchet_per_contact_key_isolation() {
     // Create and save ratchet state for Alice
     let secret_a = SymmetricKey::generate();
     let dh_a = X3DHKeyPair::generate();
-    let ratchet_a = DoubleRatchetState::initialize_initiator(&secret_a, *dh_a.public_key());
+    let ratchet_a =
+        DoubleRatchetState::initialize_initiator(&secret_a, *dh_a.public_key()).unwrap();
     storage
         .save_ratchet_state(alice.id(), &ratchet_a, true)
         .unwrap();
@@ -314,7 +317,8 @@ fn test_storage_ratchet_per_contact_key_isolation() {
     // Create and save ratchet state for Bob
     let secret_b = SymmetricKey::generate();
     let dh_b = X3DHKeyPair::generate();
-    let ratchet_b = DoubleRatchetState::initialize_initiator(&secret_b, *dh_b.public_key());
+    let ratchet_b =
+        DoubleRatchetState::initialize_initiator(&secret_b, *dh_b.public_key()).unwrap();
     storage
         .save_ratchet_state(bob.id(), &ratchet_b, false)
         .unwrap();

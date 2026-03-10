@@ -386,8 +386,8 @@ fn test_ble_shared_keys_match() {
     let alice_eph = X3DHKeyPair::generate();
     let bob_eph = X3DHKeyPair::generate();
 
-    let alice_shared = alice_eph.diffie_hellman(bob_eph.public_key());
-    let bob_shared = bob_eph.diffie_hellman(alice_eph.public_key());
+    let alice_shared = alice_eph.diffie_hellman(bob_eph.public_key()).unwrap();
+    let bob_shared = bob_eph.diffie_hellman(alice_eph.public_key()).unwrap();
 
     assert_eq!(alice_shared, bob_shared, "BLE symmetric DH should match");
 }
@@ -580,8 +580,12 @@ fn test_ble_full_exchange_with_mock_transport() {
     assert!(alice_received.verify_signature());
 
     // Symmetric DH
-    let alice_shared = alice_eph.diffie_hellman(bob_received.exchange_key());
-    let bob_shared = bob_eph.diffie_hellman(alice_received.exchange_key());
+    let alice_shared = alice_eph
+        .diffie_hellman(bob_received.exchange_key())
+        .unwrap();
+    let bob_shared = bob_eph
+        .diffie_hellman(alice_received.exchange_key())
+        .unwrap();
 
     assert_eq!(
         alice_shared, bob_shared,

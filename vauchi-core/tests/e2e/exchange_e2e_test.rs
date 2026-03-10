@@ -80,7 +80,7 @@ fn test_contact_exchange_happy_path() {
     // Step 5: Initialize Double Ratchet for encrypted communication
     let bob_dh = X3DHKeyPair::generate();
     let alice_ratchet =
-        DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key());
+        DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key()).unwrap();
     let bob_ratchet = DoubleRatchetState::initialize_responder(&shared_secret, bob_dh);
 
     // Save ratchet states for future communication

@@ -96,7 +96,7 @@ fn test_relay_send_update() {
     let shared_secret = SymmetricKey::generate();
     let bob_dh = X3DHKeyPair::generate();
     let mut ratchet =
-        DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key());
+        DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key()).unwrap();
 
     // Send update
     let msg_id = client
@@ -131,7 +131,7 @@ fn test_relay_multiple_in_flight() {
     let shared_secret = SymmetricKey::generate();
     let bob_dh = X3DHKeyPair::generate();
     let mut ratchet =
-        DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key());
+        DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key()).unwrap();
 
     // Send multiple updates
     client
@@ -285,7 +285,7 @@ fn test_full_update_propagation() {
     // Set up ratchets
     let bob_dh = X3DHKeyPair::generate();
     let alice_ratchet =
-        DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key());
+        DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key()).unwrap();
     let bob_ratchet = DoubleRatchetState::initialize_responder(&shared_secret, bob_dh);
 
     alice_wb
@@ -401,7 +401,7 @@ fn test_relay_empty_payload() {
     let shared_secret = SymmetricKey::generate();
     let bob_dh = X3DHKeyPair::generate();
     let mut ratchet =
-        DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key());
+        DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key()).unwrap();
 
     // Empty payload should still work
     let result = client.send_update("recipient-id", &mut ratchet, b"", "update-empty");
@@ -427,7 +427,7 @@ fn test_relay_large_payload() {
     let shared_secret = SymmetricKey::generate();
     let bob_dh = X3DHKeyPair::generate();
     let mut ratchet =
-        DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key());
+        DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key()).unwrap();
 
     // Large payload (100KB)
     let large_payload = vec![0xABu8; 100 * 1024];

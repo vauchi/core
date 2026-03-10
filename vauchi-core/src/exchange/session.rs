@@ -444,7 +444,7 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
         // HKDF info binds all four public keys into the derivation (transcript binding),
         // preventing identity misbinding attacks. Keys are sorted lexicographically so
         // both sides compute identical info regardless of who is "Alice" vs "Bob".
-        let shared_bytes = self.our_x3dh.diffie_hellman(&their_exchange_key);
+        let shared_bytes = self.our_x3dh.diffie_hellman(&their_exchange_key)?;
         let our_id = self.identity.signing_public_key();
         let our_eph = self.our_x3dh.public_key();
         let (id_lo, id_hi) = if our_id < &their_public_key {

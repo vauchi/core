@@ -54,7 +54,7 @@ fn setup_exchange_with_ratchets() -> (
     // Alice is responder so she can decrypt Bob's messages.
     let alice_dh = X3DHKeyPair::generate();
     let bob_ratchet =
-        DoubleRatchetState::initialize_initiator(&shared_secret, *alice_dh.public_key());
+        DoubleRatchetState::initialize_initiator(&shared_secret, *alice_dh.public_key()).unwrap();
     let alice_ratchet = DoubleRatchetState::initialize_responder(&shared_secret, alice_dh);
 
     // Store Alice's ratchet for Bob in Alice's storage
@@ -324,7 +324,8 @@ fn test_decryption_failed_rejected() {
     let different_secret = SymmetricKey::generate();
     let wrong_dh = X3DHKeyPair::generate();
     let mut wrong_ratchet =
-        DoubleRatchetState::initialize_initiator(&different_secret, *wrong_dh.public_key());
+        DoubleRatchetState::initialize_initiator(&different_secret, *wrong_dh.public_key())
+            .unwrap();
     let ratchet_msg = wrong_ratchet.encrypt(b"some payload").unwrap();
     let ciphertext = serde_json::to_vec(&ratchet_msg).unwrap();
 

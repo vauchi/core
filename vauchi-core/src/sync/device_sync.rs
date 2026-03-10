@@ -163,6 +163,9 @@ pub enum DeviceSyncError {
 
     #[error("Send failed: {0}")]
     SendFailed(String),
+
+    #[error("DH validation failed: {0}")]
+    DhValidation(#[from] crate::crypto::DhError),
 }
 
 // ============================================================

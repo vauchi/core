@@ -59,7 +59,7 @@ fn test_sync_update_propagation_happy_path() {
     // Initialize ratchets
     let bob_dh = X3DHKeyPair::generate();
     let mut alice_ratchet =
-        DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key());
+        DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key()).unwrap();
     let mut bob_ratchet = DoubleRatchetState::initialize_responder(&shared_secret, bob_dh);
 
     // Step 2: Alice updates her card
@@ -338,7 +338,7 @@ fn test_relay_update_delivery_happy_path() {
     let shared_secret = SymmetricKey::generate();
     let bob_dh = X3DHKeyPair::generate();
     let mut alice_ratchet =
-        DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key());
+        DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key()).unwrap();
 
     // Send encrypted update through relay
     let update_payload = b"Card update data";

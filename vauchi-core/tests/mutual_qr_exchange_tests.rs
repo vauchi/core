@@ -224,8 +224,8 @@ fn test_key_agreement_symmetric() {
     let alice_keys = X3DHKeyPair::generate();
     let bob_keys = X3DHKeyPair::generate();
 
-    let alice_shared = alice_keys.diffie_hellman(bob_keys.public_key());
-    let bob_shared = bob_keys.diffie_hellman(alice_keys.public_key());
+    let alice_shared = alice_keys.diffie_hellman(bob_keys.public_key()).unwrap();
+    let bob_shared = bob_keys.diffie_hellman(alice_keys.public_key()).unwrap();
 
     assert_eq!(
         alice_shared, bob_shared,

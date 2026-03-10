@@ -12,6 +12,9 @@ use crate::ui::*;
 pub struct HelpItem {
     pub id: String,
     pub question: String,
+    /// Inline answer text (preferred for TUI / offline use).
+    pub answer: Option<String>,
+    /// External URL (used by mobile/desktop if no inline answer, or as "Learn more" link).
     pub answer_url: Option<String>,
     pub category: String,
 }
@@ -78,6 +81,14 @@ impl WorkflowEngine for HelpEngine {
         match action {
             UserAction::ListItemSelected { item_id, .. } => {
                 if let Some(item) = self.items.iter().find(|i| i.id == item_id) {
+                    // Prefer inline answer (works in TUI and offline)
+                    if let Some(ref answer) = item.answer {
+                        return ActionResult::ShowAlert {
+                            title: item.question.clone(),
+                            message: answer.clone(),
+                        };
+                    }
+                    // Fall back to URL for items without inline text
                     if let Some(ref url) = item.answer_url {
                         return ActionResult::OpenUrl { url: url.clone() };
                     }

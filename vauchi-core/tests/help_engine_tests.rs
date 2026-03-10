@@ -9,18 +9,21 @@ fn sample_items() -> Vec<HelpItem> {
         HelpItem {
             id: "q1".into(),
             question: "How do I add a contact?".into(),
+            answer: Some("Meet in person and use Exchange.".into()),
             answer_url: Some("https://docs.vauchi.app/faq/add-contact".into()),
             category: "Getting Started".into(),
         },
         HelpItem {
             id: "q2".into(),
             question: "What is end-to-end encryption?".into(),
+            answer: None,
             answer_url: Some("https://docs.vauchi.app/faq/e2e".into()),
             category: "Security".into(),
         },
         HelpItem {
             id: "q3".into(),
             question: "How do I create a backup?".into(),
+            answer: None,
             answer_url: None,
             category: "Getting Started".into(),
         },
@@ -65,7 +68,7 @@ fn help_groups_by_category() {
 }
 
 #[test]
-fn help_select_item_with_url_opens_url() {
+fn help_select_item_with_answer_shows_inline_alert() {
     let mut engine = HelpEngine::new(sample_items());
     let result = engine.handle_action(UserAction::ListItemSelected {
         component_id: "Getting Started".into(),
@@ -73,8 +76,25 @@ fn help_select_item_with_url_opens_url() {
     });
 
     match result {
+        ActionResult::ShowAlert { title, message } => {
+            assert_eq!(title, "How do I add a contact?");
+            assert_eq!(message, "Meet in person and use Exchange.");
+        }
+        other => panic!("Expected ShowAlert, got {:?}", other),
+    }
+}
+
+#[test]
+fn help_select_item_without_answer_falls_back_to_url() {
+    let mut engine = HelpEngine::new(sample_items());
+    let result = engine.handle_action(UserAction::ListItemSelected {
+        component_id: "Security".into(),
+        item_id: "q2".into(),
+    });
+
+    match result {
         ActionResult::OpenUrl { url } => {
-            assert_eq!(url, "https://docs.vauchi.app/faq/add-contact");
+            assert_eq!(url, "https://docs.vauchi.app/faq/e2e");
         }
         other => panic!("Expected OpenUrl, got {:?}", other),
     }

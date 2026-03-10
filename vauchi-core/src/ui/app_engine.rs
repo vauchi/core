@@ -585,36 +585,77 @@ impl<T: Transport> AppEngine<T> {
             HelpItem {
                 id: "add-contact".into(),
                 question: "How do I add a contact?".into(),
+                answer: Some(
+                    "Meet in person and go to Exchange. \
+                     Show your QR code or use Bluetooth to share your contact card. \
+                     Both parties must be present — Vauchi never exchanges contacts remotely."
+                        .into(),
+                ),
                 answer_url: Some("https://docs.vauchi.app/faq/add-contact".into()),
                 category: "Getting Started".into(),
             },
             HelpItem {
                 id: "e2e-encryption".into(),
                 question: "What is end-to-end encryption?".into(),
+                answer: Some(
+                    "End-to-end encryption means only you and your contact can read \
+                     your shared data. The relay server sees only encrypted blobs — \
+                     it cannot read names, fields, or any content. Keys are exchanged \
+                     in person and never leave your device."
+                        .into(),
+                ),
                 answer_url: Some("https://docs.vauchi.app/faq/e2e".into()),
                 category: "Security".into(),
             },
             HelpItem {
                 id: "create-backup".into(),
                 question: "How do I create a backup?".into(),
+                answer: Some(
+                    "Go to Settings > Backup & Restore. Choose Export to create an \
+                     encrypted backup file. Store it safely — you will need your \
+                     password to restore it. Backups include your identity, contacts, \
+                     and all field data."
+                        .into(),
+                ),
                 answer_url: Some("https://docs.vauchi.app/faq/backup".into()),
                 category: "Getting Started".into(),
             },
             HelpItem {
                 id: "recovery".into(),
                 question: "How does social recovery work?".into(),
+                answer: Some(
+                    "Social recovery lets trusted contacts help you regain access \
+                     if you lose your device. You choose recovery trustees from your \
+                     contacts. To recover, a threshold of trustees must confirm your \
+                     identity in person."
+                        .into(),
+                ),
                 answer_url: Some("https://docs.vauchi.app/faq/recovery".into()),
                 category: "Security".into(),
             },
             HelpItem {
                 id: "exchange-qr".into(),
                 question: "How do I exchange contact cards?".into(),
+                answer: Some(
+                    "Go to Exchange to show your QR code. Your contact scans it \
+                     with their Vauchi app (or vice versa). This establishes an \
+                     encrypted channel so future updates sync automatically. \
+                     Both parties must be physically present."
+                        .into(),
+                ),
                 answer_url: Some("https://docs.vauchi.app/faq/exchange".into()),
                 category: "Getting Started".into(),
             },
             HelpItem {
                 id: "tor-privacy".into(),
                 question: "How does Tor routing protect my privacy?".into(),
+                answer: Some(
+                    "When enabled, Vauchi routes relay connections through Tor, \
+                     hiding your IP address from the relay server. This prevents \
+                     the server from learning your location or network identity. \
+                     Enable it in Settings > Tor Privacy."
+                        .into(),
+                ),
                 answer_url: Some("https://docs.vauchi.app/faq/tor".into()),
                 category: "Privacy".into(),
             },

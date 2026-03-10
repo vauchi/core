@@ -9,41 +9,10 @@
 //!
 //! Feature file: features/onboarding.feature
 
-use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-/// Steps in the onboarding wizard.
-///
-/// The user progresses through these in order, though backward
-/// transitions are always allowed and some steps can be skipped.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
-pub enum OnboardingStep {
-    /// Pre-gate: does the user already have an identity?
-    IdentityCheck,
-    /// Pre-gate: choose how to restore (link device or import backup)
-    LinkChoice,
-    /// Welcome screen showing value proposition
-    Welcome,
-    /// Default display name entry (renamed from CreateIdentity)
-    #[serde(alias = "CreateIdentity")]
-    DefaultName,
-    /// Skip gate: user can skip to finish or continue setup
-    SkipGate,
-    /// Groups setup: create contact groups
-    GroupsSetup,
-    /// Contact info fields (phone, email) (renamed from AddFields)
-    #[serde(alias = "AddFields")]
-    ContactInfo,
-    /// Preview the contact card before continuing
-    PreviewCard,
-    /// Security explanation screen
-    SecurityExplanation,
-    /// Prompt to set up backup
-    BackupPrompt,
-    /// Onboarding complete, ready to use
-    Ready,
-}
+pub use crate::types::{OnboardingProgress, OnboardingStep};
 
 impl OnboardingStep {
     /// Returns all steps in order.
@@ -101,25 +70,6 @@ impl OnboardingStep {
     pub fn total() -> usize {
         Self::all().len()
     }
-}
-
-/// Tracks the user's progress through the onboarding wizard.
-///
-/// Follows the same persistence pattern as `DemoContactState` and
-/// `AhaMomentTracker` — serialized to JSON, encrypted, and stored
-/// in the `ux_state` table.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct OnboardingProgress {
-    /// The step the user is currently on.
-    pub current_step: OnboardingStep,
-    /// Steps that have been completed (visited and passed).
-    pub completed_steps: HashSet<OnboardingStep>,
-    /// Timestamp when onboarding was started (Unix epoch seconds).
-    pub started_at: Option<u64>,
-    /// Timestamp when onboarding was completed (Unix epoch seconds).
-    pub completed_at: Option<u64>,
-    /// Whether the user skipped the backup step.
-    pub skipped_backup: bool,
 }
 
 impl Default for OnboardingProgress {

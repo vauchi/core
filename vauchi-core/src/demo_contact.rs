@@ -12,6 +12,8 @@
 use serde::{Deserialize, Serialize};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
+pub use crate::types::DemoContactState;
+
 /// Demo contact display name
 pub const DEMO_CONTACT_NAME: &str = "Vauchi Tips";
 
@@ -111,25 +113,6 @@ pub fn get_demo_tips() -> Vec<DemoTip> {
             content: "Use Vauchi on your phone and tablet. Link devices in Settings and your data stays in sync across all of them.".to_string(),
         },
     ]
-}
-
-/// State of the demo contact
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct DemoContactState {
-    /// Whether the demo contact is active
-    pub is_active: bool,
-    /// Whether it was manually dismissed
-    pub was_dismissed: bool,
-    /// Whether it was auto-removed after first real exchange
-    pub auto_removed: bool,
-    /// Current tip index (which tip is being shown)
-    pub current_tip_index: usize,
-    /// Timestamp of last update (Unix epoch seconds)
-    pub last_update_timestamp: u64,
-    /// History of shown tip IDs
-    pub shown_tip_ids: Vec<String>,
-    /// Number of updates sent
-    pub update_count: u32,
 }
 
 impl DemoContactState {
@@ -259,6 +242,7 @@ pub struct DemoContactCard {
     pub tip_category: String,
 }
 
+// INLINE_TEST_REQUIRED: Tests use DemoContactState internals and time-dependent state via super::*
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -9,28 +9,7 @@
 //! by storage operations even when the network module is not compiled.
 //! The actual Tor transport implementation is in `network::tor`.
 
-use serde::{Deserialize, Serialize};
-
-/// Current status of the Tor connection.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub enum TorStatus {
-    /// Tor is not enabled.
-    Disabled,
-    /// Tor client is connecting to the network.
-    Connecting,
-    /// Tor client is bootstrapping (downloading directory info).
-    Bootstrapping {
-        /// Bootstrap progress percentage (0-100).
-        percentage: u8,
-    },
-    /// Tor client is connected and ready.
-    Connected,
-    /// Tor client is disconnected.
-    Disconnected {
-        /// Reason for disconnection.
-        reason: String,
-    },
-}
+pub use crate::types::{TorConfig, TorRelayAddress, TorStatus};
 
 impl std::fmt::Display for TorStatus {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -44,19 +23,6 @@ impl std::fmt::Display for TorStatus {
             TorStatus::Disconnected { reason } => write!(f, "Disconnected: {}", reason),
         }
     }
-}
-
-/// Configuration for Tor connectivity.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TorConfig {
-    /// Whether Tor mode is enabled.
-    pub enabled: bool,
-    /// Bridge addresses for censored networks (obfs4 format).
-    pub bridges: Vec<String>,
-    /// Whether to prefer .onion addresses when available.
-    pub prefer_onion: bool,
-    /// How often to rotate Tor circuits (in seconds). Default: 600 (10 minutes).
-    pub circuit_rotation_secs: u64,
 }
 
 impl Default for TorConfig {
@@ -172,15 +138,6 @@ impl TorConfig {
     }
 }
 
-/// A relay address that may have both clearnet and .onion URLs.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct TorRelayAddress {
-    /// The clearnet URL (e.g. wss://relay.vauchi.app).
-    pub clearnet_url: String,
-    /// The optional .onion URL.
-    pub onion_url: Option<String>,
-}
-
 impl TorRelayAddress {
     /// Creates a new relay address with only a clearnet URL.
     pub fn clearnet(url: impl Into<String>) -> Self {
@@ -211,6 +168,7 @@ impl TorRelayAddress {
     }
 }
 
+// INLINE_TEST_REQUIRED: Tests use private validate_bridge method and builder internals via super::*
 #[cfg(test)]
 mod tests {
     use super::*;

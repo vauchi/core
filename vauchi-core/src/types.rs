@@ -84,3 +84,122 @@ pub struct EmergencyBroadcastConfig {
     /// Whether to include device location in the alert.
     pub include_location: bool,
 }
+
+// --- UX types used by storage and API ---
+
+/// Steps in the onboarding wizard.
+///
+/// The user progresses through these in order, though backward
+/// transitions are always allowed and some steps can be skipped.
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize, PartialOrd, Ord,
+)]
+pub enum OnboardingStep {
+    /// Pre-gate: does the user already have an identity?
+    IdentityCheck,
+    /// Pre-gate: choose how to restore (link device or import backup)
+    LinkChoice,
+    /// Welcome screen showing value proposition
+    Welcome,
+    /// Default display name entry (renamed from CreateIdentity)
+    #[serde(alias = "CreateIdentity")]
+    DefaultName,
+    /// Skip gate: user can skip to finish or continue setup
+    SkipGate,
+    /// Groups setup: create contact groups
+    GroupsSetup,
+    /// Contact info fields (phone, email) (renamed from AddFields)
+    #[serde(alias = "AddFields")]
+    ContactInfo,
+    /// Preview the contact card before continuing
+    PreviewCard,
+    /// Security explanation screen
+    SecurityExplanation,
+    /// Prompt to set up backup
+    BackupPrompt,
+    /// Onboarding complete, ready to use
+    Ready,
+}
+
+/// Tracks the user's progress through the onboarding wizard.
+///
+/// Follows the same persistence pattern as `DemoContactState` and
+/// `AhaMomentTracker` — serialized to JSON, encrypted, and stored
+/// in the `ux_state` table.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct OnboardingProgress {
+    /// The step the user is currently on.
+    pub current_step: OnboardingStep,
+    /// Steps that have been completed (visited and passed).
+    pub completed_steps: std::collections::HashSet<OnboardingStep>,
+    /// Timestamp when onboarding was started (Unix epoch seconds).
+    pub started_at: Option<u64>,
+    /// Timestamp when onboarding was completed (Unix epoch seconds).
+    pub completed_at: Option<u64>,
+    /// Whether the user skipped the backup step.
+    pub skipped_backup: bool,
+}
+
+/// State of the demo contact.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
+pub struct DemoContactState {
+    /// Whether the demo contact is active.
+    pub is_active: bool,
+    /// Whether it was manually dismissed.
+    pub was_dismissed: bool,
+    /// Whether it was auto-removed after first real exchange.
+    pub auto_removed: bool,
+    /// Current tip index (which tip is being shown).
+    pub current_tip_index: usize,
+    /// Timestamp of last update (Unix epoch seconds).
+    pub last_update_timestamp: u64,
+    /// History of shown tip IDs.
+    pub shown_tip_ids: Vec<String>,
+    /// Number of updates sent.
+    pub update_count: u32,
+}
+
+// --- Tor types used by storage and network ---
+
+/// Current status of the Tor connection.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub enum TorStatus {
+    /// Tor is not enabled.
+    Disabled,
+    /// Tor client is connecting to the network.
+    Connecting,
+    /// Tor client is bootstrapping (downloading directory info).
+    Bootstrapping {
+        /// Bootstrap progress percentage (0-100).
+        percentage: u8,
+    },
+    /// Tor client is connected and ready.
+    Connected,
+    /// Tor client is disconnected.
+    Disconnected {
+        /// Reason for disconnection.
+        reason: String,
+    },
+}
+
+/// Configuration for Tor connectivity.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct TorConfig {
+    /// Whether Tor mode is enabled.
+    pub enabled: bool,
+    /// Bridge addresses for censored networks (obfs4 format).
+    pub bridges: Vec<String>,
+    /// Whether to prefer .onion addresses when available.
+    pub prefer_onion: bool,
+    /// How often to rotate Tor circuits (in seconds). Default: 600 (10 minutes).
+    pub circuit_rotation_secs: u64,
+}
+
+/// A relay address that may have both clearnet and .onion URLs.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
+pub struct TorRelayAddress {
+    /// The clearnet URL (e.g. wss://relay.vauchi.app).
+    pub clearnet_url: String,
+    /// The optional .onion URL.
+    pub onion_url: Option<String>,
+}

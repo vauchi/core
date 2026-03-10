@@ -13,6 +13,7 @@ pub mod shredding;
 pub mod signing;
 #[cfg(feature = "crypto-wasm")]
 pub mod wasm;
+pub mod x3dh;
 
 pub use chain::{ChainError, ChainKey, MessageKey};
 pub use encryption::{decrypt, decrypt_with_ad, encrypt, encrypt_with_ad, SymmetricKey};
@@ -21,3 +22,4 @@ pub use password_kdf::{derive_key_argon2id, PasswordKdfError};
 pub use ratchet::{DoubleRatchetState, RatchetError, RatchetMessage, RATCHET_STATE_VERSION};
 pub use shredding::ShreddingMasterKey;
 pub use signing::{PublicKey, Signature, SigningKeyPair};
+pub use x3dh::X3DHKeyPair;

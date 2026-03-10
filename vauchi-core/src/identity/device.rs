@@ -7,8 +7,8 @@
 //! Handles multi-device support for Vauchi identities.
 //! Each device gets unique communication keys derived from the master seed.
 
+use crate::crypto::X3DHKeyPair;
 use crate::crypto::{Signature, SigningKeyPair, HKDF};
-use crate::exchange::X3DHKeyPair;
 use serde::{Deserialize, Serialize};
 use std::time::{SystemTime, UNIX_EPOCH};
 use thiserror::Error;

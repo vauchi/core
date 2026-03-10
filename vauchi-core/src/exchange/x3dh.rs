@@ -25,65 +25,19 @@
 //!   parties' long-term X25519 keys, preventing key-compromise impersonation.
 
 use rand::rngs::OsRng;
-use x25519_dalek::{EphemeralSecret, PublicKey, StaticSecret};
+use x25519_dalek::{EphemeralSecret, PublicKey};
 use zeroize::Zeroize;
 
 use super::ExchangeError;
 use crate::crypto::kdf::HKDF;
 use crate::crypto::SymmetricKey;
+pub use crate::crypto::X3DHKeyPair;
 
 /// Domain separation info for X3DH key derivation via HKDF.
 ///
 /// Bumped from v1 to v2 when identity binding (DH1) was added.
 /// The IKM is now 64 bytes (DH1 ‖ DH2) instead of 32 bytes (DH2 only).
 const X3DH_KEY_INFO: &[u8] = b"vauchi-x3dh-key-v2";
-
-/// X25519 keypair for X3DH key agreement.
-///
-/// Used for establishing shared secrets during contact exchange.
-pub struct X3DHKeyPair {
-    /// The static secret key
-    secret: StaticSecret,
-    /// The public key (cached for efficiency)
-    public: PublicKey,
-}
-
-impl X3DHKeyPair {
-    /// Generates a new random X25519 keypair.
-    pub fn generate() -> Self {
-        let secret = StaticSecret::random_from_rng(OsRng);
-        let public = PublicKey::from(&secret);
-
-        X3DHKeyPair { secret, public }
-    }
-
-    /// Creates a keypair from a 32-byte seed.
-    pub fn from_bytes(bytes: [u8; 32]) -> Self {
-        let secret = StaticSecret::from(bytes);
-        let public = PublicKey::from(&secret);
-
-        X3DHKeyPair { secret, public }
-    }
-
-    /// Returns the public key bytes.
-    pub fn public_key(&self) -> &[u8; 32] {
-        self.public.as_bytes()
-    }
-
-    /// Returns the secret key bytes (for backup/restore).
-    pub fn secret_bytes(&self) -> [u8; 32] {
-        self.secret.to_bytes()
-    }
-
-    /// Performs Diffie-Hellman key agreement with a public key.
-    ///
-    /// Returns the 32-byte shared secret.
-    pub fn diffie_hellman(&self, their_public: &[u8; 32]) -> [u8; 32] {
-        let their_public_key = PublicKey::from(*their_public);
-        let shared = self.secret.diffie_hellman(&their_public_key);
-        *shared.as_bytes()
-    }
-}
 
 /// X3DH protocol implementation.
 ///
@@ -145,7 +99,7 @@ impl X3DH {
         let dh1 = our_keys.diffie_hellman(their_identity_public);
 
         // DH2: our_static × their_ephemeral (forward secrecy)
-        let dh2 = *our_keys.secret.diffie_hellman(&their_ephemeral).as_bytes();
+        let dh2 = our_keys.diffie_hellman_raw(&their_ephemeral);
 
         // Concatenate DH1 ‖ DH2 and derive via HKDF
         let mut ikm = [0u8; 64];

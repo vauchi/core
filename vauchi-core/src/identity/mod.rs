@@ -24,8 +24,8 @@ pub use device::{
     MAX_DEVICES,
 };
 
+use crate::crypto::X3DHKeyPair;
 use crate::crypto::{decrypt, derive_key_argon2id, encrypt, Signature, SigningKeyPair, HKDF};
-use crate::exchange::X3DHKeyPair;
 use aws_lc_rs::rand::SystemRandom;
 use thiserror::Error;
 use zeroize::{Zeroize, Zeroizing};

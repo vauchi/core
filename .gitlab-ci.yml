@@ -12,7 +12,7 @@
 #   lint (< 2 min) ──┬── test (< 15 min)
 #                     └── security (< 5 min)
 #
-# Nightly/release pipelines also run bench:save-baseline + bench:compare.
+# Nightly/release pipelines also run bench:save-baseline + bench:compare + perf:binary-size.
 #
 #   Lint must pass before tests or security run.
 #   Security runs parallel with tests.
@@ -50,6 +50,7 @@ include:
       - '/ci-templates/test-quality.yml'
       - '/ci-templates/mutation.yml'
       - '/ci-templates/benchmark.yml'
+      - '/ci-templates/perf.yml'
 
 stages:
   - auto-tag
@@ -180,6 +181,10 @@ lint:clippy:
     - !reference [.clone-locales, before_script]
     - !reference [.clone-themes, before_script]
 
+# Duplicate dependency check (advisory — detects multiple versions of same crate)
+lint:duplicates:
+  extends: [.linux-runner-nocache, .lint-duplicates-job, .timeout-quick]
+
 # REUSE compliance provided by vauchi/scripts ci-templates/reuse.yml
 
 # ============================================================
@@ -308,6 +313,18 @@ coverage:platform:
   variables:
     COVERAGE_PACKAGE: "vauchi-platform"
     COVERAGE_REPO_LABEL: "platform"
+
+# Binary size tracking — builds release and pushes metrics to Grafana.
+# Runs on main merges and release tags (not per-MR — release build is slow).
+perf:binary-size:
+  extends: [.binary-size-tracking-job, .linux-runner, .timeout-long]
+  before_script:
+    - !reference [.self-hosted, before_script]
+    - !reference [.clone-locales, before_script]
+    - !reference [.clone-themes, before_script]
+  variables:
+    BINARY_SIZE_PACKAGES: "vauchi-core vauchi-platform"
+    BINARY_SIZE_REPO_LABEL: "core"
 
 # ============================================================
 # Benchmark Stage — Performance Regression Gate (PI-10)

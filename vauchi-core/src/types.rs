@@ -52,3 +52,35 @@ pub enum AudioCapability {
     #[default]
     None,
 }
+
+// --- API types used by storage (breaks storage→api circular dep) ---
+
+/// Duress settings for emergency alert configuration.
+///
+/// Stored in the `duress_settings` table (migration V20).
+/// Determines which contacts receive alerts, what message is included,
+/// and whether device location is included.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct DuressSettings {
+    /// Contact IDs of trusted contacts who receive duress alerts.
+    pub alert_contact_ids: Vec<String>,
+    /// Custom alert message included in the alert payload.
+    pub alert_message: String,
+    /// Whether to include device location in the alert.
+    pub include_location: bool,
+}
+
+/// Emergency broadcast configuration.
+///
+/// Stored in the `emergency_config` table (migration V22).
+/// Determines which contacts receive alerts, what message is sent,
+/// and whether device location is included.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct EmergencyBroadcastConfig {
+    /// Contact IDs of trusted contacts who receive emergency alerts.
+    pub trusted_contact_ids: Vec<String>,
+    /// Custom alert message included in the alert payload.
+    pub message: String,
+    /// Whether to include device location in the alert.
+    pub include_location: bool,
+}

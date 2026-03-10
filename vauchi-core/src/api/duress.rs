@@ -34,17 +34,4 @@ pub enum DuressAlertType {
     Shred,
 }
 
-/// Configuration for duress alerts.
-///
-/// Stored in the `duress_settings` table (migration V20).
-/// Determines which contacts receive alerts, what message is included,
-/// and whether device location is included.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DuressSettings {
-    /// Contact IDs of trusted contacts who receive duress alerts.
-    pub alert_contact_ids: Vec<String>,
-    /// Custom alert message included in the alert payload.
-    pub alert_message: String,
-    /// Whether to include device location in the alert.
-    pub include_location: bool,
-}
+pub use crate::types::DuressSettings;

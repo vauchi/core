@@ -8,7 +8,8 @@ use vauchi_core::contact_card::ContactCard;
 use vauchi_core::crypto::SymmetricKey;
 use vauchi_core::network::MockTransport;
 use vauchi_core::ui::{
-    ActionResult, ActionStyle, AppEngine, AppScreen, Component, UserAction, WorkflowEngine,
+    ActionResult, ActionStyle, AppEngine, AppScreen, Component, FormDialogType, UserAction,
+    WorkflowEngine,
 };
 
 /// Drive through the full onboarding flow, returning the final ActionResult.
@@ -1288,8 +1289,6 @@ fn contact_visibility_toggle_updates_field() {
 
 // ── FormDialogEngine tests ────────────────────────────────────────────
 
-use vauchi_core::ui::FormDialogType;
-
 #[test]
 fn form_dialog_add_field_shows_two_inputs() {
     let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
@@ -1396,4 +1395,199 @@ proptest! {
                 "screen_id must never be empty");
         }
     }
+}
+
+// ── FormDialog completion tests ──────────────────────────────────────
+
+#[test]
+fn form_dialog_edit_name_saves_display_name() {
+    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    let mut engine = AppEngine::new(vauchi);
+
+    // Navigate to FormDialog for EditName
+    engine.navigate_to(AppScreen::FormDialog {
+        dialog_type: FormDialogType::EditName {
+            current_name: "Alice".into(),
+        },
+    });
+
+    // Type new name
+    let _ = engine.handle_action(UserAction::TextChanged {
+        component_id: "display_name".into(),
+        value: "Bob".into(),
+    });
+
+    // Submit — should save and navigate back
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "submit".into(),
+    });
+
+    assert!(
+        matches!(result, ActionResult::NavigateTo(_)),
+        "EditName submit should navigate back, got {result:?}"
+    );
+}
+
+#[test]
+fn form_dialog_edit_name_empty_returns_validation_error() {
+    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    let mut engine = AppEngine::new(vauchi);
+
+    engine.navigate_to(AppScreen::FormDialog {
+        dialog_type: FormDialogType::EditName {
+            current_name: "Alice".into(),
+        },
+    });
+
+    // Clear the name (set to empty)
+    let _ = engine.handle_action(UserAction::TextChanged {
+        component_id: "display_name".into(),
+        value: "".into(),
+    });
+
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "submit".into(),
+    });
+
+    assert!(
+        matches!(
+            result,
+            ActionResult::ValidationError {
+                ref component_id,
+                ..
+            } if component_id == "display_name"
+        ),
+        "Empty name should return ValidationError, got {result:?}"
+    );
+}
+
+#[test]
+fn form_dialog_add_field_saves_to_own_card() {
+    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    let mut engine = AppEngine::new(vauchi);
+
+    engine.navigate_to(AppScreen::FormDialog {
+        dialog_type: FormDialogType::AddField,
+    });
+
+    // Enter label and value
+    let _ = engine.handle_action(UserAction::TextChanged {
+        component_id: "field_label".into(),
+        value: "Phone".into(),
+    });
+    let _ = engine.handle_action(UserAction::TextChanged {
+        component_id: "field_value".into(),
+        value: "+41 79 123 45 67".into(),
+    });
+
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "submit".into(),
+    });
+
+    assert!(
+        matches!(result, ActionResult::NavigateTo(_)),
+        "AddField submit should navigate back, got {result:?}"
+    );
+}
+
+#[test]
+fn form_dialog_add_field_empty_label_returns_validation_error() {
+    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    let mut engine = AppEngine::new(vauchi);
+
+    engine.navigate_to(AppScreen::FormDialog {
+        dialog_type: FormDialogType::AddField,
+    });
+
+    // Leave label empty, set only value
+    let _ = engine.handle_action(UserAction::TextChanged {
+        component_id: "field_value".into(),
+        value: "some-value".into(),
+    });
+
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "submit".into(),
+    });
+
+    assert!(
+        matches!(
+            result,
+            ActionResult::ValidationError {
+                ref component_id,
+                ..
+            } if component_id == "field_label"
+        ),
+        "Empty label should return ValidationError, got {result:?}"
+    );
+}
+
+#[test]
+fn form_dialog_edit_field_saves_value() {
+    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+
+    // Add a field first so we have a field_id to edit
+    let field = vauchi_core::contact_card::ContactField::new(
+        vauchi_core::contact_card::FieldType::Phone,
+        "Phone",
+        "+41 79 000 00 00",
+    );
+    let field_id = field.id().to_string();
+    vauchi.add_own_field(field).unwrap();
+
+    let mut engine = AppEngine::new(vauchi);
+
+    engine.navigate_to(AppScreen::FormDialog {
+        dialog_type: FormDialogType::EditField {
+            field_id: field_id.clone(),
+            field_label: "Phone".into(),
+        },
+    });
+
+    // Change value
+    let _ = engine.handle_action(UserAction::TextChanged {
+        component_id: "field_value".into(),
+        value: "+41 79 999 99 99".into(),
+    });
+
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "submit".into(),
+    });
+
+    assert!(
+        matches!(result, ActionResult::NavigateTo(_)),
+        "EditField submit should navigate back, got {result:?}"
+    );
+}
+
+#[test]
+fn form_dialog_edit_relay_url_navigates_back() {
+    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    let mut engine = AppEngine::new(vauchi);
+
+    engine.navigate_to(AppScreen::FormDialog {
+        dialog_type: FormDialogType::EditRelayUrl {
+            current_url: "wss://relay.vauchi.app".into(),
+        },
+    });
+
+    let _ = engine.handle_action(UserAction::TextChanged {
+        component_id: "relay_url".into(),
+        value: "wss://custom.relay.example.com".into(),
+    });
+
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "submit".into(),
+    });
+
+    // EditRelayUrl is TUI-specific config — AppEngine just navigates back
+    assert!(
+        matches!(result, ActionResult::NavigateTo(_)),
+        "EditRelayUrl submit should navigate back, got {result:?}"
+    );
 }

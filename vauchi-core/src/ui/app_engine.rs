@@ -11,6 +11,7 @@
 use std::collections::HashMap;
 
 use crate::api::Vauchi;
+use crate::contact_card::{ContactField, FieldType};
 use crate::network::Transport;
 
 use super::action::{ActionResult, UserAction};
@@ -228,6 +229,75 @@ impl<T: Transport> AppEngine<T> {
             AppScreen::EmergencyShred => {
                 let screen = self.navigate_to_internal(AppScreen::Onboarding);
                 ActionResult::NavigateTo(screen)
+            }
+            AppScreen::FormDialog { ref dialog_type } => {
+                let input = self.engine.collected_input();
+                let result = match dialog_type {
+                    FormDialogType::EditName { .. } => {
+                        let name = input.unwrap_or_default();
+                        if name.trim().is_empty() {
+                            return ActionResult::ValidationError {
+                                component_id: "display_name".into(),
+                                message: "Display name cannot be empty".into(),
+                            };
+                        }
+                        self.vauchi.update_display_name(&name)
+                    }
+                    FormDialogType::EditField { field_id, .. } => {
+                        let value = input.unwrap_or_default();
+                        match self.vauchi.own_card() {
+                            Ok(Some(mut card)) => {
+                                if let Err(e) = card.update_field_value(field_id, &value) {
+                                    return ActionResult::ShowAlert {
+                                        title: "Error".into(),
+                                        message: format!("Failed to update field: {e}"),
+                                    };
+                                }
+                                self.vauchi.update_own_card(&card).map(|_| ())
+                            }
+                            Ok(None) => {
+                                return ActionResult::ShowAlert {
+                                    title: "Error".into(),
+                                    message: "No contact card found".into(),
+                                };
+                            }
+                            Err(e) => Err(e),
+                        }
+                    }
+                    FormDialogType::AddField => {
+                        let raw = input.unwrap_or_default();
+                        let mut lines = raw.splitn(2, '\n');
+                        let label = lines.next().unwrap_or("").trim();
+                        let value = lines.next().unwrap_or("").trim();
+                        if label.is_empty() {
+                            return ActionResult::ValidationError {
+                                component_id: "field_label".into(),
+                                message: "Label cannot be empty".into(),
+                            };
+                        }
+                        let field = ContactField::new(FieldType::Custom, label, value);
+                        self.vauchi.add_own_field(field)
+                    }
+                    FormDialogType::EditRelayUrl { .. } => {
+                        // Relay URL is TUI-specific config (Backend), not in Vauchi<T>.
+                        // Navigate back; TUI handles save via Backend::set_relay_url.
+                        Ok(())
+                    }
+                };
+                match result {
+                    Ok(()) => {
+                        // Invalidate parent screen cache so it refreshes with updated data
+                        if let Some(parent) = self.nav_history.last() {
+                            self.engine_cache.remove(parent);
+                        }
+                        let screen = self.navigate_back();
+                        ActionResult::NavigateTo(screen)
+                    }
+                    Err(e) => ActionResult::ShowAlert {
+                        title: "Error".into(),
+                        message: format!("{e}"),
+                    },
+                }
             }
             _ => {
                 let screen = self.navigate_back();

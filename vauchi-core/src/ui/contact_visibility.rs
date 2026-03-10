@@ -9,6 +9,7 @@ use crate::ui::*;
 /// Engine that displays per-field visibility toggles for a contact.
 #[derive(Clone, Debug)]
 pub struct ContactVisibilityEngine {
+    #[allow(dead_code)] // Used by future save logic (set_field_shown per contact)
     contact_id: String,
     contact_name: String,
     fields: Vec<ToggleItem>,

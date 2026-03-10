@@ -9,6 +9,7 @@ use crate::ui::*;
 /// Engine that displays details of a single contact group.
 #[derive(Clone, Debug)]
 pub struct GroupDetailEngine {
+    #[allow(dead_code)] // Used by future save logic (rename/delete group)
     group_id: String,
     group_name: String,
     members: Vec<ContactItem>,

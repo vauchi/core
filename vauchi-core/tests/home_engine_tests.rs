@@ -87,7 +87,7 @@ fn home_with_no_contacts_hides_view_all() {
     );
     let screen = engine.current_screen();
     assert_eq!(screen.actions.len(), 1);
-    assert_eq!(screen.actions[0].id, "add_contact");
+    assert_eq!(screen.actions[0].id, "add_field");
 }
 
 #[test]

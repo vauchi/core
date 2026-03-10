@@ -98,9 +98,9 @@ fn identity_check_has_info_panel_and_two_actions() {
         "IdentityCheck should have an InfoPanel"
     );
     assert_eq!(screen.actions.len(), 2);
-    assert_eq!(screen.actions[0].id, "have_identity");
+    assert_eq!(screen.actions[0].id, "create_new");
     assert!(matches!(screen.actions[0].style, ActionStyle::Primary));
-    assert_eq!(screen.actions[1].id, "create_new");
+    assert_eq!(screen.actions[1].id, "have_identity");
     assert!(matches!(screen.actions[1].style, ActionStyle::Secondary));
 }
 

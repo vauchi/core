@@ -1314,7 +1314,24 @@ fn form_dialog_add_field_type_selection_shows_value_inputs() {
     engine.navigate_to(AppScreen::FormDialog {
         dialog_type: FormDialogType::AddField,
     });
-    // Select "email" type
+
+    // Step 1: Select "contact" category
+    let result = engine.handle_action(UserAction::ListItemSelected {
+        component_id: "entry_categories".into(),
+        item_id: "contact".into(),
+    });
+    match &result {
+        ActionResult::UpdateScreen(screen) => {
+            assert_eq!(screen.screen_id, "form_add_field_type");
+            assert!(
+                screen.subtitle.as_deref().unwrap_or("").contains("Contact"),
+                "Should show Contact category subtitle"
+            );
+        }
+        other => panic!("Expected UpdateScreen for category, got {other:?}"),
+    }
+
+    // Step 2: Select "email" type within Contact category
     let result = engine.handle_action(UserAction::ListItemSelected {
         component_id: "entry_types".into(),
         item_id: "email".into(),
@@ -1901,10 +1918,20 @@ fn add_field_after_onboarding_identity_creation() {
         dialog_type: FormDialogType::AddField,
     });
 
-    // Step 1: Select type (two-step form)
+    // Step 1: Select category (three-step form: category → type → value)
     let screen = engine.current_screen();
     assert_eq!(screen.screen_id, "form_add_field_type");
 
+    let result = engine.handle_action(UserAction::ListItemSelected {
+        component_id: "entry_categories".into(),
+        item_id: "contact".into(),
+    });
+    assert!(
+        matches!(result, ActionResult::UpdateScreen(_)),
+        "Category selection should update screen, got {result:?}"
+    );
+
+    // Step 2: Select type within category
     let result = engine.handle_action(UserAction::ListItemSelected {
         component_id: "entry_types".into(),
         item_id: "email".into(),
@@ -1914,7 +1941,7 @@ fn add_field_after_onboarding_identity_creation() {
         "Type selection should update screen, got {result:?}"
     );
 
-    // Step 2: Enter value
+    // Step 3: Enter value
     let screen = engine.current_screen();
     assert_eq!(screen.screen_id, "form_add_field");
 

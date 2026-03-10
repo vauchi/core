@@ -10,7 +10,7 @@
 //! SP-12b Phase 1: Core Glue — Task 7
 
 use vauchi_core::crypto::SymmetricKey;
-use vauchi_core::delivery::{OfflineManager, RetryScheduler};
+use vauchi_core::network::delivery::{OfflineManager, RetryScheduler};
 use vauchi_core::storage::{
     DeliveryRecord, DeliveryStatus, OfflineQueue, PendingUpdate, RetryEntry, Storage, UpdateStatus,
 };

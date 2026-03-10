@@ -5,7 +5,7 @@
 //! Tests for delivery::key_rotation
 //! Key change detection for delivery error handling.
 
-use vauchi_core::delivery::{KeyRotationDetector, KeyRotationError};
+use vauchi_core::network::delivery::{KeyRotationDetector, KeyRotationError};
 
 // @scenario: message_delivery:Key rotation detected during send
 // @scenario: message_delivery.feature:Handle recipient key rotation

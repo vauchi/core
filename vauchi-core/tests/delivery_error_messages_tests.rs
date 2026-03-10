@@ -5,7 +5,7 @@
 //! Tests for delivery::error_messages
 //! Human-readable failure reason mapping.
 
-use vauchi_core::delivery::failure_to_user_message;
+use vauchi_core::network::delivery::failure_to_user_message;
 
 // @scenario: message_delivery:User sees meaningful error for failed delivery
 #[test]

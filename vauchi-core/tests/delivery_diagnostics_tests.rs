@@ -5,7 +5,7 @@
 //! Tests for delivery::diagnostics
 //! Connectivity and delivery troubleshooting API.
 
-use vauchi_core::delivery::ConnectivityDiagnostics;
+use vauchi_core::network::delivery::ConnectivityDiagnostics;
 
 // @scenario: message_delivery:User can diagnose delivery problems
 #[test]

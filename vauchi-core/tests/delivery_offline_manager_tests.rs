@@ -8,7 +8,7 @@
 //! SP-12b Phase 1: Core Glue — Task 6
 
 use vauchi_core::crypto::SymmetricKey;
-use vauchi_core::delivery::OfflineManager;
+use vauchi_core::network::delivery::OfflineManager;
 use vauchi_core::storage::{OfflineQueue, PendingUpdate, Storage, UpdateStatus};
 
 fn test_storage() -> Storage {

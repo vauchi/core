@@ -10,7 +10,9 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use crate::crypto::ratchet::DoubleRatchetState;
-use crate::delivery::{DeliveryAckStatus, DeliveryService, OfflineManager, RetryScheduler};
+use crate::network::delivery::{
+    DeliveryAckStatus, DeliveryService, OfflineManager, RetryScheduler,
+};
 use crate::network::{ConnectionState, RelayClient, Transport};
 use crate::storage::Storage;
 use crate::sync::device_sync::SyncItem;

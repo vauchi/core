@@ -8,7 +8,7 @@
 //! SP-12b Phase 1: Core Glue — Task 3
 
 use vauchi_core::crypto::SymmetricKey;
-use vauchi_core::delivery::{DeliveryAckStatus, DeliveryService};
+use vauchi_core::network::delivery::{DeliveryAckStatus, DeliveryService};
 use vauchi_core::storage::{
     DeliveryRecord, DeliveryStatus, DeviceDeliveryRecord, DeviceDeliveryStatus, RetryEntry, Storage,
 };

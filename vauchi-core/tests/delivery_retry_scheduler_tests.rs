@@ -8,7 +8,7 @@
 //! SP-12b Phase 1: Core Glue — Task 5
 
 use vauchi_core::crypto::SymmetricKey;
-use vauchi_core::delivery::RetryScheduler;
+use vauchi_core::network::delivery::RetryScheduler;
 use vauchi_core::storage::{DeliveryRecord, DeliveryStatus, RetryEntry, Storage};
 
 fn test_storage() -> Storage {

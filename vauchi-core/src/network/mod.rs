@@ -149,3 +149,11 @@ pub use tor::{ArtiTorConnector, TorManager};
 // Message classification
 mod classify;
 pub use classify::{classify_message, MessageType};
+
+// Delivery service (message delivery tracking, retries, offline queue)
+pub mod delivery;
+pub use delivery::error_messages::failure_to_user_message;
+pub use delivery::{
+    CleanupResult, ConnectivityDiagnostics, ConnectivityReport, DeliveryAckStatus, DeliveryService,
+    KeyRotationDetector, KeyRotationError, OfflineManager, RetryScheduler, RetryTickResult,
+};

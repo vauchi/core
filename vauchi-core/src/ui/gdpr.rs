@@ -11,6 +11,8 @@ use crate::ui::*;
 pub struct GdprEngine {
     deletion_status: Option<String>,
     consent_summary: String,
+    /// Tracks which action triggered completion ("export" or "delete").
+    last_action: Option<String>,
 }
 
 impl GdprEngine {
@@ -18,6 +20,7 @@ impl GdprEngine {
         Self {
             deletion_status,
             consent_summary,
+            last_action: None,
         }
     }
 
@@ -94,11 +97,21 @@ impl WorkflowEngine for GdprEngine {
     fn handle_action(&mut self, action: UserAction) -> ActionResult {
         match action {
             UserAction::ActionPressed { action_id } => match action_id.as_str() {
-                "export" => ActionResult::UpdateScreen(self.build_screen()),
-                "delete" => ActionResult::UpdateScreen(self.build_screen()),
+                "export" => {
+                    self.last_action = Some("export".into());
+                    ActionResult::Complete
+                }
+                "delete" => {
+                    self.last_action = Some("delete".into());
+                    ActionResult::Complete
+                }
                 _ => ActionResult::UpdateScreen(self.build_screen()),
             },
             _ => ActionResult::UpdateScreen(self.build_screen()),
         }
+    }
+
+    fn collected_input(&self) -> Option<String> {
+        self.last_action.clone()
     }
 }

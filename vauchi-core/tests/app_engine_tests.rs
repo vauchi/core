@@ -1687,7 +1687,7 @@ fn duplicate_detection_merge_navigates_back() {
 }
 
 #[test]
-fn duplicate_detection_dismiss_navigates_back() {
+fn duplicate_detection_dismiss_stays_on_screen() {
     let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
     let mut engine = AppEngine::new(vauchi);
@@ -1695,10 +1695,10 @@ fn duplicate_detection_dismiss_navigates_back() {
     let result = engine.handle_action(UserAction::ActionPressed {
         action_id: "dismiss".into(),
     });
-    // Engine returns Complete, AppEngine intercepts and navigates back
+    // Dismiss stays on screen (only merge triggers navigation back)
     assert!(
-        matches!(result, ActionResult::NavigateTo(_)),
-        "dismiss action should navigate back, got {result:?}"
+        matches!(result, ActionResult::UpdateScreen(_)),
+        "dismiss should stay on screen, got {result:?}"
     );
 }
 
@@ -1758,7 +1758,7 @@ fn contact_merge_confirm_navigates_back() {
 }
 
 #[test]
-fn contact_merge_cancel_navigates_back() {
+fn contact_merge_cancel_stays_on_screen() {
     let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
     let mut engine = AppEngine::new(vauchi);
@@ -1771,9 +1771,10 @@ fn contact_merge_cancel_navigates_back() {
     let result = engine.handle_action(UserAction::ActionPressed {
         action_id: "cancel".into(),
     });
+    // Cancel stays on screen (only confirm triggers navigation back)
     assert!(
-        matches!(result, ActionResult::NavigateTo(_)),
-        "cancel should navigate back, got {result:?}"
+        matches!(result, ActionResult::UpdateScreen(_)),
+        "cancel should stay on screen, got {result:?}"
     );
 }
 

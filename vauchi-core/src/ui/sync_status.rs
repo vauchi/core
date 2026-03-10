@@ -77,7 +77,16 @@ impl WorkflowEngine for SyncStatusEngine {
     fn handle_action(&mut self, action: UserAction) -> ActionResult {
         match action {
             UserAction::ActionPressed { action_id } => match action_id.as_str() {
-                "sync_now" | "test_connection" => ActionResult::UpdateScreen(self.build_screen()),
+                "sync_now" => ActionResult::ShowAlert {
+                    title: "Sync".into(),
+                    message: "Manual sync will be available in a future update. \
+                              Contacts sync automatically when connected to the relay."
+                        .into(),
+                },
+                "test_connection" => ActionResult::ShowAlert {
+                    title: "Connection Test".into(),
+                    message: format!("Testing connection to {}...\nConnection test will be available in a future update.", self.relay_url),
+                },
                 _ => ActionResult::UpdateScreen(self.build_screen()),
             },
             _ => ActionResult::UpdateScreen(self.build_screen()),

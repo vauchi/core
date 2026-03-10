@@ -73,7 +73,14 @@ impl WorkflowEngine for GroupDetailEngine {
     fn handle_action(&mut self, action: UserAction) -> ActionResult {
         match action {
             UserAction::ActionPressed { action_id } => match action_id.as_str() {
-                "rename" | "delete_group" => ActionResult::UpdateScreen(self.build_screen()),
+                "rename" => ActionResult::ShowAlert {
+                    title: "Coming Soon".into(),
+                    message: "Group renaming will be available in a future update.".into(),
+                },
+                "delete_group" => ActionResult::ShowAlert {
+                    title: "Coming Soon".into(),
+                    message: "Group deletion will be available in a future update.".into(),
+                },
                 _ => ActionResult::UpdateScreen(self.build_screen()),
             },
             _ => ActionResult::UpdateScreen(self.build_screen()),

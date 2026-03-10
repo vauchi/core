@@ -80,7 +80,14 @@ impl WorkflowEngine for RecoveryEngine {
     fn handle_action(&mut self, action: UserAction) -> ActionResult {
         match action {
             UserAction::ActionPressed { action_id } => match action_id.as_str() {
-                "claim" | "status" => ActionResult::UpdateScreen(self.build_screen()),
+                "claim" => ActionResult::ShowAlert {
+                    title: "Coming Soon".into(),
+                    message: "Social recovery will be available in a future update.".into(),
+                },
+                "status" => ActionResult::ShowAlert {
+                    title: "Recovery Status".into(),
+                    message: "No active recovery claims.".into(),
+                },
                 _ => ActionResult::UpdateScreen(self.build_screen()),
             },
             _ => ActionResult::UpdateScreen(self.build_screen()),

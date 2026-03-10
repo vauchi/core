@@ -45,7 +45,10 @@ impl WorkflowEngine for GroupsEngine {
     fn handle_action(&mut self, action: UserAction) -> ActionResult {
         match action {
             UserAction::ActionPressed { action_id } => match action_id.as_str() {
-                "create_group" => ActionResult::UpdateScreen(self.build_screen()),
+                "create_group" => ActionResult::ShowAlert {
+                    title: "Coming Soon".into(),
+                    message: "Group creation will be available in a future update.".into(),
+                },
                 _ => ActionResult::UpdateScreen(self.build_screen()),
             },
             _ => ActionResult::UpdateScreen(self.build_screen()),

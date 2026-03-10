@@ -68,7 +68,23 @@ impl WorkflowEngine for ContactVisibilityEngine {
                 }
                 ActionResult::UpdateScreen(self.build_screen())
             }
+            UserAction::ActionPressed { action_id } if action_id == "save" => {
+                ActionResult::Complete
+            }
             _ => ActionResult::UpdateScreen(self.build_screen()),
         }
+    }
+
+    fn collected_input(&self) -> Option<String> {
+        // Return visibility state as "field_id:visible,field_id:hidden,..."
+        let parts: Vec<String> = self
+            .fields
+            .iter()
+            .map(|f| {
+                let state = if f.selected { "visible" } else { "hidden" };
+                format!("{}:{}", f.id, state)
+            })
+            .collect();
+        Some(parts.join(","))
     }
 }

@@ -93,7 +93,8 @@ impl WorkflowEngine for DuplicateDetectionEngine {
     fn handle_action(&mut self, action: UserAction) -> ActionResult {
         match action {
             UserAction::ActionPressed { action_id } => match action_id.as_str() {
-                "merge" | "dismiss" => ActionResult::Complete,
+                "merge" => ActionResult::Complete,
+                "dismiss" => ActionResult::UpdateScreen(self.build_screen()),
                 _ => ActionResult::UpdateScreen(self.build_screen()),
             },
             _ => ActionResult::UpdateScreen(self.build_screen()),

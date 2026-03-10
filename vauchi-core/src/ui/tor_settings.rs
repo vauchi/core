@@ -58,25 +58,12 @@ impl TorSettingsEngine {
                     ],
                 },
             ],
-            actions: vec![
-                ScreenAction {
-                    id: if self.enabled { "disable" } else { "enable" }.into(),
-                    label: if self.enabled {
-                        "Disable Tor"
-                    } else {
-                        "Enable Tor"
-                    }
-                    .into(),
-                    style: ActionStyle::Primary,
-                    enabled: true,
-                },
-                ScreenAction {
-                    id: "new_circuit".into(),
-                    label: "New Circuit".into(),
-                    style: ActionStyle::Secondary,
-                    enabled: self.enabled,
-                },
-            ],
+            actions: vec![ScreenAction {
+                id: "new_circuit".into(),
+                label: "New Circuit".into(),
+                style: ActionStyle::Secondary,
+                enabled: self.enabled,
+            }],
             progress: None,
         }
     }
@@ -90,15 +77,12 @@ impl WorkflowEngine for TorSettingsEngine {
     fn handle_action(&mut self, action: UserAction) -> ActionResult {
         match action {
             UserAction::ActionPressed { action_id } => match action_id.as_str() {
-                "enable" => {
-                    self.enabled = true;
-                    ActionResult::UpdateScreen(self.build_screen())
-                }
-                "disable" => {
-                    self.enabled = false;
-                    ActionResult::UpdateScreen(self.build_screen())
-                }
-                "new_circuit" => ActionResult::UpdateScreen(self.build_screen()),
+                "new_circuit" => ActionResult::ShowAlert {
+                    title: "New Circuit".into(),
+                    message: "Requesting new Tor circuit... \
+                              This feature will be available when Tor integration is complete."
+                        .into(),
+                },
                 _ => ActionResult::UpdateScreen(self.build_screen()),
             },
             UserAction::ItemToggled {

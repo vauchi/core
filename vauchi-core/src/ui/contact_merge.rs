@@ -110,7 +110,7 @@ impl WorkflowEngine for ContactMergeEngine {
         match action {
             UserAction::ActionPressed { action_id } => match action_id.as_str() {
                 "confirm" => ActionResult::Complete,
-                "cancel" => ActionResult::Complete,
+                "cancel" => ActionResult::UpdateScreen(self.build_screen()),
                 _ => ActionResult::UpdateScreen(self.build_screen()),
             },
             _ => ActionResult::UpdateScreen(self.build_screen()),

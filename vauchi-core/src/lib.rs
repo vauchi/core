@@ -19,6 +19,8 @@ pub use i18n::{
 };
 
 // --- future vauchi-types ---
+pub mod types;
+pub use types::{AudioCapability, ExchangeTransport, ProximityConfidence};
 pub mod contact;
 pub mod contact_card;
 pub mod identity;
@@ -47,8 +49,7 @@ pub mod capability;
 pub mod exchange;
 pub use exchange::{
     EncryptedExchangeMessage, ExchangeError, ExchangeEvent, ExchangeQR, ExchangeSession,
-    MockProximityVerifier, ProximityConfidence, ProximityError, ProximityVerifier, X3DHKeyPair,
-    X3DH,
+    MockProximityVerifier, ProximityError, ProximityVerifier, X3DHKeyPair, X3DH,
 };
 
 // --- future vauchi-recovery ---

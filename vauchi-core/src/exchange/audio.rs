@@ -58,19 +58,7 @@ impl Default for AudioConfig {
     }
 }
 
-/// Represents device audio capabilities.
-#[derive(Debug, Clone, Default, PartialEq, serde::Serialize, serde::Deserialize)]
-pub enum AudioCapability {
-    /// Device supports full ultrasonic audio (speaker + microphone)
-    Full,
-    /// Device can only emit ultrasonic audio (no microphone)
-    EmitOnly,
-    /// Device can only receive ultrasonic audio (no speaker)
-    ReceiveOnly,
-    /// Device does not support ultrasonic audio
-    #[default]
-    None,
-}
+pub use crate::types::AudioCapability;
 
 /// Ultrasonic audio proximity verifier.
 ///

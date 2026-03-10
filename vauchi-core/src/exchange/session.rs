@@ -23,21 +23,7 @@ use crate::identity::Identity;
 const SESSION_TIMEOUT: Duration = Duration::from_secs(60);
 
 /// Transport mechanism used for this exchange session.
-#[derive(
-    Debug, Clone, Copy, PartialEq, Eq, Hash, Default, serde::Serialize, serde::Deserialize,
-)]
-pub enum ExchangeTransport {
-    /// QR exchange: both sides display and scan QR codes.
-    /// Both use fresh ephemeral X25519 keys for full forward secrecy.
-    #[default]
-    Qr,
-    /// NFC Active (phone-to-phone tap): single tap replaces scan + proximity.
-    /// Fresh ephemeral X25519 keys on both sides.
-    Nfc,
-    /// BLE exchange: GATT-based payload exchange with proximity verification.
-    /// Fresh ephemeral X25519 keys on both sides.
-    Ble,
-}
+pub use crate::types::ExchangeTransport;
 
 /// State of an exchange session.
 #[derive(Debug)]

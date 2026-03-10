@@ -281,16 +281,4 @@ impl ProximityVerifier for ManualConfirmationVerifier {
     }
 }
 
-/// Confidence level of physical proximity during contact exchange.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub enum ProximityConfidence {
-    /// High confidence: verified by ultrasonic audio or NFC tap.
-    High,
-    /// Medium confidence: manual user confirmation.
-    Medium,
-    /// Low confidence: proximity check failed or timed out.
-    Low,
-    /// Unknown: no proximity check was performed (legacy contacts).
-    #[default]
-    Unknown,
-}
+pub use crate::types::ProximityConfidence;

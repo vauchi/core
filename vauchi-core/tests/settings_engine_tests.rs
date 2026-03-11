@@ -122,7 +122,17 @@ fn settings_device_count_in_detail() {
     let screen = engine.current_screen();
 
     let detail = find_link_detail(&screen, "security", "devices");
-    assert_eq!(detail.as_deref(), Some("3 device(s)"));
+    assert_eq!(detail.as_deref(), Some("3 devices"));
+}
+
+#[test]
+fn settings_single_device_no_plural() {
+    let mut config = sample_config();
+    config.device_count = 1;
+    let engine = SettingsEngine::new(config);
+    let screen = engine.current_screen();
+    let detail = find_link_detail(&screen, "security", "devices");
+    assert_eq!(detail.as_deref(), Some("1 device"));
 }
 
 // --- helpers ---

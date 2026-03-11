@@ -198,26 +198,32 @@ impl<T: Transport> AppEngine<T> {
         self.engine_cache.clear();
     }
 
-    /// Returns `true` if the current engine has user-entered data that would
-    /// be lost on cancel. Used by frontends to show a "discard changes?" prompt.
+    /// Returns `true` if the current engine has user-entered data that differs
+    /// from the original. Used by frontends to show a "discard changes?" prompt.
     pub fn form_has_data(&self) -> bool {
-        if !matches!(self.screen, AppScreen::FormDialog { .. }) {
-            return false;
-        }
-        match self.engine.collected_input() {
-            Some(input) => {
-                // For AddField: format is "type\nnote\nvalue\ngroups"
-                // Check if note or value are non-empty
+        let dialog_type = match &self.screen {
+            AppScreen::FormDialog { dialog_type } => dialog_type,
+            _ => return false,
+        };
+        let input = match self.engine.collected_input() {
+            Some(v) => v,
+            None => return false,
+        };
+        match dialog_type {
+            FormDialogType::AddField { .. } => {
+                // Format: "type\nnote\nvalue\ngroups"
                 let parts: Vec<&str> = input.splitn(4, '\n').collect();
                 if parts.len() >= 3 {
                     let note = parts.get(1).unwrap_or(&"").trim();
                     let value = parts.get(2).unwrap_or(&"").trim();
                     !note.is_empty() || !value.is_empty()
                 } else {
-                    !input.trim().is_empty()
+                    false
                 }
             }
-            None => false,
+            FormDialogType::EditField { current_value, .. } => input != *current_value,
+            FormDialogType::EditName { current_name } => input != *current_name,
+            FormDialogType::EditRelayUrl { current_url } => input != *current_url,
         }
     }
 

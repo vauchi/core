@@ -84,7 +84,11 @@ impl WorkflowEngine for SettingsEngine {
                         id: "devices".into(),
                         label: "Devices".into(),
                         kind: SettingsItemKind::Link {
-                            detail: Some(format!("{} device(s)", self.config.device_count)),
+                            detail: Some(if self.config.device_count == 1 {
+                                "1 device".to_string()
+                            } else {
+                                format!("{} devices", self.config.device_count)
+                            }),
                         },
                     },
                     SettingsItem {

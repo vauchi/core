@@ -419,11 +419,18 @@ impl<T: Transport> AppEngine<T> {
             }
             AppScreen::Exchange => {
                 let card = vauchi.own_card().ok().flatten();
+                let available_groups = vauchi
+                    .list_groups()
+                    .unwrap_or_default()
+                    .iter()
+                    .map(|g| (g.id().to_string(), g.name().to_string()))
+                    .collect();
                 let config = ExchangeConfig {
                     own_name: card
                         .map(|c| c.display_name().to_string())
                         .unwrap_or_default(),
                     own_qr_data: vauchi.public_id().unwrap_or_default(),
+                    available_groups,
                 };
                 Box::new(ExchangeEngine::new(config))
             }

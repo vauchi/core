@@ -2,32 +2,32 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! Home screen engine — single screen showing recent contacts and setup progress.
+//! MyInfo screen engine — shows user's own card, entries, and visibility controls.
 
 use crate::ui::*;
 
-/// Progress summary for the home screen.
+/// Progress summary for the MyInfo screen.
 #[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
 #[derive(Clone, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub struct HomeProgress {
+pub struct MyInfoProgress {
     pub completed_steps: usize,
     pub total_steps: usize,
 }
 
-/// Home screen engine — single screen showing recent contacts and setup progress.
+/// MyInfo screen engine — shows user's own card, entries, and visibility.
 #[derive(Clone, Debug)]
-pub struct HomeEngine {
+pub struct MyInfoEngine {
     contacts: Vec<ContactItem>,
-    progress: HomeProgress,
+    progress: MyInfoProgress,
 }
 
-impl HomeEngine {
-    pub fn new(contacts: Vec<ContactItem>, progress: HomeProgress) -> Self {
+impl MyInfoEngine {
+    pub fn new(contacts: Vec<ContactItem>, progress: MyInfoProgress) -> Self {
         Self { contacts, progress }
     }
 }
 
-impl WorkflowEngine for HomeEngine {
+impl WorkflowEngine for MyInfoEngine {
     fn current_screen(&self) -> ScreenModel {
         let mut components = Vec::new();
 
@@ -69,8 +69,8 @@ impl WorkflowEngine for HomeEngine {
         }
 
         ScreenModel {
-            screen_id: "home".into(),
-            title: "Home".into(),
+            screen_id: "my_info".into(),
+            title: "My Info".into(),
             subtitle: None,
             components,
             actions,

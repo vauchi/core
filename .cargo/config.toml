@@ -4,6 +4,7 @@
 
 # Rust-analyzer proc-macro support
 [build]
+rustc-wrapper = "sccache"
 rustflags = ["--cfg", "rust_analyzer"]
 
 # Use mold linker on Linux for faster linking (2-5x speedup)

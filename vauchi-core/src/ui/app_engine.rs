@@ -35,8 +35,8 @@ use super::gdpr::GdprEngine;
 use super::group_detail::GroupDetailEngine;
 use super::groups_list::GroupsEngine;
 use super::help::{HelpEngine, HelpItem};
-use super::home::{HomeEngine, HomeProgress};
 use super::lock_screen::LockScreenEngine;
+use super::my_info::{MyInfoEngine, MyInfoProgress};
 use super::onboarding::OnboardingEngine;
 use super::recovery_status::RecoveryEngine;
 use super::screen::ScreenModel;
@@ -49,7 +49,7 @@ use super::tor_settings::TorSettingsEngine;
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum AppScreen {
     Onboarding,
-    Home,
+    MyInfo,
     Contacts,
     ContactDetail {
         contact_id: String,
@@ -120,7 +120,7 @@ impl<T: Transport> AppEngine<T> {
         } else if vauchi.is_password_enabled().unwrap_or(false) {
             AppScreen::Lock
         } else {
-            AppScreen::Home
+            AppScreen::MyInfo
         };
         let engine = Self::create_engine(&vauchi, &screen);
         Self {
@@ -171,7 +171,7 @@ impl<T: Transport> AppEngine<T> {
 
     /// Navigate back using the history stack. Falls back to Home if empty.
     pub fn navigate_back(&mut self) -> ScreenModel {
-        let target = self.nav_history.pop().unwrap_or(AppScreen::Home);
+        let target = self.nav_history.pop().unwrap_or(AppScreen::MyInfo);
         self.navigate_to_internal(target)
     }
 
@@ -198,9 +198,9 @@ impl<T: Transport> AppEngine<T> {
             return vec![AppScreen::Onboarding];
         }
         vec![
-            AppScreen::Home,
-            AppScreen::Contacts,
             AppScreen::Exchange,
+            AppScreen::MyInfo,
+            AppScreen::Contacts,
             AppScreen::Settings,
             AppScreen::Help,
         ]
@@ -220,7 +220,7 @@ impl<T: Transport> AppEngine<T> {
                 };
                 match self.vauchi.create_identity(&name) {
                     Ok(()) => {
-                        let screen = self.navigate_to_internal(AppScreen::Home);
+                        let screen = self.navigate_to_internal(AppScreen::MyInfo);
                         ActionResult::NavigateTo(screen)
                     }
                     Err(e) => ActionResult::ShowAlert {
@@ -241,7 +241,7 @@ impl<T: Transport> AppEngine<T> {
                 };
                 match self.vauchi.authenticate(&pin) {
                     Ok(_auth_mode) => {
-                        let screen = self.navigate_to_internal(AppScreen::Home);
+                        let screen = self.navigate_to_internal(AppScreen::MyInfo);
                         ActionResult::NavigateTo(screen)
                     }
                     Err(_) => {
@@ -361,20 +361,20 @@ impl<T: Transport> AppEngine<T> {
     fn create_engine(vauchi: &Vauchi<T>, screen: &AppScreen) -> Box<dyn WorkflowEngine> {
         match screen {
             AppScreen::Onboarding => Box::new(OnboardingEngine::new()),
-            AppScreen::Home => {
+            AppScreen::MyInfo => {
                 let mut contacts = Self::load_contact_items(vauchi);
-                contacts.truncate(5); // Home shows recent contacts only
+                contacts.truncate(5); // MyInfo shows recent contacts
                 let progress = vauchi
                     .get_setup_progress()
-                    .map(|sp| HomeProgress {
+                    .map(|sp| MyInfoProgress {
                         completed_steps: sp.completed_steps,
                         total_steps: sp.total_steps,
                     })
-                    .unwrap_or(HomeProgress {
+                    .unwrap_or(MyInfoProgress {
                         completed_steps: 0,
                         total_steps: 6,
                     });
-                Box::new(HomeEngine::new(contacts, progress))
+                Box::new(MyInfoEngine::new(contacts, progress))
             }
             AppScreen::Contacts => {
                 let contacts = Self::load_contact_items(vauchi);

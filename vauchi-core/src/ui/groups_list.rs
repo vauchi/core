@@ -255,7 +255,7 @@ mod tests {
     fn test_mode_toggle_switches_to_members() {
         let mut engine = GroupsEngine::new(sample_groups(), GroupsMode::Visibility);
 
-        engine.handle_action(UserAction::ItemToggled {
+        let _ = engine.handle_action(UserAction::ItemToggled {
             component_id: "mode_toggle".into(),
             item_id: "members".into(),
         });

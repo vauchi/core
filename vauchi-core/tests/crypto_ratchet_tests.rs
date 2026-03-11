@@ -6,7 +6,6 @@
 //! Extracted from ratchet.rs
 
 use vauchi_core::crypto::*;
-use vauchi_core::*;
 
 fn create_test_pair() -> (DoubleRatchetState, DoubleRatchetState) {
     // Simulate X3DH: both parties derive the same shared secret

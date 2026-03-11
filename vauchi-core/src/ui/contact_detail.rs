@@ -371,7 +371,7 @@ mod tests {
             sample_shared_info(),
         );
 
-        engine.handle_action(UserAction::ItemToggled {
+        let _ = engine.handle_action(UserAction::ItemToggled {
             component_id: "view_mode".into(),
             item_id: "my_info_for_them".into(),
         });
@@ -398,11 +398,11 @@ mod tests {
         );
 
         // Switch to MyInfoForThem then back
-        engine.handle_action(UserAction::ItemToggled {
+        let _ = engine.handle_action(UserAction::ItemToggled {
             component_id: "view_mode".into(),
             item_id: "my_info_for_them".into(),
         });
-        engine.handle_action(UserAction::ItemToggled {
+        let _ = engine.handle_action(UserAction::ItemToggled {
             component_id: "view_mode".into(),
             item_id: "their_info".into(),
         });

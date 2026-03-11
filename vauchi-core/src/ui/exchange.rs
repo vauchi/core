@@ -396,19 +396,19 @@ mod tests {
         let mut engine = ExchangeEngine::new(config_with_groups());
 
         // Select a group
-        engine.handle_action(UserAction::ItemToggled {
+        let _ = engine.handle_action(UserAction::ItemToggled {
             component_id: "group_picker".into(),
             item_id: "g2".into(),
         });
-        engine.handle_action(UserAction::ActionPressed {
+        let _ = engine.handle_action(UserAction::ActionPressed {
             action_id: "continue".into(),
         });
 
         // Continue through ShowQr → ScanQr → Verifying → Success
-        engine.handle_action(UserAction::ActionPressed {
+        let _ = engine.handle_action(UserAction::ActionPressed {
             action_id: "continue".into(),
         });
-        engine.handle_action(UserAction::TextChanged {
+        let _ = engine.handle_action(UserAction::TextChanged {
             component_id: "scanned_data".into(),
             value: "their-qr".into(),
         });

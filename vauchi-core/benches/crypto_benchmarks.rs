@@ -176,7 +176,7 @@ fn bench_double_ratchet(c: &mut Criterion) {
                 // Setup: create a fresh initiator state that can send
                 let secret = SymmetricKey::generate();
                 let bob = X3DHKeyPair::generate();
-                DoubleRatchetState::initialize_initiator(&secret, *bob.public_key())
+                DoubleRatchetState::initialize_initiator(&secret, *bob.public_key()).unwrap()
             },
             |mut ratchet| ratchet.encrypt(black_box(message)),
             criterion::BatchSize::SmallInput,
@@ -191,7 +191,7 @@ fn bench_double_ratchet(c: &mut Criterion) {
                 let bob_keys = X3DHKeyPair::generate();
                 let bob_pub = *bob_keys.public_key();
 
-                let mut alice = DoubleRatchetState::initialize_initiator(&secret, bob_pub);
+                let mut alice = DoubleRatchetState::initialize_initiator(&secret, bob_pub).unwrap();
                 let encrypted = alice.encrypt(message).unwrap();
 
                 let bob = DoubleRatchetState::initialize_responder(&secret, bob_keys);

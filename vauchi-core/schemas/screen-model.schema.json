@@ -583,6 +583,14 @@
         "name": {
           "type": "string"
         },
+        "searchable_fields": {
+          "description": "Field values available for search (phone numbers, emails, etc.). Not displayed directly — used by ContactListEngine for full-text search.",
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
         "status": {
           "type": [
             "string",
@@ -919,10 +927,28 @@
     },
     "VisibilityMode": {
       "description": "How field visibility is controlled in the UI.",
-      "type": "string",
-      "enum": [
-        "ShowHide",
-        "PerGroup"
+      "oneOf": [
+        {
+          "description": "No visibility column — display fields read-only.",
+          "type": "string",
+          "enum": [
+            "ReadOnly"
+          ]
+        },
+        {
+          "description": "Show/hide toggle per field.",
+          "type": "string",
+          "enum": [
+            "ShowHide"
+          ]
+        },
+        {
+          "description": "Per-group visibility controls.",
+          "type": "string",
+          "enum": [
+            "PerGroup"
+          ]
+        }
       ]
     }
   }

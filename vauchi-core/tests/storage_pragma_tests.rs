@@ -127,6 +127,62 @@ fn test_auto_vacuum_full() {
 }
 
 // ============================================================================
+// File permission tests
+// ============================================================================
+
+/// Database file should be created with 0600 permissions (owner-only).
+#[cfg(unix)]
+#[test]
+fn test_database_file_permissions_0600() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let dir = tempfile::tempdir().unwrap();
+    let db_path = dir.path().join("test.db");
+
+    // File must not exist before Storage::open creates it
+    assert!(!db_path.exists());
+
+    let _storage = Storage::open(&db_path, SymmetricKey::generate()).unwrap();
+
+    let perms = std::fs::metadata(&db_path).unwrap().permissions();
+    let mode = perms.mode() & 0o777;
+    assert_eq!(
+        mode, 0o600,
+        "Database file should have 0600 permissions, got {:o}",
+        mode
+    );
+}
+
+/// Existing database files should not have their permissions changed on reopen.
+#[cfg(unix)]
+#[test]
+fn test_existing_database_permissions_preserved() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let dir = tempfile::tempdir().unwrap();
+    let db_path = dir.path().join("test.db");
+
+    // Create DB, then drop it
+    {
+        let _storage = Storage::open(&db_path, SymmetricKey::generate()).unwrap();
+    }
+
+    // Manually widen permissions (simulate user choice)
+    std::fs::set_permissions(&db_path, std::fs::Permissions::from_mode(0o644)).unwrap();
+
+    // Reopen — should NOT reset permissions
+    let _storage = Storage::open(&db_path, SymmetricKey::generate()).unwrap();
+
+    let perms = std::fs::metadata(&db_path).unwrap().permissions();
+    let mode = perms.mode() & 0o777;
+    assert_eq!(
+        mode, 0o644,
+        "Existing file permissions should be preserved, got {:o}",
+        mode
+    );
+}
+
+// ============================================================================
 // Display name index tests (Migration V12)
 // ============================================================================
 

@@ -49,6 +49,7 @@ mod mobile_visibility;
 mod mobile_wifi_aware;
 mod multipart_qr;
 mod multistage_exchange;
+mod platform_app_engine;
 mod protocol;
 mod sync;
 mod types;
@@ -91,6 +92,7 @@ pub use mobile_ui::{
 };
 pub use mobile_wifi_aware::{wifi_aware_check_availability, MobileWifiAwareStatus};
 pub use multipart_qr::{encode_multipart, MobileMultipartDecoder, MultipartDecoder};
+pub use platform_app_engine::PlatformAppEngine;
 pub use types::{
     MobileAhaMoment, MobileAhaMomentType, MobileAuthMode, MobileBroadcastResult,
     MobileConsentRecord, MobileConsentStatus, MobileConsentType, MobileContact, MobileContactCard,

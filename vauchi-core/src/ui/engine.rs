@@ -10,7 +10,7 @@ use super::{ActionResult, ScreenModel, UserAction};
 ///
 /// Core describes screens via `current_screen()`. Frontends render them.
 /// User interactions flow back via `handle_action()`.
-pub trait WorkflowEngine {
+pub trait WorkflowEngine: Send {
     /// Returns the current screen to render.
     fn current_screen(&self) -> ScreenModel;
 

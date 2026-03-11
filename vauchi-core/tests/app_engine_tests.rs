@@ -1928,3 +1928,108 @@ fn add_field_after_onboarding_identity_creation() {
         other => panic!("Unexpected result: {other:?}"),
     }
 }
+
+#[test]
+fn app_screen_serde_roundtrip_simple_variants() {
+    let screens = vec![
+        AppScreen::Onboarding,
+        AppScreen::MyInfo,
+        AppScreen::Contacts,
+        AppScreen::Exchange,
+        AppScreen::Settings,
+        AppScreen::Help,
+        AppScreen::Backup,
+        AppScreen::Lock,
+        AppScreen::DeviceLinking,
+        AppScreen::DuressPin,
+        AppScreen::EmergencyShred,
+        AppScreen::DeliveryStatus,
+        AppScreen::Sync,
+        AppScreen::TorSettings,
+        AppScreen::Recovery,
+        AppScreen::Groups,
+        AppScreen::Privacy,
+        AppScreen::Support,
+        AppScreen::ContactDuplicates,
+        AppScreen::ContactLimit,
+    ];
+    for screen in &screens {
+        let json = serde_json::to_string(screen).expect("serialize");
+        let deserialized: AppScreen = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(&deserialized, screen, "roundtrip failed for {screen:?}");
+    }
+}
+
+#[test]
+fn app_screen_serde_roundtrip_parameterized_variants() {
+    let screens = vec![
+        AppScreen::ContactDetail {
+            contact_id: "contact-123".into(),
+        },
+        AppScreen::ContactEdit {
+            contact_id: "contact-456".into(),
+        },
+        AppScreen::ContactVisibility {
+            contact_id: "contact-789".into(),
+        },
+        AppScreen::GroupDetail {
+            group_id: "group-1".into(),
+        },
+        AppScreen::MyInfoEntryDetail {
+            field_id: "field-0".into(),
+        },
+        AppScreen::ContactMerge {
+            primary_name: "Alice".into(),
+            primary_fields: vec!["phone".into()],
+            secondary_name: "Bob".into(),
+            secondary_fields: vec!["email".into()],
+        },
+        AppScreen::FormDialog {
+            dialog_type: FormDialogType::EditName {
+                current_name: "Alice".into(),
+            },
+        },
+    ];
+    for screen in &screens {
+        let json = serde_json::to_string(screen).expect("serialize");
+        let deserialized: AppScreen = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(&deserialized, screen, "roundtrip failed for {screen:?}");
+    }
+}
+
+#[test]
+fn form_dialog_type_serde_roundtrip() {
+    let variants = vec![
+        FormDialogType::AddField {
+            available_groups: vec![("g1".into(), "Family".into())],
+        },
+        FormDialogType::EditField {
+            field_id: "f1".into(),
+            field_label: "Phone".into(),
+            current_value: "+1234".into(),
+        },
+        FormDialogType::EditName {
+            current_name: "Alice".into(),
+        },
+        FormDialogType::EditRelayUrl {
+            current_url: "wss://relay.example.com".into(),
+        },
+    ];
+    for variant in &variants {
+        let json = serde_json::to_string(variant).expect("serialize");
+        let deserialized: FormDialogType = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(&deserialized, variant, "roundtrip failed for {variant:?}");
+    }
+}
+
+#[test]
+fn app_screen_form_dialog_serde_roundtrip() {
+    let screen = AppScreen::FormDialog {
+        dialog_type: FormDialogType::EditName {
+            current_name: "Bob".into(),
+        },
+    };
+    let json = serde_json::to_string(&screen).expect("serialize");
+    let deserialized: AppScreen = serde_json::from_str(&json).expect("deserialize");
+    assert_eq!(deserialized, screen);
+}

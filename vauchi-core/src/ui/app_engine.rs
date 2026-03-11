@@ -10,6 +10,8 @@
 
 use std::collections::HashMap;
 
+use serde::{Deserialize, Serialize};
+
 use crate::api::Vauchi;
 use crate::contact_card::{ContactField, FieldType};
 use crate::network::Transport;
@@ -47,7 +49,7 @@ use super::sync_status::SyncStatusEngine;
 use super::tor_settings::TorSettingsEngine;
 
 /// Top-level screens in the application.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum AppScreen {
     Onboarding,
     MyInfo,

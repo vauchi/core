@@ -4,12 +4,14 @@
 
 //! Generic form dialog engine — handles AddField, EditField, EditName, EditRelayUrl.
 
+use serde::{Deserialize, Serialize};
+
 use crate::contact_card::{CatalogEntry, FieldTypeCatalog};
 use crate::social::SocialNetworkRegistry;
 use crate::ui::*;
 
 /// The type of form dialog, determining which fields are shown.
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum FormDialogType {
     AddField {
         /// Available groups for visibility selection: (group_id, group_name).

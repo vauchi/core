@@ -198,6 +198,29 @@ impl<T: Transport> AppEngine<T> {
         self.engine_cache.clear();
     }
 
+    /// Returns `true` if the current engine has user-entered data that would
+    /// be lost on cancel. Used by frontends to show a "discard changes?" prompt.
+    pub fn form_has_data(&self) -> bool {
+        if !matches!(self.screen, AppScreen::FormDialog { .. }) {
+            return false;
+        }
+        match self.engine.collected_input() {
+            Some(input) => {
+                // For AddField: format is "type\nnote\nvalue\ngroups"
+                // Check if note or value are non-empty
+                let parts: Vec<&str> = input.splitn(4, '\n').collect();
+                if parts.len() >= 3 {
+                    let note = parts.get(1).unwrap_or(&"").trim();
+                    let value = parts.get(2).unwrap_or(&"").trim();
+                    !note.is_empty() || !value.is_empty()
+                } else {
+                    !input.trim().is_empty()
+                }
+            }
+            None => false,
+        }
+    }
+
     /// Returns all groups as (id, name) pairs for UI forms.
     pub fn available_groups(&self) -> Vec<(String, String)> {
         self.vauchi
@@ -1115,10 +1138,12 @@ impl<T: Transport> WorkflowEngine for AppEngine<T> {
                         .and_then(|a| a.downcast_ref::<MyInfoEntryDetailEngine>())
                     {
                         let label = engine.label.clone();
+                        let value = engine.value.clone();
                         let screen = self.navigate_to(AppScreen::FormDialog {
                             dialog_type: FormDialogType::EditField {
                                 field_id: field_id.clone(),
                                 field_label: label,
+                                current_value: value,
                             },
                         });
                         return ActionResult::NavigateTo(screen);

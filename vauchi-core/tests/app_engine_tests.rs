@@ -1566,6 +1566,7 @@ fn form_dialog_edit_field_saves_value() {
         dialog_type: FormDialogType::EditField {
             field_id: field_id.clone(),
             field_label: "Phone".into(),
+            current_value: "+1 555 123 4567".into(),
         },
     });
 

@@ -225,9 +225,30 @@ fn form_dialog_edit_field_screen_id() {
     let engine = FormDialogEngine::new(FormDialogType::EditField {
         field_id: "f1".into(),
         field_label: "Email".into(),
+        current_value: "old@example.com".into(),
     });
     let screen = engine.current_screen();
     assert_eq!(screen.screen_id, "form_edit_field");
+}
+
+#[test]
+fn form_dialog_edit_field_prefills_current_value() {
+    let engine = FormDialogEngine::new(FormDialogType::EditField {
+        field_id: "f1".into(),
+        field_label: "Email".into(),
+        current_value: "old@example.com".into(),
+    });
+    let screen = engine.current_screen();
+
+    let prefilled = screen.components.iter().any(|c| {
+        matches!(c,
+            Component::TextInput { id, value, .. } if id == "field_value" && value == "old@example.com"
+        )
+    });
+    assert!(
+        prefilled,
+        "field_value input should be prefilled with 'old@example.com'"
+    );
 }
 
 #[test]
@@ -235,6 +256,7 @@ fn form_dialog_edit_field_submit_completes() {
     let mut engine = FormDialogEngine::new(FormDialogType::EditField {
         field_id: "f1".into(),
         field_label: "Email".into(),
+        current_value: String::new(),
     });
     let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "field_value".into(),
@@ -251,6 +273,7 @@ fn form_dialog_edit_field_collected_input() {
     let mut engine = FormDialogEngine::new(FormDialogType::EditField {
         field_id: "f1".into(),
         field_label: "Email".into(),
+        current_value: String::new(),
     });
     let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "field_value".into(),
@@ -339,6 +362,7 @@ fn form_dialog_text_changed_updates_value() {
     let mut engine = FormDialogEngine::new(FormDialogType::EditField {
         field_id: "f1".into(),
         field_label: "Phone".into(),
+        current_value: String::new(),
     });
 
     let result = engine.handle_action(UserAction::TextChanged {

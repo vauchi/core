@@ -18,6 +18,7 @@ pub enum FormDialogType {
     EditField {
         field_id: String,
         field_label: String,
+        current_value: String,
     },
     EditName {
         current_name: String,
@@ -61,8 +62,8 @@ impl FormDialogEngine {
                 ("field_note".into(), String::new()),
                 ("field_value".into(), String::new()),
             ],
-            FormDialogType::EditField { .. } => {
-                vec![("field_value".into(), String::new())]
+            FormDialogType::EditField { current_value, .. } => {
+                vec![("field_value".into(), current_value.clone())]
             }
             FormDialogType::EditName { current_name } => {
                 vec![("display_name".into(), current_name.clone())]

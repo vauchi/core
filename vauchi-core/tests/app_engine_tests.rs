@@ -124,8 +124,8 @@ fn navigate_to_home_shows_home_screen() {
     let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
     let mut engine = AppEngine::new(vauchi);
-    let screen = engine.navigate_to(AppScreen::Home);
-    assert_eq!(screen.screen_id, "home");
+    let screen = engine.navigate_to(AppScreen::MyInfo);
+    assert_eq!(screen.screen_id, "my_info");
 }
 
 #[test]
@@ -219,7 +219,7 @@ fn app_engine_detects_persisted_identity() {
     let engine = AppEngine::new(vauchi2);
     assert_eq!(
         engine.current_app_screen(),
-        &AppScreen::Home,
+        &AppScreen::MyInfo,
         "AppEngine should start on Home when identity exists in storage"
     );
 }
@@ -240,7 +240,7 @@ fn available_screens_with_identity_has_main_nav() {
     vauchi.create_identity("Alice").unwrap();
     let engine = AppEngine::new(vauchi);
     let screens = engine.available_screens();
-    assert!(screens.contains(&AppScreen::Home));
+    assert!(screens.contains(&AppScreen::MyInfo));
     assert!(screens.contains(&AppScreen::Contacts));
     assert!(screens.contains(&AppScreen::Settings));
     assert!(!screens.contains(&AppScreen::Onboarding));
@@ -291,10 +291,10 @@ fn onboarding_complete_navigates_to_home() {
         panic!("expected NavigateTo, got {result:?}");
     };
     assert_eq!(
-        screen.screen_id, "home",
+        screen.screen_id, "my_info",
         "onboarding completion should navigate to home"
     );
-    assert_eq!(engine.current_app_screen(), &AppScreen::Home);
+    assert_eq!(engine.current_app_screen(), &AppScreen::MyInfo);
 }
 
 #[test]
@@ -302,7 +302,7 @@ fn app_engine_starts_on_home_with_identity() {
     let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
     let engine = AppEngine::new(vauchi);
-    assert_eq!(engine.current_app_screen(), &AppScreen::Home);
+    assert_eq!(engine.current_app_screen(), &AppScreen::MyInfo);
 }
 
 #[test]
@@ -339,36 +339,20 @@ fn onboarding_completion_without_name_returns_validation_error() {
 // ── setup progress tests ────────────────────────────────────────────
 
 #[test]
-fn home_screen_shows_real_setup_progress() {
+fn home_screen_no_setup_progress() {
     let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
     let engine = AppEngine::new(vauchi);
 
     let screen = engine.current_screen();
-    assert_eq!(screen.screen_id, "home");
+    assert_eq!(screen.screen_id, "my_info");
 
-    // Find the setup_progress StatusIndicator component
-    let progress_component = screen
+    // Setup progress should no longer be shown on MyInfo
+    let has_progress = screen
         .components
         .iter()
-        .find(|c| matches!(c, vauchi_core::ui::Component::StatusIndicator { id, .. } if id == "setup_progress"))
-        .expect("home screen should have a setup_progress component");
-
-    // After create_identity, identity_created and card_has_fields are true (2/6),
-    // NOT the old hardcoded 3/3
-    if let vauchi_core::ui::Component::StatusIndicator { detail, .. } = progress_component {
-        let detail = detail.as_ref().expect("should have detail text");
-        assert!(
-            detail.contains("of 6"),
-            "total_steps should be 6 (from get_setup_progress), got: {detail}"
-        );
-        assert!(
-            !detail.contains("of 3"),
-            "should not have old hardcoded total of 3, got: {detail}"
-        );
-    } else {
-        panic!("expected StatusIndicator");
-    }
+        .any(|c| matches!(c, vauchi_core::ui::Component::StatusIndicator { id, .. } if id == "setup_progress"));
+    assert!(!has_progress, "MyInfo should not show setup progress");
 }
 
 /// Verify that a whitespace-only name is also rejected.
@@ -438,7 +422,7 @@ fn onboarding_complete_creates_identity_in_vauchi() {
         "identity should be persisted after onboarding"
     );
     assert!(
-        engine.available_screens().contains(&AppScreen::Home),
+        engine.available_screens().contains(&AppScreen::MyInfo),
         "should have full nav after identity created"
     );
 }
@@ -446,51 +430,45 @@ fn onboarding_complete_creates_identity_in_vauchi() {
 // ── home screen contact limit tests ─────────────────────────────────
 
 #[test]
-fn home_screen_limits_displayed_contacts_to_five() {
+fn my_info_shows_own_fields_via_app_engine() {
     let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
-
-    // Add 7 contacts to exceed the home-screen limit of 5 (T-3)
-    for i in 0..7 {
-        let card = ContactCard::new(&format!("Contact {i}"));
-        let mut key_bytes = [0u8; 32];
-        key_bytes[0] = i + 10; // unique public keys
-        let shared_key = SymmetricKey::generate();
-        let contact = Contact::from_exchange(key_bytes, card, shared_key);
-        vauchi.add_contact(contact).unwrap();
-    }
+    vauchi
+        .add_own_field(vauchi_core::contact_card::ContactField::new(
+            vauchi_core::contact_card::FieldType::Phone,
+            "Mobile",
+            "+41 79 123 45 67",
+        ))
+        .unwrap();
 
     let engine = AppEngine::new(vauchi);
     let screen = engine.current_screen();
-    assert_eq!(screen.screen_id, "home");
+    assert_eq!(screen.screen_id, "my_info");
 
-    // Find the ContactList component and verify it has at most 5 contacts
-    let contact_list = screen
+    // MyInfo should show own fields in an ActionList (entry view)
+    let has_entries = screen.components.iter().any(
+        |c| matches!(c, vauchi_core::ui::Component::ActionList { id, .. } if id == "own_entries"),
+    );
+    assert!(has_entries, "MyInfo should show own entries ActionList");
+
+    let has_contact_list = screen
         .components
         .iter()
-        .find_map(|c| match c {
-            vauchi_core::ui::Component::ContactList { contacts, .. } => Some(contacts),
-            _ => None,
-        })
-        .expect("home screen should have a ContactList component");
-
-    assert_eq!(
-        contact_list.len(),
-        5,
-        "home screen should display at most 5 contacts, but found {}",
-        contact_list.len()
-    );
+        .any(|c| matches!(c, vauchi_core::ui::Component::ContactList { .. }));
+    assert!(!has_contact_list, "MyInfo should not show a ContactList");
 }
 
 #[test]
-fn home_screen_with_zero_contacts_renders_safely() {
+fn my_info_renders_safely_with_no_fields() {
     let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
-    // With 0 contacts, truncate(5) is a no-op — verify it doesn't break
     let engine = AppEngine::new(vauchi);
     let screen = engine.current_screen();
-    assert_eq!(screen.screen_id, "home");
-    assert!(!screen.title.is_empty(), "home screen should have a title");
+    assert_eq!(screen.screen_id, "my_info");
+    assert!(
+        !screen.title.is_empty(),
+        "my_info screen should have a title"
+    );
 }
 
 // ── contact detail / edit wiring tests ──────────────────────────────
@@ -573,8 +551,8 @@ fn navigate_away_and_back_preserves_engine_state() {
     );
 
     // Navigate away to Home — Exchange engine should be cached at scan step
-    let home = engine.navigate_to(AppScreen::Home);
-    assert_eq!(home.screen_id, "home");
+    let home = engine.navigate_to(AppScreen::MyInfo);
+    assert_eq!(home.screen_id, "my_info");
 
     // Navigate back to Exchange — should restore cached engine on scan step
     let restored = engine.navigate_to(AppScreen::Exchange);
@@ -591,7 +569,7 @@ fn onboarding_engine_not_cached() {
 
     // Start on Onboarding, navigate away — intermediate step; fresh start asserted below
     assert_eq!(engine.current_app_screen(), &AppScreen::Onboarding);
-    let _ = engine.navigate_to(AppScreen::Home);
+    let _ = engine.navigate_to(AppScreen::MyInfo);
 
     // Navigate back to Onboarding — should always be fresh (identity_check)
     let screen = engine.navigate_to(AppScreen::Onboarding);
@@ -611,7 +589,7 @@ fn lock_screen_engine_not_cached() {
     let lock = engine.navigate_to(AppScreen::Lock);
     assert_eq!(lock.screen_id, "lock_screen");
     // Intermediate step: navigate away — fresh lock screen asserted below
-    let _ = engine.navigate_to(AppScreen::Home);
+    let _ = engine.navigate_to(AppScreen::MyInfo);
 
     // Navigate back to Lock — should always be fresh
     let lock2 = engine.navigate_to(AppScreen::Lock);
@@ -691,7 +669,7 @@ fn settings_toggle_persists_after_navigate_away_and_back() {
     }
 
     // Navigate away to Home
-    engine.navigate_to(AppScreen::Home);
+    engine.navigate_to(AppScreen::MyInfo);
 
     // Invalidate Settings cache to force fresh engine from vauchi.config()
     engine.invalidate_screen(&AppScreen::Settings);
@@ -724,7 +702,7 @@ fn settings_toggle_suppress_presence_persists() {
     });
 
     // Navigate away and invalidate
-    engine.navigate_to(AppScreen::Home);
+    engine.navigate_to(AppScreen::MyInfo);
     engine.invalidate_screen(&AppScreen::Settings);
 
     // Navigate back — should still be on
@@ -745,7 +723,7 @@ fn invalidate_screen_removes_cached_engine() {
 
     // Navigate to Contacts, then Home (caches Contacts engine)
     engine.navigate_to(AppScreen::Contacts);
-    engine.navigate_to(AppScreen::Home);
+    engine.navigate_to(AppScreen::MyInfo);
 
     // Invalidate Contacts cache
     engine.invalidate_screen(&AppScreen::Contacts);
@@ -794,7 +772,7 @@ fn lock_screen_wrong_pin_stays_locked() {
     // Should NOT navigate to Home — should show error or stay on lock
     assert_ne!(
         engine.current_app_screen(),
-        &AppScreen::Home,
+        &AppScreen::MyInfo,
         "wrong PIN must NOT unlock the app"
     );
     assert!(
@@ -820,12 +798,12 @@ fn lock_screen_correct_pin_unlocks() {
         panic!("correct PIN should navigate to Home, got {result:?}");
     };
     assert_eq!(
-        screen.screen_id, "home",
+        screen.screen_id, "my_info",
         "correct PIN should navigate to home screen"
     );
     assert_eq!(
         engine.current_app_screen(),
-        &AppScreen::Home,
+        &AppScreen::MyInfo,
         "should be on Home after correct PIN"
     );
 }
@@ -842,7 +820,7 @@ fn lock_screen_empty_pin_does_not_unlock() {
 
     assert_ne!(
         engine.current_app_screen(),
-        &AppScreen::Home,
+        &AppScreen::MyInfo,
         "empty PIN must NOT unlock the app"
     );
     assert!(
@@ -914,10 +892,10 @@ fn lock_screen_correct_pin_after_failed_attempt_unlocks() {
         panic!("correct PIN after failed attempt should unlock, got {result:?}");
     };
     assert_eq!(
-        screen.screen_id, "home",
+        screen.screen_id, "my_info",
         "correct PIN after failed attempt should navigate to home"
     );
-    assert_eq!(engine.current_app_screen(), &AppScreen::Home);
+    assert_eq!(engine.current_app_screen(), &AppScreen::MyInfo);
 }
 
 #[test]
@@ -929,7 +907,7 @@ fn invalidate_all_clears_entire_cache() {
     // Cache multiple screens
     engine.navigate_to(AppScreen::Contacts);
     engine.navigate_to(AppScreen::Settings);
-    engine.navigate_to(AppScreen::Home);
+    engine.navigate_to(AppScreen::MyInfo);
 
     // Invalidate all
     engine.invalidate_all();
@@ -1058,7 +1036,7 @@ fn navigate_back_from_settings_returns_to_home() {
     engine.navigate_back();
     assert_eq!(
         engine.current_app_screen(),
-        &AppScreen::Home,
+        &AppScreen::MyInfo,
         "navigate_back from Settings should return to Home"
     );
 }
@@ -1071,8 +1049,8 @@ fn back_with_empty_history_returns_to_home() {
 
     // Without any navigation, back should go to Home (fallback)
     let screen = engine.navigate_back();
-    assert_eq!(screen.screen_id, "home");
-    assert_eq!(engine.current_app_screen(), &AppScreen::Home);
+    assert_eq!(screen.screen_id, "my_info");
+    assert_eq!(engine.current_app_screen(), &AppScreen::MyInfo);
 }
 
 #[test]
@@ -1091,11 +1069,11 @@ fn navigate_back_does_not_create_circular_history() {
 
     // Back: Contacts -> Home
     engine.navigate_back();
-    assert_eq!(engine.current_app_screen(), &AppScreen::Home);
+    assert_eq!(engine.current_app_screen(), &AppScreen::MyInfo);
 
     // Back again: empty history -> Home (fallback)
     engine.navigate_back();
-    assert_eq!(engine.current_app_screen(), &AppScreen::Home);
+    assert_eq!(engine.current_app_screen(), &AppScreen::MyInfo);
 }
 
 // ── stateful proptest: onboarding random actions (CC-13) ─────────────
@@ -1154,10 +1132,10 @@ fn navigate_to_groups_shows_groups_list() {
     let mut engine = AppEngine::new(vauchi);
     let screen = engine.navigate_to(AppScreen::Groups);
     assert_eq!(screen.screen_id, "groups_list");
-    assert_eq!(screen.title, "Contact Groups");
+    assert_eq!(screen.title, "Groups");
     assert!(
-        screen.actions.iter().any(|a| a.id == "create_group"),
-        "Groups screen must have create_group action"
+        screen.actions.iter().any(|a| a.id == "new_group"),
+        "Groups screen must have new_group action"
     );
 }
 
@@ -1290,20 +1268,25 @@ fn contact_visibility_toggle_updates_field() {
 // ── FormDialogEngine tests ────────────────────────────────────────────
 
 #[test]
-fn form_dialog_add_field_shows_type_picker_first() {
+fn form_dialog_add_field_shows_type_list() {
     let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
     let mut engine = AppEngine::new(vauchi);
     let screen = engine.navigate_to(AppScreen::FormDialog {
-        dialog_type: FormDialogType::AddField,
+        dialog_type: FormDialogType::AddField {
+            available_groups: vec![],
+        },
     });
-    // Step 1: type picker with ActionList
-    assert_eq!(screen.screen_id, "form_add_field_type");
+    // Single-page form with flat type list
+    assert_eq!(screen.screen_id, "form_add_field");
     let has_action_list = screen
         .components
         .iter()
         .any(|c| matches!(c, Component::ActionList { .. }));
-    assert!(has_action_list, "Type picker must have an ActionList");
+    assert!(
+        has_action_list,
+        "Should have an ActionList for type selection"
+    );
 }
 
 #[test]
@@ -1312,26 +1295,12 @@ fn form_dialog_add_field_type_selection_shows_value_inputs() {
     vauchi.create_identity("Alice").unwrap();
     let mut engine = AppEngine::new(vauchi);
     engine.navigate_to(AppScreen::FormDialog {
-        dialog_type: FormDialogType::AddField,
+        dialog_type: FormDialogType::AddField {
+            available_groups: vec![],
+        },
     });
 
-    // Step 1: Select "contact" category
-    let result = engine.handle_action(UserAction::ListItemSelected {
-        component_id: "entry_categories".into(),
-        item_id: "contact".into(),
-    });
-    match &result {
-        ActionResult::UpdateScreen(screen) => {
-            assert_eq!(screen.screen_id, "form_add_field_type");
-            assert!(
-                screen.subtitle.as_deref().unwrap_or("").contains("Contact"),
-                "Should show Contact category subtitle"
-            );
-        }
-        other => panic!("Expected UpdateScreen for category, got {other:?}"),
-    }
-
-    // Step 2: Select "email" type within Contact category
+    // Select type from flat list
     let result = engine.handle_action(UserAction::ListItemSelected {
         component_id: "entry_types".into(),
         item_id: "email".into(),
@@ -1347,7 +1316,7 @@ fn form_dialog_add_field_type_selection_shows_value_inputs() {
             assert_eq!(
                 text_inputs.len(),
                 2,
-                "Value step must have 2 text inputs (value + note)"
+                "Should have 2 text inputs (value + note) after selecting type"
             );
         }
         other => panic!("Expected UpdateScreen, got {other:?}"),
@@ -1388,7 +1357,7 @@ fn form_dialog_submit_navigates_back() {
     vauchi.create_identity("Alice").unwrap();
     let mut engine = AppEngine::new(vauchi);
     // Navigate to Home first, then to the form — so back goes to Home
-    engine.navigate_to(AppScreen::Home);
+    engine.navigate_to(AppScreen::MyInfo);
     engine.navigate_to(AppScreen::FormDialog {
         dialog_type: FormDialogType::EditRelayUrl {
             current_url: "wss://old.relay".into(),
@@ -1400,7 +1369,7 @@ fn form_dialog_submit_navigates_back() {
     // AppEngine intercepts Complete and navigates back
     match result {
         ActionResult::NavigateTo(screen) => {
-            assert_eq!(screen.screen_id, "home");
+            assert_eq!(screen.screen_id, "my_info");
         }
         other => panic!("Expected NavigateTo(home), got {other:?}"),
     }
@@ -1517,13 +1486,15 @@ fn form_dialog_add_field_saves_to_own_card() {
     let mut engine = AppEngine::new(vauchi);
 
     engine.navigate_to(AppScreen::FormDialog {
-        dialog_type: FormDialogType::AddField,
+        dialog_type: FormDialogType::AddField {
+            available_groups: vec![],
+        },
     });
 
-    // Enter label and value
-    let _ = engine.handle_action(UserAction::TextChanged {
-        component_id: "field_label".into(),
-        value: "Phone".into(),
+    // Select type, then enter value
+    let _ = engine.handle_action(UserAction::ListItemSelected {
+        component_id: "entry_types".into(),
+        item_id: "phone".into(),
     });
     let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "field_value".into(),
@@ -1547,10 +1518,12 @@ fn form_dialog_add_field_empty_value_returns_validation_error() {
     let mut engine = AppEngine::new(vauchi);
 
     engine.navigate_to(AppScreen::FormDialog {
-        dialog_type: FormDialogType::AddField,
+        dialog_type: FormDialogType::AddField {
+            available_groups: vec![],
+        },
     });
 
-    // Select a type first (step 1 → step 2)
+    // Select a type first
     let _ = engine.handle_action(UserAction::ListItemSelected {
         component_id: "entry_types".into(),
         item_id: "phone".into(),
@@ -1912,27 +1885,19 @@ fn add_field_after_onboarding_identity_creation() {
     engine.vauchi_mut().create_identity("TestUser").unwrap();
 
     // Navigate to Home (TUI does this after onboarding)
-    engine.navigate_to(AppScreen::Home);
+    engine.navigate_to(AppScreen::MyInfo);
 
     // Navigate to AddField form (TUI does this on 'a' key)
     engine.navigate_to(AppScreen::FormDialog {
-        dialog_type: FormDialogType::AddField,
+        dialog_type: FormDialogType::AddField {
+            available_groups: vec![],
+        },
     });
 
-    // Step 1: Select category (three-step form: category → type → value)
+    // Single-page form: select type from flat list
     let screen = engine.current_screen();
-    assert_eq!(screen.screen_id, "form_add_field_type");
+    assert_eq!(screen.screen_id, "form_add_field");
 
-    let result = engine.handle_action(UserAction::ListItemSelected {
-        component_id: "entry_categories".into(),
-        item_id: "contact".into(),
-    });
-    assert!(
-        matches!(result, ActionResult::UpdateScreen(_)),
-        "Category selection should update screen, got {result:?}"
-    );
-
-    // Step 2: Select type within category
     let result = engine.handle_action(UserAction::ListItemSelected {
         component_id: "entry_types".into(),
         item_id: "email".into(),
@@ -1941,10 +1906,6 @@ fn add_field_after_onboarding_identity_creation() {
         matches!(result, ActionResult::UpdateScreen(_)),
         "Type selection should update screen, got {result:?}"
     );
-
-    // Step 3: Enter value
-    let screen = engine.current_screen();
-    assert_eq!(screen.screen_id, "form_add_field");
 
     // Type a value
     let _ = engine.handle_action(UserAction::TextChanged {

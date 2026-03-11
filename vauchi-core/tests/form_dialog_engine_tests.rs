@@ -7,56 +7,28 @@ use vauchi_core::ui::*;
 // --- AddField tests ---
 
 #[test]
-fn form_dialog_add_field_shows_category_picker() {
-    let engine = FormDialogEngine::new(FormDialogType::AddField);
+fn form_dialog_add_field_shows_type_list() {
+    let engine = FormDialogEngine::new(FormDialogType::AddField {
+        available_groups: vec![],
+    });
     let screen = engine.current_screen();
-    assert_eq!(screen.screen_id, "form_add_field_type");
+    assert_eq!(screen.screen_id, "form_add_field");
 
-    let has_categories = screen.components.iter().any(|c| {
+    let has_types = screen.components.iter().any(|c| {
         matches!(c,
-            Component::ActionList { id, .. } if id == "entry_categories"
+            Component::ActionList { id, .. } if id == "entry_types"
         )
     });
-    assert!(has_categories, "Should show category picker initially");
-}
-
-#[test]
-fn form_dialog_add_field_select_category_shows_types() {
-    let mut engine = FormDialogEngine::new(FormDialogType::AddField);
-
-    let result = engine.handle_action(UserAction::ListItemSelected {
-        component_id: "entry_categories".into(),
-        item_id: "contact".into(),
-    });
-
-    match result {
-        ActionResult::UpdateScreen(screen) => {
-            assert_eq!(screen.screen_id, "form_add_field_type");
-            let has_types = screen.components.iter().any(|c| {
-                matches!(c,
-                    Component::ActionList { id, .. } if id == "entry_types"
-                )
-            });
-            assert!(
-                has_types,
-                "Should show entry types after selecting category"
-            );
-        }
-        other => panic!("Expected UpdateScreen, got {other:?}"),
-    }
+    assert!(has_types, "Should show entry types list initially");
 }
 
 #[test]
 fn form_dialog_add_field_select_type_shows_value_input() {
-    let mut engine = FormDialogEngine::new(FormDialogType::AddField);
-
-    // Select category
-    let _ = engine.handle_action(UserAction::ListItemSelected {
-        component_id: "entry_categories".into(),
-        item_id: "contact".into(),
+    let mut engine = FormDialogEngine::new(FormDialogType::AddField {
+        available_groups: vec![],
     });
 
-    // Select type
+    // Select type directly from flat list
     let result = engine.handle_action(UserAction::ListItemSelected {
         component_id: "entry_types".into(),
         item_id: "email".into(),
@@ -77,14 +49,32 @@ fn form_dialog_add_field_select_type_shows_value_input() {
 }
 
 #[test]
-fn form_dialog_add_field_submit_completes() {
-    let mut engine = FormDialogEngine::new(FormDialogType::AddField);
-
-    // Select category, type, enter value
-    let _ = engine.handle_action(UserAction::ListItemSelected {
-        component_id: "entry_categories".into(),
-        item_id: "contact".into(),
+fn form_dialog_add_field_select_type_shows_note_input() {
+    let mut engine = FormDialogEngine::new(FormDialogType::AddField {
+        available_groups: vec![],
     });
+
+    let _ = engine.handle_action(UserAction::ListItemSelected {
+        component_id: "entry_types".into(),
+        item_id: "phone".into(),
+    });
+
+    let screen = engine.current_screen();
+    let has_note = screen.components.iter().any(|c| {
+        matches!(c,
+            Component::TextInput { id, .. } if id == "field_note"
+        )
+    });
+    assert!(has_note, "Should show note input after selecting type");
+}
+
+#[test]
+fn form_dialog_add_field_submit_completes() {
+    let mut engine = FormDialogEngine::new(FormDialogType::AddField {
+        available_groups: vec![],
+    });
+
+    // Select type and enter value
     let _ = engine.handle_action(UserAction::ListItemSelected {
         component_id: "entry_types".into(),
         item_id: "email".into(),
@@ -101,34 +91,33 @@ fn form_dialog_add_field_submit_completes() {
 }
 
 #[test]
-fn form_dialog_add_field_cancel_from_value_goes_to_type_picker() {
-    let mut engine = FormDialogEngine::new(FormDialogType::AddField);
-
-    // Navigate to value input
-    let _ = engine.handle_action(UserAction::ListItemSelected {
-        component_id: "entry_categories".into(),
-        item_id: "contact".into(),
+fn form_dialog_add_field_cancel_with_type_deselects() {
+    let mut engine = FormDialogEngine::new(FormDialogType::AddField {
+        available_groups: vec![],
     });
+
+    // Select a type
     let _ = engine.handle_action(UserAction::ListItemSelected {
         component_id: "entry_types".into(),
         item_id: "email".into(),
     });
 
-    // Cancel should go back to type picker
+    // Cancel should deselect type and clear fields
     let result = engine.handle_action(UserAction::ActionPressed {
         action_id: "cancel".into(),
     });
     match result {
         ActionResult::UpdateScreen(screen) => {
-            assert_eq!(screen.screen_id, "form_add_field_type");
-            let has_types = screen.components.iter().any(|c| {
+            assert_eq!(screen.screen_id, "form_add_field");
+            // Should not have text inputs (no type selected)
+            let has_value_input = screen.components.iter().any(|c| {
                 matches!(c,
-                    Component::ActionList { id, .. } if id == "entry_types"
+                    Component::TextInput { id, .. } if id == "field_value"
                 )
             });
             assert!(
-                has_types,
-                "Should go back to type picker on cancel from value"
+                !has_value_input,
+                "Should hide value input after cancel (type deselected)"
             );
         }
         other => panic!("Expected UpdateScreen, got {other:?}"),
@@ -136,44 +125,28 @@ fn form_dialog_add_field_cancel_from_value_goes_to_type_picker() {
 }
 
 #[test]
-fn form_dialog_add_field_back_to_categories() {
-    let mut engine = FormDialogEngine::new(FormDialogType::AddField);
-
-    // Select category first
-    let _ = engine.handle_action(UserAction::ListItemSelected {
-        component_id: "entry_categories".into(),
-        item_id: "contact".into(),
+fn form_dialog_add_field_cancel_without_type_navigates() {
+    let mut engine = FormDialogEngine::new(FormDialogType::AddField {
+        available_groups: vec![],
     });
 
-    // Use back_to_categories action
+    // Cancel without selecting a type → NavigateTo (go back)
     let result = engine.handle_action(UserAction::ActionPressed {
-        action_id: "back_to_categories".into(),
+        action_id: "cancel".into(),
     });
-    match result {
-        ActionResult::UpdateScreen(screen) => {
-            let has_categories = screen.components.iter().any(|c| {
-                matches!(c,
-                    Component::ActionList { id, .. } if id == "entry_categories"
-                )
-            });
-            assert!(
-                has_categories,
-                "Should show categories again after back_to_categories"
-            );
-        }
-        other => panic!("Expected UpdateScreen, got {other:?}"),
-    }
+    assert!(
+        matches!(result, ActionResult::NavigateTo(_)),
+        "Cancel without type should navigate away, got {result:?}"
+    );
 }
 
 #[test]
 fn form_dialog_add_field_collected_input_format() {
-    let mut engine = FormDialogEngine::new(FormDialogType::AddField);
-
-    // Select category and type
-    let _ = engine.handle_action(UserAction::ListItemSelected {
-        component_id: "entry_categories".into(),
-        item_id: "contact".into(),
+    let mut engine = FormDialogEngine::new(FormDialogType::AddField {
+        available_groups: vec![],
     });
+
+    // Select type and fill in values
     let _ = engine.handle_action(UserAction::ListItemSelected {
         component_id: "entry_types".into(),
         item_id: "email".into(),
@@ -191,10 +164,58 @@ fn form_dialog_add_field_collected_input_format() {
         .collected_input()
         .expect("collected_input should return Some");
     let parts: Vec<&str> = input.split('\n').collect();
-    assert_eq!(parts.len(), 3, "Format should be type\\nnote\\nvalue");
+    assert_eq!(
+        parts.len(),
+        4,
+        "Format should be type\\nnote\\nvalue\\ngroups"
+    );
     assert_eq!(parts[0], "email");
     assert_eq!(parts[1], "work");
     assert_eq!(parts[2], "test@example.com");
+    assert_eq!(parts[3], "", "No groups selected");
+}
+
+#[test]
+fn form_dialog_add_field_group_toggle() {
+    let mut engine = FormDialogEngine::new(FormDialogType::AddField {
+        available_groups: vec![
+            ("g1".into(), "Family".into()),
+            ("g2".into(), "Friends".into()),
+        ],
+    });
+
+    // Select type so group toggles are visible
+    let _ = engine.handle_action(UserAction::ListItemSelected {
+        component_id: "entry_types".into(),
+        item_id: "phone".into(),
+    });
+
+    // Toggle a group
+    let result = engine.handle_action(UserAction::ItemToggled {
+        component_id: "group_visibility".into(),
+        item_id: "g1".into(),
+    });
+    match &result {
+        ActionResult::UpdateScreen(screen) => {
+            let has_toggle_list = screen
+                .components
+                .iter()
+                .any(|c| matches!(c, Component::ToggleList { id, .. } if id == "group_visibility"));
+            assert!(has_toggle_list, "Should show group visibility toggles");
+        }
+        other => panic!("Expected UpdateScreen, got {other:?}"),
+    }
+
+    // Verify collected_input includes groups
+    let _ = engine.handle_action(UserAction::TextChanged {
+        component_id: "field_value".into(),
+        value: "+1 555".into(),
+    });
+    let input = engine
+        .collected_input()
+        .expect("collected_input should return Some");
+    let parts: Vec<&str> = input.split('\n').collect();
+    assert_eq!(parts[3], "g1", "Should include toggled group");
 }
 
 // --- EditField tests ---

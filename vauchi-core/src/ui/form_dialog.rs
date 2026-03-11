@@ -4,14 +4,17 @@
 
 //! Generic form dialog engine — handles AddField, EditField, EditName, EditRelayUrl.
 
-use crate::contact_card::{CatalogEntry, FieldCategory, FieldTypeCatalog};
+use crate::contact_card::{CatalogEntry, FieldTypeCatalog};
 use crate::social::SocialNetworkRegistry;
 use crate::ui::*;
 
 /// The type of form dialog, determining which fields are shown.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum FormDialogType {
-    AddField,
+    AddField {
+        /// Available groups for visibility selection: (group_id, group_name).
+        available_groups: Vec<(String, String)>,
+    },
     EditField {
         field_id: String,
         field_label: String,
@@ -43,18 +46,18 @@ fn placeholder_for_key(key: &str) -> &'static str {
 pub struct FormDialogEngine {
     dialog_type: FormDialogType,
     values: Vec<(String, String)>, // (component_id, current_value)
-    /// For AddField: which entry type was selected (None = type picker step)
+    /// For AddField: which entry type was selected (None = type picker visible)
     selected_entry_type: Option<String>,
-    /// For AddField: optional category filter (None = show all categories)
-    selected_category: Option<FieldCategory>,
     /// Cached catalog entries for the type picker.
     catalog_entries: Vec<CatalogEntry>,
+    /// For AddField: which groups are selected for visibility.
+    selected_groups: Vec<String>,
 }
 
 impl FormDialogEngine {
     pub fn new(dialog_type: FormDialogType) -> Self {
         let values = match &dialog_type {
-            FormDialogType::AddField => vec![
+            FormDialogType::AddField { .. } => vec![
                 ("field_note".into(), String::new()),
                 ("field_value".into(), String::new()),
             ],
@@ -68,7 +71,7 @@ impl FormDialogEngine {
                 vec![("relay_url".into(), current_url.clone())]
             }
         };
-        let catalog_entries = if dialog_type == FormDialogType::AddField {
+        let catalog_entries = if matches!(dialog_type, FormDialogType::AddField { .. }) {
             let registry = SocialNetworkRegistry::with_defaults();
             let catalog = FieldTypeCatalog::new(&registry);
             catalog.all().to_vec()
@@ -79,8 +82,8 @@ impl FormDialogEngine {
             dialog_type,
             values,
             selected_entry_type: None,
-            selected_category: None,
             catalog_entries,
+            selected_groups: Vec::new(),
         }
     }
 
@@ -98,147 +101,140 @@ impl FormDialogEngine {
         }
     }
 
-    fn build_add_field_type_picker(&self) -> ScreenModel {
-        // If a category is selected, show entries in that category
-        if let Some(category) = &self.selected_category {
-            let items: Vec<ActionListItem> = self
-                .catalog_entries
-                .iter()
-                .filter(|e| &e.category == category)
-                .map(|e| ActionListItem {
-                    id: e.key.clone(),
-                    label: e.display_name.clone(),
-                    icon: e.icon.clone(),
-                    detail: Some(placeholder_for_key(&e.key).into()),
-                })
-                .collect();
-
-            return ScreenModel {
-                screen_id: "form_add_field_type".into(),
-                title: "Add Entry".into(),
-                subtitle: Some(format!("{} types", category.display_name())),
-                components: vec![Component::ActionList {
-                    id: "entry_types".into(),
-                    items,
-                }],
-                actions: vec![
-                    ScreenAction {
-                        id: "back_to_categories".into(),
-                        label: "Back".into(),
-                        style: ActionStyle::Secondary,
-                        enabled: true,
-                    },
-                    ScreenAction {
-                        id: "cancel".into(),
-                        label: "Cancel".into(),
-                        style: ActionStyle::Secondary,
-                        enabled: true,
-                    },
-                ],
-                progress: None,
-            };
-        }
-
-        // Show category picker
-        let items: Vec<ActionListItem> = FieldCategory::all()
-            .iter()
-            .map(|cat| {
-                let count = self
-                    .catalog_entries
-                    .iter()
-                    .filter(|e| &e.category == cat)
-                    .count();
-                ActionListItem {
-                    id: cat.display_name().to_lowercase(),
-                    label: cat.display_name().into(),
-                    icon: None,
-                    detail: Some(format!("{count} types")),
-                }
-            })
-            .collect();
-
-        ScreenModel {
-            screen_id: "form_add_field_type".into(),
-            title: "Add Entry".into(),
-            subtitle: Some("What type of information?".into()),
-            components: vec![Component::ActionList {
-                id: "entry_categories".into(),
-                items,
-            }],
-            actions: vec![ScreenAction {
-                id: "cancel".into(),
-                label: "Cancel".into(),
-                style: ActionStyle::Secondary,
-                enabled: true,
-            }],
-            progress: None,
+    fn available_groups(&self) -> &[(String, String)] {
+        match &self.dialog_type {
+            FormDialogType::AddField {
+                available_groups, ..
+            } => available_groups,
+            _ => &[],
         }
     }
 
-    fn build_add_field_value(&self) -> ScreenModel {
-        let selected_key = self.selected_entry_type.as_deref().unwrap_or("custom");
-        let catalog_entry = self.catalog_entries.iter().find(|e| e.key == selected_key);
-        let type_label = catalog_entry
-            .map(|e| e.display_name.as_str())
-            .unwrap_or("Entry");
-        let placeholder = placeholder_for_key(selected_key);
+    /// Build single-page AddField screen: type list + value/note + group toggles.
+    fn build_add_field_screen(&self) -> ScreenModel {
+        let mut components = Vec::new();
 
-        let input_type = match self.selected_entry_type.as_deref() {
-            Some("phone") => InputType::Phone,
-            Some("email") => InputType::Email,
-            _ => InputType::Text,
+        // Flat type list (all entries from all categories)
+        let type_items: Vec<ActionListItem> = self
+            .catalog_entries
+            .iter()
+            .map(|e| ActionListItem {
+                id: e.key.clone(),
+                label: e.display_name.clone(),
+                icon: e.icon.clone(),
+                detail: if self.selected_entry_type.as_deref() == Some(&e.key) {
+                    Some("selected".into())
+                } else {
+                    None
+                },
+            })
+            .collect();
+
+        components.push(Component::ActionList {
+            id: "entry_types".into(),
+            items: type_items,
+        });
+
+        // Value and note inputs (shown once a type is selected)
+        if let Some(selected_key) = &self.selected_entry_type {
+            let catalog_entry = self.catalog_entries.iter().find(|e| &e.key == selected_key);
+            let type_label = catalog_entry
+                .map(|e| e.display_name.as_str())
+                .unwrap_or("Entry");
+            let placeholder = placeholder_for_key(selected_key);
+
+            let input_type = match selected_key.as_str() {
+                "phone" => InputType::Phone,
+                "email" => InputType::Email,
+                _ => InputType::Text,
+            };
+
+            components.push(Component::TextInput {
+                id: "field_value".into(),
+                label: type_label.into(),
+                value: self.get_value("field_value").into(),
+                placeholder: Some(placeholder.into()),
+                max_length: Some(200),
+                validation_error: None,
+                input_type,
+            });
+
+            components.push(Component::TextInput {
+                id: "field_note".into(),
+                label: "Note (for yourself)".into(),
+                value: self.get_value("field_note").into(),
+                placeholder: Some("e.g. work phone, personal email".into()),
+                max_length: Some(50),
+                validation_error: None,
+                input_type: InputType::Text,
+            });
+
+            // Group visibility toggles
+            let groups = self.available_groups();
+            if !groups.is_empty() {
+                let toggle_items: Vec<ToggleItem> = groups
+                    .iter()
+                    .map(|(gid, gname)| ToggleItem {
+                        id: gid.clone(),
+                        label: gname.clone(),
+                        selected: self.selected_groups.contains(gid),
+                        subtitle: None,
+                    })
+                    .collect();
+
+                components.push(Component::ToggleList {
+                    id: "group_visibility".into(),
+                    label: "Visible to groups".into(),
+                    items: toggle_items,
+                });
+            }
+        }
+
+        let title = if let Some(ref key) = self.selected_entry_type {
+            let catalog_entry = self.catalog_entries.iter().find(|e| &e.key == key);
+            format!(
+                "Add {}",
+                catalog_entry
+                    .map(|e| e.display_name.as_str())
+                    .unwrap_or("Entry")
+            )
+        } else {
+            "Add Entry".into()
         };
+
+        let mut actions = Vec::new();
+        if self.selected_entry_type.is_some() {
+            actions.push(ScreenAction {
+                id: "submit".into(),
+                label: "Save".into(),
+                style: ActionStyle::Primary,
+                enabled: true,
+            });
+        }
+        actions.push(ScreenAction {
+            id: "cancel".into(),
+            label: "Cancel".into(),
+            style: ActionStyle::Secondary,
+            enabled: true,
+        });
 
         ScreenModel {
             screen_id: "form_add_field".into(),
-            title: format!("Add {type_label}"),
-            subtitle: None,
-            components: vec![
-                Component::TextInput {
-                    id: "field_value".into(),
-                    label: type_label.into(),
-                    value: self.get_value("field_value").into(),
-                    placeholder: Some(placeholder.into()),
-                    max_length: Some(200),
-                    validation_error: None,
-                    input_type,
-                },
-                Component::TextInput {
-                    id: "field_note".into(),
-                    label: "Note (for yourself)".into(),
-                    value: self.get_value("field_note").into(),
-                    placeholder: Some("e.g. work phone, personal email".into()),
-                    max_length: Some(50),
-                    validation_error: None,
-                    input_type: InputType::Text,
-                },
-            ],
-            actions: vec![
-                ScreenAction {
-                    id: "submit".into(),
-                    label: "Save".into(),
-                    style: ActionStyle::Primary,
-                    enabled: true,
-                },
-                ScreenAction {
-                    id: "cancel".into(),
-                    label: "Cancel".into(),
-                    style: ActionStyle::Secondary,
-                    enabled: true,
-                },
-            ],
+            title,
+            subtitle: if self.selected_entry_type.is_none() {
+                Some("Select a type".into())
+            } else {
+                None
+            },
+            components,
+            actions,
             progress: None,
         }
     }
 
     fn build_screen(&self) -> ScreenModel {
         match &self.dialog_type {
-            FormDialogType::AddField => {
-                if self.selected_entry_type.is_none() {
-                    return self.build_add_field_type_picker();
-                }
-                self.build_add_field_value()
-            }
+            FormDialogType::AddField { .. } => self.build_add_field_screen(),
             FormDialogType::EditField { field_label, .. } => ScreenModel {
                 screen_id: "form_edit_field".into(),
                 title: "Edit Field".into(),
@@ -352,52 +348,36 @@ impl WorkflowEngine for FormDialogEngine {
                 ActionResult::UpdateScreen(self.build_screen())
             }
             UserAction::ListItemSelected { item_id, .. } => {
-                if self.dialog_type == FormDialogType::AddField
-                    && self.selected_entry_type.is_none()
-                {
-                    if self.selected_category.is_none() {
-                        // Category selected — filter by it
-                        let category = match item_id.as_str() {
-                            "contact" => Some(FieldCategory::Contact),
-                            "social" => Some(FieldCategory::Social),
-                            "personal" => Some(FieldCategory::Personal),
-                            "custom" => Some(FieldCategory::Custom),
-                            _ => None,
-                        };
-                        if let Some(cat) = category {
-                            self.selected_category = Some(cat);
-                            return ActionResult::UpdateScreen(self.build_screen());
-                        }
-                    } else {
-                        // Entry type selected within a category
-                        self.selected_entry_type = Some(item_id);
-                        return ActionResult::UpdateScreen(self.build_screen());
-                    }
+                if matches!(self.dialog_type, FormDialogType::AddField { .. }) {
+                    // Type selected from flat list
+                    self.selected_entry_type = Some(item_id);
+                    return ActionResult::UpdateScreen(self.build_screen());
+                }
+                ActionResult::UpdateScreen(self.build_screen())
+            }
+            UserAction::ItemToggled {
+                component_id,
+                item_id,
+            } if component_id == "group_visibility" => {
+                // Toggle group selection
+                if let Some(pos) = self.selected_groups.iter().position(|g| g == &item_id) {
+                    self.selected_groups.remove(pos);
+                } else {
+                    self.selected_groups.push(item_id);
                 }
                 ActionResult::UpdateScreen(self.build_screen())
             }
             UserAction::ActionPressed { action_id } => match action_id.as_str() {
                 s if s == "submit" || s.starts_with("submit_") => ActionResult::Complete,
-                "back_to_categories" => {
-                    // Go back from type list to category picker
-                    self.selected_category = None;
-                    ActionResult::UpdateScreen(self.build_screen())
-                }
                 "cancel" => {
-                    // In AddField value step, go back to type picker
-                    if self.dialog_type == FormDialogType::AddField
+                    // In AddField with type selected, go back to type selection
+                    if matches!(self.dialog_type, FormDialogType::AddField { .. })
                         && self.selected_entry_type.is_some()
                     {
                         self.selected_entry_type = None;
                         self.set_value("field_value", String::new());
                         self.set_value("field_note", String::new());
-                        return ActionResult::UpdateScreen(self.build_screen());
-                    }
-                    // In AddField category step, go back to categories
-                    if self.dialog_type == FormDialogType::AddField
-                        && self.selected_category.is_some()
-                    {
-                        self.selected_category = None;
+                        self.selected_groups.clear();
                         return ActionResult::UpdateScreen(self.build_screen());
                     }
                     ActionResult::NavigateTo(self.build_screen())
@@ -411,12 +391,13 @@ impl WorkflowEngine for FormDialogEngine {
     fn collected_input(&self) -> Option<String> {
         // Return the primary input value for the form
         match &self.dialog_type {
-            FormDialogType::AddField => {
+            FormDialogType::AddField { .. } => {
                 let entry_type = self.selected_entry_type.as_deref().unwrap_or("custom");
                 let note = self.get_value("field_note");
                 let value = self.get_value("field_value");
-                // Format: type\nnote\nvalue
-                Some(format!("{entry_type}\n{note}\n{value}"))
+                let groups = self.selected_groups.join(",");
+                // Format: type\nnote\nvalue\ngroups
+                Some(format!("{entry_type}\n{note}\n{value}\n{groups}"))
             }
             FormDialogType::EditField { .. } => Some(self.get_value("field_value").to_string()),
             FormDialogType::EditName { .. } => Some(self.get_value("display_name").to_string()),

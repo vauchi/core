@@ -2,6 +2,8 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+use std::any::Any;
+
 use super::{ActionResult, ScreenModel, UserAction};
 
 /// Trait that all core-driven workflows implement.
@@ -20,6 +22,16 @@ pub trait WorkflowEngine {
     /// Used by `AppEngine` to extract credentials before processing
     /// `ActionResult::Complete`. Default returns `None`.
     fn collected_input(&self) -> Option<String> {
+        None
+    }
+
+    /// Downcast to concrete type for AppEngine-level interception.
+    fn as_any(&self) -> Option<&dyn Any> {
+        None
+    }
+
+    /// Downcast to concrete mutable type for AppEngine-level interception.
+    fn as_any_mut(&mut self) -> Option<&mut dyn Any> {
         None
     }
 }

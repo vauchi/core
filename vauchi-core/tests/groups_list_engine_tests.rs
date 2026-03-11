@@ -4,43 +4,49 @@
 
 use vauchi_core::ui::*;
 
-fn sample_groups() -> Vec<ActionListItem> {
+fn sample_groups() -> Vec<GroupInfo> {
     vec![
-        ActionListItem {
+        GroupInfo {
             id: "g1".into(),
-            label: "Family".into(),
-            icon: None,
-            detail: Some("3 members".into()),
+            name: "Family".into(),
+            member_count: 3,
+            visible_field_count: 2,
         },
-        ActionListItem {
+        GroupInfo {
             id: "g2".into(),
-            label: "Work".into(),
-            icon: None,
-            detail: Some("5 members".into()),
+            name: "Work".into(),
+            member_count: 5,
+            visible_field_count: 4,
         },
     ]
 }
 
 #[test]
 fn groups_list_screen_id() {
-    let engine = GroupsEngine::new(sample_groups());
+    let engine = GroupsEngine::new(sample_groups(), GroupsMode::Members);
     let screen = engine.current_screen();
     assert_eq!(screen.screen_id, "groups_list");
 }
 
 #[test]
 fn groups_list_title() {
-    let engine = GroupsEngine::new(sample_groups());
+    let engine = GroupsEngine::new(sample_groups(), GroupsMode::Members);
     let screen = engine.current_screen();
-    assert_eq!(screen.title, "Contact Groups");
+    assert_eq!(screen.title, "Groups");
 }
 
 #[test]
-fn groups_list_shows_groups() {
-    let engine = GroupsEngine::new(sample_groups());
+fn groups_list_shows_groups_with_member_counts() {
+    let engine = GroupsEngine::new(sample_groups(), GroupsMode::Members);
     let screen = engine.current_screen();
 
-    match &screen.components[0] {
+    // ActionList is the second component (after mode toggle)
+    let action_list = screen
+        .components
+        .iter()
+        .find(|c| matches!(c, Component::ActionList { id, .. } if id == "groups"))
+        .expect("should have groups ActionList");
+    match action_list {
         Component::ActionList { id, items } => {
             assert_eq!(id, "groups");
             assert_eq!(items.len(), 2);
@@ -49,32 +55,24 @@ fn groups_list_shows_groups() {
             assert_eq!(items[0].detail.as_deref(), Some("3 members"));
             assert_eq!(items[1].id, "g2");
             assert_eq!(items[1].label, "Work");
+            assert_eq!(items[1].detail.as_deref(), Some("5 members"));
         }
         other => panic!("Expected ActionList, got {other:?}"),
     }
 }
 
 #[test]
-fn groups_list_create_group_shows_alert() {
-    let mut engine = GroupsEngine::new(sample_groups());
+fn groups_list_new_group_shows_alert() {
+    let mut engine = GroupsEngine::new(sample_groups(), GroupsMode::Members);
     let result = engine.handle_action(UserAction::ActionPressed {
-        action_id: "create_group".into(),
+        action_id: "new_group".into(),
     });
-    match result {
-        ActionResult::ShowAlert { title, message } => {
-            assert_eq!(title, "Coming Soon");
-            assert_eq!(
-                message,
-                "Group creation will be available in a future update."
-            );
-        }
-        other => panic!("Expected ShowAlert, got {other:?}"),
-    }
+    assert!(matches!(result, ActionResult::ShowAlert { .. }));
 }
 
 #[test]
 fn groups_list_unknown_action_returns_update_screen() {
-    let mut engine = GroupsEngine::new(sample_groups());
+    let mut engine = GroupsEngine::new(sample_groups(), GroupsMode::Members);
     let result = engine.handle_action(UserAction::ActionPressed {
         action_id: "unknown".into(),
     });

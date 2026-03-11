@@ -491,6 +491,7 @@ proptest! {
                 | ActionResult::OpenUrl { .. }
                 | ActionResult::ShowAlert { .. }
                 | ActionResult::RequestCamera
+                | ActionResult::OpenEntryDetail { .. }
                 | ActionResult::WipeComplete => {
                     // Valid external navigation/action results
                 }

@@ -32,6 +32,7 @@ mod groups_list;
 mod help;
 mod lock_screen;
 mod my_info;
+mod my_info_entry_detail;
 mod onboarding;
 mod recovery_status;
 mod screen;
@@ -48,7 +49,9 @@ pub use component::{
     QrMode, SettingsItem, SettingsItemKind, Status, TextStyle, ToggleItem, UiFieldVisibility,
     VisibilityMode,
 };
-pub use contact_detail::{ContactDetailEngine, ContactNotFoundEngine};
+pub use contact_detail::{
+    ContactDetailEngine, ContactNotFoundEngine, ContactViewMode, SharedInfoView,
+};
 pub use contact_edit::{ContactEditEngine, EditableContact, EditableField};
 pub use contact_limit::ContactLimitEngine;
 pub use contact_list::ContactListEngine;
@@ -64,10 +67,11 @@ pub use exchange::{ExchangeConfig, ExchangeEngine};
 pub use form_dialog::{FormDialogEngine, FormDialogType};
 pub use gdpr::GdprEngine;
 pub use group_detail::GroupDetailEngine;
-pub use groups_list::GroupsEngine;
+pub use groups_list::{GroupInfo, GroupsEngine, GroupsMode};
 pub use help::{HelpEngine, HelpItem};
 pub use lock_screen::LockScreenEngine;
-pub use my_info::{MyInfoEngine, MyInfoProgress};
+pub use my_info::{MyInfoEngine, MyInfoGroupTab, MyInfoProgress, MyInfoViewMode, OwnFieldInfo};
+pub use my_info_entry_detail::{EntryContactInfo, MyInfoEntryDetailEngine};
 pub use onboarding::{FieldSetup, GroupSetup, OnboardingData, OnboardingEngine};
 pub use recovery_status::RecoveryEngine;
 pub use screen::{ActionStyle, Progress, ScreenAction, ScreenModel};

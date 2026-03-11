@@ -78,6 +78,10 @@ pub enum ActionResult {
     },
     /// Frontend should open the camera for QR scanning.
     RequestCamera,
+    /// Frontend should open the entry detail view for a MyInfo field.
+    OpenEntryDetail {
+        field_id: String,
+    },
     /// All data has been wiped — frontend should reset to initial state.
     WipeComplete,
 }

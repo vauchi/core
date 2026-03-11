@@ -150,7 +150,8 @@ fn validate_result(
         | ActionResult::OpenContact { .. }
         | ActionResult::EditContact { .. }
         | ActionResult::OpenUrl { .. }
-        | ActionResult::ShowAlert { .. } => {}
+        | ActionResult::ShowAlert { .. }
+        | ActionResult::OpenEntryDetail { .. } => {}
     }
     Ok(())
 }
@@ -161,6 +162,7 @@ fn make_exchange() -> ExchangeEngine {
     ExchangeEngine::new(ExchangeConfig {
         own_name: "Test User".to_string(),
         own_qr_data: "test-qr-data-12345".to_string(),
+        available_groups: vec![],
     })
 }
 
@@ -470,6 +472,7 @@ proptest! {
         let mut engine = ExchangeEngine::new(ExchangeConfig {
             own_name: name,
             own_qr_data: "my-qr".to_string(),
+            available_groups: vec![],
         });
 
         // ShowQr → ScanQr

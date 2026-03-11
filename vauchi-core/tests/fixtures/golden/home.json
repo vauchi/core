@@ -1,39 +1,19 @@
 {
-  "screen_id": "home",
-  "title": "Home",
+  "screen_id": "my_info",
+  "title": "Alice",
   "subtitle": null,
   "components": [
     {
-      "StatusIndicator": {
-        "id": "setup_progress",
-        "icon": "setup",
-        "title": "Complete your setup",
-        "detail": "3 of 6 steps done",
-        "status": "InProgress"
-      }
-    },
-    {
-      "ContactList": {
-        "id": "recent_contacts",
-        "contacts": [
+      "ActionList": {
+        "id": "own_entries",
+        "items": [
           {
-            "id": "c1",
-            "name": "Alice",
-            "subtitle": "Friend",
-            "avatar_initials": "A",
-            "status": null,
-            "searchable_fields": []
-          },
-          {
-            "id": "c2",
-            "name": "Bob",
-            "subtitle": null,
-            "avatar_initials": "B",
-            "status": "Updated",
-            "searchable_fields": []
+            "id": "f1",
+            "label": "+41 79 000 00 00 (Mobile)",
+            "icon": "Phone",
+            "detail": null
           }
-        ],
-        "searchable": false
+        ]
       }
     }
   ],
@@ -45,8 +25,8 @@
       "enabled": true
     },
     {
-      "id": "view_all",
-      "label": "View All Contacts",
+      "id": "toggle_view",
+      "label": "Group View",
       "style": "Secondary",
       "enabled": true
     }

@@ -1,13 +1,13 @@
 {
-  "screen_id": "home",
-  "title": "Home",
+  "screen_id": "my_info",
+  "title": "",
   "subtitle": null,
   "components": [
     {
-      "ContactList": {
-        "id": "recent_contacts",
-        "contacts": [],
-        "searchable": false
+      "Text": {
+        "id": "empty_hint",
+        "content": "No entries yet. Add your first entry to share with contacts.",
+        "style": "Caption"
       }
     }
   ],
@@ -16,6 +16,12 @@
       "id": "add_field",
       "label": "Add Entry",
       "style": "Primary",
+      "enabled": true
+    },
+    {
+      "id": "toggle_view",
+      "label": "Group View",
+      "style": "Secondary",
       "enabled": true
     }
   ],

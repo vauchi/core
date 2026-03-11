@@ -117,25 +117,30 @@ fn sample_delivery_items() -> Vec<DeliveryItem> {
 
 #[test]
 fn home_fixture_is_fresh() {
-    let engine = HomeEngine::new(
-        sample_contacts(),
-        HomeProgress {
-            completed_steps: 3,
-            total_steps: 6,
-        },
+    let engine = MyInfoEngine::new(MyInfoProgress {
+        completed_steps: 3,
+        total_steps: 6,
+    })
+    .with_own_card(
+        "Alice".into(),
+        vec![OwnFieldInfo {
+            field_id: "f1".into(),
+            field_type: "Phone".into(),
+            label: "Mobile".into(),
+            value: "+41 79 000 00 00".into(),
+            visible_groups: vec![],
+            contact_count: 0,
+        }],
     );
     assert_fixture_fresh(&engine.current_screen(), "home.json");
 }
 
 #[test]
 fn home_empty_fixture_is_fresh() {
-    let engine = HomeEngine::new(
-        vec![],
-        HomeProgress {
-            completed_steps: 6,
-            total_steps: 6,
-        },
-    );
+    let engine = MyInfoEngine::new(MyInfoProgress {
+        completed_steps: 6,
+        total_steps: 6,
+    });
     assert_fixture_fresh(&engine.current_screen(), "home_empty.json");
 }
 
@@ -238,6 +243,7 @@ fn sample_exchange_config() -> ExchangeConfig {
     ExchangeConfig {
         own_name: "Alice".into(),
         own_qr_data: "vauchi://exchange?token=abc123".into(),
+        available_groups: vec![],
     }
 }
 
@@ -300,24 +306,29 @@ fn regenerate_all_engine_fixtures() {
     let fixtures: Vec<(&str, ScreenModel)> = vec![
         (
             "home.json",
-            HomeEngine::new(
-                sample_contacts(),
-                HomeProgress {
-                    completed_steps: 3,
-                    total_steps: 6,
-                },
+            MyInfoEngine::new(MyInfoProgress {
+                completed_steps: 3,
+                total_steps: 6,
+            })
+            .with_own_card(
+                "Alice".into(),
+                vec![OwnFieldInfo {
+                    field_id: "f1".into(),
+                    field_type: "Phone".into(),
+                    label: "Mobile".into(),
+                    value: "+41 79 000 00 00".into(),
+                    visible_groups: vec![],
+                    contact_count: 0,
+                }],
             )
             .current_screen(),
         ),
         (
             "home_empty.json",
-            HomeEngine::new(
-                vec![],
-                HomeProgress {
-                    completed_steps: 6,
-                    total_steps: 6,
-                },
-            )
+            MyInfoEngine::new(MyInfoProgress {
+                completed_steps: 6,
+                total_steps: 6,
+            })
             .current_screen(),
         ),
         (

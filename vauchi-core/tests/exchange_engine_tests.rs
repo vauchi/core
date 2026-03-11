@@ -8,6 +8,7 @@ fn make_engine() -> ExchangeEngine {
     ExchangeEngine::new(ExchangeConfig {
         own_name: "Alice".to_string(),
         own_qr_data: "alice-qr-payload".to_string(),
+        available_groups: vec![],
     })
 }
 
@@ -16,8 +17,8 @@ fn exchange_starts_at_show_qr() {
     let engine = make_engine();
     let screen = engine.current_screen();
     assert_eq!(screen.screen_id, "exchange_show_qr");
-    assert_eq!(screen.progress.as_ref().unwrap().current_step, 1);
-    assert_eq!(screen.progress.as_ref().unwrap().total_steps, 5);
+    assert_eq!(screen.progress.as_ref().unwrap().current_step, 2);
+    assert_eq!(screen.progress.as_ref().unwrap().total_steps, 6);
 }
 
 #[test]
@@ -53,7 +54,7 @@ fn exchange_continue_to_scan() {
 
     let screen = engine.current_screen();
     assert_eq!(screen.screen_id, "exchange_scan_qr");
-    assert_eq!(screen.progress.as_ref().unwrap().current_step, 2);
+    assert_eq!(screen.progress.as_ref().unwrap().current_step, 3);
 
     // Verify scan QR component
     match &screen.components[0] {
@@ -88,7 +89,7 @@ fn exchange_scan_receives_data() {
     assert_eq!(engine.scanned_data(), Some("bob-qr-payload"));
 
     let screen = engine.current_screen();
-    assert_eq!(screen.progress.as_ref().unwrap().current_step, 3);
+    assert_eq!(screen.progress.as_ref().unwrap().current_step, 4);
     assert!(screen.actions.is_empty());
 }
 
@@ -108,7 +109,7 @@ fn exchange_mark_success() {
 
     let screen = engine.current_screen();
     assert_eq!(screen.screen_id, "exchange_success");
-    assert_eq!(screen.progress.as_ref().unwrap().current_step, 4);
+    assert_eq!(screen.progress.as_ref().unwrap().current_step, 5);
 
     match &screen.components[0] {
         Component::StatusIndicator { title, status, .. } => {
@@ -134,7 +135,7 @@ fn exchange_mark_failed() {
 
     let screen = engine.current_screen();
     assert_eq!(screen.screen_id, "exchange_failed");
-    assert_eq!(screen.progress.as_ref().unwrap().current_step, 5);
+    assert_eq!(screen.progress.as_ref().unwrap().current_step, 6);
 
     match &screen.components[0] {
         Component::StatusIndicator { title, status, .. } => {

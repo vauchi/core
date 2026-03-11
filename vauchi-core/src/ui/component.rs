@@ -114,7 +114,11 @@ pub enum InputType {
 #[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum VisibilityMode {
+    /// No visibility column — display fields read-only.
+    ReadOnly,
+    /// Show/hide toggle per field.
     ShowHide,
+    /// Per-group visibility controls.
     PerGroup,
 }
 

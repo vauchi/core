@@ -17,7 +17,7 @@ use crate::network::Transport;
 use super::action::{ActionResult, UserAction};
 use super::backup_recovery::BackupRecoveryEngine;
 use super::component::{ContactItem, FieldDisplay, UiFieldVisibility};
-use super::contact_detail::{ContactDetailEngine, ContactNotFoundEngine};
+use super::contact_detail::{ContactDetailEngine, ContactNotFoundEngine, SharedInfoView};
 use super::contact_edit::{ContactEditEngine, EditableContact, EditableField};
 use super::contact_limit::ContactLimitEngine;
 use super::contact_list::ContactListEngine;
@@ -33,10 +33,11 @@ use super::exchange::{ExchangeConfig, ExchangeEngine};
 use super::form_dialog::{FormDialogEngine, FormDialogType};
 use super::gdpr::GdprEngine;
 use super::group_detail::GroupDetailEngine;
-use super::groups_list::GroupsEngine;
+use super::groups_list::{GroupInfo, GroupsEngine, GroupsMode};
 use super::help::{HelpEngine, HelpItem};
 use super::lock_screen::LockScreenEngine;
-use super::my_info::{MyInfoEngine, MyInfoProgress};
+use super::my_info::{MyInfoEngine, MyInfoGroupTab, MyInfoProgress, OwnFieldInfo};
+use super::my_info_entry_detail::{EntryContactInfo, MyInfoEntryDetailEngine};
 use super::onboarding::OnboardingEngine;
 use super::recovery_status::RecoveryEngine;
 use super::screen::ScreenModel;
@@ -80,6 +81,9 @@ pub enum AppScreen {
     Support,
     FormDialog {
         dialog_type: FormDialogType,
+    },
+    MyInfoEntryDetail {
+        field_id: String,
     },
     ContactDuplicates,
     ContactMerge {
@@ -177,7 +181,10 @@ impl<T: Transport> AppEngine<T> {
 
     /// Screens that should never be cached — always start fresh.
     fn is_cacheable(screen: &AppScreen) -> bool {
-        !matches!(screen, AppScreen::Onboarding | AppScreen::Lock)
+        !matches!(
+            screen,
+            AppScreen::Onboarding | AppScreen::Lock | AppScreen::FormDialog { .. }
+        )
     }
 
     /// Invalidates a cached engine for a specific screen.
@@ -189,6 +196,16 @@ impl<T: Transport> AppEngine<T> {
     /// Invalidates all cached engines. Use after bulk mutations.
     pub fn invalidate_all(&mut self) {
         self.engine_cache.clear();
+    }
+
+    /// Returns all groups as (id, name) pairs for UI forms.
+    pub fn available_groups(&self) -> Vec<(String, String)> {
+        self.vauchi
+            .list_groups()
+            .unwrap_or_default()
+            .into_iter()
+            .map(|g| (g.id().to_string(), g.name().to_string()))
+            .collect()
     }
 
     /// Returns top-level navigation screens. Sub-screens (Sync, TorSettings,
@@ -295,13 +312,14 @@ impl<T: Transport> AppEngine<T> {
                             Err(e) => Err(e),
                         }
                     }
-                    FormDialogType::AddField => {
+                    FormDialogType::AddField { .. } => {
                         let raw = input.unwrap_or_default();
-                        // Format: type\nnote\nvalue
-                        let mut lines = raw.splitn(3, '\n');
+                        // Format: type\nnote\nvalue\ngroups
+                        let mut lines = raw.splitn(4, '\n');
                         let entry_type = lines.next().unwrap_or("custom").trim();
                         let note = lines.next().unwrap_or("").trim();
                         let value = lines.next().unwrap_or("").trim();
+                        let _groups = lines.next().unwrap_or("").trim();
                         if value.is_empty() {
                             return ActionResult::ValidationError {
                                 component_id: "field_value".into(),
@@ -328,7 +346,19 @@ impl<T: Transport> AppEngine<T> {
                             note.to_string()
                         };
                         let field = ContactField::new(field_type, &label, value);
-                        self.vauchi.add_own_field(field)
+                        let field_id = field.id().to_string();
+                        let result = self.vauchi.add_own_field(field);
+                        // Apply group visibility from selected groups
+                        if result.is_ok() && !_groups.is_empty() {
+                            for group_id in _groups.split(',').map(|s| s.trim()) {
+                                if !group_id.is_empty() {
+                                    let _ = self
+                                        .vauchi
+                                        .set_group_field_visibility(group_id, &field_id, true);
+                                }
+                            }
+                        }
+                        result
                     }
                     FormDialogType::EditRelayUrl { .. } => {
                         // Relay URL is TUI-specific config (Backend), not in Vauchi<T>.
@@ -362,19 +392,73 @@ impl<T: Transport> AppEngine<T> {
         match screen {
             AppScreen::Onboarding => Box::new(OnboardingEngine::new()),
             AppScreen::MyInfo => {
-                let mut contacts = Self::load_contact_items(vauchi);
-                contacts.truncate(5); // MyInfo shows recent contacts
-                let progress = vauchi
-                    .get_setup_progress()
-                    .map(|sp| MyInfoProgress {
-                        completed_steps: sp.completed_steps,
-                        total_steps: sp.total_steps,
+                let progress = MyInfoProgress::default();
+                let all_groups = vauchi.list_groups().unwrap_or_default();
+
+                // Build own card fields with visibility info
+                let (display_name, own_fields) = if let Ok(Some(card)) = vauchi.own_card() {
+                    let name = card.display_name().to_string();
+                    let fields: Vec<OwnFieldInfo> = card
+                        .fields()
+                        .iter()
+                        .map(|f| {
+                            // Which groups can see this field?
+                            let visible_groups: Vec<String> = all_groups
+                                .iter()
+                                .filter(|g| g.is_field_visible(f.id()))
+                                .map(|g| g.name().to_string())
+                                .collect();
+                            // Count contacts across visible groups (deduplicated)
+                            let mut visible_contact_ids =
+                                std::collections::HashSet::<String>::new();
+                            for g in &all_groups {
+                                if g.is_field_visible(f.id()) {
+                                    for cid in g.contacts() {
+                                        visible_contact_ids.insert(cid.to_string());
+                                    }
+                                }
+                            }
+                            OwnFieldInfo {
+                                field_id: f.id().to_string(),
+                                field_type: format!("{:?}", f.field_type()),
+                                label: f.label().to_string(),
+                                value: f.value().to_string(),
+                                visible_groups,
+                                contact_count: visible_contact_ids.len(),
+                            }
+                        })
+                        .collect();
+                    (name, fields)
+                } else {
+                    (String::new(), Vec::new())
+                };
+
+                // Build group tabs
+                let group_tabs: Vec<MyInfoGroupTab> = all_groups
+                    .iter()
+                    .map(|g| {
+                        let field_indices: Vec<usize> = own_fields
+                            .iter()
+                            .enumerate()
+                            .filter(|(_, f)| g.is_field_visible(&f.field_id))
+                            .map(|(i, _)| i)
+                            .collect();
+                        MyInfoGroupTab {
+                            group_id: g.id().to_string(),
+                            group_name: g.name().to_string(),
+                            field_indices,
+                        }
                     })
-                    .unwrap_or(MyInfoProgress {
-                        completed_steps: 0,
-                        total_steps: 6,
-                    });
-                Box::new(MyInfoEngine::new(contacts, progress))
+                    .collect();
+
+                Box::new(
+                    MyInfoEngine::new(progress)
+                        .with_own_card(display_name, own_fields)
+                        .with_groups(group_tabs),
+                )
+            }
+            AppScreen::MyInfoEntryDetail { ref field_id } => {
+                Self::create_entry_detail_engine(vauchi, field_id)
             }
             AppScreen::Contacts => {
                 let contacts = Self::load_contact_items(vauchi);
@@ -483,7 +567,26 @@ impl<T: Transport> AppEngine<T> {
                 let contacts = Self::load_contact_items(vauchi);
                 Box::new(RecoveryEngine::new(contacts, 3))
             }
-            AppScreen::Groups => Box::new(GroupsEngine::new(vec![])),
+            AppScreen::Groups => {
+                let all_groups = vauchi.list_groups().unwrap_or_default();
+                let contacts = Self::load_contact_items(vauchi);
+                let group_infos: Vec<GroupInfo> = all_groups
+                    .iter()
+                    .map(|g| {
+                        let member_count = contacts
+                            .iter()
+                            .filter(|c| g.contains_contact(&c.id))
+                            .count();
+                        GroupInfo {
+                            id: g.id().to_string(),
+                            name: g.name().to_string(),
+                            member_count,
+                            visible_field_count: g.visible_fields().len(),
+                        }
+                    })
+                    .collect();
+                Box::new(GroupsEngine::new(group_infos, GroupsMode::Members))
+            }
             AppScreen::GroupDetail { group_id } => Box::new(GroupDetailEngine::new(
                 group_id.clone(),
                 "Group".into(),
@@ -498,7 +601,7 @@ impl<T: Transport> AppEngine<T> {
             }
             AppScreen::ContactDetail { contact_id } => match vauchi.get_contact(contact_id) {
                 Ok(Some(contact)) => {
-                    let fields = contact
+                    let fields: Vec<FieldDisplay> = contact
                         .card()
                         .fields()
                         .iter()
@@ -523,7 +626,16 @@ impl<T: Transport> AppEngine<T> {
                             .map(|f| f.value().to_string())
                             .collect(),
                     };
-                    Box::new(ContactDetailEngine::new(item, fields))
+
+                    // Build shared info (my card as seen by this contact)
+                    let shared_info = Self::build_shared_info(vauchi, contact_id);
+
+                    match shared_info {
+                        Some(info) => {
+                            Box::new(ContactDetailEngine::with_shared_info(item, fields, info))
+                        }
+                        None => Box::new(ContactDetailEngine::new(item, fields)),
+                    }
                 }
                 _ => Box::new(ContactNotFoundEngine::new(contact_id.clone())),
             },
@@ -595,6 +707,116 @@ impl<T: Transport> AppEngine<T> {
                 Box::new(ContactLimitEngine::new(contact_count, 0))
             }
         }
+    }
+
+    /// Builds a SharedInfoView for a contact — my fields as visible to them.
+    fn build_shared_info(vauchi: &Vauchi<T>, contact_id: &str) -> Option<SharedInfoView> {
+        let own_card = vauchi.own_card().ok()??;
+
+        // Determine the display name this contact sees
+        // Check groups the contact is in for a display_name_override
+        let groups = vauchi
+            .get_groups_for_contact(contact_id)
+            .unwrap_or_default();
+        let shared_display_name = groups
+            .iter()
+            .find_map(|g| g.display_name_override().map(|s| s.to_string()))
+            .unwrap_or_else(|| own_card.display_name().to_string());
+
+        // Build my fields with effective visibility for this contact
+        let my_fields: Vec<FieldDisplay> = own_card
+            .fields()
+            .iter()
+            .map(|f| {
+                let is_visible = vauchi
+                    .get_effective_field_visibility(contact_id, f.id())
+                    .unwrap_or(true);
+                FieldDisplay {
+                    id: f.id().to_string(),
+                    field_type: format!("{:?}", f.field_type()),
+                    label: f.label().to_string(),
+                    value: f.value().to_string(),
+                    visibility: if is_visible {
+                        UiFieldVisibility::Shown
+                    } else {
+                        UiFieldVisibility::Hidden
+                    },
+                }
+            })
+            .collect();
+
+        let visible_groups: Vec<String> = groups.iter().map(|g| g.name().to_string()).collect();
+
+        Some(SharedInfoView {
+            shared_display_name,
+            my_fields,
+            visible_groups,
+        })
+    }
+
+    fn create_entry_detail_engine(vauchi: &Vauchi<T>, field_id: &str) -> Box<dyn WorkflowEngine> {
+        let card = vauchi.own_card().ok().flatten();
+        let all_groups = vauchi.list_groups().unwrap_or_default();
+
+        let field = card
+            .as_ref()
+            .and_then(|c| c.fields().iter().find(|f| f.id() == field_id).cloned());
+
+        let Some(field) = field else {
+            // Field not found — return a minimal engine
+            return Box::new(MyInfoEntryDetailEngine::new(
+                field_id.to_string(),
+                "Unknown".into(),
+                "Unknown".into(),
+                "Field not found".into(),
+                vec![],
+                vec![],
+            ));
+        };
+
+        // Build group visibility state
+        let groups: Vec<(String, String, bool)> = all_groups
+            .iter()
+            .map(|g| {
+                (
+                    g.id().to_string(),
+                    g.name().to_string(),
+                    g.is_field_visible(field_id),
+                )
+            })
+            .collect();
+
+        // Build contact list from groups that can see this field
+        let mut visible_contacts = Vec::new();
+        let mut seen_contacts = std::collections::HashSet::new();
+        for g in &all_groups {
+            if g.is_field_visible(field_id) {
+                for cid in g.contacts() {
+                    if seen_contacts.insert(cid.to_string()) {
+                        let name = vauchi
+                            .get_contact(cid)
+                            .ok()
+                            .flatten()
+                            .map(|c| c.display_name().to_string())
+                            .unwrap_or_else(|| "Unknown".into());
+                        visible_contacts.push(EntryContactInfo {
+                            contact_id: cid.to_string(),
+                            name,
+                            via_group: g.name().to_string(),
+                        });
+                    }
+                }
+            }
+        }
+
+        Box::new(MyInfoEntryDetailEngine::new(
+            field_id.to_string(),
+            format!("{:?}", field.field_type()),
+            field.label().to_string(),
+            field.value().to_string(),
+            groups,
+            visible_contacts,
+        ))
     }
 
     fn load_contact_items(vauchi: &Vauchi<T>) -> Vec<ContactItem> {
@@ -819,11 +1041,116 @@ impl<T: Transport> WorkflowEngine for AppEngine<T> {
             }
         }
 
+        // Intercept entry detail actions before delegating to engine
+        if let AppScreen::MyInfoEntryDetail { ref field_id } = self.screen {
+            let field_id = field_id.clone();
+            match &action {
+                UserAction::ItemToggled {
+                    component_id,
+                    item_id,
+                } if component_id == "group_visibility" => {
+                    // Persist group visibility change
+                    let group_id = item_id.clone();
+                    let engine = self
+                        .engine
+                        .as_any_mut()
+                        .and_then(|a| a.downcast_mut::<MyInfoEntryDetailEngine>());
+                    if let Some(engine) = engine {
+                        // Find current state and toggle
+                        let is_visible = engine
+                            .groups
+                            .iter()
+                            .find(|(gid, _, _)| gid == &group_id)
+                            .map(|(_, _, v)| *v)
+                            .unwrap_or(false);
+                        let new_visible = !is_visible;
+                        let _ = self.vauchi.set_group_field_visibility(
+                            &group_id,
+                            &field_id,
+                            new_visible,
+                        );
+                        // Update engine state
+                        if let Some(entry) = engine
+                            .groups
+                            .iter_mut()
+                            .find(|(gid, _, _)| gid == &group_id)
+                        {
+                            entry.2 = new_visible;
+                        }
+                        // Rebuild visible contacts
+                        let all_groups = self.vauchi.list_groups().unwrap_or_default();
+                        let mut visible_contacts = Vec::new();
+                        let mut seen = std::collections::HashSet::new();
+                        for g in &all_groups {
+                            if g.is_field_visible(&field_id) {
+                                for cid in g.contacts() {
+                                    if seen.insert(cid.to_string()) {
+                                        let name = self
+                                            .vauchi
+                                            .get_contact(cid)
+                                            .ok()
+                                            .flatten()
+                                            .map(|c| c.display_name().to_string())
+                                            .unwrap_or_else(|| "Unknown".into());
+                                        visible_contacts.push(EntryContactInfo {
+                                            contact_id: cid.to_string(),
+                                            name,
+                                            via_group: g.name().to_string(),
+                                        });
+                                    }
+                                }
+                            }
+                        }
+                        engine.visible_contacts = visible_contacts;
+                        // Invalidate MyInfo cache so it refreshes
+                        self.engine_cache.remove(&AppScreen::MyInfo);
+                        return ActionResult::UpdateScreen(engine.current_screen());
+                    }
+                }
+                UserAction::ActionPressed { action_id } if action_id == "edit" => {
+                    // Navigate to EditField form for this field
+                    if let Some(engine) = self
+                        .engine
+                        .as_any()
+                        .and_then(|a| a.downcast_ref::<MyInfoEntryDetailEngine>())
+                    {
+                        let label = engine.label.clone();
+                        let screen = self.navigate_to(AppScreen::FormDialog {
+                            dialog_type: FormDialogType::EditField {
+                                field_id: field_id.clone(),
+                                field_label: label,
+                            },
+                        });
+                        return ActionResult::NavigateTo(screen);
+                    }
+                }
+                UserAction::ActionPressed { action_id } if action_id == "delete" => {
+                    // Delete the field from own card
+                    if let Ok(Some(mut card)) = self.vauchi.own_card() {
+                        let _ = card.remove_field(&field_id);
+                        let _ = self.vauchi.update_own_card(&card);
+                    }
+                    self.engine_cache.remove(&AppScreen::MyInfo);
+                    let screen = self.navigate_back();
+                    return ActionResult::NavigateTo(screen);
+                }
+                UserAction::ActionPressed { action_id } if action_id == "back" => {
+                    let screen = self.navigate_back();
+                    return ActionResult::NavigateTo(screen);
+                }
+                _ => {}
+            }
+        }
+
         let result = self.engine.handle_action(action);
         match result {
             ActionResult::Complete => self.handle_completion(),
             ActionResult::EditContact { contact_id } => {
                 let screen = self.navigate_to(AppScreen::ContactEdit { contact_id });
+                ActionResult::NavigateTo(screen)
+            }
+            ActionResult::OpenEntryDetail { field_id } => {
+                let screen = self.navigate_to(AppScreen::MyInfoEntryDetail { field_id });
                 ActionResult::NavigateTo(screen)
             }
             other => other,

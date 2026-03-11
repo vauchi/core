@@ -22,7 +22,7 @@ use vauchi_core::ui::{
     ActionResult, BackupMode, BackupRecoveryEngine, ContactEditEngine, ContactItem,
     ContactListEngine, DeliveryItem, DeliveryStatusEngine, DeviceLinkingEngine, DuressConfig,
     DuressPinEngine, EditableContact, EmergencyShredEngine, ExchangeConfig, ExchangeEngine,
-    HelpEngine, HelpItem, HomeEngine, HomeProgress, LockScreenEngine, OnboardingEngine,
+    HelpEngine, HelpItem, LockScreenEngine, MyInfoEngine, MyInfoProgress, OnboardingEngine,
     ScreenModel, SettingsConfig, SettingsEngine, UserAction, WorkflowEngine,
 };
 
@@ -200,13 +200,11 @@ macro_rules! mobile_workflow {
 // ── MobileHomeWorkflow ────────────────────────────────────────────
 
 mobile_workflow! {
-    MobileHomeWorkflow wraps HomeEngine {
-        constructor(contacts_json: String, progress_json: String) -> {
-            let contacts: Vec<ContactItem> = serde_json::from_str(&contacts_json)
-                .map_err(|e| MobileError::InvalidInput(format!("Failed to parse contacts: {e}")))?;
-            let progress: HomeProgress = serde_json::from_str(&progress_json)
+    MobileHomeWorkflow wraps MyInfoEngine {
+        constructor(progress_json: String) -> {
+            let progress: MyInfoProgress = serde_json::from_str(&progress_json)
                 .map_err(|e| MobileError::InvalidInput(format!("Failed to parse progress: {e}")))?;
-            HomeEngine::new(contacts, progress)
+            MyInfoEngine::new(progress)
         }
     }
 }

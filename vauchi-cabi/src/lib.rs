@@ -286,7 +286,7 @@ pub unsafe extern "C" fn vauchi_app_navigate_to(
     };
     let screen = match name.as_str() {
         "onboarding" => AppScreen::Onboarding,
-        "home" => AppScreen::Home,
+        "home" | "my_info" => AppScreen::MyInfo,
         "contacts" => AppScreen::Contacts,
         "exchange" => AppScreen::Exchange,
         "settings" => AppScreen::Settings,
@@ -329,7 +329,7 @@ pub unsafe extern "C" fn vauchi_app_available_screens(handle: *mut VauchiApp) ->
                 .iter()
                 .map(|s| match s {
                     AppScreen::Onboarding => "onboarding",
-                    AppScreen::Home => "home",
+                    AppScreen::MyInfo => "my_info",
                     AppScreen::Contacts => "contacts",
                     AppScreen::Exchange => "exchange",
                     AppScreen::Settings => "settings",

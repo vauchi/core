@@ -218,35 +218,26 @@ fn workflow_rejects_unknown_action_variant() {
 
 #[test]
 fn home_workflow_returns_home_screen() {
-    let workflow = MobileHomeWorkflow::new(
-        r#"[{"id":"c1","name":"Alice","subtitle":null,"avatar_initials":"A","status":null}]"#
-            .into(),
-        r#"{"completed_steps":3,"total_steps":6}"#.into(),
-    )
-    .expect("should construct");
+    let workflow = MobileHomeWorkflow::new(r#"{"completed_steps":3,"total_steps":6}"#.into())
+        .expect("should construct");
 
     let json = workflow.current_screen_json().expect("should serialize");
     let screen: serde_json::Value = serde_json::from_str(&json).expect("should parse");
-    assert_eq!(screen["screen_id"], "home");
+    assert_eq!(screen["screen_id"], "my_info");
 }
 
 #[test]
 fn home_workflow_handles_action() {
-    let workflow = MobileHomeWorkflow::new(
-        "[]".into(),
-        r#"{"completed_steps":6,"total_steps":6}"#.into(),
-    )
-    .expect("should construct");
+    let workflow = MobileHomeWorkflow::new(r#"{"completed_steps":6,"total_steps":6}"#.into())
+        .expect("should construct");
 
     let result_json = workflow
-        .handle_action_json(
-            r#"{"ListItemSelected":{"component_id":"recent_contacts","item_id":"c1"}}"#.into(),
-        )
+        .handle_action_json(r#"{"ActionPressed":{"action_id":"toggle_view"}}"#.into())
         .expect("should handle action");
     let result: serde_json::Value = serde_json::from_str(&result_json).expect("should parse");
     assert!(
-        result["OpenContact"].is_object(),
-        "expected OpenContact, got: {result}"
+        result["UpdateScreen"].is_object(),
+        "expected UpdateScreen, got: {result}"
     );
 }
 

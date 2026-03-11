@@ -19,34 +19,15 @@
 use std::sync::Mutex;
 
 use vauchi_core::ui::{
-    ActionResult, BackupMode, BackupRecoveryEngine, ContactEditEngine, ContactItem,
-    ContactListEngine, DeliveryItem, DeliveryStatusEngine, DeviceLinkingEngine, DuressConfig,
-    DuressPinEngine, EditableContact, EmergencyShredEngine, ExchangeConfig, ExchangeEngine,
-    HelpEngine, HelpItem, LockScreenEngine, MyInfoEngine, MyInfoProgress, OnboardingEngine,
-    ScreenModel, SettingsConfig, SettingsEngine, UserAction, WorkflowEngine,
+    BackupMode, BackupRecoveryEngine, ContactEditEngine, ContactItem, ContactListEngine,
+    DeliveryItem, DeliveryStatusEngine, DeviceLinkingEngine, DuressConfig, DuressPinEngine,
+    EditableContact, EmergencyShredEngine, ExchangeConfig, ExchangeEngine, HelpEngine, HelpItem,
+    LockScreenEngine, MyInfoEngine, MyInfoProgress, OnboardingEngine, SettingsConfig,
+    SettingsEngine, WorkflowEngine,
 };
 
 use super::error::MobileError;
-
-// ── JSON transport helpers ──────────────────────────────────────────
-
-/// Serialize a ScreenModel to JSON.
-fn screen_to_json(screen: &ScreenModel) -> Result<String, MobileError> {
-    serde_json::to_string(screen)
-        .map_err(|e| MobileError::Internal(format!("Failed to serialize ScreenModel: {e}")))
-}
-
-/// Serialize an ActionResult to JSON.
-fn action_result_to_json(result: &ActionResult) -> Result<String, MobileError> {
-    serde_json::to_string(result)
-        .map_err(|e| MobileError::Internal(format!("Failed to serialize ActionResult: {e}")))
-}
-
-/// Deserialize a UserAction from JSON.
-fn user_action_from_json(json: &str) -> Result<UserAction, MobileError> {
-    serde_json::from_str(json)
-        .map_err(|e| MobileError::InvalidInput(format!("Failed to parse UserAction JSON: {e}")))
-}
+use super::json_helpers::{action_result_to_json, screen_to_json, user_action_from_json};
 
 // ── MobileOnboardingWorkflow ────────────────────────────────────────
 

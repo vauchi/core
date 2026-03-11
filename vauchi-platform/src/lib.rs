@@ -30,6 +30,7 @@ mod device_link_relay;
 mod diagnostic;
 mod error;
 mod exchange;
+mod json_helpers;
 mod mobile_animated_qr;
 mod mobile_ble;
 mod mobile_contacts;

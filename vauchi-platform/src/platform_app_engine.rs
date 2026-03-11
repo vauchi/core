@@ -22,33 +22,12 @@ use std::sync::{Arc, Mutex};
 use vauchi_core::api::{Vauchi, VauchiConfig};
 use vauchi_core::crypto::SymmetricKey;
 use vauchi_core::network::MockTransport;
-use vauchi_core::ui::{
-    ActionResult, AppEngine, AppScreen, ScreenModel, UserAction, WorkflowEngine,
-};
+use vauchi_core::ui::{AppEngine, WorkflowEngine};
 
 use crate::error::MobileError;
-
-// ── JSON transport helpers ──────────────────────────────────────────
-
-fn screen_to_json(screen: &ScreenModel) -> Result<String, MobileError> {
-    serde_json::to_string(screen)
-        .map_err(|e| MobileError::Internal(format!("Failed to serialize ScreenModel: {e}")))
-}
-
-fn action_result_to_json(result: &ActionResult) -> Result<String, MobileError> {
-    serde_json::to_string(result)
-        .map_err(|e| MobileError::Internal(format!("Failed to serialize ActionResult: {e}")))
-}
-
-fn user_action_from_json(json: &str) -> Result<UserAction, MobileError> {
-    serde_json::from_str(json)
-        .map_err(|e| MobileError::InvalidInput(format!("Failed to parse UserAction JSON: {e}")))
-}
-
-fn app_screen_from_json(json: &str) -> Result<AppScreen, MobileError> {
-    serde_json::from_str(json)
-        .map_err(|e| MobileError::InvalidInput(format!("Failed to parse AppScreen JSON: {e}")))
-}
+use crate::json_helpers::{
+    action_result_to_json, app_screen_from_json, screen_to_json, user_action_from_json,
+};
 
 // ── PlatformAppEngine ───────────────────────────────────────────────
 

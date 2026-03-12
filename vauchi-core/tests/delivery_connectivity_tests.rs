@@ -50,6 +50,7 @@ fn create_offline_update(storage: &Storage, manager: &OfflineManager, id: &str) 
         created_at: now(),
         retry_count: 0,
         status: UpdateStatus::Pending,
+        target_relay_url: None,
     };
     manager.send_or_queue(storage, update, false).unwrap();
 }

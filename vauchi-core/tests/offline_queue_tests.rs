@@ -31,6 +31,7 @@ fn create_pending_update(id: &str, contact_id: &str) -> PendingUpdate {
         created_at: now(),
         retry_count: 0,
         status: UpdateStatus::Pending,
+        target_relay_url: None,
     }
 }
 
@@ -166,6 +167,7 @@ fn test_pending_updates_ordered_by_creation() {
             created_at,
             retry_count: 0,
             status: UpdateStatus::Pending,
+            target_relay_url: None,
         };
         storage.queue_update(&update).unwrap();
     }
@@ -259,6 +261,7 @@ fn test_get_pending_by_status() {
             created_at: timestamp,
             retry_count: 0,
             status,
+            target_relay_url: None,
         };
         storage.queue_update(&update).unwrap();
     }

@@ -255,6 +255,7 @@ fn test_pending_update_encrypted_roundtrip() {
         created_at: 1000,
         retry_count: 0,
         status: UpdateStatus::Pending,
+        target_relay_url: None,
     };
 
     storage.queue_update(&update).unwrap();
@@ -281,6 +282,7 @@ fn test_pending_update_payload_stored_encrypted() {
         created_at: 1000,
         retry_count: 0,
         status: UpdateStatus::Pending,
+        target_relay_url: None,
     };
 
     storage.queue_update(&update).unwrap();
@@ -623,6 +625,7 @@ fn test_rekey_preserves_pending_updates() {
         created_at: 1000,
         retry_count: 0,
         status: UpdateStatus::Pending,
+        target_relay_url: None,
     };
     storage.queue_update(&update).unwrap();
 

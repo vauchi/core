@@ -72,6 +72,10 @@ pub struct PendingUpdate {
     pub created_at: u64,
     pub retry_count: u32,
     pub status: UpdateStatus,
+    /// Target relay URL for this update. When set, the update should be
+    /// sent to the contact's relay instead of the home relay.
+    /// Populated from `Contact::relay_url()` when the update is queued.
+    pub target_relay_url: Option<String>,
 }
 
 /// Delivery status for tracking message delivery progression.

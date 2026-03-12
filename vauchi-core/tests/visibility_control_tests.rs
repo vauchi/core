@@ -43,6 +43,7 @@ fn create_visibility_update(id: &str, contact_id: &str, field_id: &str) -> Pendi
         created_at: now(),
         retry_count: 0,
         status: UpdateStatus::Pending,
+        target_relay_url: None,
     }
 }
 
@@ -330,6 +331,7 @@ fn test_visibility_propagation_multiple_changes() {
             created_at,
             retry_count: 0,
             status: UpdateStatus::Pending,
+            target_relay_url: None,
         };
         storage.queue_update(&update).unwrap();
     }

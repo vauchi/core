@@ -11,7 +11,7 @@ use super::{Storage, StorageError};
 
 /// SQL columns selected for pending update queries (with encrypted payload).
 const PENDING_SELECT: &str =
-    "id, contact_id, update_type, payload_encrypted, payload, created_at, retry_count, status, error_message, retry_at";
+    "id, contact_id, update_type, payload_encrypted, payload, created_at, retry_count, status, error_message, retry_at, target_relay_url";
 
 /// Intermediate row before payload decryption.
 struct PendingRow {
@@ -23,6 +23,7 @@ struct PendingRow {
     created_at: u64,
     retry_count: u32,
     status: UpdateStatus,
+    target_relay_url: Option<String>,
 }
 
 fn row_to_pending_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<PendingRow> {
@@ -49,6 +50,7 @@ fn row_to_pending_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<PendingRow> {
         created_at: row.get::<_, i64>(5)? as u64,
         retry_count: row.get::<_, i32>(6)? as u32,
         status,
+        target_relay_url: row.get(10)?,
     })
 }
 
@@ -74,6 +76,7 @@ impl Storage {
             created_at: row.created_at,
             retry_count: row.retry_count,
             status: row.status,
+            target_relay_url: row.target_relay_url,
         })
     }
 
@@ -94,8 +97,8 @@ impl Storage {
 
         self.conn.execute(
             "INSERT OR REPLACE INTO pending_updates
-             (id, contact_id, update_type, payload, payload_encrypted, created_at, retry_count, status, error_message, retry_at)
-             VALUES (?1, ?2, ?3, X'', ?4, ?5, ?6, ?7, ?8, ?9)",
+             (id, contact_id, update_type, payload, payload_encrypted, created_at, retry_count, status, error_message, retry_at, target_relay_url)
+             VALUES (?1, ?2, ?3, X'', ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
             params![
                 update.id,
                 update.contact_id,
@@ -106,6 +109,7 @@ impl Storage {
                 status,
                 error_msg,
                 retry_at,
+                update.target_relay_url,
             ],
         )?;
 

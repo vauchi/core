@@ -111,6 +111,7 @@ fn test_sequential_pending_update_operations() {
             created_at: 1700000000 + i as u64,
             retry_count: 0,
             status: UpdateStatus::Pending,
+            target_relay_url: None,
         };
         storage.queue_update(&update).unwrap();
     }

@@ -32,6 +32,7 @@ fn test_update(id: &str, contact_id: &str) -> PendingUpdate {
         created_at: now(),
         retry_count: 0,
         status: UpdateStatus::Pending,
+        target_relay_url: None,
     }
 }
 

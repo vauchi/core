@@ -614,6 +614,7 @@ impl<T: Transport> Vauchi<T> {
             created_at: now,
             retry_count: 0,
             status: UpdateStatus::Pending,
+            target_relay_url: None,
         };
         self.storage.queue_update(&update)?;
 

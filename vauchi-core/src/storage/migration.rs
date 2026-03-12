@@ -557,16 +557,20 @@ const MIGRATION_V30_LABEL_DISPLAY_NAME_OVERRIDE: &str = "
     ALTER TABLE visibility_labels ADD COLUMN display_name_override_encrypted BLOB;
 ";
 
-/// Migration v31: Add relay fields to contacts table.
+/// Migration v31: Add relay fields to contacts and pending_updates tables.
 ///
-/// Stores the contact's relay URL and Noise NK public key, learned during
-/// QR exchange. Both columns are nullable — existing contacts (pre-relay)
-/// load with None. The relay URL is stored as plaintext TEXT (not
-/// security-sensitive: it's a public server address). The Noise pubkey is
-/// stored as a raw 32-byte BLOB.
+/// Contacts: stores relay URL and Noise NK public key learned during
+/// QR exchange. Both nullable — existing contacts load with None.
+/// The relay URL is plaintext TEXT (public server address, not secret).
+/// The Noise pubkey is a raw 32-byte BLOB.
+///
+/// Pending updates: stores the target relay URL for per-contact routing.
+/// When set, the update should be dispatched to the contact's relay
+/// instead of the home relay. NULL means use home relay.
 const MIGRATION_V31_CONTACT_RELAY_FIELDS: &str = "
     ALTER TABLE contacts ADD COLUMN relay_url TEXT;
     ALTER TABLE contacts ADD COLUMN relay_noise_pubkey BLOB;
+    ALTER TABLE pending_updates ADD COLUMN target_relay_url TEXT;
 ";
 
 /// Migration v2: Originally re-encrypted AES-GCM data to XChaCha20-Poly1305.

@@ -410,6 +410,7 @@ fn test_pending_updates_persistence() {
         created_at: 1700000000,
         retry_count: 0,
         status: UpdateStatus::Pending,
+        target_relay_url: None,
     };
 
     storage.queue_update(&update).unwrap();
@@ -516,6 +517,7 @@ fn test_default_column_values() {
         created_at: 1700000000,
         retry_count: 0,
         status: UpdateStatus::Pending,
+        target_relay_url: None,
     };
 
     storage.queue_update(&update).unwrap();

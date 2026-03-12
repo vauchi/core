@@ -168,6 +168,7 @@ impl<'a> SyncManager<'a> {
             created_at: now,
             retry_count: 0,
             status: UpdateStatus::Pending,
+            target_relay_url: None,
         };
 
         self.storage.queue_update(&update)?;
@@ -196,6 +197,7 @@ impl<'a> SyncManager<'a> {
             created_at: now,
             retry_count: 0,
             status: UpdateStatus::Pending,
+            target_relay_url: None,
         };
 
         self.storage.queue_update(&update)?;
@@ -222,6 +224,7 @@ impl<'a> SyncManager<'a> {
             created_at: current_timestamp(),
             retry_count: 0,
             status: UpdateStatus::Pending,
+            target_relay_url: None,
         };
         self.storage.queue_update(&update)?;
         Ok(update_id)
@@ -246,6 +249,7 @@ impl<'a> SyncManager<'a> {
             created_at: current_timestamp(),
             retry_count: 0,
             status: UpdateStatus::Pending,
+            target_relay_url: None,
         };
         self.storage.queue_update(&update)?;
         Ok(update_id)
@@ -442,6 +446,7 @@ impl<'a> SyncManager<'a> {
             created_at: now,
             retry_count: 0,
             status: UpdateStatus::Pending,
+            target_relay_url: None,
         };
 
         // Remove old updates and add merged one

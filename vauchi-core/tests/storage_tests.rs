@@ -121,6 +121,7 @@ fn test_storage_pending_updates() {
         created_at: 12345,
         retry_count: 0,
         status: UpdateStatus::Pending,
+        target_relay_url: None,
     };
 
     storage.queue_update(&update).unwrap();
@@ -145,6 +146,7 @@ fn test_storage_mark_update_sent() {
         created_at: 12345,
         retry_count: 0,
         status: UpdateStatus::Pending,
+        target_relay_url: None,
     };
 
     storage.queue_update(&update).unwrap();
@@ -168,6 +170,7 @@ fn test_storage_update_status() {
         created_at: 12345,
         retry_count: 0,
         status: UpdateStatus::Pending,
+        target_relay_url: None,
     };
 
     storage.queue_update(&update).unwrap();

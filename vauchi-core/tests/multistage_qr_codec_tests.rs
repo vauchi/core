@@ -236,6 +236,76 @@ fn test_init_qr_without_relay_backward_compat() {
 }
 
 #[test]
+fn test_init_qr_rejects_private_host_relay_url() {
+    let session_id = [30u8; 16];
+    let pubkey = [31u8; 32];
+    let ephemeral = [32u8; 32];
+    let commitment = [33u8; 32];
+
+    let qr = format_init_qr_with_relay(
+        &session_id,
+        &pubkey,
+        &ephemeral,
+        &commitment,
+        "Evil",
+        Some("wss://127.0.0.1/evil"),
+        None,
+    );
+
+    // Should fail SSRF validation during parse
+    let result = parse_qr(&qr);
+    assert!(result.is_err(), "private host relay URL should be rejected");
+}
+
+#[test]
+fn test_init_qr_rejects_insecure_scheme() {
+    let session_id = [34u8; 16];
+    let pubkey = [35u8; 32];
+    let ephemeral = [36u8; 32];
+    let commitment = [37u8; 32];
+
+    let qr = format_init_qr_with_relay(
+        &session_id,
+        &pubkey,
+        &ephemeral,
+        &commitment,
+        "Evil",
+        Some("ws://relay.evil.com"),
+        None,
+    );
+
+    let result = parse_qr(&qr);
+    assert!(
+        result.is_err(),
+        "insecure scheme relay URL should be rejected"
+    );
+}
+
+#[test]
+fn test_init_qr_truncated_before_flags() {
+    // Build a valid prefix but truncate before flags byte
+    let session_id = [38u8; 16];
+    let pubkey = [39u8; 32];
+    let ephemeral = [40u8; 32];
+    let commitment = [41u8; 32];
+
+    let full_qr = format_init_qr_with_relay(
+        &session_id,
+        &pubkey,
+        &ephemeral,
+        &commitment,
+        "X",
+        None,
+        None,
+    );
+
+    // Truncate 2 chars (flags field) off the end
+    let truncated = &full_qr[..full_qr.len() - 2];
+    let result = parse_qr(truncated);
+    assert!(result.is_err(), "truncated INIT QR should fail");
+}
+
+#[test]
 fn test_init_qr_with_only_noise_pubkey() {
     let session_id = [23u8; 16];
     let pubkey = [24u8; 32];

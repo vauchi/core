@@ -10,6 +10,8 @@
 
 use std::collections::HashMap;
 
+use subtle::ConstantTimeEq;
+
 use crate::contact::Contact;
 use crate::crypto::HKDF;
 
@@ -74,13 +76,13 @@ pub fn resolve_sender<'a>(
     // Also check previous epoch to handle clock skew at epoch boundaries
     for contact in contacts {
         let candidate = compute_anonymous_id(contact.shared_key().as_bytes(), epoch);
-        if &candidate == anonymous_id {
+        if bool::from(candidate.ct_eq(anonymous_id)) {
             return Some(contact);
         }
         // Check previous epoch for boundary tolerance
         if epoch > 0 {
             let prev_candidate = compute_anonymous_id(contact.shared_key().as_bytes(), epoch - 1);
-            if &prev_candidate == anonymous_id {
+            if bool::from(prev_candidate.ct_eq(anonymous_id)) {
                 return Some(contact);
             }
         }

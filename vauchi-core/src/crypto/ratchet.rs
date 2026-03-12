@@ -13,6 +13,7 @@
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use subtle::ConstantTimeEq;
 use thiserror::Error;
 use zeroize::Zeroize;
 
@@ -323,7 +324,7 @@ impl DoubleRatchetState {
         // Check if we need to perform a DH ratchet
         let their_dh_changed = self
             .their_dh
-            .map(|k| k != message.dh_public)
+            .map(|k| !bool::from(k.ct_eq(&message.dh_public)))
             .unwrap_or(true);
 
         if their_dh_changed {

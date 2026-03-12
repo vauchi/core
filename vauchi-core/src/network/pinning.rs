@@ -16,16 +16,28 @@
 //! requires a custom `rustls::ServerCertVerifier` or post-handshake check.
 
 use aws_lc_rs::digest;
+use subtle::ConstantTimeEq;
 
 /// A pinned certificate fingerprint.
 ///
 /// Stores a SHA-256 hash of a DER-encoded certificate for
 /// certificate pinning verification during TLS connections.
-#[derive(Debug, Clone, PartialEq, Eq)]
+///
+/// Uses constant-time comparison to prevent timing-based
+/// certificate pinning bypass attacks.
+#[derive(Debug, Clone)]
 pub struct PinnedCertificate {
     /// SHA-256 fingerprint of the DER-encoded certificate.
     pub sha256_fingerprint: [u8; 32],
 }
+
+impl PartialEq for PinnedCertificate {
+    fn eq(&self, other: &Self) -> bool {
+        bool::from(self.sha256_fingerprint.ct_eq(&other.sha256_fingerprint))
+    }
+}
+
+impl Eq for PinnedCertificate {}
 
 impl PinnedCertificate {
     /// Creates a new pinned certificate from a known SHA-256 fingerprint.

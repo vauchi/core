@@ -9,6 +9,7 @@
 //! with during transit.
 
 use aws_lc_rs::digest::{Context, SHA256};
+use subtle::ConstantTimeEq;
 use thiserror::Error;
 
 /// Verify SHA-256 checksum of content
@@ -40,7 +41,7 @@ pub fn verify_checksum(data: &[u8], expected: &str) -> Result<(), IntegrityError
     let digest = context.finish();
     let actual_hex = hex::encode(digest.as_ref());
 
-    if actual_hex == expected_hex {
+    if bool::from(actual_hex.as_bytes().ct_eq(expected_hex.as_bytes())) {
         Ok(())
     } else {
         Err(IntegrityError::ChecksumMismatch {

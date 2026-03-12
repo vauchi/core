@@ -7,6 +7,8 @@
 //! Detects when a recipient's cryptographic key has changed between send attempts,
 //! which may indicate key rotation or a security event requiring user verification.
 
+use subtle::ConstantTimeEq;
+
 /// Error type for key rotation detection.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum KeyRotationError {
@@ -43,7 +45,7 @@ impl KeyRotationDetector {
         known_key: &[u8; 32],
         current_key: &[u8; 32],
     ) -> Result<(), KeyRotationError> {
-        if known_key == current_key {
+        if bool::from(known_key.ct_eq(current_key)) {
             Ok(())
         } else {
             Err(KeyRotationError::RecipientKeyChanged {

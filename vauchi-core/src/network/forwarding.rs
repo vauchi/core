@@ -16,6 +16,8 @@
 
 use std::collections::HashSet;
 
+use subtle::ConstantTimeEq;
+
 use super::message::{ForwardingHint, ForwardingHints, MessageEnvelope};
 
 /// Filters out expired hints based on the current time.
@@ -84,7 +86,11 @@ pub fn verify_hint_signature(
         .ok_or_else(|| "missing signature".to_string())?;
 
     // Verify the signing key matches the expected relay
-    if relay_key_hex != expected_relay_key {
+    if !bool::from(
+        relay_key_hex
+            .as_bytes()
+            .ct_eq(expected_relay_key.as_bytes()),
+    ) {
         return Err(format!(
             "relay key mismatch: expected {}, got {}",
             expected_relay_key, relay_key_hex

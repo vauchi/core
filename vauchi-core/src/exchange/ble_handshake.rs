@@ -57,6 +57,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use aws_lc_rs::digest::{digest, SHA256};
 use aws_lc_rs::rand::{SecureRandom, SystemRandom};
+use subtle::ConstantTimeEq;
 use zeroize::Zeroize;
 
 use super::ble_payload::BleCardPayload;
@@ -416,7 +417,7 @@ impl BleHandshakeSession {
 
         // Verify commitment: SHA-256(encrypted_card) must match
         let computed_commitment = compute_commitment(their_encrypted_card);
-        if computed_commitment != their_commitment {
+        if !bool::from(computed_commitment.ct_eq(&their_commitment)) {
             return Err(ExchangeError::BleCommitmentMismatch);
         }
 
@@ -501,7 +502,7 @@ impl BleHandshakeSession {
             .try_into()
             .map_err(|_| ExchangeError::InvalidBleFormat)?;
 
-        if computed != their_commitment_arr {
+        if !bool::from(computed.ct_eq(&their_commitment_arr)) {
             return Err(ExchangeError::BleCommitmentMismatch);
         }
 
@@ -552,7 +553,7 @@ impl BleHandshakeSession {
 
             // The reveal from Phase 3 is the responder's local_commitment,
             // which should match our stored their_commitment from the KeyAck
-            if reveal_arr != their_commitment {
+            if !bool::from(reveal_arr.ct_eq(&their_commitment)) {
                 return Err(ExchangeError::BleCommitmentMismatch);
             }
         }

@@ -87,6 +87,33 @@ pub enum Component {
         confirm_text: String,
         destructive: bool,
     },
+    /// A non-blocking toast message with optional undo action.
+    ShowToast {
+        id: String,
+        message: String,
+        /// If set, show an Undo button that emits UndoPressed with this action_id.
+        undo_action_id: Option<String>,
+        /// Auto-dismiss duration in milliseconds (default: 5000).
+        duration_ms: u32,
+    },
+    /// An inline confirmation for irrevocable actions (expands in place).
+    InlineConfirm {
+        id: String,
+        warning: String,
+        confirm_text: String,
+        cancel_text: String,
+        /// If true, render confirm button in destructive/red style.
+        destructive: bool,
+    },
+    /// A text field that toggles between display and edit mode.
+    EditableText {
+        id: String,
+        label: String,
+        value: String,
+        /// When true, render as editable input. When false, render as static text with edit button.
+        editing: bool,
+        validation_error: Option<String>,
+    },
     Divider,
 }
 

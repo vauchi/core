@@ -41,6 +41,10 @@ pub enum UserAction {
         component_id: String,
         item_id: String,
     },
+    /// User pressed Undo on a toast with an undo action.
+    UndoPressed {
+        action_id: String,
+    },
 }
 
 /// The result of handling a user action.
@@ -81,6 +85,11 @@ pub enum ActionResult {
     /// Frontend should open the entry detail view for a MyInfo field.
     OpenEntryDetail {
         field_id: String,
+    },
+    /// Frontend should display a non-blocking toast. Does not replace the current screen.
+    ShowToast {
+        message: String,
+        undo_action_id: Option<String>,
     },
     /// All data has been wiped — frontend should reset to initial state.
     WipeComplete,

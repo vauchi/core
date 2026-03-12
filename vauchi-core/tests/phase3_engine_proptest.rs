@@ -151,6 +151,7 @@ fn validate_result(
         | ActionResult::EditContact { .. }
         | ActionResult::OpenUrl { .. }
         | ActionResult::ShowAlert { .. }
+        | ActionResult::ShowToast { .. }
         | ActionResult::OpenEntryDetail { .. } => {}
     }
     Ok(())

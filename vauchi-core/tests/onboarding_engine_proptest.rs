@@ -490,6 +490,7 @@ proptest! {
                 | ActionResult::EditContact { .. }
                 | ActionResult::OpenUrl { .. }
                 | ActionResult::ShowAlert { .. }
+                | ActionResult::ShowToast { .. }
                 | ActionResult::RequestCamera
                 | ActionResult::OpenEntryDetail { .. }
                 | ActionResult::WipeComplete => {

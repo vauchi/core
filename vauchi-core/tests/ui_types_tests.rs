@@ -533,8 +533,16 @@ fn test_component_show_toast_without_undo_roundtrip() {
     let json = serde_json::to_string(&component).unwrap();
     let restored: Component = serde_json::from_str(&json).unwrap();
     match restored {
-        Component::ShowToast { undo_action_id, .. } => {
+        Component::ShowToast {
+            id,
+            message,
+            undo_action_id,
+            duration_ms,
+        } => {
+            assert_eq!(id, "toast-2");
+            assert_eq!(message, "Saved");
             assert!(undo_action_id.is_none());
+            assert_eq!(duration_ms, 3000);
         }
         other => panic!("Expected ShowToast, got {:?}", other),
     }
@@ -585,7 +593,17 @@ fn test_component_inline_confirm_non_destructive_roundtrip() {
     let json = serde_json::to_string(&component).unwrap();
     let restored: Component = serde_json::from_str(&json).unwrap();
     match restored {
-        Component::InlineConfirm { destructive, .. } => {
+        Component::InlineConfirm {
+            id,
+            warning,
+            confirm_text,
+            cancel_text,
+            destructive,
+        } => {
+            assert_eq!(id, "confirm-2");
+            assert_eq!(warning, "Are you sure?");
+            assert_eq!(confirm_text, "Yes");
+            assert_eq!(cancel_text, "No");
             assert!(!destructive);
         }
         other => panic!("Expected InlineConfirm, got {:?}", other),
@@ -638,10 +656,15 @@ fn test_component_editable_text_editing_with_error_roundtrip() {
     let restored: Component = serde_json::from_str(&json).unwrap();
     match restored {
         Component::EditableText {
+            id,
+            label,
+            value,
             editing,
             validation_error,
-            ..
         } => {
+            assert_eq!(id, "edit-name");
+            assert_eq!(label, "Display Name");
+            assert_eq!(value, "");
             assert!(editing);
             assert_eq!(validation_error.as_deref(), Some("Name cannot be empty"));
         }
@@ -680,7 +703,11 @@ fn test_action_result_show_toast_without_undo_roundtrip() {
     let json = serde_json::to_string(&result).unwrap();
     let restored: ActionResult = serde_json::from_str(&json).unwrap();
     match restored {
-        ActionResult::ShowToast { undo_action_id, .. } => {
+        ActionResult::ShowToast {
+            message,
+            undo_action_id,
+        } => {
+            assert_eq!(message, "Changes saved");
             assert!(undo_action_id.is_none());
         }
         other => panic!("Expected ShowToast, got {:?}", other),

@@ -562,6 +562,123 @@
             }
           },
           "additionalProperties": false
+        },
+        {
+          "description": "A non-blocking toast message with optional undo action.",
+          "type": "object",
+          "required": [
+            "ShowToast"
+          ],
+          "properties": {
+            "ShowToast": {
+              "type": "object",
+              "required": [
+                "duration_ms",
+                "id",
+                "message"
+              ],
+              "properties": {
+                "duration_ms": {
+                  "description": "Auto-dismiss duration in milliseconds (default: 5000).",
+                  "type": "integer",
+                  "format": "uint32",
+                  "minimum": 0.0
+                },
+                "id": {
+                  "type": "string"
+                },
+                "message": {
+                  "type": "string"
+                },
+                "undo_action_id": {
+                  "description": "If set, show an Undo button that emits UndoPressed with this action_id.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "An inline confirmation for irrevocable actions (expands in place).",
+          "type": "object",
+          "required": [
+            "InlineConfirm"
+          ],
+          "properties": {
+            "InlineConfirm": {
+              "type": "object",
+              "required": [
+                "cancel_text",
+                "confirm_text",
+                "destructive",
+                "id",
+                "warning"
+              ],
+              "properties": {
+                "cancel_text": {
+                  "type": "string"
+                },
+                "confirm_text": {
+                  "type": "string"
+                },
+                "destructive": {
+                  "description": "If true, render confirm button in destructive/red style.",
+                  "type": "boolean"
+                },
+                "id": {
+                  "type": "string"
+                },
+                "warning": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "A text field that toggles between display and edit mode.",
+          "type": "object",
+          "required": [
+            "EditableText"
+          ],
+          "properties": {
+            "EditableText": {
+              "type": "object",
+              "required": [
+                "editing",
+                "id",
+                "label",
+                "value"
+              ],
+              "properties": {
+                "editing": {
+                  "description": "When true, render as editable input. When false, render as static text with edit button.",
+                  "type": "boolean"
+                },
+                "id": {
+                  "type": "string"
+                },
+                "label": {
+                  "type": "string"
+                },
+                "validation_error": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "value": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "additionalProperties": false
         }
       ]
     },

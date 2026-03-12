@@ -192,6 +192,27 @@
         }
       },
       "additionalProperties": false
+    },
+    {
+      "description": "User pressed Undo on a toast with an undo action.",
+      "type": "object",
+      "required": [
+        "UndoPressed"
+      ],
+      "properties": {
+        "UndoPressed": {
+          "type": "object",
+          "required": [
+            "action_id"
+          ],
+          "properties": {
+            "action_id": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "additionalProperties": false
     }
   ]
 }

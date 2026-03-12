@@ -74,6 +74,7 @@ stages:
 auto-tag:version:
   extends: [.linux-runner-nocache, .main-only]
   stage: auto-tag
+  resource_group: auto-tag
   needs: []
   variables:
     GIT_STRATEGY: clone
@@ -293,9 +294,11 @@ validate:content-contracts:
           - "vauchi-core/src/content/**/*.rs"
           - "scripts/validate-content-contracts.sh"
 
-# Coverage jobs: run on main merges only (not MRs) — llvm-cov is too slow
+# Coverage job: run on main merges only (not MRs) — llvm-cov is too slow
 # for per-push feedback but still needed for coverage tracking/badges.
-coverage:core:
+# Measures both vauchi-core and vauchi-platform in a single instrumentation
+# run (avoids redundant compilation + instrumentation overhead).
+coverage:workspace:
   extends: [.coverage-job, .linux-runner, .timeout-long]
   before_script:
     - !reference [.self-hosted, before_script]
@@ -303,20 +306,9 @@ coverage:core:
     - !reference [.clone-themes, before_script]
     - rustup component add llvm-tools-preview 2>/dev/null || true
   variables:
-    COVERAGE_PACKAGE: "vauchi-core"
+    COVERAGE_PACKAGE: ""
     COVERAGE_REPO_LABEL: "core"
     COVERAGE_EXTRA_FLAGS: "--features test-kdf"
-
-coverage:platform:
-  extends: [.coverage-job, .linux-runner, .timeout-long]
-  before_script:
-    - !reference [.self-hosted, before_script]
-    - !reference [.clone-locales, before_script]
-    - !reference [.clone-themes, before_script]
-    - rustup component add llvm-tools-preview 2>/dev/null || true
-  variables:
-    COVERAGE_PACKAGE: "vauchi-platform"
-    COVERAGE_REPO_LABEL: "platform"
 
 # Binary size tracking — builds release and pushes metrics to Grafana.
 # Runs on main merges and release tags (not per-MR — release build is slow).
@@ -381,20 +373,22 @@ fuzz:nightly:
 
       cd vauchi-core/fuzz
       FUZZ_DURATION="${FUZZ_DURATION_SECS:-300}"
+      FUZZ_JOBS="${FUZZ_PARALLEL_JOBS:-4}"
+
+      TARGETS="fuzz_decode_message fuzz_qr_payload fuzz_unpad fuzz_delta_decode \
+               fuzz_recovery_claim fuzz_nfc_payload fuzz_ble_payload \
+               fuzz_ble_advertisement fuzz_exchange_payload fuzz_encrypted_exchange \
+               fuzz_ratchet_state"
+
+      echo "=== Fuzzing $(echo $TARGETS | wc -w) targets, ${FUZZ_JOBS} parallel, ${FUZZ_DURATION}s each ==="
+
       FAILED=0
+      echo "$TARGETS" | tr ' ' '\n' | grep -v '^$' | \
+        xargs -P "$FUZZ_JOBS" -I{} sh -c \
+          'echo "START: {}"; cargo fuzz run {} -- -max_total_time='"$FUZZ_DURATION"' 2>&1 || echo "CRASH:{}"' \
+          | tee /tmp/fuzz-output.log
 
-      for target in fuzz_decode_message fuzz_qr_payload fuzz_unpad fuzz_delta_decode \
-                     fuzz_recovery_claim fuzz_nfc_payload fuzz_ble_payload \
-                     fuzz_ble_advertisement fuzz_exchange_payload fuzz_encrypted_exchange \
-                     fuzz_ratchet_state; do
-        echo "=== Fuzzing $target for ${FUZZ_DURATION}s ==="
-        cargo fuzz run "$target" -- -max_total_time="$FUZZ_DURATION" 2>&1 || {
-          echo "CRASH FOUND in $target"
-          FAILED=$((FAILED + 1))
-        }
-        echo ""
-      done
-
+      FAILED=$(grep -c '^CRASH:' /tmp/fuzz-output.log || true)
       echo "=== Fuzz Summary ==="
       echo "Targets: 11, Crashes: $FAILED"
       [ "$FAILED" -eq 0 ] || exit 1

@@ -4,6 +4,7 @@
 
 use vauchi_core::exchange::{BleChunker, BleReassembler, BLE_CHUNK_OVERHEAD};
 
+// @scenario: ble_exchange.feature:Small payload creates single chunk
 #[test]
 fn test_chunker_single_chunk_small_payload() {
     let data = vec![0xAB; 10];
@@ -26,6 +27,7 @@ fn test_chunker_single_chunk_small_payload() {
     assert_eq!(&chunk[BLE_CHUNK_OVERHEAD..], &data[..]);
 }
 
+// @scenario: ble_exchange.feature:Large payload splits into multiple chunks
 #[test]
 fn test_chunker_multiple_chunks() {
     let data = vec![0xCC; 500];
@@ -45,6 +47,8 @@ fn test_chunker_multiple_chunks() {
     }
 }
 
+// @scenario: ble_exchange.feature:Chunking and reassembly roundtrip
+// @scenario: ble_exchange.feature:Chunking and reassembly preserves data
 #[test]
 fn test_roundtrip_chunking_reassembly() {
     let data: Vec<u8> = (0..2000).map(|i| (i % 256) as u8).collect();
@@ -69,6 +73,7 @@ fn test_roundtrip_chunking_reassembly() {
     assert_eq!(assembled, data);
 }
 
+// @scenario: ble_exchange.feature:Out-of-order reassembly
 #[test]
 fn test_reassembly_out_of_order() {
     let data: Vec<u8> = (0..500).map(|i| (i % 256) as u8).collect();
@@ -95,6 +100,7 @@ fn test_reassembly_out_of_order() {
     assert_eq!(assembled, data);
 }
 
+// @scenario: ble_exchange.feature:Duplicate chunk is idempotent
 #[test]
 fn test_reassembly_duplicate_chunk_is_idempotent() {
     let data = vec![0xDD; 400];
@@ -120,6 +126,7 @@ fn test_reassembly_duplicate_chunk_is_idempotent() {
     assert!(!reassembler.is_complete());
 }
 
+// @scenario: ble_exchange.feature:Incomplete reassembly returns nothing
 #[test]
 fn test_reassembly_incomplete_returns_none() {
     let data = vec![0xEE; 600];
@@ -141,6 +148,7 @@ fn test_reassembly_incomplete_returns_none() {
     assert_eq!(reassembler.assemble(), None);
 }
 
+// @scenario: ble_exchange.feature:Chunk index out of range returns nothing
 #[test]
 fn test_chunk_index_out_of_range() {
     let data = vec![0xFF; 100];

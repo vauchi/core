@@ -46,6 +46,9 @@ fn make_test_card(identity: &Identity, name: &str) -> BleCardPayload {
 // Property-Based Tests
 // ============================================================
 
+// @scenario: ble_exchange.feature:Encrypt-decrypt roundtrip preserves arbitrary data
+// @scenario: ble_exchange.feature:Any single byte flip in ciphertext fails decryption
+// @scenario: ble_exchange.feature:Chunking and reassembly preserves data
 proptest! {
     #[test]
     fn prop_encrypt_decrypt_roundtrip(plaintext in prop::collection::vec(any::<u8>(), 0..10_000)) {
@@ -109,6 +112,7 @@ proptest! {
 // Adversarial Tests
 // ============================================================
 
+// @scenario: ble_exchange.feature:Empty display name roundtrips correctly
 #[test]
 fn test_adversarial_empty_display_name() {
     let identity_key = [1u8; 32];
@@ -129,6 +133,7 @@ fn test_adversarial_empty_display_name() {
     assert!(restored.verify_crc16(), "CRC16 must verify for empty name");
 }
 
+// @scenario: ble_exchange.feature:Unicode display name roundtrips correctly
 #[test]
 fn test_adversarial_unicode_display_name() {
     let identity_key = [3u8; 32];
@@ -152,6 +157,7 @@ fn test_adversarial_unicode_display_name() {
     );
 }
 
+// @scenario: ble_exchange.feature:Null bytes in fields roundtrip correctly
 #[test]
 fn test_adversarial_null_bytes_in_fields() {
     let identity_key = [5u8; 32];
@@ -186,6 +192,7 @@ fn test_adversarial_null_bytes_in_fields() {
     );
 }
 
+// @scenario: ble_exchange.feature:Maximum size avatar roundtrips correctly
 #[test]
 fn test_adversarial_max_size_avatar() {
     let identity_key = [7u8; 32];
@@ -216,6 +223,7 @@ fn test_adversarial_max_size_avatar() {
     );
 }
 
+// @scenario: ble_exchange.feature:Truncated handshake packet is rejected
 #[test]
 fn test_adversarial_truncated_handshake_packet() {
     let identity = make_test_identity();

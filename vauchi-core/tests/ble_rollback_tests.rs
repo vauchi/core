@@ -7,6 +7,7 @@
 use vauchi_core::exchange::BleRollback;
 use vauchi_core::ExchangeError;
 
+// @scenario: ble_exchange.feature:Rollback clears pending contact data
 #[test]
 fn test_rollback_clears_pending_data() {
     let mut rb = BleRollback::new();
@@ -18,6 +19,7 @@ fn test_rollback_clears_pending_data() {
     assert!(!rb.has_pending("contact-1"));
 }
 
+// @scenario: ble_exchange.feature:Rollback on nonexistent contact is a no-op
 #[test]
 fn test_rollback_nonexistent_is_noop() {
     let mut rb = BleRollback::new();
@@ -25,6 +27,7 @@ fn test_rollback_nonexistent_is_noop() {
     assert!(result.is_ok());
 }
 
+// @scenario: ble_exchange.feature:Commit returns pending data and removes it
 #[test]
 fn test_commit_removes_pending() {
     let mut rb = BleRollback::new();
@@ -37,6 +40,7 @@ fn test_commit_removes_pending() {
     assert!(!rb.has_pending("contact-2"));
 }
 
+// @scenario: ble_exchange.feature:Commit on nonexistent contact returns error
 #[test]
 fn test_commit_nonexistent_returns_error() {
     let mut rb = BleRollback::new();
@@ -50,6 +54,7 @@ fn test_commit_nonexistent_returns_error() {
     }
 }
 
+// @scenario: ble_exchange.feature:Rollback all clears everything
 #[test]
 fn test_rollback_all_clears_everything() {
     let mut rb = BleRollback::new();
@@ -68,6 +73,7 @@ fn test_rollback_all_clears_everything() {
     assert!(!rb.has_pending("c"));
 }
 
+// @scenario: ble_exchange.feature:Default rollback manager is empty
 #[test]
 fn test_default_is_empty() {
     let rb = BleRollback::default();

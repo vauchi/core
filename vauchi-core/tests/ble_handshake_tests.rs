@@ -36,6 +36,7 @@ fn make_test_card(identity: &Identity, name: &str) -> BleCardPayload {
 // Crypto Primitive Tests
 // ============================================================
 
+// @scenario: ble_exchange.feature:X25519 shared secret symmetry
 #[test]
 fn test_x25519_shared_secret_symmetry() {
     let alice = X3DHKeyPair::generate();
@@ -50,6 +51,7 @@ fn test_x25519_shared_secret_symmetry() {
     );
 }
 
+// @scenario: ble_exchange.feature:HKDF produces deterministic output
 #[test]
 fn test_hkdf_deterministic_output() {
     let ikm = [42u8; 32];
@@ -65,6 +67,7 @@ fn test_hkdf_deterministic_output() {
     );
 }
 
+// @scenario: ble_exchange.feature:XChaCha20-Poly1305 encryption roundtrip
 #[test]
 fn test_xchacha20_roundtrip() {
     let key = SymmetricKey::generate();
@@ -82,6 +85,7 @@ fn test_xchacha20_roundtrip() {
     );
 }
 
+// @scenario: ble_exchange.feature:Tampered ciphertext fails AEAD decryption
 #[test]
 fn test_tampered_ciphertext_fails_decryption() {
     let key = SymmetricKey::generate();
@@ -102,6 +106,7 @@ fn test_tampered_ciphertext_fails_decryption() {
     );
 }
 
+// @scenario: ble_exchange.feature:Wrong AAD fails AEAD decryption
 #[test]
 fn test_tampered_aad_fails_decryption() {
     let key = SymmetricKey::generate();
@@ -116,6 +121,7 @@ fn test_tampered_aad_fails_decryption() {
     assert!(result.is_err(), "Wrong AAD must fail AEAD authentication");
 }
 
+// @scenario: ble_exchange.feature:Symmetric key is zeroized on drop
 #[test]
 fn test_zeroize_on_drop() {
     // Documents the ZeroizeOnDrop contract: SymmetricKey derives ZeroizeOnDrop.
@@ -136,6 +142,7 @@ fn test_zeroize_on_drop() {
 // State Machine: Construction & Initial State
 // ============================================================
 
+// @scenario: ble_exchange.feature:Initiator starts in Idle state
 #[test]
 fn test_new_initiator_starts_idle() {
     let identity = make_test_identity();
@@ -148,6 +155,7 @@ fn test_new_initiator_starts_idle() {
     );
 }
 
+// @scenario: ble_exchange.feature:Responder starts in Idle state
 #[test]
 fn test_new_responder_starts_idle() {
     let identity = make_test_identity();
@@ -164,6 +172,7 @@ fn test_new_responder_starts_idle() {
 // Phase 1: Key Offer
 // ============================================================
 
+// @scenario: ble_exchange.feature:Key offer has correct format
 #[test]
 fn test_create_key_offer_format() {
     let identity = make_test_identity();
@@ -187,6 +196,7 @@ fn test_create_key_offer_format() {
     );
 }
 
+// @scenario: ble_exchange.feature:Double key offer is rejected
 #[test]
 fn test_double_key_offer_rejected() {
     let identity = make_test_identity();
@@ -205,6 +215,7 @@ fn test_double_key_offer_rejected() {
 // Phase 2: Key Ack (Responder processes offer)
 // ============================================================
 
+// @scenario: ble_exchange.feature:Responder processes key offer
 #[test]
 fn test_responder_processes_key_offer() {
     let alice_id = make_test_identity();
@@ -240,6 +251,7 @@ fn test_responder_processes_key_offer() {
     );
 }
 
+// @scenario: ble_exchange.feature:Responder rejects key offer with invalid version
 #[test]
 fn test_responder_rejects_invalid_version() {
     let bob_id = make_test_identity();
@@ -253,6 +265,7 @@ fn test_responder_rejects_invalid_version() {
     assert!(result.is_err(), "Invalid version must be rejected");
 }
 
+// @scenario: ble_exchange.feature:Responder rejects truncated key offer
 #[test]
 fn test_responder_rejects_truncated_offer() {
     let bob_id = make_test_identity();
@@ -268,6 +281,7 @@ fn test_responder_rejects_truncated_offer() {
 // Phase 2 (Initiator): Process Key Ack
 // ============================================================
 
+// @scenario: ble_exchange.feature:Initiator processes key acknowledgment
 #[test]
 fn test_initiator_processes_key_ack() {
     let alice_id = make_test_identity();
@@ -304,6 +318,7 @@ fn test_initiator_processes_key_ack() {
     );
 }
 
+// @scenario: ble_exchange.feature:Initiator rejects ack in wrong state
 #[test]
 fn test_initiator_rejects_ack_in_wrong_state() {
     let alice_id = make_test_identity();
@@ -322,6 +337,7 @@ fn test_initiator_rejects_ack_in_wrong_state() {
 // Phase 3: Committed Payload
 // ============================================================
 
+// @scenario: ble_exchange.feature:Responder processes committed payload
 #[test]
 fn test_responder_processes_committed_payload() {
     let alice_id = make_test_identity();
@@ -353,6 +369,7 @@ fn test_responder_processes_committed_payload() {
     );
 }
 
+// @scenario: ble_exchange.feature:Commitment mismatch is rejected
 #[test]
 fn test_commitment_mismatch_rejected() {
     let alice_id = make_test_identity();
@@ -382,6 +399,7 @@ fn test_commitment_mismatch_rejected() {
 // Phase 4: Complete Exchange
 // ============================================================
 
+// @scenario: ble_exchange.feature:Full 4-phase handshake happy path
 #[test]
 fn test_full_handshake_happy_path() {
     let alice_id = make_test_identity();
@@ -470,6 +488,7 @@ fn test_full_handshake_happy_path() {
 // Expiry & Timestamp
 // ============================================================
 
+// @scenario: ble_exchange.feature:Expired key offer is rejected
 #[test]
 fn test_expired_key_offer_rejected() {
     let bob_id = make_test_identity();
@@ -495,6 +514,7 @@ fn test_expired_key_offer_rejected() {
 // Self-Exchange Prevention
 // ============================================================
 
+// @scenario: ble_exchange.feature:Self-exchange rejected in handshake
 #[test]
 fn test_self_exchange_rejected() {
     let identity = make_test_identity();
@@ -517,6 +537,7 @@ fn test_self_exchange_rejected() {
 // Edge Cases
 // ============================================================
 
+// @scenario: ble_exchange.feature:Complete exchange rejected in wrong state
 #[test]
 fn test_complete_exchange_in_wrong_state() {
     let identity = make_test_identity();
@@ -530,6 +551,7 @@ fn test_complete_exchange_in_wrong_state() {
     );
 }
 
+// @scenario: ble_exchange.feature:Process committed payload rejected in wrong state
 #[test]
 fn test_process_committed_payload_in_wrong_state() {
     let identity = make_test_identity();

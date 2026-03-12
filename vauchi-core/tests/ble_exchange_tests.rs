@@ -4,7 +4,7 @@
 
 //! Tests for BLE Exchange (Feature C)
 //!
-//! Feature file: features/contact_exchange.feature @ble
+//! Feature file: features/ble_exchange.feature @ble
 //!
 //! GATT-based payload exchange with proximity verification.
 //! Both sides use fresh ephemeral X25519 keys for full forward secrecy.
@@ -20,7 +20,7 @@ use vauchi_core::{ContactCard, Identity};
 // ExchangeBle payload
 // ============================================================
 
-// @scenario: contact_exchange.feature:BLE exchange generates payload
+// @scenario: ble_exchange.feature:BLE payload generation contains identity and exchange keys
 #[test]
 fn test_ble_payload_generate() {
     let identity = Identity::create("Alice");
@@ -34,7 +34,7 @@ fn test_ble_payload_generate() {
     assert!(payload.verify_signature());
 }
 
-// @scenario: contact_exchange.feature:BLE exchange generates payload
+// @scenario: ble_exchange.feature:BLE payload serialization roundtrip
 #[test]
 fn test_ble_payload_roundtrip() {
     let identity = Identity::create("Alice");
@@ -84,7 +84,7 @@ fn test_ble_payload_tamper() {
     );
 }
 
-// @scenario: contact_exchange.feature:BLE exchange reports descriptive error on failure
+// @scenario: ble_exchange.feature:BLE payload rejected with invalid magic bytes
 #[test]
 fn test_ble_payload_magic() {
     let identity = Identity::create("Alice");
@@ -99,7 +99,7 @@ fn test_ble_payload_magic() {
     assert!(matches!(result, Err(ExchangeError::InvalidBleFormat)));
 }
 
-// @scenario: contact_exchange.feature:BLE exchange rejects expired payload
+// @scenario: ble_exchange.feature:BLE payload expires after 60 seconds
 #[test]
 fn test_ble_payload_expiry() {
     let identity = Identity::create("Alice");
@@ -126,7 +126,7 @@ fn test_ble_payload_expiry() {
 // GATT constants
 // ============================================================
 
-// @scenario: contact_exchange.feature:BLE exchange generates payload
+// @scenario: ble_exchange.feature:GATT UUIDs have correct format
 #[test]
 fn test_gatt_uuid_validity() {
     // UUIDs should be valid format: 8-4-4-4-12
@@ -143,7 +143,7 @@ fn test_gatt_uuid_validity() {
     }
 }
 
-// @scenario: contact_exchange.feature:BLE exchange generates payload
+// @scenario: ble_exchange.feature:GATT service and characteristic UUIDs match expected values
 #[test]
 fn test_gatt_service_uuid_match() {
     // Service UUID should match the constant
@@ -162,6 +162,7 @@ fn test_gatt_service_uuid_match() {
 // BLETransport trait + MockBLETransport
 // ============================================================
 
+// @scenario: ble_exchange.feature:BLE transport can advertise
 #[test]
 fn test_mock_ble_transport_advertise() {
     let identity = Identity::create("Alice");
@@ -172,12 +173,14 @@ fn test_mock_ble_transport_advertise() {
     assert!(mock.start_advertising(&payload).is_ok());
 }
 
+// @scenario: ble_exchange.feature:BLE transport can scan
 #[test]
 fn test_mock_ble_transport_scan() {
     let mock = MockBLETransport::with_peer_payload(&[0u8; BLE_PAYLOAD_SIZE]);
     assert!(mock.start_scanning().is_ok());
 }
 
+// @scenario: ble_exchange.feature:BLE transport connect, read, write, disconnect
 #[test]
 fn test_mock_ble_transport_connect_read_write() {
     let identity = Identity::create("Alice");
@@ -207,6 +210,7 @@ fn test_mock_ble_transport_connect_read_write() {
     assert!(mock.disconnect().is_ok());
 }
 
+// @scenario: ble_exchange.feature:BLE transport in failure mode returns errors
 #[test]
 fn test_mock_ble_transport_failure() {
     let mock = MockBLETransport::failing();
@@ -220,7 +224,7 @@ fn test_mock_ble_transport_failure() {
 // Session integration
 // ============================================================
 
-// @scenario: contact_exchange.feature:BLE exchange session starts in AwaitingBleConnection
+// @scenario: ble_exchange.feature:New BLE session starts in AwaitingBleConnection
 #[test]
 fn test_ble_session_starts_awaiting_connection() {
     let identity = Identity::create("Alice");
@@ -236,7 +240,7 @@ fn test_ble_session_starts_awaiting_connection() {
     assert_eq!(session.transport(), ExchangeTransport::Ble);
 }
 
-// @scenario: contact_exchange.feature:Successful BLE exchange with proximity
+// @scenario: ble_exchange.feature:Session transitions to AwaitingBleVerification after payload exchange
 #[test]
 fn test_ble_payload_exchanged_transitions() {
     let alice_identity = Identity::create("Alice");
@@ -268,7 +272,7 @@ fn test_ble_payload_exchanged_transitions() {
     );
 }
 
-// @scenario: contact_exchange.feature:Successful BLE exchange with proximity
+// @scenario: ble_exchange.feature:Session transitions to AwaitingKeyAgreement after proximity verification
 #[test]
 fn test_ble_proximity_verified_transitions() {
     let alice_identity = Identity::create("Alice");
@@ -300,8 +304,8 @@ fn test_ble_proximity_verified_transitions() {
     ));
 }
 
-// @scenario: contact_exchange.feature:Successful BLE exchange with proximity
-// @scenario: contact_exchange.feature:Exchange creates mutual keys
+// @scenario: ble_exchange.feature:Full BLE exchange lifecycle
+// @scenario: ble_exchange.feature:Symmetric DH produces identical shared keys
 #[test]
 fn test_ble_full_lifecycle() {
     let alice_identity = Identity::create("Alice");
@@ -379,7 +383,7 @@ fn test_ble_full_lifecycle() {
     ));
 }
 
-// @scenario: contact_exchange.feature:X3DH key agreement during exchange
+// @scenario: ble_exchange.feature:Symmetric DH produces identical shared keys
 #[test]
 fn test_ble_shared_keys_match() {
     // Verify symmetric DH produces matching keys
@@ -392,7 +396,7 @@ fn test_ble_shared_keys_match() {
     assert_eq!(alice_shared, bob_shared, "BLE symmetric DH should match");
 }
 
-// @scenario: contact_exchange.feature:BLE exchange rejects expired payload
+// @scenario: ble_exchange.feature:Expired BLE payload is rejected
 #[test]
 fn test_ble_expired_rejection() {
     let alice_identity = Identity::create("Alice");
@@ -421,7 +425,7 @@ fn test_ble_expired_rejection() {
     );
 }
 
-// @scenario: contact_exchange.feature:Cannot exchange with yourself
+// @scenario: ble_exchange.feature:Self-exchange is rejected via BLE
 #[test]
 fn test_ble_self_exchange() {
     let alice_identity = Identity::create("Alice");
@@ -445,7 +449,7 @@ fn test_ble_self_exchange() {
     );
 }
 
-// @scenario: contact_exchange.feature:BLE exchange reports descriptive error on failure
+// @scenario: ble_exchange.feature:Invalid BLE payload is rejected
 #[test]
 fn test_ble_invalid_payload() {
     let identity = Identity::create("Alice");
@@ -464,7 +468,7 @@ fn test_ble_invalid_payload() {
     );
 }
 
-// @scenario: contact_exchange.feature:BLE exchange reports descriptive error on failure
+// @scenario: ble_exchange.feature:BLE events rejected on non-BLE transport
 #[test]
 fn test_ble_rejects_wrong_transport() {
     let identity = Identity::create("Alice");
@@ -488,7 +492,7 @@ fn test_ble_rejects_wrong_transport() {
 // Challenge-response
 // ============================================================
 
-// @scenario: contact_exchange.feature:BLE proximity verification required
+// @scenario: ble_exchange.feature:Proximity verification requires AwaitingBleVerification state
 #[test]
 fn test_ble_proximity_requires_verification_state() {
     let identity = Identity::create("Alice");
@@ -505,7 +509,7 @@ fn test_ble_proximity_requires_verification_state() {
     );
 }
 
-// @scenario: contact_exchange.feature:BLE proximity verification required
+// @scenario: ble_exchange.feature:Key agreement blocked without proximity verification
 #[test]
 fn test_ble_challenge_response_blocks_on_failure() {
     // If proximity verification fails, the exchange should not proceed.
@@ -541,8 +545,8 @@ fn test_ble_challenge_response_blocks_on_failure() {
 // Full lifecycle with mock transport
 // ============================================================
 
-// @scenario: contact_exchange.feature:Successful BLE exchange with proximity
-// @scenario: contact_exchange.feature:X3DH key agreement during exchange
+// @scenario: ble_exchange.feature:Full exchange with mock transport
+// @scenario: ble_exchange.feature:Symmetric DH produces identical shared keys
 #[test]
 fn test_ble_full_exchange_with_mock_transport() {
     let alice_identity = Identity::create("Alice");
@@ -614,7 +618,7 @@ fn test_ble_full_exchange_with_mock_transport() {
 // BLE error variants
 // ============================================================
 
-// @scenario: contact_exchange.feature:BLE exchange reports descriptive error on failure
+// @scenario: ble_exchange.feature:BLE error variants have proper display messages
 #[test]
 fn test_ble_error_variants_exist() {
     let err1 = ExchangeError::InvalidBleFormat;
@@ -630,7 +634,7 @@ fn test_ble_error_variants_exist() {
     assert_eq!(format!("{}", err5), "BLE not available on this device");
 }
 
-// @scenario: contact_exchange.feature:BLE exchange generates payload
+// @scenario: ble_exchange.feature:BLE payload is exactly 174 bytes
 #[test]
 fn test_ble_payload_size() {
     assert_eq!(BLE_PAYLOAD_SIZE, 174, "BLE payload should be 174 bytes");
@@ -643,9 +647,8 @@ fn test_ble_payload_size() {
     assert_eq!(bytes.len(), 174);
 }
 
-// @scenario: contact_exchange.feature:Mutual QR uses fresh ephemeral keys for forward secrecy
+// @scenario: ble_exchange.feature:BLE ephemeral keys differ from identity keys
 // @scenario: security.feature:Forward secrecy via Double Ratchet
-// @scenario: contact_exchange.feature:BLE exchange uses fresh ephemeral keys
 #[test]
 fn test_ble_forward_secrecy() {
     // Both sides use fresh ephemeral keys — not identity-derived

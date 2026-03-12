@@ -1,0 +1,192 @@
+// SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+//
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+//! Tests for relay URL validation (Phase 1G).
+//!
+//! Validates that only safe relay URLs are accepted.
+//! Security: prevents SSRF, injection, and malicious relay URLs from contacts.
+
+use vauchi_core::network::relay_url::{validate_relay_url, RelayUrlError};
+
+// ── Valid URLs ──────────────────────────────────────────────────────
+
+#[test]
+fn valid_wss_url_accepted() {
+    assert!(validate_relay_url("wss://relay.vauchi.app").is_ok());
+}
+
+#[test]
+fn valid_wss_url_with_port_accepted() {
+    assert!(validate_relay_url("wss://relay.example.com:8443").is_ok());
+}
+
+#[test]
+fn valid_wss_url_with_path_accepted() {
+    assert!(validate_relay_url("wss://relay.example.com/ws").is_ok());
+}
+
+#[test]
+fn valid_wss_onion_url_accepted() {
+    // Tor .onion addresses are valid relay URLs
+    assert!(
+        validate_relay_url("wss://abcdefghijklmnopqrstuvwxyz234567abcdefghijklmnopqrst.onion")
+            .is_ok()
+    );
+}
+
+// ── Scheme validation ──────────────────────────────────────────────
+
+#[test]
+fn ws_scheme_rejected() {
+    let err = validate_relay_url("ws://relay.example.com").unwrap_err();
+    assert!(matches!(err, RelayUrlError::InsecureScheme));
+}
+
+#[test]
+fn http_scheme_rejected() {
+    let err = validate_relay_url("http://relay.example.com").unwrap_err();
+    assert!(matches!(err, RelayUrlError::InsecureScheme));
+}
+
+#[test]
+fn https_scheme_rejected() {
+    let err = validate_relay_url("https://relay.example.com").unwrap_err();
+    assert!(matches!(err, RelayUrlError::InsecureScheme));
+}
+
+#[test]
+fn ftp_scheme_rejected() {
+    let err = validate_relay_url("ftp://relay.example.com").unwrap_err();
+    assert!(matches!(err, RelayUrlError::InsecureScheme));
+}
+
+#[test]
+fn javascript_scheme_rejected() {
+    let err = validate_relay_url("javascript:alert(1)").unwrap_err();
+    // Could be InvalidFormat or InsecureScheme depending on parse
+    assert!(matches!(
+        err,
+        RelayUrlError::InsecureScheme | RelayUrlError::InvalidFormat(_)
+    ));
+}
+
+#[test]
+fn no_scheme_rejected() {
+    let err = validate_relay_url("relay.example.com").unwrap_err();
+    assert!(matches!(err, RelayUrlError::InvalidFormat(_)));
+}
+
+// ── Host validation (SSRF prevention) ──────────────────────────────
+
+#[test]
+fn localhost_rejected() {
+    let err = validate_relay_url("wss://localhost").unwrap_err();
+    assert!(matches!(err, RelayUrlError::PrivateHost));
+}
+
+#[test]
+fn localhost_with_port_rejected() {
+    let err = validate_relay_url("wss://localhost:8080").unwrap_err();
+    assert!(matches!(err, RelayUrlError::PrivateHost));
+}
+
+#[test]
+fn ipv4_loopback_rejected() {
+    let err = validate_relay_url("wss://127.0.0.1").unwrap_err();
+    assert!(matches!(err, RelayUrlError::PrivateHost));
+}
+
+#[test]
+fn ipv4_loopback_range_rejected() {
+    let err = validate_relay_url("wss://127.0.0.2").unwrap_err();
+    assert!(matches!(err, RelayUrlError::PrivateHost));
+}
+
+#[test]
+fn ipv4_private_10_rejected() {
+    let err = validate_relay_url("wss://10.0.0.1").unwrap_err();
+    assert!(matches!(err, RelayUrlError::PrivateHost));
+}
+
+#[test]
+fn ipv4_private_172_rejected() {
+    let err = validate_relay_url("wss://172.16.0.1").unwrap_err();
+    assert!(matches!(err, RelayUrlError::PrivateHost));
+}
+
+#[test]
+fn ipv4_private_192_rejected() {
+    let err = validate_relay_url("wss://192.168.1.1").unwrap_err();
+    assert!(matches!(err, RelayUrlError::PrivateHost));
+}
+
+#[test]
+fn ipv6_loopback_rejected() {
+    let err = validate_relay_url("wss://[::1]").unwrap_err();
+    assert!(matches!(err, RelayUrlError::PrivateHost));
+}
+
+#[test]
+fn ipv4_link_local_rejected() {
+    let err = validate_relay_url("wss://169.254.1.1").unwrap_err();
+    assert!(matches!(err, RelayUrlError::PrivateHost));
+}
+
+#[test]
+fn ipv4_zero_rejected() {
+    let err = validate_relay_url("wss://0.0.0.0").unwrap_err();
+    assert!(matches!(err, RelayUrlError::PrivateHost));
+}
+
+// ── Length validation ──────────────────────────────────────────────
+
+#[test]
+fn empty_url_rejected() {
+    let err = validate_relay_url("").unwrap_err();
+    assert!(matches!(err, RelayUrlError::Empty));
+}
+
+#[test]
+fn url_over_max_length_rejected() {
+    let long_host = "a".repeat(2000);
+    let url = format!("wss://{long_host}.com");
+    let err = validate_relay_url(&url).unwrap_err();
+    assert!(matches!(err, RelayUrlError::TooLong { .. }));
+}
+
+// ── Adversarial inputs (CC-14) ─────────────────────────────────────
+
+#[test]
+fn null_bytes_in_url_rejected() {
+    let err = validate_relay_url("wss://relay.example.com\0/evil").unwrap_err();
+    assert!(matches!(err, RelayUrlError::InvalidFormat(_)));
+}
+
+#[test]
+fn unicode_homoglyph_url_rejected_or_accepted() {
+    // Unicode domain names should be parsed but may be suspicious
+    // At minimum, the URL must parse correctly
+    let result = validate_relay_url("wss://rеlay.example.com"); // Cyrillic 'е'
+                                                                // Either accepted (punycode) or rejected — but must not panic
+    assert!(result.is_ok() || result.is_err());
+}
+
+#[test]
+fn url_with_userinfo_rejected() {
+    // URLs with user:pass@ are suspicious
+    let err = validate_relay_url("wss://user:pass@relay.example.com").unwrap_err();
+    assert!(matches!(err, RelayUrlError::InvalidFormat(_)));
+}
+
+#[test]
+fn url_with_fragment_rejected() {
+    let err = validate_relay_url("wss://relay.example.com#fragment").unwrap_err();
+    assert!(matches!(err, RelayUrlError::InvalidFormat(_)));
+}
+
+#[test]
+fn missing_host_rejected() {
+    let err = validate_relay_url("wss://").unwrap_err();
+    assert!(matches!(err, RelayUrlError::InvalidFormat(_)));
+}

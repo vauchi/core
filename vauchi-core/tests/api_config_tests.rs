@@ -14,7 +14,23 @@ fn test_vauchi_config_default() {
 
     assert_eq!(config.storage_path, PathBuf::from("./vauchi_data"));
     assert!(config.auto_save);
-    assert!(config.relay.server_url.is_empty());
+    assert_eq!(
+        config.relay.server_url, "wss://relay.vauchi.app",
+        "Default relay URL must be the production relay"
+    );
+}
+
+#[test]
+fn test_default_relay_url_is_valid_wss() {
+    let config = VauchiConfig::default();
+    assert!(
+        config.relay.server_url.starts_with("wss://"),
+        "Default relay URL must use wss:// scheme"
+    );
+    assert!(
+        !config.relay.server_url.is_empty(),
+        "Default relay URL must not be empty"
+    );
 }
 
 #[test]
@@ -32,7 +48,7 @@ fn test_vauchi_config_builder() {
 fn test_relay_config_default() {
     let config = RelayConfig::default();
 
-    assert!(config.server_url.is_empty());
+    assert_eq!(config.server_url, "wss://relay.vauchi.app");
     assert_eq!(config.connect_timeout_ms, 10_000);
     assert_eq!(config.io_timeout_ms, 30_000);
     assert_eq!(config.max_reconnect_attempts, 5);

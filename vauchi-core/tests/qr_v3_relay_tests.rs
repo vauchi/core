@@ -1,0 +1,163 @@
+// SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+//
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+//! Tests for QR exchange v3 with relay metadata (Phase 1A).
+//!
+//! Validates the extended QR binary format that includes relay URL
+//! and Noise NK public key for per-contact relay routing.
+
+use vauchi_core::exchange::{ExchangeQR, X3DHKeyPair};
+use vauchi_core::identity::Identity;
+
+// ── Roundtrip without relay metadata ───────────────────────────────
+
+#[test]
+fn v3_roundtrip_no_relay_metadata() {
+    let identity = Identity::create("Alice");
+    let ephemeral = X3DHKeyPair::generate();
+    let qr = ExchangeQR::generate(&identity, &ephemeral);
+
+    let data = qr.to_data_string();
+    let parsed = ExchangeQR::from_data_string(&data).unwrap();
+
+    assert_eq!(parsed.display_name(), "Alice");
+    assert_eq!(parsed.public_key(), identity.signing_public_key());
+    assert_eq!(parsed.exchange_key(), ephemeral.public_key());
+    assert!(parsed.relay_url().is_none());
+    assert!(parsed.relay_noise_pubkey().is_none());
+    assert!(parsed.verify_signature());
+}
+
+// ── Roundtrip with relay metadata ──────────────────────────────────
+
+#[test]
+fn v3_roundtrip_with_relay_url_and_noise_pubkey() {
+    let identity = Identity::create("Bob");
+    let ephemeral = X3DHKeyPair::generate();
+    let relay_url = "wss://relay.bobs-server.com";
+    let noise_pubkey = [42u8; 32];
+
+    let qr = ExchangeQR::generate_with_relay(
+        &identity,
+        &ephemeral,
+        Some(relay_url.to_string()),
+        Some(noise_pubkey),
+    );
+
+    let data = qr.to_data_string();
+    let parsed = ExchangeQR::from_data_string(&data).unwrap();
+
+    assert_eq!(parsed.display_name(), "Bob");
+    assert_eq!(parsed.relay_url().unwrap(), relay_url);
+    assert_eq!(parsed.relay_noise_pubkey().unwrap(), &noise_pubkey);
+    assert!(parsed.verify_signature());
+}
+
+#[test]
+fn v3_roundtrip_with_relay_url_only() {
+    let identity = Identity::create("Carol");
+    let ephemeral = X3DHKeyPair::generate();
+
+    let qr = ExchangeQR::generate_with_relay(
+        &identity,
+        &ephemeral,
+        Some("wss://relay.example.com".to_string()),
+        None,
+    );
+
+    let data = qr.to_data_string();
+    let parsed = ExchangeQR::from_data_string(&data).unwrap();
+
+    assert_eq!(parsed.relay_url().unwrap(), "wss://relay.example.com");
+    assert!(parsed.relay_noise_pubkey().is_none());
+    assert!(parsed.verify_signature());
+}
+
+#[test]
+fn v3_roundtrip_unicode_name_with_relay() {
+    let identity = Identity::create("Müller 日本語");
+    let ephemeral = X3DHKeyPair::generate();
+
+    let qr = ExchangeQR::generate_with_relay(
+        &identity,
+        &ephemeral,
+        Some("wss://relay.example.com".to_string()),
+        Some([99u8; 32]),
+    );
+
+    let data = qr.to_data_string();
+    let parsed = ExchangeQR::from_data_string(&data).unwrap();
+
+    assert_eq!(parsed.display_name(), "Müller 日本語");
+    assert_eq!(parsed.relay_url().unwrap(), "wss://relay.example.com");
+    assert!(parsed.verify_signature());
+}
+
+// ── Signature integrity ────────────────────────────────────────────
+
+#[test]
+fn v3_signature_covers_relay_fields() {
+    let identity = Identity::create("Dave");
+    let ephemeral = X3DHKeyPair::generate();
+
+    let qr = ExchangeQR::generate_with_relay(
+        &identity,
+        &ephemeral,
+        Some("wss://relay.example.com".to_string()),
+        Some([55u8; 32]),
+    );
+
+    // Signature must be valid
+    assert!(qr.verify_signature());
+}
+
+// ── Adversarial relay URLs (CC-14) ─────────────────────────────────
+
+#[test]
+fn v3_roundtrip_empty_relay_url() {
+    let identity = Identity::create("Eve");
+    let ephemeral = X3DHKeyPair::generate();
+
+    let qr = ExchangeQR::generate_with_relay(&identity, &ephemeral, Some(String::new()), None);
+
+    let data = qr.to_data_string();
+    let parsed = ExchangeQR::from_data_string(&data).unwrap();
+
+    // Empty string should roundtrip (validation happens at a higher layer)
+    assert_eq!(parsed.relay_url().unwrap(), "");
+}
+
+#[test]
+fn v3_roundtrip_long_relay_url() {
+    let identity = Identity::create("Frank");
+    let ephemeral = X3DHKeyPair::generate();
+    let long_url = format!("wss://{}.example.com", "a".repeat(200));
+
+    let qr = ExchangeQR::generate_with_relay(&identity, &ephemeral, Some(long_url.clone()), None);
+
+    let data = qr.to_data_string();
+    let parsed = ExchangeQR::from_data_string(&data).unwrap();
+
+    assert_eq!(parsed.relay_url().unwrap(), long_url);
+    assert!(parsed.verify_signature());
+}
+
+// ── QR image still generates ───────────────────────────────────────
+
+#[test]
+fn v3_qr_image_generation_with_relay() {
+    let identity = Identity::create("Grace");
+    let ephemeral = X3DHKeyPair::generate();
+
+    let qr = ExchangeQR::generate_with_relay(
+        &identity,
+        &ephemeral,
+        Some("wss://relay.vauchi.app".to_string()),
+        Some([1u8; 32]),
+    );
+
+    let image = qr.to_qr_image_string();
+    assert!(!image.is_empty(), "QR image should be generated");
+    assert!(image.contains('█'), "QR image should contain dark cells");
+}

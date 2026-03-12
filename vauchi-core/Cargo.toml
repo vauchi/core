@@ -345,5 +345,9 @@ required-features = ["testing"]
 name = "contact_relay_storage_tests"
 
 [[test]]
+name = "relay_proptests"
+required-features = ["testing"]
+
+[[test]]
 name = "schema_gen"
 required-features = ["schema-gen"]

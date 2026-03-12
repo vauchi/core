@@ -125,6 +125,96 @@ fn all_relay_urls_includes_home_and_contact_relays() {
     assert!(all.contains(&"wss://bob.relay".to_string()));
 }
 
+// ── fallback and recovery ─────────────────────────────────────────
+
+#[test]
+fn unhealthy_contact_relay_falls_back_then_recovers() {
+    let config = MultiRelayConfig::builder()
+        .primary_relay("wss://home.relay")
+        .build()
+        .unwrap();
+    let mut manager = MultiRelayManager::new(config);
+    manager.add_contact_relay("wss://alice.relay");
+
+    let alice = make_contact("Alice", Some("wss://alice.relay"), None);
+
+    // Initially healthy → uses contact relay
+    assert_eq!(manager.relay_for_contact(&alice), "wss://alice.relay");
+
+    // Mark unhealthy → falls back to home
+    manager.mark_unhealthy("wss://alice.relay");
+    assert_eq!(
+        manager.relay_for_contact(&alice),
+        "wss://home.relay",
+        "Should fall back to home when contact relay is unhealthy"
+    );
+
+    // Recovery → uses contact relay again
+    manager.mark_healthy("wss://alice.relay");
+    assert_eq!(
+        manager.relay_for_contact(&alice),
+        "wss://alice.relay",
+        "Should return to contact relay after recovery"
+    );
+}
+
+#[test]
+fn contacts_without_relay_always_use_home_regardless_of_health() {
+    let config = MultiRelayConfig::builder()
+        .primary_relay("wss://home.relay")
+        .add_relay("wss://backup.relay")
+        .build()
+        .unwrap();
+    let manager = MultiRelayManager::new(config);
+
+    let bob = make_contact("Bob", None, None);
+
+    // No relay set → home relay
+    let relay = manager.relay_for_contact(&bob);
+    assert_eq!(relay, "wss://home.relay");
+}
+
+#[test]
+fn empty_relay_url_treated_as_no_relay() {
+    let config = MultiRelayConfig::builder()
+        .primary_relay("wss://home.relay")
+        .build()
+        .unwrap();
+    let manager = MultiRelayManager::new(config);
+
+    let contact = make_contact("Eve", Some(""), None);
+    assert_eq!(
+        manager.relay_for_contact(&contact),
+        "wss://home.relay",
+        "Empty relay URL should fall back to home relay"
+    );
+}
+
+#[test]
+fn mixed_relay_contacts_route_independently() {
+    let config = MultiRelayConfig::builder()
+        .primary_relay("wss://home.relay")
+        .build()
+        .unwrap();
+    let mut manager = MultiRelayManager::new(config);
+    manager.add_contact_relay("wss://alice.relay");
+    manager.add_contact_relay("wss://carol.relay");
+
+    let alice = make_contact("Alice", Some("wss://alice.relay"), None);
+    let bob = make_contact("Bob", None, None);
+    let carol = make_contact("Carol", Some("wss://carol.relay"), None);
+
+    // Each contact routes independently
+    assert_eq!(manager.relay_for_contact(&alice), "wss://alice.relay");
+    assert_eq!(manager.relay_for_contact(&bob), "wss://home.relay");
+    assert_eq!(manager.relay_for_contact(&carol), "wss://carol.relay");
+
+    // Mark only Alice's relay unhealthy — Carol unaffected
+    manager.mark_unhealthy("wss://alice.relay");
+    assert_eq!(manager.relay_for_contact(&alice), "wss://home.relay");
+    assert_eq!(manager.relay_for_contact(&carol), "wss://carol.relay");
+}
+
 // ── group_by_relay ─────────────────────────────────────────────────
 
 #[test]

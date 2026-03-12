@@ -33,6 +33,8 @@ pub(super) struct ContactRow {
     pub exchange_transport: String,
     pub has_recovered: i32,
     pub card_updated_at: Option<i64>,
+    pub relay_url: Option<String>,
+    pub relay_noise_pubkey: Option<Vec<u8>>,
 }
 
 impl Storage {
@@ -96,8 +98,9 @@ impl Storage {
              (id, public_key, display_name, card_encrypted, shared_key_encrypted,
               visibility_rules_encrypted, exchange_timestamp, fingerprint_verified, last_sync_at,
               blocked, hidden, favorite, recovery_trusted, cek_encrypted,
-              exchange_transport, has_recovered, card_updated_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17)",
+              exchange_transport, has_recovered, card_updated_at,
+              relay_url, relay_noise_pubkey)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19)",
             params![
                 contact.id(),
                 contact.public_key().as_slice(),
@@ -116,6 +119,8 @@ impl Storage {
                 transport_str,
                 contact.has_recovered() as i32,
                 contact.card_updated_at().map(|t| t as i64),
+                contact.relay_url(),
+                contact.relay_noise_pubkey().map(|k| k.to_vec()),
             ],
         )?;
 
@@ -128,7 +133,8 @@ impl Storage {
             "SELECT id, public_key, display_name, card_encrypted, shared_key_encrypted,
                     visibility_rules_json, visibility_rules_encrypted, exchange_timestamp,
                     fingerprint_verified, blocked, hidden, favorite, recovery_trusted,
-                    cek_encrypted, exchange_transport, has_recovered, card_updated_at
+                    cek_encrypted, exchange_transport, has_recovered, card_updated_at,
+                    relay_url, relay_noise_pubkey
              FROM contacts WHERE id = ?1",
         )?;
 
@@ -151,6 +157,8 @@ impl Storage {
                 exchange_transport: row.get(14)?,
                 has_recovered: row.get(15)?,
                 card_updated_at: row.get(16)?,
+                relay_url: row.get(17)?,
+                relay_noise_pubkey: row.get(18)?,
             })
         });
 
@@ -167,7 +175,8 @@ impl Storage {
             "SELECT id, public_key, display_name, card_encrypted, shared_key_encrypted,
                     visibility_rules_json, visibility_rules_encrypted, exchange_timestamp,
                     fingerprint_verified, blocked, hidden, favorite, recovery_trusted,
-                    cek_encrypted, exchange_transport, has_recovered, card_updated_at
+                    cek_encrypted, exchange_transport, has_recovered, card_updated_at,
+                    relay_url, relay_noise_pubkey
              FROM contacts ORDER BY display_name",
         )?;
 
@@ -190,6 +199,8 @@ impl Storage {
                 exchange_transport: row.get(14)?,
                 has_recovered: row.get(15)?,
                 card_updated_at: row.get(16)?,
+                relay_url: row.get(17)?,
+                relay_noise_pubkey: row.get(18)?,
             })
         })?;
 
@@ -219,7 +230,8 @@ impl Storage {
             "SELECT id, public_key, display_name, card_encrypted, shared_key_encrypted,
                     visibility_rules_json, visibility_rules_encrypted, exchange_timestamp,
                     fingerprint_verified, blocked, hidden, favorite, recovery_trusted,
-                    cek_encrypted, exchange_transport, has_recovered, card_updated_at
+                    cek_encrypted, exchange_transport, has_recovered, card_updated_at,
+                    relay_url, relay_noise_pubkey
              FROM contacts ORDER BY display_name
              LIMIT ?1 OFFSET ?2",
         )?;
@@ -243,6 +255,8 @@ impl Storage {
                 exchange_transport: row.get(14)?,
                 has_recovered: row.get(15)?,
                 card_updated_at: row.get(16)?,
+                relay_url: row.get(17)?,
+                relay_noise_pubkey: row.get(18)?,
             })
         })?;
 
@@ -277,7 +291,8 @@ impl Storage {
             "SELECT id, public_key, display_name, card_encrypted, shared_key_encrypted,
                     visibility_rules_json, visibility_rules_encrypted, exchange_timestamp,
                     fingerprint_verified, blocked, hidden, favorite, recovery_trusted,
-                    cek_encrypted, exchange_transport, has_recovered, card_updated_at
+                    cek_encrypted, exchange_transport, has_recovered, card_updated_at,
+                    relay_url, relay_noise_pubkey
              FROM contacts
              WHERE display_name != '' AND display_name LIKE ?1 COLLATE NOCASE
              ORDER BY display_name",
@@ -302,6 +317,8 @@ impl Storage {
                 exchange_transport: row.get(14)?,
                 has_recovered: row.get(15)?,
                 card_updated_at: row.get(16)?,
+                relay_url: row.get(17)?,
+                relay_noise_pubkey: row.get(18)?,
             })
         })?;
 
@@ -316,7 +333,8 @@ impl Storage {
             "SELECT id, public_key, display_name, card_encrypted, shared_key_encrypted,
                     visibility_rules_json, visibility_rules_encrypted, exchange_timestamp,
                     fingerprint_verified, blocked, hidden, favorite, recovery_trusted,
-                    cek_encrypted, exchange_transport, has_recovered, card_updated_at
+                    cek_encrypted, exchange_transport, has_recovered, card_updated_at,
+                    relay_url, relay_noise_pubkey
              FROM contacts
              WHERE display_name = ''",
         )?;
@@ -340,6 +358,8 @@ impl Storage {
                 exchange_transport: row.get(14)?,
                 has_recovered: row.get(15)?,
                 card_updated_at: row.get(16)?,
+                relay_url: row.get(17)?,
+                relay_noise_pubkey: row.get(18)?,
             })
         })?;
 
@@ -614,6 +634,15 @@ impl Storage {
         contact.set_exchange_transport(transport);
         contact.set_has_recovered(row.has_recovered != 0);
         contact.set_card_updated_at(row.card_updated_at.map(|t| t as u64));
+
+        // Restore relay fields from storage
+        contact.set_relay_url(row.relay_url);
+        if let Some(pubkey_bytes) = row.relay_noise_pubkey {
+            let pubkey: [u8; 32] = pubkey_bytes.try_into().map_err(|_| {
+                StorageError::Encryption("Invalid relay Noise pubkey length".into())
+            })?;
+            contact.set_relay_noise_pubkey(Some(pubkey));
+        }
 
         Ok(contact)
     }

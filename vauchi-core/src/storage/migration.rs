@@ -423,6 +423,11 @@ pub fn all_migrations() -> Vec<Migration> {
             name: "label_display_name_override",
             action: MigrationAction::Sql(MIGRATION_V30_LABEL_DISPLAY_NAME_OVERRIDE),
         },
+        Migration {
+            version: 31,
+            name: "contact_relay_fields",
+            action: MigrationAction::Sql(MIGRATION_V31_CONTACT_RELAY_FIELDS),
+        },
     ]
 }
 
@@ -550,6 +555,18 @@ const MIGRATION_V29_ONBOARDING_PROGRESS: &str = "
 /// user's default display name. NULL means no override (use default).
 const MIGRATION_V30_LABEL_DISPLAY_NAME_OVERRIDE: &str = "
     ALTER TABLE visibility_labels ADD COLUMN display_name_override_encrypted BLOB;
+";
+
+/// Migration v31: Add relay fields to contacts table.
+///
+/// Stores the contact's relay URL and Noise NK public key, learned during
+/// QR exchange. Both columns are nullable — existing contacts (pre-relay)
+/// load with None. The relay URL is stored as plaintext TEXT (not
+/// security-sensitive: it's a public server address). The Noise pubkey is
+/// stored as a raw 32-byte BLOB.
+const MIGRATION_V31_CONTACT_RELAY_FIELDS: &str = "
+    ALTER TABLE contacts ADD COLUMN relay_url TEXT;
+    ALTER TABLE contacts ADD COLUMN relay_noise_pubkey BLOB;
 ";
 
 /// Migration v2: Originally re-encrypted AES-GCM data to XChaCha20-Poly1305.

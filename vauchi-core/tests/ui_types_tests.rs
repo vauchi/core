@@ -491,3 +491,215 @@ fn test_screen_action_disabled() {
     let restored: ScreenAction = serde_json::from_str(&json).unwrap();
     assert!(!restored.enabled);
 }
+
+// === ShowToast component ===
+
+#[test]
+fn test_component_show_toast_roundtrip() {
+    let component = Component::ShowToast {
+        id: "toast-1".into(),
+        message: "Contact deleted".into(),
+        undo_action_id: Some("undo-delete".into()),
+        duration_ms: 5000,
+    };
+
+    let json = serde_json::to_string(&component).unwrap();
+    let restored: Component = serde_json::from_str(&json).unwrap();
+    match restored {
+        Component::ShowToast {
+            id,
+            message,
+            undo_action_id,
+            duration_ms,
+        } => {
+            assert_eq!(id, "toast-1");
+            assert_eq!(message, "Contact deleted");
+            assert_eq!(undo_action_id.as_deref(), Some("undo-delete"));
+            assert_eq!(duration_ms, 5000);
+        }
+        other => panic!("Expected ShowToast, got {:?}", other),
+    }
+}
+
+#[test]
+fn test_component_show_toast_without_undo_roundtrip() {
+    let component = Component::ShowToast {
+        id: "toast-2".into(),
+        message: "Saved".into(),
+        undo_action_id: None,
+        duration_ms: 3000,
+    };
+
+    let json = serde_json::to_string(&component).unwrap();
+    let restored: Component = serde_json::from_str(&json).unwrap();
+    match restored {
+        Component::ShowToast { undo_action_id, .. } => {
+            assert!(undo_action_id.is_none());
+        }
+        other => panic!("Expected ShowToast, got {:?}", other),
+    }
+}
+
+// === InlineConfirm component ===
+
+#[test]
+fn test_component_inline_confirm_roundtrip() {
+    let component = Component::InlineConfirm {
+        id: "confirm-1".into(),
+        warning: "This permanently deletes your identity".into(),
+        confirm_text: "Delete Forever".into(),
+        cancel_text: "Cancel".into(),
+        destructive: true,
+    };
+
+    let json = serde_json::to_string(&component).unwrap();
+    let restored: Component = serde_json::from_str(&json).unwrap();
+    match restored {
+        Component::InlineConfirm {
+            id,
+            warning,
+            confirm_text,
+            cancel_text,
+            destructive,
+        } => {
+            assert_eq!(id, "confirm-1");
+            assert_eq!(warning, "This permanently deletes your identity");
+            assert_eq!(confirm_text, "Delete Forever");
+            assert_eq!(cancel_text, "Cancel");
+            assert!(destructive);
+        }
+        other => panic!("Expected InlineConfirm, got {:?}", other),
+    }
+}
+
+#[test]
+fn test_component_inline_confirm_non_destructive_roundtrip() {
+    let component = Component::InlineConfirm {
+        id: "confirm-2".into(),
+        warning: "Are you sure?".into(),
+        confirm_text: "Yes".into(),
+        cancel_text: "No".into(),
+        destructive: false,
+    };
+
+    let json = serde_json::to_string(&component).unwrap();
+    let restored: Component = serde_json::from_str(&json).unwrap();
+    match restored {
+        Component::InlineConfirm { destructive, .. } => {
+            assert!(!destructive);
+        }
+        other => panic!("Expected InlineConfirm, got {:?}", other),
+    }
+}
+
+// === EditableText component ===
+
+#[test]
+fn test_component_editable_text_display_mode_roundtrip() {
+    let component = Component::EditableText {
+        id: "edit-name".into(),
+        label: "Display Name".into(),
+        value: "Alice".into(),
+        editing: false,
+        validation_error: None,
+    };
+
+    let json = serde_json::to_string(&component).unwrap();
+    let restored: Component = serde_json::from_str(&json).unwrap();
+    match restored {
+        Component::EditableText {
+            id,
+            label,
+            value,
+            editing,
+            validation_error,
+        } => {
+            assert_eq!(id, "edit-name");
+            assert_eq!(label, "Display Name");
+            assert_eq!(value, "Alice");
+            assert!(!editing);
+            assert!(validation_error.is_none());
+        }
+        other => panic!("Expected EditableText, got {:?}", other),
+    }
+}
+
+#[test]
+fn test_component_editable_text_editing_with_error_roundtrip() {
+    let component = Component::EditableText {
+        id: "edit-name".into(),
+        label: "Display Name".into(),
+        value: "".into(),
+        editing: true,
+        validation_error: Some("Name cannot be empty".into()),
+    };
+
+    let json = serde_json::to_string(&component).unwrap();
+    let restored: Component = serde_json::from_str(&json).unwrap();
+    match restored {
+        Component::EditableText {
+            editing,
+            validation_error,
+            ..
+        } => {
+            assert!(editing);
+            assert_eq!(validation_error.as_deref(), Some("Name cannot be empty"));
+        }
+        other => panic!("Expected EditableText, got {:?}", other),
+    }
+}
+
+// === ShowToast ActionResult ===
+
+#[test]
+fn test_action_result_show_toast_roundtrip() {
+    let result = ActionResult::ShowToast {
+        message: "Contact deleted".into(),
+        undo_action_id: Some("undo-delete-alice".into()),
+    };
+    let json = serde_json::to_string(&result).unwrap();
+    let restored: ActionResult = serde_json::from_str(&json).unwrap();
+    match restored {
+        ActionResult::ShowToast {
+            message,
+            undo_action_id,
+        } => {
+            assert_eq!(message, "Contact deleted");
+            assert_eq!(undo_action_id.as_deref(), Some("undo-delete-alice"));
+        }
+        other => panic!("Expected ShowToast, got {:?}", other),
+    }
+}
+
+#[test]
+fn test_action_result_show_toast_without_undo_roundtrip() {
+    let result = ActionResult::ShowToast {
+        message: "Changes saved".into(),
+        undo_action_id: None,
+    };
+    let json = serde_json::to_string(&result).unwrap();
+    let restored: ActionResult = serde_json::from_str(&json).unwrap();
+    match restored {
+        ActionResult::ShowToast { undo_action_id, .. } => {
+            assert!(undo_action_id.is_none());
+        }
+        other => panic!("Expected ShowToast, got {:?}", other),
+    }
+}
+
+// === UndoPressed UserAction ===
+
+#[test]
+fn test_user_action_undo_pressed_roundtrip() {
+    let action = UserAction::UndoPressed {
+        action_id: "undo-delete-alice".into(),
+    };
+    let json = serde_json::to_string(&action).unwrap();
+    let restored: UserAction = serde_json::from_str(&json).unwrap();
+    match restored {
+        UserAction::UndoPressed { action_id } => {
+            assert_eq!(action_id, "undo-delete-alice");
+        }
+        other => panic!("Expected UndoPressed, got {:?}", other),
+    }
+}

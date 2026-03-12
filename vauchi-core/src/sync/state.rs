@@ -458,6 +458,26 @@ impl<'a> SyncManager<'a> {
         Ok(Some(merged_id))
     }
 
+    /// Gets ready-to-send updates grouped by target relay URL.
+    ///
+    /// Filters to only pending or retry-ready updates, then groups by
+    /// `target_relay_url`. This enables the sync controller to dispatch
+    /// each group to the correct relay connection.
+    pub fn get_ready_grouped_by_relay(
+        &self,
+    ) -> Result<std::collections::BTreeMap<Option<String>, Vec<PendingUpdate>>, SyncError> {
+        let ready = self.get_ready_for_retry()?;
+        let mut grouped: std::collections::BTreeMap<Option<String>, Vec<PendingUpdate>> =
+            std::collections::BTreeMap::new();
+        for update in ready {
+            grouped
+                .entry(update.target_relay_url.clone())
+                .or_default()
+                .push(update);
+        }
+        Ok(grouped)
+    }
+
     /// Gets updates that are ready for retry (past their retry_at time).
     pub fn get_ready_for_retry(&self) -> Result<Vec<PendingUpdate>, SyncError> {
         let now = current_timestamp();

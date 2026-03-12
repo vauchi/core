@@ -256,6 +256,28 @@ impl Storage {
         Ok(rows_affected)
     }
 
+    /// Gets all pending updates grouped by target relay URL.
+    ///
+    /// Returns a `BTreeMap` where keys are `Option<String>`:
+    /// - `Some(url)` → updates targeted at a specific relay
+    /// - `None` → updates for the home relay (no specific target)
+    ///
+    /// Each group is ordered by `created_at` (ascending).
+    pub fn get_pending_updates_grouped_by_relay(
+        &self,
+    ) -> Result<std::collections::BTreeMap<Option<String>, Vec<PendingUpdate>>, StorageError> {
+        let all = self.get_all_pending_updates()?;
+        let mut grouped: std::collections::BTreeMap<Option<String>, Vec<PendingUpdate>> =
+            std::collections::BTreeMap::new();
+        for update in all {
+            grouped
+                .entry(update.target_relay_url.clone())
+                .or_default()
+                .push(update);
+        }
+        Ok(grouped)
+    }
+
     /// Gets pending updates by status.
     pub fn get_pending_updates_by_status(
         &self,

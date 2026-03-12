@@ -278,3 +278,95 @@ fn test_get_pending_by_status() {
     let failed = storage.get_pending_updates_by_status("failed").unwrap();
     assert_eq!(failed.len(), 1);
 }
+
+// === Grouped by Relay Tests ===
+
+// @scenario: sync_updates:Route updates to correct relay per contact
+#[test]
+fn test_get_pending_updates_grouped_by_relay() {
+    let storage = test_storage();
+
+    // Updates for different relays
+    let mut u1 = create_pending_update("u1", "alice");
+    u1.target_relay_url = Some("wss://relay-a.example.com".to_string());
+
+    let mut u2 = create_pending_update("u2", "bob");
+    u2.target_relay_url = Some("wss://relay-a.example.com".to_string());
+
+    let mut u3 = create_pending_update("u3", "carol");
+    u3.target_relay_url = Some("wss://relay-b.example.com".to_string());
+
+    let mut u4 = create_pending_update("u4", "dave");
+    u4.target_relay_url = None; // home relay
+
+    storage.queue_update(&u1).unwrap();
+    storage.queue_update(&u2).unwrap();
+    storage.queue_update(&u3).unwrap();
+    storage.queue_update(&u4).unwrap();
+
+    let grouped = storage.get_pending_updates_grouped_by_relay().unwrap();
+
+    // 3 groups: relay-a (2), relay-b (1), None/home (1)
+    assert_eq!(grouped.len(), 3);
+
+    let relay_a = grouped
+        .get(&Some("wss://relay-a.example.com".to_string()))
+        .unwrap();
+    assert_eq!(relay_a.len(), 2);
+
+    let relay_b = grouped
+        .get(&Some("wss://relay-b.example.com".to_string()))
+        .unwrap();
+    assert_eq!(relay_b.len(), 1);
+    assert_eq!(relay_b[0].contact_id, "carol");
+
+    let home = grouped.get(&None).unwrap();
+    assert_eq!(home.len(), 1);
+    assert_eq!(home[0].contact_id, "dave");
+}
+
+// @scenario: sync_updates:All updates to same relay grouped together
+#[test]
+fn test_grouped_by_relay_all_same_relay() {
+    let storage = test_storage();
+
+    for i in 0..3 {
+        let mut update = create_pending_update(&format!("u-{i}"), &format!("c-{i}"));
+        update.target_relay_url = Some("wss://relay.example.com".to_string());
+        storage.queue_update(&update).unwrap();
+    }
+
+    let grouped = storage.get_pending_updates_grouped_by_relay().unwrap();
+    assert_eq!(grouped.len(), 1);
+
+    let relay = grouped
+        .get(&Some("wss://relay.example.com".to_string()))
+        .unwrap();
+    assert_eq!(relay.len(), 3);
+}
+
+// @scenario: sync_updates:All updates to home relay when no relay URL set
+#[test]
+fn test_grouped_by_relay_all_home() {
+    let storage = test_storage();
+
+    for i in 0..3 {
+        let update = create_pending_update(&format!("u-{i}"), &format!("c-{i}"));
+        storage.queue_update(&update).unwrap();
+    }
+
+    let grouped = storage.get_pending_updates_grouped_by_relay().unwrap();
+    assert_eq!(grouped.len(), 1);
+
+    let home = grouped.get(&None).unwrap();
+    assert_eq!(home.len(), 3);
+}
+
+// @scenario: sync_updates:Empty queue returns empty grouping
+#[test]
+fn test_grouped_by_relay_empty() {
+    let storage = test_storage();
+
+    let grouped = storage.get_pending_updates_grouped_by_relay().unwrap();
+    assert!(grouped.is_empty());
+}

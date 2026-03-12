@@ -329,3 +329,108 @@ fn test_sync_state_tracks_last_sync_timestamp() {
         other => panic!("Expected SyncState::Synced, got {:?}", other),
     }
 }
+
+// === Grouped by Relay Tests ===
+
+// @scenario: sync_updates:Route updates to correct relay per contact
+#[test]
+fn test_sync_get_ready_grouped_by_relay() {
+    let storage = create_test_storage();
+    let manager = SyncManager::new(&storage);
+
+    // Queue updates with different relay URLs directly via storage
+    let updates = vec![
+        ("u1", "alice", Some("wss://relay-a.example.com")),
+        ("u2", "bob", Some("wss://relay-a.example.com")),
+        ("u3", "carol", Some("wss://relay-b.example.com")),
+        ("u4", "dave", None),
+    ];
+
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+
+    for (id, contact_id, relay_url) in updates {
+        let update = PendingUpdate {
+            id: id.to_string(),
+            contact_id: contact_id.to_string(),
+            update_type: "card_delta".to_string(),
+            payload: vec![1, 2, 3],
+            created_at: now,
+            retry_count: 0,
+            status: UpdateStatus::Pending,
+            target_relay_url: relay_url.map(String::from),
+        };
+        storage.queue_update(&update).unwrap();
+    }
+
+    let grouped = manager.get_ready_grouped_by_relay().unwrap();
+
+    // 3 groups: relay-a (2), relay-b (1), None/home (1)
+    assert_eq!(grouped.len(), 3);
+
+    let relay_a = grouped
+        .get(&Some("wss://relay-a.example.com".to_string()))
+        .unwrap();
+    assert_eq!(relay_a.len(), 2);
+
+    let relay_b = grouped
+        .get(&Some("wss://relay-b.example.com".to_string()))
+        .unwrap();
+    assert_eq!(relay_b.len(), 1);
+
+    let home = grouped.get(&None).unwrap();
+    assert_eq!(home.len(), 1);
+}
+
+// @scenario: sync_updates:Failed updates not ready are excluded from grouped query
+#[test]
+fn test_sync_grouped_excludes_not_ready_failed() {
+    let storage = create_test_storage();
+    let manager = SyncManager::new(&storage);
+
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+
+    // One pending (ready)
+    let u1 = PendingUpdate {
+        id: "u1".to_string(),
+        contact_id: "alice".to_string(),
+        update_type: "card_delta".to_string(),
+        payload: vec![1],
+        created_at: now,
+        retry_count: 0,
+        status: UpdateStatus::Pending,
+        target_relay_url: Some("wss://relay.example.com".to_string()),
+    };
+
+    // One failed with retry in the future (not ready)
+    let u2 = PendingUpdate {
+        id: "u2".to_string(),
+        contact_id: "bob".to_string(),
+        update_type: "card_delta".to_string(),
+        payload: vec![2],
+        created_at: now,
+        retry_count: 1,
+        status: UpdateStatus::Failed {
+            error: "timeout".to_string(),
+            retry_at: now + 9999,
+        },
+        target_relay_url: Some("wss://relay.example.com".to_string()),
+    };
+
+    storage.queue_update(&u1).unwrap();
+    storage.queue_update(&u2).unwrap();
+
+    let grouped = manager.get_ready_grouped_by_relay().unwrap();
+
+    // Only the pending one should be in the result
+    let relay = grouped
+        .get(&Some("wss://relay.example.com".to_string()))
+        .unwrap();
+    assert_eq!(relay.len(), 1);
+    assert_eq!(relay[0].id, "u1");
+}

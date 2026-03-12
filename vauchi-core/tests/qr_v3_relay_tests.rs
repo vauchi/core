@@ -115,17 +115,64 @@ fn v3_signature_covers_relay_fields() {
 // ── Adversarial relay URLs (CC-14) ─────────────────────────────────
 
 #[test]
-fn v3_roundtrip_empty_relay_url() {
+fn v3_empty_relay_url_rejected_on_parse() {
     let identity = Identity::create("Eve");
     let ephemeral = X3DHKeyPair::generate();
 
     let qr = ExchangeQR::generate_with_relay(&identity, &ephemeral, Some(String::new()), None);
 
     let data = qr.to_data_string();
-    let parsed = ExchangeQR::from_data_string(&data).unwrap();
+    let result = ExchangeQR::from_data_string(&data);
 
-    // Empty string should roundtrip (validation happens at a higher layer)
-    assert_eq!(parsed.relay_url().unwrap(), "");
+    // Empty relay URL is rejected by SSRF validation
+    assert!(
+        result.is_err(),
+        "Empty relay URL must be rejected during QR parsing"
+    );
+}
+
+#[test]
+fn v3_private_host_relay_url_rejected_on_parse() {
+    let identity = Identity::create("Mallory");
+    let ephemeral = X3DHKeyPair::generate();
+
+    let qr = ExchangeQR::generate_with_relay(
+        &identity,
+        &ephemeral,
+        Some("wss://127.0.0.1/evil".to_string()),
+        None,
+    );
+
+    let data = qr.to_data_string();
+    let result = ExchangeQR::from_data_string(&data);
+
+    // Private/loopback relay URLs must be rejected (SSRF prevention)
+    assert!(
+        result.is_err(),
+        "Private host relay URL must be rejected during QR parsing"
+    );
+}
+
+#[test]
+fn v3_insecure_scheme_relay_url_rejected_on_parse() {
+    let identity = Identity::create("Oscar");
+    let ephemeral = X3DHKeyPair::generate();
+
+    let qr = ExchangeQR::generate_with_relay(
+        &identity,
+        &ephemeral,
+        Some("ws://relay.evil.com".to_string()),
+        None,
+    );
+
+    let data = qr.to_data_string();
+    let result = ExchangeQR::from_data_string(&data);
+
+    // Insecure ws:// scheme must be rejected
+    assert!(
+        result.is_err(),
+        "Insecure ws:// relay URL must be rejected during QR parsing"
+    );
 }
 
 #[test]

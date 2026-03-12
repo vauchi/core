@@ -28,6 +28,7 @@ use super::x3dh::X3DHKeyPair;
 use super::ExchangeError;
 use crate::crypto::{PublicKey, Signature};
 use crate::identity::Identity;
+use crate::network::relay_url::validate_relay_url;
 
 /// Protocol version for QR codes.
 /// v1: Original format (signing key only)
@@ -402,6 +403,12 @@ impl ExchangeQR {
 
         if !qr.verify_signature() {
             return Err(ExchangeError::InvalidSignature);
+        }
+
+        // Validate relay URL safety (SSRF prevention: reject private hosts,
+        // insecure schemes, and malformed URLs from untrusted QR payloads)
+        if let Some(ref url) = qr.relay_url {
+            validate_relay_url(url).map_err(|_| ExchangeError::InvalidQRFormat)?;
         }
 
         Ok(qr)

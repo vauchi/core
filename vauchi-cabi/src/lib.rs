@@ -352,6 +352,28 @@ pub unsafe extern "C" fn vauchi_app_available_screens(handle: *mut VauchiApp) ->
     }
 }
 
+/// Returns the default landing screen as a C string ("my_info" or "contacts").
+///
+/// # Safety
+/// `handle` must be a valid app handle or null.
+#[no_mangle]
+pub unsafe extern "C" fn vauchi_app_default_screen(handle: *mut VauchiApp) -> *mut c_char {
+    if handle.is_null() {
+        return std::ptr::null_mut();
+    }
+    let app = &*handle;
+    match app.engine.lock() {
+        Ok(engine) => {
+            let screen_id = match engine.default_screen() {
+                AppScreen::Contacts => "contacts",
+                _ => "my_info",
+            };
+            to_c_string(screen_id)
+        }
+        Err(_) => to_c_string("my_info"),
+    }
+}
+
 // ── Tests ───────────────────────────────────────────────────────────
 
 // INLINE_TEST_REQUIRED: cdylib crate-type prevents integration tests in tests/ directory

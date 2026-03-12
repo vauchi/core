@@ -2032,3 +2032,34 @@ fn app_screen_form_dialog_serde_roundtrip() {
     let deserialized: AppScreen = serde_json::from_str(&json).expect("deserialize");
     assert_eq!(deserialized, screen);
 }
+
+// ── default_screen tests (Phase 1: Navigation IA) ──────────────────
+
+#[test]
+fn default_screen_is_my_info_when_no_contacts() {
+    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    let engine = AppEngine::new(vauchi);
+    assert_eq!(engine.default_screen(), AppScreen::MyInfo);
+}
+
+#[test]
+fn default_screen_is_contacts_when_has_contacts() {
+    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    let card = ContactCard::new("Bob");
+    let shared_key = SymmetricKey::generate();
+    let contact = Contact::from_exchange([2u8; 32], card, shared_key);
+    vauchi.add_contact(contact).unwrap();
+
+    let engine = AppEngine::new(vauchi);
+    assert_eq!(engine.default_screen(), AppScreen::Contacts);
+}
+
+#[test]
+fn default_screen_is_my_info_without_identity() {
+    let vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    let engine = AppEngine::new(vauchi);
+    // Without identity, default is still MyInfo (onboarding overrides in new())
+    assert_eq!(engine.default_screen(), AppScreen::MyInfo);
+}

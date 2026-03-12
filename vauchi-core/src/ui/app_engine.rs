@@ -239,6 +239,21 @@ impl<T: Transport> AppEngine<T> {
             .collect()
     }
 
+    /// Returns the default landing screen based on contact count.
+    /// MyInfo when no contacts, Contacts when >=1 contact.
+    pub fn default_screen(&self) -> AppScreen {
+        let has_contacts = self
+            .vauchi
+            .list_contacts()
+            .map(|c| !c.is_empty())
+            .unwrap_or(false);
+        if has_contacts {
+            AppScreen::Contacts
+        } else {
+            AppScreen::MyInfo
+        }
+    }
+
     /// Returns top-level navigation screens. Sub-screens (Sync, TorSettings,
     /// Recovery, Groups, Privacy, Support) are reached via `navigate_to`.
     pub fn available_screens(&self) -> Vec<AppScreen> {

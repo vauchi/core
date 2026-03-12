@@ -213,12 +213,12 @@ impl<T: Transport> AppEngine<T> {
         };
         match dialog_type {
             FormDialogType::AddField { .. } => {
-                // Format: "type\nnote\nvalue\ngroups"
-                let parts: Vec<&str> = input.splitn(4, '\n').collect();
+                // Format: "type\nlabel\nvalue\nnote\ngroups"
+                let parts: Vec<&str> = input.splitn(5, '\n').collect();
                 if parts.len() >= 3 {
-                    let note = parts.get(1).unwrap_or(&"").trim();
+                    let label = parts.get(1).unwrap_or(&"").trim();
                     let value = parts.get(2).unwrap_or(&"").trim();
-                    !note.is_empty() || !value.is_empty()
+                    !label.is_empty() || !value.is_empty()
                 } else {
                     false
                 }
@@ -345,11 +345,12 @@ impl<T: Transport> AppEngine<T> {
                     }
                     FormDialogType::AddField { .. } => {
                         let raw = input.unwrap_or_default();
-                        // Format: type\nnote\nvalue\ngroups
-                        let mut lines = raw.splitn(4, '\n');
+                        // Format: type\nlabel\nvalue\nnote\ngroups
+                        let mut lines = raw.splitn(5, '\n');
                         let entry_type = lines.next().unwrap_or("custom").trim();
-                        let note = lines.next().unwrap_or("").trim();
+                        let label_input = lines.next().unwrap_or("").trim();
                         let value = lines.next().unwrap_or("").trim();
+                        let _note = lines.next().unwrap_or("").trim();
                         let _groups = lines.next().unwrap_or("").trim();
                         if value.is_empty() {
                             return ActionResult::ValidationError {
@@ -366,15 +367,15 @@ impl<T: Transport> AppEngine<T> {
                             "birthday" => FieldType::Birthday,
                             _ => FieldType::Custom,
                         };
-                        // Use note as label if provided, otherwise use type name
-                        let label = if note.is_empty() {
+                        // Use label_input as label if provided, otherwise use type name
+                        let label = if label_input.is_empty() {
                             entry_type
                                 .chars()
                                 .next()
                                 .map(|c| c.to_uppercase().to_string() + &entry_type[1..])
                                 .unwrap_or_else(|| "Custom".into())
                         } else {
-                            note.to_string()
+                            label_input.to_string()
                         };
                         let field = ContactField::new(field_type, &label, value);
                         let field_id = field.id().to_string();

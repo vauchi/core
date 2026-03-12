@@ -1277,15 +1277,14 @@ fn form_dialog_add_field_shows_type_list() {
             available_groups: vec![],
         },
     });
-    // Step 1: category selection list
     assert_eq!(screen.screen_id, "form_add_field");
     let has_action_list = screen
         .components
         .iter()
-        .any(|c| matches!(c, Component::ActionList { id, .. } if id == "categories"));
+        .any(|c| matches!(c, Component::ActionList { id, .. } if id == "entry_types"));
     assert!(
         has_action_list,
-        "Should have an ActionList for category selection"
+        "Should have an ActionList for entry type selection"
     );
 }
 
@@ -1300,27 +1299,7 @@ fn form_dialog_add_field_type_selection_shows_value_inputs() {
         },
     });
 
-    // Step 1: Select "Contact" category
-    let result = engine.handle_action(UserAction::ListItemSelected {
-        component_id: "categories".into(),
-        item_id: "Contact".into(),
-    });
-    match &result {
-        ActionResult::UpdateScreen(screen) => {
-            assert_eq!(screen.screen_id, "form_add_field");
-            let has_type_list = screen
-                .components
-                .iter()
-                .any(|c| matches!(c, Component::ActionList { id, .. } if id == "entry_types"));
-            assert!(
-                has_type_list,
-                "Should show type list after selecting category"
-            );
-        }
-        other => panic!("Expected UpdateScreen after category, got {other:?}"),
-    }
-
-    // Step 2: Select "email" type within Contact category
+    // Select "email" type from flat list
     let result = engine.handle_action(UserAction::ListItemSelected {
         component_id: "entry_types".into(),
         item_id: "email".into(),
@@ -1335,8 +1314,8 @@ fn form_dialog_add_field_type_selection_shows_value_inputs() {
                 .collect();
             assert_eq!(
                 text_inputs.len(),
-                2,
-                "Should have 2 text inputs (value + note) after selecting type"
+                3,
+                "Should have 3 text inputs (value + display name + comment)"
             );
         }
         other => panic!("Expected UpdateScreen, got {other:?}"),

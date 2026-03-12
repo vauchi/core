@@ -1073,6 +1073,49 @@ impl<T: Transport> WorkflowEngine for AppEngine<T> {
             }
         }
 
+        // Intercept settings item selection to route to proper sub-screens.
+        if self.screen == AppScreen::Settings {
+            if let UserAction::ListItemSelected { ref item_id, .. } = action {
+                match item_id.as_str() {
+                    "display_name" => {
+                        let current_name = self
+                            .vauchi
+                            .own_card()
+                            .ok()
+                            .flatten()
+                            .map(|c| c.display_name().to_string())
+                            .unwrap_or_default();
+                        let screen = self.navigate_to(AppScreen::FormDialog {
+                            dialog_type: FormDialogType::EditName { current_name },
+                        });
+                        return ActionResult::NavigateTo(screen);
+                    }
+                    "edit_profile" => {
+                        let screen = self.navigate_to(AppScreen::MyInfo);
+                        return ActionResult::NavigateTo(screen);
+                    }
+                    "devices" => {
+                        let screen = self.navigate_to(AppScreen::DeviceLinking);
+                        return ActionResult::NavigateTo(screen);
+                    }
+                    "duress_pin" => {
+                        let screen = self.navigate_to(AppScreen::DuressPin);
+                        return ActionResult::NavigateTo(screen);
+                    }
+                    "relay_url" => {
+                        let current_url = self.vauchi.config().relay.server_url.clone();
+                        let screen = self.navigate_to(AppScreen::FormDialog {
+                            dialog_type: FormDialogType::EditRelayUrl { current_url },
+                        });
+                        return ActionResult::NavigateTo(screen);
+                    }
+                    // emergency_wipe: handled by SettingsEngine (ShowAlert)
+                    // change_password: not yet implemented
+                    _ => {}
+                }
+            }
+        }
+
         // Intercept entry detail actions before delegating to engine
         if let AppScreen::MyInfoEntryDetail { ref field_id } = self.screen {
             let field_id = field_id.clone();

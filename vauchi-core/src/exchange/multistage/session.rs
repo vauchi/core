@@ -16,6 +16,7 @@ use aws_lc_rs::rand::{SecureRandom, SystemRandom};
 use chacha20poly1305::aead::{Aead, KeyInit, Payload};
 use chacha20poly1305::ChaCha20Poly1305;
 use rand::rngs::OsRng;
+use subtle::ConstantTimeEq;
 use x25519_dalek::{PublicKey as X25519Public, StaticSecret as X25519Secret};
 use zeroize::Zeroize;
 
@@ -585,7 +586,7 @@ impl MultiStageSession {
             }
         };
 
-        if payload_hash == expected_hash {
+        if bool::from(payload_hash.ct_eq(&expected_hash)) {
             self.state = ProtocolState::Complete;
             // Reset display_cycle so the grace period starts from 0.
             // Without this, display_cycle accumulated during Transferring/

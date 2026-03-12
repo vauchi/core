@@ -1277,15 +1277,15 @@ fn form_dialog_add_field_shows_type_list() {
             available_groups: vec![],
         },
     });
-    // Single-page form with flat type list
+    // Step 1: category selection list
     assert_eq!(screen.screen_id, "form_add_field");
     let has_action_list = screen
         .components
         .iter()
-        .any(|c| matches!(c, Component::ActionList { .. }));
+        .any(|c| matches!(c, Component::ActionList { id, .. } if id == "categories"));
     assert!(
         has_action_list,
-        "Should have an ActionList for type selection"
+        "Should have an ActionList for category selection"
     );
 }
 
@@ -1300,7 +1300,27 @@ fn form_dialog_add_field_type_selection_shows_value_inputs() {
         },
     });
 
-    // Select type from flat list
+    // Step 1: Select "Contact" category
+    let result = engine.handle_action(UserAction::ListItemSelected {
+        component_id: "categories".into(),
+        item_id: "Contact".into(),
+    });
+    match &result {
+        ActionResult::UpdateScreen(screen) => {
+            assert_eq!(screen.screen_id, "form_add_field");
+            let has_type_list = screen
+                .components
+                .iter()
+                .any(|c| matches!(c, Component::ActionList { id, .. } if id == "entry_types"));
+            assert!(
+                has_type_list,
+                "Should show type list after selecting category"
+            );
+        }
+        other => panic!("Expected UpdateScreen after category, got {other:?}"),
+    }
+
+    // Step 2: Select "email" type within Contact category
     let result = engine.handle_action(UserAction::ListItemSelected {
         component_id: "entry_types".into(),
         item_id: "email".into(),

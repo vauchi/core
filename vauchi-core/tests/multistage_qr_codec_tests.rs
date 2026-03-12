@@ -10,7 +10,15 @@ fn test_parse_init_qr() {
     let ephemeral = [2u8; 32];
     let commitment = [3u8; 32];
     let session_id = [4u8; 16];
-    let qr = format_init_qr(&session_id, &pubkey, &ephemeral, &commitment, "Alice");
+    let qr = format_init_qr_with_relay(
+        &session_id,
+        &pubkey,
+        &ephemeral,
+        &commitment,
+        "Alice",
+        None,
+        None,
+    );
     let parsed = parse_qr(&qr).unwrap();
     match parsed {
         StageQr::Init {
@@ -19,12 +27,16 @@ fn test_parse_init_qr() {
             ephemeral: eph,
             commitment_hash,
             display_name,
+            relay_url,
+            relay_noise_pubkey,
         } => {
             assert_eq!(sid, session_id);
             assert_eq!(pk, pubkey);
             assert_eq!(eph, ephemeral);
             assert_eq!(commitment_hash, commitment);
             assert_eq!(display_name, "Alice");
+            assert!(relay_url.is_none());
+            assert!(relay_noise_pubkey.is_none());
         }
         _ => panic!("expected Init"),
     }
@@ -111,5 +123,146 @@ fn test_data_qr_crc_integrity() {
         assert_eq!(crc, vauchi_core::exchange::multistage::crc16::compute(&p));
     } else {
         panic!("expected Data");
+    }
+}
+
+// === Relay URL in INIT QR ===
+
+#[test]
+fn test_init_qr_with_relay_url() {
+    let session_id = [10u8; 16];
+    let pubkey = [11u8; 32];
+    let ephemeral = [12u8; 32];
+    let commitment = [13u8; 32];
+    let relay_url = "wss://relay.example.com";
+
+    let qr = format_init_qr_with_relay(
+        &session_id,
+        &pubkey,
+        &ephemeral,
+        &commitment,
+        "Bob",
+        Some(relay_url),
+        None,
+    );
+
+    let parsed = parse_qr(&qr).unwrap();
+    match parsed {
+        StageQr::Init {
+            session_id: sid,
+            pubkey: pk,
+            ephemeral: eph,
+            commitment_hash,
+            display_name,
+            relay_url: url,
+            relay_noise_pubkey: npk,
+        } => {
+            assert_eq!(sid, session_id);
+            assert_eq!(pk, pubkey);
+            assert_eq!(eph, ephemeral);
+            assert_eq!(commitment_hash, commitment);
+            assert_eq!(display_name, "Bob");
+            assert_eq!(url.as_deref(), Some(relay_url));
+            assert!(npk.is_none());
+        }
+        _ => panic!("expected Init"),
+    }
+}
+
+#[test]
+fn test_init_qr_with_relay_url_and_noise_pubkey() {
+    let session_id = [14u8; 16];
+    let pubkey = [15u8; 32];
+    let ephemeral = [16u8; 32];
+    let commitment = [17u8; 32];
+    let relay_url = "wss://relay.example.com";
+    let noise_pubkey = [18u8; 32];
+
+    let qr = format_init_qr_with_relay(
+        &session_id,
+        &pubkey,
+        &ephemeral,
+        &commitment,
+        "Carol",
+        Some(relay_url),
+        Some(&noise_pubkey),
+    );
+
+    let parsed = parse_qr(&qr).unwrap();
+    match parsed {
+        StageQr::Init {
+            relay_url: url,
+            relay_noise_pubkey: npk,
+            ..
+        } => {
+            assert_eq!(url.as_deref(), Some(relay_url));
+            assert_eq!(npk.unwrap(), noise_pubkey);
+        }
+        _ => panic!("expected Init"),
+    }
+}
+
+#[test]
+fn test_init_qr_without_relay_backward_compat() {
+    // format_init_qr (no relay) should still parse correctly
+    let session_id = [19u8; 16];
+    let pubkey = [20u8; 32];
+    let ephemeral = [21u8; 32];
+    let commitment = [22u8; 32];
+
+    let qr = format_init_qr_with_relay(
+        &session_id,
+        &pubkey,
+        &ephemeral,
+        &commitment,
+        "Dave",
+        None,
+        None,
+    );
+    let parsed = parse_qr(&qr).unwrap();
+    match parsed {
+        StageQr::Init {
+            display_name,
+            relay_url,
+            relay_noise_pubkey,
+            ..
+        } => {
+            assert_eq!(display_name, "Dave");
+            assert!(relay_url.is_none());
+            assert!(relay_noise_pubkey.is_none());
+        }
+        _ => panic!("expected Init"),
+    }
+}
+
+#[test]
+fn test_init_qr_with_only_noise_pubkey() {
+    let session_id = [23u8; 16];
+    let pubkey = [24u8; 32];
+    let ephemeral = [25u8; 32];
+    let commitment = [26u8; 32];
+    let noise_pubkey = [27u8; 32];
+
+    let qr = format_init_qr_with_relay(
+        &session_id,
+        &pubkey,
+        &ephemeral,
+        &commitment,
+        "Eve",
+        None,
+        Some(&noise_pubkey),
+    );
+
+    let parsed = parse_qr(&qr).unwrap();
+    match parsed {
+        StageQr::Init {
+            relay_url,
+            relay_noise_pubkey,
+            ..
+        } => {
+            assert!(relay_url.is_none());
+            assert_eq!(relay_noise_pubkey.unwrap(), noise_pubkey);
+        }
+        _ => panic!("expected Init"),
     }
 }

@@ -77,6 +77,104 @@ fn test_full_exchange_two_sessions() {
 }
 
 #[test]
+fn test_full_exchange_with_relay_metadata() {
+    let alice_card = b"Alice's card for relay test".to_vec();
+    let bob_card = b"Bob's card for relay test".to_vec();
+
+    let mut alice = MultiStageSession::new_with_relay(
+        alice_card.clone(),
+        Some("wss://alice-relay.example.com".to_string()),
+        Some([0xAA; 32]),
+    );
+    let mut bob = MultiStageSession::new_with_relay(
+        bob_card.clone(),
+        Some("wss://bob-relay.example.com".to_string()),
+        None,
+    );
+
+    // Stage 1: Both display INIT QRs
+    let alice_init = alice.get_display_qr().unwrap();
+    let bob_init = bob.get_display_qr().unwrap();
+
+    // Both scan each other's INIT
+    alice.process_scanned_qr(&bob_init.data);
+    bob.process_scanned_qr(&alice_init.data);
+
+    // Exchange until complete
+    for _ in 0..100 {
+        let aq = alice.get_display_qr();
+        let bq = bob.get_display_qr();
+        if let Some(aq) = &aq {
+            bob.process_scanned_qr(&aq.data);
+        }
+        if let Some(bq) = &bq {
+            alice.process_scanned_qr(&bq.data);
+        }
+        if matches!(alice.get_state(), ProtocolState::Complete)
+            && matches!(bob.get_state(), ProtocolState::Complete)
+        {
+            break;
+        }
+    }
+
+    assert!(matches!(alice.get_state(), ProtocolState::Complete));
+    assert!(matches!(bob.get_state(), ProtocolState::Complete));
+
+    // Verify relay metadata was exchanged
+    assert_eq!(
+        alice.peer_relay_url().as_deref(),
+        Some("wss://bob-relay.example.com")
+    );
+    assert!(alice.peer_relay_noise_pubkey().is_none());
+
+    assert_eq!(
+        bob.peer_relay_url().as_deref(),
+        Some("wss://alice-relay.example.com")
+    );
+    assert_eq!(bob.peer_relay_noise_pubkey(), Some([0xAA; 32]));
+
+    // Card data should still be correct
+    assert_eq!(alice.get_received_data().unwrap(), bob_card);
+    assert_eq!(bob.get_received_data().unwrap(), alice_card);
+}
+
+#[test]
+fn test_exchange_without_relay_metadata() {
+    let alice_card = b"Alice no relay".to_vec();
+    let bob_card = b"Bob no relay".to_vec();
+
+    let mut alice = MultiStageSession::new(alice_card.clone());
+    let mut bob = MultiStageSession::new(bob_card.clone());
+
+    let alice_init = alice.get_display_qr().unwrap();
+    let bob_init = bob.get_display_qr().unwrap();
+    alice.process_scanned_qr(&bob_init.data);
+    bob.process_scanned_qr(&alice_init.data);
+
+    for _ in 0..100 {
+        let aq = alice.get_display_qr();
+        let bq = bob.get_display_qr();
+        if let Some(aq) = &aq {
+            bob.process_scanned_qr(&aq.data);
+        }
+        if let Some(bq) = &bq {
+            alice.process_scanned_qr(&bq.data);
+        }
+        if matches!(alice.get_state(), ProtocolState::Complete)
+            && matches!(bob.get_state(), ProtocolState::Complete)
+        {
+            break;
+        }
+    }
+
+    assert!(matches!(alice.get_state(), ProtocolState::Complete));
+    assert!(alice.peer_relay_url().is_none());
+    assert!(alice.peer_relay_noise_pubkey().is_none());
+    assert!(bob.peer_relay_url().is_none());
+    assert!(bob.peer_relay_noise_pubkey().is_none());
+}
+
+#[test]
 fn test_cancel_session_clears_state() {
     let mut session = MultiStageSession::new(b"data".to_vec());
     session.get_display_qr();

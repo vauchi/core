@@ -48,6 +48,8 @@ pub enum StageQr {
         ephemeral: [u8; 32],
         commitment_hash: [u8; 32],
         display_name: String,
+        relay_url: Option<String>,
+        relay_noise_pubkey: Option<[u8; 32]>,
     },
     Data {
         session_id: [u8; 16],
@@ -73,6 +75,17 @@ const F32_LEN: usize = 48; // base45(32 bytes) = 16 pairs × 3
 const CRC_LEN: usize = 3; // base45(2 bytes) = 1 pair × 3
 const IDX_LEN: usize = 3; // zero-padded decimal "000"–"255"
 const ACK_LEN_LEN: usize = 2; // zero-padded decimal length of ack field "00"–"99"
+
+/// Name length field width (zero-padded decimal "00"–"99").
+const NAME_LEN_LEN: usize = 2;
+/// URL length field width (zero-padded decimal "000"–"999").
+const URL_LEN_LEN: usize = 3;
+/// Flags field width (base45-encoded 1 byte = 2 chars).
+const FLAGS_LEN: usize = 2;
+
+/// Relay metadata flags for INIT QR.
+const FLAG_HAS_RELAY_URL: u8 = 0x01;
+const FLAG_HAS_RELAY_NOISE_PUBKEY: u8 = 0x02;
 
 /// Stage prefixes (4 chars each).
 const PREFIX_LEN: usize = 4;
@@ -111,22 +124,45 @@ fn take_rest(s: &str, pos: usize) -> &str {
 
 // ── Formatting ──────────────────────────────────────────────────────────
 
-/// Format an INIT stage QR string (positional, no separators).
-pub fn format_init_qr(
+/// Format an INIT stage QR string with optional relay metadata.
+///
+/// Layout: `INIT<sid:24><pk:48><eph:48><ch:48><name_len:2><name><flags:3>[<url_len:3><url>][<pubkey:48>]`
+pub fn format_init_qr_with_relay(
     session_id: &[u8; 16],
     pubkey: &[u8; 32],
     ephemeral: &[u8; 32],
     commitment_hash: &[u8; 32],
     display_name: &str,
+    relay_url: Option<&str>,
+    relay_noise_pubkey: Option<&[u8; 32]>,
 ) -> String {
-    format!(
-        "INIT{sid}{pk}{eph}{ch}{name}",
+    let mut flags: u8 = 0;
+    if relay_url.is_some() {
+        flags |= FLAG_HAS_RELAY_URL;
+    }
+    if relay_noise_pubkey.is_some() {
+        flags |= FLAG_HAS_RELAY_NOISE_PUBKEY;
+    }
+
+    let mut result = format!(
+        "INIT{sid}{pk}{eph}{ch}{name_len:02}{name}{flags}",
         sid = base45::encode(session_id),
         pk = base45::encode(pubkey),
         eph = base45::encode(ephemeral),
         ch = base45::encode(commitment_hash),
+        name_len = display_name.len(),
         name = display_name,
-    )
+        flags = base45::encode(&[flags]),
+    );
+
+    if let Some(url) = relay_url {
+        result.push_str(&format!("{:03}{}", url.len(), url));
+    }
+    if let Some(npk) = relay_noise_pubkey {
+        result.push_str(&base45::encode(npk));
+    }
+
+    result
 }
 
 /// Format a DATA stage QR string with CRC-16 integrity check.
@@ -196,7 +232,43 @@ fn parse_init(body: &str) -> Result<StageQr, QrCodecError> {
     let pk = take(body, &mut pos, F32_LEN)?;
     let eph = take(body, &mut pos, F32_LEN)?;
     let ch = take(body, &mut pos, F32_LEN)?;
-    let name = take_rest(body, pos);
+
+    // Name with length prefix
+    let name_len_str = take(body, &mut pos, NAME_LEN_LEN)?;
+    let name_len: usize = name_len_str
+        .parse()
+        .map_err(|_| QrCodecError::InvalidFieldCount)?;
+    let name = take(body, &mut pos, name_len)?;
+
+    // Flags byte
+    let flags_encoded = take(body, &mut pos, FLAGS_LEN)?;
+    let flags_bytes: [u8; 1] = decode_fixed(flags_encoded)?;
+    let flags = flags_bytes[0];
+
+    // Optional relay URL
+    let relay_url = if flags & FLAG_HAS_RELAY_URL != 0 {
+        let url_len_str = take(body, &mut pos, URL_LEN_LEN)?;
+        let url_len: usize = url_len_str
+            .parse()
+            .map_err(|_| QrCodecError::InvalidFieldCount)?;
+        let url = take(body, &mut pos, url_len)?;
+
+        // SSRF prevention: validate relay URL at parse time
+        crate::network::relay_url::validate_relay_url(url)
+            .map_err(|_| QrCodecError::InvalidFieldCount)?;
+
+        Some(url.to_string())
+    } else {
+        None
+    };
+
+    // Optional relay Noise NK pubkey
+    let relay_noise_pubkey = if flags & FLAG_HAS_RELAY_NOISE_PUBKEY != 0 {
+        let npk = take(body, &mut pos, F32_LEN)?;
+        Some(decode_fixed(npk)?)
+    } else {
+        None
+    };
 
     Ok(StageQr::Init {
         session_id: decode_fixed(sid)?,
@@ -204,6 +276,8 @@ fn parse_init(body: &str) -> Result<StageQr, QrCodecError> {
         ephemeral: decode_fixed(eph)?,
         commitment_hash: decode_fixed(ch)?,
         display_name: name.to_string(),
+        relay_url,
+        relay_noise_pubkey,
     })
 }
 

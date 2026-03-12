@@ -91,11 +91,31 @@ pub struct MultiStageSession {
     // Display cycle counter — every Nth cycle, re-show INIT so a slower
     // peer still in Advertising can discover us.
     display_cycle: u32,
+
+    // Our relay metadata (included in our INIT QR)
+    our_relay_url: Option<String>,
+    our_relay_noise_pubkey: Option<[u8; 32]>,
+
+    // Peer's relay metadata (extracted from their INIT QR)
+    peer_relay_url: Option<String>,
+    peer_relay_noise_pubkey: Option<[u8; 32]>,
 }
 
 impl MultiStageSession {
     /// Create a new session for exchanging the given contact card data.
     pub fn new(local_card: Vec<u8>) -> Self {
+        Self::new_with_relay(local_card, None, None)
+    }
+
+    /// Create a new session with optional relay metadata.
+    ///
+    /// The relay URL and Noise NK pubkey will be included in our INIT QR
+    /// so the peer can route future messages to our relay.
+    pub fn new_with_relay(
+        local_card: Vec<u8>,
+        relay_url: Option<String>,
+        relay_noise_pubkey: Option<[u8; 32]>,
+    ) -> Self {
         let rng = SystemRandom::new();
 
         // Generate session ID
@@ -144,6 +164,10 @@ impl MultiStageSession {
             init_qr_cache: None,
             current_chunk_idx: 0,
             display_cycle: 0,
+            our_relay_url: relay_url,
+            our_relay_noise_pubkey: relay_noise_pubkey,
+            peer_relay_url: None,
+            peer_relay_noise_pubkey: None,
         }
     }
 
@@ -164,6 +188,16 @@ impl MultiStageSession {
     /// secret for the double ratchet after exchange completion.
     pub fn get_transport_key(&self) -> Option<[u8; 32]> {
         self.transport_key
+    }
+
+    /// Returns the peer's relay URL (available after INIT exchange).
+    pub fn peer_relay_url(&self) -> Option<&str> {
+        self.peer_relay_url.as_deref()
+    }
+
+    /// Returns the peer's relay Noise NK public key (available after INIT exchange).
+    pub fn peer_relay_noise_pubkey(&self) -> Option<[u8; 32]> {
+        self.peer_relay_noise_pubkey
     }
 
     /// Cancel the session, transitioning to Failed and clearing sensitive data.
@@ -314,7 +348,16 @@ impl MultiStageSession {
                 ephemeral,
                 commitment_hash,
                 display_name: _,
-            } => self.handle_init(session_id, pubkey, ephemeral, commitment_hash),
+                relay_url,
+                relay_noise_pubkey,
+            } => self.handle_init(
+                session_id,
+                pubkey,
+                ephemeral,
+                commitment_hash,
+                relay_url,
+                relay_noise_pubkey,
+            ),
             StageQr::Data {
                 session_id: _,
                 chunk_idx,
@@ -337,12 +380,14 @@ impl MultiStageSession {
     // --- Private helpers ---
 
     fn build_init_qr(&self) -> String {
-        qr_codec::format_init_qr(
+        qr_codec::format_init_qr_with_relay(
             &self.session_id,
             &self.identity_pubkey,
             self.ephemeral_public.as_bytes(),
             self.commitment.hash(),
             &self.display_name,
+            self.our_relay_url.as_deref(),
+            self.our_relay_noise_pubkey.as_ref(),
         )
     }
 
@@ -352,6 +397,8 @@ impl MultiStageSession {
         pubkey: [u8; 32],
         ephemeral: [u8; 32],
         commitment_hash: [u8; 32],
+        relay_url: Option<String>,
+        relay_noise_pubkey: Option<[u8; 32]>,
     ) -> ProtocolState {
         // Only accept INIT while Advertising
         if !matches!(self.state, ProtocolState::Advertising) {
@@ -363,6 +410,8 @@ impl MultiStageSession {
         self.peer_pubkey = Some(pubkey);
         self.peer_ephemeral = Some(ephemeral);
         self.peer_commitment_hash = Some(commitment_hash);
+        self.peer_relay_url = relay_url;
+        self.peer_relay_noise_pubkey = relay_noise_pubkey;
 
         // Derive transport key via X25519 DH + HKDF
         if let Some(secret) = self.ephemeral_secret.take() {

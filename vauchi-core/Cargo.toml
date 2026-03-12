@@ -89,6 +89,9 @@ schemars = { version = "0.8", optional = true }
 # Password strength estimation
 zxcvbn = "3"
 
+# URL parsing and validation (relay URL safety checks)
+url = "2.5"
+
 # Database storage
 rusqlite = { version = "0.32", features = ["bundled"] }
 
@@ -332,6 +335,10 @@ required-features = ["testing"]
 
 [[test]]
 name = "transport_proptest"
+required-features = ["testing"]
+
+[[test]]
+name = "exchange_relay_wiring_tests"
 required-features = ["testing"]
 
 [[test]]

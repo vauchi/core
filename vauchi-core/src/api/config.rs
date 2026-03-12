@@ -153,7 +153,7 @@ pub struct RelayConfig {
 impl Default for RelayConfig {
     fn default() -> Self {
         RelayConfig {
-            server_url: String::new(),
+            server_url: "wss://relay.vauchi.app".to_string(),
             connect_timeout_ms: 10_000,
             io_timeout_ms: 30_000,
             max_reconnect_attempts: 5,

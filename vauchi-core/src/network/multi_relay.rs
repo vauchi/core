@@ -9,10 +9,12 @@
 
 use rand::seq::SliceRandom;
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::{Duration, Instant};
 use thiserror::Error;
+
+use crate::contact::Contact;
 
 /// Multi-relay configuration errors
 #[derive(Error, Debug)]
@@ -338,11 +340,14 @@ impl RelayHealth {
 /// Lightweight relay selection and health manager.
 ///
 /// Wraps a `MultiRelayConfig` and `RelayHealth` to provide relay selection
-/// with automatic failover. Does not manage connections — the caller picks
-/// a URL and creates/reuses a transport.
+/// with automatic failover. Supports per-contact relay routing: contacts
+/// may specify their own relay URL, and the manager tracks health for those
+/// relays too.
 pub struct MultiRelayManager {
     config: MultiRelayConfig,
     health: RelayHealth,
+    /// Relay URLs learned from contact exchanges (deduplicated).
+    contact_relays: HashSet<String>,
 }
 
 impl MultiRelayManager {
@@ -351,6 +356,7 @@ impl MultiRelayManager {
         MultiRelayManager {
             config,
             health: RelayHealth::new(),
+            contact_relays: HashSet::new(),
         }
     }
 
@@ -393,6 +399,94 @@ impl MultiRelayManager {
     /// Get a reference to the health tracker.
     pub fn health(&self) -> &RelayHealth {
         &self.health
+    }
+
+    // ========================================
+    // Per-Contact Relay Routing
+    // ========================================
+
+    /// Register a relay URL learned from a contact exchange.
+    ///
+    /// The relay is tracked for health monitoring. Duplicate URLs are ignored.
+    pub fn add_contact_relay(&mut self, url: &str) {
+        self.contact_relays.insert(url.to_string());
+    }
+
+    /// Returns the relay URL to use for a specific contact.
+    ///
+    /// If the contact has a relay URL set and that relay is healthy,
+    /// returns the contact's relay. Otherwise falls back to the home relay
+    /// (primary from config).
+    pub fn relay_for_contact(&self, contact: &Contact) -> String {
+        if let Some(contact_relay) = contact.relay_url() {
+            if !contact_relay.is_empty() && self.health.is_healthy(contact_relay) {
+                return contact_relay.to_string();
+            }
+        }
+        // Fall back to home relay
+        self.config
+            .select_healthy_relay(&self.health)
+            .unwrap_or_else(|| {
+                // Last resort: return primary even if unhealthy
+                self.config
+                    .primary()
+                    .unwrap_or_else(|| {
+                        self.config
+                            .relays()
+                            .first()
+                            .map(|s| s.as_str())
+                            .unwrap_or("")
+                    })
+                    .to_string()
+            })
+    }
+
+    /// Returns all known contact relay URLs.
+    pub fn contact_relay_urls(&self) -> Vec<&str> {
+        self.contact_relays.iter().map(|s| s.as_str()).collect()
+    }
+
+    /// Returns all unique relay URLs (home relays + contact relays).
+    pub fn all_relay_urls(&self) -> Vec<String> {
+        let mut urls: HashSet<String> = self.config.relays().iter().cloned().collect();
+        for url in &self.contact_relays {
+            urls.insert(url.clone());
+        }
+        urls.into_iter().collect()
+    }
+
+    /// Groups contacts by their target relay URL.
+    ///
+    /// Returns a map from relay URL to list of contact display names.
+    /// Contacts without a relay URL are grouped under the home relay.
+    pub fn group_contacts_by_relay<'a>(
+        &self,
+        contacts: &'a [Contact],
+    ) -> BTreeMap<String, Vec<&'a str>> {
+        let home_relay = self
+            .config
+            .primary()
+            .unwrap_or_else(|| {
+                self.config
+                    .relays()
+                    .first()
+                    .map(|s| s.as_str())
+                    .unwrap_or("")
+            })
+            .to_string();
+
+        let mut groups: BTreeMap<String, Vec<&str>> = BTreeMap::new();
+        for contact in contacts {
+            let relay = contact
+                .relay_url()
+                .filter(|url| !url.is_empty())
+                .unwrap_or(&home_relay);
+            groups
+                .entry(relay.to_string())
+                .or_default()
+                .push(contact.display_name());
+        }
+        groups
     }
 }
 

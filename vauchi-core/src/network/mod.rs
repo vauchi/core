@@ -90,6 +90,7 @@ mod noise;
 
 pub mod forwarding;
 pub mod pinning;
+pub mod relay_url;
 pub mod revocation;
 pub mod tor;
 

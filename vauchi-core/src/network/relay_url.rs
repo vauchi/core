@@ -1,0 +1,203 @@
+// SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+//
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+//! Relay URL Validation
+//!
+//! Validates relay URLs to prevent SSRF, injection, and abuse from
+//! malicious contact exchange payloads.
+
+use std::net::IpAddr;
+
+use subtle::ConstantTimeEq;
+use thiserror::Error;
+use url::Url;
+
+/// Maximum allowed relay URL length in bytes.
+const MAX_URL_LENGTH: usize = 1024;
+
+/// Errors from relay URL validation.
+#[derive(Error, Debug, Clone, PartialEq, Eq)]
+pub enum RelayUrlError {
+    #[error("Relay URL is empty")]
+    Empty,
+
+    #[error("Relay URL exceeds maximum length of {max} bytes (got {actual})")]
+    TooLong { max: usize, actual: usize },
+
+    #[error("Relay URL must use wss:// scheme")]
+    InsecureScheme,
+
+    #[error("Relay URL points to private/loopback host")]
+    PrivateHost,
+
+    #[error("Invalid relay URL format: {0}")]
+    InvalidFormat(String),
+
+    #[error("Relay Noise NK public key mismatch: pinned key does not match relay's actual key")]
+    NoisePubkeyMismatch,
+}
+
+/// Validates a relay URL for safety.
+///
+/// Checks:
+/// - Non-empty and within length limit
+/// - wss:// scheme only (no ws://, http://, etc.)
+/// - No private/loopback/link-local hosts (SSRF prevention)
+/// - No userinfo (user:pass@)
+/// - No fragment (#)
+/// - No null bytes
+pub fn validate_relay_url(url: &str) -> Result<(), RelayUrlError> {
+    // Length checks
+    if url.is_empty() {
+        return Err(RelayUrlError::Empty);
+    }
+    if url.len() > MAX_URL_LENGTH {
+        return Err(RelayUrlError::TooLong {
+            max: MAX_URL_LENGTH,
+            actual: url.len(),
+        });
+    }
+
+    // Null byte check (before URL parsing to prevent C-string truncation attacks)
+    if url.contains('\0') {
+        return Err(RelayUrlError::InvalidFormat(
+            "URL contains null bytes".to_string(),
+        ));
+    }
+
+    // Parse URL
+    let parsed = Url::parse(url).map_err(|e| RelayUrlError::InvalidFormat(e.to_string()))?;
+
+    // Scheme must be wss
+    if parsed.scheme() != "wss" {
+        return Err(RelayUrlError::InsecureScheme);
+    }
+
+    // No userinfo (prevents credential leakage and request smuggling)
+    if !parsed.username().is_empty() || parsed.password().is_some() {
+        return Err(RelayUrlError::InvalidFormat(
+            "URL must not contain userinfo".to_string(),
+        ));
+    }
+
+    // No fragment
+    if parsed.fragment().is_some() {
+        return Err(RelayUrlError::InvalidFormat(
+            "URL must not contain a fragment".to_string(),
+        ));
+    }
+
+    // Must have a host
+    let host = parsed
+        .host_str()
+        .ok_or_else(|| RelayUrlError::InvalidFormat("URL has no host".to_string()))?;
+
+    if host.is_empty() {
+        return Err(RelayUrlError::InvalidFormat(
+            "URL has empty host".to_string(),
+        ));
+    }
+
+    // Check for private/loopback hosts
+    check_host_not_private(host)?;
+
+    Ok(())
+}
+
+/// Rejects localhost, loopback, private RFC1918, link-local, and zero addresses.
+fn check_host_not_private(host: &str) -> Result<(), RelayUrlError> {
+    // Direct hostname checks
+    if host == "localhost" || host.ends_with(".localhost") {
+        return Err(RelayUrlError::PrivateHost);
+    }
+
+    // Try parsing as IP address
+    // Strip brackets for IPv6 (url crate may return "[::1]")
+    let ip_str = host.trim_start_matches('[').trim_end_matches(']');
+    if let Ok(ip) = ip_str.parse::<IpAddr>() {
+        if is_private_ip(&ip) {
+            return Err(RelayUrlError::PrivateHost);
+        }
+    }
+
+    Ok(())
+}
+
+/// Returns true if the IP address is private, loopback, link-local, or unspecified.
+fn is_private_ip(ip: &IpAddr) -> bool {
+    match ip {
+        IpAddr::V4(v4) => {
+            v4.is_loopback()           // 127.0.0.0/8
+                || v4.is_private()     // 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16
+                || v4.is_link_local()  // 169.254.0.0/16
+                || v4.is_unspecified() // 0.0.0.0
+                || v4.is_broadcast() // 255.255.255.255
+        }
+        IpAddr::V6(v6) => {
+            v6.is_loopback()           // ::1
+                || v6.is_unspecified() // ::
+                // IPv4-mapped private addresses
+                || v6.to_ipv4_mapped().is_some_and(|v4| {
+                    v4.is_loopback()
+                        || v4.is_private()
+                        || v4.is_link_local()
+                        || v4.is_unspecified()
+                })
+        }
+    }
+}
+
+/// Verifies a relay's Noise NK public key against an exchange-pinned value.
+///
+/// If `pinned` is `Some`, performs constant-time comparison with `actual`.
+/// If `pinned` is `None` (TOFU mode), accepts any key.
+///
+/// # Security
+///
+/// Uses `subtle::ConstantTimeEq` to prevent timing side-channels that
+/// could leak information about the expected key.
+pub fn verify_relay_noise_pubkey(
+    pinned: Option<&[u8; 32]>,
+    actual: &[u8; 32],
+) -> Result<(), RelayUrlError> {
+    if let Some(expected) = pinned {
+        if expected.ct_eq(actual).into() {
+            Ok(())
+        } else {
+            Err(RelayUrlError::NoisePubkeyMismatch)
+        }
+    } else {
+        // No pinned key — TOFU mode, accept any relay
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn is_private_ip_loopback_v4() {
+        assert!(is_private_ip(&"127.0.0.1".parse().unwrap()));
+        assert!(is_private_ip(&"127.0.0.2".parse().unwrap()));
+    }
+
+    #[test]
+    fn is_private_ip_rfc1918() {
+        assert!(is_private_ip(&"10.0.0.1".parse().unwrap()));
+        assert!(is_private_ip(&"172.16.0.1".parse().unwrap()));
+        assert!(is_private_ip(&"192.168.1.1".parse().unwrap()));
+    }
+
+    #[test]
+    fn is_private_ip_public() {
+        assert!(!is_private_ip(&"8.8.8.8".parse().unwrap()));
+        assert!(!is_private_ip(&"1.1.1.1".parse().unwrap()));
+    }
+
+    #[test]
+    fn is_private_ip_loopback_v6() {
+        assert!(is_private_ip(&"::1".parse().unwrap()));
+    }
+}

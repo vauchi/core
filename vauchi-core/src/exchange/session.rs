@@ -134,6 +134,14 @@ pub struct ExchangeSession<P: ProximityVerifier> {
     nfc_handshake: Option<NfcHandshakeSession>,
     /// BLE encrypted handshake session (only populated for BLE transport).
     ble_handshake: Option<BleHandshakeSession>,
+    /// Our relay URL to include in QR code (for per-contact routing).
+    our_relay_url: Option<String>,
+    /// Our relay's Noise NK public key to include in QR code.
+    our_relay_noise_pubkey: Option<[u8; 32]>,
+    /// Their relay URL extracted from their QR code.
+    their_relay_url: Option<String>,
+    /// Their relay's Noise NK public key extracted from their QR code.
+    their_relay_noise_pubkey: Option<[u8; 32]>,
 }
 
 impl<P: ProximityVerifier> ExchangeSession<P> {
@@ -161,6 +169,10 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
             their_display_name: None,
             nfc_handshake: None,
             ble_handshake: None,
+            our_relay_url: None,
+            our_relay_noise_pubkey: None,
+            their_relay_url: None,
+            their_relay_noise_pubkey: None,
         }
     }
 
@@ -188,6 +200,10 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
             their_display_name: None,
             nfc_handshake: None,
             ble_handshake: None,
+            our_relay_url: None,
+            our_relay_noise_pubkey: None,
+            their_relay_url: None,
+            their_relay_noise_pubkey: None,
         }
     }
 
@@ -216,6 +232,10 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
             their_display_name: None,
             nfc_handshake: Some(nfc_handshake),
             ble_handshake: None,
+            our_relay_url: None,
+            our_relay_noise_pubkey: None,
+            their_relay_url: None,
+            their_relay_noise_pubkey: None,
         }
     }
 
@@ -254,6 +274,10 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
             their_display_name: None,
             nfc_handshake: None,
             ble_handshake: Some(ble_handshake),
+            our_relay_url: None,
+            our_relay_noise_pubkey: None,
+            their_relay_url: None,
+            their_relay_noise_pubkey: None,
         }
     }
 
@@ -265,6 +289,18 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
     /// Returns the transport mechanism.
     pub fn transport(&self) -> ExchangeTransport {
         self.transport
+    }
+
+    /// Sets our relay URL to include in the QR code.
+    /// Must be called before `process(StartQR)`.
+    pub fn set_our_relay_url(&mut self, url: Option<String>) {
+        self.our_relay_url = url;
+    }
+
+    /// Sets our relay's Noise NK public key to include in the QR code.
+    /// Must be called before `process(StartQR)`.
+    pub fn set_our_relay_noise_pubkey(&mut self, pubkey: Option<[u8; 32]>) {
+        self.our_relay_noise_pubkey = pubkey;
     }
 
     /// Returns the QR code if in DisplayingQr or PeerScanned state.
@@ -482,13 +518,17 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
                 }
             };
 
-        let contact = Contact::from_exchange_full(
+        let mut contact = Contact::from_exchange_full(
             their_public_key,
             their_card,
             shared_key,
             self.proximity_confidence,
             self.transport,
         );
+
+        // Set relay metadata learned from their QR code
+        contact.set_relay_url(self.their_relay_url.take());
+        contact.set_relay_noise_pubkey(self.their_relay_noise_pubkey.take());
 
         self.state = ExchangeState::Complete {
             contact: contact.clone(),
@@ -511,7 +551,12 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
             ));
         }
 
-        let our_qr = ExchangeQR::generate(&self.identity, &self.our_x3dh);
+        let our_qr = ExchangeQR::generate_with_relay(
+            &self.identity,
+            &self.our_x3dh,
+            self.our_relay_url.clone(),
+            self.our_relay_noise_pubkey,
+        );
         self.our_audio_challenge = Some(*our_qr.audio_challenge());
         self.state = ExchangeState::DisplayingQr { our_qr };
         Ok(())
@@ -553,6 +598,9 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
         self.their_audio_challenge = Some(*qr.audio_challenge());
         // Store their display name from the QR code
         self.their_display_name = Some(qr.display_name().to_string());
+        // Store their relay metadata for per-contact routing
+        self.their_relay_url = qr.relay_url().map(String::from);
+        self.their_relay_noise_pubkey = qr.relay_noise_pubkey().copied();
 
         self.state = ExchangeState::PeerScanned {
             our_qr,

@@ -77,6 +77,12 @@ pub struct Contact {
     /// Timestamp of the last card update (separate from exchange_timestamp).
     /// None until the first `update_card()` call.
     card_updated_at: Option<u64>,
+    /// Relay URL learned during exchange (for per-contact relay routing).
+    /// When set, updates for this contact are sent to their relay instead of our home relay.
+    relay_url: Option<String>,
+    /// Relay's Noise NK public key, pinned during in-person exchange.
+    /// Used to verify the relay's identity on connect (eliminates TOFU).
+    relay_noise_pubkey: Option<[u8; 32]>,
 }
 
 impl Contact {
@@ -111,6 +117,8 @@ impl Contact {
             exchange_transport: ExchangeTransport::Qr,
             has_recovered: false,
             card_updated_at: None,
+            relay_url: None,
+            relay_noise_pubkey: None,
         }
     }
 
@@ -198,6 +206,8 @@ impl Contact {
             exchange_transport: ExchangeTransport::Qr,
             has_recovered: false,
             card_updated_at: None,
+            relay_url: None,
+            relay_noise_pubkey: None,
         }
     }
 
@@ -511,5 +521,35 @@ impl Contact {
     /// Updates are not sent to blocked contacts.
     pub fn should_send_updates(&self) -> bool {
         !self.blocked
+    }
+
+    // ========================================
+    // Relay Metadata (per-contact routing)
+    // ========================================
+
+    /// Returns the contact's relay URL, if known.
+    ///
+    /// When set, updates for this contact should be sent to this relay
+    /// instead of our home relay. Learned during in-person exchange.
+    pub fn relay_url(&self) -> Option<&str> {
+        self.relay_url.as_deref()
+    }
+
+    /// Sets the contact's relay URL.
+    pub fn set_relay_url(&mut self, url: Option<String>) {
+        self.relay_url = url;
+    }
+
+    /// Returns the contact's relay Noise NK public key, if known.
+    ///
+    /// When set, connections to this contact's relay must verify the
+    /// relay's Noise static key matches this pinned value.
+    pub fn relay_noise_pubkey(&self) -> Option<&[u8; 32]> {
+        self.relay_noise_pubkey.as_ref()
+    }
+
+    /// Sets the contact's relay Noise NK public key.
+    pub fn set_relay_noise_pubkey(&mut self, pubkey: Option<[u8; 32]>) {
+        self.relay_noise_pubkey = pubkey;
     }
 }

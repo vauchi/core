@@ -6855,6 +6855,7 @@ dependencies = [
  "tokio-util",
  "tor-rtcompat",
  "tungstenite",
+ "url",
  "uuid",
  "wasm-bindgen",
  "wasm-bindgen-futures",

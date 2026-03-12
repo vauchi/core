@@ -5,9 +5,13 @@
 //! Commitment scheme for the multi-stage atomic QR exchange protocol.
 //!
 //! Creates an encrypted payload (ChaCha20-Poly1305 with a random reveal key) and a
-//! binding hash (SHA-256(reveal_key || ciphertext)). The reveal key is withheld
-//! until Stage 3 (VERIFY), ensuring neither side can decrypt until both parties
-//! exchange reveal keys.
+//! binding hash (SHA-256(reveal_key || ciphertext [|| context])). The reveal key is
+//! withheld until Stage 3 (VERIFY), ensuring neither side can decrypt until both
+//! parties exchange reveal keys.
+//!
+//! The optional context parameter (T1.7) binds relay metadata (URL + Noise pubkey)
+//! into the commitment hash, preventing a MitM from swapping relay fields in the
+//! INIT QR without invalidating the commitment.
 
 use aws_lc_rs::digest::{digest, SHA256};
 use aws_lc_rs::rand::{SecureRandom, SystemRandom};
@@ -34,21 +38,31 @@ pub enum CommitmentError {
 pub struct Commitment {
     reveal_key: [u8; 32],
     ciphertext: Vec<u8>, // nonce (12 bytes) || encrypted || tag (16 bytes)
-    hash: [u8; 32],      // SHA256(reveal_key || ciphertext)
+    hash: [u8; 32],      // SHA256(reveal_key || ciphertext [|| context])
 }
 
 impl Commitment {
-    /// Create a new commitment for the given plaintext.
+    /// Create a new commitment for the given plaintext (no context binding).
     ///
     /// Generates a random reveal key and encrypts with ChaCha20-Poly1305.
     /// The commitment hash binds the reveal key to the ciphertext.
+    #[allow(dead_code)] // used by external tests
     pub fn create(plaintext: &[u8]) -> Self {
+        Self::create_with_context(plaintext, b"")
+    }
+
+    /// Create a new commitment with context binding (T1.7).
+    ///
+    /// The context (e.g., relay URL + Noise pubkey) is included in the
+    /// commitment hash but NOT encrypted. This prevents a MitM from
+    /// swapping context fields without invalidating the commitment.
+    pub fn create_with_context(plaintext: &[u8], context: &[u8]) -> Self {
         let rng = SystemRandom::new();
         let mut reveal_key = [0u8; 32];
         rng.fill(&mut reveal_key).expect("RNG failed");
 
         let ciphertext = Self::encrypt(&reveal_key, plaintext).expect("encryption failed");
-        let hash = Self::compute_hash(&reveal_key, &ciphertext);
+        let hash = Self::compute_hash_with_context(&reveal_key, &ciphertext, context);
 
         Commitment {
             reveal_key,
@@ -86,18 +100,37 @@ impl Commitment {
         Self::decrypt(reveal_key, ciphertext)
     }
 
-    /// Verify that a hash matches SHA-256(reveal_key || ciphertext).
+    /// Verify that a hash matches SHA-256(reveal_key || ciphertext) (no context).
     ///
     /// Uses constant-time comparison to prevent timing side-channels.
+    #[allow(dead_code)] // used by external tests
     pub fn verify_hash(reveal_key: &[u8; 32], ciphertext: &[u8], expected_hash: &[u8; 32]) -> bool {
-        let computed = Self::compute_hash(reveal_key, ciphertext);
+        Self::verify_hash_with_context(reveal_key, ciphertext, expected_hash, b"")
+    }
+
+    /// Verify that a hash matches SHA-256(reveal_key || ciphertext || context).
+    ///
+    /// The context must match exactly what was passed to `create_with_context`.
+    /// Uses constant-time comparison to prevent timing side-channels.
+    pub fn verify_hash_with_context(
+        reveal_key: &[u8; 32],
+        ciphertext: &[u8],
+        expected_hash: &[u8; 32],
+        context: &[u8],
+    ) -> bool {
+        let computed = Self::compute_hash_with_context(reveal_key, ciphertext, context);
         computed.ct_eq(expected_hash).into()
     }
 
-    fn compute_hash(reveal_key: &[u8; 32], ciphertext: &[u8]) -> [u8; 32] {
-        let mut input = Vec::with_capacity(32 + ciphertext.len());
+    fn compute_hash_with_context(
+        reveal_key: &[u8; 32],
+        ciphertext: &[u8],
+        context: &[u8],
+    ) -> [u8; 32] {
+        let mut input = Vec::with_capacity(32 + ciphertext.len() + context.len());
         input.extend_from_slice(reveal_key);
         input.extend_from_slice(ciphertext);
+        input.extend_from_slice(context);
         let d = digest(&SHA256, &input);
         let mut hash = [0u8; 32];
         hash.copy_from_slice(d.as_ref());

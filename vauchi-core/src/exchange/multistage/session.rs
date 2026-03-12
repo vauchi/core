@@ -133,8 +133,10 @@ impl MultiStageSession {
         let ephemeral_secret = X25519Secret::random_from_rng(OsRng);
         let ephemeral_public = X25519Public::from(&ephemeral_secret);
 
-        // Create commitment from local card
-        let commitment = Commitment::create(&local_card);
+        // Create commitment from local card, binding our relay metadata (T1.7)
+        let commitment_context =
+            Self::build_commitment_context(relay_url.as_deref(), relay_noise_pubkey.as_ref());
+        let commitment = Commitment::create_with_context(&local_card, &commitment_context);
 
         // Use identity seed as a stand-in pubkey for INIT QR
         // (In a full implementation, this would be a proper Ed25519 public key)
@@ -538,7 +540,18 @@ impl MultiStageSession {
             }
         };
 
-        if !Commitment::verify_hash(&reveal_key, &ciphertext, &peer_hash) {
+        // Build peer's commitment context from their relay metadata (T1.7)
+        let peer_context = Self::build_commitment_context(
+            self.peer_relay_url.as_deref(),
+            self.peer_relay_noise_pubkey.as_ref(),
+        );
+
+        if !Commitment::verify_hash_with_context(
+            &reveal_key,
+            &ciphertext,
+            &peer_hash,
+            &peer_context,
+        ) {
             self.state = ProtocolState::Failed("commitment verification failed".to_string());
             return self.state.clone();
         }
@@ -773,6 +786,25 @@ impl MultiStageSession {
         let mut hash = [0u8; 32];
         hash.copy_from_slice(d.as_ref());
         hash
+    }
+
+    /// Build commitment context from relay metadata (T1.7).
+    ///
+    /// Both sides must use the same context construction when creating and
+    /// verifying the commitment hash. The context binds relay fields into
+    /// the commitment so a MitM cannot swap relay URLs in the INIT QR.
+    fn build_commitment_context(
+        relay_url: Option<&str>,
+        relay_noise_pubkey: Option<&[u8; 32]>,
+    ) -> Vec<u8> {
+        let mut context = Vec::new();
+        if let Some(url) = relay_url {
+            context.extend_from_slice(url.as_bytes());
+        }
+        if let Some(pk) = relay_noise_pubkey {
+            context.extend_from_slice(pk);
+        }
+        context
     }
 
     fn clear_sensitive(&mut self) {

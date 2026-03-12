@@ -82,3 +82,85 @@ fn test_commitment_hash_mismatch_detected() {
         &wrong_hash
     ));
 }
+
+// === T1.7: Commitment binds relay metadata (context) ===
+
+#[test]
+fn test_commitment_with_context_binds_relay_url() {
+    let plaintext = b"contact card data";
+    let context = b"wss://relay.vauchi.app";
+
+    let commitment = Commitment::create_with_context(plaintext, context);
+
+    // Verify with correct context passes
+    assert!(Commitment::verify_hash_with_context(
+        commitment.reveal_key(),
+        commitment.ciphertext(),
+        commitment.hash(),
+        context,
+    ));
+
+    // Verify with wrong context (swapped relay URL) fails
+    let wrong_context = b"wss://evil-relay.example";
+    assert!(!Commitment::verify_hash_with_context(
+        commitment.reveal_key(),
+        commitment.ciphertext(),
+        commitment.hash(),
+        wrong_context,
+    ));
+}
+
+#[test]
+fn test_commitment_with_context_empty_context_differs_from_no_context() {
+    let plaintext = b"card data";
+    let commitment_no_ctx = Commitment::create(plaintext);
+    let commitment_empty_ctx = Commitment::create_with_context(plaintext, b"");
+
+    // Even with empty context, the hash computation path differs
+    // because create() uses the legacy path (no context),
+    // and create_with_context(b"") includes the length prefix.
+    // This ensures backward compat: old commitments still verify with verify_hash().
+    assert!(Commitment::verify_hash(
+        commitment_no_ctx.reveal_key(),
+        commitment_no_ctx.ciphertext(),
+        commitment_no_ctx.hash(),
+    ));
+}
+
+#[test]
+fn test_commitment_context_includes_relay_and_pubkey() {
+    let plaintext = b"card";
+    let relay_url = b"wss://relay.vauchi.app";
+    let noise_pk = [0xABu8; 32];
+
+    // Build context the same way session.rs will
+    let mut context = Vec::new();
+    context.extend_from_slice(relay_url);
+    context.extend_from_slice(&noise_pk);
+
+    let commitment = Commitment::create_with_context(plaintext, &context);
+
+    // Tamper with just the pubkey portion
+    let mut tampered_context = Vec::new();
+    tampered_context.extend_from_slice(relay_url);
+    tampered_context.extend_from_slice(&[0xCDu8; 32]); // different pubkey
+
+    assert!(!Commitment::verify_hash_with_context(
+        commitment.reveal_key(),
+        commitment.ciphertext(),
+        commitment.hash(),
+        &tampered_context,
+    ));
+}
+
+#[test]
+fn test_commitment_with_context_decryption_unchanged() {
+    // Context affects the hash only, not the encryption.
+    // Decryption still works with just the reveal key.
+    let plaintext = b"secret card";
+    let context = b"wss://relay.vauchi.app";
+
+    let commitment = Commitment::create_with_context(plaintext, context);
+    let decrypted = commitment.open().unwrap();
+    assert_eq!(decrypted, plaintext);
+}

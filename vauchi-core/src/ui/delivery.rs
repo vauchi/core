@@ -31,9 +31,9 @@ impl DeliveryStatusEngine {
     fn build_screen(&self) -> ScreenModel {
         let components = if self.items.is_empty() {
             vec![Component::InfoPanel {
-                id: "empty".to_string(),
-                icon: Some("checkmark".to_string()),
-                title: "All Delivered".to_string(),
+                id: "empty".into(),
+                icon: Some("checkmark".into()),
+                title: "All Delivered".into(),
                 items: vec![],
             }]
         } else {
@@ -51,8 +51,8 @@ impl DeliveryStatusEngine {
 
         let actions = if self.items.iter().any(|item| item.retryable) {
             vec![ScreenAction {
-                id: "retry_all".to_string(),
-                label: "Retry Failed".to_string(),
+                id: "retry_all".into(),
+                label: "Retry Failed".into(),
                 style: ActionStyle::Primary,
                 enabled: true,
             }]
@@ -61,8 +61,8 @@ impl DeliveryStatusEngine {
         };
 
         ScreenModel {
-            screen_id: "delivery_status".to_string(),
-            title: "Delivery Status".to_string(),
+            screen_id: "delivery_status".into(),
+            title: "Delivery Status".into(),
             subtitle: None,
             components,
             actions,

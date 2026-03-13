@@ -79,7 +79,7 @@ impl GroupsEngine {
                     GroupsMode::Members => {
                         let n = g.member_count;
                         if n == 1 {
-                            "1 member".to_string()
+                            "1 member".into()
                         } else {
                             format!("{n} members")
                         }
@@ -87,7 +87,7 @@ impl GroupsEngine {
                     GroupsMode::Visibility => {
                         let n = g.visible_field_count;
                         if n == 1 {
-                            "1 visible field".to_string()
+                            "1 visible field".into()
                         } else {
                             format!("{n} visible fields")
                         }

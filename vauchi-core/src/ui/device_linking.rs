@@ -70,18 +70,18 @@ impl DeviceLinkingEngine {
     fn build_screen(&self) -> ScreenModel {
         match &self.step {
             DeviceLinkStep::ShowQr => ScreenModel {
-                screen_id: "link_show_qr".to_string(),
-                title: "Link Device".to_string(),
+                screen_id: "link_show_qr".into(),
+                title: "Link Device".into(),
                 subtitle: None,
                 components: vec![Component::QrCode {
-                    id: "qr".to_string(),
+                    id: "qr".into(),
                     data: self.qr_data.clone(),
                     mode: QrMode::Display,
-                    label: Some("Scan on new device".to_string()),
+                    label: Some("Scan on new device".into()),
                 }],
                 actions: vec![ScreenAction {
-                    id: "cancel".to_string(),
-                    label: "Cancel".to_string(),
+                    id: "cancel".into(),
+                    label: "Cancel".into(),
                     style: ActionStyle::Secondary,
                     enabled: true,
                 }],
@@ -90,36 +90,36 @@ impl DeviceLinkingEngine {
             DeviceLinkStep::VerifyCode => {
                 let code = self.verification_code.as_deref().unwrap_or("------");
                 ScreenModel {
-                    screen_id: "link_verify".to_string(),
-                    title: "Verify Device".to_string(),
+                    screen_id: "link_verify".into(),
+                    title: "Verify Device".into(),
                     subtitle: None,
                     components: vec![
                         Component::Text {
-                            id: "code".to_string(),
+                            id: "code".into(),
                             content: code.to_string(),
                             style: TextStyle::Title,
                         },
                         Component::InfoPanel {
-                            id: "verify_info".to_string(),
-                            icon: Some("shield".to_string()),
-                            title: "Verify this code".to_string(),
+                            id: "verify_info".into(),
+                            icon: Some("shield".into()),
+                            title: "Verify this code".into(),
                             items: vec![InfoItem {
                                 icon: None,
-                                title: "Compare codes".to_string(),
-                                detail: "Ensure both devices show the same code".to_string(),
+                                title: "Compare codes".into(),
+                                detail: "Ensure both devices show the same code".into(),
                             }],
                         },
                     ],
                     actions: vec![
                         ScreenAction {
-                            id: "confirm".to_string(),
-                            label: "Confirm".to_string(),
+                            id: "confirm".into(),
+                            label: "Confirm".into(),
                             style: ActionStyle::Primary,
                             enabled: true,
                         },
                         ScreenAction {
-                            id: "reject".to_string(),
-                            label: "Reject".to_string(),
+                            id: "reject".into(),
+                            label: "Reject".into(),
                             style: ActionStyle::Destructive,
                             enabled: true,
                         },
@@ -128,13 +128,13 @@ impl DeviceLinkingEngine {
                 }
             }
             DeviceLinkStep::Syncing => ScreenModel {
-                screen_id: "link_syncing".to_string(),
-                title: "Syncing".to_string(),
+                screen_id: "link_syncing".into(),
+                title: "Syncing".into(),
                 subtitle: None,
                 components: vec![Component::StatusIndicator {
-                    id: "syncing".to_string(),
+                    id: "syncing".into(),
                     icon: None,
-                    title: "Syncing data...".to_string(),
+                    title: "Syncing data...".into(),
                     detail: None,
                     status: Status::InProgress,
                 }],
@@ -142,19 +142,19 @@ impl DeviceLinkingEngine {
                 progress: self.progress(),
             },
             DeviceLinkStep::Complete => ScreenModel {
-                screen_id: "link_complete".to_string(),
-                title: "Device Linked".to_string(),
+                screen_id: "link_complete".into(),
+                title: "Device Linked".into(),
                 subtitle: None,
                 components: vec![Component::StatusIndicator {
-                    id: "complete".to_string(),
+                    id: "complete".into(),
                     icon: None,
-                    title: "Device Linked".to_string(),
+                    title: "Device Linked".into(),
                     detail: None,
                     status: Status::Success,
                 }],
                 actions: vec![ScreenAction {
-                    id: "done".to_string(),
-                    label: "Done".to_string(),
+                    id: "done".into(),
+                    label: "Done".into(),
                     style: ActionStyle::Primary,
                     enabled: true,
                 }],

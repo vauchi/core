@@ -85,7 +85,7 @@ impl WorkflowEngine for SettingsEngine {
                         label: "Devices".into(),
                         kind: SettingsItemKind::Link {
                             detail: Some(if self.config.device_count == 1 {
-                                "1 device".to_string()
+                                "1 device".into()
                             } else {
                                 format!("{} devices", self.config.device_count)
                             }),

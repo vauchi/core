@@ -174,7 +174,8 @@ impl WorkflowEngine for GroupsEngine {
                 };
                 ActionResult::UpdateScreen(self.build_screen())
             }
-            // Group selected from list — open group detail
+            // Group selected from list — reuses OpenContact to signal "open detail".
+            // AppEngine routes this to GroupDetail when the current screen is Groups.
             UserAction::ListItemSelected {
                 component_id,
                 item_id,

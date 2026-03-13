@@ -1273,6 +1273,14 @@ impl<T: Transport> WorkflowEngine for AppEngine<T> {
                 let screen = self.navigate_to(AppScreen::MyInfoEntryDetail { field_id });
                 ActionResult::NavigateTo(screen)
             }
+            // GroupsEngine reuses OpenContact to signal group selection.
+            // Route to GroupDetail when on the Groups screen.
+            ActionResult::OpenContact { contact_id } if self.screen == AppScreen::Groups => {
+                let screen = self.navigate_to(AppScreen::GroupDetail {
+                    group_id: contact_id,
+                });
+                ActionResult::NavigateTo(screen)
+            }
             other => other,
         }
     }

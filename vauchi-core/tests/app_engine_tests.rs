@@ -1251,6 +1251,35 @@ fn navigate_to_group_detail_shows_group() {
     );
 }
 
+#[test]
+fn groups_list_item_selected_routes_to_group_detail() {
+    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    let mut engine = AppEngine::new(vauchi);
+    engine.navigate_to(AppScreen::Groups);
+
+    // Select a group from the list
+    let result = engine.handle_action(UserAction::ListItemSelected {
+        component_id: "groups".into(),
+        item_id: "g1".into(),
+    });
+    match result {
+        ActionResult::NavigateTo(screen) => {
+            assert_eq!(
+                screen.screen_id, "group_detail",
+                "selecting a group should navigate to GroupDetail"
+            );
+        }
+        other => panic!("Expected NavigateTo group_detail, got {:?}", other),
+    }
+    assert_eq!(
+        engine.current_app_screen(),
+        &AppScreen::GroupDetail {
+            group_id: "g1".into()
+        }
+    );
+}
+
 // ── contact visibility tests ─────────────────────────────────────────
 
 #[test]

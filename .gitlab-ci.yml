@@ -69,6 +69,9 @@ stages:
 # When Cargo.toml version is bumped and merged to main,
 # automatically create a v{version} tag to trigger the release pipeline.
 # Works for all version types: stable (0.4.0), dev (0.4.0-dev.0), rc (0.4.0-rc.1).
+#
+# If the version tag already exists (no bump), auto-creates a dev tag
+# (v{version}-dev.N) so every merge to main produces a testable build.
 
 auto-tag:version:
   extends: [.linux-runner-nocache, .main-only]
@@ -86,14 +89,6 @@ auto-tag:version:
       echo "Cargo.toml version: ${VERSION}"
       echo "Expected tag: ${TAG}"
 
-      # Check if tag already exists
-      if git ls-remote --tags origin "refs/tags/${TAG}" | grep -q "${TAG}"; then
-        echo "✓ Tag ${TAG} already exists — nothing to do"
-        exit 0
-      fi
-
-      echo "Tag ${TAG} does not exist — creating it..."
-
       git config user.name "vauchi-gitlab-runner"
       git config user.email "noreply@vauchi.app"
 
@@ -102,6 +97,33 @@ auto-tag:version:
       # tag push must trigger the release pipeline (build/package/publish stages).
       # PROJECT_ACCESS_TOKEN is set at group level in Settings > CI/CD > Variables.
       git remote set-url origin "https://vauchi-gitlab-runner:${PROJECT_ACCESS_TOKEN}@gitlab.com/${CI_PROJECT_PATH}.git"
+
+      # Check if tag already exists
+      if git ls-remote --tags origin "refs/tags/${TAG}" | grep -q "${TAG}"; then
+        echo "Tag ${TAG} already exists — creating dev tag instead"
+
+        # Strip any pre-release suffix to get the base version for dev tags
+        BASE_VERSION=$(echo "${VERSION}" | sed 's/-.*//')
+
+        # Find highest existing dev tag and increment
+        LAST_DEV=$(git ls-remote --tags origin "refs/tags/v${BASE_VERSION}-dev.*" \
+          | sed 's|.*/||' | sort -V | tail -1 || true)
+        if [ -n "${LAST_DEV}" ]; then
+          N=$(echo "${LAST_DEV}" | grep -oE '[0-9]+$')
+          N=$((N + 1))
+        else
+          N=1
+        fi
+        DEV_TAG="v${BASE_VERSION}-dev.${N}"
+
+        echo "Creating dev tag: ${DEV_TAG}"
+        git tag -a "${DEV_TAG}" -m "Dev build ${DEV_TAG}"
+        git push origin "${DEV_TAG}"
+        echo "✓ Created and pushed dev tag ${DEV_TAG}"
+        exit 0
+      fi
+
+      echo "Tag ${TAG} does not exist — creating it..."
 
       git tag -a "${TAG}" -m "Release ${TAG}"
       git push origin "${TAG}"
@@ -169,6 +191,36 @@ rc:security:audit:
 # ============================================================
 # Cheapest checks run first. Test + security jobs wait for these
 # to pass before starting (PI-13 fail-fast DAG).
+
+# Informational: warn when merging without a version bump.
+# Auto-tag will create a dev tag in that case (see auto-tag:version).
+lint:version-check:
+  extends: [.linux-runner-nocache, .timeout-quick]
+  stage: lint
+  needs: []
+  allow_failure: true
+  script:
+    - |
+      VERSION=$(grep -A5 '^\[workspace\.package\]' Cargo.toml | grep '^version' | sed 's/.*"\(.*\)"/\1/')
+      TAG="v${VERSION}"
+      echo "Cargo.toml version: ${VERSION}"
+
+      if git ls-remote --tags origin "refs/tags/${TAG}" | grep -q "${TAG}"; then
+        echo ""
+        echo "⚠ No version bump — tag ${TAG} already exists"
+        echo "  On merge, auto-tag will create a dev tag (v${VERSION%-*}-dev.N)"
+        echo "  To create a release tag, bump the version in Cargo.toml"
+      else
+        echo "✓ New version ${VERSION} — tag ${TAG} will be created on merge"
+      fi
+  rules:
+    - if: $CI_MERGE_REQUEST_IID
+      changes:
+        compare_to: refs/heads/$CI_DEFAULT_BRANCH
+        paths:
+          - "**/*.rs"
+          - "**/Cargo.toml"
+          - "**/Cargo.lock"
 
 lint:format:
   extends: [.linux-runner-nocache, .lint-format, .validation-rust, .timeout-quick]

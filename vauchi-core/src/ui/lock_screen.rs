@@ -8,7 +8,7 @@ use crate::ui::*;
 use zeroize::Zeroize;
 
 /// Lock screen engine — prompts for a password and tracks failed attempts.
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct LockScreenEngine {
     entered_pin: String,
     pin_length: usize,

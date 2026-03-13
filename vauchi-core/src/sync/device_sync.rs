@@ -10,7 +10,7 @@
 use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
-use zeroize::Zeroize;
+use zeroize::{Zeroize, ZeroizeOnDrop};
 
 use crate::contact::Contact;
 use crate::contact_card::ContactCard;
@@ -19,7 +19,7 @@ use crate::crypto::SymmetricKey;
 /// Serializable contact data for device sync.
 ///
 /// Contains all information needed to reconstruct a contact on a new device.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Zeroize, ZeroizeOnDrop)]
 pub struct ContactSyncData {
     /// Contact's unique ID (public key fingerprint).
     pub id: String,
@@ -42,12 +42,6 @@ pub struct ContactSyncData {
     /// Whether this contact is trusted for recovery.
     #[serde(default)]
     pub recovery_trusted: bool,
-}
-
-impl Drop for ContactSyncData {
-    fn drop(&mut self) {
-        self.shared_key.zeroize();
-    }
 }
 
 impl ContactSyncData {

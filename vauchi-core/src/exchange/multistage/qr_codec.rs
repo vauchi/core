@@ -106,22 +106,21 @@ fn decode_fixed<const N: usize>(encoded: &str) -> Result<[u8; N], QrCodecError> 
 }
 
 /// Take `len` chars from `s` at `pos`, advance `pos`.
+///
+/// Uses `str::get()` instead of direct indexing to avoid panic if the
+/// slice boundary falls inside a multi-byte UTF-8 codepoint.
 fn take<'a>(s: &'a str, pos: &mut usize, len: usize) -> Result<&'a str, QrCodecError> {
     if *pos + len > s.len() {
         return Err(QrCodecError::TooShort);
     }
-    let slice = &s[*pos..*pos + len];
+    let slice = s.get(*pos..*pos + len).ok_or(QrCodecError::TooShort)?;
     *pos += len;
     Ok(slice)
 }
 
 /// Take remaining chars from `pos` to end.
 fn take_rest(s: &str, pos: usize) -> &str {
-    if pos >= s.len() {
-        ""
-    } else {
-        &s[pos..]
-    }
+    s.get(pos..).unwrap_or("")
 }
 
 // ── Formatting ──────────────────────────────────────────────────────────
@@ -129,6 +128,11 @@ fn take_rest(s: &str, pos: usize) -> &str {
 /// Format an INIT stage QR string with optional relay metadata.
 ///
 /// Layout: `INIT<sid:24><pk:48><eph:48><ch:48><name_len:2><name><flags:3>[<url_len:3><url>][<pubkey:48>]`
+///
+/// # Panics
+///
+/// Panics if `display_name` exceeds 99 bytes (2-digit length field)
+/// or `relay_url` exceeds 999 bytes (3-digit length field).
 pub fn format_init_qr_with_relay(
     session_id: &[u8; 16],
     pubkey: &[u8; 32],
@@ -138,6 +142,17 @@ pub fn format_init_qr_with_relay(
     relay_url: Option<&str>,
     relay_noise_pubkey: Option<&[u8; 32]>,
 ) -> String {
+    assert!(
+        display_name.len() <= 99,
+        "display_name exceeds 99-byte limit for 2-digit length field"
+    );
+    if let Some(url) = relay_url {
+        assert!(
+            url.len() <= 999,
+            "relay_url exceeds 999-byte limit for 3-digit length field"
+        );
+    }
+
     let mut flags: u8 = 0;
     if relay_url.is_some() {
         flags |= FLAG_HAS_RELAY_URL;

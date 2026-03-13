@@ -97,10 +97,7 @@ pub fn verify_hint_signature(
             .as_bytes()
             .ct_eq(expected_relay_key.as_bytes()),
     ) {
-        return Err(format!(
-            "relay key mismatch: expected {}, got {}",
-            expected_relay_key, relay_key_hex
-        ));
+        return Err("relay key mismatch".to_string());
     }
 
     let pk_bytes =
@@ -342,7 +339,7 @@ mod tests {
         };
         let result = verify_hint_signature(&hints, &"cc".repeat(32));
         assert!(result.is_err());
-        assert!(result.unwrap_err().contains("relay key mismatch"));
+        assert_eq!(result.unwrap_err(), "relay key mismatch");
     }
 
     #[test]

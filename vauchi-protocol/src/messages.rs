@@ -304,7 +304,16 @@ pub fn decode_message(data: &[u8]) -> Result<MessageEnvelope, String> {
     }
 
     let json = &data[FRAME_HEADER_SIZE..];
-    serde_json::from_slice(json).map_err(|e| e.to_string())
+    let envelope: MessageEnvelope = serde_json::from_slice(json).map_err(|e| e.to_string())?;
+
+    if envelope.version != PROTOCOL_VERSION {
+        return Err(format!(
+            "Unsupported protocol version: {} (expected {})",
+            envelope.version, PROTOCOL_VERSION
+        ));
+    }
+
+    Ok(envelope)
 }
 
 /// Encodes a message to binary data (with length prefix).
@@ -395,6 +404,62 @@ mod tests {
         let result = decode_message(&[0, 1, 2]);
         assert!(result.is_err());
         assert_eq!(result.unwrap_err(), "Frame too short");
+    }
+
+    #[test]
+    fn test_decode_rejects_unsupported_protocol_version() {
+        let envelope = MessageEnvelope {
+            version: PROTOCOL_VERSION + 1,
+            message_id: "test-bad-version".to_string(),
+            timestamp: 1234567890,
+            payload: MessagePayload::Acknowledgment(Acknowledgment {
+                message_id: "orig".to_string(),
+                status: AckStatus::Stored,
+            }),
+        };
+        let encoded = encode_message(&envelope).unwrap();
+        let result = decode_message(&encoded);
+        assert!(
+            result.is_err(),
+            "Should reject unsupported protocol version"
+        );
+        let err = result.unwrap_err();
+        assert!(
+            err.contains("Unsupported protocol version"),
+            "Error should mention version: {err}"
+        );
+    }
+
+    #[test]
+    fn test_decode_rejects_version_zero() {
+        let envelope = MessageEnvelope {
+            version: 0,
+            message_id: "test-zero-version".to_string(),
+            timestamp: 1234567890,
+            payload: MessagePayload::Acknowledgment(Acknowledgment {
+                message_id: "orig".to_string(),
+                status: AckStatus::Stored,
+            }),
+        };
+        let encoded = encode_message(&envelope).unwrap();
+        let result = decode_message(&encoded);
+        assert!(result.is_err(), "Should reject version 0");
+    }
+
+    #[test]
+    fn test_decode_rejects_version_255() {
+        let envelope = MessageEnvelope {
+            version: 255,
+            message_id: "test-max-version".to_string(),
+            timestamp: 1234567890,
+            payload: MessagePayload::Acknowledgment(Acknowledgment {
+                message_id: "orig".to_string(),
+                status: AckStatus::Stored,
+            }),
+        };
+        let encoded = encode_message(&envelope).unwrap();
+        let result = decode_message(&encoded);
+        assert!(result.is_err(), "Should reject version 255");
     }
 
     #[test]

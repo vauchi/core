@@ -261,7 +261,16 @@ pub fn decode_simple_message(data: &[u8]) -> Result<SimpleEnvelope, String> {
     }
 
     let json = &data[FRAME_HEADER_SIZE..];
-    serde_json::from_slice(json).map_err(|e| e.to_string())
+    let envelope: SimpleEnvelope = serde_json::from_slice(json).map_err(|e| e.to_string())?;
+
+    if envelope.version != SIMPLE_PROTOCOL_VERSION {
+        return Err(format!(
+            "Unsupported protocol version: {} (expected {})",
+            envelope.version, SIMPLE_PROTOCOL_VERSION
+        ));
+    }
+
+    Ok(envelope)
 }
 
 /// Device-to-device sync message for synchronizing data between devices of the same identity.

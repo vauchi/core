@@ -66,6 +66,50 @@ fn test_simple_ack() {
     }
 }
 
+// @scenario: security:Protocol rejects unsupported versions
+#[test]
+fn test_decode_rejects_unsupported_simple_protocol_version() {
+    let mut envelope = create_simple_envelope(SimplePayload::Handshake(SimpleHandshake {
+        client_id: "test".to_string(),
+        device_id: None,
+        identity_public_key: None,
+        nonce: None,
+        signature: None,
+        timestamp: None,
+    }));
+    envelope.version = SIMPLE_PROTOCOL_VERSION + 1;
+
+    let encoded = encode_simple_message(&envelope).unwrap();
+    let result = decode_simple_message(&encoded);
+    assert!(
+        result.is_err(),
+        "Should reject unsupported simple protocol version"
+    );
+    let err = result.unwrap_err();
+    assert!(
+        err.contains("Unsupported protocol version"),
+        "Error should mention version: {err}"
+    );
+}
+
+// @scenario: security:Protocol rejects version zero
+#[test]
+fn test_decode_rejects_simple_version_zero() {
+    let mut envelope = create_simple_envelope(SimplePayload::Handshake(SimpleHandshake {
+        client_id: "test".to_string(),
+        device_id: None,
+        identity_public_key: None,
+        nonce: None,
+        signature: None,
+        timestamp: None,
+    }));
+    envelope.version = 0;
+
+    let encoded = encode_simple_message(&envelope).unwrap();
+    let result = decode_simple_message(&encoded);
+    assert!(result.is_err(), "Should reject version 0");
+}
+
 // @scenario: message_delivery:Relay provides storage confirmation
 #[test]
 fn test_encrypted_update() {

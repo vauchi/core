@@ -55,7 +55,8 @@ fn v3_roundtrip_with_relay_url_and_noise_pubkey() {
 }
 
 #[test]
-fn v3_roundtrip_with_relay_url_only() {
+fn v3_relay_url_without_noise_pubkey_rejected() {
+    // TOFU fail-closed: relay URL without Noise pubkey allows MITM
     let identity = Identity::create("Carol");
     let ephemeral = X3DHKeyPair::generate();
 
@@ -67,11 +68,11 @@ fn v3_roundtrip_with_relay_url_only() {
     );
 
     let data = qr.to_data_string();
-    let parsed = ExchangeQR::from_data_string(&data).unwrap();
-
-    assert_eq!(parsed.relay_url().unwrap(), "wss://relay.example.com");
-    assert!(parsed.relay_noise_pubkey().is_none());
-    assert!(parsed.verify_signature());
+    let result = ExchangeQR::from_data_string(&data);
+    assert!(
+        result.is_err(),
+        "relay URL without Noise pubkey must be rejected"
+    );
 }
 
 #[test]
@@ -181,12 +182,19 @@ fn v3_roundtrip_long_relay_url() {
     let ephemeral = X3DHKeyPair::generate();
     let long_url = format!("wss://{}.example.com", "a".repeat(200));
 
-    let qr = ExchangeQR::generate_with_relay(&identity, &ephemeral, Some(long_url.clone()), None);
+    // Must include Noise pubkey with relay URL (TOFU fail-closed)
+    let qr = ExchangeQR::generate_with_relay(
+        &identity,
+        &ephemeral,
+        Some(long_url.clone()),
+        Some([0xBBu8; 32]),
+    );
 
     let data = qr.to_data_string();
     let parsed = ExchangeQR::from_data_string(&data).unwrap();
 
     assert_eq!(parsed.relay_url().unwrap(), long_url);
+    assert_eq!(*parsed.relay_noise_pubkey().unwrap(), [0xBBu8; 32]);
     assert!(parsed.verify_signature());
 }
 

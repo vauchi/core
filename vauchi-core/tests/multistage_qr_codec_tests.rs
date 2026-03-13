@@ -336,3 +336,27 @@ fn test_init_qr_with_only_noise_pubkey() {
         _ => panic!("expected Init"),
     }
 }
+
+#[test]
+fn test_relay_url_without_noise_pubkey_rejected_tofu() {
+    // TOFU fail-closed: relay URL present but Noise pubkey missing → reject
+    let pubkey = [1u8; 32];
+    let ephemeral = [2u8; 32];
+    let commitment = [3u8; 32];
+    let session_id = [4u8; 16];
+
+    let qr = format_init_qr_with_relay(
+        &session_id,
+        &pubkey,
+        &ephemeral,
+        &commitment,
+        "Test",
+        Some("wss://relay.example.com"),
+        None,
+    );
+    let result = parse_qr(&qr);
+    assert!(
+        result.is_err(),
+        "relay URL without Noise pubkey must be rejected (TOFU fail-closed)"
+    );
+}

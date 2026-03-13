@@ -248,15 +248,18 @@ UniFFI bindings for Vauchi iOS apps.
 MIT License - see https://gitlab.com/vauchi/core
 EOF
 
-# Create zip archive
+# Create zip archive (-y preserves macOS framework symlinks)
 ZIP_PATH="$DIST_DIR/VauchiPlatform-$VERSION.zip"
 cd "$BUILD_DIR"
-zip -r "$ZIP_PATH" "VauchiPlatform-$VERSION"
+zip -ry "$ZIP_PATH" "VauchiPlatform-$VERSION"
 
 # Also create framework-only zip for SPM binary target
+# -y preserves symlinks (macOS versioned framework bundles use symlinks
+# like Versions/Current → A; without -y, zip follows them and stores
+# duplicate files, which Xcode can't resolve on extraction)
 XCFRAMEWORK_ZIP="$DIST_DIR/VauchiPlatformFFI.xcframework.zip"
 cd "$BUILD_DIR"
-zip -r "$XCFRAMEWORK_ZIP" "VauchiPlatformFFI.xcframework"
+zip -ry "$XCFRAMEWORK_ZIP" "VauchiPlatformFFI.xcframework"
 
 # Calculate checksums
 echo -e "${YELLOW}Calculating checksums...${NC}"

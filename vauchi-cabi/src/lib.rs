@@ -180,7 +180,7 @@ pub struct VauchiApp {
     engine: Mutex<AppEngine<MockTransport>>,
 }
 
-/// Create a new AppEngine with in-memory storage.
+/// Create a new AppEngine with in-memory storage and default relay.
 ///
 /// Returns null on initialization failure.
 ///
@@ -188,12 +188,30 @@ pub struct VauchiApp {
 /// No special requirements.
 #[no_mangle]
 pub unsafe extern "C" fn vauchi_app_create() -> *mut VauchiApp {
+    vauchi_app_create_with_relay(std::ptr::null())
+}
+
+/// Create a new AppEngine with a custom relay URL.
+///
+/// If `relay_url` is null, uses the default (`wss://relay.vauchi.app`).
+/// The caller retains ownership of the `relay_url` string.
+///
+/// Returns null on initialization failure.
+///
+/// # Safety
+/// `relay_url` must be a valid null-terminated C string, or null.
+#[no_mangle]
+pub unsafe extern "C" fn vauchi_app_create_with_relay(relay_url: *const c_char) -> *mut VauchiApp {
     let vauchi = match Vauchi::<MockTransport>::in_memory() {
         Ok(v) => v,
         Err(_) => return std::ptr::null_mut(),
     };
+    let mut engine = AppEngine::new(vauchi);
+    if let Some(url) = from_c_str(relay_url) {
+        engine.vauchi_mut().config_mut().relay.server_url = url;
+    }
     Box::into_raw(Box::new(VauchiApp {
-        engine: Mutex::new(AppEngine::new(vauchi)),
+        engine: Mutex::new(engine),
     }))
 }
 

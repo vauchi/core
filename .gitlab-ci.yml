@@ -50,6 +50,7 @@ include:
       - '/ci-templates/mutation.yml'
       - '/ci-templates/benchmark.yml'
       - '/ci-templates/perf.yml'
+      - '/ci-templates/badges.yml'
 
 stages:
   - auto-tag
@@ -61,6 +62,7 @@ stages:
   - package
   - publish
   - trigger
+  - deploy
 
 
 # ============================================================
@@ -985,3 +987,10 @@ cleanup:runner:
     - if: $CI_PIPELINE_SOURCE == "schedule" && $CLEANUP_ENABLED == "true"
     - when: manual
       allow_failure: true
+
+# ============================================================
+# Deploy Stage — Badge Pages
+# ============================================================
+
+pages:
+  extends: .badges-pages

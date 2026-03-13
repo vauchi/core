@@ -420,8 +420,11 @@ security:deny:
 
 # Supply chain verification (cargo-vet)
 # Inherits lint stage + needs:[] from shared template — starts immediately
+# Override script to use --locked (prevents generate-lockfile from resolving unvetted versions)
 security:vet:
   extends: [.linux-runner-readonly, .security-vet-job]
+  script:
+    - cargo vet --locked
 
 # Refine semgrep-sast from security.yml: gate on lint, run only on Rust changes
 semgrep-sast:

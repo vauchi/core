@@ -1213,8 +1213,6 @@ pub enum MobileConsentType {
     DataProcessing,
     /// Consent for sharing contact information.
     ContactSharing,
-    /// Consent for anonymous usage analytics.
-    Analytics,
     /// Consent to participate in recovery vouching.
     RecoveryVouching,
 }
@@ -1224,7 +1222,6 @@ impl From<MobileConsentType> for vauchi_core::api::ConsentType {
         match ct {
             MobileConsentType::DataProcessing => vauchi_core::api::ConsentType::DataProcessing,
             MobileConsentType::ContactSharing => vauchi_core::api::ConsentType::ContactSharing,
-            MobileConsentType::Analytics => vauchi_core::api::ConsentType::Analytics,
             MobileConsentType::RecoveryVouching => vauchi_core::api::ConsentType::RecoveryVouching,
         }
     }
@@ -1235,7 +1232,6 @@ impl From<&vauchi_core::api::ConsentType> for MobileConsentType {
         match ct {
             vauchi_core::api::ConsentType::DataProcessing => MobileConsentType::DataProcessing,
             vauchi_core::api::ConsentType::ContactSharing => MobileConsentType::ContactSharing,
-            vauchi_core::api::ConsentType::Analytics => MobileConsentType::Analytics,
             vauchi_core::api::ConsentType::RecoveryVouching => MobileConsentType::RecoveryVouching,
         }
     }

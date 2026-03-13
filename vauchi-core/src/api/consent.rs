@@ -15,8 +15,6 @@ pub enum ConsentType {
     DataProcessing,
     /// Consent for sharing contact information with exchanged contacts.
     ContactSharing,
-    /// Consent for anonymous usage analytics.
-    Analytics,
     /// Consent to participate in recovery vouching.
     RecoveryVouching,
 }
@@ -26,7 +24,6 @@ impl ConsentType {
         match self {
             ConsentType::DataProcessing => "data_processing",
             ConsentType::ContactSharing => "contact_sharing",
-            ConsentType::Analytics => "analytics",
             ConsentType::RecoveryVouching => "recovery_vouching",
         }
     }
@@ -36,7 +33,6 @@ impl ConsentType {
         match s {
             "data_processing" => Some(ConsentType::DataProcessing),
             "contact_sharing" => Some(ConsentType::ContactSharing),
-            "analytics" => Some(ConsentType::Analytics),
             "recovery_vouching" => Some(ConsentType::RecoveryVouching),
             _ => None,
         }

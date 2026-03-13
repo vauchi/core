@@ -515,6 +515,63 @@ mod tests {
         }
     }
 
+    // CC-14: Adversarial version values — ensure decoder rejects wrong versions
+    #[test]
+    fn test_decode_rejects_wrong_version() {
+        let mut envelope =
+            create_simple_envelope(SimplePayload::Acknowledgment(SimpleAcknowledgment {
+                message_id: "test".to_string(),
+                status: SimpleAckStatus::Stored,
+            }));
+        envelope.version = SIMPLE_PROTOCOL_VERSION + 1;
+        let encoded = encode_simple_message(&envelope).unwrap();
+        let result = decode_simple_message(&encoded);
+        assert!(result.is_err());
+        assert!(
+            result.unwrap_err().contains("Unsupported protocol version"),
+            "should mention unsupported version"
+        );
+    }
+
+    #[test]
+    fn test_decode_rejects_version_zero() {
+        let mut envelope =
+            create_simple_envelope(SimplePayload::Acknowledgment(SimpleAcknowledgment {
+                message_id: "test".to_string(),
+                status: SimpleAckStatus::Stored,
+            }));
+        envelope.version = 0;
+        let encoded = encode_simple_message(&envelope).unwrap();
+        let result = decode_simple_message(&encoded);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_decode_rejects_version_255() {
+        let mut envelope =
+            create_simple_envelope(SimplePayload::Acknowledgment(SimpleAcknowledgment {
+                message_id: "test".to_string(),
+                status: SimpleAckStatus::Stored,
+            }));
+        envelope.version = 255;
+        let encoded = encode_simple_message(&envelope).unwrap();
+        let result = decode_simple_message(&encoded);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_decode_accepts_valid_version() {
+        let envelope =
+            create_simple_envelope(SimplePayload::Acknowledgment(SimpleAcknowledgment {
+                message_id: "test".to_string(),
+                status: SimpleAckStatus::Stored,
+            }));
+        let encoded = encode_simple_message(&envelope).unwrap();
+        let result = decode_simple_message(&encoded);
+        assert!(result.is_ok(), "valid version should be accepted");
+        assert_eq!(result.unwrap().version, SIMPLE_PROTOCOL_VERSION);
+    }
+
     #[test]
     fn test_validation_revocation_payload_roundtrip() {
         let payload = SimplePayload::ValidationRevocation(SimpleValidationRevocation {

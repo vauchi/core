@@ -47,6 +47,12 @@ lto = "thin"          # Faster than full LTO, still good optimization
 codegen-units = 16    # More parallelism during compilation
 incremental = false   # CI builds are fresh, no benefit from incremental
 
+# Test profile: backtraces work, but skip full debug info and split .dwo files.
+# Reduces test binary size ~60% and eliminates 278K .dwo files (~7.5 GB).
+[profile.test]
+debug = "line-tables-only"
+split-debuginfo = "off"
+
 # Mutation testing profile: fast incremental builds, no debug info needed
 [profile.mutants]
 inherits = "test"

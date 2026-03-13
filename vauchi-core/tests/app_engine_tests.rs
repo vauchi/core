@@ -4,7 +4,7 @@
 
 use vauchi_core::api::{Vauchi, VauchiConfig};
 use vauchi_core::contact::Contact;
-use vauchi_core::contact_card::ContactCard;
+use vauchi_core::contact_card::{ContactCard, ContactField, FieldType};
 use vauchi_core::crypto::SymmetricKey;
 use vauchi_core::network::MockTransport;
 use vauchi_core::ui::{
@@ -2087,4 +2087,88 @@ fn default_screen_is_my_info_without_identity() {
     let engine = AppEngine::new(vauchi);
     // Without identity, default is still MyInfo (onboarding overrides in new())
     assert_eq!(engine.default_screen(), AppScreen::MyInfo);
+}
+
+#[test]
+fn entry_detail_delete_returns_show_toast_with_undo() {
+    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    // Add a field to delete
+    let field = ContactField::new(FieldType::Phone, "Mobile", "+1234567890");
+    let field_id = field.id().to_string();
+    if let Ok(Some(mut card)) = vauchi.own_card() {
+        card.add_field(field).unwrap();
+        vauchi.update_own_card(&card).unwrap();
+    }
+    let mut engine = AppEngine::new(vauchi);
+    engine.navigate_to(AppScreen::MyInfoEntryDetail {
+        field_id: field_id.clone(),
+    });
+
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "delete".into(),
+    });
+    match result {
+        ActionResult::ShowToast {
+            message,
+            undo_action_id,
+        } => {
+            assert!(message.contains("deleted"), "toast should mention deletion");
+            assert!(undo_action_id.is_some(), "should have undo action_id");
+            let undo_id = undo_action_id.unwrap();
+            assert!(
+                undo_id.contains(&field_id),
+                "undo_id should reference field"
+            );
+        }
+        other => panic!("Expected ShowToast, got {:?}", other),
+    }
+    // Should have navigated back to MyInfo
+    assert_eq!(engine.current_app_screen(), &AppScreen::MyInfo);
+}
+
+#[test]
+fn entry_detail_delete_undo_restores_field() {
+    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    let field = ContactField::new(FieldType::Phone, "Mobile", "+1234567890");
+    let field_id = field.id().to_string();
+    if let Ok(Some(mut card)) = vauchi.own_card() {
+        card.add_field(field).unwrap();
+        vauchi.update_own_card(&card).unwrap();
+    }
+    let mut engine = AppEngine::new(vauchi);
+    engine.navigate_to(AppScreen::MyInfoEntryDetail {
+        field_id: field_id.clone(),
+    });
+
+    // Delete the field
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "delete".into(),
+    });
+    let undo_id = match result {
+        ActionResult::ShowToast { undo_action_id, .. } => undo_action_id.unwrap(),
+        other => panic!("Expected ShowToast, got {:?}", other),
+    };
+
+    // Verify field is gone
+    let card = engine.vauchi().own_card().unwrap().unwrap();
+    assert!(
+        card.fields().iter().all(|f| f.id() != field_id),
+        "field should be deleted"
+    );
+
+    // Undo
+    let result = engine.handle_action(UserAction::UndoPressed { action_id: undo_id });
+    assert!(
+        matches!(result, ActionResult::UpdateScreen(_)),
+        "undo should return UpdateScreen"
+    );
+
+    // Verify field is restored
+    let card = engine.vauchi().own_card().unwrap().unwrap();
+    assert!(
+        card.fields().iter().any(|f| f.id() == field_id),
+        "field should be restored after undo"
+    );
 }

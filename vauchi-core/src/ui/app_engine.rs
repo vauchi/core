@@ -107,6 +107,8 @@ pub struct AppEngine<T: Transport> {
     pending_display_name: Option<String>,
     /// Navigation history stack for back-button support.
     nav_history: Vec<AppScreen>,
+    /// Field pending undo after delete from MyInfoEntryDetail.
+    pending_field_undo: Option<(String, ContactField)>,
 }
 
 impl<T: Transport> AppEngine<T> {
@@ -136,6 +138,7 @@ impl<T: Transport> AppEngine<T> {
             engine_cache: HashMap::new(),
             pending_display_name: None,
             nav_history: Vec::new(),
+            pending_field_undo: None,
         }
     }
 
@@ -1220,20 +1223,42 @@ impl<T: Transport> WorkflowEngine for AppEngine<T> {
                     }
                 }
                 UserAction::ActionPressed { action_id } if action_id == "delete" => {
-                    // Delete the field from own card
                     if let Ok(Some(mut card)) = self.vauchi.own_card() {
-                        let _ = card.remove_field(&field_id);
-                        let _ = self.vauchi.update_own_card(&card);
+                        // Find and clone the field before removing
+                        if let Some(field) =
+                            card.fields().iter().find(|f| f.id() == field_id).cloned()
+                        {
+                            let _ = card.remove_field(&field_id);
+                            let _ = self.vauchi.update_own_card(&card);
+                            self.pending_field_undo = Some((field_id.clone(), field));
+                        }
                     }
                     self.engine_cache.remove(&AppScreen::MyInfo);
-                    let screen = self.navigate_back();
-                    return ActionResult::NavigateTo(screen);
+                    self.navigate_back();
+                    return ActionResult::ShowToast {
+                        message: "Field deleted".into(),
+                        undo_action_id: Some(format!("undo_delete_field:{field_id}")),
+                    };
                 }
                 UserAction::ActionPressed { action_id } if action_id == "back" => {
                     let screen = self.navigate_back();
                     return ActionResult::NavigateTo(screen);
                 }
                 _ => {}
+            }
+        }
+
+        // Handle undo for field delete
+        if let UserAction::UndoPressed { ref action_id } = action {
+            if action_id.starts_with("undo_delete_field:") {
+                if let Some((_, field)) = self.pending_field_undo.take() {
+                    if let Ok(Some(mut card)) = self.vauchi.own_card() {
+                        let _ = card.add_field(field);
+                        let _ = self.vauchi.update_own_card(&card);
+                        self.engine_cache.remove(&AppScreen::MyInfo);
+                    }
+                }
+                return ActionResult::UpdateScreen(self.engine.current_screen());
             }
         }
 

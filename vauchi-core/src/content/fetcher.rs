@@ -128,11 +128,7 @@ impl ContentFetcher {
         let digest = hasher.finish();
         let computed_hex = hex::encode(digest.as_ref());
         if computed_hex != expected_hex {
-            return Err(super::integrity::IntegrityError::ChecksumMismatch {
-                expected: expected_hex.to_string(),
-                actual: computed_hex,
-            }
-            .into());
+            return Err(super::integrity::IntegrityError::ChecksumMismatch.into());
         }
 
         Ok(data)

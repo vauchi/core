@@ -51,18 +51,7 @@ fn test_verify_checksum_mismatch() {
     let result = verify_checksum(data, wrong_checksum);
     assert!(result.is_err());
 
-    if let Err(IntegrityError::ChecksumMismatch { expected, actual }) = result {
-        assert_eq!(
-            expected,
-            "0000000000000000000000000000000000000000000000000000000000000000"
-        );
-        assert_eq!(
-            actual,
-            "b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9"
-        );
-    } else {
-        panic!("Expected ChecksumMismatch error");
-    }
+    assert!(matches!(result, Err(IntegrityError::ChecksumMismatch)));
 }
 
 #[test]

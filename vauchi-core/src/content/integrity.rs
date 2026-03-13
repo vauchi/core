@@ -50,10 +50,7 @@ pub fn verify_checksum(data: &[u8], expected: &str) -> Result<(), IntegrityError
     if bool::from(actual_hex.as_bytes().ct_eq(expected_hex.as_bytes())) {
         Ok(())
     } else {
-        Err(IntegrityError::ChecksumMismatch {
-            expected: expected_hex.to_string(),
-            actual: actual_hex,
-        })
+        Err(IntegrityError::ChecksumMismatch)
     }
 }
 
@@ -146,13 +143,8 @@ pub enum IntegrityError {
     InvalidFormat,
 
     /// Computed checksum doesn't match expected checksum
-    #[error("Checksum mismatch: expected {expected}, got {actual}")]
-    ChecksumMismatch {
-        /// Expected checksum (hex string without prefix)
-        expected: String,
-        /// Actual computed checksum (hex string without prefix)
-        actual: String,
-    },
+    #[error("Checksum mismatch")]
+    ChecksumMismatch,
 
     /// Manifest has no signature field
     #[error("Manifest signature is missing")]

@@ -151,6 +151,8 @@ impl<T: Transport> AppEngine<T> {
     }
 
     pub fn navigate_to(&mut self, screen: AppScreen) -> ScreenModel {
+        // Clear stale undo data — field PII should not linger after user-initiated navigation
+        self.pending_field_undo = None;
         // Push the current screen to nav history before switching
         self.nav_history.push(self.screen.clone());
         self.navigate_to_internal(screen)
@@ -1171,11 +1173,19 @@ impl<T: Transport> AppEngine<T> {
     fn handle_undo(&mut self, action: &UserAction) -> Option<ActionResult> {
         if let UserAction::UndoPressed { ref action_id } = action {
             if action_id.starts_with("undo_delete_field:") {
-                if let Some((_, field)) = self.pending_field_undo.take() {
+                if let Some((field_id, field)) = self.pending_field_undo.take() {
+                    let mut restored = false;
                     if let Ok(Some(mut card)) = self.vauchi.own_card() {
-                        let _ = card.add_field(field);
-                        let _ = self.vauchi.update_own_card(&card);
-                        self.engine_cache.remove(&AppScreen::MyInfo);
+                        if card.add_field(field.clone()).is_ok()
+                            && self.vauchi.update_own_card(&card).is_ok()
+                        {
+                            restored = true;
+                            self.engine_cache.remove(&AppScreen::MyInfo);
+                        }
+                    }
+                    if !restored {
+                        // Restore to undo buffer so retry is possible
+                        self.pending_field_undo = Some((field_id, field));
                     }
                 }
                 return Some(ActionResult::UpdateScreen(self.engine.current_screen()));

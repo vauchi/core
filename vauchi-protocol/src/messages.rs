@@ -308,8 +308,8 @@ pub fn decode_message(data: &[u8]) -> Result<MessageEnvelope, String> {
 
     if envelope.version != PROTOCOL_VERSION {
         return Err(format!(
-            "Unsupported protocol version: {} (expected {})",
-            envelope.version, PROTOCOL_VERSION
+            "Unsupported protocol version: {}",
+            envelope.version
         ));
     }
 

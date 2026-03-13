@@ -265,8 +265,8 @@ pub fn decode_simple_message(data: &[u8]) -> Result<SimpleEnvelope, String> {
 
     if envelope.version != SIMPLE_PROTOCOL_VERSION {
         return Err(format!(
-            "Unsupported protocol version: {} (expected {})",
-            envelope.version, SIMPLE_PROTOCOL_VERSION
+            "Unsupported protocol version: {}",
+            envelope.version
         ));
     }
 

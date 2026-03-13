@@ -121,7 +121,7 @@ impl DuressPinEngine {
 
         if self.pending_disable {
             components.push(Component::InlineConfirm {
-                id: "disable_confirm".into(),
+                id: "disable".into(),
                 warning: "Disabling the duress PIN removes protection. Alert contacts will no longer be notified.".into(),
                 confirm_text: "Disable".into(),
                 cancel_text: "Cancel".into(),

@@ -109,7 +109,7 @@ impl GroupsEngine {
 
         if self.pending_delete {
             components.push(Component::InlineConfirm {
-                id: "delete_confirm".into(),
+                id: "delete_group".into(),
                 warning:
                     "This will permanently delete the selected group. Members will be unassigned."
                         .into(),

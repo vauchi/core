@@ -7,7 +7,7 @@
 //! Validates relay URLs to prevent SSRF, injection, and abuse from
 //! malicious contact exchange payloads.
 
-use std::net::IpAddr;
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
 use subtle::ConstantTimeEq;
 use thiserror::Error;
@@ -132,20 +132,43 @@ fn is_private_ip(ip: &IpAddr) -> bool {
                 || v4.is_private()     // 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16
                 || v4.is_link_local()  // 169.254.0.0/16
                 || v4.is_unspecified() // 0.0.0.0
-                || v4.is_broadcast() // 255.255.255.255
+                || v4.is_broadcast()   // 255.255.255.255
+                || v4.is_multicast()   // 224.0.0.0/4 (RFC 5771)
+                || is_cgn_ip(v4) // 100.64.0.0/10 (RFC 6598 Carrier-Grade NAT)
         }
         IpAddr::V6(v6) => {
             v6.is_loopback()           // ::1
                 || v6.is_unspecified() // ::
-                // IPv4-mapped private addresses
+                || v6.is_multicast()   // ff00::/8 (RFC 3513)
+                || is_ipv6_ula(v6)     // fc00::/7 (RFC 4193 Unique Local)
+                || is_ipv6_link_local(v6) // fe80::/10 (RFC 4291)
+                // IPv4-mapped private addresses (::ffff:x.x.x.x)
                 || v6.to_ipv4_mapped().is_some_and(|v4| {
                     v4.is_loopback()
                         || v4.is_private()
                         || v4.is_link_local()
                         || v4.is_unspecified()
+                        || v4.is_multicast()
+                        || is_cgn_ip(&v4)
                 })
         }
     }
+}
+
+/// Returns true if IPv4 address is in the Carrier-Grade NAT range (100.64.0.0/10, RFC 6598).
+fn is_cgn_ip(v4: &Ipv4Addr) -> bool {
+    let octets = v4.octets();
+    octets[0] == 100 && (64..=127).contains(&octets[1])
+}
+
+/// Returns true if IPv6 address is Unique Local (fc00::/7, RFC 4193).
+fn is_ipv6_ula(v6: &Ipv6Addr) -> bool {
+    (v6.segments()[0] & 0xfe00) == 0xfc00
+}
+
+/// Returns true if IPv6 address is link-local (fe80::/10, RFC 4291).
+fn is_ipv6_link_local(v6: &Ipv6Addr) -> bool {
+    (v6.segments()[0] & 0xffc0) == 0xfe80
 }
 
 /// Verifies a relay's Noise NK public key against an exchange-pinned value.
@@ -173,6 +196,7 @@ pub fn verify_relay_noise_pubkey(
     }
 }
 
+// INLINE_TEST_REQUIRED: tests access private is_private_ip, is_cgn_ip, is_ipv6_ula helpers
 #[cfg(test)]
 mod tests {
     use super::*;

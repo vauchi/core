@@ -190,3 +190,47 @@ fn missing_host_rejected() {
     let err = validate_relay_url("wss://").unwrap_err();
     assert!(matches!(err, RelayUrlError::InvalidFormat(_)));
 }
+
+// ── Extended SSRF prevention (IPv6 ULA, link-local, multicast; IPv4 CGN, multicast) ──
+
+#[test]
+fn ipv6_ula_rejected() {
+    let err = validate_relay_url("wss://[fd00::1]").unwrap_err();
+    assert!(matches!(err, RelayUrlError::PrivateHost));
+}
+
+#[test]
+fn ipv6_link_local_rejected() {
+    let err = validate_relay_url("wss://[fe80::1]").unwrap_err();
+    assert!(matches!(err, RelayUrlError::PrivateHost));
+}
+
+#[test]
+fn ipv6_multicast_rejected() {
+    let err = validate_relay_url("wss://[ff02::1]").unwrap_err();
+    assert!(matches!(err, RelayUrlError::PrivateHost));
+}
+
+#[test]
+fn ipv4_cgn_rejected() {
+    let err = validate_relay_url("wss://100.64.0.1").unwrap_err();
+    assert!(matches!(err, RelayUrlError::PrivateHost));
+}
+
+#[test]
+fn ipv4_cgn_upper_bound_rejected() {
+    let err = validate_relay_url("wss://100.127.255.254").unwrap_err();
+    assert!(matches!(err, RelayUrlError::PrivateHost));
+}
+
+#[test]
+fn ipv4_multicast_rejected() {
+    let err = validate_relay_url("wss://224.0.0.1").unwrap_err();
+    assert!(matches!(err, RelayUrlError::PrivateHost));
+}
+
+#[test]
+fn ipv4_broadcast_rejected() {
+    let err = validate_relay_url("wss://255.255.255.255").unwrap_err();
+    assert!(matches!(err, RelayUrlError::PrivateHost));
+}

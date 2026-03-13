@@ -174,15 +174,15 @@ fn contract_cli_consent_api() {
     let wb = setup();
 
     // grant_consent accepts ConsentType
-    wb.grant_consent(ConsentType::Analytics).unwrap();
+    wb.grant_consent(ConsentType::RecoveryVouching).unwrap();
 
     // check_consent returns bool
-    let granted: bool = wb.check_consent(&ConsentType::Analytics).unwrap();
+    let granted: bool = wb.check_consent(&ConsentType::RecoveryVouching).unwrap();
     assert!(granted);
 
     // revoke_consent accepts ConsentType
-    wb.revoke_consent(ConsentType::Analytics).unwrap();
-    let revoked = !wb.check_consent(&ConsentType::Analytics).unwrap();
+    wb.revoke_consent(ConsentType::RecoveryVouching).unwrap();
+    let revoked = !wb.check_consent(&ConsentType::RecoveryVouching).unwrap();
     assert!(revoked);
 
     // export_consent_log returns Vec<ConsentRecord>

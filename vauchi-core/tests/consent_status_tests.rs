@@ -46,7 +46,9 @@ fn test_get_consent_status_returns_granted_with_timestamp_after_grant() {
 fn test_get_consent_status_returns_not_granted_when_never_set() {
     let wb = create_test_vauchi();
 
-    let status = wb.get_consent_status(ConsentType::Analytics).unwrap();
+    let status = wb
+        .get_consent_status(ConsentType::RecoveryVouching)
+        .unwrap();
 
     assert!(
         !status.granted,
@@ -111,11 +113,13 @@ fn test_get_consent_status_returns_different_statuses_for_different_types() {
     let wb = create_test_vauchi();
 
     wb.grant_consent(ConsentType::DataProcessing).unwrap();
-    // Analytics left un-granted
+    // RecoveryVouching left un-granted
 
     let dp_status = wb.get_consent_status(ConsentType::DataProcessing).unwrap();
-    let analytics_status = wb.get_consent_status(ConsentType::Analytics).unwrap();
+    let rv_status = wb
+        .get_consent_status(ConsentType::RecoveryVouching)
+        .unwrap();
 
     assert!(dp_status.granted, "DataProcessing should be granted");
-    assert!(!analytics_status.granted, "Analytics should not be granted");
+    assert!(!rv_status.granted, "RecoveryVouching should not be granted");
 }

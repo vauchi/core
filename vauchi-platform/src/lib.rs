@@ -1384,20 +1384,28 @@ mod tests {
         wb.create_identity("Alice".to_string()).unwrap();
 
         // Initially not granted
-        let granted = wb.check_consent(MobileConsentType::Analytics).unwrap();
+        let granted = wb
+            .check_consent(MobileConsentType::RecoveryVouching)
+            .unwrap();
         assert!(!granted);
 
         // Grant consent
-        wb.grant_consent(MobileConsentType::Analytics).unwrap();
-        let granted = wb.check_consent(MobileConsentType::Analytics).unwrap();
+        wb.grant_consent(MobileConsentType::RecoveryVouching)
+            .unwrap();
+        let granted = wb
+            .check_consent(MobileConsentType::RecoveryVouching)
+            .unwrap();
         assert!(granted);
 
         // No sleep needed: consent query uses ORDER BY timestamp DESC, rowid DESC
         // so same-second inserts are correctly ordered by rowid (CC-06)
 
         // Revoke consent
-        wb.revoke_consent(MobileConsentType::Analytics).unwrap();
-        let granted = wb.check_consent(MobileConsentType::Analytics).unwrap();
+        wb.revoke_consent(MobileConsentType::RecoveryVouching)
+            .unwrap();
+        let granted = wb
+            .check_consent(MobileConsentType::RecoveryVouching)
+            .unwrap();
         assert!(!granted);
     }
 
@@ -1409,7 +1417,8 @@ mod tests {
 
         wb.grant_consent(MobileConsentType::DataProcessing).unwrap();
         wb.grant_consent(MobileConsentType::ContactSharing).unwrap();
-        wb.grant_consent(MobileConsentType::Analytics).unwrap();
+        wb.grant_consent(MobileConsentType::RecoveryVouching)
+            .unwrap();
 
         let records = wb.get_consent_records().unwrap();
         assert!(records.len() >= 3);
@@ -1422,21 +1431,29 @@ mod tests {
         wb.create_identity("Alice".to_string()).unwrap();
 
         // Before any consent action, status should be not granted with no timestamp
-        let status = wb.get_consent_status(MobileConsentType::Analytics).unwrap();
+        let status = wb
+            .get_consent_status(MobileConsentType::RecoveryVouching)
+            .unwrap();
         assert!(!status.granted);
         assert!(status.last_changed_at.is_none());
         assert!(status.policy_version.is_none());
 
         // After granting, status should be granted with a timestamp
-        wb.grant_consent(MobileConsentType::Analytics).unwrap();
-        let status = wb.get_consent_status(MobileConsentType::Analytics).unwrap();
+        wb.grant_consent(MobileConsentType::RecoveryVouching)
+            .unwrap();
+        let status = wb
+            .get_consent_status(MobileConsentType::RecoveryVouching)
+            .unwrap();
         assert!(status.granted);
         assert!(status.last_changed_at.is_some());
         assert!(status.last_changed_at.unwrap() > 0);
 
         // After revoking, status should be not granted but still have a timestamp
-        wb.revoke_consent(MobileConsentType::Analytics).unwrap();
-        let status = wb.get_consent_status(MobileConsentType::Analytics).unwrap();
+        wb.revoke_consent(MobileConsentType::RecoveryVouching)
+            .unwrap();
+        let status = wb
+            .get_consent_status(MobileConsentType::RecoveryVouching)
+            .unwrap();
         assert!(!status.granted);
         assert!(status.last_changed_at.is_some());
     }

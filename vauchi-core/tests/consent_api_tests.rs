@@ -27,14 +27,14 @@ fn test_consent_grant_and_check() {
     let wb = create_test_vauchi();
 
     // Not granted initially
-    let granted = wb.check_consent(&ConsentType::Analytics).unwrap();
+    let granted = wb.check_consent(&ConsentType::RecoveryVouching).unwrap();
     assert!(!granted, "Consent should not be granted initially");
 
     // Grant consent
-    wb.grant_consent(ConsentType::Analytics).unwrap();
+    wb.grant_consent(ConsentType::RecoveryVouching).unwrap();
 
     // Now granted
-    let granted = wb.check_consent(&ConsentType::Analytics).unwrap();
+    let granted = wb.check_consent(&ConsentType::RecoveryVouching).unwrap();
     assert!(granted, "Consent should be granted after grant_consent()");
 }
 
@@ -60,16 +60,16 @@ fn test_consent_revoke() {
 fn test_consent_multiple_types_independent() {
     let wb = create_test_vauchi();
 
-    wb.grant_consent(ConsentType::Analytics).unwrap();
+    wb.grant_consent(ConsentType::RecoveryVouching).unwrap();
     wb.grant_consent(ConsentType::DataProcessing).unwrap();
 
     // Revoking one doesn't affect the other
 
-    wb.revoke_consent(ConsentType::Analytics).unwrap();
+    wb.revoke_consent(ConsentType::RecoveryVouching).unwrap();
 
     assert!(
-        !wb.check_consent(&ConsentType::Analytics).unwrap(),
-        "Analytics should be revoked"
+        !wb.check_consent(&ConsentType::RecoveryVouching).unwrap(),
+        "RecoveryVouching should be revoked"
     );
     assert!(
         wb.check_consent(&ConsentType::DataProcessing).unwrap(),
@@ -87,24 +87,24 @@ fn test_consent_export_log() {
     assert!(log.is_empty(), "Consent log should be empty initially");
 
     // Grant and revoke some consents
-    wb.grant_consent(ConsentType::Analytics).unwrap();
+    wb.grant_consent(ConsentType::RecoveryVouching).unwrap();
     wb.grant_consent(ConsentType::ContactSharing).unwrap();
 
-    wb.revoke_consent(ConsentType::Analytics).unwrap();
+    wb.revoke_consent(ConsentType::RecoveryVouching).unwrap();
 
     // Log should have 3 entries
     let log = wb.export_consent_log().unwrap();
     assert_eq!(log.len(), 3, "Should have 3 consent log entries");
 
     // Verify all types are present
-    let analytics_entries: Vec<&ConsentRecord> = log
+    let vouching_entries: Vec<&ConsentRecord> = log
         .iter()
-        .filter(|r| r.consent_type == ConsentType::Analytics)
+        .filter(|r| r.consent_type == ConsentType::RecoveryVouching)
         .collect();
     assert_eq!(
-        analytics_entries.len(),
+        vouching_entries.len(),
         2,
-        "Should have 2 analytics entries (grant + revoke)"
+        "Should have 2 recovery vouching entries (grant + revoke)"
     );
 
     let sharing_entries: Vec<&ConsentRecord> = log

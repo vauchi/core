@@ -1,6 +1,8 @@
 <!-- SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me> -->
 <!-- SPDX-License-Identifier: GPL-3.0-or-later -->
 
+[![Pipeline](https://vauchi.gitlab.io/core/badges/pipeline.svg)](https://gitlab.com/vauchi/core/-/pipelines)
+[![Coverage](https://vauchi.gitlab.io/core/badges/coverage.svg)](https://gitlab.com/vauchi/core/-/pipelines)
 [![REUSE](https://api.reuse.software/badge/gitlab.com/vauchi/core)](https://api.reuse.software/info/gitlab.com/vauchi/core)
 
 > [!WARNING]

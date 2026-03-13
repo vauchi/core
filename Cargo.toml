@@ -46,6 +46,8 @@ inherits = "release"
 lto = "thin"          # Faster than full LTO, still good optimization
 codegen-units = 16    # More parallelism during compilation
 incremental = false   # CI builds are fresh, no benefit from incremental
+debug = "line-tables-only"  # Backtraces work, skip full DWARF (smaller binaries, faster linking)
+split-debuginfo = "off"     # No .dwo files on CI runners
 
 # Test profile: backtraces work, but skip full debug info and split .dwo files.
 # Reduces test binary size ~60% and eliminates 278K .dwo files (~7.5 GB).

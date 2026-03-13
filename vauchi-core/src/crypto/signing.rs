@@ -9,6 +9,7 @@
 
 use aws_lc_rs::rand::SystemRandom;
 use aws_lc_rs::signature::{Ed25519KeyPair, KeyPair as RingKeyPair};
+use subtle::ConstantTimeEq;
 use zeroize::Zeroize;
 
 /// Ed25519 signing keypair for identity and message signing.
@@ -79,10 +80,21 @@ impl SigningKeyPair {
 }
 
 /// Ed25519 public key for verification.
-#[derive(Clone, Debug, PartialEq, Eq)]
+///
+/// Uses constant-time comparison to prevent timing side-channels when
+/// comparing public keys (e.g., self-exchange detection, contact lookup).
+#[derive(Clone, Debug)]
 pub struct PublicKey {
     bytes: [u8; 32],
 }
+
+impl PartialEq for PublicKey {
+    fn eq(&self, other: &Self) -> bool {
+        bool::from(self.bytes.ct_eq(&other.bytes))
+    }
+}
+
+impl Eq for PublicKey {}
 
 impl PublicKey {
     /// Creates a public key from raw bytes.

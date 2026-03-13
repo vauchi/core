@@ -375,6 +375,9 @@ impl ExchangeQR {
                 .map_err(|_| ExchangeError::InvalidQRFormat)?;
             cursor += 32;
             Some(pubkey)
+        } else if relay_url.is_some() {
+            // Fail-closed: relay URL without Noise pubkey allows TOFU MITM
+            return Err(ExchangeError::InvalidQRFormat);
         } else {
             None
         };

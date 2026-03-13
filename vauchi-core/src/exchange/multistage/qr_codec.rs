@@ -37,6 +37,8 @@ pub enum QrCodecError {
     CrcMismatch { expected: u16, got: u16 },
     #[error("QR string too short")]
     TooShort,
+    #[error("relay URL present but Noise NK pubkey missing — TOFU not allowed")]
+    MissingRelayNoisePubkey,
 }
 
 /// Parsed stage QR payload.
@@ -266,6 +268,9 @@ fn parse_init(body: &str) -> Result<StageQr, QrCodecError> {
     let relay_noise_pubkey = if flags & FLAG_HAS_RELAY_NOISE_PUBKEY != 0 {
         let npk = take(body, &mut pos, F32_LEN)?;
         Some(decode_fixed(npk)?)
+    } else if relay_url.is_some() {
+        // Fail-closed: relay URL without Noise pubkey allows TOFU MITM
+        return Err(QrCodecError::MissingRelayNoisePubkey);
     } else {
         None
     };

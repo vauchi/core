@@ -30,11 +30,16 @@ pub struct GroupInfo {
 pub struct GroupsEngine {
     groups: Vec<GroupInfo>,
     mode: GroupsMode,
+    pending_delete: bool,
 }
 
 impl GroupsEngine {
     pub fn new(groups: Vec<GroupInfo>, mode: GroupsMode) -> Self {
-        Self { groups, mode }
+        Self {
+            groups,
+            mode,
+            pending_delete: false,
+        }
     }
 
     /// Returns the current mode.
@@ -102,6 +107,18 @@ impl GroupsEngine {
             items,
         });
 
+        if self.pending_delete {
+            components.push(Component::InlineConfirm {
+                id: "delete_confirm".into(),
+                warning:
+                    "This will permanently delete the selected group. Members will be unassigned."
+                        .into(),
+                confirm_text: "Delete Group".into(),
+                cancel_text: "Cancel".into(),
+                destructive: true,
+            });
+        }
+
         ScreenModel {
             screen_id: "groups_list".into(),
             title: "Groups".into(),
@@ -166,12 +183,22 @@ impl WorkflowEngine for GroupsEngine {
             },
             // Screen-level actions
             UserAction::ActionPressed { action_id } => match action_id.as_str() {
-                "new_group" | "rename_group" | "delete_group" | "merge_groups" => {
-                    ActionResult::ShowAlert {
-                        title: action_id.replace('_', " "),
-                        message: "This action will be handled by AppEngine.".into(),
-                    }
+                "delete_group" => {
+                    self.pending_delete = true;
+                    ActionResult::UpdateScreen(self.build_screen())
                 }
+                "confirm_delete_group" => {
+                    self.pending_delete = false;
+                    ActionResult::Complete
+                }
+                "cancel_delete_group" => {
+                    self.pending_delete = false;
+                    ActionResult::UpdateScreen(self.build_screen())
+                }
+                "new_group" | "rename_group" | "merge_groups" => ActionResult::ShowAlert {
+                    title: action_id.replace('_', " "),
+                    message: "This action will be handled by AppEngine.".into(),
+                },
                 _ => ActionResult::UpdateScreen(self.build_screen()),
             },
             _ => ActionResult::UpdateScreen(self.build_screen()),
@@ -380,5 +407,60 @@ mod tests {
             action_id: "new_group".into(),
         });
         assert!(matches!(result, ActionResult::ShowAlert { .. }));
+    }
+
+    #[test]
+    fn delete_group_shows_inline_confirm() {
+        let mut engine = GroupsEngine::new(sample_groups(), GroupsMode::Members);
+        let result = engine.handle_action(UserAction::ActionPressed {
+            action_id: "delete_group".into(),
+        });
+        let screen = match result {
+            ActionResult::UpdateScreen(s) => s,
+            other => panic!("Expected UpdateScreen, got {:?}", other),
+        };
+        let has_inline_confirm = screen
+            .components
+            .iter()
+            .any(|c| matches!(c, Component::InlineConfirm { destructive, .. } if *destructive));
+        assert!(
+            has_inline_confirm,
+            "delete_group should show a destructive InlineConfirm"
+        );
+    }
+
+    #[test]
+    fn confirm_delete_group_returns_complete() {
+        let mut engine = GroupsEngine::new(sample_groups(), GroupsMode::Members);
+        let _ = engine.handle_action(UserAction::ActionPressed {
+            action_id: "delete_group".into(),
+        });
+        let result = engine.handle_action(UserAction::ActionPressed {
+            action_id: "confirm_delete_group".into(),
+        });
+        assert!(
+            matches!(result, ActionResult::Complete),
+            "confirm should return Complete"
+        );
+    }
+
+    #[test]
+    fn cancel_delete_group_removes_inline_confirm() {
+        let mut engine = GroupsEngine::new(sample_groups(), GroupsMode::Members);
+        let _ = engine.handle_action(UserAction::ActionPressed {
+            action_id: "delete_group".into(),
+        });
+        let result = engine.handle_action(UserAction::ActionPressed {
+            action_id: "cancel_delete_group".into(),
+        });
+        let screen = match result {
+            ActionResult::UpdateScreen(s) => s,
+            other => panic!("Expected UpdateScreen, got {:?}", other),
+        };
+        let has_inline_confirm = screen
+            .components
+            .iter()
+            .any(|c| matches!(c, Component::InlineConfirm { .. }));
+        assert!(!has_inline_confirm, "cancel should remove InlineConfirm");
     }
 }

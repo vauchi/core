@@ -41,6 +41,12 @@ pub fn verify_checksum(data: &[u8], expected: &str) -> Result<(), IntegrityError
     let digest = context.finish();
     let actual_hex = hex::encode(digest.as_ref());
 
+    // SHA-256 hex is always 64 chars; reject malformed input before ct_eq
+    // (ct_eq on different-length slices short-circuits, leaking length)
+    if expected_hex.len() != 64 {
+        return Err(IntegrityError::InvalidFormat);
+    }
+
     if bool::from(actual_hex.as_bytes().ct_eq(expected_hex.as_bytes())) {
         Ok(())
     } else {

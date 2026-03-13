@@ -85,6 +85,12 @@ pub fn verify_hint_signature(
         .as_ref()
         .ok_or_else(|| "missing signature".to_string())?;
 
+    // Validate hex key lengths before constant-time comparison
+    // (ct_eq on different-length slices short-circuits, leaking length)
+    if relay_key_hex.len() != 64 || expected_relay_key.len() != 64 {
+        return Err("invalid key length: Ed25519 public key hex must be 64 chars".to_string());
+    }
+
     // Verify the signing key matches the expected relay
     if !bool::from(
         relay_key_hex

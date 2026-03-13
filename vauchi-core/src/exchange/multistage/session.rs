@@ -811,6 +811,12 @@ impl MultiStageSession {
         if let Some(ref mut key) = self.transport_key {
             key.zeroize();
         }
+        if let Some(ref mut key) = self.our_relay_noise_pubkey {
+            key.zeroize();
+        }
+        if let Some(ref mut key) = self.peer_relay_noise_pubkey {
+            key.zeroize();
+        }
         self.transport_key = None;
         self.ephemeral_secret = None;
         self.outbound_chunks.clear();
@@ -820,8 +826,6 @@ impl MultiStageSession {
 
 impl Drop for MultiStageSession {
     fn drop(&mut self) {
-        if let Some(ref mut key) = self.transport_key {
-            key.zeroize();
-        }
+        self.clear_sensitive();
     }
 }

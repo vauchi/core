@@ -1023,6 +1023,31 @@ fn navigate_back_from_duress_pin_returns_to_settings() {
 }
 
 #[test]
+fn settings_emergency_wipe_navigates_to_shred() {
+    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    let mut engine = AppEngine::new(vauchi);
+
+    // Navigate to Settings
+    engine.navigate_to(AppScreen::Settings);
+
+    // Select emergency_wipe from the danger group
+    let result = engine.handle_action(UserAction::ListItemSelected {
+        component_id: "danger".into(),
+        item_id: "emergency_wipe".into(),
+    });
+    match result {
+        ActionResult::NavigateTo(screen) => {
+            assert_eq!(
+                screen.screen_id, "shred_warning",
+                "emergency_wipe should navigate to EmergencyShred screen"
+            );
+        }
+        other => panic!("Expected NavigateTo shred_warning, got {:?}", other),
+    }
+}
+
+#[test]
 fn navigate_back_from_settings_returns_to_home() {
     let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();

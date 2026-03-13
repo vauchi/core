@@ -1124,7 +1124,10 @@ impl<T: Transport> WorkflowEngine for AppEngine<T> {
                         });
                         return ActionResult::NavigateTo(screen);
                     }
-                    // emergency_wipe: handled by SettingsEngine (ShowAlert)
+                    "emergency_wipe" => {
+                        let screen = self.navigate_to(AppScreen::EmergencyShred);
+                        return ActionResult::NavigateTo(screen);
+                    }
                     // change_password: not yet implemented
                     _ => {}
                 }

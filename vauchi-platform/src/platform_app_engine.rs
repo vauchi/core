@@ -216,4 +216,26 @@ impl PlatformAppEngine {
         engine.invalidate_screen(&screen);
         Ok(())
     }
+
+    /// Returns whether the user has created an identity.
+    ///
+    /// Used by frontends to decide between onboarding and main UI.
+    pub fn has_identity(&self) -> Result<bool, MobileError> {
+        let engine = self
+            .engine
+            .lock()
+            .map_err(|e| MobileError::Internal(format!("Lock failed: {e}")))?;
+        Ok(engine.has_identity())
+    }
+
+    /// Returns whether the current form has unsaved user data.
+    ///
+    /// Used by frontends to show a "discard changes?" prompt on back navigation.
+    pub fn form_has_data(&self) -> Result<bool, MobileError> {
+        let engine = self
+            .engine
+            .lock()
+            .map_err(|e| MobileError::Internal(format!("Lock failed: {e}")))?;
+        Ok(engine.form_has_data())
+    }
 }

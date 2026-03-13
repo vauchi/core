@@ -200,3 +200,26 @@ fn invalidate_screen_json_succeeds() {
         .invalidate_screen_json(r#""MyInfo""#.into())
         .expect("invalidate screen");
 }
+
+// ============================================================================
+// Identity and form state queries
+// ============================================================================
+
+#[test]
+fn has_identity_returns_false_before_onboarding() {
+    let (engine, _dir) = create_engine();
+    assert!(!engine.has_identity().expect("has_identity"));
+}
+
+#[test]
+fn has_identity_returns_true_after_onboarding() {
+    let (engine, _dir) = create_engine();
+    drive_onboarding(&engine);
+    assert!(engine.has_identity().expect("has_identity"));
+}
+
+#[test]
+fn form_has_data_returns_false_on_non_form_screen() {
+    let (engine, _dir) = create_engine();
+    assert!(!engine.form_has_data().expect("form_has_data"));
+}

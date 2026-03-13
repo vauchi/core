@@ -26,6 +26,7 @@ pub struct DuressPinEngine {
     config: DuressConfig,
     new_pin: String,
     confirm_pin: String,
+    pending_disable: bool,
 }
 
 impl Drop for DuressPinEngine {
@@ -50,6 +51,7 @@ impl DuressPinEngine {
             config,
             new_pin: String::new(),
             confirm_pin: String::new(),
+            pending_disable: false,
         }
     }
 
@@ -72,7 +74,7 @@ impl DuressPinEngine {
     }
 
     fn overview_screen(&self) -> ScreenModel {
-        let components = vec![
+        let mut components = vec![
             Component::InfoPanel {
                 id: "duress_info".into(),
                 icon: Some("shield".into()),
@@ -114,6 +116,16 @@ impl DuressPinEngine {
                 label: "Disable".into(),
                 style: ActionStyle::Destructive,
                 enabled: true,
+            });
+        }
+
+        if self.pending_disable {
+            components.push(Component::InlineConfirm {
+                id: "disable_confirm".into(),
+                warning: "Disabling the duress PIN removes protection. Alert contacts will no longer be notified.".into(),
+                confirm_text: "Disable".into(),
+                cancel_text: "Cancel".into(),
+                destructive: true,
             });
         }
 
@@ -258,7 +270,20 @@ impl WorkflowEngine for DuressPinEngine {
             (DuressPinStep::Overview, UserAction::ActionPressed { action_id })
                 if action_id == "disable" =>
             {
+                self.pending_disable = true;
+                ActionResult::UpdateScreen(self.current_screen())
+            }
+            (DuressPinStep::Overview, UserAction::ActionPressed { action_id })
+                if action_id == "confirm_disable" =>
+            {
+                self.pending_disable = false;
                 self.config.enabled = false;
+                ActionResult::Complete
+            }
+            (DuressPinStep::Overview, UserAction::ActionPressed { action_id })
+                if action_id == "cancel_disable" =>
+            {
+                self.pending_disable = false;
                 ActionResult::UpdateScreen(self.current_screen())
             }
 

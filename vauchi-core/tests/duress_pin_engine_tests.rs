@@ -277,22 +277,75 @@ fn duress_alerts_save_enables() {
 }
 
 #[test]
-fn duress_disable_from_overview() {
+fn duress_disable_shows_inline_confirm() {
     let mut engine = DuressPinEngine::new(enabled_config());
     assert!(engine.config().enabled, "should start enabled");
 
     let result = engine.handle_action(UserAction::ActionPressed {
         action_id: "disable".into(),
     });
-    match result {
-        ActionResult::UpdateScreen(screen) => {
-            assert_eq!(screen.screen_id, "duress_overview");
-        }
-        other => panic!("expected UpdateScreen, got {:?}", other),
-    }
+    let screen = match result {
+        ActionResult::UpdateScreen(s) => s,
+        other => panic!("Expected UpdateScreen, got {:?}", other),
+    };
+    let has_confirm = screen
+        .components
+        .iter()
+        .any(|c| matches!(c, Component::InlineConfirm { destructive, .. } if *destructive));
+    assert!(
+        has_confirm,
+        "disable should show a destructive InlineConfirm"
+    );
+    // Config should still be enabled until confirmed
+    assert!(
+        engine.config().enabled,
+        "should remain enabled until confirmed"
+    );
+}
+
+#[test]
+fn duress_confirm_disable_completes() {
+    let mut engine = DuressPinEngine::new(enabled_config());
+    // Show confirmation
+    let _ = engine.handle_action(UserAction::ActionPressed {
+        action_id: "disable".into(),
+    });
+    // Confirm disable
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "confirm_disable".into(),
+    });
+    assert_eq!(
+        result,
+        ActionResult::Complete,
+        "confirm should return Complete"
+    );
     assert!(
         !engine.config().enabled,
-        "config should be disabled after disable action"
+        "config should be disabled after confirm"
+    );
+}
+
+#[test]
+fn duress_cancel_disable_keeps_enabled() {
+    let mut engine = DuressPinEngine::new(enabled_config());
+    let _ = engine.handle_action(UserAction::ActionPressed {
+        action_id: "disable".into(),
+    });
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "cancel_disable".into(),
+    });
+    let screen = match result {
+        ActionResult::UpdateScreen(s) => s,
+        other => panic!("Expected UpdateScreen, got {:?}", other),
+    };
+    let has_confirm = screen
+        .components
+        .iter()
+        .any(|c| matches!(c, Component::InlineConfirm { .. }));
+    assert!(!has_confirm, "cancel should remove InlineConfirm");
+    assert!(
+        engine.config().enabled,
+        "config should remain enabled after cancel"
     );
 }
 

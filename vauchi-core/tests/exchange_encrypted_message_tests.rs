@@ -80,7 +80,7 @@ fn test_encrypted_message_serialization_preserves_exchange_key() {
     let (original, _) =
         EncryptedExchangeMessage::create(&alice, bob.public_key(), &[0x03u8; 32], "Test").unwrap();
 
-    let bytes = original.to_bytes();
+    let bytes = original.to_bytes().unwrap();
     let restored = EncryptedExchangeMessage::from_bytes(&bytes).unwrap();
 
     assert_eq!(restored.sender_exchange_key, original.sender_exchange_key);

@@ -1230,8 +1230,8 @@ mod tests {
     }
 
     #[test]
-    // allow(zero_assertions) — no-panic boundary test
     fn exchange_destroy_null_is_safe() {
+        // allow(zero_assertions) — no-panic boundary test
         unsafe {
             vauchi_exchange_destroy(std::ptr::null_mut());
         }
@@ -1351,8 +1351,8 @@ mod tests {
     }
 
     #[test]
-    // allow(zero_assertions) — no-panic boundary test
     fn exchange_confirm_proximity_null_is_safe() {
+        // allow(zero_assertions) — no-panic boundary test
         unsafe {
             vauchi_exchange_confirm_proximity(std::ptr::null_mut());
         }

@@ -45,6 +45,26 @@ fn test_symmetric_key_accepts_nonzero() {
     assert_eq!(key.as_bytes()[31], 1);
 }
 
+// --- K-L1: try_from_bytes returns Result instead of panicking ---
+
+#[test]
+fn test_try_from_bytes_rejects_all_zeros() {
+    let result = SymmetricKey::try_from_bytes([0u8; 32]);
+    assert!(result.is_err(), "should reject all-zeros key");
+    assert!(
+        format!("{}", result.unwrap_err()).contains("Degenerate"),
+        "error should mention degenerate key"
+    );
+}
+
+#[test]
+fn test_try_from_bytes_accepts_nonzero() {
+    let mut bytes = [0u8; 32];
+    bytes[0] = 42;
+    let key = SymmetricKey::try_from_bytes(bytes).unwrap();
+    assert_eq!(key.as_bytes()[0], 42);
+}
+
 // --- SP-9 #231: Unknown algorithm tags are rejected ---
 
 // @scenario: security.feature:Correct algorithms used

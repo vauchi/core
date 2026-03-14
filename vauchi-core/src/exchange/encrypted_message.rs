@@ -187,8 +187,8 @@ impl EncryptedExchangeMessage {
     }
 
     /// Serializes the message to bytes for wire transmission.
-    pub fn to_bytes(&self) -> Vec<u8> {
-        serde_json::to_vec(self).unwrap_or_default()
+    pub fn to_bytes(&self) -> Result<Vec<u8>, ExchangeError> {
+        serde_json::to_vec(self).map_err(|_| ExchangeError::SerializationFailed)
     }
 
     /// Deserializes a message from bytes.

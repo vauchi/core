@@ -26,6 +26,8 @@ pub enum EncryptionError {
     DecryptionFailed,
     #[error("Ciphertext too short")]
     CiphertextTooShort,
+    #[error("Degenerate key: all-zeros key rejected")]
+    DegenerateKey,
 }
 
 /// Algorithm tag for XChaCha20-Poly1305.
@@ -79,6 +81,17 @@ impl SymmetricKey {
             "SymmetricKey::from_bytes: all-zeros key is degenerate and rejected"
         );
         SymmetricKey { bytes }
+    }
+
+    /// Creates a key from raw bytes, returning an error for degenerate (all-zeros) keys.
+    ///
+    /// Use this at trust boundaries (deserialization, network input) where
+    /// panicking is unacceptable.
+    pub fn try_from_bytes(bytes: [u8; 32]) -> Result<Self, EncryptionError> {
+        if bytes.iter().all(|&b| b == 0) {
+            return Err(EncryptionError::DegenerateKey);
+        }
+        Ok(SymmetricKey { bytes })
     }
 
     /// Creates a key from raw bytes without validation.

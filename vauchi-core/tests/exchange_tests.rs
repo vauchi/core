@@ -502,7 +502,7 @@ fn test_relay_cannot_read_exchange_message() {
     // 2. Ciphertext (opaque bytes)
 
     // Verify no sensitive data leaks in the wire format
-    let wire_bytes = encrypted_msg.to_bytes();
+    let wire_bytes = encrypted_msg.to_bytes().unwrap();
     let wire_str = String::from_utf8_lossy(&wire_bytes);
 
     assert!(
@@ -530,7 +530,7 @@ fn test_encrypted_exchange_message_roundtrip() {
             .expect("Creating message should succeed");
 
     // Serialize and deserialize
-    let bytes = original.to_bytes();
+    let bytes = original.to_bytes().expect("serialization should succeed");
     let restored =
         EncryptedExchangeMessage::from_bytes(&bytes).expect("Deserialization should succeed");
 

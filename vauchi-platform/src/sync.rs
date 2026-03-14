@@ -304,7 +304,9 @@ async fn send_exchange_response(
     let update = EncryptedUpdate {
         recipient_id: recipient_id.to_string(),
         sender_id: our_id,
-        ciphertext: encrypted_msg.to_bytes(),
+        ciphertext: encrypted_msg
+            .to_bytes()
+            .map_err(|e| MobileError::CryptoError(format!("Serialization failed: {:?}", e)))?,
     };
 
     let envelope = protocol::create_envelope(MessagePayload::EncryptedUpdate(update));

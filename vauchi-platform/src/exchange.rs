@@ -361,8 +361,8 @@ pub(crate) fn create_qr_exchange_proximity(
         handler: Arc::from(handler),
     };
     let mut chain = VerifierChain::new();
-    // Method label is hardcoded to Ultrasonic — MobileProximityHandler may
-    // actually use BLE or another mechanism. Revisit when the handler interface
+    // TODO(method-label): Method label is hardcoded to Ultrasonic — MobileProximityHandler
+    // may actually use BLE or another mechanism. Revisit when the handler interface
     // reports its actual method.
     chain.add(VerifierMethod::Ultrasonic, Box::new(bridge));
     let session = ExchangeSession::new_qr(identity, our_card, chain);

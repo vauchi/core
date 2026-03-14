@@ -9,6 +9,7 @@
 //! performance analysis and debugging of exchange issues.
 
 use serde::Serialize;
+use std::fmt::Write;
 use std::time::Instant;
 
 /// Events that occur during a contact exchange flow.
@@ -70,6 +71,49 @@ impl ExchangeDebugLog {
     /// Get all recorded events.
     pub fn events(&self) -> &[TimestampedEvent] {
         &self.events
+    }
+
+    /// Export the log as a human-readable Markdown report.
+    pub fn to_markdown(&self) -> String {
+        let count = self.events.len();
+        let mut md = String::new();
+        writeln!(md, "# Exchange Debug Log\n").unwrap();
+        writeln!(md, "**{count} events**\n").unwrap();
+
+        if self.events.is_empty() {
+            writeln!(md, "_No events recorded._").unwrap();
+            return md;
+        }
+
+        writeln!(md, "| Elapsed (ms) | Event |").unwrap();
+        writeln!(md, "|---:|---|").unwrap();
+        for entry in &self.events {
+            let desc = Self::event_description(&entry.event);
+            writeln!(md, "| {} | {} |", entry.elapsed_ms, desc).unwrap();
+        }
+        md
+    }
+
+    /// Human-readable description of an exchange event.
+    fn event_description(event: &ExchangeDebugEvent) -> String {
+        match event {
+            ExchangeDebugEvent::SessionStarted { transport } => {
+                format!("SessionStarted ({transport})")
+            }
+            ExchangeDebugEvent::QrGenerated => "QrGenerated".to_string(),
+            ExchangeDebugEvent::QrScanned => "QrScanned".to_string(),
+            ExchangeDebugEvent::KeyAgreementCompleted => "KeyAgreementCompleted".to_string(),
+            ExchangeDebugEvent::ProximityCheckStarted { method } => {
+                format!("ProximityCheckStarted ({method})")
+            }
+            ExchangeDebugEvent::ProximityCheckCompleted { confidence } => {
+                format!("ProximityCheckCompleted ({confidence})")
+            }
+            ExchangeDebugEvent::ExchangeCompleted => "ExchangeCompleted".to_string(),
+            ExchangeDebugEvent::ExchangeFailed { error } => {
+                format!("ExchangeFailed: {error}")
+            }
+        }
     }
 
     /// Export the log as JSONL (one JSON object per line).

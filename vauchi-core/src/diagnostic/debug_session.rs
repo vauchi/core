@@ -8,6 +8,7 @@
 //! are no-ops. When activated (via gesture, settings toggle, or launch
 //! argument), captures timestamped UX events for diagnostic analysis.
 
+use std::fmt::Write;
 use std::time::Instant;
 
 use super::log_event::{LogEvent, LogEventKind};
@@ -126,6 +127,59 @@ impl DebugSession {
     /// Log a session marker for segmenting analysis.
     pub fn log_session_marker(&mut self, label: String) {
         self.push_event(LogEventKind::DebugSessionMarker { label });
+    }
+
+    /// Export session as a human-readable Markdown report.
+    pub fn to_markdown(&self) -> String {
+        let status = if self.active { "active" } else { "inactive" };
+        let count = self.events.len();
+        let mut md = String::new();
+        writeln!(md, "# Debug Session Report\n").unwrap();
+        writeln!(md, "**Status:** {status} | **{count} events**\n").unwrap();
+
+        if self.events.is_empty() {
+            writeln!(md, "_No events recorded._").unwrap();
+            return md;
+        }
+
+        writeln!(md, "| Timestamp (ms) | Event |").unwrap();
+        writeln!(md, "|---:|---|").unwrap();
+        for event in &self.events {
+            let desc = Self::event_description(&event.kind);
+            writeln!(md, "| {} | {} |", event.timestamp_ms, desc).unwrap();
+        }
+        md
+    }
+
+    /// Human-readable description of a log event kind.
+    fn event_description(kind: &LogEventKind) -> String {
+        match kind {
+            LogEventKind::DebugModeActivated => "DebugModeActivated".to_string(),
+            LogEventKind::ScreenAppeared { screen } => {
+                format!("ScreenAppeared — {screen:?}")
+            }
+            LogEventKind::ScreenDismissed { screen } => {
+                format!("ScreenDismissed — {screen:?}")
+            }
+            LogEventKind::UserAction { screen, action } => {
+                format!("UserAction — {screen:?}: {action}")
+            }
+            LogEventKind::FlowAbandoned { screen, reason } => {
+                format!("FlowAbandoned — {screen:?}: {reason}")
+            }
+            LogEventKind::RetryAttempted { screen, attempt } => {
+                format!("RetryAttempted — {screen:?} #{attempt}")
+            }
+            LogEventKind::ErrorPresented { screen, error } => {
+                format!("ErrorPresented — {screen:?}: {error}")
+            }
+            LogEventKind::TesterNote { note } => format!("TesterNote — {note}"),
+            LogEventKind::DebugSessionMarker { label } => {
+                format!("SessionMarker — {label}")
+            }
+            // Camera/QR tuner events — summarize briefly
+            other => format!("{other:?}"),
+        }
     }
 
     // --- Internal ---

@@ -229,6 +229,27 @@ impl VauchiPlatform {
         Ok(contacts.iter().map(MobileContact::from).collect())
     }
 
+    /// Blocks a contact. Blocked contacts cannot send updates or messages.
+    pub fn block_contact(&self, contact_id: String) -> Result<(), MobileError> {
+        let vauchi = self.open_vauchi()?;
+        vauchi.block_contact(&contact_id)?;
+        Ok(())
+    }
+
+    /// Unblocks a previously blocked contact.
+    pub fn unblock_contact(&self, contact_id: String) -> Result<(), MobileError> {
+        let vauchi = self.open_vauchi()?;
+        vauchi.unblock_contact(&contact_id)?;
+        Ok(())
+    }
+
+    /// Lists all blocked contacts.
+    pub fn list_blocked_contacts(&self) -> Result<Vec<MobileContact>, MobileError> {
+        let vauchi = self.open_vauchi()?;
+        let contacts = vauchi.list_blocked_contacts()?;
+        Ok(contacts.iter().map(MobileContact::from).collect())
+    }
+
     /// List contacts with pagination.
     pub fn list_contacts_paginated(
         &self,

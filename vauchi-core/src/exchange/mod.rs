@@ -8,6 +8,11 @@
 //! and X3DH key agreement.
 
 #[cfg(feature = "testing")]
+pub mod accelerometer;
+#[cfg(not(feature = "testing"))]
+mod accelerometer;
+
+#[cfg(feature = "testing")]
 pub mod ambient_audio;
 #[cfg(not(feature = "testing"))]
 mod ambient_audio;
@@ -115,6 +120,10 @@ pub mod x3dh;
 #[cfg(not(feature = "testing"))]
 mod x3dh;
 
+pub use accelerometer::{
+    AccelerometerBackend, AccelerometerConfig, AccelerometerSample, AccelerometerVerifier,
+    MockAccelerometerBackend,
+};
 pub use ambient_audio::{
     AmbientAudioBackend, AmbientAudioConfig, AmbientAudioVerifier, AudioFingerprint,
     MockAmbientAudioBackend,

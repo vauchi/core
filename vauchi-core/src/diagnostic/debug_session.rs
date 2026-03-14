@@ -42,7 +42,14 @@ impl DebugSession {
     }
 
     /// Activate the debug session. Logs a `DebugModeActivated` event.
+    ///
+    /// Idempotent: calling `activate()` on an already-active session is a no-op.
+    /// This prevents timestamp discontinuities that would make the JSONL export
+    /// unanalyzable.
     pub fn activate(&mut self) {
+        if self.active {
+            return;
+        }
         self.active = true;
         self.start = Instant::now();
         self.push_event(LogEventKind::DebugModeActivated);
@@ -62,7 +69,7 @@ impl DebugSession {
     pub fn to_jsonl(&self) -> String {
         self.events
             .iter()
-            .filter_map(|e| serde_json::to_string(e).ok())
+            .map(|e| serde_json::to_string(e).expect("LogEvent serialization cannot fail"))
             .collect::<Vec<_>>()
             .join("\n")
     }
@@ -80,11 +87,17 @@ impl DebugSession {
     }
 
     /// Log a user action on a screen.
+    ///
+    /// # Privacy
+    /// Callers must not include PII (contact names, keys, card content) in `action`.
     pub fn log_user_action(&mut self, screen: ScreenId, action: String) {
         self.push_event(LogEventKind::UserAction { screen, action });
     }
 
     /// Log a flow being abandoned.
+    ///
+    /// # Privacy
+    /// Callers must not include PII (contact names, keys, card content) in `reason`.
     pub fn log_flow_abandoned(&mut self, screen: ScreenId, reason: String) {
         self.push_event(LogEventKind::FlowAbandoned { screen, reason });
     }
@@ -95,11 +108,17 @@ impl DebugSession {
     }
 
     /// Log an error presented to the user.
+    ///
+    /// # Privacy
+    /// Callers must not include PII (contact names, keys, card content) in `error`.
     pub fn log_error_presented(&mut self, screen: ScreenId, error: String) {
         self.push_event(LogEventKind::ErrorPresented { screen, error });
     }
 
     /// Log a tester note.
+    ///
+    /// # Privacy
+    /// Callers must not include PII (contact names, keys, card content) in `note`.
     pub fn log_tester_note(&mut self, note: String) {
         self.push_event(LogEventKind::TesterNote { note });
     }
@@ -115,6 +134,7 @@ impl DebugSession {
         if !self.active {
             return;
         }
+        // as_millis() returns u128; truncation safe — overflows after ~585M years.
         let timestamp_ms = self.start.elapsed().as_millis() as u64;
         self.events.push(LogEvent {
             timestamp_ms,

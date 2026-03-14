@@ -10,7 +10,9 @@ pub mod snapshot;
 pub mod tuner;
 
 pub use debug_session::DebugSession;
-pub use exchange_debug::{ExchangeDebugEvent, ExchangeDebugLog, TimestampedEvent};
+// Scaffolding: not yet wired into production call sites.
+#[allow(unused_imports)]
+pub(crate) use exchange_debug::{ExchangeDebugEvent, ExchangeDebugLog, TimestampedEvent};
 pub use log_event::{LogEvent, LogEventKind, ScreenId};
 pub use report::generate_html_report;
 pub use snapshot::{BoundingBox, SnapshotMetadata};

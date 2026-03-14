@@ -61,6 +61,7 @@ impl ExchangeDebugLog {
 
     /// Record an event with the current elapsed time.
     pub fn push(&mut self, event: ExchangeDebugEvent) {
+        // as_millis() returns u128; truncation safe — overflows after ~585M years.
         let elapsed_ms = self.start.elapsed().as_millis() as u64;
         self.events.push(TimestampedEvent { elapsed_ms, event });
     }
@@ -74,7 +75,7 @@ impl ExchangeDebugLog {
     pub fn to_jsonl(&self) -> String {
         self.events
             .iter()
-            .filter_map(|e| serde_json::to_string(e).ok())
+            .map(|e| serde_json::to_string(e).expect("TimestampedEvent serialization cannot fail"))
             .collect::<Vec<_>>()
             .join("\n")
     }

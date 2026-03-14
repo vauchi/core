@@ -26,8 +26,6 @@ fn push_event_records_with_timestamp() {
 
     let events = log.events();
     assert_eq!(events.len(), 1);
-    assert!(events[0].elapsed_ms >= 0);
-
     match &events[0].event {
         ExchangeDebugEvent::SessionStarted { transport } => {
             assert_eq!(transport, "qr");

@@ -174,7 +174,11 @@ fn screen_id_serde_roundtrip() {
         ScreenId::ExchangeFailure,
         ScreenId::ContactList,
         ScreenId::ContactDetail,
+        ScreenId::SyncStatus,
+        ScreenId::SyncConflictResolution,
         ScreenId::LinkDeviceStart,
+        ScreenId::LinkDeviceQrDisplay,
+        ScreenId::LinkDeviceQrScan,
         ScreenId::LinkDeviceConfirmation,
         ScreenId::LinkDeviceSuccess,
         ScreenId::Settings,
@@ -213,6 +217,37 @@ fn to_jsonl_exports_all_events() {
 fn inactive_session_jsonl_is_empty() {
     let session = DebugSession::new();
     assert!(session.to_jsonl().is_empty());
+}
+
+// ===== Session marker =====
+
+#[test]
+fn log_session_marker() {
+    let mut session = DebugSession::new();
+    session.activate();
+    session.log_session_marker("phase_2_start".to_string());
+
+    assert!(matches!(
+        &events_last(&session).kind,
+        LogEventKind::DebugSessionMarker { label }
+            if label == "phase_2_start"
+    ));
+}
+
+// ===== Re-activation semantics =====
+
+#[test]
+fn activate_twice_is_idempotent_when_already_active() {
+    let mut session = DebugSession::new();
+    session.activate();
+    session.log_screen_appeared(ScreenId::Home);
+
+    let events_before = session.events().len();
+    session.activate(); // second activation
+
+    // Re-activation should not clear existing events or add a duplicate activation event
+    assert!(session.is_active());
+    assert_eq!(session.events().len(), events_before);
 }
 
 // ===== Helpers =====

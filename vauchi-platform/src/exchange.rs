@@ -88,8 +88,10 @@ impl ProximityVerifier for ProximityBridge {
         timeout: Duration,
         _is_initiator: bool,
     ) -> Result<(), ProximityError> {
-        // Delegate to the mobile handler for the actual hardware verification.
-        // The handler uses platform-specific audio/hardware to verify proximity.
+        // TODO(security): This delegates only the emit direction. The two-way
+        // protocol requires both parties independently verify the other's
+        // challenge. The MobileProximityHandler interface needs a two-argument
+        // form before this can enforce full bidirectionality.
         self.verify_proximity(emit_challenge, timeout)
     }
 }
@@ -329,9 +331,9 @@ impl MobileExchangeSession {
 
     /// Returns the event log from the last proximity verification.
     ///
-    /// Only populated when the session uses a `VerifierChain` (e.g.,
-    /// sessions created via `create_qr_exchange_proximity`). Returns
-    /// an empty list for single-verifier sessions.
+    /// Returns an empty list before any verification has occurred.
+    /// After key agreement, contains the chain's events (InProgress,
+    /// Completed, MethodFailed, FallingBack, etc.).
     pub fn get_verification_events(
         &self,
     ) -> Vec<crate::mobile_verifier_event::MobileProximityVerifierEvent> {
@@ -643,19 +645,30 @@ mod tests {
 
         // Key agreement triggers proximity verification
         alice_session.perform_key_agreement().unwrap();
+        bob_session.perform_key_agreement().unwrap();
 
-        // Events should now be populated
-        let events = alice_session.get_verification_events();
+        // Events should now be populated for both sides
+        let alice_events = alice_session.get_verification_events();
         assert!(
-            !events.is_empty(),
-            "Events should be populated after key agreement"
+            !alice_events.is_empty(),
+            "Alice events should be populated after key agreement"
+        );
+        let bob_events = bob_session.get_verification_events();
+        assert!(
+            !bob_events.is_empty(),
+            "Bob events should be populated after key agreement"
         );
 
-        // Should contain a Completed event
-        let has_completed = events
+        // Both should contain a Completed event
+        let alice_completed = alice_events
             .iter()
             .any(|e| matches!(e, MobileProximityVerifierEvent::Completed { .. }));
-        assert!(has_completed, "Should have a Completed event");
+        assert!(alice_completed, "Alice should have a Completed event");
+
+        let bob_completed = bob_events
+            .iter()
+            .any(|e| matches!(e, MobileProximityVerifierEvent::Completed { .. }));
+        assert!(bob_completed, "Bob should have a Completed event");
     }
 
     #[test]

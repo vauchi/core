@@ -123,21 +123,19 @@ impl VerifierChain {
         log.push(ProximityVerifierEvent::AllMethodsExhausted);
         log
     }
-}
 
-impl Default for VerifierChain {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl VerifierChain {
     /// Returns a clone of the event log from the most recent verification attempt.
     ///
     /// Returns `None` if `verify_proximity_two_way` (via the `ProximityVerifier`
     /// trait) has not been called yet.
     pub fn last_event_log(&self) -> Option<VerifierEventLog> {
         self.last_event_log.lock().expect("mutex poisoned").clone()
+    }
+}
+
+impl Default for VerifierChain {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

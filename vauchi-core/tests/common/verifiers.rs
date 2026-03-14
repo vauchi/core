@@ -26,7 +26,6 @@ use vauchi_core::exchange::{ProximityConfidence, ProximityError, ProximityVerifi
 /// ```
 pub struct ChallengeCapturingVerifier {
     should_succeed: bool,
-    simulate_timeout: bool,
     captured: Arc<Mutex<Vec<[u8; 16]>>>,
 }
 
@@ -38,7 +37,6 @@ impl ChallengeCapturingVerifier {
         (
             Self {
                 should_succeed: true,
-                simulate_timeout: false,
                 captured: captured.clone(),
             },
             captured,
@@ -51,7 +49,6 @@ impl ChallengeCapturingVerifier {
         (
             Self {
                 should_succeed: false,
-                simulate_timeout: false,
                 captured: captured.clone(),
             },
             captured,
@@ -73,9 +70,6 @@ impl ProximityVerifier for ChallengeCapturingVerifier {
     }
 
     fn listen_for_response(&self, _timeout: Duration) -> Result<Vec<u8>, ProximityError> {
-        if self.simulate_timeout {
-            return Err(ProximityError::Timeout);
-        }
         if self.should_succeed {
             let mut response = Vec::with_capacity(17);
             response.push(0x01);

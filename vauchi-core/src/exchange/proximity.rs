@@ -122,6 +122,8 @@ pub trait ProximityVerifier: Send + Sync {
 /// Mock proximity verifier for testing.
 ///
 /// Can be configured to always succeed, always fail, or simulate timeouts.
+// TODO: Gate behind cfg(any(test, feature = "testing")) once all 15+
+// integration test files are migrated to required-features = ["testing"].
 pub struct MockProximityVerifier {
     /// Whether verification should succeed
     pub should_succeed: bool,

@@ -78,6 +78,14 @@ pub trait ProximityVerifier: Send + Sync {
         }
     }
 
+    /// Returns the event log from the most recent verification attempt.
+    ///
+    /// Default returns `None`. Overridden by `VerifierChain` which tracks
+    /// per-attempt events (method progress, fallbacks, completion).
+    fn verification_event_log(&self) -> Option<super::verifier_event::VerifierEventLog> {
+        None
+    }
+
     /// Performs two-way proximity verification.
     ///
     /// - `emit_challenge`: the challenge to emit (from peer's QR)

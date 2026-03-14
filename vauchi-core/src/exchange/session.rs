@@ -372,6 +372,19 @@ impl ExchangeSession {
         self.their_display_name.as_deref()
     }
 
+    /// Returns the proximity confidence from the last verification.
+    pub fn proximity_confidence(&self) -> ProximityConfidence {
+        self.proximity_confidence
+    }
+
+    /// Returns the verification event log from the proximity verifier.
+    ///
+    /// Only populated when using a `VerifierChain`. Single verifiers
+    /// return `None` (no event logging).
+    pub fn proximity_event_log(&self) -> Option<super::VerifierEventLog> {
+        self.proximity.verification_event_log()
+    }
+
     /// Returns a reference to the proximity verifier (test-only).
     #[cfg(any(test, feature = "testing"))]
     pub fn proximity_verifier(&self) -> &dyn ProximityVerifier {

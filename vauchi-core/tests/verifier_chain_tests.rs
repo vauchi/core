@@ -342,3 +342,32 @@ fn individual_methods_return_not_supported() {
     ));
     assert!(!chain.verify_response(&[0u8; 16], &[0x01]));
 }
+
+#[test]
+fn trait_impl_verification_event_log_delegates_to_last_event_log() {
+    let mut chain = VerifierChain::new();
+    chain.add(
+        VerifierMethod::Ultrasonic,
+        Box::new(MockProximityVerifier::success()),
+    );
+
+    // Before verification, trait method returns None
+    assert!(chain.verification_event_log().is_none());
+
+    let emit = [1u8; 16];
+    let listen = [2u8; 16];
+    let timeout = Duration::from_secs(5);
+    chain
+        .verify_proximity_two_way(&emit, &listen, timeout, true)
+        .unwrap();
+
+    // After verification, trait method returns the same as last_event_log()
+    let via_trait = chain
+        .verification_event_log()
+        .expect("trait method should return log");
+    let via_direct = chain
+        .last_event_log()
+        .expect("direct method should return log");
+    assert_eq!(via_trait.events().len(), via_direct.events().len());
+    assert!(via_trait.is_completed());
+}

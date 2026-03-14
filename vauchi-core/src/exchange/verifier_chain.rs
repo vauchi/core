@@ -178,6 +178,10 @@ impl ProximityVerifier for VerifierChain {
         false
     }
 
+    fn verification_event_log(&self) -> Option<super::verifier_event::VerifierEventLog> {
+        self.last_event_log()
+    }
+
     fn verify_proximity_two_way(
         &self,
         emit_challenge: &[u8; 16],

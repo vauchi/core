@@ -15,7 +15,7 @@ use vauchi_core::contact::Contact;
 use vauchi_core::contact_card::ContactCard;
 use vauchi_core::exchange::{
     ExchangeEvent, ExchangeQR, ExchangeSession, ExchangeState, ManualConfirmationVerifier,
-    ProximityError, ProximityVerifier,
+    ProximityError, ProximityVerifier, VerifierChain, VerifierMethod,
 };
 use vauchi_core::identity::Identity;
 
@@ -317,11 +317,39 @@ impl MobileExchangeSession {
             .their_display_name()
             .map(String::from)
     }
+
+    /// Returns the proximity confidence from the last verification.
+    ///
+    /// Available after key agreement has been performed.
+    pub fn verification_confidence(
+        &self,
+    ) -> crate::mobile_verifier_event::MobileProximityConfidence {
+        self.inner.lock().unwrap().proximity_confidence().into()
+    }
+
+    /// Returns the event log from the last proximity verification.
+    ///
+    /// Only populated when the session uses a `VerifierChain` (e.g.,
+    /// sessions created via `create_qr_exchange_proximity`). Returns
+    /// an empty list for single-verifier sessions.
+    pub fn get_verification_events(
+        &self,
+    ) -> Vec<crate::mobile_verifier_event::MobileProximityVerifierEvent> {
+        self.inner
+            .lock()
+            .unwrap()
+            .proximity_event_log()
+            .map(|log| log.events().iter().cloned().map(Into::into).collect())
+            .unwrap_or_default()
+    }
 }
 
 // === Factory Functions ===
 
 /// Create a QR exchange session with proximity verification.
+///
+/// Wraps the proximity bridge in a single-entry `VerifierChain` so that
+/// verification events are always available via `get_verification_events()`.
 pub(crate) fn create_qr_exchange_proximity(
     identity: Identity,
     our_card: ContactCard,
@@ -330,17 +358,24 @@ pub(crate) fn create_qr_exchange_proximity(
     let bridge = ProximityBridge {
         handler: Arc::from(handler),
     };
-    let session = ExchangeSession::new_qr(identity, our_card, bridge);
+    let mut chain = VerifierChain::new();
+    chain.add(VerifierMethod::Ultrasonic, Box::new(bridge));
+    let session = ExchangeSession::new_qr(identity, our_card, chain);
     Arc::new(MobileExchangeSession::new(session, None))
 }
 
 /// Create a QR exchange session with manual confirmation.
+///
+/// Wraps the manual bridge in a single-entry `VerifierChain` so that
+/// verification events are always available via `get_verification_events()`.
 pub(crate) fn create_qr_exchange_manual(
     identity: Identity,
     our_card: ContactCard,
 ) -> Arc<MobileExchangeSession> {
     let (bridge, verifier) = ManualConfirmationBridge::new();
-    let session = ExchangeSession::new_qr(identity, our_card, bridge);
+    let mut chain = VerifierChain::new();
+    chain.add(VerifierMethod::ManualConfirmation, Box::new(bridge));
+    let session = ExchangeSession::new_qr(identity, our_card, chain);
     Arc::new(MobileExchangeSession::new(session, Some(verifier)))
 }
 
@@ -542,5 +577,104 @@ mod tests {
 
         let session = create_qr_exchange_manual(identity, card);
         assert!(!session.is_timed_out());
+    }
+
+    // === Phase B: Event wiring tests ===
+
+    #[test]
+    fn test_verification_confidence_defaults_to_unknown() {
+        use crate::mobile_verifier_event::MobileProximityConfidence;
+
+        let identity = Identity::create("Alice");
+        let card = ContactCard::new("Alice");
+        let session = create_qr_exchange_manual(identity, card);
+
+        // Before any verification, confidence is Unknown
+        assert_eq!(
+            session.verification_confidence(),
+            MobileProximityConfidence::Unknown
+        );
+    }
+
+    #[test]
+    fn test_get_verification_events_empty_before_verification() {
+        let identity = Identity::create("Alice");
+        let card = ContactCard::new("Alice");
+        let session = create_qr_exchange_manual(identity, card);
+
+        // Before any verification, events list is empty
+        assert!(session.get_verification_events().is_empty());
+    }
+
+    #[test]
+    fn test_verification_events_populated_after_key_agreement() {
+        use crate::mobile_verifier_event::MobileProximityVerifierEvent;
+
+        let alice = Identity::create("Alice");
+        let alice_card = ContactCard::new("Alice");
+        let bob = Identity::create("Bob");
+        let bob_card = ContactCard::new("Bob");
+
+        // Create manual sessions (confirmed before key agreement so verification succeeds)
+        let alice_session = {
+            let verifier = ManualConfirmationVerifier::new();
+            verifier.confirm();
+            let mut chain = VerifierChain::new();
+            chain.add(VerifierMethod::ManualConfirmation, Box::new(verifier));
+            let session = ExchangeSession::new_qr(alice, alice_card, chain);
+            Arc::new(MobileExchangeSession::new(session, None))
+        };
+        let bob_session = {
+            let verifier = ManualConfirmationVerifier::new();
+            verifier.confirm();
+            let mut chain = VerifierChain::new();
+            chain.add(VerifierMethod::ManualConfirmation, Box::new(verifier));
+            let session = ExchangeSession::new_qr(bob, bob_card, chain);
+            Arc::new(MobileExchangeSession::new(session, None))
+        };
+
+        // Drive through exchange to key agreement
+        let alice_qr = alice_session.generate_qr().unwrap();
+        let bob_qr = bob_session.generate_qr().unwrap();
+        alice_session.process_qr(bob_qr).unwrap();
+        bob_session.process_qr(alice_qr).unwrap();
+        alice_session.they_scanned_our_qr().unwrap();
+        bob_session.they_scanned_our_qr().unwrap();
+
+        // Key agreement triggers proximity verification
+        alice_session.perform_key_agreement().unwrap();
+
+        // Events should now be populated
+        let events = alice_session.get_verification_events();
+        assert!(
+            !events.is_empty(),
+            "Events should be populated after key agreement"
+        );
+
+        // Should contain a Completed event
+        let has_completed = events
+            .iter()
+            .any(|e| matches!(e, MobileProximityVerifierEvent::Completed { .. }));
+        assert!(has_completed, "Should have a Completed event");
+    }
+
+    #[test]
+    fn test_proximity_factory_wraps_in_chain() {
+        let identity = Identity::create("Alice");
+        let card = ContactCard::new("Alice");
+        let session = create_qr_exchange_proximity(identity, card, Box::new(SuccessHandler));
+
+        // Events start empty (no verification yet)
+        assert!(session.get_verification_events().is_empty());
+    }
+
+    #[test]
+    fn test_manual_factory_wraps_in_chain() {
+        let identity = Identity::create("Alice");
+        let card = ContactCard::new("Alice");
+        let session = create_qr_exchange_manual(identity, card);
+
+        // Events start empty (no verification yet)
+        assert!(session.get_verification_events().is_empty());
     }
 }

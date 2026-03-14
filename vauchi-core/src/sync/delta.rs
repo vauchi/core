@@ -351,18 +351,34 @@ impl CardDelta {
         encoder.finish().expect("Finishing deflate should not fail")
     }
 
+    /// Maximum decompressed payload size (10 MB).
+    ///
+    /// Limits decompression output to prevent zip-bomb denial-of-service attacks
+    /// where a small compressed payload expands to exhaust memory.
+    const MAX_DECOMPRESSED_SIZE: u64 = 10 * 1024 * 1024;
+
     /// Decompresses a DEFLATE-compressed payload.
     ///
-    /// Returns the decompressed bytes, or an error if the data is malformed.
+    /// Returns the decompressed bytes, or an error if the data is malformed
+    /// or exceeds [`Self::MAX_DECOMPRESSED_SIZE`].
     pub fn decompress_payload(compressed: &[u8]) -> Result<Vec<u8>, DeltaError> {
         use flate2::read::DeflateDecoder;
         use std::io::Read;
 
-        let mut decoder = DeflateDecoder::new(compressed);
+        let decoder = DeflateDecoder::new(compressed);
+        let mut limited = decoder.take(Self::MAX_DECOMPRESSED_SIZE + 1);
         let mut decompressed = Vec::new();
-        decoder
+        limited
             .read_to_end(&mut decompressed)
             .map_err(|e| DeltaError::CompressionError(e.to_string()))?;
+
+        if decompressed.len() as u64 > Self::MAX_DECOMPRESSED_SIZE {
+            return Err(DeltaError::CompressionError(format!(
+                "decompressed payload exceeds maximum size of {} bytes",
+                Self::MAX_DECOMPRESSED_SIZE
+            )));
+        }
+
         Ok(decompressed)
     }
 

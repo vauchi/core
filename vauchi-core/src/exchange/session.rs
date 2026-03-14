@@ -148,6 +148,15 @@ pub struct ExchangeSession {
     their_relay_noise_pubkey: Option<[u8; 32]>,
 }
 
+// Compile-time assertion: ExchangeSession must be Send + Sync because
+// MobileExchangeSession wraps it in a Mutex for UniFFI cross-thread access.
+// ProximityVerifier requires Send + Sync, so Box<dyn ProximityVerifier>
+// satisfies this. If the bound is ever weakened, this will fail to compile.
+const _: fn() = || {
+    fn assert_send_sync<T: Send + Sync>() {}
+    assert_send_sync::<ExchangeSession>();
+};
+
 impl ExchangeSession {
     /// Creates a new QR exchange session.
     ///

@@ -12,7 +12,9 @@
 use std::time::Duration;
 use vauchi_core::exchange::verifier_chain::VerifierChain;
 use vauchi_core::exchange::verifier_event::{ProximityVerifierEvent, VerifierMethod};
-use vauchi_core::exchange::{MockProximityVerifier, ProximityConfidence};
+use vauchi_core::exchange::{
+    ManualConfirmationVerifier, MockProximityVerifier, ProximityConfidence, ProximityVerifier,
+};
 
 // ===== Basic chain behavior =====
 
@@ -225,4 +227,118 @@ fn timeout_verifier_falls_back() {
         )
     });
     assert!(has_fallback);
+}
+
+// ===== ProximityVerifier trait impl (W4) =====
+
+#[test]
+fn trait_impl_populates_last_event_log() {
+    let mut chain = VerifierChain::new();
+    chain.add(
+        VerifierMethod::Ultrasonic,
+        Box::new(MockProximityVerifier::success()),
+    );
+
+    // Before any verification, last_event_log is None
+    assert!(chain.last_event_log().is_none());
+
+    let emit = [1u8; 16];
+    let listen = [2u8; 16];
+    let timeout = Duration::from_secs(5);
+
+    let result = chain.verify_proximity_two_way(&emit, &listen, timeout, true);
+    assert!(result.is_ok());
+
+    // After verification, last_event_log is populated
+    let log = chain
+        .last_event_log()
+        .expect("log should be populated after verify_proximity_two_way");
+    assert!(log.is_completed());
+    assert_eq!(log.final_confidence(), Some(ProximityConfidence::High));
+}
+
+#[test]
+fn trait_impl_populates_last_event_log_on_failure() {
+    let mut chain = VerifierChain::new();
+    chain.add(
+        VerifierMethod::Ultrasonic,
+        Box::new(MockProximityVerifier::failure()),
+    );
+
+    let emit = [1u8; 16];
+    let listen = [2u8; 16];
+    let timeout = Duration::from_secs(5);
+
+    let result = chain.verify_proximity_two_way(&emit, &listen, timeout, true);
+    assert!(result.is_err());
+
+    let log = chain
+        .last_event_log()
+        .expect("log should be populated even on failure");
+    assert!(log.is_exhausted());
+    assert!(!log.is_completed());
+}
+
+#[test]
+fn confidence_level_reflects_winner_not_maximum() {
+    // Chain: High-confidence (fails) → Medium-confidence (succeeds)
+    // confidence_level() must return Medium (the winner), not High (the max).
+    let mut chain = VerifierChain::new();
+    chain.add(
+        VerifierMethod::Ultrasonic,
+        Box::new(MockProximityVerifier::failure()),
+    );
+    chain.add(
+        VerifierMethod::ManualConfirmation,
+        Box::new(ManualConfirmationVerifier::pre_confirmed()),
+    );
+
+    let emit = [1u8; 16];
+    let listen = [2u8; 16];
+    let timeout = Duration::from_secs(5);
+
+    let result = chain.verify_proximity_two_way(&emit, &listen, timeout, true);
+    assert!(result.is_ok());
+
+    // The winning verifier is ManualConfirmation (Medium), not Ultrasonic (High)
+    assert_eq!(chain.confidence_level(), ProximityConfidence::Medium);
+}
+
+#[test]
+fn confidence_level_returns_unknown_before_any_verification() {
+    let chain = VerifierChain::new();
+    assert_eq!(chain.confidence_level(), ProximityConfidence::Unknown);
+}
+
+#[test]
+fn confidence_level_returns_unknown_after_all_fail() {
+    let mut chain = VerifierChain::new();
+    chain.add(
+        VerifierMethod::Ultrasonic,
+        Box::new(MockProximityVerifier::failure()),
+    );
+
+    let emit = [1u8; 16];
+    let listen = [2u8; 16];
+    let timeout = Duration::from_secs(5);
+
+    let _ = chain.verify_proximity_two_way(&emit, &listen, timeout, true);
+
+    // All verifiers failed — no winner, so confidence is Unknown
+    assert_eq!(chain.confidence_level(), ProximityConfidence::Unknown);
+}
+
+#[test]
+fn individual_methods_return_not_supported() {
+    let chain = VerifierChain::new();
+
+    assert!(matches!(
+        chain.emit_challenge(&[0u8; 16]),
+        Err(vauchi_core::exchange::ProximityError::NotSupported)
+    ));
+    assert!(matches!(
+        chain.listen_for_response(Duration::from_secs(1)),
+        Err(vauchi_core::exchange::ProximityError::NotSupported)
+    ));
+    assert!(!chain.verify_response(&[0u8; 16], &[0x01]));
 }

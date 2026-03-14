@@ -37,6 +37,10 @@ pub struct VerifierChain {
     /// Event log from the most recent `verify_proximity_two_way` call.
     /// Stored behind Mutex because `ProximityVerifier` methods take `&self`.
     last_event_log: Mutex<Option<VerifierEventLog>>,
+    /// Confidence of the winning verifier from the most recent successful run.
+    /// Used by `confidence_level()` to return the actual result, not the max
+    /// capability. Set to `None` before any verification or after all fail.
+    last_winning_confidence: Mutex<Option<ProximityConfidence>>,
 }
 
 impl VerifierChain {
@@ -44,6 +48,7 @@ impl VerifierChain {
         VerifierChain {
             entries: Vec::new(),
             last_event_log: Mutex::new(None),
+            last_winning_confidence: Mutex::new(None),
         }
     }
 
@@ -148,16 +153,11 @@ impl VerifierChain {
 /// instead of silently passing verification.
 impl ProximityVerifier for VerifierChain {
     fn confidence_level(&self) -> ProximityConfidence {
-        // Return the highest confidence level among entries, or Unknown if empty.
-        self.entries
-            .iter()
-            .map(|e| e.verifier.confidence_level())
-            .max_by_key(|c| match c {
-                ProximityConfidence::High => 3,
-                ProximityConfidence::Medium => 2,
-                ProximityConfidence::Low => 1,
-                ProximityConfidence::Unknown => 0,
-            })
+        // Return the winning verifier's confidence from the last successful run.
+        // Falls back to Unknown if no verification has been performed yet.
+        self.last_winning_confidence
+            .lock()
+            .expect("mutex poisoned")
             .unwrap_or(ProximityConfidence::Unknown)
     }
 
@@ -173,6 +173,8 @@ impl ProximityVerifier for VerifierChain {
 
     fn verify_response(&self, _challenge: &[u8; 16], _response: &[u8]) -> bool {
         // Safety-net: chain verification is at the two_way level, not individual.
+        // Returns false so the default verify_proximity impl fails safely
+        // if this method is ever reached unexpectedly.
         false
     }
 
@@ -184,12 +186,13 @@ impl ProximityVerifier for VerifierChain {
         is_initiator: bool,
     ) -> Result<(), ProximityError> {
         let log = self.verify(emit_challenge, listen_challenge, timeout, is_initiator);
-        let succeeded = log.is_completed();
+        let winning_confidence = log.final_confidence();
 
-        // Store the event log for later retrieval via last_event_log()
+        // Store results for later retrieval
         *self.last_event_log.lock().expect("mutex poisoned") = Some(log);
+        *self.last_winning_confidence.lock().expect("mutex poisoned") = winning_confidence;
 
-        if succeeded {
+        if winning_confidence.is_some() {
             Ok(())
         } else {
             Err(ProximityError::NoResponse)

@@ -51,15 +51,19 @@ impl ProximityVerifier for ProximityBridge {
     }
 
     fn emit_challenge(&self, _challenge: &[u8; 16]) -> Result<(), ProximityError> {
-        Ok(())
+        // Safety-net: the mobile handler is invoked at the two_way level.
+        // These stubs exist only for trait completeness. If verify_proximity_two_way
+        // were accidentally removed, the default impl would call these stubs and
+        // fail safely via Err(NotSupported) in the real handler path.
+        Err(ProximityError::NotSupported)
     }
 
     fn listen_for_response(&self, _timeout: Duration) -> Result<Vec<u8>, ProximityError> {
-        Ok(vec![0x01])
+        Err(ProximityError::NotSupported)
     }
 
     fn verify_response(&self, _challenge: &[u8; 16], _response: &[u8]) -> bool {
-        true
+        false
     }
 
     fn verify_proximity(
@@ -75,6 +79,18 @@ impl ProximityVerifier for ProximityBridge {
         } else {
             Err(ProximityError::DeviceError(result))
         }
+    }
+
+    fn verify_proximity_two_way(
+        &self,
+        emit_challenge: &[u8; 16],
+        _listen_challenge: &[u8; 16],
+        timeout: Duration,
+        _is_initiator: bool,
+    ) -> Result<(), ProximityError> {
+        // Delegate to the mobile handler for the actual hardware verification.
+        // The handler uses platform-specific audio/hardware to verify proximity.
+        self.verify_proximity(emit_challenge, timeout)
     }
 }
 

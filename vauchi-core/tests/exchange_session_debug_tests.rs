@@ -141,7 +141,7 @@ fn key_agreement_logs_completion_and_proximity() {
         .unwrap();
 
     let log = bob_session.exchange_debug_log().unwrap();
-    let event_types: Vec<_> = log
+    let _event_types: Vec<_> = log
         .events()
         .iter()
         .map(|e| std::mem::discriminant(&e.event))

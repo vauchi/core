@@ -17,6 +17,7 @@ use super::{ExchangeError, ExchangeQR, ProximityConfidence, ProximityVerifier, X
 use crate::contact::Contact;
 use crate::contact_card::ContactCard;
 use crate::crypto::kdf::HKDF;
+use crate::diagnostic::exchange_debug::{ExchangeDebugEvent, ExchangeDebugLog};
 use crate::identity::Identity;
 
 /// Session timeout duration (60 seconds for resumption).
@@ -146,6 +147,9 @@ pub struct ExchangeSession {
     their_relay_url: Option<String>,
     /// Their relay's Noise NK public key extracted from their QR code.
     their_relay_noise_pubkey: Option<[u8; 32]>,
+    /// Optional exchange debug log. When enabled, captures timestamped
+    /// events at each state transition for diagnostic analysis.
+    debug_log: Option<ExchangeDebugLog>,
 }
 
 // Compile-time assertion: ExchangeSession must be Send + Sync because
@@ -195,6 +199,7 @@ impl ExchangeSession {
             our_relay_noise_pubkey: None,
             their_relay_url: None,
             their_relay_noise_pubkey: None,
+            debug_log: None,
         }
     }
 
@@ -226,6 +231,7 @@ impl ExchangeSession {
             our_relay_noise_pubkey: None,
             their_relay_url: None,
             their_relay_noise_pubkey: None,
+            debug_log: None,
         }
     }
 
@@ -262,6 +268,7 @@ impl ExchangeSession {
             our_relay_noise_pubkey: None,
             their_relay_url: None,
             their_relay_noise_pubkey: None,
+            debug_log: None,
         }
     }
 
@@ -308,6 +315,7 @@ impl ExchangeSession {
             our_relay_noise_pubkey: None,
             their_relay_url: None,
             their_relay_noise_pubkey: None,
+            debug_log: None,
         }
     }
 
@@ -391,6 +399,38 @@ impl ExchangeSession {
         &*self.proximity
     }
 
+    /// Enable exchange debug logging. Records a `SessionStarted` event
+    /// and captures timestamped events at each subsequent state transition.
+    ///
+    /// Idempotent: calling on an already-enabled session is a no-op.
+    pub fn enable_debug_log(&mut self) {
+        if self.debug_log.is_some() {
+            return;
+        }
+        let mut log = ExchangeDebugLog::new();
+        let transport = match self.transport {
+            ExchangeTransport::Qr => "qr",
+            ExchangeTransport::Nfc => "nfc",
+            ExchangeTransport::Ble => "ble",
+        };
+        log.push(ExchangeDebugEvent::SessionStarted {
+            transport: transport.to_string(),
+        });
+        self.debug_log = Some(log);
+    }
+
+    /// Returns the exchange debug log, if enabled.
+    pub fn exchange_debug_log(&self) -> Option<&ExchangeDebugLog> {
+        self.debug_log.as_ref()
+    }
+
+    /// Push a debug event if logging is enabled.
+    fn debug_event(&mut self, event: ExchangeDebugEvent) {
+        if let Some(ref mut log) = self.debug_log {
+            log.push(event);
+        }
+    }
+
     /// Checks whether a QR code hash has already been consumed.
     ///
     /// If the hash is new, it is recorded and `Ok(())` is returned.
@@ -438,6 +478,9 @@ impl ExchangeSession {
                 self.handle_complete_exchange(card).map(|_| ())
             }
             ExchangeEvent::Fail(err) => {
+                self.debug_event(ExchangeDebugEvent::ExchangeFailed {
+                    error: format!("{:?}", err),
+                });
                 self.fail(err);
                 Ok(())
             }
@@ -535,6 +578,8 @@ impl ExchangeSession {
             shared_key,
         };
 
+        self.debug_event(ExchangeDebugEvent::KeyAgreementCompleted);
+
         // AU-2: Auto-invoke proximity check after key agreement.
         // NFC is exempt: the physical tap IS the proximity proof — running a
         // separate verifier is redundant and could fail on devices without
@@ -542,7 +587,14 @@ impl ExchangeSession {
         if self.transport == ExchangeTransport::Nfc {
             self.proximity_confidence = ProximityConfidence::High;
         } else {
+            let method = format!("{:?}", self.transport);
+            self.debug_event(ExchangeDebugEvent::ProximityCheckStarted {
+                method: method.clone(),
+            });
             self.run_proximity_check();
+            self.debug_event(ExchangeDebugEvent::ProximityCheckCompleted {
+                confidence: format!("{:?}", self.proximity_confidence),
+            });
         }
 
         Ok(())
@@ -581,6 +633,7 @@ impl ExchangeSession {
         self.state = ExchangeState::Complete {
             contact: contact.clone(),
         };
+        self.debug_event(ExchangeDebugEvent::ExchangeCompleted);
 
         Ok(contact)
     }
@@ -607,6 +660,7 @@ impl ExchangeSession {
         );
         self.our_audio_challenge = Some(*our_qr.audio_challenge());
         self.state = ExchangeState::DisplayingQr { our_qr };
+        self.debug_event(ExchangeDebugEvent::QrGenerated);
         Ok(())
     }
 
@@ -655,6 +709,7 @@ impl ExchangeSession {
             their_public_key,
             their_exchange_key,
         };
+        self.debug_event(ExchangeDebugEvent::QrScanned);
 
         Ok(())
     }

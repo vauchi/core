@@ -354,7 +354,7 @@ fn derive_symmetric_key(
 
     let our_pub = our_keys.public_key();
     let info = build_hkdf_info(our_pub, their_pub, exchange_id);
-    let derived = HKDF::derive_key(None, &dh_secret, &info);
+    let derived = HKDF::derive_key(None, &*dh_secret, &info);
     Ok(SymmetricKey::from_bytes(*derived))
 }
 

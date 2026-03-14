@@ -53,7 +53,7 @@ fn test_x3dh_respond_key_differs_from_raw_dh() {
     // The derived key MUST NOT equal the raw DH output — HKDF transforms it
     assert_ne!(
         responder_key.as_bytes(),
-        &raw_dh,
+        &*raw_dh,
         "X3DH respond key must be HKDF-derived, not raw DH output"
     );
 

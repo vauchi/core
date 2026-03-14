@@ -484,7 +484,7 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
         info.extend_from_slice(id_hi);
         info.extend_from_slice(eph_lo);
         info.extend_from_slice(eph_hi);
-        let derived = HKDF::derive_key(None, &shared_bytes, &info);
+        let derived = HKDF::derive_key(None, &*shared_bytes, &info);
         let shared_key = crate::crypto::SymmetricKey::from_bytes(*derived);
 
         self.state = ExchangeState::AwaitingCardExchange {

@@ -10,6 +10,7 @@
 
 use rand::rngs::OsRng;
 use x25519_dalek::{PublicKey, StaticSecret};
+use zeroize::{Zeroize, Zeroizing};
 
 /// Error returned when a Diffie-Hellman computation produces a non-contributory output
 /// (e.g., the all-zero shared secret from a small-subgroup public key).
@@ -56,9 +57,10 @@ impl X3DHKeyPair {
 
     /// Performs Diffie-Hellman key agreement with a public key (from bytes).
     ///
-    /// Returns the 32-byte shared secret, or `DhError` if the output is
-    /// non-contributory (e.g., peer sent a small-subgroup point).
-    pub fn diffie_hellman(&self, their_public: &[u8; 32]) -> Result<[u8; 32], DhError> {
+    /// Returns the 32-byte shared secret wrapped in `Zeroizing` for automatic
+    /// cleanup, or `DhError` if the output is non-contributory (e.g., peer
+    /// sent a small-subgroup point).
+    pub fn diffie_hellman(&self, their_public: &[u8; 32]) -> Result<Zeroizing<[u8; 32]>, DhError> {
         let their_public_key = PublicKey::from(*their_public);
         self.diffie_hellman_raw(&their_public_key)
     }
@@ -67,11 +69,24 @@ impl X3DHKeyPair {
     ///
     /// Used by the X3DH protocol where the peer key is already parsed.
     /// Returns `DhError` if the shared secret is non-contributory.
-    pub(crate) fn diffie_hellman_raw(&self, their_public: &PublicKey) -> Result<[u8; 32], DhError> {
+    pub(crate) fn diffie_hellman_raw(
+        &self,
+        their_public: &PublicKey,
+    ) -> Result<Zeroizing<[u8; 32]>, DhError> {
         let shared = self.secret.diffie_hellman(their_public);
         if !shared.was_contributory() {
             return Err(DhError);
         }
-        Ok(*shared.as_bytes())
+        Ok(Zeroizing::new(*shared.as_bytes()))
+    }
+}
+
+impl Drop for X3DHKeyPair {
+    fn drop(&mut self) {
+        // StaticSecret already zeroizes on drop internally, but we add
+        // defense-in-depth by explicitly zeroizing the secret bytes.
+        // PublicKey is not secret material and does not need zeroization.
+        let mut secret_bytes = self.secret.to_bytes();
+        secret_bytes.zeroize();
     }
 }

@@ -75,7 +75,7 @@ impl X3DH {
 
         // Concatenate DH1 ‖ DH2 and derive via HKDF
         let mut ikm = [0u8; 64];
-        ikm[..32].copy_from_slice(&dh1);
+        ikm[..32].copy_from_slice(&*dh1);
         ikm[32..].copy_from_slice(&dh2);
         let derived = HKDF::derive_key(None, &ikm, X3DH_KEY_INFO);
         ikm.zeroize();
@@ -105,8 +105,8 @@ impl X3DH {
 
         // Concatenate DH1 ‖ DH2 and derive via HKDF
         let mut ikm = [0u8; 64];
-        ikm[..32].copy_from_slice(&dh1);
-        ikm[32..].copy_from_slice(&dh2);
+        ikm[..32].copy_from_slice(&*dh1);
+        ikm[32..].copy_from_slice(&*dh2);
         let derived = HKDF::derive_key(None, &ikm, X3DH_KEY_INFO);
         ikm.zeroize();
         let key = SymmetricKey::from_bytes(*derived);

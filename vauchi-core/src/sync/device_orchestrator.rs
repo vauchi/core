@@ -329,7 +329,7 @@ impl<'a> DeviceSyncOrchestrator<'a> {
             .diffie_hellman(their_public_key)?;
 
         // HKDF to derive encryption key
-        let key_bytes = HKDF::derive_key(None, &shared_secret, DEVICE_SYNC_INFO);
+        let key_bytes = HKDF::derive_key(None, &*shared_secret, DEVICE_SYNC_INFO);
         Ok(SymmetricKey::from_bytes(*key_bytes))
     }
 

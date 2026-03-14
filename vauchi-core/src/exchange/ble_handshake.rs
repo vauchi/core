@@ -647,7 +647,7 @@ fn derive_session_key(
         info.extend_from_slice(our_pub);
     }
 
-    let derived = HKDF::derive_key(Some(&salt), &dh_secret, &info);
+    let derived = HKDF::derive_key(Some(&salt), &*dh_secret, &info);
     Ok(SymmetricKey::from_bytes(*derived))
 }
 

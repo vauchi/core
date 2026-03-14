@@ -532,8 +532,8 @@ fn test_nfc_full_exchange_payload_crypto() {
 
     assert_eq!(alice_shared, bob_shared, "NFC symmetric DH should match");
 
-    let key = vauchi_core::crypto::SymmetricKey::from_bytes(alice_shared);
-    let key2 = vauchi_core::crypto::SymmetricKey::from_bytes(bob_shared);
+    let key = vauchi_core::crypto::SymmetricKey::from_bytes(*alice_shared);
+    let key2 = vauchi_core::crypto::SymmetricKey::from_bytes(*bob_shared);
 
     let msg = b"Hello via NFC!";
     let ct = encrypt(&key, msg).unwrap();

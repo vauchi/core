@@ -25,7 +25,11 @@ bitflags::bitflags! {
         const NFC_TRIGGER  = 0b0001_0000;
         /// TCP (desktop, USB tethering)
         const TCP          = 0b0010_0000;
-        // bits 6-15 reserved for future transports
+        /// Ambient audio fingerprinting (passive room-noise LSH)
+        const AMBIENT_AUDIO  = 0b0100_0000;
+        /// Accelerometer tap/shake pairing
+        const ACCELEROMETER  = 0b1000_0000;
+        // bits 8-15 reserved for future capabilities
     }
 }
 

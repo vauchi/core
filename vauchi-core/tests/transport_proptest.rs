@@ -12,7 +12,7 @@ use vauchi_core::exchange::transport::TransportType;
 
 proptest! {
     #[test]
-    fn caps_roundtrip(bits in 0u16..=0b0011_1111u16) {
+    fn caps_roundtrip(bits in 0u16..=0b1111_1111u16) {
         let caps = TransportCaps::from_bits_truncate(bits);
         let bytes = caps.to_bytes();
         let restored = TransportCaps::from_bytes(bytes);
@@ -21,8 +21,8 @@ proptest! {
 
     #[test]
     fn negotiation_always_returns_valid_type(
-        ours_bits in 0u16..=0b0011_1111u16,
-        theirs_bits in 0u16..=0b0011_1111u16,
+        ours_bits in 0u16..=0b1111_1111u16,
+        theirs_bits in 0u16..=0b1111_1111u16,
     ) {
         let ours = TransportCaps::from_bits_truncate(ours_bits);
         let theirs = TransportCaps::from_bits_truncate(theirs_bits);
@@ -36,8 +36,8 @@ proptest! {
 
     #[test]
     fn negotiation_symmetric(
-        ours_bits in 0u16..=0b0011_1111u16,
-        theirs_bits in 0u16..=0b0011_1111u16,
+        ours_bits in 0u16..=0b1111_1111u16,
+        theirs_bits in 0u16..=0b1111_1111u16,
     ) {
         let ours = TransportCaps::from_bits_truncate(ours_bits);
         let theirs = TransportCaps::from_bits_truncate(theirs_bits);

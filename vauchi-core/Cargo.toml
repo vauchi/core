@@ -342,6 +342,10 @@ name = "transport_confidence_correctness_tests"
 required-features = ["testing"]
 
 [[test]]
+name = "verifier_caps_tests"
+required-features = ["testing"]
+
+[[test]]
 name = "exchange_relay_wiring_tests"
 required-features = ["testing"]
 

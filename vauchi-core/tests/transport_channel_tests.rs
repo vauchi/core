@@ -26,9 +26,9 @@ fn test_transport_type_display() {
 fn test_transport_priority_ordering() {
     assert!(TransportType::WifiAware.priority() > TransportType::Tcp.priority());
     assert!(TransportType::Tcp.priority() > TransportType::Ble.priority());
+    assert!(TransportType::Nfc.priority() > TransportType::Ble.priority());
     assert!(TransportType::Ble.priority() > TransportType::AnimatedQr.priority());
     assert!(TransportType::AnimatedQr.priority() > TransportType::StaticQr.priority());
-    assert!(TransportType::StaticQr.priority() > TransportType::Nfc.priority());
 }
 
 #[test]

@@ -338,6 +338,10 @@ name = "transport_proptest"
 required-features = ["testing"]
 
 [[test]]
+name = "transport_confidence_correctness_tests"
+required-features = ["testing"]
+
+[[test]]
 name = "exchange_relay_wiring_tests"
 required-features = ["testing"]
 

@@ -87,8 +87,9 @@ impl SymmetricKey {
     ///
     /// Use this at trust boundaries (deserialization, network input) where
     /// panicking is unacceptable.
-    pub fn try_from_bytes(bytes: [u8; 32]) -> Result<Self, EncryptionError> {
+    pub fn try_from_bytes(mut bytes: [u8; 32]) -> Result<Self, EncryptionError> {
         if bytes.iter().all(|&b| b == 0) {
+            bytes.zeroize();
             return Err(EncryptionError::DegenerateKey);
         }
         Ok(SymmetricKey { bytes })
@@ -96,8 +97,10 @@ impl SymmetricKey {
 
     /// Creates a key from raw bytes without validation.
     ///
-    /// Only use this for deserialization of keys known to be valid
-    /// (e.g., from encrypted storage). Prefer `from_bytes` for new keys.
+    /// Only use this for deserialization of keys already validated and stored
+    /// (e.g., from encrypted storage). At trust boundaries (network input,
+    /// user-supplied data), prefer [`try_from_bytes`](Self::try_from_bytes)
+    /// which returns `Result` instead of panicking.
     pub fn from_bytes_unchecked(bytes: [u8; 32]) -> Self {
         SymmetricKey { bytes }
     }

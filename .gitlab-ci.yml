@@ -108,8 +108,9 @@ auto-tag:version:
         BASE_VERSION=$(echo "${VERSION}" | sed 's/-.*//')
 
         # Find highest existing dev tag and increment
+        # Filter out ^{} dereferenced refs which break the grep pattern
         LAST_DEV=$(git ls-remote --tags origin "refs/tags/v${BASE_VERSION}-dev.*" \
-          | sed 's|.*/||' | sort -V | tail -1 || true)
+          | grep -v '\^{}' | sed 's|.*/||' | sort -V | tail -1 || true)
         if [ -n "${LAST_DEV}" ]; then
           N=$(echo "${LAST_DEV}" | grep -oE '[0-9]+$')
           N=$((N + 1))
@@ -118,9 +119,12 @@ auto-tag:version:
         fi
         DEV_TAG="v${BASE_VERSION}-dev.${N}"
 
-        echo "Creating dev tag: ${DEV_TAG}"
+        echo "Creating dev tag: ${DEV_TAG} (last=${LAST_DEV:-none}, N=${N})"
         git tag -a "${DEV_TAG}" -m "Dev build ${DEV_TAG}"
-        git push origin "${DEV_TAG}"
+        if ! git push origin "${DEV_TAG}" 2>&1; then
+          echo "✗ Failed to push ${DEV_TAG} — tag may already exist"
+          exit 1
+        fi
         echo "✓ Created and pushed dev tag ${DEV_TAG}"
         exit 0
       fi

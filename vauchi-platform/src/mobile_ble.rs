@@ -408,7 +408,14 @@ impl MobileBleExchangeSession {
 
         let mut reassembler_guard = self.reassembler.lock().unwrap();
         if reassembler_guard.is_none() {
-            *reassembler_guard = Some(BleReassembler::new(total));
+            match BleReassembler::new(total) {
+                Ok(r) => *reassembler_guard = Some(r),
+                Err(e) => {
+                    drop(reassembler_guard);
+                    self.fail(format!("Reassembler creation failed: {e:?}"));
+                    return;
+                }
+            }
         }
 
         let reassembler = reassembler_guard.as_mut().unwrap();

@@ -16,6 +16,12 @@ use super::error::ExchangeError;
 /// Overhead per chunk: 2 bytes chunk_index + 2 bytes total_chunks.
 pub const BLE_CHUNK_OVERHEAD: usize = 4;
 
+/// Maximum number of chunks allowed during reassembly.
+pub const MAX_TOTAL_CHUNKS: usize = 256;
+
+/// Maximum total reassembled payload size in bytes (64 KB).
+pub const MAX_REASSEMBLED_SIZE: usize = 65536;
+
 /// Splits a byte buffer into BLE MTU-sized chunks.
 pub struct BleChunker {
     data: Vec<u8>,
@@ -70,11 +76,18 @@ pub struct BleReassembler {
 
 impl BleReassembler {
     /// Create a new reassembler expecting `total` chunks.
-    pub fn new(total: u16) -> Self {
-        Self {
+    ///
+    /// Returns an error if `total` exceeds [`MAX_TOTAL_CHUNKS`].
+    pub fn new(total: u16) -> Result<Self, ExchangeError> {
+        if (total as usize) > MAX_TOTAL_CHUNKS {
+            return Err(ExchangeError::BleReassemblyLimitExceeded(format!(
+                "total chunks {total} exceeds maximum {MAX_TOTAL_CHUNKS}"
+            )));
+        }
+        Ok(Self {
             total,
             chunks: HashMap::with_capacity(total as usize),
-        }
+        })
     }
 
     /// Parse and insert a chunk packet.
@@ -102,6 +115,20 @@ impl BleReassembler {
         }
 
         let data = packet[BLE_CHUNK_OVERHEAD..].to_vec();
+
+        // Check reassembled size limit before inserting
+        let new_bytes: usize = if self.chunks.contains_key(&index) {
+            0 // duplicate, won't add bytes
+        } else {
+            data.len()
+        };
+        let current_size: usize = self.chunks.values().map(|v| v.len()).sum();
+        if current_size + new_bytes > MAX_REASSEMBLED_SIZE {
+            return Err(ExchangeError::BleReassemblyLimitExceeded(format!(
+                "reassembled size would exceed maximum {MAX_REASSEMBLED_SIZE} bytes"
+            )));
+        }
+
         // Idempotent: duplicate inserts are silently accepted
         self.chunks.entry(index).or_insert(data);
 

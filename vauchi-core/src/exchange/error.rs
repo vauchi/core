@@ -158,6 +158,12 @@ pub enum ExchangeError {
     #[error("BLE chunk reassembly failed: {0}")]
     BleChunkReassemblyFailed(String),
 
+    #[error("Display name too long ({0} bytes, max 255)")]
+    DisplayNameTooLong(usize),
+
+    #[error("BLE reassembly limit exceeded: {0}")]
+    BleReassemblyLimitExceeded(String),
+
     #[error("Non-contributory DH output: {0}")]
     InvalidDhOutput(#[from] DhError),
 }

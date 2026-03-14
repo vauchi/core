@@ -58,7 +58,7 @@ fn test_roundtrip_chunking_reassembly() {
     let total = chunker.total_chunks();
     assert!(total > 1, "2000 bytes should need multiple chunks");
 
-    let mut reassembler = BleReassembler::new(total);
+    let mut reassembler = BleReassembler::new(total).unwrap();
     for i in 0..total {
         let chunk = chunker.chunk(i).expect("chunk should exist");
         reassembler
@@ -88,7 +88,7 @@ fn test_reassembly_out_of_order() {
         .collect();
 
     // Insert in reverse order
-    let mut reassembler = BleReassembler::new(total);
+    let mut reassembler = BleReassembler::new(total).unwrap();
     for chunk in chunks.iter().rev() {
         reassembler
             .insert_chunk(chunk)
@@ -110,7 +110,7 @@ fn test_reassembly_duplicate_chunk_is_idempotent() {
     let total = chunker.total_chunks();
     assert!(total > 1);
 
-    let mut reassembler = BleReassembler::new(total);
+    let mut reassembler = BleReassembler::new(total).unwrap();
 
     // Insert first chunk twice
     let chunk0 = chunker.chunk(0).expect("chunk 0 should exist");
@@ -136,7 +136,7 @@ fn test_reassembly_incomplete_returns_none() {
     let total = chunker.total_chunks();
     assert!(total > 1);
 
-    let mut reassembler = BleReassembler::new(total);
+    let mut reassembler = BleReassembler::new(total).unwrap();
 
     // Insert only the first chunk
     let chunk0 = chunker.chunk(0).expect("chunk 0 should exist");

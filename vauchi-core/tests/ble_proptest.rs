@@ -90,13 +90,13 @@ proptest! {
 
     #[test]
     fn prop_chunking_roundtrip(
-        data in prop::collection::vec(any::<u8>(), 1..15_000),
         mtu in 20usize..512,
+        data in prop::collection::vec(any::<u8>(), 1..4_000),
     ) {
         let chunker = BleChunker::new(&data, mtu);
         let total = chunker.total_chunks();
 
-        let mut reassembler = BleReassembler::new(total);
+        let mut reassembler = BleReassembler::new(total).unwrap();
         for i in 0..total {
             let chunk = chunker.chunk(i).expect("chunk index must be valid");
             reassembler.insert_chunk(&chunk).expect("insert must succeed");

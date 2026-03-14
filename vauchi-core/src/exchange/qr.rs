@@ -48,6 +48,9 @@ const QR_EXPIRY_SECONDS: u64 = 5;
 /// QR code magic bytes to identify Vauchi QR codes.
 const MAGIC: &[u8; 4] = b"WBEX";
 
+/// Maximum allowed display name length in bytes.
+const MAX_DISPLAY_NAME_LEN: usize = 255;
+
 /// Flag: relay URL is present after display name
 const FLAG_HAS_RELAY_URL: u8 = 0x01;
 /// Flag: relay Noise NK pubkey is present
@@ -338,6 +341,10 @@ impl ExchangeQR {
 
         let display_name = String::from_utf8(bytes[127..name_end].to_vec())
             .map_err(|_| ExchangeError::InvalidQRFormat)?;
+
+        if name_len > MAX_DISPLAY_NAME_LEN {
+            return Err(ExchangeError::DisplayNameTooLong(name_len));
+        }
 
         // Parse flags byte
         let flags = bytes[name_end];

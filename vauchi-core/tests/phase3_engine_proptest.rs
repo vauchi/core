@@ -152,7 +152,8 @@ fn validate_result(
         | ActionResult::OpenUrl { .. }
         | ActionResult::ShowAlert { .. }
         | ActionResult::ShowToast { .. }
-        | ActionResult::OpenEntryDetail { .. } => {}
+        | ActionResult::OpenEntryDetail { .. }
+        | ActionResult::ExchangeCommands { .. } => {}
     }
     Ok(())
 }

@@ -493,7 +493,8 @@ proptest! {
                 | ActionResult::ShowToast { .. }
                 | ActionResult::RequestCamera
                 | ActionResult::OpenEntryDetail { .. }
-                | ActionResult::WipeComplete => {
+                | ActionResult::WipeComplete
+                | ActionResult::ExchangeCommands { .. } => {
                     // Valid external navigation/action results
                 }
             }

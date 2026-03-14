@@ -1,0 +1,222 @@
+// SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+//
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+//! Tests for DebugSession — zero-cost debug instrumentation wrapper.
+
+#![cfg(feature = "testing")]
+
+use vauchi_core::diagnostic::debug_session::{DebugSession, ScreenId};
+use vauchi_core::diagnostic::log_event::LogEventKind;
+
+// ===== Inactive session (no-op) =====
+
+#[test]
+fn inactive_session_is_default() {
+    let session = DebugSession::new();
+    assert!(!session.is_active());
+}
+
+#[test]
+fn inactive_session_ignores_events() {
+    let mut session = DebugSession::new();
+    session.log_screen_appeared(ScreenId::Home);
+    session.log_screen_dismissed(ScreenId::Home);
+    session.log_user_action(ScreenId::Home, "tap_exchange".to_string());
+
+    // No events recorded when inactive
+    assert!(session.events().is_empty());
+}
+
+// ===== Active session =====
+
+#[test]
+fn activate_enables_event_collection() {
+    let mut session = DebugSession::new();
+    session.activate();
+    assert!(session.is_active());
+
+    session.log_screen_appeared(ScreenId::Home);
+    // 2 events: DebugModeActivated + ScreenAppeared
+    assert_eq!(session.events().len(), 2);
+}
+
+#[test]
+fn activation_logs_debug_mode_activated_event() {
+    let mut session = DebugSession::new();
+    session.activate();
+
+    let events = session.events();
+    assert_eq!(events.len(), 1);
+    assert!(matches!(&events[0].kind, LogEventKind::DebugModeActivated));
+}
+
+#[test]
+fn deactivate_stops_collection() {
+    let mut session = DebugSession::new();
+    session.activate();
+    session.log_screen_appeared(ScreenId::Home);
+    session.deactivate();
+    session.log_screen_appeared(ScreenId::Settings);
+
+    // Only the activation event + Home event, not Settings
+    assert_eq!(session.events().len(), 2);
+}
+
+// ===== UX event logging =====
+
+#[test]
+fn log_screen_appeared() {
+    let mut session = DebugSession::new();
+    session.activate();
+    session.log_screen_appeared(ScreenId::ExchangeStart);
+
+    let events = session.events();
+    // First event is DebugModeActivated, second is ScreenAppeared
+    assert_eq!(events.len(), 2);
+    assert!(matches!(
+        &events[1].kind,
+        LogEventKind::ScreenAppeared { screen } if *screen == ScreenId::ExchangeStart
+    ));
+}
+
+#[test]
+fn log_screen_dismissed() {
+    let mut session = DebugSession::new();
+    session.activate();
+    session.log_screen_dismissed(ScreenId::ExchangeQrScan);
+
+    assert_eq!(session.events().len(), 2);
+    assert!(matches!(
+        &events_last(&session).kind,
+        LogEventKind::ScreenDismissed { screen } if *screen == ScreenId::ExchangeQrScan
+    ));
+}
+
+#[test]
+fn log_user_action() {
+    let mut session = DebugSession::new();
+    session.activate();
+    session.log_user_action(ScreenId::ContactList, "tap_contact".to_string());
+
+    assert!(matches!(
+        &events_last(&session).kind,
+        LogEventKind::UserAction { screen, action }
+            if *screen == ScreenId::ContactList && action == "tap_contact"
+    ));
+}
+
+#[test]
+fn log_flow_abandoned() {
+    let mut session = DebugSession::new();
+    session.activate();
+    session.log_flow_abandoned(ScreenId::ExchangeQrDisplay, "user_backed_out".to_string());
+
+    assert!(matches!(
+        &events_last(&session).kind,
+        LogEventKind::FlowAbandoned { screen, reason }
+            if *screen == ScreenId::ExchangeQrDisplay && reason == "user_backed_out"
+    ));
+}
+
+#[test]
+fn log_error_presented() {
+    let mut session = DebugSession::new();
+    session.activate();
+    session.log_error_presented(ScreenId::ExchangeFailure, "timeout".to_string());
+
+    assert!(matches!(
+        &events_last(&session).kind,
+        LogEventKind::ErrorPresented { screen, error }
+            if *screen == ScreenId::ExchangeFailure && error == "timeout"
+    ));
+}
+
+#[test]
+fn log_tester_note() {
+    let mut session = DebugSession::new();
+    session.activate();
+    session.log_tester_note("QR hard to scan in bright sunlight".to_string());
+
+    assert!(matches!(
+        &events_last(&session).kind,
+        LogEventKind::TesterNote { note }
+            if note == "QR hard to scan in bright sunlight"
+    ));
+}
+
+#[test]
+fn log_retry_attempted() {
+    let mut session = DebugSession::new();
+    session.activate();
+    session.log_retry_attempted(ScreenId::ExchangeQrScan, 2);
+
+    assert!(matches!(
+        &events_last(&session).kind,
+        LogEventKind::RetryAttempted { screen, attempt }
+            if *screen == ScreenId::ExchangeQrScan && *attempt == 2
+    ));
+}
+
+// ===== ScreenId coverage =====
+
+#[test]
+fn screen_id_serde_roundtrip() {
+    let screens = vec![
+        ScreenId::Onboarding,
+        ScreenId::Home,
+        ScreenId::ExchangeStart,
+        ScreenId::ExchangeQrDisplay,
+        ScreenId::ExchangeQrScan,
+        ScreenId::ExchangeProximityVerification,
+        ScreenId::ExchangeConfirmation,
+        ScreenId::ExchangeSuccess,
+        ScreenId::ExchangeFailure,
+        ScreenId::ContactList,
+        ScreenId::ContactDetail,
+        ScreenId::LinkDeviceStart,
+        ScreenId::LinkDeviceConfirmation,
+        ScreenId::LinkDeviceSuccess,
+        ScreenId::Settings,
+        ScreenId::DebugPanel,
+    ];
+
+    for screen in &screens {
+        let json = serde_json::to_string(screen).expect("serialize");
+        let deserialized: ScreenId = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(*screen, deserialized);
+    }
+}
+
+// ===== JSONL export =====
+
+#[test]
+fn to_jsonl_exports_all_events() {
+    let mut session = DebugSession::new();
+    session.activate();
+    session.log_screen_appeared(ScreenId::Home);
+    session.log_tester_note("test note".to_string());
+
+    let jsonl = session.to_jsonl();
+    let lines: Vec<&str> = jsonl.lines().collect();
+    assert_eq!(lines.len(), 3); // DebugModeActivated + ScreenAppeared + TesterNote
+
+    for line in &lines {
+        let parsed: serde_json::Value =
+            serde_json::from_str(line).unwrap_or_else(|e| panic!("Invalid JSON: {}: {}", line, e));
+        assert!(parsed.get("timestamp_ms").is_some());
+        assert!(parsed.get("kind").is_some());
+    }
+}
+
+#[test]
+fn inactive_session_jsonl_is_empty() {
+    let session = DebugSession::new();
+    assert!(session.to_jsonl().is_empty());
+}
+
+// ===== Helpers =====
+
+fn events_last(session: &DebugSession) -> &vauchi_core::diagnostic::log_event::LogEvent {
+    session.events().last().expect("should have events")
+}

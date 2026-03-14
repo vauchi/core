@@ -6811,6 +6811,7 @@ dependencies = [
  "cbindgen",
  "serde_json",
  "vauchi-core",
+ "zeroize",
 ]
 
 [[package]]

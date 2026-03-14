@@ -8,7 +8,6 @@
 //! Implementations can use ultrasonic audio, BLE, or other mechanisms.
 
 use std::time::Duration;
-use subtle::ConstantTimeEq;
 use thiserror::Error;
 
 /// Errors that can occur during proximity verification.
@@ -190,14 +189,11 @@ impl ProximityVerifier for MockProximityVerifier {
         }
     }
 
-    fn verify_response(&self, challenge: &[u8; 16], response: &[u8]) -> bool {
-        if response.len() != 17 {
-            return false;
-        }
-        if response[0] != 0x01 {
-            return false;
-        }
-        response[1..17].ct_eq(challenge).into()
+    fn verify_response(&self, _challenge: &[u8; 16], response: &[u8]) -> bool {
+        // Mock operates in a single process — it can't simulate the other device
+        // independently emitting our challenge. Just check format + should_succeed.
+        // Real verifiers (UltrasonicVerifier) do cryptographic challenge matching.
+        response.len() == 17 && response[0] == 0x01 && self.should_succeed
     }
 }
 

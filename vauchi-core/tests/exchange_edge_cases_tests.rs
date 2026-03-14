@@ -33,10 +33,7 @@ fn mock_proximity() -> MockProximityVerifier {
 /// `AwaitingCardExchange` state.
 ///
 /// Creates fresh identities internally since `Identity` is not `Clone`.
-fn advance_to_card_exchange() -> (
-    ExchangeSession<MockProximityVerifier>,
-    ExchangeSession<MockProximityVerifier>,
-) {
+fn advance_to_card_exchange() -> (ExchangeSession, ExchangeSession) {
     let alice_identity = Identity::create("Alice");
     let bob_identity = Identity::create("Bob");
 

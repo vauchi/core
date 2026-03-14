@@ -102,7 +102,11 @@ pub enum ExchangeEvent {
 }
 
 /// An exchange session managing the state of a contact exchange.
-pub struct ExchangeSession<P: ProximityVerifier> {
+///
+/// Stores the proximity verifier as `Box<dyn ProximityVerifier>`, eliminating
+/// the need for generic type parameters and enabling VerifierChain to be used
+/// directly without enum dispatch wrappers.
+pub struct ExchangeSession {
     /// Current state
     state: ExchangeState,
     /// Transport mechanism (QR, NFC, BLE)
@@ -113,8 +117,8 @@ pub struct ExchangeSession<P: ProximityVerifier> {
     our_card: ContactCard,
     /// Our X3DH keypair for this session (fresh ephemeral)
     our_x3dh: X3DHKeyPair,
-    /// Proximity verifier (used by NFC/BLE flows, not QR)
-    proximity: P,
+    /// Proximity verifier (trait object — supports any verifier or chain).
+    proximity: Box<dyn ProximityVerifier>,
     /// Proximity confidence result from the last proximity check.
     proximity_confidence: ProximityConfidence,
     /// When the session started
@@ -144,13 +148,22 @@ pub struct ExchangeSession<P: ProximityVerifier> {
     their_relay_noise_pubkey: Option<[u8; 32]>,
 }
 
-impl<P: ProximityVerifier> ExchangeSession<P> {
+impl ExchangeSession {
     /// Creates a new QR exchange session.
     ///
     /// Both parties display QR codes with fresh ephemeral X25519 keys and
     /// scan each other's. This gives bidirectional identity verification
     /// and full forward secrecy (no identity-derived X3DH keys used).
-    pub fn new_qr(identity: Identity, our_card: ContactCard, proximity: P) -> Self {
+    ///
+    /// The `proximity` parameter accepts any `ProximityVerifier` implementation.
+    /// The `'static` bound is required because the verifier is stored as a trait
+    /// object (`Box<dyn ProximityVerifier>`). All current implementations are
+    /// fully owned types and satisfy this bound.
+    pub fn new_qr(
+        identity: Identity,
+        our_card: ContactCard,
+        proximity: impl ProximityVerifier + 'static,
+    ) -> Self {
         // Fresh ephemeral keypair — NOT derived from identity
         let our_x3dh = X3DHKeyPair::generate();
         ExchangeSession {
@@ -159,7 +172,7 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
             identity,
             our_card,
             our_x3dh,
-            proximity,
+            proximity: Box::new(proximity),
             proximity_confidence: ProximityConfidence::Unknown,
             started_at: Instant::now(),
             interrupted: false,
@@ -181,7 +194,7 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
     pub fn new_qr_with_x3dh(
         identity: Identity,
         our_card: ContactCard,
-        proximity: P,
+        proximity: impl ProximityVerifier + 'static,
         our_x3dh: X3DHKeyPair,
     ) -> Self {
         ExchangeSession {
@@ -190,7 +203,7 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
             identity,
             our_card,
             our_x3dh,
-            proximity,
+            proximity: Box::new(proximity),
             proximity_confidence: ProximityConfidence::Unknown,
             started_at: Instant::now(),
             interrupted: false,
@@ -212,7 +225,11 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
     /// A single NFC tap replaces both QR scan and proximity verification.
     /// Both sides use fresh ephemeral X25519 keys for full forward secrecy.
     /// The session starts in `AwaitingNfcTap` — ready to receive a tap event.
-    pub fn new_nfc(identity: Identity, our_card: ContactCard, proximity: P) -> Self {
+    pub fn new_nfc(
+        identity: Identity,
+        our_card: ContactCard,
+        proximity: impl ProximityVerifier + 'static,
+    ) -> Self {
         let our_x3dh = X3DHKeyPair::generate();
         let display_name = our_card.display_name().to_string();
         let nfc_handshake = NfcHandshakeSession::new_initiator(&identity, display_name);
@@ -222,7 +239,7 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
             identity,
             our_card,
             our_x3dh,
-            proximity,
+            proximity: Box::new(proximity),
             proximity_confidence: ProximityConfidence::Unknown,
             started_at: Instant::now(),
             interrupted: false,
@@ -244,7 +261,11 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
     /// Uses GATT-based payload exchange with proximity verification.
     /// Both sides use fresh ephemeral X25519 keys for full forward secrecy.
     /// The session starts in `AwaitingBleConnection` — ready to receive a BLE event.
-    pub fn new_ble(identity: Identity, our_card: ContactCard, proximity: P) -> Self {
+    pub fn new_ble(
+        identity: Identity,
+        our_card: ContactCard,
+        proximity: impl ProximityVerifier + 'static,
+    ) -> Self {
         let our_x3dh = X3DHKeyPair::generate();
         let card = our_card.clone();
         let ble_card = BleCardPayload::new(
@@ -264,7 +285,7 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
             identity,
             our_card,
             our_x3dh,
-            proximity,
+            proximity: Box::new(proximity),
             proximity_confidence: ProximityConfidence::Unknown,
             started_at: Instant::now(),
             interrupted: false,
@@ -344,8 +365,8 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
 
     /// Returns a reference to the proximity verifier (test-only).
     #[cfg(any(test, feature = "testing"))]
-    pub fn proximity_verifier(&self) -> &P {
-        &self.proximity
+    pub fn proximity_verifier(&self) -> &dyn ProximityVerifier {
+        &*self.proximity
     }
 
     /// Checks whether a QR code hash has already been consumed.

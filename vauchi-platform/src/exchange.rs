@@ -159,75 +159,25 @@ pub enum MobileBleExchangeStatus {
 
 // === Session Wrapper ===
 
-/// Internal enum to hold either type of session.
-enum SessionInner {
-    Proximity(ExchangeSession<ProximityBridge>),
-    Manual(ExchangeSession<ManualConfirmationBridge>),
-}
-
-impl SessionInner {
-    fn state(&self) -> &ExchangeState {
-        match self {
-            SessionInner::Proximity(s) => s.state(),
-            SessionInner::Manual(s) => s.state(),
-        }
-    }
-
-    fn apply(&mut self, event: ExchangeEvent) -> Result<(), vauchi_core::exchange::ExchangeError> {
-        match self {
-            SessionInner::Proximity(s) => s.apply(event),
-            SessionInner::Manual(s) => s.apply(event),
-        }
-    }
-
-    fn is_timed_out(&self) -> bool {
-        match self {
-            SessionInner::Proximity(s) => s.is_timed_out(),
-            SessionInner::Manual(s) => s.is_timed_out(),
-        }
-    }
-
-    fn qr(&self) -> Option<&ExchangeQR> {
-        match self {
-            SessionInner::Proximity(s) => s.qr(),
-            SessionInner::Manual(s) => s.qr(),
-        }
-    }
-
-    fn their_display_name(&self) -> Option<String> {
-        match self {
-            SessionInner::Proximity(s) => s.their_display_name().map(String::from),
-            SessionInner::Manual(s) => s.their_display_name().map(String::from),
-        }
-    }
-}
-
 /// Mobile exchange session wrapping the core `ExchangeSession` state machine.
 ///
 /// Drives the exchange flow: generate/scan QR -> verify proximity -> key agreement -> complete.
+/// Since `ExchangeSession` stores `Box<dyn ProximityVerifier>`, no enum dispatch is needed.
 #[derive(uniffi::Object)]
 pub struct MobileExchangeSession {
-    inner: Mutex<SessionInner>,
+    inner: Mutex<ExchangeSession>,
     manual_verifier: Option<Arc<ManualConfirmationVerifier>>,
 }
 
 impl MobileExchangeSession {
-    /// Create a new session from a proximity-based inner session.
-    pub(crate) fn from_proximity(session: ExchangeSession<ProximityBridge>) -> Self {
-        MobileExchangeSession {
-            inner: Mutex::new(SessionInner::Proximity(session)),
-            manual_verifier: None,
-        }
-    }
-
-    /// Create a new session from a manual-confirmation inner session.
-    pub(crate) fn from_manual(
-        session: ExchangeSession<ManualConfirmationBridge>,
-        verifier: Arc<ManualConfirmationVerifier>,
+    /// Create a new session with an optional manual verifier handle.
+    pub(crate) fn new(
+        session: ExchangeSession,
+        manual_verifier: Option<Arc<ManualConfirmationVerifier>>,
     ) -> Self {
         MobileExchangeSession {
-            inner: Mutex::new(SessionInner::Manual(session)),
-            manual_verifier: Some(verifier),
+            inner: Mutex::new(session),
+            manual_verifier,
         }
     }
 
@@ -345,7 +295,11 @@ impl MobileExchangeSession {
     ///
     /// Available after `process_qr()` has been called successfully.
     pub fn peer_display_name(&self) -> Option<String> {
-        self.inner.lock().unwrap().their_display_name()
+        self.inner
+            .lock()
+            .unwrap()
+            .their_display_name()
+            .map(String::from)
     }
 }
 
@@ -361,7 +315,7 @@ pub(crate) fn create_qr_exchange_proximity(
         handler: Arc::from(handler),
     };
     let session = ExchangeSession::new_qr(identity, our_card, bridge);
-    Arc::new(MobileExchangeSession::from_proximity(session))
+    Arc::new(MobileExchangeSession::new(session, None))
 }
 
 /// Create a QR exchange session with manual confirmation.
@@ -371,7 +325,7 @@ pub(crate) fn create_qr_exchange_manual(
 ) -> Arc<MobileExchangeSession> {
     let (bridge, verifier) = ManualConfirmationBridge::new();
     let session = ExchangeSession::new_qr(identity, our_card, bridge);
-    Arc::new(MobileExchangeSession::from_manual(session, verifier))
+    Arc::new(MobileExchangeSession::new(session, Some(verifier)))
 }
 
 /// Check if BLE exchange is available on this device.

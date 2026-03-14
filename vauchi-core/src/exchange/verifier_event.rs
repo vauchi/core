@@ -85,7 +85,7 @@ pub enum ProximityVerifierEvent {
 ///
 /// Used by the VerifierChain to track progress and by tests to assert
 /// the correct sequence of events.
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct VerifierEventLog {
     events: Vec<ProximityVerifierEvent>,
 }

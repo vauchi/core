@@ -65,7 +65,7 @@ impl VerifierChain {
     ///
     /// Tries each verifier in order using `verify_proximity_two_way`.
     /// Emits events for each attempt. Returns a log of all events.
-    pub fn verify(
+    pub(crate) fn verify(
         &self,
         emit_challenge: &[u8; 16],
         listen_challenge: &[u8; 16],

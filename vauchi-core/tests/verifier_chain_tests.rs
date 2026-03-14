@@ -371,3 +371,39 @@ fn trait_impl_verification_event_log_delegates_to_last_event_log() {
     assert_eq!(via_trait.events().len(), via_direct.events().len());
     assert!(via_trait.is_completed());
 }
+
+// ===== Atomicity consistency tests =====
+
+#[test]
+fn log_and_confidence_are_consistent_after_fallback() {
+    // Fail → Succeed chain: confidence must match the winning verifier's
+    // method in the event log. Guards against future regressions if someone
+    // splits the single Mutex<VerificationResult> back into two fields.
+    let mut chain = VerifierChain::new();
+    chain.add(
+        VerifierMethod::Ultrasonic,
+        Box::new(MockProximityVerifier::failure()),
+    );
+    chain.add(
+        VerifierMethod::ManualConfirmation,
+        Box::new(ManualConfirmationVerifier::pre_confirmed()),
+    );
+
+    let emit = [0u8; 16];
+    let listen = [1u8; 16];
+    chain
+        .verify_proximity_two_way(&emit, &listen, Duration::from_secs(5), true)
+        .unwrap();
+
+    // Read both fields — they must agree on ManualConfirmation / Medium
+    let confidence = chain.confidence_level();
+    let log = chain.last_event_log().expect("log should exist");
+    assert_eq!(confidence, ProximityConfidence::Medium);
+    assert!(log.is_completed());
+
+    let completed_method = log.events().iter().find_map(|e| match e {
+        ProximityVerifierEvent::Completed { method, .. } => Some(*method),
+        _ => None,
+    });
+    assert_eq!(completed_method, Some(VerifierMethod::ManualConfirmation));
+}

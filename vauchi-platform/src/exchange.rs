@@ -331,14 +331,17 @@ impl MobileExchangeSession {
 
     /// Enable exchange debug logging.
     ///
+    /// Production API: intended for the debug panel settings toggle.
     /// When enabled, captures timestamped events at each state transition
     /// (QR generation, scan, key agreement, proximity, completion/failure).
-    /// Call before starting the exchange flow.
+    /// Call once before `generate_qr()`. Idempotent.
     pub fn enable_debug_log(&self) {
         self.inner.lock().unwrap().enable_debug_log();
     }
 
     /// Returns the exchange debug log as JSONL, if enabled.
+    ///
+    /// Production API: intended for diagnostic export (share sheet, clipboard).
     pub fn get_exchange_debug_jsonl(&self) -> Option<String> {
         self.inner
             .lock()
@@ -348,6 +351,8 @@ impl MobileExchangeSession {
     }
 
     /// Returns the exchange debug log as Markdown, if enabled.
+    ///
+    /// Production API: intended for diagnostic export (share sheet, clipboard).
     pub fn get_exchange_debug_markdown(&self) -> Option<String> {
         self.inner
             .lock()

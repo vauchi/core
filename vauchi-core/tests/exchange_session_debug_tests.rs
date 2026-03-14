@@ -217,7 +217,7 @@ fn fail_event_logs_exchange_failed() {
     let log = session.exchange_debug_log().unwrap();
     assert!(log.events().iter().any(|e| matches!(
         &e.event,
-        ExchangeDebugEvent::ExchangeFailed { error } if error == "SessionTimeout"
+        ExchangeDebugEvent::ExchangeFailed { error } if error == "Exchange session timed out"
     )));
 }
 

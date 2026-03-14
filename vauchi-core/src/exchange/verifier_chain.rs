@@ -73,8 +73,9 @@ impl VerifierChain {
     /// Set a callback for real-time event emission during verification.
     ///
     /// The callback receives each `ProximityVerifierEvent` as it occurs,
-    /// before it is stored in the event log. This enables the platform/UI
-    /// layer to show live progress indicators and fallback notifications.
+    /// before it is stored in the event log. Currently used by integration
+    /// tests; will be wired into the platform layer for live UI progress.
+    #[cfg(any(test, feature = "testing"))]
     pub fn set_event_callback(
         &mut self,
         callback: impl Fn(&ProximityVerifierEvent) + Send + Sync + 'static,
@@ -95,7 +96,7 @@ impl VerifierChain {
     /// Tries each verifier in order using `verify_proximity_two_way`.
     /// Emits events for each attempt. Returns a log of all events.
     /// Called only from `verify_proximity_two_way`; not part of the public API.
-    pub(crate) fn verify(
+    fn verify(
         &self,
         emit_challenge: &[u8; 16],
         listen_challenge: &[u8; 16],

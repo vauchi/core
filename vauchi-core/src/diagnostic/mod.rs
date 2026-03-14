@@ -3,16 +3,16 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 pub mod debug_session;
+#[cfg(feature = "testing")]
 pub mod exchange_debug;
+#[cfg(not(feature = "testing"))]
+pub(crate) mod exchange_debug;
 pub mod log_event;
 pub mod report;
 pub mod snapshot;
 pub mod tuner;
 
 pub use debug_session::DebugSession;
-// Scaffolding: not yet wired into production call sites.
-#[allow(unused_imports)]
-pub(crate) use exchange_debug::{ExchangeDebugEvent, ExchangeDebugLog, TimestampedEvent};
 pub use log_event::{LogEvent, LogEventKind, ScreenId};
 pub use report::generate_html_report;
 pub use snapshot::{BoundingBox, SnapshotMetadata};

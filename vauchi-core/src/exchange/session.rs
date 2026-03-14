@@ -496,7 +496,7 @@ impl ExchangeSession {
             }
             ExchangeEvent::Fail(err) => {
                 self.debug_event(ExchangeDebugEvent::ExchangeFailed {
-                    error: format!("{:?}", err),
+                    error: err.to_string(),
                 });
                 self.fail(err);
                 Ok(())

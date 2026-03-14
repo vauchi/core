@@ -7,6 +7,7 @@
 //! Provides `SimulatedPeer`, `Scenario`, and `VerificationOutcome` for
 //! testing the VerifierChain across device configurations and conditions.
 
+use super::proximity::ProximityVerifier;
 use super::verifier_chain::VerifierChain;
 use super::verifier_event::{ProximityVerifierEvent, VerifierMethod};
 use super::{ManualConfirmationVerifier, MockProximityVerifier, ProximityConfidence};
@@ -186,7 +187,11 @@ impl Scenario {
 
         let challenge = [0u8; 16];
         let timeout = Duration::from_secs(5);
-        let log = chain.verify(&challenge, &challenge, timeout, true);
+        // Use the trait method to go through the proper Mutex path.
+        let _ = chain.verify_proximity_two_way(&challenge, &challenge, timeout, true);
+        let log = chain
+            .last_event_log()
+            .expect("log should exist after verification");
 
         let confidence = log.final_confidence();
         let method_used = log.events().iter().find_map(|e| match e {

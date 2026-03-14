@@ -1,0 +1,228 @@
+// SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+//
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+//! Tests for VerifierChain — priority-ordered verifier orchestrator.
+//!
+//! Tries verifiers in priority order, emits events on each attempt,
+//! uses the first success. If all fail, reports AllMethodsExhausted.
+
+#![cfg(feature = "testing")]
+
+use std::time::Duration;
+use vauchi_core::exchange::verifier_chain::VerifierChain;
+use vauchi_core::exchange::verifier_event::{ProximityVerifierEvent, VerifierMethod};
+use vauchi_core::exchange::{MockProximityVerifier, ProximityConfidence};
+
+// ===== Basic chain behavior =====
+
+#[test]
+fn single_successful_verifier_completes() {
+    let verifier = MockProximityVerifier::success();
+    let mut chain = VerifierChain::new();
+    chain.add(VerifierMethod::Ultrasonic, Box::new(verifier));
+
+    let challenge = [1u8; 16];
+    let timeout = Duration::from_secs(5);
+    let log = chain.verify(&challenge, &challenge, timeout, true);
+
+    assert!(log.is_completed());
+    assert_eq!(log.final_confidence(), Some(ProximityConfidence::High));
+}
+
+#[test]
+fn single_failing_verifier_exhausts() {
+    let verifier = MockProximityVerifier::failure();
+    let mut chain = VerifierChain::new();
+    chain.add(VerifierMethod::Ultrasonic, Box::new(verifier));
+
+    let challenge = [1u8; 16];
+    let timeout = Duration::from_secs(5);
+    let log = chain.verify(&challenge, &challenge, timeout, true);
+
+    assert!(log.is_exhausted());
+    assert!(!log.is_completed());
+    assert_eq!(log.final_confidence(), None);
+}
+
+// ===== Fallback behavior =====
+
+#[test]
+fn falls_back_to_second_verifier_when_first_fails() {
+    let failing = MockProximityVerifier::failure();
+    let succeeding = MockProximityVerifier::success();
+
+    let mut chain = VerifierChain::new();
+    chain.add(VerifierMethod::Ultrasonic, Box::new(failing));
+    chain.add(VerifierMethod::AmbientAudio, Box::new(succeeding));
+
+    let challenge = [1u8; 16];
+    let timeout = Duration::from_secs(5);
+    let log = chain.verify(&challenge, &challenge, timeout, true);
+
+    assert!(log.is_completed());
+
+    let has_fallback = log.events().iter().any(|e| {
+        matches!(
+            e,
+            ProximityVerifierEvent::FallingBack {
+                failed_method: VerifierMethod::Ultrasonic,
+                next_method: VerifierMethod::AmbientAudio,
+            }
+        )
+    });
+    assert!(has_fallback, "Should have a FallingBack event");
+
+    let completed_method = log.events().iter().find_map(|e| match e {
+        ProximityVerifierEvent::Completed { method, .. } => Some(*method),
+        _ => None,
+    });
+    assert_eq!(completed_method, Some(VerifierMethod::AmbientAudio));
+}
+
+#[test]
+fn all_verifiers_fail_produces_exhausted() {
+    let fail1 = MockProximityVerifier::failure();
+    let fail2 = MockProximityVerifier::failure();
+    let fail3 = MockProximityVerifier::failure();
+
+    let mut chain = VerifierChain::new();
+    chain.add(VerifierMethod::Ultrasonic, Box::new(fail1));
+    chain.add(VerifierMethod::AmbientAudio, Box::new(fail2));
+    chain.add(VerifierMethod::Accelerometer, Box::new(fail3));
+
+    let challenge = [1u8; 16];
+    let timeout = Duration::from_secs(5);
+    let log = chain.verify(&challenge, &challenge, timeout, true);
+
+    assert!(log.is_exhausted());
+    assert!(!log.is_completed());
+
+    assert!(matches!(
+        log.last().unwrap(),
+        ProximityVerifierEvent::AllMethodsExhausted
+    ));
+}
+
+// ===== Event ordering =====
+
+#[test]
+fn events_in_correct_order_for_fallback() {
+    let failing = MockProximityVerifier::failure();
+    let succeeding = MockProximityVerifier::success();
+
+    let mut chain = VerifierChain::new();
+    chain.add(VerifierMethod::Ultrasonic, Box::new(failing));
+    chain.add(VerifierMethod::AmbientAudio, Box::new(succeeding));
+
+    let challenge = [1u8; 16];
+    let timeout = Duration::from_secs(5);
+    let log = chain.verify(&challenge, &challenge, timeout, true);
+
+    let events = log.events();
+    assert!(
+        events.len() >= 3,
+        "Should have at least 3 events, got {}",
+        events.len()
+    );
+
+    assert!(matches!(
+        &events[0],
+        ProximityVerifierEvent::InProgress {
+            method: VerifierMethod::Ultrasonic,
+            ..
+        }
+    ));
+
+    assert!(matches!(
+        &events[1],
+        ProximityVerifierEvent::MethodFailed {
+            method: VerifierMethod::Ultrasonic,
+            ..
+        }
+    ));
+
+    assert!(matches!(
+        &events[2],
+        ProximityVerifierEvent::FallingBack {
+            failed_method: VerifierMethod::Ultrasonic,
+            next_method: VerifierMethod::AmbientAudio,
+        }
+    ));
+}
+
+#[test]
+fn first_success_stops_chain() {
+    let success1 = MockProximityVerifier::success();
+    let success2 = MockProximityVerifier::success();
+
+    let mut chain = VerifierChain::new();
+    chain.add(VerifierMethod::Ultrasonic, Box::new(success1));
+    chain.add(VerifierMethod::AmbientAudio, Box::new(success2));
+
+    let challenge = [1u8; 16];
+    let timeout = Duration::from_secs(5);
+    let log = chain.verify(&challenge, &challenge, timeout, true);
+
+    let completed_method = log.events().iter().find_map(|e| match e {
+        ProximityVerifierEvent::Completed { method, .. } => Some(*method),
+        _ => None,
+    });
+    assert_eq!(completed_method, Some(VerifierMethod::Ultrasonic));
+
+    let has_ambient = log.events().iter().any(|e| {
+        matches!(
+            e,
+            ProximityVerifierEvent::InProgress {
+                method: VerifierMethod::AmbientAudio,
+                ..
+            }
+        )
+    });
+    assert!(!has_ambient, "Second verifier should not be attempted");
+}
+
+// ===== Empty chain =====
+
+#[test]
+fn empty_chain_produces_exhausted() {
+    let chain = VerifierChain::new();
+    let challenge = [1u8; 16];
+    let timeout = Duration::from_secs(5);
+    let log = chain.verify(&challenge, &challenge, timeout, true);
+
+    assert!(log.is_exhausted());
+    assert!(!log.is_completed());
+}
+
+// ===== Timeout verifier =====
+
+#[test]
+fn timeout_verifier_falls_back() {
+    let timeout_verifier = MockProximityVerifier::timeout();
+    let success_verifier = MockProximityVerifier::success();
+
+    let mut chain = VerifierChain::new();
+    chain.add(VerifierMethod::Ultrasonic, Box::new(timeout_verifier));
+    chain.add(
+        VerifierMethod::ManualConfirmation,
+        Box::new(success_verifier),
+    );
+
+    let challenge = [1u8; 16];
+    let timeout = Duration::from_secs(5);
+    let log = chain.verify(&challenge, &challenge, timeout, true);
+
+    assert!(log.is_completed());
+
+    let has_fallback = log.events().iter().any(|e| {
+        matches!(
+            e,
+            ProximityVerifierEvent::FallingBack {
+                failed_method: VerifierMethod::Ultrasonic,
+                next_method: VerifierMethod::ManualConfirmation,
+            }
+        )
+    });
+    assert!(has_fallback);
+}

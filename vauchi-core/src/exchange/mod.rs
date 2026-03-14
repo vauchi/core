@@ -61,6 +61,11 @@ pub mod device_link;
 pub mod transport;
 
 #[cfg(feature = "testing")]
+pub mod verifier_chain;
+#[cfg(not(feature = "testing"))]
+mod verifier_chain;
+
+#[cfg(feature = "testing")]
 pub mod verifier_event;
 #[cfg(not(feature = "testing"))]
 mod verifier_event;
@@ -174,6 +179,7 @@ pub use session::{
     DefaultPlatformCallbacks, DuplicateAction, ExchangeEvent, ExchangePlatformCallbacks,
     ExchangeSession, ExchangeState, ExchangeTransport,
 };
+pub use verifier_chain::VerifierChain;
 pub use verifier_event::{ProximityVerifierEvent, VerifierEventLog, VerifierMethod};
 pub use x3dh::{X3DHKeyPair, X3DH};
 

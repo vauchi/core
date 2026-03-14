@@ -50,7 +50,7 @@ fn setup_alice_with_bob_ratchet() -> (
         .create_ratchet_as_responder(
             &bob_id,
             &shared_secret,
-            X3DHKeyPair::from_bytes(bob_dh.secret_bytes()),
+            X3DHKeyPair::from_bytes(*bob_dh.secret_bytes()),
         )
         .unwrap();
 
@@ -479,7 +479,7 @@ fn test_cek_wrapped_end_to_end_flow() {
     bob.create_ratchet_as_responder(
         &alice_id,
         &shared_secret,
-        X3DHKeyPair::from_bytes(bob_dh.secret_bytes()),
+        X3DHKeyPair::from_bytes(*bob_dh.secret_bytes()),
     )
     .unwrap();
 

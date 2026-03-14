@@ -443,7 +443,7 @@ impl DoubleRatchetState {
         SerializedRatchetState {
             version: RATCHET_STATE_VERSION,
             root_key: self.root_key,
-            our_dh_secret: self.our_dh.secret_bytes(),
+            our_dh_secret: *self.our_dh.secret_bytes(),
             their_dh: self.their_dh,
             send_chain: self
                 .send_chain

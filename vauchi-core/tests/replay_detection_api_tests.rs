@@ -37,7 +37,7 @@ fn setup_alice_receiving_from_bob() -> (Vauchi<MockTransport>, String, Identity,
         .create_ratchet_as_responder(
             &bob_id,
             &shared_secret,
-            X3DHKeyPair::from_bytes(bob_dh.secret_bytes()),
+            X3DHKeyPair::from_bytes(*bob_dh.secret_bytes()),
         )
         .unwrap();
 

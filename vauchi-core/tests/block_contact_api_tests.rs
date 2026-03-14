@@ -176,7 +176,7 @@ fn test_blocked_contact_update_rejected() {
         .create_ratchet_as_responder(
             &bob_id,
             &shared_secret,
-            X3DHKeyPair::from_bytes(bob_dh.secret_bytes()),
+            X3DHKeyPair::from_bytes(*bob_dh.secret_bytes()),
         )
         .unwrap();
 

@@ -332,6 +332,11 @@ impl ExchangeQR {
                 .map_err(|_| ExchangeError::InvalidQRFormat)?,
         ) as usize;
 
+        // Enforce display name cap before any allocation
+        if name_len > MAX_DISPLAY_NAME_LEN {
+            return Err(ExchangeError::DisplayNameTooLong(name_len));
+        }
+
         // Bounds check for name
         let name_end = 127 + name_len;
         if bytes.len() < name_end + 1 {
@@ -341,10 +346,6 @@ impl ExchangeQR {
 
         let display_name = String::from_utf8(bytes[127..name_end].to_vec())
             .map_err(|_| ExchangeError::InvalidQRFormat)?;
-
-        if name_len > MAX_DISPLAY_NAME_LEN {
-            return Err(ExchangeError::DisplayNameTooLong(name_len));
-        }
 
         // Parse flags byte
         let flags = bytes[name_end];

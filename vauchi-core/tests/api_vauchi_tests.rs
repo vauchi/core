@@ -450,7 +450,7 @@ fn test_process_incoming_card_update() {
         .create_ratchet_as_responder(
             &bob_id,
             &shared_secret,
-            X3DHKeyPair::from_bytes(bob_dh.secret_bytes()),
+            X3DHKeyPair::from_bytes(*bob_dh.secret_bytes()),
         )
         .unwrap();
 
@@ -572,7 +572,7 @@ fn test_process_update_rejects_invalid_signature() {
         .create_ratchet_as_responder(
             &bob_id,
             &shared_secret,
-            X3DHKeyPair::from_bytes(bob_dh.secret_bytes()),
+            X3DHKeyPair::from_bytes(*bob_dh.secret_bytes()),
         )
         .unwrap();
 
@@ -625,7 +625,7 @@ fn test_process_card_update_truncated_message() {
         .create_ratchet_as_responder(
             &bob_id,
             &shared_secret,
-            vauchi_core::exchange::X3DHKeyPair::from_bytes(bob_dh.secret_bytes()),
+            vauchi_core::exchange::X3DHKeyPair::from_bytes(*bob_dh.secret_bytes()),
         )
         .unwrap();
 
@@ -654,7 +654,7 @@ fn test_process_card_update_empty_payload() {
         .create_ratchet_as_responder(
             &bob_id,
             &shared_secret,
-            vauchi_core::exchange::X3DHKeyPair::from_bytes(bob_dh.secret_bytes()),
+            vauchi_core::exchange::X3DHKeyPair::from_bytes(*bob_dh.secret_bytes()),
         )
         .unwrap();
 
@@ -685,7 +685,7 @@ fn test_process_card_update_malformed_json_in_ratchet() {
         .create_ratchet_as_responder(
             &bob_id,
             &shared_secret,
-            vauchi_core::exchange::X3DHKeyPair::from_bytes(bob_dh.secret_bytes()),
+            vauchi_core::exchange::X3DHKeyPair::from_bytes(*bob_dh.secret_bytes()),
         )
         .unwrap();
 

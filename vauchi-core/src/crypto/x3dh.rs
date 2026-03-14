@@ -10,7 +10,7 @@
 
 use rand::rngs::OsRng;
 use x25519_dalek::{PublicKey, StaticSecret};
-use zeroize::{Zeroize, Zeroizing};
+use zeroize::Zeroizing;
 
 /// Error returned when a Diffie-Hellman computation produces a non-contributory output
 /// (e.g., the all-zero shared secret from a small-subgroup public key).
@@ -51,8 +51,9 @@ impl X3DHKeyPair {
     }
 
     /// Returns the secret key bytes (for backup/restore).
-    pub fn secret_bytes(&self) -> [u8; 32] {
-        self.secret.to_bytes()
+    /// Wrapped in `Zeroizing` so callers don't leak key material on the stack.
+    pub fn secret_bytes(&self) -> Zeroizing<[u8; 32]> {
+        Zeroizing::new(self.secret.to_bytes())
     }
 
     /// Performs Diffie-Hellman key agreement with a public key (from bytes).
@@ -81,12 +82,5 @@ impl X3DHKeyPair {
     }
 }
 
-impl Drop for X3DHKeyPair {
-    fn drop(&mut self) {
-        // StaticSecret already zeroizes on drop internally, but we add
-        // defense-in-depth by explicitly zeroizing the secret bytes.
-        // PublicKey is not secret material and does not need zeroization.
-        let mut secret_bytes = self.secret.to_bytes();
-        secret_bytes.zeroize();
-    }
-}
+// No manual Drop needed: x25519-dalek's StaticSecret implements ZeroizeOnDrop.
+// PublicKey is not secret material.

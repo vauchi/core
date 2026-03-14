@@ -83,6 +83,9 @@ impl ProximityVerifier for ChallengeCapturingVerifier {
     }
 
     fn verify_response(&self, _challenge: &[u8; 16], response: &[u8]) -> bool {
+        // Ignores the challenge parameter: this verifier runs in a single process
+        // and cannot simulate the peer independently echoing our challenge.
+        // Real verifiers (UltrasonicVerifier) do cryptographic challenge matching.
         response.len() == 17 && response[0] == 0x01 && self.should_succeed
     }
 }

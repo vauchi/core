@@ -21,6 +21,15 @@ struct ChainEntry {
     verifier: Box<dyn ProximityVerifier>,
 }
 
+/// Snapshot of the most recent `verify_proximity_two_way` result.
+///
+/// Stored in a single Mutex to ensure log and confidence are always
+/// written and read atomically.
+struct VerificationResult {
+    log: VerifierEventLog,
+    winning_confidence: Option<ProximityConfidence>,
+}
+
 /// Priority-ordered chain of proximity verifiers.
 ///
 /// Verifiers are tried in the order they were added. The chain stops
@@ -34,21 +43,16 @@ struct ChainEntry {
 /// be silently discarded.
 pub struct VerifierChain {
     entries: Vec<ChainEntry>,
-    /// Event log from the most recent `verify_proximity_two_way` call.
-    /// Stored behind Mutex because `ProximityVerifier` methods take `&self`.
-    last_event_log: Mutex<Option<VerifierEventLog>>,
-    /// Confidence of the winning verifier from the most recent successful run.
-    /// Used by `confidence_level()` to return the actual result, not the max
-    /// capability. Set to `None` before any verification or after all fail.
-    last_winning_confidence: Mutex<Option<ProximityConfidence>>,
+    /// Result from the most recent `verify_proximity_two_way` call.
+    /// Single Mutex ensures log + confidence are atomically consistent.
+    last_result: Mutex<Option<VerificationResult>>,
 }
 
 impl VerifierChain {
     pub fn new() -> Self {
         VerifierChain {
             entries: Vec::new(),
-            last_event_log: Mutex::new(None),
-            last_winning_confidence: Mutex::new(None),
+            last_result: Mutex::new(None),
         }
     }
 
@@ -57,11 +61,10 @@ impl VerifierChain {
         self.entries.push(ChainEntry { method, verifier });
     }
 
-    /// Run the verification chain.
+    /// Run the verification chain. Always returns a log — never fails.
     ///
     /// Tries each verifier in order using `verify_proximity_two_way`.
     /// Emits events for each attempt. Returns a log of all events.
-    /// Run the verification chain. Always returns a log — never fails.
     pub fn verify(
         &self,
         emit_challenge: &[u8; 16],
@@ -129,7 +132,11 @@ impl VerifierChain {
     /// Returns `None` if `verify_proximity_two_way` (via the `ProximityVerifier`
     /// trait) has not been called yet.
     pub fn last_event_log(&self) -> Option<VerifierEventLog> {
-        self.last_event_log.lock().expect("mutex poisoned").clone()
+        self.last_result
+            .lock()
+            .expect("mutex poisoned")
+            .as_ref()
+            .map(|r| r.log.clone())
     }
 }
 
@@ -153,9 +160,11 @@ impl ProximityVerifier for VerifierChain {
     fn confidence_level(&self) -> ProximityConfidence {
         // Return the winning verifier's confidence from the last successful run.
         // Falls back to Unknown if no verification has been performed yet.
-        self.last_winning_confidence
+        self.last_result
             .lock()
             .expect("mutex poisoned")
+            .as_ref()
+            .and_then(|r| r.winning_confidence)
             .unwrap_or(ProximityConfidence::Unknown)
     }
 
@@ -190,9 +199,11 @@ impl ProximityVerifier for VerifierChain {
         let log = self.verify(emit_challenge, listen_challenge, timeout, is_initiator);
         let winning_confidence = log.final_confidence();
 
-        // Store results for later retrieval
-        *self.last_event_log.lock().expect("mutex poisoned") = Some(log);
-        *self.last_winning_confidence.lock().expect("mutex poisoned") = winning_confidence;
+        // Store log + confidence atomically in a single lock acquisition
+        *self.last_result.lock().expect("mutex poisoned") = Some(VerificationResult {
+            log,
+            winning_confidence,
+        });
 
         if winning_confidence.is_some() {
             Ok(())

@@ -361,6 +361,9 @@ pub(crate) fn create_qr_exchange_proximity(
         handler: Arc::from(handler),
     };
     let mut chain = VerifierChain::new();
+    // Method label is hardcoded to Ultrasonic — MobileProximityHandler may
+    // actually use BLE or another mechanism. Revisit when the handler interface
+    // reports its actual method.
     chain.add(VerifierMethod::Ultrasonic, Box::new(bridge));
     let session = ExchangeSession::new_qr(identity, our_card, chain);
     Arc::new(MobileExchangeSession::new(session, None))
@@ -610,7 +613,9 @@ mod tests {
 
     #[test]
     fn test_verification_events_populated_after_key_agreement() {
-        use crate::mobile_verifier_event::MobileProximityVerifierEvent;
+        use crate::mobile_verifier_event::{
+            MobileProximityConfidence, MobileProximityVerifierEvent,
+        };
 
         let alice = Identity::create("Alice");
         let alice_card = ContactCard::new("Alice");
@@ -659,16 +664,35 @@ mod tests {
             "Bob events should be populated after key agreement"
         );
 
-        // Both should contain a Completed event
-        let alice_completed = alice_events
-            .iter()
-            .any(|e| matches!(e, MobileProximityVerifierEvent::Completed { .. }));
-        assert!(alice_completed, "Alice should have a Completed event");
+        // Both should contain a Completed event with Medium confidence
+        // (ManualConfirmation verifier reports Medium)
+        let alice_completed = alice_events.iter().find(|e| {
+            matches!(
+                e,
+                MobileProximityVerifierEvent::Completed {
+                    confidence: MobileProximityConfidence::Medium,
+                    ..
+                }
+            )
+        });
+        assert!(
+            alice_completed.is_some(),
+            "Alice should have a Completed event with Medium confidence"
+        );
 
-        let bob_completed = bob_events
-            .iter()
-            .any(|e| matches!(e, MobileProximityVerifierEvent::Completed { .. }));
-        assert!(bob_completed, "Bob should have a Completed event");
+        let bob_completed = bob_events.iter().find(|e| {
+            matches!(
+                e,
+                MobileProximityVerifierEvent::Completed {
+                    confidence: MobileProximityConfidence::Medium,
+                    ..
+                }
+            )
+        });
+        assert!(
+            bob_completed.is_some(),
+            "Bob should have a Completed event with Medium confidence"
+        );
     }
 
     #[test]

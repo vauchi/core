@@ -15,7 +15,7 @@ fn log_event_serializes_to_json() {
         },
     };
     let json = serde_json::to_string(&event).expect("should serialize");
-    assert!(json.contains("\"kind\":\"DecodeSuccess\""));
+    assert!(json.contains("\"kind\":\"decode_success\""));
     assert!(json.contains("\"latency_ms\":12.5"));
     assert!(json.contains("\"frame_index\":42"));
 }
@@ -78,8 +78,8 @@ fn log_event_parses_jsonl_stream() {
     // With #[serde(tag = "kind")] on LogEventKind, the kind field in LogEvent
     // is serialized as a nested object containing "kind":"VariantName" plus fields.
     let lines = vec![
-        r#"{"timestamp_ms":1000,"device_model":"Pixel","kind":{"kind":"DecodeSuccess","latency_ms":5.0,"frame_index":1}}"#,
-        r#"{"timestamp_ms":2000,"device_model":"Pixel","kind":{"kind":"ThermalState","state":"nominal","temp_c":36.0}}"#,
+        r#"{"timestamp_ms":1000,"device_model":"Pixel","kind":{"kind":"decode_success","latency_ms":5.0,"frame_index":1}}"#,
+        r#"{"timestamp_ms":2000,"device_model":"Pixel","kind":{"kind":"thermal_state","state":"nominal","temp_c":36.0}}"#,
     ];
     for line in lines {
         let event: LogEvent = serde_json::from_str(line).expect("should parse JSONL line");
@@ -102,7 +102,7 @@ fn log_event_decode_success_has_expected_fields() {
 
     assert_eq!(parsed["timestamp_ms"], 500);
     assert_eq!(parsed["device_model"], "iPhone 15");
-    assert_eq!(parsed["kind"]["kind"], "DecodeSuccess");
+    assert_eq!(parsed["kind"]["kind"], "decode_success");
     assert_eq!(parsed["kind"]["latency_ms"], 0.0);
     assert_eq!(parsed["kind"]["frame_index"], 0);
 }
@@ -135,7 +135,7 @@ fn log_event_rejects_invalid_json() {
         r#"{}"#,
         r#"{"timestamp_ms":0}"#,
         r#"{"timestamp_ms":0,"device_model":"X","kind":{}}"#,
-        r#"{"timestamp_ms":0,"device_model":"X","kind":{"kind":"NonExistent"}}"#,
+        r#"{"timestamp_ms":0,"device_model":"X","kind":{"kind":"non_existent"}}"#,
     ];
     for input in bad_inputs {
         let result = serde_json::from_str::<LogEvent>(input);

@@ -35,7 +35,7 @@ pub enum ScreenId {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(tag = "kind")]
+#[serde(tag = "kind", rename_all = "snake_case")]
 pub enum LogEventKind {
     // --- Camera / QR tuner events ---
     DecodeSuccess {
@@ -73,6 +73,7 @@ pub enum LogEventKind {
     },
     SnapshotSaved {
         frame_index: u32,
+        #[serde(skip_serializing, default)]
         path: String,
     },
 

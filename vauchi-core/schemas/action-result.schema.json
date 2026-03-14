@@ -220,6 +220,30 @@
       "enum": [
         "WipeComplete"
       ]
+    },
+    {
+      "description": "Frontend should perform hardware actions for the exchange protocol (ADR-031). Each command maps to a platform-specific operation (QR display, BLE scan, etc.). Unsupported commands should be answered with `ExchangeHardwareEvent::HardwareUnavailable`.",
+      "type": "object",
+      "required": [
+        "ExchangeCommands"
+      ],
+      "properties": {
+        "ExchangeCommands": {
+          "type": "object",
+          "required": [
+            "commands"
+          ],
+          "properties": {
+            "commands": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/ExchangeCommand"
+              }
+            }
+          }
+        }
+      },
+      "additionalProperties": false
     }
   ],
   "definitions": {
@@ -898,6 +922,258 @@
           ]
         }
       }
+    },
+    "ExchangeCommand": {
+      "description": "A command from core to the frontend requesting a hardware action.\n\nFrontends match on these and dispatch to platform-specific APIs (camera, BLE stack, NFC reader, audio subsystem). Commands that the platform cannot fulfil should be answered with [`ExchangeHardwareEvent::HardwareUnavailable`].",
+      "oneOf": [
+        {
+          "description": "Display a QR code containing `data`.",
+          "type": "object",
+          "required": [
+            "QrDisplay"
+          ],
+          "properties": {
+            "QrDisplay": {
+              "type": "object",
+              "required": [
+                "data"
+              ],
+              "properties": {
+                "data": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Request the frontend to open a QR scanner (camera).",
+          "type": "string",
+          "enum": [
+            "QrRequestScan"
+          ]
+        },
+        {
+          "description": "Start advertising the vauchi BLE service with the given payload.",
+          "type": "object",
+          "required": [
+            "BleStartAdvertising"
+          ],
+          "properties": {
+            "BleStartAdvertising": {
+              "type": "object",
+              "required": [
+                "payload",
+                "service_uuid"
+              ],
+              "properties": {
+                "payload": {
+                  "type": "array",
+                  "items": {
+                    "type": "integer",
+                    "format": "uint8",
+                    "minimum": 0.0
+                  }
+                },
+                "service_uuid": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Start scanning for vauchi BLE peripherals.",
+          "type": "object",
+          "required": [
+            "BleStartScanning"
+          ],
+          "properties": {
+            "BleStartScanning": {
+              "type": "object",
+              "required": [
+                "service_uuid"
+              ],
+              "properties": {
+                "service_uuid": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Connect to a discovered BLE device.",
+          "type": "object",
+          "required": [
+            "BleConnect"
+          ],
+          "properties": {
+            "BleConnect": {
+              "type": "object",
+              "required": [
+                "device_id"
+              ],
+              "properties": {
+                "device_id": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Write data to a BLE characteristic.",
+          "type": "object",
+          "required": [
+            "BleWriteCharacteristic"
+          ],
+          "properties": {
+            "BleWriteCharacteristic": {
+              "type": "object",
+              "required": [
+                "data",
+                "uuid"
+              ],
+              "properties": {
+                "data": {
+                  "type": "array",
+                  "items": {
+                    "type": "integer",
+                    "format": "uint8",
+                    "minimum": 0.0
+                  }
+                },
+                "uuid": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Read data from a BLE characteristic.",
+          "type": "object",
+          "required": [
+            "BleReadCharacteristic"
+          ],
+          "properties": {
+            "BleReadCharacteristic": {
+              "type": "object",
+              "required": [
+                "uuid"
+              ],
+              "properties": {
+                "uuid": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Disconnect from the current BLE peer.",
+          "type": "string",
+          "enum": [
+            "BleDisconnect"
+          ]
+        },
+        {
+          "description": "Activate the NFC interface and prepare to exchange `payload`.",
+          "type": "object",
+          "required": [
+            "NfcActivate"
+          ],
+          "properties": {
+            "NfcActivate": {
+              "type": "object",
+              "required": [
+                "payload"
+              ],
+              "properties": {
+                "payload": {
+                  "type": "array",
+                  "items": {
+                    "type": "integer",
+                    "format": "uint8",
+                    "minimum": 0.0
+                  }
+                }
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Deactivate the NFC interface.",
+          "type": "string",
+          "enum": [
+            "NfcDeactivate"
+          ]
+        },
+        {
+          "description": "Emit an ultrasonic challenge signal.",
+          "type": "object",
+          "required": [
+            "AudioEmitChallenge"
+          ],
+          "properties": {
+            "AudioEmitChallenge": {
+              "type": "object",
+              "required": [
+                "data"
+              ],
+              "properties": {
+                "data": {
+                  "type": "array",
+                  "items": {
+                    "type": "integer",
+                    "format": "uint8",
+                    "minimum": 0.0
+                  }
+                }
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Listen for an ultrasonic response within `timeout_ms`.",
+          "type": "object",
+          "required": [
+            "AudioListenForResponse"
+          ],
+          "properties": {
+            "AudioListenForResponse": {
+              "type": "object",
+              "required": [
+                "timeout_ms"
+              ],
+              "properties": {
+                "timeout_ms": {
+                  "type": "integer",
+                  "format": "uint64",
+                  "minimum": 0.0
+                }
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Stop all audio operations.",
+          "type": "string",
+          "enum": [
+            "AudioStop"
+          ]
+        }
+      ]
     },
     "FieldDisplay": {
       "description": "A contact field as displayed in the UI.",

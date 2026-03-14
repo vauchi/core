@@ -329,6 +329,33 @@ impl MobileExchangeSession {
         self.inner.lock().unwrap().proximity_confidence().into()
     }
 
+    /// Enable exchange debug logging.
+    ///
+    /// When enabled, captures timestamped events at each state transition
+    /// (QR generation, scan, key agreement, proximity, completion/failure).
+    /// Call before starting the exchange flow.
+    pub fn enable_debug_log(&self) {
+        self.inner.lock().unwrap().enable_debug_log();
+    }
+
+    /// Returns the exchange debug log as JSONL, if enabled.
+    pub fn get_exchange_debug_jsonl(&self) -> Option<String> {
+        self.inner
+            .lock()
+            .unwrap()
+            .exchange_debug_log()
+            .map(|log| log.to_jsonl())
+    }
+
+    /// Returns the exchange debug log as Markdown, if enabled.
+    pub fn get_exchange_debug_markdown(&self) -> Option<String> {
+        self.inner
+            .lock()
+            .unwrap()
+            .exchange_debug_log()
+            .map(|log| log.to_markdown())
+    }
+
     /// Returns the event log from the last proximity verification.
     ///
     /// Returns an empty list before any verification has occurred.
@@ -713,5 +740,54 @@ mod tests {
 
         // Events start empty (no verification yet)
         assert!(session.get_verification_events().is_empty());
+    }
+
+    // === Debug log wiring tests ===
+
+    #[test]
+    fn test_debug_log_disabled_by_default() {
+        let identity = Identity::create("Alice");
+        let card = ContactCard::new("Alice");
+        let session = create_qr_exchange_manual(identity, card);
+
+        assert!(session.get_exchange_debug_jsonl().is_none());
+        assert!(session.get_exchange_debug_markdown().is_none());
+    }
+
+    #[test]
+    fn test_enable_debug_log_captures_events() {
+        let identity = Identity::create("Alice");
+        let card = ContactCard::new("Alice");
+        let session = create_qr_exchange_manual(identity, card);
+
+        session.enable_debug_log();
+        session.generate_qr().unwrap();
+
+        let jsonl = session
+            .get_exchange_debug_jsonl()
+            .expect("log should exist");
+        let lines: Vec<&str> = jsonl.lines().collect();
+        // SessionStarted + QrGenerated
+        assert_eq!(lines.len(), 2);
+        assert!(jsonl.contains("session_started"));
+        assert!(jsonl.contains("qr_generated"));
+    }
+
+    #[test]
+    fn test_debug_log_markdown_output() {
+        let identity = Identity::create("Alice");
+        let card = ContactCard::new("Alice");
+        let session = create_qr_exchange_manual(identity, card);
+
+        session.enable_debug_log();
+        session.generate_qr().unwrap();
+
+        let md = session
+            .get_exchange_debug_markdown()
+            .expect("log should exist");
+        assert!(md.contains("# Exchange Debug Log"));
+        assert!(md.contains("2 events"));
+        assert!(md.contains("SessionStarted"));
+        assert!(md.contains("QrGenerated"));
     }
 }

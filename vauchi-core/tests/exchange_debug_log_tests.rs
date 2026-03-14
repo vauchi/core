@@ -122,6 +122,7 @@ fn to_markdown_empty_log() {
     let md = log.to_markdown();
     assert!(md.contains("# Exchange Debug Log"));
     assert!(md.contains("0 events"));
+    assert!(!md.contains("|---:|---|"));
 }
 
 #[test]
@@ -138,9 +139,12 @@ fn to_markdown_with_events() {
     assert!(md.contains("# Exchange Debug Log"));
     assert!(md.contains("4 events"));
     assert!(md.contains("| Elapsed"));
-    assert!(md.contains("SessionStarted"));
+    assert!(md.contains("|---:|---|"));
+    assert!(md.contains("SessionStarted (qr)"));
     assert!(md.contains("QrGenerated"));
     assert!(md.contains("ExchangeCompleted"));
+    // First event should have numeric timestamp
+    assert!(md.contains("| 0 |") || md.contains("| 1 |"));
 }
 
 #[test]
@@ -152,4 +156,32 @@ fn to_markdown_includes_event_details() {
 
     let md = log.to_markdown();
     assert!(md.contains("timeout"));
+}
+
+#[test]
+fn to_markdown_shows_transport_and_confidence_values() {
+    let mut log = ExchangeDebugLog::new();
+    log.push(ExchangeDebugEvent::SessionStarted {
+        transport: "qr".to_string(),
+    });
+    log.push(ExchangeDebugEvent::ProximityCheckStarted {
+        method: "ble".to_string(),
+    });
+    log.push(ExchangeDebugEvent::ProximityCheckCompleted {
+        confidence: "high".to_string(),
+    });
+
+    let md = log.to_markdown();
+    assert!(
+        md.contains("SessionStarted (qr)"),
+        "transport value must appear"
+    );
+    assert!(
+        md.contains("ProximityCheckStarted (ble)"),
+        "method value must appear"
+    );
+    assert!(
+        md.contains("ProximityCheckCompleted (high)"),
+        "confidence value must appear"
+    );
 }

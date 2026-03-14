@@ -146,7 +146,11 @@ impl DebugSession {
         writeln!(md, "|---:|---|").unwrap();
         for event in &self.events {
             let desc = Self::event_description(&event.kind);
-            writeln!(md, "| {} | {} |", event.timestamp_ms, desc).unwrap();
+            let safe = desc
+                .replace('|', "\\|")
+                .replace('\n', " ")
+                .replace('\r', "");
+            writeln!(md, "| {} | {} |", event.timestamp_ms, safe).unwrap();
         }
         md
     }
@@ -177,8 +181,38 @@ impl DebugSession {
             LogEventKind::DebugSessionMarker { label } => {
                 format!("SessionMarker — {label}")
             }
-            // Camera/QR tuner events — summarize briefly
-            other => format!("{other:?}"),
+            // Camera/QR tuner events — controlled output, no raw paths
+            LogEventKind::DecodeSuccess {
+                latency_ms,
+                frame_index,
+            } => format!("DecodeSuccess — frame {frame_index}, {latency_ms:.1}ms"),
+            LogEventKind::DecodeFailure {
+                reason,
+                frame_index,
+            } => format!("DecodeFailure — frame {frame_index}: {reason}"),
+            LogEventKind::CameraConfigApplied { config_id, .. } => {
+                format!("CameraConfigApplied — config {config_id}")
+            }
+            LogEventKind::CameraConfigFailed { config_id, reason } => {
+                format!("CameraConfigFailed — config {config_id}: {reason}")
+            }
+            LogEventKind::ThermalState { state, temp_c } => {
+                format!("ThermalState — {state} ({temp_c:.1}C)")
+            }
+            LogEventKind::SweepStarted { total_configs } => {
+                format!("SweepStarted — {total_configs} configs")
+            }
+            LogEventKind::SweepPhaseComplete { phase, .. } => {
+                format!("SweepPhaseComplete — phase {phase}")
+            }
+            LogEventKind::SweepComplete {
+                best_config_id,
+                best_score,
+            } => format!("SweepComplete — config {best_config_id} (score {best_score:.2})"),
+            LogEventKind::SnapshotSaved { frame_index, .. } => {
+                // Omit path to avoid leaking filesystem layout
+                format!("SnapshotSaved — frame {frame_index}")
+            }
         }
     }
 

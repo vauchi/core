@@ -259,6 +259,8 @@ fn to_markdown_empty_session() {
     assert!(md.contains("# Debug Session Report"));
     assert!(md.contains("inactive"));
     assert!(md.contains("0 events"));
+    // Empty session should not contain a table
+    assert!(!md.contains("|---:|---|"));
 }
 
 #[test]
@@ -272,11 +274,13 @@ fn to_markdown_active_with_events() {
     assert!(md.contains("# Debug Session Report"));
     assert!(md.contains("active"));
     assert!(md.contains("3 events")); // DebugModeActivated + ScreenAppeared + UserAction
-                                      // Should contain a table with event rows
     assert!(md.contains("| Timestamp"));
+    assert!(md.contains("|---:|---|"));
     assert!(md.contains("DebugModeActivated"));
     assert!(md.contains("ScreenAppeared"));
     assert!(md.contains("UserAction"));
+    // First event timestamp should be 0ms (or very close)
+    assert!(md.contains("| 0 |") || md.contains("| 1 |"));
 }
 
 #[test]
@@ -288,6 +292,24 @@ fn to_markdown_contains_screen_details() {
     let md = session.to_markdown();
     assert!(md.contains("ExchangeFailure"));
     assert!(md.contains("timeout"));
+}
+
+#[test]
+fn to_markdown_deactivated_session_shows_inactive_with_events() {
+    let mut session = DebugSession::new();
+    session.activate();
+    session.log_screen_appeared(ScreenId::Home);
+    session.deactivate();
+
+    let md = session.to_markdown();
+    assert!(
+        md.contains("inactive"),
+        "deactivated session must report inactive"
+    );
+    assert!(
+        md.contains("2 events"),
+        "events preserved after deactivation"
+    );
 }
 
 // ===== Helpers =====

@@ -89,7 +89,11 @@ impl ExchangeDebugLog {
         writeln!(md, "|---:|---|").unwrap();
         for entry in &self.events {
             let desc = Self::event_description(&entry.event);
-            writeln!(md, "| {} | {} |", entry.elapsed_ms, desc).unwrap();
+            let safe = desc
+                .replace('|', "\\|")
+                .replace('\n', " ")
+                .replace('\r', "");
+            writeln!(md, "| {} | {} |", entry.elapsed_ms, safe).unwrap();
         }
         md
     }

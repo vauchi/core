@@ -9,6 +9,7 @@
 
 #![cfg(feature = "testing")]
 
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use vauchi_core::exchange::verifier_chain::VerifierChain;
 use vauchi_core::exchange::verifier_event::{ProximityVerifierEvent, VerifierMethod};
@@ -26,7 +27,10 @@ fn single_successful_verifier_completes() {
 
     let challenge = [1u8; 16];
     let timeout = Duration::from_secs(5);
-    let log = chain.verify(&challenge, &challenge, timeout, true);
+    chain
+        .verify_proximity_two_way(&challenge, &challenge, timeout, true)
+        .unwrap();
+    let log = chain.last_event_log().expect("log should exist");
 
     assert!(log.is_completed());
     assert_eq!(log.final_confidence(), Some(ProximityConfidence::High));
@@ -40,7 +44,8 @@ fn single_failing_verifier_exhausts() {
 
     let challenge = [1u8; 16];
     let timeout = Duration::from_secs(5);
-    let log = chain.verify(&challenge, &challenge, timeout, true);
+    let _ = chain.verify_proximity_two_way(&challenge, &challenge, timeout, true);
+    let log = chain.last_event_log().expect("log should exist");
 
     assert!(log.is_exhausted());
     assert!(!log.is_completed());
@@ -60,7 +65,10 @@ fn falls_back_to_second_verifier_when_first_fails() {
 
     let challenge = [1u8; 16];
     let timeout = Duration::from_secs(5);
-    let log = chain.verify(&challenge, &challenge, timeout, true);
+    chain
+        .verify_proximity_two_way(&challenge, &challenge, timeout, true)
+        .unwrap();
+    let log = chain.last_event_log().expect("log should exist");
 
     assert!(log.is_completed());
 
@@ -95,7 +103,8 @@ fn all_verifiers_fail_produces_exhausted() {
 
     let challenge = [1u8; 16];
     let timeout = Duration::from_secs(5);
-    let log = chain.verify(&challenge, &challenge, timeout, true);
+    let _ = chain.verify_proximity_two_way(&challenge, &challenge, timeout, true);
+    let log = chain.last_event_log().expect("log should exist");
 
     assert!(log.is_exhausted());
     assert!(!log.is_completed());
@@ -119,7 +128,10 @@ fn events_in_correct_order_for_fallback() {
 
     let challenge = [1u8; 16];
     let timeout = Duration::from_secs(5);
-    let log = chain.verify(&challenge, &challenge, timeout, true);
+    chain
+        .verify_proximity_two_way(&challenge, &challenge, timeout, true)
+        .unwrap();
+    let log = chain.last_event_log().expect("log should exist");
 
     let events = log.events();
     assert!(
@@ -164,7 +176,10 @@ fn first_success_stops_chain() {
 
     let challenge = [1u8; 16];
     let timeout = Duration::from_secs(5);
-    let log = chain.verify(&challenge, &challenge, timeout, true);
+    chain
+        .verify_proximity_two_way(&challenge, &challenge, timeout, true)
+        .unwrap();
+    let log = chain.last_event_log().expect("log should exist");
 
     let completed_method = log.events().iter().find_map(|e| match e {
         ProximityVerifierEvent::Completed { method, .. } => Some(*method),
@@ -191,7 +206,8 @@ fn empty_chain_produces_exhausted() {
     let chain = VerifierChain::new();
     let challenge = [1u8; 16];
     let timeout = Duration::from_secs(5);
-    let log = chain.verify(&challenge, &challenge, timeout, true);
+    let _ = chain.verify_proximity_two_way(&challenge, &challenge, timeout, true);
+    let log = chain.last_event_log().expect("log should exist");
 
     assert!(log.is_exhausted());
     assert!(!log.is_completed());
@@ -213,7 +229,10 @@ fn timeout_verifier_falls_back() {
 
     let challenge = [1u8; 16];
     let timeout = Duration::from_secs(5);
-    let log = chain.verify(&challenge, &challenge, timeout, true);
+    chain
+        .verify_proximity_two_way(&challenge, &challenge, timeout, true)
+        .unwrap();
+    let log = chain.last_event_log().expect("log should exist");
 
     assert!(log.is_completed());
 
@@ -406,4 +425,106 @@ fn log_and_confidence_are_consistent_after_fallback() {
         _ => None,
     });
     assert_eq!(completed_method, Some(VerifierMethod::ManualConfirmation));
+}
+
+// ===== Event callback tests =====
+
+#[test]
+fn callback_receives_events_during_verification() {
+    let received: Arc<Mutex<Vec<ProximityVerifierEvent>>> = Arc::new(Mutex::new(Vec::new()));
+    let received_clone = received.clone();
+
+    let mut chain = VerifierChain::new();
+    chain.add(
+        VerifierMethod::Ultrasonic,
+        Box::new(MockProximityVerifier::success()),
+    );
+    chain.set_event_callback(move |event| {
+        received_clone.lock().unwrap().push(event.clone());
+    });
+
+    let emit = [1u8; 16];
+    let listen = [2u8; 16];
+    chain
+        .verify_proximity_two_way(&emit, &listen, Duration::from_secs(5), true)
+        .unwrap();
+
+    let events = received.lock().unwrap();
+    // Should have received at least InProgress + Completed
+    assert!(
+        events.len() >= 2,
+        "Expected at least 2 events, got {}",
+        events.len()
+    );
+    assert!(
+        events
+            .iter()
+            .any(|e| matches!(e, ProximityVerifierEvent::InProgress { .. })),
+        "Should have received InProgress event"
+    );
+    assert!(
+        events
+            .iter()
+            .any(|e| matches!(e, ProximityVerifierEvent::Completed { .. })),
+        "Should have received Completed event"
+    );
+}
+
+#[test]
+fn callback_receives_fallback_events() {
+    let received: Arc<Mutex<Vec<ProximityVerifierEvent>>> = Arc::new(Mutex::new(Vec::new()));
+    let received_clone = received.clone();
+
+    let mut chain = VerifierChain::new();
+    chain.add(
+        VerifierMethod::Ultrasonic,
+        Box::new(MockProximityVerifier::failure()),
+    );
+    chain.add(
+        VerifierMethod::ManualConfirmation,
+        Box::new(ManualConfirmationVerifier::pre_confirmed()),
+    );
+    chain.set_event_callback(move |event| {
+        received_clone.lock().unwrap().push(event.clone());
+    });
+
+    let emit = [0u8; 16];
+    let listen = [1u8; 16];
+    chain
+        .verify_proximity_two_way(&emit, &listen, Duration::from_secs(5), true)
+        .unwrap();
+
+    let events = received.lock().unwrap();
+    assert!(
+        events
+            .iter()
+            .any(|e| matches!(e, ProximityVerifierEvent::FallingBack { .. })),
+        "Should have received FallingBack event"
+    );
+    assert!(
+        events.iter().any(|e| matches!(
+            e,
+            ProximityVerifierEvent::Completed {
+                method: VerifierMethod::ManualConfirmation,
+                ..
+            }
+        )),
+        "Should have received Completed with ManualConfirmation"
+    );
+}
+
+#[test]
+fn no_callback_does_not_panic() {
+    // Chain without callback should work fine (no-op)
+    let mut chain = VerifierChain::new();
+    chain.add(
+        VerifierMethod::Ultrasonic,
+        Box::new(MockProximityVerifier::success()),
+    );
+    // No set_event_callback call
+
+    let emit = [1u8; 16];
+    let listen = [2u8; 16];
+    let result = chain.verify_proximity_two_way(&emit, &listen, Duration::from_secs(5), true);
+    assert!(result.is_ok());
 }

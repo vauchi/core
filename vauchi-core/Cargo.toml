@@ -354,6 +354,10 @@ name = "accelerometer_verifier_tests"
 required-features = ["testing"]
 
 [[test]]
+name = "proximity_verifier_event_tests"
+required-features = ["testing"]
+
+[[test]]
 name = "exchange_relay_wiring_tests"
 required-features = ["testing"]
 

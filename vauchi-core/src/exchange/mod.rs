@@ -61,6 +61,11 @@ pub mod device_link;
 pub mod transport;
 
 #[cfg(feature = "testing")]
+pub mod verifier_event;
+#[cfg(not(feature = "testing"))]
+mod verifier_event;
+
+#[cfg(feature = "testing")]
 pub mod exchange_payload;
 #[cfg(not(feature = "testing"))]
 mod exchange_payload;
@@ -169,6 +174,7 @@ pub use session::{
     DefaultPlatformCallbacks, DuplicateAction, ExchangeEvent, ExchangePlatformCallbacks,
     ExchangeSession, ExchangeState, ExchangeTransport,
 };
+pub use verifier_event::{ProximityVerifierEvent, VerifierEventLog, VerifierMethod};
 pub use x3dh::{X3DHKeyPair, X3DH};
 
 // Multi-stage exchange re-exports

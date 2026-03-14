@@ -50,8 +50,8 @@ tokio-tungstenite = { version = "0.24", default-features = false, features = ["c
 # Stream/Sink combinators for async WebSocket
 futures-util = "0.3"
 
-# TLS for certificate pinning (rustls with ring backend - no C compilation needed)
-rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
+# TLS for certificate pinning (aws-lc-rs backend — matches vauchi-core, eliminates ring duplication)
+rustls = { version = "0.23", default-features = false, features = ["aws_lc_rs", "std", "tls12"] }
 webpki-roots = "0.26"
 
 # Password strength checking

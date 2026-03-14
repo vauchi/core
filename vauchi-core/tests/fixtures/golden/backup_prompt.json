@@ -11,7 +11,7 @@
         "items": [
           {
             "icon": "warning",
-            "title": "No identity recovery",
+            "title": "No account recovery",
             "detail": "If you lose your device without a backup, your identity is lost."
           },
           {

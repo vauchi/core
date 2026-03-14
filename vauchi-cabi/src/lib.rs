@@ -9,11 +9,18 @@
 
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
+use std::time::Duration;
+use zeroize::Zeroizing;
 
 use vauchi_core::api::Vauchi;
+use vauchi_core::exchange::{
+    ExchangeEvent, ExchangeQR, ExchangeSession, ExchangeState, ManualConfirmationVerifier,
+    ProximityConfidence, ProximityError, ProximityVerifier, VerifierChain, VerifierMethod,
+};
 use vauchi_core::network::MockTransport;
 use vauchi_core::ui::*;
+use vauchi_core::ContactCard;
 
 // ── Type-erased engine wrapper ──────────────────────────────────────
 
@@ -448,6 +455,463 @@ pub unsafe extern "C" fn vauchi_app_default_screen(handle: *mut VauchiApp) -> *m
     }
 }
 
+// ── Exchange Session functions ─────────────────────────────────────
+
+/// Wrapper to share a `ManualConfirmationVerifier` via `Arc` while
+/// implementing `ProximityVerifier` for the `VerifierChain`.
+struct SharedManualVerifier(Arc<ManualConfirmationVerifier>);
+
+impl ProximityVerifier for SharedManualVerifier {
+    fn confidence_level(&self) -> ProximityConfidence {
+        self.0.confidence_level()
+    }
+    fn emit_challenge(&self, challenge: &[u8; 16]) -> Result<(), ProximityError> {
+        self.0.emit_challenge(challenge)
+    }
+    fn listen_for_response(&self, timeout: Duration) -> Result<Vec<u8>, ProximityError> {
+        self.0.listen_for_response(timeout)
+    }
+    fn verify_response(&self, challenge: &[u8; 16], response: &[u8]) -> bool {
+        self.0.verify_response(challenge, response)
+    }
+    fn verify_proximity_two_way(
+        &self,
+        emit_challenge: &[u8; 16],
+        listen_challenge: &[u8; 16],
+        timeout: Duration,
+        is_initiator: bool,
+    ) -> Result<(), ProximityError> {
+        self.0
+            .verify_proximity_two_way(emit_challenge, listen_challenge, timeout, is_initiator)
+    }
+}
+
+/// Opaque handle to an exchange session.
+pub struct VauchiExchange {
+    session: Mutex<ExchangeSession>,
+    manual_verifier: Arc<ManualConfirmationVerifier>,
+}
+
+/// Create a new QR exchange session using the app's identity.
+///
+/// Uses manual confirmation for proximity verification (suitable for
+/// desktop platforms without audio proximity hardware).
+///
+/// Returns null if the app handle is null, identity is not created,
+/// or initialization fails.
+///
+/// # Safety
+/// `app` must be a valid app handle or null.
+#[no_mangle]
+pub unsafe extern "C" fn vauchi_exchange_create(app: *mut VauchiApp) -> *mut VauchiExchange {
+    match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        if app.is_null() {
+            return std::ptr::null_mut();
+        }
+        let app_ref = &*app;
+        let engine = match app_ref.engine.lock() {
+            Ok(e) => e,
+            Err(_) => return std::ptr::null_mut(),
+        };
+
+        let vauchi = engine.vauchi();
+        let identity_ref = match vauchi.identity() {
+            Some(id) => id,
+            None => return std::ptr::null_mut(),
+        };
+        // Clone identity via storage serialization (ExchangeSession needs ownership).
+        // Wrap in Zeroizing to scrub master_seed from heap on drop.
+        let storage_bytes = Zeroizing::new(identity_ref.to_storage_bytes());
+        let identity = match vauchi_core::identity::Identity::from_storage_bytes(&storage_bytes) {
+            Ok(id) => id,
+            Err(_) => return std::ptr::null_mut(),
+        };
+        let card = match vauchi.own_card() {
+            Ok(Some(c)) => c,
+            Ok(None) | Err(_) => return std::ptr::null_mut(),
+        };
+
+        let manual = Arc::new(ManualConfirmationVerifier::new());
+        let mut chain = VerifierChain::new();
+        chain.add(
+            VerifierMethod::ManualConfirmation,
+            Box::new(SharedManualVerifier(manual.clone())),
+        );
+
+        let session = ExchangeSession::new_qr(identity, card, chain);
+
+        Box::into_raw(Box::new(VauchiExchange {
+            session: Mutex::new(session),
+            manual_verifier: manual,
+        }))
+    })) {
+        Ok(result) => result,
+        Err(_) => std::ptr::null_mut(),
+    }
+}
+
+/// Destroy an exchange session.
+///
+/// # Safety
+/// `handle` must be a pointer returned by `vauchi_exchange_create`, or null.
+#[no_mangle]
+pub unsafe extern "C" fn vauchi_exchange_destroy(handle: *mut VauchiExchange) {
+    let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        if !handle.is_null() {
+            drop(Box::from_raw(handle));
+        }
+    }));
+}
+
+/// Start QR generation and return the QR data string ("wb://...").
+///
+/// Returns error JSON if the session is in the wrong state.
+/// Caller must free the returned string with `vauchi_string_free`.
+///
+/// # Safety
+/// `handle` must be a valid exchange handle or null.
+#[no_mangle]
+pub unsafe extern "C" fn vauchi_exchange_generate_qr(handle: *mut VauchiExchange) -> *mut c_char {
+    match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        if handle.is_null() {
+            return std::ptr::null_mut();
+        }
+        let exchange = &*handle;
+        let mut session = match exchange.session.lock() {
+            Ok(s) => s,
+            Err(_) => return to_c_string(r#"{"error":"lock poisoned"}"#),
+        };
+
+        if let Err(e) = session.apply(ExchangeEvent::StartQR) {
+            return to_c_string(&format!(r#"{{"error":"{}"}}"#, e));
+        }
+
+        match session.qr() {
+            Some(qr) => to_c_string(&format!("wb://{}", qr.to_data_string())),
+            None => to_c_string(r#"{"error":"QR not generated"}"#),
+        }
+    })) {
+        Ok(result) => result,
+        Err(_) => std::ptr::null_mut(),
+    }
+}
+
+/// Process a scanned QR code from the peer.
+///
+/// `qr_data` should be the full QR string (with or without "wb://" prefix).
+/// Returns `"ok"` on success, error JSON on failure.
+///
+/// # Safety
+/// `handle` must be a valid exchange handle or null.
+/// `qr_data` must be a valid null-terminated C string, or null.
+#[no_mangle]
+pub unsafe extern "C" fn vauchi_exchange_process_qr(
+    handle: *mut VauchiExchange,
+    qr_data: *const c_char,
+) -> *mut c_char {
+    match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        if handle.is_null() {
+            return std::ptr::null_mut();
+        }
+        let data = match from_c_str(qr_data) {
+            Some(s) => s,
+            None => return to_c_string(r#"{"error":"null QR data"}"#),
+        };
+
+        let data_str = data.strip_prefix("wb://").unwrap_or(&data);
+        let qr = match ExchangeQR::from_data_string(data_str) {
+            Ok(q) => q,
+            Err(_) => return to_c_string(r#"{"error":"invalid QR data"}"#),
+        };
+
+        let exchange = &*handle;
+        let mut session = match exchange.session.lock() {
+            Ok(s) => s,
+            Err(_) => return to_c_string(r#"{"error":"lock poisoned"}"#),
+        };
+
+        match session.apply(ExchangeEvent::ProcessQR(qr)) {
+            Ok(()) => to_c_string(r#""ok""#),
+            Err(e) => to_c_string(&format!(r#"{{"error":"{}"}}"#, e)),
+        }
+    })) {
+        Ok(result) => result,
+        Err(_) => std::ptr::null_mut(),
+    }
+}
+
+/// Helper: apply a simple event to an exchange session.
+unsafe fn exchange_apply_event(handle: *mut VauchiExchange, event: ExchangeEvent) -> *mut c_char {
+    match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        if handle.is_null() {
+            return std::ptr::null_mut();
+        }
+        let exchange = &*handle;
+        let mut session = match exchange.session.lock() {
+            Ok(s) => s,
+            Err(_) => return to_c_string(r#"{"error":"lock poisoned"}"#),
+        };
+
+        match session.apply(event) {
+            Ok(()) => to_c_string(r#""ok""#),
+            Err(e) => to_c_string(&format!(r#"{{"error":"{}"}}"#, e)),
+        }
+    })) {
+        Ok(result) => result,
+        Err(_) => std::ptr::null_mut(),
+    }
+}
+
+/// Signal that the peer scanned our QR code.
+///
+/// Returns `"ok"` on success, error JSON on failure.
+///
+/// # Safety
+/// `handle` must be a valid exchange handle or null.
+#[no_mangle]
+pub unsafe extern "C" fn vauchi_exchange_they_scanned_our_qr(
+    handle: *mut VauchiExchange,
+) -> *mut c_char {
+    exchange_apply_event(handle, ExchangeEvent::TheyScannedOurQR)
+}
+
+/// Perform key agreement and proximity verification.
+///
+/// Returns `"ok"` on success, error JSON on failure.
+///
+/// # Safety
+/// `handle` must be a valid exchange handle or null.
+#[no_mangle]
+pub unsafe extern "C" fn vauchi_exchange_perform_key_agreement(
+    handle: *mut VauchiExchange,
+) -> *mut c_char {
+    exchange_apply_event(handle, ExchangeEvent::PerformKeyAgreement)
+}
+
+/// Complete the exchange with the peer's card name.
+///
+/// Returns `"ok"` on success, error JSON on failure.
+///
+/// # Safety
+/// `handle` must be a valid exchange handle or null.
+/// `their_name` must be a valid null-terminated C string, or null.
+#[no_mangle]
+pub unsafe extern "C" fn vauchi_exchange_complete(
+    handle: *mut VauchiExchange,
+    their_name: *const c_char,
+) -> *mut c_char {
+    match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        if handle.is_null() {
+            return std::ptr::null_mut();
+        }
+        let name = match from_c_str(their_name) {
+            Some(s) => s,
+            None => return to_c_string(r#"{"error":"null name"}"#),
+        };
+
+        const MAX_NAME_LEN: usize = 256;
+        if name.len() > MAX_NAME_LEN {
+            return to_c_string(r#"{"error":"name too long"}"#);
+        }
+
+        let card = ContactCard::new(&name);
+        let exchange = &*handle;
+        let mut session = match exchange.session.lock() {
+            Ok(s) => s,
+            Err(_) => return to_c_string(r#"{"error":"lock poisoned"}"#),
+        };
+
+        match session.apply(ExchangeEvent::CompleteExchange(card)) {
+            Ok(()) => to_c_string(r#""ok""#),
+            Err(e) => to_c_string(&format!(r#"{{"error":"{}"}}"#, e)),
+        }
+    })) {
+        Ok(result) => result,
+        Err(_) => std::ptr::null_mut(),
+    }
+}
+
+/// Confirm that the user verified proximity manually.
+///
+/// # Safety
+/// `handle` must be a valid exchange handle or null.
+#[no_mangle]
+pub unsafe extern "C" fn vauchi_exchange_confirm_proximity(handle: *mut VauchiExchange) {
+    let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        if !handle.is_null() {
+            let exchange = &*handle;
+            exchange.manual_verifier.confirm();
+        }
+    }));
+}
+
+/// Get the current exchange state as a string label.
+///
+/// Returns one of: "idle", "displaying_qr", "peer_scanned",
+/// "awaiting_key_agreement", "awaiting_card_exchange", "complete", "failed".
+/// Returns null if the handle is null.
+///
+/// # Safety
+/// `handle` must be a valid exchange handle or null.
+#[no_mangle]
+pub unsafe extern "C" fn vauchi_exchange_state(handle: *mut VauchiExchange) -> *mut c_char {
+    match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        if handle.is_null() {
+            return std::ptr::null_mut();
+        }
+        let exchange = &*handle;
+        let session = match exchange.session.lock() {
+            Ok(s) => s,
+            Err(_) => return std::ptr::null_mut(),
+        };
+
+        let label = match session.state() {
+            ExchangeState::Idle => "idle",
+            ExchangeState::DisplayingQr { .. } => "displaying_qr",
+            ExchangeState::PeerScanned { .. } => "peer_scanned",
+            ExchangeState::AwaitingKeyAgreement { .. } => "awaiting_key_agreement",
+            ExchangeState::AwaitingCardExchange { .. } => "awaiting_card_exchange",
+            ExchangeState::AwaitingNfcTap => "awaiting_nfc_tap",
+            ExchangeState::AwaitingBleConnection => "awaiting_ble_connection",
+            ExchangeState::AwaitingBleVerification { .. } => "awaiting_ble_verification",
+            ExchangeState::Complete { .. } => "complete",
+            ExchangeState::Failed { .. } => "failed",
+        };
+        to_c_string(label)
+    })) {
+        Ok(result) => result,
+        Err(_) => std::ptr::null_mut(),
+    }
+}
+
+/// Check whether the exchange session has timed out.
+///
+/// Returns 1 if timed out, 0 if not, -1 on error.
+///
+/// # Safety
+/// `handle` must be a valid exchange handle or null.
+#[no_mangle]
+pub unsafe extern "C" fn vauchi_exchange_is_timed_out(handle: *mut VauchiExchange) -> i32 {
+    std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        if handle.is_null() {
+            return -1;
+        }
+        let exchange = &*handle;
+        match exchange.session.lock() {
+            Ok(session) => i32::from(session.is_timed_out()),
+            Err(_) => -1,
+        }
+    }))
+    .unwrap_or(-1)
+}
+
+/// Get the peer's display name (from their QR code).
+///
+/// Returns the name string, or null if not yet known or handle is null.
+/// Caller must free the returned string with `vauchi_string_free`.
+///
+/// # Safety
+/// `handle` must be a valid exchange handle or null.
+#[no_mangle]
+pub unsafe extern "C" fn vauchi_exchange_peer_display_name(
+    handle: *mut VauchiExchange,
+) -> *mut c_char {
+    match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        if handle.is_null() {
+            return std::ptr::null_mut();
+        }
+        let exchange = &*handle;
+        let session = match exchange.session.lock() {
+            Ok(s) => s,
+            Err(_) => return std::ptr::null_mut(),
+        };
+
+        match session.their_display_name() {
+            Some(name) => to_c_string(name),
+            None => std::ptr::null_mut(),
+        }
+    })) {
+        Ok(result) => result,
+        Err(_) => std::ptr::null_mut(),
+    }
+}
+
+/// Enable debug logging on the exchange session.
+///
+/// # Safety
+/// `handle` must be a valid exchange handle or null.
+#[no_mangle]
+pub unsafe extern "C" fn vauchi_exchange_enable_debug_log(handle: *mut VauchiExchange) {
+    let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        if !handle.is_null() {
+            let exchange = &*handle;
+            if let Ok(mut session) = exchange.session.lock() {
+                session.enable_debug_log();
+            }
+        }
+    }));
+}
+
+/// Get the exchange debug log as JSONL.
+///
+/// Returns the JSONL string, or null if debug logging is not enabled.
+/// Caller must free the returned string with `vauchi_string_free`.
+///
+/// # Safety
+/// `handle` must be a valid exchange handle or null.
+#[no_mangle]
+pub unsafe extern "C" fn vauchi_exchange_debug_jsonl(handle: *mut VauchiExchange) -> *mut c_char {
+    match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        if handle.is_null() {
+            return std::ptr::null_mut();
+        }
+        let exchange = &*handle;
+        let session = match exchange.session.lock() {
+            Ok(s) => s,
+            Err(_) => return std::ptr::null_mut(),
+        };
+
+        match session.exchange_debug_log() {
+            Some(log) => to_c_string(&log.to_jsonl()),
+            None => std::ptr::null_mut(),
+        }
+    })) {
+        Ok(result) => result,
+        Err(_) => std::ptr::null_mut(),
+    }
+}
+
+/// Get the exchange debug log as Markdown.
+///
+/// Returns the Markdown string, or null if debug logging is not enabled.
+/// Caller must free the returned string with `vauchi_string_free`.
+///
+/// # Safety
+/// `handle` must be a valid exchange handle or null.
+#[no_mangle]
+pub unsafe extern "C" fn vauchi_exchange_debug_markdown(
+    handle: *mut VauchiExchange,
+) -> *mut c_char {
+    match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        if handle.is_null() {
+            return std::ptr::null_mut();
+        }
+        let exchange = &*handle;
+        let session = match exchange.session.lock() {
+            Ok(s) => s,
+            Err(_) => return std::ptr::null_mut(),
+        };
+
+        match session.exchange_debug_log() {
+            Some(log) => to_c_string(&log.to_markdown()),
+            None => std::ptr::null_mut(),
+        }
+    })) {
+        Ok(result) => result,
+        Err(_) => std::ptr::null_mut(),
+    }
+}
+
 // ── Tests ───────────────────────────────────────────────────────────
 
 // INLINE_TEST_REQUIRED: cdylib crate-type prevents integration tests in tests/ directory
@@ -709,6 +1173,326 @@ mod tests {
             assert!(json.contains("error"), "unknown screen should return error");
             vauchi_string_free(json_ptr);
             vauchi_app_destroy(handle);
+        }
+    }
+
+    // ── Exchange session tests ──────────────────────────────────────
+
+    /// Drive a VauchiApp through onboarding to create an identity.
+    unsafe fn create_app_with_identity() -> *mut VauchiApp {
+        let handle = vauchi_app_create();
+        assert!(!handle.is_null());
+
+        let steps: &[&str] = &[
+            // 1: identity_check → welcome
+            r#"{"ActionPressed":{"action_id":"create_new"}}"#,
+            // 2: welcome → default_name
+            r#"{"ActionPressed":{"action_id":"get_started"}}"#,
+            // 3: set display name (on default_name screen)
+            r#"{"TextChanged":{"component_id":"display_name","value":"TestUser"}}"#,
+            // 4: default_name → skip_gate
+            r#"{"ActionPressed":{"action_id":"continue"}}"#,
+            // 5: skip_gate → security_explanation (fast path)
+            r#"{"ActionPressed":{"action_id":"skip_to_finish"}}"#,
+            // 6: security_explanation → backup_prompt
+            r#"{"ActionPressed":{"action_id":"continue"}}"#,
+            // 7: backup_prompt → ready
+            r#"{"ActionPressed":{"action_id":"skip"}}"#,
+            // 8: ready → Complete (creates identity)
+            r#"{"ActionPressed":{"action_id":"start"}}"#,
+        ];
+
+        for step in steps {
+            let action = CString::new(*step).unwrap();
+            let r = vauchi_app_handle_action(handle, action.as_ptr());
+            vauchi_string_free(r);
+        }
+
+        handle
+    }
+
+    #[test]
+    fn exchange_create_returns_null_without_identity() {
+        unsafe {
+            let app = vauchi_app_create();
+            let exchange = vauchi_exchange_create(app);
+            assert!(exchange.is_null(), "exchange should fail without identity");
+            vauchi_app_destroy(app);
+        }
+    }
+
+    #[test]
+    fn exchange_create_returns_null_for_null_app() {
+        unsafe {
+            let exchange = vauchi_exchange_create(std::ptr::null_mut());
+            assert!(exchange.is_null());
+        }
+    }
+
+    #[test]
+    fn exchange_destroy_null_is_safe() {
+        // No-panic boundary test — validates null input doesn't crash
+        unsafe {
+            vauchi_exchange_destroy(std::ptr::null_mut());
+        }
+    }
+
+    #[test]
+    fn exchange_create_with_identity_returns_non_null() {
+        unsafe {
+            let app = create_app_with_identity();
+            let exchange = vauchi_exchange_create(app);
+            assert!(!exchange.is_null(), "exchange should succeed with identity");
+            vauchi_exchange_destroy(exchange);
+            vauchi_app_destroy(app);
+        }
+    }
+
+    #[test]
+    fn exchange_initial_state_is_idle() {
+        unsafe {
+            let app = create_app_with_identity();
+            let exchange = vauchi_exchange_create(app);
+            assert!(!exchange.is_null());
+
+            let state_ptr = vauchi_exchange_state(exchange);
+            assert!(!state_ptr.is_null());
+            let state = CStr::from_ptr(state_ptr).to_str().unwrap();
+            assert_eq!(state, "idle");
+
+            vauchi_string_free(state_ptr);
+            vauchi_exchange_destroy(exchange);
+            vauchi_app_destroy(app);
+        }
+    }
+
+    #[test]
+    fn exchange_state_null_handle_returns_null() {
+        unsafe {
+            let state_ptr = vauchi_exchange_state(std::ptr::null_mut());
+            assert!(state_ptr.is_null());
+        }
+    }
+
+    #[test]
+    fn exchange_generate_qr_transitions_to_displaying() {
+        unsafe {
+            let app = create_app_with_identity();
+            let exchange = vauchi_exchange_create(app);
+            assert!(!exchange.is_null());
+
+            let qr_ptr = vauchi_exchange_generate_qr(exchange);
+            assert!(!qr_ptr.is_null());
+            let qr = CStr::from_ptr(qr_ptr).to_str().unwrap();
+            assert!(
+                qr.starts_with("wb://"),
+                "QR should start with wb://, got: {}",
+                qr
+            );
+
+            let state_ptr = vauchi_exchange_state(exchange);
+            let state = CStr::from_ptr(state_ptr).to_str().unwrap();
+            assert_eq!(state, "displaying_qr");
+
+            vauchi_string_free(qr_ptr);
+            vauchi_string_free(state_ptr);
+            vauchi_exchange_destroy(exchange);
+            vauchi_app_destroy(app);
+        }
+    }
+
+    #[test]
+    fn exchange_generate_qr_null_handle_returns_null() {
+        unsafe {
+            let qr_ptr = vauchi_exchange_generate_qr(std::ptr::null_mut());
+            assert!(qr_ptr.is_null());
+        }
+    }
+
+    #[test]
+    fn exchange_is_not_timed_out_initially() {
+        unsafe {
+            let app = create_app_with_identity();
+            let exchange = vauchi_exchange_create(app);
+            assert!(!exchange.is_null());
+
+            let result = vauchi_exchange_is_timed_out(exchange);
+            assert_eq!(result, 0, "new exchange should not be timed out");
+
+            vauchi_exchange_destroy(exchange);
+            vauchi_app_destroy(app);
+        }
+    }
+
+    #[test]
+    fn exchange_is_timed_out_null_returns_error() {
+        unsafe {
+            let result = vauchi_exchange_is_timed_out(std::ptr::null_mut());
+            assert_eq!(result, -1, "null handle should return -1");
+        }
+    }
+
+    #[test]
+    fn exchange_peer_name_null_before_scan() {
+        unsafe {
+            let app = create_app_with_identity();
+            let exchange = vauchi_exchange_create(app);
+            assert!(!exchange.is_null());
+
+            let name_ptr = vauchi_exchange_peer_display_name(exchange);
+            assert!(
+                name_ptr.is_null(),
+                "peer name should be null before QR scan"
+            );
+
+            vauchi_exchange_destroy(exchange);
+            vauchi_app_destroy(app);
+        }
+    }
+
+    #[test]
+    fn exchange_confirm_proximity_null_is_safe() {
+        // No-panic boundary test
+        unsafe {
+            vauchi_exchange_confirm_proximity(std::ptr::null_mut());
+        }
+    }
+
+    #[test]
+    fn exchange_debug_log_null_before_enable() {
+        unsafe {
+            let app = create_app_with_identity();
+            let exchange = vauchi_exchange_create(app);
+            assert!(!exchange.is_null());
+
+            let jsonl_ptr = vauchi_exchange_debug_jsonl(exchange);
+            assert!(
+                jsonl_ptr.is_null(),
+                "debug JSONL should be null before enabling"
+            );
+
+            let md_ptr = vauchi_exchange_debug_markdown(exchange);
+            assert!(
+                md_ptr.is_null(),
+                "debug markdown should be null before enabling"
+            );
+
+            vauchi_exchange_destroy(exchange);
+            vauchi_app_destroy(app);
+        }
+    }
+
+    #[test]
+    fn exchange_enable_debug_log_produces_output() {
+        unsafe {
+            let app = create_app_with_identity();
+            let exchange = vauchi_exchange_create(app);
+            assert!(!exchange.is_null());
+
+            vauchi_exchange_enable_debug_log(exchange);
+
+            // Generate QR to produce at least one debug event
+            let qr_ptr = vauchi_exchange_generate_qr(exchange);
+            vauchi_string_free(qr_ptr);
+
+            let jsonl_ptr = vauchi_exchange_debug_jsonl(exchange);
+            assert!(
+                !jsonl_ptr.is_null(),
+                "debug JSONL should be non-null after enabling and generating QR"
+            );
+            let jsonl = CStr::from_ptr(jsonl_ptr).to_str().unwrap();
+            assert!(!jsonl.is_empty(), "debug JSONL should not be empty");
+
+            let md_ptr = vauchi_exchange_debug_markdown(exchange);
+            assert!(
+                !md_ptr.is_null(),
+                "debug markdown should be non-null after enabling"
+            );
+
+            vauchi_string_free(jsonl_ptr);
+            vauchi_string_free(md_ptr);
+            vauchi_exchange_destroy(exchange);
+            vauchi_app_destroy(app);
+        }
+    }
+
+    #[test]
+    fn exchange_process_qr_rejects_invalid_data() {
+        unsafe {
+            let app = create_app_with_identity();
+            let exchange = vauchi_exchange_create(app);
+            assert!(!exchange.is_null());
+
+            // Must be in DisplayingQr state first
+            let qr_ptr = vauchi_exchange_generate_qr(exchange);
+            vauchi_string_free(qr_ptr);
+
+            let bad_qr = CString::new("not-a-valid-qr").unwrap();
+            let result_ptr = vauchi_exchange_process_qr(exchange, bad_qr.as_ptr());
+            assert!(!result_ptr.is_null());
+            let result = CStr::from_ptr(result_ptr).to_str().unwrap();
+            assert!(
+                result.contains("error"),
+                "invalid QR should return error, got: {}",
+                result
+            );
+
+            vauchi_string_free(result_ptr);
+            vauchi_exchange_destroy(exchange);
+            vauchi_app_destroy(app);
+        }
+    }
+
+    #[test]
+    fn exchange_process_qr_null_data_returns_error() {
+        unsafe {
+            let app = create_app_with_identity();
+            let exchange = vauchi_exchange_create(app);
+            assert!(!exchange.is_null());
+
+            let result_ptr = vauchi_exchange_process_qr(exchange, std::ptr::null());
+            assert!(!result_ptr.is_null());
+            let result = CStr::from_ptr(result_ptr).to_str().unwrap();
+            assert!(result.contains("error"));
+
+            vauchi_string_free(result_ptr);
+            vauchi_exchange_destroy(exchange);
+            vauchi_app_destroy(app);
+        }
+    }
+
+    #[test]
+    fn exchange_they_scanned_null_returns_null() {
+        unsafe {
+            let result_ptr = vauchi_exchange_they_scanned_our_qr(std::ptr::null_mut());
+            assert!(result_ptr.is_null());
+        }
+    }
+
+    #[test]
+    fn exchange_complete_null_handle_returns_null() {
+        unsafe {
+            let name = CString::new("Bob").unwrap();
+            let result_ptr = vauchi_exchange_complete(std::ptr::null_mut(), name.as_ptr());
+            assert!(result_ptr.is_null());
+        }
+    }
+
+    #[test]
+    fn exchange_complete_null_name_returns_error() {
+        unsafe {
+            let app = create_app_with_identity();
+            let exchange = vauchi_exchange_create(app);
+            assert!(!exchange.is_null());
+
+            let result_ptr = vauchi_exchange_complete(exchange, std::ptr::null());
+            assert!(!result_ptr.is_null());
+            let result = CStr::from_ptr(result_ptr).to_str().unwrap();
+            assert!(result.contains("error"));
+
+            vauchi_string_free(result_ptr);
+            vauchi_exchange_destroy(exchange);
+            vauchi_app_destroy(app);
         }
     }
 }

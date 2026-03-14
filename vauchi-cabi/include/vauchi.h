@@ -15,6 +15,11 @@
 typedef struct VauchiApp VauchiApp;
 
 /**
+ * Opaque handle to an exchange session.
+ */
+typedef struct VauchiExchange VauchiExchange;
+
+/**
  * Opaque handle to a workflow engine instance.
  */
 typedef struct VauchiWorkflow VauchiWorkflow;
@@ -151,5 +156,152 @@ char *vauchi_app_available_screens(struct VauchiApp *handle);
  * `handle` must be a valid app handle or null.
  */
 char *vauchi_app_default_screen(struct VauchiApp *handle);
+
+/**
+ * Create a new QR exchange session using the app's identity.
+ *
+ * Uses manual confirmation for proximity verification (suitable for
+ * desktop platforms without audio proximity hardware).
+ *
+ * Returns null if the app handle is null, identity is not created,
+ * or initialization fails.
+ *
+ * # Safety
+ * `app` must be a valid app handle or null.
+ */
+struct VauchiExchange *vauchi_exchange_create(struct VauchiApp *app);
+
+/**
+ * Destroy an exchange session.
+ *
+ * # Safety
+ * `handle` must be a pointer returned by `vauchi_exchange_create`, or null.
+ */
+void vauchi_exchange_destroy(struct VauchiExchange *handle);
+
+/**
+ * Start QR generation and return the QR data string ("wb://...").
+ *
+ * Returns error JSON if the session is in the wrong state.
+ * Caller must free the returned string with `vauchi_string_free`.
+ *
+ * # Safety
+ * `handle` must be a valid exchange handle or null.
+ */
+char *vauchi_exchange_generate_qr(struct VauchiExchange *handle);
+
+/**
+ * Process a scanned QR code from the peer.
+ *
+ * `qr_data` should be the full QR string (with or without "wb://" prefix).
+ * Returns `"ok"` on success, error JSON on failure.
+ *
+ * # Safety
+ * `handle` must be a valid exchange handle or null.
+ * `qr_data` must be a valid null-terminated C string, or null.
+ */
+char *vauchi_exchange_process_qr(struct VauchiExchange *handle, const char *qr_data);
+
+/**
+ * Signal that the peer scanned our QR code.
+ *
+ * Returns `"ok"` on success, error JSON on failure.
+ *
+ * # Safety
+ * `handle` must be a valid exchange handle or null.
+ */
+char *vauchi_exchange_they_scanned_our_qr(struct VauchiExchange *handle);
+
+/**
+ * Perform key agreement and proximity verification.
+ *
+ * Returns `"ok"` on success, error JSON on failure.
+ *
+ * # Safety
+ * `handle` must be a valid exchange handle or null.
+ */
+char *vauchi_exchange_perform_key_agreement(struct VauchiExchange *handle);
+
+/**
+ * Complete the exchange with the peer's card name.
+ *
+ * Returns `"ok"` on success, error JSON on failure.
+ *
+ * # Safety
+ * `handle` must be a valid exchange handle or null.
+ * `their_name` must be a valid null-terminated C string, or null.
+ */
+char *vauchi_exchange_complete(struct VauchiExchange *handle, const char *their_name);
+
+/**
+ * Confirm that the user verified proximity manually.
+ *
+ * # Safety
+ * `handle` must be a valid exchange handle or null.
+ */
+void vauchi_exchange_confirm_proximity(struct VauchiExchange *handle);
+
+/**
+ * Get the current exchange state as a string label.
+ *
+ * Returns one of: "idle", "displaying_qr", "peer_scanned",
+ * "awaiting_key_agreement", "awaiting_card_exchange", "complete", "failed".
+ * Returns null if the handle is null.
+ *
+ * # Safety
+ * `handle` must be a valid exchange handle or null.
+ */
+char *vauchi_exchange_state(struct VauchiExchange *handle);
+
+/**
+ * Check whether the exchange session has timed out.
+ *
+ * Returns 1 if timed out, 0 if not, -1 on error.
+ *
+ * # Safety
+ * `handle` must be a valid exchange handle or null.
+ */
+int32_t vauchi_exchange_is_timed_out(struct VauchiExchange *handle);
+
+/**
+ * Get the peer's display name (from their QR code).
+ *
+ * Returns the name string, or null if not yet known or handle is null.
+ * Caller must free the returned string with `vauchi_string_free`.
+ *
+ * # Safety
+ * `handle` must be a valid exchange handle or null.
+ */
+char *vauchi_exchange_peer_display_name(struct VauchiExchange *handle);
+
+/**
+ * Enable debug logging on the exchange session.
+ *
+ * # Safety
+ * `handle` must be a valid exchange handle or null.
+ */
+void vauchi_exchange_enable_debug_log(struct VauchiExchange *handle);
+
+/**
+ * Get the exchange debug log as JSONL.
+ *
+ * Returns the JSONL string, or null if debug logging is not enabled.
+ * Caller must free the returned string with `vauchi_string_free`.
+ *
+ * # Safety
+ * `handle` must be a valid exchange handle or null.
+ */
+char *vauchi_exchange_debug_jsonl(struct VauchiExchange *handle);
+
+/**
+ * Get the exchange debug log as Markdown.
+ *
+ * Returns the Markdown string, or null if debug logging is not enabled.
+ * Caller must free the returned string with `vauchi_string_free`.
+ *
+ * # Safety
+ * `handle` must be a valid exchange handle or null.
+ */
+char *vauchi_exchange_debug_markdown(struct VauchiExchange *handle);
 
 #endif  /* VAUCHI_CABI_H */

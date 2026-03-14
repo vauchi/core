@@ -8,6 +8,11 @@
 //! and X3DH key agreement.
 
 #[cfg(feature = "testing")]
+pub mod ambient_audio;
+#[cfg(not(feature = "testing"))]
+mod ambient_audio;
+
+#[cfg(feature = "testing")]
 pub mod audio;
 #[cfg(not(feature = "testing"))]
 mod audio;
@@ -110,6 +115,10 @@ pub mod x3dh;
 #[cfg(not(feature = "testing"))]
 mod x3dh;
 
+pub use ambient_audio::{
+    AmbientAudioBackend, AmbientAudioConfig, AmbientAudioVerifier, AudioFingerprint,
+    MockAmbientAudioBackend,
+};
 pub use audio::{AudioBackend, AudioCapability, AudioConfig, MockAudioBackend, UltrasonicVerifier};
 #[cfg(feature = "audio-cpal")]
 pub use audio_cpal::CpalAudioBackend;

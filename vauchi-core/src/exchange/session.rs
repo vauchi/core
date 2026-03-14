@@ -493,9 +493,14 @@ impl<P: ProximityVerifier> ExchangeSession<P> {
         };
 
         // AU-2: Auto-invoke proximity check after key agreement.
-        // This ensures proximity is always verified without relying on
-        // the platform layer to manually call run_proximity_check().
-        self.run_proximity_check();
+        // NFC is exempt: the physical tap IS the proximity proof — running a
+        // separate verifier is redundant and could fail on devices without
+        // audio hardware, causing a false negative.
+        if self.transport == ExchangeTransport::Nfc {
+            self.proximity_confidence = ProximityConfidence::High;
+        } else {
+            self.run_proximity_check();
+        }
 
         Ok(())
     }

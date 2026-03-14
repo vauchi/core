@@ -9,9 +9,11 @@ use super::caps::TransportCaps;
 use super::channel::TransportType;
 
 /// Ordered from highest to lowest priority for negotiation.
+/// NFC sits above BLE: physical tap proves adjacency, RSSI does not.
 const TRANSPORT_MAP: &[(TransportCaps, TransportType)] = &[
     (TransportCaps::WIFI_AWARE, TransportType::WifiAware),
     (TransportCaps::TCP, TransportType::Tcp),
+    (TransportCaps::NFC_TRIGGER, TransportType::Nfc),
     (TransportCaps::BLE, TransportType::Ble),
     (TransportCaps::ANIMATED_QR, TransportType::AnimatedQr),
     (TransportCaps::STATIC_QR, TransportType::StaticQr),

@@ -157,8 +157,10 @@ impl MockBLEVerifier {
 }
 
 impl ProximityVerifier for MockBLEVerifier {
+    /// BLE RSSI estimates distance but does not cryptographically prove proximity.
+    /// RSSI can be amplified, relayed, or is inaccurate through walls — Medium confidence.
     fn confidence_level(&self) -> super::ProximityConfidence {
-        super::ProximityConfidence::High
+        super::ProximityConfidence::Medium
     }
 
     fn emit_challenge(&self, _challenge: &[u8; 16]) -> Result<(), ProximityError> {

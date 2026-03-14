@@ -45,7 +45,7 @@ impl TransportType {
             Self::Ble => 40,
             Self::AnimatedQr => 30,
             Self::StaticQr => 20,
-            Self::Nfc => 10,
+            Self::Nfc => 42, // Above BLE (40), below TCP (45): physical tap > RSSI heuristic
         }
     }
 }

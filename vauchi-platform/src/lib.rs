@@ -46,6 +46,7 @@ mod mobile_recovery;
 mod mobile_security;
 mod mobile_tor;
 mod mobile_ui;
+mod mobile_verifier_event;
 mod mobile_visibility;
 mod mobile_wifi_aware;
 mod multipart_qr;
@@ -90,6 +91,9 @@ pub use mobile_ui::{
     MobileDeliveryStatusWorkflow, MobileDeviceLinkingWorkflow, MobileDuressPinWorkflow,
     MobileEmergencyShredWorkflow, MobileExchangeWorkflow, MobileHelpWorkflow, MobileHomeWorkflow,
     MobileLockScreenWorkflow, MobileOnboardingWorkflow, MobileSettingsWorkflow,
+};
+pub use mobile_verifier_event::{
+    MobileProximityConfidence, MobileProximityVerifierEvent, MobileVerifierMethod,
 };
 pub use mobile_wifi_aware::{wifi_aware_check_availability, MobileWifiAwareStatus};
 pub use multipart_qr::{encode_multipart, MobileMultipartDecoder, MultipartDecoder};

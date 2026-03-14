@@ -46,6 +46,7 @@ pub struct TimestampedEvent {
 ///
 /// Created once per exchange session. Events are pushed as the exchange
 /// progresses. The log can be exported as JSONL for diagnostic analysis.
+#[derive(Debug)]
 pub struct ExchangeDebugLog {
     start: Instant,
     events: Vec<TimestampedEvent>,

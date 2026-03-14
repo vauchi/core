@@ -141,15 +141,10 @@ fn key_agreement_logs_completion_and_proximity() {
         .unwrap();
 
     let log = bob_session.exchange_debug_log().unwrap();
-    let _event_types: Vec<_> = log
-        .events()
-        .iter()
-        .map(|e| std::mem::discriminant(&e.event))
-        .collect();
 
-    // Should contain: SessionStarted, QrGenerated, QrScanned,
+    // SessionStarted, QrGenerated, QrScanned,
     // KeyAgreementCompleted, ProximityCheckStarted, ProximityCheckCompleted
-    assert!(log.events().len() >= 5);
+    assert_eq!(log.events().len(), 6);
 
     // Verify key agreement event exists
     assert!(log
@@ -224,6 +219,25 @@ fn fail_event_logs_exchange_failed() {
         &e.event,
         ExchangeDebugEvent::ExchangeFailed { error } if error == "SessionTimeout"
     )));
+}
+
+// ===== Idempotency =====
+
+#[test]
+fn enable_debug_log_twice_is_idempotent() {
+    let identity = Identity::create("Alice");
+    let card = ContactCard::new("Alice");
+    let mut session = ExchangeSession::new_qr(identity, card, MockProximityVerifier::success());
+
+    session.enable_debug_log();
+    session.enable_debug_log(); // second call must be a no-op
+
+    let log = session.exchange_debug_log().unwrap();
+    assert_eq!(log.events().len(), 1);
+    assert!(matches!(
+        &log.events()[0].event,
+        ExchangeDebugEvent::SessionStarted { .. }
+    ));
 }
 
 // ===== No events when disabled =====

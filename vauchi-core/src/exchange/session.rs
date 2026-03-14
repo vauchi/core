@@ -402,19 +402,17 @@ impl ExchangeSession {
     /// Enable exchange debug logging. Records a `SessionStarted` event
     /// and captures timestamped events at each subsequent state transition.
     ///
+    /// This is a production API — the platform debug panel calls it when
+    /// the user activates debug mode. Not gated behind `cfg(test)`.
+    ///
     /// Idempotent: calling on an already-enabled session is a no-op.
     pub fn enable_debug_log(&mut self) {
         if self.debug_log.is_some() {
             return;
         }
         let mut log = ExchangeDebugLog::new();
-        let transport = match self.transport {
-            ExchangeTransport::Qr => "qr",
-            ExchangeTransport::Nfc => "nfc",
-            ExchangeTransport::Ble => "ble",
-        };
         log.push(ExchangeDebugEvent::SessionStarted {
-            transport: transport.to_string(),
+            transport: Self::transport_label(self.transport).to_string(),
         });
         self.debug_log = Some(log);
     }
@@ -428,6 +426,25 @@ impl ExchangeSession {
     fn debug_event(&mut self, event: ExchangeDebugEvent) {
         if let Some(ref mut log) = self.debug_log {
             log.push(event);
+        }
+    }
+
+    /// Lowercase label for a transport type (stable JSONL output).
+    fn transport_label(t: ExchangeTransport) -> &'static str {
+        match t {
+            ExchangeTransport::Qr => "qr",
+            ExchangeTransport::Nfc => "nfc",
+            ExchangeTransport::Ble => "ble",
+        }
+    }
+
+    /// Lowercase label for a confidence level (stable JSONL output).
+    fn confidence_label(c: ProximityConfidence) -> &'static str {
+        match c {
+            ProximityConfidence::High => "high",
+            ProximityConfidence::Medium => "medium",
+            ProximityConfidence::Low => "low",
+            ProximityConfidence::Unknown => "unknown",
         }
     }
 
@@ -587,13 +604,12 @@ impl ExchangeSession {
         if self.transport == ExchangeTransport::Nfc {
             self.proximity_confidence = ProximityConfidence::High;
         } else {
-            let method = format!("{:?}", self.transport);
             self.debug_event(ExchangeDebugEvent::ProximityCheckStarted {
-                method: method.clone(),
+                method: Self::transport_label(self.transport).to_string(),
             });
             self.run_proximity_check();
             self.debug_event(ExchangeDebugEvent::ProximityCheckCompleted {
-                confidence: format!("{:?}", self.proximity_confidence),
+                confidence: Self::confidence_label(self.proximity_confidence).to_string(),
             });
         }
 

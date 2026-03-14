@@ -113,3 +113,43 @@ fn jsonl_contains_event_type_tags() {
         "JSONL should contain exchange_completed tag"
     );
 }
+
+// ===== Markdown export =====
+
+#[test]
+fn to_markdown_empty_log() {
+    let log = ExchangeDebugLog::new();
+    let md = log.to_markdown();
+    assert!(md.contains("# Exchange Debug Log"));
+    assert!(md.contains("0 events"));
+}
+
+#[test]
+fn to_markdown_with_events() {
+    let mut log = ExchangeDebugLog::new();
+    log.push(ExchangeDebugEvent::SessionStarted {
+        transport: "qr".to_string(),
+    });
+    log.push(ExchangeDebugEvent::QrGenerated);
+    log.push(ExchangeDebugEvent::QrScanned);
+    log.push(ExchangeDebugEvent::ExchangeCompleted);
+
+    let md = log.to_markdown();
+    assert!(md.contains("# Exchange Debug Log"));
+    assert!(md.contains("4 events"));
+    assert!(md.contains("| Elapsed"));
+    assert!(md.contains("SessionStarted"));
+    assert!(md.contains("QrGenerated"));
+    assert!(md.contains("ExchangeCompleted"));
+}
+
+#[test]
+fn to_markdown_includes_event_details() {
+    let mut log = ExchangeDebugLog::new();
+    log.push(ExchangeDebugEvent::ExchangeFailed {
+        error: "timeout".to_string(),
+    });
+
+    let md = log.to_markdown();
+    assert!(md.contains("timeout"));
+}

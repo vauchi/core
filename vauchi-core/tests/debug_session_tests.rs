@@ -250,6 +250,46 @@ fn activate_twice_is_idempotent_when_already_active() {
     assert_eq!(session.events().len(), events_before);
 }
 
+// ===== Markdown export =====
+
+#[test]
+fn to_markdown_empty_session() {
+    let session = DebugSession::new();
+    let md = session.to_markdown();
+    assert!(md.contains("# Debug Session Report"));
+    assert!(md.contains("inactive"));
+    assert!(md.contains("0 events"));
+}
+
+#[test]
+fn to_markdown_active_with_events() {
+    let mut session = DebugSession::new();
+    session.activate();
+    session.log_screen_appeared(ScreenId::Home);
+    session.log_user_action(ScreenId::Home, "tap_exchange".to_string());
+
+    let md = session.to_markdown();
+    assert!(md.contains("# Debug Session Report"));
+    assert!(md.contains("active"));
+    assert!(md.contains("3 events")); // DebugModeActivated + ScreenAppeared + UserAction
+                                      // Should contain a table with event rows
+    assert!(md.contains("| Timestamp"));
+    assert!(md.contains("DebugModeActivated"));
+    assert!(md.contains("ScreenAppeared"));
+    assert!(md.contains("UserAction"));
+}
+
+#[test]
+fn to_markdown_contains_screen_details() {
+    let mut session = DebugSession::new();
+    session.activate();
+    session.log_error_presented(ScreenId::ExchangeFailure, "timeout".to_string());
+
+    let md = session.to_markdown();
+    assert!(md.contains("ExchangeFailure"));
+    assert!(md.contains("timeout"));
+}
+
 // ===== Helpers =====
 
 fn events_last(session: &DebugSession) -> &vauchi_core::diagnostic::log_event::LogEvent {

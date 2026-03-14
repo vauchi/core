@@ -105,8 +105,8 @@ pub mod vauchi;
 #[cfg(not(feature = "testing"))]
 mod vauchi;
 
-// Account
-pub use account::{delete_account_data, AccountError, DeletionManager, DeletionResult};
+// Identity Deletion
+pub use account::{delete_identity_data, DeletionError, DeletionManager, DeletionResult};
 
 // Consent
 pub use consent::{ConsentManager, ConsentRecord, ConsentStatus, ConsentType};

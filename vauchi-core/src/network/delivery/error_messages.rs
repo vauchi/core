@@ -20,7 +20,7 @@ pub fn failure_to_user_message(reason: &str) -> String {
             "Could not reach relay server. Check your internet connection.".to_string()
         }
         "recipient_not_found" => {
-            "Recipient is not registered. They may have deleted their account.".to_string()
+            "Recipient not found. They may have deleted their identity.".to_string()
         }
         "key_mismatch" => {
             "Recipient's security key has changed. Please re-verify this contact.".to_string()

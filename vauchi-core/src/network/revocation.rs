@@ -4,7 +4,7 @@
 
 //! Revocation protocol: canonical signature format and processing logic.
 //!
-//! When a card owner deletes their account, they send an `AccountRevoked`
+//! When a card owner destroys their identity, they send an `AccountRevoked`
 //! message to each contact. The recipient verifies the Ed25519 signature,
 //! then crypto-shreds the CEK, deletes the contact, and records a tombstone.
 

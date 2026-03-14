@@ -15,7 +15,7 @@
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use crate::api::account::{AccountError, DeletionManager};
+use crate::api::account::{DeletionError, DeletionManager};
 use crate::api::pre_signed::{PreSignedPurgeRequest, PreSignedShredMessages};
 use crate::identity::Identity;
 use crate::storage::secure::SecureStorage;
@@ -34,12 +34,12 @@ pub trait PurgeSender {
     fn send_purge(&mut self, purge: &PreSignedPurgeRequest) -> Result<bool, ShredError>;
 }
 
-/// Trait for sending account revocation messages to contacts during shred.
+/// Trait for sending identity revocation messages to contacts during shred.
 ///
 /// Abstracted to allow testing without a real relay connection and to
 /// decouple the shred orchestration from the network layer.
 pub trait RevocationSender {
-    /// Sends an account revocation message to a contact via the relay.
+    /// Sends an identity revocation message to a contact via the relay.
     ///
     /// Returns `Ok(true)` if the relay acknowledged the message,
     /// `Ok(false)` if the message was sent but not confirmed,
@@ -120,8 +120,8 @@ pub struct ShredVerification {
 /// Errors from shred operations.
 #[derive(Debug, thiserror::Error)]
 pub enum ShredError {
-    #[error("Account error: {0}")]
-    Account(#[from] AccountError),
+    #[error("Deletion error: {0}")]
+    Deletion(#[from] DeletionError),
 
     #[error("Storage error: {0}")]
     Storage(#[from] crate::storage::StorageError),
@@ -136,7 +136,7 @@ pub enum ShredError {
     FileError(String),
 }
 
-/// Orchestrates cryptographic shredding of all account data.
+/// Orchestrates cryptographic shredding of all identity data.
 ///
 /// Composes the existing `DeletionManager` for grace period tracking and
 /// adds key destruction, tombstone creation, and network notification.
@@ -206,7 +206,7 @@ impl<'a> ShredManager<'a> {
         let state = dm.deletion_state()?;
         if let DeletionState::Scheduled { scheduled_at, .. } = &state {
             if token.created_at() < *scheduled_at {
-                return Err(ShredError::Account(AccountError::DeletionFailed(
+                return Err(ShredError::Deletion(DeletionError::DeletionFailed(
                     "ShredToken predates scheduled deletion".to_string(),
                 )));
             }

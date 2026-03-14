@@ -2,14 +2,14 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! Tests for DeletionManager revocation and crypto-shredding during account deletion.
+//! Tests for DeletionManager revocation and crypto-shredding during identity deletion.
 //!
 //! Traces to features/privacy_compliance.feature:
-//!   - "Account deletion destroys all content encryption keys"
-//!   - "Account deletion sends revocation signal to all contacts"
-//!   - "Account deletion propagates across all user devices"
+//!   - "Identity deletion destroys all content encryption keys"
+//!   - "Identity deletion sends revocation signal to all contacts"
+//!   - "Identity deletion propagates across all user devices"
 
-use vauchi_core::api::account::{AccountError, DeletionManager};
+use vauchi_core::api::account::{DeletionError, DeletionManager};
 use vauchi_core::contact::Contact;
 use vauchi_core::contact_card::{ContactCard, ContactField, FieldType};
 use vauchi_core::crypto::cek::ContentEncryptionKey;
@@ -205,7 +205,7 @@ fn test_execute_deletion_still_requires_grace_period() {
         .unwrap();
 
     let result = manager.execute_deletion(&identity);
-    assert!(matches!(result, Err(AccountError::GracePeriodNotElapsed)));
+    assert!(matches!(result, Err(DeletionError::GracePeriodNotElapsed)));
 }
 
 #[test]

@@ -172,6 +172,9 @@ impl LegacyExchangeMessage {
     }
 
     /// Serialize to bytes.
+    ///
+    /// Uses `unwrap_or_default` because serialization of this type is
+    /// infallible in practice — all fields are JSON-serializable primitives.
     pub fn to_bytes(&self) -> Vec<u8> {
         serde_json::to_vec(self).unwrap_or_default()
     }

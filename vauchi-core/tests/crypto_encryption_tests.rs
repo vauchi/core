@@ -50,10 +50,12 @@ fn test_symmetric_key_accepts_nonzero() {
 #[test]
 fn test_try_from_bytes_rejects_all_zeros() {
     let result = SymmetricKey::try_from_bytes([0u8; 32]);
-    assert!(result.is_err(), "should reject all-zeros key");
     assert!(
-        format!("{}", result.unwrap_err()).contains("Degenerate"),
-        "error should mention degenerate key"
+        matches!(
+            result,
+            Err(vauchi_core::crypto::encryption::EncryptionError::DegenerateKey)
+        ),
+        "should reject all-zeros key with DegenerateKey variant"
     );
 }
 

@@ -11,6 +11,8 @@
 //! - Set on the Contact during exchange completion
 //! - Derivable from exchange session proximity check
 
+mod common;
+
 use vauchi_core::exchange::*;
 use vauchi_core::*;
 
@@ -402,8 +404,8 @@ fn test_proximity_check_uses_qr_challenge_not_zeros() {
     let expected_challenge = *alice_qr.audio_challenge();
 
     let bob_card = ContactCard::new("Bob");
-    let proximity = MockProximityVerifier::success();
-    let mut bob_session = ExchangeSession::new_qr(bob_identity, bob_card, proximity);
+    let (verifier, challenges) = common::verifiers::ChallengeCapturingVerifier::success();
+    let mut bob_session = ExchangeSession::new_qr(bob_identity, bob_card, verifier);
 
     bob_session.apply(ExchangeEvent::StartQR).unwrap();
     bob_session
@@ -417,8 +419,8 @@ fn test_proximity_check_uses_qr_challenge_not_zeros() {
     // Manually run proximity check
     bob_session.run_proximity_check();
 
-    // AU-1: Verify the mock received the QR's challenge, not zeros
-    let emitted = bob_session.proximity_verifier().emitted_challenges();
+    // AU-1: Verify the verifier received the QR's challenge, not zeros
+    let emitted = challenges.lock().unwrap();
     assert!(
         !emitted.is_empty(),
         "proximity check should have emitted a challenge"

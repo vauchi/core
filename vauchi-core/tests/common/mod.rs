@@ -13,3 +13,5 @@ pub mod fixtures;
 pub mod helpers;
 #[allow(dead_code)]
 pub mod strategies;
+#[allow(dead_code)]
+pub mod verifiers;

@@ -362,6 +362,10 @@ name = "verifier_chain_tests"
 required-features = ["testing"]
 
 [[test]]
+name = "verifier_harness_tests"
+required-features = ["testing"]
+
+[[test]]
 name = "exchange_relay_wiring_tests"
 required-features = ["testing"]
 

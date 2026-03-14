@@ -66,6 +66,11 @@ pub mod verifier_chain;
 mod verifier_chain;
 
 #[cfg(feature = "testing")]
+pub mod verifier_harness;
+#[cfg(not(feature = "testing"))]
+mod verifier_harness;
+
+#[cfg(feature = "testing")]
 pub mod verifier_event;
 #[cfg(not(feature = "testing"))]
 mod verifier_event;
@@ -181,6 +186,7 @@ pub use session::{
 };
 pub use verifier_chain::VerifierChain;
 pub use verifier_event::{ProximityVerifierEvent, VerifierEventLog, VerifierMethod};
+pub use verifier_harness::{PeerCapabilities, Scenario, SimulatedPeer, VerificationOutcome};
 pub use x3dh::{X3DHKeyPair, X3DH};
 
 // Multi-stage exchange re-exports

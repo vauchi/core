@@ -2,11 +2,13 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+pub mod exchange_debug;
 pub mod log_event;
 pub mod report;
 pub mod snapshot;
 pub mod tuner;
 
+pub use exchange_debug::{ExchangeDebugEvent, ExchangeDebugLog, TimestampedEvent};
 pub use log_event::{LogEvent, LogEventKind};
 pub use report::generate_html_report;
 pub use snapshot::{BoundingBox, SnapshotMetadata};

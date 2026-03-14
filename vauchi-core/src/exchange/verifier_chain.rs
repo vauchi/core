@@ -30,6 +30,12 @@ struct VerificationResult {
     winning_confidence: Option<ProximityConfidence>,
 }
 
+/// Callback invoked for each event during verification.
+///
+/// Receives a reference to each `ProximityVerifierEvent` as it occurs,
+/// enabling real-time UI updates (progress bars, fallback indicators).
+type EventCallback = Box<dyn Fn(&ProximityVerifierEvent) + Send + Sync>;
+
 /// Priority-ordered chain of proximity verifiers.
 ///
 /// Verifiers are tried in the order they were added. The chain stops
@@ -46,6 +52,8 @@ pub struct VerifierChain {
     /// Result from the most recent `verify_proximity_two_way` call.
     /// Single Mutex ensures log + confidence are atomically consistent.
     last_result: Mutex<Option<VerificationResult>>,
+    /// Optional callback for real-time event emission during verification.
+    event_callback: Option<EventCallback>,
 }
 
 impl VerifierChain {
@@ -53,12 +61,33 @@ impl VerifierChain {
         VerifierChain {
             entries: Vec::new(),
             last_result: Mutex::new(None),
+            event_callback: None,
         }
     }
 
     /// Add a verifier to the end of the chain (lowest priority so far).
     pub fn add(&mut self, method: VerifierMethod, verifier: Box<dyn ProximityVerifier>) {
         self.entries.push(ChainEntry { method, verifier });
+    }
+
+    /// Set a callback for real-time event emission during verification.
+    ///
+    /// The callback receives each `ProximityVerifierEvent` as it occurs,
+    /// before it is stored in the event log. This enables the platform/UI
+    /// layer to show live progress indicators and fallback notifications.
+    pub fn set_event_callback(
+        &mut self,
+        callback: impl Fn(&ProximityVerifierEvent) + Send + Sync + 'static,
+    ) {
+        self.event_callback = Some(Box::new(callback));
+    }
+
+    /// Push an event to the log and fire the callback (if set).
+    fn emit(&self, log: &mut VerifierEventLog, event: ProximityVerifierEvent) {
+        if let Some(ref cb) = self.event_callback {
+            cb(&event);
+        }
+        log.push(event);
     }
 
     /// Run the verification chain. Always returns a log — never fails.
@@ -76,18 +105,19 @@ impl VerifierChain {
         let mut log = VerifierEventLog::new();
 
         if self.entries.is_empty() {
-            log.push(ProximityVerifierEvent::AllMethodsExhausted);
+            self.emit(&mut log, ProximityVerifierEvent::AllMethodsExhausted);
             return log;
         }
 
         for (idx, entry) in self.entries.iter().enumerate() {
-            // Emit InProgress event
-            log.push(ProximityVerifierEvent::InProgress {
-                method: entry.method,
-                progress_pct: 0,
-            });
+            self.emit(
+                &mut log,
+                ProximityVerifierEvent::InProgress {
+                    method: entry.method,
+                    progress_pct: 0,
+                },
+            );
 
-            // Attempt verification
             let result = entry.verifier.verify_proximity_two_way(
                 emit_challenge,
                 listen_challenge,
@@ -97,34 +127,39 @@ impl VerifierChain {
 
             match result {
                 Ok(()) => {
-                    // Success — record completion and stop
                     let confidence = entry.verifier.confidence_level();
-                    log.push(ProximityVerifierEvent::Completed {
-                        method: entry.method,
-                        confidence,
-                    });
+                    self.emit(
+                        &mut log,
+                        ProximityVerifierEvent::Completed {
+                            method: entry.method,
+                            confidence,
+                        },
+                    );
                     return log;
                 }
                 Err(err) => {
-                    // Failed — record failure
-                    log.push(ProximityVerifierEvent::MethodFailed {
-                        method: entry.method,
-                        reason: err.to_string(),
-                    });
+                    self.emit(
+                        &mut log,
+                        ProximityVerifierEvent::MethodFailed {
+                            method: entry.method,
+                            reason: err.to_string(),
+                        },
+                    );
 
-                    // If there's a next verifier, emit FallingBack
                     if let Some(next) = self.entries.get(idx + 1) {
-                        log.push(ProximityVerifierEvent::FallingBack {
-                            failed_method: entry.method,
-                            next_method: next.method,
-                        });
+                        self.emit(
+                            &mut log,
+                            ProximityVerifierEvent::FallingBack {
+                                failed_method: entry.method,
+                                next_method: next.method,
+                            },
+                        );
                     }
                 }
             }
         }
 
-        // All verifiers failed
-        log.push(ProximityVerifierEvent::AllMethodsExhausted);
+        self.emit(&mut log, ProximityVerifierEvent::AllMethodsExhausted);
         log
     }
 

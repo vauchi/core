@@ -48,8 +48,9 @@ pub use storage::{PendingUpdate, Storage, StorageError, UpdateStatus};
 pub mod exchange;
 pub use exchange::capability;
 pub use exchange::{
-    EncryptedExchangeMessage, ExchangeError, ExchangeEvent, ExchangeQR, ExchangeSession,
-    MockProximityVerifier, ProximityError, ProximityVerifier, X3DHKeyPair, X3DH,
+    EncryptedExchangeMessage, ExchangeCommand, ExchangeError, ExchangeEvent, ExchangeHardwareEvent,
+    ExchangeQR, ExchangeSession, MockProximityVerifier, ProximityError, ProximityVerifier,
+    X3DHKeyPair, X3DH,
 };
 
 // --- future vauchi-recovery ---

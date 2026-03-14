@@ -56,6 +56,7 @@ pub mod multistage;
 mod multistage;
 
 pub mod capability;
+pub mod command;
 pub mod device_link;
 
 pub mod transport;
@@ -160,6 +161,7 @@ pub use ble_handshake::{
 };
 pub use ble_payload::BleCardPayload;
 pub use ble_rollback::BleRollback;
+pub use command::{ExchangeCommand, ExchangeHardwareEvent};
 pub use device_link::{
     compute_confirmation_mac, generate_numeric_code, DeviceLinkConfirmation, DeviceLinkInitiator,
     DeviceLinkInitiatorRestored, DeviceLinkQR, DeviceLinkRequest, DeviceLinkResponder,

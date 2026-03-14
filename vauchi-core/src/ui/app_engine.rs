@@ -47,6 +47,7 @@ use super::settings::{SettingsConfig, SettingsEngine};
 use super::support::SupportEngine;
 use super::sync_status::SyncStatusEngine;
 use super::tor_settings::TorSettingsEngine;
+use crate::exchange::ExchangeHardwareEvent;
 
 /// Top-level screens in the application.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -272,6 +273,50 @@ impl<T: Transport> AppEngine<T> {
             AppScreen::Settings,
             AppScreen::Help,
         ]
+    }
+
+    /// Handle a hardware event from the frontend during an exchange (ADR-031).
+    ///
+    /// Frontends call this when hardware reports results (QR scanned, BLE data
+    /// received, etc.). Returns `ExchangeCommands` with response commands, or
+    /// a screen update if the exchange state changed (e.g., verification started).
+    ///
+    /// Returns `None` if the current screen is not an exchange screen.
+    pub fn handle_hardware_event(&mut self, event: ExchangeHardwareEvent) -> Option<ActionResult> {
+        if !matches!(self.screen, AppScreen::Exchange) {
+            return None;
+        }
+
+        // The exchange engine currently uses ExchangeEngine (UI-only QR workflow).
+        // In the full ADR-031 implementation, this will delegate to ExchangeSession
+        // for protocol state transitions. For now, handle QR scanned events
+        // by feeding them to the engine as TextChanged actions.
+        match event {
+            ExchangeHardwareEvent::QrScanned { data } => {
+                let result = self.engine.handle_action(UserAction::TextChanged {
+                    component_id: "scanned_data".into(),
+                    value: data,
+                });
+                Some(result)
+            }
+            ExchangeHardwareEvent::HardwareUnavailable { transport } => {
+                Some(ActionResult::ShowToast {
+                    message: format!("{} is not available on this device", transport),
+                    undo_action_id: None,
+                })
+            }
+            ExchangeHardwareEvent::HardwareError { transport, error } => {
+                Some(ActionResult::ShowAlert {
+                    title: format!("{} error", transport),
+                    message: error,
+                })
+            }
+            _ => {
+                // Other hardware events (BLE, NFC, audio) will be handled
+                // when ExchangeSession is integrated into ExchangeEngine.
+                None
+            }
+        }
     }
 
     fn handle_completion(&mut self) -> ActionResult {

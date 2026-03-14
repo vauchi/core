@@ -12,6 +12,7 @@ use std::time::{Duration, Instant};
 
 use super::ble_handshake::BleHandshakeSession;
 use super::ble_payload::BleCardPayload;
+use super::command::{ExchangeCommand, ExchangeHardwareEvent};
 use super::nfc_handshake::NfcHandshakeSession;
 use super::{ExchangeError, ExchangeQR, ProximityConfidence, ProximityVerifier, X3DHKeyPair};
 use crate::contact::Contact;
@@ -150,6 +151,9 @@ pub struct ExchangeSession {
     /// Optional exchange debug log. When enabled, captures timestamped
     /// events at each state transition for diagnostic analysis.
     debug_log: Option<ExchangeDebugLog>,
+    /// Pending commands to be sent to the frontend (ADR-031).
+    /// Populated by `apply_hardware_event()` and drained by `drain_commands()`.
+    pending_commands: Vec<ExchangeCommand>,
 }
 
 // Compile-time assertion: ExchangeSession must be Send + Sync because
@@ -200,6 +204,7 @@ impl ExchangeSession {
             their_relay_url: None,
             their_relay_noise_pubkey: None,
             debug_log: None,
+            pending_commands: Vec::new(),
         }
     }
 
@@ -232,6 +237,7 @@ impl ExchangeSession {
             their_relay_url: None,
             their_relay_noise_pubkey: None,
             debug_log: None,
+            pending_commands: Vec::new(),
         }
     }
 
@@ -269,6 +275,7 @@ impl ExchangeSession {
             their_relay_url: None,
             their_relay_noise_pubkey: None,
             debug_log: None,
+            pending_commands: Vec::new(),
         }
     }
 
@@ -316,6 +323,7 @@ impl ExchangeSession {
             their_relay_url: None,
             their_relay_noise_pubkey: None,
             debug_log: None,
+            pending_commands: Vec::new(),
         }
     }
 
@@ -517,6 +525,129 @@ impl ExchangeSession {
                 self.proximity_confidence = confidence;
                 Ok(())
             }
+        }
+    }
+
+    // ── ADR-031: Command/event protocol ────────────────────────────────
+
+    /// Returns and clears all pending commands.
+    ///
+    /// Frontends call this after `apply()` or `apply_hardware_event()` to
+    /// get the list of hardware actions they need to perform.
+    pub fn drain_commands(&mut self) -> Vec<ExchangeCommand> {
+        std::mem::take(&mut self.pending_commands)
+    }
+
+    /// Queues a command for the frontend.
+    fn emit_command(&mut self, cmd: ExchangeCommand) {
+        self.pending_commands.push(cmd);
+    }
+
+    /// Processes a hardware event from the frontend and advances the state machine.
+    ///
+    /// This is the ADR-031 entry point. Frontends report hardware results
+    /// (QR scanned, BLE data received, etc.) and this method:
+    /// 1. Converts the event to an internal `ExchangeEvent`
+    /// 2. Calls `apply()` to advance the state machine
+    /// 3. Emits response commands based on the new state
+    ///
+    /// After calling this, use `drain_commands()` to get outgoing commands.
+    pub fn apply_hardware_event(
+        &mut self,
+        event: ExchangeHardwareEvent,
+    ) -> Result<(), ExchangeError> {
+        match event {
+            ExchangeHardwareEvent::QrScanned { data } => {
+                let qr = ExchangeQR::from_data_string(&data)?;
+                self.apply(ExchangeEvent::ProcessQR(qr))
+            }
+            ExchangeHardwareEvent::NfcDataReceived { data } => {
+                self.apply(ExchangeEvent::NfcTapComplete {
+                    their_payload: data,
+                })
+            }
+            ExchangeHardwareEvent::BleConnected { .. } => {
+                // Connection established — no state transition yet.
+                // The BLE handshake proceeds via characteristic read/write events.
+                Ok(())
+            }
+            ExchangeHardwareEvent::BleCharacteristicRead { data, .. }
+            | ExchangeHardwareEvent::BleCharacteristicNotified { data, .. } => {
+                // BLE payload received — attempt to complete the BLE exchange.
+                // In a full implementation, we'd track device_id from BleConnected.
+                self.apply(ExchangeEvent::BlePayloadExchanged {
+                    their_payload: data,
+                    device_id: String::new(),
+                })
+            }
+            ExchangeHardwareEvent::AudioResponseReceived { .. } => {
+                // Audio proximity response — trigger proximity check.
+                // The actual verification is done by the ProximityVerifier.
+                Ok(())
+            }
+            ExchangeHardwareEvent::BleDeviceDiscovered { id, .. } => {
+                // Discovered a peer — emit connect command.
+                self.emit_command(ExchangeCommand::BleConnect { device_id: id });
+                Ok(())
+            }
+            ExchangeHardwareEvent::BleDisconnected { reason } => {
+                if matches!(self.state, ExchangeState::AwaitingBleConnection) {
+                    self.apply(ExchangeEvent::Fail(ExchangeError::BleConnectionLost))?;
+                }
+                self.debug_event(ExchangeDebugEvent::ExchangeFailed {
+                    error: format!("BLE disconnected: {}", reason),
+                });
+                Ok(())
+            }
+            ExchangeHardwareEvent::HardwareError { transport, error } => {
+                self.apply(ExchangeEvent::Fail(ExchangeError::HardwareFailure {
+                    transport,
+                    error,
+                }))
+            }
+            ExchangeHardwareEvent::HardwareUnavailable { transport } => {
+                // Not a fatal error — the transport is just not available.
+                // Log it and let the session continue with other transports.
+                self.debug_event(ExchangeDebugEvent::ExchangeFailed {
+                    error: format!("{} hardware unavailable", transport),
+                });
+                Ok(())
+            }
+        }
+    }
+
+    /// Emits initial commands for the current transport type.
+    ///
+    /// Call this after creating a new session to get the first set of
+    /// hardware commands (e.g., `QrDisplay` for QR sessions, `BleStartScanning`
+    /// for BLE sessions). Use `drain_commands()` to retrieve them.
+    pub fn emit_initial_commands(&mut self) {
+        match (&self.state, self.transport) {
+            (ExchangeState::DisplayingQr { our_qr }, ExchangeTransport::Qr) => {
+                self.pending_commands.push(ExchangeCommand::QrDisplay {
+                    data: our_qr.to_data_string(),
+                });
+            }
+            (ExchangeState::AwaitingNfcTap, ExchangeTransport::Nfc) => {
+                // NFC handshake uses multi-step APDU protocol.
+                // Emit NfcActivate with empty payload — the actual APDU exchange
+                // is driven by the NfcHandshakeSession via separate events.
+                self.pending_commands.push(ExchangeCommand::NfcActivate {
+                    payload: Vec::new(),
+                });
+            }
+            (ExchangeState::AwaitingBleConnection, ExchangeTransport::Ble) => {
+                self.pending_commands
+                    .push(ExchangeCommand::BleStartScanning {
+                        service_uuid: super::VAUCHI_BLE_SERVICE_UUID.to_string(),
+                    });
+                self.pending_commands
+                    .push(ExchangeCommand::BleStartAdvertising {
+                        service_uuid: super::VAUCHI_BLE_SERVICE_UUID.to_string(),
+                        payload: Vec::new(),
+                    });
+            }
+            _ => {}
         }
     }
 

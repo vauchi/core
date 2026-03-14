@@ -5,6 +5,7 @@
 use serde::{Deserialize, Serialize};
 
 use super::screen::ScreenModel;
+use crate::exchange::ExchangeCommand;
 
 /// An action the user performed in the UI.
 #[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
@@ -93,4 +94,10 @@ pub enum ActionResult {
     },
     /// All data has been wiped — frontend should reset to initial state.
     WipeComplete,
+    /// Frontend should perform hardware actions for the exchange protocol (ADR-031).
+    /// Each command maps to a platform-specific operation (QR display, BLE scan, etc.).
+    /// Unsupported commands should be answered with `ExchangeHardwareEvent::HardwareUnavailable`.
+    ExchangeCommands {
+        commands: Vec<ExchangeCommand>,
+    },
 }

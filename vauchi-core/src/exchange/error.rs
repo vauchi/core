@@ -166,4 +166,7 @@ pub enum ExchangeError {
 
     #[error("Non-contributory DH output: {0}")]
     InvalidDhOutput(#[from] DhError),
+
+    #[error("Hardware failure ({transport}): {error}")]
+    HardwareFailure { transport: String, error: String },
 }

@@ -110,6 +110,8 @@ pub struct AppEngine<T: Transport> {
     nav_history: Vec<AppScreen>,
     /// Field pending undo after delete from MyInfoEntryDetail.
     pending_field_undo: Option<(String, ContactField)>,
+    /// Cached field type catalog (built once from SocialNetworkRegistry).
+    field_catalog: crate::contact_card::FieldTypeCatalog,
 }
 
 impl<T: Transport> AppEngine<T> {
@@ -132,6 +134,8 @@ impl<T: Transport> AppEngine<T> {
             AppScreen::MyInfo
         };
         let engine = Self::create_engine(&vauchi, &screen);
+        let registry = crate::social::SocialNetworkRegistry::with_defaults();
+        let field_catalog = crate::contact_card::FieldTypeCatalog::new(&registry);
         Self {
             vauchi,
             screen,
@@ -140,6 +144,7 @@ impl<T: Transport> AppEngine<T> {
             pending_display_name: None,
             nav_history: Vec::new(),
             pending_field_undo: None,
+            field_catalog,
         }
     }
 
@@ -246,9 +251,8 @@ impl<T: Transport> AppEngine<T> {
     }
 
     /// Returns the field type catalog for the Add Field picker.
-    pub fn field_type_catalog(&self) -> crate::contact_card::FieldTypeCatalog {
-        let registry = crate::social::SocialNetworkRegistry::with_defaults();
-        crate::contact_card::FieldTypeCatalog::new(&registry)
+    pub fn field_type_catalog(&self) -> &crate::contact_card::FieldTypeCatalog {
+        &self.field_catalog
     }
 
     /// Returns the default landing screen based on contact count.

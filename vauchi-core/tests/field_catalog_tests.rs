@@ -187,8 +187,8 @@ fn test_app_engine_field_type_catalog() {
 
     // Should have base types + social networks
     assert!(
-        catalog.len() >= 6,
-        "Catalog should have at least 6 base entries"
+        catalog.len() >= 36,
+        "Catalog should have at least 36 entries (6 base + 30 social)"
     );
     assert!(catalog.get("phone").is_some());
     assert!(catalog.get("email").is_some());

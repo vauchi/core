@@ -230,3 +230,9 @@ pub trait Transport: Send {
         self.send(&envelope)
     }
 }
+
+// Compile-time assertion: Transport must remain object-safe so that
+// Vauchi can store `Box<dyn Transport>` without generic parameters (ADR-030).
+const _: fn() = || {
+    fn _assert_object_safe(_: &dyn Transport) {}
+};

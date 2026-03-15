@@ -673,6 +673,142 @@ mod tests {
         assert!(result.is_none());
     }
 
+    /// Helper: create two sessions (Alice and Bob) and return Alice's engine
+    /// plus Bob's QR data string (what Alice would scan).
+    fn create_alice_engine_and_bob_qr() -> (ExchangeEngine, String) {
+        let alice_identity = crate::identity::Identity::create("Alice");
+        let alice_card = crate::contact_card::ContactCard::new("Alice");
+        let alice_proximity = crate::exchange::ManualConfirmationVerifier::new();
+        let alice_session =
+            crate::exchange::ExchangeSession::new_qr(alice_identity, alice_card, alice_proximity);
+
+        let bob_identity = crate::identity::Identity::create("Bob");
+        let bob_card = crate::contact_card::ContactCard::new("Bob");
+        let bob_proximity = crate::exchange::ManualConfirmationVerifier::new();
+        let mut bob_session =
+            crate::exchange::ExchangeSession::new_qr(bob_identity, bob_card, bob_proximity);
+        // Start Bob's QR so we can get his data string
+        bob_session
+            .apply(crate::exchange::ExchangeEvent::StartQR)
+            .unwrap();
+        let bob_qr = bob_session.qr().unwrap();
+        let bob_qr_data = bob_qr.to_data_string();
+
+        let engine = ExchangeEngine::with_session(config_no_groups(), alice_session);
+        (engine, bob_qr_data)
+    }
+
+    #[test]
+    fn test_qr_scanned_advances_step_to_verifying() {
+        let (mut engine, bob_qr_data) = create_alice_engine_and_bob_qr();
+        let _ = engine.drain_commands(); // drain initial QrDisplay
+
+        // Move to ScanQr
+        let _ = engine.handle_action(UserAction::ActionPressed {
+            action_id: "continue".into(),
+        });
+        assert_eq!(engine.step, ExchangeStep::ScanQr);
+
+        // Simulate scanning Bob's QR
+        let result =
+            engine.handle_hardware_event(crate::exchange::ExchangeHardwareEvent::QrScanned {
+                data: bob_qr_data,
+            });
+
+        // Should advance to Verifying
+        assert!(result.is_some());
+        assert_eq!(
+            engine.step,
+            ExchangeStep::Verifying,
+            "After QrScanned, engine step should be Verifying"
+        );
+    }
+
+    #[test]
+    fn test_show_qr_screen_uses_session_qr_data_when_active() {
+        let session = create_test_session();
+        let mut engine = ExchangeEngine::with_session(config_no_groups(), session);
+        let _ = engine.drain_commands();
+
+        // The ShowQr screen should use the session's QR data, not config.own_qr_data
+        let screen = engine.current_screen();
+        assert_eq!(screen.screen_id, "exchange_show_qr");
+
+        // Find the QrCode component and verify its data is NOT the config's static data
+        let qr_component = screen.components.iter().find(|c| {
+            matches!(
+                c,
+                Component::QrCode {
+                    mode: QrMode::Display,
+                    ..
+                }
+            )
+        });
+        assert!(
+            qr_component.is_some(),
+            "ShowQr screen should have a QrCode component"
+        );
+        if let Some(Component::QrCode { data, .. }) = qr_component {
+            assert_ne!(
+                data, &"qr-data",
+                "QR data should come from session, not static config"
+            );
+            assert!(
+                !data.is_empty(),
+                "Session-generated QR data should not be empty"
+            );
+        }
+    }
+
+    #[test]
+    fn test_full_qr_exchange_flow_via_commands_and_events() {
+        let (mut engine, bob_qr_data) = create_alice_engine_and_bob_qr();
+
+        // 1. After construction: QrDisplay command should be pending
+        let commands = engine.drain_commands();
+        assert_eq!(commands.len(), 1);
+        assert!(matches!(
+            &commands[0],
+            crate::exchange::command::ExchangeCommand::QrDisplay { .. }
+        ));
+
+        // 2. User presses "Scan Their Code" → QrRequestScan command
+        let result = engine.handle_action(UserAction::ActionPressed {
+            action_id: "continue".into(),
+        });
+        match result {
+            ActionResult::ExchangeCommands { commands } => {
+                assert_eq!(commands.len(), 1);
+                assert_eq!(
+                    commands[0],
+                    crate::exchange::command::ExchangeCommand::QrRequestScan
+                );
+            }
+            other => panic!("Expected ExchangeCommands, got {:?}", other),
+        }
+
+        // 3. Frontend scans Bob's QR → feed as hardware event
+        let result =
+            engine.handle_hardware_event(crate::exchange::ExchangeHardwareEvent::QrScanned {
+                data: bob_qr_data,
+            });
+        assert!(result.is_some());
+
+        // 4. Engine should be in Verifying step
+        assert_eq!(engine.step, ExchangeStep::Verifying);
+
+        // 5. Session should be in PeerScanned state
+        let session = engine.session().unwrap();
+        assert!(
+            matches!(
+                session.state(),
+                crate::exchange::ExchangeState::PeerScanned { .. }
+            ),
+            "Session should be in PeerScanned state, got {:?}",
+            session.state()
+        );
+    }
+
     #[test]
     fn test_selected_groups_persists_through_exchange() {
         let mut engine = ExchangeEngine::new(config_with_groups());

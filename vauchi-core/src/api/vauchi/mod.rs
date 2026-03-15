@@ -109,8 +109,9 @@ const SMK_KEY_NAME: &str = "smk";
 /// Coordinates identity management, contact exchange, synchronization, and event dispatching.
 ///
 /// Transport is type-erased (ADR-030): callers no longer need to carry a
-/// generic `<T: Transport>` through the call chain. Use `new()` for mock
-/// transport (testing) or `with_transport_factory()` to inject a real one.
+/// generic `<T: Transport>` through the call chain. `with_transport_factory()`
+/// is retained for call-site compatibility but does not invoke the factory —
+/// connection management will be handled separately.
 pub struct Vauchi {
     config: VauchiConfig,
     identity: Option<Identity>,
@@ -144,11 +145,11 @@ impl Vauchi {
         Self::init(config, Some(secure_storage))
     }
 
-    /// Creates a new Vauchi instance with a custom transport factory.
+    /// Creates a new Vauchi instance (transport factory accepted but not invoked).
     ///
-    /// The factory is accepted for API compatibility but the transport is not
-    /// stored — connection management is handled separately. This preserves
-    /// the call-site pattern while removing the generic from the struct.
+    /// **ADR-030**: The factory parameter is retained for call-site compatibility
+    /// only. The closure is never called and no transport is created or stored.
+    /// Connection management will be handled separately in a future phase.
     pub fn with_transport_factory<T: crate::network::Transport, F>(
         config: VauchiConfig,
         _transport_factory: F,
@@ -159,8 +160,9 @@ impl Vauchi {
         Self::init(config, None)
     }
 
-    /// Creates a new Vauchi instance with transport factory and optional SecureStorage.
+    /// Creates a new Vauchi instance with optional SecureStorage (transport factory not invoked).
     ///
+    /// **ADR-030**: The factory parameter is retained for call-site compatibility only.
     /// If SecureStorage is provided and contains an SMK, the SEK is derived from it.
     /// Otherwise, falls back to `config.storage_key` or generates a random key.
     pub fn with_transport_and_secure_storage<T: crate::network::Transport, F>(

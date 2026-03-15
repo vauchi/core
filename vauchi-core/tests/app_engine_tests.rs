@@ -2207,12 +2207,26 @@ fn entry_detail_delete_undo_restores_field() {
 fn exchange_screen_with_identity_has_session() {
     let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
+    let static_public_id = vauchi.public_id().unwrap_or_default();
     let mut engine = AppEngine::new(vauchi);
     engine.navigate_to(AppScreen::Exchange);
 
     // The exchange screen should have created an ExchangeEngine with a session
     let screen = engine.current_screen();
     assert_eq!(screen.screen_id, "exchange_show_qr");
+
+    // Verify the QR data comes from the session (ephemeral), not the static public ID.
+    // This confirms ADR-031 session wiring is active.
+    let qr_data = screen.components.iter().find_map(|c| match c {
+        vauchi_core::ui::Component::QrCode { data, .. } => Some(data.clone()),
+        _ => None,
+    });
+    let qr_data = qr_data.expect("exchange screen should have a QrCode component");
+    assert_ne!(
+        qr_data, static_public_id,
+        "QR data should be session-generated, not the static public ID"
+    );
+    assert!(!qr_data.is_empty(), "session QR data should not be empty");
 }
 
 #[test]

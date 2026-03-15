@@ -89,7 +89,7 @@ impl ExchangeEngine {
     /// cryptographic protocol state machine.
     ///
     /// If no group selection is needed, the session is started immediately
-    /// (StartQR applied). Use `drain_initial_commands()` to get the initial
+    /// (StartQR applied). Use `drain_commands()` to get the initial
     /// `QrDisplay` command after construction.
     pub fn with_session(config: ExchangeConfig, mut session: ExchangeSession) -> Self {
         let step = if config.available_groups.is_empty() {
@@ -98,9 +98,20 @@ impl ExchangeEngine {
             ExchangeStep::GroupSelection
         };
 
-        // If starting directly at ShowQr, kick off the session now
+        // If starting directly at ShowQr, kick off the session now.
+        // StartQR should always succeed on a fresh Idle session.
         if step == ExchangeStep::ShowQr {
-            let _ = session.apply(ExchangeEvent::StartQR);
+            if session.apply(ExchangeEvent::StartQR).is_err() {
+                // Session failed to start — proceed without a session so the
+                // UI still works (falls back to static QR data).
+                return Self {
+                    step,
+                    config,
+                    scanned_data: None,
+                    selected_groups: Vec::new(),
+                    session: None,
+                };
+            }
             session.emit_initial_commands();
         }
 
@@ -163,12 +174,19 @@ impl ExchangeEngine {
     /// Otherwise, returns `NavigateTo` for legacy UI-only behavior.
     fn start_session_if_needed(&mut self) -> ActionResult {
         if let Some(ref mut session) = self.session {
-            // Start QR generation in the protocol session
-            let _ = session.apply(ExchangeEvent::StartQR);
-            session.emit_initial_commands();
-            let commands = session.drain_commands();
-            if !commands.is_empty() {
-                return ActionResult::ExchangeCommands { commands };
+            match session.apply(ExchangeEvent::StartQR) {
+                Ok(()) => {
+                    session.emit_initial_commands();
+                    let commands = session.drain_commands();
+                    if !commands.is_empty() {
+                        return ActionResult::ExchangeCommands { commands };
+                    }
+                }
+                Err(_) => {
+                    // Session failed to start QR — drop it and fall back to
+                    // legacy UI-only mode with static QR data.
+                    self.session = None;
+                }
             }
         }
         ActionResult::NavigateTo(self.build_screen())
@@ -183,7 +201,12 @@ impl ExchangeEngine {
         event: crate::exchange::ExchangeHardwareEvent,
     ) -> Option<ActionResult> {
         let session = self.session.as_mut()?;
-        let _ = session.apply_hardware_event(event);
+        if let Err(_e) = session.apply_hardware_event(event) {
+            // The session rejected the event (invalid state, malformed QR, etc.).
+            // Transition to Failed so the UI reflects the error.
+            self.step = ExchangeStep::Failed;
+            return Some(ActionResult::UpdateScreen(self.build_screen()));
+        }
         let commands = session.drain_commands();
 
         // Sync engine step from session state
@@ -198,6 +221,8 @@ impl ExchangeEngine {
             crate::exchange::ExchangeState::PeerScanned { .. }
             | crate::exchange::ExchangeState::AwaitingKeyAgreement { .. }
             | crate::exchange::ExchangeState::AwaitingCardExchange { .. }
+            | crate::exchange::ExchangeState::AwaitingNfcTap
+            | crate::exchange::ExchangeState::AwaitingBleConnection
             | crate::exchange::ExchangeState::AwaitingBleVerification { .. } => {
                 self.step = ExchangeStep::Verifying;
             }

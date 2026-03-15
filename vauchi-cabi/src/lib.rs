@@ -1202,6 +1202,42 @@ mod tests {
     }
 
     #[test]
+    fn app_create_with_config_with_relay_url_returns_non_null() {
+        unsafe {
+            let dir = tempfile::tempdir().unwrap();
+            let dir_cstr = CString::new(dir.path().to_str().unwrap()).unwrap();
+            let relay_cstr = CString::new("wss://relay.example.com").unwrap();
+            let handle = vauchi_app_create_with_config(dir_cstr.as_ptr(), relay_cstr.as_ptr());
+            assert!(
+                !handle.is_null(),
+                "app engine with config + relay URL should create successfully"
+            );
+            vauchi_app_destroy(handle);
+        }
+    }
+
+    #[test]
+    fn app_create_with_config_persists_across_reopens() {
+        unsafe {
+            let dir = tempfile::tempdir().unwrap();
+            let dir_cstr = CString::new(dir.path().to_str().unwrap()).unwrap();
+
+            // First open — create and complete onboarding
+            let handle = vauchi_app_create_with_config(dir_cstr.as_ptr(), std::ptr::null());
+            assert!(!handle.is_null());
+            vauchi_app_destroy(handle);
+
+            // Second open — should succeed (db file exists)
+            let handle2 = vauchi_app_create_with_config(dir_cstr.as_ptr(), std::ptr::null());
+            assert!(
+                !handle2.is_null(),
+                "reopening with same data_dir should succeed"
+            );
+            vauchi_app_destroy(handle2);
+        }
+    }
+
+    #[test]
     fn app_available_screens_starts_with_onboarding() {
         unsafe {
             let handle = vauchi_app_create();

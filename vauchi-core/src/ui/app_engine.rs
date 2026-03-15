@@ -296,7 +296,42 @@ impl AppEngine {
             return None;
         }
 
-        // Common error handling for all transports
+        // ADR-031: Try delegating to ExchangeEngine's session first,
+        // so the session can update its state (e.g., transition to Failed
+        // on HardwareError) before we return the UI result.
+        if let Some(exchange_engine) = self
+            .engine
+            .as_any_mut()
+            .and_then(|a| a.downcast_mut::<ExchangeEngine>())
+        {
+            if exchange_engine.session().is_some() {
+                // For error events, build the UI response before moving event
+                // into the session (so it can transition to Failed).
+                let ui_override = match &event {
+                    ExchangeHardwareEvent::HardwareUnavailable { transport } => {
+                        Some(ActionResult::ShowToast {
+                            message: format!("{} is not available on this device", transport),
+                            undo_action_id: None,
+                        })
+                    }
+                    ExchangeHardwareEvent::HardwareError { transport, error } => {
+                        Some(ActionResult::ShowAlert {
+                            title: format!("{} error", transport),
+                            message: error.clone(),
+                        })
+                    }
+                    _ => None,
+                };
+
+                let session_result = exchange_engine.handle_hardware_event(event);
+                if let Some(ui) = ui_override {
+                    return Some(ui);
+                }
+                return session_result;
+            }
+        }
+
+        // No session — handle error events directly
         match &event {
             ExchangeHardwareEvent::HardwareUnavailable { transport } => {
                 return Some(ActionResult::ShowToast {
@@ -311,17 +346,6 @@ impl AppEngine {
                 });
             }
             _ => {}
-        }
-
-        // ADR-031: Try delegating to ExchangeEngine's session
-        if let Some(exchange_engine) = self
-            .engine
-            .as_any_mut()
-            .and_then(|a| a.downcast_mut::<ExchangeEngine>())
-        {
-            if exchange_engine.session().is_some() {
-                return exchange_engine.handle_hardware_event(event);
-            }
         }
 
         // Fallback: legacy TextChanged-based QR handling (no session)
@@ -635,10 +659,11 @@ impl AppEngine {
                 // ADR-031: Create a protocol session if identity + card are available.
                 // Identity is cloned via storage serialization (it intentionally
                 // doesn't impl Clone because it contains private key material).
+                // The intermediate buffer is zeroized to avoid leaking key material.
                 let session = vauchi
                     .identity()
                     .and_then(|id_ref| {
-                        let bytes = id_ref.to_storage_bytes();
+                        let bytes = zeroize::Zeroizing::new(id_ref.to_storage_bytes());
                         crate::identity::Identity::from_storage_bytes(&bytes).ok()
                     })
                     .and_then(|identity| {

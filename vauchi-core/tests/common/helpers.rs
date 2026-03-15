@@ -9,7 +9,6 @@
 use vauchi_core::{
     crypto::ratchet::DoubleRatchetState,
     exchange::X3DHKeyPair,
-    network::MockTransport,
     theme::{load_themes_from_json, Theme},
     Contact, ContactCard, ContactField, FieldType, SymmetricKey, Vauchi,
 };
@@ -27,17 +26,14 @@ pub fn theme_by_id(id: &str) -> Option<Theme> {
 }
 
 /// Create an in-memory Vauchi with an identity.
-pub fn create_vauchi_with_identity(name: &str) -> Vauchi<MockTransport> {
-    let mut wb: Vauchi<MockTransport> = Vauchi::in_memory().unwrap();
+pub fn create_vauchi_with_identity(name: &str) -> Vauchi {
+    let mut wb: Vauchi = Vauchi::in_memory().unwrap();
     wb.create_identity(name).unwrap();
     wb
 }
 
 /// Create a Vauchi with identity and some fields on the card.
-pub fn create_vauchi_with_card(
-    name: &str,
-    fields: Vec<(FieldType, &str, &str)>,
-) -> Vauchi<MockTransport> {
+pub fn create_vauchi_with_card(name: &str, fields: Vec<(FieldType, &str, &str)>) -> Vauchi {
     let wb = create_vauchi_with_identity(name);
     for (field_type, label, value) in fields {
         wb.add_own_field(ContactField::new(field_type, label, value))
@@ -48,13 +44,7 @@ pub fn create_vauchi_with_card(
 
 /// Set up two Vauchis with a mutual contact relationship.
 /// Returns (alice_wb, bob_wb, shared_secret, bob_contact_id_at_alice, alice_contact_id_at_bob)
-pub fn setup_alice_bob_exchange() -> (
-    Vauchi<MockTransport>,
-    Vauchi<MockTransport>,
-    SymmetricKey,
-    String,
-    String,
-) {
+pub fn setup_alice_bob_exchange() -> (Vauchi, Vauchi, SymmetricKey, String, String) {
     let alice_wb = create_vauchi_with_identity("Alice");
     let bob_wb = create_vauchi_with_identity("Bob");
 
@@ -101,9 +91,9 @@ pub fn setup_ratchets(shared_secret: &SymmetricKey) -> (DoubleRatchetState, Doub
 /// Returns (alice, bob, carol, secrets_map)
 #[allow(clippy::type_complexity)]
 pub fn setup_three_users() -> (
-    Vauchi<MockTransport>,
-    Vauchi<MockTransport>,
-    Vauchi<MockTransport>,
+    Vauchi,
+    Vauchi,
+    Vauchi,
     std::collections::HashMap<(String, String), SymmetricKey>,
 ) {
     let alice = create_vauchi_with_identity("Alice");
@@ -175,7 +165,7 @@ pub fn setup_three_users() -> (
 }
 
 /// Assert that a Vauchi has a specific number of contacts.
-pub fn assert_contact_count(wb: &Vauchi<MockTransport>, expected: usize) {
+pub fn assert_contact_count(wb: &Vauchi, expected: usize) {
     let contacts = wb.storage().list_contacts().unwrap();
     assert_eq!(
         contacts.len(),

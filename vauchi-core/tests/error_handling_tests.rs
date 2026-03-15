@@ -250,7 +250,7 @@ fn test_delta_signature_rejects_tampered_delta() {
 /// Test: Loading non-existent contact returns None
 #[test]
 fn test_load_nonexistent_contact_returns_none() {
-    let wb: Vauchi<MockTransport> = Vauchi::in_memory().unwrap();
+    let wb: Vauchi = Vauchi::in_memory().unwrap();
 
     let result = wb.get_contact("does-not-exist").unwrap();
     assert!(result.is_none(), "Non-existent contact should return None");
@@ -268,7 +268,7 @@ fn test_load_nonexistent_ratchet_returns_none() {
 /// Test: Saving and loading contact preserves data
 #[test]
 fn test_contact_roundtrip_preserves_data() {
-    let wb: Vauchi<MockTransport> = Vauchi::in_memory().unwrap();
+    let wb: Vauchi = Vauchi::in_memory().unwrap();
 
     let mut card = ContactCard::new("Test Contact");
     card.add_field(ContactField::new(
@@ -314,7 +314,7 @@ fn test_empty_delta_when_cards_identical() {
 /// Test: Cannot create identity twice
 #[test]
 fn test_cannot_create_identity_twice() {
-    let mut wb: Vauchi<MockTransport> = Vauchi::in_memory().unwrap();
+    let mut wb: Vauchi = Vauchi::in_memory().unwrap();
 
     wb.create_identity("First").unwrap();
     let result = wb.create_identity("Second");
@@ -325,7 +325,7 @@ fn test_cannot_create_identity_twice() {
 /// Test: Cannot add duplicate contact
 #[test]
 fn test_cannot_add_duplicate_contact() {
-    let wb: Vauchi<MockTransport> = Vauchi::in_memory().unwrap();
+    let wb: Vauchi = Vauchi::in_memory().unwrap();
 
     let contact = Contact::from_exchange(
         [1u8; 32],
@@ -416,7 +416,7 @@ fn test_empty_password_rejected_for_backup() {
 /// Test: Setting visibility on non-existent field is handled
 #[test]
 fn test_visibility_on_nonexistent_field() {
-    let wb: Vauchi<MockTransport> = Vauchi::in_memory().unwrap();
+    let wb: Vauchi = Vauchi::in_memory().unwrap();
 
     let contact = Contact::from_exchange(
         [1u8; 32],

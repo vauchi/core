@@ -14,19 +14,18 @@ use std::collections::HashSet;
 
 use vauchi_core::contact::{FieldVisibility, VisibilityRules};
 use vauchi_core::exchange::X3DHKeyPair;
-use vauchi_core::network::MockTransport;
 use vauchi_core::sync::delta::{CardDelta, FieldChange};
 use vauchi_core::{Contact, ContactCard, ContactField, FieldType, Identity, SymmetricKey, Vauchi};
 
 // -- Helpers -----------------------------------------------------------
 
-fn create_test_vauchi() -> Vauchi<MockTransport> {
+fn create_test_vauchi() -> Vauchi {
     let mut wb = Vauchi::in_memory().unwrap();
     wb.create_identity("Alice").unwrap();
     wb
 }
 
-fn add_contact_with_ratchet(wb: &Vauchi<MockTransport>, name: &str) -> String {
+fn add_contact_with_ratchet(wb: &Vauchi, name: &str) -> String {
     let identity = Identity::create(name);
     let shared = SymmetricKey::generate();
     let contact = Contact::from_exchange(
@@ -45,7 +44,7 @@ fn add_contact_with_ratchet(wb: &Vauchi<MockTransport>, name: &str) -> String {
 }
 
 fn add_contact_with_ratchet_and_visibility(
-    wb: &Vauchi<MockTransport>,
+    wb: &Vauchi,
     name: &str,
     setup_rules: impl FnOnce(&mut VisibilityRules),
 ) -> String {

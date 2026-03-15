@@ -11,13 +11,12 @@ use crate::contact::merge::{
     compute_similarity, filter_dismissed, find_duplicates, merge_contacts, normalize_pair_key,
     DuplicatePair,
 };
-use crate::network::Transport;
 
 use super::super::error::{VauchiError, VauchiResult};
 use super::super::events::VauchiEvent;
 use super::Vauchi;
 
-impl<T: Transport> Vauchi<T> {
+impl Vauchi {
     /// Scans all contacts for potential duplicates.
     ///
     /// Returns duplicate pairs ordered by similarity (highest first),

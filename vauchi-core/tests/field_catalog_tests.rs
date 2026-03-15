@@ -178,10 +178,9 @@ fn test_all_categories() {
 #[test]
 fn test_app_engine_field_type_catalog() {
     use vauchi_core::api::Vauchi;
-    use vauchi_core::network::MockTransport;
     use vauchi_core::ui::AppEngine;
 
-    let vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    let vauchi = Vauchi::in_memory().unwrap();
     let engine = AppEngine::new(vauchi);
     let catalog = engine.field_type_catalog();
 

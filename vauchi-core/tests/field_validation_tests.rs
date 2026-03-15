@@ -1337,10 +1337,10 @@ fn test_get_field_validation_status_excludes_blocked_contacts() {
     use vauchi_core::contact_card::ContactCard;
     use vauchi_core::crypto::SymmetricKey;
     use vauchi_core::social::ProfileValidation;
-    use vauchi_core::{Contact, Identity, MockTransport, Vauchi};
+    use vauchi_core::{Contact, Identity, Vauchi};
 
     // Create Vauchi instance with identity
-    let mut wb: Vauchi<MockTransport> = Vauchi::in_memory().unwrap();
+    let mut wb: Vauchi = Vauchi::in_memory().unwrap();
     wb.create_identity("Alice").unwrap();
 
     // Create two validator identities
@@ -1715,10 +1715,10 @@ fn test_from_validations_backward_compat() {
 fn test_validate_field_queues_delivery_to_contact() {
     use vauchi_core::contact_card::ContactCard;
     use vauchi_core::crypto::SymmetricKey;
-    use vauchi_core::{Contact, Identity, MockTransport, Vauchi};
+    use vauchi_core::{Contact, Identity, Vauchi};
 
     // Create Alice (the validator) with identity
-    let mut alice: Vauchi<MockTransport> = Vauchi::in_memory().unwrap();
+    let mut alice: Vauchi = Vauchi::in_memory().unwrap();
     alice.create_identity("Alice").unwrap();
 
     // Create Bob as a contact
@@ -1789,10 +1789,10 @@ fn test_validate_field_queues_delivery_to_contact() {
 fn test_revoke_field_validation_queues_revocation() {
     use vauchi_core::contact_card::ContactCard;
     use vauchi_core::crypto::SymmetricKey;
-    use vauchi_core::{Contact, Identity, MockTransport, Vauchi};
+    use vauchi_core::{Contact, Identity, Vauchi};
 
     // Create Alice (the validator) with identity
-    let mut alice: Vauchi<MockTransport> = Vauchi::in_memory().unwrap();
+    let mut alice: Vauchi = Vauchi::in_memory().unwrap();
     alice.create_identity("Alice").unwrap();
 
     // Create Bob as a contact
@@ -1853,14 +1853,14 @@ fn test_revoke_field_validation_queues_revocation() {
 fn test_validate_field_queue_failure_does_not_fail_validation() {
     use vauchi_core::contact_card::ContactCard;
     use vauchi_core::crypto::SymmetricKey;
-    use vauchi_core::{Contact, Identity, MockTransport, Vauchi};
+    use vauchi_core::{Contact, Identity, Vauchi};
 
     // This test verifies the validation itself succeeds even if queuing
     // were to fail internally. Since we use `let _ = ...` to ignore
     // queue errors, validate_field should always succeed if the local
     // save succeeds.
 
-    let mut alice: Vauchi<MockTransport> = Vauchi::in_memory().unwrap();
+    let mut alice: Vauchi = Vauchi::in_memory().unwrap();
     alice.create_identity("Alice").unwrap();
 
     let bob_identity = Identity::create("Bob");
@@ -1901,10 +1901,10 @@ fn test_validate_field_queue_failure_does_not_fail_validation() {
 fn test_process_incoming_validation_verifies_and_stores() {
     use vauchi_core::contact_card::ContactCard;
     use vauchi_core::crypto::SymmetricKey;
-    use vauchi_core::{Contact, Identity, MockTransport, Vauchi};
+    use vauchi_core::{Contact, Identity, Vauchi};
 
     // Create Bob (the recipient) with identity
-    let mut bob: Vauchi<MockTransport> = Vauchi::in_memory().unwrap();
+    let mut bob: Vauchi = Vauchi::in_memory().unwrap();
     bob.create_identity("Bob").unwrap();
 
     let bob_identity_id = hex::encode(bob.identity().unwrap().signing_public_key());
@@ -1958,10 +1958,10 @@ fn test_process_incoming_validation_verifies_and_stores() {
 fn test_process_incoming_validation_rejects_invalid_signature() {
     use vauchi_core::contact_card::ContactCard;
     use vauchi_core::crypto::SymmetricKey;
-    use vauchi_core::{Contact, Identity, MockTransport, Vauchi};
+    use vauchi_core::{Contact, Identity, Vauchi};
 
     // Create Bob (the recipient) with identity
-    let mut bob: Vauchi<MockTransport> = Vauchi::in_memory().unwrap();
+    let mut bob: Vauchi = Vauchi::in_memory().unwrap();
     bob.create_identity("Bob").unwrap();
 
     let bob_identity_id = hex::encode(bob.identity().unwrap().signing_public_key());
@@ -2009,10 +2009,10 @@ fn test_process_incoming_validation_rejects_invalid_signature() {
 fn test_process_incoming_validation_rejects_validator_id_mismatch() {
     use vauchi_core::contact_card::ContactCard;
     use vauchi_core::crypto::SymmetricKey;
-    use vauchi_core::{Contact, Identity, MockTransport, Vauchi};
+    use vauchi_core::{Contact, Identity, Vauchi};
 
     // Create Bob (the recipient) with identity
-    let mut bob: Vauchi<MockTransport> = Vauchi::in_memory().unwrap();
+    let mut bob: Vauchi = Vauchi::in_memory().unwrap();
     bob.create_identity("Bob").unwrap();
 
     let bob_identity_id = hex::encode(bob.identity().unwrap().signing_public_key());
@@ -2066,10 +2066,10 @@ fn test_process_incoming_validation_rejects_validator_id_mismatch() {
 fn test_process_incoming_validation_idempotent_on_duplicate() {
     use vauchi_core::contact_card::ContactCard;
     use vauchi_core::crypto::SymmetricKey;
-    use vauchi_core::{Contact, Identity, MockTransport, Vauchi};
+    use vauchi_core::{Contact, Identity, Vauchi};
 
     // Create Bob (the recipient) with identity
-    let mut bob: Vauchi<MockTransport> = Vauchi::in_memory().unwrap();
+    let mut bob: Vauchi = Vauchi::in_memory().unwrap();
     bob.create_identity("Bob").unwrap();
 
     let bob_identity_id = hex::encode(bob.identity().unwrap().signing_public_key());
@@ -2121,10 +2121,10 @@ fn test_process_incoming_validation_idempotent_on_duplicate() {
 fn test_process_incoming_revocation_deletes_validation() {
     use vauchi_core::contact_card::ContactCard;
     use vauchi_core::crypto::SymmetricKey;
-    use vauchi_core::{Contact, Identity, MockTransport, Vauchi};
+    use vauchi_core::{Contact, Identity, Vauchi};
 
     // Create Bob (the recipient) with identity
-    let mut bob: Vauchi<MockTransport> = Vauchi::in_memory().unwrap();
+    let mut bob: Vauchi = Vauchi::in_memory().unwrap();
     bob.create_identity("Bob").unwrap();
 
     let bob_identity_id = hex::encode(bob.identity().unwrap().signing_public_key());
@@ -2194,10 +2194,10 @@ fn test_process_incoming_revocation_deletes_validation() {
 fn test_process_incoming_revocation_rejects_validator_id_mismatch() {
     use vauchi_core::contact_card::ContactCard;
     use vauchi_core::crypto::SymmetricKey;
-    use vauchi_core::{Contact, Identity, MockTransport, Vauchi};
+    use vauchi_core::{Contact, Identity, Vauchi};
 
     // Create Bob (the recipient) with identity
-    let mut bob: Vauchi<MockTransport> = Vauchi::in_memory().unwrap();
+    let mut bob: Vauchi = Vauchi::in_memory().unwrap();
     bob.create_identity("Bob").unwrap();
 
     let bob_identity_id = hex::encode(bob.identity().unwrap().signing_public_key());

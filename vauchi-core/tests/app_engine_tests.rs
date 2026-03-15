@@ -6,7 +6,6 @@ use vauchi_core::api::{Vauchi, VauchiConfig};
 use vauchi_core::contact::Contact;
 use vauchi_core::contact_card::{ContactCard, ContactField, FieldType};
 use vauchi_core::crypto::SymmetricKey;
-use vauchi_core::network::MockTransport;
 use vauchi_core::ui::{
     ActionResult, ActionStyle, AppEngine, AppScreen, Component, FormDialogType, UserAction,
     WorkflowEngine,
@@ -14,7 +13,7 @@ use vauchi_core::ui::{
 
 /// Drive through the full onboarding flow, returning the final ActionResult.
 /// Each intermediate step is asserted to produce the expected ActionResult variant (T-12).
-fn drive_onboarding(engine: &mut AppEngine<MockTransport>) -> ActionResult {
+fn drive_onboarding(engine: &mut AppEngine) -> ActionResult {
     // Step 1: create_new -> navigates to welcome
     let r = engine.handle_action(UserAction::ActionPressed {
         action_id: "create_new".into(),
@@ -105,14 +104,14 @@ fn drive_onboarding(engine: &mut AppEngine<MockTransport>) -> ActionResult {
 
 #[test]
 fn app_engine_starts_on_onboarding_without_identity() {
-    let vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    let vauchi = Vauchi::in_memory().unwrap();
     let engine = AppEngine::new(vauchi);
     assert_eq!(engine.current_app_screen(), &AppScreen::Onboarding);
 }
 
 #[test]
 fn app_engine_shows_onboarding_screen() {
-    let vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    let vauchi = Vauchi::in_memory().unwrap();
     let engine = AppEngine::new(vauchi);
     let screen = engine.current_screen();
     assert_eq!(screen.screen_id, "identity_check");
@@ -121,7 +120,7 @@ fn app_engine_shows_onboarding_screen() {
 
 #[test]
 fn navigate_to_home_shows_home_screen() {
-    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
     let mut engine = AppEngine::new(vauchi);
     let screen = engine.navigate_to(AppScreen::MyInfo);
@@ -130,7 +129,7 @@ fn navigate_to_home_shows_home_screen() {
 
 #[test]
 fn navigate_to_contacts_shows_contact_list() {
-    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
     let mut engine = AppEngine::new(vauchi);
     let screen = engine.navigate_to(AppScreen::Contacts);
@@ -139,7 +138,7 @@ fn navigate_to_contacts_shows_contact_list() {
 
 #[test]
 fn navigate_to_settings_shows_settings() {
-    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
     let mut engine = AppEngine::new(vauchi);
     let screen = engine.navigate_to(AppScreen::Settings);
@@ -148,7 +147,7 @@ fn navigate_to_settings_shows_settings() {
 
 #[test]
 fn navigate_to_exchange_shows_qr() {
-    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
     let mut engine = AppEngine::new(vauchi);
     let screen = engine.navigate_to(AppScreen::Exchange);
@@ -157,7 +156,7 @@ fn navigate_to_exchange_shows_qr() {
 
 #[test]
 fn navigate_to_help_shows_help() {
-    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
     let mut engine = AppEngine::new(vauchi);
     let screen = engine.navigate_to(AppScreen::Help);
@@ -166,7 +165,7 @@ fn navigate_to_help_shows_help() {
 
 #[test]
 fn navigate_to_lock_shows_lock() {
-    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
     let mut engine = AppEngine::new(vauchi);
     let screen = engine.navigate_to(AppScreen::Lock);
@@ -175,7 +174,7 @@ fn navigate_to_lock_shows_lock() {
 
 #[test]
 fn navigate_to_emergency_shred_shows_warning() {
-    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
     let mut engine = AppEngine::new(vauchi);
     let screen = engine.navigate_to(AppScreen::EmergencyShred);
@@ -184,7 +183,7 @@ fn navigate_to_emergency_shred_shows_warning() {
 
 #[test]
 fn navigate_to_backup_shows_backup() {
-    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
     let mut engine = AppEngine::new(vauchi);
     let screen = engine.navigate_to(AppScreen::Backup);
@@ -203,14 +202,14 @@ fn app_engine_detects_persisted_identity() {
     {
         let config =
             VauchiConfig::with_storage_path(&db_path).with_storage_key(storage_key.clone());
-        let mut vauchi = Vauchi::<MockTransport>::new(config).unwrap();
+        let mut vauchi = Vauchi::new(config).unwrap();
         vauchi.create_identity("Persisted User").unwrap();
         assert!(vauchi.has_identity());
     }
 
     // Open a fresh Vauchi from the same path — identity should be loaded
     let config2 = VauchiConfig::with_storage_path(&db_path).with_storage_key(storage_key);
-    let vauchi2 = Vauchi::<MockTransport>::new(config2).unwrap();
+    let vauchi2 = Vauchi::new(config2).unwrap();
     assert!(
         vauchi2.has_identity(),
         "Vauchi should detect persisted identity on reopen"
@@ -228,7 +227,7 @@ fn app_engine_detects_persisted_identity() {
 
 #[test]
 fn available_screens_without_identity_is_onboarding_only() {
-    let vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    let vauchi = Vauchi::in_memory().unwrap();
     let engine = AppEngine::new(vauchi);
     let screens = engine.available_screens();
     assert_eq!(screens, vec![AppScreen::Onboarding]);
@@ -236,7 +235,7 @@ fn available_screens_without_identity_is_onboarding_only() {
 
 #[test]
 fn available_screens_with_identity_has_main_nav() {
-    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
     let engine = AppEngine::new(vauchi);
     let screens = engine.available_screens();
@@ -250,7 +249,7 @@ fn available_screens_with_identity_has_main_nav() {
 
 /// Drive onboarding to the name step and attempt to continue without entering a name.
 /// Returns the result of pressing "continue" without a display name.
-fn drive_onboarding_without_name(engine: &mut AppEngine<MockTransport>) -> ActionResult {
+fn drive_onboarding_without_name(engine: &mut AppEngine) -> ActionResult {
     let r = engine.handle_action(UserAction::ActionPressed {
         action_id: "create_new".into(),
     });
@@ -281,7 +280,7 @@ fn drive_onboarding_without_name(engine: &mut AppEngine<MockTransport>) -> Actio
 
 #[test]
 fn onboarding_complete_navigates_to_home() {
-    let vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    let vauchi = Vauchi::in_memory().unwrap();
     let mut engine = AppEngine::new(vauchi);
 
     let result = drive_onboarding(&mut engine);
@@ -299,7 +298,7 @@ fn onboarding_complete_navigates_to_home() {
 
 #[test]
 fn app_engine_starts_on_home_with_identity() {
-    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
     let engine = AppEngine::new(vauchi);
     assert_eq!(engine.current_app_screen(), &AppScreen::MyInfo);
@@ -307,7 +306,7 @@ fn app_engine_starts_on_home_with_identity() {
 
 #[test]
 fn onboarding_completion_without_name_returns_validation_error() {
-    let vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    let vauchi = Vauchi::in_memory().unwrap();
     let mut engine = AppEngine::new(vauchi);
 
     let result = drive_onboarding_without_name(&mut engine);
@@ -340,7 +339,7 @@ fn onboarding_completion_without_name_returns_validation_error() {
 
 #[test]
 fn home_screen_no_setup_progress() {
-    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
     let engine = AppEngine::new(vauchi);
 
@@ -358,7 +357,7 @@ fn home_screen_no_setup_progress() {
 /// Verify that a whitespace-only name is also rejected.
 #[test]
 fn onboarding_completion_with_empty_name_returns_validation_error() {
-    let vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    let vauchi = Vauchi::in_memory().unwrap();
     let mut engine = AppEngine::new(vauchi);
 
     // Intermediate navigation steps — final validation asserted below
@@ -399,7 +398,7 @@ fn onboarding_completion_with_empty_name_returns_validation_error() {
 
 #[test]
 fn duress_pin_screen_renders_with_defaults() {
-    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
     let mut engine = AppEngine::new(vauchi);
     let screen = engine.navigate_to(AppScreen::DuressPin);
@@ -409,7 +408,7 @@ fn duress_pin_screen_renders_with_defaults() {
 
 #[test]
 fn onboarding_complete_creates_identity_in_vauchi() {
-    let vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    let vauchi = Vauchi::in_memory().unwrap();
     let mut engine = AppEngine::new(vauchi);
 
     assert!(!engine.has_identity());
@@ -431,7 +430,7 @@ fn onboarding_complete_creates_identity_in_vauchi() {
 
 #[test]
 fn my_info_shows_own_fields_via_app_engine() {
-    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
     vauchi
         .add_own_field(vauchi_core::contact_card::ContactField::new(
@@ -460,7 +459,7 @@ fn my_info_shows_own_fields_via_app_engine() {
 
 #[test]
 fn my_info_renders_safely_with_no_fields() {
-    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
     let engine = AppEngine::new(vauchi);
     let screen = engine.current_screen();
@@ -479,7 +478,7 @@ fn my_info_renders_safely_with_no_fields() {
 
 #[test]
 fn contact_detail_nonexistent_shows_not_found() {
-    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
     let mut engine = AppEngine::new(vauchi);
 
@@ -491,7 +490,7 @@ fn contact_detail_nonexistent_shows_not_found() {
 
 #[test]
 fn contact_edit_nonexistent_shows_not_found() {
-    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
     let mut engine = AppEngine::new(vauchi);
 
@@ -511,7 +510,7 @@ fn contact_edit_nonexistent_shows_not_found() {
 #[test]
 fn navigate_to_exchange_without_identity_card() {
     // Create Vauchi but don't create identity — own_card() returns None
-    let vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    let vauchi = Vauchi::in_memory().unwrap();
     let mut engine = AppEngine::new(vauchi);
 
     // Should be on onboarding, navigate to exchange anyway
@@ -521,7 +520,7 @@ fn navigate_to_exchange_without_identity_card() {
 
 #[test]
 fn navigate_to_settings_without_identity() {
-    let vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    let vauchi = Vauchi::in_memory().unwrap();
     let mut engine = AppEngine::new(vauchi);
 
     let screen = engine.navigate_to(AppScreen::Settings);
@@ -532,7 +531,7 @@ fn navigate_to_settings_without_identity() {
 
 #[test]
 fn navigate_away_and_back_preserves_engine_state() {
-    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
     let mut engine = AppEngine::new(vauchi);
 
@@ -564,7 +563,7 @@ fn navigate_away_and_back_preserves_engine_state() {
 
 #[test]
 fn onboarding_engine_not_cached() {
-    let vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    let vauchi = Vauchi::in_memory().unwrap();
     let mut engine = AppEngine::new(vauchi);
 
     // Start on Onboarding, navigate away — intermediate step; fresh start asserted below
@@ -581,7 +580,7 @@ fn onboarding_engine_not_cached() {
 
 #[test]
 fn lock_screen_engine_not_cached() {
-    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
     let mut engine = AppEngine::new(vauchi);
 
@@ -601,7 +600,7 @@ fn lock_screen_engine_not_cached() {
 
 #[test]
 fn navigate_creates_fresh_engine_first_time() {
-    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
     let mut engine = AppEngine::new(vauchi);
 
@@ -642,7 +641,7 @@ fn find_settings_toggle(
 
 #[test]
 fn settings_toggle_persists_after_navigate_away_and_back() {
-    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
     let mut engine = AppEngine::new(vauchi);
 
@@ -684,7 +683,7 @@ fn settings_toggle_persists_after_navigate_away_and_back() {
 
 #[test]
 fn settings_toggle_suppress_presence_persists() {
-    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
     let mut engine = AppEngine::new(vauchi);
 
@@ -717,7 +716,7 @@ fn settings_toggle_suppress_presence_persists() {
 
 #[test]
 fn invalidate_screen_removes_cached_engine() {
-    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
     let mut engine = AppEngine::new(vauchi);
 
@@ -736,8 +735,8 @@ fn invalidate_screen_removes_cached_engine() {
 // ── lock screen password verification tests (CRIT-3) ─────────────────
 
 /// Helper: create an AppEngine with identity + password set, starting on Lock screen.
-fn engine_with_password(password: &str) -> AppEngine<MockTransport> {
-    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+fn engine_with_password(password: &str) -> AppEngine {
+    let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
     vauchi.setup_app_password(password).unwrap();
     assert!(
@@ -748,7 +747,7 @@ fn engine_with_password(password: &str) -> AppEngine<MockTransport> {
 }
 
 /// Helper: enter a PIN into the lock screen engine.
-fn enter_pin(engine: &mut AppEngine<MockTransport>, pin: &str) {
+fn enter_pin(engine: &mut AppEngine, pin: &str) {
     for ch in pin.chars() {
         // Intermediate step: accumulate PIN digits — unlock result asserted by caller
         let _ = engine.handle_action(UserAction::TextChanged {
@@ -900,7 +899,7 @@ fn lock_screen_correct_pin_after_failed_attempt_unlocks() {
 
 #[test]
 fn invalidate_all_clears_entire_cache() {
-    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
     let mut engine = AppEngine::new(vauchi);
 
@@ -923,7 +922,7 @@ fn invalidate_all_clears_entire_cache() {
 
 #[test]
 fn contact_detail_edit_navigates_to_edit_screen() {
-    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
     // Add a contact
     let card = ContactCard::new("Bob");
@@ -968,7 +967,7 @@ fn contact_detail_edit_navigates_to_edit_screen() {
 
 #[test]
 fn back_from_contact_detail_returns_to_contacts() {
-    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
     let mut engine = AppEngine::new(vauchi);
 
@@ -1004,7 +1003,7 @@ fn back_from_contact_detail_returns_to_contacts() {
 
 #[test]
 fn navigate_back_from_duress_pin_returns_to_settings() {
-    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
     let mut engine = AppEngine::new(vauchi);
 
@@ -1024,7 +1023,7 @@ fn navigate_back_from_duress_pin_returns_to_settings() {
 
 #[test]
 fn settings_emergency_wipe_navigates_to_shred() {
-    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
     let mut engine = AppEngine::new(vauchi);
 
@@ -1049,7 +1048,7 @@ fn settings_emergency_wipe_navigates_to_shred() {
 
 #[test]
 fn navigate_back_from_settings_returns_to_home() {
-    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
     let mut engine = AppEngine::new(vauchi);
 
@@ -1068,7 +1067,7 @@ fn navigate_back_from_settings_returns_to_home() {
 
 #[test]
 fn back_with_empty_history_returns_to_home() {
-    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
     let mut engine = AppEngine::new(vauchi);
 
@@ -1080,7 +1079,7 @@ fn back_with_empty_history_returns_to_home() {
 
 #[test]
 fn navigate_back_does_not_create_circular_history() {
-    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
     let mut engine = AppEngine::new(vauchi);
 
@@ -1109,7 +1108,7 @@ use proptest::prelude::*;
 
 #[test]
 fn navigate_to_sync_shows_sync_status() {
-    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
     let mut engine = AppEngine::new(vauchi);
     let screen = engine.navigate_to(AppScreen::Sync);
@@ -1123,7 +1122,7 @@ fn navigate_to_sync_shows_sync_status() {
 
 #[test]
 fn navigate_to_tor_settings_shows_tor() {
-    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
     let mut engine = AppEngine::new(vauchi);
     let screen = engine.navigate_to(AppScreen::TorSettings);
@@ -1137,7 +1136,7 @@ fn navigate_to_tor_settings_shows_tor() {
 
 #[test]
 fn navigate_to_recovery_shows_recovery_status() {
-    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
     let mut engine = AppEngine::new(vauchi);
     let screen = engine.navigate_to(AppScreen::Recovery);
@@ -1152,7 +1151,7 @@ fn navigate_to_recovery_shows_recovery_status() {
 
 #[test]
 fn navigate_to_groups_shows_groups_list() {
-    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
     let mut engine = AppEngine::new(vauchi);
     let screen = engine.navigate_to(AppScreen::Groups);
@@ -1166,7 +1165,7 @@ fn navigate_to_groups_shows_groups_list() {
 
 #[test]
 fn navigate_to_privacy_shows_privacy_settings() {
-    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
     let mut engine = AppEngine::new(vauchi);
     let screen = engine.navigate_to(AppScreen::Privacy);
@@ -1184,7 +1183,7 @@ fn navigate_to_privacy_shows_privacy_settings() {
 
 #[test]
 fn navigate_to_support_shows_support() {
-    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
     let mut engine = AppEngine::new(vauchi);
     let screen = engine.navigate_to(AppScreen::Support);
@@ -1200,7 +1199,7 @@ fn navigate_to_support_shows_support() {
 
 #[test]
 fn sync_engine_unknown_action_returns_screen() {
-    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
     let mut engine = AppEngine::new(vauchi);
     engine.navigate_to(AppScreen::Sync);
@@ -1217,7 +1216,7 @@ fn sync_engine_unknown_action_returns_screen() {
 
 #[test]
 fn privacy_engine_text_changed_is_noop() {
-    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
     let mut engine = AppEngine::new(vauchi);
     engine.navigate_to(AppScreen::Privacy);
@@ -1235,7 +1234,7 @@ fn privacy_engine_text_changed_is_noop() {
 
 #[test]
 fn navigate_to_group_detail_shows_group() {
-    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
     let mut engine = AppEngine::new(vauchi);
     let screen = engine.navigate_to(AppScreen::GroupDetail {
@@ -1253,7 +1252,7 @@ fn navigate_to_group_detail_shows_group() {
 
 #[test]
 fn groups_list_item_selected_routes_to_group_detail() {
-    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
     let mut engine = AppEngine::new(vauchi);
     engine.navigate_to(AppScreen::Groups);
@@ -1284,7 +1283,7 @@ fn groups_list_item_selected_routes_to_group_detail() {
 
 #[test]
 fn navigate_to_contact_visibility_shows_toggles() {
-    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
     let mut engine = AppEngine::new(vauchi);
     // No real contact exists, so engine shows empty field list
@@ -1300,7 +1299,7 @@ fn navigate_to_contact_visibility_shows_toggles() {
 
 #[test]
 fn contact_visibility_toggle_updates_field() {
-    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
     let mut engine = AppEngine::new(vauchi);
     engine.navigate_to(AppScreen::ContactVisibility {
@@ -1323,7 +1322,7 @@ fn contact_visibility_toggle_updates_field() {
 
 #[test]
 fn form_dialog_add_field_shows_type_list() {
-    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
     let mut engine = AppEngine::new(vauchi);
     let screen = engine.navigate_to(AppScreen::FormDialog {
@@ -1344,7 +1343,7 @@ fn form_dialog_add_field_shows_type_list() {
 
 #[test]
 fn form_dialog_add_field_type_selection_shows_value_inputs() {
-    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
     let mut engine = AppEngine::new(vauchi);
     engine.navigate_to(AppScreen::FormDialog {
@@ -1378,7 +1377,7 @@ fn form_dialog_add_field_type_selection_shows_value_inputs() {
 
 #[test]
 fn form_dialog_edit_name_tracks_text_changes() {
-    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
     let mut engine = AppEngine::new(vauchi);
     engine.navigate_to(AppScreen::FormDialog {
@@ -1406,7 +1405,7 @@ fn form_dialog_edit_name_tracks_text_changes() {
 
 #[test]
 fn form_dialog_submit_navigates_back() {
-    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
     let mut engine = AppEngine::new(vauchi);
     // Navigate to Home first, then to the form — so back goes to Home
@@ -1454,7 +1453,7 @@ proptest! {
             0..30
         )
     ) {
-        let vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+        let vauchi = Vauchi::in_memory().unwrap();
         let mut engine = AppEngine::new(vauchi);
         for action in actions {
             // Result intentionally discarded — proptest asserts no-panic + non-empty screen_id
@@ -1470,7 +1469,7 @@ proptest! {
 
 #[test]
 fn form_dialog_edit_name_saves_display_name() {
-    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
     let mut engine = AppEngine::new(vauchi);
 
@@ -1500,7 +1499,7 @@ fn form_dialog_edit_name_saves_display_name() {
 
 #[test]
 fn form_dialog_edit_name_empty_returns_validation_error() {
-    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
     let mut engine = AppEngine::new(vauchi);
 
@@ -1534,7 +1533,7 @@ fn form_dialog_edit_name_empty_returns_validation_error() {
 
 #[test]
 fn form_dialog_add_field_saves_to_own_card() {
-    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
     let mut engine = AppEngine::new(vauchi);
 
@@ -1566,7 +1565,7 @@ fn form_dialog_add_field_saves_to_own_card() {
 
 #[test]
 fn form_dialog_add_field_empty_value_returns_validation_error() {
-    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
     let mut engine = AppEngine::new(vauchi);
 
@@ -1601,7 +1600,7 @@ fn form_dialog_add_field_empty_value_returns_validation_error() {
 
 #[test]
 fn form_dialog_edit_field_saves_value() {
-    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
 
     // Add a field first so we have a field_id to edit
@@ -1641,7 +1640,7 @@ fn form_dialog_edit_field_saves_value() {
 
 #[test]
 fn form_dialog_edit_relay_url_navigates_back() {
-    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
     let mut engine = AppEngine::new(vauchi);
 
@@ -1673,7 +1672,7 @@ fn form_dialog_edit_relay_url_navigates_back() {
 
 #[test]
 fn duplicate_detection_navigate_shows_screen() {
-    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
     let mut engine = AppEngine::new(vauchi);
     let screen = engine.navigate_to(AppScreen::ContactDuplicates);
@@ -1683,7 +1682,7 @@ fn duplicate_detection_navigate_shows_screen() {
 
 #[test]
 fn duplicate_detection_empty_shows_no_duplicates() {
-    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
     let mut engine = AppEngine::new(vauchi);
     let screen = engine.navigate_to(AppScreen::ContactDuplicates);
@@ -1699,7 +1698,7 @@ fn duplicate_detection_empty_shows_no_duplicates() {
 
 #[test]
 fn duplicate_detection_merge_navigates_back() {
-    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
     let mut engine = AppEngine::new(vauchi);
     engine.navigate_to(AppScreen::ContactDuplicates);
@@ -1715,7 +1714,7 @@ fn duplicate_detection_merge_navigates_back() {
 
 #[test]
 fn duplicate_detection_dismiss_stays_on_screen() {
-    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
     let mut engine = AppEngine::new(vauchi);
     engine.navigate_to(AppScreen::ContactDuplicates);
@@ -1731,7 +1730,7 @@ fn duplicate_detection_dismiss_stays_on_screen() {
 
 #[test]
 fn contact_merge_navigate_shows_screen() {
-    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
     let mut engine = AppEngine::new(vauchi);
     let screen = engine.navigate_to(AppScreen::ContactMerge {
@@ -1746,7 +1745,7 @@ fn contact_merge_navigate_shows_screen() {
 
 #[test]
 fn contact_merge_shows_both_contacts() {
-    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
     let mut engine = AppEngine::new(vauchi);
     let screen = engine.navigate_to(AppScreen::ContactMerge {
@@ -1766,7 +1765,7 @@ fn contact_merge_shows_both_contacts() {
 
 #[test]
 fn contact_merge_confirm_navigates_back() {
-    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
     let mut engine = AppEngine::new(vauchi);
     engine.navigate_to(AppScreen::ContactMerge {
@@ -1786,7 +1785,7 @@ fn contact_merge_confirm_navigates_back() {
 
 #[test]
 fn contact_merge_cancel_stays_on_screen() {
-    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
     let mut engine = AppEngine::new(vauchi);
     engine.navigate_to(AppScreen::ContactMerge {
@@ -1807,7 +1806,7 @@ fn contact_merge_cancel_stays_on_screen() {
 
 #[test]
 fn contact_limit_navigate_shows_screen() {
-    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
     let mut engine = AppEngine::new(vauchi);
     let screen = engine.navigate_to(AppScreen::ContactLimit);
@@ -1817,7 +1816,7 @@ fn contact_limit_navigate_shows_screen() {
 
 #[test]
 fn contact_limit_shows_text_input() {
-    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
     let mut engine = AppEngine::new(vauchi);
     let screen = engine.navigate_to(AppScreen::ContactLimit);
@@ -1832,7 +1831,7 @@ fn contact_limit_shows_text_input() {
 
 #[test]
 fn contact_limit_edit_then_save() {
-    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
     let mut engine = AppEngine::new(vauchi);
     engine.navigate_to(AppScreen::ContactLimit);
@@ -1864,7 +1863,7 @@ fn contact_limit_edit_then_save() {
 
 #[test]
 fn contact_limit_save_invalid_returns_validation_error() {
-    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
     let mut engine = AppEngine::new(vauchi);
     engine.navigate_to(AppScreen::ContactLimit);
@@ -1892,7 +1891,7 @@ fn contact_limit_save_invalid_returns_validation_error() {
 
 #[test]
 fn contact_limit_cancel_edit_restores_value() {
-    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
     let mut engine = AppEngine::new(vauchi);
     engine.navigate_to(AppScreen::ContactLimit);
@@ -1931,7 +1930,7 @@ fn contact_limit_cancel_edit_restores_value() {
 #[test]
 fn add_field_after_onboarding_identity_creation() {
     // Create Vauchi (no identity) + AppEngine — same as TUI startup
-    let vauchi: Vauchi<MockTransport> = Vauchi::in_memory().unwrap();
+    let vauchi: Vauchi = Vauchi::in_memory().unwrap();
     let mut engine = AppEngine::new(vauchi);
 
     // Simulate TUI onboarding: create identity directly on vauchi
@@ -2091,7 +2090,7 @@ fn app_screen_form_dialog_serde_roundtrip() {
 
 #[test]
 fn default_screen_is_my_info_when_no_contacts() {
-    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
     let engine = AppEngine::new(vauchi);
     assert_eq!(engine.default_screen(), AppScreen::MyInfo);
@@ -2099,7 +2098,7 @@ fn default_screen_is_my_info_when_no_contacts() {
 
 #[test]
 fn default_screen_is_contacts_when_has_contacts() {
-    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
     let card = ContactCard::new("Bob");
     let shared_key = SymmetricKey::generate();
@@ -2112,7 +2111,7 @@ fn default_screen_is_contacts_when_has_contacts() {
 
 #[test]
 fn default_screen_is_my_info_without_identity() {
-    let vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    let vauchi = Vauchi::in_memory().unwrap();
     let engine = AppEngine::new(vauchi);
     // Without identity, default is still MyInfo (onboarding overrides in new())
     assert_eq!(engine.default_screen(), AppScreen::MyInfo);
@@ -2120,7 +2119,7 @@ fn default_screen_is_my_info_without_identity() {
 
 #[test]
 fn entry_detail_delete_returns_show_toast_with_undo() {
-    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
     // Add a field to delete
     let field = ContactField::new(FieldType::Phone, "Mobile", "+1234567890");
@@ -2158,7 +2157,7 @@ fn entry_detail_delete_returns_show_toast_with_undo() {
 
 #[test]
 fn entry_detail_delete_undo_restores_field() {
-    let mut vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
     let field = ContactField::new(FieldType::Phone, "Mobile", "+1234567890");
     let field_id = field.id().to_string();

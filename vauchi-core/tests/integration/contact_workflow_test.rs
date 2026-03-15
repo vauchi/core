@@ -6,14 +6,12 @@
 //!
 //! Tests for contact management, visibility rules, and delta computation.
 
-use vauchi_core::{
-    network::MockTransport, Contact, ContactCard, ContactField, FieldType, SymmetricKey, Vauchi,
-};
+use vauchi_core::{Contact, ContactCard, ContactField, FieldType, SymmetricKey, Vauchi};
 
 /// Test: Contact management workflow
 #[test]
 fn test_contact_management_workflow() {
-    let wb: Vauchi<MockTransport> = Vauchi::in_memory().unwrap();
+    let wb: Vauchi = Vauchi::in_memory().unwrap();
 
     // Initially no contacts
     assert_eq!(wb.contact_count().unwrap(), 0);
@@ -151,7 +149,7 @@ fn test_card_delta_workflow() {
 /// Test: Error handling for contacts
 #[test]
 fn test_contact_error_handling() {
-    let mut wb: Vauchi<MockTransport> = Vauchi::in_memory().unwrap();
+    let mut wb: Vauchi = Vauchi::in_memory().unwrap();
 
     // Try to get public ID without identity
     let result = wb.public_id();

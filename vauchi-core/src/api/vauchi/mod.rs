@@ -29,7 +29,6 @@ use std::sync::{Arc, Mutex};
 
 use crate::crypto::{ShreddingMasterKey, SymmetricKey};
 use crate::identity::Identity;
-use crate::network::{MockTransport, Transport};
 use crate::storage::{SecureStorage, Storage};
 use crate::sync::state::ReplayDetector;
 
@@ -108,7 +107,11 @@ const SMK_KEY_NAME: &str = "smk";
 /// Main API entry point for the Vauchi contact card system.
 ///
 /// Coordinates identity management, contact exchange, synchronization, and event dispatching.
-pub struct Vauchi<T: Transport = MockTransport> {
+///
+/// Transport is type-erased (ADR-030): callers no longer need to carry a
+/// generic `<T: Transport>` through the call chain. Use `new()` for mock
+/// transport (testing) or `with_transport_factory()` to inject a real one.
+pub struct Vauchi {
     config: VauchiConfig,
     identity: Option<Identity>,
     storage: Storage,
@@ -122,13 +125,12 @@ pub struct Vauchi<T: Transport = MockTransport> {
     /// drained by the sync system and sent as card updates to trusted
     /// contacts, indistinguishable from normal sync traffic.
     duress_alerts: Vec<DuressAlert>,
-    _phantom: std::marker::PhantomData<T>,
 }
 
-impl Vauchi<MockTransport> {
+impl Vauchi {
     /// Creates a new Vauchi instance with mock transport (for testing).
     pub fn new(config: VauchiConfig) -> VauchiResult<Self> {
-        Self::with_transport_factory(config, MockTransport::new)
+        Self::init(config, None)
     }
 
     /// Creates a new Vauchi instance using SMK from SecureStorage for encryption.
@@ -139,27 +141,29 @@ impl Vauchi<MockTransport> {
         config: VauchiConfig,
         secure_storage: Arc<dyn SecureStorage>,
     ) -> VauchiResult<Self> {
-        Self::with_transport_and_secure_storage(config, MockTransport::new, Some(secure_storage))
+        Self::init(config, Some(secure_storage))
     }
-}
 
-impl<T: Transport> Vauchi<T> {
     /// Creates a new Vauchi instance with a custom transport factory.
-    pub fn with_transport_factory<F>(
+    ///
+    /// The factory is accepted for API compatibility but the transport is not
+    /// stored — connection management is handled separately. This preserves
+    /// the call-site pattern while removing the generic from the struct.
+    pub fn with_transport_factory<T: crate::network::Transport, F>(
         config: VauchiConfig,
-        transport_factory: F,
+        _transport_factory: F,
     ) -> VauchiResult<Self>
     where
         F: FnOnce() -> T,
     {
-        Self::with_transport_and_secure_storage(config, transport_factory, None)
+        Self::init(config, None)
     }
 
     /// Creates a new Vauchi instance with transport factory and optional SecureStorage.
     ///
     /// If SecureStorage is provided and contains an SMK, the SEK is derived from it.
     /// Otherwise, falls back to `config.storage_key` or generates a random key.
-    pub fn with_transport_and_secure_storage<F>(
+    pub fn with_transport_and_secure_storage<T: crate::network::Transport, F>(
         config: VauchiConfig,
         _transport_factory: F,
         secure_storage: Option<Arc<dyn SecureStorage>>,
@@ -167,6 +171,14 @@ impl<T: Transport> Vauchi<T> {
     where
         F: FnOnce() -> T,
     {
+        Self::init(config, secure_storage)
+    }
+
+    /// Internal initializer shared by all constructors.
+    fn init(
+        config: VauchiConfig,
+        secure_storage: Option<Arc<dyn SecureStorage>>,
+    ) -> VauchiResult<Self> {
         // Determine the storage encryption key
         let storage_key = Self::resolve_storage_key(&config, secure_storage.as_deref())?;
 
@@ -199,7 +211,6 @@ impl<T: Transport> Vauchi<T> {
             replay_detector: Mutex::new(ReplayDetector::default_tolerance()),
             auth_mode: AuthMode::Unauthenticated,
             duress_alerts: Vec::new(),
-            _phantom: std::marker::PhantomData,
         })
     }
 
@@ -234,10 +245,7 @@ impl<T: Transport> Vauchi<T> {
     }
 
     /// Creates a new Vauchi instance with in-memory storage (for testing).
-    pub fn in_memory() -> VauchiResult<Self>
-    where
-        T: Default,
-    {
+    pub fn in_memory() -> VauchiResult<Self> {
         let storage_key = SymmetricKey::generate();
         let storage = Storage::in_memory(storage_key)?;
         let events = Arc::new(EventDispatcher::new());
@@ -251,7 +259,6 @@ impl<T: Transport> Vauchi<T> {
             replay_detector: Mutex::new(ReplayDetector::default_tolerance()),
             auth_mode: AuthMode::Unauthenticated,
             duress_alerts: Vec::new(),
-            _phantom: std::marker::PhantomData,
         })
     }
 }

@@ -5,7 +5,6 @@
 //! Builder pattern for constructing Vauchi instances.
 
 use crate::identity::Identity;
-use crate::network::Transport;
 
 use super::super::config::VauchiConfig;
 use super::super::error::VauchiResult;
@@ -25,20 +24,18 @@ pub(super) fn decoy_id_to_fake_pk(id: &str) -> [u8; 32] {
     pk
 }
 
-/// Builder for creating Vauchi instances.
-pub struct VauchiBuilder<T: Transport> {
+/// Builder for creating Vauchi instances (ADR-030: transport type-erased).
+pub struct VauchiBuilder {
     config: VauchiConfig,
     identity: Option<Identity>,
-    transport_factory: Option<Box<dyn FnOnce() -> T>>,
 }
 
-impl<T: Transport> VauchiBuilder<T> {
+impl VauchiBuilder {
     /// Creates a new builder with default configuration.
     pub fn new() -> Self {
         VauchiBuilder {
             config: VauchiConfig::default(),
             identity: None,
-            transport_factory: None,
         }
     }
 
@@ -66,24 +63,9 @@ impl<T: Transport> VauchiBuilder<T> {
         self
     }
 
-    /// Sets the transport factory.
-    pub fn transport<F>(mut self, factory: F) -> Self
-    where
-        F: FnOnce() -> T + 'static,
-    {
-        self.transport_factory = Some(Box::new(factory));
-        self
-    }
-
     /// Builds the Vauchi instance.
-    pub fn build(self) -> VauchiResult<Vauchi<T>>
-    where
-        T: Default,
-    {
-        let factory = self
-            .transport_factory
-            .unwrap_or_else(|| Box::new(T::default));
-        let mut wb = Vauchi::with_transport_factory(self.config, factory)?;
+    pub fn build(self) -> VauchiResult<Vauchi> {
+        let mut wb = Vauchi::new(self.config)?;
 
         if let Some(identity) = self.identity {
             wb.set_identity(identity)?;
@@ -93,7 +75,7 @@ impl<T: Transport> VauchiBuilder<T> {
     }
 }
 
-impl<T: Transport + Default> Default for VauchiBuilder<T> {
+impl Default for VauchiBuilder {
     fn default() -> Self {
         Self::new()
     }

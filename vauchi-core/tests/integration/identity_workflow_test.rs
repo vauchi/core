@@ -6,13 +6,13 @@
 //!
 //! Tests for identity creation, multi-device linking, and device registry operations.
 
-use vauchi_core::{network::MockTransport, ContactField, FieldType, Vauchi};
+use vauchi_core::{ContactField, FieldType, Vauchi};
 
 /// Test: Full identity and contact card workflow
 #[test]
 fn test_full_identity_workflow() {
     // Create Vauchi instance
-    let mut wb: Vauchi<MockTransport> = Vauchi::in_memory().unwrap();
+    let mut wb: Vauchi = Vauchi::in_memory().unwrap();
 
     // Create identity
     wb.create_identity("Alice").unwrap();

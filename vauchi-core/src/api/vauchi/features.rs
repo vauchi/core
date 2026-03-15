@@ -7,7 +7,6 @@
 
 use crate::contact::Contact;
 use crate::contact_card::ContactCard;
-use crate::network::Transport;
 
 use super::super::consent::{ConsentManager, ConsentRecord, ConsentType};
 use super::super::contact_manager::ContactManager;
@@ -15,7 +14,7 @@ use super::super::error::{VauchiError, VauchiResult};
 use super::super::events::VauchiEvent;
 use super::{RecoveryReadiness, Vauchi};
 
-impl<T: Transport> Vauchi<T> {
+impl Vauchi {
     // === Aha Moments Operations ===
 
     /// Tries to trigger an aha moment of the given type.

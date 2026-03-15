@@ -4,13 +4,11 @@
 
 //! Visibility labels, field validation, and incoming validation processing.
 
-use crate::network::Transport;
-
 use super::super::error::{VauchiError, VauchiResult};
 use super::super::events::VauchiEvent;
 use super::Vauchi;
 
-impl<T: Transport> Vauchi<T> {
+impl Vauchi {
     // === Visibility Labels ===
 
     /// Lists all visibility labels.

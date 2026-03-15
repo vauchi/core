@@ -5,7 +5,7 @@
 //! Provider contract tests: core API stability for TUI and Desktop consumers (PI-04).
 //!
 //! TUI and Desktop use the lower-level API (Storage, Identity, ContactCard) rather
-//! than the Vauchi<T> facade. These tests verify that API surface from the
+//! than the Vauchi facade. These tests verify that API surface from the
 //! provider side.
 //!
 //! Consumers: vauchi-tui, vauchi-desktop

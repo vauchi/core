@@ -20,7 +20,7 @@ use vauchi_core::crypto::SymmetricKey;
 use vauchi_core::social::{
     calculate_trust_weight, ProfileValidation, TrustLevel, ValidationStatus, ValidatorMeta,
 };
-use vauchi_core::{Contact, Identity, MockTransport, Vauchi};
+use vauchi_core::{Contact, Identity, Vauchi};
 
 // ============================================================
 // Helper: numeric ordering for TrustLevel
@@ -296,7 +296,7 @@ proptest! {
         ops in prop::collection::vec(arb_validation_op(), 1..30)
     ) {
         // Set up a Vauchi instance with 5 validator contacts
-        let mut wb: Vauchi<MockTransport> = Vauchi::in_memory().unwrap();
+        let mut wb: Vauchi = Vauchi::in_memory().unwrap();
         wb.create_identity("Owner").unwrap();
 
         // Create the target contact whose field will be validated

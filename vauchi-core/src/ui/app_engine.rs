@@ -4,7 +4,7 @@
 
 //! Top-level application orchestrator.
 //!
-//! `AppEngine` wraps `Vauchi<T>`, owns the active workflow engine,
+//! `AppEngine` wraps `Vauchi`, owns the active workflow engine,
 //! handles navigation routing, and implements `WorkflowEngine` so
 //! frontends see a single uniform interface.
 
@@ -14,7 +14,6 @@ use serde::{Deserialize, Serialize};
 
 use crate::api::Vauchi;
 use crate::contact_card::{ContactField, FieldType};
-use crate::network::Transport;
 
 use super::action::{ActionResult, UserAction};
 use super::backup_recovery::BackupRecoveryEngine;
@@ -99,8 +98,8 @@ pub enum AppScreen {
 }
 
 /// Unified orchestrator for all frontends.
-pub struct AppEngine<T: Transport> {
-    vauchi: Vauchi<T>,
+pub struct AppEngine {
+    vauchi: Vauchi,
     screen: AppScreen,
     engine: Box<dyn WorkflowEngine>,
     engine_cache: HashMap<AppScreen, Box<dyn WorkflowEngine>>,
@@ -114,18 +113,18 @@ pub struct AppEngine<T: Transport> {
     field_catalog: crate::contact_card::FieldTypeCatalog,
 }
 
-impl<T: Transport> AppEngine<T> {
+impl AppEngine {
     /// Returns a reference to the inner Vauchi instance.
-    pub fn vauchi(&self) -> &Vauchi<T> {
+    pub fn vauchi(&self) -> &Vauchi {
         &self.vauchi
     }
 
     /// Returns a mutable reference to the inner Vauchi instance.
-    pub fn vauchi_mut(&mut self) -> &mut Vauchi<T> {
+    pub fn vauchi_mut(&mut self) -> &mut Vauchi {
         &mut self.vauchi
     }
 
-    pub fn new(vauchi: Vauchi<T>) -> Self {
+    pub fn new(vauchi: Vauchi) -> Self {
         let screen = if !vauchi.has_identity() {
             AppScreen::Onboarding
         } else if vauchi.is_password_enabled().unwrap_or(false) {
@@ -468,7 +467,7 @@ impl<T: Transport> AppEngine<T> {
                         result
                     }
                     FormDialogType::EditRelayUrl { .. } => {
-                        // Relay URL is TUI-specific config (Backend), not in Vauchi<T>.
+                        // Relay URL is TUI-specific config (Backend), not in Vauchi.
                         // Navigate back; TUI handles save via Backend::set_relay_url.
                         Ok(())
                     }
@@ -495,7 +494,7 @@ impl<T: Transport> AppEngine<T> {
         }
     }
 
-    fn create_engine(vauchi: &Vauchi<T>, screen: &AppScreen) -> Box<dyn WorkflowEngine> {
+    fn create_engine(vauchi: &Vauchi, screen: &AppScreen) -> Box<dyn WorkflowEngine> {
         match screen {
             AppScreen::Onboarding => Box::new(OnboardingEngine::new()),
             AppScreen::MyInfo => {
@@ -817,7 +816,7 @@ impl<T: Transport> AppEngine<T> {
     }
 
     /// Builds a SharedInfoView for a contact — my fields as visible to them.
-    fn build_shared_info(vauchi: &Vauchi<T>, contact_id: &str) -> Option<SharedInfoView> {
+    fn build_shared_info(vauchi: &Vauchi, contact_id: &str) -> Option<SharedInfoView> {
         let own_card = vauchi.own_card().ok()??;
 
         // Determine the display name this contact sees
@@ -861,7 +860,7 @@ impl<T: Transport> AppEngine<T> {
         })
     }
 
-    fn create_entry_detail_engine(vauchi: &Vauchi<T>, field_id: &str) -> Box<dyn WorkflowEngine> {
+    fn create_entry_detail_engine(vauchi: &Vauchi, field_id: &str) -> Box<dyn WorkflowEngine> {
         let card = vauchi.own_card().ok().flatten();
         let all_groups = vauchi.list_groups().unwrap_or_default();
 
@@ -926,7 +925,7 @@ impl<T: Transport> AppEngine<T> {
         ))
     }
 
-    fn load_contact_items(vauchi: &Vauchi<T>) -> Vec<ContactItem> {
+    fn load_contact_items(vauchi: &Vauchi) -> Vec<ContactItem> {
         match vauchi.list_contacts() {
             Ok(contacts) => contacts
                 .iter()
@@ -1342,7 +1341,7 @@ mod proptests {
     }
 }
 
-impl<T: Transport> WorkflowEngine for AppEngine<T> {
+impl WorkflowEngine for AppEngine {
     fn current_screen(&self) -> ScreenModel {
         self.engine.current_screen()
     }

@@ -13,17 +13,16 @@
 
 mod common;
 
-use vauchi_core::network::MockTransport;
 use vauchi_core::{
     AhaMomentType, Contact, ContactCard, ContactField, FieldType, SymmetricKey, Vauchi,
 };
 
-fn create_test_vauchi() -> Vauchi<MockTransport> {
+fn create_test_vauchi() -> Vauchi {
     Vauchi::in_memory().unwrap()
 }
 
-fn create_vauchi_with_identity(name: &str) -> Vauchi<MockTransport> {
-    let mut wb: Vauchi<MockTransport> = Vauchi::in_memory().unwrap();
+fn create_vauchi_with_identity(name: &str) -> Vauchi {
+    let mut wb: Vauchi = Vauchi::in_memory().unwrap();
     wb.create_identity(name).unwrap();
     wb
 }

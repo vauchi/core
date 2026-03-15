@@ -18,11 +18,10 @@
 //! - JSON serialization roundtrip
 //! - API integration via Vauchi
 
-use vauchi_core::network::MockTransport;
 use vauchi_core::onboarding::{display_name_suggestions, OnboardingProgress, OnboardingStep};
 use vauchi_core::Vauchi;
 
-fn create_test_vauchi() -> Vauchi<MockTransport> {
+fn create_test_vauchi() -> Vauchi {
     Vauchi::in_memory().unwrap()
 }
 

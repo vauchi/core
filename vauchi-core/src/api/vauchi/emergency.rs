@@ -7,7 +7,7 @@
 use std::sync::Arc;
 
 use crate::contact_card::ContactCard;
-use crate::network::Transport;
+
 use crate::storage::Storage;
 
 use super::super::config::VauchiConfig;
@@ -18,7 +18,7 @@ use super::super::error::{VauchiError, VauchiResult};
 use super::super::events::{EventDispatcher, VauchiEvent};
 use super::Vauchi;
 
-impl<T: Transport> Vauchi<T> {
+impl Vauchi {
     // === Emergency Broadcast ===
 
     /// Configures the emergency broadcast system.

@@ -258,11 +258,9 @@ fn test_sync_state_pending_count() {
 // @scenario: sync_updates.feature:All sync traffic is encrypted
 #[test]
 fn test_full_update_propagation() {
-    use vauchi_core::network::MockTransport;
-
     // Set up Alice and Bob
-    let mut alice_wb: Vauchi<MockTransport> = Vauchi::in_memory().unwrap();
-    let mut bob_wb: Vauchi<MockTransport> = Vauchi::in_memory().unwrap();
+    let mut alice_wb: Vauchi = Vauchi::in_memory().unwrap();
+    let mut bob_wb: Vauchi = Vauchi::in_memory().unwrap();
 
     alice_wb.create_identity("Alice").unwrap();
     bob_wb.create_identity("Bob").unwrap();

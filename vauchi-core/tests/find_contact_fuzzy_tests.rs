@@ -11,11 +11,11 @@ use vauchi_core::contact_card::ContactCard;
 use vauchi_core::crypto::SymmetricKey;
 use vauchi_core::*;
 
-fn create_test_vauchi() -> Vauchi<MockTransport> {
+fn create_test_vauchi() -> Vauchi {
     Vauchi::in_memory().unwrap()
 }
 
-fn add_named_contact(wb: &Vauchi<MockTransport>, name: &str, pk: [u8; 32]) -> String {
+fn add_named_contact(wb: &Vauchi, name: &str, pk: [u8; 32]) -> String {
     let card = ContactCard::new(name);
     let shared_key = SymmetricKey::generate();
     let contact = Contact::from_exchange(pk, card, shared_key);

@@ -4,8 +4,6 @@
 
 //! Device management operations: listing, linking, and revocation.
 
-use crate::network::Transport;
-
 use super::super::error::{VauchiError, VauchiResult};
 use super::Vauchi;
 
@@ -35,7 +33,7 @@ pub struct DeviceLinkResult {
     pub fingerprint: String,
 }
 
-impl<T: Transport> Vauchi<T> {
+impl Vauchi {
     /// Lists all linked devices.
     ///
     /// Returns device info from the registry, or falls back to the current

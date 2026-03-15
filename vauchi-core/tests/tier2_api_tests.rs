@@ -13,7 +13,7 @@ use vauchi_core::storage::{DeliveryRecord, DeliveryStatus};
 use vauchi_core::sync::device_sync::{ContactSyncData, SyncItem};
 use vauchi_core::*;
 
-fn create_test_vauchi() -> Vauchi<MockTransport> {
+fn create_test_vauchi() -> Vauchi {
     Vauchi::in_memory().unwrap()
 }
 

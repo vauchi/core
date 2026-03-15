@@ -7,14 +7,13 @@
 use crate::contact::Contact;
 use crate::crypto::ratchet::DoubleRatchetState;
 use crate::crypto::SymmetricKey;
-use crate::network::Transport;
 
 use super::super::contact_manager::ContactManager;
 use super::super::error::{VauchiError, VauchiResult};
 use super::builder::decoy_id_to_fake_pk;
 use super::{AuthMode, Vauchi};
 
-impl<T: Transport> Vauchi<T> {
+impl Vauchi {
     // === Contact Operations ===
 
     /// Gets a contact by ID.

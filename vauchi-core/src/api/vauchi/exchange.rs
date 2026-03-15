@@ -6,7 +6,6 @@
 
 use crate::contact_card::ContactCard;
 use crate::exchange::{ExchangeEvent, ExchangeSession, ManualConfirmationVerifier};
-use crate::network::Transport;
 
 use super::super::error::{VauchiError, VauchiResult};
 use super::Vauchi;
@@ -40,7 +39,7 @@ impl ExchangeQrData {
     }
 }
 
-impl<T: Transport> Vauchi<T> {
+impl Vauchi {
     /// Generates exchange QR data for contact exchange.
     ///
     /// Uses ExchangeSession state machine with ManualConfirmationVerifier.

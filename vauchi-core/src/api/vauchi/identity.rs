@@ -8,14 +8,14 @@ use std::sync::Arc;
 
 use crate::contact_card::{ContactCard, ContactField};
 use crate::identity::Identity;
-use crate::network::Transport;
+
 use crate::storage::SecureStorage;
 
 use super::super::contact_manager::ContactManager;
 use super::super::error::{VauchiError, VauchiResult};
 use super::{Vauchi, SMK_KEY_NAME};
 
-impl<T: Transport> Vauchi<T> {
+impl Vauchi {
     // === Identity Operations ===
 
     /// Sets the SecureStorage backend for SMK persistence.

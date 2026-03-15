@@ -6,15 +6,13 @@
 
 use std::sync::Arc;
 
-use crate::network::Transport;
-
 use super::super::app_password::{AppPasswordConfig, AuthResult};
 use super::super::duress::{DuressAlert, DuressAlertType, DuressSettings};
 use super::super::error::{VauchiError, VauchiResult};
 use super::super::events::{EventHandler, VauchiEvent};
 use super::{AuthMode, Vauchi};
 
-impl<T: Transport> Vauchi<T> {
+impl Vauchi {
     // === Delivery Status Operations ===
 
     /// Gets delivery records for a specific contact.

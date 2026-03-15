@@ -8,8 +8,8 @@
 //! Scenario: Successful QR code exchange with proximity
 
 use vauchi_core::{
-    crypto::ratchet::DoubleRatchetState, exchange::X3DHKeyPair, network::MockTransport, Contact,
-    ContactField, FieldType, SymmetricKey, Vauchi,
+    crypto::ratchet::DoubleRatchetState, exchange::X3DHKeyPair, Contact, ContactField, FieldType,
+    SymmetricKey, Vauchi,
 };
 
 /// Tests the complete contact exchange workflow between two users.
@@ -23,8 +23,8 @@ use vauchi_core::{
 #[test]
 fn test_contact_exchange_happy_path() {
     // Step 1: Create Vauchi instances for Alice and Bob
-    let mut alice_wb: Vauchi<MockTransport> = Vauchi::in_memory().unwrap();
-    let mut bob_wb: Vauchi<MockTransport> = Vauchi::in_memory().unwrap();
+    let mut alice_wb: Vauchi = Vauchi::in_memory().unwrap();
+    let mut bob_wb: Vauchi = Vauchi::in_memory().unwrap();
 
     alice_wb.create_identity("Alice").unwrap();
     bob_wb.create_identity("Bob").unwrap();

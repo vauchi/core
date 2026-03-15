@@ -10,7 +10,6 @@
 use vauchi_core::{
     contact::FieldVisibility,
     identity::{DeviceInfo, DeviceRegistry, Identity, MAX_DEVICES},
-    network::MockTransport,
     sync::CardDelta,
     Contact, ContactCard, ContactField, FieldType, SigningKeyPair, SymmetricKey, Vauchi,
 };
@@ -111,7 +110,7 @@ fn test_empty_card_delta_computation() {
 /// Test: Field with emoji roundtrip
 #[test]
 fn test_field_with_emoji_roundtrip() {
-    let wb: Vauchi<MockTransport> = Vauchi::in_memory().unwrap();
+    let wb: Vauchi = Vauchi::in_memory().unwrap();
 
     let mut card = ContactCard::new("Test 🎉");
     card.add_field(ContactField::new(
@@ -140,7 +139,7 @@ fn test_field_with_emoji_roundtrip() {
 /// Test: Field with RTL text
 #[test]
 fn test_field_with_rtl_text() {
-    let wb: Vauchi<MockTransport> = Vauchi::in_memory().unwrap();
+    let wb: Vauchi = Vauchi::in_memory().unwrap();
 
     let mut card = ContactCard::new("مرحبا"); // Arabic "Hello"
     card.add_field(ContactField::new(
@@ -169,7 +168,7 @@ fn test_field_with_rtl_text() {
 /// Test: Field with various Unicode categories
 #[test]
 fn test_field_with_various_unicode() {
-    let wb: Vauchi<MockTransport> = Vauchi::in_memory().unwrap();
+    let wb: Vauchi = Vauchi::in_memory().unwrap();
 
     let mut card = ContactCard::new("Тест"); // Cyrillic
     card.add_field(ContactField::new(
@@ -326,7 +325,7 @@ fn test_device_revocation_when_at_two() {
 /// Test: Visibility with all fields hidden
 #[test]
 fn test_visibility_all_fields_hidden() {
-    let wb: Vauchi<MockTransport> = Vauchi::in_memory().unwrap();
+    let wb: Vauchi = Vauchi::in_memory().unwrap();
 
     let contact = Contact::from_exchange(
         [1u8; 32],
@@ -356,7 +355,7 @@ fn test_visibility_all_fields_hidden() {
 /// Test: Visibility default is Everyone
 #[test]
 fn test_visibility_default_is_everyone() {
-    let wb: Vauchi<MockTransport> = Vauchi::in_memory().unwrap();
+    let wb: Vauchi = Vauchi::in_memory().unwrap();
 
     let contact = Contact::from_exchange(
         [1u8; 32],
@@ -421,7 +420,7 @@ fn test_contact_long_display_name() {
 /// Test: Contact search is case insensitive
 #[test]
 fn test_contact_search_case_insensitive() {
-    let wb: Vauchi<MockTransport> = Vauchi::in_memory().unwrap();
+    let wb: Vauchi = Vauchi::in_memory().unwrap();
 
     let contact1 = Contact::from_exchange(
         [1u8; 32],
@@ -454,7 +453,7 @@ fn test_contact_search_case_insensitive() {
 /// Test: Contact search with partial match
 #[test]
 fn test_contact_search_partial_match() {
-    let wb: Vauchi<MockTransport> = Vauchi::in_memory().unwrap();
+    let wb: Vauchi = Vauchi::in_memory().unwrap();
 
     let contact1 = Contact::from_exchange(
         [1u8; 32],
@@ -484,7 +483,7 @@ fn test_contact_search_partial_match() {
 /// Test: Saving same contact twice updates
 #[test]
 fn test_saving_contact_twice_updates() {
-    let wb: Vauchi<MockTransport> = Vauchi::in_memory().unwrap();
+    let wb: Vauchi = Vauchi::in_memory().unwrap();
 
     let mut card = ContactCard::new("Test");
     card.add_field(ContactField::new(
@@ -522,7 +521,7 @@ fn test_saving_contact_twice_updates() {
 /// Test: Contact count remains accurate after operations
 #[test]
 fn test_contact_count_accuracy() {
-    let wb: Vauchi<MockTransport> = Vauchi::in_memory().unwrap();
+    let wb: Vauchi = Vauchi::in_memory().unwrap();
 
     assert_eq!(wb.contact_count().unwrap(), 0);
 

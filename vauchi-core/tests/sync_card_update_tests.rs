@@ -24,8 +24,8 @@ use vauchi_core::SymmetricKey;
 ///
 /// Returns: (alice_wb, bob_wb, shared_secret, bob_contact_id_at_alice, alice_contact_id_at_bob)
 fn setup_exchange_with_ratchets() -> (
-    vauchi_core::Vauchi<vauchi_core::network::MockTransport>,
-    vauchi_core::Vauchi<vauchi_core::network::MockTransport>,
+    vauchi_core::Vauchi,
+    vauchi_core::Vauchi,
     SymmetricKey,
     String,
     String,
@@ -86,7 +86,7 @@ fn setup_exchange_with_ratchets() -> (
 /// 4. Encrypt with Bob's ratchet
 /// 5. Serialize RatchetMessage to JSON
 fn create_valid_update(
-    bob_wb: &vauchi_core::Vauchi<vauchi_core::network::MockTransport>,
+    bob_wb: &vauchi_core::Vauchi,
     alice_signing_pk: &[u8; 32],
     alice_contact_id: &str,
     old_card: &ContactCard,

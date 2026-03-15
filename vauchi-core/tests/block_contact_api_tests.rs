@@ -8,13 +8,12 @@
 //! work correctly, and that blocked contacts are enforced during card propagation
 //! and incoming update processing.
 
-use vauchi_core::network::MockTransport;
 use vauchi_core::{
     crypto::ratchet::DoubleRatchetState, exchange::X3DHKeyPair, sync::delta::CardDelta, Contact,
     ContactCard, ContactField, FieldType, Identity, SymmetricKey, Vauchi, VauchiError,
 };
 
-fn create_test_vauchi() -> Vauchi<MockTransport> {
+fn create_test_vauchi() -> Vauchi {
     Vauchi::in_memory().unwrap()
 }
 

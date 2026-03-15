@@ -7,7 +7,6 @@
 //! Verifies that the ReplayDetector is properly integrated into the Vauchi API
 //! and rejects duplicate nonces and stale timestamps.
 
-use vauchi_core::network::MockTransport;
 use vauchi_core::{
     crypto::ratchet::DoubleRatchetState, exchange::X3DHKeyPair, sync::delta::CardDelta, Contact,
     ContactCard, ContactField, FieldType, Identity, SymmetricKey, Vauchi,
@@ -15,8 +14,7 @@ use vauchi_core::{
 
 /// Helper: set up Alice's Vauchi instance with Bob as a contact and ratchet ready.
 /// Returns (alice_vauchi, bob_id, bob_identity, bob_ratchet).
-fn setup_alice_receiving_from_bob() -> (Vauchi<MockTransport>, String, Identity, DoubleRatchetState)
-{
+fn setup_alice_receiving_from_bob() -> (Vauchi, String, Identity, DoubleRatchetState) {
     let mut alice = Vauchi::in_memory().unwrap();
     alice.create_identity("Alice").unwrap();
 

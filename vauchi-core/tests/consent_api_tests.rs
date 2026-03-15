@@ -11,10 +11,9 @@
 //! for ordering, so tests don't need sleeps between operations.
 
 use vauchi_core::api::{ConsentRecord, ConsentType};
-use vauchi_core::network::MockTransport;
 use vauchi_core::Vauchi;
 
-fn create_test_vauchi() -> Vauchi<MockTransport> {
+fn create_test_vauchi() -> Vauchi {
     let mut wb = Vauchi::in_memory().unwrap();
     wb.create_identity("TestUser").unwrap();
     wb

@@ -17,19 +17,13 @@ use vauchi_core::exchange::X3DHKeyPair;
 use vauchi_core::sync::delta::{CardDelta, CekWrappedPayload, VersionedPayload};
 use vauchi_core::*;
 
-fn create_test_vauchi() -> Vauchi<MockTransport> {
+fn create_test_vauchi() -> Vauchi {
     Vauchi::in_memory().unwrap()
 }
 
 /// Helper: create Alice with identity and a contact Bob with an established ratchet.
 /// Returns (alice_vauchi, bob_contact_id, bob_identity, bob_dh_keypair, shared_secret).
-fn setup_alice_with_bob_ratchet() -> (
-    Vauchi<MockTransport>,
-    String,
-    Identity,
-    X3DHKeyPair,
-    SymmetricKey,
-) {
+fn setup_alice_with_bob_ratchet() -> (Vauchi, String, Identity, X3DHKeyPair, SymmetricKey) {
     let mut alice = create_test_vauchi();
     alice.create_identity("Alice").unwrap();
 
@@ -58,7 +52,7 @@ fn setup_alice_with_bob_ratchet() -> (
 }
 
 /// Helper: setup Alice as initiator for sending TO Bob.
-fn setup_alice_as_sender_to_bob() -> (Vauchi<MockTransport>, String) {
+fn setup_alice_as_sender_to_bob() -> (Vauchi, String) {
     let mut alice = create_test_vauchi();
     alice.create_identity("Alice").unwrap();
 

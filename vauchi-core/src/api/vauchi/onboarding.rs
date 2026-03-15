@@ -9,13 +9,13 @@
 //! wires it to storage and events.
 
 use crate::contact::Group;
-use crate::network::Transport;
+
 use crate::onboarding::{OnboardingProgress, OnboardingStep};
 
 use super::super::error::VauchiResult;
 use super::Vauchi;
 
-impl<T: Transport> Vauchi<T> {
+impl Vauchi {
     // === Onboarding Progress Operations ===
 
     /// Returns the current onboarding progress.

@@ -7,19 +7,18 @@
 //! Tests that changing visibility rules via set_field_*_and_repropagate()
 //! triggers a new card update to the affected contact.
 
-use vauchi_core::network::MockTransport;
 use vauchi_core::{
     exchange::X3DHKeyPair, Contact, ContactCard, ContactField, FieldType, Identity, SymmetricKey,
     Vauchi, VauchiError,
 };
 
-fn create_test_vauchi() -> Vauchi<MockTransport> {
+fn create_test_vauchi() -> Vauchi {
     let mut wb = Vauchi::in_memory().unwrap();
     wb.create_identity("Alice").unwrap();
     wb
 }
 
-fn add_contact_with_ratchet(wb: &Vauchi<MockTransport>, name: &str) -> String {
+fn add_contact_with_ratchet(wb: &Vauchi, name: &str) -> String {
     let identity = Identity::create(name);
     let shared = SymmetricKey::generate();
     let contact = Contact::from_exchange(

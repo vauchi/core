@@ -8,8 +8,6 @@
 //! combining identity creation, card completion, first contact, and device
 //! linking into a unified `SetupProgress` struct.
 
-use crate::network::Transport;
-
 use super::super::error::VauchiResult;
 use super::Vauchi;
 
@@ -52,7 +50,7 @@ impl SetupProgress {
     }
 }
 
-impl<T: Transport> Vauchi<T> {
+impl Vauchi {
     /// Returns the current onboarding/setup progress.
     ///
     /// Aggregates multiple state checks into a single struct that clients

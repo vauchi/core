@@ -9,7 +9,7 @@ use vauchi_core::api::*;
 use vauchi_core::contact_card::FieldType;
 use vauchi_core::*;
 
-fn create_test_vauchi() -> Vauchi<MockTransport> {
+fn create_test_vauchi() -> Vauchi {
     Vauchi::in_memory().unwrap()
 }
 
@@ -218,7 +218,7 @@ fn test_vauchi_public_id() {
 fn test_vauchi_builder() {
     let dir = tempfile::tempdir().unwrap();
     let db_path = dir.path().join("vauchi.db");
-    let wb: Vauchi<MockTransport> = VauchiBuilder::new()
+    let wb: Vauchi = VauchiBuilder::new()
         .storage_path(db_path.to_str().unwrap())
         .relay_url("wss://relay.example.com")
         .build()
@@ -234,7 +234,7 @@ fn test_vauchi_builder_with_identity() {
     let identity = Identity::create("Alice");
     let public_id = identity.public_id();
 
-    let wb: Vauchi<MockTransport> = VauchiBuilder::new()
+    let wb: Vauchi = VauchiBuilder::new()
         .storage_path(db_path.to_str().unwrap())
         .identity(identity)
         .build()

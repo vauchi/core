@@ -14,11 +14,10 @@
 //! When adding new contract tests, note which consumer depends on the contract.
 
 use vauchi_core::api::{ConsentRecord, ConsentType};
-use vauchi_core::network::MockTransport;
 use vauchi_core::{Contact, ContactCard, ContactField, FieldType, Identity, Vauchi};
 
 /// Helper: create a Vauchi instance with identity.
-fn setup() -> Vauchi<MockTransport> {
+fn setup() -> Vauchi {
     let mut wb = Vauchi::in_memory().unwrap();
     wb.create_identity("ProviderContract").unwrap();
     wb

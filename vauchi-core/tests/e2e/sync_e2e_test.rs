@@ -22,8 +22,8 @@ use vauchi_core::{
 #[test]
 fn test_sync_update_propagation_happy_path() {
     // Step 1: Set up Alice and Bob with existing exchange
-    let mut alice_wb: Vauchi<MockTransport> = Vauchi::in_memory().unwrap();
-    let mut bob_wb: Vauchi<MockTransport> = Vauchi::in_memory().unwrap();
+    let mut alice_wb: Vauchi = Vauchi::in_memory().unwrap();
+    let mut bob_wb: Vauchi = Vauchi::in_memory().unwrap();
 
     alice_wb.create_identity("Alice").unwrap();
     bob_wb.create_identity("Bob").unwrap();
@@ -175,9 +175,9 @@ fn test_sync_manager_queue_happy_path() {
 /// Combines: exchange, visibility, sync
 #[test]
 fn test_full_three_user_workflow() {
-    let mut alice_wb: Vauchi<MockTransport> = Vauchi::in_memory().unwrap();
-    let mut bob_wb: Vauchi<MockTransport> = Vauchi::in_memory().unwrap();
-    let mut carol_wb: Vauchi<MockTransport> = Vauchi::in_memory().unwrap();
+    let mut alice_wb: Vauchi = Vauchi::in_memory().unwrap();
+    let mut bob_wb: Vauchi = Vauchi::in_memory().unwrap();
+    let mut carol_wb: Vauchi = Vauchi::in_memory().unwrap();
 
     alice_wb.create_identity("Alice").unwrap();
     bob_wb.create_identity("Bob").unwrap();

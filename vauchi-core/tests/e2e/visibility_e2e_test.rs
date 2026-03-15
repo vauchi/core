@@ -6,9 +6,7 @@
 //!
 //! Feature: visibility_control.feature
 
-use vauchi_core::{
-    network::MockTransport, Contact, ContactCard, ContactField, FieldType, SymmetricKey, Vauchi,
-};
+use vauchi_core::{Contact, ContactCard, ContactField, FieldType, SymmetricKey, Vauchi};
 
 /// Tests the visibility control workflow.
 ///
@@ -17,7 +15,7 @@ use vauchi_core::{
 #[test]
 fn test_visibility_control_happy_path() {
     // Step 1: Create Alice's Vauchi with contacts
-    let mut alice_wb: Vauchi<MockTransport> = Vauchi::in_memory().unwrap();
+    let mut alice_wb: Vauchi = Vauchi::in_memory().unwrap();
     alice_wb.create_identity("Alice").unwrap();
 
     // Add fields to Alice's card

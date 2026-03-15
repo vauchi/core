@@ -8,11 +8,10 @@
 //! on ContactCard (transition to no-group mode). When the first group is
 //! created, field_visibility are preserved for the user to explicitly reassign.
 
-use vauchi_core::network::MockTransport;
 use vauchi_core::{ContactField, FieldType, Vauchi};
 
-fn create_vauchi_with_identity(name: &str) -> Vauchi<MockTransport> {
-    let mut wb: Vauchi<MockTransport> = Vauchi::in_memory().unwrap();
+fn create_vauchi_with_identity(name: &str) -> Vauchi {
+    let mut wb: Vauchi = Vauchi::in_memory().unwrap();
     wb.create_identity(name).unwrap();
     wb
 }

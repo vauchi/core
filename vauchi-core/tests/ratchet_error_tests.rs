@@ -292,10 +292,10 @@ fn test_consecutive_messages_same_party() {
 /// Test: Ratchet state can be serialized and restored
 #[test]
 fn test_ratchet_state_serialization() {
-    use vauchi_core::{network::MockTransport, Contact, ContactCard, Vauchi};
+    use vauchi_core::{Contact, ContactCard, Vauchi};
 
-    let mut alice_wb: Vauchi<MockTransport> = Vauchi::in_memory().unwrap();
-    let mut bob_wb: Vauchi<MockTransport> = Vauchi::in_memory().unwrap();
+    let mut alice_wb: Vauchi = Vauchi::in_memory().unwrap();
+    let mut bob_wb: Vauchi = Vauchi::in_memory().unwrap();
 
     alice_wb.create_identity("Alice").unwrap();
     bob_wb.create_identity("Bob").unwrap();

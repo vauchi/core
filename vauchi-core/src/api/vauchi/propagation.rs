@@ -5,12 +5,11 @@
 //! Card propagation, CEK migration, device lookup, content updates, and sync item application.
 
 use crate::contact_card::{ContactCard, ContactField};
-use crate::network::Transport;
 
 use super::super::error::{VauchiError, VauchiResult};
 use super::Vauchi;
 
-impl<T: Transport> Vauchi<T> {
+impl Vauchi {
     // === Card Propagation Operations ===
 
     /// Propagates own card update to all contacts.

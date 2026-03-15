@@ -14,8 +14,8 @@
 //! - Persistence across app restarts
 
 use vauchi_core::{
-    network::MockTransport, AhaMoment, AhaMomentTracker, AhaMomentType, Contact, ContactCard,
-    ContactField, FieldType, SymmetricKey, Vauchi,
+    AhaMoment, AhaMomentTracker, AhaMomentType, Contact, ContactCard, ContactField, FieldType,
+    SymmetricKey, Vauchi,
 };
 
 // ============================================================
@@ -373,7 +373,7 @@ fn test_context_interpolation() {
 // @scenario: aha_moments:Card creation celebration is shown once
 #[test]
 fn test_vauchi_api_aha_moment_integration() {
-    let mut wb: Vauchi<MockTransport> = Vauchi::in_memory().unwrap();
+    let mut wb: Vauchi = Vauchi::in_memory().unwrap();
 
     // Create identity
     wb.create_identity("Test User").unwrap();
@@ -417,7 +417,7 @@ fn test_vauchi_api_aha_moment_integration() {
 // @scenario: aha_moments:First edit shows would-update feedback
 #[test]
 fn test_edit_triggers_first_edit_moment() {
-    let mut wb: Vauchi<MockTransport> = Vauchi::in_memory().unwrap();
+    let mut wb: Vauchi = Vauchi::in_memory().unwrap();
     wb.create_identity("Test User").unwrap();
 
     // Add a field (this is an edit operation)
@@ -440,7 +440,7 @@ fn test_edit_triggers_first_edit_moment() {
 // @scenario: aha_moments:First contact added celebration
 #[test]
 fn test_add_contact_triggers_first_contact_moment() {
-    let wb: Vauchi<MockTransport> = Vauchi::in_memory().unwrap();
+    let wb: Vauchi = Vauchi::in_memory().unwrap();
 
     // Add first contact
     let bob = Contact::from_exchange([1u8; 32], ContactCard::new("Bob"), SymmetricKey::generate());
@@ -460,7 +460,7 @@ fn test_add_contact_triggers_first_contact_moment() {
 /// Test: Demo contact API integration
 #[test]
 fn test_vauchi_api_demo_contact_integration() {
-    let mut wb: Vauchi<MockTransport> = Vauchi::in_memory().unwrap();
+    let mut wb: Vauchi = Vauchi::in_memory().unwrap();
     wb.create_identity("Test User").unwrap();
 
     // Initialize demo contact for new user
@@ -502,7 +502,7 @@ fn test_vauchi_api_demo_contact_integration() {
 // @scenario: demo_contact.feature:Demo contact does not appear if user has contacts
 #[test]
 fn test_demo_contact_skipped_with_contacts() {
-    let wb: Vauchi<MockTransport> = Vauchi::in_memory().unwrap();
+    let wb: Vauchi = Vauchi::in_memory().unwrap();
 
     // Add a contact first
     let alice = Contact::from_exchange(

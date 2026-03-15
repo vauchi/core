@@ -12,7 +12,6 @@
 //!   cargo test --test cucumber_tests -- --tags @contact-card
 
 use cucumber::World;
-use vauchi_core::network::MockTransport;
 use vauchi_core::{ContactCard, Vauchi};
 
 mod steps;
@@ -23,7 +22,7 @@ mod steps;
 #[derive(World)]
 #[world(init = Self::new)]
 pub struct VauchiWorld {
-    pub vauchi: Vauchi<MockTransport>,
+    pub vauchi: Vauchi,
     pub current_card: Option<ContactCard>,
     pub pending_field_type: Option<String>,
     pub pending_label: Option<String>,

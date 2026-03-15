@@ -18,7 +18,8 @@ pub mod visibility;
 mod visibility;
 
 pub use labels::{
-    resolve_visible_fields, Group, GroupManager, LabelError, MAX_LABELS, SUGGESTED_LABELS,
+    resolve_visible_fields, Group, GroupError, GroupManager, LabelError, MAX_LABELS,
+    SUGGESTED_LABELS,
 };
 pub use visibility::{FieldVisibility, VisibilityRules};
 

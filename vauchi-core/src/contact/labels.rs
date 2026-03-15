@@ -2,10 +2,10 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! Visibility Labels
+//! Contact Groups
 //!
-//! Labels allow organizing contacts into groups for easier visibility management.
-//! Labels are local-only - they are never transmitted to contacts, only synced
+//! Groups allow organizing contacts for easier visibility management.
+//! Groups are local-only - they are never transmitted to contacts, only synced
 //! across your own devices.
 
 use serde::{Deserialize, Serialize};
@@ -17,33 +17,36 @@ pub const MAX_LABELS: usize = 50;
 /// Suggested default labels for new users.
 pub const SUGGESTED_LABELS: &[&str] = &["Family", "Friends", "Coworkers", "Business"];
 
-/// Error type for label operations.
+/// Error type for group operations.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum LabelError {
-    /// Label with this name already exists.
+pub enum GroupError {
+    /// Group with this name already exists.
     DuplicateName(String),
-    /// Label not found.
+    /// Group not found.
     NotFound(String),
-    /// Maximum number of labels reached.
+    /// Maximum number of groups reached.
     MaxLabelsReached,
-    /// Invalid label name.
+    /// Invalid group name.
     InvalidName(String),
 }
 
-impl std::fmt::Display for LabelError {
+/// Deprecated alias for backward compatibility.
+pub type LabelError = GroupError;
+
+impl std::fmt::Display for GroupError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            LabelError::DuplicateName(name) => write!(f, "Label already exists: {}", name),
-            LabelError::NotFound(name) => write!(f, "Label not found: {}", name),
-            LabelError::MaxLabelsReached => {
-                write!(f, "Maximum number of labels reached ({})", MAX_LABELS)
+            GroupError::DuplicateName(name) => write!(f, "Group already exists: {}", name),
+            GroupError::NotFound(name) => write!(f, "Group not found: {}", name),
+            GroupError::MaxLabelsReached => {
+                write!(f, "Maximum number of groups reached ({})", MAX_LABELS)
             }
-            LabelError::InvalidName(msg) => write!(f, "Invalid label name: {}", msg),
+            GroupError::InvalidName(msg) => write!(f, "Invalid group name: {}", msg),
         }
     }
 }
 
-impl std::error::Error for LabelError {}
+impl std::error::Error for GroupError {}
 
 /// A visibility label for organizing contacts.
 ///
@@ -140,7 +143,7 @@ impl Group {
     ///
     /// Validates that the name is non-empty, not whitespace-only, and
     /// at most 100 characters (after trimming).
-    pub fn set_display_name_override(&mut self, name: Option<&str>) -> Result<(), LabelError> {
+    pub fn set_display_name_override(&mut self, name: Option<&str>) -> Result<(), GroupError> {
         match name {
             None => {
                 self.display_name_override = None;
@@ -150,12 +153,12 @@ impl Group {
             Some(raw) => {
                 let trimmed = raw.trim();
                 if trimmed.is_empty() {
-                    return Err(LabelError::InvalidName(
+                    return Err(GroupError::InvalidName(
                         "Display name override cannot be empty".to_string(),
                     ));
                 }
                 if trimmed.chars().count() > 100 {
-                    return Err(LabelError::InvalidName(
+                    return Err(GroupError::InvalidName(
                         "Display name override cannot exceed 100 characters".to_string(),
                     ));
                 }
@@ -270,186 +273,212 @@ impl Group {
     }
 }
 
-/// Manages visibility labels for a user.
+/// Manages contact groups for a user.
 ///
-/// Labels are organized in a collection with efficient lookup by ID and name.
+/// Groups are organized in a collection with efficient lookup by ID and name.
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct GroupManager {
-    /// Labels indexed by ID.
-    labels: HashMap<String, Group>,
+    /// Groups indexed by ID.
+    #[serde(alias = "labels")]
+    groups: HashMap<String, Group>,
     /// Per-contact overrides: contact_id -> (field_id -> is_visible).
-    /// These take precedence over label-based visibility.
+    /// These take precedence over group-based visibility.
     per_contact_overrides: HashMap<String, HashMap<String, bool>>,
 }
 
 impl GroupManager {
-    /// Creates a new empty label manager.
+    /// Creates a new empty group manager.
     pub fn new() -> Self {
         GroupManager {
-            labels: HashMap::new(),
+            groups: HashMap::new(),
             per_contact_overrides: HashMap::new(),
         }
     }
 
-    /// Inserts a label loaded from storage, preserving its original ID and all fields.
+    /// Inserts a group loaded from storage, preserving its original ID and all fields.
     ///
     /// This bypasses validation (name length, duplicates) because the data was
     /// already validated when first created.
+    pub fn insert_loaded_group(&mut self, group: Group) {
+        self.groups.insert(group.id().to_string(), group);
+    }
+
+    /// Deprecated: use `insert_loaded_group` instead.
     pub fn insert_loaded_label(&mut self, label: Group) {
-        self.labels.insert(label.id().to_string(), label);
+        self.insert_loaded_group(label);
     }
 
-    /// Returns all labels.
+    /// Returns all groups.
+    pub fn all_groups(&self) -> Vec<&Group> {
+        self.groups.values().collect()
+    }
+
+    /// Deprecated: use `all_groups` instead.
     pub fn all_labels(&self) -> Vec<&Group> {
-        self.labels.values().collect()
+        self.all_groups()
     }
 
-    /// Returns the number of labels.
+    /// Returns the number of groups.
+    pub fn group_count(&self) -> usize {
+        self.groups.len()
+    }
+
+    /// Deprecated: use `group_count` instead.
     pub fn label_count(&self) -> usize {
-        self.labels.len()
+        self.group_count()
     }
 
-    /// Returns true if no labels exist.
+    /// Returns true if no groups exist.
     pub fn is_empty(&self) -> bool {
-        self.labels.is_empty()
+        self.groups.is_empty()
     }
 
-    /// Gets a label by ID.
-    pub fn get_group(&self, label_id: &str) -> Option<&Group> {
-        self.labels.get(label_id)
+    /// Gets a group by ID.
+    pub fn get_group(&self, group_id: &str) -> Option<&Group> {
+        self.groups.get(group_id)
     }
 
-    /// Gets a mutable reference to a label by ID.
-    pub fn get_group_mut(&mut self, label_id: &str) -> Option<&mut Group> {
-        self.labels.get_mut(label_id)
+    /// Gets a mutable reference to a group by ID.
+    pub fn get_group_mut(&mut self, group_id: &str) -> Option<&mut Group> {
+        self.groups.get_mut(group_id)
     }
 
-    /// Gets a label by name.
+    /// Gets a group by name.
     pub fn get_group_by_name(&self, name: &str) -> Option<&Group> {
-        self.labels.values().find(|l| l.name == name)
+        self.groups.values().find(|l| l.name == name)
     }
 
-    /// Creates a new label.
-    pub fn create_group(&mut self, name: &str) -> Result<&Group, LabelError> {
+    /// Creates a new group.
+    pub fn create_group(&mut self, name: &str) -> Result<&Group, GroupError> {
         // Validate name
         let name = name.trim();
         if name.is_empty() {
-            return Err(LabelError::InvalidName("Name cannot be empty".to_string()));
+            return Err(GroupError::InvalidName("Name cannot be empty".to_string()));
         }
         if name.chars().count() > 50 {
-            return Err(LabelError::InvalidName(
+            return Err(GroupError::InvalidName(
                 "Name cannot exceed 50 characters".to_string(),
             ));
         }
 
         // Check for duplicate
         if self.get_group_by_name(name).is_some() {
-            return Err(LabelError::DuplicateName(name.to_string()));
+            return Err(GroupError::DuplicateName(name.to_string()));
         }
 
         // Check limit
-        if self.labels.len() >= MAX_LABELS {
-            return Err(LabelError::MaxLabelsReached);
+        if self.groups.len() >= MAX_LABELS {
+            return Err(GroupError::MaxLabelsReached);
         }
 
-        // Create label
-        let label = Group::new(name);
-        let id = label.id.clone();
-        self.labels.insert(id.clone(), label);
+        // Create group
+        let group = Group::new(name);
+        let id = group.id.clone();
+        self.groups.insert(id.clone(), group);
 
-        Ok(self.labels.get(&id).expect("just inserted"))
+        Ok(self.groups.get(&id).expect("just inserted"))
     }
 
-    /// Renames a label.
-    pub fn rename_group(&mut self, label_id: &str, new_name: &str) -> Result<(), LabelError> {
+    /// Renames a group.
+    pub fn rename_group(&mut self, group_id: &str, new_name: &str) -> Result<(), GroupError> {
         let new_name = new_name.trim();
 
         // Validate new name
         if new_name.is_empty() {
-            return Err(LabelError::InvalidName("Name cannot be empty".to_string()));
+            return Err(GroupError::InvalidName("Name cannot be empty".to_string()));
         }
         if new_name.chars().count() > 50 {
-            return Err(LabelError::InvalidName(
+            return Err(GroupError::InvalidName(
                 "Name cannot exceed 50 characters".to_string(),
             ));
         }
 
-        // Check for duplicate (excluding this label)
+        // Check for duplicate (excluding this group)
         if let Some(existing) = self.get_group_by_name(new_name) {
-            if existing.id != label_id {
-                return Err(LabelError::DuplicateName(new_name.to_string()));
+            if existing.id != group_id {
+                return Err(GroupError::DuplicateName(new_name.to_string()));
             }
         }
 
         // Find and rename
-        let label = self
-            .labels
-            .get_mut(label_id)
-            .ok_or_else(|| LabelError::NotFound(label_id.to_string()))?;
+        let group = self
+            .groups
+            .get_mut(group_id)
+            .ok_or_else(|| GroupError::NotFound(group_id.to_string()))?;
 
-        label.set_name(new_name);
+        group.set_name(new_name);
         Ok(())
     }
 
-    /// Deletes a label.
+    /// Deletes a group.
     ///
-    /// Contacts in the label remain in the contact list; they just lose
-    /// their label membership.
-    pub fn delete_group(&mut self, label_id: &str) -> Result<Group, LabelError> {
-        self.labels
-            .remove(label_id)
-            .ok_or_else(|| LabelError::NotFound(label_id.to_string()))
+    /// Contacts in the group remain in the contact list; they just lose
+    /// their group membership.
+    pub fn delete_group(&mut self, group_id: &str) -> Result<Group, GroupError> {
+        self.groups
+            .remove(group_id)
+            .ok_or_else(|| GroupError::NotFound(group_id.to_string()))
     }
 
-    /// Returns all labels that contain a specific contact.
-    pub fn labels_for_contact(&self, contact_id: &str) -> Vec<&Group> {
-        self.labels
+    /// Returns all groups that contain a specific contact.
+    pub fn groups_for_contact(&self, contact_id: &str) -> Vec<&Group> {
+        self.groups
             .values()
             .filter(|l| l.contains_contact(contact_id))
             .collect()
     }
 
-    /// Returns all contacts not in any label.
-    pub fn unlabeled_contacts(&self, all_contact_ids: &[&str]) -> Vec<String> {
+    /// Deprecated: use `groups_for_contact` instead.
+    pub fn labels_for_contact(&self, contact_id: &str) -> Vec<&Group> {
+        self.groups_for_contact(contact_id)
+    }
+
+    /// Returns all contacts not in any group.
+    pub fn ungrouped_contacts(&self, all_contact_ids: &[&str]) -> Vec<String> {
         all_contact_ids
             .iter()
-            .filter(|id| !self.labels.values().any(|l| l.contains_contact(id)))
+            .filter(|id| !self.groups.values().any(|l| l.contains_contact(id)))
             .map(|id| id.to_string())
             .collect()
     }
 
-    /// Adds a contact to a label.
+    /// Deprecated: use `ungrouped_contacts` instead.
+    pub fn unlabeled_contacts(&self, all_contact_ids: &[&str]) -> Vec<String> {
+        self.ungrouped_contacts(all_contact_ids)
+    }
+
+    /// Adds a contact to a group.
     pub fn add_contact_to_group(
         &mut self,
-        label_id: &str,
+        group_id: &str,
         contact_id: &str,
-    ) -> Result<bool, LabelError> {
-        let label = self
-            .labels
-            .get_mut(label_id)
-            .ok_or_else(|| LabelError::NotFound(label_id.to_string()))?;
+    ) -> Result<bool, GroupError> {
+        let group = self
+            .groups
+            .get_mut(group_id)
+            .ok_or_else(|| GroupError::NotFound(group_id.to_string()))?;
 
-        Ok(label.add_contact(contact_id))
+        Ok(group.add_contact(contact_id))
     }
 
-    /// Removes a contact from a label.
+    /// Removes a contact from a group.
     pub fn remove_contact_from_group(
         &mut self,
-        label_id: &str,
+        group_id: &str,
         contact_id: &str,
-    ) -> Result<bool, LabelError> {
-        let label = self
-            .labels
-            .get_mut(label_id)
-            .ok_or_else(|| LabelError::NotFound(label_id.to_string()))?;
+    ) -> Result<bool, GroupError> {
+        let group = self
+            .groups
+            .get_mut(group_id)
+            .ok_or_else(|| GroupError::NotFound(group_id.to_string()))?;
 
-        Ok(label.remove_contact(contact_id))
+        Ok(group.remove_contact(contact_id))
     }
 
-    /// Removes a contact from all labels (e.g., when deleting the contact).
+    /// Removes a contact from all groups (e.g., when deleting the contact).
     pub fn remove_contact_from_all_groups(&mut self, contact_id: &str) {
-        for label in self.labels.values_mut() {
-            label.remove_contact(contact_id);
+        for group in self.groups.values_mut() {
+            group.remove_contact(contact_id);
         }
         self.per_contact_overrides.remove(contact_id);
     }
@@ -496,10 +525,10 @@ impl GroupManager {
     ///
     /// Visibility is determined by:
     /// 1. Per-contact override (if set, takes precedence)
-    /// 2. Label membership (visible if contact is in any label that shows this field)
-    /// 3. Default (not visible through labels - falls back to VisibilityRules)
+    /// 2. Group membership (visible if contact is in any group that shows this field)
+    /// 3. Default (not visible through groups - falls back to VisibilityRules)
     ///
-    /// Returns `Some(true)` if visible via labels, `Some(false)` if explicitly
+    /// Returns `Some(true)` if visible via groups, `Some(false)` if explicitly
     /// hidden via override, `None` to fall back to default VisibilityRules.
     pub fn can_see_via_labels(&self, contact_id: &str, field_id: &str) -> Option<bool> {
         // Check per-contact override first
@@ -507,15 +536,15 @@ impl GroupManager {
             return Some(is_visible);
         }
 
-        // Check if any label containing this contact shows this field
-        let labels_for_contact = self.labels_for_contact(contact_id);
-        for label in labels_for_contact {
-            if label.is_field_visible(field_id) {
+        // Check if any group containing this contact shows this field
+        let groups = self.groups_for_contact(contact_id);
+        for group in groups {
+            if group.is_field_visible(field_id) {
                 return Some(true);
             }
         }
 
-        // No label grants visibility - return None to fall back to default rules
+        // No group grants visibility - return None to fall back to default rules
         None
     }
 
@@ -524,26 +553,26 @@ impl GroupManager {
     /// Union of members and visible fields. The source group is deleted.
     /// Per-contact overrides are preserved (they're contact-scoped, not group-scoped).
     /// The target group keeps its name and display_name_override.
-    pub fn merge_groups(&mut self, target_id: &str, source_id: &str) -> Result<(), LabelError> {
+    pub fn merge_groups(&mut self, target_id: &str, source_id: &str) -> Result<(), GroupError> {
         if target_id == source_id {
-            return Err(LabelError::InvalidName(
+            return Err(GroupError::InvalidName(
                 "Cannot merge a group with itself".to_string(),
             ));
         }
 
         // Validate target exists BEFORE removing source to prevent data loss
-        if !self.labels.contains_key(target_id) {
-            return Err(LabelError::NotFound(target_id.to_string()));
+        if !self.groups.contains_key(target_id) {
+            return Err(GroupError::NotFound(target_id.to_string()));
         }
 
         // Remove source (safe now — target is known to exist)
         let source = self
-            .labels
+            .groups
             .remove(source_id)
-            .ok_or_else(|| LabelError::NotFound(source_id.to_string()))?;
+            .ok_or_else(|| GroupError::NotFound(source_id.to_string()))?;
 
         let target = self
-            .labels
+            .groups
             .get_mut(target_id)
             .expect("target existence verified above");
 
@@ -560,13 +589,13 @@ impl GroupManager {
         Ok(())
     }
 
-    /// Returns all fields that a contact can see via labels.
+    /// Returns all fields that a contact can see via groups.
     pub fn visible_fields_via_labels(&self, contact_id: &str) -> HashSet<String> {
         let mut visible = HashSet::new();
 
-        // Add fields from all labels the contact is in
-        for label in self.labels_for_contact(contact_id) {
-            visible.extend(label.visible_fields().clone());
+        // Add fields from all groups the contact is in
+        for group in self.groups_for_contact(contact_id) {
+            visible.extend(group.visible_fields().clone());
         }
 
         // Apply per-contact overrides
@@ -628,7 +657,7 @@ mod tests {
         manager.create_group("Friends").unwrap();
 
         let result = manager.create_group("Friends");
-        assert!(matches!(result, Err(LabelError::DuplicateName(_))));
+        assert!(matches!(result, Err(GroupError::DuplicateName(_))));
     }
 
     #[test]
@@ -765,7 +794,7 @@ mod tests {
         assert_eq!(deleted.name(), "Temporary");
 
         assert!(manager.get_group(&label_id).is_none());
-        assert_eq!(manager.label_count(), 0);
+        assert_eq!(manager.group_count(), 0);
     }
 
     #[test]
@@ -777,7 +806,7 @@ mod tests {
         }
 
         let result = manager.create_group("OneMore");
-        assert!(matches!(result, Err(LabelError::MaxLabelsReached)));
+        assert!(matches!(result, Err(GroupError::MaxLabelsReached)));
     }
 
     #[test]
@@ -806,16 +835,16 @@ mod tests {
 
         // Empty string should fail
         let result = label.set_display_name_override(Some(""));
-        assert!(matches!(result, Err(LabelError::InvalidName(_))));
+        assert!(matches!(result, Err(GroupError::InvalidName(_))));
 
         // Whitespace-only should fail
         let result = label.set_display_name_override(Some("   "));
-        assert!(matches!(result, Err(LabelError::InvalidName(_))));
+        assert!(matches!(result, Err(GroupError::InvalidName(_))));
 
         // Too long (>100 chars) should fail
         let long_name = "a".repeat(101);
         let result = label.set_display_name_override(Some(&long_name));
-        assert!(matches!(result, Err(LabelError::InvalidName(_))));
+        assert!(matches!(result, Err(GroupError::InvalidName(_))));
 
         // Exactly 100 chars should succeed
         let max_name = "b".repeat(100);
@@ -913,7 +942,7 @@ mod tests {
 
         // Source group is deleted
         assert!(manager.get_group(&source).is_none());
-        assert_eq!(manager.label_count(), 1);
+        assert_eq!(manager.group_count(), 1);
     }
 
     #[test]
@@ -922,7 +951,7 @@ mod tests {
         let target = manager.create_group("Family").unwrap().id().to_string();
 
         let result = manager.merge_groups(&target, "nonexistent");
-        assert!(matches!(result, Err(LabelError::NotFound(_))));
+        assert!(matches!(result, Err(GroupError::NotFound(_))));
     }
 
     #[test]
@@ -931,7 +960,7 @@ mod tests {
         let source = manager.create_group("Friends").unwrap().id().to_string();
 
         let result = manager.merge_groups("nonexistent", &source);
-        assert!(matches!(result, Err(LabelError::NotFound(_))));
+        assert!(matches!(result, Err(GroupError::NotFound(_))));
         assert!(
             manager.get_group(&source).is_some(),
             "source must survive a failed merge"
@@ -944,7 +973,7 @@ mod tests {
         let group = manager.create_group("Family").unwrap().id().to_string();
 
         let result = manager.merge_groups(&group, &group);
-        assert!(matches!(result, Err(LabelError::InvalidName(_))));
+        assert!(matches!(result, Err(GroupError::InvalidName(_))));
     }
 
     #[test]

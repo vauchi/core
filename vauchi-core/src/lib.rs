@@ -27,7 +27,7 @@ pub mod identity;
 pub mod tor_config;
 pub use contact::merge::DuplicatePair;
 pub use contact::{
-    resolve_visible_fields, Contact, FieldVisibility, Group, GroupError, GroupManager, LabelError,
+    resolve_visible_fields, Contact, FieldVisibility, Group, GroupError, GroupManager,
     VisibilityRules, MAX_LABELS, SUGGESTED_LABELS,
 };
 pub use contact_card::{

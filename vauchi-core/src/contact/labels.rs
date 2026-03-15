@@ -30,9 +30,6 @@ pub enum GroupError {
     InvalidName(String),
 }
 
-/// Deprecated alias for backward compatibility.
-pub type LabelError = GroupError;
-
 impl std::fmt::Display for GroupError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -303,29 +300,14 @@ impl GroupManager {
         self.groups.insert(group.id().to_string(), group);
     }
 
-    /// Deprecated: use `insert_loaded_group` instead.
-    pub fn insert_loaded_label(&mut self, label: Group) {
-        self.insert_loaded_group(label);
-    }
-
     /// Returns all groups.
     pub fn all_groups(&self) -> Vec<&Group> {
         self.groups.values().collect()
     }
 
-    /// Deprecated: use `all_groups` instead.
-    pub fn all_labels(&self) -> Vec<&Group> {
-        self.all_groups()
-    }
-
     /// Returns the number of groups.
     pub fn group_count(&self) -> usize {
         self.groups.len()
-    }
-
-    /// Deprecated: use `group_count` instead.
-    pub fn label_count(&self) -> usize {
-        self.group_count()
     }
 
     /// Returns true if no groups exist.
@@ -428,11 +410,6 @@ impl GroupManager {
             .collect()
     }
 
-    /// Deprecated: use `groups_for_contact` instead.
-    pub fn labels_for_contact(&self, contact_id: &str) -> Vec<&Group> {
-        self.groups_for_contact(contact_id)
-    }
-
     /// Returns all contacts not in any group.
     pub fn ungrouped_contacts(&self, all_contact_ids: &[&str]) -> Vec<String> {
         all_contact_ids
@@ -440,11 +417,6 @@ impl GroupManager {
             .filter(|id| !self.groups.values().any(|l| l.contains_contact(id)))
             .map(|id| id.to_string())
             .collect()
-    }
-
-    /// Deprecated: use `ungrouped_contacts` instead.
-    pub fn unlabeled_contacts(&self, all_contact_ids: &[&str]) -> Vec<String> {
-        self.ungrouped_contacts(all_contact_ids)
     }
 
     /// Adds a contact to a group.

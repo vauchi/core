@@ -186,13 +186,20 @@ impl ExchangeEngine {
         let _ = session.apply_hardware_event(event);
         let commands = session.drain_commands();
 
-        // Check if the session completed or failed, update step accordingly
+        // Sync engine step from session state
         match session.state() {
             crate::exchange::ExchangeState::Complete { .. } => {
                 self.step = ExchangeStep::Success;
             }
             crate::exchange::ExchangeState::Failed { .. } => {
                 self.step = ExchangeStep::Failed;
+            }
+            // Any state beyond DisplayingQr means verification is in progress
+            crate::exchange::ExchangeState::PeerScanned { .. }
+            | crate::exchange::ExchangeState::AwaitingKeyAgreement { .. }
+            | crate::exchange::ExchangeState::AwaitingCardExchange { .. }
+            | crate::exchange::ExchangeState::AwaitingBleVerification { .. } => {
+                self.step = ExchangeStep::Verifying;
             }
             _ => {}
         }
@@ -252,24 +259,36 @@ impl ExchangeEngine {
                     progress: Some(self.progress()),
                 }
             }
-            ExchangeStep::ShowQr => ScreenModel {
-                screen_id: "exchange_show_qr".into(),
-                title: "Share Your Code".into(),
-                subtitle: None,
-                components: vec![Component::QrCode {
-                    id: "own_qr".into(),
-                    data: self.config.own_qr_data.clone(),
-                    mode: QrMode::Display,
-                    label: Some(self.config.own_name.clone()),
-                }],
-                actions: vec![ScreenAction {
-                    id: "continue".into(),
-                    label: "Scan Their Code".into(),
-                    style: ActionStyle::Primary,
-                    enabled: true,
-                }],
-                progress: Some(self.progress()),
-            },
+            ExchangeStep::ShowQr => {
+                // ADR-031: Use session QR data when available (cryptographically
+                // generated with ephemeral keys), falling back to config for
+                // legacy UI-only mode.
+                let qr_data = self
+                    .session
+                    .as_ref()
+                    .and_then(|s| s.qr())
+                    .map(|qr| qr.to_data_string())
+                    .unwrap_or_else(|| self.config.own_qr_data.clone());
+
+                ScreenModel {
+                    screen_id: "exchange_show_qr".into(),
+                    title: "Share Your Code".into(),
+                    subtitle: None,
+                    components: vec![Component::QrCode {
+                        id: "own_qr".into(),
+                        data: qr_data,
+                        mode: QrMode::Display,
+                        label: Some(self.config.own_name.clone()),
+                    }],
+                    actions: vec![ScreenAction {
+                        id: "continue".into(),
+                        label: "Scan Their Code".into(),
+                        style: ActionStyle::Primary,
+                        enabled: true,
+                    }],
+                    progress: Some(self.progress()),
+                }
+            }
             ExchangeStep::ScanQr => ScreenModel {
                 screen_id: "exchange_scan_qr".into(),
                 title: "Scan Their Code".into(),

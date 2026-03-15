@@ -4,7 +4,7 @@
 
 //! Unified AppEngine wrapper for mobile/desktop platforms via UniFFI.
 //!
-//! `PlatformAppEngine` wraps `AppEngine<MockTransport>` and exposes the same
+//! `PlatformAppEngine` wraps `AppEngine` and exposes the same
 //! JSON-based transport format used by `Mobile*Workflow` objects. Unlike those
 //! individual workflow wrappers, `PlatformAppEngine` manages navigation, engine
 //! lifecycle, and data persistence as a single unified entry point.
@@ -21,7 +21,6 @@ use std::sync::{Arc, Mutex};
 
 use vauchi_core::api::{Vauchi, VauchiConfig};
 use vauchi_core::crypto::SymmetricKey;
-use vauchi_core::network::MockTransport;
 use vauchi_core::ui::{AppEngine, WorkflowEngine};
 
 use crate::error::MobileError;
@@ -33,7 +32,7 @@ use crate::json_helpers::{
 
 /// Unified navigation and screen engine for mobile/desktop platforms.
 ///
-/// Wraps `AppEngine<MockTransport>` with JSON-based FFI transport.
+/// Wraps `AppEngine` with JSON-based FFI transport.
 /// Manages screen navigation, engine lifecycle, and form dialog persistence.
 ///
 /// # Usage from Swift/Kotlin
@@ -61,7 +60,7 @@ use crate::json_helpers::{
 /// ```
 #[derive(uniffi::Object)]
 pub struct PlatformAppEngine {
-    engine: Mutex<AppEngine<MockTransport>>,
+    engine: Mutex<AppEngine>,
 }
 
 #[uniffi::export]
@@ -93,8 +92,7 @@ impl PlatformAppEngine {
             .with_relay_url(&relay_url)
             .with_storage_key(storage_key);
 
-        let vauchi: Vauchi<MockTransport> =
-            Vauchi::new(config).map_err(|e| MobileError::Internal(e.to_string()))?;
+        let vauchi = Vauchi::new(config).map_err(|e| MobileError::Internal(e.to_string()))?;
 
         Ok(Arc::new(Self {
             engine: Mutex::new(AppEngine::new(vauchi)),

@@ -18,7 +18,6 @@ use vauchi_core::exchange::{
     ExchangeEvent, ExchangeQR, ExchangeSession, ExchangeState, ManualConfirmationVerifier,
     ProximityConfidence, ProximityError, ProximityVerifier, VerifierChain, VerifierMethod,
 };
-use vauchi_core::network::MockTransport;
 use vauchi_core::ui::*;
 use vauchi_core::ContactCard;
 
@@ -203,7 +202,7 @@ pub unsafe extern "C" fn vauchi_workflow_handle_action(
 
 /// Opaque handle to an AppEngine instance.
 pub struct VauchiApp {
-    engine: Mutex<AppEngine<MockTransport>>,
+    engine: Mutex<AppEngine>,
 }
 
 /// Create a new AppEngine with in-memory storage and default relay.
@@ -234,7 +233,7 @@ pub unsafe extern "C" fn vauchi_app_create() -> *mut VauchiApp {
 #[no_mangle]
 pub unsafe extern "C" fn vauchi_app_create_with_relay(relay_url: *const c_char) -> *mut VauchiApp {
     match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        let vauchi = match Vauchi::<MockTransport>::in_memory() {
+        let vauchi = match Vauchi::in_memory() {
             Ok(v) => v,
             Err(_) => return std::ptr::null_mut(),
         };

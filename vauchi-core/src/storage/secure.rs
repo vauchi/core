@@ -69,8 +69,11 @@ impl SecureStorage for PlatformKeyring {
         let entry = keyring::Entry::new(&self.service, name)
             .map_err(|e| StorageError::Encryption(format!("Keyring error: {}", e)))?;
 
+        // Encode as hex to avoid binary corruption in keyutils/Secret Service
+        // string-based storage backends (null bytes truncate raw binary).
+        let hex = hex::encode(key);
         entry
-            .set_secret(key)
+            .set_password(&hex)
             .map_err(|e| StorageError::Encryption(format!("Failed to save to keychain: {}", e)))
     }
 
@@ -78,8 +81,13 @@ impl SecureStorage for PlatformKeyring {
         let entry = keyring::Entry::new(&self.service, name)
             .map_err(|e| StorageError::Encryption(format!("Keyring error: {}", e)))?;
 
-        match entry.get_secret() {
-            Ok(secret) => Ok(Some(secret)),
+        match entry.get_password() {
+            Ok(hex) => {
+                let bytes = hex::decode(&hex).map_err(|e| {
+                    StorageError::Encryption(format!("Failed to decode key from keychain: {}", e))
+                })?;
+                Ok(Some(bytes))
+            }
             Err(keyring::Error::NoEntry) => Ok(None),
             Err(e) => Err(StorageError::Encryption(format!(
                 "Failed to load from keychain: {}",

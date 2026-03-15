@@ -6,7 +6,6 @@
 //! Trace: ADR-021 Tier 1 — find_group_fuzzy
 
 use vauchi_core::api::*;
-use vauchi_core::*;
 
 fn create_test_vauchi() -> Vauchi {
     Vauchi::in_memory().unwrap()

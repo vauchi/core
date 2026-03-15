@@ -296,36 +296,44 @@ impl AppEngine {
             return None;
         }
 
-        // The exchange engine currently uses ExchangeEngine (UI-only QR workflow).
-        // In the full ADR-031 implementation, this will delegate to ExchangeSession
-        // for protocol state transitions. For now, handle QR scanned events
-        // by feeding them to the engine as TextChanged actions.
-        match event {
-            ExchangeHardwareEvent::QrScanned { data } => {
-                let result = self.engine.handle_action(UserAction::TextChanged {
-                    component_id: "scanned_data".into(),
-                    value: data,
-                });
-                Some(result)
-            }
+        // Common error handling for all transports
+        match &event {
             ExchangeHardwareEvent::HardwareUnavailable { transport } => {
-                Some(ActionResult::ShowToast {
+                return Some(ActionResult::ShowToast {
                     message: format!("{} is not available on this device", transport),
                     undo_action_id: None,
-                })
+                });
             }
             ExchangeHardwareEvent::HardwareError { transport, error } => {
-                Some(ActionResult::ShowAlert {
+                return Some(ActionResult::ShowAlert {
                     title: format!("{} error", transport),
-                    message: error,
-                })
+                    message: error.clone(),
+                });
             }
-            _ => {
-                // Other hardware events (BLE, NFC, audio) will be handled
-                // when ExchangeSession is integrated into ExchangeEngine.
-                None
+            _ => {}
+        }
+
+        // ADR-031: Try delegating to ExchangeEngine's session
+        if let Some(exchange_engine) = self
+            .engine
+            .as_any_mut()
+            .and_then(|a| a.downcast_mut::<ExchangeEngine>())
+        {
+            if exchange_engine.session().is_some() {
+                return exchange_engine.handle_hardware_event(event);
             }
         }
+
+        // Fallback: legacy TextChanged-based QR handling (no session)
+        if let ExchangeHardwareEvent::QrScanned { data } = event {
+            let result = self.engine.handle_action(UserAction::TextChanged {
+                component_id: "scanned_data".into(),
+                value: data,
+            });
+            return Some(result);
+        }
+
+        None
     }
 
     fn handle_completion(&mut self) -> ActionResult {
@@ -617,12 +625,33 @@ impl AppEngine {
                     .collect();
                 let config = ExchangeConfig {
                     own_name: card
+                        .as_ref()
                         .map(|c| c.display_name().to_string())
                         .unwrap_or_default(),
                     own_qr_data: vauchi.public_id().unwrap_or_default(),
                     available_groups,
                 };
-                Box::new(ExchangeEngine::new(config))
+
+                // ADR-031: Create a protocol session if identity + card are available.
+                // Identity is cloned via storage serialization (it intentionally
+                // doesn't impl Clone because it contains private key material).
+                let session = vauchi
+                    .identity()
+                    .and_then(|id_ref| {
+                        let bytes = id_ref.to_storage_bytes();
+                        crate::identity::Identity::from_storage_bytes(&bytes).ok()
+                    })
+                    .and_then(|identity| {
+                        card.map(|c| {
+                            let proximity = crate::exchange::ManualConfirmationVerifier::new();
+                            crate::exchange::ExchangeSession::new_qr(identity, c, proximity)
+                        })
+                    });
+
+                match session {
+                    Some(s) => Box::new(ExchangeEngine::with_session(config, s)),
+                    None => Box::new(ExchangeEngine::new(config)),
+                }
             }
             AppScreen::Help => Box::new(HelpEngine::new(Self::default_help_items())),
             AppScreen::Backup => Box::new(BackupRecoveryEngine::new(None)),

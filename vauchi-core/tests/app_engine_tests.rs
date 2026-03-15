@@ -2200,3 +2200,61 @@ fn entry_detail_delete_undo_restores_field() {
         "field should be restored after undo"
     );
 }
+
+// ── ADR-031: AppEngine exchange round-trip tests ──────────────────
+
+#[test]
+fn exchange_screen_with_identity_has_session() {
+    let mut vauchi = Vauchi::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    let mut engine = AppEngine::new(vauchi);
+    engine.navigate_to(AppScreen::Exchange);
+
+    // The exchange screen should have created an ExchangeEngine with a session
+    let screen = engine.current_screen();
+    assert_eq!(screen.screen_id, "exchange_show_qr");
+}
+
+#[test]
+fn exchange_hardware_event_delegated_to_session() {
+    use vauchi_core::exchange::ExchangeHardwareEvent;
+
+    let mut vauchi = Vauchi::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    let mut engine = AppEngine::new(vauchi);
+    engine.navigate_to(AppScreen::Exchange);
+
+    // Send a BLE discovery event — should be handled by the session
+    let result = engine.handle_hardware_event(ExchangeHardwareEvent::BleDeviceDiscovered {
+        id: "device-1".into(),
+        rssi: -42,
+        adv_data: vec![],
+    });
+
+    // Should return Some (handled by session)
+    assert!(
+        result.is_some(),
+        "Hardware event should be handled by the session"
+    );
+}
+
+#[test]
+fn exchange_hardware_unavailable_shows_toast() {
+    use vauchi_core::exchange::ExchangeHardwareEvent;
+
+    let mut vauchi = Vauchi::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    let mut engine = AppEngine::new(vauchi);
+    engine.navigate_to(AppScreen::Exchange);
+
+    let result = engine.handle_hardware_event(ExchangeHardwareEvent::HardwareUnavailable {
+        transport: "BLE".into(),
+    });
+
+    match result {
+        Some(ActionResult::ShowToast { message, .. }) => {
+            assert!(message.contains("BLE"), "Toast should mention BLE");
+        }
+        other => panic!("Expected ShowToast, got {:?}", other),
+    }
+}

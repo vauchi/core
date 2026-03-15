@@ -3,7 +3,14 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 //! Exchange engine — QR-based contact exchange workflow.
+//!
+//! ADR-031: ExchangeEngine holds an optional `ExchangeSession` to connect
+//! the UI workflow with the cryptographic protocol state machine. When a
+//! session is provided, transitions emit `ExchangeCommand`s that frontends
+//! dispatch to platform hardware (camera, BLE, NFC, audio).
 
+use crate::exchange::command::ExchangeCommand;
+use crate::exchange::{ExchangeEvent, ExchangeSession};
 use crate::ui::*;
 
 /// Configuration for starting an exchange.
@@ -18,12 +25,19 @@ pub struct ExchangeConfig {
 }
 
 /// Engine that drives the QR exchange workflow.
+///
+/// ADR-031: When `session` is `Some`, the engine delegates protocol state
+/// transitions to `ExchangeSession` and emits `ExchangeCommand`s via
+/// `ActionResult::ExchangeCommands`. When `session` is `None`, the engine
+/// behaves as a UI-only workflow (legacy behavior).
 pub struct ExchangeEngine {
     step: ExchangeStep,
     config: ExchangeConfig,
     scanned_data: Option<String>,
     /// Groups selected by the user before exchange.
     selected_groups: Vec<String>,
+    /// ADR-031: Protocol session for hardware command/event exchange.
+    session: Option<ExchangeSession>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -64,7 +78,60 @@ impl ExchangeEngine {
             config,
             scanned_data: None,
             selected_groups: Vec::new(),
+            session: None,
         }
+    }
+
+    /// Creates a new ExchangeEngine with a protocol session (ADR-031).
+    ///
+    /// When a session is provided, the engine emits `ExchangeCommand`s
+    /// at each step transition, connecting the UI workflow with the
+    /// cryptographic protocol state machine.
+    ///
+    /// If no group selection is needed, the session is started immediately
+    /// (StartQR applied). Use `drain_initial_commands()` to get the initial
+    /// `QrDisplay` command after construction.
+    pub fn with_session(config: ExchangeConfig, mut session: ExchangeSession) -> Self {
+        let step = if config.available_groups.is_empty() {
+            ExchangeStep::ShowQr
+        } else {
+            ExchangeStep::GroupSelection
+        };
+
+        // If starting directly at ShowQr, kick off the session now
+        if step == ExchangeStep::ShowQr {
+            let _ = session.apply(ExchangeEvent::StartQR);
+            session.emit_initial_commands();
+        }
+
+        Self {
+            step,
+            config,
+            scanned_data: None,
+            selected_groups: Vec::new(),
+            session: Some(session),
+        }
+    }
+
+    /// Drains any pending commands from the session (ADR-031).
+    ///
+    /// Call this after construction with `with_session()` to get the
+    /// initial `QrDisplay` command.
+    pub fn drain_commands(&mut self) -> Vec<ExchangeCommand> {
+        self.session
+            .as_mut()
+            .map(|s| s.drain_commands())
+            .unwrap_or_default()
+    }
+
+    /// Returns a reference to the protocol session, if any (ADR-031).
+    pub fn session(&self) -> Option<&ExchangeSession> {
+        self.session.as_ref()
+    }
+
+    /// Returns a mutable reference to the protocol session, if any (ADR-031).
+    pub fn session_mut(&mut self) -> Option<&mut ExchangeSession> {
+        self.session.as_mut()
     }
 
     /// Returns the groups selected by the user for the new contact.
@@ -87,6 +154,54 @@ impl ExchangeEngine {
     /// Returns the data scanned from the peer's QR code, if any.
     pub fn scanned_data(&self) -> Option<&str> {
         self.scanned_data.as_deref()
+    }
+
+    /// Start the protocol session (ADR-031) when entering ShowQr.
+    ///
+    /// If a session is present, applies `StartQR` to generate the QR code,
+    /// emits initial commands, and returns `ExchangeCommands`.
+    /// Otherwise, returns `NavigateTo` for legacy UI-only behavior.
+    fn start_session_if_needed(&mut self) -> ActionResult {
+        if let Some(ref mut session) = self.session {
+            // Start QR generation in the protocol session
+            let _ = session.apply(ExchangeEvent::StartQR);
+            session.emit_initial_commands();
+            let commands = session.drain_commands();
+            if !commands.is_empty() {
+                return ActionResult::ExchangeCommands { commands };
+            }
+        }
+        ActionResult::NavigateTo(self.build_screen())
+    }
+
+    /// Handle a hardware event by delegating to the protocol session (ADR-031).
+    ///
+    /// Returns `ExchangeCommands` with response commands, or `None` if
+    /// no session is active.
+    pub fn handle_hardware_event(
+        &mut self,
+        event: crate::exchange::ExchangeHardwareEvent,
+    ) -> Option<ActionResult> {
+        let session = self.session.as_mut()?;
+        let _ = session.apply_hardware_event(event);
+        let commands = session.drain_commands();
+
+        // Check if the session completed or failed, update step accordingly
+        match session.state() {
+            crate::exchange::ExchangeState::Complete { .. } => {
+                self.step = ExchangeStep::Success;
+            }
+            crate::exchange::ExchangeState::Failed { .. } => {
+                self.step = ExchangeStep::Failed;
+            }
+            _ => {}
+        }
+
+        if commands.is_empty() {
+            Some(ActionResult::UpdateScreen(self.build_screen()))
+        } else {
+            Some(ActionResult::ExchangeCommands { commands })
+        }
     }
 
     fn progress(&self) -> Progress {
@@ -242,6 +357,14 @@ impl WorkflowEngine for ExchangeEngine {
         self.build_screen()
     }
 
+    fn as_any(&self) -> Option<&dyn std::any::Any> {
+        Some(self)
+    }
+
+    fn as_any_mut(&mut self) -> Option<&mut dyn std::any::Any> {
+        Some(self)
+    }
+
     fn handle_action(&mut self, action: UserAction) -> ActionResult {
         match (&self.step, action) {
             // Group selection: toggle group membership
@@ -267,13 +390,20 @@ impl WorkflowEngine for ExchangeEngine {
                     self.selected_groups.clear();
                 }
                 self.step = ExchangeStep::ShowQr;
-                ActionResult::NavigateTo(self.build_screen())
+                self.start_session_if_needed()
             }
             (ExchangeStep::ShowQr, UserAction::ActionPressed { action_id })
                 if action_id == "continue" =>
             {
                 self.step = ExchangeStep::ScanQr;
-                ActionResult::RequestCamera
+                // ADR-031: emit QrRequestScan command if session is active
+                if self.session.is_some() {
+                    ActionResult::ExchangeCommands {
+                        commands: vec![ExchangeCommand::QrRequestScan],
+                    }
+                } else {
+                    ActionResult::RequestCamera
+                }
             }
             (ExchangeStep::ScanQr, UserAction::ActionPressed { action_id })
                 if action_id == "back" =>
@@ -389,6 +519,158 @@ mod tests {
         assert!(matches!(result, ActionResult::NavigateTo(_)));
         assert_eq!(engine.step, ExchangeStep::ShowQr);
         assert!(engine.selected_groups().is_empty());
+    }
+
+    // ── ADR-031: ExchangeSession integration tests ──────────────────
+
+    fn create_test_session() -> crate::exchange::ExchangeSession {
+        let identity = crate::identity::Identity::create("TestUser");
+        let card = crate::contact_card::ContactCard::new("TestUser");
+        let proximity = crate::exchange::ManualConfirmationVerifier::new();
+        crate::exchange::ExchangeSession::new_qr(identity, card, proximity)
+    }
+
+    #[test]
+    fn test_with_session_starts_qr_and_emits_display_command() {
+        let session = create_test_session();
+        let mut engine = ExchangeEngine::with_session(config_no_groups(), session);
+
+        // Session should be present
+        assert!(engine.session().is_some());
+
+        // Should be at ShowQr step
+        assert_eq!(engine.step, ExchangeStep::ShowQr);
+
+        // Should have a QrDisplay command ready to drain
+        let commands = engine.drain_commands();
+        assert_eq!(commands.len(), 1);
+        assert!(
+            matches!(
+                &commands[0],
+                crate::exchange::command::ExchangeCommand::QrDisplay { .. }
+            ),
+            "Expected QrDisplay command, got {:?}",
+            commands[0]
+        );
+    }
+
+    #[test]
+    fn test_with_session_group_selection_defers_qr_start() {
+        let session = create_test_session();
+        let engine = ExchangeEngine::with_session(config_with_groups(), session);
+
+        // Should be at GroupSelection step — session not started yet
+        assert_eq!(engine.step, ExchangeStep::GroupSelection);
+
+        // No commands should be pending (session hasn't started QR yet)
+        // (drain_commands is on mut self, so we check session state instead)
+        assert!(engine.session().is_some());
+    }
+
+    #[test]
+    fn test_with_session_group_continue_starts_qr() {
+        let session = create_test_session();
+        let mut engine = ExchangeEngine::with_session(config_with_groups(), session);
+
+        // Continue from group selection → ShowQr
+        let result = engine.handle_action(UserAction::ActionPressed {
+            action_id: "continue".into(),
+        });
+
+        // Should emit ExchangeCommands with QrDisplay
+        match result {
+            ActionResult::ExchangeCommands { commands } => {
+                assert_eq!(commands.len(), 1);
+                assert!(
+                    matches!(
+                        &commands[0],
+                        crate::exchange::command::ExchangeCommand::QrDisplay { .. }
+                    ),
+                    "Expected QrDisplay command, got {:?}",
+                    commands[0]
+                );
+            }
+            other => panic!("Expected ExchangeCommands, got {:?}", other),
+        }
+        assert_eq!(engine.step, ExchangeStep::ShowQr);
+    }
+
+    #[test]
+    fn test_with_session_show_qr_continue_emits_scan_request() {
+        let session = create_test_session();
+        let mut engine = ExchangeEngine::with_session(config_no_groups(), session);
+        let _ = engine.drain_commands(); // drain initial QrDisplay
+
+        // Press continue → ScanQr
+        let result = engine.handle_action(UserAction::ActionPressed {
+            action_id: "continue".into(),
+        });
+
+        // Should emit QrRequestScan command
+        match result {
+            ActionResult::ExchangeCommands { commands } => {
+                assert_eq!(commands.len(), 1);
+                assert_eq!(
+                    commands[0],
+                    crate::exchange::command::ExchangeCommand::QrRequestScan
+                );
+            }
+            other => panic!(
+                "Expected ExchangeCommands with QrRequestScan, got {:?}",
+                other
+            ),
+        }
+        assert_eq!(engine.step, ExchangeStep::ScanQr);
+    }
+
+    #[test]
+    fn test_handle_hardware_event_ble_discovery_emits_connect() {
+        let session = create_test_session();
+        let mut engine = ExchangeEngine::with_session(config_no_groups(), session);
+        let _ = engine.drain_commands();
+
+        // Simulate BLE discovery
+        let result = engine.handle_hardware_event(
+            crate::exchange::ExchangeHardwareEvent::BleDeviceDiscovered {
+                id: "device-1".into(),
+                rssi: -42,
+                adv_data: vec![],
+            },
+        );
+
+        // Should emit BleConnect command
+        assert!(result.is_some());
+        if let Some(ActionResult::ExchangeCommands { commands }) = result {
+            assert!(
+                commands.iter().any(|c| matches!(
+                    c,
+                    crate::exchange::command::ExchangeCommand::BleConnect { .. }
+                )),
+                "Expected BleConnect command in {:?}",
+                commands
+            );
+        }
+    }
+
+    #[test]
+    fn test_without_session_preserves_legacy_behavior() {
+        let mut engine = ExchangeEngine::new(config_no_groups());
+
+        // No session
+        assert!(engine.session().is_none());
+
+        // ShowQr → ScanQr should return RequestCamera (legacy)
+        let result = engine.handle_action(UserAction::ActionPressed {
+            action_id: "continue".into(),
+        });
+        assert!(matches!(result, ActionResult::RequestCamera));
+
+        // handle_hardware_event returns None without session
+        let result =
+            engine.handle_hardware_event(crate::exchange::ExchangeHardwareEvent::QrScanned {
+                data: "test".into(),
+            });
+        assert!(result.is_none());
     }
 
     #[test]

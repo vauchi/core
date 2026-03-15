@@ -186,6 +186,10 @@ impl ExchangeEngine {
                     // Session failed to start QR — drop it and fall back to
                     // legacy UI-only mode with static QR data.
                     self.session = None;
+                    return ActionResult::ShowToast {
+                        message: "Secure exchange unavailable — using basic mode".into(),
+                        undo_action_id: None,
+                    };
                 }
             }
         }

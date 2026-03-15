@@ -173,3 +173,24 @@ fn test_all_categories() {
     assert_eq!(all[2], FieldCategory::Personal);
     assert_eq!(all[3], FieldCategory::Custom);
 }
+
+// @scenario: contacts_management.feature:AppEngine exposes field type catalog
+#[test]
+fn test_app_engine_field_type_catalog() {
+    use vauchi_core::api::Vauchi;
+    use vauchi_core::network::MockTransport;
+    use vauchi_core::ui::AppEngine;
+
+    let vauchi = Vauchi::<MockTransport>::in_memory().unwrap();
+    let engine = AppEngine::new(vauchi);
+    let catalog = engine.field_type_catalog();
+
+    // Should have base types + social networks
+    assert!(
+        catalog.len() >= 6,
+        "Catalog should have at least 6 base entries"
+    );
+    assert!(catalog.get("phone").is_some());
+    assert!(catalog.get("email").is_some());
+    assert!(!catalog.by_category(&FieldCategory::Social).is_empty());
+}

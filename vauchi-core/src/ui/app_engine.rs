@@ -245,6 +245,12 @@ impl<T: Transport> AppEngine<T> {
             .collect()
     }
 
+    /// Returns the field type catalog for the Add Field picker.
+    pub fn field_type_catalog(&self) -> crate::contact_card::FieldTypeCatalog {
+        let registry = crate::social::SocialNetworkRegistry::with_defaults();
+        crate::contact_card::FieldTypeCatalog::new(&registry)
+    }
+
     /// Returns the default landing screen based on contact count.
     /// MyInfo when no contacts, Contacts when >=1 contact.
     pub fn default_screen(&self) -> AppScreen {

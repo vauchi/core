@@ -484,6 +484,24 @@ mod tests {
     }
 
     #[test]
+    fn test_high_contrast_theme_exists_and_accessible() {
+        let data = include_bytes!("../../../themes/themes.json");
+        let themes = load_themes_from_json(data).unwrap();
+        let hc = themes
+            .iter()
+            .find(|t| t.id == "high-contrast")
+            .expect("high-contrast theme must exist in themes.json");
+
+        assert_eq!(hc.name, "High Contrast");
+        assert_eq!(hc.mode, ThemeMode::Dark);
+        assert_eq!(hc.colors.bg_primary, "#000000");
+        assert_eq!(hc.colors.text_primary, "#ffffff");
+        assert_eq!(hc.colors.border, "#ffffff");
+        hc.validate_accessibility()
+            .expect("High-contrast theme must pass WCAG AA");
+    }
+
+    #[test]
     fn test_theme_json_without_tokens_uses_defaults() {
         let json = r##"[{
             "id": "no-tokens",

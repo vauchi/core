@@ -173,6 +173,35 @@ char *vauchi_app_available_screens(struct VauchiApp *handle);
 char *vauchi_app_default_screen(struct VauchiApp *handle);
 
 /**
+ * Handle a hardware event during an exchange (ADR-031).
+ *
+ * `event_json` must be a JSON-encoded `ExchangeHardwareEvent`.
+ * Returns the action result as JSON, or null if the event was ignored
+ * (e.g., not on the exchange screen).
+ *
+ * # Safety
+ * `handle` must be a valid app handle or null.
+ * `event_json` must be a valid null-terminated C string, or null.
+ */
+char *vauchi_app_handle_hardware_event(struct VauchiApp *handle, const char *event_json);
+
+/**
+ * Create a new AppEngine with persistent storage and platform keyring.
+ *
+ * Uses `PlatformKeyring` (D-Bus Secret Service on Linux, Keychain on macOS)
+ * for secure key storage. Falls back to file-based key storage if the
+ * keyring is unavailable.
+ *
+ * Returns null on initialization failure.
+ *
+ * # Safety
+ * `data_dir` must be a valid null-terminated C string pointing to a
+ * writable directory. `relay_url` must be a valid null-terminated C
+ * string, or null.
+ */
+struct VauchiApp *vauchi_app_create_with_keyring(const char *data_dir, const char *relay_url);
+
+/**
  * Create a new QR exchange session using the app's identity.
  *
  * Uses manual confirmation for proximity verification (suitable for

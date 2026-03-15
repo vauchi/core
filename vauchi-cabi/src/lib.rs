@@ -501,6 +501,113 @@ pub unsafe extern "C" fn vauchi_app_default_screen(handle: *mut VauchiApp) -> *m
     }
 }
 
+/// Handle a hardware event during an exchange (ADR-031).
+///
+/// `event_json` must be a JSON-encoded `ExchangeHardwareEvent`.
+/// Returns the action result as JSON, or null if the event was ignored
+/// (e.g., not on the exchange screen).
+///
+/// # Safety
+/// `handle` must be a valid app handle or null.
+/// `event_json` must be a valid null-terminated C string, or null.
+#[no_mangle]
+pub unsafe extern "C" fn vauchi_app_handle_hardware_event(
+    handle: *mut VauchiApp,
+    event_json: *const c_char,
+) -> *mut c_char {
+    match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        if handle.is_null() {
+            return std::ptr::null_mut();
+        }
+        let json = match from_c_str(event_json) {
+            Some(s) => s,
+            None => return std::ptr::null_mut(),
+        };
+        let app = &*handle;
+        match app.engine.lock() {
+            Ok(mut engine) => {
+                match serde_json::from_str::<vauchi_core::exchange::ExchangeHardwareEvent>(&json) {
+                    Ok(event) => match engine.handle_hardware_event(event) {
+                        Some(result) => serde_json::to_string(&result).map_or_else(
+                            |e| to_c_string(&format!(r#"{{"error":"{}"}}"#, e)),
+                            |j| to_c_string(&j),
+                        ),
+                        None => std::ptr::null_mut(),
+                    },
+                    Err(e) => to_c_string(&format!(r#"{{"error":"{}"}}"#, e)),
+                }
+            }
+            Err(_) => to_c_string(r#"{"error":"lock poisoned"}"#),
+        }
+    })) {
+        Ok(result) => result,
+        Err(_) => std::ptr::null_mut(),
+    }
+}
+
+/// Create a new AppEngine with persistent storage and platform keyring.
+///
+/// Uses `PlatformKeyring` (D-Bus Secret Service on Linux, Keychain on macOS)
+/// for secure key storage. Falls back to file-based key storage if the
+/// keyring is unavailable.
+///
+/// Returns null on initialization failure.
+///
+/// # Safety
+/// `data_dir` must be a valid null-terminated C string pointing to a
+/// writable directory. `relay_url` must be a valid null-terminated C
+/// string, or null.
+#[no_mangle]
+pub unsafe extern "C" fn vauchi_app_create_with_keyring(
+    data_dir: *const c_char,
+    relay_url: *const c_char,
+) -> *mut VauchiApp {
+    match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        let dir = match from_c_str(data_dir) {
+            Some(d) => d,
+            None => return std::ptr::null_mut(),
+        };
+
+        let data_path = std::path::PathBuf::from(&dir);
+        if std::fs::create_dir_all(&data_path).is_err() {
+            return std::ptr::null_mut();
+        }
+
+        let storage_path = data_path.join("vauchi.db");
+        let mut config = vauchi_core::api::VauchiConfig::with_storage_path(&storage_path);
+        if let Some(url) = from_c_str(relay_url) {
+            config = config.with_relay_url(url);
+        }
+
+        // Try platform keyring first, fall back to config-only init
+        #[cfg(feature = "secure-storage")]
+        {
+            let keyring = Arc::new(vauchi_core::storage::PlatformKeyring::new("vauchi"));
+            // Probe the keyring to see if it's functional
+            if keyring.load_key("_probe").is_ok() {
+                if let Ok(vauchi) = Vauchi::with_secure_storage(config.clone(), keyring) {
+                    return Box::into_raw(Box::new(VauchiApp {
+                        engine: Mutex::new(AppEngine::new(vauchi)),
+                    }));
+                }
+            }
+        }
+
+        // Fallback: no keyring
+        let vauchi = match Vauchi::new(config) {
+            Ok(v) => v,
+            Err(_) => return std::ptr::null_mut(),
+        };
+
+        Box::into_raw(Box::new(VauchiApp {
+            engine: Mutex::new(AppEngine::new(vauchi)),
+        }))
+    })) {
+        Ok(result) => result,
+        Err(_) => std::ptr::null_mut(),
+    }
+}
+
 // ── Exchange Session functions ─────────────────────────────────────
 
 /// Wrapper to share a `ManualConfirmationVerifier` via `Arc` while
@@ -1597,6 +1704,96 @@ mod tests {
             vauchi_string_free(result_ptr);
             vauchi_exchange_destroy(exchange);
             vauchi_app_destroy(app);
+        }
+    }
+
+    // ── Hardware event tests ────────────────────────────────────────
+
+    #[test]
+    fn handle_hardware_event_null_handle_returns_null() {
+        unsafe {
+            let event = CString::new(r#"{"QrScanned":{"data":"test"}}"#).unwrap();
+            let result = vauchi_app_handle_hardware_event(std::ptr::null_mut(), event.as_ptr());
+            assert!(result.is_null());
+        }
+    }
+
+    #[test]
+    fn handle_hardware_event_null_json_returns_null() {
+        unsafe {
+            let handle = vauchi_app_create();
+            let result = vauchi_app_handle_hardware_event(handle, std::ptr::null());
+            assert!(result.is_null());
+            vauchi_app_destroy(handle);
+        }
+    }
+
+    #[test]
+    fn handle_hardware_event_not_on_exchange_returns_null() {
+        unsafe {
+            // App starts on onboarding, not exchange — event should be ignored
+            let handle = vauchi_app_create();
+            let event = CString::new(r#"{"QrScanned":{"data":"test"}}"#).unwrap();
+            let result = vauchi_app_handle_hardware_event(handle, event.as_ptr());
+            assert!(
+                result.is_null(),
+                "hardware event on non-exchange screen should return null"
+            );
+            vauchi_app_destroy(handle);
+        }
+    }
+
+    #[test]
+    fn handle_hardware_event_on_exchange_returns_result() {
+        unsafe {
+            let app = create_app_with_identity();
+            // Navigate to exchange screen
+            let screen = CString::new("exchange").unwrap();
+            let r = vauchi_app_navigate_to(app, screen.as_ptr());
+            if !r.is_null() {
+                vauchi_string_free(r);
+            }
+
+            // Send a HardwareUnavailable event — should return a toast/alert
+            let event = CString::new(r#"{"HardwareUnavailable":{"transport":"BLE"}}"#).unwrap();
+            let result = vauchi_app_handle_hardware_event(app, event.as_ptr());
+            assert!(
+                !result.is_null(),
+                "hardware event on exchange screen should return result"
+            );
+            let result_str = CStr::from_ptr(result).to_str().unwrap();
+            assert!(
+                result_str.contains("BLE"),
+                "result should mention BLE transport: {}",
+                result_str
+            );
+            vauchi_string_free(result);
+            vauchi_app_destroy(app);
+        }
+    }
+
+    // ── Keyring init tests ──────────────────────────────────────────
+
+    #[test]
+    fn create_with_keyring_null_dir_returns_null() {
+        unsafe {
+            let handle = vauchi_app_create_with_keyring(std::ptr::null(), std::ptr::null());
+            assert!(handle.is_null());
+        }
+    }
+
+    #[test]
+    fn create_with_keyring_valid_dir_returns_non_null() {
+        unsafe {
+            let dir = tempfile::tempdir().unwrap();
+            let dir_cstr = CString::new(dir.path().to_str().unwrap()).unwrap();
+            let handle = vauchi_app_create_with_keyring(dir_cstr.as_ptr(), std::ptr::null());
+            // May or may not use keyring depending on platform, but should always succeed
+            assert!(
+                !handle.is_null(),
+                "create_with_keyring should succeed (with or without keyring)"
+            );
+            vauchi_app_destroy(handle);
         }
     }
 }

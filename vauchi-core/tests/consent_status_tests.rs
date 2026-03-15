@@ -6,7 +6,6 @@
 //! Trace: ADR-021 Tier 1 — get_consent_status
 
 use vauchi_core::api::*;
-use vauchi_core::*;
 
 fn create_test_vauchi() -> Vauchi {
     Vauchi::in_memory().unwrap()

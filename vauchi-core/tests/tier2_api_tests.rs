@@ -11,7 +11,6 @@ use vauchi_core::contact_card::ContactCard;
 use vauchi_core::content::UpdateStatus;
 use vauchi_core::storage::{DeliveryRecord, DeliveryStatus};
 use vauchi_core::sync::device_sync::{ContactSyncData, SyncItem};
-use vauchi_core::*;
 
 fn create_test_vauchi() -> Vauchi {
     Vauchi::in_memory().unwrap()

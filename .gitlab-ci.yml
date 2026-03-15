@@ -58,6 +58,7 @@ stages:
   - test
   - security
   - mutation
+  - prebuild
   - build
   - package
   - publish
@@ -508,8 +509,63 @@ secret_detection:
       optional: true
 
 # ============================================================
+# Prebuild Stage — Cache bindings on main merge
+# ============================================================
+# Pre-builds Apple and Android bindings on every merge to main and
+# uploads them to the GitLab Generic Package Registry keyed by commit SHA.
+# The release pipeline (build stage) checks for cached artifacts before
+# building from scratch, saving ~45 min (Apple) + ~35 min (Android).
+#
+# Artifacts expire after 7 days in the package registry — only the
+# latest main merge matters for the next release.
+
+prebuild:apple:
+  extends: [.macos-runner, .main-only, .timeout-extended]
+  stage: prebuild
+  needs: []
+  script:
+    - ./scripts/build-bindings.sh --apple
+    - |
+      echo "Uploading Apple binding artifacts for SHA ${CI_COMMIT_SHA}..."
+      tar czf bindings-apple.tar.gz -C target/bindings ios/ macos/
+      curl --fail --header "JOB-TOKEN: ${CI_JOB_TOKEN}" \
+           --upload-file bindings-apple.tar.gz \
+           "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/vauchi-prebuild/${CI_COMMIT_SHA}/bindings-apple.tar.gz"
+      echo "✓ Apple bindings cached for SHA ${CI_COMMIT_SHA}"
+
+prebuild:android:
+  extends: [.linux-runner, .main-only, .timeout-long]
+  stage: prebuild
+  needs: []
+  before_script:
+    - !reference [.self-hosted, before_script]
+    - |
+      for ndk_path in /opt/android-sdk/ndk/* /opt/android-ndk $HOME/Android/Sdk/ndk/*; do
+        if [ -d "$ndk_path" ]; then
+          export ANDROID_NDK_HOME="$ndk_path"
+          echo "Found Android NDK at: $ANDROID_NDK_HOME"
+          break
+        fi
+      done
+      if [ -z "$ANDROID_NDK_HOME" ]; then
+        echo "ERROR: Android NDK not found. Please install it or set ANDROID_NDK_HOME."
+        exit 1
+      fi
+    - rustup target add aarch64-linux-android x86_64-linux-android
+  script:
+    - ./scripts/build-bindings.sh --android
+    - |
+      echo "Uploading Android binding artifacts for SHA ${CI_COMMIT_SHA}..."
+      tar czf bindings-android.tar.gz -C target/bindings android/
+      curl --fail --header "JOB-TOKEN: ${CI_JOB_TOKEN}" \
+           --upload-file bindings-android.tar.gz \
+           "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/vauchi-prebuild/${CI_COMMIT_SHA}/bindings-android.tar.gz"
+      echo "✓ Android bindings cached for SHA ${CI_COMMIT_SHA}"
+
+# ============================================================
 # Build Stage — All version tags (stable, RC, dev)
 # Builds platform bindings for iOS and Android on every version tag.
+# Checks for prebuild cache first — falls back to full build on miss.
 # ============================================================
 
 # Verify tag is on main branch before proceeding with release
@@ -541,7 +597,21 @@ build:apple:
   stage: build
   needs: [release:verify]
   script:
-    - ./scripts/build-bindings.sh --apple
+    - |
+      # Try to download prebuild artifacts cached on main merge
+      echo "Checking for prebuild Apple bindings at SHA ${CI_COMMIT_SHA}..."
+      HTTP_CODE=$(curl -s -o bindings-apple.tar.gz -w "%{http_code}" \
+        --header "JOB-TOKEN: ${CI_JOB_TOKEN}" \
+        "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/vauchi-prebuild/${CI_COMMIT_SHA}/bindings-apple.tar.gz")
+      if [ "$HTTP_CODE" = "200" ]; then
+        echo "✓ Found prebuild Apple bindings — extracting (skipping ~45 min build)"
+        mkdir -p target/bindings
+        tar xzf bindings-apple.tar.gz -C target/bindings
+        rm bindings-apple.tar.gz
+      else
+        echo "⚠ No prebuild found (HTTP $HTTP_CODE) — building from scratch"
+        ./scripts/build-bindings.sh --apple
+      fi
   artifacts:
     paths:
       - target/bindings/ios/
@@ -569,7 +639,21 @@ build:android:
       fi
     - rustup target add aarch64-linux-android x86_64-linux-android
   script:
-    - ./scripts/build-bindings.sh --android
+    - |
+      # Try to download prebuild artifacts cached on main merge
+      echo "Checking for prebuild Android bindings at SHA ${CI_COMMIT_SHA}..."
+      HTTP_CODE=$(curl -s -o bindings-android.tar.gz -w "%{http_code}" \
+        --header "JOB-TOKEN: ${CI_JOB_TOKEN}" \
+        "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/vauchi-prebuild/${CI_COMMIT_SHA}/bindings-android.tar.gz")
+      if [ "$HTTP_CODE" = "200" ]; then
+        echo "✓ Found prebuild Android bindings — extracting (skipping ~35 min build)"
+        mkdir -p target/bindings
+        tar xzf bindings-android.tar.gz -C target/bindings
+        rm bindings-android.tar.gz
+      else
+        echo "⚠ No prebuild found (HTTP $HTTP_CODE) — building from scratch"
+        ./scripts/build-bindings.sh --android
+      fi
   artifacts:
     paths:
       - target/bindings/android/

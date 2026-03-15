@@ -31,6 +31,7 @@ use crate::exchange::error::ExchangeError;
 use crate::exchange::transport::caps::TransportCaps;
 use chacha20poly1305::aead::{Aead, KeyInit};
 use chacha20poly1305::XChaCha20Poly1305;
+use rand::rngs::OsRng;
 use rand::RngCore;
 use x25519_dalek::{PublicKey, StaticSecret};
 use zeroize::{Zeroize, Zeroizing};
@@ -76,13 +77,11 @@ pub struct ExchangeProtocol {
 impl ExchangeProtocol {
     /// Creates a new protocol instance with fresh random keys.
     pub fn new_random() -> Self {
-        let mut rng = rand::thread_rng();
-
-        let identity_secret = StaticSecret::random_from_rng(&mut rng);
-        let ephemeral_secret = StaticSecret::random_from_rng(&mut rng);
+        let identity_secret = StaticSecret::random_from_rng(OsRng);
+        let ephemeral_secret = StaticSecret::random_from_rng(OsRng);
 
         let mut nonce = [0u8; NONCE_SIZE];
-        rng.fill_bytes(&mut nonce);
+        OsRng.fill_bytes(&mut nonce);
 
         Self {
             identity_secret,
@@ -175,7 +174,7 @@ impl ExchangeProtocol {
         let cipher = XChaCha20Poly1305::new(shared.as_bytes().into());
 
         let mut nonce_bytes = [0u8; XCHACHA_NONCE_SIZE];
-        rand::thread_rng().fill_bytes(&mut nonce_bytes);
+        OsRng.fill_bytes(&mut nonce_bytes);
         let nonce = chacha20poly1305::XNonce::from_slice(&nonce_bytes);
 
         let ciphertext = cipher

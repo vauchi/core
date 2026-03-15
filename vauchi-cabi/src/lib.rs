@@ -250,6 +250,53 @@ pub unsafe extern "C" fn vauchi_app_create_with_relay(relay_url: *const c_char) 
     }
 }
 
+/// Create a new AppEngine with persistent storage and custom relay URL.
+///
+/// Unlike `vauchi_app_create` (in-memory), this stores data on disk at
+/// `data_dir/vauchi.db`. Pass null for `relay_url` to use the default.
+///
+/// Returns null on initialization failure.
+///
+/// # Safety
+/// `data_dir` must be a valid null-terminated C string pointing to a
+/// writable directory. `relay_url` must be a valid null-terminated C
+/// string, or null.
+#[no_mangle]
+pub unsafe extern "C" fn vauchi_app_create_with_config(
+    data_dir: *const c_char,
+    relay_url: *const c_char,
+) -> *mut VauchiApp {
+    match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        let dir = match from_c_str(data_dir) {
+            Some(d) => d,
+            None => return std::ptr::null_mut(),
+        };
+
+        let data_path = std::path::PathBuf::from(&dir);
+        if std::fs::create_dir_all(&data_path).is_err() {
+            return std::ptr::null_mut();
+        }
+
+        let storage_path = data_path.join("vauchi.db");
+        let mut config = vauchi_core::api::VauchiConfig::with_storage_path(&storage_path);
+        if let Some(url) = from_c_str(relay_url) {
+            config = config.with_relay_url(url);
+        }
+
+        let vauchi = match Vauchi::new(config) {
+            Ok(v) => v,
+            Err(_) => return std::ptr::null_mut(),
+        };
+
+        Box::into_raw(Box::new(VauchiApp {
+            engine: Mutex::new(AppEngine::new(vauchi)),
+        }))
+    })) {
+        Ok(result) => result,
+        Err(_) => std::ptr::null_mut(),
+    }
+}
+
 /// Destroy an AppEngine instance.
 ///
 /// # Safety
@@ -1129,6 +1176,28 @@ mod tests {
             assert_eq!(screen["screen_id"], "identity_check");
             vauchi_string_free(json_ptr);
             vauchi_app_destroy(handle);
+        }
+    }
+
+    #[test]
+    fn app_create_with_config_returns_non_null_handle() {
+        unsafe {
+            let dir = tempfile::tempdir().unwrap();
+            let dir_cstr = CString::new(dir.path().to_str().unwrap()).unwrap();
+            let handle = vauchi_app_create_with_config(dir_cstr.as_ptr(), std::ptr::null());
+            assert!(
+                !handle.is_null(),
+                "app engine with config should create successfully"
+            );
+            vauchi_app_destroy(handle);
+        }
+    }
+
+    #[test]
+    fn app_create_with_config_null_dir_returns_null() {
+        unsafe {
+            let handle = vauchi_app_create_with_config(std::ptr::null(), std::ptr::null());
+            assert!(handle.is_null(), "null data_dir should return null");
         }
     }
 

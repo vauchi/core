@@ -104,6 +104,21 @@ struct VauchiApp *vauchi_app_create(void);
 struct VauchiApp *vauchi_app_create_with_relay(const char *relay_url);
 
 /**
+ * Create a new AppEngine with persistent storage and custom relay URL.
+ *
+ * Unlike `vauchi_app_create` (in-memory), this stores data on disk at
+ * `data_dir/vauchi.db`. Pass null for `relay_url` to use the default.
+ *
+ * Returns null on initialization failure.
+ *
+ * # Safety
+ * `data_dir` must be a valid null-terminated C string pointing to a
+ * writable directory. `relay_url` must be a valid null-terminated C
+ * string, or null.
+ */
+struct VauchiApp *vauchi_app_create_with_config(const char *data_dir, const char *relay_url);
+
+/**
  * Destroy an AppEngine instance.
  *
  * # Safety

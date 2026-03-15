@@ -6876,6 +6876,7 @@ version = "0.3.0"
 dependencies = [
  "cbindgen",
  "serde_json",
+ "tempfile",
  "vauchi-core",
  "zeroize",
 ]

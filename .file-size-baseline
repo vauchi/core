@@ -1,0 +1,16 @@
+# Generated 2026-03-15. Files above error threshold, grandfathered.
+# These files must not grow beyond their baseline. Reduce over time.
+vauchi-cabi/src/lib.rs 1498
+vauchi-core/src/api/shred.rs 1075
+vauchi-core/src/exchange/session.rs 1103
+vauchi-core/src/recovery/mod.rs 1062
+vauchi-core/src/storage/migration.rs 1559
+vauchi-core/src/storage/mod.rs 1074
+vauchi-core/src/ui/app_engine.rs 1374
+vauchi-core/tests/app_engine_tests.rs 2203
+vauchi-core/tests/field_validation_tests.rs 2256
+vauchi-core/tests/onboarding_tests.rs 1292
+vauchi-core/tests/sync_device_orchestrator_tests.rs 1286
+vauchi-core/tests/visibility_label_tests.rs 1216
+vauchi-platform/src/lib.rs 1876
+vauchi-platform/src/types.rs 1547

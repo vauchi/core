@@ -15,6 +15,13 @@ network = ["network-native-tls"]
 network-native-tls = ["tungstenite", "tungstenite/handshake", "tungstenite/native-tls", "native-tls", "snow"]
 network-rustls = ["tungstenite", "tungstenite/handshake", "tungstenite/rustls-tls-native-roots", "rustls", "webpki-roots", "snow"]
 secure-storage = ["keyring"]
+# Platform-specific keyring backends (consumers pick the right one):
+# - Linux: kernel keyutils + D-Bus Secret Service (GNOME Keyring, KDE Wallet, KeePassXC)
+# - macOS/iOS: apple-native (Keychain)
+# - Windows: windows-native (Credential Manager)
+secure-storage-linux = ["secure-storage", "keyring/linux-native-sync-persistent"]
+secure-storage-apple = ["secure-storage", "keyring/apple-native"]
+secure-storage-windows = ["secure-storage", "keyring/windows-native"]
 # Real audio proximity verification using CPAL (desktop only)
 audio-cpal = ["cpal"]
 # Enable this feature to expose internal modules for integration tests
@@ -110,6 +117,8 @@ rustls = { version = "0.23", default-features = false, features = ["aws_lc_rs", 
 webpki-roots = { version = "0.26", optional = true }
 
 # Platform keychain access (optional, for desktop apps)
+# Backend features are platform-specific — see [target] sections below.
+# Bare keyring dep used as the common optional dependency.
 keyring = { version = "3", optional = true }
 
 # Cross-platform audio for ultrasonic proximity verification (desktop only)

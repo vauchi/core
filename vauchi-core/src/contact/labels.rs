@@ -531,7 +531,12 @@ impl GroupManager {
             ));
         }
 
-        // Remove source first to avoid double-borrow
+        // Validate target exists BEFORE removing source to prevent data loss
+        if !self.labels.contains_key(target_id) {
+            return Err(LabelError::NotFound(target_id.to_string()));
+        }
+
+        // Remove source (safe now — target is known to exist)
         let source = self
             .labels
             .remove(source_id)
@@ -540,7 +545,7 @@ impl GroupManager {
         let target = self
             .labels
             .get_mut(target_id)
-            .ok_or_else(|| LabelError::NotFound(target_id.to_string()))?;
+            .expect("target existence verified above");
 
         // Union of contacts
         for contact_id in source.contacts() {
@@ -927,6 +932,10 @@ mod tests {
 
         let result = manager.merge_groups("nonexistent", &source);
         assert!(matches!(result, Err(LabelError::NotFound(_))));
+        assert!(
+            manager.get_group(&source).is_some(),
+            "source must survive a failed merge"
+        );
     }
 
     #[test]

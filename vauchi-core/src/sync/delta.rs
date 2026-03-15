@@ -396,7 +396,7 @@ impl CardDelta {
             sender_pk,
             recipient_pk,
         };
-        serde_json::to_vec(&signable).unwrap_or_default()
+        serde_json::to_vec(&signable).expect("SignableDelta serialization is infallible")
     }
 }
 

@@ -10,7 +10,7 @@ vauchi-core/src/exchange/session.rs 1103
 vauchi-core/src/recovery/mod.rs 1062
 vauchi-core/src/storage/migration.rs 1559
 vauchi-core/src/storage/mod.rs 1074
-vauchi-core/src/ui/app_engine.rs 1374
+vauchi-core/src/ui/app_engine.rs 1384
 vauchi-core/tests/app_engine_tests.rs 2203
 vauchi-core/tests/field_validation_tests.rs 2256
 vauchi-core/tests/onboarding_tests.rs 1292

@@ -164,7 +164,7 @@ version = "0.27.0"
 criteria = "safe-to-deploy"
 
 [[exemptions.cc]]
-version = "1.2.56"
+version = "1.2.57"
 criteria = "safe-to-deploy"
 
 [[exemptions.cesu8]]
@@ -292,7 +292,7 @@ version = "0.20.11"
 criteria = "safe-to-deploy"
 
 [[exemptions.darling]]
-version = "0.21.3"
+version = "0.23.0"
 criteria = "safe-to-deploy"
 
 [[exemptions.darling_core]]
@@ -304,7 +304,7 @@ version = "0.20.11"
 criteria = "safe-to-deploy"
 
 [[exemptions.darling_core]]
-version = "0.21.3"
+version = "0.23.0"
 criteria = "safe-to-deploy"
 
 [[exemptions.darling_macro]]
@@ -313,6 +313,10 @@ criteria = "safe-to-deploy"
 
 [[exemptions.darling_macro]]
 version = "0.20.11"
+criteria = "safe-to-deploy"
+
+[[exemptions.darling_macro]]
+version = "0.23.0"
 criteria = "safe-to-deploy"
 
 [[exemptions.dasp_sample]]
@@ -321,6 +325,14 @@ criteria = "safe-to-deploy"
 
 [[exemptions.data-encoding]]
 version = "2.10.0"
+criteria = "safe-to-deploy"
+
+[[exemptions.dbus]]
+version = "0.9.10"
+criteria = "safe-to-deploy"
+
+[[exemptions.dbus-secret-service]]
+version = "4.1.0"
 criteria = "safe-to-deploy"
 
 [[exemptions.der-parser]]
@@ -332,7 +344,7 @@ version = "0.14.6"
 criteria = "safe-to-deploy"
 
 [[exemptions.derive-deftly]]
-version = "1.6.0"
+version = "1.7.0"
 criteria = "safe-to-deploy"
 
 [[exemptions.derive-deftly-macros]]
@@ -340,7 +352,7 @@ version = "0.14.6"
 criteria = "safe-to-deploy"
 
 [[exemptions.derive-deftly-macros]]
-version = "1.6.0"
+version = "1.7.0"
 criteria = "safe-to-deploy"
 
 [[exemptions.derive_builder]]
@@ -572,7 +584,7 @@ version = "0.1.65"
 criteria = "safe-to-deploy"
 
 [[exemptions.image]]
-version = "0.25.9"
+version = "0.25.10"
 criteria = "safe-to-deploy"
 
 [[exemptions.inotify]]
@@ -639,6 +651,10 @@ criteria = "safe-to-run"
 version = "3.6.0"
 criteria = "safe-to-run"
 
+[[exemptions.libdbus-sys]]
+version = "0.2.7"
+criteria = "safe-to-deploy"
+
 [[exemptions.libloading]]
 version = "0.8.9"
 criteria = "safe-to-deploy"
@@ -649,6 +665,10 @@ criteria = "safe-to-deploy"
 
 [[exemptions.libsqlite3-sys]]
 version = "0.30.1"
+criteria = "safe-to-deploy"
+
+[[exemptions.linux-keyutils]]
+version = "0.2.4"
 criteria = "safe-to-deploy"
 
 [[exemptions.lru-slab]]
@@ -672,7 +692,7 @@ version = "0.2.1"
 criteria = "safe-to-deploy"
 
 [[exemptions.moxcms]]
-version = "0.7.11"
+version = "0.8.1"
 criteria = "safe-to-deploy"
 
 [[exemptions.native-tls]]
@@ -728,7 +748,7 @@ version = "0.2.3"
 criteria = "safe-to-deploy"
 
 [[exemptions.openssl]]
-version = "0.10.75"
+version = "0.10.76"
 criteria = "safe-to-deploy"
 
 [[exemptions.openssl-probe]]
@@ -736,7 +756,7 @@ version = "0.2.1"
 criteria = "safe-to-deploy"
 
 [[exemptions.openssl-sys]]
-version = "0.9.111"
+version = "0.9.112"
 criteria = "safe-to-deploy"
 
 [[exemptions.os_str_bytes]]
@@ -746,10 +766,6 @@ criteria = "safe-to-deploy"
 [[exemptions.outref]]
 version = "0.5.2"
 criteria = "safe-to-run"
-
-[[exemptions.parking]]
-version = "2.2.1"
-criteria = "safe-to-deploy"
 
 [[exemptions.peg]]
 version = "0.6.3"
@@ -920,7 +936,7 @@ version = "0.6.0"
 criteria = "safe-to-deploy"
 
 [[exemptions.schannel]]
-version = "0.1.28"
+version = "0.1.29"
 criteria = "safe-to-deploy"
 
 [[exemptions.schemars]]
@@ -964,11 +980,11 @@ version = "0.7.1"
 criteria = "safe-to-deploy"
 
 [[exemptions.serde_with]]
-version = "3.17.0"
+version = "3.18.0"
 criteria = "safe-to-deploy"
 
 [[exemptions.serde_with_macros]]
-version = "3.17.0"
+version = "3.18.0"
 criteria = "safe-to-deploy"
 
 [[exemptions.shellexpand]]
@@ -1011,6 +1027,14 @@ criteria = "safe-to-deploy"
 version = "1.2.1"
 criteria = "safe-to-deploy"
 
+[[exemptions.strum]]
+version = "0.28.0"
+criteria = "safe-to-deploy"
+
+[[exemptions.strum_macros]]
+version = "0.28.0"
+criteria = "safe-to-deploy"
+
 [[exemptions.sync_wrapper]]
 version = "1.0.2"
 criteria = "safe-to-deploy"
@@ -1028,7 +1052,7 @@ version = "0.3.1"
 criteria = "safe-to-run"
 
 [[exemptions.tempfile]]
-version = "3.26.0"
+version = "3.27.0"
 criteria = "safe-to-deploy"
 
 [[exemptions.terminal_size]]
@@ -1040,7 +1064,7 @@ version = "0.3.47"
 criteria = "safe-to-deploy"
 
 [[exemptions.tinyvec]]
-version = "1.10.0"
+version = "1.11.0"
 criteria = "safe-to-deploy"
 
 [[exemptions.tokio-rustls]]
@@ -1204,7 +1228,7 @@ version = "0.1.36"
 criteria = "safe-to-deploy"
 
 [[exemptions.tracing-subscriber]]
-version = "0.3.22"
+version = "0.3.23"
 criteria = "safe-to-deploy"
 
 [[exemptions.tracing-test]]

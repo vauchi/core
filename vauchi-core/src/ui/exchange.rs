@@ -196,50 +196,6 @@ impl ExchangeEngine {
         ActionResult::NavigateTo(self.build_screen())
     }
 
-    /// Handle a hardware event by delegating to the protocol session (ADR-031).
-    ///
-    /// Returns `ExchangeCommands` with response commands, or `None` if
-    /// no session is active.
-    pub fn handle_hardware_event(
-        &mut self,
-        event: crate::exchange::ExchangeHardwareEvent,
-    ) -> Option<ActionResult> {
-        let session = self.session.as_mut()?;
-        if let Err(_e) = session.apply_hardware_event(event) {
-            // The session rejected the event (invalid state, malformed QR, etc.).
-            // Transition to Failed so the UI reflects the error.
-            self.step = ExchangeStep::Failed;
-            return Some(ActionResult::UpdateScreen(self.build_screen()));
-        }
-        let commands = session.drain_commands();
-
-        // Sync engine step from session state
-        match session.state() {
-            crate::exchange::ExchangeState::Complete { .. } => {
-                self.step = ExchangeStep::Success;
-            }
-            crate::exchange::ExchangeState::Failed { .. } => {
-                self.step = ExchangeStep::Failed;
-            }
-            // Any state beyond DisplayingQr means verification is in progress
-            crate::exchange::ExchangeState::PeerScanned { .. }
-            | crate::exchange::ExchangeState::AwaitingKeyAgreement { .. }
-            | crate::exchange::ExchangeState::AwaitingCardExchange { .. }
-            | crate::exchange::ExchangeState::AwaitingNfcTap
-            | crate::exchange::ExchangeState::AwaitingBleConnection
-            | crate::exchange::ExchangeState::AwaitingBleVerification { .. } => {
-                self.step = ExchangeStep::Verifying;
-            }
-            _ => {}
-        }
-
-        if commands.is_empty() {
-            Some(ActionResult::UpdateScreen(self.build_screen()))
-        } else {
-            Some(ActionResult::ExchangeCommands { commands })
-        }
-    }
-
     fn progress(&self) -> Progress {
         Progress {
             current_step: self.step.step_number(),
@@ -405,12 +361,57 @@ impl WorkflowEngine for ExchangeEngine {
         self.build_screen()
     }
 
-    fn as_any(&self) -> Option<&dyn std::any::Any> {
-        Some(self)
-    }
+    fn handle_hardware_event(
+        &mut self,
+        event: crate::exchange::ExchangeHardwareEvent,
+    ) -> Option<ActionResult> {
+        // No session — handle QR scan via legacy TextChanged path
+        let session = match self.session.as_mut() {
+            Some(s) => s,
+            None => {
+                if let crate::exchange::ExchangeHardwareEvent::QrScanned { data } = event {
+                    let result = self.handle_action(UserAction::TextChanged {
+                        component_id: "scanned_data".into(),
+                        value: data,
+                    });
+                    return Some(result);
+                }
+                return None;
+            }
+        };
+        if let Err(_e) = session.apply_hardware_event(event) {
+            // The session rejected the event (invalid state, malformed QR, etc.).
+            // Transition to Failed so the UI reflects the error.
+            self.step = ExchangeStep::Failed;
+            return Some(ActionResult::UpdateScreen(self.build_screen()));
+        }
+        let commands = session.drain_commands();
 
-    fn as_any_mut(&mut self) -> Option<&mut dyn std::any::Any> {
-        Some(self)
+        // Sync engine step from session state
+        match session.state() {
+            crate::exchange::ExchangeState::Complete { .. } => {
+                self.step = ExchangeStep::Success;
+            }
+            crate::exchange::ExchangeState::Failed { .. } => {
+                self.step = ExchangeStep::Failed;
+            }
+            // Any state beyond DisplayingQr means verification is in progress
+            crate::exchange::ExchangeState::PeerScanned { .. }
+            | crate::exchange::ExchangeState::AwaitingKeyAgreement { .. }
+            | crate::exchange::ExchangeState::AwaitingCardExchange { .. }
+            | crate::exchange::ExchangeState::AwaitingNfcTap
+            | crate::exchange::ExchangeState::AwaitingBleConnection
+            | crate::exchange::ExchangeState::AwaitingBleVerification { .. } => {
+                self.step = ExchangeStep::Verifying;
+            }
+            _ => {}
+        }
+
+        if commands.is_empty() {
+            Some(ActionResult::UpdateScreen(self.build_screen()))
+        } else {
+            Some(ActionResult::ExchangeCommands { commands })
+        }
     }
 
     fn handle_action(&mut self, action: UserAction) -> ActionResult {
@@ -713,12 +714,28 @@ mod tests {
         });
         assert!(matches!(result, ActionResult::RequestCamera));
 
-        // handle_hardware_event returns None without session
+        // handle_hardware_event handles QrScanned via legacy TextChanged path
         let result =
             engine.handle_hardware_event(crate::exchange::ExchangeHardwareEvent::QrScanned {
                 data: "test".into(),
             });
-        assert!(result.is_none());
+        assert!(
+            result.is_some(),
+            "QrScanned should be handled even without session"
+        );
+
+        // Non-QR events return None without session
+        let result = engine.handle_hardware_event(
+            crate::exchange::ExchangeHardwareEvent::BleDeviceDiscovered {
+                id: "d1".into(),
+                rssi: -40,
+                adv_data: vec![],
+            },
+        );
+        assert!(
+            result.is_none(),
+            "BLE events should be ignored without session"
+        );
     }
 
     /// Helper: create two sessions (Alice and Bob) and return Alice's engine

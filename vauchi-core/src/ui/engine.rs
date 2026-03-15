@@ -5,6 +5,7 @@
 use std::any::Any;
 
 use super::{ActionResult, ScreenModel, UserAction};
+use crate::exchange::ExchangeHardwareEvent;
 
 /// Trait that all core-driven workflows implement.
 ///
@@ -25,7 +26,19 @@ pub trait WorkflowEngine: Send {
         None
     }
 
+    /// Handle a hardware event from the frontend (ADR-031).
+    ///
+    /// Engines that interact with platform hardware (camera, BLE, NFC,
+    /// audio) override this to process events. Default returns `None`
+    /// (engine does not handle hardware events).
+    fn handle_hardware_event(&mut self, _event: ExchangeHardwareEvent) -> Option<ActionResult> {
+        None
+    }
+
     /// Downcast to concrete type for AppEngine-level interception.
+    ///
+    /// Used by `MyInfoEntryDetailEngine` for group visibility persistence.
+    /// Prefer adding trait methods over new downcast sites.
     fn as_any(&self) -> Option<&dyn Any> {
         None
     }

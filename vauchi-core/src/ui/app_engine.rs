@@ -296,65 +296,34 @@ impl AppEngine {
             return None;
         }
 
-        // ADR-031: Try delegating to ExchangeEngine's session first,
-        // so the session can update its state (e.g., transition to Failed
-        // on HardwareError) before we return the UI result.
-        if let Some(exchange_engine) = self
-            .engine
-            .as_any_mut()
-            .and_then(|a| a.downcast_mut::<ExchangeEngine>())
-        {
-            if exchange_engine.session().is_some() {
-                // For error events, build the UI response before moving event
-                // into the session (so it can transition to Failed).
-                let ui_override = match &event {
-                    ExchangeHardwareEvent::HardwareUnavailable { transport } => {
-                        Some(ActionResult::ShowToast {
-                            message: format!("{} is not available on this device", transport),
-                            undo_action_id: None,
-                        })
-                    }
-                    ExchangeHardwareEvent::HardwareError { transport, error } => {
-                        Some(ActionResult::ShowAlert {
-                            title: format!("{} error", transport),
-                            message: error.clone(),
-                        })
-                    }
-                    _ => None,
-                };
-
-                let session_result = exchange_engine.handle_hardware_event(event);
-                if let Some(ui) = ui_override {
-                    return Some(ui);
-                }
-                return session_result;
-            }
-        }
-
-        // No session — handle error events directly
-        match &event {
+        // ADR-031: For error events, build a user-friendly UI response
+        // before delegating to the engine (which may transition to Failed).
+        let ui_override = match &event {
             ExchangeHardwareEvent::HardwareUnavailable { transport } => {
-                return Some(ActionResult::ShowToast {
+                Some(ActionResult::ShowToast {
                     message: format!("{} is not available on this device", transport),
                     undo_action_id: None,
-                });
+                })
             }
             ExchangeHardwareEvent::HardwareError { transport, error } => {
-                return Some(ActionResult::ShowAlert {
+                Some(ActionResult::ShowAlert {
                     title: format!("{} error", transport),
                     message: error.clone(),
-                });
+                })
             }
-            _ => {}
+            _ => None,
+        };
+
+        // Delegate to the engine via the WorkflowEngine trait (ADR-031).
+        // ExchangeEngine handles session-aware events; other engines return None.
+        if let Some(result) = self.engine.handle_hardware_event(event) {
+            // Prefer user-friendly error messages over raw session results
+            return Some(ui_override.unwrap_or(result));
         }
 
-        // Fallback: legacy TextChanged-based QR handling (no session)
-        if let ExchangeHardwareEvent::QrScanned { data } = event {
-            let result = self.engine.handle_action(UserAction::TextChanged {
-                component_id: "scanned_data".into(),
-                value: data,
-            });
-            return Some(result);
+        // Engine didn't handle it — return error UI if applicable
+        if let Some(ui) = ui_override {
+            return Some(ui);
         }
 
         None

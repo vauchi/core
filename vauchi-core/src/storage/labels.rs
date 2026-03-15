@@ -346,31 +346,31 @@ impl Storage {
 
     /// Saves a complete GroupManager to storage.
     ///
-    /// This saves all labels and all per-contact overrides.
+    /// This saves all groups and all per-contact overrides.
     pub fn save_group_manager(&self, manager: &GroupManager) -> Result<(), StorageError> {
-        // Save all labels
-        for label in manager.all_labels() {
-            self.save_group(label)?;
+        // Save all groups
+        for group in manager.all_groups() {
+            self.save_group(group)?;
         }
 
         // Note: Per-contact overrides are saved individually as they're set
-        // This method primarily saves the label state
+        // This method primarily saves the group state
 
         Ok(())
     }
 
     /// Loads a complete GroupManager from storage.
     ///
-    /// This loads all labels and all per-contact overrides.
+    /// This loads all groups and all per-contact overrides.
     pub fn load_group_manager(&self) -> Result<GroupManager, StorageError> {
-        let labels = self.load_all_groups()?;
+        let groups = self.load_all_groups()?;
         let overrides = self.load_all_contact_overrides()?;
 
         let mut manager = GroupManager::new();
 
-        // Reconstruct labels preserving stored IDs and all fields
-        for label in labels {
-            manager.insert_loaded_label(label);
+        // Reconstruct groups preserving stored IDs and all fields
+        for group in groups {
+            manager.insert_loaded_group(group);
         }
 
         // Add per-contact overrides

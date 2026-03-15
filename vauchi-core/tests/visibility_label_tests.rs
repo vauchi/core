@@ -16,7 +16,7 @@
 
 use std::collections::HashSet;
 
-use vauchi_core::contact::{Group, GroupManager, LabelError, MAX_LABELS};
+use vauchi_core::contact::{Group, GroupError, GroupManager, MAX_LABELS};
 use vauchi_core::sync::SyncItem;
 
 // =============================================================================
@@ -86,7 +86,7 @@ fn test_label_crud_operations() {
     let family_id = family.id().to_string();
 
     // Verify it exists
-    assert_eq!(manager.label_count(), 1);
+    assert_eq!(manager.group_count(), 1);
     assert!(manager.get_group(&family_id).is_some());
     assert!(manager.get_group_by_name("Family").is_some());
 
@@ -97,7 +97,7 @@ fn test_label_crud_operations() {
     let professional = manager.create_group("Professional").unwrap();
     let professional_id = professional.id().to_string();
 
-    assert_eq!(manager.label_count(), 3);
+    assert_eq!(manager.group_count(), 3);
 
     // =========================================================================
     // CREATE - Error cases
@@ -107,21 +107,21 @@ fn test_label_crud_operations() {
     let duplicate_result = manager.create_group("Family");
     assert!(matches!(
         duplicate_result,
-        Err(LabelError::DuplicateName(_))
+        Err(GroupError::DuplicateName(_))
     ));
 
     // Cannot create label with empty name
     let empty_result = manager.create_group("");
-    assert!(matches!(empty_result, Err(LabelError::InvalidName(_))));
+    assert!(matches!(empty_result, Err(GroupError::InvalidName(_))));
 
     // Cannot create label with only whitespace
     let whitespace_result = manager.create_group("   ");
-    assert!(matches!(whitespace_result, Err(LabelError::InvalidName(_))));
+    assert!(matches!(whitespace_result, Err(GroupError::InvalidName(_))));
 
     // Cannot create label with name exceeding 50 characters
     let long_name = "A".repeat(51);
     let long_result = manager.create_group(&long_name);
-    assert!(matches!(long_result, Err(LabelError::InvalidName(_))));
+    assert!(matches!(long_result, Err(GroupError::InvalidName(_))));
 
     // =========================================================================
     // READ - Retrieve labels
@@ -136,7 +136,7 @@ fn test_label_crud_operations() {
     assert_eq!(by_name.id(), friends_id);
 
     // List all labels
-    let all_labels = manager.all_labels();
+    let all_labels = manager.all_groups();
     assert_eq!(all_labels.len(), 3);
 
     // =========================================================================
@@ -158,21 +158,21 @@ fn test_label_crud_operations() {
     let rename_dup_result = manager.rename_group(&friends_id, "Family");
     assert!(matches!(
         rename_dup_result,
-        Err(LabelError::DuplicateName(_))
+        Err(GroupError::DuplicateName(_))
     ));
 
     // Cannot rename to empty name
     let rename_empty_result = manager.rename_group(&friends_id, "");
     assert!(matches!(
         rename_empty_result,
-        Err(LabelError::InvalidName(_))
+        Err(GroupError::InvalidName(_))
     ));
 
     // Cannot rename non-existent label
     let rename_missing_result = manager.rename_group("non-existent-id", "New Name");
     assert!(matches!(
         rename_missing_result,
-        Err(LabelError::NotFound(_))
+        Err(GroupError::NotFound(_))
     ));
 
     // Renaming to same name is allowed (no-op)
@@ -195,13 +195,13 @@ fn test_label_crud_operations() {
     // Label should no longer exist
     assert!(manager.get_group(&professional_id).is_none());
     assert!(manager.get_group_by_name("Professional").is_none());
-    assert_eq!(manager.label_count(), 2);
+    assert_eq!(manager.group_count(), 2);
 
     // Cannot delete non-existent label
     let delete_missing_result = manager.delete_group("non-existent-id");
     assert!(matches!(
         delete_missing_result,
-        Err(LabelError::NotFound(_))
+        Err(GroupError::NotFound(_))
     ));
 
     // =========================================================================
@@ -228,15 +228,15 @@ fn test_label_max_limit() {
         manager.create_group(&format!("Label{}", i)).unwrap();
     }
 
-    assert_eq!(manager.label_count(), MAX_LABELS);
+    assert_eq!(manager.group_count(), MAX_LABELS);
 
     // Cannot create one more
     let result = manager.create_group("OneMore");
-    assert!(matches!(result, Err(LabelError::MaxLabelsReached)));
+    assert!(matches!(result, Err(GroupError::MaxLabelsReached)));
 
     // Delete one label
     let label_ids: Vec<String> = manager
-        .all_labels()
+        .all_groups()
         .iter()
         .map(|l| l.id().to_string())
         .collect();
@@ -244,7 +244,7 @@ fn test_label_max_limit() {
 
     // Now we can create one more
     manager.create_group("NewLabel").unwrap();
-    assert_eq!(manager.label_count(), MAX_LABELS);
+    assert_eq!(manager.group_count(), MAX_LABELS);
 }
 
 // =============================================================================
@@ -325,7 +325,7 @@ fn test_contact_assignment_to_label() {
     manager.add_contact_to_group(colleagues_id, carol).unwrap();
 
     // Carol should be in both Friends and Colleagues
-    let carol_labels = manager.labels_for_contact(carol);
+    let carol_labels = manager.groups_for_contact(carol);
     assert_eq!(carol_labels.len(), 2);
 
     let carol_label_names: HashSet<&str> = carol_labels.iter().map(|l| l.name()).collect();
@@ -333,7 +333,7 @@ fn test_contact_assignment_to_label() {
     assert!(carol_label_names.contains("Colleagues"));
 
     // Bob is in Family and Friends
-    let bob_labels = manager.labels_for_contact(bob);
+    let bob_labels = manager.groups_for_contact(bob);
     assert_eq!(bob_labels.len(), 2);
 
     // =========================================================================
@@ -358,7 +358,7 @@ fn test_contact_assignment_to_label() {
 
     // Eve is not in any label
     let all_contacts = vec![bob, carol, dave, eve];
-    let unlabeled = manager.unlabeled_contacts(&all_contacts);
+    let unlabeled = manager.ungrouped_contacts(&all_contacts);
 
     assert_eq!(unlabeled.len(), 2);
     assert!(unlabeled.contains(&dave.to_string()));
@@ -369,13 +369,13 @@ fn test_contact_assignment_to_label() {
     // =========================================================================
 
     // Bob is in Family and Friends
-    assert_eq!(manager.labels_for_contact(bob).len(), 2);
+    assert_eq!(manager.groups_for_contact(bob).len(), 2);
 
     // Remove Bob from all labels
     manager.remove_contact_from_all_groups(bob);
 
     // Bob should be in no labels
-    assert_eq!(manager.labels_for_contact(bob).len(), 0);
+    assert_eq!(manager.groups_for_contact(bob).len(), 0);
 
     // =========================================================================
     // Error cases
@@ -383,13 +383,13 @@ fn test_contact_assignment_to_label() {
 
     // Cannot add to non-existent label
     let add_missing_result = manager.add_contact_to_group("non-existent", bob);
-    assert!(matches!(add_missing_result, Err(LabelError::NotFound(_))));
+    assert!(matches!(add_missing_result, Err(GroupError::NotFound(_))));
 
     // Cannot remove from non-existent label
     let remove_missing_result = manager.remove_contact_from_group("non-existent", bob);
     assert!(matches!(
         remove_missing_result,
-        Err(LabelError::NotFound(_))
+        Err(GroupError::NotFound(_))
     ));
 }
 
@@ -769,7 +769,7 @@ fn test_label_based_field_visibility() {
     // =========================================================================
 
     // personal-phone is in Family and Close Friends
-    let labels = manager.all_labels();
+    let labels = manager.all_groups();
     let labels_showing_phone: Vec<&str> = labels
         .iter()
         .filter(|l| l.is_field_visible("personal-phone"))
@@ -1057,14 +1057,14 @@ fn test_delete_contact_clears_overrides() {
     manager.set_contact_override(bob, "field-2", false);
 
     // Verify state
-    assert_eq!(manager.labels_for_contact(bob).len(), 2);
+    assert_eq!(manager.groups_for_contact(bob).len(), 2);
     assert!(manager.get_all_contact_overrides(bob).is_some());
 
     // Remove Bob from all labels (simulates contact deletion)
     manager.remove_contact_from_all_groups(bob);
 
     // Bob should be in no labels
-    assert_eq!(manager.labels_for_contact(bob).len(), 0);
+    assert_eq!(manager.groups_for_contact(bob).len(), 0);
 
     // Per-contact overrides should be cleared
     assert!(manager.get_all_contact_overrides(bob).is_none());
@@ -1193,7 +1193,7 @@ fn test_label_manager_serialization() {
     let restored: GroupManager = serde_json::from_str(&json).unwrap();
 
     // Verify restored state
-    assert_eq!(restored.label_count(), 2);
+    assert_eq!(restored.group_count(), 2);
 
     let family = restored.get_group(&family_id).unwrap();
     assert_eq!(family.name(), "Family");

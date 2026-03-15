@@ -34,7 +34,7 @@ mod visibility_integration_tests {
         let mut manager = create_test_label_manager();
         let label = manager.create_group("Work Contacts").unwrap();
         assert_eq!(label.name(), "Work Contacts");
-        assert_eq!(manager.label_count(), 1);
+        assert_eq!(manager.group_count(), 1);
     }
 
     // @scenario: visibility_control.feature:Apply visibility group to a field
@@ -110,7 +110,7 @@ mod visibility_integration_tests {
         manager.add_contact_to_group(&label_id, contact_id).unwrap();
 
         // Verify assignment
-        let contact_labels = manager.labels_for_contact(contact_id);
+        let contact_labels = manager.groups_for_contact(contact_id);
         assert_eq!(contact_labels.len(), 1);
         assert_eq!(contact_labels[0].id(), label_id);
     }

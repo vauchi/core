@@ -834,16 +834,16 @@ fn test_visibility_bulk_remove_contact_from_all_labels() {
     // Also set some per-contact overrides
     manager.set_contact_override(contact_id, "special-field", true);
 
-    // Verify contact is in all labels
-    let contact_labels = manager.labels_for_contact(contact_id);
-    assert_eq!(contact_labels.len(), 3);
+    // Verify contact is in all groups
+    let contact_groups = manager.groups_for_contact(contact_id);
+    assert_eq!(contact_groups.len(), 3);
 
-    // Bulk remove contact from all labels (e.g., when deleting the contact)
+    // Bulk remove contact from all groups (e.g., when deleting the contact)
     manager.remove_contact_from_all_groups(contact_id);
 
-    // Verify contact is removed from all labels
-    let contact_labels = manager.labels_for_contact(contact_id);
-    assert_eq!(contact_labels.len(), 0, "Contact should be in no labels");
+    // Verify contact is removed from all groups
+    let contact_groups = manager.groups_for_contact(contact_id);
+    assert_eq!(contact_groups.len(), 0, "Contact should be in no groups");
 
     // Verify per-contact overrides are also cleared
     assert!(

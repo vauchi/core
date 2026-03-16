@@ -93,8 +93,8 @@ auto-tag:version:
       echo "Cargo.toml version: ${VERSION}"
       echo "Expected tag: ${TAG}"
 
-      git config user.name "vauchi-gitlab-runner"
-      git config user.email "noreply@vauchi.app"
+      git config user.name "${GITLAB_USER_NAME}"
+      git config user.email "${GITLAB_USER_EMAIL}"
 
       # Use project access token for push — CI_JOB_TOKEN cannot be used here
       # because pushes via CI_JOB_TOKEN do not trigger new pipelines, and the
@@ -808,7 +808,7 @@ publish:core:
           git remote set-url origin "$REPO_URL" 2>/dev/null || git remote add origin "$REPO_URL"
           git checkout -b "$BRANCH_NAME"
           git add Cargo.toml
-          git -c user.name="CI Bot" -c user.email="ci@vauchi.com" \
+          git -c user.name="${GITLAB_USER_NAME}" -c user.email="${GITLAB_USER_EMAIL}" \
             commit -m "chore: Bump version to $VERSION"
           git push -u origin "$BRANCH_NAME" && \
           MR_RESP=$(curl --silent --header "JOB-TOKEN: ${CI_JOB_TOKEN}" \

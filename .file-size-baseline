@@ -9,7 +9,7 @@ vauchi-core/src/api/shred.rs 1081
 vauchi-core/src/exchange/session.rs 1103
 vauchi-core/src/recovery/mod.rs 1062
 vauchi-core/src/storage/migration.rs 1559
-vauchi-core/src/storage/mod.rs 1074
+vauchi-core/src/storage/mod.rs 1079
 vauchi-core/src/ui/app_engine.rs 1437
 vauchi-core/tests/app_engine_tests.rs 2274
 vauchi-core/tests/field_validation_tests.rs 2256

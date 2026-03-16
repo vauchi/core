@@ -6,7 +6,7 @@
     {
       "Text": {
         "id": "empty_hint",
-        "content": "No entries yet. Add your first entry to share with contacts.",
+        "content": "No entries yet. Add your first entry to share with contacts.\n\nYou can add phone numbers, email addresses, websites, social profiles, and more. Tap \"Add Entry\" to get started.",
         "style": "Caption"
       }
     }

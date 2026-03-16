@@ -91,7 +91,7 @@ fn test_remove_field_not_found() {
 #[test]
 fn test_max_fields_reached() {
     let mut card = ContactCard::new("Test");
-    for i in 0..25 {
+    for i in 0..vauchi_core::contact_card::MAX_FIELDS {
         card.add_field(ContactField::new(
             FieldType::Custom,
             &format!("field_{}", i),

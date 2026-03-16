@@ -19,7 +19,7 @@ use vauchi_core::{
 // =============================================================================
 
 /// Maximum number of fields allowed per card
-const MAX_FIELDS: usize = 25;
+use vauchi_core::contact_card::MAX_FIELDS;
 
 /// Test: Card at max fields rejects addition
 #[test]

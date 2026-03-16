@@ -1,7 +1,7 @@
 {
   "screen_id": "contact_info",
   "title": "Add contact info",
-  "subtitle": "Add fields to your contact card.",
+  "subtitle": "Add phone, email, social profiles, and more to your card. You can always add or change entries later.",
   "components": [
     {
       "FieldList": {

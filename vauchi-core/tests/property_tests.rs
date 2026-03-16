@@ -575,18 +575,19 @@ mod extended_property_tests {
         ) {
             let mut card = ContactCard::new(&name);
 
-            // Add maximum number of fields (25)
-            for i in 0..25 {
+            // Add maximum number of fields
+            let max = vauchi_core::contact_card::MAX_FIELDS;
+            for i in 0..max {
                 let field = ContactField::new(
                     FieldType::Custom,
                     &format!("field_{}", i),
                     &format!("value_{}", i),
                 );
                 let result = card.add_field(field);
-                prop_assert!(result.is_ok(), "Should allow field {} of 25", i + 1);
+                prop_assert!(result.is_ok(), "Should allow field {} of {}", i + 1, max);
             }
 
-            prop_assert_eq!(card.fields().len(), 25);
+            prop_assert_eq!(card.fields().len(), max);
 
             // 26th field should fail
             let extra_field = ContactField::new(FieldType::Custom, "extra", "value");

@@ -14,8 +14,9 @@ use std::time::Duration;
 use vauchi_core::contact::Contact;
 use vauchi_core::contact_card::ContactCard;
 use vauchi_core::exchange::{
-    ExchangeEvent, ExchangeQR, ExchangeSession, ExchangeState, ManualConfirmationVerifier,
-    ProximityError, ProximityVerifier, VerifierChain, VerifierMethod,
+    ExchangeCommand, ExchangeEvent, ExchangeHardwareEvent, ExchangeQR, ExchangeSession,
+    ExchangeState, ManualConfirmationVerifier, ProximityError, ProximityVerifier, VerifierChain,
+    VerifierMethod,
 };
 use vauchi_core::identity::Identity;
 
@@ -361,6 +362,43 @@ impl MobileExchangeSession {
             .map(|log| log.to_markdown())
     }
 
+    // ── ADR-031: Command/Event API ──────────────────────────────────
+
+    /// Drain all pending commands from the session (ADR-031).
+    ///
+    /// Call after any state-advancing method (generate_qr, process_qr,
+    /// perform_key_agreement, etc.) to get hardware commands that the
+    /// mobile app should execute (display QR, start BLE scan, emit audio, etc.).
+    ///
+    /// Returns an empty list if no commands are pending.
+    pub fn drain_pending_commands(&self) -> Vec<MobileExchangeCommand> {
+        self.inner
+            .lock()
+            .unwrap()
+            .drain_commands()
+            .into_iter()
+            .map(MobileExchangeCommand::from)
+            .collect()
+    }
+
+    /// Feed a hardware event back to the session (ADR-031).
+    ///
+    /// Call when the platform completes a hardware action (QR scanned,
+    /// BLE data received, NFC tap, audio response, etc.). The session
+    /// advances its state machine and may produce new commands.
+    ///
+    /// After calling this, use `drain_pending_commands()` to get response commands.
+    pub fn apply_hardware_event(
+        &self,
+        event: MobileExchangeHardwareEvent,
+    ) -> Result<(), MobileError> {
+        self.inner
+            .lock()
+            .unwrap()
+            .apply_hardware_event(event.into())
+            .map_err(|e| MobileError::ExchangeFailed(format!("{:?}", e)))
+    }
+
     /// Returns the event log from the last proximity verification.
     ///
     /// Returns an empty list before any verification has occurred.
@@ -375,6 +413,166 @@ impl MobileExchangeSession {
             .proximity_event_log()
             .map(|log| log.events().iter().cloned().map(Into::into).collect())
             .unwrap_or_default()
+    }
+}
+
+// === ADR-031: Command/Event UniFFI Exports ===
+
+/// Exchange command sent from core to the frontend (ADR-031).
+///
+/// Mobile apps match on these and dispatch to platform-specific APIs
+/// (camera, BLE stack, NFC reader, audio subsystem).
+#[derive(uniffi::Enum, Debug, Clone)]
+pub enum MobileExchangeCommand {
+    // QR
+    QrDisplay {
+        data: String,
+    },
+    QrRequestScan,
+    // BLE
+    BleStartAdvertising {
+        service_uuid: String,
+        payload: Vec<u8>,
+    },
+    BleStartScanning {
+        service_uuid: String,
+    },
+    BleConnect {
+        device_id: String,
+    },
+    BleWriteCharacteristic {
+        uuid: String,
+        data: Vec<u8>,
+    },
+    BleReadCharacteristic {
+        uuid: String,
+    },
+    BleDisconnect,
+    // NFC
+    NfcActivate {
+        payload: Vec<u8>,
+    },
+    NfcDeactivate,
+    // Audio
+    AudioEmitChallenge {
+        data: Vec<u8>,
+    },
+    AudioListenForResponse {
+        timeout_ms: u64,
+    },
+    AudioStop,
+}
+
+impl From<ExchangeCommand> for MobileExchangeCommand {
+    fn from(cmd: ExchangeCommand) -> Self {
+        match cmd {
+            ExchangeCommand::QrDisplay { data } => Self::QrDisplay { data },
+            ExchangeCommand::QrRequestScan => Self::QrRequestScan,
+            ExchangeCommand::BleStartAdvertising {
+                service_uuid,
+                payload,
+            } => Self::BleStartAdvertising {
+                service_uuid,
+                payload,
+            },
+            ExchangeCommand::BleStartScanning { service_uuid } => {
+                Self::BleStartScanning { service_uuid }
+            }
+            ExchangeCommand::BleConnect { device_id } => Self::BleConnect { device_id },
+            ExchangeCommand::BleWriteCharacteristic { uuid, data } => {
+                Self::BleWriteCharacteristic { uuid, data }
+            }
+            ExchangeCommand::BleReadCharacteristic { uuid } => Self::BleReadCharacteristic { uuid },
+            ExchangeCommand::BleDisconnect => Self::BleDisconnect,
+            ExchangeCommand::NfcActivate { payload } => Self::NfcActivate { payload },
+            ExchangeCommand::NfcDeactivate => Self::NfcDeactivate,
+            ExchangeCommand::AudioEmitChallenge { data } => Self::AudioEmitChallenge { data },
+            ExchangeCommand::AudioListenForResponse { timeout_ms } => {
+                Self::AudioListenForResponse { timeout_ms }
+            }
+            ExchangeCommand::AudioStop => Self::AudioStop,
+        }
+    }
+}
+
+/// Hardware event reported by the frontend back to core (ADR-031).
+///
+/// Mobile apps create these after executing a command (e.g., QR scanned,
+/// BLE data received) and feed them back via `apply_hardware_event()`.
+#[derive(uniffi::Enum, Debug, Clone)]
+pub enum MobileExchangeHardwareEvent {
+    // QR
+    QrScanned {
+        data: String,
+    },
+    // BLE
+    BleDeviceDiscovered {
+        id: String,
+        rssi: i16,
+        adv_data: Vec<u8>,
+    },
+    BleConnected {
+        device_id: String,
+    },
+    BleCharacteristicRead {
+        uuid: String,
+        data: Vec<u8>,
+    },
+    BleCharacteristicNotified {
+        uuid: String,
+        data: Vec<u8>,
+    },
+    BleDisconnected {
+        reason: String,
+    },
+    // NFC
+    NfcDataReceived {
+        data: Vec<u8>,
+    },
+    // Audio
+    AudioResponseReceived {
+        data: Vec<u8>,
+    },
+    // Errors
+    HardwareError {
+        transport: String,
+        error: String,
+    },
+    HardwareUnavailable {
+        transport: String,
+    },
+}
+
+impl From<MobileExchangeHardwareEvent> for ExchangeHardwareEvent {
+    fn from(evt: MobileExchangeHardwareEvent) -> Self {
+        match evt {
+            MobileExchangeHardwareEvent::QrScanned { data } => Self::QrScanned { data },
+            MobileExchangeHardwareEvent::BleDeviceDiscovered { id, rssi, adv_data } => {
+                Self::BleDeviceDiscovered { id, rssi, adv_data }
+            }
+            MobileExchangeHardwareEvent::BleConnected { device_id } => {
+                Self::BleConnected { device_id }
+            }
+            MobileExchangeHardwareEvent::BleCharacteristicRead { uuid, data } => {
+                Self::BleCharacteristicRead { uuid, data }
+            }
+            MobileExchangeHardwareEvent::BleCharacteristicNotified { uuid, data } => {
+                Self::BleCharacteristicNotified { uuid, data }
+            }
+            MobileExchangeHardwareEvent::BleDisconnected { reason } => {
+                Self::BleDisconnected { reason }
+            }
+            MobileExchangeHardwareEvent::NfcDataReceived { data } => Self::NfcDataReceived { data },
+            MobileExchangeHardwareEvent::AudioResponseReceived { data } => {
+                Self::AudioResponseReceived { data }
+            }
+            MobileExchangeHardwareEvent::HardwareError { transport, error } => {
+                Self::HardwareError { transport, error }
+            }
+            MobileExchangeHardwareEvent::HardwareUnavailable { transport } => {
+                Self::HardwareUnavailable { transport }
+            }
+        }
     }
 }
 

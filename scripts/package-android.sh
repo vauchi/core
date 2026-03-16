@@ -60,8 +60,10 @@ if [[ ! -d "$ANDROID_KOTLIN_DIR/uniffi" ]]; then
     exit 1
 fi
 
-# Clean and create directories
+# Clean and create directories (rm dist/ to prevent stale artifacts from prior
+# pipeline runs accumulating on shell runners — see 2026-03-16 problem record)
 rm -rf "$BUILD_DIR"
+rm -rf "$DIST_DIR"
 mkdir -p "$BUILD_DIR"
 mkdir -p "$DIST_DIR"
 

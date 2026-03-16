@@ -11,7 +11,7 @@ vauchi-core/src/recovery/mod.rs 1062
 vauchi-core/src/storage/migration.rs 1559
 vauchi-core/src/storage/mod.rs 1079
 vauchi-core/src/ui/app_engine.rs 1437
-vauchi-core/tests/app_engine_tests.rs 2274
+vauchi-core/tests/app_engine_tests.rs 2275
 vauchi-core/tests/field_validation_tests.rs 2256
 vauchi-core/tests/onboarding_tests.rs 1292
 vauchi-core/tests/sync_device_orchestrator_tests.rs 1286

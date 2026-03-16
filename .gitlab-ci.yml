@@ -1078,11 +1078,13 @@ build:dev:
 
 cleanup:runner:
   extends: .cleanup-runner
-  # Run weekly via scheduled pipeline (only when CLEANUP_ENABLED is set) or manually
+  # Run on scheduled pipeline when CLEANUP_ENABLED is set.
+  # On non-scheduled pipelines: never create (manual .post jobs cause
+  # pipeline status to show "failed" even with allow_failure: true —
+  # see problem record 2026-03-16-pipeline-reliability).
   rules:
     - if: $CI_PIPELINE_SOURCE == "schedule" && $CLEANUP_ENABLED == "true"
-    - when: manual
-      allow_failure: true
+    - when: never
 
 # ============================================================
 # Deploy Stage — Badge Pages

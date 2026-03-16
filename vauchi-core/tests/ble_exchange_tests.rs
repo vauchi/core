@@ -2,6 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#![allow(deprecated)] // Uses legacy BLETransport/MockBLETransport (pre-ADR-031)
 //! Tests for BLE Exchange (Feature C)
 //!
 //! Feature file: features/ble_exchange.feature @ble

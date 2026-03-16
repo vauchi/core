@@ -10,7 +10,8 @@ license.workspace = true
 description = "Core library for Vauchi - privacy-focused contact card exchange"
 
 [features]
-default = ["network"]
+default = ["network", "storage"]
+storage = ["rusqlite"]
 network = ["network-native-tls"]
 network-native-tls = ["tungstenite", "tungstenite/handshake", "tungstenite/native-tls", "native-tls", "snow"]
 network-rustls = ["tungstenite", "tungstenite/handshake", "tungstenite/rustls-tls-native-roots", "rustls", "webpki-roots", "snow"]
@@ -99,8 +100,8 @@ zxcvbn = "3"
 # URL parsing and validation (relay URL safety checks)
 url = "2.5"
 
-# Database storage
-rusqlite = { version = "0.32", features = ["bundled"] }
+# Database storage (optional — not available on wasm32)
+rusqlite = { version = "0.32", features = ["bundled"], optional = true }
 
 # UUID generation for IDs
 uuid = { version = "1.0", features = ["v4"] }
@@ -135,8 +136,11 @@ arti-client = { version = "0.27", optional = true, default-features = false, fea
 tor-rtcompat = { version = "0.27", optional = true, features = ["tokio", "native-tls"] }
 tokio-util = { version = "0.7", optional = true, features = ["io", "io-util"] }
 
-# WASM crypto backend (hybrid WebCrypto + RustCrypto — behind crypto-wasm feature)
+# WASM compatibility — uuid needs JS-backed RNG on wasm32
 [target.'cfg(target_arch = "wasm32")'.dependencies]
+uuid = { version = "1.0", features = ["js"] }
+
+# WASM crypto backend (hybrid WebCrypto + RustCrypto — behind crypto-wasm feature)
 wasm-bindgen = { version = "0.2", optional = true }
 wasm-bindgen-futures = { version = "0.4", optional = true }
 web-sys = { version = "0.3", features = [

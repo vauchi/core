@@ -41,7 +41,9 @@ pub use tor_config::{TorConfig, TorRelayAddress, TorStatus};
 pub mod content;
 
 // --- future vauchi-storage ---
+#[cfg(feature = "storage")]
 pub mod storage;
+#[cfg(feature = "storage")]
 pub use storage::{PendingUpdate, Storage, StorageError, UpdateStatus};
 
 // --- future vauchi-exchange ---
@@ -69,7 +71,9 @@ pub use network::{
     classify_message, ConnectionState, EmergencyAlert, GeoLocation, MessageEnvelope, MessageType,
     MockTransport, NetworkError, RelayClient, RelayClientConfig, Transport, WebSocketTransport,
 };
+#[cfg(feature = "storage")]
 pub mod sync;
+#[cfg(feature = "storage")]
 pub use sync::{CardDelta, DeltaError, FieldChange, SyncError, SyncManager, SyncState};
 
 // --- stays in vauchi-core (orchestrator) ---

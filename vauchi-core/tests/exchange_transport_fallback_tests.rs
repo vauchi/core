@@ -100,5 +100,12 @@ fn set_device_capabilities_is_accessible() {
         ..Default::default()
     };
     session.set_device_capabilities(caps);
-    // Should not panic — just verify the API exists
+    // Verify session is still usable after setting capabilities
+    assert!(
+        matches!(
+            session.state(),
+            vauchi_core::exchange::ExchangeState::AwaitingBleConnection
+        ),
+        "session should remain in AwaitingBleConnection after setting capabilities"
+    );
 }

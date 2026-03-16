@@ -99,6 +99,11 @@ pub enum TransportError {
 }
 
 /// Raw bidirectional byte channel. All transports implement this trait.
+///
+/// **Deprecated (ADR-031):** Use `ExchangeCommand`/`ExchangeHardwareEvent` instead.
+/// Core no longer owns hardware I/O — frontends execute commands and report events.
+/// This trait will be removed in a future version.
+#[deprecated(note = "ADR-031: use ExchangeCommand/ExchangeHardwareEvent instead")]
 pub trait TransportChannel: Send + Sync {
     /// Which transport this channel uses.
     fn transport_type(&self) -> TransportType;

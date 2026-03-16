@@ -24,6 +24,9 @@ struct MockState {
 ///
 /// Uses `Arc<Mutex<...>>` for interior mutability so the mock can be
 /// shared and inspected after use.
+///
+/// **Deprecated (ADR-031):** Use `ExchangeHardwareEvent` injection for testing.
+#[deprecated(note = "ADR-031: use ExchangeHardwareEvent injection for testing")]
 #[derive(Debug, Clone)]
 pub struct MockTransportChannel {
     transport_type: TransportType,

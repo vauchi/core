@@ -634,6 +634,10 @@ impl ExchangeBle {
 ///
 /// Platform implementations (Android, iOS) implement this trait;
 /// tests use `MockBLETransport`.
+///
+/// **Deprecated (ADR-031):** Use `ExchangeCommand::Ble*` / `ExchangeHardwareEvent::Ble*`
+/// instead. Core no longer calls hardware directly — frontends execute BLE commands.
+#[deprecated(note = "ADR-031: use ExchangeCommand/ExchangeHardwareEvent for BLE")]
 pub trait BLETransport: Send + Sync {
     /// Start advertising our exchange payload.
     fn start_advertising(&self, payload: &ExchangeBle) -> Result<(), BLEError>;
@@ -658,6 +662,9 @@ pub trait BLETransport: Send + Sync {
 }
 
 /// Mock BLE transport for testing.
+///
+/// **Deprecated (ADR-031):** Use `ExchangeHardwareEvent::Ble*` injection for testing.
+#[deprecated(note = "ADR-031: use ExchangeHardwareEvent injection for BLE testing")]
 pub struct MockBLETransport {
     /// Payload to return when reading CHAR_EXCHANGE_PAYLOAD.
     pub peer_payload: std::sync::Mutex<Option<Vec<u8>>>,

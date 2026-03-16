@@ -19,6 +19,10 @@ pub enum FallbackPolicy {
 }
 
 /// Ordered chain of transports with automatic fallback.
+///
+/// **Deprecated (ADR-031):** Transport fallback is now handled inside
+/// `ExchangeSession` via `DeviceCapabilities` and `HardwareUnavailable` events.
+#[deprecated(note = "ADR-031: transport fallback now in ExchangeSession via DeviceCapabilities")]
 pub struct TransportChain {
     transports: Vec<Box<dyn TransportChannel>>,
     policy: FallbackPolicy,

@@ -278,6 +278,11 @@ impl RelayHealth {
 
     /// Check if we should retry a failed relay
     pub fn should_retry(&self, relay: &str) -> bool {
+        self.should_retry_at(relay, Instant::now())
+    }
+
+    /// Check if we should retry a failed relay at a given point in time.
+    pub fn should_retry_at(&self, relay: &str, now: Instant) -> bool {
         match self.states.get(relay) {
             None => true,
             Some(state) => {
@@ -288,7 +293,7 @@ impl RelayHealth {
                     None => true,
                     Some(last_failure) => {
                         let cooldown = self.calculate_cooldown(state.failure_count);
-                        Instant::now().duration_since(last_failure) >= cooldown
+                        now.duration_since(last_failure) >= cooldown
                     }
                 }
             }

@@ -295,7 +295,11 @@ impl<T: Transport> RelayClient<T> {
     /// Timed-out messages are removed from the in-flight tracking.
     /// The caller should handle retry logic.
     pub fn check_timeouts(&mut self) -> Vec<String> {
-        let now = Instant::now();
+        self.check_timeouts_at(Instant::now())
+    }
+
+    /// Checks for timed-out messages at a given point in time.
+    pub fn check_timeouts_at(&mut self, now: Instant) -> Vec<String> {
         let timeout = std::time::Duration::from_millis(self.config.ack_timeout_ms);
 
         let timed_out: Vec<_> = self

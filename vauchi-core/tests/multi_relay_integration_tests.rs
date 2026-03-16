@@ -177,22 +177,11 @@ fn test_relay_recovery_after_cooldown() {
     health.record_failure("wss://relay.vauchi.app");
     assert!(!health.is_healthy("wss://relay.vauchi.app"));
 
-    // Poll until cooldown expires (CC-06: no bare sleeps for synchronization)
-    // Note: should_retry uses random jitter per call, so we poll until it returns true
-    let deadline = Instant::now() + Duration::from_secs(2);
-    let retried = loop {
-        if health.should_retry("wss://relay.vauchi.app") {
-            break true;
-        }
-        assert!(
-            Instant::now() < deadline,
-            "Timed out waiting for cooldown to expire"
-        );
-        std::thread::sleep(Duration::from_millis(10));
-    };
-
-    // After cooldown, relay should be considered for retry
-    assert!(retried);
+    // Advance time past the maximum possible cooldown (base=50ms, failures=1,
+    // so max cooldown = 50ms, jitter range = [25ms, 50ms]). At 100ms past the
+    // failure, any jitter value is exceeded — no sleep needed.
+    let future = Instant::now() + Duration::from_millis(100);
+    assert!(health.should_retry_at("wss://relay.vauchi.app", future));
 }
 
 /// Test: Consecutive failures increase cooldown

@@ -14,7 +14,6 @@
 use rand::Rng;
 use std::sync::{Arc, Barrier};
 use std::thread;
-use std::time::Duration;
 use tempfile::tempdir;
 use vauchi_core::contact::Contact;
 use vauchi_core::crypto::SymmetricKey;
@@ -25,18 +24,12 @@ use vauchi_core::{ContactCard, ContactField, FieldType};
 // HELPER FUNCTIONS
 // =============================================================================
 
-/// Open storage with retries to handle SQLite BUSY during concurrent access.
-fn open_with_retry(path: &std::path::Path, key: SymmetricKey, max_retries: u32) -> Storage {
-    for attempt in 0..max_retries {
-        match Storage::open(path, key.clone()) {
-            Ok(s) => return s,
-            Err(_) if attempt < max_retries - 1 => {
-                thread::sleep(Duration::from_millis(50 * (attempt as u64 + 1)));
-            }
-            Err(e) => panic!("Storage::open failed after {} retries: {}", max_retries, e),
-        }
-    }
-    unreachable!()
+/// Open storage for concurrent access. No manual retry needed — SQLite's
+/// busy_timeout (set at the C level before any SQL) handles lock contention
+/// internally with a 5-second wait.
+fn open_with_retry(path: &std::path::Path, key: SymmetricKey, _max_retries: u32) -> Storage {
+    Storage::open(path, key)
+        .expect("Storage::open failed; busy_timeout=5s should handle contention")
 }
 
 fn create_test_contact(name: &str) -> Contact {

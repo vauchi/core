@@ -196,12 +196,17 @@ impl Storage {
     /// data persists in WAL file). The primary protection is the SMK encryption
     /// layer; these PRAGMAs are secondary defense-in-depth.
     fn configure_pragmas(conn: &Connection) -> Result<(), StorageError> {
+        // Set busy_timeout at the C level FIRST, before executing any SQL.
+        // This ensures all subsequent statements (including the pragma batch
+        // below) will wait up to 5s for locks instead of failing immediately.
+        // Solves the bootstrap problem: SQL-based PRAGMA busy_timeout can
+        // itself fail with SQLITE_BUSY if another connection holds a lock.
+        conn.busy_timeout(std::time::Duration::from_secs(5))?;
         // auto_vacuum must be set before any tables are created (before first
         // page write), so it comes first — before journal_mode=WAL which writes
         // the database header.
         conn.execute_batch(
             "PRAGMA auto_vacuum=FULL;
-             PRAGMA busy_timeout=5000;
              PRAGMA journal_mode=WAL;
              PRAGMA synchronous=NORMAL;
              PRAGMA cache_size=10000;

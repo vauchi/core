@@ -253,19 +253,9 @@ fn test_session_timeout() {
 
     session.start_scanning().unwrap();
 
-    // Poll until timeout is detected (CC-06: no bare sleeps for synchronization)
-    let deadline = std::time::Instant::now() + Duration::from_secs(2);
-    loop {
-        session.check_timeout();
-        if matches!(session.state(), BLEExchangeState::TimedOut) {
-            break;
-        }
-        assert!(
-            std::time::Instant::now() < deadline,
-            "Timed out waiting for session timeout"
-        );
-        std::thread::sleep(Duration::from_millis(1));
-    }
+    // Advance time past the session timeout — no sleep needed
+    let future = std::time::Instant::now() + Duration::from_millis(20);
+    session.check_timeout_at(future);
 
     assert!(matches!(session.state(), BLEExchangeState::TimedOut));
 }

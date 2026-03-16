@@ -463,8 +463,13 @@ impl BLEExchangeSession {
 
     /// Check for timeout and update state.
     pub fn check_timeout(&mut self) {
+        self.check_timeout_at(Instant::now());
+    }
+
+    /// Check for timeout at a given point in time.
+    pub fn check_timeout_at(&mut self, now: Instant) {
         if let Some(started) = self.started_at {
-            if Instant::now().duration_since(started) >= self.timeout {
+            if now.duration_since(started) >= self.timeout {
                 self.state = BLEExchangeState::TimedOut;
             }
         }

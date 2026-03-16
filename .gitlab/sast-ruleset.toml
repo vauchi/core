@@ -3,17 +3,11 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 # Custom Semgrep SAST configuration
-# Adds Rust community rules + vauchi security rules.
-#
-# NOTE: Currently points to vauchi-rust.yml (combined security+quality).
-# After scripts !142 merges, switch to vauchi-security.yml to exclude
-# quality rules (CC-03, CC-06) from the Security Dashboard.
-#
-# Quality rules for local use:
-#   semgrep --config scripts/semgrep-rules/vauchi-quality.yml .
+# Security rules only — quality rules (CC-03, CC-06) excluded from dashboard.
+# Quality rules for local use: semgrep --config scripts/semgrep-rules/vauchi-quality.yml .
 
 [semgrep]
-  description = "Semgrep with Rust community + vauchi custom rules"
+  description = "Semgrep with Rust community + vauchi security rules"
 
   [[semgrep.passthrough]]
     type = "url"
@@ -22,6 +16,6 @@
 
   [[semgrep.passthrough]]
     type = "url"
-    value = "https://gitlab.com/vauchi/scripts/-/raw/main/semgrep-rules/vauchi-rust.yml"
-    target = "semgrep-vauchi-custom.yml"
+    value = "https://gitlab.com/vauchi/scripts/-/raw/main/semgrep-rules/vauchi-security.yml"
+    target = "semgrep-vauchi-security.yml"
 

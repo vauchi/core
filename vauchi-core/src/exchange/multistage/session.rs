@@ -327,7 +327,7 @@ impl MultiStageSession {
                         error_correction: "M".to_string(),
                         display_duration_ms: 500,
                     })
-                } else if self.display_cycle.is_multiple_of(4) == false
+                } else if !self.display_cycle.is_multiple_of(4)
                     && self.display_cycle.is_multiple_of(3)
                 {
                     // Show CONF for peers in Confirming

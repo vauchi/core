@@ -140,6 +140,8 @@ pub struct ExchangeSession {
     nfc_handshake: Option<NfcHandshakeSession>,
     /// BLE encrypted handshake session (only populated for BLE transport).
     ble_handshake: Option<BleHandshakeSession>,
+    /// Device hardware capabilities for transport fallback decisions.
+    device_capabilities: Option<super::capability::types::DeviceCapabilities>,
     /// Whether we initiated the BLE connection (scanner role).
     /// Set to `true` on `BleDeviceDiscovered`, determines who sends KeyOffer first.
     ble_is_initiator: bool,
@@ -206,6 +208,7 @@ impl ExchangeSession {
             their_display_name: None,
             nfc_handshake: None,
             ble_handshake: None,
+            device_capabilities: None,
             ble_is_initiator: false,
             ble_pending_handshake: None,
             ble_pending_card: None,
@@ -242,6 +245,7 @@ impl ExchangeSession {
             their_display_name: None,
             nfc_handshake: None,
             ble_handshake: None,
+            device_capabilities: None,
             ble_is_initiator: false,
             ble_pending_handshake: None,
             ble_pending_card: None,
@@ -283,6 +287,7 @@ impl ExchangeSession {
             their_display_name: None,
             nfc_handshake: Some(nfc_handshake),
             ble_handshake: None,
+            device_capabilities: None,
             ble_is_initiator: false,
             ble_pending_handshake: None,
             ble_pending_card: None,
@@ -334,6 +339,7 @@ impl ExchangeSession {
             their_display_name: None,
             nfc_handshake: None,
             ble_handshake: Some(ble_handshake),
+            device_capabilities: None,
             ble_is_initiator: false,
             ble_pending_handshake: None,
             ble_pending_card: None,
@@ -360,6 +366,15 @@ impl ExchangeSession {
     /// Must be called before `process(StartQR)`.
     pub fn set_our_relay_url(&mut self, url: Option<String>) {
         self.our_relay_url = url;
+    }
+
+    /// Sets device capabilities for transport fallback decisions.
+    ///
+    /// When a transport reports `HardwareUnavailable`, the session uses these
+    /// capabilities to determine if a fallback transport is available (e.g.,
+    /// BLE → QR if `has_camera` is true).
+    pub fn set_device_capabilities(&mut self, caps: super::capability::types::DeviceCapabilities) {
+        self.device_capabilities = Some(caps);
     }
 
     /// Sets our relay's Noise NK public key to include in the QR code.
@@ -624,11 +639,11 @@ impl ExchangeSession {
                 }))
             }
             ExchangeHardwareEvent::HardwareUnavailable { transport } => {
-                // Not a fatal error — the transport is just not available.
-                // Log it and let the session continue with other transports.
                 self.debug_event(ExchangeDebugEvent::ExchangeFailed {
                     error: format!("{} hardware unavailable", transport),
                 });
+                // Attempt transport fallback based on device capabilities.
+                self.attempt_transport_fallback(&transport);
                 Ok(())
             }
         }
@@ -673,6 +688,41 @@ impl ExchangeSession {
                     });
             }
             _ => {}
+        }
+    }
+
+    // ── ADR-031: Transport fallback ──────────────────────────────────────
+
+    /// Attempts to fall back to an alternative transport when the current one
+    /// reports unavailable. Checks `device_capabilities` to find a supported
+    /// fallback and emits initial commands for that transport.
+    ///
+    /// Fallback priority: BLE/NFC → QR (camera required).
+    /// QR is the universal fallback since it requires only a camera.
+    fn attempt_transport_fallback(&mut self, _failed_transport: &str) {
+        let caps = match &self.device_capabilities {
+            Some(c) => c.clone(),
+            None => return, // No capabilities set — can't determine fallback
+        };
+
+        // Only fall back if we haven't progressed past the initial transport state
+        let can_fallback = matches!(
+            self.state,
+            ExchangeState::AwaitingBleConnection | ExchangeState::AwaitingNfcTap
+        );
+        if !can_fallback {
+            return;
+        }
+
+        // Try QR fallback (requires camera)
+        if caps.has_camera {
+            // Switch to QR transport
+            self.transport = ExchangeTransport::Qr;
+            self.state = ExchangeState::Idle;
+            // Start QR session — generates ephemeral keys and QR code
+            if self.apply(ExchangeEvent::StartQR).is_ok() {
+                self.emit_initial_commands();
+            }
         }
     }
 

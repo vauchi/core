@@ -9,8 +9,7 @@
 
 use vauchi_core::exchange::capability::types::DeviceCapabilities;
 use vauchi_core::exchange::{
-    ExchangeCommand, ExchangeHardwareEvent, ExchangeSession, ExchangeState,
-    ManualConfirmationVerifier, VAUCHI_BLE_SERVICE_UUID,
+    ExchangeCommand, ExchangeHardwareEvent, ExchangeSession, ManualConfirmationVerifier,
 };
 use vauchi_core::identity::Identity;
 use vauchi_core::ContactCard;

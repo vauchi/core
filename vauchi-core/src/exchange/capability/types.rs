@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 /// Populated once at app startup by the platform layer (iOS/Android/Desktop).
 /// All fields use `#[serde(default)]` for backward compatibility when
 /// deserializing from older versions that may not include newer fields.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct DeviceCapabilities {
     /// Device has NFC hardware (for NFC Active exchange).
     #[serde(default)]

@@ -44,7 +44,7 @@ fn create_peer_scanned_sessions() -> (ExchangeSession, ExchangeSession) {
     (alice, bob)
 }
 
-// ── Audio commands emitted after key agreement ──────────────────────
+// −− Audio commands emitted after key agreement −−−−−−−−−−−−−−−−−−−−−−
 
 #[test]
 fn qr_key_agreement_emits_audio_commands() {
@@ -73,7 +73,7 @@ fn qr_key_agreement_emits_audio_commands() {
     );
 }
 
-// ── AudioResponseReceived sets proximity confidence ─────────────────
+// −− AudioResponseReceived sets proximity confidence −−−−−−−−−−−−−−−−−
 
 #[test]
 fn audio_response_received_advances_state() {
@@ -98,7 +98,7 @@ fn audio_response_received_advances_state() {
     );
 }
 
-// ── Audio unavailable doesn't block exchange ────────────────────────
+// −− Audio unavailable doesn't block exchange −−−−−−−−−−−−−−−−−−−−−−−−
 
 #[test]
 fn audio_hardware_unavailable_does_not_block_key_agreement() {

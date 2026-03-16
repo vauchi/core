@@ -23,7 +23,7 @@ fn ble_session_with_caps(name: &str, caps: DeviceCapabilities) -> ExchangeSessio
     session
 }
 
-// ── Fallback from BLE → QR ─────────────────────────────────────────
+// −− Fallback from BLE -> QR −−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−
 
 #[test]
 fn ble_unavailable_with_camera_falls_back_to_qr() {
@@ -55,7 +55,7 @@ fn ble_unavailable_with_camera_falls_back_to_qr() {
     );
 }
 
-// ── No fallback when no alternatives available ──────────────────────
+// −− No fallback when no alternatives available −−−−−−−−−−−−−−−−−−−−−−
 
 #[test]
 fn ble_unavailable_without_camera_does_not_fall_back() {
@@ -84,7 +84,7 @@ fn ble_unavailable_without_camera_does_not_fall_back() {
     );
 }
 
-// ── DeviceCapabilities setter ───────────────────────────────────────
+// −− DeviceCapabilities setter −−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−
 
 #[test]
 fn set_device_capabilities_is_accessible() {

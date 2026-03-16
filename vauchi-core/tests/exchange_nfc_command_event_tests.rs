@@ -23,7 +23,7 @@ fn nfc_session(name: &str) -> ExchangeSession {
     ExchangeSession::new_nfc(identity, card, proximity)
 }
 
-// ── Initial commands ────────────────────────────────────────────────
+// −− Initial commands −−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−
 
 #[test]
 fn nfc_session_emits_activate_with_payload() {
@@ -44,7 +44,7 @@ fn nfc_session_emits_activate_with_payload() {
     }
 }
 
-// ── NFC tap completes exchange ──────────────────────────────────────
+// −− NFC tap completes exchange −−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−
 
 #[test]
 fn nfc_data_received_with_valid_payload_completes_exchange() {
@@ -77,7 +77,7 @@ fn nfc_data_received_with_valid_payload_completes_exchange() {
     );
 }
 
-// ── NFC hardware unavailable ────────────────────────────────────────
+// −− NFC hardware unavailable −−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−
 
 #[test]
 fn nfc_hardware_unavailable_does_not_crash() {
@@ -97,7 +97,7 @@ fn nfc_hardware_unavailable_does_not_crash() {
     );
 }
 
-// ── NFC deactivate on completion ────────────────────────────────────
+// −− NFC deactivate on completion −−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−
 
 #[test]
 fn nfc_tap_emits_deactivate_after_processing() {

@@ -24,7 +24,7 @@ fn ble_session(name: &str) -> ExchangeSession {
     ExchangeSession::new_ble(identity, card, proximity)
 }
 
-// ── Initial commands ────────────────────────────────────────────────
+// −− Initial commands −−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−
 
 #[test]
 fn ble_session_emits_scan_and_advertise_on_start() {
@@ -47,7 +47,7 @@ fn ble_session_emits_scan_and_advertise_on_start() {
     assert!(has_advertise, "missing BleStartAdvertising command");
 }
 
-// ── Discovery → Connect ─────────────────────────────────────────────
+// −− Discovery -> Connect −−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−
 
 #[test]
 fn ble_device_discovered_emits_connect_command() {
@@ -70,7 +70,7 @@ fn ble_device_discovered_emits_connect_command() {
     );
 }
 
-// ── BleConnected (initiator) → KeyOffer write ───────────────────────
+// −− BleConnected (initiator) -> KeyOffer write −−−−−−−−−−−−−−−−−−−−−−−
 
 #[test]
 fn ble_connected_after_discovery_emits_key_offer_write() {
@@ -110,7 +110,7 @@ fn ble_connected_after_discovery_emits_key_offer_write() {
     );
 }
 
-// ── Full 4-phase initiator flow ─────────────────────────────────────
+// −− Full 4-phase initiator flow −−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−
 
 #[test]
 fn ble_full_initiator_flow_via_command_event() {
@@ -225,7 +225,7 @@ fn ble_full_initiator_flow_via_command_event() {
     );
 }
 
-// ── BLE disconnect during handshake → fail ──────────────────────────
+// −− BLE disconnect during handshake -> fail −−−−−−−−−−−−−−−−−−−−−−−−−−
 
 #[test]
 fn ble_disconnect_during_connection_fails_session() {
@@ -243,7 +243,7 @@ fn ble_disconnect_during_connection_fails_session() {
     );
 }
 
-// ── BLE hardware error → fail ───────────────────────────────────────
+// −− BLE hardware error -> fail −−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−
 
 #[test]
 fn ble_hardware_error_fails_session() {
@@ -262,7 +262,7 @@ fn ble_hardware_error_fails_session() {
     );
 }
 
-// ── Out-of-order BLE data buffering ─────────────────────────────────
+// −− Out-of-order BLE data buffering −−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−
 
 #[test]
 fn ble_card_before_key_ack_is_buffered_and_processed() {

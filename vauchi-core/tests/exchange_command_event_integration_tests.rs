@@ -16,7 +16,7 @@ use vauchi_core::exchange::{
 use vauchi_core::identity::Identity;
 use vauchi_core::ContactCard;
 
-// ── Helpers ─────────────────────────────────────────────────────────
+// −− Helpers −−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−
 
 fn qr_session(name: &str) -> ExchangeSession {
     let identity = Identity::create(name);
@@ -39,7 +39,7 @@ fn ble_session(name: &str) -> ExchangeSession {
     ExchangeSession::new_ble(identity, card, proximity)
 }
 
-// ── QR full round-trip ──────────────────────────────────────────────
+// −− QR full round-trip −−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−
 
 #[test]
 fn qr_full_round_trip_via_commands_and_events() {
@@ -96,7 +96,7 @@ fn qr_full_round_trip_via_commands_and_events() {
     );
 }
 
-// ── NFC full round-trip ─────────────────────────────────────────────
+// −− NFC full round-trip −−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−
 
 #[test]
 fn nfc_full_round_trip_via_commands_and_events() {
@@ -172,7 +172,7 @@ fn nfc_full_round_trip_via_commands_and_events() {
     );
 }
 
-// ── BLE → QR fallback ───────────────────────────────────────────────
+// −− BLE -> QR fallback −−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−
 
 #[test]
 fn ble_to_qr_fallback_produces_working_qr_session() {
@@ -185,7 +185,7 @@ fn ble_to_qr_fallback_produces_working_qr_session() {
     session.emit_initial_commands();
     let _ = session.drain_commands(); // drain BLE commands
 
-    // BLE unavailable → should fall back to QR
+    // BLE unavailable -> should fall back to QR
     session
         .apply_hardware_event(ExchangeHardwareEvent::HardwareUnavailable {
             transport: "BLE".into(),
@@ -217,7 +217,7 @@ fn ble_to_qr_fallback_produces_working_qr_session() {
     );
 }
 
-// ── Mixed transport: command/event isolation ────────────────────────
+// −− Mixed transport: command/event isolation −−−−−−−−−−−−−−−−−−−−−−−−
 
 #[test]
 fn qr_session_ignores_ble_events() {

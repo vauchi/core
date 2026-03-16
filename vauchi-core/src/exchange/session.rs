@@ -581,9 +581,14 @@ impl ExchangeSession {
                 self.apply(ExchangeEvent::ProcessQR(qr))
             }
             ExchangeHardwareEvent::NfcDataReceived { data } => {
-                self.apply(ExchangeEvent::NfcTapComplete {
+                let result = self.apply(ExchangeEvent::NfcTapComplete {
                     their_payload: data,
-                })
+                });
+                // Deactivate NFC interface after tap is processed
+                if result.is_ok() {
+                    self.emit_command(ExchangeCommand::NfcDeactivate);
+                }
+                result
             }
             ExchangeHardwareEvent::BleConnected { device_id } => {
                 self.handle_ble_connected(device_id)
@@ -642,12 +647,19 @@ impl ExchangeSession {
                 });
             }
             (ExchangeState::AwaitingNfcTap, ExchangeTransport::Nfc) => {
-                // NFC handshake uses multi-step APDU protocol.
-                // Emit NfcActivate with empty payload — the actual APDU exchange
-                // is driven by the NfcHandshakeSession via separate events.
-                self.pending_commands.push(ExchangeCommand::NfcActivate {
-                    payload: Vec::new(),
-                });
+                // Generate our NFC key offer payload for the frontend to present.
+                // The frontend activates the NFC interface with this data, and when
+                // the peer taps, sends their data back as NfcDataReceived.
+                let payload = if let Some(ref mut hs) = self.nfc_handshake {
+                    hs.create_key_offer(&self.identity).unwrap_or_default()
+                } else {
+                    // Fallback: generate ExchangeNfc payload directly
+                    let nfc =
+                        super::nfc_active::ExchangeNfc::generate(&self.identity, &self.our_x3dh);
+                    nfc.to_bytes().to_vec()
+                };
+                self.pending_commands
+                    .push(ExchangeCommand::NfcActivate { payload });
             }
             (ExchangeState::AwaitingBleConnection, ExchangeTransport::Ble) => {
                 self.pending_commands

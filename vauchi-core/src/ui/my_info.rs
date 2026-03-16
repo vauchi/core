@@ -83,7 +83,7 @@ impl MyInfoEngine {
         if self.own_fields.is_empty() {
             components.push(Component::Text {
                 id: "empty_hint".into(),
-                content: "No entries yet. Add your first entry to share with contacts.".into(),
+                content: "No entries yet. Add your first entry to share with contacts.\n\nYou can add phone numbers, email addresses, websites, social profiles, and more. Tap \"Add Entry\" to get started.".into(),
                 style: TextStyle::Caption,
             });
             return components;
@@ -208,12 +208,17 @@ impl WorkflowEngine for MyInfoEngine {
             MyInfoViewMode::GroupView { .. } => "Entry View",
         };
 
+        let at_field_limit = self.own_fields.len() >= crate::contact_card::MAX_FIELDS;
         let actions = vec![
             ScreenAction {
                 id: "add_field".into(),
-                label: "Add Entry".into(),
+                label: if at_field_limit {
+                    format!("Field limit reached ({})", crate::contact_card::MAX_FIELDS)
+                } else {
+                    "Add Entry".into()
+                },
                 style: ActionStyle::Primary,
-                enabled: true,
+                enabled: !at_field_limit,
             },
             ScreenAction {
                 id: "toggle_view".into(),

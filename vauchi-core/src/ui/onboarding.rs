@@ -399,7 +399,7 @@ impl OnboardingEngine {
         ScreenModel {
             screen_id: "contact_info".into(),
             title: "Add contact info".into(),
-            subtitle: Some("Add fields to your contact card.".into()),
+            subtitle: Some("Add phone, email, social profiles, and more to your card. You can always add or change entries later.".into()),
             components: vec![Component::FieldList {
                 id: "fields".into(),
                 fields,
@@ -767,6 +767,22 @@ impl OnboardingEngine {
             UserAction::ActionPressed { action_id }
                 if action_id == "continue" || action_id == "skip" =>
             {
+                // Auto-add any pending custom group text before advancing
+                let pending = self.custom_group_input.trim().to_string();
+                if !pending.is_empty()
+                    && !self
+                        .data
+                        .selected_groups
+                        .iter()
+                        .any(|g| g.name.eq_ignore_ascii_case(&pending))
+                {
+                    self.data.selected_groups.push(GroupSetup {
+                        name: pending,
+                        selected: true,
+                        name_override: None,
+                    });
+                    self.custom_group_input.clear();
+                }
                 self.navigate_to(Step::ContactInfo)
             }
             _ => ActionResult::UpdateScreen(self.current_screen()),

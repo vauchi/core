@@ -16,6 +16,8 @@ pub enum ValidationError {
     InvalidPhone,
     #[error("Invalid email format")]
     InvalidEmail,
+    #[error("Invalid URL format")]
+    InvalidUrl,
     #[error("Value too long (max {max} characters)")]
     ValueTooLong { max: usize },
     #[error("Value cannot be empty")]
@@ -142,14 +144,20 @@ impl ContactField {
         match self.field_type {
             FieldType::Phone => self.validate_phone(),
             FieldType::Email => self.validate_email(),
+            FieldType::Website => self.validate_website(),
             FieldType::Birthday => self.validate_birthday(),
-            _ => Ok(()), // Other types accept any value
+            _ => Ok(()), // Social, Address, Custom accept any value
         }
     }
 
     /// Validates phone number format.
     fn validate_phone(&self) -> Result<(), ValidationError> {
         let value = &self.value;
+
+        // Reasonable max phone length (international with formatting)
+        if value.len() > 30 {
+            return Err(ValidationError::InvalidPhone);
+        }
 
         // Must have at least some digits
         let digit_count = value.chars().filter(|c| c.is_ascii_digit()).count();
@@ -202,6 +210,19 @@ impl ContactField {
         }
 
         Ok(())
+    }
+
+    /// Validates website URL format.
+    fn validate_website(&self) -> Result<(), ValidationError> {
+        let value = self.value.trim();
+        // Must start with http:// or https://, or contain a dot (domain)
+        if value.starts_with("http://") || value.starts_with("https://") {
+            return Ok(());
+        }
+        if value.contains('.') && !value.contains(' ') {
+            return Ok(());
+        }
+        Err(ValidationError::InvalidUrl)
     }
 
     /// Validates ISO 8601 birthday format (YYYY-MM-DD) and checks date validity.

@@ -30,7 +30,7 @@ use crate::types::VisibilityRules;
 use thiserror::Error;
 
 /// Maximum number of fields per contact card.
-pub const MAX_FIELDS: usize = 25;
+pub const MAX_FIELDS: usize = 200;
 
 /// Maximum display name length.
 pub const MAX_DISPLAY_NAME_LENGTH: usize = 100;
@@ -48,7 +48,7 @@ pub enum ContactCardError {
     EmptyDisplayName,
     #[error("Display name too long (max 100 characters)")]
     DisplayNameTooLong,
-    #[error("Maximum number of fields reached (25)")]
+    #[error("Maximum number of fields reached ({MAX_FIELDS})")]
     MaxFieldsReached,
     #[error("Field not found")]
     FieldNotFound,

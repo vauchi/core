@@ -254,9 +254,12 @@ impl AppEngine {
         &self.field_catalog
     }
 
-    /// Returns the default landing screen based on contact count.
-    /// MyInfo when no contacts, Contacts when >=1 contact.
+    /// Returns the default landing screen.
+    /// Onboarding when no identity, Contacts when >=1 contact, MyInfo otherwise.
     pub fn default_screen(&self) -> AppScreen {
+        if !self.vauchi.has_identity() {
+            return AppScreen::Onboarding;
+        }
         let has_contacts = self
             .vauchi
             .list_contacts()

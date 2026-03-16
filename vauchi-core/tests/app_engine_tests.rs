@@ -2110,11 +2110,12 @@ fn default_screen_is_contacts_when_has_contacts() {
 }
 
 #[test]
-fn default_screen_is_my_info_without_identity() {
+fn default_screen_is_onboarding_without_identity() {
     let vauchi = Vauchi::in_memory().unwrap();
     let engine = AppEngine::new(vauchi);
-    // Without identity, default is still MyInfo (onboarding overrides in new())
-    assert_eq!(engine.default_screen(), AppScreen::MyInfo);
+    // Without identity, default_screen returns Onboarding so frontends
+    // that call navigate_to(default_screen()) don't bypass onboarding.
+    assert_eq!(engine.default_screen(), AppScreen::Onboarding);
 }
 
 #[test]

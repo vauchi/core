@@ -585,7 +585,7 @@ mod tests {
         let mut engine = ExchangeEngine::with_session(config_no_groups(), session);
 
         // Session should be present
-        assert!(engine.session().is_some());
+        assert!(engine.session().is_some(), "expected Some value");
 
         // Should be at ShowQr step
         assert_eq!(engine.step, ExchangeStep::ShowQr);
@@ -613,7 +613,7 @@ mod tests {
 
         // No commands should be pending (session hasn't started QR yet)
         // (drain_commands is on mut self, so we check session state instead)
-        assert!(engine.session().is_some());
+        assert!(engine.session().is_some(), "expected Some value");
     }
 
     #[test]
@@ -688,7 +688,7 @@ mod tests {
         );
 
         // Should emit BleConnect command
-        assert!(result.is_some());
+        assert!(result.is_some(), "expected Some value");
         if let Some(ActionResult::ExchangeCommands { commands }) = result {
             assert!(
                 commands.iter().any(|c| matches!(
@@ -781,7 +781,7 @@ mod tests {
             });
 
         // Should advance to Verifying
-        assert!(result.is_some());
+        assert!(result.is_some(), "expected Some value");
         assert_eq!(
             engine.step,
             ExchangeStep::Verifying,
@@ -857,7 +857,7 @@ mod tests {
             engine.handle_hardware_event(crate::exchange::ExchangeHardwareEvent::QrScanned {
                 data: bob_qr_data,
             });
-        assert!(result.is_some());
+        assert!(result.is_some(), "expected Some value");
 
         // 4. Engine should be in Verifying step
         assert_eq!(engine.step, ExchangeStep::Verifying);

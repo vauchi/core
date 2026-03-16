@@ -426,7 +426,7 @@ fn test_wrong_device_cannot_decrypt() {
         *create_test_device(&master_seed, 0, "Device A").exchange_public_key();
     let result = orchestrator_c.decrypt_from_device(&device_a_public_key, &ciphertext);
 
-    assert!(result.is_err());
+    assert!(result.is_err(), "expected error");
 }
 
 // ============================================================
@@ -1105,7 +1105,7 @@ fn test_orchestrator_checkpoint_lifecycle() {
 
     // Load checkpoint
     let checkpoint = orchestrator.load_checkpoint(&device_b_id).unwrap();
-    assert!(checkpoint.is_some());
+    assert!(checkpoint.is_some(), "expected Some value");
     let (loaded_items, sent_count) = checkpoint.unwrap();
     assert_eq!(loaded_items.len(), 3);
     assert_eq!(sent_count, 2);

@@ -152,7 +152,7 @@ fn test_manager_get_locale_returns_bundled_english() {
 
     let locale = manager.locale("en");
     // English should always be available as bundled
-    assert!(locale.is_some());
+    assert!(locale.is_some(), "expected Some value");
 }
 
 #[test]
@@ -193,7 +193,7 @@ fn test_manager_help_returns_cached_content() {
     let manager = ContentManager::new(config).unwrap();
     let help = manager.help("en");
 
-    assert!(help.is_some());
+    assert!(help.is_some(), "expected Some value");
     let strings = help.unwrap();
     assert_eq!(strings.get("getting_started").unwrap(), "Welcome to Vauchi");
     assert_eq!(strings.get("faq").unwrap(), "Frequently asked questions");

@@ -87,7 +87,10 @@ fn test_delete_cek_crypto_shreds() {
     storage.save_contact_cek(contact.id(), &cek).unwrap();
 
     // Verify CEK exists
-    assert!(storage.load_contact_cek(contact.id()).unwrap().is_some());
+    storage
+        .load_contact_cek(contact.id())
+        .unwrap()
+        .expect("expected Some");
 
     // Delete CEK (crypto-shred)
     storage.delete_contact_cek(contact.id()).unwrap();
@@ -127,7 +130,7 @@ fn test_save_cek_nonexistent_contact_fails() {
     let cek = ContentEncryptionKey::generate();
 
     let result = storage.save_contact_cek("nonexistent", &cek);
-    assert!(result.is_err());
+    result.expect_err("expected error");
 }
 
 #[test]
@@ -151,7 +154,7 @@ fn test_cek_rotation_replaces_old() {
 
     // Old CEK should not work
     let ct_old = cek_v1.encrypt(b"old data").unwrap();
-    assert!(loaded.decrypt(&ct_old).is_err());
+    loaded.decrypt(&ct_old).expect_err("expected error");
 }
 
 // === Crypto-Shredding Integration ===
@@ -265,7 +268,7 @@ fn test_multi_contact_cek_isolation() {
     );
 
     // Cross-contact: Bob's CEK cannot decrypt Alice's data
-    assert!(loaded_bob.decrypt(&ct_alice).is_err());
+    loaded_bob.decrypt(&ct_alice).expect_err("expected error");
 }
 
 #[test]

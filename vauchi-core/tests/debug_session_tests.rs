@@ -208,8 +208,8 @@ fn to_jsonl_exports_all_events() {
     for line in &lines {
         let parsed: serde_json::Value =
             serde_json::from_str(line).unwrap_or_else(|e| panic!("Invalid JSON: {}: {}", line, e));
-        assert!(parsed.get("timestamp_ms").is_some());
-        assert!(parsed.get("kind").is_some());
+        parsed.get("timestamp_ms").expect("expected Some");
+        parsed.get("kind").expect("expected Some");
     }
 }
 

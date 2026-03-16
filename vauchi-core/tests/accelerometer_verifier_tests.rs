@@ -61,7 +61,7 @@ fn accelerometer_emit_records_and_stores() {
     let challenge = [42u8; 16];
 
     let result = verifier.emit_challenge(&challenge);
-    assert!(result.is_ok());
+    result.expect("expected success");
 }
 
 #[test]
@@ -72,7 +72,7 @@ fn accelerometer_listen_returns_envelope() {
 
     verifier.emit_challenge(&challenge).unwrap();
     let response = verifier.listen_for_response(Duration::from_secs(5));
-    assert!(response.is_ok());
+    response.expect("expected success");
     // Response is the serialized magnitude envelope (f32 per sample, 4 bytes each)
     let bytes = response.unwrap();
     assert!(

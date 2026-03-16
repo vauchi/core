@@ -266,7 +266,7 @@ fn trait_impl_populates_last_event_log() {
     let timeout = Duration::from_secs(5);
 
     let result = chain.verify_proximity_two_way(&emit, &listen, timeout, true);
-    assert!(result.is_ok());
+    result.expect("expected success");
 
     // After verification, last_event_log is populated
     let log = chain
@@ -289,7 +289,7 @@ fn trait_impl_populates_last_event_log_on_failure() {
     let timeout = Duration::from_secs(5);
 
     let result = chain.verify_proximity_two_way(&emit, &listen, timeout, true);
-    assert!(result.is_err());
+    result.expect_err("expected error");
 
     let log = chain
         .last_event_log()
@@ -317,7 +317,7 @@ fn confidence_level_reflects_winner_not_maximum() {
     let timeout = Duration::from_secs(5);
 
     let result = chain.verify_proximity_two_way(&emit, &listen, timeout, true);
-    assert!(result.is_ok());
+    result.expect("expected success");
 
     // The winning verifier is ManualConfirmation (Medium), not Ultrasonic (High)
     assert_eq!(chain.confidence_level(), ProximityConfidence::Medium);
@@ -526,5 +526,5 @@ fn no_callback_does_not_panic() {
     let emit = [1u8; 16];
     let listen = [2u8; 16];
     let result = chain.verify_proximity_two_way(&emit, &listen, Duration::from_secs(5), true);
-    assert!(result.is_ok());
+    result.expect("expected success");
 }

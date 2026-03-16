@@ -43,7 +43,7 @@ fn test_screen_model_serde_roundtrip() {
     assert_eq!(restored.title, "Welcome to Vauchi");
     assert_eq!(restored.components.len(), 2);
     assert_eq!(restored.actions.len(), 1);
-    assert!(restored.progress.is_some());
+    assert!(restored.progress.is_some(), "expected Some value");
     let progress = restored.progress.unwrap();
     assert_eq!(progress.current_step, 1);
     assert_eq!(progress.total_steps, 9);

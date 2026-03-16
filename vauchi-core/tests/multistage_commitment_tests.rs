@@ -53,7 +53,7 @@ fn test_commitment_wrong_key_fails() {
     let wrong_key = [0xFFu8; 32];
 
     let result = Commitment::open_with_key(&wrong_key, &ciphertext);
-    assert!(result.is_err());
+    result.expect_err("expected error");
 }
 
 #[test]
@@ -65,7 +65,7 @@ fn test_commitment_tampered_ciphertext_fails() {
     ciphertext[0] ^= 0xFF; // tamper
 
     let result = Commitment::open_with_key(&reveal_key, &ciphertext);
-    assert!(result.is_err());
+    result.expect_err("expected error");
 }
 
 #[test]

@@ -509,7 +509,7 @@ mod tests {
     #[test]
     fn test_empty_config_fails() {
         let result = MultiRelayConfig::builder().build();
-        assert!(result.is_err());
+        result.expect_err("expected error");
     }
 
     #[test]

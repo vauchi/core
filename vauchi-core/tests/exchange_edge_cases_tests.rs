@@ -197,7 +197,7 @@ fn test_duplicate_contact_detection() {
     // Check for duplicate
     let contacts = [existing_alice];
     let duplicate = bob_session.check_duplicate(&contacts);
-    assert!(duplicate.is_some());
+    duplicate.expect("expected Some");
     assert_eq!(duplicate.unwrap().display_name(), "Alice");
 }
 
@@ -459,7 +459,7 @@ fn test_qr_reuse_detected() {
     let qr_hash = [42u8; 32];
 
     // First use succeeds
-    assert!(session.check_qr_reuse(&qr_hash).is_ok());
+    session.check_qr_reuse(&qr_hash).expect("expected success");
 
     // Second use with same hash should fail
     let result = session.check_qr_reuse(&qr_hash);
@@ -478,8 +478,8 @@ fn test_different_qr_hashes_independent() {
     let hash_a = [1u8; 32];
     let hash_b = [2u8; 32];
 
-    assert!(session.check_qr_reuse(&hash_a).is_ok());
-    assert!(session.check_qr_reuse(&hash_b).is_ok());
+    session.check_qr_reuse(&hash_a).expect("expected success");
+    session.check_qr_reuse(&hash_b).expect("expected success");
 }
 
 // =============================================================================

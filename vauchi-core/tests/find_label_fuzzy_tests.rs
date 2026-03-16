@@ -36,7 +36,7 @@ fn test_find_label_fuzzy_matches_exact_name() {
 
     let found = wb.find_group_fuzzy("Professional").unwrap();
 
-    assert!(found.is_some());
+    assert!(found.is_some(), "expected Some value");
     assert_eq!(found.unwrap().id(), label.id());
 }
 
@@ -91,7 +91,7 @@ fn test_find_label_fuzzy_prefers_name_match_over_id_prefix() {
     // Search by name should find the right one
     let found = wb.find_group_fuzzy("friends").unwrap();
 
-    assert!(found.is_some());
+    assert!(found.is_some(), "expected Some value");
     assert_eq!(found.unwrap().id(), label1.id());
 }
 
@@ -103,6 +103,6 @@ fn test_find_label_fuzzy_mixed_case_name() {
 
     let found = wb.find_group_fuzzy("CLOSE FRIENDS").unwrap();
 
-    assert!(found.is_some());
+    assert!(found.is_some(), "expected Some value");
     assert_eq!(found.unwrap().id(), label.id());
 }

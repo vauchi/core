@@ -274,6 +274,7 @@ fn export_devices(storage: &Storage) -> Option<Vec<GdprDevice>> {
     }
 }
 
+// INLINE_TEST_REQUIRED: tests private internals
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -283,8 +284,8 @@ mod tests {
         let input = r#"{"action":"exchange","encryption_key":"deadbeef","contact":"Bob"}"#;
         let result = filter_audit_details(input);
         let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
-        assert!(parsed.get("contact").is_some());
-        assert!(parsed.get("action").is_some());
+        parsed.get("contact").expect("expected Some");
+        parsed.get("action").expect("expected Some");
         assert!(parsed.get("encryption_key").is_none());
     }
 
@@ -293,7 +294,7 @@ mod tests {
         let input = r#"{"nonce":"abc","shared_secret":"xyz","event":"sync"}"#;
         let result = filter_audit_details(input);
         let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
-        assert!(parsed.get("event").is_some());
+        parsed.get("event").expect("expected Some");
         assert!(parsed.get("nonce").is_none());
         assert!(parsed.get("shared_secret").is_none());
     }
@@ -303,7 +304,7 @@ mod tests {
         let input = r#"{"cek":"abc","smk":"def","sek":"ghi","contact_id":"123"}"#;
         let result = filter_audit_details(input);
         let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
-        assert!(parsed.get("contact_id").is_some());
+        parsed.get("contact_id").expect("expected Some");
         assert!(parsed.get("cek").is_none());
         assert!(parsed.get("smk").is_none());
         assert!(parsed.get("sek").is_none());
@@ -314,7 +315,7 @@ mod tests {
         let input = r#"{"Encryption_Key":"val","Private_Key":"val2","ok":"yes"}"#;
         let result = filter_audit_details(input);
         let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
-        assert!(parsed.get("ok").is_some());
+        parsed.get("ok").expect("expected Some");
         assert!(parsed.get("Encryption_Key").is_none());
         assert!(parsed.get("Private_Key").is_none());
     }
@@ -368,7 +369,7 @@ mod tests {
         let input = r#"{"ratchet_state":"abc","seed":"xyz","count":5}"#;
         let result = filter_audit_details(input);
         let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
-        assert!(parsed.get("count").is_some());
+        parsed.get("count").expect("expected Some");
         assert!(parsed.get("ratchet_state").is_none());
         assert!(parsed.get("seed").is_none());
     }

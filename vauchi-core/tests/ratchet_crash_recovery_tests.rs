@@ -242,7 +242,7 @@ fn test_invalid_send_chain_rejected() {
     // Should still deserialize (corruption doesn't cause format error)
     // But messages encrypted with corrupted state won't decrypt properly
     let alice = DoubleRatchetState::deserialize(state);
-    assert!(alice.is_ok()); // Deserialization succeeds
+    alice.expect("expected success"); // Deserialization succeeds
 }
 
 // =============================================================================

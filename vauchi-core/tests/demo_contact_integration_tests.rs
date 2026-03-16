@@ -102,7 +102,7 @@ fn test_demo_tips_advance() {
     let initial_index = state.current_tip_index;
 
     let next_tip = state.advance_to_next_tip();
-    assert!(next_tip.is_some());
+    assert!(next_tip.is_some(), "expected Some value");
     assert_ne!(
         state.current_tip_index, initial_index,
         "Index should advance"
@@ -364,10 +364,10 @@ fn test_demo_works_offline() {
 
     // All operations are local
     let tip = state.current_tip();
-    assert!(tip.is_some());
+    assert!(tip.is_some(), "expected Some value");
 
     let next = state.advance_to_next_tip();
-    assert!(next.is_some());
+    assert!(next.is_some(), "expected Some value");
 
     // Card generation is local
     let card = generate_demo_contact_card(&next.unwrap());

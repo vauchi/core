@@ -449,7 +449,7 @@ mod tests {
 
         // Try to load with key2 - should fail
         let result = storage2.load_key("test");
-        assert!(result.is_err());
+        result.expect_err("expected error");
     }
 
     #[cfg(unix)]
@@ -523,7 +523,7 @@ mod tests {
 
         // Deleting a key that doesn't exist should succeed silently
         let result = storage.secure_delete_key("nonexistent");
-        assert!(result.is_ok());
+        result.expect("expected success");
     }
 
     #[test]

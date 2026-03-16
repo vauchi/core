@@ -20,12 +20,12 @@ fn test_create_field() {
 #[test]
 fn test_validate_valid_phone() {
     let field = ContactField::new(FieldType::Phone, "Test", "+1-555-123-4567");
-    assert!(field.validate().is_ok());
+    field.validate().expect("expected success");
 }
 
 // @scenario: field_validation.feature:Valid email address formats
 #[test]
 fn test_validate_valid_email() {
     let field = ContactField::new(FieldType::Email, "Test", "test@example.com");
-    assert!(field.validate().is_ok());
+    field.validate().expect("expected success");
 }

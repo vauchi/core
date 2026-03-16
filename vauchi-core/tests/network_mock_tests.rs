@@ -68,7 +68,7 @@ fn test_mock_transport_error_injection() {
     transport.inject_error(NetworkError::ConnectionFailed("test error".into()));
 
     let result = transport.connect(&TransportConfig::default());
-    assert!(result.is_err());
+    assert!(result.is_err(), "expected error");
     assert!(result.unwrap_err().to_string().contains("test error"));
 }
 
@@ -102,7 +102,7 @@ fn test_mock_transport_not_connected_error() {
     let message = create_test_message();
     let result = transport.send(&message);
 
-    assert!(result.is_err());
+    assert!(result.is_err(), "expected error");
     assert!(matches!(result.unwrap_err(), NetworkError::NotConnected));
 }
 

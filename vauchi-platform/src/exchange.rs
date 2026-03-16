@@ -460,7 +460,7 @@ mod tests {
 
         let challenge = [0xAA; 16];
         let result = bridge.verify_proximity(&challenge, Duration::from_secs(5));
-        assert!(result.is_ok());
+        assert!(result.is_ok(), "expected success");
     }
 
     // @scenario: contact_exchange:QR code exchange blocked without proximity
@@ -473,7 +473,7 @@ mod tests {
 
         let challenge = [0xBB; 16];
         let result = bridge.verify_proximity(&challenge, Duration::from_secs(5));
-        assert!(result.is_err());
+        assert!(result.is_err(), "expected error");
         match result.unwrap_err() {
             ProximityError::DeviceError(msg) => assert_eq!(msg, "Device too far away"),
             other => panic!("Expected DeviceError, got {:?}", other),
@@ -577,7 +577,7 @@ mod tests {
 
         // Should fail — session is Idle, not Complete
         let result = session.extract_contact();
-        assert!(result.is_err());
+        assert!(result.is_err(), "expected error");
     }
 
     // @scenario: contact_exchange:Successful QR code exchange with proximity

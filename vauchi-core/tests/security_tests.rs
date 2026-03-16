@@ -57,6 +57,6 @@ fn test_formalized_state_machine() {
 
     // Test invalid transition
     let res = alice_session.apply(ExchangeEvent::PerformKeyAgreement);
-    assert!(res.is_err());
+    assert!(res.is_err(), "expected error");
     assert!(matches!(res.unwrap_err(), ExchangeError::InvalidState(_)));
 }

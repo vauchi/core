@@ -258,7 +258,7 @@ mod tests {
 
         // Also test that initiator.finalize fails with garbage response
         let result = initiator.finalize(&[0u8; 48]);
-        assert!(result.is_err());
+        assert!(result.is_err(), "expected error");
     }
 
     #[test]
@@ -284,7 +284,7 @@ mod tests {
 
         // Decryption should fail on corrupted data
         let result = client_transport.decrypt(&corrupted);
-        assert!(result.is_err());
+        assert!(result.is_err(), "expected error");
     }
 
     // @scenario: noise_protocol.feature:Relay public key parsed from URL fragment

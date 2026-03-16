@@ -205,7 +205,7 @@ proptest! {
         let ciphertext = encrypt(&key1, &plaintext).unwrap();
         let result = decrypt(&key2, &ciphertext);
 
-        prop_assert!(result.is_err());
+        prop_assert!(result.is_err(), "decryption with wrong key should fail but got {:?}", result);
     }
 
     /// Property: Signing and verification roundtrip
@@ -557,14 +557,14 @@ mod extended_property_tests {
             let field = ContactField::new(FieldType::Custom, &label, &long_value);
 
             let result = card.add_field(field);
-            prop_assert!(result.is_ok());
+            prop_assert!(result.is_ok(), "add_field failed: {:?}", result);
 
             // Verify roundtrip
             let json = serde_json::to_string(&card).unwrap();
             let restored: ContactCard = serde_json::from_str(&json).unwrap();
 
             let restored_field = restored.fields().iter().find(|f| f.label() == label);
-            prop_assert!(restored_field.is_some());
+            prop_assert!(restored_field.is_some(), "field '{}' not found after roundtrip", label);
             prop_assert_eq!(restored_field.unwrap().value(), long_value);
         }
 

@@ -476,7 +476,7 @@ fn test_json_roundtrip_preserves_option_timestamps() {
     for _ in 0..11 {
         progress.advance();
     }
-    assert!(progress.completed_at.is_some());
+    progress.completed_at.expect("expected Some");
 
     let json = progress.to_json().unwrap();
     let restored = OnboardingProgress::from_json(&json).unwrap();

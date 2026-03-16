@@ -82,7 +82,7 @@ fn test_sequential_contact_operations() {
     // Verify each can be loaded individually
     for id in &contact_ids {
         let loaded = storage.load_contact(id).unwrap();
-        assert!(loaded.is_some());
+        assert!(loaded.is_some(), "expected Some value");
     }
 
     // Delete half and verify
@@ -212,7 +212,7 @@ fn test_concurrent_readers_file_based() {
             // Read each contact
             for contact in &contacts {
                 let loaded = storage.load_contact(contact.id()).unwrap();
-                assert!(loaded.is_some());
+                assert!(loaded.is_some(), "expected Some value");
             }
 
             thread_id
@@ -296,7 +296,7 @@ fn test_read_after_write_consistency() {
     {
         let storage = Storage::open(&db_path, key.clone()).unwrap();
         let loaded = storage.load_contact(&contact_id).unwrap();
-        assert!(loaded.is_some());
+        assert!(loaded.is_some(), "expected Some value");
         assert_eq!(loaded.unwrap().card().display_name(), "Consistency Test");
     }
 }
@@ -331,11 +331,11 @@ fn test_update_visibility_consistency() {
 
         // Contact should exist
         let loaded = storage.load_contact(&contact_id).unwrap();
-        assert!(loaded.is_some());
+        assert!(loaded.is_some(), "expected Some value");
 
         // Own card should be updated
         let own_card = storage.load_own_card().unwrap();
-        assert!(own_card.is_some());
+        assert!(own_card.is_some(), "expected Some value");
         assert_eq!(own_card.unwrap().display_name(), "Updated Name");
     }
 }
@@ -407,12 +407,12 @@ fn test_delete_nonexistent_is_idempotent() {
 
     // Deleting non-existent contact should not error
     let result = storage.delete_contact("does-not-exist");
-    assert!(result.is_ok());
+    assert!(result.is_ok(), "expected success");
 
     // Deleting same non-existent ID multiple times should all succeed
     for _ in 0..10 {
         let result = storage.delete_contact("still-does-not-exist");
-        assert!(result.is_ok());
+        assert!(result.is_ok(), "expected success");
     }
 }
 

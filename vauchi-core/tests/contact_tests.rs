@@ -127,7 +127,7 @@ fn test_contact_set_display_name_empty_error() {
     let mut contact = create_test_contact();
 
     let result = contact.set_display_name("");
-    assert!(result.is_err());
+    result.expect_err("expected error");
 }
 
 // @scenario: contacts_management.feature:View contact details

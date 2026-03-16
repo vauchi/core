@@ -27,7 +27,7 @@ fn test_phone_with_spaces_generates_tel_uri() {
     let field = ContactField::new(FieldType::Phone, "International", "+44 20 7946 0958");
     let uri = field.to_uri();
     // Spaces should be preserved or removed depending on RFC 3966
-    assert!(uri.is_some());
+    assert!(uri.is_some(), "expected Some value");
     assert!(uri.unwrap().starts_with("tel:"));
 }
 
@@ -36,7 +36,7 @@ fn test_phone_with_spaces_generates_tel_uri() {
 fn test_phone_with_parentheses() {
     let field = ContactField::new(FieldType::Phone, "Home", "(555) 123-4567");
     let uri = field.to_uri();
-    assert!(uri.is_some());
+    assert!(uri.is_some(), "expected Some value");
     assert!(uri.unwrap().starts_with("tel:"));
 }
 
@@ -261,7 +261,7 @@ fn test_social_to_action_returns_open_url() {
 fn test_address_generates_map_query() {
     let field = ContactField::new(FieldType::Address, "Home", "123 Main St, City, ST 12345");
     let uri = field.to_uri();
-    assert!(uri.is_some());
+    assert!(uri.is_some(), "expected Some value");
     let uri_str = uri.unwrap();
     // Should be a geo: URI or maps URL
     assert!(uri_str.starts_with("geo:") || uri_str.contains("maps"));
@@ -276,7 +276,7 @@ fn test_address_is_url_encoded() {
         "123 Main St, San Francisco, CA",
     );
     let uri = field.to_uri();
-    assert!(uri.is_some());
+    assert!(uri.is_some(), "expected Some value");
     let uri_str = uri.unwrap();
     // Spaces and commas should be encoded
     assert!(!uri_str.contains(' ') || uri_str.contains("%20") || uri_str.contains('+'));
@@ -332,7 +332,7 @@ fn test_custom_field_uses_heuristic_for_uri() {
     let field = ContactField::new(FieldType::Custom, "Signal", "+1-555-987-6543");
     let uri = field.to_uri();
     // Should detect as phone and return tel: URI
-    assert!(uri.is_some());
+    assert!(uri.is_some(), "expected Some value");
     assert!(uri.unwrap().starts_with("tel:"));
 }
 
@@ -469,7 +469,7 @@ fn test_whitespace_only_value_returns_none() {
 fn test_special_characters_in_email_encoded() {
     let field = ContactField::new(FieldType::Email, "Test", "test&user@example.com");
     let uri = field.to_uri();
-    assert!(uri.is_some());
+    assert!(uri.is_some(), "expected Some value");
     // & should be safe in mailto but let's verify it's handled
     assert!(uri.unwrap().contains("test"));
 }
@@ -478,7 +478,7 @@ fn test_special_characters_in_email_encoded() {
 fn test_unicode_in_address_encoded() {
     let field = ContactField::new(FieldType::Address, "Office", "東京都渋谷区");
     let uri = field.to_uri();
-    assert!(uri.is_some());
+    assert!(uri.is_some(), "expected Some value");
     // Unicode should be percent-encoded
     let uri_str = uri.unwrap();
     assert!(uri_str.contains('%') || uri_str.contains("東京")); // Either encoded or raw UTF-8
@@ -582,7 +582,7 @@ fn test_empty_field_secondary_actions() {
 fn test_directions_uri_basic_address() {
     let field = ContactField::new(FieldType::Address, "Home", "123 Main St, City, ST 12345");
     let uri = field.to_directions_uri();
-    assert!(uri.is_some());
+    assert!(uri.is_some(), "expected Some value");
     let uri_str = uri.unwrap();
     // Should be a web maps directions URL (not geo:)
     assert!(uri_str.starts_with("https://"));
@@ -595,7 +595,7 @@ fn test_directions_uri_basic_address() {
 fn test_directions_uri_special_chars_encoded() {
     let field = ContactField::new(FieldType::Address, "Office", "123 O'Brien's Way, Suite #5");
     let uri = field.to_directions_uri();
-    assert!(uri.is_some());
+    assert!(uri.is_some(), "expected Some value");
     let uri_str = uri.unwrap();
     // Apostrophe and # should be encoded
     assert!(!uri_str.contains('\'') || uri_str.contains("%27"));
@@ -631,7 +631,7 @@ fn test_directions_uri_non_address_returns_none() {
 fn test_directions_uri_unicode_address() {
     let field = ContactField::new(FieldType::Address, "Tokyo Office", "東京都渋谷区");
     let uri = field.to_directions_uri();
-    assert!(uri.is_some());
+    assert!(uri.is_some(), "expected Some value");
     let uri_str = uri.unwrap();
     assert!(uri_str.starts_with("https://"));
     // Unicode should be percent-encoded
@@ -924,7 +924,7 @@ fn test_unicode_domain_url() {
     let field = ContactField::new(FieldType::Website, "IDN", "https://例え.jp");
     let uri = field.to_uri();
     // Should preserve or encode the unicode domain
-    assert!(uri.is_some());
+    assert!(uri.is_some(), "expected Some value");
 }
 
 /// Edge case: Email with dots in local part
@@ -942,7 +942,7 @@ fn test_email_with_dots() {
 fn test_address_special_characters() {
     let field = ContactField::new(FieldType::Address, "Office", "123 O'Brien's Way, Suite #5");
     let uri = field.to_uri();
-    assert!(uri.is_some());
+    assert!(uri.is_some(), "expected Some value");
     // Special characters should be encoded
     let uri_str = uri.unwrap();
     assert!(uri_str.contains("geo:") || uri_str.contains("maps"));

@@ -370,7 +370,7 @@ fn test_onion_address_construction() {
 
     let with_onion =
         TorRelayAddress::with_onion("wss://relay.example.com", "ws://example.onion:80");
-    assert!(with_onion.onion_url.is_some());
+    with_onion.onion_url.expect("expected Some");
     assert_eq!(
         with_onion.onion_url.as_deref(),
         Some("ws://example.onion:80")

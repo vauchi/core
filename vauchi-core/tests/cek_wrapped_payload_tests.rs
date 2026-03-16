@@ -103,13 +103,13 @@ fn test_versioned_payload_cek_roundtrip() {
 fn test_versioned_payload_unknown_version_returns_error() {
     let data = vec![0xFF, 0x01, 0x02, 0x03];
     let result = VersionedPayload::decode(&data);
-    assert!(result.is_err());
+    result.expect_err("expected error");
 }
 
 #[test]
 fn test_versioned_payload_empty_returns_error() {
     let result = VersionedPayload::decode(&[]);
-    assert!(result.is_err());
+    result.expect_err("expected error");
 }
 
 // === Backward Compatibility ===
@@ -188,7 +188,9 @@ fn test_cek_rotation_in_wrapped_payload() {
 
     // v1 CEK cannot decrypt v2 ciphertext
     let old_cek = ContentEncryptionKey::from_bytes(wrapped_v1.cek);
-    assert!(old_cek.decrypt(&wrapped_v2.cek_ciphertext).is_err());
+    old_cek
+        .decrypt(&wrapped_v2.cek_ciphertext)
+        .expect_err("expected error");
 
     // v2 CEK correctly decrypts v2 ciphertext
     let new_cek = ContentEncryptionKey::from_bytes(wrapped_v2.cek);

@@ -368,7 +368,11 @@ fn test_migrate_contacts_generates_cek() {
     assert_eq!(migrated, 1);
 
     // Bob should now have a CEK
-    assert!(alice.storage().load_contact_cek(&bob_id).unwrap().is_some());
+    alice
+        .storage()
+        .load_contact_cek(&bob_id)
+        .unwrap()
+        .expect("expected Some");
 }
 
 #[test]

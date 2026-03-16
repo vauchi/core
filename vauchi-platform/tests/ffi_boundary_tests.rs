@@ -374,7 +374,7 @@ fn test_get_faqs_by_category_localized() {
 fn test_get_faq_by_id_localized() {
     ensure_init();
     let faq = get_faq_by_id_localized("faq-phone-lost".to_string(), MobileLocale::German);
-    assert!(faq.is_some());
+    assert!(faq.is_some(), "expected Some value");
     assert!(faq.unwrap().question.contains("Telefon"));
 }
 

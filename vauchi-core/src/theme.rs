@@ -256,7 +256,7 @@ mod tests {
 
     #[test]
     fn test_parse_hex_valid() {
-        assert!(parse_hex("#ffffff").is_ok());
+        parse_hex("#ffffff").expect("expected success");
         assert_eq!(parse_hex("#ffffff").unwrap(), (255, 255, 255));
         assert_eq!(parse_hex("#000000").unwrap(), (0, 0, 0));
         assert_eq!(parse_hex("#1e1e2e").unwrap(), (30, 30, 46));
@@ -264,9 +264,9 @@ mod tests {
 
     #[test]
     fn test_parse_hex_invalid() {
-        assert!(parse_hex("ffffff").is_err());
-        assert!(parse_hex("#fff").is_err());
-        assert!(parse_hex("#gggggg").is_err());
+        parse_hex("ffffff").expect_err("expected error");
+        parse_hex("#fff").expect_err("expected error");
+        parse_hex("#gggggg").expect_err("expected error");
     }
 
     #[test]
@@ -293,7 +293,7 @@ mod tests {
         let data = include_bytes!("../../../themes/themes.json");
         let themes = load_themes_from_json(data).unwrap();
         let found = themes.iter().find(|t| t.id == "catppuccin-mocha");
-        assert!(found.is_some());
+        found.expect("expected Some");
     }
 
     #[test]
@@ -349,7 +349,7 @@ mod tests {
     #[test]
     fn test_load_themes_from_json_invalid_json() {
         let result = load_themes_from_json(b"not json");
-        assert!(result.is_err());
+        result.expect_err("expected error");
     }
 
     #[test]

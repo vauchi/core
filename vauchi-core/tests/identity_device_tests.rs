@@ -159,7 +159,7 @@ fn test_find_device() {
     let registry = DeviceRegistry::new(device.to_registered(&seed), &signing_key);
 
     let found = registry.find_device(&device_id);
-    assert!(found.is_some());
+    found.expect("expected Some");
     assert_eq!(found.unwrap().device_name, "Primary");
 
     let not_found = registry.find_device(&[0u8; 32]);

@@ -71,7 +71,10 @@ fn test_storage_delete_contact() {
     let contact_id = contact.id().to_string();
 
     storage.save_contact(&contact).unwrap();
-    assert!(storage.load_contact(&contact_id).unwrap().is_some());
+    assert!(
+        storage.load_contact(&contact_id).unwrap().is_some(),
+        "expected Some value"
+    );
 
     let deleted = storage.delete_contact(&contact_id).unwrap();
     assert!(deleted);
@@ -271,7 +274,10 @@ fn test_storage_ratchet_deleted_with_contact() {
         .unwrap();
 
     // Verify ratchet exists
-    assert!(storage.load_ratchet_state(&contact_id).unwrap().is_some());
+    assert!(
+        storage.load_ratchet_state(&contact_id).unwrap().is_some(),
+        "expected Some value"
+    );
 
     // Delete contact
     storage.delete_contact(&contact_id).unwrap();
@@ -625,7 +631,7 @@ fn test_save_load_avatar() {
 fn test_save_avatar_nonexistent_contact() {
     let storage = create_test_storage();
     let result = storage.save_avatar("nonexistent", b"data");
-    assert!(result.is_err());
+    assert!(result.is_err(), "expected error");
 }
 
 /// Test load_avatar fails for nonexistent contact
@@ -634,7 +640,7 @@ fn test_save_avatar_nonexistent_contact() {
 fn test_load_avatar_nonexistent_contact() {
     let storage = create_test_storage();
     let result = storage.load_avatar("nonexistent");
-    assert!(result.is_err());
+    assert!(result.is_err(), "expected error");
 }
 
 /// Test get_contact_limit returns default 10_000
@@ -684,7 +690,7 @@ fn test_record_and_load_delta_version() {
 fn test_last_delta_version_nonexistent_contact() {
     let storage = create_test_storage();
     let result = storage.last_delta_version("nonexistent");
-    assert!(result.is_err());
+    assert!(result.is_err(), "expected error");
 }
 
 /// Test wipe_device_data clears device_info and sync state
@@ -774,7 +780,7 @@ fn test_load_device_registry_json() {
 
     // Load as JSON
     let json = storage.load_device_registry_json().unwrap();
-    assert!(json.is_some());
+    assert!(json.is_some(), "expected Some value");
     let json_str = json.unwrap();
     assert!(json_str.contains("device_id"));
 }

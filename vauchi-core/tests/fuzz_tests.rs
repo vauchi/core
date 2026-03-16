@@ -280,11 +280,11 @@ proptest! {
 
         // Encrypt should succeed for any input
         let ciphertext = encrypt(&key, &data);
-        prop_assert!(ciphertext.is_ok());
+        prop_assert!(ciphertext.is_ok(), "encrypt failed: {:?}", ciphertext);
 
         // Decrypt should succeed and return original
         let plaintext = decrypt(&key, &ciphertext.unwrap());
-        prop_assert!(plaintext.is_ok());
+        prop_assert!(plaintext.is_ok(), "decrypt failed: {:?}", plaintext);
         prop_assert_eq!(data, plaintext.unwrap());
     }
 
@@ -313,7 +313,7 @@ proptest! {
 
         // Decrypting with wrong key should fail
         let result = decrypt(&key2, &ciphertext);
-        prop_assert!(result.is_err());
+        prop_assert!(result.is_err(), "wrong-key decrypt should fail but got {:?}", result);
     }
 }
 
@@ -334,7 +334,7 @@ proptest! {
 
         // Should not panic regardless of input
         let result = HKDF::derive(Some(&salt), &ikm, info, 32);
-        prop_assert!(result.is_ok());
+        prop_assert!(result.is_ok(), "HKDF derive failed: {:?}", result);
         prop_assert_eq!(result.unwrap().len(), 32);
     }
 
@@ -348,7 +348,7 @@ proptest! {
         let info = b"test-info";
 
         let result = HKDF::derive(Some(&salt), &ikm, info, len);
-        prop_assert!(result.is_ok());
+        prop_assert!(result.is_ok(), "HKDF derive failed: {:?}", result);
         prop_assert_eq!(result.unwrap().len(), len);
     }
 }

@@ -84,7 +84,7 @@ fn test_resolve_sender_finds_match() {
     let anon_id = compute_anonymous_id(contacts[0].shared_key().as_bytes(), epoch);
 
     let result = resolve_sender(&contacts, &anon_id, epoch);
-    assert!(result.is_some());
+    result.expect("expected Some");
     assert_eq!(result.unwrap().display_name(), "Alice");
 }
 
@@ -113,7 +113,7 @@ fn test_resolve_sender_previous_epoch_tolerance() {
 
     // Should still resolve when checking current epoch (boundary tolerance)
     let result = resolve_sender(&contacts, &prev_id, epoch);
-    assert!(result.is_some());
+    result.expect("expected Some");
     assert_eq!(result.unwrap().display_name(), "Bob");
 }
 
@@ -135,7 +135,7 @@ fn test_resolve_sender_epoch_zero() {
 
     let anon_id = compute_anonymous_id(contacts[0].shared_key().as_bytes(), 0);
     let result = resolve_sender(&contacts, &anon_id, 0);
-    assert!(result.is_some());
+    result.expect("expected Some");
 }
 
 // @scenario: anonymous_sender.feature:Receiver resolves anonymous sender from contact list
@@ -152,7 +152,7 @@ fn test_resolve_sender_multiple_contacts() {
     let bob_id = compute_anonymous_id(contacts[1].shared_key().as_bytes(), epoch);
 
     let result = resolve_sender(&contacts, &bob_id, epoch);
-    assert!(result.is_some());
+    result.expect("expected Some");
     assert_eq!(result.unwrap().display_name(), "Bob");
 }
 
@@ -397,8 +397,8 @@ fn test_replay_prevention_same_epoch_requires_message_dedup() {
     let first_resolution = resolve_sender(&contacts, &anon_id, epoch);
     let second_resolution = resolve_sender(&contacts, &anon_id, epoch);
 
-    assert!(first_resolution.is_some());
-    assert!(second_resolution.is_some());
+    first_resolution.expect("expected Some");
+    second_resolution.expect("expected Some");
     assert_eq!(first_resolution.unwrap().display_name(), "Target");
     assert_eq!(second_resolution.unwrap().display_name(), "Target");
 

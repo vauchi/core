@@ -15,13 +15,13 @@ use crate::VauchiWorld;
 #[given("I have an existing identity")]
 fn have_existing_identity(world: &mut VauchiWorld) {
     // Identity creation is handled in VauchiWorld::new()
-    assert!(world.vauchi.identity().is_some());
+    world.vauchi.identity().expect("expected Some");
 }
 
 #[given("I am logged into Vauchi")]
 fn logged_into_vauchi(world: &mut VauchiWorld) {
     // In-memory mode is always "logged in"
-    assert!(world.vauchi.identity().is_some());
+    world.vauchi.identity().expect("expected Some");
 }
 
 #[given(expr = "I have a contact card with display name {string}")]

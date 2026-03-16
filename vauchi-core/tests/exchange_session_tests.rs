@@ -243,7 +243,7 @@ fn test_detect_duplicate_contact() {
 
     // Should detect Alice as duplicate (session is in PeerScanned state)
     let duplicate = bob_session.check_duplicate(&contacts);
-    assert!(duplicate.is_some());
+    duplicate.expect("expected Some");
     assert_eq!(duplicate.unwrap().display_name(), "Alice");
 }
 

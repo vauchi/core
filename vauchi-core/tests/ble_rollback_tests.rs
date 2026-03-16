@@ -15,7 +15,7 @@ fn test_rollback_clears_pending_data() {
     assert!(rb.has_pending("contact-1"));
 
     let result = rb.rollback("contact-1");
-    assert!(result.is_ok());
+    assert!(result.is_ok(), "expected success");
     assert!(!rb.has_pending("contact-1"));
 }
 
@@ -24,7 +24,7 @@ fn test_rollback_clears_pending_data() {
 fn test_rollback_nonexistent_is_noop() {
     let mut rb = BleRollback::new();
     let result = rb.rollback("does-not-exist");
-    assert!(result.is_ok());
+    assert!(result.is_ok(), "expected success");
 }
 
 // @scenario: ble_exchange.feature:Commit returns pending data and removes it
@@ -35,7 +35,7 @@ fn test_commit_removes_pending() {
     rb.record_pending("contact-2".to_string(), data.clone());
 
     let committed = rb.commit("contact-2");
-    assert!(committed.is_ok());
+    assert!(committed.is_ok(), "expected success");
     assert_eq!(committed.unwrap(), data);
     assert!(!rb.has_pending("contact-2"));
 }
@@ -45,7 +45,7 @@ fn test_commit_removes_pending() {
 fn test_commit_nonexistent_returns_error() {
     let mut rb = BleRollback::new();
     let result = rb.commit("missing");
-    assert!(result.is_err());
+    assert!(result.is_err(), "expected error");
     match result {
         Err(ExchangeError::InvalidState(msg)) => {
             assert!(msg.contains("missing"), "error should contain contact_id");

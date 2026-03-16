@@ -73,7 +73,7 @@ fn test_create_and_retrieve_retry_entry() {
     storage.create_retry_entry(&entry).unwrap();
 
     let retrieved = storage.get_retry_entry("retry-msg-001").unwrap();
-    assert!(retrieved.is_some());
+    assert!(retrieved.is_some(), "expected Some value");
 
     let retrieved = retrieved.unwrap();
     assert_eq!(retrieved.message_id, "retry-msg-001");
@@ -159,7 +159,10 @@ fn test_delete_retry_entry() {
     };
     storage.create_retry_entry(&entry).unwrap();
 
-    assert!(storage.get_retry_entry("to-delete").unwrap().is_some());
+    assert!(
+        storage.get_retry_entry("to-delete").unwrap().is_some(),
+        "expected Some value"
+    );
 
     let deleted = storage.delete_retry_entry("to-delete").unwrap();
     assert!(deleted);

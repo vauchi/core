@@ -123,7 +123,7 @@ mod send_tests {
     fn test_binary_sender_failure() {
         let mut sender = MockSender::failing_after(0);
         let result = sender.send_binary(vec![1, 2, 3]);
-        assert!(result.is_err());
+        result.expect_err("expected error");
     }
 
     // Async sender tests
@@ -184,7 +184,7 @@ mod send_tests {
         rt.block_on(async {
             let mut sender = MockAsyncSender::failing_after(0);
             let result = sender.send_binary(vec![1, 2, 3]).await;
-            assert!(result.is_err());
+            result.expect_err("expected error");
         });
     }
 }

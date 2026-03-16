@@ -87,8 +87,8 @@ fn test_label_crud_operations() {
 
     // Verify it exists
     assert_eq!(manager.group_count(), 1);
-    assert!(manager.get_group(&family_id).is_some());
-    assert!(manager.get_group_by_name("Family").is_some());
+    manager.get_group(&family_id).expect("expected Some");
+    manager.get_group_by_name("Family").expect("expected Some");
 
     // Create additional labels
     let friends = manager.create_group("Friends").unwrap();
@@ -152,7 +152,9 @@ fn test_label_crud_operations() {
     assert!(manager.get_group_by_name("Friends").is_none());
 
     // New name should work
-    assert!(manager.get_group_by_name("Close Friends").is_some());
+    manager
+        .get_group_by_name("Close Friends")
+        .expect("expected Some");
 
     // Cannot rename to existing label name
     let rename_dup_result = manager.rename_group(&friends_id, "Family");
@@ -1058,7 +1060,9 @@ fn test_delete_contact_clears_overrides() {
 
     // Verify state
     assert_eq!(manager.groups_for_contact(bob).len(), 2);
-    assert!(manager.get_all_contact_overrides(bob).is_some());
+    manager
+        .get_all_contact_overrides(bob)
+        .expect("expected Some");
 
     // Remove Bob from all labels (simulates contact deletion)
     manager.remove_contact_from_all_groups(bob);

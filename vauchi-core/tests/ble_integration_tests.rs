@@ -162,7 +162,7 @@ fn test_create_exchange_session() {
     let session = BLEExchangeSession::new(&keypair);
 
     assert!(matches!(session.state(), BLEExchangeState::Idle));
-    assert!(session.exchange_token().is_some());
+    session.exchange_token().expect("expected Some");
 }
 
 /// Test: Start advertising
@@ -298,8 +298,12 @@ fn test_verify_proximity_before_exchange() {
     let close_verifier = MockBLEVerifier::success_at_distance(1.0);
     let far_verifier = MockBLEVerifier::success_at_distance(10.0);
 
-    assert!(close_verifier.verify_device_proximity(&device).is_ok());
-    assert!(far_verifier.verify_device_proximity(&device).is_err());
+    close_verifier
+        .verify_device_proximity(&device)
+        .expect("expected success");
+    far_verifier
+        .verify_device_proximity(&device)
+        .expect_err("expected error");
 }
 
 /// Test: Proximity challenge-response
@@ -343,7 +347,7 @@ fn test_discovery_failure() {
 
     let result = verifier.discover_nearby(Duration::from_secs(5));
 
-    assert!(result.is_err());
+    result.expect_err("expected error");
 }
 
 /// Test: Connection to device without token fails

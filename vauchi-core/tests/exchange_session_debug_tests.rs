@@ -273,6 +273,6 @@ fn debug_log_exports_to_jsonl() {
     for line in &lines {
         let parsed: serde_json::Value =
             serde_json::from_str(line).unwrap_or_else(|e| panic!("Invalid JSON: {}: {}", line, e));
-        assert!(parsed.get("elapsed_ms").is_some());
+        parsed.get("elapsed_ms").expect("expected Some");
     }
 }

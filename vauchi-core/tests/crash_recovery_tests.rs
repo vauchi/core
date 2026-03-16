@@ -160,7 +160,10 @@ fn test_multiple_device_checkpoints_independent() {
     // Clearing one doesn't affect the other
     storage.clear_sync_checkpoint(&device_a).unwrap();
     assert!(storage.load_sync_checkpoint(&device_a).unwrap().is_none());
-    assert!(storage.load_sync_checkpoint(&device_b).unwrap().is_some());
+    assert!(
+        storage.load_sync_checkpoint(&device_b).unwrap().is_some(),
+        "expected Some value"
+    );
 }
 
 // ============================================================
@@ -177,7 +180,7 @@ fn test_batch_checkpoint_save_and_load() {
         .unwrap();
 
     let loaded = storage.load_batch_checkpoint(batch_id).unwrap();
-    assert!(loaded.is_some());
+    assert!(loaded.is_some(), "expected Some value");
 
     let (total, processed, state) = loaded.unwrap();
     assert_eq!(total, 50);
@@ -269,5 +272,8 @@ fn test_batch_checkpoint_no_orphans() {
 
     // The other should still exist
     assert!(storage.load_batch_checkpoint("b1").unwrap().is_none());
-    assert!(storage.load_batch_checkpoint("b2").unwrap().is_some());
+    assert!(
+        storage.load_batch_checkpoint("b2").unwrap().is_some(),
+        "expected Some value"
+    );
 }

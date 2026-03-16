@@ -299,7 +299,7 @@ mod tests {
 
         // Next attempt should fail with MaxRetriesExceeded
         let result = conn.reconnect();
-        assert!(result.is_err());
+        assert!(result.is_err(), "expected error");
         assert!(matches!(
             result.unwrap_err(),
             NetworkError::MaxRetriesExceeded

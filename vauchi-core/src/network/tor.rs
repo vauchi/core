@@ -492,6 +492,7 @@ fn parse_host_port(url: &str) -> Result<(String, u16), super::error::NetworkErro
     }
 }
 
+// INLINE_TEST_REQUIRED: tests private internals
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -515,7 +516,7 @@ mod tests {
     fn test_mock_connector_bootstrap_failure() {
         let connector = MockTorConnector::failing_bootstrap();
         let result = connector.bootstrap();
-        assert!(result.is_err());
+        assert!(result.is_err(), "expected error");
     }
 
     #[test]
@@ -523,21 +524,21 @@ mod tests {
         let connector = MockTorConnector::failing_connect();
         connector.bootstrap().unwrap();
         let result = connector.connect_to("example.com", 443);
-        assert!(result.is_err());
+        assert!(result.is_err(), "expected error");
     }
 
     #[test]
     fn test_mock_connector_connect_before_bootstrap() {
         let connector = MockTorConnector::new();
         let result = connector.connect_to("example.com", 443);
-        assert!(result.is_err());
+        assert!(result.is_err(), "expected error");
     }
 
     #[test]
     fn test_mock_connector_rotate_before_bootstrap() {
         let connector = MockTorConnector::new();
         let result = connector.rotate_circuit();
-        assert!(result.is_err());
+        assert!(result.is_err(), "expected error");
     }
 
     #[test]
@@ -618,7 +619,7 @@ mod tests {
         };
 
         let result = transport.connect(&config);
-        assert!(result.is_err());
+        assert!(result.is_err(), "expected error");
         assert_eq!(transport.state(), ConnectionState::Disconnected);
     }
 
@@ -641,6 +642,6 @@ mod tests {
         };
 
         let result = transport.send(&envelope);
-        assert!(result.is_err());
+        assert!(result.is_err(), "expected error");
     }
 }

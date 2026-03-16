@@ -451,7 +451,10 @@ fn test_invalid_accent_rejected() {
     let customized = CustomizedTheme::new(base);
 
     // Invalid hex should be rejected
-    assert!(customized.with_accent("not-a-color").is_err());
+    assert!(
+        customized.with_accent("not-a-color").is_err(),
+        "expected error"
+    );
 }
 
 /// Test: Custom accent persists (simulation)
@@ -543,7 +546,7 @@ fn test_remote_theme_updates() {
 
     // Verify cache was written
     let cached = cache.get_content(ContentType::Themes, "themes.json");
-    assert!(cached.is_some());
+    assert!(cached.is_some(), "expected Some value");
     let cached_data = cached.unwrap();
     assert!(String::from_utf8_lossy(&cached_data).contains("tokyo-night"));
 }
@@ -644,7 +647,7 @@ fn test_theme_selection_preserved_after_update() {
     let updated_theme = theme_by_id(&settings.selected_theme_id);
 
     // Then the user's theme selection should be preserved
-    assert!(updated_theme.is_some());
+    assert!(updated_theme.is_some(), "expected Some value");
     assert_eq!(updated_theme.unwrap().id, "catppuccin-mocha");
 }
 

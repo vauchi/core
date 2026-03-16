@@ -220,19 +220,19 @@ mod tests {
     #[test]
     fn test_bridge_validation_rejects_empty() {
         let result = TorConfig::enabled().with_bridges(vec!["".to_string()]);
-        assert!(result.is_err());
+        result.expect_err("expected error");
     }
 
     #[test]
     fn test_bridge_validation_rejects_no_port() {
         let result = TorConfig::enabled().with_bridges(vec!["obfs4 198.51.100.1".to_string()]);
-        assert!(result.is_err());
+        result.expect_err("expected error");
     }
 
     #[test]
     fn test_bridge_validation_rejects_invalid_port() {
         let result = TorConfig::enabled().with_bridges(vec!["obfs4 198.51.100.1:abc".to_string()]);
-        assert!(result.is_err());
+        result.expect_err("expected error");
     }
 
     #[test]
@@ -240,13 +240,13 @@ mod tests {
         let result = TorConfig::enabled().with_bridges(vec![
             "obfs4 198.51.100.1:443 cert=abcdef iat-mode=0".to_string(),
         ]);
-        assert!(result.is_ok());
+        result.expect("expected success");
     }
 
     #[test]
     fn test_bridge_validation_accepts_plain_bridge() {
         let result = TorConfig::enabled().with_bridges(vec!["198.51.100.1:9001".to_string()]);
-        assert!(result.is_ok());
+        result.expect("expected success");
     }
 
     #[test]

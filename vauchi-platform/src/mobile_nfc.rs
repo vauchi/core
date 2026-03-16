@@ -348,6 +348,6 @@ mod tests {
         let session = create_nfc_initiator_test(make_identity(), "Alice".into());
         session.create_key_offer().unwrap();
         let result = session.create_key_offer();
-        assert!(result.is_err());
+        result.expect_err("expected error");
     }
 }

@@ -494,7 +494,7 @@ fn test_serialized_ratchet_state_compatibility_v1() {
     assert_eq!(state.root_key[31], 7);
 
     // Verify their_dh is present
-    assert!(state.their_dh.is_some());
+    state.their_dh.expect("expected Some");
     assert_eq!(state.their_dh.unwrap()[0], 8);
 
     // Verify send_chain

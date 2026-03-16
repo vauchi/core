@@ -62,7 +62,7 @@ fn test_send_or_queue_online_marks_sending() {
 
     // Send while online — should still queue but mark as "sending"
     let result = manager.send_or_queue(&storage, test_update("msg-1", "alice"), true);
-    assert!(result.is_ok());
+    result.expect("expected success");
 
     // The update is queued with Sending status (caller is responsible for actual send)
     let pending = storage.get_pending_update("msg-1").unwrap();

@@ -17,7 +17,7 @@ fn test_get_display_qr_starts_advertising() {
     let card = b"Alice's card".to_vec();
     let mut session = MultiStageSession::new(card);
     let qr = session.get_display_qr();
-    assert!(qr.is_some());
+    qr.expect("expected Some");
     assert!(qr.unwrap().data.starts_with("INIT"));
     assert!(matches!(session.get_state(), ProtocolState::Advertising));
 }

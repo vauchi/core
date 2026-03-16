@@ -113,7 +113,7 @@ fn test_coalesce_preserves_final_state() {
 
     // Coalesce
     let result = sync_manager.coalesce_updates(contact_id).unwrap();
-    assert!(result.is_some());
+    result.expect("expected Some");
 
     // The coalesced payload should contain the field change
     let pending = sync_manager.get_pending(contact_id).unwrap();

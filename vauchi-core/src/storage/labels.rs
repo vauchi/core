@@ -636,7 +636,7 @@ mod tests {
         storage.delete_group(label.id()).unwrap();
 
         let result = storage.load_group(label.id());
-        assert!(result.is_err());
+        result.expect_err("expected error");
     }
 
     #[test]

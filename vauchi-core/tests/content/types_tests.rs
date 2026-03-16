@@ -31,7 +31,7 @@ fn test_content_manifest_deserialize() {
     let manifest: ContentManifest = serde_json::from_str(json).unwrap();
     assert_eq!(manifest.schema_version, 1);
     assert_eq!(manifest.base_url, "https://vauchi.app/app-files");
-    assert!(manifest.content.networks.is_some());
+    assert!(manifest.content.networks.is_some(), "expected Some value");
 
     let networks = manifest.content.networks.unwrap();
     assert_eq!(networks.version, "1.0.0");

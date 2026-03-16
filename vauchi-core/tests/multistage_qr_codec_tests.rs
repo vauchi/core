@@ -107,7 +107,7 @@ fn test_parse_confirm_qr() {
 #[test]
 fn test_parse_unknown_prefix() {
     let result = parse_qr("UNKNOWN:data");
-    assert!(result.is_err());
+    result.expect_err("expected error");
 }
 
 #[test]

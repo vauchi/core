@@ -51,7 +51,7 @@ fn test_load_or_generate_fallback_key_rejects_wrong_length() {
     let key_path = dir.path().join(".fallback-key");
     std::fs::write(&key_path, b"too short").unwrap();
     let result = local_keys::load_or_generate_fallback_key(dir.path());
-    assert!(result.is_err());
+    assert!(result.is_err(), "expected error");
     let err_msg = result.unwrap_err().to_string();
     assert!(
         err_msg.contains("Invalid fallback key length"),
@@ -125,7 +125,7 @@ fn test_load_or_generate_backup_password_rejects_wrong_length() {
     let pw_path = dir.path().join(".backup-password");
     std::fs::write(&pw_path, "tooshort").unwrap();
     let result = local_keys::load_or_generate_backup_password(dir.path());
-    assert!(result.is_err());
+    assert!(result.is_err(), "expected error");
     let err_msg = result.unwrap_err().to_string();
     assert!(
         err_msg.contains("Invalid backup password length"),

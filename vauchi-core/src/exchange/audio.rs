@@ -354,7 +354,9 @@ mod tests {
         assert_eq!(verifier.capability(), &AudioCapability::Full);
 
         // Should be able to emit
-        assert!(verifier.emit_challenge(&challenge).is_ok());
+        verifier
+            .emit_challenge(&challenge)
+            .expect("expected success");
 
         // Should receive valid response
         let response = verifier
@@ -372,7 +374,7 @@ mod tests {
         let verifier = UltrasonicVerifier::new(Box::new(backend));
 
         let result = verifier.verify_proximity(&challenge, Duration::from_secs(5));
-        assert!(result.is_ok());
+        result.expect("expected success");
     }
 
     #[test]
@@ -405,7 +407,9 @@ mod tests {
         let verifier = UltrasonicVerifier::new(Box::new(backend));
 
         // Can emit
-        assert!(verifier.emit_challenge(&[0u8; 16]).is_ok());
+        verifier
+            .emit_challenge(&[0u8; 16])
+            .expect("expected success");
 
         // Cannot receive
         let result = verifier.listen_for_response(Duration::from_secs(1));
@@ -425,7 +429,9 @@ mod tests {
         assert!(matches!(result, Err(ProximityError::NotSupported)));
 
         // Can receive
-        assert!(verifier.listen_for_response(Duration::from_secs(1)).is_ok());
+        verifier
+            .listen_for_response(Duration::from_secs(1))
+            .expect("expected success");
     }
 
     #[test]
@@ -464,7 +470,7 @@ mod tests {
             Duration::from_secs(5),
             true, // is_initiator
         );
-        assert!(result.is_ok());
+        result.expect("expected success");
     }
 
     #[test]
@@ -483,7 +489,7 @@ mod tests {
             Duration::from_secs(5),
             false, // is_responder
         );
-        assert!(result.is_ok());
+        result.expect("expected success");
     }
 
     // AU-7: Property-based test for challenge encoding roundtrip

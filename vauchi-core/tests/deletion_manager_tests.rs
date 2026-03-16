@@ -148,8 +148,14 @@ fn test_execute_deletion_shreds_all_ceks() {
     storage.save_contact(&carol).unwrap();
 
     // Verify CEKs exist before deletion
-    assert!(storage.load_contact_cek(&bob_id).unwrap().is_some());
-    assert!(storage.load_contact_cek(&carol_id).unwrap().is_some());
+    storage
+        .load_contact_cek(&bob_id)
+        .unwrap()
+        .expect("expected Some");
+    storage
+        .load_contact_cek(&carol_id)
+        .unwrap()
+        .expect("expected Some");
 
     let manager = DeletionManager::new(&storage);
     manager.schedule_deletion_with_execute_at(0, 0).unwrap();
@@ -230,7 +236,7 @@ fn test_execute_deletion_requires_scheduled_state() {
     // Don't schedule deletion
 
     let result = manager.execute_deletion(&identity);
-    assert!(result.is_err());
+    result.expect_err("expected error");
 }
 
 // === Edge Cases ===
@@ -284,5 +290,7 @@ fn test_execute_deletion_mixed_cek_and_legacy_contacts() {
     assert_eq!(result.revocations.len(), 2);
 
     // Bob's contact fully deleted (#48)
-    assert!(storage.load_contact_cek(&bob_id).is_err());
+    storage
+        .load_contact_cek(&bob_id)
+        .expect_err("expected error");
 }

@@ -115,7 +115,7 @@ fn ambient_audio_listen_returns_local_fingerprint() {
 
     // listen_for_response returns our local fingerprint (serialized)
     let response = verifier.listen_for_response(Duration::from_secs(5));
-    assert!(response.is_ok());
+    response.expect("expected success");
     let fp_bytes = response.unwrap();
     assert_eq!(
         fp_bytes.len(),

@@ -62,7 +62,7 @@ fn test_backup_recovery_happy_path() {
 
     // Step 5: Verify wrong password fails
     let wrong_password_result = Identity::import_backup(&backup, "wrong_password");
-    assert!(wrong_password_result.is_err());
+    assert!(wrong_password_result.is_err(), "expected error");
 
     // Step 6: Verify restored identity can sign and verify
     let test_message = b"Test message for signature verification";

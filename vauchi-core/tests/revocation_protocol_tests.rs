@@ -166,7 +166,7 @@ fn test_process_revocation_deletes_contact_and_records_tombstone() {
     let revoked = AccountRevoked::create(&identity, &bob_id, future_ts);
 
     let result = process_revocation(&revoked, &storage);
-    assert!(result.is_ok());
+    result.expect("expected success");
 
     // Contact should be deleted
     assert!(storage.load_contact(alice_contact.id()).unwrap().is_none());
@@ -194,10 +194,13 @@ fn test_process_revocation_rejects_invalid_signature() {
     spoofed.sender_id = alice_contact.id().to_string();
 
     let result = process_revocation(&spoofed, &storage);
-    assert!(result.is_ok()); // No error, just a no-op
+    result.expect("expected success"); // No error, just a no-op
 
     // Alice's contact should still exist (signature didn't verify)
-    assert!(storage.load_contact(alice_contact.id()).unwrap().is_some());
+    storage
+        .load_contact(alice_contact.id())
+        .unwrap()
+        .expect("expected Some");
 }
 
 // @scenario: privacy_compliance.feature:Replayed revocation for re-established contact is rejected
@@ -215,10 +218,13 @@ fn test_process_revocation_stale_rejected() {
     let stale_revoked = AccountRevoked::create(&identity, &bob_id, 0);
 
     let result = process_revocation(&stale_revoked, &storage);
-    assert!(result.is_ok());
+    result.expect("expected success");
 
     // Alice's contact should still exist (stale revocation ignored)
-    assert!(storage.load_contact(alice_contact.id()).unwrap().is_some());
+    storage
+        .load_contact(alice_contact.id())
+        .unwrap()
+        .expect("expected Some");
 }
 
 #[test]
@@ -231,7 +237,7 @@ fn test_process_revocation_unknown_sender_noop() {
 
     // No contact stored for sender — should be a no-op
     let result = process_revocation(&revoked, &storage);
-    assert!(result.is_ok());
+    result.expect("expected success");
 }
 
 // @scenario: privacy_compliance.feature:Card update arriving after revocation is discarded
@@ -268,7 +274,10 @@ fn test_revocation_only_deletes_matching_sender() {
     process_revocation(&revocation, &storage).unwrap();
 
     // Alice should still be there (revocation was from unknown sender)
-    assert!(storage.load_contact(alice_contact.id()).unwrap().is_some());
+    storage
+        .load_contact(alice_contact.id())
+        .unwrap()
+        .expect("expected Some");
 }
 
 // @scenario: security.feature:Tampered exchange data is rejected

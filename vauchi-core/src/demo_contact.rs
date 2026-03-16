@@ -283,7 +283,7 @@ mod tests {
     fn test_demo_state_current_tip() {
         let state = DemoContactState::new_active();
         let tip = state.current_tip();
-        assert!(tip.is_some());
+        tip.expect("expected Some");
     }
 
     #[test]
@@ -292,7 +292,7 @@ mod tests {
         let initial_index = state.current_tip_index;
 
         let tip = state.advance_to_next_tip();
-        assert!(tip.is_some());
+        tip.expect("expected Some");
         assert_ne!(state.current_tip_index, initial_index);
         assert_eq!(state.update_count, 1);
     }

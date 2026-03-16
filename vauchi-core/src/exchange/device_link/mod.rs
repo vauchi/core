@@ -222,7 +222,7 @@ mod tests {
         let encrypted = request.encrypt(&correct_key).unwrap();
         let result = DeviceLinkRequest::decrypt(&encrypted, &wrong_key);
 
-        assert!(result.is_err());
+        assert!(result.is_err(), "expected error");
     }
 
     // ============================================================
@@ -394,7 +394,7 @@ mod tests {
         let encrypted = response.encrypt(&correct_key).unwrap();
         let result = DeviceLinkResponse::decrypt(&encrypted, &wrong_key);
 
-        assert!(result.is_err());
+        assert!(result.is_err(), "expected error");
     }
 
     #[test]
@@ -705,7 +705,7 @@ mod tests {
 
         // Should fail because create_request() was never called
         let result = responder.compute_confirmation_code();
-        assert!(result.is_err());
+        assert!(result.is_err(), "expected error");
     }
 
     #[test]

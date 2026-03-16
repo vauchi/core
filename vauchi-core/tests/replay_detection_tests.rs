@@ -76,7 +76,7 @@ fn test_replay_after_chain_advance() {
     let result = bob.decrypt(&msg0);
 
     // Should fail - the key for index 0 is gone
-    assert!(result.is_err());
+    result.expect_err("expected error");
 }
 
 /// Scenario: Out-of-order messages work, but duplicates don't
@@ -109,7 +109,7 @@ fn test_out_of_order_vs_duplicate() {
     let replay_result = bob.decrypt(&msg1);
 
     // Should fail - already decrypted
-    assert!(replay_result.is_err());
+    replay_result.expect_err("expected error");
 }
 
 // =============================================================================
@@ -148,7 +148,7 @@ fn test_old_dh_generation_rejected() {
     // Attacker replays old_msg (DH gen 0, already processed)
     // The skipped key for this was already used
     let result = bob.decrypt(&old_msg);
-    assert!(result.is_err());
+    result.expect_err("expected error");
 }
 
 // =============================================================================
@@ -179,7 +179,7 @@ fn test_skipped_keys_deleted_after_use() {
 
     // Replay msg0 - skipped key is now deleted
     let result = bob.decrypt(&msg0);
-    assert!(result.is_err());
+    result.expect_err("expected error");
 
     // msg1 should still work (skipped key still exists)
     let p1 = bob.decrypt(&msg1).unwrap();
@@ -187,7 +187,7 @@ fn test_skipped_keys_deleted_after_use() {
 
     // But replaying msg1 fails
     let result = bob.decrypt(&msg1);
-    assert!(result.is_err());
+    result.expect_err("expected error");
 }
 
 /// Scenario: Too many skipped messages rejected (DoS protection)
@@ -243,7 +243,7 @@ fn test_replay_detection_timestamp_independent() {
 
     // Replay attempt (regardless of any timestamp manipulation)
     let result = bob.decrypt(&msg);
-    assert!(result.is_err());
+    result.expect_err("expected error");
 }
 
 // =============================================================================
@@ -281,5 +281,5 @@ fn test_cross_chain_replay_prevention() {
     // Try to replay Bob's old message to Alice
     // Alice has already processed it and advanced
     let result = alice.decrypt(&replay_msg);
-    assert!(result.is_err());
+    result.expect_err("expected error");
 }

@@ -322,7 +322,7 @@ fn test_e2e_no_qr_after_complete() {
 
     // After completion, CONF is shown for a grace period so the slower peer
     // can also reach Complete. Eventually returns None.
-    assert!(alice.get_display_qr().is_some());
+    alice.get_display_qr().expect("expected Some");
     for _ in 0..30 {
         alice.get_display_qr();
         bob.get_display_qr();

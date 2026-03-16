@@ -149,13 +149,15 @@ fn test_schema_has_all_expected_tables() {
     // that would fail if tables don't exist
 
     // Verify contacts table works
-    assert!(temp_storage.list_contacts().is_ok());
+    temp_storage.list_contacts().expect("expected success");
 
     // Verify pending_updates table works
-    assert!(temp_storage.get_all_pending_updates().is_ok());
+    temp_storage
+        .get_all_pending_updates()
+        .expect("expected success");
 
     // Verify own_card table works (returns None if empty, but no error)
-    assert!(temp_storage.load_own_card().is_ok());
+    temp_storage.load_own_card().expect("expected success");
 
     drop(storage);
     drop(conn);

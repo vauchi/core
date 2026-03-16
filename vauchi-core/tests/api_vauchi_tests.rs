@@ -108,7 +108,7 @@ fn test_vauchi_contact_operations() {
 
     // Verify contact exists
     assert_eq!(wb.contact_count().unwrap(), 1);
-    assert!(wb.get_contact(&contact_id).unwrap().is_some());
+    wb.get_contact(&contact_id).unwrap().expect("expected Some");
 
     // Search contacts
     let results = wb.search_contacts("bob").unwrap();
@@ -181,7 +181,7 @@ fn test_vauchi_own_fingerprint() {
 
     // No identity yet
     let result = wb.own_fingerprint();
-    assert!(result.is_err());
+    result.expect_err("expected error");
 
     // Create identity
     wb.create_identity("Alice").unwrap();
@@ -516,11 +516,11 @@ fn test_update_display_name_empty_fails() {
 
     // Empty name should fail
     let result = wb.update_display_name("");
-    assert!(result.is_err());
+    result.expect_err("expected error");
 
     // Whitespace-only should fail
     let result = wb.update_display_name("   ");
-    assert!(result.is_err());
+    result.expect_err("expected error");
 }
 
 #[test]
@@ -531,7 +531,7 @@ fn test_update_display_name_too_long_fails() {
     // Name over 100 chars should fail
     let long_name = "a".repeat(101);
     let result = wb.update_display_name(&long_name);
-    assert!(result.is_err());
+    result.expect_err("expected error");
 }
 
 #[test]

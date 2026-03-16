@@ -55,14 +55,14 @@ fn test_contact_set_and_get_cek() {
 
     contact.set_cek(cek);
 
-    assert!(contact.cek().is_some());
+    contact.cek().expect("expected Some");
     assert_eq!(contact.cek().unwrap().to_bytes(), cek_bytes);
 }
 
 #[test]
 fn test_contact_clear_cek() {
     let mut contact = make_contact_with_cek("Alice");
-    assert!(contact.cek().is_some());
+    contact.cek().expect("expected Some");
 
     contact.clear_cek();
     assert!(contact.cek().is_none());
@@ -104,7 +104,7 @@ fn test_list_contacts_includes_cek_contacts() {
     let all = storage.list_contacts().unwrap();
     assert_eq!(all.len(), 1);
     assert_eq!(all[0].display_name(), "CEK Contact");
-    assert!(all[0].cek().is_some());
+    all[0].cek().expect("expected Some");
 }
 
 // === CEK-Protected Display Name ===
@@ -247,5 +247,5 @@ fn test_save_contact_with_rotated_cek() {
     // Should still load correctly with the new CEK
     let loaded = storage.load_contact(contact.id()).unwrap().unwrap();
     assert_eq!(loaded.display_name(), "Dave Rotated");
-    assert!(loaded.cek().is_some());
+    loaded.cek().expect("expected Some");
 }

@@ -1200,7 +1200,7 @@ mod tests {
         assert!(!networks.is_empty());
 
         let github = networks.iter().find(|n| n.id == "github");
-        assert!(github.is_some());
+        github.expect("expected Some");
 
         let url = wb.get_profile_url("github".to_string(), "octocat".to_string());
         assert_eq!(url, Some("https://github.com/octocat".to_string()));
@@ -1299,7 +1299,7 @@ mod tests {
         wb.create_identity("Alice".to_string()).unwrap();
 
         let result = wb.parse_device_link_qr("invalid_qr_data".to_string());
-        assert!(result.is_err());
+        result.expect_err("expected error");
     }
 
     // @scenario: device_management:User views linked devices
@@ -1449,7 +1449,7 @@ mod tests {
             .get_consent_status(MobileConsentType::RecoveryVouching)
             .unwrap();
         assert!(status.granted);
-        assert!(status.last_changed_at.is_some());
+        status.last_changed_at.expect("expected Some");
         assert!(status.last_changed_at.unwrap() > 0);
 
         // After revoking, status should be not granted but still have a timestamp
@@ -1459,7 +1459,7 @@ mod tests {
             .get_consent_status(MobileConsentType::RecoveryVouching)
             .unwrap();
         assert!(!status.granted);
-        assert!(status.last_changed_at.is_some());
+        status.last_changed_at.expect("expected Some");
     }
 
     // @scenario: device_sync:Sync result aggregation
@@ -1701,7 +1701,7 @@ mod tests {
             .unwrap()
             .as_secs();
         let result = initiator.confirm_link_ultrasonic(wrong_challenge, verified_at);
-        assert!(result.is_err());
+        result.expect_err("expected error");
     }
 
     // @scenario: device_management:Link new device via manual confirmation

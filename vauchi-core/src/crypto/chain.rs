@@ -314,7 +314,7 @@ mod tests {
 
         // Skipping exactly MAX_SKIP should succeed
         let result = chain.skip_to(MAX_SKIP);
-        assert!(result.is_ok());
+        result.expect("expected success");
     }
 
     #[test]

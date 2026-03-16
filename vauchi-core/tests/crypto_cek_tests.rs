@@ -55,9 +55,9 @@ fn test_cek_rotation_invalidates_old() {
     // New CEK can decrypt v2
     assert_eq!(new_cek.decrypt(&ciphertext_v2).unwrap(), card_v2);
     // New CEK cannot decrypt v1 (old content)
-    assert!(new_cek.decrypt(&ciphertext_v1).is_err());
+    new_cek.decrypt(&ciphertext_v1).expect_err("expected error");
     // Old CEK cannot decrypt v2 (new content)
-    assert!(old_cek.decrypt(&ciphertext_v2).is_err());
+    old_cek.decrypt(&ciphertext_v2).expect_err("expected error");
 }
 
 // @scenario: security.feature:Secure deletion of data
@@ -78,7 +78,7 @@ fn test_cek_destroy_renders_card_unreadable() {
 
     // But without the bytes, ciphertext is irrecoverable
     let wrong_key = ContentEncryptionKey::generate();
-    assert!(wrong_key.decrypt(&ciphertext).is_err());
+    wrong_key.decrypt(&ciphertext).expect_err("expected error");
 }
 
 #[test]

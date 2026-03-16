@@ -345,7 +345,7 @@ mod tests {
 
         // First trigger should succeed
         let moment = tracker.try_trigger(AhaMomentType::CardCreationComplete);
-        assert!(moment.is_some());
+        assert!(moment.is_some(), "expected Some value");
         assert_eq!(
             moment.unwrap().moment_type,
             AhaMomentType::CardCreationComplete
@@ -363,7 +363,7 @@ mod tests {
         let moment =
             tracker.try_trigger_with_context(AhaMomentType::FirstContactAdded, "Alice".to_string());
 
-        assert!(moment.is_some());
+        assert!(moment.is_some(), "expected Some value");
         let m = moment.unwrap();
         assert_eq!(m.moment_type, AhaMomentType::FirstContactAdded);
         assert!(m.message().contains("Alice"));

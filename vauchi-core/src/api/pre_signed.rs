@@ -338,7 +338,7 @@ mod tests {
     fn test_load_nonexistent_file_returns_error() {
         let dir = tempfile::tempdir().unwrap();
         let result = PreSignedShredMessages::load(dir.path());
-        assert!(result.is_err());
+        result.expect_err("expected error");
     }
 
     #[test]

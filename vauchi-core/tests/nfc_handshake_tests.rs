@@ -200,7 +200,7 @@ fn test_relay_fallback_from_key_ack_received() {
 
     // Bob's tap drops after key exchange — fallback to relay
     let result = bob.enter_relay_fallback();
-    assert!(result.is_ok());
+    result.expect("expected success");
     assert!(matches!(
         bob.state(),
         NfcHandshakeState::RelayFallback { .. }

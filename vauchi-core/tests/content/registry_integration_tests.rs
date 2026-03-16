@@ -32,8 +32,8 @@ fn test_registry_from_content_manager_bundled() {
 
     // Should have bundled networks
     assert!(!registry.is_empty());
-    assert!(registry.get("twitter").is_some());
-    assert!(registry.get("github").is_some());
+    assert!(registry.get("twitter").is_some(), "expected Some value");
+    assert!(registry.get("github").is_some(), "expected Some value");
 }
 
 #[test]
@@ -63,8 +63,8 @@ fn test_registry_from_content_manager_cached() {
 
     // Should have cached networks (not bundled)
     assert_eq!(registry.len(), 2);
-    assert!(registry.get("custom1").is_some());
-    assert!(registry.get("custom2").is_some());
+    assert!(registry.get("custom1").is_some(), "expected Some value");
+    assert!(registry.get("custom2").is_some(), "expected Some value");
     assert!(registry.get("twitter").is_none()); // Bundled networks not present
 }
 
@@ -77,7 +77,7 @@ fn test_registry_generates_urls() {
     let registry = SocialNetworkRegistry::from_content_manager(&content);
 
     let url = registry.profile_url("twitter", "alice");
-    assert!(url.is_some());
+    assert!(url.is_some(), "expected Some value");
     assert!(url.unwrap().contains("alice"));
 }
 
@@ -115,7 +115,7 @@ fn test_new_network_after_cache_update() {
     let registry2 = SocialNetworkRegistry::from_content_manager(&content2);
 
     // Now "newnetwork" should exist
-    assert!(registry2.get("newnetwork").is_some());
+    assert!(registry2.get("newnetwork").is_some(), "expected Some value");
     assert_eq!(
         registry2.get("newnetwork").unwrap().display_name(),
         "New Network"

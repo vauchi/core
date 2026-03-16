@@ -15,7 +15,7 @@ fn test_mock_proximity_success() {
     let challenge = [0u8; 16];
 
     let result = verifier.verify_proximity(&challenge, Duration::from_secs(5));
-    assert!(result.is_ok());
+    result.expect("expected success");
 }
 
 // @scenario: contact_exchange.feature:Proximity verification prevents remote exchange
@@ -25,7 +25,7 @@ fn test_mock_proximity_failure() {
     let challenge = [0u8; 16];
 
     let result = verifier.verify_proximity(&challenge, Duration::from_secs(5));
-    assert!(result.is_err());
+    result.expect_err("expected error");
 }
 
 // @scenario: contact_exchange.feature:Proximity verification prevents remote exchange
@@ -67,5 +67,5 @@ fn test_manual_confirmation() {
     assert!(verifier.is_confirmed());
 
     let result = verifier.verify_proximity(&challenge, Duration::from_secs(5));
-    assert!(result.is_ok());
+    result.expect("expected success");
 }

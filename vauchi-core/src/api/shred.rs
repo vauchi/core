@@ -664,7 +664,7 @@ mod tests {
 
         // Hard shred should fail — grace period hasn't elapsed
         let result = manager.hard_shred(token, None, None);
-        assert!(result.is_err());
+        result.expect_err("expected error");
     }
 
     #[test]
@@ -690,7 +690,10 @@ mod tests {
         let (dir, storage, secure_storage, identity) = setup_test_env();
 
         // Verify SMK exists before shred
-        assert!(secure_storage.load_key(SMK_KEY_NAME).unwrap().is_some());
+        secure_storage
+            .load_key(SMK_KEY_NAME)
+            .unwrap()
+            .expect("expected Some");
 
         // Set up past-due deletion
         let dm = DeletionManager::new(&storage);
@@ -712,7 +715,10 @@ mod tests {
         let (dir, storage, secure_storage, identity) = setup_test_env();
 
         // Verify SMK exists before
-        assert!(secure_storage.load_key(SMK_KEY_NAME).unwrap().is_some());
+        secure_storage
+            .load_key(SMK_KEY_NAME)
+            .unwrap()
+            .expect("expected Some");
 
         let manager = ShredManager::new(&storage, &secure_storage, &identity, dir.path());
         let report = manager.panic_shred(None, None).unwrap();

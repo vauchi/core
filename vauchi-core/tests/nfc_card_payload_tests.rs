@@ -95,5 +95,5 @@ fn test_deserialization_rejects_truncated_bytes() {
     let payload = NfcCardPayload::new([0x11; 32], "Test".to_string(), [0x22; 32]);
     let bytes = payload.to_bytes().expect("should serialize");
     let truncated = &bytes[..bytes.len() / 2];
-    assert!(NfcCardPayload::from_bytes(truncated).is_err());
+    NfcCardPayload::from_bytes(truncated).expect_err("expected error");
 }

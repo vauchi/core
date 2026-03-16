@@ -15,14 +15,14 @@ use vauchi_core::network::relay_url::verify_relay_noise_pubkey;
 fn matching_pubkey_accepted() {
     let expected = [42u8; 32];
     let actual = [42u8; 32];
-    assert!(verify_relay_noise_pubkey(Some(&expected), &actual).is_ok());
+    verify_relay_noise_pubkey(Some(&expected), &actual).expect("expected success");
 }
 
 #[test]
 fn no_pinned_pubkey_accepted() {
     // When no pubkey is pinned (TOFU), any relay pubkey is accepted
     let actual = [99u8; 32];
-    assert!(verify_relay_noise_pubkey(None, &actual).is_ok());
+    verify_relay_noise_pubkey(None, &actual).expect("expected success");
 }
 
 // ── Mismatched pubkey ──────────────────────────────────────────────
@@ -57,5 +57,5 @@ fn single_byte_difference_rejected() {
 fn all_zeros_vs_all_ones_rejected() {
     let expected = [0u8; 32];
     let actual = [0xFF; 32];
-    assert!(verify_relay_noise_pubkey(Some(&expected), &actual).is_err());
+    verify_relay_noise_pubkey(Some(&expected), &actual).expect_err("expected error");
 }

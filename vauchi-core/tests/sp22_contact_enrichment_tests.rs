@@ -71,7 +71,7 @@ fn test_birthday_field_iso8601_invalid_date_format() {
     let field = ContactField::new(FieldType::Birthday, "Birthday", "03/15/1995");
 
     // Should reject non-ISO 8601 format
-    assert!(field.validate().is_err());
+    field.validate().expect_err("expected error");
 }
 
 #[test]
@@ -82,7 +82,7 @@ fn test_birthday_field_iso8601_invalid_date_value() {
     let field = ContactField::new(FieldType::Birthday, "Birthday", "2025-13-45");
 
     // Should reject invalid date components
-    assert!(field.validate().is_err());
+    field.validate().expect_err("expected error");
 }
 
 #[test]
@@ -101,7 +101,7 @@ fn test_contact_card_single_birthday_constraint() {
     let result = card.add_field(birthday2);
 
     // Should reject second birthday
-    assert!(result.is_err());
+    result.expect_err("expected error");
     assert_eq!(card.fields().len(), 1);
 }
 
@@ -122,5 +122,5 @@ fn test_birthday_field_leap_year_invalid() {
     let field = ContactField::new(FieldType::Birthday, "Birthday", "1900-02-29");
 
     // 1900 is not a leap year
-    assert!(field.validate().is_err());
+    field.validate().expect_err("expected error");
 }

@@ -22,7 +22,7 @@ fn provider_contract_storage_open_returns_result() {
     let db_path = dir.path().join("provider.db");
     let key = SymmetricKey::generate();
     let storage = Storage::open(db_path.to_str().unwrap(), key);
-    assert!(storage.is_ok());
+    assert!(storage.is_ok(), "expected success");
 }
 
 // ============================================================
@@ -39,7 +39,7 @@ fn provider_contract_storage_save_load_identity() {
     storage.save_identity(&data, "ProviderTest").unwrap();
 
     let loaded = storage.load_identity().unwrap();
-    assert!(loaded.is_some());
+    assert!(loaded.is_some(), "expected Some value");
     let (loaded_data, loaded_name) = loaded.unwrap();
     assert_eq!(loaded_data, data);
     assert_eq!(loaded_name, "ProviderTest");

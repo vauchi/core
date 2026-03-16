@@ -19,7 +19,7 @@ fn test_xchacha20_tagged_starts_with_tag() {
 fn test_decrypt_empty_ciphertext() {
     let key = SymmetricKey::generate();
     let result = decrypt(&key, &[]);
-    assert!(result.is_err());
+    result.expect_err("expected error");
 }
 
 // @scenario: security:Contact cards are encrypted at rest
@@ -29,7 +29,7 @@ fn test_decrypt_too_short_xchacha20() {
     // Tag 0x02 + less than 24 (nonce) + 16 (tag) bytes
     let short = vec![0x02, 0, 0, 0, 0];
     let result = decrypt(&key, &short);
-    assert!(result.is_err());
+    result.expect_err("expected error");
 }
 
 // @scenario: security:Contact cards are encrypted at rest
@@ -49,7 +49,7 @@ fn test_decrypt_wrong_key() {
     let key2 = SymmetricKey::generate();
     let ciphertext = encrypt(&key1, b"secret data").unwrap();
     let result = decrypt(&key2, &ciphertext);
-    assert!(result.is_err());
+    result.expect_err("expected error");
 }
 
 // @scenario: security:Contact cards are encrypted at rest
@@ -61,7 +61,7 @@ fn test_decrypt_corrupted_data() {
     let last = ciphertext.len() - 1;
     ciphertext[last] ^= 0xFF;
     let result = decrypt(&key, &ciphertext);
-    assert!(result.is_err());
+    result.expect_err("expected error");
 }
 
 // @scenario: security:Sufficient key lengths

@@ -49,7 +49,7 @@ fn chain_errors_when_none_available() {
     );
 
     let result = chain.select_transport();
-    assert!(result.is_err());
+    result.expect_err("expected error");
     let err = result.err().expect("should be an error");
     let err_msg = format!("{err}");
     assert!(
@@ -120,7 +120,7 @@ fn mock_with_send_error_causes_send_to_fail() {
         .with_send_error("network down");
 
     let result = mock.send(b"data");
-    assert!(result.is_err());
+    result.expect_err("expected error");
     let err_msg = format!("{}", result.unwrap_err());
     assert!(
         err_msg.contains("network down"),

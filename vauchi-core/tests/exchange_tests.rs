@@ -159,10 +159,10 @@ fn test_qr_signature_verification() {
 #[test]
 fn test_malformed_qr_rejected() {
     let result = ExchangeQR::from_data_string("not-valid-qr-data");
-    assert!(result.is_err());
+    result.expect_err("expected error");
 
     let result = ExchangeQR::from_data_string("");
-    assert!(result.is_err());
+    result.expect_err("expected error");
 }
 
 /// Tests that QR from different app/protocol is rejected
@@ -172,7 +172,7 @@ fn test_non_vauchi_qr_rejected() {
     // Random base64 data that's not our protocol
     let fake_qr = "eyJub3QiOiJ3ZWJib29rIn0=";
     let result = ExchangeQR::from_data_string(fake_qr);
-    assert!(result.is_err());
+    result.expect_err("expected error");
 }
 
 // =============================================================================
@@ -221,7 +221,7 @@ fn test_ble_exchange_succeeds_within_2_meters() {
     let result = verifier.verify_device_proximity(&verifier.devices[0]);
 
     // Then contact cards should be exchanged
-    assert!(result.is_ok());
+    result.expect("expected success");
 }
 
 /// Feature: Contact Card Exchange
@@ -262,7 +262,7 @@ fn test_ble_relay_attack_detection() {
     let emit_result = verifier.emit_challenge(&challenge);
 
     // Then the relay attack should be detected (device error)
-    assert!(emit_result.is_err());
+    emit_result.expect_err("expected error");
 }
 
 /// Tests RSSI to distance conversion accuracy
@@ -316,7 +316,7 @@ fn test_ble_discovery_failure() {
 
     // Discovery should return error
     let result = verifier.discover_nearby(Duration::from_secs(5));
-    assert!(result.is_err());
+    result.expect_err("expected error");
 }
 
 // =============================================================================
@@ -337,11 +337,11 @@ fn test_manual_proximity_exchange_initiation() {
     // When both parties confirm proximity
     let challenge = [1u8; 16];
     let emit_result = verifier.emit_challenge(&challenge);
-    assert!(emit_result.is_ok());
+    emit_result.expect("expected success");
 
     // And public keys should be exchanged
     let response_result = verifier.listen_for_response(Duration::from_secs(5));
-    assert!(response_result.is_ok());
+    response_result.expect("expected success");
 }
 
 /// Tests manual confirmation exchange times out without confirmation
@@ -364,7 +364,9 @@ fn test_manual_confirmation_verifier() {
     let verifier = ManualConfirmationVerifier::pre_confirmed();
 
     let challenge = [2u8; 16];
-    assert!(verifier.emit_challenge(&challenge).is_ok());
+    verifier
+        .emit_challenge(&challenge)
+        .expect("expected success");
 
     // Manual confirmation succeeds when user confirms
     let response = verifier

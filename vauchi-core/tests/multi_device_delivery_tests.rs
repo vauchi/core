@@ -41,7 +41,7 @@ fn test_create_device_delivery_record() {
     storage.create_device_delivery(&record).unwrap();
 
     let retrieved = storage.get_device_delivery("msg-001", "device-1").unwrap();
-    assert!(retrieved.is_some());
+    assert!(retrieved.is_some(), "expected Some value");
 
     let retrieved = retrieved.unwrap();
     assert_eq!(retrieved.message_id, "msg-001");

@@ -153,14 +153,14 @@ fn test_contact_error_handling() {
 
     // Try to get public ID without identity
     let result = wb.public_id();
-    assert!(result.is_err());
+    result.expect_err("expected error");
 
     // Create identity
     wb.create_identity("Test").unwrap();
 
     // Try to create identity again
     let result = wb.create_identity("Test2");
-    assert!(result.is_err());
+    result.expect_err("expected error");
 
     // Try to get non-existent contact
     let result = wb.get_contact("nonexistent").unwrap();
@@ -172,5 +172,5 @@ fn test_contact_error_handling() {
 
     // Try to verify fingerprint for non-existent contact
     let result = wb.verify_contact_fingerprint("nonexistent");
-    assert!(result.is_err());
+    result.expect_err("expected error");
 }

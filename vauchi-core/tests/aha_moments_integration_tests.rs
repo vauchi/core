@@ -50,7 +50,7 @@ fn test_card_creation_shown_once() {
 
     // First trigger succeeds
     let first = tracker.try_trigger(AhaMomentType::CardCreationComplete);
-    assert!(first.is_some());
+    assert!(first.is_some(), "expected Some value");
 
     // Second trigger should fail (already seen)
     let second = tracker.try_trigger(AhaMomentType::CardCreationComplete);
@@ -71,7 +71,7 @@ fn test_first_edit_triggers_feedback() {
 
     let moment = tracker.try_trigger(AhaMomentType::FirstEdit);
 
-    assert!(moment.is_some());
+    assert!(moment.is_some(), "expected Some value");
     let m = moment.unwrap();
     assert!(m.message().contains("anyone had your card"));
     assert!(m.has_animation(), "Should have ripple animation");
@@ -86,7 +86,7 @@ fn test_first_edit_shown_once() {
     let mut tracker = AhaMomentTracker::new();
 
     let first = tracker.try_trigger(AhaMomentType::FirstEdit);
-    assert!(first.is_some());
+    assert!(first.is_some(), "expected Some value");
 
     let second = tracker.try_trigger(AhaMomentType::FirstEdit);
     assert!(second.is_none(), "Should not repeat first edit feedback");
@@ -107,7 +107,7 @@ fn test_first_contact_celebration_with_name() {
     let moment =
         tracker.try_trigger_with_context(AhaMomentType::FirstContactAdded, "Bob".to_string());
 
-    assert!(moment.is_some());
+    assert!(moment.is_some(), "expected Some value");
     let m = moment.unwrap();
     assert!(m.message().contains("Bob"), "Should mention contact name");
     assert!(
@@ -127,7 +127,7 @@ fn test_subsequent_contacts_no_celebration() {
     // First contact triggers
     let first =
         tracker.try_trigger_with_context(AhaMomentType::FirstContactAdded, "Bob".to_string());
-    assert!(first.is_some());
+    assert!(first.is_some(), "expected Some value");
 
     // Second contact does not trigger aha moment
     let second =
@@ -151,7 +151,7 @@ fn test_first_update_received_with_context() {
     let moment =
         tracker.try_trigger_with_context(AhaMomentType::FirstUpdateReceived, "Bob".to_string());
 
-    assert!(moment.is_some());
+    assert!(moment.is_some(), "expected Some value");
     let m = moment.unwrap();
     assert!(
         m.message().contains("Bob"),
@@ -170,7 +170,7 @@ fn test_subsequent_updates_no_aha_moment() {
 
     let first =
         tracker.try_trigger_with_context(AhaMomentType::FirstUpdateReceived, "Bob".to_string());
-    assert!(first.is_some());
+    assert!(first.is_some(), "expected Some value");
 
     let second =
         tracker.try_trigger_with_context(AhaMomentType::FirstUpdateReceived, "Alice".to_string());
@@ -192,7 +192,7 @@ fn test_first_outbound_delivery_confirmation() {
     let moment =
         tracker.try_trigger_with_context(AhaMomentType::FirstOutboundDelivered, "3".to_string());
 
-    assert!(moment.is_some());
+    assert!(moment.is_some(), "expected Some value");
     let m = moment.unwrap();
     assert!(
         m.message().contains("3 contacts"),
@@ -271,12 +271,12 @@ fn test_full_user_journey_aha_moments() {
 
     // Step 1: User creates identity (card creation)
     let card_created = tracker.try_trigger(AhaMomentType::CardCreationComplete);
-    assert!(card_created.is_some());
+    assert!(card_created.is_some(), "expected Some value");
     assert_eq!(tracker.seen_count(), 1);
 
     // Step 2: User edits their card for the first time
     let first_edit = tracker.try_trigger(AhaMomentType::FirstEdit);
-    assert!(first_edit.is_some());
+    assert!(first_edit.is_some(), "expected Some value");
     assert_eq!(tracker.seen_count(), 2);
 
     // Step 3: User edits again (no aha moment)
@@ -286,35 +286,35 @@ fn test_full_user_journey_aha_moments() {
     // Step 4: User exchanges with Bob
     let first_contact =
         tracker.try_trigger_with_context(AhaMomentType::FirstContactAdded, "Bob".to_string());
-    assert!(first_contact.is_some());
+    assert!(first_contact.is_some(), "expected Some value");
     assert!(first_contact.unwrap().message().contains("Bob"));
     assert_eq!(tracker.seen_count(), 3);
 
     // Step 5: Bob sends an update
     let first_update =
         tracker.try_trigger_with_context(AhaMomentType::FirstUpdateReceived, "Bob".to_string());
-    assert!(first_update.is_some());
+    assert!(first_update.is_some(), "expected Some value");
     assert_eq!(tracker.seen_count(), 4);
 
     // Step 6: User edits card (now has contacts)
     let outbound =
         tracker.try_trigger_with_context(AhaMomentType::FirstOutboundDelivered, "1".to_string());
-    assert!(outbound.is_some());
+    assert!(outbound.is_some(), "expected Some value");
     assert_eq!(tracker.seen_count(), 5);
 
     // Step 6b: User edits a field
     let field_edit = tracker.try_trigger(AhaMomentType::FirstFieldEdit);
-    assert!(field_edit.is_some());
+    assert!(field_edit.is_some(), "expected Some value");
     assert_eq!(tracker.seen_count(), 6);
 
     // Step 6c: User reaches 3 contacts
     let three_contacts = tracker.try_trigger(AhaMomentType::ThreeContactsReached);
-    assert!(three_contacts.is_some());
+    assert!(three_contacts.is_some(), "expected Some value");
     assert_eq!(tracker.seen_count(), 7);
 
     // Step 6d: User links a device
     let device_linked = tracker.try_trigger(AhaMomentType::DeviceLinked);
-    assert!(device_linked.is_some());
+    assert!(device_linked.is_some(), "expected Some value");
     assert_eq!(tracker.seen_count(), 8);
 
     // All aha moments have been seen
@@ -402,7 +402,7 @@ fn test_vauchi_api_aha_moment_integration() {
 
     // Trigger first edit with context
     let edit_moment = wb.try_trigger_aha_moment(AhaMomentType::FirstEdit).unwrap();
-    assert!(edit_moment.is_some());
+    assert!(edit_moment.is_some(), "expected Some value");
     assert_eq!(wb.aha_moments_seen_count().unwrap(), 2);
 
     // Reset and verify
@@ -453,7 +453,7 @@ fn test_add_contact_triggers_first_contact_moment() {
     let moment = wb
         .try_trigger_aha_moment_with_context(AhaMomentType::FirstContactAdded, bob_name)
         .unwrap();
-    assert!(moment.is_some());
+    assert!(moment.is_some(), "expected Some value");
     assert!(moment.unwrap().message().contains("Bob"));
 }
 
@@ -471,14 +471,14 @@ fn test_vauchi_api_demo_contact_integration() {
 
     // Get demo contact card
     let card = wb.demo_contact_card().unwrap();
-    assert!(card.is_some());
+    assert!(card.is_some(), "expected Some value");
     let card = card.unwrap();
     assert!(card.is_demo);
     assert!(!card.tip_title.is_empty());
 
     // Advance to next tip
     let next_tip = wb.advance_demo_contact().unwrap();
-    assert!(next_tip.is_some());
+    assert!(next_tip.is_some(), "expected Some value");
 
     // Dismiss demo contact
     wb.dismiss_demo_contact().unwrap();

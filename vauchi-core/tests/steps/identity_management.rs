@@ -66,7 +66,7 @@ fn x25519_keypair_derived(world: &mut VauchiWorld) {
 #[then("the private keys should be stored in secure storage")]
 fn keys_in_secure_storage(world: &mut VauchiWorld) {
     // In-memory mode stores keys in the in-memory DB
-    assert!(world.vauchi.identity().is_some());
+    assert!(world.vauchi.identity().is_some(), "expected Some value");
 }
 
 #[then("I should see the identity setup screen")]
@@ -126,7 +126,7 @@ fn see_error(world: &mut VauchiWorld, _expected: String) {
 
 #[then("I should not be able to proceed")]
 fn cannot_proceed(world: &mut VauchiWorld) {
-    assert!(world.last_result.is_err());
+    assert!(world.last_result.is_err(), "expected error");
 }
 
 // ============================================================

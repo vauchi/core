@@ -112,7 +112,7 @@ fn test_get_duplicate_score_returns_similarity() {
 fn test_get_duplicate_score_contact_not_found() {
     let wb = create_vauchi_with_identity("Alice");
     let result = wb.get_duplicate_score("nonexistent1", "nonexistent2");
-    assert!(result.is_err());
+    assert!(result.is_err(), "expected error");
 }
 
 #[test]
@@ -194,7 +194,10 @@ fn test_merge_contacts_combines_fields() {
     assert!(merged.card().fields().iter().any(|f| f.label() == "phone"));
 
     // Primary still exists
-    assert!(wb.get_contact(&primary_id).unwrap().is_some());
+    assert!(
+        wb.get_contact(&primary_id).unwrap().is_some(),
+        "expected Some value"
+    );
 
     // Secondary should be deleted
     assert!(wb.get_contact(&secondary_id).unwrap().is_none());
@@ -223,7 +226,7 @@ fn test_merge_contacts_not_found_error() {
     wb.add_contact(c1).unwrap();
 
     let result = wb.merge_contacts(&primary_id, "nonexistent");
-    assert!(result.is_err());
+    assert!(result.is_err(), "expected error");
 }
 
 // ================================================================
@@ -382,7 +385,7 @@ fn test_perform_emergency_wipe_requires_confirmation() {
     let mut wb = create_vauchi_with_identity("Alice");
 
     let result = wb.perform_emergency_wipe(false);
-    assert!(result.is_err());
+    assert!(result.is_err(), "expected error");
     assert!(result
         .unwrap_err()
         .to_string()
@@ -468,7 +471,7 @@ fn test_new_aha_moments_trigger_via_api() {
     let moment = wb
         .try_trigger_aha_moment(AhaMomentType::FirstFieldEdit)
         .unwrap();
-    assert!(moment.is_some());
+    assert!(moment.is_some(), "expected Some value");
     assert_eq!(moment.unwrap().moment_type, AhaMomentType::FirstFieldEdit);
 
     // Second trigger should return None (already seen)

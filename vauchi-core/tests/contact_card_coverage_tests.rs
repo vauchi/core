@@ -20,7 +20,7 @@ fn test_set_display_name() {
 fn test_set_display_name_empty_fails() {
     let mut card = ContactCard::new("Original");
     let result = card.set_display_name("");
-    assert!(result.is_err());
+    result.expect_err("expected error");
 }
 
 // @scenario: contact_card_management:Display name length limit
@@ -29,7 +29,7 @@ fn test_set_display_name_too_long_fails() {
     let mut card = ContactCard::new("Original");
     let long = "X".repeat(101);
     let result = card.set_display_name(&long);
-    assert!(result.is_err());
+    result.expect_err("expected error");
 }
 
 // @scenario: contact_card_management:Display name length limit
@@ -57,7 +57,7 @@ fn test_update_field_value() {
 fn test_update_field_value_not_found() {
     let mut card = ContactCard::new("Test");
     let result = card.update_field_value("nonexistent", "value");
-    assert!(result.is_err());
+    result.expect_err("expected error");
 }
 
 // @scenario: contact_card_management:Edit a field label
@@ -76,14 +76,14 @@ fn test_update_field_label() {
 fn test_update_field_label_not_found() {
     let mut card = ContactCard::new("Test");
     let result = card.update_field_label("nonexistent", "label");
-    assert!(result.is_err());
+    result.expect_err("expected error");
 }
 
 #[test]
 fn test_remove_field_not_found() {
     let mut card = ContactCard::new("Test");
     let result = card.remove_field("nonexistent");
-    assert!(result.is_err());
+    result.expect_err("expected error");
 }
 
 // @scenario: contact_card_management:Exceed maximum fields
@@ -100,7 +100,7 @@ fn test_max_fields_reached() {
         .unwrap();
     }
     let result = card.add_field(ContactField::new(FieldType::Custom, "extra", "value"));
-    assert!(result.is_err());
+    result.expect_err("expected error");
 }
 
 // @scenario: contact_card_management:Contact card size limit
@@ -145,7 +145,7 @@ fn test_reorder_fields_invalid_id() {
     card.add_field(ContactField::new(FieldType::Email, "a", "a@a.com"))
         .unwrap();
     let result = card.reorder_fields(&["nonexistent"]);
-    assert!(result.is_err());
+    result.expect_err("expected error");
 }
 
 // @scenario: contact_card_management:Add avatar to contact card
@@ -155,7 +155,7 @@ fn test_set_avatar() {
     assert!(card.avatar().is_none());
 
     card.set_avatar(vec![0xFF, 0xD8, 0xFF]).unwrap();
-    assert!(card.avatar().is_some());
+    card.avatar().expect("expected Some");
     assert_eq!(card.avatar().unwrap(), &[0xFF, 0xD8, 0xFF]);
 }
 
@@ -165,7 +165,7 @@ fn test_set_avatar_too_large() {
     let mut card = ContactCard::new("Test");
     let large = vec![0u8; 262145]; // MAX_AVATAR_SIZE + 1
     let result = card.set_avatar(large);
-    assert!(result.is_err());
+    result.expect_err("expected error");
 }
 
 // @scenario: contact_card_management:Add avatar to contact card
@@ -174,7 +174,7 @@ fn test_set_avatar_at_max_size() {
     let mut card = ContactCard::new("Test");
     let max = vec![0u8; 262144]; // exactly MAX_AVATAR_SIZE
     card.set_avatar(max).unwrap();
-    assert!(card.avatar().is_some());
+    card.avatar().expect("expected Some");
 }
 
 // @scenario: contact_card_management:Remove avatar from contact card
@@ -182,7 +182,7 @@ fn test_set_avatar_at_max_size() {
 fn test_clear_avatar() {
     let mut card = ContactCard::new("Test");
     card.set_avatar(vec![1, 2, 3]).unwrap();
-    assert!(card.avatar().is_some());
+    card.avatar().expect("expected Some");
 
     card.clear_avatar();
     assert!(card.avatar().is_none());

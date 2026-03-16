@@ -65,9 +65,9 @@ fn test_registry_with_defaults() {
     let registry = SocialNetworkRegistry::with_defaults();
 
     assert!(registry.len() > 20);
-    assert!(registry.get("twitter").is_some());
-    assert!(registry.get("github").is_some());
-    assert!(registry.get("linkedin").is_some());
+    registry.get("twitter").expect("expected Some");
+    registry.get("github").expect("expected Some");
+    registry.get("linkedin").expect("expected Some");
 }
 
 // @scenario: contact_card_management:Load social network configurations from remote repository
@@ -75,9 +75,9 @@ fn test_registry_with_defaults() {
 fn test_registry_get_case_insensitive() {
     let registry = SocialNetworkRegistry::with_defaults();
 
-    assert!(registry.get("Twitter").is_some());
-    assert!(registry.get("GITHUB").is_some());
-    assert!(registry.get("LinkedIn").is_some());
+    registry.get("Twitter").expect("expected Some");
+    registry.get("GITHUB").expect("expected Some");
+    registry.get("LinkedIn").expect("expected Some");
 }
 
 // @scenario: contact_card_management:Generate profile URL from social field
@@ -112,7 +112,7 @@ fn test_registry_add_and_remove() {
         "Custom Network",
         "https://custom.com/{username}",
     ));
-    assert!(registry.get("custom").is_some());
+    registry.get("custom").expect("expected Some");
 
     registry.remove("custom");
     assert!(registry.get("custom").is_none());

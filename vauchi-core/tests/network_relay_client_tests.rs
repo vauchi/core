@@ -213,7 +213,7 @@ fn test_relay_client_max_pending_limit() {
 
     // Third should fail
     let result = client.send_update("r3", &mut alice_ratchet, b"3", "u3");
-    assert!(result.is_err());
+    assert!(result.is_err(), "expected error");
     assert!(result.unwrap_err().to_string().contains("Too many pending"));
 }
 
@@ -379,7 +379,7 @@ fn test_send_purge_request_send_error() {
     };
 
     let result = client.send_purge_request(&request);
-    assert!(result.is_err());
+    assert!(result.is_err(), "expected error");
 }
 
 // === Delivery Receipts Privacy Tests (SP-12b Phase 2) ===

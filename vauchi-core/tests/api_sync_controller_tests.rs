@@ -69,7 +69,7 @@ fn test_sync_controller_ratchet_management() {
     assert!(!controller.has_ratchet("contact-2"));
 
     let removed = controller.remove_ratchet("contact-1");
-    assert!(removed.is_some());
+    assert!(removed.is_some(), "expected Some value");
     assert!(!controller.has_ratchet("contact-1"));
 }
 
@@ -426,7 +426,7 @@ fn test_sync_controller_send_device_sync() {
 
     // Send device sync via controller
     let result = controller.send_device_sync(&orchestrator, &device_b_id, &device_b_public_key);
-    assert!(result.is_ok());
+    assert!(result.is_ok(), "expected success");
 }
 
 #[test]
@@ -454,6 +454,6 @@ fn test_sync_controller_process_device_sync() {
 
     // Process via controller
     let applied = controller.process_device_sync(&mut orchestrator, incoming);
-    assert!(applied.is_ok());
+    assert!(applied.is_ok(), "expected success");
     assert_eq!(applied.unwrap().len(), 1);
 }

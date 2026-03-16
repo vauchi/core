@@ -403,7 +403,7 @@ fn test_relay_empty_payload() {
 
     // Empty payload should still work
     let result = client.send_update("recipient-id", &mut ratchet, b"", "update-empty");
-    assert!(result.is_ok());
+    result.expect("expected success");
 }
 
 /// Test: Large payload handling
@@ -430,5 +430,5 @@ fn test_relay_large_payload() {
     // Large payload (100KB)
     let large_payload = vec![0xABu8; 100 * 1024];
     let result = client.send_update("recipient-id", &mut ratchet, &large_payload, "update-large");
-    assert!(result.is_ok());
+    result.expect("expected success");
 }

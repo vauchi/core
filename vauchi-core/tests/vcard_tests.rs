@@ -135,7 +135,7 @@ fn test_import_address_field() {
 fn test_import_missing_begin() {
     let vcard = "VERSION:4.0\r\nFN:Alice\r\nEND:VCARD";
     let result = import_vcard(vcard);
-    assert!(result.is_err());
+    result.expect_err("expected error");
 }
 
 // @scenario: contacts_management:Export contact to vCard
@@ -143,14 +143,14 @@ fn test_import_missing_begin() {
 fn test_import_missing_fn() {
     let vcard = "BEGIN:VCARD\r\nVERSION:4.0\r\nTEL:+1234\r\nEND:VCARD";
     let result = import_vcard(vcard);
-    assert!(result.is_err());
+    result.expect_err("expected error");
 }
 
 // @scenario: contacts_management:Export contact to vCard
 #[test]
 fn test_import_empty_string() {
     let result = import_vcard("");
-    assert!(result.is_err());
+    result.expect_err("expected error");
 }
 
 // @scenario: contacts_management:Export contact to vCard

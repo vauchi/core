@@ -39,7 +39,7 @@ fn test_create_and_retrieve_delivery_record() {
     storage.create_delivery_record(&record).unwrap();
 
     let retrieved = storage.get_delivery_record("msg-001").unwrap();
-    assert!(retrieved.is_some());
+    assert!(retrieved.is_some(), "expected Some value");
 
     let retrieved = retrieved.unwrap();
     assert_eq!(retrieved.message_id, "msg-001");
@@ -340,7 +340,10 @@ fn test_delete_delivery_record() {
     storage.create_delivery_record(&record).unwrap();
 
     // Verify it exists
-    assert!(storage.get_delivery_record("to-delete").unwrap().is_some());
+    assert!(
+        storage.get_delivery_record("to-delete").unwrap().is_some(),
+        "expected Some value"
+    );
 
     // Delete it
     let deleted = storage.delete_delivery_record("to-delete").unwrap();
@@ -870,7 +873,10 @@ fn test_startup_maintenance_cleans_old_terminal_records() {
         .get_delivery_record("recent-delivered")
         .unwrap()
         .is_some());
-    assert!(storage.get_delivery_record("old-queued").unwrap().is_some());
+    assert!(
+        storage.get_delivery_record("old-queued").unwrap().is_some(),
+        "expected Some value"
+    );
 }
 
 /// Test: startup maintenance on empty database is a no-op

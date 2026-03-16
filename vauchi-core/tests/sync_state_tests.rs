@@ -243,7 +243,7 @@ fn test_sync_coalesce_updates() {
 
     // Coalesce
     let merged_id = manager.coalesce_updates("contact-1").unwrap();
-    assert!(merged_id.is_some());
+    merged_id.expect("expected Some");
 
     // Should now have only one update
     assert_eq!(manager.get_pending("contact-1").unwrap().len(), 1);

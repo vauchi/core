@@ -711,7 +711,7 @@ mod tests {
             None,
             delegate2,
         );
-        assert!(result2.is_err());
+        assert!(result2.is_err(), "expected error");
     }
 
     #[test]

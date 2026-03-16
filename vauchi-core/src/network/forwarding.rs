@@ -338,7 +338,7 @@ mod tests {
             signature: Some("bb".repeat(64)),
         };
         let result = verify_hint_signature(&hints, &"cc".repeat(32));
-        assert!(result.is_err());
+        assert!(result.is_err(), "expected error");
         assert_eq!(result.unwrap_err(), "relay key mismatch");
     }
 

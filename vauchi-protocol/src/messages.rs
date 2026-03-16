@@ -402,7 +402,7 @@ mod tests {
     #[test]
     fn test_decode_frame_too_short() {
         let result = decode_message(&[0, 1, 2]);
-        assert!(result.is_err());
+        assert!(result.is_err(), "expected error");
         assert_eq!(result.unwrap_err(), "Frame too short");
     }
 

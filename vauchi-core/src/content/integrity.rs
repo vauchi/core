@@ -169,7 +169,7 @@ mod tests {
         // Known SHA-256 hash of "hello world"
         let data = b"hello world";
         let expected = "sha256:b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9";
-        assert!(verify_checksum(data, expected).is_ok());
+        assert!(verify_checksum(data, expected).is_ok(), "expected success");
     }
 
     // Trace: codebase-review-tracker item #24
@@ -196,7 +196,10 @@ mod tests {
         manifest.signature = Some(hex::encode(signature.as_bytes()));
 
         // Verify
-        assert!(verify_manifest_signature(&manifest, &public_key).is_ok());
+        assert!(
+            verify_manifest_signature(&manifest, &public_key).is_ok(),
+            "expected success"
+        );
     }
 
     // Trace: codebase-review-tracker item #24
@@ -225,7 +228,10 @@ mod tests {
         manifest.base_url = "https://evil.example.com/files".to_string();
 
         // Verification should fail
-        assert!(verify_manifest_signature(&manifest, &public_key).is_err());
+        assert!(
+            verify_manifest_signature(&manifest, &public_key).is_err(),
+            "expected error"
+        );
     }
 
     // Trace: codebase-review-tracker item #24
@@ -246,7 +252,7 @@ mod tests {
         };
 
         let result = verify_manifest_signature(&manifest, &public_key);
-        assert!(result.is_err());
+        assert!(result.is_err(), "expected error");
         assert!(matches!(
             result.unwrap_err(),
             IntegrityError::MissingSignature
@@ -275,7 +281,10 @@ mod tests {
         manifest.signature = Some(hex::encode(signature.as_bytes()));
 
         // Verification with wrong key should fail
-        assert!(verify_manifest_signature(&manifest, &wrong_key).is_err());
+        assert!(
+            verify_manifest_signature(&manifest, &wrong_key).is_err(),
+            "expected error"
+        );
     }
 
     // Trace: codebase-review-tracker item #24

@@ -40,7 +40,7 @@ fn test_verify_checksum_valid() {
     let data = b"hello world";
     let checksum = "sha256:b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9";
 
-    assert!(verify_checksum(data, checksum).is_ok());
+    assert!(verify_checksum(data, checksum).is_ok(), "expected success");
 }
 
 #[test]
@@ -49,7 +49,7 @@ fn test_verify_checksum_mismatch() {
     let wrong_checksum = "sha256:0000000000000000000000000000000000000000000000000000000000000000";
 
     let result = verify_checksum(data, wrong_checksum);
-    assert!(result.is_err());
+    assert!(result.is_err(), "expected error");
 
     assert!(matches!(result, Err(IntegrityError::ChecksumMismatch)));
 }
@@ -78,7 +78,7 @@ fn test_verify_checksum_wrong_algorithm_prefix() {
 fn test_checksum_roundtrip() {
     let data = b"test content for checksum verification";
     let checksum = compute_checksum(data);
-    assert!(verify_checksum(data, &checksum).is_ok());
+    assert!(verify_checksum(data, &checksum).is_ok(), "expected success");
 }
 
 #[test]
@@ -86,7 +86,10 @@ fn test_checksum_binary_data() {
     // Test with binary data including null bytes
     let data: Vec<u8> = (0..=255).collect();
     let checksum = compute_checksum(&data);
-    assert!(verify_checksum(&data, &checksum).is_ok());
+    assert!(
+        verify_checksum(&data, &checksum).is_ok(),
+        "expected success"
+    );
 }
 
 #[test]
@@ -94,5 +97,8 @@ fn test_checksum_large_data() {
     // Test with 1MB of data
     let data = vec![0x42u8; 1024 * 1024];
     let checksum = compute_checksum(&data);
-    assert!(verify_checksum(&data, &checksum).is_ok());
+    assert!(
+        verify_checksum(&data, &checksum).is_ok(),
+        "expected success"
+    );
 }

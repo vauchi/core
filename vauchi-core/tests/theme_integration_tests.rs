@@ -218,8 +218,8 @@ fn test_low_contrast_fails() {
 // @scenario: theming:Default theme on fresh install
 #[test]
 fn test_default_themes_exist() {
-    assert!(theme_by_id("default-dark").is_some());
-    assert!(theme_by_id("default-light").is_some());
+    theme_by_id("default-dark").expect("expected Some");
+    theme_by_id("default-light").expect("expected Some");
 }
 
 /// Test: Catppuccin themes exist
@@ -290,16 +290,16 @@ fn test_nord_theme() {
 // @scenario: theming:Solarized themes available
 #[test]
 fn test_solarized_themes() {
-    assert!(theme_by_id("solarized-dark").is_some());
-    assert!(theme_by_id("solarized-light").is_some());
+    theme_by_id("solarized-dark").expect("expected Some");
+    theme_by_id("solarized-light").expect("expected Some");
 }
 
 /// Test: Gruvbox themes exist
 // @scenario: theming:Gruvbox themes available
 #[test]
 fn test_gruvbox_themes() {
-    assert!(theme_by_id("gruvbox-dark").is_some());
-    assert!(theme_by_id("gruvbox-light").is_some());
+    theme_by_id("gruvbox-dark").expect("expected Some");
+    theme_by_id("gruvbox-light").expect("expected Some");
 }
 
 // ============================================================
@@ -336,10 +336,10 @@ fn test_unique_theme_ids() {
 // @scenario: theming:Theme file contains required colors
 #[test]
 fn test_valid_hex_colors() {
-    assert!(validate_hex_color("#ffffff").is_ok());
-    assert!(validate_hex_color("#000000").is_ok());
-    assert!(validate_hex_color("#1e1e2e").is_ok());
-    assert!(validate_hex_color("#ABCDEF").is_ok());
+    validate_hex_color("#ffffff").expect("expected success");
+    validate_hex_color("#000000").expect("expected success");
+    validate_hex_color("#1e1e2e").expect("expected success");
+    validate_hex_color("#ABCDEF").expect("expected success");
 }
 
 /// Test: Invalid hex colors fail validation
@@ -380,10 +380,10 @@ fn test_theme_serialization() {
 #[test]
 fn test_theme_attribution() {
     let catppuccin = theme_by_id("catppuccin-mocha").unwrap();
-    assert!(catppuccin.author.is_some());
-    assert!(catppuccin.license.is_some());
-    assert!(catppuccin.source.is_some());
+    catppuccin.author.expect("expected Some");
+    catppuccin.license.expect("expected Some");
+    catppuccin.source.expect("expected Some");
 
     let dracula = theme_by_id("dracula").unwrap();
-    assert!(dracula.author.is_some());
+    dracula.author.expect("expected Some");
 }

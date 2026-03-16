@@ -357,10 +357,13 @@ mod tests {
         let handshake = create_signed_handshake(&identity, None);
 
         assert!(!handshake.client_id.is_empty());
-        assert!(handshake.identity_public_key.is_some());
-        assert!(handshake.nonce.is_some());
-        assert!(handshake.signature.is_some());
-        assert!(handshake.timestamp.is_some());
+        assert!(
+            handshake.identity_public_key.is_some(),
+            "expected Some value"
+        );
+        assert!(handshake.nonce.is_some(), "expected Some value");
+        assert!(handshake.signature.is_some(), "expected Some value");
+        assert!(handshake.timestamp.is_some(), "expected Some value");
 
         // Public key should be 64 hex chars (32 bytes)
         assert_eq!(handshake.identity_public_key.as_ref().unwrap().len(), 64);
@@ -403,7 +406,10 @@ mod tests {
         // Verify with aws-lc-rs (as the relay does)
         let public_key =
             aws_lc_rs::signature::UnparsedPublicKey::new(&aws_lc_rs::signature::ED25519, &pk_bytes);
-        assert!(public_key.verify(&signed_data, &sig_bytes).is_ok());
+        assert!(
+            public_key.verify(&signed_data, &sig_bytes).is_ok(),
+            "expected success"
+        );
     }
 
     #[test]
@@ -413,7 +419,7 @@ mod tests {
         let handshake = create_signed_handshake(&identity, device_id.clone());
 
         assert_eq!(handshake.device_id, device_id);
-        assert!(handshake.signature.is_some());
+        assert!(handshake.signature.is_some(), "expected Some value");
     }
 
     #[test]
@@ -426,10 +432,10 @@ mod tests {
         let decoded = decode_simple_message(&encoded).unwrap();
 
         if let SimplePayload::Handshake(h) = decoded.payload {
-            assert!(h.identity_public_key.is_some());
-            assert!(h.nonce.is_some());
-            assert!(h.signature.is_some());
-            assert!(h.timestamp.is_some());
+            assert!(h.identity_public_key.is_some(), "expected Some value");
+            assert!(h.nonce.is_some(), "expected Some value");
+            assert!(h.signature.is_some(), "expected Some value");
+            assert!(h.timestamp.is_some(), "expected Some value");
         } else {
             panic!("Expected Handshake payload");
         }

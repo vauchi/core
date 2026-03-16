@@ -29,22 +29,22 @@ fn test_password_strength_from_score() {
 // @scenario: identity_management.feature:Backup password requirements
 #[test]
 fn test_short_password() {
-    assert!(validate_password("short").is_err());
-    assert!(validate_password("").is_err());
-    assert!(validate_password("1234567").is_err());
+    validate_password("short").expect_err("expected error");
+    validate_password("").expect_err("expected error");
+    validate_password("1234567").expect_err("expected error");
 }
 
 // @scenario: identity_management.feature:Backup password requirements
 #[test]
 fn test_common_passwords() {
-    assert!(validate_password("password").is_err());
-    assert!(validate_password("12345678").is_err());
-    assert!(validate_password("qwertyui").is_err());
+    validate_password("password").expect_err("expected error");
+    validate_password("12345678").expect_err("expected error");
+    validate_password("qwertyui").expect_err("expected error");
 }
 
 // @scenario: identity_management.feature:Backup password requirements
 #[test]
 fn test_strong_passphrase() {
     let result = validate_password("correct-horse-battery-staple");
-    assert!(result.is_ok());
+    result.expect("expected success");
 }

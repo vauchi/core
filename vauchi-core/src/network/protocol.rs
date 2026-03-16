@@ -132,7 +132,7 @@ mod tests {
         let oversized = vec![0u8; MAX_MESSAGE_SIZE + 1];
         let result = decode_message(&oversized);
 
-        assert!(result.is_err());
+        assert!(result.is_err(), "expected error");
         assert!(result.unwrap_err().to_string().contains("too large"));
     }
 
@@ -144,7 +144,7 @@ mod tests {
         let json = serde_json::to_vec(&envelope).unwrap();
         let result = decode_message(&json);
 
-        assert!(result.is_err());
+        assert!(result.is_err(), "expected error");
         assert!(result
             .unwrap_err()
             .to_string()
@@ -178,7 +178,7 @@ mod tests {
         let invalid = b"not valid json";
         let result = decode_message(invalid);
 
-        assert!(result.is_err());
+        assert!(result.is_err(), "expected error");
         assert!(matches!(
             result.unwrap_err(),
             NetworkError::InvalidMessage(_)

@@ -499,7 +499,7 @@ mod tests {
         reset_store();
         let result = init(Path::new("/tmp/nonexistent-vauchi-i18n-test"));
         // Should succeed with empty store (dir doesn't exist = no files)
-        assert!(result.is_ok());
+        result.expect("expected success");
     }
 
     #[test]

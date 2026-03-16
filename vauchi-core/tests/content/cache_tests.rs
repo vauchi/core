@@ -56,7 +56,7 @@ fn test_cache_manifest_roundtrip() {
     let loaded = cache.get_manifest().unwrap();
     assert_eq!(loaded.schema_version, 1);
     assert_eq!(loaded.base_url, "https://vauchi.app/app-files");
-    assert!(loaded.content.networks.is_some());
+    loaded.content.networks.expect("expected Some");
 }
 
 #[test]
@@ -119,7 +119,7 @@ fn test_cache_rejects_invalid_checksum() {
     let wrong_checksum = "sha256:0000000000000000000000000000000000000000000000000000000000000000";
 
     let result = cache.save_content(ContentType::Networks, "networks.json", data, wrong_checksum);
-    assert!(result.is_err());
+    result.expect_err("expected error");
 
     // File should not exist
     assert!(cache

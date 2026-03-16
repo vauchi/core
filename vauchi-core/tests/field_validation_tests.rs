@@ -1037,12 +1037,12 @@ fn test_cross_field_dependencies_independent_validation() {
     let custom = ContactField::new(FieldType::Custom, "Signal", "test.123");
 
     // All should add successfully
-    assert!(card.add_field(phone).is_ok());
-    assert!(card.add_field(email).is_ok());
-    assert!(card.add_field(social).is_ok());
-    assert!(card.add_field(website).is_ok());
-    assert!(card.add_field(address).is_ok());
-    assert!(card.add_field(custom).is_ok());
+    card.add_field(phone).expect("expected success");
+    card.add_field(email).expect("expected success");
+    card.add_field(social).expect("expected success");
+    card.add_field(website).expect("expected success");
+    card.add_field(address).expect("expected success");
+    card.add_field(custom).expect("expected success");
 
     assert_eq!(card.fields().len(), 6, "All 6 fields should be added");
 }
@@ -1056,7 +1056,7 @@ fn test_cross_field_dependencies_validation_isolation() {
 
     // Add a valid phone
     let valid_phone = ContactField::new(FieldType::Phone, "Mobile", "+1-555-123-4567");
-    assert!(card.add_field(valid_phone).is_ok());
+    card.add_field(valid_phone).expect("expected success");
 
     // Try to add an invalid email - should fail
     let invalid_email = ContactField::new(FieldType::Email, "Work", "not-an-email");

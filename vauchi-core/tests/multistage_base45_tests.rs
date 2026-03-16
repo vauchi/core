@@ -42,7 +42,7 @@ fn test_encode_uses_alphanumeric_charset() {
 
 #[test]
 fn test_decode_invalid_char() {
-    assert!(base45::decode("abc").is_err()); // lowercase not in charset
+    base45::decode("abc").expect_err("expected error"); // lowercase not in charset
 }
 
 #[test]

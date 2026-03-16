@@ -311,7 +311,7 @@ fn test_full_three_user_workflow() {
         .fields()
         .iter()
         .find(|f| f.label() == "personal" && f.field_type() == FieldType::Email);
-    assert!(carol_personal.is_some());
+    carol_personal.expect("expected Some");
 }
 
 /// Tests update delivery through relay when direct P2P fails.

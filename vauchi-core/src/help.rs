@@ -303,7 +303,7 @@ mod tests {
     fn test_get_faq_by_id() {
         ensure_init();
         let faq = get_faq_by_id("faq-phone-lost");
-        assert!(faq.is_some());
+        assert!(faq.is_some(), "expected Some value");
         assert!(faq.unwrap().question.contains("lose my phone"));
     }
 
@@ -386,7 +386,7 @@ mod tests {
     fn test_localized_faq_by_id() {
         ensure_init();
         let faq = get_faq_by_id_localized("faq-phone-lost", Locale::German);
-        assert!(faq.is_some());
+        assert!(faq.is_some(), "expected Some value");
         assert!(faq.unwrap().question.contains("Telefon"));
     }
 }

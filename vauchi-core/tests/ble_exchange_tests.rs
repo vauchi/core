@@ -170,14 +170,14 @@ fn test_mock_ble_transport_advertise() {
     let payload = ExchangeBle::generate(&identity, &ephemeral);
 
     let mock = MockBLETransport::with_peer_payload(&payload.to_bytes());
-    assert!(mock.start_advertising(&payload).is_ok());
+    mock.start_advertising(&payload).expect("expected success");
 }
 
 // @scenario: ble_exchange.feature:BLE transport can scan
 #[test]
 fn test_mock_ble_transport_scan() {
     let mock = MockBLETransport::with_peer_payload(&[0u8; BLE_PAYLOAD_SIZE]);
-    assert!(mock.start_scanning().is_ok());
+    mock.start_scanning().expect("expected success");
 }
 
 // @scenario: ble_exchange.feature:BLE transport connect, read, write, disconnect
@@ -191,7 +191,7 @@ fn test_mock_ble_transport_connect_read_write() {
     let mock = MockBLETransport::with_peer_payload(&payload_bytes);
 
     // Connect
-    assert!(mock.connect("device-1").is_ok());
+    mock.connect("device-1").expect("expected success");
 
     // Read exchange payload
     let read = mock.read_characteristic(CHAR_EXCHANGE_PAYLOAD).unwrap();
@@ -207,7 +207,7 @@ fn test_mock_ble_transport_connect_read_write() {
     assert_eq!(written[0].0, CHAR_CARD_EXCHANGE);
 
     // Disconnect
-    assert!(mock.disconnect().is_ok());
+    mock.disconnect().expect("expected success");
 }
 
 // @scenario: ble_exchange.feature:BLE transport in failure mode returns errors
@@ -215,9 +215,10 @@ fn test_mock_ble_transport_connect_read_write() {
 fn test_mock_ble_transport_failure() {
     let mock = MockBLETransport::failing();
 
-    assert!(mock.start_scanning().is_err());
-    assert!(mock.connect("device-1").is_err());
-    assert!(mock.read_characteristic(CHAR_EXCHANGE_PAYLOAD).is_err());
+    mock.start_scanning().expect_err("expected error");
+    mock.connect("device-1").expect_err("expected error");
+    mock.read_characteristic(CHAR_EXCHANGE_PAYLOAD)
+        .expect_err("expected error");
 }
 
 // ============================================================

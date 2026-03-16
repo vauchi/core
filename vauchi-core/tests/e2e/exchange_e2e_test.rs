@@ -109,13 +109,13 @@ fn test_contact_exchange_happy_path() {
         .storage()
         .load_ratchet_state(&bob_contact_id)
         .unwrap();
-    assert!(alice_ratchet_loaded.is_some());
+    assert!(alice_ratchet_loaded.is_some(), "expected Some value");
 
     let bob_ratchet_loaded = bob_wb
         .storage()
         .load_ratchet_state(&alice_contact_id)
         .unwrap();
-    assert!(bob_ratchet_loaded.is_some());
+    assert!(bob_ratchet_loaded.is_some(), "expected Some value");
 
     // Step 7: Verify encrypted communication works
     let (mut alice_ratchet, _) = alice_ratchet_loaded.unwrap();

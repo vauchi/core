@@ -588,6 +588,7 @@ pub enum ContentError {
     Fetch(String),
 }
 
+// INLINE_TEST_REQUIRED: tests private internals
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -602,7 +603,7 @@ mod tests {
     #[test]
     fn test_bundled_english_locale() {
         let locale = bundled_locale("en");
-        assert!(locale.is_some());
+        assert!(locale.is_some(), "expected Some value");
         let strings = locale.unwrap();
         assert!(strings.contains_key("app.name"));
     }

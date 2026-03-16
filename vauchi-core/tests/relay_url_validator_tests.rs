@@ -13,17 +13,26 @@ use vauchi_core::network::relay_url::{validate_relay_url, RelayUrlError};
 
 #[test]
 fn valid_wss_url_accepted() {
-    assert!(validate_relay_url("wss://relay.vauchi.app").is_ok());
+    assert!(
+        validate_relay_url("wss://relay.vauchi.app").is_ok(),
+        "expected success"
+    );
 }
 
 #[test]
 fn valid_wss_url_with_port_accepted() {
-    assert!(validate_relay_url("wss://relay.example.com:8443").is_ok());
+    assert!(
+        validate_relay_url("wss://relay.example.com:8443").is_ok(),
+        "expected success"
+    );
 }
 
 #[test]
 fn valid_wss_url_with_path_accepted() {
-    assert!(validate_relay_url("wss://relay.example.com/ws").is_ok());
+    assert!(
+        validate_relay_url("wss://relay.example.com/ws").is_ok(),
+        "expected success"
+    );
 }
 
 #[test]
@@ -169,7 +178,7 @@ fn unicode_homoglyph_url_rejected_or_accepted() {
     // At minimum, the URL must parse correctly
     let result = validate_relay_url("wss://rеlay.example.com"); // Cyrillic 'е'
                                                                 // Either accepted (punycode) or rejected — but must not panic
-    assert!(result.is_ok() || result.is_err());
+    assert!(result.is_ok() || result.is_err(), "expected error");
 }
 
 #[test]

@@ -134,7 +134,7 @@ fn test_concurrent_revoke_and_add() {
     let result2 = handle2.join().unwrap();
 
     // Both operations should succeed
-    assert!(result1.is_ok() || result2.is_ok());
+    assert!(result1.is_ok() || result2.is_ok(), "expected success");
 
     let registry = registry.lock().unwrap();
     // Should have at least 1 active (device0) and possibly device2
@@ -169,7 +169,7 @@ fn test_max_devices_enforced() {
     let extra_device = DeviceInfo::derive(&master_seed, MAX_DEVICES as u32, "Extra".to_string());
     let result = registry.add_device(extra_device.to_registered(&master_seed), &signing_key);
 
-    assert!(result.is_err());
+    assert!(result.is_err(), "expected error");
     assert_eq!(registry.active_count(), MAX_DEVICES);
 }
 
@@ -206,7 +206,7 @@ fn test_add_after_revoke_at_max() {
     let new_device = DeviceInfo::derive(&master_seed, MAX_DEVICES as u32, "New Device".to_string());
     let result = registry.add_device(new_device.to_registered(&master_seed), &signing_key);
 
-    assert!(result.is_ok());
+    assert!(result.is_ok(), "expected success");
     assert_eq!(registry.active_count(), MAX_DEVICES);
 }
 
@@ -228,7 +228,7 @@ fn test_link_already_linked_device_same_identity() {
     let result = registry.add_device(device0.to_registered(&master_seed), &signing_key);
 
     // Should fail with duplicate device error
-    assert!(result.is_err());
+    assert!(result.is_err(), "expected error");
 }
 
 // =============================================================================
@@ -283,6 +283,6 @@ fn test_cannot_unlink_last_device() {
     let result = registry.revoke_device(device0.device_id(), &signing_key);
 
     // Should fail - cannot unlink last device
-    assert!(result.is_err());
+    assert!(result.is_err(), "expected error");
     assert_eq!(registry.active_count(), 1);
 }

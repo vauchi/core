@@ -31,7 +31,9 @@ fn test_ble_accept_within_2_meters() {
     let device = &verifier.devices[0];
 
     assert!(verifier.is_within_range(device, 2.0));
-    assert!(verifier.verify_device_proximity(device).is_ok());
+    verifier
+        .verify_device_proximity(device)
+        .expect("expected success");
 }
 
 // @scenario: contact_exchange.feature:BLE exchange blocked when too far
@@ -60,5 +62,5 @@ fn test_ble_verifier_failure() {
     let verifier = MockBLEVerifier::failure();
 
     let result = verifier.discover_nearby(Duration::from_secs(1));
-    assert!(result.is_err());
+    result.expect_err("expected error");
 }

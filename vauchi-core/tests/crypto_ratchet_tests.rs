@@ -184,7 +184,7 @@ fn test_dr_responder_cannot_send_first() {
 
     // Bob (responder) tries to send first - should fail
     let result = bob.encrypt(b"Hello");
-    assert!(result.is_err());
+    result.expect_err("expected error");
 }
 
 #[test]
@@ -348,10 +348,10 @@ fn test_ratchet_deserialize_accepts_current_and_legacy_version() {
 
     // Version 1 (current)
     let serialized_v1 = alice.serialize();
-    assert!(DoubleRatchetState::deserialize(serialized_v1).is_ok());
+    DoubleRatchetState::deserialize(serialized_v1).expect("expected success");
 
     // Version 0 (legacy — from before versioning was added, serde default)
     let mut serialized_v0 = alice.serialize();
     serialized_v0.version = 0;
-    assert!(DoubleRatchetState::deserialize(serialized_v0).is_ok());
+    DoubleRatchetState::deserialize(serialized_v0).expect("expected success");
 }

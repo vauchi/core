@@ -189,7 +189,7 @@ fn test_app_engine_field_type_catalog() {
         catalog.len() >= 36,
         "Catalog should have at least 36 entries (6 base + 30 social)"
     );
-    assert!(catalog.get("phone").is_some());
-    assert!(catalog.get("email").is_some());
+    catalog.get("phone").expect("expected Some");
+    catalog.get("email").expect("expected Some");
     assert!(!catalog.by_category(&FieldCategory::Social).is_empty());
 }

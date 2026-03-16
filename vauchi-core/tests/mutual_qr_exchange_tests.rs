@@ -155,7 +155,7 @@ fn test_scan_their_qr_transitions() {
     );
 
     // QR should still be accessible (for Bob to scan)
-    assert!(alice_session.qr().is_some());
+    alice_session.qr().expect("expected Some");
 }
 
 // @scenario: contact_exchange.feature:Mutual QR rejects expired peer QR code

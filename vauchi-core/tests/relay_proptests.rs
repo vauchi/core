@@ -220,7 +220,7 @@ proptest! {
     fn valid_wss_urls_pass_validation(
         relay_url in valid_relay_url_strategy()
     ) {
-        prop_assert!(validate_relay_url(&relay_url).is_ok());
+        prop_assert!(validate_relay_url(&relay_url).is_ok(), "valid URL rejected: {}", relay_url);
     }
 
     #[test]
@@ -230,7 +230,7 @@ proptest! {
     ) {
         let url = format!("{scheme}://{host}");
         if scheme != "wss" {
-            prop_assert!(validate_relay_url(&url).is_err());
+            prop_assert!(validate_relay_url(&url).is_err(), "non-wss URL should be rejected: {}", url);
         }
     }
 }

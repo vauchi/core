@@ -19,7 +19,7 @@ fn test_save_and_get_recovery_response() {
         .unwrap();
 
     let result = storage.get_recovery_response("claim-1").unwrap();
-    assert!(result.is_some());
+    assert!(result.is_some(), "expected Some value");
 
     let (contact_id, response, remind_at) = result.unwrap();
     assert_eq!(contact_id, "contact-a");
@@ -113,9 +113,18 @@ fn test_multiple_recovery_responses() {
         .save_recovery_response("claim-3", "contact-c", "remind_me_later", Some(5000))
         .unwrap();
 
-    assert!(storage.get_recovery_response("claim-1").unwrap().is_some());
-    assert!(storage.get_recovery_response("claim-2").unwrap().is_some());
-    assert!(storage.get_recovery_response("claim-3").unwrap().is_some());
+    assert!(
+        storage.get_recovery_response("claim-1").unwrap().is_some(),
+        "expected Some value"
+    );
+    assert!(
+        storage.get_recovery_response("claim-2").unwrap().is_some(),
+        "expected Some value"
+    );
+    assert!(
+        storage.get_recovery_response("claim-3").unwrap().is_some(),
+        "expected Some value"
+    );
 }
 
 // ============================================================

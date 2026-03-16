@@ -172,7 +172,7 @@ fn test_device_registry_integration() {
     let tablet = registry.find_device(device1.device_id()).unwrap();
     assert!(!tablet.is_active());
     assert!(tablet.revoked);
-    assert!(tablet.revoked_at.is_some());
+    tablet.revoked_at.expect("expected Some");
 }
 
 /// Test: Three devices with correct key derivation

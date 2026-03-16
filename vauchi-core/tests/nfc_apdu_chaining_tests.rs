@@ -86,7 +86,7 @@ fn test_empty_payload() {
 #[test]
 fn test_reassemble_empty_chain_fails() {
     let result = reassemble_chain(&[]);
-    assert!(result.is_err());
+    result.expect_err("expected error");
 }
 
 #[test]
@@ -94,14 +94,14 @@ fn test_reassemble_missing_final_fails() {
     // A chain where the only command has chaining bit set — no final marker
     let cmd = vec![0x10, 0xE2, 0x00, 0x00, 0x01, 0xAA];
     let result = reassemble_chain(&[cmd]);
-    assert!(result.is_err());
+    result.expect_err("expected error");
 }
 
 #[test]
 fn test_reassemble_truncated_command_fails() {
     let short = vec![0x00, 0xE2]; // Too short — no Lc
     let result = reassemble_chain(&[short]);
-    assert!(result.is_err());
+    result.expect_err("expected error");
 }
 
 #[test]

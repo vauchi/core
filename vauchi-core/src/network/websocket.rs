@@ -490,7 +490,7 @@ mod tests {
     #[test]
     fn test_parse_url_invalid_scheme() {
         let result = WebSocketTransport::parse_url("http://example.com");
-        assert!(result.is_err());
+        result.expect_err("expected error");
     }
 
     #[test]
@@ -526,7 +526,7 @@ mod tests {
     fn test_disconnect_when_not_connected_ok() {
         let mut transport = WebSocketTransport::new();
         let result = transport.disconnect();
-        assert!(result.is_ok());
+        result.expect("expected success");
         assert_eq!(transport.state(), ConnectionState::Disconnected);
     }
 }

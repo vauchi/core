@@ -293,7 +293,7 @@ fn test_collect_multiple_vouchers() {
     }
 
     assert_eq!(proof.voucher_count(), 3);
-    assert!(proof.validate().is_ok());
+    assert!(proof.validate().is_ok(), "expected success");
 }
 
 /// Scenario: Reject insufficient vouchers
@@ -416,7 +416,7 @@ fn test_proof_roundtrip() {
     assert_eq!(restored.new_pk(), &new_pk);
     assert_eq!(restored.threshold(), 2);
     assert_eq!(restored.voucher_count(), 2);
-    assert!(restored.validate().is_ok());
+    assert!(restored.validate().is_ok(), "expected success");
 }
 
 // =============================================================================
@@ -607,7 +607,7 @@ fn test_detect_conflicting_claims() {
     }
 
     let conflict = RecoveryConflict::detect(&[proof1, proof2]);
-    assert!(conflict.is_some());
+    assert!(conflict.is_some(), "expected Some value");
 
     let conflict = conflict.unwrap();
     assert_eq!(conflict.old_pk(), &old_pk);
@@ -794,7 +794,7 @@ fn test_collect_beyond_threshold() {
     }
 
     assert_eq!(proof.voucher_count(), 5);
-    assert!(proof.validate().is_ok());
+    assert!(proof.validate().is_ok(), "expected success");
 }
 
 // =============================================================================
@@ -845,7 +845,10 @@ fn test_trusted_voucher_accepted() {
     let mut proof = RecoveryProof::new(&old_pk, &new_pk, 1);
     let voucher = vauchi_core::RecoveryVoucher::create(&old_pk, &new_pk, &trusted_kp);
 
-    assert!(proof.add_voucher_trusted(voucher, &trusted_pks).is_ok());
+    assert!(
+        proof.add_voucher_trusted(voucher, &trusted_pks).is_ok(),
+        "expected success"
+    );
     assert_eq!(proof.voucher_count(), 1);
 }
 
@@ -888,8 +891,14 @@ fn test_threshold_only_counts_trusted_vouchers() {
     // Add two trusted vouchers
     let v1 = vauchi_core::RecoveryVoucher::create(&old_pk, &new_pk, &kp1);
     let v2 = vauchi_core::RecoveryVoucher::create(&old_pk, &new_pk, &kp2);
-    assert!(proof.add_voucher_trusted(v1, &trusted_pks).is_ok());
-    assert!(proof.add_voucher_trusted(v2, &trusted_pks).is_ok());
+    assert!(
+        proof.add_voucher_trusted(v1, &trusted_pks).is_ok(),
+        "expected success"
+    );
+    assert!(
+        proof.add_voucher_trusted(v2, &trusted_pks).is_ok(),
+        "expected success"
+    );
 
     // Untrusted voucher should be rejected
     let v3 = vauchi_core::RecoveryVoucher::create(&old_pk, &new_pk, &kp3_untrusted);
@@ -900,7 +909,7 @@ fn test_threshold_only_counts_trusted_vouchers() {
 
     // Only 2 vouchers — below threshold of 3
     assert_eq!(proof.voucher_count(), 2);
-    assert!(proof.validate().is_err());
+    assert!(proof.validate().is_err(), "expected error");
 }
 
 /// Scenario: Mixed trust-checked and unchecked voucher addition
@@ -916,7 +925,7 @@ fn test_add_voucher_still_works_without_trust_check() {
     let voucher = vauchi_core::RecoveryVoucher::create(&old_pk, &new_pk, &kp);
 
     // Old method — no trust check
-    assert!(proof.add_voucher(voucher).is_ok());
+    assert!(proof.add_voucher(voucher).is_ok(), "expected success");
     assert_eq!(proof.voucher_count(), 1);
 }
 
@@ -941,7 +950,7 @@ fn test_trusted_voucher_still_validates_signature() {
 
     // Should fail with MismatchedKeys (keys checked before signature)
     let result = proof.add_voucher_trusted(voucher, &trusted_pks);
-    assert!(result.is_err());
+    assert!(result.is_err(), "expected error");
     assert_eq!(proof.voucher_count(), 0);
 }
 
@@ -962,7 +971,10 @@ fn test_duplicate_trusted_voucher_rejected() {
     let v1 = vauchi_core::RecoveryVoucher::create(&old_pk, &new_pk, &kp);
     let v2 = vauchi_core::RecoveryVoucher::create(&old_pk, &new_pk, &kp);
 
-    assert!(proof.add_voucher_trusted(v1, &trusted_pks).is_ok());
+    assert!(
+        proof.add_voucher_trusted(v1, &trusted_pks).is_ok(),
+        "expected success"
+    );
     assert!(matches!(
         proof.add_voucher_trusted(v2, &trusted_pks),
         Err(RecoveryError::DuplicateVoucher)
@@ -995,5 +1007,5 @@ fn test_full_trusted_recovery_flow() {
     }
 
     assert_eq!(proof.voucher_count(), 3);
-    assert!(proof.validate().is_ok());
+    assert!(proof.validate().is_ok(), "expected success");
 }

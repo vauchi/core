@@ -46,7 +46,7 @@ fn test_brute_force_protection() {
     let duration = start.elapsed();
 
     // Derivation should succeed
-    assert!(result.is_ok());
+    result.expect("expected success");
 
     // Argon2id with m=64MB, t=3, p=4 should take meaningful time
     // This ensures brute-force is expensive. On typical hardware, this

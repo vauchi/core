@@ -691,6 +691,50 @@ impl ExchangeSession {
         }
     }
 
+    // ── ADR-031: Audio proximity commands ────────────────────────────────
+
+    /// Emits audio commands for async proximity verification after key agreement.
+    ///
+    /// If audio challenges are available (from QR codes), emits
+    /// `AudioEmitChallenge` and/or `AudioListenForResponse` commands.
+    /// The frontend handles audio I/O via CpalAudioBackend (desktop) or
+    /// PlatformAudioBackend (mobile) and reports `AudioResponseReceived`.
+    ///
+    /// If no challenges are available, falls back to the synchronous
+    /// ProximityVerifier (e.g., ManualConfirmationVerifier).
+    fn emit_proximity_commands(&mut self) {
+        // Always run the synchronous verifier first — it provides a baseline
+        // confidence and populates verification event logs for diagnostics.
+        // Then emit audio commands so ADR-031 frontends can perform
+        // hardware-backed verification and upgrade the confidence to High.
+        self.debug_event(ExchangeDebugEvent::ProximityCheckStarted {
+            method: Self::transport_label(self.transport).to_string(),
+        });
+        self.run_proximity_check();
+        self.debug_event(ExchangeDebugEvent::ProximityCheckCompleted {
+            confidence: Self::confidence_label(self.proximity_confidence).to_string(),
+        });
+
+        // ADR-031: Also emit audio commands when QR challenges are available.
+        // Frontends that support ultrasonic verification handle these and
+        // report AudioResponseReceived to upgrade confidence. Frontends that
+        // don't support audio simply ignore them (confidence stays at baseline).
+        if let Some(their) = self.their_audio_challenge {
+            let is_initiator = self.their_audio_challenge.is_some();
+            if is_initiator {
+                self.emit_command(ExchangeCommand::AudioEmitChallenge {
+                    data: their.to_vec(),
+                });
+                self.emit_command(ExchangeCommand::AudioListenForResponse { timeout_ms: 5000 });
+            } else {
+                self.emit_command(ExchangeCommand::AudioListenForResponse { timeout_ms: 5000 });
+                self.emit_command(ExchangeCommand::AudioEmitChallenge {
+                    data: their.to_vec(),
+                });
+            }
+        }
+    }
+
     // ── ADR-031: Transport fallback ──────────────────────────────────────
 
     /// Attempts to fall back to an alternative transport when the current one
@@ -1001,19 +1045,15 @@ impl ExchangeSession {
         self.debug_event(ExchangeDebugEvent::KeyAgreementCompleted);
 
         // AU-2: Auto-invoke proximity check after key agreement.
-        // NFC is exempt: the physical tap IS the proximity proof — running a
-        // separate verifier is redundant and could fail on devices without
-        // audio hardware, causing a false negative.
+        // NFC is exempt: the physical tap IS the proximity proof.
         if self.transport == ExchangeTransport::Nfc {
             self.proximity_confidence = ProximityConfidence::High;
         } else {
-            self.debug_event(ExchangeDebugEvent::ProximityCheckStarted {
-                method: Self::transport_label(self.transport).to_string(),
-            });
-            self.run_proximity_check();
-            self.debug_event(ExchangeDebugEvent::ProximityCheckCompleted {
-                confidence: Self::confidence_label(self.proximity_confidence).to_string(),
-            });
+            // ADR-031: Emit audio commands for async proximity verification.
+            // The frontend handles audio I/O and reports AudioResponseReceived.
+            // If no audio challenges are available (no QR scanned), fall back
+            // to the synchronous verifier (ManualConfirmation etc.).
+            self.emit_proximity_commands();
         }
 
         Ok(())

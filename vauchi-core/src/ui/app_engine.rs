@@ -1137,6 +1137,30 @@ impl AppEngine {
         None
     }
 
+    /// Intercept add-field actions on MyInfo and Onboarding to open FormDialog.
+    fn intercept_add_field(&mut self, action: &UserAction) -> Option<ActionResult> {
+        let action_id = match action {
+            UserAction::ActionPressed { action_id } => action_id.as_str(),
+            UserAction::ListItemSelected { item_id, .. } => item_id.as_str(),
+            _ => return None,
+        };
+
+        if action_id != "add_field" && action_id != "add_entry" {
+            return None;
+        }
+
+        // Only intercept on screens that support field addition
+        if !matches!(self.screen, AppScreen::MyInfo | AppScreen::Onboarding) {
+            return None;
+        }
+
+        let available_groups = self.available_groups();
+        let screen = self.navigate_to(AppScreen::FormDialog {
+            dialog_type: FormDialogType::AddField { available_groups },
+        });
+        Some(ActionResult::NavigateTo(screen))
+    }
+
     /// Intercept entry detail actions before delegating to engine.
     fn intercept_entry_detail_action(
         &mut self,
@@ -1387,6 +1411,10 @@ impl WorkflowEngine for AppEngine {
         }
 
         self.persist_settings_toggle(&action);
+
+        if let Some(result) = self.intercept_add_field(&action) {
+            return result;
+        }
 
         if let Some(result) = self.intercept_settings_action(&action) {
             return result;

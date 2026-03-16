@@ -412,9 +412,15 @@ impl OnboardingEngine {
             }],
             actions: vec![
                 ScreenAction {
+                    id: "add_entry".into(),
+                    label: "Add Entry".into(),
+                    style: ActionStyle::Primary,
+                    enabled: true,
+                },
+                ScreenAction {
                     id: "continue".into(),
                     label: "Continue".into(),
-                    style: ActionStyle::Primary,
+                    style: ActionStyle::Secondary,
                     enabled: true,
                 },
                 ScreenAction {

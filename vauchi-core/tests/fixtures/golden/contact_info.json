@@ -14,9 +14,15 @@
   ],
   "actions": [
     {
+      "id": "add_entry",
+      "label": "Add Entry",
+      "style": "Primary",
+      "enabled": true
+    },
+    {
       "id": "continue",
       "label": "Continue",
-      "style": "Primary",
+      "style": "Secondary",
       "enabled": true
     },
     {

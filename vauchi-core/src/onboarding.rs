@@ -45,7 +45,8 @@ impl OnboardingStep {
             OnboardingStep::PreviewCard => 7,
             OnboardingStep::SecurityExplanation => 8,
             OnboardingStep::BackupPrompt => 9,
-            OnboardingStep::Ready => 10,
+            OnboardingStep::BackupPassword => 10,
+            OnboardingStep::Ready => 11,
         }
     }
 

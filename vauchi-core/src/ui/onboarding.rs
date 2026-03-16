@@ -20,6 +20,7 @@ pub struct OnboardingData {
     pub display_name: String,
     pub selected_groups: Vec<GroupSetup>,
     pub fields: Vec<FieldSetup>,
+    pub backup_password: Option<String>,
 }
 
 /// A group the user can toggle during onboarding.
@@ -77,6 +78,7 @@ impl OnboardingEngine {
                 display_name: String::new(),
                 selected_groups: groups,
                 fields: Vec::new(),
+                backup_password: None,
             },
             selected_preview_group: None,
             custom_group_input: String::new(),
@@ -93,7 +95,7 @@ impl OnboardingEngine {
     fn progress(&self, step: u8) -> Option<Progress> {
         Some(Progress {
             current_step: step,
-            total_steps: 9,
+            total_steps: 10,
             label: None,
         })
     }
@@ -595,6 +597,38 @@ impl OnboardingEngine {
         }
     }
 
+    fn build_backup_password(&self) -> ScreenModel {
+        ScreenModel {
+            screen_id: "backup_password".into(),
+            title: "Backup Password".into(),
+            subtitle: Some("Choose a password to protect your backup. You'll need this to restore your identity on another device.".into()),
+            components: vec![Component::TextInput {
+                id: "backup_password".into(),
+                label: "Backup password".into(),
+                value: self.data.backup_password.clone().unwrap_or_default(),
+                placeholder: Some("Choose a strong password".into()),
+                max_length: Some(128),
+                validation_error: None,
+                input_type: InputType::Password,
+            }],
+            actions: vec![
+                ScreenAction {
+                    id: "continue".into(),
+                    label: "Continue".into(),
+                    style: ActionStyle::Primary,
+                    enabled: self.data.backup_password.as_ref().is_some_and(|p| !p.is_empty()),
+                },
+                ScreenAction {
+                    id: "skip".into(),
+                    label: "Skip".into(),
+                    style: ActionStyle::Secondary,
+                    enabled: true,
+                },
+            ],
+            progress: self.progress(8),
+        }
+    }
+
     fn build_ready(&self) -> ScreenModel {
         ScreenModel {
             screen_id: "ready".into(),
@@ -623,7 +657,7 @@ impl OnboardingEngine {
                 style: ActionStyle::Primary,
                 enabled: true,
             }],
-            progress: self.progress(9),
+            progress: self.progress(10),
         }
     }
 
@@ -860,9 +894,31 @@ impl OnboardingEngine {
 
     fn handle_backup_prompt(&mut self, action: &UserAction) -> ActionResult {
         match action {
-            UserAction::ActionPressed { action_id }
-                if action_id == "setup_backup" || action_id == "skip" =>
-            {
+            UserAction::ActionPressed { action_id } if action_id == "setup_backup" => {
+                self.navigate_to(Step::BackupPassword)
+            }
+            UserAction::ActionPressed { action_id } if action_id == "skip" => {
+                self.navigate_to(Step::Ready)
+            }
+            _ => ActionResult::UpdateScreen(self.current_screen()),
+        }
+    }
+
+    fn handle_backup_password(&mut self, action: &UserAction) -> ActionResult {
+        match action {
+            UserAction::TextChanged {
+                component_id,
+                value,
+            } if component_id == "backup_password" => {
+                self.data.backup_password = Some(value.clone());
+                ActionResult::UpdateScreen(self.current_screen())
+            }
+            UserAction::ActionPressed { action_id } if action_id == "continue" => {
+                // Password is stored in data.backup_password for identity creation
+                self.navigate_to(Step::Ready)
+            }
+            UserAction::ActionPressed { action_id } if action_id == "skip" => {
+                self.data.backup_password = None;
                 self.navigate_to(Step::Ready)
             }
             _ => ActionResult::UpdateScreen(self.current_screen()),
@@ -892,6 +948,7 @@ impl WorkflowEngine for OnboardingEngine {
             Step::PreviewCard => self.build_preview_card(),
             Step::SecurityExplanation => self.build_security_explanation(),
             Step::BackupPrompt => self.build_backup_prompt(),
+            Step::BackupPassword => self.build_backup_password(),
             Step::Ready => self.build_ready(),
         }
     }
@@ -908,6 +965,7 @@ impl WorkflowEngine for OnboardingEngine {
             Step::PreviewCard => self.handle_preview_card(&action),
             Step::SecurityExplanation => self.handle_security_explanation(&action),
             Step::BackupPrompt => self.handle_backup_prompt(&action),
+            Step::BackupPassword => self.handle_backup_password(&action),
             Step::Ready => self.handle_ready(&action),
         }
     }

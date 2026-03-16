@@ -726,6 +726,7 @@ impl From<vauchi_core::OnboardingStep> for MobileOnboardingStep {
                 MobileOnboardingStep::SecurityExplanation
             }
             vauchi_core::OnboardingStep::BackupPrompt => MobileOnboardingStep::BackupPrompt,
+            vauchi_core::OnboardingStep::BackupPassword => MobileOnboardingStep::BackupPrompt, // Mobile merges backup steps
             vauchi_core::OnboardingStep::Ready => MobileOnboardingStep::Ready,
         }
     }

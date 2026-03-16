@@ -117,6 +117,8 @@ pub enum OnboardingStep {
     SecurityExplanation,
     /// Prompt to set up backup
     BackupPrompt,
+    /// Backup password entry
+    BackupPassword,
     /// Onboarding complete, ready to use
     Ready,
 }

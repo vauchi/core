@@ -36,6 +36,7 @@ pub enum ProtocolState {
     Verifying,
     Confirming,
     Complete,
+    Finalized,
     Failed(String),
 }
 

@@ -33,8 +33,8 @@ fn run_exchange(
         if let Some(bq) = &bq {
             alice.process_scanned_qr(&bq.data);
         }
-        if matches!(alice.get_state(), ProtocolState::Complete)
-            && matches!(bob.get_state(), ProtocolState::Complete)
+        if matches!(alice.get_state(), ProtocolState::Finalized)
+            && matches!(bob.get_state(), ProtocolState::Finalized)
         {
             break;
         }
@@ -60,9 +60,9 @@ proptest! {
 
         let (alice, bob) = run_exchange(alice_data, bob_data, 500);
 
-        prop_assert!(matches!(alice.get_state(), ProtocolState::Complete),
+        prop_assert!(matches!(alice.get_state(), ProtocolState::Finalized),
             "Alice did not reach Complete, got: {:?}", alice.get_state());
-        prop_assert!(matches!(bob.get_state(), ProtocolState::Complete),
+        prop_assert!(matches!(bob.get_state(), ProtocolState::Finalized),
             "Bob did not reach Complete, got: {:?}", bob.get_state());
         prop_assert_eq!(alice.get_received_data().unwrap(), bob_data_clone);
         prop_assert_eq!(bob.get_received_data().unwrap(), alice_data_clone);
@@ -97,12 +97,12 @@ fn regression_asymmetric_payload_deadlock() {
     let (alice, bob) = run_exchange(alice_data.clone(), bob_data.clone(), 200);
 
     assert!(
-        matches!(alice.get_state(), ProtocolState::Complete),
+        matches!(alice.get_state(), ProtocolState::Finalized),
         "Alice stuck in {:?}",
         alice.get_state()
     );
     assert!(
-        matches!(bob.get_state(), ProtocolState::Complete),
+        matches!(bob.get_state(), ProtocolState::Finalized),
         "Bob stuck in {:?}",
         bob.get_state()
     );
@@ -119,12 +119,12 @@ fn regression_extreme_asymmetry() {
     let (alice, bob) = run_exchange(alice_data.clone(), bob_data.clone(), 500);
 
     assert!(
-        matches!(alice.get_state(), ProtocolState::Complete),
+        matches!(alice.get_state(), ProtocolState::Finalized),
         "Alice stuck in {:?}",
         alice.get_state()
     );
     assert!(
-        matches!(bob.get_state(), ProtocolState::Complete),
+        matches!(bob.get_state(), ProtocolState::Finalized),
         "Bob stuck in {:?}",
         bob.get_state()
     );

@@ -13,7 +13,7 @@ use vauchi_core::exchange::multistage::types::ProtocolState;
 /// Helper: run a full exchange between two sessions.
 ///
 /// Drives both sessions through the complete protocol lifecycle:
-/// INIT -> DATA transfer -> VERIFY -> CONFIRM -> COMPLETE
+/// INIT -> DATA transfer -> VERIFY -> CONFIRM -> COMPLETE -> READY -> FINALIZED
 fn run_full_exchange(
     alice_card: Vec<u8>,
     bob_card: Vec<u8>,
@@ -27,7 +27,7 @@ fn run_full_exchange(
     alice.process_scanned_qr(&bi.data);
     bob.process_scanned_qr(&ai.data);
 
-    // Stages 2-4: cycle through DATA, VERIFY, CONFIRM
+    // Stages 2-6: cycle through DATA, VERIFY, CONFIRM, READY
     for _ in 0..500 {
         let aq = alice.get_display_qr();
         let bq = bob.get_display_qr();
@@ -37,8 +37,8 @@ fn run_full_exchange(
         if let Some(bq) = &bq {
             alice.process_scanned_qr(&bq.data);
         }
-        if matches!(alice.get_state(), ProtocolState::Complete)
-            && matches!(bob.get_state(), ProtocolState::Complete)
+        if matches!(alice.get_state(), ProtocolState::Finalized)
+            && matches!(bob.get_state(), ProtocolState::Finalized)
         {
             break;
         }
@@ -53,8 +53,8 @@ fn test_e2e_text_only_card() {
     let bob_card = b"name:Bob\nemail:bob@example.com".to_vec();
     let (alice, bob) = run_full_exchange(alice_card.clone(), bob_card.clone());
 
-    assert_eq!(alice.get_state(), ProtocolState::Complete);
-    assert_eq!(bob.get_state(), ProtocolState::Complete);
+    assert_eq!(alice.get_state(), ProtocolState::Finalized);
+    assert_eq!(bob.get_state(), ProtocolState::Finalized);
     assert_eq!(alice.get_received_data().unwrap(), bob_card);
     assert_eq!(bob.get_received_data().unwrap(), alice_card);
 }
@@ -68,8 +68,8 @@ fn test_e2e_card_with_avatar() {
     bob_card.extend(vec![0xAAu8; 8_000]);
     let (alice, bob) = run_full_exchange(alice_card.clone(), bob_card.clone());
 
-    assert_eq!(alice.get_state(), ProtocolState::Complete);
-    assert_eq!(bob.get_state(), ProtocolState::Complete);
+    assert_eq!(alice.get_state(), ProtocolState::Finalized);
+    assert_eq!(bob.get_state(), ProtocolState::Finalized);
     assert_eq!(alice.get_received_data().unwrap(), bob_card);
     assert_eq!(bob.get_received_data().unwrap(), alice_card);
 }
@@ -81,8 +81,8 @@ fn test_e2e_max_payload_32kb() {
     let bob_card = vec![0x43u8; 32_000];
     let (alice, bob) = run_full_exchange(alice_card.clone(), bob_card.clone());
 
-    assert_eq!(alice.get_state(), ProtocolState::Complete);
-    assert_eq!(bob.get_state(), ProtocolState::Complete);
+    assert_eq!(alice.get_state(), ProtocolState::Finalized);
+    assert_eq!(bob.get_state(), ProtocolState::Finalized);
     assert_eq!(alice.get_received_data().unwrap(), bob_card);
     assert_eq!(bob.get_received_data().unwrap(), alice_card);
 }
@@ -91,8 +91,8 @@ fn test_e2e_max_payload_32kb() {
 fn test_e2e_minimum_payload_1_byte() {
     let (alice, bob) = run_full_exchange(vec![0x01], vec![0x02]);
 
-    assert_eq!(alice.get_state(), ProtocolState::Complete);
-    assert_eq!(bob.get_state(), ProtocolState::Complete);
+    assert_eq!(alice.get_state(), ProtocolState::Finalized);
+    assert_eq!(bob.get_state(), ProtocolState::Finalized);
     assert_eq!(alice.get_received_data().unwrap(), vec![0x02]);
     assert_eq!(bob.get_received_data().unwrap(), vec![0x01]);
 }
@@ -105,8 +105,8 @@ fn test_e2e_asymmetric_payload_sizes() {
     let bob_card = vec![0xBB; 20_000]; // many chunks
     let (alice, bob) = run_full_exchange(alice_card.clone(), bob_card.clone());
 
-    assert_eq!(alice.get_state(), ProtocolState::Complete);
-    assert_eq!(bob.get_state(), ProtocolState::Complete);
+    assert_eq!(alice.get_state(), ProtocolState::Finalized);
+    assert_eq!(bob.get_state(), ProtocolState::Finalized);
     assert_eq!(alice.get_received_data().unwrap(), bob_card);
     assert_eq!(bob.get_received_data().unwrap(), alice_card);
 }
@@ -168,7 +168,7 @@ fn test_e2e_one_side_cancel_other_unaffected() {
 
     // Bob is still in Transferring — unaware of Alice's cancellation.
     // Bob's state should not be Complete or Failed (no partner signals).
-    assert!(!matches!(bob.get_state(), ProtocolState::Complete));
+    assert!(!matches!(bob.get_state(), ProtocolState::Finalized));
     assert!(!matches!(bob.get_state(), ProtocolState::Failed(_)));
 }
 
@@ -200,15 +200,15 @@ fn test_e2e_duplicate_init_scans_idempotent() {
         if let Some(bq) = &bq {
             alice.process_scanned_qr(&bq.data);
         }
-        if matches!(alice.get_state(), ProtocolState::Complete)
-            && matches!(bob.get_state(), ProtocolState::Complete)
+        if matches!(alice.get_state(), ProtocolState::Finalized)
+            && matches!(bob.get_state(), ProtocolState::Finalized)
         {
             break;
         }
     }
 
-    assert_eq!(alice.get_state(), ProtocolState::Complete);
-    assert_eq!(bob.get_state(), ProtocolState::Complete);
+    assert_eq!(alice.get_state(), ProtocolState::Finalized);
+    assert_eq!(bob.get_state(), ProtocolState::Finalized);
     assert_eq!(alice.get_received_data().unwrap(), bob_card);
     assert_eq!(bob.get_received_data().unwrap(), alice_card);
 }
@@ -238,15 +238,15 @@ fn test_e2e_duplicate_data_scans_idempotent() {
             alice.process_scanned_qr(&bq.data);
             alice.process_scanned_qr(&bq.data); // duplicate DATA
         }
-        if matches!(alice.get_state(), ProtocolState::Complete)
-            && matches!(bob.get_state(), ProtocolState::Complete)
+        if matches!(alice.get_state(), ProtocolState::Finalized)
+            && matches!(bob.get_state(), ProtocolState::Finalized)
         {
             break;
         }
     }
 
-    assert_eq!(alice.get_state(), ProtocolState::Complete);
-    assert_eq!(bob.get_state(), ProtocolState::Complete);
+    assert_eq!(alice.get_state(), ProtocolState::Finalized);
+    assert_eq!(bob.get_state(), ProtocolState::Finalized);
     assert_eq!(alice.get_received_data().unwrap(), bob_card);
     assert_eq!(bob.get_received_data().unwrap(), alice_card);
 }
@@ -300,33 +300,27 @@ fn test_e2e_invalid_qr_during_transfer_ignored() {
         if let Some(bq) = &bq {
             alice.process_scanned_qr(&bq.data);
         }
-        if matches!(alice.get_state(), ProtocolState::Complete)
-            && matches!(bob.get_state(), ProtocolState::Complete)
+        if matches!(alice.get_state(), ProtocolState::Finalized)
+            && matches!(bob.get_state(), ProtocolState::Finalized)
         {
             break;
         }
     }
 
-    assert_eq!(alice.get_state(), ProtocolState::Complete);
-    assert_eq!(bob.get_state(), ProtocolState::Complete);
+    assert_eq!(alice.get_state(), ProtocolState::Finalized);
+    assert_eq!(bob.get_state(), ProtocolState::Finalized);
     assert_eq!(alice.get_received_data().unwrap(), bob_card);
     assert_eq!(bob.get_received_data().unwrap(), alice_card);
 }
 
 #[test]
-fn test_e2e_no_qr_after_complete() {
+fn test_e2e_no_qr_after_finalized() {
     let (mut alice, mut bob) = run_full_exchange(b"Alice".to_vec(), b"Bob".to_vec());
 
-    assert_eq!(alice.get_state(), ProtocolState::Complete);
-    assert_eq!(bob.get_state(), ProtocolState::Complete);
+    assert_eq!(alice.get_state(), ProtocolState::Finalized);
+    assert_eq!(bob.get_state(), ProtocolState::Finalized);
 
-    // After completion, CONF is shown for a grace period so the slower peer
-    // can also reach Complete. Eventually returns None.
-    alice.get_display_qr().expect("expected Some");
-    for _ in 0..30 {
-        alice.get_display_qr();
-        bob.get_display_qr();
-    }
+    // After finalization, no more QR codes should be displayed.
     assert!(alice.get_display_qr().is_none());
     assert!(bob.get_display_qr().is_none());
 }
@@ -360,8 +354,8 @@ fn test_e2e_binary_payload_all_byte_values() {
     let bob_card: Vec<u8> = (0..=255).rev().collect();
     let (alice, bob) = run_full_exchange(alice_card.clone(), bob_card.clone());
 
-    assert_eq!(alice.get_state(), ProtocolState::Complete);
-    assert_eq!(bob.get_state(), ProtocolState::Complete);
+    assert_eq!(alice.get_state(), ProtocolState::Finalized);
+    assert_eq!(bob.get_state(), ProtocolState::Finalized);
     assert_eq!(alice.get_received_data().unwrap(), bob_card);
     assert_eq!(bob.get_received_data().unwrap(), alice_card);
 }
@@ -372,8 +366,135 @@ fn test_e2e_identical_cards() {
     let card = b"identical data on both sides".to_vec();
     let (alice, bob) = run_full_exchange(card.clone(), card.clone());
 
-    assert_eq!(alice.get_state(), ProtocolState::Complete);
-    assert_eq!(bob.get_state(), ProtocolState::Complete);
+    assert_eq!(alice.get_state(), ProtocolState::Finalized);
+    assert_eq!(bob.get_state(), ProtocolState::Finalized);
     assert_eq!(alice.get_received_data().unwrap(), card);
     assert_eq!(bob.get_received_data().unwrap(), card);
+}
+
+// === Atomicity tests (PRB-031) ===
+
+/// Feature: contact_exchange.feature @atomicity
+/// Data must not be available until both sides reach Finalized.
+#[test]
+fn test_atomicity_data_not_available_in_complete() {
+    let alice_card = b"Alice".to_vec();
+    let bob_card = b"Bob".to_vec();
+
+    let mut alice = MultiStageSession::new(alice_card);
+    let mut bob = MultiStageSession::new(bob_card);
+
+    // INIT
+    let ai = alice.get_display_qr().unwrap();
+    let bi = bob.get_display_qr().unwrap();
+    alice.process_scanned_qr(&bi.data);
+    bob.process_scanned_qr(&ai.data);
+
+    // Drive through DATA/VERIFY/CONFIRM until Complete
+    for _ in 0..500 {
+        let aq = alice.get_display_qr();
+        let bq = bob.get_display_qr();
+        if let Some(aq) = &aq {
+            bob.process_scanned_qr(&aq.data);
+        }
+        if let Some(bq) = &bq {
+            alice.process_scanned_qr(&bq.data);
+        }
+        if matches!(alice.get_state(), ProtocolState::Complete)
+            && matches!(bob.get_state(), ProtocolState::Complete)
+        {
+            break;
+        }
+    }
+
+    // Both are in Complete but NOT Finalized yet
+    assert_eq!(alice.get_state(), ProtocolState::Complete);
+    assert_eq!(bob.get_state(), ProtocolState::Complete);
+
+    // Data must NOT be available in Complete — only in Finalized
+    assert!(
+        alice.get_received_data().is_none(),
+        "Data should not be available in Complete state"
+    );
+    assert!(
+        bob.get_received_data().is_none(),
+        "Data should not be available in Complete state"
+    );
+}
+
+/// Feature: contact_exchange.feature @atomicity
+/// Both sides must exchange READY QRs to reach Finalized.
+#[test]
+fn test_atomicity_ready_exchange_reaches_finalized() {
+    let alice_card = b"Alice atomicity test".to_vec();
+    let bob_card = b"Bob atomicity test".to_vec();
+    let (alice, bob) = run_full_exchange(alice_card.clone(), bob_card.clone());
+
+    assert_eq!(alice.get_state(), ProtocolState::Finalized);
+    assert_eq!(bob.get_state(), ProtocolState::Finalized);
+    assert_eq!(alice.get_received_data().unwrap(), bob_card);
+    assert_eq!(bob.get_received_data().unwrap(), alice_card);
+}
+
+/// Feature: contact_exchange.feature @atomicity
+/// If one side stops scanning after Complete (never scans READY),
+/// the other side must NOT reach Finalized.
+#[test]
+fn test_atomicity_one_side_stops_scanning_no_finalize() {
+    let alice_card = b"Alice".to_vec();
+    let bob_card = b"Bob".to_vec();
+
+    let mut alice = MultiStageSession::new(alice_card);
+    let mut bob = MultiStageSession::new(bob_card);
+
+    // INIT
+    let ai = alice.get_display_qr().unwrap();
+    let bi = bob.get_display_qr().unwrap();
+    alice.process_scanned_qr(&bi.data);
+    bob.process_scanned_qr(&ai.data);
+
+    // Drive to Complete (both sides)
+    for _ in 0..500 {
+        let aq = alice.get_display_qr();
+        let bq = bob.get_display_qr();
+        if let Some(aq) = &aq {
+            bob.process_scanned_qr(&aq.data);
+        }
+        if let Some(bq) = &bq {
+            alice.process_scanned_qr(&bq.data);
+        }
+        if matches!(alice.get_state(), ProtocolState::Complete)
+            && matches!(bob.get_state(), ProtocolState::Complete)
+        {
+            break;
+        }
+    }
+
+    assert_eq!(alice.get_state(), ProtocolState::Complete);
+    assert_eq!(bob.get_state(), ProtocolState::Complete);
+
+    // Now only Alice displays QRs (READY), but Bob never scans them.
+    // Only Alice scans Bob's READY QRs, not vice versa.
+    for _ in 0..100 {
+        let aq = alice.get_display_qr();
+        let bq = bob.get_display_qr();
+        // Alice scans Bob's READY
+        if let Some(bq) = &bq {
+            alice.process_scanned_qr(&bq.data);
+        }
+        // Bob does NOT scan Alice's READY — simulates one side stopping
+        let _ = aq;
+    }
+
+    // Alice may have received Bob's READY, but Bob never received Alice's
+    // Bob should NOT be Finalized
+    assert!(
+        !matches!(bob.get_state(), ProtocolState::Finalized),
+        "Bob should not be Finalized without scanning Alice's READY"
+    );
+    // Bob's data should not be available
+    assert!(
+        bob.get_received_data().is_none(),
+        "Bob's data should not be available without finalization"
+    );
 }

@@ -69,6 +69,10 @@ pub enum StageQr {
         session_id: [u8; 16],
         payload_hash: [u8; 32],
     },
+    Ready {
+        session_id: [u8; 16],
+        ack_hash: [u8; 32],
+    },
 }
 
 /// Base45-encoded widths for fixed-size binary fields.
@@ -224,6 +228,18 @@ pub fn format_confirm_qr(session_id: &[u8; 16], payload_hash: &[u8; 32]) -> Stri
     )
 }
 
+/// Format a READY QR: `RDYY<sid:24><ack_hash:48>`
+///
+/// The ack_hash is SHA-256(min(sid_a, sid_b) || max(sid_a, sid_b)),
+/// proving both sides participated in the same exchange.
+pub fn format_ready_qr(session_id: &[u8; 16], ack_hash: &[u8; 32]) -> String {
+    format!(
+        "RDYY{sid}{ah}",
+        sid = base45::encode(session_id),
+        ah = base45::encode(ack_hash),
+    )
+}
+
 // ── Parsing ─────────────────────────────────────────────────────────────
 
 /// Parse a QR string into a [`StageQr`] variant.
@@ -239,6 +255,7 @@ pub fn parse_qr(raw: &str) -> Result<StageQr, QrCodecError> {
         "DATA" => parse_data(body),
         "VRFY" => parse_verify(body),
         "CONF" => parse_confirm(body),
+        "RDYY" => parse_ready(body),
         _ => Err(QrCodecError::UnknownPrefix),
     }
 }
@@ -374,5 +391,16 @@ fn parse_confirm(body: &str) -> Result<StageQr, QrCodecError> {
     Ok(StageQr::Confirm {
         session_id: decode_fixed(sid)?,
         payload_hash: decode_fixed(ph)?,
+    })
+}
+
+fn parse_ready(body: &str) -> Result<StageQr, QrCodecError> {
+    let mut pos = 0;
+    let sid = take(body, &mut pos, SID_LEN)?;
+    let ah = take(body, &mut pos, F32_LEN)?;
+
+    Ok(StageQr::Ready {
+        session_id: decode_fixed(sid)?,
+        ack_hash: decode_fixed(ah)?,
     })
 }

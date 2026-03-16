@@ -179,9 +179,17 @@ impl MultiStageSession {
         self.state.clone()
     }
 
-    /// Returns the received peer data if the exchange is complete.
+    /// Returns the received peer data if the exchange is finalized.
+    ///
+    /// Data is only available in the `Finalized` state — both sides must
+    /// have exchanged READY QRs to confirm mutual completion. This ensures
+    /// atomicity: neither side persists a contact unless both succeeded.
     pub fn get_received_data(&self) -> Option<Vec<u8>> {
-        self.received_data.clone()
+        if matches!(self.state, ProtocolState::Finalized) {
+            self.received_data.clone()
+        } else {
+            None
+        }
     }
 
     /// Returns the transport key derived during the ECDH key exchange.
@@ -300,37 +308,48 @@ impl MultiStageSession {
                 }
             }
             ProtocolState::Complete => {
-                // Keep showing QR codes for a grace period so the slower peer
-                // can catch up from any state. Cycle between VRFY and CONF:
-                // - Peer in Verifying needs our VRFY to advance to Confirming
-                // - Peer in Confirming needs our CONF to advance to Complete
+                // Show READY QR to confirm mutual completion.
+                // Also interleave VRFY/CONF so slower peers can catch up.
                 self.display_cycle += 1;
-                if self.display_cycle < 6 {
-                    if self.display_cycle.is_multiple_of(3) {
-                        // Show VRFY for peers still in Verifying
-                        let qr_data = qr_codec::format_verify_qr(
-                            &self.session_id,
-                            self.commitment.reveal_key(),
-                        );
-                        Some(QrPayload {
-                            data: qr_data,
-                            error_correction: "M".to_string(),
-                            display_duration_ms: 500,
-                        })
-                    } else {
-                        // Show CONF for peers in Confirming
-                        let card_hash = self.compute_card_hash(&self.local_card);
-                        let qr_data = qr_codec::format_confirm_qr(&self.session_id, &card_hash);
-                        Some(QrPayload {
-                            data: qr_data,
-                            error_correction: "M".to_string(),
-                            display_duration_ms: 500,
-                        })
-                    }
+                if self.display_cycle > 30 {
+                    // Timeout: peer never sent READY
+                    self.state =
+                        ProtocolState::Failed("peer did not confirm readiness".to_string());
+                    return None;
+                }
+
+                if self.display_cycle.is_multiple_of(4) {
+                    // Show VRFY for peers still in Verifying
+                    let qr_data =
+                        qr_codec::format_verify_qr(&self.session_id, self.commitment.reveal_key());
+                    Some(QrPayload {
+                        data: qr_data,
+                        error_correction: "M".to_string(),
+                        display_duration_ms: 500,
+                    })
+                } else if self.display_cycle.is_multiple_of(4) == false
+                    && self.display_cycle.is_multiple_of(3)
+                {
+                    // Show CONF for peers in Confirming
+                    let card_hash = self.compute_card_hash(&self.local_card);
+                    let qr_data = qr_codec::format_confirm_qr(&self.session_id, &card_hash);
+                    Some(QrPayload {
+                        data: qr_data,
+                        error_correction: "M".to_string(),
+                        display_duration_ms: 500,
+                    })
                 } else {
-                    None
+                    // Show READY for mutual confirmation
+                    let ack_hash = self.compute_ready_hash();
+                    let qr_data = qr_codec::format_ready_qr(&self.session_id, &ack_hash);
+                    Some(QrPayload {
+                        data: qr_data,
+                        error_correction: "M".to_string(),
+                        display_duration_ms: 500,
+                    })
                 }
             }
+            ProtocolState::Finalized => None,
             ProtocolState::Failed(_) => None,
         }
     }
@@ -377,6 +396,10 @@ impl MultiStageSession {
                 session_id: _,
                 payload_hash,
             } => self.handle_confirm(payload_hash),
+            StageQr::Ready {
+                session_id: _,
+                ack_hash,
+            } => self.handle_ready(ack_hash),
         }
     }
 
@@ -805,6 +828,45 @@ impl MultiStageSession {
             context.extend_from_slice(pk);
         }
         context
+    }
+
+    fn handle_ready(&mut self, ack_hash: [u8; 32]) -> ProtocolState {
+        // Only accept READY in Complete state
+        if !matches!(self.state, ProtocolState::Complete) {
+            return self.state.clone();
+        }
+
+        // Verify ack_hash matches our computation
+        let expected = self.compute_ready_hash();
+        if bool::from(ack_hash.ct_eq(&expected)) {
+            self.state = ProtocolState::Finalized;
+        }
+        // Ignore mismatched READY (could be from a different exchange)
+
+        self.state.clone()
+    }
+
+    /// Compute the READY acknowledgment hash.
+    ///
+    /// SHA-256(min(our_session_id, peer_session_id) || max(our_session_id, peer_session_id))
+    ///
+    /// Using sorted session IDs ensures both sides compute the same hash
+    /// regardless of who initiated the exchange.
+    fn compute_ready_hash(&self) -> [u8; 32] {
+        let peer_sid = self.peer_session_id.unwrap_or([0u8; 16]);
+        let (first, second) = if self.session_id <= peer_sid {
+            (self.session_id, peer_sid)
+        } else {
+            (peer_sid, self.session_id)
+        };
+
+        let mut input = Vec::with_capacity(32);
+        input.extend_from_slice(&first);
+        input.extend_from_slice(&second);
+        let d = digest(&SHA256, &input);
+        let mut hash = [0u8; 32];
+        hash.copy_from_slice(d.as_ref());
+        hash
     }
 
     fn clear_sensitive(&mut self) {

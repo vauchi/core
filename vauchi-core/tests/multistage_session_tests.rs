@@ -60,15 +60,15 @@ fn test_full_exchange_two_sessions() {
             alice.process_scanned_qr(&bq.data);
         }
 
-        if matches!(alice.get_state(), ProtocolState::Complete)
-            && matches!(bob.get_state(), ProtocolState::Complete)
+        if matches!(alice.get_state(), ProtocolState::Finalized)
+            && matches!(bob.get_state(), ProtocolState::Finalized)
         {
             break;
         }
     }
 
-    assert!(matches!(alice.get_state(), ProtocolState::Complete));
-    assert!(matches!(bob.get_state(), ProtocolState::Complete));
+    assert!(matches!(alice.get_state(), ProtocolState::Finalized));
+    assert!(matches!(bob.get_state(), ProtocolState::Finalized));
 
     let alice_received = alice.get_received_data().unwrap();
     let bob_received = bob.get_received_data().unwrap();
@@ -110,15 +110,15 @@ fn test_full_exchange_with_relay_metadata() {
         if let Some(bq) = &bq {
             alice.process_scanned_qr(&bq.data);
         }
-        if matches!(alice.get_state(), ProtocolState::Complete)
-            && matches!(bob.get_state(), ProtocolState::Complete)
+        if matches!(alice.get_state(), ProtocolState::Finalized)
+            && matches!(bob.get_state(), ProtocolState::Finalized)
         {
             break;
         }
     }
 
-    assert!(matches!(alice.get_state(), ProtocolState::Complete));
-    assert!(matches!(bob.get_state(), ProtocolState::Complete));
+    assert!(matches!(alice.get_state(), ProtocolState::Finalized));
+    assert!(matches!(bob.get_state(), ProtocolState::Finalized));
 
     // Verify relay metadata was exchanged
     assert_eq!(
@@ -160,14 +160,14 @@ fn test_exchange_without_relay_metadata() {
         if let Some(bq) = &bq {
             alice.process_scanned_qr(&bq.data);
         }
-        if matches!(alice.get_state(), ProtocolState::Complete)
-            && matches!(bob.get_state(), ProtocolState::Complete)
+        if matches!(alice.get_state(), ProtocolState::Finalized)
+            && matches!(bob.get_state(), ProtocolState::Finalized)
         {
             break;
         }
     }
 
-    assert!(matches!(alice.get_state(), ProtocolState::Complete));
+    assert!(matches!(alice.get_state(), ProtocolState::Finalized));
     assert!(alice.peer_relay_url().is_none());
     assert!(alice.peer_relay_noise_pubkey().is_none());
     assert!(bob.peer_relay_url().is_none());
@@ -205,14 +205,14 @@ fn test_exchange_with_large_payload() {
         if let Some(bq) = &bq {
             alice.process_scanned_qr(&bq.data);
         }
-        if matches!(alice.get_state(), ProtocolState::Complete)
-            && matches!(bob.get_state(), ProtocolState::Complete)
+        if matches!(alice.get_state(), ProtocolState::Finalized)
+            && matches!(bob.get_state(), ProtocolState::Finalized)
         {
             break;
         }
     }
 
-    assert!(matches!(alice.get_state(), ProtocolState::Complete));
+    assert!(matches!(alice.get_state(), ProtocolState::Finalized));
     let alice_received = alice.get_received_data().unwrap();
     let bob_received = bob.get_received_data().unwrap();
     assert_eq!(alice_received, bob_card);

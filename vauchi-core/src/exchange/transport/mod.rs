@@ -6,6 +6,9 @@
 //!
 //! Provides a unified [`TransportChannel`] trait that all transports implement,
 //! with automatic negotiation, fallback chains, and diagnostic tooling.
+//!
+//! **Deprecated (ADR-031):** The blocking `TransportChannel` trait is superseded
+//! by `ExchangeCommand`/`ExchangeHardwareEvent`. See `exchange::command`.
 
 pub mod animated_qr;
 pub mod caps;

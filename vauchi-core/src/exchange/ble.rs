@@ -699,6 +699,7 @@ impl MockBLETransport {
     }
 }
 
+#[allow(deprecated)]
 impl BLETransport for MockBLETransport {
     fn start_advertising(&self, _payload: &ExchangeBle) -> Result<(), BLEError> {
         if self.should_succeed {

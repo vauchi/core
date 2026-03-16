@@ -6,6 +6,8 @@
 //!
 //! [`TransportChain`] tries transports in priority order and falls back
 //! to the next available transport on failure.
+//!
+//! **Deprecated (ADR-031):** Fallback is now in `ExchangeSession` via `DeviceCapabilities`.
 
 use super::channel::{TransportChannel, TransportError, TransportType};
 

@@ -26,8 +26,10 @@ mod audio;
 pub mod audio_cpal;
 
 #[cfg(feature = "testing")]
+#[allow(deprecated)]
 pub mod ble;
 #[cfg(not(feature = "testing"))]
+#[allow(deprecated)]
 mod ble;
 
 #[cfg(feature = "testing")]
@@ -59,6 +61,7 @@ pub mod capability;
 pub mod command;
 pub mod device_link;
 
+#[allow(deprecated)]
 pub mod transport;
 
 #[cfg(feature = "testing")]
@@ -147,6 +150,7 @@ pub use ambient_audio::{
 pub use audio::{AudioBackend, AudioCapability, AudioConfig, MockAudioBackend, UltrasonicVerifier};
 #[cfg(feature = "audio-cpal")]
 pub use audio_cpal::CpalAudioBackend;
+#[allow(deprecated)]
 pub use ble::{
     BLEAdvertisement, BLEDevice, BLEError, BLEExchangeSession, BLEExchangeState,
     BLEProximityVerifier, BLETransport, ExchangeBle, MockBLETransport, MockBLEVerifier,

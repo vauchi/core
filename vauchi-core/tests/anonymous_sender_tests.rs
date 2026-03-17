@@ -791,7 +791,7 @@ fn test_adversarial_sender_index_rejects_crafted_ids() {
 /// completely different anonymous IDs — no partial collision.
 #[test]
 fn test_adversarial_near_collision_keys() {
-    let mut key1 = [0x42u8; 32];
+    let key1 = [0x42u8; 32];
     let mut key2 = key1;
     key2[31] ^= 0x01; // Flip one bit
 

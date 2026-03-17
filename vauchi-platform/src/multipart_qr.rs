@@ -13,6 +13,56 @@ use std::collections::HashMap;
 
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use base64::Engine;
+use thiserror::Error;
+
+/// Errors from multipart QR encoding/decoding.
+#[derive(Error, Debug)]
+pub enum MultipartQrError {
+    #[error("invalid chunk format: expected index/total/crc32/data")]
+    InvalidFormat,
+
+    #[error("invalid chunk index: {0}")]
+    InvalidIndex(#[source] std::num::ParseIntError),
+
+    #[error("invalid chunk total: {0}")]
+    InvalidTotal(#[source] std::num::ParseIntError),
+
+    #[error("invalid chunk total: must be > 0")]
+    ZeroTotal,
+
+    #[error("chunk index {index} out of range for total {total}")]
+    IndexOutOfRange { index: usize, total: usize },
+
+    #[error("invalid CRC32 hex length: expected 8, got {len}")]
+    InvalidCrcLength { len: usize },
+
+    #[error("chunk total mismatch: expected {expected}, got {got}")]
+    TotalMismatch { expected: usize, got: usize },
+
+    #[error("invalid base64url data: {0}")]
+    InvalidBase64(#[from] base64::DecodeError),
+
+    #[error(
+        "CRC32 checksum mismatch for chunk {index}: expected {expected:08x}, got {actual:08x}"
+    )]
+    CrcMismatch {
+        index: usize,
+        expected: u32,
+        actual: u32,
+    },
+
+    #[error("invalid CRC32 hex: {0}")]
+    InvalidCrcHex(#[source] std::num::ParseIntError),
+
+    #[error("no chunks received yet")]
+    NoChunks,
+
+    #[error("incomplete: received {received}/{total} chunks")]
+    Incomplete { received: usize, total: usize },
+
+    #[error("missing chunk {index}")]
+    MissingChunk { index: usize },
+}
 
 /// Encode a byte payload into multiple QR-sized chunk strings.
 ///
@@ -131,59 +181,53 @@ impl MultipartDecoder {
     ///
     /// Returns `Ok(true)` if the chunk is new, `Ok(false)` if it was a duplicate.
     /// Returns `Err` if the chunk format is invalid or the CRC checksum fails.
-    pub fn add_chunk(&mut self, raw: &str) -> Result<bool, String> {
+    pub fn add_chunk(&mut self, raw: &str) -> Result<bool, MultipartQrError> {
         let parts: Vec<&str> = raw.splitn(4, '/').collect();
         if parts.len() < 4 {
-            return Err("invalid chunk format: expected index/total/crc32/data".into());
+            return Err(MultipartQrError::InvalidFormat);
         }
 
-        let index: usize = parts[0]
-            .parse()
-            .map_err(|e| format!("invalid chunk index: {e}"))?;
-        let total: usize = parts[1]
-            .parse()
-            .map_err(|e| format!("invalid chunk total: {e}"))?;
+        let index: usize = parts[0].parse().map_err(MultipartQrError::InvalidIndex)?;
+        let total: usize = parts[1].parse().map_err(MultipartQrError::InvalidTotal)?;
         let expected_crc_hex = parts[2];
         let b64_data = parts[3];
 
         if total == 0 {
-            return Err("invalid chunk total: must be > 0".into());
+            return Err(MultipartQrError::ZeroTotal);
         }
         if index >= total {
-            return Err(format!(
-                "chunk index {index} out of range for total {total}"
-            ));
+            return Err(MultipartQrError::IndexOutOfRange { index, total });
         }
         if expected_crc_hex.len() != 8 {
-            return Err(format!(
-                "invalid CRC32 hex length: expected 8, got {}",
-                expected_crc_hex.len()
-            ));
+            return Err(MultipartQrError::InvalidCrcLength {
+                len: expected_crc_hex.len(),
+            });
         }
 
         // Check total consistency
         if let Some(existing_total) = self.total {
             if total != existing_total {
-                return Err(format!(
-                    "chunk total mismatch: expected {existing_total}, got {total}"
-                ));
+                return Err(MultipartQrError::TotalMismatch {
+                    expected: existing_total,
+                    got: total,
+                });
             }
         }
 
         // Decode the base64 data
-        let chunk_bytes = URL_SAFE_NO_PAD
-            .decode(b64_data)
-            .map_err(|e| format!("invalid base64url data: {e}"))?;
+        let chunk_bytes = URL_SAFE_NO_PAD.decode(b64_data)?;
 
         // Verify CRC32
         let actual_crc = crc32fast::hash(&chunk_bytes);
-        let expected_crc = u32::from_str_radix(expected_crc_hex, 16)
-            .map_err(|e| format!("invalid CRC32 hex: {e}"))?;
+        let expected_crc =
+            u32::from_str_radix(expected_crc_hex, 16).map_err(MultipartQrError::InvalidCrcHex)?;
 
         if actual_crc != expected_crc {
-            return Err(format!(
-                "CRC32 checksum mismatch for chunk {index}: expected {expected_crc:08x}, got {actual_crc:08x}"
-            ));
+            return Err(MultipartQrError::CrcMismatch {
+                index,
+                expected: expected_crc,
+                actual: actual_crc,
+            });
         }
 
         // Store total on first chunk
@@ -219,17 +263,14 @@ impl MultipartDecoder {
     /// Reassemble the original payload from received chunks.
     ///
     /// Returns `Err` if not all chunks have been received yet.
-    pub fn assemble(&self) -> Result<Vec<u8>, String> {
-        let total = self
-            .total
-            .ok_or_else(|| "no chunks received yet".to_string())?;
+    pub fn assemble(&self) -> Result<Vec<u8>, MultipartQrError> {
+        let total = self.total.ok_or(MultipartQrError::NoChunks)?;
 
         if self.chunks.len() != total {
-            return Err(format!(
-                "incomplete: received {}/{} chunks",
-                self.chunks.len(),
-                total
-            ));
+            return Err(MultipartQrError::Incomplete {
+                received: self.chunks.len(),
+                total,
+            });
         }
 
         let mut result = Vec::new();
@@ -237,7 +278,7 @@ impl MultipartDecoder {
             let chunk = self
                 .chunks
                 .get(&i)
-                .ok_or_else(|| format!("missing chunk {i}"))?;
+                .ok_or(MultipartQrError::MissingChunk { index: i })?;
             result.extend_from_slice(chunk);
         }
 
@@ -281,7 +322,7 @@ impl MobileMultipartDecoder {
             .lock()
             .unwrap()
             .add_chunk(&chunk)
-            .map_err(MobileError::InvalidInput)
+            .map_err(|e| MobileError::InvalidInput(e.to_string()))
     }
 
     /// Number of unique chunks received so far.
@@ -311,7 +352,7 @@ impl MobileMultipartDecoder {
             .lock()
             .unwrap()
             .assemble()
-            .map_err(MobileError::InvalidInput)
+            .map_err(|e| MobileError::InvalidInput(e.to_string()))
     }
 }
 
@@ -470,7 +511,7 @@ mod tests {
         let mut decoder = MultipartDecoder::new();
         let result = decoder.add_chunk(&corrupted);
         assert!(result.is_err(), "corrupted chunk should be rejected");
-        let err_msg = result.unwrap_err();
+        let err_msg = result.unwrap_err().to_string();
         assert!(
             err_msg.contains("checksum") || err_msg.contains("CRC"),
             "error should mention checksum, got: {err_msg}"

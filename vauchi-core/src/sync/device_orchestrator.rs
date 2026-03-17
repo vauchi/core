@@ -507,7 +507,7 @@ impl<'a> DeviceSyncOrchestrator<'a> {
             );
 
             let encoded = crate::network::simple_message::encode_simple_message(&envelope)
-                .map_err(DeviceSyncError::Serialization)?;
+                .map_err(|e| DeviceSyncError::Serialization(e.to_string()))?;
 
             envelopes.push(encoded);
         }

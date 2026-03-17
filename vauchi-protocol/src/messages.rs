@@ -8,6 +8,20 @@
 //! relay WebSocket connection. Types are serde-only — no crypto, no I/O.
 
 use serde::{Deserialize, Serialize};
+use thiserror::Error;
+
+/// Errors from encoding/decoding protocol messages.
+#[derive(Error, Debug)]
+pub enum ProtocolMessageError {
+    #[error("Frame too short")]
+    FrameTooShort,
+
+    #[error("Unsupported protocol version: {version}")]
+    UnsupportedVersion { version: u8 },
+
+    #[error("{0}")]
+    Serialization(#[from] serde_json::Error),
+}
 
 // =========================================================================
 // Constants
@@ -298,27 +312,26 @@ pub fn negotiate_version(client_versions: Option<&[u8]>, server_versions: &[u8])
 // =========================================================================
 
 /// Decodes a message from binary data (with length prefix).
-pub fn decode_message(data: &[u8]) -> Result<MessageEnvelope, String> {
+pub fn decode_message(data: &[u8]) -> Result<MessageEnvelope, ProtocolMessageError> {
     if data.len() < FRAME_HEADER_SIZE {
-        return Err("Frame too short".to_string());
+        return Err(ProtocolMessageError::FrameTooShort);
     }
 
     let json = &data[FRAME_HEADER_SIZE..];
-    let envelope: MessageEnvelope = serde_json::from_slice(json).map_err(|e| e.to_string())?;
+    let envelope: MessageEnvelope = serde_json::from_slice(json)?;
 
     if envelope.version != PROTOCOL_VERSION {
-        return Err(format!(
-            "Unsupported protocol version: {}",
-            envelope.version
-        ));
+        return Err(ProtocolMessageError::UnsupportedVersion {
+            version: envelope.version,
+        });
     }
 
     Ok(envelope)
 }
 
 /// Encodes a message to binary data (with length prefix).
-pub fn encode_message(envelope: &MessageEnvelope) -> Result<Vec<u8>, String> {
-    let json = serde_json::to_vec(envelope).map_err(|e| e.to_string())?;
+pub fn encode_message(envelope: &MessageEnvelope) -> Result<Vec<u8>, ProtocolMessageError> {
+    let json = serde_json::to_vec(envelope)?;
     let len = json.len() as u32;
 
     let mut frame = Vec::with_capacity(FRAME_HEADER_SIZE + json.len());
@@ -403,7 +416,7 @@ mod tests {
     fn test_decode_frame_too_short() {
         let result = decode_message(&[0, 1, 2]);
         assert!(result.is_err(), "expected error");
-        assert_eq!(result.unwrap_err(), "Frame too short");
+        assert_eq!(result.unwrap_err().to_string(), "Frame too short");
     }
 
     #[test]
@@ -424,9 +437,10 @@ mod tests {
             "Should reject unsupported protocol version"
         );
         let err = result.unwrap_err();
+        let err_msg = err.to_string();
         assert!(
-            err.contains("Unsupported protocol version"),
-            "Error should mention version: {err}"
+            err_msg.contains("Unsupported protocol version"),
+            "Error should mention version: {err_msg}"
         );
     }
 

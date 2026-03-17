@@ -86,9 +86,10 @@ fn test_decode_rejects_unsupported_simple_protocol_version() {
         "Should reject unsupported simple protocol version"
     );
     let err = result.unwrap_err();
+    let err_msg = err.to_string();
     assert!(
-        err.contains("Unsupported protocol version"),
-        "Error should mention version: {err}"
+        err_msg.contains("Unsupported protocol version"),
+        "Error should mention version: {err_msg}"
     );
 }
 

@@ -183,7 +183,7 @@ impl VauchiPlatform {
             &msg,
             timeout_secs,
         ))
-        .map_err(MobileError::NetworkError)
+        .map_err(|e| MobileError::NetworkError(e.to_string()))
     }
 
     /// Listen for incoming device link request via relay (existing device / initiator).
@@ -211,7 +211,7 @@ impl VauchiPlatform {
                 &identity_id,
                 timeout_secs,
             ))
-            .map_err(MobileError::NetworkError)?;
+            .map_err(|e| MobileError::NetworkError(e.to_string()))?;
 
         Ok(MobileDeviceLinkRequest {
             encrypted_payload: payload,
@@ -242,7 +242,7 @@ impl VauchiPlatform {
             &sender_token,
             encrypted_response,
         ))
-        .map_err(MobileError::NetworkError)
+        .map_err(|e| MobileError::NetworkError(e.to_string()))
     }
 
     /// Get the device count.

@@ -11,9 +11,56 @@
 use std::time::Duration;
 
 use futures_util::{SinkExt, StreamExt};
+use thiserror::Error;
 use tokio_tungstenite::tungstenite::Message;
 
 use crate::cert_pinning;
+
+/// Errors from device link relay operations.
+#[derive(Error, Debug)]
+pub enum DeviceLinkError {
+    #[error("Failed to decode DeviceLinkRelayMessage: {0}")]
+    DecodeFailed(#[from] serde_json::Error),
+
+    #[error("{0}")]
+    Connection(#[from] crate::cert_pinning::CertPinningError),
+
+    #[error("Failed to send device link message: {0}")]
+    SendFailed(String),
+
+    #[error("Relay closed connection before response")]
+    ConnectionClosedBeforeResponse,
+
+    #[error("WebSocket error: {0}")]
+    WebSocket(String),
+
+    #[error("Connection closed without response")]
+    ConnectionClosed,
+
+    #[error("Timed out waiting for device link response")]
+    ResponseTimeout,
+
+    #[error("Relay closed connection while listening")]
+    ConnectionClosedWhileListening,
+
+    #[error("WebSocket error while listening: {0}")]
+    WebSocketListening(String),
+
+    #[error("Connection closed while listening")]
+    ConnectionClosedListening,
+
+    #[error("Timed out waiting for device link request")]
+    RequestTimeout,
+
+    #[error("Failed to send listening handshake: {0}")]
+    HandshakeSendFailed(String),
+
+    #[error("Failed to encode handshake: {0}")]
+    HandshakeEncodeFailed(#[source] serde_json::Error),
+
+    #[error("Failed to send device link response: {0}")]
+    ResponseSendFailed(String),
+}
 
 /// A device link message sent through the relay.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -32,9 +79,8 @@ pub fn encode_device_link_message(msg: &DeviceLinkRelayMessage) -> Vec<u8> {
 }
 
 /// Deserialize a `DeviceLinkRelayMessage` from JSON bytes.
-pub fn decode_device_link_message(data: &[u8]) -> Result<DeviceLinkRelayMessage, String> {
-    serde_json::from_slice(data)
-        .map_err(|e| format!("Failed to decode DeviceLinkRelayMessage: {e}"))
+pub fn decode_device_link_message(data: &[u8]) -> Result<DeviceLinkRelayMessage, DeviceLinkError> {
+    Ok(serde_json::from_slice(data)?)
 }
 
 /// Send a device link message via relay and wait for a binary response.
@@ -46,14 +92,14 @@ pub async fn send_and_receive(
     pinned_cert: Option<&str>,
     message: &DeviceLinkRelayMessage,
     timeout_secs: u64,
-) -> Result<Vec<u8>, String> {
+) -> Result<Vec<u8>, DeviceLinkError> {
     let mut socket = cert_pinning::connect_with_pinning(relay_url, pinned_cert).await?;
 
     let data = encode_device_link_message(message);
     socket
         .send(Message::Binary(data))
         .await
-        .map_err(|e| format!("Failed to send device link message: {e}"))?;
+        .map_err(|e| DeviceLinkError::SendFailed(e.to_string()))?;
 
     // Wait for binary response
     let response = tokio::time::timeout(Duration::from_secs(timeout_secs), async {
@@ -61,16 +107,16 @@ pub async fn send_and_receive(
             match msg {
                 Ok(Message::Binary(data)) => return Ok(data),
                 Ok(Message::Close(_)) => {
-                    return Err("Relay closed connection before response".to_string())
+                    return Err(DeviceLinkError::ConnectionClosedBeforeResponse)
                 }
                 Ok(_) => continue, // skip text/ping/pong
-                Err(e) => return Err(format!("WebSocket error: {e}")),
+                Err(e) => return Err(DeviceLinkError::WebSocket(e.to_string())),
             }
         }
-        Err("Connection closed without response".to_string())
+        Err(DeviceLinkError::ConnectionClosed)
     })
     .await
-    .map_err(|_| "Timed out waiting for device link response".to_string())??;
+    .map_err(|_| DeviceLinkError::ResponseTimeout)??;
 
     let _ = socket.close(None).await;
     Ok(response)
@@ -88,7 +134,7 @@ pub async fn listen_for_request(
     pinned_cert: Option<&str>,
     identity_id: &str,
     timeout_secs: u64,
-) -> Result<(Vec<u8>, String), String> {
+) -> Result<(Vec<u8>, String), DeviceLinkError> {
     let mut socket = cert_pinning::connect_with_pinning(relay_url, pinned_cert).await?;
 
     // Send a listening handshake so the relay knows who we are
@@ -97,11 +143,11 @@ pub async fn listen_for_request(
         "identity_id": identity_id,
     });
     let handshake_bytes =
-        serde_json::to_vec(&handshake).map_err(|e| format!("Failed to encode handshake: {e}"))?;
+        serde_json::to_vec(&handshake).map_err(DeviceLinkError::HandshakeEncodeFailed)?;
     socket
         .send(Message::Binary(handshake_bytes))
         .await
-        .map_err(|e| format!("Failed to send listening handshake: {e}"))?;
+        .map_err(|e| DeviceLinkError::HandshakeSendFailed(e.to_string()))?;
 
     // Wait for incoming request
     let result = tokio::time::timeout(Duration::from_secs(timeout_secs), async {
@@ -112,16 +158,16 @@ pub async fn listen_for_request(
                     return Ok((relay_msg.payload, relay_msg.sender_token));
                 }
                 Ok(Message::Close(_)) => {
-                    return Err("Relay closed connection while listening".to_string())
+                    return Err(DeviceLinkError::ConnectionClosedWhileListening)
                 }
                 Ok(_) => continue,
-                Err(e) => return Err(format!("WebSocket error while listening: {e}")),
+                Err(e) => return Err(DeviceLinkError::WebSocketListening(e.to_string())),
             }
         }
-        Err("Connection closed while listening".to_string())
+        Err(DeviceLinkError::ConnectionClosedListening)
     })
     .await
-    .map_err(|_| "Timed out waiting for device link request".to_string())??;
+    .map_err(|_| DeviceLinkError::RequestTimeout)??;
 
     let _ = socket.close(None).await;
     Ok(result)
@@ -136,7 +182,7 @@ pub async fn send_response(
     pinned_cert: Option<&str>,
     sender_token: &str,
     response_payload: Vec<u8>,
-) -> Result<(), String> {
+) -> Result<(), DeviceLinkError> {
     let mut socket = cert_pinning::connect_with_pinning(relay_url, pinned_cert).await?;
 
     let msg = DeviceLinkRelayMessage {
@@ -149,7 +195,7 @@ pub async fn send_response(
     socket
         .send(Message::Binary(data))
         .await
-        .map_err(|e| format!("Failed to send device link response: {e}"))?;
+        .map_err(|e| DeviceLinkError::ResponseSendFailed(e.to_string()))?;
 
     let _ = socket.close(None).await;
     Ok(())
@@ -200,7 +246,7 @@ mod tests {
         let result = decode_device_link_message(invalid);
         assert!(result.is_err(), "decoding invalid JSON should fail");
 
-        let err_msg = result.unwrap_err();
+        let err_msg = result.unwrap_err().to_string();
         assert!(
             err_msg.contains("Failed to decode"),
             "error should contain 'Failed to decode', got: {err_msg}"

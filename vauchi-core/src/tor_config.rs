@@ -9,7 +9,25 @@
 //! by storage operations even when the network module is not compiled.
 //! The actual Tor transport implementation is in `network::tor`.
 
+use thiserror::Error;
+
 pub use crate::types::{TorConfig, TorRelayAddress, TorStatus};
+
+/// Errors from Tor bridge configuration validation.
+#[derive(Error, Debug, Clone, PartialEq, Eq)]
+pub enum TorConfigError {
+    #[error("bridge address cannot be empty")]
+    EmptyBridge,
+
+    #[error("bridge transport '{transport}' requires at least an IP:PORT")]
+    MissingAddress { transport: String },
+
+    #[error("bridge address '{address}' missing port (expected IP:PORT)")]
+    MissingPort { address: String },
+
+    #[error("bridge port '{port}' is not a valid port number")]
+    InvalidPort { port: String },
+}
 
 impl std::fmt::Display for TorStatus {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -50,7 +68,7 @@ impl TorConfig {
     /// Each bridge must be non-empty and contain a transport keyword followed
     /// by an IP:port (e.g., `obfs4 198.51.100.1:443 cert=...`).
     /// Returns an error if any bridge string is malformed.
-    pub fn with_bridges(mut self, bridges: Vec<String>) -> Result<Self, String> {
+    pub fn with_bridges(mut self, bridges: Vec<String>) -> Result<Self, TorConfigError> {
         for bridge in &bridges {
             Self::validate_bridge(bridge)?;
         }
@@ -63,26 +81,25 @@ impl TorConfig {
     /// Accepted formats:
     /// - `obfs4 IP:PORT cert=... iat-mode=N`
     /// - `IP:PORT` (plain bridge)
-    fn validate_bridge(bridge: &str) -> Result<(), String> {
+    fn validate_bridge(bridge: &str) -> Result<(), TorConfigError> {
         let bridge = bridge.trim();
         if bridge.is_empty() {
-            return Err("bridge address cannot be empty".to_string());
+            return Err(TorConfigError::EmptyBridge);
         }
 
         // Split into parts. First token is either a transport or an IP:PORT.
         let parts: Vec<&str> = bridge.split_whitespace().collect();
         if parts.is_empty() {
-            return Err("bridge address cannot be empty".to_string());
+            return Err(TorConfigError::EmptyBridge);
         }
 
         // Check if first part is a known transport
         let addr_part = match parts[0] {
             "obfs4" | "obfs3" | "meek_lite" | "snowflake" | "webtunnel" => {
                 if parts.len() < 2 {
-                    return Err(format!(
-                        "bridge transport '{}' requires at least an IP:PORT",
-                        parts[0]
-                    ));
+                    return Err(TorConfigError::MissingAddress {
+                        transport: parts[0].to_string(),
+                    });
                 }
                 parts[1]
             }
@@ -91,19 +108,17 @@ impl TorConfig {
 
         // Validate that addr_part looks like IP:PORT
         if !addr_part.contains(':') {
-            return Err(format!(
-                "bridge address '{}' missing port (expected IP:PORT)",
-                addr_part
-            ));
+            return Err(TorConfigError::MissingPort {
+                address: addr_part.to_string(),
+            });
         }
 
         // Validate port is numeric
         if let Some(port_str) = addr_part.rsplit(':').next() {
             if port_str.parse::<u16>().is_err() {
-                return Err(format!(
-                    "bridge port '{}' is not a valid port number",
-                    port_str
-                ));
+                return Err(TorConfigError::InvalidPort {
+                    port: port_str.to_string(),
+                });
             }
         }
 

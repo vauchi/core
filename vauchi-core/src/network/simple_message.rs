@@ -12,6 +12,20 @@
 //! vauchi-platform, vauchi-cli, and vauchi-relay.
 
 use serde::{Deserialize, Serialize};
+use thiserror::Error;
+
+/// Errors from encoding/decoding simple relay messages.
+#[derive(Error, Debug)]
+pub enum SimpleMessageError {
+    #[error("Frame too short")]
+    FrameTooShort,
+
+    #[error("Unsupported protocol version: {version}")]
+    UnsupportedVersion { version: u8 },
+
+    #[error("{0}")]
+    Serialization(#[from] serde_json::Error),
+}
 
 /// Protocol version for simple messages.
 pub const SIMPLE_PROTOCOL_VERSION: u8 = 1;
@@ -202,8 +216,8 @@ pub fn create_simple_ack(message_id: &str, status: SimpleAckStatus) -> SimpleEnv
 }
 
 /// Encode a simple envelope to bytes with length prefix.
-pub fn encode_simple_message(envelope: &SimpleEnvelope) -> Result<Vec<u8>, String> {
-    let json = serde_json::to_vec(envelope).map_err(|e| e.to_string())?;
+pub fn encode_simple_message(envelope: &SimpleEnvelope) -> Result<Vec<u8>, SimpleMessageError> {
+    let json = serde_json::to_vec(envelope)?;
     let len = json.len() as u32;
 
     let mut frame = Vec::with_capacity(FRAME_HEADER_SIZE + json.len());
@@ -258,19 +272,18 @@ fn hex_encode(bytes: &[u8]) -> String {
 }
 
 /// Decode a simple envelope from bytes with length prefix.
-pub fn decode_simple_message(data: &[u8]) -> Result<SimpleEnvelope, String> {
+pub fn decode_simple_message(data: &[u8]) -> Result<SimpleEnvelope, SimpleMessageError> {
     if data.len() < FRAME_HEADER_SIZE {
-        return Err("Frame too short".to_string());
+        return Err(SimpleMessageError::FrameTooShort);
     }
 
     let json = &data[FRAME_HEADER_SIZE..];
-    let envelope: SimpleEnvelope = serde_json::from_slice(json).map_err(|e| e.to_string())?;
+    let envelope: SimpleEnvelope = serde_json::from_slice(json)?;
 
     if envelope.version != SIMPLE_PROTOCOL_VERSION {
-        return Err(format!(
-            "Unsupported protocol version: {}",
-            envelope.version
-        ));
+        return Err(SimpleMessageError::UnsupportedVersion {
+            version: envelope.version,
+        });
     }
 
     Ok(envelope)

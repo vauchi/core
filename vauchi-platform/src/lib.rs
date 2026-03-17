@@ -797,7 +797,7 @@ impl vauchi_core::api::RevocationSender for MobileRevocationSender {
                 cert_pinning::connect_with_pinning(&self.relay_url, self.pinned_cert.as_deref())
                     .await
                     .map_err(|e| {
-                        vauchi_core::api::ShredError::FileError(format!("Connect: {}", e))
+                        vauchi_core::api::ShredError::FileError(format!("Connect: {e}"))
                     })?;
 
             socket

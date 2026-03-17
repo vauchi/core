@@ -12,13 +12,33 @@ use rustls::pki_types::CertificateDer;
 use rustls::ClientConfig;
 use std::sync::Arc;
 use std::time::Duration;
+use thiserror::Error;
+
+/// Errors from TLS certificate pinning and WebSocket connection.
+#[derive(Error, Debug)]
+pub enum CertPinningError {
+    #[error("No certificates found in PEM")]
+    NoCertificates,
+
+    #[error("Invalid base64 in certificate: {0}")]
+    InvalidBase64(#[from] base64::DecodeError),
+
+    #[error("Failed to add certificate: {0}")]
+    CertificateAdd(String),
+
+    #[error("Connection timed out")]
+    Timeout,
+
+    #[error("WebSocket connection failed: {0}")]
+    WebSocketFailed(String),
+}
 
 /// Type alias for the async WebSocket stream.
 pub type WsStream =
     tokio_tungstenite::WebSocketStream<tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>>;
 
 /// Parse PEM-encoded certificates into DER format.
-fn parse_pem_certs(pem: &str) -> Result<Vec<CertificateDer<'static>>, String> {
+fn parse_pem_certs(pem: &str) -> Result<Vec<CertificateDer<'static>>, CertPinningError> {
     let mut certs = Vec::new();
     let mut current_cert = String::new();
     let mut in_cert = false;
@@ -31,9 +51,7 @@ fn parse_pem_certs(pem: &str) -> Result<Vec<CertificateDer<'static>>, String> {
             in_cert = false;
             if !current_cert.is_empty() {
                 use base64::Engine;
-                let der = base64::engine::general_purpose::STANDARD
-                    .decode(&current_cert)
-                    .map_err(|e| format!("Invalid base64 in certificate: {}", e))?;
+                let der = base64::engine::general_purpose::STANDARD.decode(&current_cert)?;
                 certs.push(CertificateDer::from(der));
             }
         } else if in_cert {
@@ -42,7 +60,7 @@ fn parse_pem_certs(pem: &str) -> Result<Vec<CertificateDer<'static>>, String> {
     }
 
     if certs.is_empty() {
-        return Err("No certificates found in PEM".to_string());
+        return Err(CertPinningError::NoCertificates);
     }
 
     Ok(certs)
@@ -54,7 +72,7 @@ fn ensure_crypto_provider() {
 }
 
 /// Create a rustls ClientConfig with certificate pinning.
-fn create_pinned_config(pinned_cert_pem: &str) -> Result<Arc<ClientConfig>, String> {
+fn create_pinned_config(pinned_cert_pem: &str) -> Result<Arc<ClientConfig>, CertPinningError> {
     ensure_crypto_provider();
     let certs = parse_pem_certs(pinned_cert_pem)?;
 
@@ -62,7 +80,7 @@ fn create_pinned_config(pinned_cert_pem: &str) -> Result<Arc<ClientConfig>, Stri
     for cert in certs {
         root_store
             .add(cert)
-            .map_err(|e| format!("Failed to add certificate: {}", e))?;
+            .map_err(|e| CertPinningError::CertificateAdd(e.to_string()))?;
     }
 
     let config = ClientConfig::builder()
@@ -73,7 +91,7 @@ fn create_pinned_config(pinned_cert_pem: &str) -> Result<Arc<ClientConfig>, Stri
 }
 
 /// Create a rustls ClientConfig using system/webpki roots (no pinning).
-fn create_default_config() -> Result<Arc<ClientConfig>, String> {
+fn create_default_config() -> Result<Arc<ClientConfig>, CertPinningError> {
     ensure_crypto_provider();
     let mut root_store = rustls::RootCertStore::empty();
     root_store.extend(webpki_roots::TLS_SERVER_ROOTS.iter().cloned());
@@ -91,7 +109,7 @@ fn create_default_config() -> Result<Arc<ClientConfig>, String> {
 pub async fn connect_with_pinning(
     url_str: &str,
     pinned_cert_pem: Option<&str>,
-) -> Result<WsStream, String> {
+) -> Result<WsStream, CertPinningError> {
     let connector = match pinned_cert_pem {
         Some(pem) => {
             let config = create_pinned_config(pem)?;
@@ -108,8 +126,8 @@ pub async fn connect_with_pinning(
         tokio_tungstenite::connect_async_tls_with_config(url_str, None, false, connector),
     )
     .await
-    .map_err(|_| "Connection timed out".to_string())?
-    .map_err(|e| format!("WebSocket connection failed: {}", e))?;
+    .map_err(|_| CertPinningError::Timeout)?
+    .map_err(|e| CertPinningError::WebSocketFailed(e.to_string()))?;
 
     Ok(ws)
 }
@@ -162,7 +180,7 @@ wupY
         let result = parse_pem_certs("");
         assert!(result.is_err(), "Empty input should fail");
         assert_eq!(
-            result.unwrap_err(),
+            result.unwrap_err().to_string(),
             "No certificates found in PEM",
             "Should report no certificates found"
         );
@@ -173,7 +191,7 @@ wupY
         let result = parse_pem_certs("just some random text\nwithout any PEM markers");
         assert!(result.is_err(), "No PEM markers should fail");
         assert_eq!(
-            result.unwrap_err(),
+            result.unwrap_err().to_string(),
             "No certificates found in PEM",
             "Should report no certificates found"
         );
@@ -184,7 +202,7 @@ wupY
         let bad_pem = "-----BEGIN CERTIFICATE-----\n!!invalid-base64!!\n-----END CERTIFICATE-----";
         let result = parse_pem_certs(bad_pem);
         assert!(result.is_err(), "Invalid base64 should fail");
-        let err = result.unwrap_err();
+        let err = result.unwrap_err().to_string();
         assert!(
             err.contains("Invalid base64"),
             "Should mention invalid base64, got: {err}"
@@ -197,7 +215,7 @@ wupY
         let result = parse_pem_certs(no_end);
         assert!(result.is_err(), "Missing END marker should fail");
         assert_eq!(
-            result.unwrap_err(),
+            result.unwrap_err().to_string(),
             "No certificates found in PEM",
             "Should report no certificates found"
         );

@@ -24,15 +24,22 @@ pub use device_sync::{
 pub use merkle::MerkleTree;
 pub use state::{ReplayDetector, SyncError, SyncManager, SyncState};
 
+/// Error from sending binary messages over a transport.
+#[derive(Debug, thiserror::Error)]
+pub enum BinarySendError {
+    #[error("{0}")]
+    SendFailed(String),
+}
+
 /// Trait for sending binary messages over a WebSocket-like transport.
 pub trait BinarySender {
-    fn send_binary(&mut self, data: Vec<u8>) -> Result<(), String>;
+    fn send_binary(&mut self, data: Vec<u8>) -> Result<(), BinarySendError>;
 }
 
 /// Async version of `BinarySender` for non-blocking WebSocket transports.
 #[async_trait::async_trait]
 pub trait AsyncBinarySender: Send {
-    async fn send_binary(&mut self, data: Vec<u8>) -> Result<(), String>;
+    async fn send_binary(&mut self, data: Vec<u8>) -> Result<(), BinarySendError>;
 }
 
 /// Builds device sync envelopes and sends them via the provided sender.
@@ -67,7 +74,7 @@ pub async fn send_device_sync_async(
         sender
             .send_binary(data)
             .await
-            .map_err(DeviceSyncError::SendFailed)?;
+            .map_err(|e| DeviceSyncError::SendFailed(e.to_string()))?;
         sent += 1;
     }
     Ok(sent)
@@ -100,10 +107,10 @@ mod send_tests {
     }
 
     impl BinarySender for MockSender {
-        fn send_binary(&mut self, data: Vec<u8>) -> Result<(), String> {
+        fn send_binary(&mut self, data: Vec<u8>) -> Result<(), BinarySendError> {
             if let Some(limit) = self.fail_after {
                 if self.messages.len() >= limit {
-                    return Err("send failed".to_string());
+                    return Err(BinarySendError::SendFailed("send failed".to_string()));
                 }
             }
             self.messages.push(data);
@@ -151,10 +158,10 @@ mod send_tests {
 
     #[async_trait::async_trait]
     impl AsyncBinarySender for MockAsyncSender {
-        async fn send_binary(&mut self, data: Vec<u8>) -> Result<(), String> {
+        async fn send_binary(&mut self, data: Vec<u8>) -> Result<(), BinarySendError> {
             if let Some(limit) = self.fail_after {
                 if self.messages.len() >= limit {
-                    return Err("send failed".to_string());
+                    return Err(BinarySendError::SendFailed("send failed".to_string()));
                 }
             }
             self.messages.push(data);

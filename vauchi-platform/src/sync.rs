@@ -310,7 +310,8 @@ async fn send_exchange_response(
     };
 
     let envelope = protocol::create_envelope(MessagePayload::EncryptedUpdate(update));
-    let data = protocol::encode_message(&envelope).map_err(MobileError::SyncFailed)?;
+    let data =
+        protocol::encode_message(&envelope).map_err(|e| MobileError::SyncFailed(e.to_string()))?;
     socket
         .send(Message::Binary(data))
         .await
@@ -458,7 +459,7 @@ pub async fn do_sync_async(
     // Phase 1: Connect to relay and receive messages (async, no Storage)
     let mut socket = cert_pinning::connect_with_pinning(relay_url, pinned_cert)
         .await
-        .map_err(MobileError::NetworkError)?;
+        .map_err(|e| MobileError::NetworkError(e.to_string()))?;
 
     send_handshake(&mut socket, identity, Some(&device_id_hex)).await?;
 

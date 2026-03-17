@@ -35,7 +35,7 @@ pub use contact_card::{
     ValidationError,
 };
 pub use identity::{Identity, IdentityBackup};
-pub use tor_config::{TorConfig, TorRelayAddress, TorStatus};
+pub use tor_config::{TorConfig, TorConfigError, TorRelayAddress, TorStatus};
 
 // --- future vauchi-content ---
 pub mod content;

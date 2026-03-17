@@ -17,8 +17,34 @@
 use std::collections::HashSet;
 
 use subtle::ConstantTimeEq;
+use thiserror::Error;
 
 use super::message::{ForwardingHint, ForwardingHints, MessageEnvelope};
+
+/// Errors from verifying forwarding hint signatures.
+#[derive(Error, Debug, PartialEq, Eq)]
+pub enum HintVerificationError {
+    #[error("unsigned")]
+    Unsigned,
+
+    #[error("missing signature")]
+    MissingSignature,
+
+    #[error("invalid key length: Ed25519 public key hex must be 64 chars")]
+    InvalidKeyLength,
+
+    #[error("relay key mismatch")]
+    RelayKeyMismatch,
+
+    #[error("invalid public key hex: {0}")]
+    InvalidPublicKeyHex(String),
+
+    #[error("invalid signature hex: {0}")]
+    InvalidSignatureHex(String),
+
+    #[error("signature verification failed")]
+    VerificationFailed,
+}
 
 /// Filters out expired hints based on the current time.
 pub fn filter_expired_hints(hints: &ForwardingHints, now_secs: u64) -> Vec<&ForwardingHint> {
@@ -75,20 +101,20 @@ pub fn group_hints_by_relay<'a>(
 pub fn verify_hint_signature(
     hints: &ForwardingHints,
     expected_relay_key: &str,
-) -> Result<(), String> {
+) -> Result<(), HintVerificationError> {
     let relay_key_hex = hints
         .relay_signing_key
         .as_ref()
-        .ok_or_else(|| "unsigned".to_string())?;
+        .ok_or(HintVerificationError::Unsigned)?;
     let signature_hex = hints
         .signature
         .as_ref()
-        .ok_or_else(|| "missing signature".to_string())?;
+        .ok_or(HintVerificationError::MissingSignature)?;
 
     // Validate hex key lengths before constant-time comparison
     // (ct_eq on different-length slices short-circuits, leaking length)
     if relay_key_hex.len() != 64 || expected_relay_key.len() != 64 {
-        return Err("invalid key length: Ed25519 public key hex must be 64 chars".to_string());
+        return Err(HintVerificationError::InvalidKeyLength);
     }
 
     // Verify the signing key matches the expected relay
@@ -97,13 +123,13 @@ pub fn verify_hint_signature(
             .as_bytes()
             .ct_eq(expected_relay_key.as_bytes()),
     ) {
-        return Err("relay key mismatch".to_string());
+        return Err(HintVerificationError::RelayKeyMismatch);
     }
 
-    let pk_bytes =
-        hex::decode(relay_key_hex).map_err(|e| format!("invalid public key hex: {}", e))?;
-    let sig_bytes =
-        hex::decode(signature_hex).map_err(|e| format!("invalid signature hex: {}", e))?;
+    let pk_bytes = hex::decode(relay_key_hex)
+        .map_err(|e| HintVerificationError::InvalidPublicKeyHex(e.to_string()))?;
+    let sig_bytes = hex::decode(signature_hex)
+        .map_err(|e| HintVerificationError::InvalidSignatureHex(e.to_string()))?;
 
     let public_key =
         aws_lc_rs::signature::UnparsedPublicKey::new(&aws_lc_rs::signature::ED25519, &pk_bytes);
@@ -111,7 +137,7 @@ pub fn verify_hint_signature(
     let canonical = hints.canonical_data();
     public_key
         .verify(&canonical, &sig_bytes)
-        .map_err(|_| "signature verification failed".to_string())
+        .map_err(|_| HintVerificationError::VerificationFailed)
 }
 
 // INLINE_TEST_REQUIRED: tests access private internals
@@ -327,7 +353,7 @@ mod tests {
     fn test_verify_unsigned_hints_returns_error() {
         let hints = make_unsigned_hints(vec![make_hint("blob-1", "wss://relay.test", 1000)]);
         let result = verify_hint_signature(&hints, "deadbeef");
-        assert_eq!(result, Err("unsigned".to_string()));
+        assert_eq!(result, Err(HintVerificationError::Unsigned));
     }
 
     #[test]
@@ -339,7 +365,7 @@ mod tests {
         };
         let result = verify_hint_signature(&hints, &"cc".repeat(32));
         assert!(result.is_err(), "expected error");
-        assert_eq!(result.unwrap_err(), "relay key mismatch");
+        assert_eq!(result.unwrap_err(), HintVerificationError::RelayKeyMismatch);
     }
 
     #[test]

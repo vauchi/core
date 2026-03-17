@@ -2,24 +2,24 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! Shred Manager — Core Shred Orchestration
+//! Shred Module — Types, Traits, and Re-exports
 //!
-//! Implements the three-phase shred protocol:
-//! 1. **Soft Shred**: Schedule deletion with 7-day grace period
-//! 2. **Hard Shred**: Irreversible destruction after grace period
-//! 3. **Panic Shred**: Immediate destruction using pre-signed messages (DP-2)
-//!
-//! The ShredManager composes the existing DeletionManager for grace period
-//! tracking and adds cryptographic key destruction and network notification.
+//! Provides the public types for the shred protocol and re-exports the
+//! `ShredManager` orchestrator and `widget_panic_shred` entry point.
 
-use std::path::{Path, PathBuf};
+mod manager;
+mod storage;
+
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use crate::api::account::{DeletionError, DeletionManager};
-use crate::api::pre_signed::{PreSignedPurgeRequest, PreSignedShredMessages};
-use crate::identity::Identity;
-use crate::storage::secure::SecureStorage;
-use crate::storage::{DeletionState, Storage};
+use crate::api::pre_signed::PreSignedPurgeRequest;
+
+pub use manager::ShredManager;
+pub(crate) use storage::secure_overwrite_file_public;
+pub use storage::widget_panic_shred;
+
+/// Key name for the Shredding Master Key in SecureStorage.
+const SMK_KEY_NAME: &str = "smk";
 
 /// Trait for sending relay purge requests during shred operations.
 ///
@@ -50,9 +50,6 @@ pub trait RevocationSender {
     ) -> Result<bool, ShredError>;
 }
 
-/// Key name for the Shredding Master Key in SecureStorage.
-const SMK_KEY_NAME: &str = "smk";
-
 /// Token returned by soft_shred to authorize hard_shred.
 #[derive(Debug, Clone)]
 pub struct ShredToken {
@@ -60,7 +57,7 @@ pub struct ShredToken {
 }
 
 impl ShredToken {
-    fn new() -> Self {
+    pub(super) fn new() -> Self {
         let created_at = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap_or_default()
@@ -121,7 +118,7 @@ pub struct ShredVerification {
 #[derive(Debug, thiserror::Error)]
 pub enum ShredError {
     #[error("Deletion error: {0}")]
-    Deletion(#[from] DeletionError),
+    Deletion(#[from] crate::api::account::DeletionError),
 
     #[error("Storage error: {0}")]
     Storage(#[from] crate::storage::StorageError),
@@ -134,305 +131,6 @@ pub enum ShredError {
 
     #[error("File operation failed: {0}")]
     FileError(String),
-}
-
-/// Orchestrates cryptographic shredding of all identity data.
-///
-/// Composes the existing `DeletionManager` for grace period tracking and
-/// adds key destruction, tombstone creation, and network notification.
-pub struct ShredManager<'a> {
-    storage: &'a Storage,
-    secure_storage: &'a dyn SecureStorage,
-    identity: &'a Identity,
-    data_dir: PathBuf,
-}
-
-impl<'a> ShredManager<'a> {
-    /// Creates a new ShredManager.
-    pub fn new(
-        storage: &'a Storage,
-        secure_storage: &'a dyn SecureStorage,
-        identity: &'a Identity,
-        data_dir: impl Into<PathBuf>,
-    ) -> Self {
-        Self {
-            storage,
-            secure_storage,
-            identity,
-            data_dir: data_dir.into(),
-        }
-    }
-
-    /// Phase 1: Soft Shred — schedule deletion with 7-day grace period.
-    ///
-    /// Delegates to DeletionManager for grace period tracking.
-    /// Refreshes pre-signed messages for later use by panic/hard shred.
-    pub fn soft_shred(&self) -> Result<ShredToken, ShredError> {
-        // 1. Delegate to DeletionManager for grace period
-        let dm = DeletionManager::new(self.storage);
-        dm.schedule_deletion()?;
-
-        // 2. Refresh pre-signed messages file
-        let _ = self.refresh_pre_signed_messages();
-
-        Ok(ShredToken::new())
-    }
-
-    /// Cancel a scheduled shred during the grace period.
-    pub fn cancel_shred(&self, _token: ShredToken) -> Result<(), ShredError> {
-        let dm = DeletionManager::new(self.storage);
-        dm.cancel_deletion()?;
-        Ok(())
-    }
-
-    /// Phase 2: Hard Shred — irreversible destruction.
-    ///
-    /// Requires grace period to have elapsed. Sends network notifications
-    /// while keys are still available, then destroys all key material.
-    ///
-    /// If `purge_sender` is provided, sends a pre-signed purge request to the
-    /// relay before destroying local data. Purge failure does not abort shred.
-    pub fn hard_shred(
-        &self,
-        token: ShredToken,
-        purge_sender: Option<&mut dyn PurgeSender>,
-        revocation_sender: Option<&mut dyn RevocationSender>,
-    ) -> Result<ShredReport, ShredError> {
-        let mut report = ShredReport::default();
-
-        // Validate ShredToken was created at or after the scheduled deletion time (#199a).
-        // This ensures the token came from soft_shred(), not fabricated independently.
-        let dm = DeletionManager::new(self.storage);
-        let state = dm.deletion_state()?;
-        if let DeletionState::Scheduled { scheduled_at, .. } = &state {
-            if token.created_at() < *scheduled_at {
-                return Err(ShredError::Deletion(DeletionError::DeletionFailed(
-                    "ShredToken predates scheduled deletion".to_string(),
-                )));
-            }
-        }
-
-        // 1. Verify grace period has elapsed and generate revocations
-        let deletion_result = dm.execute_deletion(self.identity)?;
-
-        // 2. Send revocation notifications to contacts (best-effort, while keys alive)
-        if let Some(sender) = revocation_sender {
-            for revocation in &deletion_result.revocations {
-                if sender.send_revocation(revocation).unwrap_or(false) {
-                    report.contacts_notified += 1;
-                }
-            }
-        }
-        report.devices_notified = 0;
-
-        // Send relay purge if sender provided (before point-of-no-return)
-        if let Some(sender) = purge_sender {
-            let pre_signed = PreSignedShredMessages::load(&self.data_dir)
-                .or_else(|_| Ok::<_, ShredError>(PreSignedShredMessages::generate(self.identity)));
-            if let Ok(msgs) = pre_signed {
-                report.relay_purge_sent = sender.send_purge(&msgs.purge_request).unwrap_or(false);
-            }
-        }
-
-        // ═══ POINT OF NO RETURN ═══
-
-        // 5. Destroy SMK from SecureStorage
-        report.smk_destroyed = self.destroy_smk();
-
-        // 6. Secure-delete identity backup file
-        report.identity_file_destroyed = self.secure_delete_identity_file();
-
-        // 7. Delete all key files (best-effort, count successes)
-        report.key_files_destroyed = self.delete_key_files();
-
-        // 8. Secure-delete SQLite database + WAL/SHM
-        report.sqlite_destroyed = self.secure_delete_database();
-
-        // 9. Delete pre-signed messages file
-        report.pre_signed_deleted = self.delete_pre_signed_file();
-
-        // 10. Delete data directory
-        report.data_dir_deleted = self.delete_data_directory();
-
-        Ok(report)
-    }
-
-    /// Panic Shred — immediate destruction, no grace period.
-    ///
-    /// Follows DP-2 (sign-before-destroy): loads pre-signed messages before
-    /// destroying any key material. Network operations happen after destruction.
-    ///
-    /// If `purge_sender` is provided, sends the pre-signed purge request to
-    /// the relay after key destruction (Phase C). Purge failure does not abort shred.
-    pub fn panic_shred(
-        &self,
-        purge_sender: Option<&mut dyn PurgeSender>,
-        revocation_sender: Option<&mut dyn RevocationSender>,
-    ) -> Result<ShredReport, ShredError> {
-        let mut report = ShredReport::default();
-
-        // ── Phase A: Prepare outbound messages while keys available ──
-
-        // 1. Load pre-signed messages from file (unencrypted per DP-3)
-        let pre_signed = match PreSignedShredMessages::load(&self.data_dir) {
-            Ok(msgs) => Some(msgs),
-            Err(_) => {
-                // 2. Fallback: sign fresh messages now (keys still available)
-                let msgs = PreSignedShredMessages::generate(self.identity);
-                Some(msgs)
-            }
-        };
-
-        // Sign fresh revocations for each contact (keys still available)
-        let revocations = {
-            let now = SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap_or_default()
-                .as_secs();
-            let contacts = self.storage.list_contacts().unwrap_or_default();
-            contacts
-                .iter()
-                .map(|c| crate::network::AccountRevoked::create(self.identity, c.id(), now))
-                .collect::<Vec<_>>()
-        };
-
-        // ── Phase B: Destroy all key material ──
-
-        // 3. Destroy SMK from all SecureStorage backends
-        report.smk_destroyed = self.destroy_smk();
-
-        // 4. Secure-delete identity backup file
-        report.identity_file_destroyed = self.secure_delete_identity_file();
-
-        // 5. Delete all key files
-        report.key_files_destroyed = self.delete_key_files();
-
-        // ── Phase C: Best-effort network and cleanup ──
-        // Send pre-signed purge after key destruction (best-effort)
-        if let (Some(sender), Some(msgs)) = (purge_sender, &pre_signed) {
-            report.relay_purge_sent = sender.send_purge(&msgs.purge_request).unwrap_or(false);
-        }
-
-        // Send revocations to contacts (best-effort, keys already destroyed)
-        if let Some(sender) = revocation_sender {
-            for revocation in &revocations {
-                if sender.send_revocation(revocation).unwrap_or(false) {
-                    report.contacts_notified += 1;
-                }
-            }
-        }
-
-        // 8. Secure-delete SQLite database
-        report.sqlite_destroyed = self.secure_delete_database();
-
-        // 9. Delete pre-signed messages file
-        report.pre_signed_deleted = self.delete_pre_signed_file();
-
-        // 10. Delete data directory
-        report.data_dir_deleted = self.delete_data_directory();
-
-        Ok(report)
-    }
-
-    /// Post-shred verification audit.
-    ///
-    /// Checks that all key material and data has been destroyed.
-    pub fn verify_shred(&self) -> ShredVerification {
-        let smk_absent = self
-            .secure_storage
-            .load_key(SMK_KEY_NAME)
-            .map(|k| k.is_none())
-            .unwrap_or(true);
-
-        let database_absent = !self.data_dir.join("vauchi.db").exists();
-        let data_dir_absent = !self.data_dir.exists();
-        let pre_signed_absent = !PreSignedShredMessages::file_path(&self.data_dir).exists();
-
-        let all_clear = smk_absent && database_absent && pre_signed_absent;
-
-        ShredVerification {
-            smk_absent,
-            database_absent,
-            data_dir_absent,
-            pre_signed_absent,
-            all_clear,
-        }
-    }
-
-    // ── Internal helpers ──
-
-    fn destroy_smk(&self) -> bool {
-        self.secure_storage.secure_delete_key(SMK_KEY_NAME).is_ok()
-    }
-
-    fn secure_delete_identity_file(&self) -> bool {
-        let identity_path = self.data_dir.join("identity.json");
-        if identity_path.exists() {
-            secure_overwrite_file(&identity_path).is_ok()
-        } else {
-            true // File doesn't exist, nothing to delete
-        }
-    }
-
-    fn delete_key_files(&self) -> usize {
-        let keys_dir = self.data_dir.join("keys");
-        if !keys_dir.exists() {
-            return 0;
-        }
-        let mut count = 0;
-        if let Ok(entries) = std::fs::read_dir(&keys_dir) {
-            for entry in entries.flatten() {
-                if secure_overwrite_file(&entry.path()).is_ok() {
-                    count += 1;
-                }
-            }
-        }
-        let _ = std::fs::remove_dir(&keys_dir);
-        count
-    }
-
-    fn secure_delete_database(&self) -> bool {
-        // Flush WAL into main DB before file-level overwrite (#81)
-        let _ = self.storage.wal_checkpoint();
-
-        let db_path = self.data_dir.join("vauchi.db");
-        let mut success = true;
-
-        for suffix in &["", "-wal", "-shm", "-journal"] {
-            let path = if suffix.is_empty() {
-                db_path.clone()
-            } else {
-                db_path.with_extension(format!("db{}", suffix))
-            };
-            if path.exists() && secure_overwrite_file(&path).is_err() {
-                success = false;
-            }
-        }
-        success
-    }
-
-    fn delete_pre_signed_file(&self) -> bool {
-        let path = PreSignedShredMessages::file_path(&self.data_dir);
-        if path.exists() {
-            // Use secure overwrite instead of bare remove_file (#200a)
-            secure_overwrite_file(&path).is_ok()
-        } else {
-            true
-        }
-    }
-
-    fn delete_data_directory(&self) -> bool {
-        if self.data_dir.exists() {
-            std::fs::remove_dir_all(&self.data_dir).is_ok()
-        } else {
-            true
-        }
-    }
-
-    fn refresh_pre_signed_messages(&self) -> bool {
-        let msgs = PreSignedShredMessages::refresh(self.identity);
-        msgs.save(&self.data_dir).is_ok()
-    }
 }
 
 /// Widget confirmation mode for panic shred activation.
@@ -449,156 +147,27 @@ pub enum WidgetConfirmationMode {
     DoubleTap,
 }
 
-/// Panic shred callable from a widget without full Vauchi initialization.
-///
-/// This is the core API for iOS/Android home screen widgets that need to
-/// trigger a panic shred without opening the full app. It only requires
-/// the data directory path and a `SecureStorage` implementation.
-///
-/// Follows the same 3-phase protocol as `ShredManager::panic_shred()`:
-///   1. Load pre-signed messages (if available, before destroying anything)
-///   2. Destroy all key material (SMK, identity, key files)
-///   3. Delete database, pre-signed file, and data directory
-///
-/// Network operations (relay purge, contact revocations) are NOT performed
-/// by the widget version — the widget has no network access. Pre-signed
-/// messages are loaded for future use by the relay cleanup daemon.
-pub fn widget_panic_shred(
-    data_dir: &Path,
-    secure_storage: &dyn SecureStorage,
-) -> Result<ShredReport, ShredError> {
-    let mut report = ShredReport::default();
-
-    // ── Phase A: Load pre-signed messages while they exist ──
-    // We load these before destroying anything, per DP-2 (sign-before-destroy).
-    // The widget can't send them (no network), but loading confirms they exist.
-    let _pre_signed = PreSignedShredMessages::load(data_dir).ok();
-
-    // ── Phase B: Destroy all key material ──
-
-    // 1. Destroy SMK from SecureStorage
-    report.smk_destroyed = secure_storage.secure_delete_key(SMK_KEY_NAME).is_ok();
-
-    // 2. Secure-delete identity backup file
-    let identity_path = data_dir.join("identity.json");
-    report.identity_file_destroyed = if identity_path.exists() {
-        secure_overwrite_file(&identity_path).is_ok()
-    } else {
-        true // File doesn't exist, nothing to delete
-    };
-
-    // 3. Delete all key files
-    let keys_dir = data_dir.join("keys");
-    report.key_files_destroyed = if keys_dir.exists() {
-        let mut count = 0;
-        if let Ok(entries) = std::fs::read_dir(&keys_dir) {
-            for entry in entries.flatten() {
-                if secure_overwrite_file(&entry.path()).is_ok() {
-                    count += 1;
-                }
-            }
-        }
-        let _ = std::fs::remove_dir(&keys_dir);
-        count
-    } else {
-        0
-    };
-
-    // ── Phase C: Cleanup ──
-
-    // 4. Secure-delete SQLite database + WAL/SHM
-    let db_path = data_dir.join("vauchi.db");
-    let mut db_success = true;
-    for suffix in &["", "-wal", "-shm", "-journal"] {
-        let path = if suffix.is_empty() {
-            db_path.clone()
-        } else {
-            db_path.with_extension(format!("db{}", suffix))
-        };
-        if path.exists() && secure_overwrite_file(&path).is_err() {
-            db_success = false;
-        }
-    }
-    report.sqlite_destroyed = db_success;
-
-    // 5. Delete pre-signed messages file (secure overwrite, #200a)
-    let pre_signed_path = PreSignedShredMessages::file_path(data_dir);
-    report.pre_signed_deleted = if pre_signed_path.exists() {
-        secure_overwrite_file(&pre_signed_path).is_ok()
-    } else {
-        true
-    };
-
-    // 6. Delete data directory
-    report.data_dir_deleted = if data_dir.exists() {
-        std::fs::remove_dir_all(data_dir).is_ok()
-    } else {
-        true
-    };
-
-    Ok(report)
-}
-
-/// Public entry point for secure file overwrite, callable from other modules.
-pub(crate) fn secure_overwrite_file_public(path: &Path) -> Result<(), std::io::Error> {
-    secure_overwrite_file(path)
-}
-
-/// Securely overwrites a file with random data then zeros before removing it.
-///
-/// Uses 2-pass overwrite (#200a): random data (destroys original bit patterns)
-/// followed by zeros (verifiable wipe). Both passes are flushed to disk with
-/// `sync_all()` to ensure the overwrite reaches physical storage.
-fn secure_overwrite_file(path: &Path) -> Result<(), std::io::Error> {
-    use aws_lc_rs::rand::SecureRandom;
-    use std::io::{Seek, Write};
-
-    if !path.exists() {
-        return Ok(());
-    }
-
-    let size = std::fs::metadata(path)?.len() as usize;
-    if size == 0 {
-        std::fs::remove_file(path)?;
-        return Ok(());
-    }
-
-    let mut file = std::fs::OpenOptions::new().write(true).open(path)?;
-
-    // Pass 1: Overwrite with random data
-    let rng = aws_lc_rs::rand::SystemRandom::new();
-    let mut random = vec![0u8; size];
-    rng.fill(&mut random)
-        .map_err(|_| std::io::Error::other("RNG fill failed"))?;
-    file.write_all(&random)?;
-    file.sync_all()?;
-
-    // Pass 2: Overwrite with zeros
-    file.seek(std::io::SeekFrom::Start(0))?;
-    let zeros = vec![0u8; size];
-    file.write_all(&zeros)?;
-    file.sync_all()?;
-
-    // Close handle, then remove
-    drop(file);
-    std::fs::remove_file(path)?;
-    Ok(())
-}
-
 // INLINE_TEST_REQUIRED: tests access private internals
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::api::account::DeletionManager;
+    use crate::api::pre_signed::PreSignedShredMessages;
     use crate::crypto::SymmetricKey;
-    use crate::storage::secure::MemoryKeyStorage;
+    use crate::storage::secure::{MemoryKeyStorage, SecureStorage};
     use crate::storage::Storage;
 
-    fn setup_test_env() -> (tempfile::TempDir, Storage, MemoryKeyStorage, Identity) {
+    fn setup_test_env() -> (
+        tempfile::TempDir,
+        Storage,
+        MemoryKeyStorage,
+        crate::identity::Identity,
+    ) {
         let dir = tempfile::tempdir().unwrap();
         let db_path = dir.path().join("vauchi.db");
         let storage = Storage::open(&db_path, SymmetricKey::generate()).unwrap();
         let secure_storage = MemoryKeyStorage::new();
-        let identity = Identity::create("TestUser");
+        let identity = crate::identity::Identity::create("TestUser");
 
         // Store SMK in secure storage (as would happen at identity creation)
         let smk = crate::crypto::ShreddingMasterKey::derive_from_seed(&[0x42; 32]);
@@ -969,7 +538,7 @@ mod tests {
         }
     }
 
-    fn add_test_contact(storage: &Storage, _contact_id: &str) {
+    fn add_test_contact(storage: &crate::storage::Storage, _contact_id: &str) {
         use crate::contact::Contact;
         use crate::contact_card::ContactCard;
         use crate::crypto::SymmetricKey;

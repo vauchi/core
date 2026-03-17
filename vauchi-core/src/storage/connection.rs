@@ -1,0 +1,172 @@
+// SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+//
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+//! Connection management, PRAGMA configuration, migrations, and core utilities.
+
+use aws_lc_rs::hmac;
+use rusqlite::Connection;
+use std::path::Path;
+
+use crate::crypto::{SymmetricKey, HKDF};
+
+use super::migration;
+use super::{Storage, StorageError};
+
+impl Storage {
+    /// Opens or creates a storage database at the given path.
+    pub fn open<P: AsRef<Path>>(
+        path: P,
+        encryption_key: SymmetricKey,
+    ) -> Result<Self, StorageError> {
+        let path_buf = path.as_ref().to_path_buf();
+        let is_new = !path_buf.exists();
+        let conn = Connection::open(&path_buf)?;
+
+        // Restrict database file permissions to owner-only (0600).
+        // SQLite creates files with default umask (typically 0644), which
+        // would make encrypted contact data world-readable on shared systems.
+        #[cfg(unix)]
+        if is_new {
+            use std::os::unix::fs::PermissionsExt;
+            let _ = std::fs::set_permissions(&path_buf, std::fs::Permissions::from_mode(0o600));
+        }
+
+        Self::configure_pragmas(&conn)?;
+        let storage = Storage {
+            conn,
+            encryption_key,
+            db_path: Some(path_buf),
+        };
+        storage.run_migrations()?;
+        // T2-12: Clean up old terminal delivery records on startup
+        let _ = storage.run_startup_maintenance();
+        Ok(storage)
+    }
+
+    /// Creates an in-memory storage (for testing).
+    pub fn in_memory(encryption_key: SymmetricKey) -> Result<Self, StorageError> {
+        let conn = Connection::open_in_memory()?;
+        Self::configure_pragmas(&conn)?;
+        let storage = Storage {
+            conn,
+            encryption_key,
+            db_path: None,
+        };
+        storage.run_migrations()?;
+        Ok(storage)
+    }
+
+    /// Configures SQLite PRAGMAs for performance and security.
+    ///
+    /// Performance:
+    /// - WAL mode: enables concurrent reads during writes
+    /// - busy_timeout=5000: wait up to 5s for locks instead of failing immediately
+    /// - synchronous=NORMAL: safe with WAL, better write throughput
+    /// - cache_size=10000: larger page cache for query performance
+    ///
+    /// Security (defense-in-depth for crypto-shredding):
+    /// - secure_delete=ON: overwrites deleted content with zeros
+    /// - auto_vacuum=FULL: reclaims and overwrites freed pages on delete
+    /// - temp_store=MEMORY: keeps temporary tables in RAM, not on disk
+    ///
+    /// Note: secure_delete is partially negated by WAL mode (pre-modification
+    /// data persists in WAL file). The primary protection is the SMK encryption
+    /// layer; these PRAGMAs are secondary defense-in-depth.
+    fn configure_pragmas(conn: &Connection) -> Result<(), StorageError> {
+        // Set busy_timeout at the C level FIRST, before executing any SQL.
+        // This ensures all subsequent statements (including the pragma batch
+        // below) will wait up to 5s for locks instead of failing immediately.
+        // Solves the bootstrap problem: SQL-based PRAGMA busy_timeout can
+        // itself fail with SQLITE_BUSY if another connection holds a lock.
+        conn.busy_timeout(std::time::Duration::from_secs(5))?;
+        // auto_vacuum must be set before any tables are created (before first
+        // page write), so it comes first — before journal_mode=WAL which writes
+        // the database header.
+        conn.execute_batch(
+            "PRAGMA auto_vacuum=FULL;
+             PRAGMA journal_mode=WAL;
+             PRAGMA synchronous=NORMAL;
+             PRAGMA cache_size=10000;
+             PRAGMA secure_delete=ON;
+             PRAGMA temp_store=MEMORY;",
+        )?;
+        Ok(())
+    }
+
+    /// Runs all pending schema migrations.
+    ///
+    /// For file-based databases, creates a pre-migration backup before
+    /// applying pending migrations (#17).
+    fn run_migrations(&self) -> Result<(), StorageError> {
+        let migrations = migration::all_migrations();
+        migration::MigrationRunner::run(
+            &self.conn,
+            &self.encryption_key,
+            &migrations,
+            self.db_path.as_deref(),
+        )
+    }
+
+    /// Returns the current schema version.
+    pub fn schema_version(&self) -> Result<u32, StorageError> {
+        migration::MigrationRunner::current_version(&self.conn)
+    }
+
+    /// Computes a deterministic HMAC for encrypted column lookups (#128).
+    ///
+    /// Derives a dedicated HMAC key from the SEK via HKDF, then computes
+    /// HMAC-SHA256(hmac_key, data). This allows equality lookups on encrypted
+    /// data without decryption (e.g., label name uniqueness checks).
+    pub(super) fn compute_lookup_hmac(&self, domain: &[u8], data: &[u8]) -> Vec<u8> {
+        let hmac_key_bytes = HKDF::derive_key(None, self.encryption_key.as_bytes(), domain);
+        let key = hmac::Key::new(hmac::HMAC_SHA256, &*hmac_key_bytes);
+        hmac::sign(&key, data).as_ref().to_vec()
+    }
+
+    /// Forces a WAL checkpoint, merging all WAL frames into the main DB file (#81).
+    ///
+    /// TRUNCATE mode flushes WAL contents and truncates the WAL file to zero bytes.
+    /// This must be called before secure delete or rekey operations to ensure that
+    /// pre-modification data in the WAL is merged and overwritable.
+    pub fn wal_checkpoint(&self) -> Result<(), StorageError> {
+        self.conn
+            .execute_batch("PRAGMA wal_checkpoint(TRUNCATE);")
+            .map_err(|e| StorageError::Migration(format!("WAL checkpoint: {}", e)))
+    }
+
+    /// Begins a database transaction.
+    ///
+    /// Must be paired with `commit()` or `rollback()`.
+    /// Use `BEGIN IMMEDIATE` to acquire a write lock immediately,
+    /// preventing deadlocks when multiple writes are planned.
+    pub fn begin_transaction(&self) -> Result<(), StorageError> {
+        self.conn
+            .execute_batch("BEGIN IMMEDIATE TRANSACTION")
+            .map_err(StorageError::from)
+    }
+
+    /// Commits the current transaction.
+    pub fn commit(&self) -> Result<(), StorageError> {
+        self.conn
+            .execute_batch("COMMIT")
+            .map_err(StorageError::from)
+    }
+
+    /// Rolls back the current transaction.
+    pub fn rollback(&self) {
+        let _ = self.conn.execute_batch("ROLLBACK");
+    }
+
+    /// Returns a reference to the underlying connection (testing only).
+    #[cfg(feature = "testing")]
+    pub fn connection(&self) -> &Connection {
+        &self.conn
+    }
+
+    /// Returns a reference to the storage encryption key (testing only).
+    #[cfg(feature = "testing")]
+    pub fn key(&self) -> &SymmetricKey {
+        &self.encryption_key
+    }
+}

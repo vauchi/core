@@ -680,8 +680,8 @@ fn test_adversarial_cross_epoch_correlation_attempt() {
         .windows(2)
         .map(|pair| {
             let mut xor = [0u8; 32];
-            for i in 0..32 {
-                xor[i] = pair[0][i] ^ pair[1][i];
+            for (i, byte) in xor.iter_mut().enumerate() {
+                *byte = pair[0][i] ^ pair[1][i];
             }
             xor
         })
@@ -744,16 +744,16 @@ fn test_adversarial_random_ids_never_resolve() {
         {
             // null bytes alternating
             let mut id = [0u8; 32];
-            for i in 0..32 {
-                id[i] = if i % 2 == 0 { 0 } else { 0xFF };
+            for (i, byte) in id.iter_mut().enumerate() {
+                *byte = if i % 2 == 0 { 0 } else { 0xFF };
             }
             id
         },
         {
             // sequential bytes
             let mut id = [0u8; 32];
-            for i in 0..32 {
-                id[i] = i as u8;
+            for (i, byte) in id.iter_mut().enumerate() {
+                *byte = i as u8;
             }
             id
         },
@@ -781,8 +781,8 @@ fn test_adversarial_sender_index_rejects_crafted_ids() {
     assert!(index.resolve(&[0u8; 32]).is_none());
     assert!(index.resolve(&[0xFFu8; 32]).is_none());
     let mut seq = [0u8; 32];
-    for i in 0..32 {
-        seq[i] = i as u8;
+    for (i, byte) in seq.iter_mut().enumerate() {
+        *byte = i as u8;
     }
     assert!(index.resolve(&seq).is_none());
 }

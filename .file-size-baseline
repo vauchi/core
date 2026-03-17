@@ -2,19 +2,42 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-# Generated 2026-03-15. Files above error threshold, grandfathered.
-# These files must not grow beyond their baseline. Reduce over time.
+# Generated 2026-03-15. Updated 2026-03-16 with exemptions from PRB-2026-032.
+# Files must not grow beyond baseline. EXEMPT files have structural justification.
+# SPLIT files are queued for splitting in PRB-2026-032 implementation phases.
+
+# SPLIT — Phase 1: zero-risk type/FFI splits
 vauchi-cabi/src/lib.rs 1799
-vauchi-core/src/api/shred.rs 1081
+vauchi-platform/src/types.rs 1547
+
+# EXEMPT — UniFFI facade: splitting breaks binding generation (31 delegating methods)
+vauchi-platform/src/lib.rs 1877
+
+# EXEMPT — state machine: scattered transitions create protocol bugs
 vauchi-core/src/exchange/session.rs 1415
+
+# EXEMPT — security-critical: crypto + verification belong together
 vauchi-core/src/recovery/mod.rs 1062
+
+# EXEMPT — migration ledger: coherence over size, version history must be co-located
 vauchi-core/src/storage/migration.rs 1559
+
+# SPLIT — Phase 3: extract connection management
 vauchi-core/src/storage/mod.rs 1079
+
+# SPLIT — Phase 3: extract per-screen handlers into sub-module dir
 vauchi-core/src/ui/app_engine.rs 1437
+
+# SPLIT — Phase 3: extract into crypto, storage, verification files
+vauchi-core/src/api/shred.rs 1081
+
+# SPLIT — Phase 2: split into 5 files by subsystem
 vauchi-core/tests/app_engine_tests.rs 2275
+
+# SPLIT — Phase 2: split into 5 files by field type
 vauchi-core/tests/field_validation_tests.rs 2256
+
+# Grandfathered — below split threshold, monitor
 vauchi-core/tests/onboarding_tests.rs 1292
 vauchi-core/tests/sync_device_orchestrator_tests.rs 1286
 vauchi-core/tests/visibility_label_tests.rs 1220
-vauchi-platform/src/lib.rs 1877
-vauchi-platform/src/types.rs 1547

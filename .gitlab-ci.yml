@@ -335,6 +335,26 @@ validate:schema:
           - "vauchi-core/schemas/**"
           - "vauchi-core/Cargo.toml"
 
+# Tor feature gate check — ensures the optional tor feature compiles.
+# The tor feature is not in default features and was previously broken
+# undetected. This job prevents regression.
+validate:tor-feature:
+  extends: [.linux-runner, .timeout-quick]
+  stage: test
+  needs:
+    - job: lint:format
+      optional: true
+  script:
+    - cargo check --features tor -p vauchi-core
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes:
+        compare_to: refs/heads/$CI_DEFAULT_BRANCH
+        paths:
+          - "vauchi-core/src/network/tor.rs"
+          - "vauchi-core/src/tor_config.rs"
+          - "vauchi-core/Cargo.toml"
+
 # Content contract validation — detect drift between core parsers and
 # sibling content repos (themes/, locales/). Runs when parser code changes.
 validate:content-contracts:

@@ -291,19 +291,23 @@ mod manager {
             Ok(Box::new(sync_stream))
         }
 
-        /// Resets the circuit age timer (#106).
+        /// Rotates the Tor circuit by replacing the client with an isolated copy.
         ///
-        /// NOTE: This does not actually create a new Tor circuit. The arti client
-        /// reuses circuits based on its own isolation policy. This method only resets
-        /// the `circuit_created_at` timer so that `needs_circuit_rotation()` returns
-        /// false. True circuit isolation requires reconnecting with a fresh
-        /// `IsolationToken`, which is done by the transport layer on reconnect.
+        /// `isolated_client()` creates a new `TorClient` that shares the same
+        /// Tor directory state but uses a fresh `IsolationToken`, forcing arti
+        /// to build new circuits for all subsequent connections. Previous
+        /// connections on the old client are unaffected.
         fn rotate_circuit(&self) -> Result<(), NetworkError> {
-            let client_guard = self
+            let mut client_guard = self
                 .client
                 .lock()
                 .map_err(|_| NetworkError::Tor("client mutex poisoned".into()))?;
-            let _client = client_guard.as_ref().ok_or(NetworkError::TorNotAvailable)?;
+            let old_client = client_guard.as_ref().ok_or(NetworkError::TorNotAvailable)?;
+
+            // Create an isolated copy — same Tor state, new circuit isolation
+            let isolated = old_client.isolated_client();
+            *client_guard = Some(Arc::new(isolated));
+            drop(client_guard);
 
             let mut created = self
                 .circuit_created_at

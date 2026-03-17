@@ -568,6 +568,248 @@ fn test_epoch_calculation_formula() {
 // "Derivation context prevents cross-protocol confusion"
 // ============================================================
 
+// ============================================================
+// Anonymous ID Size and Structure Tests
+// Traces to: features/anonymous_sender.feature @generation
+// "Anonymous ID is 32 bytes"
+// ============================================================
+
+// @scenario: anonymous_sender.feature:Anonymous ID is 32 bytes
+#[test]
+fn test_anonymous_id_is_exactly_32_bytes() {
+    let key = [0x42u8; 32];
+    let id = compute_anonymous_id(&key, 1000);
+
+    // The anonymous_id field is [u8; 32] — enforced at compile time,
+    // but verify the runtime value is non-trivial (not all zeros)
+    assert_eq!(id.len(), 32);
+    assert_ne!(id, [0u8; 32], "Anonymous ID should not be all zeros");
+
+    // Also verify via AnonymousSender struct
+    let sender = AnonymousSender::compute(&key, 1000);
+    assert_eq!(sender.anonymous_id.len(), 32);
+    assert_eq!(sender.anonymous_id, id);
+}
+
+// @scenario: anonymous_sender.feature:Anonymous ID is 32 bytes
+#[test]
+fn test_anonymous_id_derived_via_hkdf_is_full_entropy() {
+    // Verify the output looks like a proper HKDF derivation: high entropy,
+    // no obvious patterns. Check byte distribution across multiple keys.
+    let mut unique_bytes = std::collections::HashSet::new();
+    for i in 0u8..50 {
+        let key = [i; 32];
+        let id = compute_anonymous_id(&key, 1000);
+        unique_bytes.extend(id.iter().copied());
+    }
+    // 50 different 32-byte IDs should use a large portion of the byte space
+    assert!(
+        unique_bytes.len() > 200,
+        "HKDF output should use diverse byte values (got {} unique out of 256)",
+        unique_bytes.len()
+    );
+}
+
+// ============================================================
+// Adversarial Tests (CC-14)
+// Security boundaries need parameterized tests with adversarial payloads:
+// empty, max-length, null bytes, tampered, injection.
+// ============================================================
+
+/// CC-14: All-zeros shared key must still produce a valid, non-zero anonymous ID.
+/// An attacker cannot force a "null" anonymous ID by manipulating the shared key.
+#[test]
+fn test_adversarial_zero_key_produces_valid_id() {
+    let zero_key = [0u8; 32];
+    let id = compute_anonymous_id(&zero_key, 1000);
+    assert_ne!(id, [0u8; 32], "Zero key must not produce zero ID");
+    assert_ne!(id, zero_key, "ID must not equal the input key");
+}
+
+/// CC-14: All-ones shared key must produce a valid, distinct anonymous ID.
+#[test]
+fn test_adversarial_ones_key_produces_valid_id() {
+    let ones_key = [0xFFu8; 32];
+    let id = compute_anonymous_id(&ones_key, 1000);
+    assert_ne!(id, [0u8; 32]);
+    assert_ne!(
+        id, [0xFFu8; 32],
+        "ID must not be trivially derived from key"
+    );
+}
+
+/// CC-14: Epoch 0 and epoch u64::MAX are valid edge cases.
+#[test]
+fn test_adversarial_extreme_epochs() {
+    let key = [0x42u8; 32];
+
+    let id_zero = compute_anonymous_id(&key, 0);
+    let id_max = compute_anonymous_id(&key, u64::MAX);
+
+    assert_ne!(id_zero, [0u8; 32]);
+    assert_ne!(id_max, [0u8; 32]);
+    assert_ne!(
+        id_zero, id_max,
+        "Epoch 0 and MAX must produce different IDs"
+    );
+}
+
+/// CC-14: Cross-epoch correlation attack — an adversary observing IDs across
+/// consecutive epochs should not be able to link them to the same sender.
+/// We verify statistical independence: no shared prefix, suffix, or XOR pattern.
+#[test]
+fn test_adversarial_cross_epoch_correlation_attempt() {
+    let key = [0x42u8; 32];
+    let epoch_base = 10_000u64;
+
+    let ids: Vec<[u8; 32]> = (0..20)
+        .map(|i| compute_anonymous_id(&key, epoch_base + i))
+        .collect();
+
+    // Check: no two IDs share the same first 4 bytes (birthday bound is fine for 20 samples)
+    let prefixes: std::collections::HashSet<[u8; 4]> =
+        ids.iter().map(|id| [id[0], id[1], id[2], id[3]]).collect();
+    assert_eq!(
+        prefixes.len(),
+        ids.len(),
+        "All 4-byte prefixes should be unique across epochs"
+    );
+
+    // Check: XOR of consecutive IDs should look random (not constant or predictable)
+    let xors: Vec<[u8; 32]> = ids
+        .windows(2)
+        .map(|pair| {
+            let mut xor = [0u8; 32];
+            for i in 0..32 {
+                xor[i] = pair[0][i] ^ pair[1][i];
+            }
+            xor
+        })
+        .collect();
+
+    // All XOR diffs must be unique (no repeating pattern)
+    let unique_xors: std::collections::HashSet<[u8; 32]> = xors.iter().copied().collect();
+    assert_eq!(
+        unique_xors.len(),
+        xors.len(),
+        "XOR diffs between consecutive epoch IDs should all be unique"
+    );
+}
+
+/// CC-14: Replay of stale sender IDs — IDs from 2+ epochs ago must fail resolution.
+#[test]
+fn test_adversarial_replay_stale_sender_ids() {
+    let key = SymmetricKey::generate();
+    let contact = make_contact_with_key("Victim", key.clone());
+    let contacts = vec![contact];
+
+    let original_epoch = 1000;
+    let captured_id = compute_anonymous_id(contacts[0].shared_key().as_bytes(), original_epoch);
+
+    // Replaying at epoch+1 (within tolerance) — resolves
+    assert!(
+        resolve_sender(&contacts, &captured_id, original_epoch + 1).is_some(),
+        "Epoch+1 replay should resolve (within tolerance)"
+    );
+
+    // Replaying at epoch+2 (beyond tolerance) — must fail
+    assert!(
+        resolve_sender(&contacts, &captured_id, original_epoch + 2).is_none(),
+        "Epoch+2 replay must fail"
+    );
+
+    // Replaying at epoch+100 (far future) — must fail
+    assert!(
+        resolve_sender(&contacts, &captured_id, original_epoch + 100).is_none(),
+        "Far-future replay must fail"
+    );
+
+    // Replaying at epoch+1000 — must fail
+    assert!(
+        resolve_sender(&contacts, &captured_id, original_epoch + 1000).is_none(),
+        "Very far-future replay must fail"
+    );
+}
+
+/// CC-14: Random/malformed anonymous IDs should never resolve to any contact.
+#[test]
+fn test_adversarial_random_ids_never_resolve() {
+    let key = SymmetricKey::generate();
+    let contacts = vec![make_contact_with_key("Alice", key)];
+
+    let adversarial_ids: Vec<[u8; 32]> = vec![
+        [0u8; 32],    // all zeros
+        [0xFFu8; 32], // all ones
+        [0x80u8; 32], // high bit set
+        {
+            // null bytes alternating
+            let mut id = [0u8; 32];
+            for i in 0..32 {
+                id[i] = if i % 2 == 0 { 0 } else { 0xFF };
+            }
+            id
+        },
+        {
+            // sequential bytes
+            let mut id = [0u8; 32];
+            for i in 0..32 {
+                id[i] = i as u8;
+            }
+            id
+        },
+    ];
+
+    for (i, bad_id) in adversarial_ids.iter().enumerate() {
+        let result = resolve_sender(&contacts, bad_id, 1000);
+        assert!(
+            result.is_none(),
+            "Adversarial ID pattern {} should not resolve to any contact",
+            i
+        );
+    }
+}
+
+/// CC-14: SenderIndex must also reject adversarial IDs.
+#[test]
+fn test_adversarial_sender_index_rejects_crafted_ids() {
+    let key = SymmetricKey::generate();
+    let contacts = vec![make_contact_with_key("Alice", key)];
+
+    let index = SenderIndex::build(&contacts, 1000);
+
+    // Try all-zeros, all-ones, and sequential pattern
+    assert!(index.resolve(&[0u8; 32]).is_none());
+    assert!(index.resolve(&[0xFFu8; 32]).is_none());
+    let mut seq = [0u8; 32];
+    for i in 0..32 {
+        seq[i] = i as u8;
+    }
+    assert!(index.resolve(&seq).is_none());
+}
+
+/// CC-14: Two contacts with nearly-identical keys (1 bit different) must produce
+/// completely different anonymous IDs — no partial collision.
+#[test]
+fn test_adversarial_near_collision_keys() {
+    let mut key1 = [0x42u8; 32];
+    let mut key2 = key1;
+    key2[31] ^= 0x01; // Flip one bit
+
+    let epoch = 1000;
+    let id1 = compute_anonymous_id(&key1, epoch);
+    let id2 = compute_anonymous_id(&key2, epoch);
+
+    assert_ne!(id1, id2, "1-bit key difference must produce different IDs");
+
+    // Check that the IDs differ in many bytes (avalanche effect)
+    let differing_bytes = id1.iter().zip(id2.iter()).filter(|(a, b)| a != b).count();
+    assert!(
+        differing_bytes >= 16,
+        "HKDF should show avalanche effect: {} of 32 bytes differ (expected >= 16)",
+        differing_bytes
+    );
+}
+
 #[test]
 fn test_hkdf_context_ensures_domain_separation() {
     // Verify that the anonymous ID derivation uses a unique context

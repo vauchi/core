@@ -337,6 +337,133 @@ mod tests {
         assert_eq!(parsed, Some(pub_key));
     }
 
+    // @scenario: noise_protocol.feature:Messages decrypted by recipient
+    #[test]
+    fn test_relay_to_client_decryption_roundtrip() {
+        let (priv_key, pub_key) = generate_test_relay_keypair();
+
+        let (initiator, handshake_msg) = NoiseInitiator::new(&pub_key).unwrap();
+        let mut responder = build_test_responder(&priv_key);
+        let mut read_buf = vec![0u8; 65535];
+        responder
+            .read_message(&handshake_msg, &mut read_buf)
+            .unwrap();
+        let mut response = vec![0u8; 65535];
+        let response_len = responder.write_message(&[], &mut response).unwrap();
+        response.truncate(response_len);
+        let mut responder_transport = responder.into_transport_mode().unwrap();
+        let mut client_transport = initiator.finalize(&response).unwrap();
+
+        // Relay encrypts a message
+        let relay_plaintext = b"relay response payload";
+        let mut ct = vec![0u8; relay_plaintext.len() + 16];
+        let ct_len = responder_transport
+            .write_message(relay_plaintext, &mut ct)
+            .unwrap();
+        ct.truncate(ct_len);
+
+        // Ciphertext must differ from plaintext
+        assert_ne!(&ct[..relay_plaintext.len()], relay_plaintext.as_slice());
+
+        // Client decrypts successfully and plaintext matches
+        let decrypted = client_transport.decrypt(&ct).unwrap();
+        assert_eq!(decrypted, relay_plaintext);
+    }
+
+    // @scenario: noise_protocol.feature:Noise NK provides initiator anonymity
+    #[test]
+    fn test_nk_pattern_no_initiator_static_key() {
+        // NK pattern: only the responder's static key is pre-shared.
+        // The initiator never sends a static key, providing anonymity.
+        assert_eq!(NOISE_PATTERN, "Noise_NK_25519_ChaChaPoly_BLAKE2s");
+
+        let (_priv, pub_key) = generate_test_relay_keypair();
+        let (_initiator, handshake_msg) = NoiseInitiator::new(&pub_key).unwrap();
+
+        // NK message 1 is exactly 48 bytes: 32-byte ephemeral + 16-byte MAC.
+        // If the client sent a static key, the message would be larger (96+ bytes).
+        assert_eq!(
+            handshake_msg.len(),
+            48,
+            "NK pattern msg1 must be 48 bytes (ephemeral only, no static key)"
+        );
+
+        // Verify the builder does not accept a local static key for NK initiator:
+        // building with local_private_key on an NK initiator would be an error or
+        // would be ignored. The pattern itself guarantees no static key is sent.
+        let builder = Builder::new(NOISE_PATTERN.parse().unwrap());
+        let dummy_key = [0xAA; 32];
+        // NK initiator with a static key set should still produce the same 48-byte message
+        // (snow ignores the static key for NK initiators), confirming the pattern
+        // does not transmit it.
+        let mut state = builder
+            .local_private_key(&dummy_key)
+            .remote_public_key(&pub_key)
+            .build_initiator()
+            .unwrap();
+        let mut msg = vec![0u8; 65535];
+        let len = state.write_message(&[], &mut msg).unwrap();
+        assert_eq!(
+            len, 48,
+            "Even with a static key set, NK initiator sends only 48 bytes"
+        );
+    }
+
+    // @scenario: noise_protocol.feature:Messages encrypted after handshake
+    #[test]
+    fn test_encryption_produces_mac_and_differs_from_plaintext() {
+        let (priv_key, pub_key) = generate_test_relay_keypair();
+
+        let (initiator, handshake_msg) = NoiseInitiator::new(&pub_key).unwrap();
+        let mut responder = build_test_responder(&priv_key);
+        let mut read_buf = vec![0u8; 65535];
+        responder
+            .read_message(&handshake_msg, &mut read_buf)
+            .unwrap();
+        let mut response = vec![0u8; 65535];
+        let response_len = responder.write_message(&[], &mut response).unwrap();
+        response.truncate(response_len);
+        let _responder_transport = responder.into_transport_mode().unwrap();
+        let mut client_transport = initiator.finalize(&response).unwrap();
+
+        let plaintext = b"sensitive routing metadata";
+        let ct = client_transport.encrypt(plaintext).unwrap();
+
+        // Ciphertext = plaintext_len + 16-byte MAC
+        assert_eq!(ct.len(), plaintext.len() + 16);
+        // Ciphertext must differ from plaintext
+        assert_ne!(&ct[..plaintext.len()], plaintext.as_slice());
+    }
+
+    // @scenario: noise_protocol.feature:Sequential messages use advancing nonces
+    #[test]
+    fn test_sequential_messages_unique_ciphertexts() {
+        let (priv_key, pub_key) = generate_test_relay_keypair();
+
+        let (initiator, handshake_msg) = NoiseInitiator::new(&pub_key).unwrap();
+        let mut responder = build_test_responder(&priv_key);
+        let mut read_buf = vec![0u8; 65535];
+        responder
+            .read_message(&handshake_msg, &mut read_buf)
+            .unwrap();
+        let mut response = vec![0u8; 65535];
+        let response_len = responder.write_message(&[], &mut response).unwrap();
+        response.truncate(response_len);
+        let _responder_transport = responder.into_transport_mode().unwrap();
+        let mut client_transport = initiator.finalize(&response).unwrap();
+
+        // Encrypt the same plaintext twice — nonce advancement means different ciphertexts
+        let plaintext = b"identical message";
+        let ct1 = client_transport.encrypt(plaintext).unwrap();
+        let ct2 = client_transport.encrypt(plaintext).unwrap();
+
+        assert_ne!(
+            ct1, ct2,
+            "Same plaintext must produce different ciphertexts (nonce advances)"
+        );
+    }
+
+    // @scenario: noise_protocol.feature:Sequential messages use advancing nonces
     #[test]
     fn test_multiple_messages_sequential() {
         let (priv_key, pub_key) = generate_test_relay_keypair();

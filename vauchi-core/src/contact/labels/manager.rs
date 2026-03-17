@@ -2,273 +2,12 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! Contact Groups
-//!
-//! Groups allow organizing contacts for easier visibility management.
-//! Groups are local-only - they are never transmitted to contacts, only synced
-//! across your own devices.
+//! Group manager: assignment, visibility resolution, and merge logic.
 
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 
-/// Maximum number of labels allowed per user.
-pub const MAX_LABELS: usize = 50;
-
-/// Suggested default labels for new users.
-pub const SUGGESTED_LABELS: &[&str] = &["Family", "Friends", "Coworkers", "Business"];
-
-/// Error type for group operations.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum GroupError {
-    /// Group with this name already exists.
-    DuplicateName(String),
-    /// Group not found.
-    NotFound(String),
-    /// Maximum number of groups reached.
-    MaxLabelsReached,
-    /// Invalid group name.
-    InvalidName(String),
-}
-
-impl std::fmt::Display for GroupError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            GroupError::DuplicateName(name) => write!(f, "Group already exists: {}", name),
-            GroupError::NotFound(name) => write!(f, "Group not found: {}", name),
-            GroupError::MaxLabelsReached => {
-                write!(f, "Maximum number of groups reached ({})", MAX_LABELS)
-            }
-            GroupError::InvalidName(msg) => write!(f, "Invalid group name: {}", msg),
-        }
-    }
-}
-
-impl std::error::Error for GroupError {}
-
-/// A visibility label for organizing contacts.
-///
-/// Labels allow grouping contacts and assigning field visibility to groups.
-/// For example, a "Family" label might show personal phone and home address,
-/// while "Professional" shows only work email and phone.
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct Group {
-    /// Unique identifier for this label (UUID).
-    id: String,
-    /// Human-readable name.
-    name: String,
-    /// IDs of contacts assigned to this label.
-    contacts: HashSet<String>,
-    /// IDs of fields visible to contacts in this label.
-    visible_fields: HashSet<String>,
-    /// Optional display name override for this label's contacts.
-    ///
-    /// When set, contacts in this label see this name instead of the
-    /// user's default display name.
-    #[serde(default)]
-    display_name_override: Option<String>,
-    /// Timestamp when the label was created.
-    created_at: u64,
-    /// Timestamp when the label was last modified.
-    modified_at: u64,
-}
-
-impl Group {
-    /// Creates a new label with the given name.
-    pub fn new(name: &str) -> Self {
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .expect("Time went backwards")
-            .as_secs();
-
-        Group {
-            id: uuid::Uuid::new_v4().to_string(),
-            name: name.to_string(),
-            contacts: HashSet::new(),
-            visible_fields: HashSet::new(),
-            display_name_override: None,
-            created_at: now,
-            modified_at: now,
-        }
-    }
-
-    /// Creates a label from storage data.
-    pub fn from_storage(
-        id: String,
-        name: String,
-        contacts: HashSet<String>,
-        visible_fields: HashSet<String>,
-        display_name_override: Option<String>,
-        created_at: u64,
-        modified_at: u64,
-    ) -> Self {
-        Group {
-            id,
-            name,
-            contacts,
-            visible_fields,
-            display_name_override,
-            created_at,
-            modified_at,
-        }
-    }
-
-    /// Returns the label ID.
-    pub fn id(&self) -> &str {
-        &self.id
-    }
-
-    /// Returns the label name.
-    pub fn name(&self) -> &str {
-        &self.name
-    }
-
-    /// Sets the label name.
-    pub fn set_name(&mut self, name: &str) {
-        self.name = name.to_string();
-        self.touch();
-    }
-
-    /// Returns the display name override, if set.
-    pub fn display_name_override(&self) -> Option<&str> {
-        self.display_name_override.as_deref()
-    }
-
-    /// Sets or clears the display name override.
-    ///
-    /// When set, contacts in this label see this name instead of the
-    /// user's default display name. Pass `None` to clear the override.
-    ///
-    /// Validates that the name is non-empty, not whitespace-only, and
-    /// at most 100 characters (after trimming).
-    pub fn set_display_name_override(&mut self, name: Option<&str>) -> Result<(), GroupError> {
-        match name {
-            None => {
-                self.display_name_override = None;
-                self.touch();
-                Ok(())
-            }
-            Some(raw) => {
-                let trimmed = raw.trim();
-                if trimmed.is_empty() {
-                    return Err(GroupError::InvalidName(
-                        "Display name override cannot be empty".to_string(),
-                    ));
-                }
-                if trimmed.chars().count() > 100 {
-                    return Err(GroupError::InvalidName(
-                        "Display name override cannot exceed 100 characters".to_string(),
-                    ));
-                }
-                self.display_name_override = Some(trimmed.to_string());
-                self.touch();
-                Ok(())
-            }
-        }
-    }
-
-    /// Resolves the display name for contacts in this label.
-    ///
-    /// Returns the override if set, otherwise the provided default name.
-    pub fn resolve_display_name<'a>(&'a self, default_name: &'a str) -> &'a str {
-        match &self.display_name_override {
-            Some(override_name) => override_name.as_str(),
-            None => default_name,
-        }
-    }
-
-    /// Returns the set of contact IDs in this label.
-    pub fn contacts(&self) -> &HashSet<String> {
-        &self.contacts
-    }
-
-    /// Returns the number of contacts in this label.
-    pub fn contact_count(&self) -> usize {
-        self.contacts.len()
-    }
-
-    /// Checks if a contact is in this label.
-    pub fn contains_contact(&self, contact_id: &str) -> bool {
-        self.contacts.contains(contact_id)
-    }
-
-    /// Adds a contact to this label.
-    ///
-    /// Returns true if the contact was added (wasn't already present).
-    pub fn add_contact(&mut self, contact_id: &str) -> bool {
-        let added = self.contacts.insert(contact_id.to_string());
-        if added {
-            self.touch();
-        }
-        added
-    }
-
-    /// Removes a contact from this label.
-    ///
-    /// Returns true if the contact was removed (was present).
-    pub fn remove_contact(&mut self, contact_id: &str) -> bool {
-        let removed = self.contacts.remove(contact_id);
-        if removed {
-            self.touch();
-        }
-        removed
-    }
-
-    /// Returns the set of field IDs visible to contacts in this label.
-    pub fn visible_fields(&self) -> &HashSet<String> {
-        &self.visible_fields
-    }
-
-    /// Checks if a field is visible to contacts in this label.
-    pub fn is_field_visible(&self, field_id: &str) -> bool {
-        self.visible_fields.contains(field_id)
-    }
-
-    /// Adds a field to the visible fields for this label.
-    ///
-    /// Returns true if the field was added (wasn't already present).
-    pub fn add_visible_field(&mut self, field_id: &str) -> bool {
-        let added = self.visible_fields.insert(field_id.to_string());
-        if added {
-            self.touch();
-        }
-        added
-    }
-
-    /// Removes a field from the visible fields for this label.
-    ///
-    /// Returns true if the field was removed (was present).
-    pub fn remove_visible_field(&mut self, field_id: &str) -> bool {
-        let removed = self.visible_fields.remove(field_id);
-        if removed {
-            self.touch();
-        }
-        removed
-    }
-
-    /// Sets all visible fields at once.
-    pub fn set_visible_fields(&mut self, field_ids: HashSet<String>) {
-        self.visible_fields = field_ids;
-        self.touch();
-    }
-
-    /// Returns the creation timestamp.
-    pub fn created_at(&self) -> u64 {
-        self.created_at
-    }
-
-    /// Returns the last modification timestamp.
-    pub fn modified_at(&self) -> u64 {
-        self.modified_at
-    }
-
-    /// Updates the modification timestamp.
-    fn touch(&mut self) {
-        self.modified_at = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .expect("Time went backwards")
-            .as_secs();
-    }
-}
+use super::{Group, GroupError, MAX_LABELS};
 
 /// Manages contact groups for a user.
 ///
@@ -327,7 +66,7 @@ impl GroupManager {
 
     /// Gets a group by name.
     pub fn get_group_by_name(&self, name: &str) -> Option<&Group> {
-        self.groups.values().find(|l| l.name == name)
+        self.groups.values().find(|l| l.name() == name)
     }
 
     /// Creates a new group.
@@ -355,7 +94,7 @@ impl GroupManager {
 
         // Create group
         let group = Group::new(name);
-        let id = group.id.clone();
+        let id = group.id().to_string();
         self.groups.insert(id.clone(), group);
 
         Ok(self.groups.get(&id).expect("just inserted"))
@@ -377,7 +116,7 @@ impl GroupManager {
 
         // Check for duplicate (excluding this group)
         if let Some(existing) = self.get_group_by_name(new_name) {
-            if existing.id != group_id {
+            if existing.id() != group_id {
                 return Err(GroupError::DuplicateName(new_name.to_string()));
             }
         }
@@ -608,7 +347,7 @@ pub fn resolve_visible_fields(
     }
 }
 
-// INLINE_TEST_REQUIRED: tests access private Group fields and GroupManager internals
+// INLINE_TEST_REQUIRED: tests access private GroupManager internals
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -782,94 +521,11 @@ mod tests {
     }
 
     #[test]
-    fn test_label_display_name_override() {
-        let mut label = Group::new("Family");
-
-        // Initially None
-        assert_eq!(label.display_name_override(), None);
-
-        // Set override
-        label
-            .set_display_name_override(Some("Matt"))
-            .expect("valid name should succeed");
-        assert_eq!(label.display_name_override(), Some("Matt"));
-
-        // Clear override
-        label
-            .set_display_name_override(None)
-            .expect("clearing should succeed");
-        assert_eq!(label.display_name_override(), None);
-    }
-
-    #[test]
-    fn test_label_display_name_override_validation() {
-        let mut label = Group::new("Friends");
-
-        // Empty string should fail
-        let result = label.set_display_name_override(Some(""));
-        assert!(matches!(result, Err(GroupError::InvalidName(_))));
-
-        // Whitespace-only should fail
-        let result = label.set_display_name_override(Some("   "));
-        assert!(matches!(result, Err(GroupError::InvalidName(_))));
-
-        // Too long (>100 chars) should fail
-        let long_name = "a".repeat(101);
-        let result = label.set_display_name_override(Some(&long_name));
-        assert!(matches!(result, Err(GroupError::InvalidName(_))));
-
-        // Exactly 100 chars should succeed
-        let max_name = "b".repeat(100);
-        label
-            .set_display_name_override(Some(&max_name))
-            .expect("100 chars should succeed");
-        assert_eq!(label.display_name_override(), Some(max_name.as_str()));
-
-        // Whitespace trimming
-        label
-            .set_display_name_override(Some("  Dr. Egloff  "))
-            .expect("trimmed name should succeed");
-        assert_eq!(label.display_name_override(), Some("Dr. Egloff"));
-    }
-
-    #[test]
-    fn test_label_resolve_display_name() {
-        let mut label = Group::new("Business");
-
-        // Without override, returns default
-        assert_eq!(label.resolve_display_name("Mattia Egloff"), "Mattia Egloff");
-
-        // With override, returns override
-        label
-            .set_display_name_override(Some("Dr. Egloff"))
-            .expect("valid name");
-        assert_eq!(label.resolve_display_name("Mattia Egloff"), "Dr. Egloff");
-
-        // After clearing, returns default again
-        label
-            .set_display_name_override(None)
-            .expect("clearing should succeed");
-        assert_eq!(label.resolve_display_name("Mattia Egloff"), "Mattia Egloff");
-    }
-
-    #[test]
     fn test_suggested_labels_updated() {
         assert_eq!(
-            SUGGESTED_LABELS,
+            super::super::SUGGESTED_LABELS,
             &["Family", "Friends", "Coworkers", "Business"]
         );
-    }
-
-    #[test]
-    fn test_labels_are_local() {
-        // Labels exist only in GroupManager, not in Contact
-        // This test verifies the design doesn't leak labels to contacts
-        let label = Group::new("Secret Name");
-
-        // The label name is never serialized in a way that would be sent to contacts
-        // Label data should only be synced to the user's own devices
-        assert_eq!(label.name(), "Secret Name");
-        // The contact sees field visibility, not labels
     }
 
     #[test]

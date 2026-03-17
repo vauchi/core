@@ -106,6 +106,68 @@ pub unsafe extern "C" fn vauchi_app_create_with_config(
     }
 }
 
+/// Create a new AppEngine with persistent storage and caller-provided key.
+///
+/// The caller manages key storage (e.g., Windows PasswordVault, platform keychain).
+/// `key_bytes` must point to exactly `key_len` bytes. `key_len` must be 32.
+///
+/// Returns null on initialization failure or invalid parameters.
+///
+/// # Safety
+/// `data_dir` must be a valid null-terminated C string pointing to a writable directory.
+/// `relay_url` must be a valid null-terminated C string, or null.
+/// `key_bytes` must point to at least `key_len` valid bytes, or be null.
+#[no_mangle]
+pub unsafe extern "C" fn vauchi_app_create_with_key(
+    data_dir: *const c_char,
+    relay_url: *const c_char,
+    key_bytes: *const u8,
+    key_len: usize,
+) -> *mut VauchiApp {
+    use vauchi_core::crypto::SymmetricKey;
+    use zeroize::Zeroize;
+
+    match std::panic::catch_unwind(std::panic::AssertUnwindSafe(move || {
+        if key_bytes.is_null() || key_len != 32 {
+            return std::ptr::null_mut();
+        }
+
+        let dir = match from_c_str(data_dir) {
+            Some(d) => d,
+            None => return std::ptr::null_mut(),
+        };
+
+        let data_path = std::path::PathBuf::from(&dir);
+        if std::fs::create_dir_all(&data_path).is_err() {
+            return std::ptr::null_mut();
+        }
+
+        let mut arr = [0u8; 32];
+        arr.copy_from_slice(std::slice::from_raw_parts(key_bytes, 32));
+        let key = SymmetricKey::from_bytes_unchecked(arr);
+        arr.zeroize();
+
+        let storage_path = data_path.join("vauchi.db");
+        let mut config =
+            vauchi_core::api::VauchiConfig::with_storage_path(&storage_path).with_storage_key(key);
+        if let Some(url) = from_c_str(relay_url) {
+            config = config.with_relay_url(url);
+        }
+
+        let vauchi = match Vauchi::new(config) {
+            Ok(v) => v,
+            Err(_) => return std::ptr::null_mut(),
+        };
+
+        Box::into_raw(Box::new(VauchiApp {
+            engine: Mutex::new(AppEngine::new(vauchi)),
+        }))
+    })) {
+        Ok(result) => result,
+        Err(_) => std::ptr::null_mut(),
+    }
+}
+
 /// Destroy an AppEngine instance.
 ///
 /// # Safety

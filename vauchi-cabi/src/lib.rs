@@ -824,4 +824,162 @@ mod tests {
             vauchi_app_destroy(handle);
         }
     }
+
+    // ── Key-based init tests ───────────────────────────────────────
+
+    #[test]
+    fn create_with_key_valid_returns_non_null() {
+        unsafe {
+            let dir = tempfile::tempdir().unwrap();
+            let dir_cstr = CString::new(dir.path().to_str().unwrap()).unwrap();
+            let key = [0xABu8; 32];
+            let handle =
+                vauchi_app_create_with_key(dir_cstr.as_ptr(), std::ptr::null(), key.as_ptr(), 32);
+            assert!(!handle.is_null(), "valid key + dir should succeed");
+            vauchi_app_destroy(handle);
+        }
+    }
+
+    #[test]
+    fn create_with_key_wrong_length_returns_null() {
+        unsafe {
+            let dir = tempfile::tempdir().unwrap();
+            let dir_cstr = CString::new(dir.path().to_str().unwrap()).unwrap();
+            let key = [0xABu8; 16];
+            let handle =
+                vauchi_app_create_with_key(dir_cstr.as_ptr(), std::ptr::null(), key.as_ptr(), 16);
+            assert!(handle.is_null(), "wrong key length should return null");
+        }
+    }
+
+    #[test]
+    fn create_with_key_null_key_returns_null() {
+        unsafe {
+            let dir = tempfile::tempdir().unwrap();
+            let dir_cstr = CString::new(dir.path().to_str().unwrap()).unwrap();
+            let handle = vauchi_app_create_with_key(
+                dir_cstr.as_ptr(),
+                std::ptr::null(),
+                std::ptr::null(),
+                32,
+            );
+            assert!(handle.is_null(), "null key_bytes should return null");
+        }
+    }
+
+    #[test]
+    fn create_with_key_null_dir_returns_null() {
+        unsafe {
+            let key = [0xABu8; 32];
+            let handle =
+                vauchi_app_create_with_key(std::ptr::null(), std::ptr::null(), key.as_ptr(), 32);
+            assert!(handle.is_null(), "null data_dir should return null");
+        }
+    }
+
+    #[test]
+    fn create_with_key_persists_identity_across_reopens() {
+        unsafe {
+            let dir = tempfile::tempdir().unwrap();
+            let dir_cstr = CString::new(dir.path().to_str().unwrap()).unwrap();
+            let key = [0x42u8; 32];
+
+            let handle =
+                vauchi_app_create_with_key(dir_cstr.as_ptr(), std::ptr::null(), key.as_ptr(), 32);
+            assert!(!handle.is_null());
+
+            let steps: &[&str] = &[
+                r#"{"ActionPressed":{"action_id":"create_new"}}"#,
+                r#"{"ActionPressed":{"action_id":"get_started"}}"#,
+                r#"{"TextChanged":{"component_id":"display_name","value":"PersistTest"}}"#,
+                r#"{"ActionPressed":{"action_id":"continue"}}"#,
+                r#"{"ActionPressed":{"action_id":"skip_to_finish"}}"#,
+                r#"{"ActionPressed":{"action_id":"continue"}}"#,
+                r#"{"ActionPressed":{"action_id":"skip"}}"#,
+                r#"{"ActionPressed":{"action_id":"start"}}"#,
+            ];
+            for step in steps {
+                let action = CString::new(*step).unwrap();
+                let r = vauchi_app_handle_action(handle, action.as_ptr());
+                if !r.is_null() {
+                    vauchi_string_free(r);
+                }
+            }
+
+            let screens_ptr = vauchi_app_available_screens(handle);
+            let screens_json = CStr::from_ptr(screens_ptr).to_str().unwrap().to_string();
+            vauchi_string_free(screens_ptr);
+            assert!(
+                screens_json.contains("contacts"),
+                "after onboarding, contacts should be available: {}",
+                screens_json
+            );
+
+            vauchi_app_destroy(handle);
+
+            let handle2 =
+                vauchi_app_create_with_key(dir_cstr.as_ptr(), std::ptr::null(), key.as_ptr(), 32);
+            assert!(!handle2.is_null());
+
+            let screens_ptr2 = vauchi_app_available_screens(handle2);
+            let screens_json2 = CStr::from_ptr(screens_ptr2).to_str().unwrap().to_string();
+            vauchi_string_free(screens_ptr2);
+            assert!(
+                screens_json2.contains("contacts"),
+                "reopened with same key should see contacts: {}",
+                screens_json2
+            );
+
+            vauchi_app_destroy(handle2);
+        }
+    }
+
+    #[test]
+    fn create_with_key_wrong_key_cannot_read_old_data() {
+        unsafe {
+            let dir = tempfile::tempdir().unwrap();
+            let dir_cstr = CString::new(dir.path().to_str().unwrap()).unwrap();
+            let key_a = [0x42u8; 32];
+            let key_b = [0x99u8; 32];
+
+            let handle =
+                vauchi_app_create_with_key(dir_cstr.as_ptr(), std::ptr::null(), key_a.as_ptr(), 32);
+            assert!(!handle.is_null());
+
+            let steps: &[&str] = &[
+                r#"{"ActionPressed":{"action_id":"create_new"}}"#,
+                r#"{"ActionPressed":{"action_id":"get_started"}}"#,
+                r#"{"TextChanged":{"component_id":"display_name","value":"KeyTest"}}"#,
+                r#"{"ActionPressed":{"action_id":"continue"}}"#,
+                r#"{"ActionPressed":{"action_id":"skip_to_finish"}}"#,
+                r#"{"ActionPressed":{"action_id":"continue"}}"#,
+                r#"{"ActionPressed":{"action_id":"skip"}}"#,
+                r#"{"ActionPressed":{"action_id":"start"}}"#,
+            ];
+            for step in steps {
+                let action = CString::new(*step).unwrap();
+                let r = vauchi_app_handle_action(handle, action.as_ptr());
+                if !r.is_null() {
+                    vauchi_string_free(r);
+                }
+            }
+            vauchi_app_destroy(handle);
+
+            let handle2 =
+                vauchi_app_create_with_key(dir_cstr.as_ptr(), std::ptr::null(), key_b.as_ptr(), 32);
+            if handle2.is_null() {
+                assert!(handle2.is_null(), "wrong key returned null (expected)");
+            } else {
+                let screens_ptr = vauchi_app_available_screens(handle2);
+                let screens_json = CStr::from_ptr(screens_ptr).to_str().unwrap().to_string();
+                vauchi_string_free(screens_ptr);
+                assert!(
+                    !screens_json.contains("contacts"),
+                    "wrong key should not see contacts: {}",
+                    screens_json
+                );
+                vauchi_app_destroy(handle2);
+            }
+        }
+    }
 }

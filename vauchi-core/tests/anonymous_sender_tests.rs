@@ -5,7 +5,7 @@
 //! Tests for network::anonymous (anonymous sender IDs)
 
 use vauchi_core::network::anonymous::{
-    compute_anonymous_id, current_epoch, resolve_sender, AnonymousSender,
+    compute_anonymous_id, current_epoch, resolve_sender, AnonymousSender, SenderIndex,
 };
 use vauchi_core::{Contact, ContactCard, SymmetricKey};
 
@@ -406,4 +406,189 @@ fn test_replay_prevention_same_epoch_requires_message_dedup() {
     // processing layer, not at the anonymous ID resolution layer.
     // The message layer should maintain a set of seen message IDs and
     // reject duplicates.
+}
+
+// ============================================================
+// SenderIndex Tests
+// Traces to: features/anonymous_sender.feature @resolution
+// SenderIndex provides O(1) lookup vs O(n) resolve_sender.
+// ============================================================
+
+// @scenario: anonymous_sender.feature:Receiver resolves anonymous sender from contact list
+#[test]
+fn test_sender_index_build_and_resolve() {
+    let key = SymmetricKey::generate();
+    let contact = make_contact_with_key("Alice", key.clone());
+    let contacts = vec![contact];
+
+    let epoch = 1000;
+    let index = SenderIndex::build(&contacts, epoch);
+
+    let anon_id = compute_anonymous_id(contacts[0].shared_key().as_bytes(), epoch);
+    let result = index.resolve(&anon_id);
+    assert!(result.is_some(), "SenderIndex should resolve known contact");
+    assert_eq!(result.unwrap(), contacts[0].id());
+}
+
+// @scenario: anonymous_sender.feature:Resolution tolerates previous epoch for clock skew
+#[test]
+fn test_sender_index_resolves_previous_epoch() {
+    let key = SymmetricKey::generate();
+    let contact = make_contact_with_key("Bob", key.clone());
+    let contacts = vec![contact];
+
+    let epoch = 1000;
+    let index = SenderIndex::build(&contacts, epoch);
+
+    // ID from previous epoch should resolve (boundary tolerance)
+    let prev_id = compute_anonymous_id(contacts[0].shared_key().as_bytes(), epoch - 1);
+    let result = index.resolve(&prev_id);
+    assert!(
+        result.is_some(),
+        "SenderIndex should resolve previous epoch ID"
+    );
+    assert_eq!(result.unwrap(), contacts[0].id());
+}
+
+// @scenario: anonymous_sender.feature:Unknown sender cannot be resolved
+#[test]
+fn test_sender_index_unknown_id_returns_none() {
+    let key = SymmetricKey::generate();
+    let contact = make_contact_with_key("Alice", key);
+    let contacts = vec![contact];
+
+    let index = SenderIndex::build(&contacts, 1000);
+    let unknown_id = [0xFFu8; 32];
+    assert!(
+        index.resolve(&unknown_id).is_none(),
+        "Unknown ID should not resolve"
+    );
+}
+
+#[test]
+fn test_sender_index_empty_contacts() {
+    let contacts: Vec<Contact> = vec![];
+    let index = SenderIndex::build(&contacts, 1000);
+    let any_id = [0x42u8; 32];
+    assert!(index.resolve(&any_id).is_none());
+}
+
+#[test]
+fn test_sender_index_multiple_contacts() {
+    let key1 = SymmetricKey::generate();
+    let key2 = SymmetricKey::generate();
+    let key3 = SymmetricKey::generate();
+    let contacts = vec![
+        make_contact_with_key("Alice", key1),
+        make_contact_with_key("Bob", key2),
+        make_contact_with_key("Carol", key3),
+    ];
+
+    let epoch = 500;
+    let index = SenderIndex::build(&contacts, epoch);
+
+    // Each contact should resolve correctly
+    for contact in &contacts {
+        let anon_id = compute_anonymous_id(contact.shared_key().as_bytes(), epoch);
+        let result = index.resolve(&anon_id);
+        assert!(
+            result.is_some(),
+            "Should resolve {}",
+            contact.display_name()
+        );
+        assert_eq!(result.unwrap(), contact.id());
+    }
+}
+
+#[test]
+fn test_sender_index_stale_detection() {
+    let contacts: Vec<Contact> = vec![];
+    // Build for a past epoch
+    let past_epoch = 1;
+    let index = SenderIndex::build(&contacts, past_epoch);
+    assert!(index.is_stale(), "Index built for epoch 1 should be stale");
+    assert_eq!(index.epoch(), past_epoch);
+}
+
+#[test]
+fn test_sender_index_epoch_zero() {
+    let key = SymmetricKey::generate();
+    let contact = make_contact_with_key("Alice", key.clone());
+    let contacts = vec![contact];
+
+    // Epoch 0: no previous epoch to check
+    let index = SenderIndex::build(&contacts, 0);
+    let anon_id = compute_anonymous_id(contacts[0].shared_key().as_bytes(), 0);
+    let result = index.resolve(&anon_id);
+    assert!(result.is_some(), "Should resolve at epoch 0");
+}
+
+#[test]
+fn test_sender_index_future_epoch_not_resolved() {
+    let key = SymmetricKey::generate();
+    let contact = make_contact_with_key("Alice", key.clone());
+    let contacts = vec![contact];
+
+    let epoch = 1000;
+    let index = SenderIndex::build(&contacts, epoch);
+
+    // ID from future epoch (epoch + 1) should NOT resolve
+    let future_id = compute_anonymous_id(contacts[0].shared_key().as_bytes(), epoch + 1);
+    assert!(
+        index.resolve(&future_id).is_none(),
+        "Future epoch ID should not resolve"
+    );
+}
+
+// ============================================================
+// Epoch Calculation Tests
+// Traces to: features/anonymous_sender.feature @epoch
+// ============================================================
+
+#[test]
+fn test_epoch_calculation_formula() {
+    // Verify epoch = unix_timestamp / 3600
+    // We can't control system time, but we can verify the formula
+    // by checking current_epoch is in the right range for 2026
+    let epoch = current_epoch();
+    // 2026-01-01 00:00:00 UTC = 1767225600 seconds
+    // 1767225600 / 3600 = 490896
+    // 2026-12-31 23:59:59 UTC = 1798761599 seconds
+    // 1798761599 / 3600 = 499656
+    assert!(
+        (490_000..=510_000).contains(&epoch),
+        "Epoch {} should be in 2026 range (490000-510000)",
+        epoch
+    );
+}
+
+// ============================================================
+// HKDF Context String Test
+// Traces to: features/anonymous_sender.feature @privacy
+// "Derivation context prevents cross-protocol confusion"
+// ============================================================
+
+#[test]
+fn test_hkdf_context_ensures_domain_separation() {
+    // Verify that the anonymous ID derivation uses a unique context
+    // by checking that raw HKDF with the same key+epoch but different
+    // context produces a different result.
+    use vauchi_core::crypto::HKDF;
+
+    let key = [0x42u8; 32];
+    let epoch: u64 = 1000;
+    let epoch_bytes = epoch.to_le_bytes();
+
+    // Compute with the production context
+    let anon_id = compute_anonymous_id(&key, epoch);
+
+    // Compute with a different context (simulating cross-protocol confusion)
+    let mut wrong_info = b"Wrong_Context_v1".to_vec();
+    wrong_info.extend_from_slice(&epoch_bytes);
+    let wrong_id = *HKDF::derive_key(None, &key, &wrong_info);
+
+    assert_ne!(
+        anon_id, wrong_id,
+        "Different HKDF contexts must produce different IDs"
+    );
 }

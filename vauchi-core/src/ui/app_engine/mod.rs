@@ -1,0 +1,245 @@
+// SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+//
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+//! Top-level application orchestrator.
+//!
+//! `AppEngine` wraps `Vauchi`, owns the active workflow engine,
+//! handles navigation routing, and implements `WorkflowEngine` so
+//! frontends see a single uniform interface.
+
+mod intercept;
+mod navigation;
+mod routing;
+mod screens;
+
+use std::collections::HashMap;
+
+use serde::{Deserialize, Serialize};
+
+use crate::api::Vauchi;
+
+use super::action::{ActionResult, UserAction};
+use super::engine::WorkflowEngine;
+use super::screen::ScreenModel;
+
+/// Top-level screens in the application.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum AppScreen {
+    Onboarding,
+    MyInfo,
+    Contacts,
+    ContactDetail {
+        contact_id: String,
+    },
+    ContactEdit {
+        contact_id: String,
+    },
+    ContactVisibility {
+        contact_id: String,
+    },
+    Exchange,
+    Settings,
+    Help,
+    Backup,
+    Lock,
+    DeviceLinking,
+    DuressPin,
+    EmergencyShred,
+    DeliveryStatus,
+    Sync,
+    TorSettings,
+    Recovery,
+    Groups,
+    GroupDetail {
+        group_id: String,
+    },
+    Privacy,
+    Support,
+    FormDialog {
+        dialog_type: super::form_dialog::FormDialogType,
+    },
+    MyInfoEntryDetail {
+        field_id: String,
+    },
+    ContactDuplicates,
+    ContactMerge {
+        primary_name: String,
+        primary_fields: Vec<String>,
+        secondary_name: String,
+        secondary_fields: Vec<String>,
+    },
+    ContactLimit,
+}
+
+/// Unified orchestrator for all frontends.
+pub struct AppEngine {
+    vauchi: Vauchi,
+    screen: AppScreen,
+    engine: Box<dyn WorkflowEngine>,
+    engine_cache: HashMap<AppScreen, Box<dyn WorkflowEngine>>,
+    /// Captured from onboarding TextChanged events for identity persistence.
+    pending_display_name: Option<String>,
+    /// Navigation history stack for back-button support.
+    nav_history: Vec<AppScreen>,
+    /// Field pending undo after delete from MyInfoEntryDetail.
+    pending_field_undo: Option<(String, crate::contact_card::ContactField)>,
+    /// Cached field type catalog (built once from SocialNetworkRegistry).
+    field_catalog: crate::contact_card::FieldTypeCatalog,
+}
+
+impl AppEngine {
+    /// Returns a reference to the inner Vauchi instance.
+    pub fn vauchi(&self) -> &Vauchi {
+        &self.vauchi
+    }
+
+    /// Returns a mutable reference to the inner Vauchi instance.
+    pub fn vauchi_mut(&mut self) -> &mut Vauchi {
+        &mut self.vauchi
+    }
+
+    pub fn new(vauchi: Vauchi) -> Self {
+        let screen = if !vauchi.has_identity() {
+            AppScreen::Onboarding
+        } else if vauchi.is_password_enabled().unwrap_or(false) {
+            AppScreen::Lock
+        } else {
+            AppScreen::MyInfo
+        };
+        let engine = Self::create_engine(&vauchi, &screen);
+        let registry = crate::social::SocialNetworkRegistry::with_defaults();
+        let field_catalog = crate::contact_card::FieldTypeCatalog::new(&registry);
+        Self {
+            vauchi,
+            screen,
+            engine,
+            engine_cache: HashMap::new(),
+            pending_display_name: None,
+            nav_history: Vec::new(),
+            pending_field_undo: None,
+            field_catalog,
+        }
+    }
+
+    pub fn current_app_screen(&self) -> &AppScreen {
+        &self.screen
+    }
+
+    pub fn has_identity(&self) -> bool {
+        self.vauchi.has_identity()
+    }
+}
+
+fn initials(name: &str) -> String {
+    name.split_whitespace()
+        .filter_map(|w| w.chars().next())
+        .take(2)
+        .collect::<String>()
+        .to_uppercase()
+}
+
+// INLINE_TEST_REQUIRED: initials() is module-private, cannot be tested from external tests/
+#[cfg(test)]
+mod tests {
+    use super::initials;
+
+    #[test]
+    fn initials_single_word() {
+        assert_eq!(initials("Alice"), "A");
+    }
+
+    #[test]
+    fn initials_two_words() {
+        assert_eq!(initials("Alice Smith"), "AS");
+    }
+
+    #[test]
+    fn initials_three_words_takes_first_two() {
+        assert_eq!(initials("Alice B Smith"), "AB");
+    }
+
+    #[test]
+    fn initials_empty_string() {
+        assert_eq!(initials(""), "");
+    }
+
+    #[test]
+    fn initials_unicode() {
+        assert_eq!(initials("Ägidius Ölmann"), "ÄÖ");
+    }
+
+    #[test]
+    fn initials_extra_whitespace() {
+        assert_eq!(initials("  Alice   Smith  "), "AS");
+    }
+}
+
+// INLINE_TEST_REQUIRED: initials() is module-private, cannot be tested from external tests/
+#[cfg(test)]
+mod proptests {
+    use super::initials;
+    use proptest::prelude::*;
+
+    proptest! {
+        #[test]
+        fn initials_never_panics(name in "\\PC*") {
+            let result = initials(&name);
+            // Unicode to_uppercase() can expand a single char to multiple,
+            // so we only assert the result is valid UTF-8 (which String guarantees)
+            // and that it equals its own uppercase form.
+            prop_assert_eq!(result.clone(), result.to_uppercase());
+        }
+
+        #[test]
+        fn initials_are_uppercase(name in "[a-z]+ [a-z]+") {
+            let result = initials(&name);
+            prop_assert_eq!(result.clone(), result.to_uppercase());
+        }
+    }
+}
+
+impl WorkflowEngine for AppEngine {
+    fn current_screen(&self) -> ScreenModel {
+        self.engine.current_screen()
+    }
+
+    fn handle_action(&mut self, action: UserAction) -> ActionResult {
+        // Capture display name during onboarding for identity persistence
+        if self.screen == AppScreen::Onboarding {
+            if let UserAction::TextChanged {
+                ref component_id,
+                ref value,
+            } = action
+            {
+                if component_id == "display_name" {
+                    self.pending_display_name = Some(value.clone());
+                }
+            }
+        }
+
+        self.persist_settings_toggle(&action);
+
+        if let Some(result) = self.intercept_add_field(&action) {
+            return result;
+        }
+
+        if let Some(result) = self.intercept_settings_action(&action) {
+            return result;
+        }
+
+        if let AppScreen::MyInfoEntryDetail { ref field_id } = self.screen {
+            let field_id = field_id.clone();
+            if let Some(result) = self.intercept_entry_detail_action(&field_id, &action) {
+                return result;
+            }
+        }
+
+        if let Some(result) = self.handle_undo(&action) {
+            return result;
+        }
+
+        let result = self.engine.handle_action(action);
+        self.route_result(result)
+    }
+}

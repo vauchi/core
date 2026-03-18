@@ -153,7 +153,8 @@ fn validate_result(
         | ActionResult::ShowAlert { .. }
         | ActionResult::ShowToast { .. }
         | ActionResult::OpenEntryDetail { .. }
-        | ActionResult::ExchangeCommands { .. } => {}
+        | ActionResult::ExchangeCommands { .. }
+        | ActionResult::TorCommand { .. } => {}
     }
     Ok(())
 }

@@ -7,6 +7,30 @@ use serde::{Deserialize, Serialize};
 use super::screen::ScreenModel;
 use crate::exchange::ExchangeCommand;
 
+/// A command from the UI layer requesting a Tor backend operation.
+///
+/// These commands are emitted by `TorSettingsEngine` when the user toggles
+/// Tor settings. The app layer dispatches them to the `TorManager` (when
+/// the `tor` feature is enabled) or ignores them gracefully.
+///
+/// This type is unconditionally available (no feature gate) so that the
+/// UI layer compiles regardless of whether `tor` is enabled.
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum TorCommand {
+    /// Start the Tor client and establish a circuit.
+    Bootstrap,
+    /// Shut down the Tor client.
+    Shutdown,
+    /// Request a new Tor circuit (new exit node).
+    RotateCircuit,
+    /// Update Tor configuration (e.g., onion preference changed).
+    UpdateConfig {
+        /// Whether to prefer .onion addresses.
+        prefer_onion: bool,
+    },
+}
+
 /// An action the user performed in the UI.
 #[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -99,5 +123,12 @@ pub enum ActionResult {
     /// Unsupported commands should be answered with `ExchangeHardwareEvent::HardwareUnavailable`.
     ExchangeCommands {
         commands: Vec<ExchangeCommand>,
+    },
+    /// Frontend/app layer should dispatch this Tor backend command.
+    ///
+    /// The app layer forwards these to `TorManager` when the `tor` feature
+    /// is enabled, or handles them as no-ops when Tor is not compiled in.
+    TorCommand {
+        command: TorCommand,
     },
 }

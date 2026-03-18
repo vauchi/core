@@ -296,10 +296,10 @@ proptest! {
         let (k1a, k1b) = HKDF::derive_key_pair(Some(&salt), &ikm, &info);
         let (k2a, k2b) = HKDF::derive_key_pair(Some(&salt), &ikm, &info);
 
-        prop_assert_eq!(k1a, k2a, "First key must be deterministic");
-        prop_assert_eq!(k1b, k2b, "Second key must be deterministic");
+        prop_assert_eq!(*k1a, *k2a, "First key must be deterministic");
+        prop_assert_eq!(*k1b, *k2b, "Second key must be deterministic");
         // The two keys in a pair should be different (overwhelmingly likely)
-        prop_assert_ne!(k1a, k1b, "Key pair should produce two distinct keys");
+        prop_assert_ne!(*k1a, *k1b, "Key pair should produce two distinct keys");
     }
 
     /// Property: Different IKM produces different HKDF output.

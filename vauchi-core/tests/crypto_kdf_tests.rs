@@ -133,7 +133,7 @@ fn test_hkdf_derive_key_pair() {
     assert_eq!(key2.len(), 32);
 
     // Keys should be different
-    assert_ne!(key1, key2);
+    assert_ne!(*key1, *key2);
 }
 
 #[test]

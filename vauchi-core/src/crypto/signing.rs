@@ -23,7 +23,7 @@ impl SigningKeyPair {
     ///
     /// Uses system random number generator for key material.
     pub fn generate() -> Self {
-        let seed: [u8; 32] = super::random_bytes();
+        let seed = zeroize::Zeroizing::new(super::random_bytes::<32>());
         Self::from_seed(&seed)
     }
 

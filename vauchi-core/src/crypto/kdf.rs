@@ -14,7 +14,7 @@
 use hkdf::Hkdf;
 use sha2::Sha256;
 use thiserror::Error;
-use zeroize::{Zeroize, Zeroizing};
+use zeroize::Zeroizing;
 
 /// KDF error types.
 #[derive(Error, Debug)]
@@ -96,15 +96,19 @@ impl HKDF {
     ///
     /// Used in Double Ratchet for deriving (root_key, chain_key) pairs.
     /// The intermediate PRK and OKM buffer are zeroized after extraction.
-    pub fn derive_key_pair(salt: Option<&[u8]>, ikm: &[u8], info: &[u8]) -> ([u8; 32], [u8; 32]) {
+    pub fn derive_key_pair(
+        salt: Option<&[u8]>,
+        ikm: &[u8],
+        info: &[u8],
+    ) -> (Zeroizing<[u8; 32]>, Zeroizing<[u8; 32]>) {
         let hk = Hkdf::<Sha256>::new(salt, ikm);
-        let mut okm = [0u8; 64];
-        hk.expand(info, &mut okm).expect("64 bytes is valid length");
+        let mut okm = Zeroizing::new([0u8; 64]);
+        hk.expand(info, okm.as_mut())
+            .expect("64 bytes is valid length");
         let mut key1 = [0u8; 32];
         let mut key2 = [0u8; 32];
         key1.copy_from_slice(&okm[..32]);
         key2.copy_from_slice(&okm[32..]);
-        okm.zeroize();
-        (key1, key2)
+        (Zeroizing::new(key1), Zeroizing::new(key2))
     }
 }

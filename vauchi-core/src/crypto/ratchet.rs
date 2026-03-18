@@ -226,8 +226,10 @@ impl DoubleRatchetState {
 
         // Perform initial DH to get first root key and send chain
         let dh_output = our_dh.diffie_hellman(&their_dh_public)?;
-        let (root_key, send_chain_key) =
+        let (root_key_z, send_chain_key_z) =
             HKDF::derive_key_pair(Some(x3dh_secret.as_bytes()), &*dh_output, ROOT_RATCHET_INFO);
+        let root_key = *root_key_z;
+        let send_chain_key = *send_chain_key_z;
 
         Ok(DoubleRatchetState {
             root_key,
@@ -405,10 +407,10 @@ impl DoubleRatchetState {
 
         // DH with their new key and our current key -> new receiving chain
         let dh_recv = self.our_dh.diffie_hellman(their_new_public)?;
-        let (root_key, recv_chain_key) =
+        let (root_key_z, recv_chain_key_z) =
             HKDF::derive_key_pair(Some(&self.root_key), &*dh_recv, ROOT_RATCHET_INFO);
-        self.root_key = root_key;
-        self.recv_chain = Some(ChainKey::new(recv_chain_key));
+        self.root_key = *root_key_z;
+        self.recv_chain = Some(ChainKey::new(*recv_chain_key_z));
         self.recv_message_count = 0;
 
         // Generate new DH keypair
@@ -417,10 +419,10 @@ impl DoubleRatchetState {
 
         // DH with their key and our NEW key -> new sending chain
         let dh_send = self.our_dh.diffie_hellman(their_new_public)?;
-        let (root_key, send_chain_key) =
+        let (root_key_z, send_chain_key_z) =
             HKDF::derive_key_pair(Some(&self.root_key), &*dh_send, ROOT_RATCHET_INFO);
-        self.root_key = root_key;
-        self.send_chain = Some(ChainKey::new(send_chain_key));
+        self.root_key = *root_key_z;
+        self.send_chain = Some(ChainKey::new(*send_chain_key_z));
         self.send_message_count = 0;
 
         self.dh_generation += 1;

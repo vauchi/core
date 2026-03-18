@@ -5,26 +5,17 @@
 //! Ed25519 Digital Signatures
 //!
 //! Provides signing keypair generation and signature operations using the
-//! audited `aws-lc-rs` cryptographic library (FIPS 140-3).
+//! `ed25519-dalek` cryptographic library.
 
-use aws_lc_rs::signature::{Ed25519KeyPair, KeyPair as RingKeyPair};
+use ed25519_dalek::{Signer, Verifier};
 use subtle::ConstantTimeEq;
-use zeroize::Zeroize;
 
 /// Ed25519 signing keypair for identity and message signing.
 ///
-/// The stored `seed` (32 bytes) is zeroed on drop. Note: `aws_lc_rs::Ed25519KeyPair`
-/// retains expanded key material internally and does not implement `Zeroize`,
-/// so full zeroization coverage is limited to the seed.
+/// Wraps `ed25519_dalek::SigningKey`, which implements `ZeroizeOnDrop`
+/// — both the seed and expanded key material are zeroed on drop.
 pub struct SigningKeyPair {
-    keypair: Ed25519KeyPair,
-    seed: [u8; 32],
-}
-
-impl Drop for SigningKeyPair {
-    fn drop(&mut self) {
-        self.seed.zeroize();
-    }
+    inner: ed25519_dalek::SigningKey,
 }
 
 impl SigningKeyPair {
@@ -41,35 +32,23 @@ impl SigningKeyPair {
     /// The same seed will always produce the same keypair,
     /// enabling deterministic key recovery from backups.
     pub fn from_seed(seed: &[u8; 32]) -> Self {
-        let keypair =
-            Ed25519KeyPair::from_seed_unchecked(seed).expect("Seed should be valid for Ed25519");
-
-        SigningKeyPair {
-            keypair,
-            seed: *seed,
-        }
+        let inner = ed25519_dalek::SigningKey::from_bytes(seed);
+        SigningKeyPair { inner }
     }
 
     /// Returns the public key portion of this keypair.
     pub fn public_key(&self) -> PublicKey {
+        let vk = self.inner.verifying_key();
         PublicKey {
-            bytes: self
-                .keypair
-                .public_key()
-                .as_ref()
-                .try_into()
-                .expect("Ed25519 public key is always 32 bytes"),
+            bytes: vk.to_bytes(),
         }
     }
 
     /// Signs a message and returns the signature.
     pub fn sign(&self, message: &[u8]) -> Signature {
-        let sig = self.keypair.sign(message);
+        let sig = self.inner.sign(message);
         Signature {
-            bytes: sig
-                .as_ref()
-                .try_into()
-                .expect("Ed25519 signature is always 64 bytes"),
+            bytes: sig.to_bytes(),
         }
     }
 }
@@ -112,10 +91,11 @@ impl PublicKey {
 
     /// Verifies a signature against a message using this public key.
     pub fn verify(&self, message: &[u8], signature: &Signature) -> bool {
-        use aws_lc_rs::signature::{UnparsedPublicKey, ED25519};
-
-        let public_key = UnparsedPublicKey::new(&ED25519, &self.bytes);
-        public_key.verify(message, &signature.bytes).is_ok()
+        let Ok(vk) = ed25519_dalek::VerifyingKey::from_bytes(&self.bytes) else {
+            return false;
+        };
+        let sig = ed25519_dalek::Signature::from_bytes(&signature.bytes);
+        vk.verify(message, &sig).is_ok()
     }
 }
 

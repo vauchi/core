@@ -151,6 +151,6 @@ mod tests {
         let expected = Sha256::digest(cert_der);
         let pin = PinnedCertificate::from_der(cert_der);
 
-        assert_eq!(pin.sha256_fingerprint.as_slice(), expected.as_ref());
+        assert_eq!(pin.sha256_fingerprint.as_slice(), &expected[..]);
     }
 }

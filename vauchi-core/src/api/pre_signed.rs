@@ -199,7 +199,7 @@ impl std::error::Error for PreSignedError {}
 #[cfg(test)]
 mod tests {
     use super::*;
-    use aws_lc_rs::signature;
+    use crate::crypto::signing::{PublicKey as CryptoPublicKey, Signature as CryptoSignature};
 
     #[test]
     fn test_generate_pre_signed_messages() {
@@ -237,11 +237,13 @@ mod tests {
         message.push(stage_byte);
         message.extend_from_slice(&notice.timestamp.to_be_bytes());
 
-        // Verify using aws-lc-rs directly
-        let peer_key = signature::UnparsedPublicKey::new(&signature::ED25519, &notice.public_key);
-        peer_key
-            .verify(&message, &notice.signature)
-            .expect("Deletion notice signature should be valid");
+        // Verify using ed25519-dalek via crypto module
+        let peer_key = CryptoPublicKey::from_bytes(notice.public_key);
+        let sig = CryptoSignature::from_bytes(notice.signature);
+        assert!(
+            peer_key.verify(&message, &sig),
+            "Deletion notice signature should be valid"
+        );
     }
 
     #[test]
@@ -257,11 +259,15 @@ mod tests {
         message.extend_from_slice(&purge.purge_token);
         message.extend_from_slice(&purge.timestamp.to_be_bytes());
 
-        // Verify using aws-lc-rs directly
-        let peer_key = signature::UnparsedPublicKey::new(&signature::ED25519, &purge.public_key);
-        peer_key
-            .verify(&message, &purge.signature)
-            .expect("Purge request signature should be valid");
+        // Verify using ed25519-dalek via crypto module
+        let peer_key = CryptoPublicKey::from_bytes(purge.public_key);
+        let sig = CryptoSignature::from_bytes(
+            purge.signature.clone().try_into().expect("sig is 64 bytes"),
+        );
+        assert!(
+            peer_key.verify(&message, &sig),
+            "Purge request signature should be valid"
+        );
     }
 
     #[test]
@@ -352,9 +358,13 @@ mod tests {
         relay_message.extend_from_slice(&purge.purge_token);
         relay_message.extend_from_slice(&purge.timestamp.to_be_bytes());
 
-        let peer_key = signature::UnparsedPublicKey::new(&signature::ED25519, &purge.public_key);
-        peer_key
-            .verify(&relay_message, &purge.signature)
-            .expect("Signature must be verifiable using relay's message format");
+        let peer_key = CryptoPublicKey::from_bytes(purge.public_key);
+        let sig = CryptoSignature::from_bytes(
+            purge.signature.clone().try_into().expect("sig is 64 bytes"),
+        );
+        assert!(
+            peer_key.verify(&relay_message, &sig),
+            "Signature must be verifiable using relay's message format"
+        );
     }
 }

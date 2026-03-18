@@ -39,7 +39,7 @@ pub fn verify_checksum(data: &[u8], expected: &str) -> Result<(), IntegrityError
     let mut hasher = Sha256::new();
     hasher.update(data);
     let hash = hasher.finalize();
-    let actual_hex = hex::encode(hash.as_ref());
+    let actual_hex = hex::encode(&hash[..]);
 
     // SHA-256 hex is always 64 chars; reject malformed input before ct_eq
     // (ct_eq on different-length slices short-circuits, leaking length)
@@ -74,7 +74,7 @@ pub fn compute_checksum(data: &[u8]) -> String {
     let mut hasher = Sha256::new();
     hasher.update(data);
     let hash = hasher.finalize();
-    format!("sha256:{}", hex::encode(hash.as_ref()))
+    format!("sha256:{}", hex::encode(&hash[..]))
 }
 
 /// Verify an Ed25519 signature on a content manifest.

@@ -10,10 +10,18 @@
 //!   - (revocation of pre-signed operations — DP-2 compliance)
 //!   - "Pre-signed messages stored unencrypted" (offline storage)
 
-use aws_lc_rs::signature;
 use std::time::{SystemTime, UNIX_EPOCH};
 use vauchi_core::api::PreSignedShredMessages;
+use vauchi_core::crypto::signing::{PublicKey as CryptoPublicKey, Signature as CryptoSignature};
 use vauchi_core::identity::Identity;
+
+/// Helper: verify an Ed25519 signature using the crypto module.
+fn verify_ed25519(public_key: &[u8; 32], message: &[u8], signature: &[u8]) -> bool {
+    let pk = CryptoPublicKey::from_bytes(*public_key);
+    let sig_bytes: [u8; 64] = signature.try_into().expect("signature should be 64 bytes");
+    let sig = CryptoSignature::from_bytes(sig_bytes);
+    pk.verify(message, &sig)
+}
 
 // === Refresh Tests ===
 // Traces to: "Refresh pre-signed messages periodically"
@@ -46,10 +54,10 @@ fn test_pre_signed_message_refresh() {
     message.extend_from_slice(&purge.purge_token);
     message.extend_from_slice(&purge.timestamp.to_be_bytes());
 
-    let peer_key = signature::UnparsedPublicKey::new(&signature::ED25519, &purge.public_key);
-    peer_key
-        .verify(&message, &purge.signature)
-        .expect("Refreshed purge request signature should be valid");
+    assert!(
+        verify_ed25519(&purge.public_key, &message, &purge.signature),
+        "Refreshed purge request signature should be valid"
+    );
 
     // And deletion notice should be valid
     let notice = &refreshed.deletion_notice;
@@ -59,10 +67,10 @@ fn test_pre_signed_message_refresh() {
     notice_message.push(stage_byte);
     notice_message.extend_from_slice(&notice.timestamp.to_be_bytes());
 
-    let notice_key = signature::UnparsedPublicKey::new(&signature::ED25519, &notice.public_key);
-    notice_key
-        .verify(&notice_message, &notice.signature)
-        .expect("Refreshed deletion notice signature should be valid");
+    assert!(
+        verify_ed25519(&notice.public_key, &notice_message, &notice.signature),
+        "Refreshed deletion notice signature should be valid"
+    );
 }
 
 /// Test that refreshed messages have different purge tokens for replay prevention.
@@ -155,10 +163,10 @@ fn test_purge_token_rotation_maintains_signature_validity() {
         message.extend_from_slice(&purge.purge_token);
         message.extend_from_slice(&purge.timestamp.to_be_bytes());
 
-        let peer_key = signature::UnparsedPublicKey::new(&signature::ED25519, &purge.public_key);
-        peer_key
-            .verify(&message, &purge.signature)
-            .expect("Each version's signature should be valid for its token");
+        assert!(
+            verify_ed25519(&purge.public_key, &message, &purge.signature),
+            "Each version's signature should be valid for its token"
+        );
     }
 
     // But a signature from one version should NOT verify with another's token
@@ -172,14 +180,12 @@ fn test_purge_token_rotation_maintains_signature_validity() {
         mixed_message.extend_from_slice(&msgs_b.purge_request.purge_token); // Wrong token!
         mixed_message.extend_from_slice(&msgs_a.purge_request.timestamp.to_be_bytes());
 
-        let peer_key = signature::UnparsedPublicKey::new(
-            &signature::ED25519,
-            &msgs_a.purge_request.public_key,
-        );
         assert!(
-            peer_key
-                .verify(&mixed_message, &msgs_a.purge_request.signature)
-                .is_err(),
+            !verify_ed25519(
+                &msgs_a.purge_request.public_key,
+                &mixed_message,
+                &msgs_a.purge_request.signature
+            ),
             "Signature should NOT verify with wrong token"
         );
     }
@@ -214,10 +220,10 @@ fn test_pre_signed_revocation() {
     notice_message.push(stage_byte);
     notice_message.extend_from_slice(&notice.timestamp.to_be_bytes());
 
-    let notice_key = signature::UnparsedPublicKey::new(&signature::ED25519, &public_key);
-    notice_key
-        .verify(&notice_message, &notice.signature)
-        .expect("Deletion notice should verify after identity destruction");
+    assert!(
+        verify_ed25519(&public_key, &notice_message, &notice.signature),
+        "Deletion notice should verify after identity destruction"
+    );
 
     // And the pre-signed purge request can still be verified
     let purge = &msgs.purge_request;
@@ -226,10 +232,10 @@ fn test_pre_signed_revocation() {
     purge_message.extend_from_slice(&purge.purge_token);
     purge_message.extend_from_slice(&purge.timestamp.to_be_bytes());
 
-    let purge_key = signature::UnparsedPublicKey::new(&signature::ED25519, &public_key);
-    purge_key
-        .verify(&purge_message, &purge.signature)
-        .expect("Purge request should verify after identity destruction");
+    assert!(
+        verify_ed25519(&public_key, &purge_message, &purge.signature),
+        "Purge request should verify after identity destruction"
+    );
 }
 
 /// Test that revocation via pre-signed messages includes correct public key.
@@ -327,10 +333,10 @@ fn test_pre_signed_offline_storage_survives_restart() {
     message.extend_from_slice(&purge.purge_token);
     message.extend_from_slice(&purge.timestamp.to_be_bytes());
 
-    let peer_key = signature::UnparsedPublicKey::new(&signature::ED25519, &public_key);
-    peer_key
-        .verify(&message, &purge.signature)
-        .expect("Loaded messages should have valid signatures");
+    assert!(
+        verify_ed25519(&public_key, &message, &purge.signature),
+        "Loaded messages should have valid signatures"
+    );
 }
 
 /// Test that offline storage file is readable without decryption.
@@ -385,10 +391,10 @@ fn test_pre_signed_offline_airplane_mode() {
     message.extend_from_slice(&purge.purge_token);
     message.extend_from_slice(&purge.timestamp.to_be_bytes());
 
-    let peer_key = signature::UnparsedPublicKey::new(&signature::ED25519, &purge.public_key);
-    peer_key
-        .verify(&message, &purge.signature)
-        .expect("Pre-signed messages should work in airplane mode");
+    assert!(
+        verify_ed25519(&purge.public_key, &message, &purge.signature),
+        "Pre-signed messages should work in airplane mode"
+    );
 
     // Step 4: When user comes back online, messages can be sent
     // (Network layer tested elsewhere, here we just verify messages are usable)

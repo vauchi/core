@@ -241,7 +241,7 @@ fn test_responder_processes_key_offer() {
     let expected_commitment = Sha256::digest(&encrypted_card);
     assert_eq!(
         &ack_bytes[81..113],
-        expected_commitment.as_ref(),
+        &expected_commitment[..],
         "Commitment in KeyAck must be SHA-256(encrypted_card)"
     );
 
@@ -313,7 +313,7 @@ fn test_initiator_processes_key_ack() {
     let expected = Sha256::digest(&alice_encrypted_card);
     assert_eq!(
         commitment.as_slice(),
-        expected.as_ref(),
+        &expected[..],
         "Commitment must match SHA-256(encrypted_card)"
     );
 }

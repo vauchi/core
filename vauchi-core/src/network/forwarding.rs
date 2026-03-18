@@ -131,13 +131,22 @@ pub fn verify_hint_signature(
     let sig_bytes = hex::decode(signature_hex)
         .map_err(|e| HintVerificationError::InvalidSignatureHex(e.to_string()))?;
 
-    let public_key =
-        aws_lc_rs::signature::UnparsedPublicKey::new(&aws_lc_rs::signature::ED25519, &pk_bytes);
+    let pk_array: [u8; 32] = pk_bytes
+        .try_into()
+        .map_err(|_| HintVerificationError::InvalidPublicKeyHex("not 32 bytes".to_string()))?;
+    let sig_array: [u8; 64] = sig_bytes
+        .try_into()
+        .map_err(|_| HintVerificationError::InvalidSignatureHex("not 64 bytes".to_string()))?;
+
+    let public_key = crate::crypto::signing::PublicKey::from_bytes(pk_array);
+    let signature = crate::crypto::signing::Signature::from_bytes(sig_array);
 
     let canonical = hints.canonical_data();
-    public_key
-        .verify(&canonical, &sig_bytes)
-        .map_err(|_| HintVerificationError::VerificationFailed)
+    if public_key.verify(&canonical, &signature) {
+        Ok(())
+    } else {
+        Err(HintVerificationError::VerificationFailed)
+    }
 }
 
 // INLINE_TEST_REQUIRED: tests access private internals

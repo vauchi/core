@@ -411,11 +411,13 @@ mod tests {
         signed_data.extend_from_slice(&nonce_bytes);
         signed_data.extend_from_slice(&timestamp.to_be_bytes());
 
-        // Verify with aws-lc-rs (as the relay does)
-        let public_key =
-            aws_lc_rs::signature::UnparsedPublicKey::new(&aws_lc_rs::signature::ED25519, &pk_bytes);
+        // Verify with ed25519 (as the relay does)
+        let pk_array: [u8; 32] = pk_bytes.try_into().expect("pk should be 32 bytes");
+        let sig_array: [u8; 64] = sig_bytes.try_into().expect("sig should be 64 bytes");
+        let public_key = crate::crypto::signing::PublicKey::from_bytes(pk_array);
+        let signature = crate::crypto::signing::Signature::from_bytes(sig_array);
         assert!(
-            public_key.verify(&signed_data, &sig_bytes).is_ok(),
+            public_key.verify(&signed_data, &signature),
             "expected success"
         );
     }

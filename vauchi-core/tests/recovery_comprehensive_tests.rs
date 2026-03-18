@@ -409,7 +409,7 @@ fn test_proof_roundtrip() {
         proof.add_voucher(voucher).unwrap();
     }
 
-    let bytes = proof.to_bytes();
+    let bytes = proof.to_bytes().unwrap();
     let restored = RecoveryProof::from_bytes(&bytes).unwrap();
 
     assert_eq!(restored.old_pk(), &old_pk);
@@ -680,7 +680,7 @@ fn test_revocation_roundtrip() {
     let new_pk = [0x02u8; 32];
 
     let revocation = RecoveryRevocation::create(&old_pk, &new_pk, &old_keypair);
-    let bytes = revocation.to_bytes();
+    let bytes = revocation.to_bytes().unwrap();
     let restored = RecoveryRevocation::from_bytes(&bytes).unwrap();
 
     assert_eq!(restored.old_pk(), &old_pk);

@@ -674,9 +674,8 @@ impl RecoveryProof {
     }
 
     /// Serializes the proof to bytes.
-    pub fn to_bytes(&self) -> Vec<u8> {
-        // Use postcard for compact serialization
-        postcard::to_allocvec(self).expect("Serialization should not fail")
+    pub fn to_bytes(&self) -> Result<Vec<u8>, RecoveryError> {
+        postcard::to_allocvec(self).map_err(|e| RecoveryError::SerializationError(e.to_string()))
     }
 
     /// Deserializes a proof from bytes.
@@ -1051,8 +1050,8 @@ impl RecoveryRevocation {
     }
 
     /// Serializes the revocation to bytes.
-    pub fn to_bytes(&self) -> Vec<u8> {
-        postcard::to_allocvec(self).expect("Serialization should not fail")
+    pub fn to_bytes(&self) -> Result<Vec<u8>, RecoveryError> {
+        postcard::to_allocvec(self).map_err(|e| RecoveryError::SerializationError(e.to_string()))
     }
 
     /// Deserializes a revocation from bytes.

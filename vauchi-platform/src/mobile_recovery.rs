@@ -41,8 +41,13 @@ impl VauchiPlatform {
 
         // Create proof to store vouchers and save to file
         let proof = RecoveryProof::new(&old_pk, &new_pk, 3); // Default threshold of 3
-        std::fs::write(self.recovery_proof_path(), proof.to_bytes())
-            .map_err(|e| MobileError::StorageError(e.to_string()))?;
+        std::fs::write(
+            self.recovery_proof_path(),
+            proof
+                .to_bytes()
+                .map_err(|e| MobileError::CryptoError(e.to_string()))?,
+        )
+        .map_err(|e| MobileError::StorageError(e.to_string()))?;
 
         // Encode claim for sharing
         let claim_data = base64::engine::general_purpose::STANDARD.encode(claim.to_bytes());
@@ -170,8 +175,13 @@ impl VauchiPlatform {
         }
 
         // Save updated proof
-        std::fs::write(&proof_path, proof.to_bytes())
-            .map_err(|e| MobileError::StorageError(e.to_string()))?;
+        std::fs::write(
+            &proof_path,
+            proof
+                .to_bytes()
+                .map_err(|e| MobileError::CryptoError(e.to_string()))?,
+        )
+        .map_err(|e| MobileError::StorageError(e.to_string()))?;
 
         let is_complete = proof.voucher_count() >= proof.threshold() as usize;
 
@@ -229,7 +239,11 @@ impl VauchiPlatform {
             .map_err(|e| MobileError::InvalidInput(format!("Invalid proof: {}", e)))?;
 
         if proof.voucher_count() >= proof.threshold() as usize {
-            let proof_data = base64::engine::general_purpose::STANDARD.encode(proof.to_bytes());
+            let proof_data = base64::engine::general_purpose::STANDARD.encode(
+                proof
+                    .to_bytes()
+                    .map_err(|e| MobileError::CryptoError(e.to_string()))?,
+            );
             Ok(Some(proof_data))
         } else {
             Ok(None)

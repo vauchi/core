@@ -39,7 +39,7 @@ fn test_legacy_exchange_message() {
     assert_eq!(msg.msg_type, "exchange");
     assert!(!msg.is_response);
 
-    let bytes = msg.to_bytes();
+    let bytes = msg.to_bytes().unwrap();
     assert!(LegacyExchangeMessage::is_exchange(&bytes));
 
     let parsed = LegacyExchangeMessage::from_bytes(&bytes).unwrap();

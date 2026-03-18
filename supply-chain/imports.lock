@@ -1009,8 +1009,8 @@ user-login = "epage"
 user-name = "Ed Page"
 
 [[publisher.toml_datetime]]
-version = "1.0.0+spec-1.1.0"
-when = "2026-02-11"
+version = "1.0.1+spec-1.1.0"
+when = "2026-03-17"
 user-id = 6743
 user-login = "epage"
 user-name = "Ed Page"
@@ -1023,15 +1023,15 @@ user-login = "epage"
 user-name = "Ed Page"
 
 [[publisher.toml_edit]]
-version = "0.25.4+spec-1.1.0"
-when = "2026-03-04"
+version = "0.25.5+spec-1.1.0"
+when = "2026-03-17"
 user-id = 6743
 user-login = "epage"
 user-name = "Ed Page"
 
 [[publisher.toml_parser]]
-version = "1.0.9+spec-1.1.0"
-when = "2026-02-16"
+version = "1.0.10+spec-1.1.0"
+when = "2026-03-17"
 user-id = 6743
 user-login = "epage"
 user-name = "Ed Page"
@@ -1571,6 +1571,13 @@ user-name = "Kenny Kerr"
 [[publisher.winnow]]
 version = "0.7.15"
 when = "2026-03-05"
+user-id = 6743
+user-login = "epage"
+user-name = "Ed Page"
+
+[[publisher.winnow]]
+version = "1.0.0"
+when = "2026-03-17"
 user-id = 6743
 user-login = "epage"
 user-name = "Ed Page"

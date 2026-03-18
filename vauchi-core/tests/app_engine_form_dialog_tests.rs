@@ -310,13 +310,44 @@ fn form_dialog_cancel_navigates_back() {
         action_id: "cancel".into(),
     });
 
-    // Cancel should navigate back to MyInfo (same as submit)
+    // Cancel should navigate back to MyInfo
     match result {
         ActionResult::NavigateTo(screen) => {
             assert_eq!(screen.screen_id, "my_info");
         }
         other => panic!("Expected NavigateTo(my_info), got {other:?}"),
     }
+}
+
+#[test]
+fn form_dialog_cancel_does_not_save_modified_name() {
+    let mut vauchi = Vauchi::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    let mut engine = AppEngine::new(vauchi);
+
+    engine.navigate_to(AppScreen::MyInfo);
+    engine.navigate_to(AppScreen::FormDialog {
+        dialog_type: FormDialogType::EditName {
+            current_name: "Alice".into(),
+        },
+    });
+
+    // User types a new name
+    engine.handle_action(UserAction::TextChanged {
+        component_id: "display_name".into(),
+        value: "Eve".into(),
+    });
+
+    // User presses Cancel — should NOT save "Eve"
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "cancel".into(),
+    });
+
+    assert!(matches!(result, ActionResult::NavigateTo(_)));
+
+    // Verify the name is still "Alice" — cancel must not persist
+    let identity = engine.vauchi().identity().unwrap();
+    assert_eq!(identity.display_name(), "Alice");
 }
 
 #[test]
@@ -344,5 +375,50 @@ fn form_dialog_edit_relay_url_navigates_back() {
     assert!(
         matches!(result, ActionResult::NavigateTo(_)),
         "EditRelayUrl submit should navigate back, got {result:?}"
+    );
+}
+
+#[test]
+fn form_dialog_cancel_add_field_does_not_save() {
+    let mut vauchi = Vauchi::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    let mut engine = AppEngine::new(vauchi);
+
+    let field_count_before = engine
+        .vauchi()
+        .own_card()
+        .unwrap()
+        .map(|c| c.fields().len())
+        .unwrap_or(0);
+
+    engine.navigate_to(AppScreen::MyInfo);
+    engine.navigate_to(AppScreen::FormDialog {
+        dialog_type: FormDialogType::AddField {
+            available_groups: vec![],
+        },
+    });
+
+    // User fills in field data
+    engine.handle_action(UserAction::TextChanged {
+        component_id: "field_value".into(),
+        value: "+41 79 000 00 00".into(),
+    });
+
+    // User presses Cancel — field must NOT be added
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "cancel".into(),
+    });
+
+    assert!(matches!(result, ActionResult::NavigateTo(_)));
+
+    let field_count_after = engine
+        .vauchi()
+        .own_card()
+        .unwrap()
+        .map(|c| c.fields().len())
+        .unwrap_or(0);
+    assert_eq!(
+        field_count_before, field_count_after,
+        "cancel must not add a field"
     );
 }

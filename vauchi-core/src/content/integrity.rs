@@ -430,4 +430,105 @@ mod tests {
             serde_json::from_str(json_with_sig).unwrap();
         assert_eq!(manifest.signature.as_deref(), Some("abcd1234"));
     }
+
+    /// Contract test: validates core can deserialize the manifest format
+    /// produced by website/scripts/build-manifest.py.
+    ///
+    /// If this test fails, build-manifest.py output has drifted from core's
+    /// ContentManifest struct. Fix by updating build-manifest.py to include
+    /// the new/changed fields.
+    ///
+    /// Set VAUCHI_MANIFEST_PATH to a real manifest to test against production.
+    /// Without it, the test uses an inline sample matching build-manifest.py output.
+    #[test]
+    fn test_deserialize_build_manifest_output() {
+        use crate::content::types::ContentManifest;
+
+        let json = match std::env::var("VAUCHI_MANIFEST_PATH") {
+            Ok(path) => std::fs::read_to_string(&path)
+                .unwrap_or_else(|e| panic!("Failed to read manifest at {path}: {e}")),
+            Err(_) => {
+                // Inline sample matching build-manifest.py output format exactly.
+                // Keep this in sync when adding fields to ContentManifest/ContentEntry/etc.
+                r#"{
+                    "schema_version": 1,
+                    "generated_at": "2026-03-18T00:00:00+00:00",
+                    "base_url": "https://cdn.vauchi.app/v1/",
+                    "content": {
+                        "networks": {
+                            "version": "1.0.0",
+                            "path": "networks.json",
+                            "checksum": "sha256:aabbccdd00112233445566778899aabbccddeeff00112233445566778899aabb",
+                            "size_bytes": 3211,
+                            "min_app_version": "0.1.0"
+                        },
+                        "locales": {
+                            "version": "1.0.0",
+                            "path": "locales/",
+                            "min_app_version": "0.1.0",
+                            "files": {
+                                "en": {
+                                    "path": "en.json",
+                                    "checksum": "sha256:aabbccdd00112233445566778899aabbccddeeff00112233445566778899aabb",
+                                    "size_bytes": 56311
+                                },
+                                "de": {
+                                    "path": "de.json",
+                                    "checksum": "sha256:aabbccdd00112233445566778899aabbccddeeff00112233445566778899aabb",
+                                    "size_bytes": 62389
+                                }
+                            }
+                        },
+                        "themes": {
+                            "version": "1.0.0",
+                            "path": "themes/themes.json",
+                            "checksum": "sha256:aabbccdd00112233445566778899aabbccddeeff00112233445566778899aabb",
+                            "size_bytes": 7743,
+                            "min_app_version": "0.1.0"
+                        }
+                    },
+                    "signature": "aabbccdd00112233"
+                }"#
+                .to_string()
+            }
+        };
+
+        let manifest: ContentManifest = serde_json::from_str(&json).expect(
+            "Core cannot deserialize build-manifest.py output — struct/script drift detected",
+        );
+
+        assert_eq!(manifest.schema_version, 1);
+        assert!(!manifest.base_url.is_empty());
+
+        // Verify content entries deserialized with all required fields
+        if let Some(ref networks) = manifest.content.networks {
+            assert!(!networks.version.is_empty());
+            assert!(networks.size_bytes > 0, "networks must have size_bytes");
+        }
+        if let Some(ref locales) = manifest.content.locales {
+            assert!(
+                !locales.files.is_empty(),
+                "locales must have at least one file"
+            );
+            for (lang, entry) in &locales.files {
+                assert!(!lang.is_empty());
+                assert!(entry.size_bytes > 0, "locale {lang} must have size_bytes");
+            }
+        }
+        if let Some(ref themes) = manifest.content.themes {
+            assert!(themes.size_bytes > 0, "themes must have size_bytes");
+        }
+
+        println!(
+            "Contract check passed: manifest deserialized with {} content types",
+            [
+                manifest.content.networks.is_some(),
+                manifest.content.locales.is_some(),
+                manifest.content.themes.is_some(),
+            ]
+            .iter()
+            .filter(|x| **x)
+            .count()
+        );
+    }
 }

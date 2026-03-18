@@ -98,6 +98,22 @@ else
 fi
 
 echo ""
+
+# --- CDN Manifest ---
+# Validates core can deserialize the manifest format produced by build-manifest.py.
+# Uses the inline sample in test_deserialize_build_manifest_output by default.
+# Pass VAUCHI_MANIFEST_PATH to test against a real manifest file.
+echo "Checking CDN manifest contract..."
+MANIFEST_TEST="content::integrity::tests::test_deserialize_build_manifest_output"
+if cargo test -p vauchi-core --lib -- "$MANIFEST_TEST" --exact 2>/dev/null; then
+    echo "  PASS: Core can deserialize build-manifest.py output format"
+else
+    echo "  FAIL: Core cannot deserialize CDN manifest — ContentManifest struct drifted from build-manifest.py"
+    echo "  Fix: update website/scripts/build-manifest.py to match core/vauchi-core/src/content/types.rs"
+    ERRORS=$((ERRORS + 1))
+fi
+
+echo ""
 echo "=== Summary ==="
 if [ $ERRORS -gt 0 ]; then
     echo "FAILED: $ERRORS contract violation(s) detected"

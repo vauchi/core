@@ -293,6 +293,33 @@ fn form_dialog_edit_field_saves_value() {
 }
 
 #[test]
+fn form_dialog_cancel_navigates_back() {
+    let mut vauchi = Vauchi::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    let mut engine = AppEngine::new(vauchi);
+
+    // Navigate to MyInfo first so back-stack has something
+    engine.navigate_to(AppScreen::MyInfo);
+    engine.navigate_to(AppScreen::FormDialog {
+        dialog_type: FormDialogType::EditName {
+            current_name: "Alice".into(),
+        },
+    });
+
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "cancel".into(),
+    });
+
+    // Cancel should navigate back to MyInfo (same as submit)
+    match result {
+        ActionResult::NavigateTo(screen) => {
+            assert_eq!(screen.screen_id, "my_info");
+        }
+        other => panic!("Expected NavigateTo(my_info), got {other:?}"),
+    }
+}
+
+#[test]
 fn form_dialog_edit_relay_url_navigates_back() {
     let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();

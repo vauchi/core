@@ -13,8 +13,6 @@ pub mod password_kdf;
 pub mod ratchet;
 pub mod shredding;
 pub mod signing;
-#[cfg(feature = "crypto-wasm")]
-pub mod wasm;
 pub mod x3dh;
 
 /// Generate cryptographically secure random bytes.

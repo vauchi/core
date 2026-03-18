@@ -20,14 +20,14 @@ impl Storage {
         encryption_key: SymmetricKey,
     ) -> Result<Self, StorageError> {
         let path_buf = path.as_ref().to_path_buf();
-        let is_new = !path_buf.exists();
+        let _is_new = !path_buf.exists();
         let conn = Connection::open(&path_buf)?;
 
         // Restrict database file permissions to owner-only (0600).
         // SQLite creates files with default umask (typically 0644), which
         // would make encrypted contact data world-readable on shared systems.
         #[cfg(unix)]
-        if is_new {
+        if _is_new {
             use std::os::unix::fs::PermissionsExt;
             let _ = std::fs::set_permissions(&path_buf, std::fs::Permissions::from_mode(0o600));
         }

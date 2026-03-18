@@ -190,7 +190,7 @@ mod tests {
         let mut manifest = ContentManifest {
             schema_version: 1,
             generated_at: "2026-02-14T00:00:00Z".to_string(),
-            base_url: "https://vauchi.app/app-files".to_string(),
+            base_url: "https://cdn.vauchi.app/v1".to_string(),
             content: ContentIndex::default(),
             signature: None,
         };
@@ -220,7 +220,7 @@ mod tests {
         let mut manifest = ContentManifest {
             schema_version: 1,
             generated_at: "2026-02-14T00:00:00Z".to_string(),
-            base_url: "https://vauchi.app/app-files".to_string(),
+            base_url: "https://cdn.vauchi.app/v1".to_string(),
             content: ContentIndex::default(),
             signature: None,
         };
@@ -253,7 +253,7 @@ mod tests {
         let manifest = ContentManifest {
             schema_version: 1,
             generated_at: "2026-02-14T00:00:00Z".to_string(),
-            base_url: "https://vauchi.app/app-files".to_string(),
+            base_url: "https://cdn.vauchi.app/v1".to_string(),
             content: ContentIndex::default(),
             signature: None,
         };
@@ -278,7 +278,7 @@ mod tests {
         let mut manifest = ContentManifest {
             schema_version: 1,
             generated_at: "2026-02-14T00:00:00Z".to_string(),
-            base_url: "https://vauchi.app/app-files".to_string(),
+            base_url: "https://cdn.vauchi.app/v1".to_string(),
             content: ContentIndex::default(),
             signature: None,
         };

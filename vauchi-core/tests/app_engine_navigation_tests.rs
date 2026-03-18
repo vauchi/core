@@ -548,3 +548,56 @@ fn default_screen_is_onboarding_without_identity() {
     // that call navigate_to(default_screen()) don't bypass onboarding.
     assert_eq!(engine.default_screen(), AppScreen::Onboarding);
 }
+
+/// CABI completeness canary: every non-parameterized AppScreen must roundtrip
+/// through `screen_id()` → `from_screen_id()`.
+///
+/// When a new AppScreen variant is added, this test will fail if `from_screen_id`
+/// isn't updated — which means CABI consumers (Linux-Qt, Windows) can't navigate
+/// to it. This prevents the "missing 6 screens" problem from recurring.
+///
+/// See: Gate 6 of frontend architecture audit (2026-03-18)
+#[test]
+fn cabi_completeness_all_simple_screens_roundtrip_via_screen_id() {
+    // All non-parameterized AppScreen variants that CABI must support.
+    // Parameterized variants (ContactDetail, ContactEdit, etc.) require
+    // additional data and are accessed via handle_action, not navigate_to.
+    let simple_screens = vec![
+        AppScreen::Onboarding,
+        AppScreen::MyInfo,
+        AppScreen::Contacts,
+        AppScreen::Exchange,
+        AppScreen::Settings,
+        AppScreen::Help,
+        AppScreen::Backup,
+        AppScreen::Lock,
+        AppScreen::DeviceLinking,
+        AppScreen::DuressPin,
+        AppScreen::EmergencyShred,
+        AppScreen::DeliveryStatus,
+        AppScreen::Sync,
+        AppScreen::TorSettings,
+        AppScreen::Recovery,
+        AppScreen::Groups,
+        AppScreen::Privacy,
+        AppScreen::Support,
+        AppScreen::ContactDuplicates,
+        AppScreen::ContactLimit,
+    ];
+
+    let mut missing = Vec::new();
+    for screen in &simple_screens {
+        let id = screen.screen_id();
+        if AppScreen::from_screen_id(id).is_none() {
+            missing.push(id);
+        }
+    }
+
+    assert!(
+        missing.is_empty(),
+        "AppScreen::from_screen_id() does not handle these screen IDs: {:?}\n\
+         CABI consumers (Linux-Qt, Windows) cannot navigate to these screens.\n\
+         Add them to from_screen_id() in app_engine/mod.rs.",
+        missing
+    );
+}

@@ -16,7 +16,7 @@ fn test_content_manifest_deserialize() {
     let json = r#"{
         "schema_version": 1,
         "generated_at": "2026-01-24T12:00:00Z",
-        "base_url": "https://vauchi.app/app-files",
+        "base_url": "https://cdn.vauchi.app/v1",
         "content": {
             "networks": {
                 "version": "1.0.0",
@@ -30,7 +30,7 @@ fn test_content_manifest_deserialize() {
 
     let manifest: ContentManifest = serde_json::from_str(json).unwrap();
     assert_eq!(manifest.schema_version, 1);
-    assert_eq!(manifest.base_url, "https://vauchi.app/app-files");
+    assert_eq!(manifest.base_url, "https://cdn.vauchi.app/v1");
     assert!(manifest.content.networks.is_some(), "expected Some value");
 
     let networks = manifest.content.networks.unwrap();
@@ -43,7 +43,7 @@ fn test_content_manifest_with_locales() {
     let json = r#"{
         "schema_version": 1,
         "generated_at": "2026-01-24T12:00:00Z",
-        "base_url": "https://vauchi.app/app-files",
+        "base_url": "https://cdn.vauchi.app/v1",
         "content": {
             "locales": {
                 "version": "1.0.0",

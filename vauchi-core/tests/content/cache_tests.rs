@@ -18,7 +18,7 @@ fn create_test_manifest() -> ContentManifest {
     ContentManifest {
         schema_version: 1,
         generated_at: "2026-01-24T12:00:00Z".to_string(),
-        base_url: "https://vauchi.app/app-files".to_string(),
+        base_url: "https://cdn.vauchi.app/v1".to_string(),
         content: ContentIndex {
             networks: Some(ContentEntry {
                 version: "1.0.0".to_string(),
@@ -55,7 +55,7 @@ fn test_cache_manifest_roundtrip() {
 
     let loaded = cache.get_manifest().unwrap();
     assert_eq!(loaded.schema_version, 1);
-    assert_eq!(loaded.base_url, "https://vauchi.app/app-files");
+    assert_eq!(loaded.base_url, "https://cdn.vauchi.app/v1");
     loaded.content.networks.expect("expected Some");
 }
 

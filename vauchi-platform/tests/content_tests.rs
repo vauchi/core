@@ -58,7 +58,7 @@ fn test_default_config() {
         "Remote updates should be enabled by default"
     );
     assert_eq!(
-        config.content_url, "https://vauchi.app/app-files",
+        config.content_url, "https://cdn.vauchi.app/v1",
         "Default URL should be vauchi.app/app-files"
     );
     assert!(

@@ -355,6 +355,27 @@ validate:tor-feature:
           - "vauchi-core/src/tor_config.rs"
           - "vauchi-core/Cargo.toml"
 
+# WASM target compatibility — ensures vauchi-core compiles for wasm32 with
+# crypto-wasm feature. Catches new C FFI dependencies (e.g., aws-lc-rs)
+# before they break web-demo. Gate 4 of frontend architecture audit (2026-03-18).
+validate:wasm-compat:
+  extends: [.linux-runner-nocache, .timeout-quick]
+  stage: test
+  needs:
+    - job: lint:format
+      optional: true
+  script:
+    - rustup target add wasm32-unknown-unknown
+    - cargo check --target wasm32-unknown-unknown -p vauchi-core --no-default-features --features crypto-wasm
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes:
+        compare_to: refs/heads/$CI_DEFAULT_BRANCH
+        paths:
+          - "vauchi-core/Cargo.toml"
+          - "vauchi-core/src/crypto/**/*.rs"
+          - "vauchi-core/src/lib.rs"
+
 # Content contract validation — detect drift between core parsers and
 # sibling content repos (themes/, locales/). Runs when parser code changes.
 validate:content-contracts:

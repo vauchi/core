@@ -277,7 +277,7 @@ fn test_error_strings() {
 // RTL Support
 // ============================================================
 
-/// Test: RTL detection for future locales
+/// Test: RTL detection for current locales (all LTR)
 // @scenario: internationalization:RTL layout for Arabic
 // @scenario: internationalization:RTL layout for Hebrew
 #[test]
@@ -287,6 +287,35 @@ fn test_rtl_detection() {
     assert!(!get_locale_info(Locale::German).is_rtl);
     assert!(!get_locale_info(Locale::French).is_rtl);
     assert!(!get_locale_info(Locale::Spanish).is_rtl);
+}
+
+/// Canary test: blocks RTL locale addition until layout mirroring is implemented.
+///
+/// If this test fails, it means an RTL locale (Arabic, Hebrew, etc.) has been added
+/// to the Locale enum. Before enabling it:
+///   1. Implement LayoutDirection in core ScreenModel
+///   2. Add layout mirroring in each frontend (iOS, Android, GTK, Qt, Windows, Web)
+///   3. Add RTL-specific integration tests per platform
+///   4. Remove this canary gate
+///
+/// See: _private/docs/plans/2026-03-18-frontend-audit-investigation.md (S-04)
+/// See: _private/docs/planning/done/2026-01-20-internationalization-implementation.md (Phase 6)
+// @scenario: internationalization:RTL layout for Arabic
+#[test]
+fn test_rtl_canary_no_rtl_locales_without_layout_support() {
+    let rtl_locales: Vec<_> = get_available_locales()
+        .into_iter()
+        .filter(|l| get_locale_info(*l).is_rtl)
+        .collect();
+
+    assert!(
+        rtl_locales.is_empty(),
+        "RTL locale(s) found ({:?}) but layout mirroring is NOT yet implemented \
+         in any frontend. Adding an RTL locale without layout support will cause \
+         visual breakage on all platforms. See Phase 6 of the i18n plan and the \
+         frontend architecture audit (2026-03-18) before proceeding.",
+        rtl_locales.iter().map(|l| l.code()).collect::<Vec<_>>()
+    );
 }
 
 // ============================================================

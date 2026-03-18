@@ -128,6 +128,14 @@ impl AppScreen {
             "duress_pin" => Self::DuressPin,
             "emergency_shred" => Self::EmergencyShred,
             "delivery_status" => Self::DeliveryStatus,
+            "sync" => Self::Sync,
+            "tor_settings" => Self::TorSettings,
+            "recovery" => Self::Recovery,
+            "groups" => Self::Groups,
+            "privacy" => Self::Privacy,
+            "support" => Self::Support,
+            "contact_duplicates" => Self::ContactDuplicates,
+            "contact_limit" => Self::ContactLimit,
             _ => return None,
         })
     }

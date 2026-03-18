@@ -117,7 +117,7 @@ impl Default for MobileContentConfig {
     fn default() -> Self {
         Self {
             remote_updates_enabled: true,
-            content_url: "https://vauchi.app/app-files".to_string(),
+            content_url: "https://cdn.vauchi.app/v1".to_string(),
             proxy_url: None,
         }
     }

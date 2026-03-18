@@ -16,7 +16,7 @@ use vauchi_core::content::ContentConfig;
 fn test_config_default() {
     let config = ContentConfig::default();
 
-    assert_eq!(config.content_url, "https://vauchi.app/app-files");
+    assert_eq!(config.content_url, "https://cdn.vauchi.app/v1");
     assert!(config.remote_updates_enabled);
     assert_eq!(config.check_interval, Duration::from_secs(3600));
     assert_eq!(config.timeout, Duration::from_secs(30));

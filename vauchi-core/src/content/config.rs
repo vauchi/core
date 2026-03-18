@@ -13,7 +13,7 @@ pub struct ContentConfig {
     /// Local storage path for cache
     pub storage_path: PathBuf,
 
-    /// Remote content URL (e.g., "https://vauchi.app/app-files")
+    /// Remote content URL (e.g., "https://cdn.vauchi.app/v1")
     pub content_url: String,
 
     /// Enable/disable remote updates
@@ -42,7 +42,7 @@ impl Default for ContentConfig {
     fn default() -> Self {
         Self {
             storage_path: PathBuf::from("."),
-            content_url: "https://vauchi.app/app-files".to_string(),
+            content_url: "https://cdn.vauchi.app/v1".to_string(),
             remote_updates_enabled: true,
             check_interval: Duration::from_secs(3600), // 1 hour
             timeout: Duration::from_secs(30),

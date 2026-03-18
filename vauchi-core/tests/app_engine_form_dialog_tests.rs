@@ -333,7 +333,7 @@ fn form_dialog_cancel_does_not_save_modified_name() {
     });
 
     // User types a new name
-    engine.handle_action(UserAction::TextChanged {
+    let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "display_name".into(),
         value: "Eve".into(),
     });
@@ -399,7 +399,7 @@ fn form_dialog_cancel_add_field_does_not_save() {
     });
 
     // User fills in field data
-    engine.handle_action(UserAction::TextChanged {
+    let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "field_value".into(),
         value: "+41 79 000 00 00".into(),
     });

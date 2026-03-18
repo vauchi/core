@@ -55,6 +55,9 @@ pub struct FormDialogEngine {
     catalog_entries: Vec<CatalogEntry>,
     /// For AddField: which groups are selected for visibility.
     selected_groups: Vec<String>,
+    /// Set to true when the user presses cancel. `handle_completion` checks this
+    /// to skip persistence and just navigate back.
+    cancelled: bool,
 }
 
 impl FormDialogEngine {
@@ -88,6 +91,7 @@ impl FormDialogEngine {
             selected_entry_type: None,
             catalog_entries,
             selected_groups: Vec::new(),
+            cancelled: false,
         }
     }
 
@@ -373,7 +377,10 @@ impl WorkflowEngine for FormDialogEngine {
             }
             UserAction::ActionPressed { action_id } => match action_id.as_str() {
                 s if s == "submit" || s.starts_with("submit_") => ActionResult::Complete,
-                "cancel" => ActionResult::Complete,
+                "cancel" => {
+                    self.cancelled = true;
+                    ActionResult::Complete
+                }
                 _ => ActionResult::UpdateScreen(self.build_screen()),
             },
             _ => ActionResult::UpdateScreen(self.build_screen()),
@@ -396,5 +403,9 @@ impl WorkflowEngine for FormDialogEngine {
             FormDialogType::EditName { .. } => Some(self.get_value("display_name").to_string()),
             FormDialogType::EditRelayUrl { .. } => Some(self.get_value("relay_url").to_string()),
         }
+    }
+
+    fn was_cancelled(&self) -> bool {
+        self.cancelled
     }
 }

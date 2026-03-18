@@ -268,20 +268,9 @@ pub unsafe extern "C" fn vauchi_app_navigate_to(
             Some(s) => s,
             None => return to_c_string(r#"{"error":"null screen name"}"#),
         };
-        let screen = match name.as_str() {
-            "onboarding" => AppScreen::Onboarding,
-            "home" | "my_info" => AppScreen::MyInfo,
-            "contacts" => AppScreen::Contacts,
-            "exchange" => AppScreen::Exchange,
-            "settings" => AppScreen::Settings,
-            "help" => AppScreen::Help,
-            "backup" => AppScreen::Backup,
-            "lock" => AppScreen::Lock,
-            "device_linking" => AppScreen::DeviceLinking,
-            "duress_pin" => AppScreen::DuressPin,
-            "emergency_shred" => AppScreen::EmergencyShred,
-            "delivery_status" => AppScreen::DeliveryStatus,
-            _ => return to_c_string(&format!(r#"{{"error":"unknown screen: {}"}}"#, name)),
+        let screen = match AppScreen::from_screen_id(&name) {
+            Some(s) => s,
+            None => return to_c_string(&format!(r#"{{"error":"unknown screen: {}"}}"#, name)),
         };
         let app = &*handle;
         match app.engine.lock() {
@@ -316,21 +305,7 @@ pub unsafe extern "C" fn vauchi_app_available_screens(handle: *mut VauchiApp) ->
                 let screens: Vec<&str> = engine
                     .available_screens()
                     .iter()
-                    .map(|s| match s {
-                        AppScreen::Onboarding => "onboarding",
-                        AppScreen::MyInfo => "my_info",
-                        AppScreen::Contacts => "contacts",
-                        AppScreen::Exchange => "exchange",
-                        AppScreen::Settings => "settings",
-                        AppScreen::Help => "help",
-                        AppScreen::Backup => "backup",
-                        AppScreen::Lock => "lock",
-                        AppScreen::DeviceLinking => "device_linking",
-                        AppScreen::DuressPin => "duress_pin",
-                        AppScreen::EmergencyShred => "emergency_shred",
-                        AppScreen::DeliveryStatus => "delivery_status",
-                        _ => "unknown",
-                    })
+                    .map(|s| s.screen_id())
                     .collect();
                 serde_json::to_string(&screens).map_or_else(
                     |e| to_c_string(&format!(r#"{{"error":"{}"}}"#, e)),
@@ -357,14 +332,7 @@ pub unsafe extern "C" fn vauchi_app_default_screen(handle: *mut VauchiApp) -> *m
         }
         let app = &*handle;
         match app.engine.lock() {
-            Ok(engine) => {
-                let screen_id = match engine.default_screen() {
-                    AppScreen::Onboarding => "onboarding",
-                    AppScreen::Contacts => "contacts",
-                    _ => "my_info",
-                };
-                to_c_string(screen_id)
-            }
+            Ok(engine) => to_c_string(engine.default_screen().screen_id()),
             Err(_) => to_c_string("my_info"),
         }
     })) {

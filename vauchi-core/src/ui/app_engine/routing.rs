@@ -158,6 +158,11 @@ impl AppEngine {
                 ActionResult::NavigateTo(screen)
             }
             AppScreen::FormDialog { ref dialog_type } => {
+                // Cancel navigates back without saving
+                if self.engine.was_cancelled() {
+                    let screen = self.navigate_back();
+                    return ActionResult::NavigateTo(screen);
+                }
                 let input = self.engine.collected_input();
                 let result = match dialog_type {
                     FormDialogType::EditName { .. } => {

@@ -26,6 +26,13 @@ pub trait WorkflowEngine: Send {
         None
     }
 
+    /// Returns `true` if the last `Complete` was triggered by a cancel action
+    /// rather than a submit. `AppEngine::handle_completion` skips persistence
+    /// for cancelled workflows.
+    fn was_cancelled(&self) -> bool {
+        false
+    }
+
     /// Handle a hardware event from the frontend (ADR-031).
     ///
     /// Engines that interact with platform hardware (camera, BLE, NFC,

@@ -72,6 +72,67 @@ pub enum AppScreen {
     ContactLimit,
 }
 
+impl AppScreen {
+    /// Canonical navigation-level string ID for this screen.
+    ///
+    /// Used by CABI to convert between `AppScreen` and the string IDs
+    /// that frontends pass to `navigate_to` / receive from `available_screens`.
+    /// Exhaustive — adding a new variant without a mapping is a compile error.
+    pub fn screen_id(&self) -> &'static str {
+        match self {
+            Self::Onboarding => "onboarding",
+            Self::MyInfo => "my_info",
+            Self::Contacts => "contacts",
+            Self::ContactDetail { .. } => "contact_detail",
+            Self::ContactEdit { .. } => "contact_edit",
+            Self::ContactVisibility { .. } => "contact_visibility",
+            Self::Exchange => "exchange",
+            Self::Settings => "settings",
+            Self::Help => "help",
+            Self::Backup => "backup",
+            Self::Lock => "lock",
+            Self::DeviceLinking => "device_linking",
+            Self::DuressPin => "duress_pin",
+            Self::EmergencyShred => "emergency_shred",
+            Self::DeliveryStatus => "delivery_status",
+            Self::Sync => "sync",
+            Self::TorSettings => "tor_settings",
+            Self::Recovery => "recovery",
+            Self::Groups => "groups",
+            Self::GroupDetail { .. } => "group_detail",
+            Self::Privacy => "privacy",
+            Self::Support => "support",
+            Self::FormDialog { .. } => "form_dialog",
+            Self::MyInfoEntryDetail { .. } => "entry_detail",
+            Self::ContactDuplicates => "contact_duplicates",
+            Self::ContactMerge { .. } => "contact_merge",
+            Self::ContactLimit => "contact_limit",
+        }
+    }
+
+    /// Parse a navigation-level screen ID string into an `AppScreen`.
+    ///
+    /// Only handles simple (non-parameterized) screens. Parameterized screens
+    /// like `ContactDetail` require additional data and return `None`.
+    pub fn from_screen_id(id: &str) -> Option<Self> {
+        Some(match id {
+            "onboarding" => Self::Onboarding,
+            "home" | "my_info" => Self::MyInfo,
+            "contacts" => Self::Contacts,
+            "exchange" => Self::Exchange,
+            "settings" => Self::Settings,
+            "help" => Self::Help,
+            "backup" => Self::Backup,
+            "lock" => Self::Lock,
+            "device_linking" => Self::DeviceLinking,
+            "duress_pin" => Self::DuressPin,
+            "emergency_shred" => Self::EmergencyShred,
+            "delivery_status" => Self::DeliveryStatus,
+            _ => return None,
+        })
+    }
+}
+
 /// Unified orchestrator for all frontends.
 pub struct AppEngine {
     vauchi: Vauchi,

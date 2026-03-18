@@ -668,7 +668,10 @@ fn test_local_operations_work_without_tor() {
     assert!(bootstrap_result.is_err(), "Network should be unavailable");
 
     // But config is still fully usable
-    assert!(config.has_bridges() || !config.has_bridges()); // Local operation
+    assert_eq!(
+        restored.enabled, config.enabled,
+        "local config still readable"
+    );
 }
 
 // @scenario: tor_mode.feature:Tor status indicator in app
@@ -716,13 +719,20 @@ fn test_tor_view_circuit_info() {
     connector.bootstrap().unwrap();
     assert_eq!(connector.status(), TorStatus::Connected);
 
-    // When I view Tor status
-    // Then I should see the status is Connected (circuit is active)
+    // When I rotate the circuit (simulating "New Circuit" action)
+    connector
+        .rotate_circuit()
+        .expect("circuit rotation should succeed while connected");
+
+    // Then status should still be Connected (circuit refresh does not disconnect)
     // And I should NOT see exit node IP (privacy — mock doesn't expose IPs)
     // Note: Full circuit info (hops, latency) requires arti integration,
     // but we verify the status reporting path works
-    let status = connector.status();
-    assert_eq!(status, TorStatus::Connected);
+    assert_eq!(
+        connector.status(),
+        TorStatus::Connected,
+        "status remains Connected after circuit rotation"
+    );
 }
 
 // @scenario: tor_mode.feature:Tor mode not mentioned in basic onboarding

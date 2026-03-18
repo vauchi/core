@@ -176,6 +176,15 @@ fn tor_settings_new_circuit_enabled_when_tor_on() {
     );
 }
 
+#[test]
+fn tor_settings_new_circuit_while_disabled_returns_update_screen() {
+    let mut engine = TorSettingsEngine::new(false, true);
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "new_circuit".into(),
+    });
+    assert!(matches!(result, ActionResult::UpdateScreen(_)));
+}
+
 // =============================================================================
 // Unknown action
 // =============================================================================

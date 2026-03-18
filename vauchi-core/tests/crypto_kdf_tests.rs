@@ -212,24 +212,16 @@ fn test_hkdf_derive_key_returns_zeroizing_wrapper() {
 /// extra derived key material bytes that must be zeroed before truncation.
 /// @scenario: security.feature:Key material zeroized after use
 #[test]
-fn test_hkdf_expand_zeroizes_tail_bytes() {
+fn test_hkdf_expand_no_overallocation() {
     let prk = [0x42u8; 32];
-    let info = b"test zeroize tail";
-    // Request 48 bytes: ceil(48/32)=2 blocks → 64 bytes allocated, 16 tail bytes
+    let info = b"test no overallocation";
+    // Request 48 bytes — the hkdf crate allocates exactly the requested length,
+    // no over-allocation means no tail bytes to leak. This is a security improvement
+    // over the previous manual implementation which allocated ceil(len/32)*32 bytes.
     let okm = HKDF::expand(&prk, info, 48).unwrap();
     assert_eq!(okm.len(), 48);
 
-    // The Vec's capacity should be at least 64 (2 * HASH_LEN)
-    assert!(okm.capacity() >= 64);
-
-    // Verify tail bytes in spare capacity are zeroed (security property).
-    // SAFETY: We're reading bytes within the Vec's allocated capacity.
-    // These bytes were written by extend_from_slice and should be zeroed
-    // before truncation to prevent key material leakage.
-    unsafe {
-        let ptr = okm.as_ptr();
-        for i in 48..64 {
-            assert_eq!(*ptr.add(i), 0, "tail byte at offset {} should be zeroed", i);
-        }
-    }
+    // Verify no over-allocation: capacity should be exactly what was requested
+    // (hkdf crate writes into a pre-sized vec, no block-aligned allocation)
+    assert_eq!(okm.capacity(), 48);
 }

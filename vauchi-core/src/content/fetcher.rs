@@ -10,6 +10,7 @@
 //! - Proxy support (for Tor)
 //! - Timeout configuration
 
+use sha2::Digest;
 use thiserror::Error;
 
 #[cfg(feature = "content-updates")]
@@ -126,7 +127,7 @@ impl ContentFetcher {
             .strip_prefix("sha256:")
             .ok_or(super::integrity::IntegrityError::InvalidFormat)?;
         let digest = sha2::Digest::finalize(hasher);
-        let computed_hex = hex::encode(digest.as_ref());
+        let computed_hex = hex::encode(&digest[..]);
         if computed_hex != expected_hex {
             return Err(super::integrity::IntegrityError::ChecksumMismatch.into());
         }

@@ -94,9 +94,15 @@ impl WorkflowEngine for TorSettingsEngine {
     fn handle_action(&mut self, action: UserAction) -> ActionResult {
         match action {
             UserAction::ActionPressed { action_id } => match action_id.as_str() {
-                "new_circuit" => ActionResult::TorCommand {
-                    command: TorCommand::RotateCircuit,
-                },
+                "new_circuit" => {
+                    if self.enabled {
+                        ActionResult::TorCommand {
+                            command: TorCommand::RotateCircuit,
+                        }
+                    } else {
+                        ActionResult::UpdateScreen(self.build_screen())
+                    }
+                }
                 _ => ActionResult::UpdateScreen(self.build_screen()),
             },
             UserAction::ItemToggled {

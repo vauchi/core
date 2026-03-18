@@ -14,7 +14,6 @@
 //! INIT QR without invalidating the commitment.
 
 use aws_lc_rs::digest::{digest, SHA256};
-use aws_lc_rs::rand::{SecureRandom, SystemRandom};
 use chacha20poly1305::aead::{Aead, KeyInit};
 use chacha20poly1305::ChaCha20Poly1305;
 use subtle::ConstantTimeEq;
@@ -57,9 +56,7 @@ impl Commitment {
     /// commitment hash but NOT encrypted. This prevents a MitM from
     /// swapping context fields without invalidating the commitment.
     pub fn create_with_context(plaintext: &[u8], context: &[u8]) -> Self {
-        let rng = SystemRandom::new();
-        let mut reveal_key = [0u8; 32];
-        rng.fill(&mut reveal_key).expect("RNG failed");
+        let reveal_key: [u8; 32] = crate::crypto::random_bytes();
 
         let ciphertext = Self::encrypt(&reveal_key, plaintext).expect("encryption failed");
         let hash = Self::compute_hash_with_context(&reveal_key, &ciphertext, context);
@@ -139,10 +136,7 @@ impl Commitment {
     }
 
     fn encrypt(key: &[u8; 32], plaintext: &[u8]) -> Result<Vec<u8>, CommitmentError> {
-        let rng = SystemRandom::new();
-        let mut nonce_bytes = [0u8; 12];
-        rng.fill(&mut nonce_bytes)
-            .map_err(|_| CommitmentError::EncryptionFailed)?;
+        let nonce_bytes: [u8; 12] = crate::crypto::random_bytes();
 
         let cipher = ChaCha20Poly1305::new(key.into());
         let nonce = chacha20poly1305::Nonce::from_slice(&nonce_bytes);

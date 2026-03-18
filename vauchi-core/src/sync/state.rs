@@ -7,7 +7,6 @@
 //! Manages the synchronization state for each contact and coordinates
 //! update delivery with offline queuing and retry logic.
 
-use aws_lc_rs::rand::SecureRandom;
 use std::collections::{HashMap, HashSet};
 use thiserror::Error;
 use uuid::Uuid;
@@ -420,10 +419,7 @@ impl<'a> SyncManager<'a> {
         let now = current_timestamp();
 
         // Generate random nonce for replay detection
-        let mut nonce = [0u8; 32];
-        aws_lc_rs::rand::SystemRandom::new()
-            .fill(&mut nonce)
-            .expect("System RNG should not fail");
+        let nonce: [u8; 32] = crate::crypto::random_bytes();
 
         let merged_delta = CardDelta {
             version: highest_version,

@@ -2,6 +2,8 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+use rand::RngCore;
+
 pub mod cek;
 pub mod chain;
 pub mod encryption;
@@ -14,6 +16,18 @@ pub mod signing;
 #[cfg(feature = "crypto-wasm")]
 pub mod wasm;
 pub mod x3dh;
+
+/// Generate cryptographically secure random bytes.
+pub fn random_bytes<const N: usize>() -> [u8; N] {
+    let mut buf = [0u8; N];
+    rand::rngs::OsRng.fill_bytes(&mut buf);
+    buf
+}
+
+/// Fill a mutable slice with cryptographically secure random bytes.
+pub fn random_fill(buf: &mut [u8]) {
+    rand::rngs::OsRng.fill_bytes(buf);
+}
 
 pub use chain::{ChainError, ChainKey, MessageKey};
 pub use encryption::{decrypt, decrypt_with_ad, encrypt, encrypt_with_ad, SymmetricKey};

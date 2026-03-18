@@ -236,9 +236,7 @@ pub fn create_signed_handshake(
     let client_id = identity.public_id();
 
     // Generate random 32-byte nonce
-    let rng = aws_lc_rs::rand::SystemRandom::new();
-    let mut nonce_bytes = [0u8; 32];
-    aws_lc_rs::rand::SecureRandom::fill(&rng, &mut nonce_bytes).expect("RNG failure");
+    let nonce_bytes: [u8; 32] = crate::crypto::random_bytes();
 
     let timestamp = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)

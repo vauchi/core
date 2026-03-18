@@ -180,12 +180,8 @@ impl FileKeyStorage {
             })?;
 
         // Pass 1: Overwrite with random data
-        use aws_lc_rs::rand::SecureRandom;
-        let rng = aws_lc_rs::rand::SystemRandom::new();
         let mut random = vec![0u8; size];
-        rng.fill(&mut random).map_err(|_| {
-            StorageError::Encryption("Failed to generate random data for overwrite".to_string())
-        })?;
+        crate::crypto::random_fill(&mut random);
         file.write_all(&random).map_err(|e| {
             StorageError::Encryption(format!("Failed to write random overwrite: {}", e))
         })?;

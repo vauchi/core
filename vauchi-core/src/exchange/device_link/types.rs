@@ -93,11 +93,7 @@ pub fn compute_confirmation_mac(link_key: &[u8; 32], confirmation_code: &str) ->
 /// available (e.g., accessibility needs, camera failure). The code is derived
 /// from secure random bytes and formatted as XXX-XXX.
 pub fn generate_numeric_code() -> String {
-    use aws_lc_rs::rand::SystemRandom;
-    let rng = SystemRandom::new();
-    let bytes = aws_lc_rs::rand::generate::<[u8; 4]>(&rng)
-        .expect("RNG should not fail")
-        .expose();
+    let bytes: [u8; 4] = crate::crypto::random_bytes();
     let value = u32::from_be_bytes(bytes) % 1_000_000;
     format!("{:03}-{:03}", value / 1000, value % 1000)
 }

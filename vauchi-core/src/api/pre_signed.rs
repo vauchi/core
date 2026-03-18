@@ -14,7 +14,6 @@
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use aws_lc_rs::rand::{SecureRandom, SystemRandom};
 use serde::{Deserialize, Serialize};
 
 use crate::identity::Identity;
@@ -75,10 +74,7 @@ impl PreSignedShredMessages {
         let deletion_notice = Self::sign_deletion_notice(identity, public_key, now);
 
         // Generate purge request: sign(public_key || purge_token || timestamp)
-        let rng = SystemRandom::new();
-        let mut purge_token = [0u8; 32];
-        rng.fill(&mut purge_token)
-            .expect("System RNG should not fail");
+        let purge_token: [u8; 32] = crate::crypto::random_bytes();
 
         let purge_request = Self::sign_purge_request(identity, public_key, purge_token, now);
 

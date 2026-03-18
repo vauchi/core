@@ -25,7 +25,6 @@ pub(crate) fn secure_overwrite_file_public(path: &Path) -> Result<(), std::io::E
 /// followed by zeros (verifiable wipe). Both passes are flushed to disk with
 /// `sync_all()` to ensure the overwrite reaches physical storage.
 pub(super) fn secure_overwrite_file(path: &Path) -> Result<(), std::io::Error> {
-    use aws_lc_rs::rand::SecureRandom;
     use std::io::{Seek, Write};
 
     if !path.exists() {
@@ -41,10 +40,8 @@ pub(super) fn secure_overwrite_file(path: &Path) -> Result<(), std::io::Error> {
     let mut file = std::fs::OpenOptions::new().write(true).open(path)?;
 
     // Pass 1: Overwrite with random data
-    let rng = aws_lc_rs::rand::SystemRandom::new();
     let mut random = vec![0u8; size];
-    rng.fill(&mut random)
-        .map_err(|_| std::io::Error::other("RNG fill failed"))?;
+    crate::crypto::random_fill(&mut random);
     file.write_all(&random)?;
     file.sync_all()?;
 

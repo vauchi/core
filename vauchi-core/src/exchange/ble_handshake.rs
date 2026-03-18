@@ -56,7 +56,6 @@ use std::collections::HashMap;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use aws_lc_rs::digest::{digest, SHA256};
-use aws_lc_rs::rand::{SecureRandom, SystemRandom};
 use subtle::ConstantTimeEq;
 use zeroize::Zeroize;
 
@@ -142,7 +141,7 @@ pub struct BleExchangeResult {
 /// # Key Lifecycle
 ///
 /// - Ephemeral X25519 keypair: generated in constructor, consumed during key derivation.
-/// - Session nonce (16 bytes): generated from `SystemRandom` in constructor.
+/// - Session nonce (16 bytes): generated from OS CSPRNG in constructor.
 /// - Session key: derived during Phase 2 processing, zeroized on Drop.
 /// - Private key material: should not be used after `derive_session_key` completes.
 pub struct BleHandshakeSession {
@@ -200,10 +199,7 @@ impl BleHandshakeSession {
 
     /// Internal constructor from raw identity key bytes.
     fn new_from_key(identity_key: [u8; 32], card: BleCardPayload) -> Self {
-        let rng = SystemRandom::new();
-        let mut nonce = [0u8; NONCE_SIZE];
-        rng.fill(&mut nonce)
-            .expect("System RNG should not fail for nonce generation");
+        let nonce: [u8; NONCE_SIZE] = crate::crypto::random_bytes();
 
         let timestamp = SystemTime::now()
             .duration_since(UNIX_EPOCH)

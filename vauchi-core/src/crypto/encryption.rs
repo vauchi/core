@@ -11,7 +11,6 @@
 //!   - Tag `0x02`: XChaCha20-Poly1305 (24-byte nonce, 16-byte tag)
 //!   - Tag `0x03`: XChaCha20-Poly1305 with associated data (24-byte nonce, 16-byte tag)
 
-use aws_lc_rs::rand::{SecureRandom, SystemRandom};
 use chacha20poly1305::aead::{Aead, KeyInit, Payload};
 use chacha20poly1305::XChaCha20Poly1305;
 use thiserror::Error;
@@ -63,10 +62,7 @@ impl std::fmt::Debug for SymmetricKey {
 impl SymmetricKey {
     /// Generates a new random symmetric key.
     pub fn generate() -> Self {
-        let rng = SystemRandom::new();
-        let key = aws_lc_rs::rand::generate::<[u8; 32]>(&rng)
-            .expect("System RNG should not fail")
-            .expose();
+        let key: [u8; 32] = super::random_bytes();
         SymmetricKey { bytes: key }
     }
 
@@ -118,18 +114,14 @@ impl SymmetricKey {
 /// # Nonce Security (Tracker #226)
 ///
 /// Each encryption generates a fresh 24-byte (192-bit) nonce from
-/// `aws_lc_rs::rand::SystemRandom` (OS CSPRNG). The 192-bit nonce space of
+/// `rand::rngs::OsRng` (OS CSPRNG). The 192-bit nonce space of
 /// XChaCha20-Poly1305 makes random collision negligible even at high
 /// volume (~2^96 encryptions before birthday-bound concern). This is
 /// why XChaCha20 was chosen over AES-GCM (96-bit nonce, birthday-bound
 /// at ~2^32 encryptions per key).
 pub fn encrypt(key: &SymmetricKey, plaintext: &[u8]) -> Result<Vec<u8>, EncryptionError> {
-    let rng = SystemRandom::new();
-
     // Generate cryptographically random 24-byte nonce from OS CSPRNG
-    let mut nonce_bytes = [0u8; XCHACHA20_NONCE_SIZE];
-    rng.fill(&mut nonce_bytes)
-        .map_err(|_| EncryptionError::EncryptionFailed)?;
+    let nonce_bytes: [u8; XCHACHA20_NONCE_SIZE] = super::random_bytes();
 
     let cipher = XChaCha20Poly1305::new(key.as_bytes().into());
     let nonce = chacha20poly1305::XNonce::from_slice(&nonce_bytes);
@@ -160,11 +152,7 @@ pub fn encrypt_with_ad(
     plaintext: &[u8],
     ad: &[u8],
 ) -> Result<Vec<u8>, EncryptionError> {
-    let rng = SystemRandom::new();
-
-    let mut nonce_bytes = [0u8; XCHACHA20_NONCE_SIZE];
-    rng.fill(&mut nonce_bytes)
-        .map_err(|_| EncryptionError::EncryptionFailed)?;
+    let nonce_bytes: [u8; XCHACHA20_NONCE_SIZE] = super::random_bytes();
 
     let cipher = XChaCha20Poly1305::new(key.as_bytes().into());
     let nonce = chacha20poly1305::XNonce::from_slice(&nonce_bytes);

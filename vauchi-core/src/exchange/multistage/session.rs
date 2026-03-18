@@ -12,7 +12,6 @@
 //! ensures atomicity (neither side can decrypt until both reveal keys are exchanged).
 
 use aws_lc_rs::digest::{digest, SHA256};
-use aws_lc_rs::rand::{SecureRandom, SystemRandom};
 use chacha20poly1305::aead::{Aead, KeyInit, Payload};
 use chacha20poly1305::ChaCha20Poly1305;
 use rand::rngs::OsRng;
@@ -117,17 +116,13 @@ impl MultiStageSession {
         relay_url: Option<String>,
         relay_noise_pubkey: Option<[u8; 32]>,
     ) -> Self {
-        let rng = SystemRandom::new();
-
         // Generate session ID
-        let mut session_id = [0u8; 16];
-        rng.fill(&mut session_id).expect("RNG failed");
+        let session_id: [u8; 16] = crate::crypto::random_bytes();
 
         // Generate identity keypair (Ed25519-like, but we only need 32 bytes for the INIT QR)
         // For the multi-stage protocol, we use the X25519 public key as the "pubkey" field
         // since that's what matters for key agreement.
-        let mut identity_seed = [0u8; 32];
-        rng.fill(&mut identity_seed).expect("RNG failed");
+        let identity_seed: [u8; 32] = crate::crypto::random_bytes();
 
         // Generate X25519 ephemeral keypair
         let ephemeral_secret = X25519Secret::random_from_rng(OsRng);
@@ -763,9 +758,7 @@ impl MultiStageSession {
     }
 
     fn transport_encrypt(&self, key: &[u8; 32], chunk_idx: u8, plaintext: &[u8]) -> Vec<u8> {
-        let rng = SystemRandom::new();
-        let mut nonce_bytes = [0u8; 12];
-        rng.fill(&mut nonce_bytes).expect("RNG failed");
+        let nonce_bytes: [u8; 12] = crate::crypto::random_bytes();
 
         let cipher = ChaCha20Poly1305::new(key.into());
         let nonce = chacha20poly1305::Nonce::from_slice(&nonce_bytes);

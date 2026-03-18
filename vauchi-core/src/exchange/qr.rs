@@ -136,17 +136,11 @@ impl ExchangeQR {
         relay_url: Option<String>,
         relay_noise_pubkey: Option<[u8; 32]>,
     ) -> Self {
-        use aws_lc_rs::rand::SystemRandom;
+        use crate::crypto::random_bytes;
 
-        let rng = SystemRandom::new();
+        let exchange_token: [u8; 32] = random_bytes();
 
-        let exchange_token = aws_lc_rs::rand::generate::<[u8; 32]>(&rng)
-            .expect("RNG should not fail")
-            .expose();
-
-        let audio_challenge = aws_lc_rs::rand::generate::<[u8; 16]>(&rng)
-            .expect("RNG should not fail")
-            .expose();
+        let audio_challenge: [u8; 16] = random_bytes();
 
         let public_key = *identity.signing_public_key();
         let exchange_key: [u8; 32] = *ephemeral.public_key();

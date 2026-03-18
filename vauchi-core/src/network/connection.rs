@@ -6,8 +6,6 @@
 //!
 //! Manages connection lifecycle with automatic reconnection and handshake.
 
-use aws_lc_rs::rand::{SecureRandom, SystemRandom};
-
 use super::error::NetworkError;
 use super::message::MessageEnvelope;
 use super::transport::{ConnectionState, Transport, TransportConfig, TransportResult};
@@ -185,10 +183,7 @@ impl<T: Transport> ConnectionManager<T> {
             .as_ref()
             .ok_or_else(|| NetworkError::AuthenticationFailed("No identity set".into()))?;
 
-        let rng = SystemRandom::new();
-        let mut nonce = [0u8; 32];
-        rng.fill(&mut nonce)
-            .map_err(|_| NetworkError::AuthenticationFailed("RNG failed".into()))?;
+        let nonce: [u8; 32] = crate::crypto::random_bytes();
 
         let timestamp = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)

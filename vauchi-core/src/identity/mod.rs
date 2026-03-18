@@ -25,8 +25,9 @@ pub use device::{
 };
 
 use crate::crypto::X3DHKeyPair;
-use crate::crypto::{decrypt, derive_key_argon2id, encrypt, Signature, SigningKeyPair, HKDF};
-use aws_lc_rs::rand::SystemRandom;
+use crate::crypto::{
+    decrypt, derive_key_argon2id, encrypt, random_bytes, Signature, SigningKeyPair, HKDF,
+};
 use thiserror::Error;
 use zeroize::{Zeroize, Zeroizing};
 
@@ -73,12 +74,8 @@ impl Identity {
     ///
     /// Generates a random master seed and derives all keypairs from it.
     pub fn create(display_name: &str) -> Self {
-        let rng = SystemRandom::new();
-
         // Generate random master seed
-        let master_seed = aws_lc_rs::rand::generate::<[u8; 32]>(&rng)
-            .expect("System RNG should not fail")
-            .expose();
+        let master_seed: [u8; 32] = random_bytes();
 
         Self::from_seed(master_seed, display_name.to_string())
     }
@@ -299,10 +296,7 @@ impl Identity {
         password::validate_password(password)?;
 
         // Generate random salt
-        let rng = SystemRandom::new();
-        let salt = aws_lc_rs::rand::generate::<[u8; 16]>(&rng)
-            .map_err(|_| IdentityError::BackupFailed)?
-            .expose();
+        let salt: [u8; 16] = random_bytes();
 
         // Derive encryption key from password using Argon2id
         let encryption_key = derive_key_argon2id(password.as_bytes(), &salt)

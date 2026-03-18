@@ -11,7 +11,6 @@
 //! timing side-channel attacks. Both the normal hash and duress hash
 //! are always checked (even if one matches) to ensure uniform timing.
 
-use aws_lc_rs::rand::{SecureRandom, SystemRandom};
 use subtle::ConstantTimeEq;
 
 use super::error::{VauchiError, VauchiResult};
@@ -180,11 +179,7 @@ impl AppPasswordConfig {
 
 /// Generates a cryptographically random 16-byte salt.
 fn generate_salt() -> VauchiResult<[u8; 16]> {
-    let rng = SystemRandom::new();
-    let mut salt = [0u8; 16];
-    rng.fill(&mut salt)
-        .map_err(|_| VauchiError::Crypto("failed to generate salt".into()))?;
-    Ok(salt)
+    Ok(crate::crypto::random_bytes())
 }
 
 /// Hashes a password with Argon2id using the given salt.

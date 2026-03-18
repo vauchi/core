@@ -14,7 +14,6 @@
 //! - `0x01`: Legacy `CardDelta` (raw serialized bytes)
 //! - `0x02`: CEK-wrapped payload (`CekWrappedPayload`)
 
-use aws_lc_rs::rand::SecureRandom;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use thiserror::Error;
@@ -167,10 +166,7 @@ impl CardDelta {
             .unwrap_or(0);
 
         // Generate random nonce for replay detection
-        let mut nonce = [0u8; 32];
-        aws_lc_rs::rand::SystemRandom::new()
-            .fill(&mut nonce)
-            .expect("System RNG should not fail");
+        let nonce: [u8; 32] = crate::crypto::random_bytes();
 
         CardDelta {
             version: 1, // Default; callers should set via set_version() before signing

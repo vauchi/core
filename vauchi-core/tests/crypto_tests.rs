@@ -300,7 +300,7 @@ fn test_nonce_bytes_have_entropy() {
 /// Tracker #226: Nonce uniqueness across encryptions.
 ///
 /// Verifies that nonces extracted from 100 consecutive encryptions are all unique.
-/// With 24-byte (192-bit) nonces from SystemRandom, collision probability is
+/// With 24-byte (192-bit) nonces from OsRng, collision probability is
 /// negligible (~2^-128 for 100 samples). A collision here would indicate a
 /// catastrophic RNG failure.
 // @scenario: security.feature:Sufficient key lengths

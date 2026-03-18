@@ -74,13 +74,8 @@ pub struct ContactField {
 impl ContactField {
     /// Creates a new contact field with a generated ID.
     pub fn new(field_type: FieldType, label: &str, value: &str) -> Self {
-        use aws_lc_rs::rand::SystemRandom;
-
-        let rng = SystemRandom::new();
-        let random_bytes = aws_lc_rs::rand::generate::<[u8; 8]>(&rng)
-            .expect("System RNG should not fail")
-            .expose();
-        let id = hex::encode(random_bytes);
+        let rand_id: [u8; 8] = crate::crypto::random_bytes();
+        let id = hex::encode(rand_id);
 
         ContactField {
             id,

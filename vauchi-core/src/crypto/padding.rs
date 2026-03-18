@@ -29,7 +29,7 @@
 //! The first 4 bytes are the big-endian original plaintext length.
 //! This allows the receiver to strip padding after decryption.
 
-use aws_lc_rs::rand::{SecureRandom, SystemRandom};
+use super::random_fill;
 
 /// Bucket sizes in bytes (including the 4-byte length prefix).
 const BUCKET_SMALL: usize = 256;
@@ -63,9 +63,7 @@ pub fn pad(plaintext: &[u8]) -> Vec<u8> {
     let padding_len = target_size - needed;
     if padding_len > 0 {
         padded.resize(target_size, 0);
-        let rng = SystemRandom::new();
-        rng.fill(&mut padded[needed..])
-            .expect("System RNG should not fail");
+        random_fill(&mut padded[needed..]);
     }
 
     padded

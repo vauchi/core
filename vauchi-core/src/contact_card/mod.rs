@@ -23,7 +23,6 @@ pub use catalog::{CatalogEntry, FieldCategory, FieldTypeCatalog};
 pub use field::{ContactField, FieldType, ValidationError};
 pub use uri::{is_allowed_scheme, is_blocked_scheme, is_safe_url, is_valid_phone, ContactAction};
 
-use aws_lc_rs::rand::SystemRandom;
 use serde::{Deserialize, Serialize};
 
 use crate::types::VisibilityRules;
@@ -90,11 +89,8 @@ pub struct ContactCard {
 impl ContactCard {
     /// Creates a new contact card with the given display name.
     pub fn new(display_name: &str) -> Self {
-        let rng = SystemRandom::new();
-        let random_bytes = aws_lc_rs::rand::generate::<[u8; 16]>(&rng)
-            .expect("System RNG should not fail")
-            .expose();
-        let id = hex::encode(random_bytes);
+        let rand_id: [u8; 16] = crate::crypto::random_bytes();
+        let id = hex::encode(rand_id);
 
         ContactCard {
             id,

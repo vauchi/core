@@ -7,7 +7,6 @@
 //! Provides signing keypair generation and signature operations using the
 //! audited `aws-lc-rs` cryptographic library (FIPS 140-3).
 
-use aws_lc_rs::rand::SystemRandom;
 use aws_lc_rs::signature::{Ed25519KeyPair, KeyPair as RingKeyPair};
 use subtle::ConstantTimeEq;
 use zeroize::Zeroize;
@@ -33,11 +32,7 @@ impl SigningKeyPair {
     ///
     /// Uses system random number generator for key material.
     pub fn generate() -> Self {
-        let rng = SystemRandom::new();
-        let seed = aws_lc_rs::rand::generate::<[u8; 32]>(&rng)
-            .expect("System RNG should not fail")
-            .expose();
-
+        let seed: [u8; 32] = super::random_bytes();
         Self::from_seed(&seed)
     }
 

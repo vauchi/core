@@ -4,7 +4,6 @@
 
 //! Device link QR code generation and parsing.
 
-use aws_lc_rs::rand::SystemRandom;
 use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
 use std::time::{SystemTime, UNIX_EPOCH};
 use zeroize::Zeroize;
@@ -49,12 +48,8 @@ impl DeviceLinkQR {
 
     /// Generates a link QR with a specific timestamp (for testing).
     pub fn generate_with_timestamp(identity: &Identity, timestamp: u64) -> Self {
-        let rng = SystemRandom::new();
-
         // Generate random link key
-        let link_key = aws_lc_rs::rand::generate::<[u8; 32]>(&rng)
-            .expect("RNG should not fail")
-            .expose();
+        let link_key: [u8; 32] = crate::crypto::random_bytes();
 
         let identity_public_key = *identity.signing_public_key();
 

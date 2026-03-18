@@ -34,8 +34,6 @@ test-timings = []
 test-kdf = []
 # JSON Schema generation for UI types (dev tooling only)
 schema-gen = ["schemars"]
-# WASM crypto backend (hybrid WebCrypto + RustCrypto)
-crypto-wasm = ["dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:web-sys", "dep:js-sys", "dep:getrandom"]
 # Tor anonymity layer (embedded arti client)
 tor = ["arti-client", "tor-rtcompat", "tokio-util", "tokio"]
 # Remote content updates (requires HTTP client)
@@ -43,8 +41,11 @@ content-updates = ["reqwest", "tokio"]
 
 [dependencies]
 # Cryptography (audited libraries)
-aws-lc-rs = "1.16"
 x25519-dalek = { version = "2.0.1", features = ["static_secrets"] }
+ed25519-dalek = { version = "2.1", features = ["rand_core"] }
+sha2 = "0.10"
+hmac = "0.12"
+hkdf = "0.12"
 
 # XChaCha20-Poly1305 (spec-mandated cipher, documented exception to aws-lc-rs-only rule)
 chacha20poly1305 = "0.10.1"
@@ -139,19 +140,7 @@ tokio-util = { version = "0.7", optional = true, features = ["io", "io-util"] }
 # WASM compatibility — uuid needs JS-backed RNG on wasm32
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 uuid = { version = "1.0", features = ["js"] }
-
-# WASM crypto backend (hybrid WebCrypto + RustCrypto — behind crypto-wasm feature)
-wasm-bindgen = { version = "0.2", optional = true }
-wasm-bindgen-futures = { version = "0.4", optional = true }
-web-sys = { version = "0.3", features = [
-    "Crypto", "SubtleCrypto", "CryptoKey", "CryptoKeyPair",
-    "HmacImportParams", "HkdfParams", "Pbkdf2Params",
-    "Algorithm", "WorkerGlobalScope"
-], optional = true }
-js-sys = { version = "0.3", optional = true }
-getrandom = { version = "0.2", features = ["js"], optional = true }
-# ChaCha20-Poly1305 already a non-optional dep (compiles to wasm32 as pure Rust)
-# Argon2 already a non-optional dep (compiles to wasm32 as pure Rust)
+getrandom = { version = "0.2", features = ["js"] }
 
 [dev-dependencies]
 # JSON Schema validation for contract tests

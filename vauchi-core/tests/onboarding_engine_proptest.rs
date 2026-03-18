@@ -494,7 +494,8 @@ proptest! {
                 | ActionResult::RequestCamera
                 | ActionResult::OpenEntryDetail { .. }
                 | ActionResult::WipeComplete
-                | ActionResult::ExchangeCommands { .. } => {
+                | ActionResult::ExchangeCommands { .. }
+                | ActionResult::TorCommand { .. } => {
                     // Valid external navigation/action results
                 }
             }

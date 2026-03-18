@@ -41,7 +41,7 @@ mod support;
 mod sync_status;
 mod tor_settings;
 
-pub use action::{ActionResult, UserAction};
+pub use action::{ActionResult, TorCommand, UserAction};
 pub use app_engine::{AppEngine, AppScreen};
 pub use backup_recovery::{BackupMode, BackupRecoveryEngine};
 pub use component::{

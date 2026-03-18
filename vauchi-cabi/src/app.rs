@@ -359,6 +359,7 @@ pub unsafe extern "C" fn vauchi_app_default_screen(handle: *mut VauchiApp) -> *m
         match app.engine.lock() {
             Ok(engine) => {
                 let screen_id = match engine.default_screen() {
+                    AppScreen::Onboarding => "onboarding",
                     AppScreen::Contacts => "contacts",
                     _ => "my_info",
                 };

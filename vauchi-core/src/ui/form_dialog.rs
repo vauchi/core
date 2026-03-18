@@ -373,7 +373,7 @@ impl WorkflowEngine for FormDialogEngine {
             }
             UserAction::ActionPressed { action_id } => match action_id.as_str() {
                 s if s == "submit" || s.starts_with("submit_") => ActionResult::Complete,
-                "cancel" => ActionResult::NavigateTo(self.build_screen()),
+                "cancel" => ActionResult::Complete,
                 _ => ActionResult::UpdateScreen(self.build_screen()),
             },
             _ => ActionResult::UpdateScreen(self.build_screen()),

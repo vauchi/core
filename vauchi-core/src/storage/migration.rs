@@ -105,22 +105,11 @@ impl MigrationRunner {
         if let Some(path) = db_path {
             let backup_path =
                 path.with_extension(format!("pre-migration-v{}.bak", current_version));
-            if let Err(e) = conn.execute(
+            // Backup failure is non-fatal — the transaction provides rollback safety.
+            let _ = conn.execute(
                 "VACUUM INTO ?1",
                 rusqlite::params![backup_path.to_string_lossy().as_ref()],
-            ) {
-                eprintln!(
-                    "Pre-migration backup to {:?} failed (non-fatal): {}",
-                    backup_path, e
-                );
-            } else {
-                eprintln!(
-                    "Pre-migration backup created at {:?} (v{} → v{})",
-                    backup_path,
-                    current_version,
-                    pending.last().map(|m| m.version).unwrap_or(0)
-                );
-            }
+            );
         }
 
         // Verify migrations are in order

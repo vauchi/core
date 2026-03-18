@@ -405,7 +405,7 @@ mod tests {
                 if sibling.exists() {
                     sibling.to_string_lossy().to_string()
                 } else {
-                    eprintln!(
+                    println!(
                         "VAUCHI_THEMES_PATH not set and themes/ sibling repo not found — skipping"
                     );
                     return;
@@ -434,7 +434,7 @@ mod tests {
             );
         }
 
-        eprintln!(
+        println!(
             "Contract check passed: core parsed {} themes from {path}",
             themes.len()
         );

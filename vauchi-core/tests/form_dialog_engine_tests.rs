@@ -98,9 +98,14 @@ fn form_dialog_add_field_cancel_navigates() {
     let result = engine.handle_action(UserAction::ActionPressed {
         action_id: "cancel".into(),
     });
+    assert_eq!(
+        result,
+        ActionResult::Complete,
+        "Cancel should return Complete"
+    );
     assert!(
-        matches!(result, ActionResult::NavigateTo(_)),
-        "Cancel should navigate away, got {result:?}"
+        engine.was_cancelled(),
+        "Engine should be marked as cancelled"
     );
 }
 

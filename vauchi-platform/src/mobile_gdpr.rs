@@ -150,10 +150,7 @@ impl VauchiPlatform {
             self.pinned_cert_pem.lock().unwrap().clone(),
         ) {
             Ok(sender) => (Some(sender), None),
-            Err(e) => {
-                eprintln!("WARNING: Failed to create revocation sender: {e}");
-                (None, Some(e.to_string()))
-            }
+            Err(e) => (None, Some(e.to_string())),
         };
 
         let report = manager
@@ -194,10 +191,7 @@ impl VauchiPlatform {
             self.pinned_cert_pem.lock().unwrap().clone(),
         ) {
             Ok(sender) => (Some(sender), None),
-            Err(e) => {
-                eprintln!("WARNING: Failed to create revocation sender: {e}");
-                (None, Some(e.to_string()))
-            }
+            Err(e) => (None, Some(e.to_string())),
         };
 
         let report = manager

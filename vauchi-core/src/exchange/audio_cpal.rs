@@ -290,9 +290,7 @@ impl AudioBackend for CpalAudioBackend {
                         }
                     }
                 },
-                |err| {
-                    eprintln!("Audio output error: {}", err);
-                },
+                |_err| {},
                 None,
             )
             .map_err(|e| ProximityError::HardwareError(format!("Stream error: {}", e)))?;
@@ -355,9 +353,7 @@ impl AudioBackend for CpalAudioBackend {
                             .extend_from_slice(input);
                     }
                 },
-                |err| {
-                    eprintln!("Audio input error: {}", err);
-                },
+                |_err| {},
                 None,
             )
             .map_err(|e| ProximityError::HardwareError(format!("Stream error: {}", e)))?;

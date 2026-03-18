@@ -516,10 +516,7 @@ impl AppEngine {
                     }
                 })
                 .collect(),
-            Err(e) => {
-                eprintln!("[WARN] Failed to load contacts: {e}");
-                vec![]
-            }
+            Err(_) => vec![],
         }
     }
 

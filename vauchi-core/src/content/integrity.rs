@@ -120,10 +120,15 @@ pub fn verify_manifest_signature(
             .map_err(|_| IntegrityError::InvalidSignatureFormat)?,
     );
 
-    // Compute canonical signed data: manifest JSON without the signature field
+    // Compute canonical signed data: manifest JSON without the signature field.
+    // Serialize via serde_json::Value to get sorted keys (BTreeMap-backed Map),
+    // ensuring deterministic output regardless of HashMap iteration order.
+    // This matches Python's json.dumps(sort_keys=True, separators=(",",":")).
     let mut manifest_for_signing = manifest.clone();
     manifest_for_signing.signature = None;
-    let canonical_json = serde_json::to_vec(&manifest_for_signing)
+    let value = serde_json::to_value(&manifest_for_signing)
+        .map_err(|e| IntegrityError::SignatureVerificationFailed(e.to_string()))?;
+    let canonical_json = serde_json::to_vec(&value)
         .map_err(|e| IntegrityError::SignatureVerificationFailed(e.to_string()))?;
 
     if public_key.verify(&canonical_json, &signature) {
@@ -190,8 +195,9 @@ mod tests {
             signature: None,
         };
 
-        // Sign: canonical JSON of manifest without signature
-        let canonical_json = serde_json::to_vec(&manifest).unwrap();
+        // Sign: canonical JSON of manifest without signature (via Value for sorted keys)
+        let value = serde_json::to_value(&manifest).unwrap();
+        let canonical_json = serde_json::to_vec(&value).unwrap();
         let signature = keypair.sign(&canonical_json);
         manifest.signature = Some(hex::encode(signature.as_bytes()));
 
@@ -219,8 +225,9 @@ mod tests {
             signature: None,
         };
 
-        // Sign the original
-        let canonical_json = serde_json::to_vec(&manifest).unwrap();
+        // Sign the original (via Value for sorted keys)
+        let value = serde_json::to_value(&manifest).unwrap();
+        let canonical_json = serde_json::to_vec(&value).unwrap();
         let signature = keypair.sign(&canonical_json);
         manifest.signature = Some(hex::encode(signature.as_bytes()));
 
@@ -284,6 +291,115 @@ mod tests {
         assert!(
             verify_manifest_signature(&manifest, &wrong_key).is_err(),
             "expected error"
+        );
+    }
+
+    /// Verify that signing works with locale files (HashMap determinism).
+    ///
+    /// Before the sorted-key fix, HashMap iteration order made canonical
+    /// JSON non-deterministic for manifests with multiple locale files.
+    #[test]
+    fn test_verify_manifest_signature_with_locales() {
+        use crate::content::types::{ContentIndex, ContentManifest, FileEntry, LocalesEntry};
+        use crate::crypto::signing::SigningKeyPair;
+        use std::collections::HashMap;
+
+        let keypair = SigningKeyPair::generate();
+        let public_key = keypair.public_key();
+
+        let mut files = HashMap::new();
+        files.insert(
+            "en".to_string(),
+            FileEntry {
+                path: "en.json".to_string(),
+                checksum: "sha256:aaa".to_string(),
+                size_bytes: 1000,
+            },
+        );
+        files.insert(
+            "de".to_string(),
+            FileEntry {
+                path: "de.json".to_string(),
+                checksum: "sha256:bbb".to_string(),
+                size_bytes: 1100,
+            },
+        );
+        files.insert(
+            "fr".to_string(),
+            FileEntry {
+                path: "fr.json".to_string(),
+                checksum: "sha256:ccc".to_string(),
+                size_bytes: 1200,
+            },
+        );
+
+        let mut manifest = ContentManifest {
+            schema_version: 1,
+            generated_at: "2026-03-18T00:00:00Z".to_string(),
+            base_url: "https://cdn.vauchi.app/v1/".to_string(),
+            content: ContentIndex {
+                locales: Some(LocalesEntry {
+                    version: "1.0.0".to_string(),
+                    path: "locales/".to_string(),
+                    files,
+                    min_app_version: "0.1.0".to_string(),
+                }),
+                ..ContentIndex::default()
+            },
+            signature: None,
+        };
+
+        // Sign
+        let value = serde_json::to_value(&manifest).unwrap();
+        let canonical_json = serde_json::to_vec(&value).unwrap();
+        let signature = keypair.sign(&canonical_json);
+        manifest.signature = Some(hex::encode(signature.as_bytes()));
+
+        // Verify multiple times to catch HashMap ordering flakiness
+        for _ in 0..10 {
+            assert!(
+                verify_manifest_signature(&manifest, &public_key).is_ok(),
+                "Signature verification should be deterministic with locale files"
+            );
+        }
+    }
+
+    /// Verify canonical JSON matches Python's json.dumps(sort_keys=True).
+    ///
+    /// The CI signing script (sign-manifest.py) uses:
+    ///   json.dumps(data, sort_keys=True, separators=(",",":"))
+    /// Core must produce identical bytes for signature verification.
+    #[test]
+    fn test_canonical_json_matches_python_sorted_keys() {
+        use crate::content::types::{ContentIndex, ContentManifest};
+
+        let manifest = ContentManifest {
+            schema_version: 1,
+            generated_at: "2026-01-01T00:00:00Z".to_string(),
+            base_url: "https://cdn.vauchi.app/v1/".to_string(),
+            content: ContentIndex::default(),
+            signature: None,
+        };
+
+        let value = serde_json::to_value(&manifest).unwrap();
+        let canonical = serde_json::to_vec(&value).unwrap();
+        let canonical_str = String::from_utf8(canonical).unwrap();
+
+        // Must match Python: json.dumps(sort_keys=True, separators=(",",":"))
+        // Keys sorted alphabetically: base_url, content, generated_at, schema_version
+        assert!(
+            canonical_str.starts_with(r#"{"base_url":"#),
+            "Canonical JSON must have sorted keys (base_url first), got: {}",
+            &canonical_str[..50.min(canonical_str.len())]
+        );
+        assert!(
+            !canonical_str.contains(' '),
+            "Canonical JSON must be compact (no spaces)"
+        );
+        // Signature field must not be present (skip_serializing_if = None)
+        assert!(
+            !canonical_str.contains("signature"),
+            "Canonical JSON must not contain signature field when None"
         );
     }
 

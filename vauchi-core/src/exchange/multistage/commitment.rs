@@ -13,9 +13,9 @@
 //! into the commitment hash, preventing a MitM from swapping relay fields in the
 //! INIT QR without invalidating the commitment.
 
-use aws_lc_rs::digest::{digest, SHA256};
 use chacha20poly1305::aead::{Aead, KeyInit};
 use chacha20poly1305::ChaCha20Poly1305;
+use sha2::{Digest, Sha256};
 use subtle::ConstantTimeEq;
 use thiserror::Error;
 use zeroize::Zeroize;
@@ -128,7 +128,7 @@ impl Commitment {
         input.extend_from_slice(reveal_key);
         input.extend_from_slice(ciphertext);
         input.extend_from_slice(context);
-        let d = digest(&SHA256, &input);
+        let d = Sha256::digest(&input);
         let mut hash = [0u8; 32];
         hash.copy_from_slice(d.as_ref());
         input.zeroize();

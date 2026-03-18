@@ -8,7 +8,7 @@
 //! Covers crypto primitives, state machine transitions, commitment scheme,
 //! and error paths.
 
-use aws_lc_rs::digest::{digest, SHA256};
+use sha2::{Digest, Sha256};
 use vauchi_core::crypto::encryption::{self, SymmetricKey};
 use vauchi_core::crypto::kdf::HKDF;
 use vauchi_core::exchange::{
@@ -238,7 +238,7 @@ fn test_responder_processes_key_offer() {
     );
 
     // Commitment is SHA-256 of encrypted card
-    let expected_commitment = digest(&SHA256, &encrypted_card);
+    let expected_commitment = Sha256::digest(&encrypted_card);
     assert_eq!(
         &ack_bytes[81..113],
         expected_commitment.as_ref(),
@@ -310,7 +310,7 @@ fn test_initiator_processes_key_ack() {
     );
 
     // Commitment must be SHA-256 of Alice's encrypted card
-    let expected = digest(&SHA256, &alice_encrypted_card);
+    let expected = Sha256::digest(&alice_encrypted_card);
     assert_eq!(
         commitment.as_slice(),
         expected.as_ref(),

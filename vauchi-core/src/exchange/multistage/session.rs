@@ -11,10 +11,10 @@
 //! encryption, an Ed25519 identity keypair, and a commitment scheme that
 //! ensures atomicity (neither side can decrypt until both reveal keys are exchanged).
 
-use aws_lc_rs::digest::{digest, SHA256};
 use chacha20poly1305::aead::{Aead, KeyInit, Payload};
 use chacha20poly1305::ChaCha20Poly1305;
 use rand::rngs::OsRng;
+use sha2::{Digest, Sha256};
 use subtle::ConstantTimeEq;
 use x25519_dalek::{PublicKey as X25519Public, StaticSecret as X25519Secret};
 use zeroize::Zeroize;
@@ -798,7 +798,7 @@ impl MultiStageSession {
     }
 
     fn compute_card_hash(&self, data: &[u8]) -> [u8; 32] {
-        let d = digest(&SHA256, data);
+        let d = Sha256::digest(data);
         let mut hash = [0u8; 32];
         hash.copy_from_slice(d.as_ref());
         hash
@@ -856,7 +856,7 @@ impl MultiStageSession {
         let mut input = Vec::with_capacity(32);
         input.extend_from_slice(&first);
         input.extend_from_slice(&second);
-        let d = digest(&SHA256, &input);
+        let d = Sha256::digest(&input);
         let mut hash = [0u8; 32];
         hash.copy_from_slice(d.as_ref());
         hash

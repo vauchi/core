@@ -15,7 +15,7 @@
 //! transport does not call `verify_pin` during the handshake. Wiring this up
 //! requires a custom `rustls::ServerCertVerifier` or post-handshake check.
 
-use aws_lc_rs::digest;
+use sha2::{Digest, Sha256};
 use subtle::ConstantTimeEq;
 
 /// A pinned certificate fingerprint.
@@ -48,7 +48,7 @@ impl PinnedCertificate {
     /// Computes SHA-256 hash of DER-encoded certificate bytes and creates
     /// a pinned certificate from the result.
     pub fn from_der(cert_der: &[u8]) -> Self {
-        let hash = digest::digest(&digest::SHA256, cert_der);
+        let hash = Sha256::digest(cert_der);
         let mut fingerprint = [0u8; 32];
         fingerprint.copy_from_slice(hash.as_ref());
         PinnedCertificate {
@@ -146,9 +146,9 @@ mod tests {
 
     #[test]
     fn test_verify_pin_uses_sha256() {
-        // Verify that from_der produces the same hash as aws_lc_rs::digest
+        // Verify that from_der produces the same hash as sha2::Sha256
         let cert_der = b"verify SHA-256 consistency";
-        let expected = digest::digest(&digest::SHA256, cert_der);
+        let expected = Sha256::digest(cert_der);
         let pin = PinnedCertificate::from_der(cert_der);
 
         assert_eq!(pin.sha256_fingerprint.as_slice(), expected.as_ref());

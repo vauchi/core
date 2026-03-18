@@ -14,11 +14,11 @@ use super::Vauchi;
 ///
 /// This is a deterministic mapping used only for display purposes — decoy
 /// contacts don't have real cryptographic keys. The resulting bytes are
-/// derived by hashing the ID with aws-lc-rs SHA-256, ensuring consistent
+/// derived by hashing the ID with SHA-256, ensuring consistent
 /// IDs across sessions.
 pub(super) fn decoy_id_to_fake_pk(id: &str) -> [u8; 32] {
-    use aws_lc_rs::digest;
-    let hash = digest::digest(&digest::SHA256, id.as_bytes());
+    use sha2::{Digest, Sha256};
+    let hash = Sha256::digest(id.as_bytes());
     let mut pk = [0u8; 32];
     pk.copy_from_slice(hash.as_ref());
     pk

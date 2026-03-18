@@ -105,7 +105,7 @@ impl ContentFetcher {
         }
 
         // Stream-verify: download in chunks with incremental SHA-256 hash (#146)
-        let mut hasher = aws_lc_rs::digest::Context::new(&aws_lc_rs::digest::SHA256);
+        let mut hasher = sha2::Sha256::new();
         let mut data = Vec::new();
         let mut total: u64 = 0;
 
@@ -125,7 +125,7 @@ impl ContentFetcher {
         let expected_hex = expected_checksum
             .strip_prefix("sha256:")
             .ok_or(super::integrity::IntegrityError::InvalidFormat)?;
-        let digest = hasher.finish();
+        let digest = sha2::Digest::finalize(hasher);
         let computed_hex = hex::encode(digest.as_ref());
         if computed_hex != expected_hex {
             return Err(super::integrity::IntegrityError::ChecksumMismatch.into());

@@ -8,7 +8,7 @@
 //! saved to the local cache. This ensures content has not been tampered
 //! with during transit.
 
-use aws_lc_rs::digest::{Context, SHA256};
+use sha2::{Digest, Sha256};
 use subtle::ConstantTimeEq;
 use thiserror::Error;
 
@@ -36,10 +36,10 @@ pub fn verify_checksum(data: &[u8], expected: &str) -> Result<(), IntegrityError
         .strip_prefix("sha256:")
         .ok_or(IntegrityError::InvalidFormat)?;
 
-    let mut context = Context::new(&SHA256);
-    context.update(data);
-    let digest = context.finish();
-    let actual_hex = hex::encode(digest.as_ref());
+    let mut hasher = Sha256::new();
+    hasher.update(data);
+    let hash = hasher.finalize();
+    let actual_hex = hex::encode(hash.as_ref());
 
     // SHA-256 hex is always 64 chars; reject malformed input before ct_eq
     // (ct_eq on different-length slices short-circuits, leaking length)
@@ -71,10 +71,10 @@ pub fn verify_checksum(data: &[u8], expected: &str) -> Result<(), IntegrityError
 /// assert!(checksum.starts_with("sha256:"));
 /// ```
 pub fn compute_checksum(data: &[u8]) -> String {
-    let mut context = Context::new(&SHA256);
-    context.update(data);
-    let digest = context.finish();
-    format!("sha256:{}", hex::encode(digest.as_ref()))
+    let mut hasher = Sha256::new();
+    hasher.update(data);
+    let hash = hasher.finalize();
+    format!("sha256:{}", hex::encode(hash.as_ref()))
 }
 
 /// Verify an Ed25519 signature on a content manifest.

@@ -55,7 +55,7 @@
 use std::collections::HashMap;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use aws_lc_rs::digest::{digest, SHA256};
+use sha2::{Digest, Sha256};
 use subtle::ConstantTimeEq;
 use zeroize::Zeroize;
 
@@ -649,7 +649,7 @@ fn derive_session_key(
 
 /// Computes SHA-256 commitment over encrypted card bytes.
 fn compute_commitment(encrypted_card: &[u8]) -> [u8; 32] {
-    let d = digest(&SHA256, encrypted_card);
+    let d = Sha256::digest(encrypted_card);
     let mut out = [0u8; 32];
     out.copy_from_slice(d.as_ref());
     out
@@ -671,7 +671,7 @@ fn compute_exchange_id(identity_key: &[u8; 32], ephemeral_key: &[u8; 32]) -> [u8
     let mut data = Vec::with_capacity(64);
     data.extend_from_slice(identity_key);
     data.extend_from_slice(ephemeral_key);
-    let d = digest(&SHA256, &data);
+    let d = Sha256::digest(&data);
     let mut out = [0u8; 32];
     out.copy_from_slice(d.as_ref());
     out

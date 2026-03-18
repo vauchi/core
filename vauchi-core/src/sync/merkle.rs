@@ -4,12 +4,12 @@
 
 //! Merkle Tree for Efficient Sync
 //!
-//! A simple Merkle tree implementation using SHA-256 (via `aws-lc-rs`) for
+//! A simple Merkle tree implementation using SHA-256 (via `sha2`) for
 //! efficient comparison of contact state between devices. By comparing
 //! root hashes, two devices can quickly determine if they are in sync.
 //! If not, the `diff` method identifies which leaf indices differ.
 
-use aws_lc_rs::digest;
+use sha2::{Digest, Sha256};
 
 /// A Merkle tree built from contact hashes.
 ///
@@ -78,9 +78,9 @@ impl MerkleTree {
     /// Computes the Merkle root from a list of leaf hashes.
     fn compute_root(leaves: &[[u8; 32]]) -> [u8; 32] {
         if leaves.is_empty() {
-            let digest = digest::digest(&digest::SHA256, b"");
+            let hash = Sha256::digest(b"");
             let mut root = [0u8; 32];
-            root.copy_from_slice(digest.as_ref());
+            root.copy_from_slice(hash.as_ref());
             return root;
         }
 
@@ -107,9 +107,9 @@ impl MerkleTree {
                 combined.extend_from_slice(left);
                 combined.extend_from_slice(right);
 
-                let digest = digest::digest(&digest::SHA256, &combined);
+                let d = Sha256::digest(&combined);
                 let mut hash = [0u8; 32];
-                hash.copy_from_slice(digest.as_ref());
+                hash.copy_from_slice(d.as_ref());
                 next_level.push(hash);
             }
 
@@ -124,10 +124,9 @@ impl MerkleTree {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use aws_lc_rs::digest;
 
     fn hash_bytes(data: &[u8]) -> [u8; 32] {
-        let d = digest::digest(&digest::SHA256, data);
+        let d = Sha256::digest(data);
         let mut h = [0u8; 32];
         h.copy_from_slice(d.as_ref());
         h

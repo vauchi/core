@@ -28,7 +28,8 @@ use rusqlite::Connection;
 
 use crate::crypto::SymmetricKey;
 
-use aws_lc_rs::hmac;
+use hmac::{Hmac, Mac};
+use sha2::Sha256;
 
 use super::StorageError;
 
@@ -1458,7 +1459,7 @@ fn migrate_v23_encrypt_label_names(
 
     // Derive HMAC key for label name lookups
     let hmac_key_bytes = HKDF::derive_key(None, key.as_bytes(), b"Vauchi_Label_Name_HMAC_v1");
-    let hmac_key = hmac::Key::new(hmac::HMAC_SHA256, &*hmac_key_bytes);
+    type HmacSha256 = Hmac<Sha256>;
 
     // Encrypt existing plaintext names
     let mut stmt = conn
@@ -1475,12 +1476,15 @@ fn migrate_v23_encrypt_label_names(
 
     for (id, name) in &rows {
         let name_encrypted = encrypt_and_verify(key, name.as_bytes(), "label_name")?;
-        let name_hmac_value = hmac::sign(&hmac_key, name.as_bytes());
+        let mut mac =
+            HmacSha256::new_from_slice(&*hmac_key_bytes).expect("HMAC accepts any key length");
+        mac.update(name.as_bytes());
+        let name_hmac_value = mac.finalize().into_bytes();
 
         // Set plaintext name to the label id (satisfies UNIQUE constraint without leaking data)
         conn.execute(
             "UPDATE visibility_labels SET name_encrypted = ?1, name_hmac = ?2, name = ?3 WHERE id = ?3",
-            rusqlite::params![name_encrypted, name_hmac_value.as_ref(), id],
+            rusqlite::params![name_encrypted, &name_hmac_value[..], id],
         )
         .map_err(|e| StorageError::Migration(format!("Update label {}: {}", id, e)))?;
     }

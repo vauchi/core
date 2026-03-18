@@ -11,7 +11,8 @@
 //! All intermediate key material (PRK, T(i) blocks) is zeroized after use
 //! to prevent key extraction from memory dumps (#234).
 
-use aws_lc_rs::hmac;
+use hkdf::Hkdf;
+use sha2::Sha256;
 use thiserror::Error;
 use zeroize::{Zeroize, Zeroizing};
 
@@ -36,13 +37,10 @@ impl HKDF {
     ///
     /// If salt is None, uses a string of HashLen zeros.
     pub fn extract(salt: Option<&[u8]>, ikm: &[u8]) -> [u8; 32] {
-        let default_salt = [0u8; 32];
-        let salt_bytes = salt.unwrap_or(&default_salt);
-        let key = hmac::Key::new(hmac::HMAC_SHA256, salt_bytes);
-        let tag = hmac::sign(&key, ikm);
-        let mut prk = [0u8; 32];
-        prk.copy_from_slice(tag.as_ref());
-        prk
+        let (prk, _) = Hkdf::<Sha256>::extract(salt, ikm);
+        let mut out = [0u8; 32];
+        out.copy_from_slice(&prk);
+        out
     }
 
     /// HKDF Expand: Expands a PRK into output keying material.
@@ -54,47 +52,14 @@ impl HKDF {
     ///
     /// Intermediate buffers (T(i-1), input concatenation) are zeroized after use.
     pub fn expand(prk: &[u8; 32], info: &[u8], length: usize) -> Result<Vec<u8>, KDFError> {
-        const HASH_LEN: usize = 32;
-        const MAX_OUTPUT: usize = 255 * HASH_LEN;
-
-        if length > MAX_OUTPUT {
-            return Err(KDFError::OutputTooLong);
-        }
-
         if length == 0 {
             return Ok(Vec::new());
         }
 
-        let key = hmac::Key::new(hmac::HMAC_SHA256, prk);
-        let n = length.div_ceil(HASH_LEN);
-
-        let mut okm = Vec::with_capacity(n * HASH_LEN);
-        let mut t_prev: Vec<u8> = Vec::new();
-
-        for i in 1..=n {
-            // T(i) = HMAC(PRK, T(i-1) || info || i)
-            let mut input = Vec::with_capacity(t_prev.len() + info.len() + 1);
-            input.extend_from_slice(&t_prev);
-            input.extend_from_slice(info);
-            input.push(i as u8);
-
-            let tag = hmac::sign(&key, &input);
-
-            // Zeroize intermediate buffers before overwriting
-            input.zeroize();
-            t_prev.zeroize();
-
-            t_prev = tag.as_ref().to_vec();
-            okm.extend_from_slice(&t_prev);
-        }
-
-        // Zeroize the last T(N) block
-        t_prev.zeroize();
-
-        // Zeroize tail bytes beyond requested length before truncation.
-        // These are derived key material in the Vec's spare capacity.
-        okm[length..].zeroize();
-        okm.truncate(length);
+        let hk = Hkdf::<Sha256>::from_prk(prk).map_err(|_| KDFError::InvalidPRKLength)?;
+        let mut okm = vec![0u8; length];
+        hk.expand(info, &mut okm)
+            .map_err(|_| KDFError::OutputTooLong)?;
         Ok(okm)
     }
 
@@ -108,10 +73,11 @@ impl HKDF {
         info: &[u8],
         length: usize,
     ) -> Result<Vec<u8>, KDFError> {
-        let mut prk = Self::extract(salt, ikm);
-        let result = Self::expand(&prk, info, length);
-        prk.zeroize();
-        result
+        let hk = Hkdf::<Sha256>::new(salt, ikm);
+        let mut okm = vec![0u8; length];
+        hk.expand(info, &mut okm)
+            .map_err(|_| KDFError::OutputTooLong)?;
+        Ok(okm)
     }
 
     /// Derives a fixed-size 32-byte key, wrapped in `Zeroizing` for automatic
@@ -120,14 +86,10 @@ impl HKDF {
     /// Convenience method for the common case of deriving a single symmetric key.
     /// The intermediate PRK and OKM buffer are zeroized after extraction.
     pub fn derive_key(salt: Option<&[u8]>, ikm: &[u8], info: &[u8]) -> Zeroizing<[u8; 32]> {
-        let mut prk = Self::extract(salt, ikm);
-        // expand for exactly 32 bytes can't fail
-        let mut okm = Self::expand(&prk, info, 32).expect("32 bytes is valid length");
-        prk.zeroize();
-        let mut key = [0u8; 32];
-        key.copy_from_slice(&okm);
-        okm.zeroize();
-        Zeroizing::new(key)
+        let hk = Hkdf::<Sha256>::new(salt, ikm);
+        let mut okm = [0u8; 32];
+        hk.expand(info, &mut okm).expect("32 bytes is valid length");
+        Zeroizing::new(okm)
     }
 
     /// Derives two 32-byte keys from the same input.
@@ -135,9 +97,9 @@ impl HKDF {
     /// Used in Double Ratchet for deriving (root_key, chain_key) pairs.
     /// The intermediate PRK and OKM buffer are zeroized after extraction.
     pub fn derive_key_pair(salt: Option<&[u8]>, ikm: &[u8], info: &[u8]) -> ([u8; 32], [u8; 32]) {
-        let mut prk = Self::extract(salt, ikm);
-        let mut okm = Self::expand(&prk, info, 64).expect("64 bytes is valid length");
-        prk.zeroize();
+        let hk = Hkdf::<Sha256>::new(salt, ikm);
+        let mut okm = [0u8; 64];
+        hk.expand(info, &mut okm).expect("64 bytes is valid length");
         let mut key1 = [0u8; 32];
         let mut key2 = [0u8; 32];
         key1.copy_from_slice(&okm[..32]);

@@ -4,9 +4,12 @@
 
 //! Constants, enums, and helper functions for the device linking protocol.
 
-use aws_lc_rs::hmac;
+use hmac::{Hmac, Mac};
+use sha2::Sha256;
 
 use crate::crypto::HKDF;
+
+type HmacSha256 = Hmac<Sha256>;
 
 /// QR code magic bytes for device linking.
 pub(super) const DEVICE_LINK_MAGIC: &[u8; 4] = b"WBDL";
@@ -80,11 +83,12 @@ pub struct DeviceLinkConfirmation {
 pub fn compute_confirmation_mac(link_key: &[u8; 32], confirmation_code: &str) -> [u8; 32] {
     let derived_key = HKDF::derive(None, link_key, CONFIRMATION_MAC_DOMAIN, 32)
         .expect("32 bytes is valid HKDF output length");
-    let hmac_key = hmac::Key::new(hmac::HMAC_SHA256, &derived_key);
-    let tag = hmac::sign(&hmac_key, confirmation_code.as_bytes());
-    let mut mac = [0u8; 32];
-    mac.copy_from_slice(tag.as_ref());
-    mac
+    let mut mac = HmacSha256::new_from_slice(&derived_key).expect("HMAC accepts any key length");
+    mac.update(confirmation_code.as_bytes());
+    let tag = mac.finalize().into_bytes();
+    let mut result = [0u8; 32];
+    result.copy_from_slice(&tag);
+    result
 }
 
 /// Generates a 6-digit numeric code from cryptographically random bytes.
@@ -117,9 +121,10 @@ pub(super) fn derive_proximity_challenge(link_key: &[u8; 32]) -> [u8; 16] {
 /// HMAC-SHA256 with the link key as the signing key and the nonce as the
 /// message, then takes the first 3 bytes modulo 1_000_000 for a 6-digit code.
 pub(super) fn derive_confirmation_code(link_key: &[u8; 32], request_nonce: &[u8; 32]) -> String {
-    let hmac_key = hmac::Key::new(hmac::HMAC_SHA256, link_key);
-    let tag = hmac::sign(&hmac_key, request_nonce);
-    let bytes = tag.as_ref();
+    let mut mac = HmacSha256::new_from_slice(link_key).expect("HMAC accepts any key length");
+    mac.update(request_nonce);
+    let tag = mac.finalize().into_bytes();
+    let bytes: &[u8] = tag.as_ref();
 
     // Take first 4 bytes as u32, reduce to 6 digits
     let value = u32::from_be_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]) % 1_000_000;

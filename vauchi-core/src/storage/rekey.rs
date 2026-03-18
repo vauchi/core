@@ -4,10 +4,13 @@
 
 //! Re-encryption (rekey) of all encrypted columns when the storage encryption key changes.
 
-use aws_lc_rs::hmac;
+use hmac::{Hmac, Mac};
 use rusqlite::params;
+use sha2::Sha256;
 
 use crate::crypto::{decrypt, encrypt, kdf::HKDF, SymmetricKey};
+
+type HmacSha256 = Hmac<Sha256>;
 
 use super::{Storage, StorageError};
 
@@ -305,7 +308,7 @@ impl Storage {
                 // Derive HMAC keys for old and new SEK
                 let new_hmac_key_bytes =
                     HKDF::derive_key(None, new_key.as_bytes(), b"Vauchi_Label_Name_HMAC_v1");
-                let new_hmac_key = hmac::Key::new(hmac::HMAC_SHA256, &*new_hmac_key_bytes);
+                let new_hmac_key_ref: &[u8] = &*new_hmac_key_bytes;
 
                 for (id, contacts_enc, fields_enc, name_enc) in &rows {
                     let contacts_new = if !contacts_enc.is_empty() {
@@ -349,8 +352,11 @@ impl Storage {
                             let new_enc = encrypt(&new_key, &plain).map_err(|e| {
                                 StorageError::Migration(format!("Encrypt label name {}: {}", id, e))
                             })?;
-                            let hmac_val = hmac::sign(&new_hmac_key, &plain);
-                            (Some(new_enc), Some(hmac_val.as_ref().to_vec()))
+                            let mut mac = HmacSha256::new_from_slice(new_hmac_key_ref)
+                                .expect("HMAC accepts any key length");
+                            mac.update(&plain);
+                            let hmac_val = mac.finalize().into_bytes();
+                            (Some(new_enc), Some(hmac_val.to_vec()))
                         } else {
                             (Some(enc.clone()), None)
                         }

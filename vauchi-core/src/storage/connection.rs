@@ -4,11 +4,14 @@
 
 //! Connection management, PRAGMA configuration, migrations, and core utilities.
 
-use aws_lc_rs::hmac;
+use hmac::{Hmac, Mac};
 use rusqlite::Connection;
+use sha2::Sha256;
 use std::path::Path;
 
 use crate::crypto::{SymmetricKey, HKDF};
+
+type HmacSha256 = Hmac<Sha256>;
 
 use super::migration;
 use super::{Storage, StorageError};
@@ -120,8 +123,10 @@ impl Storage {
     /// data without decryption (e.g., label name uniqueness checks).
     pub(super) fn compute_lookup_hmac(&self, domain: &[u8], data: &[u8]) -> Vec<u8> {
         let hmac_key_bytes = HKDF::derive_key(None, self.encryption_key.as_bytes(), domain);
-        let key = hmac::Key::new(hmac::HMAC_SHA256, &*hmac_key_bytes);
-        hmac::sign(&key, data).as_ref().to_vec()
+        let mut mac =
+            HmacSha256::new_from_slice(&*hmac_key_bytes).expect("HMAC accepts any key length");
+        mac.update(data);
+        mac.finalize().into_bytes().to_vec()
     }
 
     /// Forces a WAL checkpoint, merging all WAL frames into the main DB file (#81).

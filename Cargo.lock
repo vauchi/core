@@ -474,7 +474,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "94bffc006df10ac2a68c83692d734a465f8ee6c5b384d8545a636f81d858f4bf"
 dependencies = [
  "aws-lc-sys",
- "untrusted 0.7.1",
  "zeroize",
 ]
 
@@ -4394,7 +4393,7 @@ dependencies = [
  "cfg-if",
  "getrandom 0.2.17",
  "libc",
- "untrusted 0.9.0",
+ "untrusted",
  "windows-sys 0.52.0",
 ]
 
@@ -4539,7 +4538,7 @@ dependencies = [
  "aws-lc-rs",
  "ring",
  "rustls-pki-types",
- "untrusted 0.9.0",
+ "untrusted",
 ]
 
 [[package]]
@@ -6802,12 +6801,6 @@ dependencies = [
 
 [[package]]
 name = "untrusted"
-version = "0.7.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a156c684c91ea7d62626509bce3cb4e1d9ed5c4d978f7b4352658f96a4c26b4a"
-
-[[package]]
-name = "untrusted"
 version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8ecb6da28b8a351d773b68d5825ac39017e680750f980f3a1a85cd8dd28a47c1"
@@ -6888,7 +6881,6 @@ dependencies = [
  "argon2",
  "arti-client",
  "async-trait",
- "aws-lc-rs",
  "base64",
  "bitflags 2.11.0",
  "chacha20poly1305",
@@ -6896,11 +6888,13 @@ dependencies = [
  "crc32fast",
  "criterion",
  "cucumber",
+ "ed25519-dalek",
  "flate2",
  "futures",
  "getrandom 0.2.17",
  "hex",
- "js-sys",
+ "hkdf",
+ "hmac",
  "jsonschema",
  "keyring",
  "native-tls",
@@ -6915,6 +6909,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_with",
+ "sha2",
  "snow",
  "subtle",
  "tempfile",
@@ -6925,9 +6920,6 @@ dependencies = [
  "tungstenite",
  "url",
  "uuid",
- "wasm-bindgen",
- "wasm-bindgen-futures",
- "web-sys",
  "webpki-roots 0.26.11",
  "x25519-dalek",
  "zeroize",

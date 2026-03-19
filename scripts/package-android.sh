@@ -189,7 +189,7 @@ echo "  $CHECKSUM"
 # Write checksum to file for CI
 echo "$CHECKSUM" > "$DIST_DIR/vauchi-platform-kotlin-$VERSION.zip.sha256"
 
-# Sign checksum with cosign (T1-5: required in CI, optional locally)
+# Sign checksum with cosign (T1-5: required for release CI, optional for dev/local)
 # GitLab masked file variables store base64-encoded content — decode if needed.
 if [[ -n "${COSIGN_KEY:-}" ]]; then
     COSIGN_KEY_FILE="$COSIGN_KEY"
@@ -203,9 +203,9 @@ if [[ -n "${COSIGN_KEY:-}" ]]; then
         "$DIST_DIR/vauchi-platform-kotlin-$VERSION.zip.sha256"
     [[ "$COSIGN_KEY_FILE" != "$COSIGN_KEY" ]] && rm -f "$COSIGN_KEY_FILE"
     echo -e "${GREEN}Checksum signed${NC}"
-elif [[ -n "${CI:-}" ]]; then
+elif [[ -n "${CI:-}" ]] && [[ "$VERSION" != dev-* ]]; then
     echo -e "${RED}ERROR: COSIGN_KEY is required in CI for release signing${NC}"
     exit 1
 else
-    echo -e "${YELLOW}COSIGN_KEY not set — skipping checksum signing (local build)${NC}"
+    echo -e "${YELLOW}COSIGN_KEY not set — skipping checksum signing (local/dev build)${NC}"
 fi

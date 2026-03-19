@@ -288,6 +288,7 @@ fn parse_init(body: &str) -> Result<StageQr, QrCodecError> {
         let url = take(body, &mut pos, url_len)?;
 
         // SSRF prevention: validate relay URL at parse time
+        #[cfg(any(feature = "network-native-tls", feature = "network-rustls"))]
         crate::network::relay_url::validate_relay_url(url)
             .map_err(|_| QrCodecError::InvalidFieldCount)?;
 

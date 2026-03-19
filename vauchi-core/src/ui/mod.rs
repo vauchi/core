@@ -9,6 +9,7 @@
 //! User interactions flow back as UserAction.
 
 mod action;
+#[cfg(any(feature = "network-native-tls", feature = "network-rustls"))]
 mod app_engine;
 mod backup_recovery;
 mod component;
@@ -43,6 +44,7 @@ mod sync_status;
 mod tor_settings;
 
 pub use action::{ActionResult, TorCommand, UserAction};
+#[cfg(any(feature = "network-native-tls", feature = "network-rustls"))]
 pub use app_engine::{AppEngine, AppScreen};
 pub use backup_recovery::{BackupMode, BackupRecoveryEngine};
 pub use component::{

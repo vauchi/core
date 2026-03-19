@@ -10,6 +10,7 @@
 //! - Proxy support (for Tor)
 //! - Timeout configuration
 
+#[cfg(feature = "content-updates")]
 use sha2::Digest;
 use thiserror::Error;
 

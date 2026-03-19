@@ -249,6 +249,10 @@ name = "exchange_tests"
 required-features = ["testing"]
 
 [[test]]
+name = "exchange_proximity_tests"
+required-features = ["testing"]
+
+[[test]]
 name = "exchange_proximity_enforcement_tests"
 required-features = ["testing"]
 
@@ -376,6 +380,50 @@ name = "contact_relay_storage_tests"
 
 [[test]]
 name = "relay_proptests"
+required-features = ["testing"]
+
+[[test]]
+name = "ble_exchange_tests"
+required-features = ["testing"]
+
+[[test]]
+name = "security_hardening_tests"
+required-features = ["testing"]
+
+[[test]]
+name = "security_tests"
+required-features = ["testing"]
+
+[[test]]
+name = "exchange_edge_cases_tests"
+required-features = ["testing"]
+
+[[test]]
+name = "mutual_qr_exchange_tests"
+required-features = ["testing"]
+
+[[test]]
+name = "exchange_session_tests"
+required-features = ["testing"]
+
+[[test]]
+name = "exchange_session_debug_tests"
+required-features = ["testing"]
+
+[[test]]
+name = "nfc_active_exchange_tests"
+required-features = ["testing"]
+
+[[test]]
+name = "sp9_security_coverage_tests"
+required-features = ["testing"]
+
+[[test]]
+name = "exchange_e2e_tests"
+required-features = ["testing"]
+
+[[test]]
+name = "trust_metrics_tests"
 required-features = ["testing"]
 
 [[test]]

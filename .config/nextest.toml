@@ -10,6 +10,14 @@ default-filter = "not binary(cucumber_tests)"
 # Per-test timeout: prevent hung tests from blocking the pipeline.
 slow-timeout = { period = "60s", terminate-after = 3 }
 
+[profile.ci]
+# CI runs test:core with parallel: 2, spawning two nextest instances on the
+# same 16-core runner. Default test-threads = num-cpus = 16, giving 32 total
+# processes competing for 16 cores — extreme oversubscription that makes
+# individual tests 100-400x slower (shred tests: 0.13s local → 63s CI).
+# Halving to 8 threads per partition gives 16 total = one per core.
+test-threads = 8
+
 [profile.ci.junit]
 # Path is relative to nextest's output dir (target/nextest/ci/), not project root.
 path = "junit.xml"

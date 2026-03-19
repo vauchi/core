@@ -90,6 +90,33 @@ pub fn resolve_sender<'a>(
     None
 }
 
+/// Resolves a sender_id string (from an EncryptedUpdate) to a contact.
+///
+/// Tries anonymous resolution first (O(n) scan with epoch tolerance),
+/// then falls back to direct contact lookup by ID for backward
+/// compatibility with old-format messages that use real identity fingerprints.
+///
+/// Returns the contact's ID string if resolved, or None.
+pub fn resolve_sender_id(contacts: &[Contact], sender_id_hex: &str) -> Option<String> {
+    // Try anonymous resolution: decode hex → resolve via shared keys
+    if let Ok(anonymous_id_bytes) = hex::decode(sender_id_hex) {
+        if anonymous_id_bytes.len() == 32 {
+            let mut arr = [0u8; 32];
+            arr.copy_from_slice(&anonymous_id_bytes);
+            let epoch = current_epoch();
+            if let Some(contact) = resolve_sender(contacts, &arr, epoch) {
+                return Some(contact.id().to_string());
+            }
+        }
+    }
+
+    // Fall back to direct contact lookup (backward compat with old format)
+    contacts
+        .iter()
+        .find(|c| c.id() == sender_id_hex)
+        .map(|c| c.id().to_string())
+}
+
 /// Pre-computed index for O(1) anonymous sender ID resolution (#104).
 ///
 /// Maps anonymous IDs (for current + previous epoch) to contact indices.

@@ -133,7 +133,10 @@ pub use multi_relay::{
 };
 
 // Anonymous sender identifiers
-pub use anonymous::{compute_anonymous_id, current_epoch, resolve_sender, AnonymousSender};
+pub use anonymous::{
+    compute_anonymous_id, current_epoch, resolve_sender, resolve_sender_id, AnonymousSender,
+    SenderIndex,
+};
 
 // Noise NK inner transport encryption
 pub use noise::{parse_relay_noise_pubkey, NoiseInitiator, NoiseTransport as NoiseSession};

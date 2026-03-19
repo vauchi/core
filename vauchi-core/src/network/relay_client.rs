@@ -119,6 +119,9 @@ impl<T: Transport> RelayClient<T> {
     /// Sends an encrypted update to a contact.
     ///
     /// The update is encrypted using the Double Ratchet before sending.
+    /// When `shared_key` is provided, the sender_id field is replaced with
+    /// a rotating anonymous ID derived from the shared key, preventing
+    /// relay-side correlation of sender identity across messages.
     /// Returns the message ID for tracking acknowledgments.
     pub fn send_update(
         &mut self,
@@ -126,6 +129,7 @@ impl<T: Transport> RelayClient<T> {
         ratchet: &mut DoubleRatchetState,
         payload: &[u8],
         update_id: &str,
+        shared_key: Option<&[u8; 32]>,
     ) -> Result<MessageId, NetworkError> {
         // Check in-flight limit
         if self.in_flight.len() >= self.config.max_pending_messages {
@@ -137,8 +141,15 @@ impl<T: Transport> RelayClient<T> {
             .encrypt(payload)
             .map_err(|e| NetworkError::Encryption(e.to_string()))?;
 
+        // Generate anonymous sender ID if shared key provided
+        let anon_id_hex = shared_key.map(|key| {
+            let anon = super::anonymous::AnonymousSender::for_current_epoch(key);
+            hex::encode(anon.anonymous_id)
+        });
+
         // Convert to wire format
-        let envelope = self.create_update_envelope(recipient_id, &ratchet_msg);
+        let envelope =
+            self.create_update_envelope(recipient_id, &ratchet_msg, anon_id_hex.as_deref());
         let message_id = envelope.message_id.clone();
 
         // Send
@@ -161,18 +172,25 @@ impl<T: Transport> RelayClient<T> {
     /// Sends a raw encrypted update (already encrypted externally).
     ///
     /// Use this when you've already encrypted the message and just need
-    /// to send it through the relay.
+    /// to send it through the relay. Pass `shared_key` for anonymous sending.
     pub fn send_raw_update(
         &mut self,
         recipient_id: &str,
         ratchet_msg: &RatchetMessage,
         update_id: &str,
+        shared_key: Option<&[u8; 32]>,
     ) -> Result<MessageId, NetworkError> {
         if self.in_flight.len() >= self.config.max_pending_messages {
             return Err(NetworkError::SendFailed("Too many pending messages".into()));
         }
 
-        let envelope = self.create_update_envelope(recipient_id, ratchet_msg);
+        let anon_id_hex = shared_key.map(|key| {
+            let anon = super::anonymous::AnonymousSender::for_current_epoch(key);
+            hex::encode(anon.anonymous_id)
+        });
+
+        let envelope =
+            self.create_update_envelope(recipient_id, ratchet_msg, anon_id_hex.as_deref());
         let message_id = envelope.message_id.clone();
 
         self.connection.send(&envelope)?;
@@ -353,14 +371,21 @@ impl<T: Transport> RelayClient<T> {
     }
 
     /// Creates an encrypted update envelope from a ratchet message.
+    ///
+    /// When `anonymous_sender_id` is `Some`, uses it as the sender_id field
+    /// (preventing relay-side correlation). When `None`, uses the real
+    /// identity fingerprint (backward compat for device sync, purge, etc.).
     fn create_update_envelope(
         &self,
         recipient_id: &str,
         ratchet_msg: &RatchetMessage,
+        anonymous_sender_id: Option<&str>,
     ) -> MessageEnvelope {
         let encrypted_update = EncryptedUpdate {
             recipient_id: recipient_id.to_string(),
-            sender_id: self.our_identity_id.clone(),
+            sender_id: anonymous_sender_id
+                .map(|s| s.to_string())
+                .unwrap_or_else(|| self.our_identity_id.clone()),
             ratchet_header: RatchetHeader {
                 dh_public: ratchet_msg.dh_public,
                 dh_generation: ratchet_msg.dh_generation,

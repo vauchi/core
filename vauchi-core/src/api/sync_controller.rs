@@ -217,10 +217,13 @@ impl<'a, T: Transport> SyncController<'a, T> {
             };
 
             // Send the update
-            match self
-                .relay
-                .send_update(&update.contact_id, ratchet, &update.payload, &update.id)
-            {
+            match self.relay.send_update(
+                &update.contact_id,
+                ratchet,
+                &update.payload,
+                &update.id,
+                None,
+            ) {
                 Ok(msg_id) => {
                     result.sent += 1;
                     self.events.dispatch(VauchiEvent::MessageDelivered {
@@ -282,7 +285,7 @@ impl<'a, T: Transport> SyncController<'a, T> {
         for update in updates {
             match self
                 .relay
-                .send_update(contact_id, ratchet, &update.payload, &update.id)
+                .send_update(contact_id, ratchet, &update.payload, &update.id, None)
             {
                 Ok(_) => {
                     result.sent += 1;

@@ -11,7 +11,8 @@ default-filter = "not binary(cucumber_tests)"
 slow-timeout = { period = "60s", terminate-after = 3 }
 
 [profile.ci.junit]
-path = "target/nextest/ci/junit.xml"
+# Path is relative to nextest's output dir (target/nextest/ci/), not project root.
+path = "junit.xml"
 
 # File-based SQLite concurrency tests spawn internal threads that compete for
 # write locks. Under heavy parallel test execution (coverage:workspace with

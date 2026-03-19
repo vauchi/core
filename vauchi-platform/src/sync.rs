@@ -490,8 +490,22 @@ pub async fn do_sync_async(
 
         let contacts_added = legacy_added + encrypted_added;
 
+        // Resolve anonymous sender IDs before processing card updates.
+        // Anonymous IDs (HKDF-derived, rotating hourly) are resolved to real
+        // contact IDs using shared keys. Old-format messages with real identity
+        // fingerprints pass through unchanged via the fallback path.
+        let contacts = storage.list_contacts().unwrap_or_default();
+        let resolved_updates: Vec<(String, Vec<u8>)> = received
+            .card_updates
+            .into_iter()
+            .filter_map(|(sender_id, ciphertext)| {
+                vauchi_core::network::anonymous::resolve_sender_id(&contacts, &sender_id)
+                    .map(|resolved_id| (resolved_id, ciphertext))
+            })
+            .collect();
+
         // Process card updates
-        let cards_updated = process_card_updates(identity, &storage, received.card_updates)?;
+        let cards_updated = process_card_updates(identity, &storage, resolved_updates)?;
 
         // Process device sync messages
         let device_synced =

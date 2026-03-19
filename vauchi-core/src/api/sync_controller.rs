@@ -216,13 +216,21 @@ impl<'a, T: Transport> SyncController<'a, T> {
                 }
             };
 
-            // Send the update
+            // Load contact's shared key for anonymous sender ID
+            let shared_key = self
+                .storage
+                .load_contact(&update.contact_id)
+                .ok()
+                .flatten()
+                .map(|c| *c.shared_key().as_bytes());
+
+            // Send the update (anonymous sender ID if shared key available)
             match self.relay.send_update(
                 &update.contact_id,
                 ratchet,
                 &update.payload,
                 &update.id,
-                None, // TODO(SP-32): pass contact shared_key once receive-side resolution is wired
+                shared_key.as_ref(),
             ) {
                 Ok(msg_id) => {
                     result.sent += 1;
@@ -279,14 +287,25 @@ impl<'a, T: Transport> SyncController<'a, T> {
             }
         };
 
+        // Load contact's shared key for anonymous sender ID
+        let shared_key = self
+            .storage
+            .load_contact(contact_id)
+            .ok()
+            .flatten()
+            .map(|c| *c.shared_key().as_bytes());
+
         // Get pending updates for this contact
         let updates = self.sync_manager.get_pending(contact_id)?;
 
         for update in updates {
-            match self
-                .relay
-                .send_update(contact_id, ratchet, &update.payload, &update.id, None)
-            {
+            match self.relay.send_update(
+                contact_id,
+                ratchet,
+                &update.payload,
+                &update.id,
+                shared_key.as_ref(),
+            ) {
                 Ok(_) => {
                     result.sent += 1;
                 }

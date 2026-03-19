@@ -222,7 +222,7 @@ impl<'a, T: Transport> SyncController<'a, T> {
                 ratchet,
                 &update.payload,
                 &update.id,
-                None,
+                None, // TODO(SP-32): pass contact shared_key once receive-side resolution is wired
             ) {
                 Ok(msg_id) => {
                     result.sent += 1;

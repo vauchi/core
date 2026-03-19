@@ -19,6 +19,15 @@ use super::protocol::create_envelope;
 use super::transport::{Transport, TransportConfig};
 use crate::crypto::ratchet::{DoubleRatchetState, RatchetMessage};
 
+/// Generates a hex-encoded anonymous sender ID from an optional shared key.
+/// Returns `None` if no shared key is provided (backward compat — uses real identity).
+fn anonymous_sender_hex(shared_key: Option<&[u8; 32]>) -> Option<String> {
+    shared_key.map(|key| {
+        let anon = super::anonymous::AnonymousSender::for_current_epoch(key);
+        hex::encode(anon.anonymous_id)
+    })
+}
+
 /// Configuration for the relay client.
 #[derive(Debug, Clone)]
 pub struct RelayClientConfig {
@@ -141,13 +150,8 @@ impl<T: Transport> RelayClient<T> {
             .encrypt(payload)
             .map_err(|e| NetworkError::Encryption(e.to_string()))?;
 
-        // Generate anonymous sender ID if shared key provided
-        let anon_id_hex = shared_key.map(|key| {
-            let anon = super::anonymous::AnonymousSender::for_current_epoch(key);
-            hex::encode(anon.anonymous_id)
-        });
-
         // Convert to wire format
+        let anon_id_hex = anonymous_sender_hex(shared_key);
         let envelope =
             self.create_update_envelope(recipient_id, &ratchet_msg, anon_id_hex.as_deref());
         let message_id = envelope.message_id.clone();
@@ -184,11 +188,7 @@ impl<T: Transport> RelayClient<T> {
             return Err(NetworkError::SendFailed("Too many pending messages".into()));
         }
 
-        let anon_id_hex = shared_key.map(|key| {
-            let anon = super::anonymous::AnonymousSender::for_current_epoch(key);
-            hex::encode(anon.anonymous_id)
-        });
-
+        let anon_id_hex = anonymous_sender_hex(shared_key);
         let envelope =
             self.create_update_envelope(recipient_id, ratchet_msg, anon_id_hex.as_deref());
         let message_id = envelope.message_id.clone();

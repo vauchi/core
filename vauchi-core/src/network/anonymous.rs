@@ -110,7 +110,10 @@ pub fn resolve_sender_id(contacts: &[Contact], sender_id_hex: &str) -> Option<St
         }
     }
 
-    // Fall back to direct contact lookup (backward compat with old format)
+    // Fall back to direct contact lookup (backward compat with old format).
+    // Note: uses standard == (not constant-time) because contact IDs are
+    // public-key fingerprints, not secrets. An observer cannot learn anything
+    // from timing that they don't already know from the wire format.
     contacts
         .iter()
         .find(|c| c.id() == sender_id_hex)

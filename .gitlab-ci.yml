@@ -260,7 +260,8 @@ lint:semver:
     - command -v cargo-semver-checks >/dev/null 2>&1 || cargo binstall cargo-semver-checks --no-confirm 2>/dev/null || cargo install cargo-semver-checks
     - git fetch origin main
     - cargo semver-checks check-release -p vauchi-core --baseline-rev origin/main
-    - cargo semver-checks check-release -p vauchi-platform --baseline-rev origin/main
+    # vauchi-platform skipped: include_bytes!("../../../themes/themes.json") can't resolve
+    # in semver-checks' temp baseline checkout (themes repo is a sibling, not in core)
     - cargo semver-checks check-release -p vauchi-protocol --baseline-rev origin/main
 
 # Duplicate dependency check (advisory — detects multiple versions of same crate)

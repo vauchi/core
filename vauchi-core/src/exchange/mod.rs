@@ -69,10 +69,8 @@ pub mod verifier_chain;
 #[cfg(not(feature = "testing"))]
 mod verifier_chain;
 
-#[cfg(feature = "testing")]
+#[cfg(any(test, feature = "testing"))]
 pub mod verifier_harness;
-#[cfg(not(feature = "testing"))]
-mod verifier_harness;
 
 #[cfg(feature = "testing")]
 pub mod verifier_event;
@@ -181,9 +179,10 @@ pub use nfc_apdu_chaining::{
 pub use nfc_card_payload::NfcCardPayload;
 pub use nfc_handshake::{NfcExchangeResult, NfcHandshakeSession, NfcHandshakeState};
 pub use nfc_rollback::{NfcRollback, NoopNfcRollback};
+#[cfg(any(test, feature = "testing"))]
+pub use proximity::MockProximityVerifier;
 pub use proximity::{
-    ManualConfirmationVerifier, MockProximityVerifier, ProximityConfidence, ProximityError,
-    ProximityVerifier,
+    ManualConfirmationVerifier, ProximityConfidence, ProximityError, ProximityVerifier,
 };
 pub use qr::{check_clock_drift, ExchangeQR};
 pub use session::{
@@ -192,6 +191,7 @@ pub use session::{
 };
 pub use verifier_chain::VerifierChain;
 pub use verifier_event::{ProximityVerifierEvent, VerifierEventLog, VerifierMethod};
+#[cfg(any(test, feature = "testing"))]
 pub use verifier_harness::{PeerCapabilities, Scenario, SimulatedPeer, VerificationOutcome};
 pub use x3dh::{X3DHKeyPair, X3DH};
 

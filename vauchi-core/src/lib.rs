@@ -49,10 +49,11 @@ pub use storage::{PendingUpdate, Storage, StorageError, UpdateStatus};
 // --- future vauchi-exchange ---
 pub mod exchange;
 pub use exchange::capability;
+#[cfg(any(test, feature = "testing"))]
+pub use exchange::MockProximityVerifier;
 pub use exchange::{
     EncryptedExchangeMessage, ExchangeCommand, ExchangeError, ExchangeEvent, ExchangeHardwareEvent,
-    ExchangeQR, ExchangeSession, MockProximityVerifier, ProximityError, ProximityVerifier,
-    X3DHKeyPair, X3DH,
+    ExchangeQR, ExchangeSession, ProximityError, ProximityVerifier, X3DHKeyPair, X3DH,
 };
 
 // --- future vauchi-recovery ---

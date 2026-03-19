@@ -122,8 +122,7 @@ pub trait ProximityVerifier: Send + Sync {
 /// Mock proximity verifier for testing.
 ///
 /// Can be configured to always succeed, always fail, or simulate timeouts.
-// TODO: Gate behind cfg(any(test, feature = "testing")) once all 15+
-// integration test files are migrated to required-features = ["testing"].
+#[cfg(any(test, feature = "testing"))]
 pub struct MockProximityVerifier {
     /// Whether verification should succeed
     pub should_succeed: bool,
@@ -133,6 +132,7 @@ pub struct MockProximityVerifier {
     challenges: std::sync::Mutex<Vec<[u8; 16]>>,
 }
 
+#[cfg(any(test, feature = "testing"))]
 impl MockProximityVerifier {
     /// Creates a new mock verifier that succeeds.
     pub fn success() -> Self {
@@ -167,6 +167,7 @@ impl MockProximityVerifier {
     }
 }
 
+#[cfg(any(test, feature = "testing"))]
 impl ProximityVerifier for MockProximityVerifier {
     fn confidence_level(&self) -> super::ProximityConfidence {
         // Mock simulates hardware-level proximity verification

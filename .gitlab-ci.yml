@@ -46,6 +46,7 @@ include:
       - '/ci-templates/release.yml'
       - '/ci-templates/downstream.yml'
       - '/ci-templates/reuse.yml'
+      - '/ci-templates/typos.yml'
       - '/ci-templates/test-quality.yml'
       - '/ci-templates/file-size.yml'
       - '/ci-templates/mutation.yml'

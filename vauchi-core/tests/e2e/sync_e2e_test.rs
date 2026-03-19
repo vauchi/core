@@ -348,6 +348,7 @@ fn test_relay_update_delivery_happy_path() {
             &mut alice_ratchet,
             update_payload,
             "update-001",
+            None,
         )
         .unwrap();
 

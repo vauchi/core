@@ -834,3 +834,253 @@ fn test_hkdf_context_ensures_domain_separation() {
         "Different HKDF contexts must produce different IDs"
     );
 }
+
+// ============================================================
+// Wire Integration Tests — resolve_sender_id()
+// Traces to: features/anonymous_sender.feature @wire
+// Tests the dual-mode resolution (anonymous ID → contact, fallback to direct)
+// ============================================================
+
+// @scenario: anonymous_sender.feature:Incoming messages with anonymous sender ID are resolved
+#[test]
+fn test_resolve_sender_id_anonymous_mode() {
+    let key = SymmetricKey::generate();
+    let contact = make_contact_with_key("Alice", key.clone());
+    let contacts = vec![contact.clone()];
+
+    // Generate anonymous ID and hex-encode (as it would appear in EncryptedUpdate.sender_id)
+    let anon = AnonymousSender::for_current_epoch(contact.shared_key().as_bytes());
+    let sender_id_hex = hex::encode(anon.anonymous_id);
+
+    let result = vauchi_core::network::anonymous::resolve_sender_id(&contacts, &sender_id_hex);
+    assert!(result.is_some(), "Should resolve anonymous sender ID");
+    assert_eq!(result.unwrap(), contact.id());
+}
+
+// @scenario: anonymous_sender.feature:Old-format messages without anonymous sender still work
+#[test]
+fn test_resolve_sender_id_direct_fallback() {
+    let key = SymmetricKey::generate();
+    let contact = make_contact_with_key("Bob", key);
+    let contacts = vec![contact.clone()];
+
+    // Use real identity fingerprint (old format)
+    let result = vauchi_core::network::anonymous::resolve_sender_id(&contacts, contact.id());
+    assert!(result.is_some(), "Should resolve via direct contact lookup");
+    assert_eq!(result.unwrap(), contact.id());
+}
+
+// @scenario: anonymous_sender.feature:Unknown anonymous sender ID is handled gracefully
+#[test]
+fn test_resolve_sender_id_unknown_returns_none() {
+    let key = SymmetricKey::generate();
+    let contact = make_contact_with_key("Alice", key);
+    let contacts = vec![contact];
+
+    // Unknown hex-encoded 32-byte value
+    let unknown_hex = hex::encode([0xFFu8; 32]);
+    let result = vauchi_core::network::anonymous::resolve_sender_id(&contacts, &unknown_hex);
+    assert!(result.is_none(), "Unknown anonymous ID should return None");
+}
+
+// @scenario: anonymous_sender.feature:Unknown anonymous sender ID is handled gracefully
+#[test]
+fn test_resolve_sender_id_malformed_hex() {
+    let key = SymmetricKey::generate();
+    let contacts = vec![make_contact_with_key("Alice", key)];
+
+    // Non-hex string
+    let result = vauchi_core::network::anonymous::resolve_sender_id(&contacts, "not-valid-hex!");
+    assert!(result.is_none(), "Malformed hex should return None");
+
+    // Valid hex but wrong length (not 32 bytes)
+    let result = vauchi_core::network::anonymous::resolve_sender_id(&contacts, "abcdef");
+    assert!(result.is_none(), "Short hex should return None");
+
+    // Empty string
+    let result = vauchi_core::network::anonymous::resolve_sender_id(&contacts, "");
+    assert!(result.is_none(), "Empty string should return None");
+}
+
+// @scenario: anonymous_sender.feature:Epoch boundary handling
+#[test]
+fn test_resolve_sender_id_epoch_boundary() {
+    let key = SymmetricKey::generate();
+    let contact = make_contact_with_key("Carol", key.clone());
+    let contacts = vec![contact.clone()];
+
+    // Generate anonymous ID for previous epoch
+    let prev_epoch = current_epoch() - 1;
+    let anon = AnonymousSender::compute(contact.shared_key().as_bytes(), prev_epoch);
+    let sender_id_hex = hex::encode(anon.anonymous_id);
+
+    // Should still resolve (±1 epoch tolerance)
+    let result = vauchi_core::network::anonymous::resolve_sender_id(&contacts, &sender_id_hex);
+    assert!(
+        result.is_some(),
+        "Previous epoch anonymous ID should resolve via tolerance"
+    );
+    assert_eq!(result.unwrap(), contact.id());
+}
+
+// @scenario: anonymous_sender.feature:Outgoing messages use anonymous sender ID
+#[test]
+fn test_send_update_with_shared_key_uses_anonymous_id() {
+    use vauchi_core::crypto::ratchet::DoubleRatchetState;
+    use vauchi_core::exchange::X3DHKeyPair;
+    use vauchi_core::network::*;
+
+    let transport = MockTransport::new();
+    let config = RelayClientConfig {
+        transport: TransportConfig::default(),
+        max_pending_messages: 10,
+        ack_timeout_ms: 100,
+        max_retries: 3,
+        delivery_receipts_enabled: true,
+        suppress_presence: false,
+    };
+    let mut client = RelayClient::new(transport, config, "real-sender-id".into());
+    client.connect().unwrap();
+
+    let bob_dh = X3DHKeyPair::generate();
+    let shared_secret = SymmetricKey::generate();
+    let mut ratchet =
+        DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key()).unwrap();
+
+    // Send with shared_key → anonymous sender ID
+    let shared_key = [0x42u8; 32];
+    let _msg_id = client
+        .send_update(
+            "recipient-id",
+            &mut ratchet,
+            b"payload",
+            "u1",
+            Some(&shared_key),
+        )
+        .unwrap();
+
+    // Verify the sent message has an anonymous sender_id (not "real-sender-id")
+    let sent = client.connection().transport().sent_messages();
+    assert_eq!(sent.len(), 1);
+    let envelope = &sent[0];
+    if let MessagePayload::EncryptedUpdate(update) = &envelope.payload {
+        assert_ne!(
+            update.sender_id, "real-sender-id",
+            "sender_id should be anonymous, not the real identity"
+        );
+        // Verify it's a valid hex-encoded 32-byte value
+        let decoded = hex::decode(&update.sender_id).expect("sender_id should be valid hex");
+        assert_eq!(decoded.len(), 32, "Anonymous sender ID should be 32 bytes");
+        // Verify it matches the expected anonymous ID
+        let expected = AnonymousSender::for_current_epoch(&shared_key);
+        assert_eq!(
+            decoded,
+            expected.anonymous_id.to_vec(),
+            "sender_id should match HKDF-derived anonymous ID"
+        );
+    } else {
+        panic!("Expected EncryptedUpdate payload");
+    }
+}
+
+// @scenario: anonymous_sender.feature:Outgoing messages use anonymous sender ID
+#[test]
+fn test_send_update_without_shared_key_uses_real_identity() {
+    use vauchi_core::crypto::ratchet::DoubleRatchetState;
+    use vauchi_core::exchange::X3DHKeyPair;
+    use vauchi_core::network::*;
+
+    let transport = MockTransport::new();
+    let config = RelayClientConfig {
+        transport: TransportConfig::default(),
+        max_pending_messages: 10,
+        ack_timeout_ms: 100,
+        max_retries: 3,
+        delivery_receipts_enabled: true,
+        suppress_presence: false,
+    };
+    let mut client = RelayClient::new(transport, config, "real-sender-id".into());
+    client.connect().unwrap();
+
+    let bob_dh = X3DHKeyPair::generate();
+    let shared_secret = SymmetricKey::generate();
+    let mut ratchet =
+        DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key()).unwrap();
+
+    // Send without shared_key → real identity
+    let _msg_id = client
+        .send_update("recipient-id", &mut ratchet, b"payload", "u1", None)
+        .unwrap();
+
+    let sent = client.connection().transport().sent_messages();
+    assert_eq!(sent.len(), 1);
+    let envelope = &sent[0];
+    if let MessagePayload::EncryptedUpdate(update) = &envelope.payload {
+        assert_eq!(
+            update.sender_id, "real-sender-id",
+            "sender_id should be the real identity when no shared_key provided"
+        );
+    } else {
+        panic!("Expected EncryptedUpdate payload");
+    }
+}
+
+// @scenario: anonymous_sender.feature:Anonymous ID changes each epoch
+#[test]
+fn test_send_update_anonymous_id_differs_per_contact() {
+    use vauchi_core::crypto::ratchet::DoubleRatchetState;
+    use vauchi_core::exchange::X3DHKeyPair;
+    use vauchi_core::network::*;
+
+    let transport = MockTransport::new();
+    let config = RelayClientConfig {
+        transport: TransportConfig::default(),
+        max_pending_messages: 10,
+        ack_timeout_ms: 100,
+        max_retries: 3,
+        delivery_receipts_enabled: true,
+        suppress_presence: false,
+    };
+    let mut client = RelayClient::new(transport, config, "sender".into());
+    client.connect().unwrap();
+
+    let bob_dh = X3DHKeyPair::generate();
+    let shared_secret = SymmetricKey::generate();
+    let mut ratchet =
+        DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key()).unwrap();
+
+    // Send to two different contacts (different shared keys)
+    let key_alice = [0xAAu8; 32];
+    let key_bob = [0xBBu8; 32];
+
+    client
+        .send_update("alice", &mut ratchet, b"hi", "u1", Some(&key_alice))
+        .unwrap();
+
+    let bob_dh2 = X3DHKeyPair::generate();
+    let mut ratchet2 =
+        DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh2.public_key()).unwrap();
+    client
+        .send_update("bob", &mut ratchet2, b"hi", "u2", Some(&key_bob))
+        .unwrap();
+
+    let sent = client.connection().transport().sent_messages();
+    assert_eq!(sent.len(), 2);
+
+    let env1 = &sent[0];
+    let env2 = &sent[1];
+
+    let sid1 = match &env1.payload {
+        MessagePayload::EncryptedUpdate(u) => &u.sender_id,
+        _ => panic!("Expected EncryptedUpdate"),
+    };
+    let sid2 = match &env2.payload {
+        MessagePayload::EncryptedUpdate(u) => &u.sender_id,
+        _ => panic!("Expected EncryptedUpdate"),
+    };
+
+    assert_ne!(
+        sid1, sid2,
+        "Anonymous sender IDs for different contacts must differ (unlinkable)"
+    );
+}

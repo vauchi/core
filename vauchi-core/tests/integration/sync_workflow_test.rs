@@ -93,7 +93,13 @@ fn test_relay_client_workflow() {
 
     // Send an update
     let msg_id = client
-        .send_update("recipient-id", &mut ratchet, b"test payload", "update-1")
+        .send_update(
+            "recipient-id",
+            &mut ratchet,
+            b"test payload",
+            "update-1",
+            None,
+        )
         .unwrap();
 
     assert!(!msg_id.is_empty());

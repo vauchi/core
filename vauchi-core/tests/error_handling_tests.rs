@@ -72,7 +72,13 @@ fn test_relay_disconnect_clears_state() {
         DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key()).unwrap();
 
     client
-        .send_update("recipient-id", &mut ratchet, b"test payload", "update-1")
+        .send_update(
+            "recipient-id",
+            &mut ratchet,
+            b"test payload",
+            "update-1",
+            None,
+        )
         .unwrap();
     assert_eq!(client.in_flight_count(), 1);
 

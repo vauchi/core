@@ -185,10 +185,11 @@ impl Scenario {
             chain.add(*method, verifier);
         }
 
-        let challenge = [0u8; 16];
+        let emit_challenge = [0x0Au8; 16];
+        let listen_challenge = [0x0Bu8; 16];
         let timeout = Duration::from_secs(5);
-        // Use the trait method to go through the proper Mutex path.
-        let _ = chain.verify_proximity_two_way(&challenge, &challenge, timeout, true);
+        // Use asymmetric challenges to exercise the two-way protocol path.
+        let _ = chain.verify_proximity_two_way(&emit_challenge, &listen_challenge, timeout, true);
         let log = chain
             .last_event_log()
             .expect("log should exist after verification");

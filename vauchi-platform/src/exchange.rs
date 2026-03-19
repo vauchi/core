@@ -30,13 +30,32 @@ use crate::error::MobileError;
 /// using ultrasonic audio or other hardware-based mechanisms.
 #[uniffi::export(callback_interface)]
 pub trait MobileProximityHandler: Send + Sync {
-    /// Perform proximity verification with the given challenge.
+    /// Perform single-direction proximity verification (legacy).
     ///
     /// challenge: 16 bytes from the QR code's audio_challenge field.
     /// timeout_ms: maximum time to wait in milliseconds.
     ///
     /// Returns empty string on success, error message on failure.
     fn verify_proximity(&self, challenge: Vec<u8>, timeout_ms: u64) -> String;
+
+    /// Perform bidirectional proximity verification.
+    ///
+    /// Both devices must independently prove they can hear each other.
+    /// The initiator emits first then listens; the responder listens first then emits.
+    ///
+    /// emit_challenge: 16 bytes to emit (from peer's QR audio_challenge).
+    /// listen_challenge: 16 bytes to listen for (our challenge, sent via encrypted channel).
+    /// timeout_ms: maximum time to wait in milliseconds.
+    /// is_initiator: true if this device scanned the QR (emit first), false if displayed.
+    ///
+    /// Returns empty string on success, error message on failure.
+    fn verify_proximity_two_way(
+        &self,
+        emit_challenge: Vec<u8>,
+        listen_challenge: Vec<u8>,
+        timeout_ms: u64,
+        is_initiator: bool,
+    ) -> String;
 }
 
 // === ProximityBridge ===
@@ -85,15 +104,21 @@ impl ProximityVerifier for ProximityBridge {
     fn verify_proximity_two_way(
         &self,
         emit_challenge: &[u8; 16],
-        _listen_challenge: &[u8; 16],
+        listen_challenge: &[u8; 16],
         timeout: Duration,
-        _is_initiator: bool,
+        is_initiator: bool,
     ) -> Result<(), ProximityError> {
-        // TODO(security): This delegates only the emit direction. The two-way
-        // protocol requires both parties independently verify the other's
-        // challenge. The MobileProximityHandler interface needs a two-argument
-        // form before this can enforce full bidirectionality.
-        self.verify_proximity(emit_challenge, timeout)
+        let result = self.handler.verify_proximity_two_way(
+            emit_challenge.to_vec(),
+            listen_challenge.to_vec(),
+            timeout.as_millis() as u64,
+            is_initiator,
+        );
+        if result.is_empty() {
+            Ok(())
+        } else {
+            Err(ProximityError::DeviceError(result))
+        }
     }
 }
 
@@ -638,12 +663,30 @@ mod tests {
         fn verify_proximity(&self, _challenge: Vec<u8>, _timeout_ms: u64) -> String {
             String::new()
         }
+        fn verify_proximity_two_way(
+            &self,
+            _emit: Vec<u8>,
+            _listen: Vec<u8>,
+            _timeout_ms: u64,
+            _is_initiator: bool,
+        ) -> String {
+            String::new()
+        }
     }
 
     /// Mock proximity handler that always fails.
     struct FailureHandler;
     impl MobileProximityHandler for FailureHandler {
         fn verify_proximity(&self, _challenge: Vec<u8>, _timeout_ms: u64) -> String {
+            "Device too far away".to_string()
+        }
+        fn verify_proximity_two_way(
+            &self,
+            _emit: Vec<u8>,
+            _listen: Vec<u8>,
+            _timeout_ms: u64,
+            _is_initiator: bool,
+        ) -> String {
             "Device too far away".to_string()
         }
     }
@@ -676,6 +719,67 @@ mod tests {
             ProximityError::DeviceError(msg) => assert_eq!(msg, "Device too far away"),
             other => panic!("Expected DeviceError, got {:?}", other),
         }
+    }
+
+    // @scenario: contact_exchange:Two-way proximity delegates both challenges
+    #[test]
+    fn test_proximity_bridge_two_way_delegates_both_challenges() {
+        use std::sync::atomic::{AtomicU32, Ordering};
+
+        /// Handler that records which challenges it received.
+        struct RecordingHandler {
+            calls: AtomicU32,
+        }
+        impl MobileProximityHandler for RecordingHandler {
+            fn verify_proximity(&self, _challenge: Vec<u8>, _timeout_ms: u64) -> String {
+                String::new()
+            }
+            fn verify_proximity_two_way(
+                &self,
+                emit: Vec<u8>,
+                listen: Vec<u8>,
+                _timeout_ms: u64,
+                _is_initiator: bool,
+            ) -> String {
+                self.calls.fetch_add(1, Ordering::Relaxed);
+                // Verify both challenges are distinct and correct length
+                assert_eq!(emit.len(), 16, "emit challenge must be 16 bytes");
+                assert_eq!(listen.len(), 16, "listen challenge must be 16 bytes");
+                assert_ne!(emit, listen, "emit and listen challenges must differ");
+                String::new()
+            }
+        }
+
+        let handler = Arc::new(RecordingHandler {
+            calls: AtomicU32::new(0),
+        });
+        let bridge = ProximityBridge {
+            handler: handler.clone(),
+        };
+
+        let emit = [0xAA; 16];
+        let listen = [0xBB; 16];
+        let result = bridge.verify_proximity_two_way(&emit, &listen, Duration::from_secs(5), true);
+        assert!(result.is_ok(), "two-way verification should succeed");
+        assert_eq!(
+            handler.calls.load(Ordering::Relaxed),
+            1,
+            "handler.verify_proximity_two_way should be called exactly once"
+        );
+    }
+
+    // @scenario: contact_exchange:Two-way proximity failure propagates
+    #[test]
+    fn test_proximity_bridge_two_way_failure() {
+        let handler = Arc::new(FailureHandler);
+        let bridge = ProximityBridge {
+            handler: handler.clone(),
+        };
+
+        let emit = [0xAA; 16];
+        let listen = [0xBB; 16];
+        let result = bridge.verify_proximity_two_way(&emit, &listen, Duration::from_secs(5), false);
+        assert!(result.is_err(), "two-way should propagate failure");
     }
 
     // @scenario: contact_exchange:Generate exchange QR code

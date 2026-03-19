@@ -129,15 +129,25 @@ fn available_screens_without_identity_is_onboarding_only() {
 }
 
 #[test]
-fn available_screens_with_identity_has_main_nav() {
+fn available_screens_with_identity_has_five_tab_nav() {
     let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
     let engine = AppEngine::new(vauchi);
     let screens = engine.available_screens();
-    assert!(screens.contains(&AppScreen::MyInfo));
-    assert!(screens.contains(&AppScreen::Contacts));
-    assert!(screens.contains(&AppScreen::Settings));
+    assert_eq!(
+        screens,
+        vec![
+            AppScreen::MyInfo,
+            AppScreen::Contacts,
+            AppScreen::Exchange,
+            AppScreen::Groups,
+            AppScreen::More,
+        ],
+        "L2b navigation: 5-tab model [MyInfo, Contacts, Exchange, Groups, More]"
+    );
     assert!(!screens.contains(&AppScreen::Onboarding));
+    assert!(!screens.contains(&AppScreen::Settings));
+    assert!(!screens.contains(&AppScreen::Help));
 }
 
 // ── failure-path tests for create_engine edge cases ─────────────────
@@ -583,6 +593,7 @@ fn cabi_completeness_all_simple_screens_roundtrip_via_screen_id() {
         AppScreen::Support,
         AppScreen::ContactDuplicates,
         AppScreen::ContactLimit,
+        AppScreen::More,
     ];
 
     let mut missing = Vec::new();
@@ -600,4 +611,131 @@ fn cabi_completeness_all_simple_screens_roundtrip_via_screen_id() {
          Add them to from_screen_id() in app_engine/mod.rs.",
         missing
     );
+}
+
+// ── L2b MoreEngine tests ─────────────────────────────────────────────
+
+#[test]
+fn navigate_to_more_shows_more_menu() {
+    let mut vauchi = Vauchi::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    let mut engine = AppEngine::new(vauchi);
+    let screen = engine.navigate_to(AppScreen::More);
+    assert_eq!(screen.screen_id, "more");
+    assert_eq!(screen.title, "More");
+    assert!(
+        !screen.components.is_empty(),
+        "More screen must have at least one component"
+    );
+}
+
+#[test]
+fn more_engine_has_expected_navigation_targets() {
+    let mut vauchi = Vauchi::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    let mut engine = AppEngine::new(vauchi);
+    let screen = engine.navigate_to(AppScreen::More);
+
+    // Extract action IDs from the ActionList component
+    let action_ids: Vec<String> = screen
+        .components
+        .iter()
+        .flat_map(|c| match c {
+            vauchi_core::ui::Component::ActionList { items, .. } => {
+                items.iter().map(|item| item.id.clone()).collect::<Vec<_>>()
+            }
+            _ => vec![],
+        })
+        .collect();
+
+    assert!(
+        action_ids.contains(&"sync".to_string()),
+        "More must contain sync"
+    );
+    assert!(
+        action_ids.contains(&"device_linking".to_string()),
+        "More must contain device_linking"
+    );
+    assert!(
+        action_ids.contains(&"settings".to_string()),
+        "More must contain settings"
+    );
+    assert!(
+        action_ids.contains(&"backup".to_string()),
+        "More must contain backup"
+    );
+    assert!(
+        action_ids.contains(&"privacy".to_string()),
+        "More must contain privacy"
+    );
+    assert!(
+        action_ids.contains(&"help".to_string()),
+        "More must contain help"
+    );
+    assert_eq!(action_ids.len(), 6, "More menu should have exactly 6 items");
+}
+
+#[test]
+fn more_engine_routes_to_settings() {
+    let mut vauchi = Vauchi::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    let mut engine = AppEngine::new(vauchi);
+    engine.navigate_to(AppScreen::More);
+
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "settings".into(),
+    });
+    match result {
+        ActionResult::NavigateTo(screen) => {
+            assert_eq!(screen.screen_id, "settings");
+        }
+        other => panic!("Expected NavigateTo settings, got {other:?}"),
+    }
+    assert_eq!(engine.current_app_screen(), &AppScreen::Settings);
+}
+
+#[test]
+fn more_engine_routes_to_help() {
+    let mut vauchi = Vauchi::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    let mut engine = AppEngine::new(vauchi);
+    engine.navigate_to(AppScreen::More);
+
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "help".into(),
+    });
+    match result {
+        ActionResult::NavigateTo(screen) => {
+            assert_eq!(screen.screen_id, "help");
+        }
+        other => panic!("Expected NavigateTo help, got {other:?}"),
+    }
+    assert_eq!(engine.current_app_screen(), &AppScreen::Help);
+}
+
+#[test]
+fn more_engine_unknown_action_returns_update_screen() {
+    let mut vauchi = Vauchi::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    let mut engine = AppEngine::new(vauchi);
+    engine.navigate_to(AppScreen::More);
+
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "nonexistent_screen".into(),
+    });
+    match result {
+        ActionResult::UpdateScreen(screen) => {
+            assert_eq!(screen.screen_id, "more");
+        }
+        other => panic!("Expected UpdateScreen for unknown action, got {other:?}"),
+    }
+}
+
+#[test]
+fn from_screen_id_more_roundtrips() {
+    let screen = AppScreen::More;
+    let id = screen.screen_id();
+    assert_eq!(id, "more");
+    let parsed = AppScreen::from_screen_id(id).expect("from_screen_id must handle 'more'");
+    assert_eq!(parsed, AppScreen::More);
 }

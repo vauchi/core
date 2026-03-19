@@ -89,11 +89,11 @@ impl AppEngine {
             return vec![AppScreen::Onboarding];
         }
         vec![
-            AppScreen::Exchange,
             AppScreen::MyInfo,
             AppScreen::Contacts,
-            AppScreen::Settings,
-            AppScreen::Help,
+            AppScreen::Exchange,
+            AppScreen::Groups,
+            AppScreen::More,
         ]
     }
 }

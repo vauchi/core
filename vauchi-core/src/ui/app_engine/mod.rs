@@ -70,6 +70,7 @@ pub enum AppScreen {
         secondary_fields: Vec<String>,
     },
     ContactLimit,
+    More,
 }
 
 impl AppScreen {
@@ -107,6 +108,7 @@ impl AppScreen {
             Self::ContactDuplicates => "contact_duplicates",
             Self::ContactMerge { .. } => "contact_merge",
             Self::ContactLimit => "contact_limit",
+            Self::More => "more",
         }
     }
 
@@ -136,6 +138,7 @@ impl AppScreen {
             "support" => Self::Support,
             "contact_duplicates" => Self::ContactDuplicates,
             "contact_limit" => Self::ContactLimit,
+            "more" => Self::More,
             _ => return None,
         })
     }

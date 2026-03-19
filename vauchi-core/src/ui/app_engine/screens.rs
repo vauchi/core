@@ -31,6 +31,7 @@ use crate::ui::group_detail::GroupDetailEngine;
 use crate::ui::groups_list::{GroupInfo, GroupsEngine, GroupsMode};
 use crate::ui::help::{HelpEngine, HelpItem};
 use crate::ui::lock_screen::LockScreenEngine;
+use crate::ui::more::MoreEngine;
 use crate::ui::my_info::{MyInfoEngine, MyInfoGroupTab, MyInfoProgress, OwnFieldInfo};
 use crate::ui::my_info_entry_detail::{EntryContactInfo, MyInfoEntryDetailEngine};
 use crate::ui::onboarding::OnboardingEngine;
@@ -274,6 +275,7 @@ impl AppEngine {
             AppScreen::FormDialog { dialog_type } => {
                 Box::new(FormDialogEngine::new(dialog_type.clone()))
             }
+            AppScreen::More => Box::new(MoreEngine::new()),
             AppScreen::ContactDetail { contact_id } => match vauchi.get_contact(contact_id) {
                 Ok(Some(contact)) => {
                     let fields: Vec<FieldDisplay> = contact

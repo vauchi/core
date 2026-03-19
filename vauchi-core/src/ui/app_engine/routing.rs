@@ -286,6 +286,17 @@ impl AppEngine {
                 let screen = self.navigate_to(AppScreen::MyInfoEntryDetail { field_id });
                 ActionResult::NavigateTo(screen)
             }
+            // MoreEngine reuses OpenContact to signal menu selection.
+            // Route to the target screen when on the More screen.
+            ActionResult::OpenContact { contact_id } if self.screen == AppScreen::More => {
+                match AppScreen::from_screen_id(&contact_id) {
+                    Some(target) => {
+                        let screen = self.navigate_to(target);
+                        ActionResult::NavigateTo(screen)
+                    }
+                    None => ActionResult::UpdateScreen(self.engine.current_screen()),
+                }
+            }
             // GroupsEngine reuses OpenContact to signal group selection.
             // Route to GroupDetail when on the Groups screen.
             ActionResult::OpenContact { contact_id } if self.screen == AppScreen::Groups => {

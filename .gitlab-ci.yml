@@ -257,9 +257,9 @@ lint:semver:
   allow_failure: true  # advisory until baseline is established
   script:
     - command -v cargo-semver-checks >/dev/null 2>&1 || cargo binstall cargo-semver-checks --no-confirm 2>/dev/null || cargo install cargo-semver-checks
-    - cargo semver-checks check-release -p vauchi-core
-    - cargo semver-checks check-release -p vauchi-platform
-    - cargo semver-checks check-release -p vauchi-protocol
+    - cargo semver-checks check-release -p vauchi-core --baseline-rev origin/main
+    - cargo semver-checks check-release -p vauchi-platform --baseline-rev origin/main
+    - cargo semver-checks check-release -p vauchi-protocol --baseline-rev origin/main
 
 # Duplicate dependency check (advisory — detects multiple versions of same crate)
 lint:duplicates:

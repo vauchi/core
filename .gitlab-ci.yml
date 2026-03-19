@@ -269,7 +269,6 @@ lint:machete:
 test:core:
   extends: [.linux-runner, .validation-rust, .timeout-standard]
   stage: test
-  parallel: 2
   needs:
     - job: lint:format
       optional: true
@@ -278,7 +277,7 @@ test:core:
     - !reference [.clone-locales, before_script]
     - !reference [.clone-themes, before_script]
   script:
-    - cargo nextest run --profile ci -p vauchi-core --features test-kdf --partition slice:${CI_NODE_INDEX}/${CI_NODE_TOTAL}
+    - cargo nextest run --profile ci -p vauchi-core --features test-kdf
   artifacts:
     when: always
     reports:

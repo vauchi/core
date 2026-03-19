@@ -18,20 +18,29 @@ echo "=== Content Contract Validation ==="
 echo ""
 
 # --- Themes ---
-THEMES_JSON="${CORE_DIR}/../themes/themes.json"
+# Core reads the generated flat format, not the hierarchical source.
+# The .clone-themes CI template runs generate.py to produce it.
+THEMES_JSON="${CORE_DIR}/../themes/generated/themes.json"
+if [ ! -f "$THEMES_JSON" ]; then
+    # Fallback: try generating if source exists
+    if [ -f "${CORE_DIR}/../themes/scripts/generate.py" ]; then
+        python3 "${CORE_DIR}/../themes/scripts/generate.py" 2>/dev/null || true
+    fi
+fi
 if [ -f "$THEMES_JSON" ]; then
     echo "Checking themes contract..."
-    # Use cargo test to validate core can parse the real themes.json
-    # The test_load_real_themes_json test loads from VAUCHI_THEMES_PATH env var
-    if VAUCHI_THEMES_PATH="$THEMES_JSON" cargo test -p vauchi-core --lib -- theme::tests::test_load_real_themes_json --exact 2>/dev/null; then
+    THEME_OUTPUT=$(VAUCHI_THEMES_PATH="$THEMES_JSON" cargo test -p vauchi-core --lib -- theme::tests::test_load_real_themes_json --exact 2>&1)
+    THEME_EXIT=$?
+    if [ $THEME_EXIT -eq 0 ]; then
         THEME_COUNT=$(python3 -c "import json; print(len(json.load(open('$THEMES_JSON'))))" 2>/dev/null || echo "?")
-        echo "  PASS: Core parsed all $THEME_COUNT themes from themes/themes.json"
+        echo "  PASS: Core parsed all $THEME_COUNT themes from generated/themes.json"
     else
-        echo "  FAIL: Core cannot parse themes/themes.json — parser/schema drift detected"
+        echo "  FAIL: themes contract test failed (exit $THEME_EXIT)"
+        echo "$THEME_OUTPUT" | grep -E "error|FAILED|panicked" | head -5
         ERRORS=$((ERRORS + 1))
     fi
 else
-    echo "  SKIP: themes/ repo not found at $THEMES_JSON"
+    echo "  SKIP: themes/generated/themes.json not found (run generate.py first)"
 fi
 
 echo ""
@@ -105,11 +114,15 @@ echo ""
 # Pass VAUCHI_MANIFEST_PATH to test against a real manifest file.
 echo "Checking CDN manifest contract..."
 MANIFEST_TEST="content::integrity::tests::test_deserialize_build_manifest_output"
-if cargo test -p vauchi-core --lib -- "$MANIFEST_TEST" --exact 2>/dev/null; then
+MANIFEST_OUTPUT=$(cargo test -p vauchi-core --lib -- "$MANIFEST_TEST" --exact 2>&1)
+MANIFEST_EXIT=$?
+if [ $MANIFEST_EXIT -eq 0 ]; then
     echo "  PASS: Core can deserialize build-manifest.py output format"
 else
-    echo "  FAIL: Core cannot deserialize CDN manifest — ContentManifest struct drifted from build-manifest.py"
-    echo "  Fix: update website/scripts/build-manifest.py to match core/vauchi-core/src/content/types.rs"
+    # Show the actual error (not hidden behind 2>/dev/null)
+    echo "  FAIL: CDN manifest contract test failed (exit $MANIFEST_EXIT)"
+    echo "$MANIFEST_OUTPUT" | grep -E "error|FAILED|panicked" | head -5
+    echo "  Fix: check content/types.rs vs website/scripts/build-manifest.py"
     ERRORS=$((ERRORS + 1))
 fi
 

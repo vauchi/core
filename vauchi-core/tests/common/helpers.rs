@@ -13,11 +13,15 @@ use vauchi_core::{
     Contact, ContactCard, ContactField, FieldType, SymmetricKey, Vauchi,
 };
 
-const THEMES_JSON: &[u8] = include_bytes!("../../../../themes/themes.json");
-
-/// Load all themes from themes.json (replaces deprecated get_bundled_themes).
+/// Load all themes from generated/themes.json at runtime.
+/// Falls back to default theme if file not found (themes repo not checked out).
 pub fn all_themes() -> Vec<Theme> {
-    load_themes_from_json(THEMES_JSON).expect("themes.json must be valid")
+    let path =
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../themes/generated/themes.json");
+    match std::fs::read(&path) {
+        Ok(data) => load_themes_from_json(&data).expect("generated/themes.json must be valid"),
+        Err(_) => vec![vauchi_core::default_theme()],
+    }
 }
 
 /// Find a theme by ID from themes.json (replaces deprecated get_theme_by_id).

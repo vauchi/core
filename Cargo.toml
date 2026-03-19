@@ -30,7 +30,7 @@ overflow-checks = true  # Panic on integer overflow (security: prevent silent wr
 # Development profile: fast compilation, good debugging
 [profile.dev]
 opt-level = 0        # No optimization
-debug = true         # Full debug info
+debug = "line-tables-only"  # Backtraces work, 2-30% faster builds (use CARGO_PROFILE_DEV_DEBUG=2 for full debuginfo)
 strip = false
 split-debuginfo = "unpacked"  # Reduce linker work (skip debuginfo bundling)
 

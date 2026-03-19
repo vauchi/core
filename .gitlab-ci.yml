@@ -248,6 +248,19 @@ lint:clippy:
     - !reference [.clone-locales, before_script]
     - !reference [.clone-themes, before_script]
 
+# SemVer compatibility check — catch breaking API changes before they cascade
+# to 10+ downstream consumers (cli, tui, e2e, relay, linux-gtk, mobile bindings)
+lint:semver:
+  extends: [.linux-runner-readonly, .validation-rust, .timeout-quick]
+  stage: lint
+  needs: []
+  allow_failure: true  # advisory until baseline is established
+  script:
+    - command -v cargo-semver-checks >/dev/null 2>&1 || cargo binstall cargo-semver-checks --no-confirm 2>/dev/null || cargo install cargo-semver-checks
+    - cargo semver-checks check-release -p vauchi-core
+    - cargo semver-checks check-release -p vauchi-platform
+    - cargo semver-checks check-release -p vauchi-protocol
+
 # Duplicate dependency check (advisory — detects multiple versions of same crate)
 lint:duplicates:
   extends: [.linux-runner-nocache, .lint-duplicates-job, .timeout-quick]

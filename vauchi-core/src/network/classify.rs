@@ -32,7 +32,7 @@ pub enum MessageType {
     ValidationRecord,
     /// Field validation revocation.
     ValidationRevocation,
-    /// Unrecognized or unparseable message.
+    /// Unrecognized or unparsable message.
     Unknown,
 }
 

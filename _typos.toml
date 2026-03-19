@@ -1,0 +1,22 @@
+# SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+# typos source code spell checker configuration
+# https://github.com/crate-ci/typos
+
+[files]
+extend-exclude = [
+    "target/",
+    "supply-chain/",         # cargo-vet managed — crate names are not typos
+    "**/cert_pinning.rs",    # base64-encoded certificates produce false positives
+    "*.lock",
+]
+
+[default.extend-words]
+# _ba suffix in commutativity test variables (merged_ba, result_ba, etc.)
+ba = "ba"
+# French test strings ("identité" without accents for Unicode boundary tests)
+identite = "identite"
+# French i18n: "Bienvenue sur Vauchi"
+sur = "sur"

@@ -257,6 +257,7 @@ lint:semver:
   allow_failure: true  # advisory until baseline is established
   script:
     - command -v cargo-semver-checks >/dev/null 2>&1 || cargo binstall cargo-semver-checks --no-confirm 2>/dev/null || cargo install cargo-semver-checks
+    - git fetch origin main
     - cargo semver-checks check-release -p vauchi-core --baseline-rev origin/main
     - cargo semver-checks check-release -p vauchi-platform --baseline-rev origin/main
     - cargo semver-checks check-release -p vauchi-protocol --baseline-rev origin/main

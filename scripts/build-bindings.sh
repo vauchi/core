@@ -39,8 +39,10 @@ LOCAL_IOS_DIR="$WORKSPACE_ROOT/ios"
 LOCAL_ANDROID_DIR="$WORKSPACE_ROOT/android"
 LOCAL_MACOS_DIR="$WORKSPACE_ROOT/macos"
 
-# NDK paths (for Android)
-NDK_HOME="${ANDROID_NDK_HOME:-$HOME/Library/Android/sdk/ndk/26.1.10909125}"
+# NDK paths (for Android) — auto-detect latest installed NDK if ANDROID_NDK_HOME not set
+NDK_DEFAULT=$(ls -d "$HOME/Library/Android/sdk/ndk"/*/ 2>/dev/null | sort -V | tail -1)
+NDK_DEFAULT="${NDK_DEFAULT%/}"
+NDK_HOME="${ANDROID_NDK_HOME:-${NDK_DEFAULT:-$HOME/Library/Android/sdk/ndk}}"
 
 echo -e "${YELLOW}╔════════════════════════════════════════╗${NC}"
 echo -e "${YELLOW}║     Vauchi UniFFI Bindings Build       ║${NC}"

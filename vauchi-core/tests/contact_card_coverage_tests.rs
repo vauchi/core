@@ -204,3 +204,106 @@ fn test_card_id_unique() {
     let card2 = ContactCard::new("Test");
     assert_ne!(card1.id(), card2.id());
 }
+
+// @scenario: contact_card_management.feature:Field value size limit
+#[test]
+fn test_field_value_at_max_length() {
+    let long_value = "x".repeat(1000 /* MAX_VALUE_LENGTH */);
+    let field = ContactField::new(FieldType::Custom, "notes", &long_value);
+    assert!(
+        field.validate().is_ok(),
+        "Value at MAX_VALUE_LENGTH should be valid"
+    );
+}
+
+// @scenario: contact_card_management.feature:Field value size limit
+#[test]
+fn test_field_value_exceeds_max_length() {
+    let too_long = "x".repeat(1000 /* MAX_VALUE_LENGTH */ + 1);
+    let field = ContactField::new(FieldType::Custom, "notes", &too_long);
+    let err = field
+        .validate()
+        .expect_err("should reject value > MAX_VALUE_LENGTH");
+    assert!(
+        format!("{err}").contains("too long") || format!("{err:?}").contains("ValueTooLong"),
+        "Error should indicate value too long: {err:?}"
+    );
+}
+
+// @scenario: contact_card_management.feature:Field value size limit
+#[test]
+fn test_field_label_at_max_length() {
+    let long_label = "L".repeat(64 /* MAX_LABEL_LENGTH */);
+    let field = ContactField::new(FieldType::Custom, &long_label, "value");
+    // Label length validation is on the field, not separate
+    assert!(
+        field.validate().is_ok(),
+        "Label at MAX_LABEL_LENGTH should be valid"
+    );
+}
+
+// @scenario: contact_card_management.feature:Cancel editing preserves original values
+#[test]
+fn test_update_field_preserves_other_fields() {
+    let mut card = ContactCard::new("Alice");
+    card.add_field(ContactField::new(FieldType::Email, "work", "old@work.com"))
+        .unwrap();
+    card.add_field(ContactField::new(
+        FieldType::Phone,
+        "mobile",
+        "+41791234567",
+    ))
+    .unwrap();
+
+    let email_id = card.fields()[0].id().to_string();
+
+    // Update only the email field
+    card.update_field_value(&email_id, "new@work.com").unwrap();
+
+    // Email updated
+    assert_eq!(card.fields()[0].value(), "new@work.com");
+    // Phone preserved
+    assert_eq!(card.fields()[1].value(), "+41791234567");
+    assert_eq!(card.fields()[1].label(), "mobile");
+}
+
+// @scenario: contact_card_management.feature:Remove field updates contacts
+#[test]
+fn test_remove_field_preserves_remaining() {
+    let mut card = ContactCard::new("Alice");
+    card.add_field(ContactField::new(FieldType::Email, "work", "a@b.com"))
+        .unwrap();
+    card.add_field(ContactField::new(
+        FieldType::Phone,
+        "mobile",
+        "+41791234567",
+    ))
+    .unwrap();
+    card.add_field(ContactField::new(FieldType::Custom, "notes", "friend"))
+        .unwrap();
+
+    let phone_id = card.fields()[1].id().to_string();
+
+    // Remove the middle field
+    card.remove_field(&phone_id).unwrap();
+
+    // Should have 2 fields remaining
+    assert_eq!(card.fields().len(), 2);
+    assert_eq!(card.fields()[0].label(), "work");
+    assert_eq!(card.fields()[1].label(), "notes");
+}
+
+// @scenario: contact_card_management.feature:Cancel field removal
+#[test]
+fn test_remove_nonexistent_field_fails() {
+    let mut card = ContactCard::new("Alice");
+    card.add_field(ContactField::new(FieldType::Email, "work", "a@b.com"))
+        .unwrap();
+
+    let result = card.remove_field("nonexistent-id");
+    assert!(result.is_err(), "Removing nonexistent field should fail");
+
+    // Original field preserved
+    assert_eq!(card.fields().len(), 1);
+    assert_eq!(card.fields()[0].label(), "work");
+}

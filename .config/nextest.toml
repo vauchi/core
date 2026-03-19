@@ -7,8 +7,20 @@
 # non-standard format that nextest cannot parse. Cucumber tests run via
 # `cargo test --test cucumber_tests` separately.
 default-filter = "not binary(cucumber_tests)"
-# Per-test timeout: prevent deadlocked concurrency tests from hanging the pipeline.
+# Per-test timeout: prevent hung tests from blocking the pipeline.
 slow-timeout = { period = "60s", terminate-after = 3 }
 
 [profile.ci.junit]
 path = "target/nextest/ci/junit.xml"
+
+# File-based SQLite concurrency tests spawn internal threads that compete for
+# write locks. Under heavy parallel test execution (coverage:workspace with
+# ~3700 tests on 16 cores), the external I/O pressure pushes SQLite lock
+# contention past busy_timeout, causing SQLITE_BUSY failures. Run these tests
+# isolated from other test processes.
+[test-groups.sqlite-concurrency]
+max-threads = 1
+
+[[profile.default.overrides]]
+filter = "test(test_sequential_writers_file_based) + test(test_concurrent_readers_file_based) + test(test_multiple_connections_same_file) + test(test_rapid_open_close_cycles) + test(test_interleaved_reads_writes)"
+test-group = "sqlite-concurrency"

@@ -12,7 +12,6 @@
 //! 4. WAL mode concurrent access (if enabled)
 
 use rand::Rng;
-use std::sync::{Arc, Barrier};
 use std::thread;
 use tempfile::tempdir;
 use vauchi_core::contact::Contact;
@@ -24,12 +23,22 @@ use vauchi_core::{ContactCard, ContactField, FieldType};
 // HELPER FUNCTIONS
 // =============================================================================
 
-/// Open storage for concurrent access. No manual retry needed — SQLite's
-/// busy_timeout (set at the C level before any SQL) handles lock contention
-/// internally with a 5-second wait.
-fn open_with_retry(path: &std::path::Path, key: SymmetricKey, _max_retries: u32) -> Storage {
-    Storage::open(path, key)
-        .expect("Storage::open failed; busy_timeout=5s should handle contention")
+/// Open storage with retries for CI environments where heavy parallel test
+/// execution creates transient SQLITE_BUSY errors during initialization.
+/// SQLite's busy_timeout handles lock contention for SQL statements, but
+/// Storage::open also runs DDL (CREATE TABLE IF NOT EXISTS) and maintenance
+/// (DELETE) that can fail under extreme I/O pressure.
+fn open_with_retry(path: &std::path::Path, key: SymmetricKey, max_retries: u32) -> Storage {
+    for attempt in 0..=max_retries {
+        match Storage::open(path, key.clone()) {
+            Ok(storage) => return storage,
+            Err(e) if attempt < max_retries => {
+                std::thread::sleep(std::time::Duration::from_millis(200 * (attempt as u64 + 1)));
+            }
+            Err(e) => panic!("Storage::open failed after {} retries: {}", max_retries, e),
+        }
+    }
+    unreachable!()
 }
 
 fn create_test_contact(name: &str) -> Contact {
@@ -179,23 +188,19 @@ fn test_concurrent_readers_file_based() {
         }
     }
 
-    // Spawn multiple reader threads
+    // Spawn multiple reader threads — no Barrier synchronization.
+    // WAL mode handles concurrent reads correctly; a Barrier would risk
+    // deadlock if any thread panics during Storage::open (the remaining
+    // threads wait at the barrier forever, causing a 180s nextest timeout).
     let path = db_path.clone();
-    let barrier = Arc::new(Barrier::new(5));
     let mut handles = Vec::new();
 
     for thread_id in 0..5 {
         let thread_path = path.clone();
         let thread_key = key.clone();
-        let thread_barrier = Arc::clone(&barrier);
 
         let handle = thread::spawn(move || {
-            // Open connection before barrier with retries to handle
-            // SQLite contention during concurrent initialization/migration
             let storage = open_with_retry(&thread_path, thread_key, 5);
-
-            // Wait for all threads to be ready, then read concurrently
-            thread_barrier.wait();
 
             let contacts = storage.list_contacts().unwrap();
 

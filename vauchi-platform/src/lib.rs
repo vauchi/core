@@ -72,8 +72,9 @@ pub use diagnostic::{
 };
 pub use error::{KeychainError, MobileError};
 pub use exchange::{
-    MobileBleExchangeStatus, MobileExchangeCommand, MobileExchangeHardwareEvent,
-    MobileExchangeSession, MobileExchangeState, MobileProximityHandler,
+    create_qr_exchange_manual, create_qr_exchange_proximity, MobileBleExchangeStatus,
+    MobileExchangeCommand, MobileExchangeHardwareEvent, MobileExchangeSession, MobileExchangeState,
+    MobileProximityHandler,
 };
 pub use mobile_animated_qr::{
     MobileAnimatedQrConfig, MobileAnimatedQrError, MobileAnimatedQrProgress,

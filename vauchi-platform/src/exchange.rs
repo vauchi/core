@@ -49,13 +49,18 @@ pub trait MobileProximityHandler: Send + Sync {
     /// is_initiator: true if this device scanned the QR (emit first), false if displayed.
     ///
     /// Returns empty string on success, error message on failure.
+    ///
+    /// Default: falls back to single-direction (emit only) for backward compat.
+    /// Mobile apps should override this to enforce both directions.
     fn verify_proximity_two_way(
         &self,
         emit_challenge: Vec<u8>,
-        listen_challenge: Vec<u8>,
+        _listen_challenge: Vec<u8>,
         timeout_ms: u64,
-        is_initiator: bool,
-    ) -> String;
+        _is_initiator: bool,
+    ) -> String {
+        self.verify_proximity(emit_challenge, timeout_ms)
+    }
 }
 
 // === ProximityBridge ===
@@ -215,7 +220,7 @@ pub struct MobileExchangeSession {
 
 impl MobileExchangeSession {
     /// Create a new session with an optional manual verifier handle.
-    pub(crate) fn new(
+    pub fn new(
         session: ExchangeSession,
         manual_verifier: Option<Arc<ManualConfirmationVerifier>>,
     ) -> Self {
@@ -226,7 +231,7 @@ impl MobileExchangeSession {
     }
 
     /// Extract the contact from a completed session (used by finalize_exchange).
-    pub(crate) fn extract_contact(&self) -> Result<Contact, MobileError> {
+    pub fn extract_contact(&self) -> Result<Contact, MobileError> {
         let inner = self.inner.lock().unwrap();
         match inner.state() {
             ExchangeState::Complete { contact } => Ok(contact.clone()),
@@ -607,7 +612,7 @@ impl From<MobileExchangeHardwareEvent> for ExchangeHardwareEvent {
 ///
 /// Wraps the proximity bridge in a single-entry `VerifierChain` so that
 /// verification events are always available via `get_verification_events()`.
-pub(crate) fn create_qr_exchange_proximity(
+pub fn create_qr_exchange_proximity(
     identity: Identity,
     our_card: ContactCard,
     handler: Box<dyn MobileProximityHandler>,
@@ -628,7 +633,7 @@ pub(crate) fn create_qr_exchange_proximity(
 ///
 /// Wraps the manual bridge in a single-entry `VerifierChain` so that
 /// verification events are always available via `get_verification_events()`.
-pub(crate) fn create_qr_exchange_manual(
+pub fn create_qr_exchange_manual(
     identity: Identity,
     our_card: ContactCard,
 ) -> Arc<MobileExchangeSession> {
@@ -663,15 +668,7 @@ mod tests {
         fn verify_proximity(&self, _challenge: Vec<u8>, _timeout_ms: u64) -> String {
             String::new()
         }
-        fn verify_proximity_two_way(
-            &self,
-            _emit: Vec<u8>,
-            _listen: Vec<u8>,
-            _timeout_ms: u64,
-            _is_initiator: bool,
-        ) -> String {
-            String::new()
-        }
+        // verify_proximity_two_way uses default (falls back to verify_proximity)
     }
 
     /// Mock proximity handler that always fails.
@@ -680,15 +677,7 @@ mod tests {
         fn verify_proximity(&self, _challenge: Vec<u8>, _timeout_ms: u64) -> String {
             "Device too far away".to_string()
         }
-        fn verify_proximity_two_way(
-            &self,
-            _emit: Vec<u8>,
-            _listen: Vec<u8>,
-            _timeout_ms: u64,
-            _is_initiator: bool,
-        ) -> String {
-            "Device too far away".to_string()
-        }
+        // verify_proximity_two_way uses default (falls back to verify_proximity)
     }
 
     // @scenario: contact_exchange:Successful QR code exchange with proximity
@@ -782,319 +771,6 @@ mod tests {
         assert!(result.is_err(), "two-way should propagate failure");
     }
 
-    // @scenario: contact_exchange:Generate exchange QR code
-    #[test]
-    fn test_session_generates_qr() {
-        let identity = Identity::create("Alice");
-        let card = ContactCard::new("Alice");
-
-        let session = create_qr_exchange_manual(identity, card);
-
-        // Initially idle
-        assert!(matches!(session.state(), MobileExchangeState::Idle));
-
-        // Generate QR
-        let qr_data = session.generate_qr().unwrap();
-        assert!(qr_data.starts_with("wb://"));
-
-        // State should be DisplayingQr
-        assert!(matches!(
-            session.state(),
-            MobileExchangeState::DisplayingQr { .. }
-        ));
-    }
-
-    // @scenario: contact_exchange:Mutual QR exchange with bidirectional scanning
-    #[test]
-    fn test_session_mutual_qr_flow() {
-        let alice = Identity::create("Alice");
-        let alice_card = ContactCard::new("Alice");
-        let bob = Identity::create("Bob");
-        let bob_card = ContactCard::new("Bob");
-
-        // Both sides create QR sessions and generate QR codes
-        let alice_session = create_qr_exchange_manual(alice, alice_card);
-        let alice_qr = alice_session.generate_qr().unwrap();
-
-        let bob_session = create_qr_exchange_manual(bob, bob_card);
-        let bob_qr = bob_session.generate_qr().unwrap();
-
-        // Both scan each other's QR
-        alice_session.process_qr(bob_qr).unwrap();
-        bob_session.process_qr(alice_qr).unwrap();
-
-        // Both should be in PeerScanned
-        assert!(matches!(
-            alice_session.state(),
-            MobileExchangeState::PeerScanned
-        ));
-        assert!(matches!(
-            bob_session.state(),
-            MobileExchangeState::PeerScanned
-        ));
-
-        // Signal that the other party scanned our QR
-        alice_session.they_scanned_our_qr().unwrap();
-        bob_session.they_scanned_our_qr().unwrap();
-
-        assert!(matches!(
-            alice_session.state(),
-            MobileExchangeState::AwaitingKeyAgreement
-        ));
-
-        // Key agreement
-        alice_session.perform_key_agreement().unwrap();
-        bob_session.perform_key_agreement().unwrap();
-
-        assert!(matches!(
-            alice_session.state(),
-            MobileExchangeState::AwaitingCardExchange
-        ));
-
-        // Complete card exchange
-        alice_session
-            .complete_card_exchange("Bob".to_string())
-            .unwrap();
-        bob_session
-            .complete_card_exchange("Alice".to_string())
-            .unwrap();
-
-        assert!(matches!(
-            alice_session.state(),
-            MobileExchangeState::Complete { .. }
-        ));
-        assert!(matches!(
-            bob_session.state(),
-            MobileExchangeState::Complete { .. }
-        ));
-    }
-
-    // @scenario: contact_exchange:Incomplete exchange recovery
-    #[test]
-    fn test_finalize_requires_complete_state() {
-        let identity = Identity::create("Alice");
-        let card = ContactCard::new("Alice");
-
-        let session = create_qr_exchange_manual(identity, card);
-
-        // Should fail — session is Idle, not Complete
-        let result = session.extract_contact();
-        assert!(result.is_err(), "expected error");
-    }
-
-    // @scenario: contact_exchange:Successful QR code exchange with proximity
-    #[test]
-    fn test_confirm_proximity_manual_session() {
-        let identity = Identity::create("Alice");
-        let card = ContactCard::new("Alice");
-
-        let session = create_qr_exchange_manual(identity, card);
-        // Should succeed without error
-        session
-            .confirm_proximity()
-            .expect("confirm_proximity should succeed on manual session");
-    }
-
-    // @scenario: contact_exchange:Successful QR code exchange with proximity
-    #[test]
-    fn test_confirm_proximity_proximity_session() {
-        let identity = Identity::create("Alice");
-        let card = ContactCard::new("Alice");
-
-        let session = create_qr_exchange_proximity(identity, card, Box::new(SuccessHandler));
-        // Should be no-op for proximity sessions (auto-verified)
-        session
-            .confirm_proximity()
-            .expect("confirm_proximity should be a no-op on proximity session");
-    }
-
-    // @scenario: contact_exchange:Exchange timeout after interruption
-    #[test]
-    fn test_session_not_timed_out_initially() {
-        let identity = Identity::create("Alice");
-        let card = ContactCard::new("Alice");
-
-        let session = create_qr_exchange_manual(identity, card);
-        assert!(!session.is_timed_out());
-    }
-
-    // === Phase B: Event wiring tests ===
-
-    #[test]
-    fn test_verification_confidence_defaults_to_unknown() {
-        use crate::mobile_verifier_event::MobileProximityConfidence;
-
-        let identity = Identity::create("Alice");
-        let card = ContactCard::new("Alice");
-        let session = create_qr_exchange_manual(identity, card);
-
-        // Before any verification, confidence is Unknown
-        assert_eq!(
-            session.verification_confidence(),
-            MobileProximityConfidence::Unknown
-        );
-    }
-
-    #[test]
-    fn test_get_verification_events_empty_before_verification() {
-        let identity = Identity::create("Alice");
-        let card = ContactCard::new("Alice");
-        let session = create_qr_exchange_manual(identity, card);
-
-        // Before any verification, events list is empty
-        assert!(session.get_verification_events().is_empty());
-    }
-
-    #[test]
-    fn test_verification_events_populated_after_key_agreement() {
-        use crate::mobile_verifier_event::{
-            MobileProximityConfidence, MobileProximityVerifierEvent,
-        };
-
-        let alice = Identity::create("Alice");
-        let alice_card = ContactCard::new("Alice");
-        let bob = Identity::create("Bob");
-        let bob_card = ContactCard::new("Bob");
-
-        // Create manual sessions (confirmed before key agreement so verification succeeds)
-        let alice_session = {
-            let verifier = ManualConfirmationVerifier::new();
-            verifier.confirm();
-            let mut chain = VerifierChain::new();
-            chain.add(VerifierMethod::ManualConfirmation, Box::new(verifier));
-            let session = ExchangeSession::new_qr(alice, alice_card, chain);
-            Arc::new(MobileExchangeSession::new(session, None))
-        };
-        let bob_session = {
-            let verifier = ManualConfirmationVerifier::new();
-            verifier.confirm();
-            let mut chain = VerifierChain::new();
-            chain.add(VerifierMethod::ManualConfirmation, Box::new(verifier));
-            let session = ExchangeSession::new_qr(bob, bob_card, chain);
-            Arc::new(MobileExchangeSession::new(session, None))
-        };
-
-        // Drive through exchange to key agreement
-        let alice_qr = alice_session.generate_qr().unwrap();
-        let bob_qr = bob_session.generate_qr().unwrap();
-        alice_session.process_qr(bob_qr).unwrap();
-        bob_session.process_qr(alice_qr).unwrap();
-        alice_session.they_scanned_our_qr().unwrap();
-        bob_session.they_scanned_our_qr().unwrap();
-
-        // Key agreement triggers proximity verification
-        alice_session.perform_key_agreement().unwrap();
-        bob_session.perform_key_agreement().unwrap();
-
-        // Events should now be populated for both sides
-        let alice_events = alice_session.get_verification_events();
-        assert!(
-            !alice_events.is_empty(),
-            "Alice events should be populated after key agreement"
-        );
-        let bob_events = bob_session.get_verification_events();
-        assert!(
-            !bob_events.is_empty(),
-            "Bob events should be populated after key agreement"
-        );
-
-        // Both should contain a Completed event with Medium confidence
-        // (ManualConfirmation verifier reports Medium)
-        let alice_completed = alice_events.iter().find(|e| {
-            matches!(
-                e,
-                MobileProximityVerifierEvent::Completed {
-                    confidence: MobileProximityConfidence::Medium,
-                    ..
-                }
-            )
-        });
-        assert!(
-            alice_completed.is_some(),
-            "Alice should have a Completed event with Medium confidence"
-        );
-
-        let bob_completed = bob_events.iter().find(|e| {
-            matches!(
-                e,
-                MobileProximityVerifierEvent::Completed {
-                    confidence: MobileProximityConfidence::Medium,
-                    ..
-                }
-            )
-        });
-        assert!(
-            bob_completed.is_some(),
-            "Bob should have a Completed event with Medium confidence"
-        );
-    }
-
-    #[test]
-    fn test_proximity_factory_wraps_in_chain() {
-        let identity = Identity::create("Alice");
-        let card = ContactCard::new("Alice");
-        let session = create_qr_exchange_proximity(identity, card, Box::new(SuccessHandler));
-
-        // Events start empty (no verification yet)
-        assert!(session.get_verification_events().is_empty());
-    }
-
-    #[test]
-    fn test_manual_factory_wraps_in_chain() {
-        let identity = Identity::create("Alice");
-        let card = ContactCard::new("Alice");
-        let session = create_qr_exchange_manual(identity, card);
-
-        // Events start empty (no verification yet)
-        assert!(session.get_verification_events().is_empty());
-    }
-
-    // === Debug log wiring tests ===
-
-    #[test]
-    fn test_debug_log_disabled_by_default() {
-        let identity = Identity::create("Alice");
-        let card = ContactCard::new("Alice");
-        let session = create_qr_exchange_manual(identity, card);
-
-        assert!(session.get_exchange_debug_jsonl().is_none());
-        assert!(session.get_exchange_debug_markdown().is_none());
-    }
-
-    #[test]
-    fn test_enable_debug_log_captures_events() {
-        let identity = Identity::create("Alice");
-        let card = ContactCard::new("Alice");
-        let session = create_qr_exchange_manual(identity, card);
-
-        session.enable_debug_log();
-        session.generate_qr().unwrap();
-
-        let jsonl = session
-            .get_exchange_debug_jsonl()
-            .expect("log should exist");
-        let lines: Vec<&str> = jsonl.lines().collect();
-        // SessionStarted + QrGenerated
-        assert_eq!(lines.len(), 2);
-        assert!(jsonl.contains("session_started"));
-        assert!(jsonl.contains("qr_generated"));
-    }
-
-    #[test]
-    fn test_debug_log_markdown_output() {
-        let identity = Identity::create("Alice");
-        let card = ContactCard::new("Alice");
-        let session = create_qr_exchange_manual(identity, card);
-
-        session.enable_debug_log();
-        session.generate_qr().unwrap();
-
-        let md = session
-            .get_exchange_debug_markdown()
-            .expect("log should exist");
-        assert!(md.contains("# Exchange Debug Log"));
-        assert!(md.contains("2 events"));
-        assert!(md.contains("SessionStarted"));
-        assert!(md.contains("QrGenerated"));
-    }
+    // Remaining session-level tests moved to tests/exchange_session_mobile_tests.rs
+    // (they use only the public MobileExchangeSession API, not ProximityBridge internals)
 }

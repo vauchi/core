@@ -302,7 +302,7 @@ test:core:
 test:cucumber:
   extends: [.linux-runner, .validation-rust, .timeout-quick]
   stage: test
-  allow_failure: true  # advisory: some feature files have parsing errors
+  allow_failure: false
   needs:
     - job: lint:format
       optional: true

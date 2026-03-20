@@ -11,7 +11,7 @@ vauchi-cabi/src/lib.rs 1799
 vauchi-platform/src/types.rs 1547
 
 # EXEMPT — UniFFI facade: splitting breaks binding generation (31 delegating methods)
-vauchi-platform/src/lib.rs 1878
+vauchi-platform/src/lib.rs 1880
 
 # EXEMPT — state machine: scattered transitions create protocol bugs
 vauchi-core/src/exchange/session.rs 1415
@@ -38,6 +38,6 @@ vauchi-core/tests/app_engine_tests.rs 2275
 vauchi-core/tests/field_validation_tests.rs 2256
 
 # Grandfathered — below split threshold, monitor
-vauchi-core/tests/onboarding_tests.rs 1292
+vauchi-core/tests/onboarding_tests.rs 1301
 vauchi-core/tests/sync_device_orchestrator_tests.rs 1286
 vauchi-core/tests/visibility_label_tests.rs 1220

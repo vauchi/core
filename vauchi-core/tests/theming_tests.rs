@@ -21,9 +21,9 @@ mod common;
 use common::helpers::{all_themes, theme_by_id};
 use tempfile::TempDir;
 use vauchi_core::content::{
-    compute_checksum, ContentCache, ContentConfig, ContentManager, ContentType,
+    ContentCache, ContentConfig, ContentManager, ContentType, compute_checksum,
 };
-use vauchi_core::theme::{validate_hex_color, Theme, ThemeError, ThemeMode};
+use vauchi_core::theme::{Theme, ThemeError, ThemeMode, validate_hex_color};
 
 // ============================================================
 // Theme Preview Before Apply

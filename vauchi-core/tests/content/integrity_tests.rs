@@ -8,7 +8,7 @@
 //! - Verify content checksum before saving
 //! - Reject content with mismatched checksum
 
-use vauchi_core::content::{compute_checksum, verify_checksum, IntegrityError};
+use vauchi_core::content::{IntegrityError, compute_checksum, verify_checksum};
 
 #[test]
 fn test_compute_checksum() {

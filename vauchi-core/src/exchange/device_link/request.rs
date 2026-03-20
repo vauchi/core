@@ -6,7 +6,7 @@
 
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use crate::crypto::{decrypt, encrypt, SymmetricKey};
+use crate::crypto::{SymmetricKey, decrypt, encrypt};
 
 use super::super::ExchangeError;
 

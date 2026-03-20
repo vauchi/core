@@ -11,7 +11,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::i18n::{get_string, Locale};
+use crate::i18n::{Locale, get_string};
 
 /// Categories of help content
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]

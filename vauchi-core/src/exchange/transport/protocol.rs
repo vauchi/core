@@ -29,10 +29,10 @@
 use crate::crypto::kdf::HKDF;
 use crate::exchange::error::ExchangeError;
 use crate::exchange::transport::caps::TransportCaps;
-use chacha20poly1305::aead::{Aead, KeyInit};
 use chacha20poly1305::XChaCha20Poly1305;
-use rand::rngs::OsRng;
+use chacha20poly1305::aead::{Aead, KeyInit};
 use rand::RngCore;
+use rand::rngs::OsRng;
 use x25519_dalek::{PublicKey, StaticSecret};
 use zeroize::{Zeroize, Zeroizing};
 

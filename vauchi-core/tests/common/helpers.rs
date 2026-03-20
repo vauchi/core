@@ -7,10 +7,10 @@
 //! Common helper functions for setting up test scenarios.
 
 use vauchi_core::{
+    Contact, ContactCard, ContactField, FieldType, SymmetricKey, Vauchi,
     crypto::ratchet::DoubleRatchetState,
     exchange::X3DHKeyPair,
-    theme::{load_themes_from_json, Theme},
-    Contact, ContactCard, ContactField, FieldType, SymmetricKey, Vauchi,
+    theme::{Theme, load_themes_from_json},
 };
 
 /// Load all themes from generated/themes.json at runtime.

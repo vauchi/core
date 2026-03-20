@@ -5,8 +5,8 @@
 //! Tests for classify_message API
 //! Trace: ADR-021 Tier 1 — classify_message
 
-use vauchi_core::network::simple_message::*;
 use vauchi_core::network::MessageType;
+use vauchi_core::network::simple_message::*;
 
 #[test]
 fn test_classify_message_returns_encrypted_update_for_encrypted_update_payload() {

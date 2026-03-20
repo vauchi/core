@@ -85,7 +85,10 @@ impl WorkflowEngine for SyncStatusEngine {
                 },
                 "test_connection" => ActionResult::ShowAlert {
                     title: "Connection Test".into(),
-                    message: format!("Testing connection to {}...\nConnection test will be available in a future update.", self.relay_url),
+                    message: format!(
+                        "Testing connection to {}...\nConnection test will be available in a future update.",
+                        self.relay_url
+                    ),
                 },
                 _ => ActionResult::UpdateScreen(self.build_screen()),
             },

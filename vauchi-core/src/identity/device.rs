@@ -8,7 +8,7 @@
 //! Each device gets unique communication keys derived from the master seed.
 
 use crate::crypto::X3DHKeyPair;
-use crate::crypto::{Signature, SigningKeyPair, HKDF};
+use crate::crypto::{HKDF, Signature, SigningKeyPair};
 use serde::{Deserialize, Serialize};
 use std::time::{SystemTime, UNIX_EPOCH};
 use thiserror::Error;
@@ -322,10 +322,10 @@ impl DeviceRegistry {
     ) -> Result<(), DeviceError> {
         if self.active_count() <= 1 {
             // Check if we're trying to revoke the last active device
-            if let Some(device) = self.find_device(device_id) {
-                if device.is_active() {
-                    return Err(DeviceError::CannotRemoveLastDevice);
-                }
+            if let Some(device) = self.find_device(device_id)
+                && device.is_active()
+            {
+                return Err(DeviceError::CannotRemoveLastDevice);
             }
         }
 

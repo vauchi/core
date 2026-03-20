@@ -12,12 +12,12 @@
 //!   → TheyScannedOurQR → AwaitingKeyAgreement → PerformKeyAgreement
 //!   → AwaitingCardExchange → CompleteExchange → Complete.
 
+use vauchi_core::ContactCard;
 use vauchi_core::exchange::{
     ExchangeError, ExchangeEvent, ExchangeQR, ExchangeSession, ExchangeState,
     MockProximityVerifier, X3DHKeyPair,
 };
 use vauchi_core::identity::Identity;
-use vauchi_core::ContactCard;
 
 /// Helper to create a mock proximity verifier.
 ///

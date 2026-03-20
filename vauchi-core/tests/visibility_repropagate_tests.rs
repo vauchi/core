@@ -8,8 +8,8 @@
 //! triggers a new card update to the affected contact.
 
 use vauchi_core::{
-    exchange::X3DHKeyPair, Contact, ContactCard, ContactField, FieldType, Identity, SymmetricKey,
-    Vauchi, VauchiError,
+    Contact, ContactCard, ContactField, FieldType, Identity, SymmetricKey, Vauchi, VauchiError,
+    exchange::X3DHKeyPair,
 };
 
 fn create_test_vauchi() -> Vauchi {

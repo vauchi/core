@@ -4,8 +4,8 @@
 
 //! Tests for BLE exchange rollback tracking.
 
-use vauchi_core::exchange::BleRollback;
 use vauchi_core::ExchangeError;
+use vauchi_core::exchange::BleRollback;
 
 // @scenario: ble_exchange.feature:Rollback clears pending contact data
 #[test]

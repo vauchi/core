@@ -6,7 +6,7 @@ use std::fmt::Write;
 
 use super::log_event::LogEvent;
 use super::snapshot::SnapshotMetadata;
-use super::tuner::{rank_configs, DeviceCapabilityProfile, Platform, TuningResult};
+use super::tuner::{DeviceCapabilityProfile, Platform, TuningResult, rank_configs};
 
 #[derive(Debug)]
 pub enum ReportError {
@@ -236,7 +236,8 @@ fn write_config_table(
             r.avg_latency_ms,
             r.jitter_ms,
             r.actual_iso.map_or("-".to_string(), |v| v.to_string()),
-            r.actual_exposure_ev.map_or("-".to_string(), |v| v.to_string()),
+            r.actual_exposure_ev
+                .map_or("-".to_string(), |v| v.to_string()),
             r.thermal_events,
         )?;
     }
@@ -270,9 +271,11 @@ fn write_snapshot_section(
             s.config_id,
             s.frame_index,
             if s.decode_result { "yes" } else { "no" },
-            s.decode_latency_ms.map_or("-".to_string(), |v| format!("{:.1}", v)),
+            s.decode_latency_ms
+                .map_or("-".to_string(), |v| format!("{:.1}", v)),
             s.actual_iso.map_or("-".to_string(), |v| v.to_string()),
-            s.actual_exposure_ev.map_or("-".to_string(), |v| v.to_string()),
+            s.actual_exposure_ev
+                .map_or("-".to_string(), |v| v.to_string()),
         )?;
     }
 

@@ -10,8 +10,8 @@
 //!
 //! Frame wire format: `{index}/{total}/{crc32_hex_8chars}/{base64url_data}`
 
-use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use base64::Engine;
+use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use thiserror::Error;
 
 /// Configuration for animated QR sessions.
@@ -268,7 +268,7 @@ impl AnimatedQrSession {
                     return Err(AnimatedQrError::IncompleteReassembly {
                         received: self.received_count,
                         total: i,
-                    })
+                    });
                 }
             }
         }

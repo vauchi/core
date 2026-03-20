@@ -4,9 +4,9 @@
 
 //! Visibility operations and labels for mobile.
 
+use super::VauchiPlatform;
 use super::error::MobileError;
 use super::types::{MobileVisibilityLabel, MobileVisibilityLabelDetail};
-use super::VauchiPlatform;
 
 #[uniffi::export]
 impl VauchiPlatform {

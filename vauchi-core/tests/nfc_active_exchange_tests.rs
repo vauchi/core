@@ -11,7 +11,7 @@
 
 use vauchi_core::exchange::{
     ExchangeError, ExchangeEvent, ExchangeNfc, ExchangeSession, ExchangeState, ExchangeTransport,
-    MockProximityVerifier, X3DHKeyPair, NFC_PAYLOAD_SIZE,
+    MockProximityVerifier, NFC_PAYLOAD_SIZE, X3DHKeyPair,
 };
 use vauchi_core::{ContactCard, Identity};
 

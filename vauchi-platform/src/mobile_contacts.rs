@@ -6,12 +6,12 @@
 
 use vauchi_core::ContactField;
 
+use super::VauchiPlatform;
 use super::error::MobileError;
 use super::types::{
     MobileContact, MobileContactCard, MobileFieldType, MobileFieldValidation, MobileSocialNetwork,
     MobileValidationStatus,
 };
-use super::VauchiPlatform;
 
 #[uniffi::export]
 impl VauchiPlatform {

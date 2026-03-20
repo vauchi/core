@@ -336,8 +336,8 @@ impl CardDelta {
     ///
     /// Useful for reducing the size of delta payloads before transmission.
     pub fn compress_payload(payload: &[u8]) -> Vec<u8> {
-        use flate2::write::DeflateEncoder;
         use flate2::Compression;
+        use flate2::write::DeflateEncoder;
         use std::io::Write;
 
         let mut encoder = DeflateEncoder::new(Vec::new(), Compression::default());

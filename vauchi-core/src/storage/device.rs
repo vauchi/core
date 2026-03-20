@@ -295,10 +295,10 @@ impl Storage {
                 None
             };
             let json = json.unwrap_or(plaintext);
-            if !json.is_empty() {
-                if let Ok(state) = InterDeviceSyncState::from_json(&json) {
-                    states.push(state);
-                }
+            if !json.is_empty()
+                && let Ok(state) = InterDeviceSyncState::from_json(&json)
+            {
+                states.push(state);
             }
         }
 

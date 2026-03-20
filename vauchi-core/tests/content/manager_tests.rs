@@ -13,7 +13,7 @@
 use std::time::Duration;
 use tempfile::TempDir;
 use vauchi_core::content::{
-    compute_checksum, ContentCache, ContentConfig, ContentManager, ContentType, UpdateStatus,
+    ContentCache, ContentConfig, ContentManager, ContentType, UpdateStatus, compute_checksum,
 };
 
 fn test_config(temp: &TempDir) -> ContentConfig {

@@ -11,7 +11,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::i18n::{get_string, get_string_with_args, Locale};
+use crate::i18n::{Locale, get_string, get_string_with_args};
 
 /// Types of aha moments that can be triggered
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]

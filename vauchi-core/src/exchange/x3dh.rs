@@ -29,9 +29,9 @@ use x25519_dalek::{EphemeralSecret, PublicKey};
 use zeroize::Zeroize;
 
 use super::ExchangeError;
-use crate::crypto::kdf::HKDF;
 use crate::crypto::SymmetricKey;
 pub use crate::crypto::X3DHKeyPair;
+use crate::crypto::kdf::HKDF;
 
 /// Domain separation info for X3DH key derivation via HKDF.
 ///

@@ -99,14 +99,14 @@ pub fn resolve_sender<'a>(
 /// Returns the contact's ID string if resolved, or None.
 pub fn resolve_sender_id(contacts: &[Contact], sender_id_hex: &str) -> Option<String> {
     // Try anonymous resolution: decode hex → resolve via shared keys
-    if let Ok(anonymous_id_bytes) = hex::decode(sender_id_hex) {
-        if anonymous_id_bytes.len() == 32 {
-            let mut arr = [0u8; 32];
-            arr.copy_from_slice(&anonymous_id_bytes);
-            let epoch = current_epoch();
-            if let Some(contact) = resolve_sender(contacts, &arr, epoch) {
-                return Some(contact.id().to_string());
-            }
+    if let Ok(anonymous_id_bytes) = hex::decode(sender_id_hex)
+        && anonymous_id_bytes.len() == 32
+    {
+        let mut arr = [0u8; 32];
+        arr.copy_from_slice(&anonymous_id_bytes);
+        let epoch = current_epoch();
+        if let Some(contact) = resolve_sender(contacts, &arr, epoch) {
+            return Some(contact.id().to_string());
         }
     }
 

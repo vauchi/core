@@ -6,12 +6,12 @@
 
 use vauchi_core::ContactCard;
 
+use super::VauchiPlatform;
 use super::error::MobileError;
 use super::types::{
     MobileAuthMode, MobileBroadcastResult, MobileDecoyContact, MobileDuressSettings,
     MobileEmergencyConfig,
 };
-use super::VauchiPlatform;
 
 #[uniffi::export]
 impl VauchiPlatform {

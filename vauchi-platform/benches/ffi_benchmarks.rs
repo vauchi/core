@@ -7,7 +7,7 @@
 //! Measures FFI overhead and critical path performance for mobile operations.
 //! These benchmarks help identify bottlenecks in the UniFFI bridge layer.
 
-use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
+use criterion::{BenchmarkId, Criterion, Throughput, black_box, criterion_group, criterion_main};
 use std::sync::Arc;
 use tempfile::TempDir;
 use vauchi_platform::VauchiPlatform;

@@ -7,7 +7,7 @@
 //! These tests are written FIRST (RED phase) before implementation.
 //! Each test maps to scenarios from security.feature and identity_management.feature
 
-use vauchi_core::crypto::{decrypt, encrypt, SigningKeyPair, SymmetricKey};
+use vauchi_core::crypto::{SigningKeyPair, SymmetricKey, decrypt, encrypt};
 
 // =============================================================================
 // Ed25519 Keypair Generation Tests (from identity_management.feature)

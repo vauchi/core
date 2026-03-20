@@ -12,8 +12,8 @@
 
 use rusqlite::Connection;
 use vauchi_core::crypto::SymmetricKey;
-use vauchi_core::storage::migration::{all_migrations, MigrationRunner};
 use vauchi_core::storage::Storage;
+use vauchi_core::storage::migration::{MigrationRunner, all_migrations};
 
 // =============================================================================
 // SCHEMA VERSION 1 (Current)

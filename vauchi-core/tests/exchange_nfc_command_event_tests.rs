@@ -8,12 +8,12 @@
 //! is simpler than BLE: both sides present their NFC payload, the OS
 //! handles the tap, and core processes the received data.
 
+use vauchi_core::ContactCard;
 use vauchi_core::exchange::{
     ExchangeCommand, ExchangeHardwareEvent, ExchangeSession, ExchangeState,
     ManualConfirmationVerifier,
 };
 use vauchi_core::identity::Identity;
-use vauchi_core::ContactCard;
 
 /// Helper: create an NFC exchange session.
 fn nfc_session(name: &str) -> ExchangeSession {

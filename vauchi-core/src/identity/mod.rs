@@ -19,14 +19,14 @@ pub mod password;
 
 pub use backup::IdentityBackup;
 pub use device::{
-    check_identity_collision, classify_device_type, BroadcastDevice, DeviceError, DeviceInfo,
-    DeviceRegistry, DeviceRevocationCertificate, DeviceType, RegisteredDevice, RegistryBroadcast,
-    MAX_DEVICES,
+    BroadcastDevice, DeviceError, DeviceInfo, DeviceRegistry, DeviceRevocationCertificate,
+    DeviceType, MAX_DEVICES, RegisteredDevice, RegistryBroadcast, check_identity_collision,
+    classify_device_type,
 };
 
 use crate::crypto::X3DHKeyPair;
 use crate::crypto::{
-    decrypt, derive_key_argon2id, encrypt, random_bytes, Signature, SigningKeyPair, HKDF,
+    HKDF, Signature, SigningKeyPair, decrypt, derive_key_argon2id, encrypt, random_bytes,
 };
 use thiserror::Error;
 use zeroize::{Zeroize, Zeroizing};

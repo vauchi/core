@@ -31,7 +31,7 @@
 //! cargo bench -p vauchi-core --bench performance_regression -- --baseline main
 //! ```
 
-use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
+use criterion::{BenchmarkId, Criterion, Throughput, black_box, criterion_group, criterion_main};
 use std::hint::black_box as hint_black_box;
 
 use vauchi_core::contact::Contact;

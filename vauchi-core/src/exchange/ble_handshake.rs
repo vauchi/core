@@ -384,7 +384,7 @@ impl BleHandshakeSession {
             _ => {
                 return Err(ExchangeError::InvalidState(
                     "Expected KeyOfferSent state for processing key ack".into(),
-                ))
+                ));
             }
         };
 
@@ -488,7 +488,7 @@ impl BleHandshakeSession {
             _ => {
                 return Err(ExchangeError::InvalidState(
                     "Expected AwaitingPayload state for processing committed payload".into(),
-                ))
+                ));
             }
         };
 
@@ -533,7 +533,7 @@ impl BleHandshakeSession {
             _ => {
                 return Err(ExchangeError::InvalidState(
                     "Expected PayloadsExchanged state for completing exchange".into(),
-                ))
+                ));
             }
         };
 

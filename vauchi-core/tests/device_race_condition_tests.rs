@@ -9,8 +9,8 @@
 
 use std::sync::{Arc, Mutex};
 use std::thread;
-use vauchi_core::identity::{DeviceInfo, DeviceRegistry, MAX_DEVICES};
 use vauchi_core::SigningKeyPair;
+use vauchi_core::identity::{DeviceInfo, DeviceRegistry, MAX_DEVICES};
 
 // =============================================================================
 // Concurrent Device Linking Tests

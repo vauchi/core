@@ -10,8 +10,7 @@ use super::error::{PendingUpdate, UpdateStatus};
 use super::{Storage, StorageError};
 
 /// SQL columns selected for pending update queries (with encrypted payload).
-const PENDING_SELECT: &str =
-    "id, contact_id, update_type, payload_encrypted, payload, created_at, retry_count, status, error_message, retry_at, target_relay_url";
+const PENDING_SELECT: &str = "id, contact_id, update_type, payload_encrypted, payload, created_at, retry_count, status, error_message, retry_at, target_relay_url";
 
 /// Intermediate row before payload decryption.
 struct PendingRow {

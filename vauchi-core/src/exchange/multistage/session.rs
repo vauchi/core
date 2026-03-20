@@ -11,8 +11,8 @@
 //! encryption, an Ed25519 identity keypair, and a commitment scheme that
 //! ensures atomicity (neither side can decrypt until both reveal keys are exchanged).
 
-use chacha20poly1305::aead::{Aead, KeyInit, Payload};
 use chacha20poly1305::ChaCha20Poly1305;
+use chacha20poly1305::aead::{Aead, KeyInit, Payload};
 use rand::rngs::OsRng;
 use sha2::{Digest, Sha256};
 use subtle::ConstantTimeEq;
@@ -435,18 +435,21 @@ impl MultiStageSession {
         self.peer_relay_noise_pubkey = relay_noise_pubkey;
 
         // Derive transport key via X25519 DH + HKDF
-        if let Some(secret) = self.ephemeral_secret.take() {
-            let peer_public = X25519Public::from(ephemeral);
-            let shared_secret = secret.diffie_hellman(&peer_public);
-            if !shared_secret.was_contributory() {
-                self.state = ProtocolState::Failed("non-contributory DH output".to_string());
+        match self.ephemeral_secret.take() {
+            Some(secret) => {
+                let peer_public = X25519Public::from(ephemeral);
+                let shared_secret = secret.diffie_hellman(&peer_public);
+                if !shared_secret.was_contributory() {
+                    self.state = ProtocolState::Failed("non-contributory DH output".to_string());
+                    return self.state.clone();
+                }
+                let transport_key = self.derive_transport_key(shared_secret.as_bytes());
+                self.transport_key = Some(transport_key);
+            }
+            _ => {
+                self.state = ProtocolState::Failed("ephemeral secret already consumed".to_string());
                 return self.state.clone();
             }
-            let transport_key = self.derive_transport_key(shared_secret.as_bytes());
-            self.transport_key = Some(transport_key);
-        } else {
-            self.state = ProtocolState::Failed("ephemeral secret already consumed".to_string());
-            return self.state.clone();
         }
 
         // Prepare outbound: chunk the commitment ciphertext and transport-encrypt each chunk

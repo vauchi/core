@@ -5,7 +5,7 @@
 //! Tests for identity::password
 //! Extracted from password.rs
 
-use vauchi_core::identity::password::{validate_password, PasswordStrength};
+use vauchi_core::identity::password::{PasswordStrength, validate_password};
 use zxcvbn::Score;
 
 #[test]

@@ -11,9 +11,9 @@
 //! Both sides use fresh ephemeral X25519 keys for full forward secrecy.
 
 use vauchi_core::exchange::{
-    BLETransport, ExchangeBle, ExchangeError, ExchangeEvent, ExchangeSession, ExchangeState,
-    ExchangeTransport, MockBLETransport, MockProximityVerifier, X3DHKeyPair, BLE_PAYLOAD_SIZE,
-    CHAR_CARD_EXCHANGE, CHAR_CHALLENGE, CHAR_EXCHANGE_PAYLOAD, VAUCHI_BLE_SERVICE_UUID,
+    BLE_PAYLOAD_SIZE, BLETransport, CHAR_CARD_EXCHANGE, CHAR_CHALLENGE, CHAR_EXCHANGE_PAYLOAD,
+    ExchangeBle, ExchangeError, ExchangeEvent, ExchangeSession, ExchangeState, ExchangeTransport,
+    MockBLETransport, MockProximityVerifier, VAUCHI_BLE_SERVICE_UUID, X3DHKeyPair,
 };
 use vauchi_core::{ContactCard, Identity};
 
@@ -199,9 +199,10 @@ fn test_mock_ble_transport_connect_read_write() {
     assert_eq!(read, payload_bytes);
 
     // Write card exchange data
-    assert!(mock
-        .write_characteristic(CHAR_CARD_EXCHANGE, b"encrypted-card")
-        .is_ok());
+    assert!(
+        mock.write_characteristic(CHAR_CARD_EXCHANGE, b"encrypted-card")
+            .is_ok()
+    );
 
     let written = mock.get_written();
     assert_eq!(written.len(), 1);

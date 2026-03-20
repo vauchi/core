@@ -118,8 +118,8 @@ fn test_device_linking_via_backup() {
 /// state is correct throughout.
 #[test]
 fn test_device_registry_integration() {
-    use vauchi_core::identity::{DeviceInfo, DeviceRegistry};
     use vauchi_core::SigningKeyPair;
+    use vauchi_core::identity::{DeviceInfo, DeviceRegistry};
 
     let master_seed = [0x42u8; 32];
     let signing_key = SigningKeyPair::from_seed(&master_seed);
@@ -211,8 +211,8 @@ fn test_three_device_key_derivation() {
 /// and can be verified.
 #[test]
 fn test_device_revocation_certificate_workflow() {
-    use vauchi_core::identity::{DeviceInfo, DeviceRegistry, DeviceRevocationCertificate};
     use vauchi_core::SigningKeyPair;
+    use vauchi_core::identity::{DeviceInfo, DeviceRegistry, DeviceRevocationCertificate};
 
     let master_seed = [0x42u8; 32];
     let signing_key = SigningKeyPair::from_seed(&master_seed);
@@ -265,8 +265,8 @@ fn test_device_revocation_certificate_workflow() {
 /// and can be verified by contacts.
 #[test]
 fn test_registry_broadcast_for_contacts() {
-    use vauchi_core::identity::{DeviceInfo, DeviceRegistry, RegistryBroadcast};
     use vauchi_core::SigningKeyPair;
+    use vauchi_core::identity::{DeviceInfo, DeviceRegistry, RegistryBroadcast};
 
     let master_seed = [0x42u8; 32];
     let signing_key = SigningKeyPair::from_seed(&master_seed);
@@ -316,8 +316,8 @@ fn test_registry_broadcast_for_contacts() {
 /// Verifies that the registry enforces the MAX_DEVICES limit.
 #[test]
 fn test_max_devices_limit_enforced() {
-    use vauchi_core::identity::{DeviceError, DeviceInfo, DeviceRegistry, MAX_DEVICES};
     use vauchi_core::SigningKeyPair;
+    use vauchi_core::identity::{DeviceError, DeviceInfo, DeviceRegistry, MAX_DEVICES};
 
     let master_seed = [0x42u8; 32];
     let signing_key = SigningKeyPair::from_seed(&master_seed);
@@ -348,8 +348,8 @@ fn test_max_devices_limit_enforced() {
 /// Verifies that the registry prevents revoking the last remaining device.
 #[test]
 fn test_cannot_revoke_last_device() {
-    use vauchi_core::identity::{DeviceError, DeviceInfo, DeviceRegistry};
     use vauchi_core::SigningKeyPair;
+    use vauchi_core::identity::{DeviceError, DeviceInfo, DeviceRegistry};
 
     let master_seed = [0x42u8; 32];
     let signing_key = SigningKeyPair::from_seed(&master_seed);

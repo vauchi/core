@@ -10,8 +10,7 @@ use super::error::RetryEntry;
 use super::{Storage, StorageError};
 
 /// SQL columns selected for retry entry queries (with encrypted payload).
-const RETRY_SELECT: &str =
-    "message_id, recipient_id, payload_encrypted, payload, attempt, next_retry, created_at, max_attempts";
+const RETRY_SELECT: &str = "message_id, recipient_id, payload_encrypted, payload, attempt, next_retry, created_at, max_attempts";
 
 /// Intermediate row before payload decryption.
 struct RetryRow {

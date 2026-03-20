@@ -5,8 +5,8 @@
 //! Contact and double ratchet operations.
 
 use crate::contact::Contact;
-use crate::crypto::ratchet::DoubleRatchetState;
 use crate::crypto::SymmetricKey;
+use crate::crypto::ratchet::DoubleRatchetState;
 
 use super::super::contact_manager::ContactManager;
 use super::super::error::{VauchiError, VauchiResult};

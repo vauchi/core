@@ -13,11 +13,11 @@
 
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use super::exchange_payload::{
-    build_exchange_payload, is_payload_expired, parse_exchange_payload, verify_payload_signature,
-    ParsedPayload, EXCHANGE_PAYLOAD_SIZE,
-};
 use super::ExchangeError;
+use super::exchange_payload::{
+    EXCHANGE_PAYLOAD_SIZE, ParsedPayload, build_exchange_payload, is_payload_expired,
+    parse_exchange_payload, verify_payload_signature,
+};
 use crate::identity::Identity;
 
 use super::x3dh::X3DHKeyPair;

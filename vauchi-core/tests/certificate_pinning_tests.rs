@@ -9,7 +9,7 @@
 //!
 //! Feature reference: features/certificate_pinning.feature
 
-use vauchi_core::network::{verify_pin, PinnedCertificate};
+use vauchi_core::network::{PinnedCertificate, verify_pin};
 
 // =============================================================================
 // Pin Format Validation Tests

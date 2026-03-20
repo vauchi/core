@@ -6,11 +6,11 @@
 
 use vauchi_core::recovery::{RecoveryClaim, RecoveryProof, RecoveryVoucher};
 
+use super::VauchiPlatform;
 use super::error::MobileError;
 use super::types::{
     MobileRecoveryClaim, MobileRecoveryProgress, MobileRecoveryVerification, MobileRecoveryVoucher,
 };
-use super::VauchiPlatform;
 
 #[uniffi::export]
 impl VauchiPlatform {

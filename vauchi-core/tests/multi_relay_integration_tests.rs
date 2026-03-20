@@ -33,10 +33,12 @@ fn test_multi_relay_config_creation() {
         .expect("Should create config");
 
     assert_eq!(config.relay_count(), 3);
-    assert!(config
-        .relays()
-        .iter()
-        .any(|r| r == "wss://relay1.vauchi.app"));
+    assert!(
+        config
+            .relays()
+            .iter()
+            .any(|r| r == "wss://relay1.vauchi.app")
+    );
 }
 
 /// Test: At least one relay required

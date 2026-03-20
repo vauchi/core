@@ -9,8 +9,8 @@
 //!
 //! Feature: contacts_management.feature @contacts
 
-use vauchi_core::contact::statistics::compute_statistics;
 use vauchi_core::contact::Contact;
+use vauchi_core::contact::statistics::compute_statistics;
 use vauchi_core::contact_card::ContactCard;
 use vauchi_core::crypto::SymmetricKey;
 use vauchi_core::exchange::{ExchangeTransport, ProximityConfidence};

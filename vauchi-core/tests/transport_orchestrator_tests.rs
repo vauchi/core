@@ -5,9 +5,9 @@
 #![cfg(feature = "testing")]
 
 use vauchi_core::exchange::transport::{
+    TransportChannel, TransportType,
     mock::MockTransportChannel,
     orchestrator::{FallbackPolicy, TransportChain},
-    TransportChannel, TransportType,
 };
 
 #[test]

@@ -112,10 +112,10 @@ impl MultiRelayConfig {
         match self.selector {
             RelaySelector::PrimaryFirst => {
                 // Try primary first
-                if let Some(primary) = &self.primary {
-                    if health.is_healthy(primary) {
-                        return Some(primary.clone());
-                    }
+                if let Some(primary) = &self.primary
+                    && health.is_healthy(primary)
+                {
+                    return Some(primary.clone());
                 }
                 // Fall back to first healthy
                 self.relays.iter().find(|r| health.is_healthy(r)).cloned()
@@ -423,10 +423,11 @@ impl MultiRelayManager {
     /// returns the contact's relay. Otherwise falls back to the home relay
     /// (primary from config).
     pub fn relay_for_contact(&self, contact: &Contact) -> String {
-        if let Some(contact_relay) = contact.relay_url() {
-            if !contact_relay.is_empty() && self.health.is_healthy(contact_relay) {
-                return contact_relay.to_string();
-            }
+        if let Some(contact_relay) = contact.relay_url()
+            && !contact_relay.is_empty()
+            && self.health.is_healthy(contact_relay)
+        {
+            return contact_relay.to_string();
         }
         // Fall back to home relay
         self.config

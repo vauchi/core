@@ -71,10 +71,9 @@ impl ContentManager {
         if let Some(data) = self
             .cache
             .get_content(ContentType::Networks, "networks.json")
+            && let Ok(networks) = serde_json::from_slice(&data)
         {
-            if let Ok(networks) = serde_json::from_slice(&data) {
-                return networks;
-            }
+            return networks;
         }
 
         // Fall back to bundled
@@ -86,12 +85,11 @@ impl ContentManager {
     /// Returns all themes from the cached themes.json if available,
     /// otherwise returns a vec containing only the bundled default theme.
     pub fn themes(&self) -> Vec<crate::Theme> {
-        if let Some(data) = self.cache.get_content(ContentType::Themes, "themes.json") {
-            if let Ok(themes) = crate::load_themes_from_json(&data) {
-                if !themes.is_empty() {
-                    return themes;
-                }
-            }
+        if let Some(data) = self.cache.get_content(ContentType::Themes, "themes.json")
+            && let Ok(themes) = crate::load_themes_from_json(&data)
+            && !themes.is_empty()
+        {
+            return themes;
         }
 
         // Fallback: single bundled default
@@ -102,10 +100,10 @@ impl ContentManager {
     pub fn help(&self, lang: &str) -> Option<LocaleStrings> {
         let filename = format!("{}.json", lang);
 
-        if let Some(data) = self.cache.get_content(ContentType::Help, &filename) {
-            if let Ok(strings) = serde_json::from_slice(&data) {
-                return Some(strings);
-            }
+        if let Some(data) = self.cache.get_content(ContentType::Help, &filename)
+            && let Ok(strings) = serde_json::from_slice(&data)
+        {
+            return Some(strings);
         }
 
         None
@@ -116,10 +114,10 @@ impl ContentManager {
         let filename = format!("{}.json", lang);
 
         // Try cached first
-        if let Some(data) = self.cache.get_content(ContentType::Locales, &filename) {
-            if let Ok(strings) = serde_json::from_slice(&data) {
-                return Some(strings);
-            }
+        if let Some(data) = self.cache.get_content(ContentType::Locales, &filename)
+            && let Ok(strings) = serde_json::from_slice(&data)
+        {
+            return Some(strings);
         }
 
         // Fall back to bundled
@@ -201,12 +199,11 @@ impl ContentManager {
 
         for entry in entries.flatten() {
             let path = entry.path();
-            if path.extension().and_then(|e| e.to_str()) == Some("json") {
-                if let Some(code) = path.file_stem().and_then(|s| s.to_str()) {
-                    if let Ok(data) = std::fs::read(&path) {
-                        let _ = crate::i18n::load_locale_from_bytes(code, &data);
-                    }
-                }
+            if path.extension().and_then(|e| e.to_str()) == Some("json")
+                && let Some(code) = path.file_stem().and_then(|s| s.to_str())
+                && let Ok(data) = std::fs::read(&path)
+            {
+                let _ = crate::i18n::load_locale_from_bytes(code, &data);
             }
         }
     }

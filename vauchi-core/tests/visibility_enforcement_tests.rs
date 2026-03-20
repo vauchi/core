@@ -248,10 +248,12 @@ fn test_remove_rule_reverts_to_everyone_at_delta_level() {
         !filtered_visible.is_empty(),
         "Field should be visible after removing Nobody rule"
     );
-    assert!(filtered_visible
-        .changes
-        .iter()
-        .any(|c| matches!(c, FieldChange::Added { .. })));
+    assert!(
+        filtered_visible
+            .changes
+            .iter()
+            .any(|c| matches!(c, FieldChange::Added { .. }))
+    );
 }
 
 // -- Tests: Nobody Enforcement -----------------------------------------

@@ -19,8 +19,8 @@
 use std::sync::Mutex;
 
 use vauchi_core::exchange::{
-    BleCardPayload, BleChunker, BleExchangeResult, BleHandshakeSession, BleHandshakeState,
-    BleReassembler, BLE_CHUNK_OVERHEAD, BLE_DEFAULT_USABLE, CHAR_DATA_NOTIFY, CHAR_DATA_WRITE,
+    BLE_CHUNK_OVERHEAD, BLE_DEFAULT_USABLE, BleCardPayload, BleChunker, BleExchangeResult,
+    BleHandshakeSession, BleHandshakeState, BleReassembler, CHAR_DATA_NOTIFY, CHAR_DATA_WRITE,
     CHAR_HANDSHAKE_NOTIFY, CHAR_HANDSHAKE_WRITE,
 };
 
@@ -520,11 +520,11 @@ impl MobileBleExchangeSession {
         self.delegate.on_state_changed(MobileBleState::Transferring);
 
         for i in 0..chunker.total_chunks() {
-            if let Some(chunk) = chunker.chunk(i) {
-                if let Err(e) = self.delegate.send_data(characteristic.to_string(), chunk) {
-                    self.fail(format!("Failed to send chunk {i}: {e}"));
-                    return;
-                }
+            if let Some(chunk) = chunker.chunk(i)
+                && let Err(e) = self.delegate.send_data(characteristic.to_string(), chunk)
+            {
+                self.fail(format!("Failed to send chunk {i}: {e}"));
+                return;
             }
         }
     }

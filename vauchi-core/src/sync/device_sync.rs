@@ -509,7 +509,7 @@ pub fn validate_timestamp(timestamp: u64) -> bool {
 
 /// Serde helper for 32-byte arrays.
 mod bytes_array_32 {
-    use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
+    use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
     use serde::{Deserialize, Deserializer, Serializer};
 
     /// Serializes a 32-byte array to a base64-encoded string for device sync payloads.

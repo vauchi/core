@@ -151,10 +151,13 @@ impl<'a, T: Transport> SyncController<'a, T> {
         match self.relay.process_incoming() {
             Ok(incoming) => {
                 for update_id in incoming.acknowledged {
-                    if let Err(e) = self.sync_manager.mark_delivered(&update_id) {
-                        result.errors.push((update_id.clone(), e.to_string()));
-                    } else {
-                        result.acknowledged += 1;
+                    match self.sync_manager.mark_delivered(&update_id) {
+                        Err(e) => {
+                            result.errors.push((update_id.clone(), e.to_string()));
+                        }
+                        _ => {
+                            result.acknowledged += 1;
+                        }
                     }
                 }
 
@@ -198,10 +201,10 @@ impl<'a, T: Transport> SyncController<'a, T> {
 
         // Apply batch_size limit (#64) — cap updates per cycle to avoid
         // blocking the thread when a large backlog exists.
-        if let Some(batch_size) = self.config.batch_size {
-            if batch_size > 0 {
-                ready_updates.truncate(batch_size);
-            }
+        if let Some(batch_size) = self.config.batch_size
+            && batch_size > 0
+        {
+            ready_updates.truncate(batch_size);
         }
 
         // Send each ready update
@@ -395,26 +398,26 @@ impl<'a, T: Transport> SyncController<'a, T> {
     /// Best-effort: errors are logged via events but don't propagate.
     fn on_connectivity_restored(&mut self) {
         // Process due retries
-        if let Ok(tick_result) = self.retry_scheduler.tick(self.storage) {
-            if tick_result.rescheduled > 0 || tick_result.expired > 0 {
-                self.events.dispatch(VauchiEvent::DeliveryStatusUpdate {
-                    message_id: String::new(),
-                    status: format!(
-                        "Retry tick: {} rescheduled, {} expired",
-                        tick_result.rescheduled, tick_result.expired
-                    ),
-                });
-            }
+        if let Ok(tick_result) = self.retry_scheduler.tick(self.storage)
+            && (tick_result.rescheduled > 0 || tick_result.expired > 0)
+        {
+            self.events.dispatch(VauchiEvent::DeliveryStatusUpdate {
+                message_id: String::new(),
+                status: format!(
+                    "Retry tick: {} rescheduled, {} expired",
+                    tick_result.rescheduled, tick_result.expired
+                ),
+            });
         }
 
         // Flush offline queue — returns updates ready for sending
-        if let Ok(flushed) = self.offline_manager.flush_queue(self.storage) {
-            if !flushed.is_empty() {
-                self.events.dispatch(VauchiEvent::DeliveryStatusUpdate {
-                    message_id: String::new(),
-                    status: format!("{} offline updates ready for send", flushed.len()),
-                });
-            }
+        if let Ok(flushed) = self.offline_manager.flush_queue(self.storage)
+            && !flushed.is_empty()
+        {
+            self.events.dispatch(VauchiEvent::DeliveryStatusUpdate {
+                message_id: String::new(),
+                status: format!("{} offline updates ready for send", flushed.len()),
+            });
         }
     }
 

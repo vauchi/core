@@ -9,14 +9,14 @@
 //! handshake packets.
 
 use proptest::prelude::*;
+use vauchi_core::ExchangeError;
 use vauchi_core::crypto::encryption::{self, SymmetricKey};
 use vauchi_core::crypto::kdf::HKDF;
 use vauchi_core::exchange::{
-    BleCardPayload, BleChunker, BleHandshakeSession, BleReassembler, X3DHKeyPair,
-    BLE_HANDSHAKE_INFO,
+    BLE_HANDSHAKE_INFO, BleCardPayload, BleChunker, BleHandshakeSession, BleReassembler,
+    X3DHKeyPair,
 };
 use vauchi_core::identity::Identity;
-use vauchi_core::ExchangeError;
 
 // ============================================================
 // Helpers

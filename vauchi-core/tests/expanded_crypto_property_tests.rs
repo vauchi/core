@@ -12,14 +12,14 @@
 
 use proptest::prelude::*;
 
-use vauchi_core::crypto::{derive_key_argon2id, DoubleRatchetState, SymmetricKey, HKDF};
+use vauchi_core::crypto::{DoubleRatchetState, HKDF, SymmetricKey, derive_key_argon2id};
 use vauchi_core::exchange::X3DHKeyPair;
 use vauchi_core::identity::Identity;
 use vauchi_core::network::{
     AccountDeletionNotice, AccountRevoked, AckStatus, Acknowledgment, DeletionStage,
     DeviceSyncMessage, EncryptedUpdate, ForwardingHint, ForwardingHints, Handshake,
-    MessageEnvelope, MessagePayload, PresenceStatus, PresenceUpdate, PurgeRequest, RatchetHeader,
-    VersionNegotiation, PROTOCOL_VERSION,
+    MessageEnvelope, MessagePayload, PROTOCOL_VERSION, PresenceStatus, PresenceUpdate,
+    PurgeRequest, RatchetHeader, VersionNegotiation,
 };
 
 // ============================================================

@@ -5,8 +5,8 @@
 //! Tests for api::events
 //! Extracted from events.rs
 
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use vauchi_core::api::*;
 use vauchi_core::*;
 

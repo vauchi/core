@@ -4,10 +4,10 @@
 
 //! Tor privacy mode operations for mobile.
 
+use super::VauchiPlatform;
 use super::error::MobileError;
 use super::types::MobileTorConfig;
 use super::types::MobileTorStatus;
-use super::VauchiPlatform;
 
 #[uniffi::export]
 impl VauchiPlatform {

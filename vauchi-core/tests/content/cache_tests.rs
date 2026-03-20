@@ -11,7 +11,7 @@
 
 use tempfile::TempDir;
 use vauchi_core::content::{
-    compute_checksum, ContentCache, ContentEntry, ContentIndex, ContentManifest, ContentType,
+    ContentCache, ContentEntry, ContentIndex, ContentManifest, ContentType, compute_checksum,
 };
 
 fn create_test_manifest() -> ContentManifest {
@@ -105,9 +105,11 @@ fn test_cache_content_not_found() {
     let temp = TempDir::new().unwrap();
     let cache = ContentCache::new(temp.path()).unwrap();
 
-    assert!(cache
-        .get_content(ContentType::Networks, "nonexistent.json")
-        .is_none());
+    assert!(
+        cache
+            .get_content(ContentType::Networks, "nonexistent.json")
+            .is_none()
+    );
 }
 
 #[test]
@@ -122,9 +124,11 @@ fn test_cache_rejects_invalid_checksum() {
     result.expect_err("expected error");
 
     // File should not exist
-    assert!(cache
-        .get_content(ContentType::Networks, "networks.json")
-        .is_none());
+    assert!(
+        cache
+            .get_content(ContentType::Networks, "networks.json")
+            .is_none()
+    );
 }
 
 #[test]
@@ -234,9 +238,11 @@ fn test_cache_clear_content_type() {
 
     cache.clear_content_type(ContentType::Networks).unwrap();
 
-    assert!(cache
-        .get_content(ContentType::Networks, "networks.json")
-        .is_none());
+    assert!(
+        cache
+            .get_content(ContentType::Networks, "networks.json")
+            .is_none()
+    );
 }
 
 #[test]

@@ -10,8 +10,8 @@
 
 use serde::{Deserialize, Serialize};
 
-use super::{ExchangeError, X3DHKeyPair, X3DH};
-use crate::crypto::{decrypt, encrypt, SymmetricKey};
+use super::{ExchangeError, X3DH, X3DHKeyPair};
+use crate::crypto::{SymmetricKey, decrypt, encrypt};
 
 /// Serde helper for 32-byte arrays (base64 encoded).
 mod bytes_array_32 {

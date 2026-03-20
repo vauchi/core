@@ -688,7 +688,7 @@ fn test_expired_qr_rejected_in_state_machine() {
 // @scenario: security:Contact card signatures verified
 #[test]
 fn test_invalid_signature_qr_rejected_via_data_string() {
-    use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
+    use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
 
     let alice_identity = vauchi_core::Identity::create("Alice");
     let alice_ephemeral = X3DHKeyPair::generate();
@@ -714,7 +714,7 @@ fn test_invalid_signature_qr_rejected_via_data_string() {
 // @scenario: security:Contact card signatures verified
 #[test]
 fn test_qr_parser_rejects_trailing_bytes() {
-    use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
+    use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
 
     let alice_identity = vauchi_core::Identity::create("Alice");
     let alice_ephemeral = X3DHKeyPair::generate();

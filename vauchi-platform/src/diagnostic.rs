@@ -8,8 +8,8 @@
 //! to `u32` for UniFFI compatibility.
 
 use vauchi_core::diagnostic::{
-    generate_qr_test_patterns, generate_sweep_matrix, rank_configs, score_config,
     DeviceCapabilityProfile, ErrorCorrectionLevel, Platform, QrConfig, TuningResult,
+    generate_qr_test_patterns, generate_sweep_matrix, rank_configs, score_config,
 };
 
 // === Mobile Wrapper Types ===

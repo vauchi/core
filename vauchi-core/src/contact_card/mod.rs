@@ -21,7 +21,7 @@ pub mod vcard;
 
 pub use catalog::{CatalogEntry, FieldCategory, FieldTypeCatalog};
 pub use field::{ContactField, FieldType, ValidationError};
-pub use uri::{is_allowed_scheme, is_blocked_scheme, is_safe_url, is_valid_phone, ContactAction};
+pub use uri::{ContactAction, is_allowed_scheme, is_blocked_scheme, is_safe_url, is_valid_phone};
 
 use serde::{Deserialize, Serialize};
 

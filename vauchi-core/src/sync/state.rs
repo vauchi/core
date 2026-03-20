@@ -334,13 +334,13 @@ impl<'a> SyncManager<'a> {
         let failed = pending
             .iter()
             .find(|u| matches!(u.status, UpdateStatus::Failed { .. }));
-        if let Some(f) = failed {
-            if let UpdateStatus::Failed { error, retry_at } = &f.status {
-                return Ok(SyncState::Failed {
-                    error: error.clone(),
-                    retry_at: *retry_at,
-                });
-            }
+        if let Some(f) = failed
+            && let UpdateStatus::Failed { error, retry_at } = &f.status
+        {
+            return Ok(SyncState::Failed {
+                error: error.clone(),
+                retry_at: *retry_at,
+            });
         }
 
         // Has pending updates
@@ -507,13 +507,13 @@ impl<'a> SyncManager<'a> {
         let failed = updates
             .iter()
             .find(|u| matches!(u.status, UpdateStatus::Failed { .. }));
-        if let Some(f) = failed {
-            if let UpdateStatus::Failed { error, retry_at } = &f.status {
-                return SyncState::Failed {
-                    error: error.clone(),
-                    retry_at: *retry_at,
-                };
-            }
+        if let Some(f) = failed
+            && let UpdateStatus::Failed { error, retry_at } = &f.status
+        {
+            return SyncState::Failed {
+                error: error.clone(),
+                retry_at: *retry_at,
+            };
         }
 
         // Pending
@@ -575,10 +575,10 @@ impl ReplayDetector {
         }
 
         // Check for timestamp regression
-        if let Some(&last_ts) = self.last_timestamps.get(contact_id) {
-            if timestamp + self.max_clock_skew_secs < last_ts {
-                return false;
-            }
+        if let Some(&last_ts) = self.last_timestamps.get(contact_id)
+            && timestamp + self.max_clock_skew_secs < last_ts
+        {
+            return false;
         }
 
         // Evict oldest contact nonces if at capacity (#41)
@@ -605,7 +605,7 @@ impl ReplayDetector {
         let stale_contacts: Vec<String> = self
             .last_timestamps
             .iter()
-            .filter(|(_, &ts)| ts < cutoff)
+            .filter(|&(_, &ts)| ts < cutoff)
             .map(|(id, _)| id.clone())
             .collect();
 
@@ -623,7 +623,7 @@ impl ReplayDetector {
         if let Some(oldest_id) = self
             .last_timestamps
             .iter()
-            .min_by_key(|(_, &ts)| ts)
+            .min_by_key(|&(_, &ts)| ts)
             .map(|(id, _)| id.clone())
         {
             self.seen_nonces.retain(|(id, _)| *id != oldest_id);

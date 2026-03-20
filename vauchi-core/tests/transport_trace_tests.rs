@@ -4,8 +4,8 @@
 
 #![cfg(feature = "testing")]
 
-use vauchi_core::exchange::transport::trace::{TraceEventKind, TraceLog};
 use vauchi_core::exchange::transport::TransportType;
+use vauchi_core::exchange::transport::trace::{TraceEventKind, TraceLog};
 
 #[test]
 fn records_events_and_returns_them() {

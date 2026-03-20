@@ -85,14 +85,18 @@ mod visibility_integration_tests {
             .add_visible_field(field_id);
 
         // Verify field is visible to both labels
-        assert!(manager
-            .get_group(&work_id)
-            .unwrap()
-            .is_field_visible(field_id));
-        assert!(manager
-            .get_group(&friends_id)
-            .unwrap()
-            .is_field_visible(field_id));
+        assert!(
+            manager
+                .get_group(&work_id)
+                .unwrap()
+                .is_field_visible(field_id)
+        );
+        assert!(
+            manager
+                .get_group(&friends_id)
+                .unwrap()
+                .is_field_visible(field_id)
+        );
     }
 
     // @scenario: visibility_control.feature:Add contact to group updates their visibility

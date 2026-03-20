@@ -147,20 +147,23 @@ fn key_agreement_logs_completion_and_proximity() {
     assert_eq!(log.events().len(), 6);
 
     // Verify key agreement event exists
-    assert!(log
-        .events()
-        .iter()
-        .any(|e| matches!(&e.event, ExchangeDebugEvent::KeyAgreementCompleted)));
+    assert!(
+        log.events()
+            .iter()
+            .any(|e| matches!(&e.event, ExchangeDebugEvent::KeyAgreementCompleted))
+    );
 
     // Verify proximity events exist
-    assert!(log
-        .events()
-        .iter()
-        .any(|e| matches!(&e.event, ExchangeDebugEvent::ProximityCheckStarted { .. })));
-    assert!(log
-        .events()
-        .iter()
-        .any(|e| matches!(&e.event, ExchangeDebugEvent::ProximityCheckCompleted { .. })));
+    assert!(
+        log.events()
+            .iter()
+            .any(|e| matches!(&e.event, ExchangeDebugEvent::ProximityCheckStarted { .. }))
+    );
+    assert!(
+        log.events()
+            .iter()
+            .any(|e| matches!(&e.event, ExchangeDebugEvent::ProximityCheckCompleted { .. }))
+    );
 }
 
 // ===== Exchange completion =====
@@ -195,10 +198,11 @@ fn complete_exchange_logs_completed() {
         .unwrap();
 
     let log = bob_session.exchange_debug_log().unwrap();
-    assert!(log
-        .events()
-        .iter()
-        .any(|e| matches!(&e.event, ExchangeDebugEvent::ExchangeCompleted)));
+    assert!(
+        log.events()
+            .iter()
+            .any(|e| matches!(&e.event, ExchangeDebugEvent::ExchangeCompleted))
+    );
 }
 
 // ===== Failure logging =====

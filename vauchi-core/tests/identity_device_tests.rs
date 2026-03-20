@@ -371,10 +371,12 @@ fn test_apply_revocation_to_contact_registry() {
         .unwrap();
 
     assert_eq!(registry.active_count(), 1);
-    assert!(!registry
-        .find_device(device1.device_id())
-        .unwrap()
-        .is_active());
+    assert!(
+        !registry
+            .find_device(device1.device_id())
+            .unwrap()
+            .is_active()
+    );
 }
 
 // =============================================================================

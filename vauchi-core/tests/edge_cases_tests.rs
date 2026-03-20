@@ -8,10 +8,10 @@
 //! These tests verify the system handles edge cases correctly.
 
 use vauchi_core::{
+    Contact, ContactCard, ContactField, FieldType, SigningKeyPair, SymmetricKey, Vauchi,
     contact::FieldVisibility,
     identity::{DeviceInfo, DeviceRegistry, Identity, MAX_DEVICES},
     sync::CardDelta,
-    Contact, ContactCard, ContactField, FieldType, SigningKeyPair, SymmetricKey, Vauchi,
 };
 
 // =============================================================================

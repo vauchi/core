@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-use vauchi_core::exchange::{BleChunker, BleReassembler, BLE_CHUNK_OVERHEAD};
+use vauchi_core::exchange::{BLE_CHUNK_OVERHEAD, BleChunker, BleReassembler};
 
 // @scenario: ble_exchange.feature:Small payload creates single chunk
 #[test]

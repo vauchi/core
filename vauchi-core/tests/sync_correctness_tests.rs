@@ -443,10 +443,12 @@ fn test_checkpoint_clear() {
         .unwrap();
 
     // Verify exists
-    assert!(storage
-        .load_sync_checkpoint(&target_device_id)
-        .unwrap()
-        .is_some());
+    assert!(
+        storage
+            .load_sync_checkpoint(&target_device_id)
+            .unwrap()
+            .is_some()
+    );
 
     // Clear
     storage.clear_sync_checkpoint(&target_device_id).unwrap();

@@ -97,13 +97,13 @@ impl ContentFetcher {
         }
 
         // Check content length before downloading
-        if let Some(len) = response.content_length() {
-            if len > self.max_content_size {
-                return Err(FetchError::TooLarge {
-                    size: len,
-                    max: self.max_content_size,
-                });
-            }
+        if let Some(len) = response.content_length()
+            && len > self.max_content_size
+        {
+            return Err(FetchError::TooLarge {
+                size: len,
+                max: self.max_content_size,
+            });
         }
 
         // Stream-verify: download in chunks with incremental SHA-256 hash (#146)

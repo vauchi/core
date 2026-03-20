@@ -65,16 +65,16 @@ pub use content::{
     MobileUpdateStatus,
 };
 pub use diagnostic::{
-    diagnostic_generate_qr_test_patterns, diagnostic_generate_sweep_matrix,
-    diagnostic_rank_configs, diagnostic_score_config, MobileCameraConfig,
-    MobileDeviceCapabilityProfile, MobileErrorCorrectionLevel, MobileFpsRange, MobilePlatform,
-    MobileQrConfig, MobileQrTestPattern, MobileScoredConfig, MobileSweepMatrix, MobileTuningResult,
+    MobileCameraConfig, MobileDeviceCapabilityProfile, MobileErrorCorrectionLevel, MobileFpsRange,
+    MobilePlatform, MobileQrConfig, MobileQrTestPattern, MobileScoredConfig, MobileSweepMatrix,
+    MobileTuningResult, diagnostic_generate_qr_test_patterns, diagnostic_generate_sweep_matrix,
+    diagnostic_rank_configs, diagnostic_score_config,
 };
 pub use error::{KeychainError, MobileError};
 pub use exchange::{
-    create_qr_exchange_manual, create_qr_exchange_proximity, MobileBleExchangeStatus,
-    MobileExchangeCommand, MobileExchangeHardwareEvent, MobileExchangeSession, MobileExchangeState,
-    MobileProximityHandler,
+    MobileBleExchangeStatus, MobileExchangeCommand, MobileExchangeHardwareEvent,
+    MobileExchangeSession, MobileExchangeState, MobileProximityHandler, create_qr_exchange_manual,
+    create_qr_exchange_proximity,
 };
 pub use mobile_animated_qr::{
     MobileAnimatedQrConfig, MobileAnimatedQrError, MobileAnimatedQrProgress,
@@ -97,8 +97,8 @@ pub use mobile_ui::{
 pub use mobile_verifier_event::{
     MobileProximityConfidence, MobileProximityVerifierEvent, MobileVerifierMethod,
 };
-pub use mobile_wifi_aware::{wifi_aware_check_availability, MobileWifiAwareStatus};
-pub use multipart_qr::{encode_multipart, MobileMultipartDecoder, MultipartDecoder};
+pub use mobile_wifi_aware::{MobileWifiAwareStatus, wifi_aware_check_availability};
+pub use multipart_qr::{MobileMultipartDecoder, MultipartDecoder, encode_multipart};
 pub use platform_app_engine::PlatformAppEngine;
 pub use types::{
     MobileAhaMoment, MobileAhaMomentType, MobileAuthMode, MobileBroadcastResult,
@@ -131,8 +131,8 @@ pub fn core_version() -> String {
 // === Device Link Wrapper Objects ===
 
 use vauchi_core::exchange::{
-    compute_confirmation_mac, DeviceLinkInitiator, DeviceLinkRequest, DeviceLinkResponder,
-    ProximityProof,
+    DeviceLinkInitiator, DeviceLinkRequest, DeviceLinkResponder, ProximityProof,
+    compute_confirmation_mac,
 };
 
 /// UniFFI-exposed wrapper around DeviceLinkInitiator.
@@ -1586,9 +1586,11 @@ mod tests {
         assert_eq!(groups.len(), 16, "own fingerprint should have 16 groups");
         for group in groups {
             assert_eq!(group.len(), 4);
-            assert!(group
-                .chars()
-                .all(|c: char| c.is_ascii_hexdigit() && !c.is_ascii_lowercase()));
+            assert!(
+                group
+                    .chars()
+                    .all(|c: char| c.is_ascii_hexdigit() && !c.is_ascii_lowercase())
+            );
         }
     }
 

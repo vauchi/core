@@ -18,7 +18,7 @@ use proptest::prelude::*;
 use vauchi_core::contact_card::ContactCard;
 use vauchi_core::crypto::SymmetricKey;
 use vauchi_core::social::{
-    calculate_trust_weight, ProfileValidation, TrustLevel, ValidationStatus, ValidatorMeta,
+    ProfileValidation, TrustLevel, ValidationStatus, ValidatorMeta, calculate_trust_weight,
 };
 use vauchi_core::{Contact, Identity, Vauchi};
 

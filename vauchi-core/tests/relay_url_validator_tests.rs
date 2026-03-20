@@ -7,7 +7,7 @@
 //! Validates that only safe relay URLs are accepted.
 //! Security: prevents SSRF, injection, and malicious relay URLs from contacts.
 
-use vauchi_core::network::relay_url::{validate_relay_url, RelayUrlError};
+use vauchi_core::network::relay_url::{RelayUrlError, validate_relay_url};
 
 // ── Valid URLs ──────────────────────────────────────────────────────
 
@@ -177,7 +177,7 @@ fn unicode_homoglyph_url_rejected_or_accepted() {
     // Unicode domain names should be parsed but may be suspicious
     // At minimum, the URL must parse correctly
     let result = validate_relay_url("wss://rеlay.example.com"); // Cyrillic 'е'
-                                                                // Either accepted (punycode) or rejected — but must not panic
+    // Either accepted (punycode) or rejected — but must not panic
     assert!(result.is_ok() || result.is_err(), "expected error");
 }
 

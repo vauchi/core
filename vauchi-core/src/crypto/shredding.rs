@@ -38,7 +38,7 @@
 //! creation or migration, then stored in SecureStorage. At boot, SMK is loaded
 //! from SecureStorage — never re-derived — to avoid bootstrap deadlock.
 
-use crate::crypto::{SymmetricKey, HKDF};
+use crate::crypto::{HKDF, SymmetricKey};
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
 /// HKDF info string for SMK derivation from master_seed.

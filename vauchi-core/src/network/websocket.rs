@@ -26,7 +26,7 @@ use super::error::NetworkError;
 use super::message::MessageEnvelope;
 use super::noise::{self, NoiseInitiator, NoiseTransport};
 use super::pinning;
-use super::protocol::{decode_message, encode_message, read_frame_length, FRAME_HEADER_SIZE};
+use super::protocol::{FRAME_HEADER_SIZE, decode_message, encode_message, read_frame_length};
 use super::transport::{ConnectionState, Transport, TransportConfig, TransportResult};
 
 /// WebSocket transport for relay communication.
@@ -154,7 +154,7 @@ impl WebSocketTransport {
     /// Extracts the leaf (server) certificate DER bytes from a TLS stream.
     #[cfg(feature = "network-rustls")]
     fn extract_leaf_cert_der(stream: &MaybeTlsStream<TcpStream>) -> Option<Vec<u8>> {
-        if let MaybeTlsStream::Rustls(ref tls) = stream {
+        if let MaybeTlsStream::Rustls(tls) = stream {
             tls.conn
                 .peer_certificates()
                 .and_then(|certs| certs.first())

@@ -7,7 +7,7 @@
 //! Tests for Double Ratchet error conditions and edge cases.
 //! These tests ensure the cryptographic protocol handles errors correctly.
 
-use vauchi_core::{crypto::ratchet::DoubleRatchetState, exchange::X3DHKeyPair, SymmetricKey};
+use vauchi_core::{SymmetricKey, crypto::ratchet::DoubleRatchetState, exchange::X3DHKeyPair};
 
 // =============================================================================
 // Message Order Tests

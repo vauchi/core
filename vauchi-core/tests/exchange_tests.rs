@@ -6,8 +6,8 @@
 //!
 //! These tests are written FIRST (RED phase) before implementation.
 
-use vauchi_core::exchange::{ExchangeQR, X3DHKeyPair, X3DH};
 use vauchi_core::Identity;
+use vauchi_core::exchange::{ExchangeQR, X3DH, X3DHKeyPair};
 
 // =============================================================================
 // X3DH Key Agreement Tests

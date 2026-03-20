@@ -379,7 +379,7 @@ impl MobileProximityVerifier {
                 return MobileProximityResult {
                     success: false,
                     error: "Audio handler not set".to_string(),
-                }
+                };
             }
         };
 

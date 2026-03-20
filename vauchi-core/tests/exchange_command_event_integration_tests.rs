@@ -8,13 +8,13 @@
 //! `ExchangeCommand`s and `ExchangeHardwareEvent`s — no hardware traits,
 //! no mock transports, no blocking calls.
 
+use vauchi_core::ContactCard;
 use vauchi_core::exchange::capability::types::DeviceCapabilities;
 use vauchi_core::exchange::{
     ExchangeCommand, ExchangeEvent, ExchangeHardwareEvent, ExchangeSession, ExchangeState,
     ManualConfirmationVerifier,
 };
 use vauchi_core::identity::Identity;
-use vauchi_core::ContactCard;
 
 // −− Helpers −−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−
 

@@ -15,11 +15,11 @@
 //! It only requires a data directory path and a SecureStorage implementation.
 //! All tests use REAL crypto and REAL file operations — no mocking.
 
-use vauchi_core::api::{widget_panic_shred, PreSignedShredMessages, WidgetConfirmationMode};
+use vauchi_core::api::{PreSignedShredMessages, WidgetConfirmationMode, widget_panic_shred};
 use vauchi_core::crypto::SymmetricKey;
 use vauchi_core::identity::Identity;
-use vauchi_core::storage::secure::{MemoryKeyStorage, SecureStorage};
 use vauchi_core::storage::Storage;
+use vauchi_core::storage::secure::{MemoryKeyStorage, SecureStorage};
 
 /// SMK key name used by the shred system.
 const SMK_KEY_NAME: &str = "smk";

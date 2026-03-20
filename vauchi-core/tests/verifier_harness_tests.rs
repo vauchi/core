@@ -9,9 +9,9 @@
 
 #![cfg(feature = "testing")]
 
+use vauchi_core::exchange::ProximityConfidence;
 use vauchi_core::exchange::verifier_event::VerifierMethod;
 use vauchi_core::exchange::verifier_harness::{PeerCapabilities, Scenario, SimulatedPeer};
-use vauchi_core::exchange::ProximityConfidence;
 
 // ===== SimulatedPeer construction =====
 

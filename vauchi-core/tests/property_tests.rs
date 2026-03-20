@@ -12,7 +12,7 @@ use std::collections::HashSet;
 
 use vauchi_core::contact::{FieldVisibility, VisibilityRules};
 use vauchi_core::contact_card::{ContactCard, ContactField, FieldType};
-use vauchi_core::crypto::{decrypt, encrypt, SigningKeyPair, SymmetricKey};
+use vauchi_core::crypto::{SigningKeyPair, SymmetricKey, decrypt, encrypt};
 use vauchi_core::identity::{DeviceInfo, Identity};
 use vauchi_core::sync::{SyncItem, VersionVector};
 

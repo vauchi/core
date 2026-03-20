@@ -15,8 +15,8 @@ use vauchi_core::exchange::{
 };
 use vauchi_core::identity::Identity;
 
-use crate::error::MobileError;
 use crate::VauchiPlatform;
+use crate::error::MobileError;
 
 // === Callback Interface ===
 

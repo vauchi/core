@@ -10,8 +10,8 @@
 //! The consent storage uses second-precision timestamps with rowid tiebreaker
 //! for ordering, so tests don't need sleeps between operations.
 
-use vauchi_core::api::{ConsentRecord, ConsentType};
 use vauchi_core::Vauchi;
+use vauchi_core::api::{ConsentRecord, ConsentType};
 
 fn create_test_vauchi() -> Vauchi {
     let mut wb = Vauchi::in_memory().unwrap();

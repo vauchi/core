@@ -7,9 +7,9 @@
 #[cfg(feature = "content-updates")]
 use vauchi_core::content::{ContentConfig, ContentManager};
 
+use super::VauchiPlatform;
 use super::content;
 use super::types::MobileSocialNetwork;
-use super::VauchiPlatform;
 
 #[uniffi::export]
 impl VauchiPlatform {
@@ -88,7 +88,7 @@ impl VauchiPlatform {
             Err(e) => {
                 return MobileUpdateStatus::CheckFailed {
                     error: e.to_string(),
-                }
+                };
             }
         };
 
@@ -97,7 +97,7 @@ impl VauchiPlatform {
             Err(e) => {
                 return MobileUpdateStatus::CheckFailed {
                     error: e.to_string(),
-                }
+                };
             }
         };
 
@@ -122,7 +122,7 @@ impl VauchiPlatform {
             Err(e) => {
                 return MobileApplyResult::Error {
                     error: e.to_string(),
-                }
+                };
             }
         };
 
@@ -131,7 +131,7 @@ impl VauchiPlatform {
             Err(e) => {
                 return MobileApplyResult::Error {
                     error: e.to_string(),
-                }
+                };
             }
         };
 

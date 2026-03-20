@@ -13,7 +13,7 @@ use crate::storage::SecureStorage;
 
 use super::super::contact_manager::ContactManager;
 use super::super::error::{VauchiError, VauchiResult};
-use super::{Vauchi, SMK_KEY_NAME};
+use super::{SMK_KEY_NAME, Vauchi};
 
 impl Vauchi {
     // === Identity Operations ===

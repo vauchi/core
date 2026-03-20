@@ -14,8 +14,8 @@
 //! - Persistence across restarts
 
 use vauchi_core::{
-    generate_demo_contact_card, get_demo_tips, DemoContactState, DemoTipCategory, DEMO_CONTACT_ID,
-    DEMO_CONTACT_NAME,
+    DEMO_CONTACT_ID, DEMO_CONTACT_NAME, DemoContactState, DemoTipCategory,
+    generate_demo_contact_card, get_demo_tips,
 };
 
 // ============================================================

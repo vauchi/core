@@ -530,12 +530,16 @@ fn test_address_secondary_actions() {
     let field = ContactField::new(FieldType::Address, "Home", "123 Main St, City");
     let actions = field.to_secondary_actions();
     assert_eq!(actions.len(), 3); // OpenMap, GetDirections, CopyToClipboard
-    assert!(actions
-        .iter()
-        .any(|a| matches!(a, ContactAction::OpenMap(_))));
-    assert!(actions
-        .iter()
-        .any(|a| matches!(a, ContactAction::GetDirections(_))));
+    assert!(
+        actions
+            .iter()
+            .any(|a| matches!(a, ContactAction::OpenMap(_)))
+    );
+    assert!(
+        actions
+            .iter()
+            .any(|a| matches!(a, ContactAction::GetDirections(_)))
+    );
     assert!(actions.contains(&ContactAction::CopyToClipboard));
 }
 

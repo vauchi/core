@@ -7,12 +7,12 @@
 //! When a transport reports HardwareUnavailable, the session should
 //! fall back to the next available transport based on DeviceCapabilities.
 
+use vauchi_core::ContactCard;
 use vauchi_core::exchange::capability::types::DeviceCapabilities;
 use vauchi_core::exchange::{
     ExchangeCommand, ExchangeHardwareEvent, ExchangeSession, ManualConfirmationVerifier,
 };
 use vauchi_core::identity::Identity;
-use vauchi_core::ContactCard;
 
 fn ble_session_with_caps(name: &str, caps: DeviceCapabilities) -> ExchangeSession {
     let identity = Identity::create(name);

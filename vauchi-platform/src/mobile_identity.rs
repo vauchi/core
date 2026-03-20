@@ -25,15 +25,15 @@ impl VauchiPlatform {
             }
         }
 
-        if let Ok(storage) = self.open_storage() {
-            if let Ok(Some((backup_data, display_name))) = storage.load_identity() {
-                let identity_data = IdentityData {
-                    backup_data,
-                    display_name,
-                };
-                *self.identity_data.lock().unwrap() = Some(identity_data);
-                return true;
-            }
+        if let Ok(storage) = self.open_storage()
+            && let Ok(Some((backup_data, display_name))) = storage.load_identity()
+        {
+            let identity_data = IdentityData {
+                backup_data,
+                display_name,
+            };
+            *self.identity_data.lock().unwrap() = Some(identity_data);
+            return true;
         }
 
         false

@@ -9,8 +9,8 @@
 //! and incoming update processing.
 
 use vauchi_core::{
-    crypto::ratchet::DoubleRatchetState, exchange::X3DHKeyPair, sync::delta::CardDelta, Contact,
-    ContactCard, ContactField, FieldType, Identity, SymmetricKey, Vauchi, VauchiError,
+    Contact, ContactCard, ContactField, FieldType, Identity, SymmetricKey, Vauchi, VauchiError,
+    crypto::ratchet::DoubleRatchetState, exchange::X3DHKeyPair, sync::delta::CardDelta,
 };
 
 fn create_test_vauchi() -> Vauchi {

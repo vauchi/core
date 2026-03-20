@@ -23,8 +23,8 @@ use crate::storage::{DeletionState, Storage};
 
 use super::storage::secure_overwrite_file;
 use super::{
-    PurgeSender, RevocationSender, ShredError, ShredReport, ShredToken, ShredVerification,
-    SMK_KEY_NAME,
+    PurgeSender, RevocationSender, SMK_KEY_NAME, ShredError, ShredReport, ShredToken,
+    ShredVerification,
 };
 
 /// Orchestrates cryptographic shredding of all identity data.
@@ -95,12 +95,12 @@ impl<'a> ShredManager<'a> {
         // This ensures the token came from soft_shred(), not fabricated independently.
         let dm = DeletionManager::new(self.storage);
         let state = dm.deletion_state()?;
-        if let DeletionState::Scheduled { scheduled_at, .. } = &state {
-            if token.created_at() < *scheduled_at {
-                return Err(ShredError::Deletion(DeletionError::DeletionFailed(
-                    "ShredToken predates scheduled deletion".to_string(),
-                )));
-            }
+        if let DeletionState::Scheduled { scheduled_at, .. } = &state
+            && token.created_at() < *scheduled_at
+        {
+            return Err(ShredError::Deletion(DeletionError::DeletionFailed(
+                "ShredToken predates scheduled deletion".to_string(),
+            )));
         }
 
         // 1. Verify grace period has elapsed and generate revocations

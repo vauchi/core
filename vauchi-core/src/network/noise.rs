@@ -15,8 +15,8 @@
 //! This is defense-in-depth: if TLS is compromised, routing metadata
 //! (recipient_id, message types) remains encrypted.
 
-use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use base64::Engine;
+use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use snow::{Builder, TransportState};
 
 /// Noise protocol pattern for relay-client communication.

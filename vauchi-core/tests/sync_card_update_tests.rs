@@ -10,6 +10,7 @@
 mod common;
 
 use common::helpers::create_vauchi_with_identity;
+use vauchi_core::SymmetricKey;
 use vauchi_core::contact::Contact;
 use vauchi_core::contact_card::{ContactCard, ContactField, FieldType};
 use vauchi_core::crypto::cek::ContentEncryptionKey;
@@ -17,7 +18,6 @@ use vauchi_core::crypto::ratchet::DoubleRatchetState;
 use vauchi_core::exchange::X3DHKeyPair;
 use vauchi_core::sync::card_update::{process_card_updates, process_single_card_update};
 use vauchi_core::sync::delta::{CardDelta, CekWrappedPayload, VersionedPayload};
-use vauchi_core::SymmetricKey;
 
 /// Helper: create Alice and Bob with a mutual contact, ratchet states stored,
 /// and return everything needed to construct and process card updates.

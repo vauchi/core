@@ -1007,7 +1007,7 @@ impl ExchangeSession {
             _ => {
                 return Err(ExchangeError::InvalidState(
                     "Not in key agreement state".into(),
-                ))
+                ));
             }
         };
 

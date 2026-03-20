@@ -205,10 +205,10 @@ impl<'a> ContactManager<'a> {
         }
 
         // Second: try ID prefix match
-        if !query.is_empty() {
-            if let Some(label) = labels.iter().find(|l| l.id().starts_with(query)) {
-                return Ok(Some(label.clone()));
-            }
+        if !query.is_empty()
+            && let Some(label) = labels.iter().find(|l| l.id().starts_with(query))
+        {
+            return Ok(Some(label.clone()));
         }
 
         Ok(None)

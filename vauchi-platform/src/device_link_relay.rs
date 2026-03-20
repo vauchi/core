@@ -107,7 +107,7 @@ pub async fn send_and_receive(
             match msg {
                 Ok(Message::Binary(data)) => return Ok(data),
                 Ok(Message::Close(_)) => {
-                    return Err(DeviceLinkError::ConnectionClosedBeforeResponse)
+                    return Err(DeviceLinkError::ConnectionClosedBeforeResponse);
                 }
                 Ok(_) => continue, // skip text/ping/pong
                 Err(e) => return Err(DeviceLinkError::WebSocket(e.to_string())),
@@ -158,7 +158,7 @@ pub async fn listen_for_request(
                     return Ok((relay_msg.payload, relay_msg.sender_token));
                 }
                 Ok(Message::Close(_)) => {
-                    return Err(DeviceLinkError::ConnectionClosedWhileListening)
+                    return Err(DeviceLinkError::ConnectionClosedWhileListening);
                 }
                 Ok(_) => continue,
                 Err(e) => return Err(DeviceLinkError::WebSocketListening(e.to_string())),

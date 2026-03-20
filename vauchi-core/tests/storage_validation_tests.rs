@@ -86,21 +86,27 @@ fn test_has_validated() {
     let validation = create_test_validation("contact123", "email", "validator456");
 
     // Initially not validated
-    assert!(!storage
-        .has_validated("contact123", "email", "validator456")
-        .unwrap());
+    assert!(
+        !storage
+            .has_validated("contact123", "email", "validator456")
+            .unwrap()
+    );
 
     storage.save_validation(&validation).unwrap();
 
     // Now validated
-    assert!(storage
-        .has_validated("contact123", "email", "validator456")
-        .unwrap());
+    assert!(
+        storage
+            .has_validated("contact123", "email", "validator456")
+            .unwrap()
+    );
 
     // Different validator hasn't validated
-    assert!(!storage
-        .has_validated("contact123", "email", "other_validator")
-        .unwrap());
+    assert!(
+        !storage
+            .has_validated("contact123", "email", "other_validator")
+            .unwrap()
+    );
 }
 
 #[test]

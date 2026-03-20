@@ -87,8 +87,8 @@ fn v2_peer_without_verifier_caps_still_works() {
 #[test]
 fn verifier_caps_do_not_affect_transport_negotiation() {
     // Adding verifier caps should not change which transport is selected
-    use vauchi_core::exchange::transport::negotiation::negotiate_transport;
     use vauchi_core::exchange::transport::TransportType;
+    use vauchi_core::exchange::transport::negotiation::negotiate_transport;
 
     let ours = TransportCaps::BLE | TransportCaps::STATIC_QR;
     let ours_with_verifiers = ours | TransportCaps::AMBIENT_AUDIO | TransportCaps::ACCELEROMETER;

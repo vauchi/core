@@ -8,7 +8,7 @@ use std::os::raw::c_char;
 
 use vauchi_core::ui::*;
 
-use super::{from_c_str, to_c_string, VauchiWorkflow, WorkflowEngineAny};
+use super::{VauchiWorkflow, WorkflowEngineAny, from_c_str, to_c_string};
 
 // ── Lifecycle functions ─────────────────────────────────────────────
 
@@ -23,7 +23,7 @@ use super::{from_c_str, to_c_string, VauchiWorkflow, WorkflowEngineAny};
 ///
 /// # Safety
 /// `workflow_type` must be a valid null-terminated C string, or null.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn vauchi_workflow_create(
     workflow_type: *const c_char,
 ) -> *mut VauchiWorkflow {
@@ -53,13 +53,15 @@ pub unsafe extern "C" fn vauchi_workflow_create(
 ///
 /// # Safety
 /// `handle` must be a pointer returned by `vauchi_workflow_create`, or null.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn vauchi_workflow_destroy(handle: *mut VauchiWorkflow) {
-    let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        if !handle.is_null() {
-            drop(Box::from_raw(handle));
-        }
-    }));
+    unsafe {
+        let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            if !handle.is_null() {
+                drop(Box::from_raw(handle));
+            }
+        }));
+    }
 }
 
 // ── Screen and action functions ─────────────────────────────────────
@@ -72,23 +74,25 @@ pub unsafe extern "C" fn vauchi_workflow_destroy(handle: *mut VauchiWorkflow) {
 ///
 /// # Safety
 /// `handle` must be a valid workflow handle or null.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn vauchi_workflow_current_screen(
     handle: *mut VauchiWorkflow,
 ) -> *mut c_char {
-    match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        if handle.is_null() {
-            return std::ptr::null_mut();
-        }
+    unsafe {
+        match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            if handle.is_null() {
+                return std::ptr::null_mut();
+            }
 
-        let workflow = &*handle;
-        match workflow.engine.lock() {
-            Ok(engine) => to_c_string(&engine.current_screen_json()),
-            Err(_) => to_c_string(r#"{"error":"lock poisoned"}"#),
+            let workflow = &*handle;
+            match workflow.engine.lock() {
+                Ok(engine) => to_c_string(&engine.current_screen_json()),
+                Err(_) => to_c_string(r#"{"error":"lock poisoned"}"#),
+            }
+        })) {
+            Ok(result) => result,
+            Err(_) => std::ptr::null_mut(),
         }
-    })) {
-        Ok(result) => result,
-        Err(_) => std::ptr::null_mut(),
     }
 }
 
@@ -101,28 +105,30 @@ pub unsafe extern "C" fn vauchi_workflow_current_screen(
 /// # Safety
 /// `handle` must be a valid workflow handle or null.
 /// `action_json` must be a valid null-terminated C string, or null.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn vauchi_workflow_handle_action(
     handle: *mut VauchiWorkflow,
     action_json: *const c_char,
 ) -> *mut c_char {
-    match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        if handle.is_null() {
-            return std::ptr::null_mut();
-        }
+    unsafe {
+        match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            if handle.is_null() {
+                return std::ptr::null_mut();
+            }
 
-        let json = match from_c_str(action_json) {
-            Some(s) => s,
-            None => return to_c_string(r#"{"error":"null action JSON"}"#),
-        };
+            let json = match from_c_str(action_json) {
+                Some(s) => s,
+                None => return to_c_string(r#"{"error":"null action JSON"}"#),
+            };
 
-        let workflow = &*handle;
-        match workflow.engine.lock() {
-            Ok(mut engine) => to_c_string(&engine.handle_action_json(&json)),
-            Err(_) => to_c_string(r#"{"error":"lock poisoned"}"#),
+            let workflow = &*handle;
+            match workflow.engine.lock() {
+                Ok(mut engine) => to_c_string(&engine.handle_action_json(&json)),
+                Err(_) => to_c_string(r#"{"error":"lock poisoned"}"#),
+            }
+        })) {
+            Ok(result) => result,
+            Err(_) => std::ptr::null_mut(),
         }
-    })) {
-        Ok(result) => result,
-        Err(_) => std::ptr::null_mut(),
     }
 }

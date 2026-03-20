@@ -5,7 +5,7 @@
 //! Additional identity::password tests for full coverage of PasswordStrength
 //! and password_feedback.
 
-use vauchi_core::identity::password::{password_feedback, validate_password, PasswordStrength};
+use vauchi_core::identity::password::{PasswordStrength, password_feedback, validate_password};
 use zxcvbn::Score;
 
 // @scenario: identity_management:Password strength validation

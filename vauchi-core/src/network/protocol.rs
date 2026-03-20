@@ -145,10 +145,12 @@ mod tests {
         let result = decode_message(&json);
 
         assert!(result.is_err(), "expected error");
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("Unsupported protocol version"));
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("Unsupported protocol version")
+        );
     }
 
     #[test]

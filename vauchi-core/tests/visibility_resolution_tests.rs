@@ -13,8 +13,8 @@
 //! - @groups-mode: label-based visibility
 //! - @ungrouped-contact: default-closed for ungrouped contacts in groups mode
 
-use vauchi_core::contact::labels::resolve_visible_fields;
 use vauchi_core::contact::GroupManager;
+use vauchi_core::contact::labels::resolve_visible_fields;
 use vauchi_core::contact_card::{ContactCard, ContactField, FieldType};
 
 #[test]

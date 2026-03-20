@@ -115,10 +115,10 @@ impl GroupManager {
         }
 
         // Check for duplicate (excluding this group)
-        if let Some(existing) = self.get_group_by_name(new_name) {
-            if existing.id() != group_id {
-                return Err(GroupError::DuplicateName(new_name.to_string()));
-            }
+        if let Some(existing) = self.get_group_by_name(new_name)
+            && existing.id() != group_id
+        {
+            return Err(GroupError::DuplicateName(new_name.to_string()));
         }
 
         // Find and rename

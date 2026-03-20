@@ -243,12 +243,16 @@ fn test_field_validation_has_validated_works() {
 
     storage.save_validation(&validation).unwrap();
 
-    assert!(storage
-        .has_validated(contact_id, "email", "validator-xyz")
-        .unwrap());
-    assert!(!storage
-        .has_validated(contact_id, "email", "other-validator")
-        .unwrap());
+    assert!(
+        storage
+            .has_validated(contact_id, "email", "validator-xyz")
+            .unwrap()
+    );
+    assert!(
+        !storage
+            .has_validated(contact_id, "email", "other-validator")
+            .unwrap()
+    );
 }
 
 // === ux_state roundtrip tests ===

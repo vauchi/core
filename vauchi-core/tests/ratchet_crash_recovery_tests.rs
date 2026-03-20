@@ -7,8 +7,8 @@
 //! Tests for ratchet state persistence and recovery after crashes.
 //! Based on: sync_updates.feature edge cases
 
-use vauchi_core::crypto::ratchet::DoubleRatchetState;
 use vauchi_core::crypto::SymmetricKey;
+use vauchi_core::crypto::ratchet::DoubleRatchetState;
 use vauchi_core::exchange::X3DHKeyPair;
 
 // =============================================================================

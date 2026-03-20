@@ -8,7 +8,7 @@
 //! deserialization. This lets clients route messages to the correct handler
 //! without duplicating classification logic.
 
-use super::simple_message::{SimpleEnvelope, SimplePayload, FRAME_HEADER_SIZE};
+use super::simple_message::{FRAME_HEADER_SIZE, SimpleEnvelope, SimplePayload};
 
 /// Classified message type.
 ///

@@ -5,7 +5,7 @@
 //! Tests for network::anonymous (anonymous sender IDs)
 
 use vauchi_core::network::anonymous::{
-    compute_anonymous_id, current_epoch, resolve_sender, AnonymousSender, SenderIndex,
+    AnonymousSender, SenderIndex, compute_anonymous_id, current_epoch, resolve_sender,
 };
 use vauchi_core::{Contact, ContactCard, SymmetricKey};
 

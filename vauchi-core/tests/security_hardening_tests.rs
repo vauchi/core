@@ -17,13 +17,13 @@
 
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use vauchi_core::crypto::{derive_key_argon2id, SigningKeyPair, SymmetricKey};
+use vauchi_core::Identity;
+use vauchi_core::crypto::{SigningKeyPair, SymmetricKey, derive_key_argon2id};
 use vauchi_core::exchange::{
     BLEProximityVerifier, ExchangeError, ExchangeEvent, ExchangeQR, ExchangeSession,
     MockBLEVerifier, MockProximityVerifier, ProximityError, X3DHKeyPair,
 };
 use vauchi_core::storage::Storage;
-use vauchi_core::Identity;
 
 // =============================================================================
 // Test 1: Brute Force Protection on Backup Password (Argon2id cost)

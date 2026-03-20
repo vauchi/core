@@ -14,7 +14,7 @@ use super::types::{
     MobileDeviceInfo, MobileDeviceLinkData, MobileDeviceLinkInfo, MobileDeviceLinkRequest,
 };
 use super::{
-    device_link_relay, MobileDeviceLinkInitiator, MobileDeviceLinkResponder, VauchiPlatform,
+    MobileDeviceLinkInitiator, MobileDeviceLinkResponder, VauchiPlatform, device_link_relay,
 };
 
 #[uniffi::export]

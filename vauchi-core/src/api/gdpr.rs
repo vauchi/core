@@ -248,25 +248,23 @@ fn export_devices(storage: &Storage) -> Option<Vec<GdprDevice>> {
     match storage.load_device_registry_json() {
         Ok(Some(json)) => {
             // Parse device registry JSON
-            if let Ok(registry) = serde_json::from_str::<serde_json::Value>(&json) {
-                if let Some(devices) = registry.get("devices").and_then(|d| d.as_array()) {
-                    let gdpr_devices: Vec<GdprDevice> = devices
-                        .iter()
-                        .map(|d| GdprDevice {
-                            device_name: d
-                                .get("device_name")
-                                .and_then(|n| n.as_str())
-                                .unwrap_or("Unknown")
-                                .to_string(),
-                            device_index: d
-                                .get("device_index")
-                                .and_then(|i| i.as_u64())
-                                .unwrap_or(0) as u32,
-                            created_at: d.get("created_at").and_then(|t| t.as_u64()).unwrap_or(0),
-                        })
-                        .collect();
-                    return Some(gdpr_devices);
-                }
+            if let Ok(registry) = serde_json::from_str::<serde_json::Value>(&json)
+                && let Some(devices) = registry.get("devices").and_then(|d| d.as_array())
+            {
+                let gdpr_devices: Vec<GdprDevice> = devices
+                    .iter()
+                    .map(|d| GdprDevice {
+                        device_name: d
+                            .get("device_name")
+                            .and_then(|n| n.as_str())
+                            .unwrap_or("Unknown")
+                            .to_string(),
+                        device_index: d.get("device_index").and_then(|i| i.as_u64()).unwrap_or(0)
+                            as u32,
+                        created_at: d.get("created_at").and_then(|t| t.as_u64()).unwrap_or(0),
+                    })
+                    .collect();
+                return Some(gdpr_devices);
             }
             Some(Vec::new())
         }

@@ -386,10 +386,12 @@ fn test_perform_emergency_wipe_requires_confirmation() {
 
     let result = wb.perform_emergency_wipe(false);
     assert!(result.is_err(), "expected error");
-    assert!(result
-        .unwrap_err()
-        .to_string()
-        .contains("requires explicit confirmation"));
+    assert!(
+        result
+            .unwrap_err()
+            .to_string()
+            .contains("requires explicit confirmation")
+    );
 }
 
 #[test]

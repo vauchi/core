@@ -8,8 +8,8 @@
 //! ensuring that only connections to servers with a known certificate are allowed.
 //! Uses rustls for pure-Rust TLS (no OpenSSL dependency - works on Android/iOS).
 
-use rustls::pki_types::CertificateDer;
 use rustls::ClientConfig;
+use rustls::pki_types::CertificateDer;
 use std::sync::Arc;
 use std::time::Duration;
 use thiserror::Error;

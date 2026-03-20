@@ -153,7 +153,7 @@ impl Vauchi {
     ) -> VauchiResult<Vec<String>> {
         use crate::crypto::cek::ContentEncryptionKey;
         use crate::crypto::ratchet::RatchetMessage;
-        use crate::sync::delta::{CardDelta, VersionedPayload, PAYLOAD_VERSION_CEK};
+        use crate::sync::delta::{CardDelta, PAYLOAD_VERSION_CEK, VersionedPayload};
 
         // Check revoked_senders tombstone
         if self.storage.is_sender_revoked(contact_id)? {
@@ -163,10 +163,10 @@ impl Vauchi {
         }
 
         // Reject updates from blocked contacts
-        if let Some(contact) = self.storage.load_contact(contact_id)? {
-            if contact.is_blocked() {
-                return Err(VauchiError::ContactBlocked(contact_id.to_string()));
-            }
+        if let Some(contact) = self.storage.load_contact(contact_id)?
+            && contact.is_blocked()
+        {
+            return Err(VauchiError::ContactBlocked(contact_id.to_string()));
         }
 
         // Load contact

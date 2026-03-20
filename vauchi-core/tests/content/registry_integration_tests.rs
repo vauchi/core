@@ -10,7 +10,7 @@
 
 use tempfile::TempDir;
 use vauchi_core::content::{
-    compute_checksum, ContentCache, ContentConfig, ContentManager, ContentType,
+    ContentCache, ContentConfig, ContentManager, ContentType, compute_checksum,
 };
 use vauchi_core::social::SocialNetworkRegistry;
 

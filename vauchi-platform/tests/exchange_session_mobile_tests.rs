@@ -15,8 +15,8 @@ use vauchi_core::exchange::{
 };
 use vauchi_core::identity::Identity;
 use vauchi_platform::{
-    create_qr_exchange_manual, create_qr_exchange_proximity, MobileExchangeSession,
-    MobileExchangeState, MobileProximityHandler,
+    MobileExchangeSession, MobileExchangeState, MobileProximityHandler, create_qr_exchange_manual,
+    create_qr_exchange_proximity,
 };
 
 struct SuccessHandler;

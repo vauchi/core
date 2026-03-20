@@ -9,8 +9,8 @@ use rusqlite::params;
 use super::{Storage, StorageError};
 use crate::contact::Contact;
 use crate::contact_card::ContactCard;
-use crate::crypto::cek::ContentEncryptionKey;
 use crate::crypto::SymmetricKey;
+use crate::crypto::cek::ContentEncryptionKey;
 use crate::exchange::ExchangeTransport;
 
 /// Internal struct for database row data.

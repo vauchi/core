@@ -5,10 +5,10 @@
 #![cfg(feature = "testing")]
 
 use proptest::prelude::*;
+use vauchi_core::exchange::transport::TransportType;
 use vauchi_core::exchange::transport::caps::TransportCaps;
 use vauchi_core::exchange::transport::negotiation::negotiate_transport;
 use vauchi_core::exchange::transport::protocol::ExchangeProtocol;
-use vauchi_core::exchange::transport::TransportType;
 
 proptest! {
     #[test]

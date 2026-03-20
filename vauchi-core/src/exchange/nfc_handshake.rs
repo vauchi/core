@@ -191,7 +191,7 @@ impl NfcHandshakeSession {
             _ => {
                 return Err(ExchangeError::InvalidState(
                     "Expected KeyOfferSent state".into(),
-                ))
+                ));
             }
         };
 
@@ -237,7 +237,7 @@ impl NfcHandshakeSession {
             _ => {
                 return Err(ExchangeError::InvalidState(
                     "Expected KeyAckReceived state".into(),
-                ))
+                ));
             }
         };
 
@@ -276,7 +276,7 @@ impl NfcHandshakeSession {
             _ => {
                 return Err(ExchangeError::InvalidState(
                     "Expected PayloadSent state".into(),
-                ))
+                ));
             }
         };
 
@@ -321,7 +321,7 @@ impl NfcHandshakeSession {
             _ => {
                 return Err(ExchangeError::InvalidState(
                     "Cannot enter relay fallback from current state".into(),
-                ))
+                ));
             }
         };
 

@@ -14,7 +14,7 @@ use proptest::prelude::*;
 use vauchi_core::contact::Contact;
 use vauchi_core::contact_card::ContactCard;
 use vauchi_core::crypto::SymmetricKey;
-use vauchi_core::exchange::multistage::qr_codec::{format_init_qr_with_relay, parse_qr, StageQr};
+use vauchi_core::exchange::multistage::qr_codec::{StageQr, format_init_qr_with_relay, parse_qr};
 use vauchi_core::exchange::{ExchangeQR, X3DHKeyPair};
 use vauchi_core::identity::Identity;
 use vauchi_core::network::relay_url::validate_relay_url;

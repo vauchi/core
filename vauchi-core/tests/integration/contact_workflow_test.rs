@@ -114,28 +114,36 @@ fn test_card_delta_workflow() {
     assert!(!delta.changes.is_empty());
 
     // Display name changed
-    assert!(delta
-        .changes
-        .iter()
-        .any(|c| matches!(c, FieldChange::DisplayNameChanged { .. })));
+    assert!(
+        delta
+            .changes
+            .iter()
+            .any(|c| matches!(c, FieldChange::DisplayNameChanged { .. }))
+    );
 
     // Email modified (same field ID, different value)
-    assert!(delta
-        .changes
-        .iter()
-        .any(|c| matches!(c, FieldChange::Modified { .. })));
+    assert!(
+        delta
+            .changes
+            .iter()
+            .any(|c| matches!(c, FieldChange::Modified { .. }))
+    );
 
     // Mobile removed
-    assert!(delta
-        .changes
-        .iter()
-        .any(|c| matches!(c, FieldChange::Removed { .. })));
+    assert!(
+        delta
+            .changes
+            .iter()
+            .any(|c| matches!(c, FieldChange::Removed { .. }))
+    );
 
     // Blog added
-    assert!(delta
-        .changes
-        .iter()
-        .any(|c| matches!(c, FieldChange::Added { .. })));
+    assert!(
+        delta
+            .changes
+            .iter()
+            .any(|c| matches!(c, FieldChange::Added { .. }))
+    );
 
     // Apply delta to a copy of old card
     let mut result_card = old_card.clone();

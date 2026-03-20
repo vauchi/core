@@ -6,14 +6,14 @@
 //!
 //! Run with: cargo bench -p vauchi-core
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion, Throughput};
+use criterion::{Criterion, Throughput, black_box, criterion_group, criterion_main};
 
 // =============================================================================
 // SYMMETRIC ENCRYPTION BENCHMARKS
 // =============================================================================
 
 fn bench_symmetric_encryption(c: &mut Criterion) {
-    use vauchi_core::crypto::{decrypt, encrypt, SymmetricKey};
+    use vauchi_core::crypto::{SymmetricKey, decrypt, encrypt};
 
     let key = SymmetricKey::generate();
 
@@ -140,8 +140,8 @@ fn bench_hkdf(c: &mut Criterion) {
 // =============================================================================
 
 fn bench_double_ratchet(c: &mut Criterion) {
-    use vauchi_core::crypto::ratchet::DoubleRatchetState;
     use vauchi_core::crypto::SymmetricKey;
+    use vauchi_core::crypto::ratchet::DoubleRatchetState;
     use vauchi_core::exchange::X3DHKeyPair;
 
     let mut group = c.benchmark_group("double_ratchet");
@@ -210,7 +210,7 @@ fn bench_double_ratchet(c: &mut Criterion) {
 // =============================================================================
 
 fn bench_x3dh(c: &mut Criterion) {
-    use vauchi_core::exchange::{X3DHKeyPair, X3DH};
+    use vauchi_core::exchange::{X3DH, X3DHKeyPair};
 
     let mut group = c.benchmark_group("x3dh");
 

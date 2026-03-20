@@ -12,7 +12,7 @@ use std::path::Path;
 use crate::api::pre_signed::PreSignedShredMessages;
 use crate::storage::secure::SecureStorage;
 
-use super::{ShredError, ShredReport, SMK_KEY_NAME};
+use super::{SMK_KEY_NAME, ShredError, ShredReport};
 
 /// Public entry point for secure file overwrite, callable from other modules.
 pub(crate) fn secure_overwrite_file_public(path: &Path) -> Result<(), std::io::Error> {

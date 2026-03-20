@@ -8,8 +8,8 @@
 //! with storage for dismissed-duplicate tracking and event dispatching.
 
 use crate::contact::merge::{
-    compute_similarity, filter_dismissed, find_duplicates, merge_contacts, normalize_pair_key,
-    DuplicatePair,
+    DuplicatePair, compute_similarity, filter_dismissed, find_duplicates, merge_contacts,
+    normalize_pair_key,
 };
 
 use super::super::error::{VauchiError, VauchiResult};

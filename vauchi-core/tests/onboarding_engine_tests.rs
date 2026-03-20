@@ -639,10 +639,12 @@ fn security_explanation_has_info_panel() {
     let screen = engine.current_screen();
     assert_eq!(screen.screen_id, "security_explanation");
     assert_eq!(screen.progress.as_ref().unwrap().current_step, 7);
-    assert!(screen
-        .components
-        .iter()
-        .any(|c| matches!(c, Component::InfoPanel { .. })));
+    assert!(
+        screen
+            .components
+            .iter()
+            .any(|c| matches!(c, Component::InfoPanel { .. }))
+    );
     assert_eq!(screen.actions.len(), 1);
     assert_eq!(screen.actions[0].id, "continue");
 }

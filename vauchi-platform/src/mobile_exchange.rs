@@ -8,15 +8,15 @@ use std::sync::Arc;
 
 use vauchi_core::contact::Contact;
 use vauchi_core::contact_card::ContactCard;
-use vauchi_core::crypto::ratchet::DoubleRatchetState;
 use vauchi_core::crypto::SymmetricKey;
+use vauchi_core::crypto::ratchet::DoubleRatchetState;
 
+use super::VauchiPlatform;
 use super::error::MobileError;
 use super::exchange::MobileExchangeSession;
 use super::exchange::MobileProximityHandler;
 use super::multistage_exchange::MobileMultiStageSession;
 use super::types::MobileExchangeResult;
-use super::VauchiPlatform;
 
 /// Exchange payload format version byte.
 const EXCHANGE_PAYLOAD_VERSION: u8 = 1;

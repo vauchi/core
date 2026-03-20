@@ -6,7 +6,7 @@
 
 use zeroize::Zeroize;
 
-use crate::crypto::{decrypt, encrypt, SymmetricKey};
+use crate::crypto::{SymmetricKey, decrypt, encrypt};
 use crate::identity::DeviceRegistry;
 
 use super::super::ExchangeError;

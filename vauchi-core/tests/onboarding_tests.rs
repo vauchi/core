@@ -18,8 +18,8 @@
 //! - JSON serialization roundtrip
 //! - API integration via Vauchi
 
-use vauchi_core::onboarding::{display_name_suggestions, OnboardingProgress, OnboardingStep};
 use vauchi_core::Vauchi;
+use vauchi_core::onboarding::{OnboardingProgress, OnboardingStep, display_name_suggestions};
 
 fn create_test_vauchi() -> Vauchi {
     Vauchi::in_memory().unwrap()
@@ -158,16 +158,20 @@ fn test_advance_through_all_steps() {
     // Advance from IdentityCheck to LinkChoice
     let step = progress.advance();
     assert_eq!(step, OnboardingStep::LinkChoice);
-    assert!(progress
-        .completed_steps
-        .contains(&OnboardingStep::IdentityCheck));
+    assert!(
+        progress
+            .completed_steps
+            .contains(&OnboardingStep::IdentityCheck)
+    );
 
     // Advance from LinkChoice to Welcome
     let step = progress.advance();
     assert_eq!(step, OnboardingStep::Welcome);
-    assert!(progress
-        .completed_steps
-        .contains(&OnboardingStep::LinkChoice));
+    assert!(
+        progress
+            .completed_steps
+            .contains(&OnboardingStep::LinkChoice)
+    );
 
     // Advance from Welcome to DefaultName
     let step = progress.advance();
@@ -177,9 +181,11 @@ fn test_advance_through_all_steps() {
     // Advance through remaining steps
     let step = progress.advance();
     assert_eq!(step, OnboardingStep::SkipGate);
-    assert!(progress
-        .completed_steps
-        .contains(&OnboardingStep::DefaultName));
+    assert!(
+        progress
+            .completed_steps
+            .contains(&OnboardingStep::DefaultName)
+    );
 
     let step = progress.advance();
     assert_eq!(step, OnboardingStep::GroupsSetup);
@@ -405,9 +411,11 @@ fn test_serde_backward_compat_aliases() {
     let old_json = r#"{"current_step":"CreateIdentity","completed_steps":["AddFields"],"started_at":1000,"completed_at":null,"skipped_backup":false}"#;
     let progress = OnboardingProgress::from_json(old_json).expect("Old JSON should deserialize");
     assert_eq!(progress.current_step(), OnboardingStep::DefaultName);
-    assert!(progress
-        .completed_steps
-        .contains(&OnboardingStep::ContactInfo));
+    assert!(
+        progress
+            .completed_steps
+            .contains(&OnboardingStep::ContactInfo)
+    );
 
     // Re-serialization must use canonical names, not aliases
     let re_serialized = progress.to_json().expect("Re-serialization should succeed");
@@ -518,9 +526,11 @@ fn test_storage_save_load_roundtrip() {
 
     assert_eq!(loaded.current_step(), OnboardingStep::Welcome);
     assert_eq!(loaded.completed_steps.len(), 2);
-    assert!(loaded
-        .completed_steps
-        .contains(&OnboardingStep::IdentityCheck));
+    assert!(
+        loaded
+            .completed_steps
+            .contains(&OnboardingStep::IdentityCheck)
+    );
     assert!(loaded.completed_steps.contains(&OnboardingStep::LinkChoice));
 }
 

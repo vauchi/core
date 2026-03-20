@@ -4,7 +4,7 @@
 
 //! Encryption coverage tests for XChaCha20-Poly1305 paths
 
-use vauchi_core::crypto::{decrypt, decrypt_with_ad, encrypt, encrypt_with_ad, SymmetricKey};
+use vauchi_core::crypto::{SymmetricKey, decrypt, decrypt_with_ad, encrypt, encrypt_with_ad};
 
 // @scenario: security:Correct algorithms used
 #[test]

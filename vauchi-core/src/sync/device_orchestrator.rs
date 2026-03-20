@@ -10,7 +10,7 @@
 use std::collections::HashMap;
 
 use crate::contact_card::ContactCard;
-use crate::crypto::{encryption, SymmetricKey, HKDF};
+use crate::crypto::{HKDF, SymmetricKey, encryption};
 use crate::identity::device::{DeviceInfo, DeviceRegistry};
 use crate::storage::Storage;
 use crate::sync::device_sync::{

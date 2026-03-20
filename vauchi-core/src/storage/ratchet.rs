@@ -7,9 +7,9 @@
 use rusqlite::params;
 
 use super::{Storage, StorageError};
+use crate::crypto::SymmetricKey;
 use crate::crypto::kdf::HKDF;
 use crate::crypto::ratchet::DoubleRatchetState;
-use crate::crypto::SymmetricKey;
 
 impl Storage {
     // === Double Ratchet State Operations ===

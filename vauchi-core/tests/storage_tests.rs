@@ -197,8 +197,8 @@ fn test_storage_update_status() {
 
 #[test]
 fn test_storage_save_load_ratchet_state() {
-    use vauchi_core::crypto::ratchet::DoubleRatchetState;
     use vauchi_core::crypto::SymmetricKey;
+    use vauchi_core::crypto::ratchet::DoubleRatchetState;
     use vauchi_core::exchange::X3DHKeyPair;
 
     let storage = create_test_storage();
@@ -226,8 +226,8 @@ fn test_storage_save_load_ratchet_state() {
 
 #[test]
 fn test_storage_ratchet_state_encryption() {
-    use vauchi_core::crypto::ratchet::DoubleRatchetState;
     use vauchi_core::crypto::SymmetricKey;
+    use vauchi_core::crypto::ratchet::DoubleRatchetState;
     use vauchi_core::exchange::X3DHKeyPair;
 
     let storage = create_test_storage();
@@ -255,8 +255,8 @@ fn test_storage_ratchet_state_encryption() {
 
 #[test]
 fn test_storage_ratchet_deleted_with_contact() {
-    use vauchi_core::crypto::ratchet::DoubleRatchetState;
     use vauchi_core::crypto::SymmetricKey;
+    use vauchi_core::crypto::ratchet::DoubleRatchetState;
     use vauchi_core::exchange::X3DHKeyPair;
 
     let storage = create_test_storage();
@@ -298,8 +298,8 @@ fn test_storage_ratchet_not_found() {
 /// and can be loaded back correctly.
 #[test]
 fn test_storage_ratchet_per_contact_key_isolation() {
-    use vauchi_core::crypto::ratchet::DoubleRatchetState;
     use vauchi_core::crypto::SymmetricKey;
+    use vauchi_core::crypto::ratchet::DoubleRatchetState;
     use vauchi_core::exchange::X3DHKeyPair;
 
     let storage = create_test_storage();

@@ -223,10 +223,10 @@ impl ContactField {
     /// Generate URI for website field.
     fn website_to_uri(&self, value: &str) -> Option<String> {
         // Check for blocked schemes first
-        if let Some(scheme) = extract_scheme(value) {
-            if is_blocked_scheme(scheme) {
-                return None;
-            }
+        if let Some(scheme) = extract_scheme(value)
+            && is_blocked_scheme(scheme)
+        {
+            return None;
         }
 
         // If already has valid protocol, use as-is
@@ -262,12 +262,12 @@ impl ContactField {
         let username = normalize_social_username(value);
 
         // Handle Mastodon federated handles (@user@instance or user@instance)
-        if label_lower == "mastodon" {
-            if let Some(profile_url) = parse_mastodon_federated(username) {
-                return Some(profile_url);
-            }
-            // Not a federated handle — fall through to registry
+        if label_lower == "mastodon"
+            && let Some(profile_url) = parse_mastodon_federated(username)
+        {
+            return Some(profile_url);
         }
+        // Not a federated handle — fall through to registry
 
         // Strip LinkedIn "in/" prefix if user included it (template already has it)
         let username = if label_lower == "linkedin" {

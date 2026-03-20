@@ -56,15 +56,19 @@ fn test_visibility_rules() {
     let mut contact = create_test_contact();
 
     // Initially no specific rules
-    assert!(contact
-        .visibility_rules()
-        .can_see("any_field", contact.id()));
+    assert!(
+        contact
+            .visibility_rules()
+            .can_see("any_field", contact.id())
+    );
 
     // Set a field as private
     contact.visibility_rules_mut().set_nobody("private_field");
-    assert!(!contact
-        .visibility_rules()
-        .can_see("private_field", contact.id()));
+    assert!(
+        !contact
+            .visibility_rules()
+            .can_see("private_field", contact.id())
+    );
 }
 
 // ============================================================
@@ -92,9 +96,11 @@ fn test_contact_from_sync_data() {
     assert_eq!(contact.display_name(), "Synced User");
     assert_eq!(contact.exchange_timestamp(), 1234567890);
     assert!(contact.is_fingerprint_verified());
-    assert!(!contact
-        .visibility_rules()
-        .can_see("private_field", "anyone"));
+    assert!(
+        !contact
+            .visibility_rules()
+            .can_see("private_field", "anyone")
+    );
 }
 
 // @scenario: sync_updates.feature:Receive contact update from relay

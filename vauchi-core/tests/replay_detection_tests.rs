@@ -7,8 +7,8 @@
 //! Tests for detecting and rejecting replayed messages.
 //! Based on: security.feature - Replay attack prevention
 
-use vauchi_core::crypto::ratchet::{DoubleRatchetState, RatchetError};
 use vauchi_core::crypto::SymmetricKey;
+use vauchi_core::crypto::ratchet::{DoubleRatchetState, RatchetError};
 use vauchi_core::exchange::X3DHKeyPair;
 
 // =============================================================================

@@ -157,7 +157,7 @@ impl AppEngine {
                 let screen = self.navigate_to_internal(AppScreen::Onboarding);
                 ActionResult::NavigateTo(screen)
             }
-            AppScreen::FormDialog { ref dialog_type } => {
+            AppScreen::FormDialog { dialog_type } => {
                 // Cancel navigates back without saving
                 if self.engine.was_cancelled() {
                     let screen = self.navigate_back();

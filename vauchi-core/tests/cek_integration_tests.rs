@@ -308,11 +308,13 @@ fn test_process_cek_wrapped_update_applies_delta() {
 
     // Verify Bob's card was updated
     let bob_contact = alice.get_contact(&bob_id).unwrap().unwrap();
-    assert!(bob_contact
-        .card()
-        .fields()
-        .iter()
-        .any(|f| f.label() == "personal"));
+    assert!(
+        bob_contact
+            .card()
+            .fields()
+            .iter()
+            .any(|f| f.label() == "personal")
+    );
 }
 
 // =============================================================================

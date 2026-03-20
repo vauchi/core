@@ -21,7 +21,7 @@ pub use request::DeviceLinkRequest;
 pub use responder::DeviceLinkResponder;
 pub use response::DeviceLinkResponse;
 pub use types::{
-    compute_confirmation_mac, generate_numeric_code, DeviceLinkConfirmation, ProximityProof,
+    DeviceLinkConfirmation, ProximityProof, compute_confirmation_mac, generate_numeric_code,
 };
 
 // INLINE_TEST_REQUIRED: Tests private DEVICE_LINK_VERSION, DEVICE_LINK_MAGIC, BASE64 constants and version field
@@ -29,7 +29,7 @@ pub use types::{
 mod tests {
     use super::*;
 
-    use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
+    use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
     use std::time::{SystemTime, UNIX_EPOCH};
 
     use super::types::{DEVICE_LINK_MAGIC, DEVICE_LINK_VERSION};

@@ -17,6 +17,6 @@ pub use log_event::{LogEvent, LogEventKind, ScreenId};
 pub use report::generate_html_report;
 pub use snapshot::{BoundingBox, SnapshotMetadata};
 pub use tuner::{
-    generate_qr_test_patterns, generate_sweep_matrix, rank_configs, score_config, CameraConfig,
-    DeviceCapabilityProfile, ErrorCorrectionLevel, Platform, QrConfig, SweepMatrix, TuningResult,
+    CameraConfig, DeviceCapabilityProfile, ErrorCorrectionLevel, Platform, QrConfig, SweepMatrix,
+    TuningResult, generate_qr_test_patterns, generate_sweep_matrix, rank_configs, score_config,
 };

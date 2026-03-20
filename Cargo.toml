@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 [workspace]
-resolver = "2"
+resolver = "3"
 members = [
     "vauchi-cabi",
     "vauchi-core",
@@ -13,7 +13,7 @@ members = [
 
 [workspace.package]
 version = "0.7.2"
-edition = "2021"
+edition = "2024"
 license = "GPL-3.0-or-later"
 repository = "https://gitlab.com/vauchi/core"
 authors = ["Vauchi Contributors"]

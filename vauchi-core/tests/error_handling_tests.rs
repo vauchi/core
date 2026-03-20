@@ -8,11 +8,11 @@
 //! These tests ensure the system handles failures gracefully.
 
 use vauchi_core::{
+    Contact, ContactCard, ContactField, FieldType, Storage, SymmetricKey, Vauchi,
     crypto::ratchet::DoubleRatchetState,
     exchange::X3DHKeyPair,
     network::{MockTransport, RelayClient, RelayClientConfig, TransportConfig},
     sync::{CardDelta, SyncManager},
-    Contact, ContactCard, ContactField, FieldType, Storage, SymmetricKey, Vauchi,
 };
 
 // =============================================================================

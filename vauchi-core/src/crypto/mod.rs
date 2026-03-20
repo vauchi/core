@@ -28,10 +28,10 @@ pub fn random_fill(buf: &mut [u8]) {
 }
 
 pub use chain::{ChainError, ChainKey, MessageKey};
-pub use encryption::{decrypt, decrypt_with_ad, encrypt, encrypt_with_ad, SymmetricKey};
-pub use kdf::{KDFError, HKDF};
-pub use password_kdf::{derive_key_argon2id, PasswordKdfError};
-pub use ratchet::{DoubleRatchetState, RatchetError, RatchetMessage, RATCHET_STATE_VERSION};
+pub use encryption::{SymmetricKey, decrypt, decrypt_with_ad, encrypt, encrypt_with_ad};
+pub use kdf::{HKDF, KDFError};
+pub use password_kdf::{PasswordKdfError, derive_key_argon2id};
+pub use ratchet::{DoubleRatchetState, RATCHET_STATE_VERSION, RatchetError, RatchetMessage};
 pub use shredding::ShreddingMasterKey;
 pub use signing::{PublicKey, Signature, SigningKeyPair};
 pub use x3dh::{DhError, X3DHKeyPair};

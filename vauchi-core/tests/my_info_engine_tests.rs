@@ -47,11 +47,13 @@ fn my_info_shows_own_fields_in_action_list() {
         assert_eq!(items.len(), 2);
         assert!(items[0].label.contains("+41 79 123 45 67"));
         assert!(items[0].detail.as_deref().unwrap_or("").contains("Family"));
-        assert!(items[0]
-            .detail
-            .as_deref()
-            .unwrap_or("")
-            .contains("3 contacts"));
+        assert!(
+            items[0]
+                .detail
+                .as_deref()
+                .unwrap_or("")
+                .contains("3 contacts")
+        );
     }
 }
 
@@ -105,10 +107,12 @@ fn my_info_toggle_view_switches_mode() {
 
     // Initially in entry view
     let screen = engine.current_screen();
-    assert!(screen
-        .actions
-        .iter()
-        .any(|a| a.id == "toggle_view" && a.label == "Group View"));
+    assert!(
+        screen
+            .actions
+            .iter()
+            .any(|a| a.id == "toggle_view" && a.label == "Group View")
+    );
 
     // Toggle to group view
     let result = engine.handle_action(UserAction::ActionPressed {
@@ -117,10 +121,12 @@ fn my_info_toggle_view_switches_mode() {
     assert!(matches!(result, ActionResult::UpdateScreen(_)));
 
     let screen = engine.current_screen();
-    assert!(screen
-        .actions
-        .iter()
-        .any(|a| a.id == "toggle_view" && a.label == "Entry View"));
+    assert!(
+        screen
+            .actions
+            .iter()
+            .any(|a| a.id == "toggle_view" && a.label == "Entry View")
+    );
 }
 
 #[test]

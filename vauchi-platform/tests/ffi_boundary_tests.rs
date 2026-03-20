@@ -14,10 +14,10 @@
 use std::sync::Once;
 
 use vauchi_platform::{
+    MobileAhaMomentType, MobileHelpCategory, MobileLocale, MobilePasswordStrength,
     check_password_strength, generate_storage_key, get_aha_moment_localized,
     get_faq_by_id_localized, get_faqs_by_category_localized, get_faqs_localized, is_allowed_scheme,
-    is_blocked_scheme, is_safe_url, search_faqs_localized, MobileAhaMomentType, MobileHelpCategory,
-    MobileLocale, MobilePasswordStrength,
+    is_blocked_scheme, is_safe_url, search_faqs_localized,
 };
 
 static INIT: Once = Once::new();
@@ -503,8 +503,8 @@ fn test_aha_moment_localized_french() {
 fn test_confirmation_mac_contract_deterministic_and_accepted() {
     use std::time::{SystemTime, UNIX_EPOCH};
     use vauchi_core::exchange::{
-        compute_confirmation_mac, DeviceLinkInitiator, DeviceLinkQR, DeviceLinkResponder,
-        ProximityProof,
+        DeviceLinkInitiator, DeviceLinkQR, DeviceLinkResponder, ProximityProof,
+        compute_confirmation_mac,
     };
     use vauchi_core::identity::{DeviceRegistry, Identity};
 

@@ -114,12 +114,12 @@ impl TorConfig {
         }
 
         // Validate port is numeric
-        if let Some(port_str) = addr_part.rsplit(':').next() {
-            if port_str.parse::<u16>().is_err() {
-                return Err(TorConfigError::InvalidPort {
-                    port: port_str.to_string(),
-                });
-            }
+        if let Some(port_str) = addr_part.rsplit(':').next()
+            && port_str.parse::<u16>().is_err()
+        {
+            return Err(TorConfigError::InvalidPort {
+                port: port_str.to_string(),
+            });
         }
 
         Ok(())

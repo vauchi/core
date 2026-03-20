@@ -9,11 +9,11 @@
 //! Covers the relay_network.feature scenarios.
 
 use vauchi_core::{
+    Contact, ContactCard, ContactField, FieldType, Storage, SymmetricKey, Vauchi,
     crypto::ratchet::DoubleRatchetState,
     exchange::X3DHKeyPair,
     network::{MockTransport, RelayClient, RelayClientConfig, TransportConfig},
     sync::SyncManager,
-    Contact, ContactCard, ContactField, FieldType, Storage, SymmetricKey, Vauchi,
 };
 
 // =============================================================================
@@ -336,10 +336,12 @@ fn test_full_update_propagation() {
 
     // Verify Bob has the new field
     assert_eq!(alice_card_at_bob.fields().len(), 1);
-    assert!(alice_card_at_bob
-        .fields()
-        .iter()
-        .any(|f| f.label() == "work"));
+    assert!(
+        alice_card_at_bob
+            .fields()
+            .iter()
+            .any(|f| f.label() == "work")
+    );
 }
 
 // =============================================================================

@@ -278,16 +278,14 @@ impl WorkflowEngine for AppEngine {
 
     fn handle_action(&mut self, action: UserAction) -> ActionResult {
         // Capture display name during onboarding for identity persistence
-        if self.screen == AppScreen::Onboarding {
-            if let UserAction::TextChanged {
+        if self.screen == AppScreen::Onboarding
+            && let UserAction::TextChanged {
                 ref component_id,
                 ref value,
             } = action
-            {
-                if component_id == "display_name" {
-                    self.pending_display_name = Some(value.clone());
-                }
-            }
+            && component_id == "display_name"
+        {
+            self.pending_display_name = Some(value.clone());
         }
 
         self.persist_settings_toggle(&action);

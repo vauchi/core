@@ -8,12 +8,12 @@
 //! AudioListenForResponse commands (depending on initiator role). The frontend
 //! handles audio I/O and reports back via AudioResponseReceived.
 
+use vauchi_core::ContactCard;
 use vauchi_core::exchange::{
     ExchangeCommand, ExchangeEvent, ExchangeHardwareEvent, ExchangeSession, ExchangeState,
     ManualConfirmationVerifier,
 };
 use vauchi_core::identity::Identity;
-use vauchi_core::ContactCard;
 
 fn qr_session(name: &str) -> ExchangeSession {
     let identity = Identity::create(name);

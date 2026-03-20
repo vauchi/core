@@ -10,8 +10,7 @@ use super::{Storage, StorageError};
 use crate::social::ProfileValidation;
 
 /// SQL columns selected for validation queries (with encrypted fields).
-const VALIDATION_SELECT: &str =
-    "field_id, field_value_encrypted, field_value, validator_id, validated_at, signature_encrypted, signature";
+const VALIDATION_SELECT: &str = "field_id, field_value_encrypted, field_value, validator_id, validated_at, signature_encrypted, signature";
 
 /// Intermediate row before field decryption.
 struct ValidationRow {

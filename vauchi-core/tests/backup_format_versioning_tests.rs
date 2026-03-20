@@ -7,8 +7,8 @@
 //! Feature: backup_format_versioning.feature
 //! Tests version detection, migration, and corruption detection for identity backups.
 
-use vauchi_core::identity::{IdentityBackup, IdentityError};
 use vauchi_core::Identity;
+use vauchi_core::identity::{IdentityBackup, IdentityError};
 
 /// Backup format version byte for v2 (Argon2id + XChaCha20).
 const BACKUP_VERSION_V2: u8 = 0x02;

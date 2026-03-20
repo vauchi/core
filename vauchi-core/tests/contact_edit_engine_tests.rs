@@ -165,7 +165,7 @@ fn edit_visibility_shows_toggle_lists() {
             assert_eq!(id, "vis_phone1");
             assert_eq!(label, "Phone");
             assert_eq!(items.len(), 3); // Family, Friends, Work
-                                        // Family should be selected (phone1 is visible to Family)
+            // Family should be selected (phone1 is visible to Family)
             assert!(
                 items
                     .iter()

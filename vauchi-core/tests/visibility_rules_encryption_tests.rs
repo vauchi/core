@@ -100,15 +100,21 @@ fn test_contact_with_visibility_rules_roundtrip() {
         loaded.visibility_rules().get("phone-field"),
         &vauchi_core::contact::FieldVisibility::Nobody
     );
-    assert!(loaded
-        .visibility_rules()
-        .can_see("address-field", "contact-1"));
-    assert!(loaded
-        .visibility_rules()
-        .can_see("address-field", "contact-2"));
-    assert!(!loaded
-        .visibility_rules()
-        .can_see("address-field", "contact-3"));
+    assert!(
+        loaded
+            .visibility_rules()
+            .can_see("address-field", "contact-1")
+    );
+    assert!(
+        loaded
+            .visibility_rules()
+            .can_see("address-field", "contact-2")
+    );
+    assert!(
+        !loaded
+            .visibility_rules()
+            .can_see("address-field", "contact-3")
+    );
 }
 
 // @scenario: visibility_control.feature:New fields default to visible to all contacts

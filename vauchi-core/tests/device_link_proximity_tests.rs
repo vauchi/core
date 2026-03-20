@@ -10,8 +10,8 @@
 
 use std::time::{SystemTime, UNIX_EPOCH};
 use vauchi_core::exchange::{
-    compute_confirmation_mac, DeviceLinkInitiator, DeviceLinkInitiatorRestored, DeviceLinkQR,
-    DeviceLinkResponder, ExchangeError, ProximityProof,
+    DeviceLinkInitiator, DeviceLinkInitiatorRestored, DeviceLinkQR, DeviceLinkResponder,
+    ExchangeError, ProximityProof, compute_confirmation_mac,
 };
 use vauchi_core::identity::{DeviceRegistry, Identity};
 

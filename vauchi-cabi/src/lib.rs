@@ -70,13 +70,15 @@ pub struct VauchiExchange {
 ///
 /// # Safety
 /// `ptr` must be a pointer returned by a vauchi_* function, or null.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn vauchi_string_free(ptr: *mut c_char) {
-    let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        if !ptr.is_null() {
-            drop(CString::from_raw(ptr));
-        }
-    }));
+    unsafe {
+        let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            if !ptr.is_null() {
+                drop(CString::from_raw(ptr));
+            }
+        }));
+    }
 }
 
 pub(crate) fn to_c_string(s: &str) -> *mut c_char {
@@ -419,35 +421,37 @@ mod tests {
 
     /// Drive a VauchiApp through onboarding to create an identity.
     unsafe fn create_app_with_identity() -> *mut VauchiApp {
-        let handle = vauchi_app_create();
-        assert!(!handle.is_null());
+        unsafe {
+            let handle = vauchi_app_create();
+            assert!(!handle.is_null());
 
-        let steps: &[&str] = &[
-            // 1: identity_check → welcome
-            r#"{"ActionPressed":{"action_id":"create_new"}}"#,
-            // 2: welcome → default_name
-            r#"{"ActionPressed":{"action_id":"get_started"}}"#,
-            // 3: set display name (on default_name screen)
-            r#"{"TextChanged":{"component_id":"display_name","value":"TestUser"}}"#,
-            // 4: default_name → skip_gate
-            r#"{"ActionPressed":{"action_id":"continue"}}"#,
-            // 5: skip_gate → security_explanation (fast path)
-            r#"{"ActionPressed":{"action_id":"skip_to_finish"}}"#,
-            // 6: security_explanation → backup_prompt
-            r#"{"ActionPressed":{"action_id":"continue"}}"#,
-            // 7: backup_prompt → ready
-            r#"{"ActionPressed":{"action_id":"skip"}}"#,
-            // 8: ready → Complete (creates identity)
-            r#"{"ActionPressed":{"action_id":"start"}}"#,
-        ];
+            let steps: &[&str] = &[
+                // 1: identity_check → welcome
+                r#"{"ActionPressed":{"action_id":"create_new"}}"#,
+                // 2: welcome → default_name
+                r#"{"ActionPressed":{"action_id":"get_started"}}"#,
+                // 3: set display name (on default_name screen)
+                r#"{"TextChanged":{"component_id":"display_name","value":"TestUser"}}"#,
+                // 4: default_name → skip_gate
+                r#"{"ActionPressed":{"action_id":"continue"}}"#,
+                // 5: skip_gate → security_explanation (fast path)
+                r#"{"ActionPressed":{"action_id":"skip_to_finish"}}"#,
+                // 6: security_explanation → backup_prompt
+                r#"{"ActionPressed":{"action_id":"continue"}}"#,
+                // 7: backup_prompt → ready
+                r#"{"ActionPressed":{"action_id":"skip"}}"#,
+                // 8: ready → Complete (creates identity)
+                r#"{"ActionPressed":{"action_id":"start"}}"#,
+            ];
 
-        for step in steps {
-            let action = CString::new(*step).unwrap();
-            let r = vauchi_app_handle_action(handle, action.as_ptr());
-            vauchi_string_free(r);
+            for step in steps {
+                let action = CString::new(*step).unwrap();
+                let r = vauchi_app_handle_action(handle, action.as_ptr());
+                vauchi_string_free(r);
+            }
+
+            handle
         }
-
-        handle
     }
 
     #[test]

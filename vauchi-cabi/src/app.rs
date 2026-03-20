@@ -14,7 +14,7 @@ use vauchi_core::api::Vauchi;
 use vauchi_core::storage::SecureStorage;
 use vauchi_core::ui::*;
 
-use super::{from_c_str, to_c_string, VauchiApp};
+use super::{VauchiApp, from_c_str, to_c_string};
 
 /// Create a new AppEngine with in-memory storage and default relay.
 ///
@@ -22,13 +22,15 @@ use super::{from_c_str, to_c_string, VauchiApp};
 ///
 /// # Safety
 /// No special requirements.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn vauchi_app_create() -> *mut VauchiApp {
-    match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        vauchi_app_create_with_relay(std::ptr::null())
-    })) {
-        Ok(result) => result,
-        Err(_) => std::ptr::null_mut(),
+    unsafe {
+        match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            vauchi_app_create_with_relay(std::ptr::null())
+        })) {
+            Ok(result) => result,
+            Err(_) => std::ptr::null_mut(),
+        }
     }
 }
 
@@ -41,7 +43,7 @@ pub unsafe extern "C" fn vauchi_app_create() -> *mut VauchiApp {
 ///
 /// # Safety
 /// `relay_url` must be a valid null-terminated C string, or null.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn vauchi_app_create_with_relay(relay_url: *const c_char) -> *mut VauchiApp {
     match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         let vauchi = match Vauchi::in_memory() {
@@ -72,7 +74,7 @@ pub unsafe extern "C" fn vauchi_app_create_with_relay(relay_url: *const c_char) 
 /// `data_dir` must be a valid null-terminated C string pointing to a
 /// writable directory. `relay_url` must be a valid null-terminated C
 /// string, or null.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn vauchi_app_create_with_config(
     data_dir: *const c_char,
     relay_url: *const c_char,
@@ -119,54 +121,56 @@ pub unsafe extern "C" fn vauchi_app_create_with_config(
 /// `data_dir` must be a valid null-terminated C string pointing to a writable directory.
 /// `relay_url` must be a valid null-terminated C string, or null.
 /// `key_bytes` must point to at least `key_len` valid bytes, or be null.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn vauchi_app_create_with_key(
     data_dir: *const c_char,
     relay_url: *const c_char,
     key_bytes: *const u8,
     key_len: usize,
 ) -> *mut VauchiApp {
-    use vauchi_core::crypto::SymmetricKey;
-    use zeroize::Zeroize;
+    unsafe {
+        use vauchi_core::crypto::SymmetricKey;
+        use zeroize::Zeroize;
 
-    match std::panic::catch_unwind(std::panic::AssertUnwindSafe(move || {
-        if key_bytes.is_null() || key_len != 32 {
-            return std::ptr::null_mut();
+        match std::panic::catch_unwind(std::panic::AssertUnwindSafe(move || {
+            if key_bytes.is_null() || key_len != 32 {
+                return std::ptr::null_mut();
+            }
+
+            let dir = match from_c_str(data_dir) {
+                Some(d) => d,
+                None => return std::ptr::null_mut(),
+            };
+
+            let data_path = std::path::PathBuf::from(&dir);
+            if std::fs::create_dir_all(&data_path).is_err() {
+                return std::ptr::null_mut();
+            }
+
+            let mut arr = [0u8; 32];
+            arr.copy_from_slice(std::slice::from_raw_parts(key_bytes, 32));
+            let key = SymmetricKey::from_bytes_unchecked(arr);
+            arr.zeroize();
+
+            let storage_path = data_path.join("vauchi.db");
+            let mut config = vauchi_core::api::VauchiConfig::with_storage_path(&storage_path)
+                .with_storage_key(key);
+            if let Some(url) = from_c_str(relay_url) {
+                config = config.with_relay_url(url);
+            }
+
+            let vauchi = match Vauchi::new(config) {
+                Ok(v) => v,
+                Err(_) => return std::ptr::null_mut(),
+            };
+
+            Box::into_raw(Box::new(VauchiApp {
+                engine: Mutex::new(AppEngine::new(vauchi)),
+            }))
+        })) {
+            Ok(result) => result,
+            Err(_) => std::ptr::null_mut(),
         }
-
-        let dir = match from_c_str(data_dir) {
-            Some(d) => d,
-            None => return std::ptr::null_mut(),
-        };
-
-        let data_path = std::path::PathBuf::from(&dir);
-        if std::fs::create_dir_all(&data_path).is_err() {
-            return std::ptr::null_mut();
-        }
-
-        let mut arr = [0u8; 32];
-        arr.copy_from_slice(std::slice::from_raw_parts(key_bytes, 32));
-        let key = SymmetricKey::from_bytes_unchecked(arr);
-        arr.zeroize();
-
-        let storage_path = data_path.join("vauchi.db");
-        let mut config =
-            vauchi_core::api::VauchiConfig::with_storage_path(&storage_path).with_storage_key(key);
-        if let Some(url) = from_c_str(relay_url) {
-            config = config.with_relay_url(url);
-        }
-
-        let vauchi = match Vauchi::new(config) {
-            Ok(v) => v,
-            Err(_) => return std::ptr::null_mut(),
-        };
-
-        Box::into_raw(Box::new(VauchiApp {
-            engine: Mutex::new(AppEngine::new(vauchi)),
-        }))
-    })) {
-        Ok(result) => result,
-        Err(_) => std::ptr::null_mut(),
     }
 }
 
@@ -174,39 +178,43 @@ pub unsafe extern "C" fn vauchi_app_create_with_key(
 ///
 /// # Safety
 /// `handle` must be a pointer returned by `vauchi_app_create`, or null.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn vauchi_app_destroy(handle: *mut VauchiApp) {
-    let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        if !handle.is_null() {
-            drop(Box::from_raw(handle));
-        }
-    }));
+    unsafe {
+        let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            if !handle.is_null() {
+                drop(Box::from_raw(handle));
+            }
+        }));
+    }
 }
 
 /// Get the current screen as a JSON string.
 ///
 /// # Safety
 /// `handle` must be a valid app handle or null.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn vauchi_app_current_screen(handle: *mut VauchiApp) -> *mut c_char {
-    match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        if handle.is_null() {
-            return std::ptr::null_mut();
-        }
-        let app = &*handle;
-        match app.engine.lock() {
-            Ok(engine) => {
-                let screen = engine.current_screen();
-                match serde_json::to_string(&screen) {
-                    Ok(json) => to_c_string(&json),
-                    Err(e) => to_c_string(&format!(r#"{{"error":"{}"}}"#, e)),
-                }
+    unsafe {
+        match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            if handle.is_null() {
+                return std::ptr::null_mut();
             }
-            Err(_) => to_c_string(r#"{"error":"lock poisoned"}"#),
+            let app = &*handle;
+            match app.engine.lock() {
+                Ok(engine) => {
+                    let screen = engine.current_screen();
+                    match serde_json::to_string(&screen) {
+                        Ok(json) => to_c_string(&json),
+                        Err(e) => to_c_string(&format!(r#"{{"error":"{}"}}"#, e)),
+                    }
+                }
+                Err(_) => to_c_string(r#"{"error":"lock poisoned"}"#),
+            }
+        })) {
+            Ok(result) => result,
+            Err(_) => std::ptr::null_mut(),
         }
-    })) {
-        Ok(result) => result,
-        Err(_) => std::ptr::null_mut(),
     }
 }
 
@@ -215,36 +223,38 @@ pub unsafe extern "C" fn vauchi_app_current_screen(handle: *mut VauchiApp) -> *m
 /// # Safety
 /// `handle` must be a valid app handle or null.
 /// `action_json` must be a valid null-terminated C string, or null.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn vauchi_app_handle_action(
     handle: *mut VauchiApp,
     action_json: *const c_char,
 ) -> *mut c_char {
-    match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        if handle.is_null() {
-            return std::ptr::null_mut();
+    unsafe {
+        match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            if handle.is_null() {
+                return std::ptr::null_mut();
+            }
+            let json = match from_c_str(action_json) {
+                Some(s) => s,
+                None => return to_c_string(r#"{"error":"null action JSON"}"#),
+            };
+            let app = &*handle;
+            match app.engine.lock() {
+                Ok(mut engine) => match serde_json::from_str::<UserAction>(&json) {
+                    Ok(action) => {
+                        let result = engine.handle_action(action);
+                        serde_json::to_string(&result).map_or_else(
+                            |e| to_c_string(&format!(r#"{{"error":"{}"}}"#, e)),
+                            |j| to_c_string(&j),
+                        )
+                    }
+                    Err(e) => to_c_string(&format!(r#"{{"error":"{}"}}"#, e)),
+                },
+                Err(_) => to_c_string(r#"{"error":"lock poisoned"}"#),
+            }
+        })) {
+            Ok(result) => result,
+            Err(_) => std::ptr::null_mut(),
         }
-        let json = match from_c_str(action_json) {
-            Some(s) => s,
-            None => return to_c_string(r#"{"error":"null action JSON"}"#),
-        };
-        let app = &*handle;
-        match app.engine.lock() {
-            Ok(mut engine) => match serde_json::from_str::<UserAction>(&json) {
-                Ok(action) => {
-                    let result = engine.handle_action(action);
-                    serde_json::to_string(&result).map_or_else(
-                        |e| to_c_string(&format!(r#"{{"error":"{}"}}"#, e)),
-                        |j| to_c_string(&j),
-                    )
-                }
-                Err(e) => to_c_string(&format!(r#"{{"error":"{}"}}"#, e)),
-            },
-            Err(_) => to_c_string(r#"{"error":"lock poisoned"}"#),
-        }
-    })) {
-        Ok(result) => result,
-        Err(_) => std::ptr::null_mut(),
     }
 }
 
@@ -259,37 +269,39 @@ pub unsafe extern "C" fn vauchi_app_handle_action(
 /// # Safety
 /// `handle` must be a valid app handle or null.
 /// `screen_name` must be a valid null-terminated C string, or null.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn vauchi_app_navigate_to(
     handle: *mut VauchiApp,
     screen_name: *const c_char,
 ) -> *mut c_char {
-    match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        if handle.is_null() {
-            return std::ptr::null_mut();
-        }
-        let name = match from_c_str(screen_name) {
-            Some(s) => s,
-            None => return to_c_string(r#"{"error":"null screen name"}"#),
-        };
-        let screen = match AppScreen::from_screen_id(&name) {
-            Some(s) => s,
-            None => return to_c_string(&format!(r#"{{"error":"unknown screen: {}"}}"#, name)),
-        };
-        let app = &*handle;
-        match app.engine.lock() {
-            Ok(mut engine) => {
-                let model = engine.navigate_to(screen);
-                serde_json::to_string(&model).map_or_else(
-                    |e| to_c_string(&format!(r#"{{"error":"{}"}}"#, e)),
-                    |j| to_c_string(&j),
-                )
+    unsafe {
+        match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            if handle.is_null() {
+                return std::ptr::null_mut();
             }
-            Err(_) => to_c_string(r#"{"error":"lock poisoned"}"#),
+            let name = match from_c_str(screen_name) {
+                Some(s) => s,
+                None => return to_c_string(r#"{"error":"null screen name"}"#),
+            };
+            let screen = match AppScreen::from_screen_id(&name) {
+                Some(s) => s,
+                None => return to_c_string(&format!(r#"{{"error":"unknown screen: {}"}}"#, name)),
+            };
+            let app = &*handle;
+            match app.engine.lock() {
+                Ok(mut engine) => {
+                    let model = engine.navigate_to(screen);
+                    serde_json::to_string(&model).map_or_else(
+                        |e| to_c_string(&format!(r#"{{"error":"{}"}}"#, e)),
+                        |j| to_c_string(&j),
+                    )
+                }
+                Err(_) => to_c_string(r#"{"error":"lock poisoned"}"#),
+            }
+        })) {
+            Ok(result) => result,
+            Err(_) => std::ptr::null_mut(),
         }
-    })) {
-        Ok(result) => result,
-        Err(_) => std::ptr::null_mut(),
     }
 }
 
@@ -297,30 +309,32 @@ pub unsafe extern "C" fn vauchi_app_navigate_to(
 ///
 /// # Safety
 /// `handle` must be a valid app handle or null.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn vauchi_app_available_screens(handle: *mut VauchiApp) -> *mut c_char {
-    match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        if handle.is_null() {
-            return std::ptr::null_mut();
-        }
-        let app = &*handle;
-        match app.engine.lock() {
-            Ok(engine) => {
-                let screens: Vec<&str> = engine
-                    .available_screens()
-                    .iter()
-                    .map(|s| s.screen_id())
-                    .collect();
-                serde_json::to_string(&screens).map_or_else(
-                    |e| to_c_string(&format!(r#"{{"error":"{}"}}"#, e)),
-                    |j| to_c_string(&j),
-                )
+    unsafe {
+        match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            if handle.is_null() {
+                return std::ptr::null_mut();
             }
-            Err(_) => to_c_string(r#"{"error":"lock poisoned"}"#),
+            let app = &*handle;
+            match app.engine.lock() {
+                Ok(engine) => {
+                    let screens: Vec<&str> = engine
+                        .available_screens()
+                        .iter()
+                        .map(|s| s.screen_id())
+                        .collect();
+                    serde_json::to_string(&screens).map_or_else(
+                        |e| to_c_string(&format!(r#"{{"error":"{}"}}"#, e)),
+                        |j| to_c_string(&j),
+                    )
+                }
+                Err(_) => to_c_string(r#"{"error":"lock poisoned"}"#),
+            }
+        })) {
+            Ok(result) => result,
+            Err(_) => std::ptr::null_mut(),
         }
-    })) {
-        Ok(result) => result,
-        Err(_) => std::ptr::null_mut(),
     }
 }
 
@@ -328,20 +342,22 @@ pub unsafe extern "C" fn vauchi_app_available_screens(handle: *mut VauchiApp) ->
 ///
 /// # Safety
 /// `handle` must be a valid app handle or null.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn vauchi_app_default_screen(handle: *mut VauchiApp) -> *mut c_char {
-    match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        if handle.is_null() {
-            return std::ptr::null_mut();
+    unsafe {
+        match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            if handle.is_null() {
+                return std::ptr::null_mut();
+            }
+            let app = &*handle;
+            match app.engine.lock() {
+                Ok(engine) => to_c_string(engine.default_screen().screen_id()),
+                Err(_) => to_c_string("my_info"),
+            }
+        })) {
+            Ok(result) => result,
+            Err(_) => std::ptr::null_mut(),
         }
-        let app = &*handle;
-        match app.engine.lock() {
-            Ok(engine) => to_c_string(engine.default_screen().screen_id()),
-            Err(_) => to_c_string("my_info"),
-        }
-    })) {
-        Ok(result) => result,
-        Err(_) => std::ptr::null_mut(),
     }
 }
 
@@ -354,38 +370,42 @@ pub unsafe extern "C" fn vauchi_app_default_screen(handle: *mut VauchiApp) -> *m
 /// # Safety
 /// `handle` must be a valid app handle or null.
 /// `event_json` must be a valid null-terminated C string, or null.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn vauchi_app_handle_hardware_event(
     handle: *mut VauchiApp,
     event_json: *const c_char,
 ) -> *mut c_char {
-    match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        if handle.is_null() {
-            return std::ptr::null_mut();
-        }
-        let json = match from_c_str(event_json) {
-            Some(s) => s,
-            None => return std::ptr::null_mut(),
-        };
-        let app = &*handle;
-        match app.engine.lock() {
-            Ok(mut engine) => {
-                match serde_json::from_str::<vauchi_core::exchange::ExchangeHardwareEvent>(&json) {
-                    Ok(event) => match engine.handle_hardware_event(event) {
-                        Some(result) => serde_json::to_string(&result).map_or_else(
-                            |e| to_c_string(&format!(r#"{{"error":"{}"}}"#, e)),
-                            |j| to_c_string(&j),
-                        ),
-                        None => std::ptr::null_mut(),
-                    },
-                    Err(e) => to_c_string(&format!(r#"{{"error":"{}"}}"#, e)),
-                }
+    unsafe {
+        match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            if handle.is_null() {
+                return std::ptr::null_mut();
             }
-            Err(_) => to_c_string(r#"{"error":"lock poisoned"}"#),
+            let json = match from_c_str(event_json) {
+                Some(s) => s,
+                None => return std::ptr::null_mut(),
+            };
+            let app = &*handle;
+            match app.engine.lock() {
+                Ok(mut engine) => {
+                    match serde_json::from_str::<vauchi_core::exchange::ExchangeHardwareEvent>(
+                        &json,
+                    ) {
+                        Ok(event) => match engine.handle_hardware_event(event) {
+                            Some(result) => serde_json::to_string(&result).map_or_else(
+                                |e| to_c_string(&format!(r#"{{"error":"{}"}}"#, e)),
+                                |j| to_c_string(&j),
+                            ),
+                            None => std::ptr::null_mut(),
+                        },
+                        Err(e) => to_c_string(&format!(r#"{{"error":"{}"}}"#, e)),
+                    }
+                }
+                Err(_) => to_c_string(r#"{"error":"lock poisoned"}"#),
+            }
+        })) {
+            Ok(result) => result,
+            Err(_) => std::ptr::null_mut(),
         }
-    })) {
-        Ok(result) => result,
-        Err(_) => std::ptr::null_mut(),
     }
 }
 
@@ -401,7 +421,7 @@ pub unsafe extern "C" fn vauchi_app_handle_hardware_event(
 /// `data_dir` must be a valid null-terminated C string pointing to a
 /// writable directory. `relay_url` must be a valid null-terminated C
 /// string, or null.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn vauchi_app_create_with_keyring(
     data_dir: *const c_char,
     relay_url: *const c_char,

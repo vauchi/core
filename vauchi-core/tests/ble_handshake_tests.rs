@@ -9,13 +9,13 @@
 //! and error paths.
 
 use sha2::{Digest, Sha256};
+use vauchi_core::ExchangeError;
 use vauchi_core::crypto::encryption::{self, SymmetricKey};
 use vauchi_core::crypto::kdf::HKDF;
 use vauchi_core::exchange::{
-    BleCardPayload, BleHandshakeSession, BleHandshakeState, X3DHKeyPair, BLE_HANDSHAKE_VERSION,
+    BLE_HANDSHAKE_VERSION, BleCardPayload, BleHandshakeSession, BleHandshakeState, X3DHKeyPair,
 };
 use vauchi_core::identity::Identity;
-use vauchi_core::ExchangeError;
 
 fn make_test_identity() -> Identity {
     Identity::create("Test")
@@ -500,7 +500,7 @@ fn test_expired_key_offer_rejected() {
     offer.extend_from_slice(&[1u8; 32]); // identity_pub
     offer.extend_from_slice(&[2u8; 32]); // ephemeral_pub
     offer.extend_from_slice(&[3u8; 16]); // nonce
-                                         // Timestamp: 0 (epoch) — definitely expired
+    // Timestamp: 0 (epoch) — definitely expired
     offer.extend_from_slice(&0u64.to_be_bytes());
 
     let result = bob.process_key_offer(&offer);

@@ -8,8 +8,8 @@
 //! Scenario: Successful QR code exchange with proximity
 
 use vauchi_core::{
-    crypto::ratchet::DoubleRatchetState, exchange::X3DHKeyPair, Contact, ContactField, FieldType,
-    SymmetricKey, Vauchi,
+    Contact, ContactField, FieldType, SymmetricKey, Vauchi, crypto::ratchet::DoubleRatchetState,
+    exchange::X3DHKeyPair,
 };
 
 /// Tests the complete contact exchange workflow between two users.

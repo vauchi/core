@@ -8,13 +8,13 @@
 //! through the full 4-phase handshake using only `ExchangeCommand`s and
 //! `ExchangeHardwareEvent`s — no hardware traits, no mock transports.
 
+use vauchi_core::ContactCard;
 use vauchi_core::exchange::{
+    CHAR_DATA_NOTIFY, CHAR_DATA_WRITE, CHAR_HANDSHAKE_NOTIFY, CHAR_HANDSHAKE_WRITE,
     ExchangeCommand, ExchangeHardwareEvent, ExchangeSession, ExchangeState,
-    ManualConfirmationVerifier, CHAR_DATA_NOTIFY, CHAR_DATA_WRITE, CHAR_HANDSHAKE_NOTIFY,
-    CHAR_HANDSHAKE_WRITE, VAUCHI_BLE_SERVICE_UUID,
+    ManualConfirmationVerifier, VAUCHI_BLE_SERVICE_UUID,
 };
 use vauchi_core::identity::Identity;
-use vauchi_core::ContactCard;
 
 /// Helper: create a BLE exchange session with a fresh identity.
 fn ble_session(name: &str) -> ExchangeSession {

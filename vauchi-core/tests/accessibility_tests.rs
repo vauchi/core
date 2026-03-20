@@ -17,9 +17,9 @@
 mod common;
 
 use common::helpers::all_themes;
+use vauchi_core::ContactCard;
 use vauchi_core::contact_card::{ContactField, FieldType};
 use vauchi_core::theme::{DesignTokens, Theme, ThemeColors, ThemeMode};
-use vauchi_core::ContactCard;
 
 // ============================================================
 // Semantic Labels

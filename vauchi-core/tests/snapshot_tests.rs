@@ -85,8 +85,8 @@ fn test_contact_field_serialization_snapshot() {
 
 #[test]
 fn test_field_change_added_serialization_snapshot() {
-    use vauchi_core::sync::FieldChange;
     use vauchi_core::ContactField;
+    use vauchi_core::sync::FieldChange;
 
     let field_json =
         r#"{"id":"new-field","field_type":"Phone","label":"Home","value":"+9876543210"}"#;

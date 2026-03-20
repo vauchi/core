@@ -16,7 +16,7 @@
 use std::path::PathBuf;
 use std::sync::Once;
 use vauchi_core::i18n::{
-    get_available_locales, get_locale_info, get_string, get_string_with_args, Locale,
+    Locale, get_available_locales, get_locale_info, get_string, get_string_with_args,
 };
 
 /// Initialize i18n once for integration tests using the bundled locale files.

@@ -17,11 +17,11 @@ use subtle::ConstantTimeEq;
 use thiserror::Error;
 use zeroize::Zeroize;
 
+use super::X3DHKeyPair;
 use super::chain::{ChainError, ChainKey, MessageKey};
-use super::encryption::{decrypt_with_ad, encrypt_with_ad, EncryptionError, SymmetricKey};
+use super::encryption::{EncryptionError, SymmetricKey, decrypt_with_ad, encrypt_with_ad};
 use super::kdf::HKDF;
 use super::padding;
-use super::X3DHKeyPair;
 
 /// Maximum number of skipped message keys to store.
 const MAX_SKIPPED_KEYS: usize = 1000;
@@ -109,7 +109,7 @@ impl Drop for SerializedRatchetState {
         if let Some((ref mut key, _)) = self.recv_chain {
             key.zeroize();
         }
-        for (_, ref mut key) in self.skipped_keys.iter_mut() {
+        for (_, key) in self.skipped_keys.iter_mut() {
             key.zeroize();
         }
     }
@@ -487,8 +487,8 @@ impl DoubleRatchetState {
 
         let our_dh = X3DHKeyPair::from_bytes(our_dh_secret);
 
-        let send_chain = send_chain_data.map(|(key, gen)| ChainKey::with_generation(key, gen));
-        let recv_chain = recv_chain_data.map(|(key, gen)| ChainKey::with_generation(key, gen));
+        let send_chain = send_chain_data.map(|(key, r#gen)| ChainKey::with_generation(key, r#gen));
+        let recv_chain = recv_chain_data.map(|(key, r#gen)| ChainKey::with_generation(key, r#gen));
 
         let skipped_keys = skipped_keys_data
             .into_iter()

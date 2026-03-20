@@ -161,7 +161,7 @@ fn test_coalesce_skips_when_single_update() {
 // @scenario: performance:Batch encryption for multi-contact sync
 #[test]
 fn test_batch_encryption_50_contacts() {
-    use vauchi_core::crypto::{encrypt, SymmetricKey};
+    use vauchi_core::crypto::{SymmetricKey, encrypt};
 
     // Simulate batch encryption: 50 different contacts with their own keys
     let mut results = Vec::new();

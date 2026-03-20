@@ -12,8 +12,8 @@ use crate::contact_card::ValidationError;
 use crate::exchange::ExchangeError;
 use crate::network::NetworkError;
 use crate::storage::StorageError;
-use crate::sync::device_sync::DeviceSyncError;
 use crate::sync::SyncError;
+use crate::sync::device_sync::DeviceSyncError;
 
 /// Unified error type for Vauchi operations.
 #[derive(Error, Debug)]

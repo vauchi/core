@@ -232,12 +232,11 @@ fn parse_locale_bytes(data: &[u8]) -> Result<HashMap<String, String>, I18nError>
 fn get_strings_for_locale(locale: Locale) -> HashMap<String, String> {
     let code = locale.code();
 
-    if let Ok(lock) = LOCALE_STORE.read() {
-        if let Some(store) = lock.as_ref() {
-            if let Some(strings) = store.get(code) {
-                return strings.clone();
-            }
-        }
+    if let Ok(lock) = LOCALE_STORE.read()
+        && let Some(store) = lock.as_ref()
+        && let Some(strings) = store.get(code)
+    {
+        return strings.clone();
     }
 
     // Fallback: if requesting English and nothing loaded, use bundled minimal set

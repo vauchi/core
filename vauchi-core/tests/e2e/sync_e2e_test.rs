@@ -8,11 +8,11 @@
 //! Feature: relay_network.feature
 
 use vauchi_core::{
+    Contact, ContactCard, ContactField, FieldType, Storage, SymmetricKey, Vauchi,
     crypto::ratchet::DoubleRatchetState,
     exchange::X3DHKeyPair,
     network::{MockTransport, RelayClient, RelayClientConfig, TransportConfig},
     sync::{CardDelta, SyncManager},
-    Contact, ContactCard, ContactField, FieldType, Storage, SymmetricKey, Vauchi,
 };
 
 /// Tests the sync and update propagation workflow.
@@ -251,9 +251,11 @@ fn test_full_three_user_workflow() {
     assert!(bob_contact.visibility_rules().can_see("work", &bob_id));
     assert!(!bob_contact.visibility_rules().can_see("personal", &bob_id));
     assert!(carol_contact.visibility_rules().can_see("work", &carol_id));
-    assert!(carol_contact
-        .visibility_rules()
-        .can_see("personal", &carol_id));
+    assert!(
+        carol_contact
+            .visibility_rules()
+            .can_see("personal", &carol_id)
+    );
 
     // Alice updates her card
     let old_card = alice_wb.own_card().unwrap().unwrap();
@@ -355,9 +357,11 @@ fn test_relay_update_delivery_happy_path() {
     // Verify update is tracked
     assert!(!msg_id.is_empty());
     assert_eq!(client.in_flight_count(), 1);
-    assert!(client
-        .in_flight_update_ids()
-        .contains(&"update-001".to_string()));
+    assert!(
+        client
+            .in_flight_update_ids()
+            .contains(&"update-001".to_string())
+    );
 
     // Clean up
     client.disconnect().unwrap();

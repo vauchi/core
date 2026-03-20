@@ -11,8 +11,8 @@
 
 use std::collections::HashMap;
 
-use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use base64::Engine;
+use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use thiserror::Error;
 
 /// Errors from multipart QR encoding/decoding.
@@ -42,9 +42,7 @@ pub enum MultipartQrError {
     #[error("invalid base64url data: {0}")]
     InvalidBase64(#[from] base64::DecodeError),
 
-    #[error(
-        "CRC32 checksum mismatch for chunk {index}: expected {expected:08x}, got {actual:08x}"
-    )]
+    #[error("CRC32 checksum mismatch for chunk {index}: expected {expected:08x}, got {actual:08x}")]
     CrcMismatch {
         index: usize,
         expected: u32,
@@ -205,13 +203,13 @@ impl MultipartDecoder {
         }
 
         // Check total consistency
-        if let Some(existing_total) = self.total {
-            if total != existing_total {
-                return Err(MultipartQrError::TotalMismatch {
-                    expected: existing_total,
-                    got: total,
-                });
-            }
+        if let Some(existing_total) = self.total
+            && total != existing_total
+        {
+            return Err(MultipartQrError::TotalMismatch {
+                expected: existing_total,
+                got: total,
+            });
         }
 
         // Decode the base64 data
@@ -385,8 +383,8 @@ mod tests {
         assert_eq!(parts[2].len(), 8, "CRC32 hex must be 8 chars");
 
         // Verify the data decodes back
-        use base64::engine::general_purpose::URL_SAFE_NO_PAD;
         use base64::Engine;
+        use base64::engine::general_purpose::URL_SAFE_NO_PAD;
         let decoded = URL_SAFE_NO_PAD.decode(parts[3]).expect("valid base64url");
         assert_eq!(decoded, b"hello");
     }
@@ -583,8 +581,8 @@ mod tests {
     #[test]
     fn test_chunk_crc32_is_verified() {
         // Manually construct a chunk with correct format but wrong CRC
-        use base64::engine::general_purpose::URL_SAFE_NO_PAD;
         use base64::Engine;
+        use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 
         let payload = b"test payload";
         let encoded = URL_SAFE_NO_PAD.encode(payload);

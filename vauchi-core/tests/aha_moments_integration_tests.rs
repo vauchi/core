@@ -392,9 +392,10 @@ fn test_vauchi_api_aha_moment_integration() {
     assert!(moment2.is_none(), "Should not repeat");
 
     // Check has_seen
-    assert!(wb
-        .has_seen_aha_moment(AhaMomentType::CardCreationComplete)
-        .unwrap());
+    assert!(
+        wb.has_seen_aha_moment(AhaMomentType::CardCreationComplete)
+            .unwrap()
+    );
     assert!(!wb.has_seen_aha_moment(AhaMomentType::FirstEdit).unwrap());
 
     // Check seen count
@@ -408,9 +409,10 @@ fn test_vauchi_api_aha_moment_integration() {
     // Reset and verify
     wb.reset_aha_moments().unwrap();
     assert_eq!(wb.aha_moments_seen_count().unwrap(), 0);
-    assert!(!wb
-        .has_seen_aha_moment(AhaMomentType::CardCreationComplete)
-        .unwrap());
+    assert!(
+        !wb.has_seen_aha_moment(AhaMomentType::CardCreationComplete)
+            .unwrap()
+    );
 }
 
 /// Test: Edit operation should check for first edit aha moment

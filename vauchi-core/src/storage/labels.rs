@@ -217,13 +217,13 @@ impl Storage {
         encrypted: Option<&[u8]>,
         plaintext_fallback: &str,
     ) -> Result<String, StorageError> {
-        if let Some(enc) = encrypted {
-            if !enc.is_empty() {
-                let decrypted = crate::crypto::decrypt(&self.encryption_key, enc)
-                    .map_err(|e| StorageError::Encryption(e.to_string()))?;
-                return String::from_utf8(decrypted)
-                    .map_err(|e| StorageError::Serialization(e.to_string()));
-            }
+        if let Some(enc) = encrypted
+            && !enc.is_empty()
+        {
+            let decrypted = crate::crypto::decrypt(&self.encryption_key, enc)
+                .map_err(|e| StorageError::Encryption(e.to_string()))?;
+            return String::from_utf8(decrypted)
+                .map_err(|e| StorageError::Serialization(e.to_string()));
         }
         // Plaintext fallback is only valid for pre-migration data where
         // the plaintext columns contained real data. Post-migration, plaintext

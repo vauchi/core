@@ -99,16 +99,16 @@ pub use error::NetworkError;
 
 // Message types
 pub use message::{
-    negotiate_version, AccountDeletionNotice, AccountRevoked, AckStatus, Acknowledgment,
-    DeletionStage, DeviceSyncMessage, EmergencyAlert, EncryptedUpdate, ForwardingHint,
-    ForwardingHints, GeoLocation, Handshake, MessageEnvelope, MessageId, MessagePayload,
+    AccountDeletionNotice, AccountRevoked, AckStatus, Acknowledgment, DeletionStage,
+    DeviceSyncMessage, EmergencyAlert, EncryptedUpdate, ForwardingHint, ForwardingHints,
+    GeoLocation, Handshake, MessageEnvelope, MessageId, MessagePayload, PROTOCOL_VERSION,
     PresenceStatus, PresenceUpdate, PurgeRequest, RatchetHeader, VersionNegotiation,
-    PROTOCOL_VERSION,
+    negotiate_version,
 };
 
 // Protocol utilities
 pub use protocol::{
-    create_envelope, decode_message, encode_message, FRAME_HEADER_SIZE, MAX_MESSAGE_SIZE,
+    FRAME_HEADER_SIZE, MAX_MESSAGE_SIZE, create_envelope, decode_message, encode_message,
 };
 
 // Transport abstraction
@@ -134,15 +134,15 @@ pub use multi_relay::{
 
 // Anonymous sender identifiers
 pub use anonymous::{
-    compute_anonymous_id, current_epoch, resolve_sender, resolve_sender_id, AnonymousSender,
-    SenderIndex,
+    AnonymousSender, SenderIndex, compute_anonymous_id, current_epoch, resolve_sender,
+    resolve_sender_id,
 };
 
 // Noise NK inner transport encryption
-pub use noise::{parse_relay_noise_pubkey, NoiseInitiator, NoiseTransport as NoiseSession};
+pub use noise::{NoiseInitiator, NoiseTransport as NoiseSession, parse_relay_noise_pubkey};
 
 // Certificate pinning
-pub use pinning::{verify_pin, PinnedCertificate};
+pub use pinning::{PinnedCertificate, verify_pin};
 
 // Tor transport
 pub use tor::{TorConfig, TorConnector, TorRelayAddress, TorStatus, TorTransport};
@@ -152,7 +152,7 @@ pub use tor::{ArtiTorConnector, TorManager};
 
 // Message classification
 mod classify;
-pub use classify::{classify_message, MessageType};
+pub use classify::{MessageType, classify_message};
 
 // Delivery service (message delivery tracking, retries, offline queue)
 pub mod delivery;

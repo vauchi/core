@@ -8,7 +8,7 @@
 //! Feature: device_management.feature
 
 use vauchi_core::{
-    crypto::PublicKey, sync::CardDelta, ContactCard, ContactField, FieldType, Identity, Vauchi,
+    ContactCard, ContactField, FieldType, Identity, Vauchi, crypto::PublicKey, sync::CardDelta,
 };
 
 /// Tests the complete backup and recovery workflow.

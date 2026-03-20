@@ -18,15 +18,15 @@ pub mod visibility;
 mod visibility;
 
 pub use labels::{
-    resolve_visible_fields, Group, GroupError, GroupManager, MAX_LABELS, SUGGESTED_LABELS,
+    Group, GroupError, GroupManager, MAX_LABELS, SUGGESTED_LABELS, resolve_visible_fields,
 };
 pub use visibility::{FieldVisibility, VisibilityRules};
 
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::contact_card::ContactCard;
-use crate::crypto::cek::ContentEncryptionKey;
 use crate::crypto::SymmetricKey;
+use crate::crypto::cek::ContentEncryptionKey;
 use crate::exchange::{ExchangeTransport, ProximityConfidence};
 
 /// A contact obtained through exchange.

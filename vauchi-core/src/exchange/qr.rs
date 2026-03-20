@@ -21,11 +21,11 @@
 //! - Bit 1: has_relay_noise_pubkey — if set, 32-byte pubkey follows relay_url (or flags if no URL)
 //! - Bits 2-7: reserved (must be zero)
 
-use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
+use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use super::x3dh::X3DHKeyPair;
 use super::ExchangeError;
+use super::x3dh::X3DHKeyPair;
 use crate::crypto::{PublicKey, Signature};
 use crate::identity::Identity;
 #[cfg(any(feature = "network-native-tls", feature = "network-rustls"))]

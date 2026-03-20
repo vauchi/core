@@ -150,31 +150,31 @@ pub use audio::{AudioBackend, AudioCapability, AudioConfig, MockAudioBackend, Ul
 pub use audio_cpal::CpalAudioBackend;
 #[allow(deprecated)]
 pub use ble::{
-    BLEAdvertisement, BLEDevice, BLEError, BLEExchangeSession, BLEExchangeState,
-    BLEProximityVerifier, BLETransport, ExchangeBle, MockBLETransport, MockBLEVerifier,
-    BLE_DEFAULT_USABLE, BLE_MIN_MTU, BLE_PAYLOAD_SIZE, CHAR_CARD_EXCHANGE, CHAR_CHALLENGE,
-    CHAR_DATA_NOTIFY, CHAR_DATA_WRITE, CHAR_EXCHANGE_PAYLOAD, CHAR_HANDSHAKE_NOTIFY,
-    CHAR_HANDSHAKE_WRITE, VAUCHI_BLE_DIAGNOSTIC_SERVICE_UUID, VAUCHI_BLE_SERVICE_UUID,
+    BLE_DEFAULT_USABLE, BLE_MIN_MTU, BLE_PAYLOAD_SIZE, BLEAdvertisement, BLEDevice, BLEError,
+    BLEExchangeSession, BLEExchangeState, BLEProximityVerifier, BLETransport, CHAR_CARD_EXCHANGE,
+    CHAR_CHALLENGE, CHAR_DATA_NOTIFY, CHAR_DATA_WRITE, CHAR_EXCHANGE_PAYLOAD,
+    CHAR_HANDSHAKE_NOTIFY, CHAR_HANDSHAKE_WRITE, ExchangeBle, MockBLETransport, MockBLEVerifier,
+    VAUCHI_BLE_DIAGNOSTIC_SERVICE_UUID, VAUCHI_BLE_SERVICE_UUID,
 };
-pub use ble_chunking::{BleChunker, BleReassembler, BLE_CHUNK_OVERHEAD};
+pub use ble_chunking::{BLE_CHUNK_OVERHEAD, BleChunker, BleReassembler};
 pub use ble_handshake::{
-    BleExchangeResult, BleHandshakeSession, BleHandshakeState, BLE_HANDSHAKE_INFO,
-    BLE_HANDSHAKE_VERSION,
+    BLE_HANDSHAKE_INFO, BLE_HANDSHAKE_VERSION, BleExchangeResult, BleHandshakeSession,
+    BleHandshakeState,
 };
 pub use ble_payload::BleCardPayload;
 pub use ble_rollback::BleRollback;
 pub use command::{ExchangeCommand, ExchangeHardwareEvent};
 pub use device_link::{
-    compute_confirmation_mac, generate_numeric_code, DeviceLinkConfirmation, DeviceLinkInitiator,
-    DeviceLinkInitiatorRestored, DeviceLinkQR, DeviceLinkRequest, DeviceLinkResponder,
-    DeviceLinkResponse, ProximityProof,
+    DeviceLinkConfirmation, DeviceLinkInitiator, DeviceLinkInitiatorRestored, DeviceLinkQR,
+    DeviceLinkRequest, DeviceLinkResponder, DeviceLinkResponse, ProximityProof,
+    compute_confirmation_mac, generate_numeric_code,
 };
 pub use encrypted_message::{DecryptedExchangePayload, EncryptedExchangeMessage};
 pub use error::ExchangeError;
 pub use nfc_active::apdu as nfc_apdu;
 pub use nfc_active::{ExchangeNfc, NFC_PAYLOAD_SIZE};
 pub use nfc_apdu_chaining::{
-    extract_data, is_chained, reassemble_chain, split_into_chain, MAX_APDU_DATA,
+    MAX_APDU_DATA, extract_data, is_chained, reassemble_chain, split_into_chain,
 };
 pub use nfc_card_payload::NfcCardPayload;
 pub use nfc_handshake::{NfcExchangeResult, NfcHandshakeSession, NfcHandshakeState};
@@ -184,7 +184,7 @@ pub use proximity::MockProximityVerifier;
 pub use proximity::{
     ManualConfirmationVerifier, ProximityConfidence, ProximityError, ProximityVerifier,
 };
-pub use qr::{check_clock_drift, ExchangeQR};
+pub use qr::{ExchangeQR, check_clock_drift};
 pub use session::{
     DefaultPlatformCallbacks, DuplicateAction, ExchangeEvent, ExchangePlatformCallbacks,
     ExchangeSession, ExchangeState, ExchangeTransport,
@@ -193,7 +193,7 @@ pub use verifier_chain::VerifierChain;
 pub use verifier_event::{ProximityVerifierEvent, VerifierEventLog, VerifierMethod};
 #[cfg(any(test, feature = "testing"))]
 pub use verifier_harness::{PeerCapabilities, Scenario, SimulatedPeer, VerificationOutcome};
-pub use x3dh::{X3DHKeyPair, X3DH};
+pub use x3dh::{X3DH, X3DHKeyPair};
 
 // Multi-stage exchange re-exports
 pub use multistage::session::MultiStageSession;

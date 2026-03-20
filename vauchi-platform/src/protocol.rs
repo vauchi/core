@@ -10,19 +10,19 @@
 
 // Re-export types from vauchi-core's simple_message module
 pub use vauchi_core::network::simple_message::{
+    LegacyExchangeMessage as ExchangeMessage, SimpleAccountRevoked as AccountRevoked,
+    SimpleAckStatus as AckStatus, SimpleDeviceSyncMessage as DeviceSyncMessage,
+    SimpleEncryptedUpdate as EncryptedUpdate, SimplePayload as MessagePayload,
     create_device_sync_ack, create_simple_ack as create_ack,
     create_simple_envelope as create_envelope, decode_simple_message as decode_message,
-    encode_simple_message as encode_message, LegacyExchangeMessage as ExchangeMessage,
-    SimpleAccountRevoked as AccountRevoked, SimpleAckStatus as AckStatus,
-    SimpleDeviceSyncMessage as DeviceSyncMessage, SimpleEncryptedUpdate as EncryptedUpdate,
-    SimplePayload as MessagePayload,
+    encode_simple_message as encode_message,
 };
 
 // Re-export for tests
 #[cfg(test)]
-pub use vauchi_core::network::simple_message::SimpleHandshake as Handshake;
-#[cfg(test)]
 pub use vauchi_core::network::simple_message::SIMPLE_PROTOCOL_VERSION as PROTOCOL_VERSION;
+#[cfg(test)]
+pub use vauchi_core::network::simple_message::SimpleHandshake as Handshake;
 
 // INLINE_TEST_REQUIRED: Tests re-export compatibility layer - small module kept inline
 #[cfg(test)]

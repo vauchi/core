@@ -234,16 +234,16 @@ impl Vauchi {
         secure_storage: Option<&dyn SecureStorage>,
     ) -> VauchiResult<SymmetricKey> {
         // Try loading SMK from SecureStorage
-        if let Some(ss) = secure_storage {
-            if let Some(smk_bytes) = ss.load_key(SMK_KEY_NAME).map_err(|e| {
+        if let Some(ss) = secure_storage
+            && let Some(smk_bytes) = ss.load_key(SMK_KEY_NAME).map_err(|e| {
                 VauchiError::Configuration(format!("Failed to load SMK from SecureStorage: {}", e))
-            })? {
-                let smk_array: [u8; 32] = smk_bytes.try_into().map_err(|_| {
-                    VauchiError::Configuration("SMK in SecureStorage has invalid length".into())
-                })?;
-                let smk = ShreddingMasterKey::from_bytes(smk_array);
-                return Ok(smk.derive_sek());
-            }
+            })?
+        {
+            let smk_array: [u8; 32] = smk_bytes.try_into().map_err(|_| {
+                VauchiError::Configuration("SMK in SecureStorage has invalid length".into())
+            })?;
+            let smk = ShreddingMasterKey::from_bytes(smk_array);
+            return Ok(smk.derive_sek());
         }
 
         // Fall back to config storage key or generate random

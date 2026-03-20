@@ -447,7 +447,7 @@ impl Transport for TorTransport {
             Ok(()) => {}
             Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => return Ok(None),
             Err(ref e) if e.kind() == std::io::ErrorKind::UnexpectedEof => {
-                return Err(super::error::NetworkError::ConnectionClosed)
+                return Err(super::error::NetworkError::ConnectionClosed);
             }
             Err(e) => return Err(super::error::NetworkError::ReceiveFailed(e.to_string())),
         }

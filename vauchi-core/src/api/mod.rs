@@ -106,21 +106,21 @@ pub mod vauchi;
 mod vauchi;
 
 // Identity Deletion
-pub use account::{delete_identity_data, DeletionError, DeletionManager, DeletionResult};
+pub use account::{DeletionError, DeletionManager, DeletionResult, delete_identity_data};
 
 // Consent
 pub use consent::{ConsentManager, ConsentRecord, ConsentStatus, ConsentType};
 
 // GDPR
-pub use gdpr::{export_all_data, GdprExport};
+pub use gdpr::{GdprExport, export_all_data};
 
 // Pre-signed shred messages
 pub use pre_signed::{PreSignedError, PreSignedPurgeRequest, PreSignedShredMessages};
 
 // Shred Manager
 pub use shred::{
-    widget_panic_shred, PurgeSender, RevocationSender, ShredError, ShredManager, ShredReport,
-    ShredToken, ShredVerification, WidgetConfirmationMode,
+    PurgeSender, RevocationSender, ShredError, ShredManager, ShredReport, ShredToken,
+    ShredVerification, WidgetConfirmationMode, widget_panic_shred,
 };
 
 // Error types

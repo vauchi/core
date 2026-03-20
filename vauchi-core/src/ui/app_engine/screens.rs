@@ -6,9 +6,9 @@
 
 use std::collections::HashMap;
 
-use super::initials;
 use super::AppEngine;
 use super::AppScreen;
+use super::initials;
 use crate::api::Vauchi;
 use crate::ui::backup_recovery::BackupRecoveryEngine;
 use crate::ui::component::{ContactItem, FieldDisplay, UiFieldVisibility};
@@ -50,41 +50,42 @@ impl AppEngine {
                 let all_groups = vauchi.list_groups().unwrap_or_default();
 
                 // Build own card fields with visibility info
-                let (display_name, own_fields) = if let Ok(Some(card)) = vauchi.own_card() {
-                    let name = card.display_name().to_string();
-                    let fields: Vec<OwnFieldInfo> = card
-                        .fields()
-                        .iter()
-                        .map(|f| {
-                            // Which groups can see this field?
-                            let visible_groups: Vec<String> = all_groups
-                                .iter()
-                                .filter(|g| g.is_field_visible(f.id()))
-                                .map(|g| g.name().to_string())
-                                .collect();
-                            // Count contacts across visible groups (deduplicated)
-                            let mut visible_contact_ids =
-                                std::collections::HashSet::<String>::new();
-                            for g in &all_groups {
-                                if g.is_field_visible(f.id()) {
-                                    for cid in g.contacts() {
-                                        visible_contact_ids.insert(cid.to_string());
+                let (display_name, own_fields) = match vauchi.own_card() {
+                    Ok(Some(card)) => {
+                        let name = card.display_name().to_string();
+                        let fields: Vec<OwnFieldInfo> = card
+                            .fields()
+                            .iter()
+                            .map(|f| {
+                                // Which groups can see this field?
+                                let visible_groups: Vec<String> = all_groups
+                                    .iter()
+                                    .filter(|g| g.is_field_visible(f.id()))
+                                    .map(|g| g.name().to_string())
+                                    .collect();
+                                // Count contacts across visible groups (deduplicated)
+                                let mut visible_contact_ids =
+                                    std::collections::HashSet::<String>::new();
+                                for g in &all_groups {
+                                    if g.is_field_visible(f.id()) {
+                                        for cid in g.contacts() {
+                                            visible_contact_ids.insert(cid.to_string());
+                                        }
                                     }
                                 }
-                            }
-                            OwnFieldInfo {
-                                field_id: f.id().to_string(),
-                                field_type: format!("{:?}", f.field_type()),
-                                label: f.label().to_string(),
-                                value: f.value().to_string(),
-                                visible_groups,
-                                contact_count: visible_contact_ids.len(),
-                            }
-                        })
-                        .collect();
-                    (name, fields)
-                } else {
-                    (String::new(), Vec::new())
+                                OwnFieldInfo {
+                                    field_id: f.id().to_string(),
+                                    field_type: format!("{:?}", f.field_type()),
+                                    label: f.label().to_string(),
+                                    value: f.value().to_string(),
+                                    visible_groups,
+                                    contact_count: visible_contact_ids.len(),
+                                }
+                            })
+                            .collect();
+                        (name, fields)
+                    }
+                    _ => (String::new(), Vec::new()),
                 };
 
                 // Build group tabs
@@ -111,7 +112,7 @@ impl AppEngine {
                         .with_groups(group_tabs),
                 )
             }
-            AppScreen::MyInfoEntryDetail { ref field_id } => {
+            AppScreen::MyInfoEntryDetail { field_id } => {
                 Self::create_entry_detail_engine(vauchi, field_id)
             }
             AppScreen::Contacts => {
@@ -369,10 +370,10 @@ impl AppEngine {
             },
             AppScreen::ContactDuplicates => Box::new(DuplicateDetectionEngine::new(vec![])),
             AppScreen::ContactMerge {
-                ref primary_name,
-                ref primary_fields,
-                ref secondary_name,
-                ref secondary_fields,
+                primary_name,
+                primary_fields,
+                secondary_name,
+                secondary_fields,
             } => Box::new(ContactMergeEngine::new(MergePreview {
                 primary_name: primary_name.clone(),
                 primary_fields: primary_fields.clone(),

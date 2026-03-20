@@ -13,8 +13,8 @@
 //! into the commitment hash, preventing a MitM from swapping relay fields in the
 //! INIT QR without invalidating the commitment.
 
-use chacha20poly1305::aead::{Aead, KeyInit};
 use chacha20poly1305::ChaCha20Poly1305;
+use chacha20poly1305::aead::{Aead, KeyInit};
 use sha2::{Digest, Sha256};
 use subtle::ConstantTimeEq;
 use thiserror::Error;

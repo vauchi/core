@@ -20,16 +20,16 @@ use tokio_tungstenite::tungstenite::Message;
 use vauchi_core::crypto::ratchet::DoubleRatchetState;
 use vauchi_core::exchange::{EncryptedExchangeMessage, X3DHKeyPair};
 use vauchi_core::sync::{
-    process_card_updates as core_process_card_updates, ContactSyncData, DeviceSyncOrchestrator,
-    SyncItem,
+    ContactSyncData, DeviceSyncOrchestrator, SyncItem,
+    process_card_updates as core_process_card_updates,
 };
 use vauchi_core::{Contact, ContactCard, Identity, Storage, SymmetricKey};
 
 use crate::cert_pinning::{self, WsStream};
 use crate::error::MobileError;
 use crate::protocol::{
-    self, create_device_sync_ack, AckStatus, DeviceSyncMessage, EncryptedUpdate, ExchangeMessage,
-    MessagePayload,
+    self, AckStatus, DeviceSyncMessage, EncryptedUpdate, ExchangeMessage, MessagePayload,
+    create_device_sync_ack,
 };
 use crate::types::MobileSyncResult;
 use vauchi_core::network::simple_message::create_signed_handshake;
@@ -141,11 +141,11 @@ fn classify_and_store_message(
     card_updates: &mut Vec<(String, Vec<u8>)>,
 ) {
     // Try legacy plaintext exchange format first
-    if ExchangeMessage::is_exchange(&update.ciphertext) {
-        if let Some(exchange) = ExchangeMessage::from_bytes(&update.ciphertext) {
-            legacy_exchange.push(exchange);
-            return;
-        }
+    if ExchangeMessage::is_exchange(&update.ciphertext)
+        && let Some(exchange) = ExchangeMessage::from_bytes(&update.ciphertext)
+    {
+        legacy_exchange.push(exchange);
+        return;
     }
 
     // Try encrypted exchange format
@@ -598,10 +598,11 @@ fn parse_hex_key(hex_str: &str) -> Option<[u8; 32]> {
 
 /// Update a contact's display name if it differs from the given name.
 fn update_contact_name_if_needed(storage: &Storage, contact_id: &str, new_name: &str) {
-    if let Ok(Some(mut contact)) = storage.load_contact(contact_id) {
-        if contact.display_name() != new_name && contact.set_display_name(new_name).is_ok() {
-            let _ = storage.save_contact(&contact);
-        }
+    if let Ok(Some(mut contact)) = storage.load_contact(contact_id)
+        && contact.display_name() != new_name
+        && contact.set_display_name(new_name).is_ok()
+    {
+        let _ = storage.save_contact(&contact);
     }
 }
 
@@ -656,10 +657,10 @@ fn apply_sync_item(storage: &Storage, item: &SyncItem) -> Result<(), MobileError
             new_value,
             ..
         } => {
-            if let Ok(Some(mut card)) = storage.load_own_card() {
-                if card.update_field_value(field_label, new_value).is_ok() {
-                    storage.save_own_card(&card)?;
-                }
+            if let Ok(Some(mut card)) = storage.load_own_card()
+                && card.update_field_value(field_label, new_value).is_ok()
+            {
+                storage.save_own_card(&card)?;
             }
         }
         SyncItem::VisibilityChanged {

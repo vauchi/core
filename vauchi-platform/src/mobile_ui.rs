@@ -140,7 +140,7 @@ impl MobileOnboardingWorkflow {
 macro_rules! mobile_workflow {
     (
         $name:ident wraps $engine:ty {
-            constructor($($param:ident : $ptype:ty),*) -> $parse:expr
+            constructor($($param:ident : $ptype:ty),*) -> $parse:expr_2021
         }
     ) => {
         #[derive(uniffi::Object)]

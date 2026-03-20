@@ -21,7 +21,7 @@ use crate::crypto::cek::ContentEncryptionKey;
 use crate::crypto::ratchet::RatchetMessage;
 use crate::identity::Identity;
 use crate::storage::{Storage, StorageError};
-use crate::sync::delta::{CardDelta, VersionedPayload, PAYLOAD_VERSION_CEK};
+use crate::sync::delta::{CardDelta, PAYLOAD_VERSION_CEK, VersionedPayload};
 
 /// Error returned when a single card update fails.
 ///

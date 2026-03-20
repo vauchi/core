@@ -15,8 +15,8 @@ use super::qr::DeviceLinkQR;
 use super::request::DeviceLinkRequest;
 use super::response::DeviceLinkResponse;
 use super::types::{
-    compute_confirmation_mac, derive_confirmation_code, derive_proximity_challenge,
-    DeviceLinkConfirmation, ProximityProof, PROXIMITY_PROOF_MAX_AGE_SECS,
+    DeviceLinkConfirmation, PROXIMITY_PROOF_MAX_AGE_SECS, ProximityProof, compute_confirmation_mac,
+    derive_confirmation_code, derive_proximity_challenge,
 };
 
 /// State machine for device linking from the existing device's perspective.

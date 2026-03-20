@@ -13,7 +13,7 @@ use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 use thiserror::Error;
 
-use super::integrity::{verify_checksum, IntegrityError};
+use super::integrity::{IntegrityError, verify_checksum};
 use super::types::{ContentManifest, ContentType};
 
 /// Local cache for remote content
@@ -145,6 +145,7 @@ pub enum CacheError {
     InvalidTime,
 }
 
+// INLINE_TEST_REQUIRED: tests use private cache internals (atomic_write, CacheEntry)
 #[cfg(test)]
 mod tests {
     use super::*;

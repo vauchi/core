@@ -115,10 +115,10 @@ fn check_host_not_private(host: &str) -> Result<(), RelayUrlError> {
     // Try parsing as IP address
     // Strip brackets for IPv6 (url crate may return "[::1]")
     let ip_str = host.trim_start_matches('[').trim_end_matches(']');
-    if let Ok(ip) = ip_str.parse::<IpAddr>() {
-        if is_private_ip(&ip) {
-            return Err(RelayUrlError::PrivateHost);
-        }
+    if let Ok(ip) = ip_str.parse::<IpAddr>()
+        && is_private_ip(&ip)
+    {
+        return Err(RelayUrlError::PrivateHost);
     }
 
     Ok(())

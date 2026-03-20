@@ -17,7 +17,7 @@ use vauchi_core::crypto::SymmetricKey;
 use vauchi_core::identity::Identity;
 use vauchi_core::network::message::AccountRevoked;
 use vauchi_core::network::revocation::{
-    canonical_revocation_bytes, process_revocation, REVOCATION_DOMAIN_SEPARATOR,
+    REVOCATION_DOMAIN_SEPARATOR, canonical_revocation_bytes, process_revocation,
 };
 use vauchi_core::storage::Storage;
 

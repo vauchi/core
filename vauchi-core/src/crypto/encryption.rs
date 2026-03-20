@@ -11,8 +11,8 @@
 //!   - Tag `0x02`: XChaCha20-Poly1305 (24-byte nonce, 16-byte tag)
 //!   - Tag `0x03`: XChaCha20-Poly1305 with associated data (24-byte nonce, 16-byte tag)
 
-use chacha20poly1305::aead::{Aead, KeyInit, Payload};
 use chacha20poly1305::XChaCha20Poly1305;
+use chacha20poly1305::aead::{Aead, KeyInit, Payload};
 use thiserror::Error;
 use zeroize::Zeroize;
 

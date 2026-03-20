@@ -10,7 +10,7 @@
 
 use vauchi_core::crypto::cek::ContentEncryptionKey;
 use vauchi_core::sync::delta::{
-    CekWrappedPayload, VersionedPayload, PAYLOAD_VERSION_CEK, PAYLOAD_VERSION_LEGACY,
+    CekWrappedPayload, PAYLOAD_VERSION_CEK, PAYLOAD_VERSION_LEGACY, VersionedPayload,
 };
 
 // === Serialization Round-trips ===

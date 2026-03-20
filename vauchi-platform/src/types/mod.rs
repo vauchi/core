@@ -35,8 +35,8 @@ pub use social::{
     MobileVisibilityLabel, MobileVisibilityLabelDetail,
 };
 pub use ux::{
-    mobile_get_string, mobile_get_string_with_args, MobileAhaMoment, MobileAhaMomentType,
-    MobileDemoContact, MobileDemoContactState, MobileFaqItem, MobileHelpCategory,
-    MobileHelpCategoryInfo, MobileLocale, MobileLocaleInfo, MobileOnboardingProgress,
-    MobileOnboardingStep, MobileTheme, MobileThemeColors, MobileThemeMode,
+    MobileAhaMoment, MobileAhaMomentType, MobileDemoContact, MobileDemoContactState, MobileFaqItem,
+    MobileHelpCategory, MobileHelpCategoryInfo, MobileLocale, MobileLocaleInfo,
+    MobileOnboardingProgress, MobileOnboardingStep, MobileTheme, MobileThemeColors,
+    MobileThemeMode, mobile_get_string, mobile_get_string_with_args,
 };

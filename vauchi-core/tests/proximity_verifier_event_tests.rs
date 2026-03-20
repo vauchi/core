@@ -11,10 +11,10 @@
 
 #![cfg(feature = "testing")]
 
+use vauchi_core::exchange::ProximityConfidence;
 use vauchi_core::exchange::verifier_event::{
     ProximityVerifierEvent, VerifierEventLog, VerifierMethod,
 };
-use vauchi_core::exchange::ProximityConfidence;
 
 // ===== VerifierMethod =====
 

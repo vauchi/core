@@ -13,7 +13,7 @@ use super::types::{
     MobileDeliveryRecord, MobileDeliveryStatus, MobileDeliverySummary, MobileDeviceDeliveryRecord,
     MobileRetryEntry, MobileSyncResult, MobileSyncStatus,
 };
-use super::{sync, IdentityData, VauchiPlatform};
+use super::{IdentityData, VauchiPlatform, sync};
 
 #[uniffi::export]
 impl VauchiPlatform {

@@ -154,8 +154,8 @@ mod tests {
     use crate::api::account::DeletionManager;
     use crate::api::pre_signed::PreSignedShredMessages;
     use crate::crypto::SymmetricKey;
-    use crate::storage::secure::{MemoryKeyStorage, SecureStorage};
     use crate::storage::Storage;
+    use crate::storage::secure::{MemoryKeyStorage, SecureStorage};
 
     fn setup_test_env() -> (
         tempfile::TempDir,

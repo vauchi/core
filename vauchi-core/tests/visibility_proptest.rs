@@ -20,7 +20,7 @@ use std::collections::HashSet;
 use proptest::prelude::*;
 
 use vauchi_core::contact_card::{ContactCard, ContactField, FieldType};
-use vauchi_core::{resolve_visible_fields, GroupManager};
+use vauchi_core::{GroupManager, resolve_visible_fields};
 
 use common::strategies::contact_id_strategy;
 

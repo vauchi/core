@@ -10,7 +10,7 @@
 
 use std::path::PathBuf;
 use std::sync::Once;
-use vauchi_core::i18n::{get_string, load_locale_from_bytes, Locale};
+use vauchi_core::i18n::{Locale, get_string, load_locale_from_bytes};
 
 static INIT: Once = Once::new();
 

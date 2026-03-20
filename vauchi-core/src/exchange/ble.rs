@@ -9,8 +9,8 @@
 //! for BLE-based contact exchange.
 
 use super::exchange_payload::{
-    build_exchange_payload, is_payload_expired, parse_exchange_payload, verify_payload_signature,
-    ParsedPayload, EXCHANGE_PAYLOAD_SIZE,
+    EXCHANGE_PAYLOAD_SIZE, ParsedPayload, build_exchange_payload, is_payload_expired,
+    parse_exchange_payload, verify_payload_signature,
 };
 use super::x3dh::X3DHKeyPair;
 use super::{ExchangeError, ProximityError, ProximityVerifier};
@@ -466,10 +466,10 @@ impl BLEExchangeSession {
 
     /// Check for timeout at a given point in time.
     pub fn check_timeout_at(&mut self, now: Instant) {
-        if let Some(started) = self.started_at {
-            if now.duration_since(started) >= self.timeout {
-                self.state = BLEExchangeState::TimedOut;
-            }
+        if let Some(started) = self.started_at
+            && now.duration_since(started) >= self.timeout
+        {
+            self.state = BLEExchangeState::TimedOut;
         }
     }
 
@@ -739,10 +739,10 @@ impl BLETransport for MockBLETransport {
             return Err(BLEError::NotConnected);
         }
 
-        if uuid == CHAR_EXCHANGE_PAYLOAD {
-            if let Some(payload) = self.peer_payload.lock().expect("mutex poisoned").as_ref() {
-                return Ok(payload.clone());
-            }
+        if uuid == CHAR_EXCHANGE_PAYLOAD
+            && let Some(payload) = self.peer_payload.lock().expect("mutex poisoned").as_ref()
+        {
+            return Ok(payload.clone());
         }
 
         Err(BLEError::InvalidPayload(

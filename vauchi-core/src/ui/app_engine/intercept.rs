@@ -19,21 +19,20 @@ impl AppEngine {
             return;
         }
         if let UserAction::SettingsToggled {
-            ref component_id,
-            ref item_id,
+            component_id,
+            item_id,
         } = action
+            && component_id == "privacy"
         {
-            if component_id == "privacy" {
-                let config = self.vauchi.config_mut();
-                match item_id.as_str() {
-                    "delivery_receipts" => {
-                        config.delivery_receipts_enabled = !config.delivery_receipts_enabled;
-                    }
-                    "suppress_presence" => {
-                        config.suppress_presence = !config.suppress_presence;
-                    }
-                    _ => {}
+            let config = self.vauchi.config_mut();
+            match item_id.as_str() {
+                "delivery_receipts" => {
+                    config.delivery_receipts_enabled = !config.delivery_receipts_enabled;
                 }
+                "suppress_presence" => {
+                    config.suppress_presence = !config.suppress_presence;
+                }
+                _ => {}
             }
         }
     }
@@ -46,7 +45,7 @@ impl AppEngine {
         if self.screen != AppScreen::Settings {
             return None;
         }
-        if let UserAction::ListItemSelected { ref item_id, .. } = action {
+        if let UserAction::ListItemSelected { item_id, .. } = action {
             match item_id.as_str() {
                 "display_name" => {
                     let current_name = self
@@ -229,25 +228,24 @@ impl AppEngine {
 
     /// Handle undo actions (field delete restoration).
     pub(super) fn handle_undo(&mut self, action: &UserAction) -> Option<ActionResult> {
-        if let UserAction::UndoPressed { ref action_id } = action {
-            if action_id.starts_with("undo_delete_field:") {
-                if let Some((field_id, field)) = self.pending_field_undo.take() {
-                    let mut restored = false;
-                    if let Ok(Some(mut card)) = self.vauchi.own_card() {
-                        if card.add_field(field.clone()).is_ok()
-                            && self.vauchi.update_own_card(&card).is_ok()
-                        {
-                            restored = true;
-                            self.engine_cache.remove(&AppScreen::MyInfo);
-                        }
-                    }
-                    if !restored {
-                        // Restore to undo buffer so retry is possible
-                        self.pending_field_undo = Some((field_id, field));
-                    }
+        if let UserAction::UndoPressed { action_id } = action
+            && action_id.starts_with("undo_delete_field:")
+        {
+            if let Some((field_id, field)) = self.pending_field_undo.take() {
+                let mut restored = false;
+                if let Ok(Some(mut card)) = self.vauchi.own_card()
+                    && card.add_field(field.clone()).is_ok()
+                    && self.vauchi.update_own_card(&card).is_ok()
+                {
+                    restored = true;
+                    self.engine_cache.remove(&AppScreen::MyInfo);
                 }
-                return Some(ActionResult::UpdateScreen(self.engine.current_screen()));
+                if !restored {
+                    // Restore to undo buffer so retry is possible
+                    self.pending_field_undo = Some((field_id, field));
+                }
             }
+            return Some(ActionResult::UpdateScreen(self.engine.current_screen()));
         }
         None
     }

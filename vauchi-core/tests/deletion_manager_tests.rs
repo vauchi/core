@@ -12,8 +12,8 @@
 use vauchi_core::api::account::{DeletionError, DeletionManager};
 use vauchi_core::contact::Contact;
 use vauchi_core::contact_card::{ContactCard, ContactField, FieldType};
-use vauchi_core::crypto::cek::ContentEncryptionKey;
 use vauchi_core::crypto::SymmetricKey;
+use vauchi_core::crypto::cek::ContentEncryptionKey;
 use vauchi_core::identity::Identity;
 use vauchi_core::storage::{DeletionState, Storage};
 

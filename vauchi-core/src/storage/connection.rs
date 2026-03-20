@@ -9,7 +9,7 @@ use rusqlite::Connection;
 use sha2::Sha256;
 use std::path::Path;
 
-use crate::crypto::{SymmetricKey, HKDF};
+use crate::crypto::{HKDF, SymmetricKey};
 
 type HmacSha256 = Hmac<Sha256>;
 

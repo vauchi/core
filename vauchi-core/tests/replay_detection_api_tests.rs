@@ -8,8 +8,8 @@
 //! and rejects duplicate nonces and stale timestamps.
 
 use vauchi_core::{
-    crypto::ratchet::DoubleRatchetState, exchange::X3DHKeyPair, sync::delta::CardDelta, Contact,
-    ContactCard, ContactField, FieldType, Identity, SymmetricKey, Vauchi,
+    Contact, ContactCard, ContactField, FieldType, Identity, SymmetricKey, Vauchi,
+    crypto::ratchet::DoubleRatchetState, exchange::X3DHKeyPair, sync::delta::CardDelta,
 };
 
 /// Helper: set up Alice's Vauchi instance with Bob as a contact and ratchet ready.

@@ -193,9 +193,11 @@ fn test_vauchi_own_fingerprint() {
     assert_eq!(groups.len(), 16);
     for group in groups {
         assert_eq!(group.len(), 4);
-        assert!(group
-            .chars()
-            .all(|c: char| c.is_ascii_hexdigit() && !c.is_ascii_lowercase()));
+        assert!(
+            group
+                .chars()
+                .all(|c: char| c.is_ascii_hexdigit() && !c.is_ascii_lowercase())
+        );
     }
 }
 
@@ -422,10 +424,10 @@ fn test_propagate_partial_visibility() {
 
 #[test]
 fn test_process_incoming_card_update() {
+    use vauchi_core::Identity;
     use vauchi_core::crypto::ratchet::DoubleRatchetState;
     use vauchi_core::exchange::X3DHKeyPair;
     use vauchi_core::sync::delta::CardDelta;
-    use vauchi_core::Identity;
 
     // Create Alice's Vauchi
     let mut alice_wb = create_test_vauchi();
@@ -545,10 +547,10 @@ fn test_update_display_name_no_identity_fails() {
 
 #[test]
 fn test_process_update_rejects_invalid_signature() {
+    use vauchi_core::Identity;
     use vauchi_core::crypto::ratchet::DoubleRatchetState;
     use vauchi_core::exchange::X3DHKeyPair;
     use vauchi_core::sync::delta::CardDelta;
-    use vauchi_core::Identity;
 
     let mut alice_wb = create_test_vauchi();
     alice_wb.create_identity("Alice").unwrap();

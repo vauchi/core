@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-use vauchi_core::exchange::{reassemble_chain, split_into_chain, MAX_APDU_DATA};
+use vauchi_core::exchange::{MAX_APDU_DATA, reassemble_chain, split_into_chain};
 
 #[test]
 fn test_small_payload_single_chunk() {

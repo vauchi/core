@@ -858,21 +858,27 @@ fn test_startup_maintenance_cleans_old_terminal_records() {
     assert_eq!(count, 3, "Should clean 3 old terminal records");
 
     // Verify old terminal records are gone
-    assert!(storage
-        .get_delivery_record("old-delivered")
-        .unwrap()
-        .is_none());
-    assert!(storage
-        .get_delivery_record("old-expired")
-        .unwrap()
-        .is_none());
+    assert!(
+        storage
+            .get_delivery_record("old-delivered")
+            .unwrap()
+            .is_none()
+    );
+    assert!(
+        storage
+            .get_delivery_record("old-expired")
+            .unwrap()
+            .is_none()
+    );
     assert!(storage.get_delivery_record("old-failed").unwrap().is_none());
 
     // Verify recent and non-terminal records kept
-    assert!(storage
-        .get_delivery_record("recent-delivered")
-        .unwrap()
-        .is_some());
+    assert!(
+        storage
+            .get_delivery_record("recent-delivered")
+            .unwrap()
+            .is_some()
+    );
     assert!(
         storage.get_delivery_record("old-queued").unwrap().is_some(),
         "expected Some value"

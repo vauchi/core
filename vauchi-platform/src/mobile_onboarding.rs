@@ -4,9 +4,9 @@
 
 //! Onboarding operations for mobile.
 
+use super::VauchiPlatform;
 use super::error::MobileError;
 use super::types::{MobileOnboardingProgress, MobileOnboardingStep};
-use super::VauchiPlatform;
 
 #[uniffi::export]
 impl VauchiPlatform {

@@ -370,6 +370,27 @@ validate:tor-feature:
           - "vauchi-core/src/tor_config.rs"
           - "vauchi-core/Cargo.toml"
 
+# The secure-storage feature is only used by downstream CABI consumers
+# (linux-qt, windows). Core CI doesn't enable it by default, so trait
+# imports and API compatibility can break undetected (F1, 2026-03-20).
+validate:secure-storage:
+  extends: [.linux-runner, .timeout-quick]
+  stage: test
+  needs:
+    - job: lint:format
+      optional: true
+  script:
+    - cargo check --features secure-storage -p vauchi-cabi
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes:
+        compare_to: refs/heads/$CI_DEFAULT_BRANCH
+        paths:
+          - "vauchi-cabi/src/**/*.rs"
+          - "vauchi-core/src/storage/**/*.rs"
+          - "vauchi-core/Cargo.toml"
+          - "vauchi-cabi/Cargo.toml"
+
 # WASM compatibility guard — verifies no C FFI crate (aws-lc-rs, ring, openssl)
 # appears in vauchi-core's non-TLS dependency path. Compilation check is not
 # possible with --no-default-features because some modules reference feature-gated

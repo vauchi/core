@@ -10,6 +10,8 @@ use std::sync::Arc;
 use std::sync::Mutex;
 
 use vauchi_core::api::Vauchi;
+#[cfg(feature = "secure-storage")]
+use vauchi_core::storage::SecureStorage;
 use vauchi_core::ui::*;
 
 use super::{from_c_str, to_c_string, VauchiApp};

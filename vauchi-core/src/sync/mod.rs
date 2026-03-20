@@ -108,10 +108,10 @@ mod send_tests {
 
     impl BinarySender for MockSender {
         fn send_binary(&mut self, data: Vec<u8>) -> Result<(), BinarySendError> {
-            if let Some(limit) = self.fail_after {
-                if self.messages.len() >= limit {
-                    return Err(BinarySendError::SendFailed("send failed".to_string()));
-                }
+            if let Some(limit) = self.fail_after
+                && self.messages.len() >= limit
+            {
+                return Err(BinarySendError::SendFailed("send failed".to_string()));
             }
             self.messages.push(data);
             Ok(())
@@ -159,10 +159,10 @@ mod send_tests {
     #[async_trait::async_trait]
     impl AsyncBinarySender for MockAsyncSender {
         async fn send_binary(&mut self, data: Vec<u8>) -> Result<(), BinarySendError> {
-            if let Some(limit) = self.fail_after {
-                if self.messages.len() >= limit {
-                    return Err(BinarySendError::SendFailed("send failed".to_string()));
-                }
+            if let Some(limit) = self.fail_after
+                && self.messages.len() >= limit
+            {
+                return Err(BinarySendError::SendFailed("send failed".to_string()));
             }
             self.messages.push(data);
             Ok(())

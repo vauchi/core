@@ -141,7 +141,7 @@ impl WebSocketTransport {
     /// Extracts the leaf (server) certificate DER bytes from a TLS stream.
     #[cfg(all(feature = "network-native-tls", not(feature = "network-rustls")))]
     fn extract_leaf_cert_der(stream: &MaybeTlsStream<TcpStream>) -> Option<Vec<u8>> {
-        if let MaybeTlsStream::NativeTls(ref tls) = stream {
+        if let MaybeTlsStream::NativeTls(tls) = stream {
             tls.peer_certificate()
                 .ok()
                 .flatten()

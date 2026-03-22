@@ -62,6 +62,8 @@ pub enum MessagePayload {
     AccountRevoked(AccountRevoked),
     ForwardingHints(ForwardingHints),
     DeviceLinkRelay(DeviceLinkRelay),
+    RegisterMailbox(RegisterMailbox),
+    DeregisterMailbox(DeregisterMailbox),
     #[serde(other)]
     Unknown,
 }
@@ -254,6 +256,23 @@ impl ForwardingHints {
         }
         data
     }
+}
+
+// =========================================================================
+// Mailbox token registration
+// =========================================================================
+
+/// Client registers mailbox tokens for message delivery routing.
+/// Tokens are opaque 64-char hex strings that rotate daily.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RegisterMailbox {
+    pub tokens: Vec<String>,
+}
+
+/// Client deregisters mailbox tokens (e.g., after historical catchup).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DeregisterMailbox {
+    pub tokens: Vec<String>,
 }
 
 // =========================================================================
@@ -551,6 +570,68 @@ mod tests {
         assert_eq!(decoded.hints.len(), 1);
         assert!(decoded.relay_signing_key.is_none());
         assert!(decoded.signature.is_none());
+    }
+
+    #[test]
+    fn test_register_mailbox_serde_roundtrip() {
+        let msg = RegisterMailbox {
+            tokens: vec!["abc123".into(), "def456".into()],
+        };
+        let envelope = MessageEnvelope {
+            version: PROTOCOL_VERSION,
+            message_id: "reg-test-1".to_string(),
+            timestamp: 1234567890,
+            payload: MessagePayload::RegisterMailbox(msg),
+        };
+        let encoded = encode_message(&envelope).unwrap();
+        let decoded = decode_message(&encoded).unwrap();
+        match decoded.payload {
+            MessagePayload::RegisterMailbox(rm) => {
+                assert_eq!(rm.tokens.len(), 2);
+                assert_eq!(rm.tokens[0], "abc123");
+                assert_eq!(rm.tokens[1], "def456");
+            }
+            _ => panic!("wrong variant"),
+        }
+    }
+
+    #[test]
+    fn test_deregister_mailbox_serde_roundtrip() {
+        let msg = DeregisterMailbox {
+            tokens: vec!["abc123".into()],
+        };
+        let envelope = MessageEnvelope {
+            version: PROTOCOL_VERSION,
+            message_id: "dereg-test-1".to_string(),
+            timestamp: 1234567890,
+            payload: MessagePayload::DeregisterMailbox(msg),
+        };
+        let encoded = encode_message(&envelope).unwrap();
+        let decoded = decode_message(&encoded).unwrap();
+        match decoded.payload {
+            MessagePayload::DeregisterMailbox(dm) => {
+                assert_eq!(dm.tokens.len(), 1);
+                assert_eq!(dm.tokens[0], "abc123");
+            }
+            _ => panic!("wrong variant"),
+        }
+    }
+
+    #[test]
+    fn test_register_mailbox_empty_tokens() {
+        let msg = RegisterMailbox { tokens: vec![] };
+        let envelope = MessageEnvelope {
+            version: PROTOCOL_VERSION,
+            message_id: "reg-empty-test-1".to_string(),
+            timestamp: 1234567890,
+            payload: MessagePayload::RegisterMailbox(msg),
+        };
+        let encoded = encode_message(&envelope).unwrap();
+        let decoded = decode_message(&encoded).unwrap();
+        match decoded.payload {
+            MessagePayload::RegisterMailbox(rm) => assert!(rm.tokens.is_empty()),
+            _ => panic!("wrong variant"),
+        }
     }
 
     #[test]

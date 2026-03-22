@@ -2,6 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+use proptest::prelude::*;
 use vauchi_core::network::mailbox_token::{
     batch_register_tokens, compute_mailbox_token, compute_self_token, token_hex,
 };
@@ -86,4 +87,18 @@ fn test_batch_tokens_historical_catchup() {
     let master_seed = [0xBBu8; 32];
     let tokens = batch_register_tokens(&contacts, &master_seed, 19804, 3);
     assert_eq!(tokens.len(), 256); // Still padded to 256
+}
+
+proptest! {
+    #[test]
+    fn prop_different_contacts_produce_unlinkable_tokens(
+        key_a in prop::array::uniform32(any::<u8>()),
+        key_b in prop::array::uniform32(any::<u8>()),
+        day in 0u64..100000,
+    ) {
+        prop_assume!(key_a != key_b);
+        let t_a = compute_mailbox_token(&key_a, day);
+        let t_b = compute_mailbox_token(&key_b, day);
+        prop_assert_ne!(t_a, t_b);
+    }
 }

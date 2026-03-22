@@ -857,19 +857,6 @@ fn test_resolve_sender_id_anonymous_mode() {
     assert_eq!(result.unwrap(), contact.id());
 }
 
-// @scenario: anonymous_sender.feature:Old-format messages without anonymous sender still work
-#[test]
-fn test_resolve_sender_id_direct_fallback() {
-    let key = SymmetricKey::generate();
-    let contact = make_contact_with_key("Bob", key);
-    let contacts = vec![contact.clone()];
-
-    // Use real identity fingerprint (old format)
-    let result = vauchi_core::network::anonymous::resolve_sender_id(&contacts, contact.id());
-    assert!(result.is_some(), "Should resolve via direct contact lookup");
-    assert_eq!(result.unwrap(), contact.id());
-}
-
 // @scenario: anonymous_sender.feature:Unknown anonymous sender ID is handled gracefully
 #[test]
 fn test_resolve_sender_id_unknown_returns_none() {

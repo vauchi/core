@@ -665,45 +665,6 @@ fn test_process_card_update_resolves_anonymous_sender_id() {
     assert_eq!(result.skipped, 0, "No updates should be skipped");
 }
 
-// @scenario: anonymous_sender.feature:Old-format messages without anonymous sender still work
-#[test]
-fn test_process_card_update_still_works_with_real_contact_id() {
-    let (alice_wb, bob_wb, _shared_secret, bob_contact_id, alice_contact_id) =
-        setup_exchange_with_ratchets();
-
-    let alice_signing_pk = *alice_wb.identity().unwrap().signing_public_key();
-    let old_card = ContactCard::new("Bob");
-    let mut new_card = ContactCard::new("Bob Updated");
-    new_card
-        .add_field(ContactField::new(
-            FieldType::Email,
-            "Email",
-            "bob@compat.test",
-        ))
-        .unwrap();
-
-    let ciphertext = create_valid_update(
-        &bob_wb,
-        &alice_signing_pk,
-        &alice_contact_id,
-        &old_card,
-        &new_card,
-    );
-
-    // Process using real contact ID (old format, backward compat)
-    let result = process_card_updates(
-        alice_wb.identity().unwrap(),
-        alice_wb.storage(),
-        vec![(bob_contact_id, ciphertext)],
-    )
-    .unwrap();
-
-    assert_eq!(
-        result.processed, 1,
-        "Update with real contact ID should still work (backward compat)"
-    );
-}
-
 // @scenario: anonymous_sender.feature:Unknown anonymous sender ID is handled gracefully
 #[test]
 fn test_process_card_update_skips_unresolvable_anonymous_id() {

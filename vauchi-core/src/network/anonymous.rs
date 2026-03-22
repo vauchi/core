@@ -92,13 +92,12 @@ pub fn resolve_sender<'a>(
 
 /// Resolves a sender_id string (from an EncryptedUpdate) to a contact.
 ///
-/// Tries anonymous resolution first (O(n) scan with epoch tolerance),
-/// then falls back to direct contact lookup by ID for backward
-/// compatibility with old-format messages that use real identity fingerprints.
+/// Decodes the hex sender_id and resolves it via anonymous (HKDF-derived)
+/// ID lookup across all contacts for the current and previous epoch.
 ///
 /// Returns the contact's ID string if resolved, or None.
 pub fn resolve_sender_id(contacts: &[Contact], sender_id_hex: &str) -> Option<String> {
-    // Try anonymous resolution: decode hex → resolve via shared keys
+    // Decode hex → resolve via shared keys (current + previous epoch)
     if let Ok(anonymous_id_bytes) = hex::decode(sender_id_hex)
         && anonymous_id_bytes.len() == 32
     {
@@ -110,14 +109,7 @@ pub fn resolve_sender_id(contacts: &[Contact], sender_id_hex: &str) -> Option<St
         }
     }
 
-    // Fall back to direct contact lookup (backward compat with old format).
-    // Note: uses standard == (not constant-time) because contact IDs are
-    // public-key fingerprints, not secrets. An observer cannot learn anything
-    // from timing that they don't already know from the wire format.
-    contacts
-        .iter()
-        .find(|c| c.id() == sender_id_hex)
-        .map(|c| c.id().to_string())
+    None
 }
 
 /// Pre-computed index for O(1) anonymous sender ID resolution (#104).

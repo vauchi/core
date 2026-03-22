@@ -271,7 +271,7 @@ pub fn all_migrations() -> Vec<Migration> {
         Migration {
             version: 2,
             name: "re_encrypt_aes_gcm_to_xchacha20",
-            action: MigrationAction::Callback(migrate_v2_noop),
+            action: MigrationAction::Sql(""),
         },
         Migration {
             version: 3,
@@ -562,14 +562,6 @@ const MIGRATION_V31_CONTACT_RELAY_FIELDS: &str = "
     ALTER TABLE contacts ADD COLUMN relay_noise_pubkey BLOB;
     ALTER TABLE pending_updates ADD COLUMN target_relay_url TEXT;
 ";
-
-/// Migration v2: Originally re-encrypted AES-GCM data to XChaCha20-Poly1305.
-///
-/// Now a no-op — AES-GCM support has been removed. This migration already ran
-/// on all existing databases; new databases never had AES-GCM data.
-fn migrate_v2_noop(_conn: &Connection, _key: &SymmetricKey) -> Result<(), StorageError> {
-    Ok(())
-}
 
 /// Migration v1: Baseline schema.
 ///

@@ -188,6 +188,30 @@ fn navigate_to_group_detail_shows_group() {
     );
 }
 
+/// @scenario: visibility_labels:Group detail shows real name and members
+#[test]
+fn group_detail_shows_real_name_and_members() {
+    let mut vauchi = Vauchi::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    let group = vauchi.create_group("Family").unwrap();
+    let mut engine = AppEngine::new(vauchi);
+
+    let screen = engine.navigate_to(AppScreen::GroupDetail {
+        group_id: group.id().to_string(),
+    });
+
+    assert_eq!(
+        screen.title, "Family",
+        "Title should be the real group name"
+    );
+    // With no contacts added, members list should be empty
+    let has_member_list = screen
+        .components
+        .iter()
+        .any(|c| matches!(c, Component::ContactList { id, contacts, .. } if id == "members" && contacts.is_empty()));
+    assert!(has_member_list, "Should have an empty members ContactList");
+}
+
 #[test]
 fn groups_list_item_selected_routes_to_group_detail() {
     let mut vauchi = Vauchi::in_memory().unwrap();

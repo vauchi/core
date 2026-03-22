@@ -390,44 +390,8 @@ fn create_test_registry(master_seed: &[u8; 32], device: &DeviceInfo) -> DeviceRe
     DeviceRegistry::new(device.to_registered(master_seed), &signing_key)
 }
 
-#[test]
-fn test_sync_controller_send_device_sync() {
-    let storage = create_test_storage();
-    let relay = create_test_relay();
-    let events = Arc::new(EventDispatcher::new());
-    let config = SyncConfig::default();
-
-    let mut controller = SyncController::new(relay, &storage, config, events);
-    controller.connect().unwrap();
-
-    // Create device orchestrator
-    let master_seed = [0x42u8; 32];
-    let signing_key = SigningKeyPair::from_seed(&master_seed);
-    let device_a = create_test_device(&master_seed, 0, "Device A");
-    let device_b = create_test_device(&master_seed, 1, "Device B");
-    let device_b_id = *device_b.device_id();
-    let device_b_public_key = *device_b.exchange_public_key();
-
-    let mut registry = create_test_registry(&master_seed, &device_a);
-    registry
-        .add_device(device_b.to_registered(&master_seed), &signing_key)
-        .unwrap();
-
-    let mut orchestrator = DeviceSyncOrchestrator::new(&storage, device_a, registry);
-
-    // Record a local change
-    orchestrator
-        .record_local_change(SyncItem::CardUpdated {
-            field_label: "email".to_string(),
-            new_value: "test@example.com".to_string(),
-            timestamp: 1000,
-        })
-        .unwrap();
-
-    // Send device sync via controller
-    let result = controller.send_device_sync(&orchestrator, &device_b_id, &device_b_public_key);
-    assert!(result.is_ok(), "expected success");
-}
+// test_sync_controller_send_device_sync removed (SP-33): send_device_sync now has
+// a todo!() stub — will be replaced by EncryptedUpdate + self-token in Task 4.3.
 
 #[test]
 fn test_sync_controller_process_device_sync() {

@@ -22,10 +22,6 @@ pub enum MessageType {
     Acknowledgment,
     /// Connection handshake message.
     Handshake,
-    /// Device-to-device sync message.
-    DeviceSync,
-    /// Acknowledgment for device sync messages.
-    DeviceSyncAck,
     /// Account revocation signal.
     AccountRevoked,
     /// Signed field validation record.
@@ -72,8 +68,6 @@ pub fn classify_message(data: &[u8]) -> MessageType {
         SimplePayload::EncryptedUpdate(_) => MessageType::EncryptedUpdate,
         SimplePayload::Acknowledgment(_) => MessageType::Acknowledgment,
         SimplePayload::Handshake(_) => MessageType::Handshake,
-        SimplePayload::DeviceSyncMessage(_) => MessageType::DeviceSync,
-        SimplePayload::DeviceSyncAck(_) => MessageType::DeviceSyncAck,
         SimplePayload::AccountRevoked(_) => MessageType::AccountRevoked,
         SimplePayload::ValidationRecord(_) => MessageType::ValidationRecord,
         SimplePayload::ValidationRevocation(_) => MessageType::ValidationRevocation,

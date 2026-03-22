@@ -439,58 +439,11 @@ impl<'a, T: Transport> SyncController<'a, T> {
     /// Creates an encrypted sync message and sends it via the relay.
     pub fn send_device_sync(
         &mut self,
-        orchestrator: &DeviceSyncOrchestrator<'_>,
-        target_device_id: &[u8; 32],
-        target_public_key: &[u8; 32],
+        _orchestrator: &DeviceSyncOrchestrator<'_>,
+        _target_device_id: &[u8; 32],
+        _target_public_key: &[u8; 32],
     ) -> VauchiResult<()> {
-        // Get pending items for target device
-        let pending = orchestrator.pending_for_device(target_device_id);
-        if pending.is_empty() {
-            return Ok(()); // Nothing to send
-        }
-
-        // Serialize pending items
-        let payload = serde_json::to_vec(&pending).map_err(|e| {
-            VauchiError::InvalidState(format!("Failed to serialize sync items: {}", e))
-        })?;
-
-        // Encrypt for target device (returns 0x02 || nonce[24] || ciphertext || tag[16])
-        let encrypted = orchestrator
-            .encrypt_for_device(target_public_key, &payload)
-            .map_err(VauchiError::DeviceSync)?;
-
-        // Split encrypted data for wire transport (first 12 bytes as "nonce" field,
-        // rest as "ciphertext" field). Note: actual XChaCha20 nonce is 24 bytes with
-        // algorithm tag — the receiver reassembles nonce++ciphertext before decryption.
-        // TODO(K-M1): Update wire format to pass encrypted blob as single opaque field
-        const NONCE_SIZE: usize = 12;
-        if encrypted.len() < NONCE_SIZE {
-            return Err(VauchiError::InvalidState(
-                "Encrypted data too short".to_string(),
-            ));
-        }
-
-        let nonce: [u8; 12] = encrypted[..NONCE_SIZE]
-            .try_into()
-            .expect("nonce slice should be 12 bytes");
-        let ciphertext = encrypted[NONCE_SIZE..].to_vec();
-
-        // Get sync version from orchestrator
-        let sync_version = orchestrator
-            .version_vector()
-            .get(orchestrator.current_device().device_id());
-
-        // Send via relay
-        let sender_device_id = orchestrator.current_device().device_id();
-        self.relay.send_device_sync_message(
-            sender_device_id,
-            target_device_id,
-            ciphertext,
-            nonce,
-            sync_version,
-        )?;
-
-        Ok(())
+        todo!("SP-33 Task 4.3: replace with self-token EncryptedUpdate")
     }
 
     /// Processes incoming device sync items.

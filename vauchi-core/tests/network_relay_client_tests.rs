@@ -303,45 +303,8 @@ fn test_process_result_default() {
     assert!(result.errors.is_empty());
 }
 
-// @scenario: device_management:Changes sync between devices
-#[test]
-fn test_relay_client_send_device_sync_message() {
-    let transport = MockTransport::new();
-    let mut client = RelayClient::new(transport, create_test_config(), "sender-id".into());
-    client.connect().unwrap();
-
-    let sender_device_id = [1u8; 32];
-    let target_device_id = [2u8; 32];
-    let ciphertext = vec![10u8; 50]; // nonce (12) + encrypted payload (38)
-    let nonce = [3u8; 12];
-    let sync_version = 42u64;
-
-    let msg_id = client
-        .send_device_sync_message(
-            &sender_device_id,
-            &target_device_id,
-            ciphertext.clone(),
-            nonce,
-            sync_version,
-        )
-        .unwrap();
-
-    assert!(!msg_id.is_empty());
-
-    // Check the message was sent
-    let sent = client.connection().transport().sent_messages();
-    assert_eq!(sent.len(), 1);
-
-    if let MessagePayload::DeviceSync(sync_msg) = &sent[0].payload {
-        assert_eq!(sync_msg.sender_device_id, sender_device_id);
-        assert_eq!(sync_msg.target_device_id, target_device_id);
-        assert_eq!(sync_msg.ciphertext, ciphertext);
-        assert_eq!(sync_msg.nonce, nonce);
-        assert_eq!(sync_msg.sync_version, sync_version);
-    } else {
-        panic!("Expected DeviceSync message");
-    }
-}
+// Device sync send test removed (SP-33): DeviceSyncMessage wire type removed.
+// send_device_sync_message now has a todo!() stub — will be replaced in Task 4.3.
 
 // @scenario: relay_network:Automatic cleanup of stale blobs
 #[test]

@@ -19,18 +19,12 @@ use tokio_tungstenite::tungstenite::Message;
 
 use vauchi_core::crypto::ratchet::DoubleRatchetState;
 use vauchi_core::exchange::{EncryptedExchangeMessage, X3DHKeyPair};
-use vauchi_core::sync::{
-    ContactSyncData, DeviceSyncOrchestrator, SyncItem,
-    process_card_updates as core_process_card_updates,
-};
+use vauchi_core::sync::process_card_updates as core_process_card_updates;
 use vauchi_core::{Contact, ContactCard, Identity, Storage, SymmetricKey};
 
 use crate::cert_pinning::{self, WsStream};
 use crate::error::MobileError;
-use crate::protocol::{
-    self, AckStatus, DeviceSyncMessage, EncryptedUpdate, ExchangeMessage, MessagePayload,
-    create_device_sync_ack,
-};
+use crate::protocol::{self, AckStatus, EncryptedUpdate, ExchangeMessage, MessagePayload};
 use crate::types::MobileSyncResult;
 use vauchi_core::network::simple_message::create_signed_handshake;
 
@@ -42,8 +36,6 @@ pub struct ReceivedMessages {
     pub encrypted_exchange: Vec<Vec<u8>>,
     /// Card updates from existing contacts: (sender_id, ciphertext).
     pub card_updates: Vec<(String, Vec<u8>)>,
-    /// Device sync messages (inter-device synchronization).
-    pub device_sync_messages: Vec<DeviceSyncMessage>,
 }
 
 /// Exchange response data collected during processing for async sending.
@@ -74,8 +66,6 @@ async fn receive_pending(socket: &mut WsStream) -> Result<ReceivedMessages, Mobi
     let mut legacy_exchange_messages = Vec::new();
     let mut encrypted_exchange_messages = Vec::new();
     let mut card_updates = Vec::new();
-    let mut device_sync_messages = Vec::new();
-
     loop {
         let msg = match tokio::time::timeout(Duration::from_secs(1), socket.next()).await {
             Ok(Some(Ok(msg))) => msg,
@@ -104,15 +94,6 @@ async fn receive_pending(socket: &mut WsStream) -> Result<ReceivedMessages, Mobi
                                 let _ = socket.send(Message::Binary(ack_data)).await;
                             }
                         }
-                        MessagePayload::DeviceSyncMessage(msg) => {
-                            let version = msg.version;
-                            device_sync_messages.push(msg);
-
-                            let ack = create_device_sync_ack(&envelope.message_id, version);
-                            if let Ok(ack_data) = protocol::encode_message(&ack) {
-                                let _ = socket.send(Message::Binary(ack_data)).await;
-                            }
-                        }
                         _ => {}
                     }
                 }
@@ -129,7 +110,6 @@ async fn receive_pending(socket: &mut WsStream) -> Result<ReceivedMessages, Mobi
         legacy_exchange: legacy_exchange_messages,
         encrypted_exchange: encrypted_exchange_messages,
         card_updates,
-        device_sync_messages,
     })
 }
 
@@ -207,9 +187,6 @@ fn process_legacy_exchange_messages(
         let contact_id = contact.id().to_string();
         storage.save_contact(&contact)?;
 
-        // Record for inter-device sync
-        let _ = record_contact_for_device_sync(identity, storage, &contact);
-
         // Initialize ratchet as responder
         let ratchet_dh = X3DHKeyPair::from_bytes(*our_x3dh.secret_bytes());
         let ratchet = DoubleRatchetState::initialize_responder(&shared_secret, ratchet_dh);
@@ -263,9 +240,6 @@ fn process_encrypted_exchange_messages(
         let contact = Contact::from_exchange(payload.identity_key, card, shared_secret.clone());
         let contact_id = contact.id().to_string();
         storage.save_contact(&contact)?;
-
-        // Record for inter-device sync
-        let _ = record_contact_for_device_sync(identity, storage, &contact);
 
         // Initialize ratchet as responder
         let ratchet_dh = X3DHKeyPair::from_bytes(*our_x3dh.secret_bytes());
@@ -372,77 +346,6 @@ fn collect_pending_updates_data(identity: &Identity, storage: &Storage) -> Vec<(
     result
 }
 
-/// Processes incoming device sync messages from other devices.
-fn process_device_sync_messages(
-    identity: &Identity,
-    storage: &Storage,
-    messages: Vec<DeviceSyncMessage>,
-) -> Result<u32, MobileError> {
-    if messages.is_empty() {
-        return Ok(0);
-    }
-
-    // Try to load device registry - if none exists, skip
-    let registry = match storage.load_device_registry()? {
-        Some(r) if r.device_count() > 1 => r,
-        _ => return Ok(0),
-    };
-
-    let mut orchestrator =
-        DeviceSyncOrchestrator::new(storage, identity.create_device_info(), registry.clone());
-
-    let mut processed = 0u32;
-
-    for msg in messages {
-        // Parse sender device ID
-        let sender_device_id: [u8; 32] = match hex::decode(&msg.sender_device_id) {
-            Ok(bytes) if bytes.len() == 32 => {
-                let mut arr = [0u8; 32];
-                arr.copy_from_slice(&bytes);
-                arr
-            }
-            _ => continue,
-        };
-
-        // Find sender in registry
-        let sender_device = match registry.find_device(&sender_device_id) {
-            Some(d) => d,
-            None => continue,
-        };
-
-        // Decrypt payload
-        let plaintext = match orchestrator
-            .decrypt_from_device(&sender_device.exchange_public_key, &msg.encrypted_payload)
-        {
-            Ok(pt) => pt,
-            Err(_) => continue,
-        };
-
-        // Parse SyncItems
-        let items: Vec<SyncItem> = match serde_json::from_slice(&plaintext) {
-            Ok(items) => items,
-            Err(_) => continue,
-        };
-
-        // Process items with conflict resolution
-        let applied = match orchestrator.process_incoming(items) {
-            Ok(applied) => applied,
-            Err(_) => continue,
-        };
-
-        // Apply the items
-        for item in &applied {
-            let _ = apply_sync_item(storage, item);
-        }
-
-        if !applied.is_empty() {
-            processed += 1;
-        }
-    }
-
-    Ok(processed)
-}
-
 /// Performs a complete sync operation (async, Storage scoped for Send safety).
 ///
 /// Storage is created in scoped blocks and dropped before any `.await` points
@@ -468,14 +371,7 @@ pub async fn do_sync_async(
     let received = receive_pending(&mut socket).await?;
 
     // Phase 2: Process received messages (Storage scoped, no await)
-    let (
-        contacts_added,
-        exchange_responses,
-        cards_updated,
-        device_synced,
-        device_envelopes,
-        pending_updates,
-    ) = {
+    let (contacts_added, exchange_responses, cards_updated, pending_updates) = {
         let storage = Storage::open(storage_path, storage_key.clone())
             .map_err(|e| MobileError::StorageError(e.to_string()))?;
 
@@ -494,25 +390,12 @@ pub async fn do_sync_async(
         // internally by process_card_updates — no pre-resolution needed)
         let cards_updated = process_card_updates(identity, &storage, received.card_updates)?;
 
-        // Process device sync messages
-        let device_synced =
-            process_device_sync_messages(identity, &storage, received.device_sync_messages)?;
-
-        // Build device sync envelopes
-        let device_envelopes =
-            vauchi_core::sync::build_device_sync_envelopes(identity, &storage).unwrap_or_default();
+        // SP-33 Task 4.3: device sync receive + send replaced by EncryptedUpdate + self-token
 
         // Collect pending updates
         let pending_updates = collect_pending_updates_data(identity, &storage);
 
-        (
-            contacts_added,
-            responses,
-            cards_updated,
-            device_synced,
-            device_envelopes,
-            pending_updates,
-        )
+        (contacts_added, responses, cards_updated, pending_updates)
         // storage dropped here
     };
 
@@ -527,14 +410,6 @@ pub async fn do_sync_async(
             &response.recipient_exchange_key,
         )
         .await;
-    }
-
-    // Send device sync envelopes
-    let mut device_sync_sent = 0u32;
-    for data in device_envelopes {
-        if socket.send(Message::Binary(data)).await.is_ok() {
-            device_sync_sent += 1;
-        }
     }
 
     // Send pending updates
@@ -559,14 +434,12 @@ pub async fn do_sync_async(
         }
     }
 
-    let total_cards = cards_updated + device_synced;
-    let total_sent = updates_sent + device_sync_sent;
     Ok(MobileSyncResult {
         contacts_added,
-        cards_updated: total_cards,
-        updates_sent: total_sent,
-        total: contacts_added + total_cards + total_sent,
-        has_changes: contacts_added > 0 || total_cards > 0 || total_sent > 0,
+        cards_updated,
+        updates_sent,
+        total: contacts_added + cards_updated + updates_sent,
+        has_changes: contacts_added > 0 || cards_updated > 0 || updates_sent > 0,
     })
 }
 
@@ -591,107 +464,4 @@ fn update_contact_name_if_needed(storage: &Storage, contact_id: &str, new_name: 
     {
         let _ = storage.save_contact(&contact);
     }
-}
-
-/// Records a contact addition for inter-device sync.
-fn record_contact_for_device_sync(
-    identity: &Identity,
-    storage: &Storage,
-    contact: &Contact,
-) -> Result<(), MobileError> {
-    // Try to load device registry - if none exists or only one device, skip
-    let registry = match storage.load_device_registry()? {
-        Some(r) if r.device_count() > 1 => r,
-        _ => return Ok(()), // No other devices to sync to
-    };
-
-    // Create orchestrator
-    let mut orchestrator =
-        DeviceSyncOrchestrator::new(storage, identity.create_device_info(), registry);
-
-    // Create ContactSyncData from the contact
-    let contact_data = ContactSyncData::from_contact(contact);
-
-    // Record the sync item
-    let item = SyncItem::ContactAdded {
-        contact_data,
-        timestamp: std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs(),
-    };
-
-    orchestrator
-        .record_local_change(item)
-        .map_err(|e| MobileError::SyncFailed(format!("Failed to record device sync: {:?}", e)))?;
-
-    Ok(())
-}
-
-/// Applies a single sync item to local storage.
-fn apply_sync_item(storage: &Storage, item: &SyncItem) -> Result<(), MobileError> {
-    match item {
-        SyncItem::ContactAdded { contact_data, .. } => {
-            if let Ok(contact) = contact_data.to_contact() {
-                storage.save_contact(&contact)?;
-            }
-        }
-        SyncItem::ContactRemoved { contact_id, .. } => {
-            storage.delete_contact(contact_id)?;
-        }
-        SyncItem::CardUpdated {
-            field_label,
-            new_value,
-            ..
-        } => {
-            if let Ok(Some(mut card)) = storage.load_own_card()
-                && card.update_field_value(field_label, new_value).is_ok()
-            {
-                storage.save_own_card(&card)?;
-            }
-        }
-        SyncItem::VisibilityChanged {
-            contact_id,
-            field_label,
-            is_visible,
-            ..
-        } => {
-            if let Some(mut contact) = storage.load_contact(contact_id)? {
-                if *is_visible {
-                    contact.visibility_rules_mut().set_everyone(field_label);
-                } else {
-                    contact.visibility_rules_mut().set_nobody(field_label);
-                }
-                storage.save_contact(&contact)?;
-            }
-        }
-        SyncItem::LabelChange { .. } => {
-            // Label changes are handled by the label manager during full sync
-        }
-        SyncItem::ContactTrustChanged {
-            contact_id,
-            recovery_trusted,
-            ..
-        } => {
-            if let Some(mut contact) = storage.load_contact(contact_id)? {
-                contact.set_recovery_trusted(*recovery_trusted);
-                storage.save_contact(&contact)?;
-            }
-        }
-        SyncItem::DeletionScheduled {
-            scheduled_at,
-            execute_at,
-            ..
-        } => {
-            let state = vauchi_core::storage::DeletionState::Scheduled {
-                scheduled_at: *scheduled_at,
-                execute_at: *execute_at,
-            };
-            storage.save_deletion_state(&state)?;
-        }
-        SyncItem::DeletionCancelled { .. } => {
-            storage.save_deletion_state(&vauchi_core::storage::DeletionState::None)?;
-        }
-    }
-    Ok(())
 }

@@ -17,9 +17,9 @@ use vauchi_core::exchange::X3DHKeyPair;
 use vauchi_core::identity::Identity;
 use vauchi_core::network::{
     AccountDeletionNotice, AccountRevoked, AckStatus, Acknowledgment, DeletionStage,
-    DeviceSyncMessage, EncryptedUpdate, ForwardingHint, ForwardingHints, Handshake,
-    MessageEnvelope, MessagePayload, PROTOCOL_VERSION, PresenceStatus, PresenceUpdate,
-    PurgeRequest, RatchetHeader, VersionNegotiation,
+    EncryptedUpdate, ForwardingHint, ForwardingHints, Handshake, MessageEnvelope, MessagePayload,
+    PROTOCOL_VERSION, PresenceStatus, PresenceUpdate, PurgeRequest, RatchetHeader,
+    VersionNegotiation,
 };
 
 // ============================================================
@@ -495,44 +495,7 @@ proptest! {
         }
     }
 
-    /// Property: DeviceSync payload roundtrips through JSON serialization.
-    #[test]
-    fn prop_device_sync_roundtrip(
-        target_device_id in bytes32_strategy(),
-        sender_device_id in bytes32_strategy(),
-        ciphertext in prop::collection::vec(any::<u8>(), 1..200),
-        nonce in prop::array::uniform12(any::<u8>()),
-        sync_version in any::<u64>(),
-        msg_id in message_id_strategy(),
-        timestamp in timestamp_strategy()
-    ) {
-        let envelope = MessageEnvelope {
-            version: PROTOCOL_VERSION,
-            message_id: msg_id.clone(),
-            timestamp,
-            payload: MessagePayload::DeviceSync(DeviceSyncMessage {
-                target_device_id,
-                sender_device_id,
-                ciphertext: ciphertext.clone(),
-                nonce,
-                sync_version,
-            }),
-        };
-
-        let json = serde_json::to_string(&envelope).expect("serialization should succeed");
-        let restored: MessageEnvelope = serde_json::from_str(&json)
-            .expect("deserialization should succeed");
-
-        if let MessagePayload::DeviceSync(d) = &restored.payload {
-            prop_assert_eq!(d.target_device_id, target_device_id);
-            prop_assert_eq!(d.sender_device_id, sender_device_id);
-            prop_assert_eq!(&d.ciphertext, &ciphertext);
-            prop_assert_eq!(d.nonce, nonce);
-            prop_assert_eq!(d.sync_version, sync_version);
-        } else {
-            prop_assert!(false, "Expected DeviceSync variant");
-        }
-    }
+    // DeviceSync roundtrip property test removed (SP-33): wire type removed.
 
     /// Property: AccountRevoked payload roundtrips through JSON serialization.
     #[test]

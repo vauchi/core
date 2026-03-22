@@ -474,45 +474,9 @@ impl<'a> DeviceSyncOrchestrator<'a> {
     /// Returns a list of encoded envelopes ready to send over the wire.
     pub fn build_outbound_envelopes(
         &self,
-        identity: &crate::Identity,
+        _identity: &crate::Identity,
     ) -> Result<Vec<Vec<u8>>, DeviceSyncError> {
-        let identity_id = identity.public_id();
-        let sender_device_id = hex::encode(identity.device_id());
-        let mut envelopes = Vec::new();
-
-        for device in self.registry.active_devices() {
-            if device.device_id == *identity.device_id() {
-                continue;
-            }
-
-            let pending = self.pending_for_device(&device.device_id);
-            if pending.is_empty() {
-                continue;
-            }
-
-            let payload = serde_json::to_vec(pending)
-                .map_err(|e| DeviceSyncError::Serialization(e.to_string()))?;
-
-            let encrypted = self.encrypt_for_device(&device.exchange_public_key, &payload)?;
-
-            let target_device_id = hex::encode(device.device_id);
-            let version = self.version_vector.get(identity.device_id());
-
-            let envelope = crate::network::simple_message::create_device_sync_message(
-                &identity_id,
-                &target_device_id,
-                &sender_device_id,
-                encrypted,
-                version,
-            );
-
-            let encoded = crate::network::simple_message::encode_simple_message(&envelope)
-                .map_err(|e| DeviceSyncError::Serialization(e.to_string()))?;
-
-            envelopes.push(encoded);
-        }
-
-        Ok(envelopes)
+        todo!("SP-33 Task 4.3: replace with self-token EncryptedUpdate")
     }
 }
 

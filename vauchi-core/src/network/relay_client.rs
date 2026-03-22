@@ -12,8 +12,8 @@ use std::time::Instant;
 use super::connection::ConnectionManager;
 use super::error::NetworkError;
 use super::message::{
-    AckStatus, DeviceSyncMessage, EncryptedUpdate, MessageEnvelope, MessageId, MessagePayload,
-    PurgeRequest, RatchetHeader,
+    AckStatus, EncryptedUpdate, MessageEnvelope, MessageId, MessagePayload, PurgeRequest,
+    RatchetHeader,
 };
 use super::protocol::create_envelope;
 use super::transport::{Transport, TransportConfig};
@@ -210,30 +210,16 @@ impl<T: Transport> RelayClient<T> {
 
     /// Sends a device sync message to another device.
     ///
-    /// Used for syncing data between devices belonging to the same identity.
-    /// The ciphertext should already be encrypted for the target device.
+    /// SP-33 Task 4.3: will be replaced by EncryptedUpdate + self-token routing.
     pub fn send_device_sync_message(
         &mut self,
-        sender_device_id: &[u8; 32],
-        target_device_id: &[u8; 32],
-        ciphertext: Vec<u8>,
-        nonce: [u8; 12],
-        sync_version: u64,
+        _sender_device_id: &[u8; 32],
+        _target_device_id: &[u8; 32],
+        _ciphertext: Vec<u8>,
+        _nonce: [u8; 12],
+        _sync_version: u64,
     ) -> Result<MessageId, NetworkError> {
-        let sync_msg = DeviceSyncMessage {
-            target_device_id: *target_device_id,
-            sender_device_id: *sender_device_id,
-            ciphertext,
-            nonce,
-            sync_version,
-        };
-
-        let envelope = create_envelope(MessagePayload::DeviceSync(sync_msg));
-        let message_id = envelope.message_id.clone();
-
-        self.connection.send(&envelope)?;
-
-        Ok(message_id)
+        todo!("SP-33 Task 4.3: replace with self-token EncryptedUpdate")
     }
 
     /// Sends a purge request to the relay server.

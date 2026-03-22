@@ -38,8 +38,6 @@ pub enum MessagePayload {
     Handshake(Handshake),
     /// Presence/status update.
     Presence(PresenceUpdate),
-    /// Device-to-device sync message (between own devices).
-    DeviceSync(DeviceSyncMessage),
     /// Account revocation signal (sent when card owner deletes account).
     AccountRevoked(AccountRevoked),
     /// Account deletion notification sent to contacts.
@@ -150,28 +148,6 @@ pub enum PresenceStatus {
     Online,
     Away,
     Offline,
-}
-
-/// Device-to-device sync message for inter-device synchronization.
-///
-/// Used for syncing data between devices belonging to the same identity.
-/// The payload is encrypted using the target device's exchange key.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DeviceSyncMessage {
-    /// Target device ID (one of our own devices).
-    #[serde(with = "bytes_array_32")]
-    pub target_device_id: [u8; 32],
-    /// Sender device ID.
-    #[serde(with = "bytes_array_32")]
-    pub sender_device_id: [u8; 32],
-    /// Encrypted sync payload (SyncItems encrypted with device exchange key).
-    pub ciphertext: Vec<u8>,
-    /// First 12 bytes of the encrypted blob, split for wire transport.
-    /// Reassembled with ciphertext before decryption.
-    #[serde(with = "bytes_array_12")]
-    pub nonce: [u8; 12],
-    /// Sync version number for ordering/deduplication.
-    pub sync_version: u64,
 }
 
 /// Account deletion notification sent to contacts.
@@ -447,34 +423,6 @@ mod bytes_array_64 {
         bytes
             .try_into()
             .map_err(|_| serde::de::Error::custom("invalid length for 64-byte array"))
-    }
-}
-
-/// Serde helper for 12-byte arrays.
-mod bytes_array_12 {
-    use base64::Engine;
-    use serde::{Deserialize, Deserializer, Serializer};
-
-    /// Serializes a 12-byte array to a base64-encoded string.
-    pub fn serialize<S>(bytes: &[u8; 12], serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        serializer.serialize_str(&base64::engine::general_purpose::STANDARD.encode(bytes))
-    }
-
-    /// Deserializes a 12-byte array from a base64-encoded string.
-    pub fn deserialize<'de, D>(deserializer: D) -> Result<[u8; 12], D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let s = String::deserialize(deserializer)?;
-        let bytes = base64::engine::general_purpose::STANDARD
-            .decode(&s)
-            .map_err(serde::de::Error::custom)?;
-        bytes
-            .try_into()
-            .map_err(|_| serde::de::Error::custom("invalid length for 12-byte array"))
     }
 }
 

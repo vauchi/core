@@ -52,21 +52,7 @@ fn test_classify_message_returns_handshake_for_handshake_payload() {
     assert_eq!(result, MessageType::Handshake);
 }
 
-#[test]
-fn test_classify_message_returns_device_sync_for_device_sync_payload() {
-    let envelope = create_device_sync_message(
-        "identity-1",
-        "target-device",
-        "sender-device",
-        vec![0x01, 0x02],
-        1,
-    );
-    let bytes = encode_simple_message(&envelope).unwrap();
-
-    let result = vauchi_core::network::classify_message(&bytes);
-
-    assert_eq!(result, MessageType::DeviceSync);
-}
+// DeviceSync classify test removed (SP-33): wire type removed.
 
 #[test]
 fn test_classify_message_returns_account_revoked_for_revoked_payload() {
@@ -115,15 +101,7 @@ fn test_classify_message_returns_unknown_for_truncated_json() {
     assert_eq!(result, MessageType::Unknown);
 }
 
-#[test]
-fn test_classify_message_returns_device_sync_ack_for_sync_ack_payload() {
-    let envelope = create_device_sync_ack("msg-456", 42);
-    let bytes = encode_simple_message(&envelope).unwrap();
-
-    let result = vauchi_core::network::classify_message(&bytes);
-
-    assert_eq!(result, MessageType::DeviceSyncAck);
-}
+// DeviceSyncAck classify test removed (SP-33): wire type removed.
 
 mod proptest_classify {
     use proptest::prelude::*;
@@ -140,8 +118,6 @@ mod proptest_classify {
                 MessageType::EncryptedUpdate
                     | MessageType::Acknowledgment
                     | MessageType::Handshake
-                    | MessageType::DeviceSync
-                    | MessageType::DeviceSyncAck
                     | MessageType::AccountRevoked
                     | MessageType::ValidationRecord
                     | MessageType::ValidationRevocation

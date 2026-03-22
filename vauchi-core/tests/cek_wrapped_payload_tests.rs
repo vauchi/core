@@ -9,9 +9,7 @@
 //!   - "Crypto-shredding renders card unreadable without key"
 
 use vauchi_core::crypto::cek::ContentEncryptionKey;
-use vauchi_core::sync::delta::{
-    CekWrappedPayload, PAYLOAD_VERSION_CEK, PAYLOAD_VERSION_LEGACY, VersionedPayload,
-};
+use vauchi_core::sync::delta::{CekWrappedPayload, PAYLOAD_VERSION_CEK, VersionedPayload};
 
 // === Serialization Round-trips ===
 
@@ -59,20 +57,6 @@ fn test_cek_wrapped_payload_decrypt_roundtrip() {
 // === Version-Tagged Encoding ===
 
 #[test]
-fn test_versioned_payload_legacy_roundtrip() {
-    let delta_bytes = b"legacy card delta JSON bytes";
-
-    let encoded = VersionedPayload::encode_legacy(delta_bytes);
-    assert_eq!(encoded[0], PAYLOAD_VERSION_LEGACY);
-
-    let decoded = VersionedPayload::decode(&encoded).unwrap();
-    match decoded {
-        VersionedPayload::Legacy(data) => assert_eq!(data, delta_bytes),
-        _ => panic!("Expected Legacy variant"),
-    }
-}
-
-#[test]
 fn test_versioned_payload_cek_roundtrip() {
     let cek = ContentEncryptionKey::generate();
     let cek_ciphertext = cek.encrypt(b"card delta").unwrap();
@@ -88,15 +72,11 @@ fn test_versioned_payload_cek_roundtrip() {
     assert_eq!(encoded[0], PAYLOAD_VERSION_CEK);
 
     let decoded = VersionedPayload::decode(&encoded).unwrap();
-    match decoded {
-        VersionedPayload::CekWrapped(p) => {
-            assert_eq!(p.cek, cek.to_bytes());
-            assert_eq!(p.cek_ciphertext, cek_ciphertext);
-            assert_eq!(p.signature, [0x11u8; 64]);
-            assert_eq!(p.nonce, [0x22u8; 32]);
-        }
-        _ => panic!("Expected CekWrapped variant"),
-    }
+    let VersionedPayload::CekWrapped(p) = decoded;
+    assert_eq!(p.cek, cek.to_bytes());
+    assert_eq!(p.cek_ciphertext, cek_ciphertext);
+    assert_eq!(p.signature, [0x11u8; 64]);
+    assert_eq!(p.nonce, [0x22u8; 32]);
 }
 
 #[test]
@@ -110,23 +90,6 @@ fn test_versioned_payload_unknown_version_returns_error() {
 fn test_versioned_payload_empty_returns_error() {
     let result = VersionedPayload::decode(&[]);
     result.expect_err("expected error");
-}
-
-// === Backward Compatibility ===
-
-#[test]
-fn test_legacy_payload_preserves_exact_bytes() {
-    // Legacy CardDelta bytes must be preserved exactly after version byte stripping
-    let original =
-        br#"{"version":1,"timestamp":1700000000,"changes":[],"nonce":"AA==","signature":"AA=="}"#;
-
-    let encoded = VersionedPayload::encode_legacy(original);
-    let decoded = VersionedPayload::decode(&encoded).unwrap();
-
-    match decoded {
-        VersionedPayload::Legacy(data) => assert_eq!(data, original.to_vec()),
-        _ => panic!("Expected Legacy variant"),
-    }
 }
 
 #[test]
@@ -149,14 +112,10 @@ fn test_cek_wrapped_with_real_encryption() {
 
     // Recipient side
     let decoded = VersionedPayload::decode(&versioned_bytes).unwrap();
-    match decoded {
-        VersionedPayload::CekWrapped(p) => {
-            let recipient_cek = ContentEncryptionKey::from_bytes(p.cek);
-            let decrypted = recipient_cek.decrypt(&p.cek_ciphertext).unwrap();
-            assert_eq!(decrypted, delta_json);
-        }
-        _ => panic!("Expected CekWrapped variant"),
-    }
+    let VersionedPayload::CekWrapped(p) = decoded;
+    let recipient_cek = ContentEncryptionKey::from_bytes(p.cek);
+    let decrypted = recipient_cek.decrypt(&p.cek_ciphertext).unwrap();
+    assert_eq!(decrypted, delta_json);
 }
 
 #[test]
@@ -202,6 +161,5 @@ fn test_cek_rotation_in_wrapped_payload() {
 
 #[test]
 fn test_version_constants() {
-    assert_eq!(PAYLOAD_VERSION_LEGACY, 0x01);
     assert_eq!(PAYLOAD_VERSION_CEK, 0x02);
 }

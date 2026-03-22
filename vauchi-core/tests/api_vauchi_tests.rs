@@ -425,9 +425,10 @@ fn test_propagate_partial_visibility() {
 #[test]
 fn test_process_incoming_card_update() {
     use vauchi_core::Identity;
+    use vauchi_core::crypto::cek::ContentEncryptionKey;
     use vauchi_core::crypto::ratchet::DoubleRatchetState;
     use vauchi_core::exchange::X3DHKeyPair;
-    use vauchi_core::sync::delta::CardDelta;
+    use vauchi_core::sync::delta::{CardDelta, CekWrappedPayload, VersionedPayload};
 
     // Create Alice's Vauchi
     let mut alice_wb = create_test_vauchi();
@@ -473,9 +474,18 @@ fn test_process_incoming_card_update() {
     let alice_pk = alice_wb.identity().unwrap().signing_public_key();
     delta.sign(&bob_identity, alice_pk);
 
-    // Encrypt the delta
+    // CEK-wrap and encrypt the delta
     let delta_bytes = serde_json::to_vec(&delta).unwrap();
-    let ratchet_msg = bob_ratchet.encrypt(&delta_bytes).unwrap();
+    let cek = ContentEncryptionKey::generate();
+    let cek_ciphertext = cek.encrypt(&delta_bytes).unwrap();
+    let wrapped = CekWrappedPayload {
+        cek: cek.to_bytes(),
+        cek_ciphertext,
+        signature: delta.signature,
+        nonce: delta.nonce,
+    };
+    let payload = VersionedPayload::encode_cek(&wrapped);
+    let ratchet_msg = bob_ratchet.encrypt(&payload).unwrap();
     let encrypted = serde_json::to_vec(&ratchet_msg).unwrap();
 
     // Alice processes the incoming update
@@ -548,9 +558,10 @@ fn test_update_display_name_no_identity_fails() {
 #[test]
 fn test_process_update_rejects_invalid_signature() {
     use vauchi_core::Identity;
+    use vauchi_core::crypto::cek::ContentEncryptionKey;
     use vauchi_core::crypto::ratchet::DoubleRatchetState;
     use vauchi_core::exchange::X3DHKeyPair;
-    use vauchi_core::sync::delta::CardDelta;
+    use vauchi_core::sync::delta::{CardDelta, CekWrappedPayload, VersionedPayload};
 
     let mut alice_wb = create_test_vauchi();
     alice_wb.create_identity("Alice").unwrap();
@@ -596,7 +607,16 @@ fn test_process_update_rejects_invalid_signature() {
     delta.sign(&wrong_identity, alice_pk); // WRONG signature!
 
     let delta_bytes = serde_json::to_vec(&delta).unwrap();
-    let ratchet_msg = bob_ratchet.encrypt(&delta_bytes).unwrap();
+    let cek = ContentEncryptionKey::generate();
+    let cek_ciphertext = cek.encrypt(&delta_bytes).unwrap();
+    let wrapped = CekWrappedPayload {
+        cek: cek.to_bytes(),
+        cek_ciphertext,
+        signature: delta.signature,
+        nonce: delta.nonce,
+    };
+    let payload = VersionedPayload::encode_cek(&wrapped);
+    let ratchet_msg = bob_ratchet.encrypt(&payload).unwrap();
     let encrypted = serde_json::to_vec(&ratchet_msg).unwrap();
 
     // Should fail signature verification

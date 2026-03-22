@@ -11,7 +11,6 @@
 //! ## Version-Tagged Payloads
 //!
 //! The inner payload (before Double Ratchet encryption) uses a version byte prefix:
-//! - `0x01`: Legacy `CardDelta` (raw serialized bytes)
 //! - `0x02`: CEK-wrapped payload (`CekWrappedPayload`)
 
 use serde::{Deserialize, Serialize};
@@ -32,9 +31,6 @@ pub struct ValidationSummary {
     /// Human-readable trust level derived from the count (e.g. "none", "unverified", "verified").
     pub trust_level: String,
 }
-
-/// Version byte for legacy CardDelta payloads (raw serialized JSON).
-pub const PAYLOAD_VERSION_LEGACY: u8 = 0x01;
 
 /// Version byte for CEK-wrapped payloads (crypto-shredding enabled).
 pub const PAYLOAD_VERSION_CEK: u8 = 0x02;
@@ -498,25 +494,14 @@ impl CekWrappedPayload {
 /// Version-tagged payload decoded from the inner Double Ratchet plaintext.
 ///
 /// The first byte determines the format:
-/// - `0x01`: Legacy `CardDelta` (remaining bytes are serialized JSON)
 /// - `0x02`: CEK-wrapped payload (remaining bytes are `CekWrappedPayload`)
 #[derive(Debug)]
 pub enum VersionedPayload {
-    /// Legacy format: raw CardDelta bytes (version 0x01).
-    Legacy(Vec<u8>),
     /// CEK-wrapped format: contains rotated CEK + CEK-encrypted delta (version 0x02).
     CekWrapped(CekWrappedPayload),
 }
 
 impl VersionedPayload {
-    /// Encode a legacy CardDelta with version prefix.
-    pub fn encode_legacy(delta_bytes: &[u8]) -> Vec<u8> {
-        let mut buf = Vec::with_capacity(1 + delta_bytes.len());
-        buf.push(PAYLOAD_VERSION_LEGACY);
-        buf.extend_from_slice(delta_bytes);
-        buf
-    }
-
     /// Encode a CEK-wrapped payload with version prefix.
     pub fn encode_cek(payload: &CekWrappedPayload) -> Vec<u8> {
         let inner = payload.encode();
@@ -533,7 +518,6 @@ impl VersionedPayload {
         }
 
         match data[0] {
-            PAYLOAD_VERSION_LEGACY => Ok(VersionedPayload::Legacy(data[1..].to_vec())),
             PAYLOAD_VERSION_CEK => {
                 let payload = CekWrappedPayload::decode(&data[1..])?;
                 Ok(VersionedPayload::CekWrapped(payload))

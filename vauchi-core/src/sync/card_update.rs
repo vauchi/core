@@ -12,7 +12,7 @@
 //! - Revoked sender rejection
 //! - Blocked contact rejection
 //! - Ratchet decryption
-//! - Versioned payload handling (CEK-wrapped and legacy)
+//! - Versioned payload handling (CEK-wrapped v0x02)
 //! - Ed25519 signature verification (sender + recipient binding)
 //! - Replay detection via storage nonces
 //! - Atomic transaction for all DB writes
@@ -200,7 +200,7 @@ pub fn process_single_card_update(
     }
 }
 
-/// Decodes versioned payload, handling CEK-wrapped (v2) and legacy formats.
+/// Decodes versioned payload, handling CEK-wrapped (v2) format.
 fn decode_versioned_payload(
     plaintext: &[u8],
 ) -> Result<(Vec<u8>, Option<ContentEncryptionKey>), CardUpdateError> {
@@ -214,14 +214,11 @@ fn decode_versioned_payload(
                     .map_err(|_| CardUpdateError::CekDecryptionFailed)?;
                 Ok((decrypted, Some(cek)))
             }
-            Ok(VersionedPayload::Legacy(data)) => Ok((data, None)),
             Err(e) => Err(CardUpdateError::InvalidPayload(e.to_string())),
         }
     } else {
-        // Legacy: raw JSON bytes or version 0x01
-        match VersionedPayload::decode(plaintext) {
-            Ok(VersionedPayload::Legacy(data)) => Ok((data, None)),
-            _ => Ok((plaintext.to_vec(), None)),
-        }
+        Err(CardUpdateError::InvalidPayload(
+            "unknown payload version".into(),
+        ))
     }
 }

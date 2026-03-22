@@ -208,20 +208,12 @@ impl Vauchi {
                         .map_err(|e| VauchiError::Crypto(format!("CEK decrypt: {:?}", e)))?;
                     (decrypted, Some(cek))
                 }
-                Ok(VersionedPayload::Legacy(data)) => (data, None),
                 Err(e) => {
                     return Err(VauchiError::Serialization(format!("payload decode: {}", e)));
                 }
             }
         } else {
-            // Legacy: raw JSON bytes (no version tag, or version 0x01)
-            match VersionedPayload::decode(&plaintext) {
-                Ok(VersionedPayload::Legacy(data)) => (data, None),
-                _ => {
-                    // Fall back to treating entire plaintext as legacy delta JSON
-                    (plaintext, None)
-                }
-            }
+            return Err(VauchiError::Serialization("unknown payload version".into()));
         };
 
         // Parse delta

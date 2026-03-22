@@ -82,7 +82,7 @@ fn setup_exchange_with_ratchets() -> (
 ///
 /// 1. Compute delta between old and new card
 /// 2. Sign with Bob's identity, binding to Alice as recipient
-/// 3. Encode as legacy versioned payload
+/// 3. CEK-wrap the delta bytes (v0x02)
 /// 4. Encrypt with Bob's ratchet
 /// 5. Serialize RatchetMessage to JSON
 fn create_valid_update(
@@ -98,7 +98,15 @@ fn create_valid_update(
     delta.sign(bob_identity, alice_signing_pk);
 
     let delta_bytes = serde_json::to_vec(&delta).unwrap();
-    let payload = VersionedPayload::encode_legacy(&delta_bytes);
+    let cek = ContentEncryptionKey::generate();
+    let cek_ciphertext = cek.encrypt(&delta_bytes).unwrap();
+    let wrapped = CekWrappedPayload {
+        cek: cek.to_bytes(),
+        cek_ciphertext,
+        signature: delta.signature,
+        nonce: delta.nonce,
+    };
+    let payload = VersionedPayload::encode_cek(&wrapped);
 
     // Load Bob's ratchet for Alice, encrypt, save updated state
     let (mut bob_ratchet, is_init) = bob_wb
@@ -364,7 +372,15 @@ fn test_signature_invalid_rejected() {
     delta.sign(bob_identity, &wrong_recipient_pk);
 
     let delta_bytes = serde_json::to_vec(&delta).unwrap();
-    let payload = VersionedPayload::encode_legacy(&delta_bytes);
+    let cek = ContentEncryptionKey::generate();
+    let cek_ciphertext = cek.encrypt(&delta_bytes).unwrap();
+    let wrapped = CekWrappedPayload {
+        cek: cek.to_bytes(),
+        cek_ciphertext,
+        signature: delta.signature,
+        nonce: delta.nonce,
+    };
+    let payload = VersionedPayload::encode_cek(&wrapped);
 
     let (mut bob_ratchet, is_init) = bob_wb
         .storage()
@@ -450,7 +466,15 @@ fn test_replay_detected() {
     delta2.sign(bob_identity, &alice_signing_pk);
 
     let delta_bytes2 = serde_json::to_vec(&delta2).unwrap();
-    let payload2 = VersionedPayload::encode_legacy(&delta_bytes2);
+    let cek2 = ContentEncryptionKey::generate();
+    let cek_ciphertext2 = cek2.encrypt(&delta_bytes2).unwrap();
+    let wrapped2 = CekWrappedPayload {
+        cek: cek2.to_bytes(),
+        cek_ciphertext: cek_ciphertext2,
+        signature: delta2.signature,
+        nonce: delta2.nonce,
+    };
+    let payload2 = VersionedPayload::encode_cek(&wrapped2);
 
     let (mut bob_ratchet2, is_init2) = bob_wb
         .storage()
@@ -519,16 +543,15 @@ fn test_batch_partial_failure() {
 }
 
 #[test]
-fn test_decode_versioned_payload_legacy() {
-    // Test via a full pipeline: create a legacy-encoded update and verify it processes
+fn test_decode_versioned_payload_via_helper() {
+    // Test via a full pipeline: create a CEK-wrapped update and verify it processes
     let (alice_wb, bob_wb, _shared_secret, bob_contact_id, alice_contact_id) =
         setup_exchange_with_ratchets();
 
     let alice_signing_pk = *alice_wb.identity().unwrap().signing_public_key();
     let old_card = ContactCard::new("Bob");
-    let new_card = ContactCard::new("Bob Legacy");
+    let new_card = ContactCard::new("Bob Updated");
 
-    // create_valid_update already uses VersionedPayload::encode_legacy
     let ciphertext = create_valid_update(
         &bob_wb,
         &alice_signing_pk,
@@ -546,7 +569,7 @@ fn test_decode_versioned_payload_legacy() {
 
     assert!(
         result.is_ok(),
-        "Legacy versioned payload should be processed successfully: {:?}",
+        "CEK-wrapped versioned payload should be processed successfully: {:?}",
         result
     );
 }

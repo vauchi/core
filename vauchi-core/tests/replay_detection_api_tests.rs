@@ -9,7 +9,10 @@
 
 use vauchi_core::{
     Contact, ContactCard, ContactField, FieldType, Identity, SymmetricKey, Vauchi,
-    crypto::ratchet::DoubleRatchetState, exchange::X3DHKeyPair, sync::delta::CardDelta,
+    crypto::cek::ContentEncryptionKey,
+    crypto::ratchet::DoubleRatchetState,
+    exchange::X3DHKeyPair,
+    sync::delta::{CardDelta, CekWrappedPayload, VersionedPayload},
 };
 
 /// Helper: set up Alice's Vauchi instance with Bob as a contact and ratchet ready.
@@ -64,7 +67,16 @@ fn create_encrypted_update(
     delta.sign(bob_identity, recipient_pk);
 
     let delta_bytes = serde_json::to_vec(&delta).unwrap();
-    let ratchet_msg = bob_ratchet.encrypt(&delta_bytes).unwrap();
+    let cek = ContentEncryptionKey::generate();
+    let cek_ciphertext = cek.encrypt(&delta_bytes).unwrap();
+    let wrapped = CekWrappedPayload {
+        cek: cek.to_bytes(),
+        cek_ciphertext,
+        signature: delta.signature,
+        nonce: delta.nonce,
+    };
+    let payload = VersionedPayload::encode_cek(&wrapped);
+    let ratchet_msg = bob_ratchet.encrypt(&payload).unwrap();
     serde_json::to_vec(&ratchet_msg).unwrap()
 }
 
@@ -111,7 +123,16 @@ fn test_replay_rejects_reused_nonce_different_encryption() {
 
     // Encrypt and process first update
     let delta_bytes = serde_json::to_vec(&delta).unwrap();
-    let ratchet_msg = bob_ratchet.encrypt(&delta_bytes).unwrap();
+    let cek = ContentEncryptionKey::generate();
+    let cek_ciphertext = cek.encrypt(&delta_bytes).unwrap();
+    let wrapped = CekWrappedPayload {
+        cek: cek.to_bytes(),
+        cek_ciphertext,
+        signature: delta.signature,
+        nonce: delta.nonce,
+    };
+    let payload = VersionedPayload::encode_cek(&wrapped);
+    let ratchet_msg = bob_ratchet.encrypt(&payload).unwrap();
     let encrypted = serde_json::to_vec(&ratchet_msg).unwrap();
     alice.process_card_update(&bob_id, &encrypted).unwrap();
 

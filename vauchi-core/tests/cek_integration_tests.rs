@@ -201,11 +201,11 @@ fn test_process_cek_wrapped_update_saves_cek() {
 }
 
 #[test]
-fn test_process_legacy_update_backward_compat() {
+fn test_process_cek_wrapped_update() {
     let (alice, bob_id, bob_identity, bob_dh, shared_secret) = setup_alice_with_bob_ratchet();
     let alice_pk = alice.identity().unwrap().signing_public_key();
 
-    // Bob sends a legacy (non-CEK) update — existing behavior must keep working
+    // Bob sends a CEK-wrapped update (the only supported format)
     let mut bob_ratchet =
         DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key()).unwrap();
 
@@ -220,18 +220,23 @@ fn test_process_legacy_update_backward_compat() {
     let mut delta = CardDelta::compute(&old_card, &new_card);
     delta.sign(&bob_identity, alice_pk);
 
-    // Legacy: just raw JSON bytes (no version tag)
     let delta_bytes = serde_json::to_vec(&delta).unwrap();
-    let ratchet_msg = bob_ratchet.encrypt(&delta_bytes).unwrap();
+    let cek = ContentEncryptionKey::generate();
+    let cek_ciphertext = cek.encrypt(&delta_bytes).unwrap();
+    let wrapped = CekWrappedPayload {
+        cek: cek.to_bytes(),
+        cek_ciphertext,
+        signature: delta.signature,
+        nonce: delta.nonce,
+    };
+    let payload = VersionedPayload::encode_cek(&wrapped);
+    let ratchet_msg = bob_ratchet.encrypt(&payload).unwrap();
     let encrypted = serde_json::to_vec(&ratchet_msg).unwrap();
 
-    // Alice processes the update — should work (legacy path)
+    // Alice processes the update — should work
     let changed = alice.process_card_update(&bob_id, &encrypted).unwrap();
     assert!(!changed.is_empty());
     assert!(changed.iter().any(|f| f == "work"));
-
-    // No CEK should be set (legacy update doesn't carry one)
-    assert!(alice.storage().load_contact_cek(&bob_id).unwrap().is_none());
 }
 
 #[test]
@@ -256,7 +261,16 @@ fn test_process_update_from_revoked_sender_rejected() {
     delta.sign(&bob_identity, alice_pk);
 
     let delta_bytes = serde_json::to_vec(&delta).unwrap();
-    let ratchet_msg = bob_ratchet.encrypt(&delta_bytes).unwrap();
+    let cek = ContentEncryptionKey::generate();
+    let cek_ciphertext = cek.encrypt(&delta_bytes).unwrap();
+    let wrapped = CekWrappedPayload {
+        cek: cek.to_bytes(),
+        cek_ciphertext,
+        signature: delta.signature,
+        nonce: delta.nonce,
+    };
+    let payload = VersionedPayload::encode_cek(&wrapped);
+    let ratchet_msg = bob_ratchet.encrypt(&payload).unwrap();
     let encrypted = serde_json::to_vec(&ratchet_msg).unwrap();
 
     // Alice should reject the update
@@ -341,9 +355,18 @@ fn test_cek_wrapped_forged_signature_rejected() {
         *byte ^= 0xFF;
     }
 
-    // Encode as legacy (non-CEK) to test signature path directly
+    // CEK-wrap with tampered signature to test signature verification path
     let delta_bytes = serde_json::to_vec(&delta).unwrap();
-    let ratchet_msg = bob_ratchet.encrypt(&delta_bytes).unwrap();
+    let cek = ContentEncryptionKey::generate();
+    let cek_ciphertext = cek.encrypt(&delta_bytes).unwrap();
+    let wrapped = CekWrappedPayload {
+        cek: cek.to_bytes(),
+        cek_ciphertext,
+        signature: delta.signature,
+        nonce: delta.nonce,
+    };
+    let payload = VersionedPayload::encode_cek(&wrapped);
+    let ratchet_msg = bob_ratchet.encrypt(&payload).unwrap();
     let encrypted = serde_json::to_vec(&ratchet_msg).unwrap();
 
     // Alice should reject the forged update

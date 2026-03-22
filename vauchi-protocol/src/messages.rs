@@ -56,8 +56,6 @@ pub enum MessagePayload {
     RecoveryProofStore(RecoveryProofStore),
     RecoveryProofQuery(RecoveryProofQuery),
     RecoveryProofResponse(RecoveryProofResponse),
-    DeviceSyncMessage(DeviceSyncMessage),
-    DeviceSyncAck(DeviceSyncAck),
     HandshakeAck(HandshakeAck),
     PurgeRequest(PurgeRequest),
     PurgeResponse(PurgeResponse),
@@ -153,25 +151,6 @@ pub struct RecoveryProofEntry {
 }
 
 // =========================================================================
-// Device sync messages
-// =========================================================================
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DeviceSyncMessage {
-    pub identity_id: String,
-    pub target_device_id: String,
-    pub sender_device_id: String,
-    pub encrypted_payload: Vec<u8>,
-    pub version: u64,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DeviceSyncAck {
-    pub message_id: String,
-    pub synced_version: u64,
-}
-
-// =========================================================================
 // Device link relay messages
 // =========================================================================
 
@@ -193,8 +172,6 @@ pub struct DeviceLinkRelay {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PurgeRequest {
     #[serde(default)]
-    pub include_device_sync: bool,
-    #[serde(default)]
     pub include_recovery_proofs: bool,
     #[serde(default)]
     pub recovery_key_hash: Option<String>,
@@ -213,7 +190,6 @@ pub struct PurgeRequest {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PurgeResponse {
     pub blobs_deleted: usize,
-    pub device_sync_deleted: usize,
     #[serde(default)]
     pub recovery_proofs_deleted: usize,
 }
@@ -326,7 +302,6 @@ mod tests {
     #[test]
     fn test_purge_request_roundtrip() {
         let req = PurgeRequest {
-            include_device_sync: true,
             include_recovery_proofs: true,
             recovery_key_hash: Some("abc123".to_string()),
             public_key: Some("pk123".to_string()),
@@ -336,7 +311,6 @@ mod tests {
         };
         let json = serde_json::to_string(&req).unwrap();
         let decoded: PurgeRequest = serde_json::from_str(&json).unwrap();
-        assert!(decoded.include_device_sync);
         assert!(decoded.include_recovery_proofs);
         assert_eq!(decoded.recovery_key_hash, Some("abc123".to_string()));
         assert_eq!(decoded.public_key, Some("pk123".to_string()));
@@ -349,7 +323,6 @@ mod tests {
     fn test_purge_request_defaults() {
         let json = "{}";
         let decoded: PurgeRequest = serde_json::from_str(json).unwrap();
-        assert!(!decoded.include_device_sync);
         assert!(!decoded.include_recovery_proofs);
         assert_eq!(decoded.recovery_key_hash, None);
         assert_eq!(decoded.public_key, None);
@@ -472,21 +445,6 @@ mod tests {
     }
 
     #[test]
-    fn test_device_sync_message_roundtrip() {
-        let msg = DeviceSyncMessage {
-            identity_id: "id1".to_string(),
-            target_device_id: "dev1".to_string(),
-            sender_device_id: "dev2".to_string(),
-            encrypted_payload: vec![10, 20, 30],
-            version: 42,
-        };
-        let json = serde_json::to_string(&msg).unwrap();
-        let decoded: DeviceSyncMessage = serde_json::from_str(&json).unwrap();
-        assert_eq!(decoded.version, 42);
-        assert_eq!(decoded.encrypted_payload, vec![10, 20, 30]);
-    }
-
-    #[test]
     fn test_unknown_payload_variant() {
         let json = r#"{"version":1,"message_id":"m1","timestamp":0,"payload":{"type":"FutureFeature","data":"x"}}"#;
         let envelope: MessageEnvelope = serde_json::from_str(json).unwrap();
@@ -497,13 +455,11 @@ mod tests {
     fn test_purge_response_roundtrip() {
         let resp = PurgeResponse {
             blobs_deleted: 5,
-            device_sync_deleted: 3,
             recovery_proofs_deleted: 1,
         };
         let json = serde_json::to_string(&resp).unwrap();
         let decoded: PurgeResponse = serde_json::from_str(&json).unwrap();
         assert_eq!(decoded.blobs_deleted, 5);
-        assert_eq!(decoded.device_sync_deleted, 3);
         assert_eq!(decoded.recovery_proofs_deleted, 1);
     }
 

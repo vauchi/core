@@ -62,7 +62,6 @@ fn provider_contract_all_relay_payload_variants_constructable() {
         }),
         MessagePayload::PurgeResponse(PurgeResponse {
             blobs_deleted: 0,
-            device_sync_deleted: 0,
             recovery_proofs_deleted: 0,
         }),
         MessagePayload::RecoveryProofResponse(RecoveryProofResponse { proofs: vec![] }),

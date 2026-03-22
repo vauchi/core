@@ -264,11 +264,31 @@ impl AppEngine {
                     .collect();
                 Box::new(GroupsEngine::new(group_infos, GroupsMode::Members))
             }
-            AppScreen::GroupDetail { group_id } => Box::new(GroupDetailEngine::new(
-                group_id.clone(),
-                "Group".into(),
-                vec![],
-            )),
+            AppScreen::GroupDetail { group_id } => {
+                let group_name = vauchi
+                    .get_group(group_id)
+                    .ok()
+                    .map(|g| g.name().to_string())
+                    .unwrap_or_else(|| "Group".into());
+                let members = vauchi
+                    .get_group_members(group_id)
+                    .unwrap_or_default()
+                    .into_iter()
+                    .map(|c| ContactItem {
+                        id: c.id().to_string(),
+                        name: c.display_name().to_string(),
+                        subtitle: None,
+                        avatar_initials: initials(c.display_name()),
+                        status: None,
+                        searchable_fields: vec![],
+                    })
+                    .collect();
+                Box::new(GroupDetailEngine::new(
+                    group_id.clone(),
+                    group_name,
+                    members,
+                ))
+            }
             AppScreen::Privacy => {
                 Box::new(GdprEngine::new(None, "No data export requested".into()))
             }

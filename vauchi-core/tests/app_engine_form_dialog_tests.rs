@@ -6,6 +6,7 @@
 //! submission, validation errors, and navigation after completion.
 
 use vauchi_core::api::Vauchi;
+use vauchi_core::contact_card::FieldType;
 use vauchi_core::ui::{
     ActionResult, AppEngine, AppScreen, Component, FormDialogType, UserAction, WorkflowEngine,
 };
@@ -420,5 +421,100 @@ fn form_dialog_cancel_add_field_does_not_save() {
     assert_eq!(
         field_count_before, field_count_after,
         "cancel must not add a field"
+    );
+}
+
+// ── Social network field routing tests ──────────────────────────────
+
+/// @scenario: contact_card_management:Add social network field from catalog
+#[test]
+fn form_dialog_add_social_field_stores_as_social_type() {
+    let mut vauchi = Vauchi::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    let mut engine = AppEngine::new(vauchi);
+
+    engine.navigate_to(AppScreen::FormDialog {
+        dialog_type: FormDialogType::AddField {
+            available_groups: vec![],
+        },
+    });
+
+    // Select "social:github" from the catalog type list
+    let _ = engine.handle_action(UserAction::ListItemSelected {
+        component_id: "entry_types".into(),
+        item_id: "social:github".into(),
+    });
+    let _ = engine.handle_action(UserAction::TextChanged {
+        component_id: "field_value".into(),
+        value: "octocat".into(),
+    });
+
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "submit".into(),
+    });
+    assert!(
+        matches!(result, ActionResult::NavigateTo(_)),
+        "Should navigate back after submit, got {result:?}"
+    );
+
+    // Verify: field is stored as FieldType::Social, NOT Custom
+    let card = engine.vauchi().own_card().unwrap().unwrap();
+    let social_fields: Vec<_> = card
+        .fields()
+        .iter()
+        .filter(|f| f.field_type() == FieldType::Social)
+        .collect();
+    assert_eq!(
+        social_fields.len(),
+        1,
+        "Expected 1 Social field, got {} (fields: {:?})",
+        social_fields.len(),
+        card.fields()
+            .iter()
+            .map(|f| format!("{:?}:{}", f.field_type(), f.label()))
+            .collect::<Vec<_>>()
+    );
+    assert_eq!(social_fields[0].value(), "octocat");
+}
+
+/// @scenario: contact_card_management:Social field label uses display name
+#[test]
+fn form_dialog_add_social_field_uses_display_name_as_label() {
+    let mut vauchi = Vauchi::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    let mut engine = AppEngine::new(vauchi);
+
+    engine.navigate_to(AppScreen::FormDialog {
+        dialog_type: FormDialogType::AddField {
+            available_groups: vec![],
+        },
+    });
+
+    // Select "social:github", don't set a custom label
+    let _ = engine.handle_action(UserAction::ListItemSelected {
+        component_id: "entry_types".into(),
+        item_id: "social:github".into(),
+    });
+    let _ = engine.handle_action(UserAction::TextChanged {
+        component_id: "field_value".into(),
+        value: "torvalds".into(),
+    });
+
+    let _ = engine.handle_action(UserAction::ActionPressed {
+        action_id: "submit".into(),
+    });
+
+    let card = engine.vauchi().own_card().unwrap().unwrap();
+    let social_field = card
+        .fields()
+        .iter()
+        .find(|f| f.field_type() == FieldType::Social)
+        .expect("Should have a Social field");
+
+    assert_eq!(
+        social_field.label(),
+        "GitHub",
+        "Label should be 'GitHub' (catalog display name), not '{}'",
+        social_field.label()
     );
 }

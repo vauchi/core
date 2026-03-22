@@ -100,24 +100,15 @@ impl EmergencyShredEngine {
             screen_id: "shred_confirm".into(),
             title: "Confirm Wipe".into(),
             subtitle: None,
-            components: vec![
-                Component::ConfirmationDialog {
-                    id: "confirm_dialog".into(),
-                    title: "Confirm Wipe".into(),
-                    message: "Type DELETE to confirm".into(),
-                    confirm_text: "DELETE".into(),
-                    destructive: true,
-                },
-                Component::TextInput {
-                    id: "confirmation".into(),
-                    label: "Type DELETE to confirm".into(),
-                    value: self.typed_confirmation.clone(),
-                    placeholder: None,
-                    max_length: None,
-                    validation_error: None,
-                    input_type: InputType::Text,
-                },
-            ],
+            components: vec![Component::TextInput {
+                id: "confirmation".into(),
+                label: "Type DELETE to confirm".into(),
+                value: self.typed_confirmation.clone(),
+                placeholder: None,
+                max_length: None,
+                validation_error: None,
+                input_type: InputType::Text,
+            }],
             actions: vec![
                 ScreenAction {
                     id: "wipe".into(),

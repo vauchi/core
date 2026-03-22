@@ -215,20 +215,23 @@ impl AppEngine {
                             "phone" => FieldType::Phone,
                             "email" => FieldType::Email,
                             "social" => FieldType::Social,
+                            s if s.starts_with("social:") => FieldType::Social,
                             "address" => FieldType::Address,
                             "website" => FieldType::Website,
                             "birthday" => FieldType::Birthday,
                             _ => FieldType::Custom,
                         };
-                        // Use label_input as label if provided, otherwise use type name
-                        let label = if label_input.is_empty() {
+                        // Use label_input if provided, otherwise derive from catalog
+                        let label = if !label_input.is_empty() {
+                            label_input.to_string()
+                        } else if let Some(entry) = self.field_catalog.get(entry_type) {
+                            entry.display_name.clone()
+                        } else {
                             entry_type
                                 .chars()
                                 .next()
                                 .map(|c| c.to_uppercase().to_string() + &entry_type[1..])
                                 .unwrap_or_else(|| "Custom".into())
-                        } else {
-                            label_input.to_string()
                         };
                         let field =
                             crate::contact_card::ContactField::new(field_type, &label, value);

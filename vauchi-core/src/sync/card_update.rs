@@ -20,6 +20,7 @@
 use crate::crypto::cek::ContentEncryptionKey;
 use crate::crypto::ratchet::RatchetMessage;
 use crate::identity::Identity;
+use crate::network::anonymous::resolve_sender_id;
 use crate::storage::{Storage, StorageError};
 use crate::sync::delta::{CardDelta, PAYLOAD_VERSION_CEK, VersionedPayload};
 
@@ -93,8 +94,15 @@ pub fn process_card_updates(
 ) -> Result<CardUpdateResult, StorageError> {
     let mut result = CardUpdateResult::default();
 
+    // Load contacts once for anonymous sender ID resolution.
+    // Anonymous IDs (HKDF-derived, rotating hourly) are resolved to real
+    // contact IDs using shared keys. Old-format messages with real identity
+    // fingerprints pass through unchanged via the fallback path.
+    let contacts = storage.list_contacts().unwrap_or_default();
+
     for (sender_id, ciphertext) in updates {
-        match process_single_card_update(identity, storage, &sender_id, &ciphertext) {
+        let resolved_id = resolve_sender_id(&contacts, &sender_id).unwrap_or(sender_id);
+        match process_single_card_update(identity, storage, &resolved_id, &ciphertext) {
             Ok(()) => result.processed += 1,
             Err(_) => result.skipped += 1,
         }

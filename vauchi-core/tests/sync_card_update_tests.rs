@@ -606,3 +606,123 @@ fn test_decode_versioned_payload_cek_wrapped() {
         result
     );
 }
+
+// ============================================================
+// Anonymous Sender Resolution Tests (SP-32)
+// Traces to: features/anonymous_sender.feature @wire
+// Verifies that process_card_updates resolves anonymous sender IDs
+// to real contact IDs before storage lookups.
+// ============================================================
+
+// @scenario: anonymous_sender.feature:Incoming messages with anonymous sender ID are resolved
+#[test]
+fn test_process_card_update_resolves_anonymous_sender_id() {
+    use vauchi_core::network::anonymous::AnonymousSender;
+
+    let (alice_wb, bob_wb, _shared_secret, bob_contact_id, alice_contact_id) =
+        setup_exchange_with_ratchets();
+
+    let alice_signing_pk = *alice_wb.identity().unwrap().signing_public_key();
+    let old_card = ContactCard::new("Bob");
+    let mut new_card = ContactCard::new("Bob Updated");
+    new_card
+        .add_field(ContactField::new(
+            FieldType::Email,
+            "Email",
+            "bob@anon.test",
+        ))
+        .unwrap();
+
+    let ciphertext = create_valid_update(
+        &bob_wb,
+        &alice_signing_pk,
+        &alice_contact_id,
+        &old_card,
+        &new_card,
+    );
+
+    // Compute Bob's anonymous sender ID using the shared key Alice has for Bob
+    let bob_contact = alice_wb
+        .storage()
+        .load_contact(&bob_contact_id)
+        .unwrap()
+        .unwrap();
+    let anon = AnonymousSender::for_current_epoch(bob_contact.shared_key().as_bytes());
+    let anonymous_id_hex = hex::encode(anon.anonymous_id);
+
+    // Process using anonymous sender ID instead of real contact ID
+    let result = process_card_updates(
+        alice_wb.identity().unwrap(),
+        alice_wb.storage(),
+        vec![(anonymous_id_hex.clone(), ciphertext)],
+    )
+    .unwrap();
+
+    assert_eq!(
+        result.processed, 1,
+        "Update with anonymous sender ID should be processed (resolved to real contact)"
+    );
+    assert_eq!(result.skipped, 0, "No updates should be skipped");
+}
+
+// @scenario: anonymous_sender.feature:Old-format messages without anonymous sender still work
+#[test]
+fn test_process_card_update_still_works_with_real_contact_id() {
+    let (alice_wb, bob_wb, _shared_secret, bob_contact_id, alice_contact_id) =
+        setup_exchange_with_ratchets();
+
+    let alice_signing_pk = *alice_wb.identity().unwrap().signing_public_key();
+    let old_card = ContactCard::new("Bob");
+    let mut new_card = ContactCard::new("Bob Updated");
+    new_card
+        .add_field(ContactField::new(
+            FieldType::Email,
+            "Email",
+            "bob@compat.test",
+        ))
+        .unwrap();
+
+    let ciphertext = create_valid_update(
+        &bob_wb,
+        &alice_signing_pk,
+        &alice_contact_id,
+        &old_card,
+        &new_card,
+    );
+
+    // Process using real contact ID (old format, backward compat)
+    let result = process_card_updates(
+        alice_wb.identity().unwrap(),
+        alice_wb.storage(),
+        vec![(bob_contact_id, ciphertext)],
+    )
+    .unwrap();
+
+    assert_eq!(
+        result.processed, 1,
+        "Update with real contact ID should still work (backward compat)"
+    );
+}
+
+// @scenario: anonymous_sender.feature:Unknown anonymous sender ID is handled gracefully
+#[test]
+fn test_process_card_update_skips_unresolvable_anonymous_id() {
+    let alice_wb = create_vauchi_with_identity("Alice");
+
+    // Fake ciphertext with unknown anonymous sender ID
+    let unknown_anon_hex = hex::encode([0xFFu8; 32]);
+    let fake_ciphertext = b"not real ciphertext".to_vec();
+
+    let result = process_card_updates(
+        alice_wb.identity().unwrap(),
+        alice_wb.storage(),
+        vec![(unknown_anon_hex, fake_ciphertext)],
+    )
+    .unwrap();
+
+    assert_eq!(
+        result.processed, 0,
+        "Unknown sender should not be processed"
+    );
+    assert_eq!(result.skipped, 1, "Unknown sender should be skipped");
+}

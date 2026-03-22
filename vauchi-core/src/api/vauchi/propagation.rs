@@ -148,12 +148,21 @@ impl Vauchi {
     /// Returns a list of changed field labels.
     pub fn process_card_update(
         &self,
-        contact_id: &str,
+        sender_id: &str,
         encrypted: &[u8],
     ) -> VauchiResult<Vec<String>> {
         use crate::crypto::cek::ContentEncryptionKey;
         use crate::crypto::ratchet::RatchetMessage;
+        use crate::network::anonymous::resolve_sender_id;
         use crate::sync::delta::{CardDelta, PAYLOAD_VERSION_CEK, VersionedPayload};
+
+        // Resolve anonymous sender ID to real contact ID.
+        // Old-format messages with real identity fingerprints pass through
+        // unchanged via the fallback path in resolve_sender_id.
+        let contacts = self.storage.list_contacts().unwrap_or_default();
+        let resolved =
+            resolve_sender_id(&contacts, sender_id).unwrap_or_else(|| sender_id.to_string());
+        let contact_id = resolved.as_str();
 
         // Check revoked_senders tombstone
         if self.storage.is_sender_revoked(contact_id)? {

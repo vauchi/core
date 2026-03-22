@@ -35,6 +35,7 @@
 //! ```
 
 pub mod anonymous;
+pub mod mailbox_token;
 
 #[cfg(feature = "testing")]
 pub mod connection;

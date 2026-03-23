@@ -142,3 +142,19 @@ fn test_empty_name_contacts() {
     let dups = find_duplicates(&contacts);
     assert!(dups.is_empty());
 }
+
+#[test]
+fn test_duplicate_detection_nfc_vs_nfd() {
+    // NFC (precomposed) and NFD (decomposed) versions of "José" should
+    // produce identical display names after normalization, so duplicate
+    // detection should find them as exact matches.
+    let nfc_contact = make_contact("Jos\u{00E9}", &[]); // NFC: é
+    let nfd_contact = make_contact("Jose\u{0301}", &[]); // NFD: e + combining acute
+
+    // After normalization in ContactCard::new, both should have identical names
+    assert_eq!(
+        nfc_contact.card().display_name(),
+        nfd_contact.card().display_name(),
+        "NFC and NFD names should be identical after normalization"
+    );
+}

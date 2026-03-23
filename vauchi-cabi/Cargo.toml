@@ -18,7 +18,7 @@ audio = ["vauchi-core/audio-cpal"]
 secure-storage = ["vauchi-core/secure-storage-linux"]
 
 [dependencies]
-vauchi-core = { path = "../vauchi-core", version = "0.8.0" }
+vauchi-core = { path = "../vauchi-core", version = "0.8.1" }
 serde_json = "1.0"
 zeroize = "1.8"
 

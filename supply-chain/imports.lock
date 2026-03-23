@@ -494,8 +494,8 @@ user-login = "epage"
 user-name = "Ed Page"
 
 [[publisher.itoa]]
-version = "1.0.17"
-when = "2025-12-27"
+version = "1.0.18"
+when = "2026-03-20"
 user-id = 3618
 user-login = "dtolnay"
 user-name = "David Tolnay"
@@ -1999,7 +1999,7 @@ notes = "one use of unsafe to call windows specific api to get console handle."
 who = "Alex Crichton <alex@alexcrichton.com>"
 criteria = "safe-to-deploy"
 delta = "0.46.0 -> 0.50.1"
-notes = "Lots of stylistic/rust-related chanegs, plus new features, but nothing out of the ordrinary."
+notes = "Lots of stylistic/rust-related changes, plus new features, but nothing out of the ordrinary."
 
 [[audits.bytecode-alliance.audits.nu-ansi-term]]
 who = "Alex Crichton <alex@alexcrichton.com>"

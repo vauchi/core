@@ -1506,17 +1506,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e8ea84d0109517cc2253d4a679bdda1e8989e9bd86987e9e4f75ffdda0095fd1"
 dependencies = [
  "derive-deftly-macros 0.14.6",
- "heck 0.4.1",
+ "heck 0.5.0",
 ]
 
 [[package]]
 name = "derive-deftly"
-version = "1.8.0"
+version = "1.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ab1bd51ecaad26b6ea61ac92cf01c3ce8d37224cbd53e64e8d47206e10b54d0c"
+checksum = "0cc30cc55ee5fe317681ded66a62cbfc5dcc0ddfcfb98f16b15cf0c75aee171f"
 dependencies = [
- "derive-deftly-macros 1.8.0",
- "heck 0.4.1",
+ "derive-deftly-macros 1.9.0",
+ "heck 0.5.0",
 ]
 
 [[package]]
@@ -1525,8 +1525,8 @@ version = "0.14.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "357422a457ccb850dc8f1c1680e0670079560feaad6c2e247e3f345c4fab8a3f"
 dependencies = [
- "heck 0.4.1",
- "indexmap 1.9.3",
+ "heck 0.5.0",
+ "indexmap 2.13.0",
  "itertools 0.14.0",
  "proc-macro-crate",
  "proc-macro2",
@@ -1539,12 +1539,12 @@ dependencies = [
 
 [[package]]
 name = "derive-deftly-macros"
-version = "1.8.0"
+version = "1.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e244b92ba66dcb7a49885445f4a7ec5415efafafeab39c839f1adf5582d842c4"
+checksum = "d0d846d91382f541129262ee4d9838b5bca9202454f2aa76285fc47c56d893a3"
 dependencies = [
- "heck 0.4.1",
- "indexmap 1.9.3",
+ "heck 0.5.0",
+ "indexmap 2.13.0",
  "itertools 0.14.0",
  "proc-macro-crate",
  "proc-macro2",
@@ -1552,6 +1552,7 @@ dependencies = [
  "sha3",
  "strum 0.28.0",
  "syn 2.0.117",
+ "unicode-ident",
  "void",
 ]
 
@@ -2829,9 +2830,9 @@ checksum = "d98f6fed1fde3f8c21bc40a1abb88dd75e67924f9cffc3ef95607bad8017f8e2"
 
 [[package]]
 name = "iri-string"
-version = "0.7.10"
+version = "0.7.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c91338f0783edbd6195decb37bae672fd3b165faffb89bf7b9e6942f8b1a731a"
+checksum = "d8e7418f59cc01c88316161279a7f665217ae316b388e58a0d10e29f54f1e5eb"
 dependencies = [
  "memchr",
  "serde",
@@ -2883,9 +2884,9 @@ dependencies = [
 
 [[package]]
 name = "itoa"
-version = "1.0.17"
+version = "1.0.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "92ecc6618181def0457392ccd0ee51198e065e016d1d527a7ac1b6dc7c1f09d2"
+checksum = "8f42a60cbdf9a97f5d2305f08a87dc4e09308d1276d28c869c684d7777685682"
 
 [[package]]
 name = "jni"
@@ -2896,7 +2897,7 @@ dependencies = [
  "cesu8",
  "cfg-if",
  "combine",
- "jni-sys",
+ "jni-sys 0.3.1",
  "log",
  "thiserror 1.0.69",
  "walkdir",
@@ -2905,9 +2906,31 @@ dependencies = [
 
 [[package]]
 name = "jni-sys"
-version = "0.3.0"
+version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8eaf4bc02d17cbdd7ff4c7438cafcdf7fb9a4613313ad11b4f8fefe7d3fa0130"
+checksum = "41a652e1f9b6e0275df1f15b32661cf0d4b78d4d87ddec5e0c3c20f097433258"
+dependencies = [
+ "jni-sys 0.4.1",
+]
+
+[[package]]
+name = "jni-sys"
+version = "0.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c6377a88cb3910bee9b0fa88d4f42e1d2da8e79915598f65fb0c7ee14c878af2"
+dependencies = [
+ "jni-sys-macros",
+]
+
+[[package]]
+name = "jni-sys-macros"
+version = "0.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "38c0b942f458fe50cdac086d2f946512305e5631e720728f2a61aabcd47a6264"
+dependencies = [
+ "quote",
+ "syn 2.0.117",
+]
 
 [[package]]
 name = "jobserver"
@@ -3099,9 +3122,9 @@ checksum = "0717cef1bc8b636c6e1c1bbdefc09e6322da8a9321966e8928ef80d20f7f770f"
 
 [[package]]
 name = "linux-keyutils"
-version = "0.2.4"
+version = "0.2.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "761e49ec5fd8a5a463f9b84e877c373d888935b71c6be78f3767fe2ae6bed18e"
+checksum = "83270a18e9f90d0707c41e9f35efada77b64c0e6f3f1810e71c8368a864d5590"
 dependencies = [
  "bitflags 2.11.0",
  "libc",
@@ -3263,7 +3286,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2076a31b7010b17a38c01907c45b945e8f11495ee4dd588309718901b1f7a5b7"
 dependencies = [
  "bitflags 2.11.0",
- "jni-sys",
+ "jni-sys 0.3.1",
  "log",
  "ndk-sys",
  "num_enum",
@@ -3282,7 +3305,7 @@ version = "0.5.0+25.2.9519653"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8c196769dd60fd4f363e11d948139556a344e79d451aeb2fa2fd040738ef7691"
 dependencies = [
- "jni-sys",
+ "jni-sys 0.3.1",
 ]
 
 [[package]]
@@ -4022,7 +4045,7 @@ version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0e2023f41b5fcb7c30eb5300a5733edfaa9e0e0d502d51b586f65633fd39e40c"
 dependencies = [
- "derive-deftly 1.8.0",
+ "derive-deftly 1.9.0",
  "libc",
  "paste",
  "thiserror 2.0.18",
@@ -6865,7 +6888,7 @@ checksum = "ba73ea9cf16a25df0c8caa16c51acb937d5712a8429db78a3ee29d5dcacd3a65"
 
 [[package]]
 name = "vauchi-cabi"
-version = "0.8.0"
+version = "0.8.1"
 dependencies = [
  "cbindgen",
  "serde_json",
@@ -6876,7 +6899,7 @@ dependencies = [
 
 [[package]]
 name = "vauchi-core"
-version = "0.8.0"
+version = "0.8.1"
 dependencies = [
  "argon2",
  "arti-client",
@@ -6928,7 +6951,7 @@ dependencies = [
 
 [[package]]
 name = "vauchi-platform"
-version = "0.8.0"
+version = "0.8.1"
 dependencies = [
  "base64",
  "crc32fast",
@@ -6951,7 +6974,7 @@ dependencies = [
 
 [[package]]
 name = "vauchi-protocol"
-version = "0.8.0"
+version = "0.8.1"
 dependencies = [
  "serde",
  "serde_json",
@@ -7774,18 +7797,18 @@ dependencies = [
 
 [[package]]
 name = "zerocopy"
-version = "0.8.42"
+version = "0.8.47"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f2578b716f8a7a858b7f02d5bd870c14bf4ddbbcf3a4c05414ba6503640505e3"
+checksum = "efbb2a062be311f2ba113ce66f697a4dc589f85e78a4aea276200804cea0ed87"
 dependencies = [
  "zerocopy-derive",
 ]
 
 [[package]]
 name = "zerocopy-derive"
-version = "0.8.42"
+version = "0.8.47"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7e6cc098ea4d3bd6246687de65af3f920c430e236bee1e3bf2e441463f08a02f"
+checksum = "0e8bc7269b54418e7aeeef514aa68f8690b8c0489a06b0136e5f57c4c5ccab89"
 dependencies = [
  "proc-macro2",
  "quote",

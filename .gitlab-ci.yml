@@ -270,7 +270,7 @@ lint:clippy:
 # SemVer compatibility check — catch breaking API changes before they cascade
 # to 10+ downstream consumers (cli, tui, e2e, relay, linux-gtk, mobile bindings)
 lint:semver:
-  extends: [.linux-runner-readonly, .validation-rust, .timeout-quick]
+  extends: [.linux-runner, .validation-rust, .timeout-quick]
   stage: lint
   needs: []
   allow_failure: false

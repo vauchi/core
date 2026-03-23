@@ -21,6 +21,9 @@ pub use i18n::{
 
 // --- future vauchi-types ---
 pub mod types;
+
+// --- text normalization ---
+pub mod text;
 pub use types::{AudioCapability, ExchangeTransport, ProximityConfidence};
 pub mod contact;
 pub mod contact_card;

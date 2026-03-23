@@ -100,6 +100,9 @@ zeroize = { version = "1.8", features = ["derive"] }
 # JSON Schema generation (optional, behind schema-gen feature)
 schemars = { version = "0.8", optional = true }
 
+# Unicode NFC normalization for cross-platform string consistency
+unicode-normalization = "0.1.25"
+
 # Password strength estimation
 zxcvbn = "3"
 

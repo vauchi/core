@@ -270,7 +270,7 @@ impl AppEngine {
                     .ok()
                     .map(|g| g.name().to_string())
                     .unwrap_or_else(|| "Group".into());
-                let members = vauchi
+                let mut members: Vec<ContactItem> = vauchi
                     .get_group_members(group_id)
                     .unwrap_or_default()
                     .into_iter()
@@ -283,6 +283,7 @@ impl AppEngine {
                         searchable_fields: vec![],
                     })
                     .collect();
+                members.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
                 Box::new(GroupDetailEngine::new(
                     group_id.clone(),
                     group_name,

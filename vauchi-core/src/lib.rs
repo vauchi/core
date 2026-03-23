@@ -5,7 +5,8 @@
 //! Vauchi Core Library
 //!
 //! Privacy-focused contact card exchange library.
-//! All cryptographic operations use the audited `aws-lc-rs` crate (FIPS 140-3 certified).
+//! Cryptographic operations use audited RustCrypto crates (`ed25519-dalek`, `x25519-dalek`,
+//! `sha2`, `hmac`, `hkdf`, `chacha20poly1305`, `argon2`). TLS uses `aws-lc-rs` via rustls.
 
 // --- future vauchi-crypto ---
 pub mod crypto;

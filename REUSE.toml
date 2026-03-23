@@ -47,3 +47,9 @@ SPDX-License-Identifier = "GPL-3.0-or-later"
 path = ["supply-chain/**"]
 SPDX-FileCopyrightText = "2026 Mattia Egloff <mattia.egloff@pm.me>"
 SPDX-License-Identifier = "GPL-3.0-or-later"
+
+# Gradle wrapper (binary + config — third-party, Apache-2.0 licensed)
+[[annotations]]
+path = ["ci/maven-publish/gradle/wrapper/gradle-wrapper.jar", "ci/maven-publish/gradle/wrapper/gradle-wrapper.properties", "ci/maven-publish/gradlew.bat"]
+SPDX-FileCopyrightText = "Gradle Inc."
+SPDX-License-Identifier = "Apache-2.0"

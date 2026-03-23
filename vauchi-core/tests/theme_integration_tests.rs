@@ -229,7 +229,7 @@ fn test_default_themes_exist() {
         eprintln!("SKIP: themes/generated/themes.json not found — skipping theme integration test");
         return;
     };
-    let find = |id: &str| themes.iter().find(|t| t.id == id).is_some();
+    let find = |id: &str| themes.iter().any(|t| t.id == id);
     assert!(find("default-dark"), "Should have default-dark theme");
     assert!(find("default-light"), "Should have default-light theme");
 }

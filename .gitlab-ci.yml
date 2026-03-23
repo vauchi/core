@@ -85,7 +85,7 @@ auto-tag:version:
   needs: []
   variables:
     GIT_STRATEGY: clone
-    GIT_DEPTH: "1"
+    GIT_DEPTH: "50"
   before_script: []
   script:
     - |
@@ -106,6 +106,24 @@ auto-tag:version:
       # Check if tag already exists
       if git ls-remote --tags origin "refs/tags/${TAG}" | grep -q "${TAG}"; then
         echo "Tag ${TAG} already exists — creating dev tag instead"
+
+        # Skip dev tag for non-code changes (docs, scripts, CI-only merges).
+        # Uses CI_COMMIT_BEFORE_SHA (previous main HEAD before this push) to
+        # detect ALL files changed in the merge, not just the last commit.
+        # Fallback: if before-SHA is zeros (shouldn't happen on main), assume code changed.
+        BEFORE="${CI_COMMIT_BEFORE_SHA:-0000000000000000000000000000000000000000}"
+        if [ "$BEFORE" != "0000000000000000000000000000000000000000" ]; then
+          CODE_CHANGES=$(git diff --name-only "$BEFORE" HEAD | grep -cE '\.(rs)$|Cargo\.(toml|lock)$' || echo 0)
+          if [ "$CODE_CHANGES" = "0" ]; then
+            echo "ℹ No Rust code changes in this merge — skipping dev tag"
+            echo "  Changed files:"
+            git diff --name-only "$BEFORE" HEAD | sed 's/^/    /'
+            exit 0
+          fi
+          echo "Detected ${CODE_CHANGES} code file(s) changed — proceeding with dev tag"
+        else
+          echo "⚠ CI_COMMIT_BEFORE_SHA is zeros — assuming code changed (safe default)"
+        fi
 
         # Strip any pre-release suffix to get the base version for dev tags
         BASE_VERSION=$(echo "${VERSION}" | sed 's/-.*//')
@@ -139,10 +157,10 @@ auto-tag:version:
       echo "✓ Created and pushed tag ${TAG}"
 
 # ============================================================
-# Dev Tag Pipeline (lint + test + binding build)
+# Dev Tag Pipeline (lightweight — lint + test only)
 # ============================================================
-# Triggered by v0.2.3-dev.N tags. Runs lint + test (dev-specific jobs below),
-# plus build/package/publish/trigger via .release-or-rc (shared with stable/RC).
+# Triggered by v0.2.3-dev.N tags. Runs lint + test only.
+# Dev tags do NOT run build/package/publish (excluded from .release-or-rc).
 
 dev:verify:
   extends: [.linux-runner-nocache, .dev-verify]
@@ -624,9 +642,18 @@ secret_detection:
 # latest main merge matters for the next release.
 
 prebuild:apple:
-  extends: [.macos-runner, .main-only, .timeout-extended]
+  extends: [.macos-runner, .timeout-extended]
   stage: prebuild
   needs: []
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      changes:
+        paths:
+          - "**/*.rs"
+          - "**/Cargo.toml"
+          - "**/Cargo.lock"
+          - "scripts/build-bindings.sh"
+          - "scripts/package-xcframework.sh"
   script:
     - ./scripts/build-bindings.sh --apple
     - |
@@ -638,9 +665,18 @@ prebuild:apple:
       echo "✓ Apple bindings cached for SHA ${CI_COMMIT_SHA}"
 
 prebuild:android:
-  extends: [.linux-runner, .main-only, .timeout-long]
+  extends: [.linux-runner, .timeout-long]
   stage: prebuild
   needs: []
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      changes:
+        paths:
+          - "**/*.rs"
+          - "**/Cargo.toml"
+          - "**/Cargo.lock"
+          - "scripts/build-bindings.sh"
+          - "scripts/package-android.sh"
   before_script:
     - !reference [.self-hosted, before_script]
     - |
@@ -1089,11 +1125,9 @@ release:create:
 # ============================================================
 # Trigger Stage (Tags only) — Platform Distribution
 # ============================================================
-# Trigger vauchi-platform-swift and vauchi-platform-kotlin to rebuild
-# and publish bindings for this release version.
 #
 # ============================================================
-# Direct Distribution (replaces trigger:swift + trigger:kotlin)
+# Direct Distribution
 # ============================================================
 # Core owns the entire distribution chain:
 #   - Maven AAR: published by publish:maven (above)
@@ -1216,15 +1250,15 @@ verify:downstream-rust:
       - DOWNSTREAM: [vauchi/cli, vauchi/tui, vauchi/e2e, vauchi/relay, vauchi/linux-gtk]
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      changes:
+        paths:
+          - "**/*.rs"
+          - "**/Cargo.toml"
+          - "**/Cargo.lock"
 
-# When core gets a dev tag, trigger downstream to verify compatibility
-verify:downstream-dev:
-  extends: .trigger-parallel-prerelease
-  parallel:
-    matrix:
-      - DOWNSTREAM: [vauchi/cli, vauchi/tui, vauchi/e2e, vauchi/relay, vauchi/linux-gtk]
-  rules:
-    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+-dev\.\d+$/
+# verify:downstream-dev removed — verify:downstream-rust on main already
+# triggers the same 5 repos against the same code. Running again from the
+# dev tag was pure redundancy (~20 min wasted per merge).
 
 # When core gets an RC tag, trigger downstream to verify compatibility
 verify:downstream-rc:

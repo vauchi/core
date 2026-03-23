@@ -13,10 +13,16 @@ description = "Core library for Vauchi - privacy-focused contact card exchange"
 # DeviceSyncMessage/Ack removed, VersionedPayload::Legacy removed,
 # send_device_sync_message signature simplified, MessageType discriminants shifted.
 [package.metadata.cargo-semver-checks.lints]
-enum_variant_missing = "allow"
-function_missing = "allow"
+# SP-33: intentional breaking changes for v0.1 alpha (no deployed clients)
+enum_variant_missing = "allow"           # DeviceSyncMessage/Ack removed from SimplePayload
+enum_variant_added = "allow"             # RegisterMailbox/DeregisterMailbox added to MessagePayload
+function_missing = "allow"               # create_device_sync_message/ack removed
 function_parameter_count_changed = "allow"
-enum_no_repr_variant_discriminant_changed = "allow"
+method_parameter_count_changed = "allow" # send_device_sync_message 5→3 params
+inherent_method_missing = "allow"        # VersionedPayload::encode_legacy removed
+enum_no_repr_variant_discriminant_changed = "allow" # MessageType discriminants shifted
+pub_module_level_const_missing = "allow" # PAYLOAD_VERSION_LEGACY removed
+struct_missing = "allow"                 # DeviceSyncMessage struct removed
 
 [features]
 default = ["network", "storage"]

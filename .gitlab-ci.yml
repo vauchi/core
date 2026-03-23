@@ -989,6 +989,43 @@ publish:platform:
 
       echo "✓ Published vauchi-platform $VERSION"
 
+# Publish Android AAR to core's Maven registry (visible at group level).
+# Eliminates the vauchi-platform-kotlin intermediary repo.
+publish:maven:
+  extends: .docker-runner
+  stage: publish
+  image: cimg/android:2024.01
+  interruptible: false
+  needs: [package:android]
+  variables:
+    VERSION: "${CI_COMMIT_TAG}"
+  rules:
+    # Release and RC tags only — dev tags do not publish to Maven
+    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/
+    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+-rc\.\d+$/
+  script:
+    - |
+      CLEAN_VERSION="${CI_COMMIT_TAG#v}"
+      echo "Publishing Maven AAR version $CLEAN_VERSION"
+
+      # Extract pre-packaged Android bindings (zip has version-prefixed top dir)
+      mkdir -p ci/maven-publish/vauchi-platform/src/main/jniLibs
+      mkdir -p ci/maven-publish/vauchi-platform/src/main/kotlin
+      unzip -o dist/vauchi-platform-kotlin-${CLEAN_VERSION}.zip -d /tmp/android-bindings
+
+      # Copy JNI libs (arm64-v8a, x86_64)
+      cp -r /tmp/android-bindings/vauchi-platform-kotlin-${CLEAN_VERSION}/jniLibs/* ci/maven-publish/vauchi-platform/src/main/jniLibs/
+
+      # Copy Kotlin bindings
+      cp -r /tmp/android-bindings/vauchi-platform-kotlin-${CLEAN_VERSION}/kotlin/* ci/maven-publish/vauchi-platform/src/main/kotlin/
+
+      # Build and publish AAR
+      cd ci/maven-publish
+      export VERSION="$CLEAN_VERSION"
+      ./gradlew :vauchi-platform:publishReleasePublicationToGitLabRepository --no-daemon
+
+      echo "✓ Published app.vauchi:vauchi-platform:$CLEAN_VERSION to Maven"
+
 release:create:
   extends: .release-only
   stage: publish
@@ -996,7 +1033,13 @@ release:create:
   tags:
     - docker
   interruptible: false
-  needs: [publish:packages, publish:core, publish:platform, package:sbom]
+  needs:
+    - publish:packages
+    - publish:core
+    - publish:platform
+    - job: publish:maven
+      optional: true
+    - package:sbom
   script:
     - |
       echo "Creating release $CI_COMMIT_TAG"

@@ -7,7 +7,7 @@
 
 use vauchi_core::{ContactCard, ContactField, FieldType};
 
-// @scenario: contact_card_management:Update display name
+// @scenario: contact_card_management :: Update display name
 #[test]
 fn test_set_display_name() {
     let mut card = ContactCard::new("Original");
@@ -15,7 +15,7 @@ fn test_set_display_name() {
     assert_eq!(card.display_name(), "Updated");
 }
 
-// @scenario: contact_card_management:Display name cannot be empty
+// @scenario: contact_card_management :: Display name cannot be empty
 #[test]
 fn test_set_display_name_empty_fails() {
     let mut card = ContactCard::new("Original");
@@ -23,7 +23,7 @@ fn test_set_display_name_empty_fails() {
     result.expect_err("expected error");
 }
 
-// @scenario: contact_card_management:Display name length limit
+// @scenario: contact_card_management :: Display name length limit
 #[test]
 fn test_set_display_name_too_long_fails() {
     let mut card = ContactCard::new("Original");
@@ -32,7 +32,7 @@ fn test_set_display_name_too_long_fails() {
     result.expect_err("expected error");
 }
 
-// @scenario: contact_card_management:Display name length limit
+// @scenario: contact_card_management :: Display name length limit
 #[test]
 fn test_set_display_name_max_length() {
     let mut card = ContactCard::new("Original");
@@ -41,7 +41,7 @@ fn test_set_display_name_max_length() {
     assert_eq!(card.display_name(), exactly_100);
 }
 
-// @scenario: contact_card_management:Edit an existing field value
+// @scenario: contact_card_management :: Edit an existing field value
 #[test]
 fn test_update_field_value() {
     let mut card = ContactCard::new("Test");
@@ -60,7 +60,7 @@ fn test_update_field_value_not_found() {
     result.expect_err("expected error");
 }
 
-// @scenario: contact_card_management:Edit a field label
+// @scenario: contact_card_management :: Edit a field label
 #[test]
 fn test_update_field_label() {
     let mut card = ContactCard::new("Test");
@@ -86,8 +86,8 @@ fn test_remove_field_not_found() {
     result.expect_err("expected error");
 }
 
-// @scenario: contact_card_management:Exceed maximum fields
-// @scenario: contact_card_management.feature:Maximum number of fields
+// @scenario: contact_card_management :: Exceed maximum fields
+// @scenario: contact_card_management :: Maximum number of fields
 #[test]
 fn test_max_fields_reached() {
     let mut card = ContactCard::new("Test");
@@ -103,7 +103,7 @@ fn test_max_fields_reached() {
     result.expect_err("expected error");
 }
 
-// @scenario: contact_card_management:Contact card size limit
+// @scenario: contact_card_management :: Contact card size limit
 #[test]
 fn test_validate_size_ok() {
     let card = ContactCard::new("Test");
@@ -113,7 +113,7 @@ fn test_validate_size_ok() {
     );
 }
 
-// @scenario: contact_card_management:Reorder contact fields
+// @scenario: contact_card_management :: Reorder contact fields
 #[test]
 fn test_reorder_fields() {
     let mut card = ContactCard::new("Test");
@@ -148,7 +148,7 @@ fn test_reorder_fields_invalid_id() {
     result.expect_err("expected error");
 }
 
-// @scenario: contact_card_management:Add avatar to contact card
+// @scenario: contact_card_management :: Add avatar to contact card
 #[test]
 fn test_set_avatar() {
     let mut card = ContactCard::new("Test");
@@ -159,7 +159,7 @@ fn test_set_avatar() {
     assert_eq!(card.avatar().unwrap(), &[0xFF, 0xD8, 0xFF]);
 }
 
-// @scenario: contact_card_management:Avatar image too large
+// @scenario: contact_card_management :: Avatar image too large
 #[test]
 fn test_set_avatar_too_large() {
     let mut card = ContactCard::new("Test");
@@ -168,7 +168,7 @@ fn test_set_avatar_too_large() {
     result.expect_err("expected error");
 }
 
-// @scenario: contact_card_management:Add avatar to contact card
+// @scenario: contact_card_management :: Add avatar to contact card
 #[test]
 fn test_set_avatar_at_max_size() {
     let mut card = ContactCard::new("Test");
@@ -177,7 +177,7 @@ fn test_set_avatar_at_max_size() {
     card.avatar().expect("expected Some");
 }
 
-// @scenario: contact_card_management:Remove avatar from contact card
+// @scenario: contact_card_management :: Remove avatar from contact card
 #[test]
 fn test_clear_avatar() {
     let mut card = ContactCard::new("Test");

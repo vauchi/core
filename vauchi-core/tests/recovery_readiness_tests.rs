@@ -24,8 +24,8 @@ fn add_contact_with_recovery_trust(wb: &Vauchi, pk: [u8; 32], trusted: bool) {
     wb.add_contact(contact).unwrap();
 }
 
-// @scenario: contact_recovery:Warning when trusted contacts below threshold
-// @scenario: contact_recovery.feature:Warning when removing trust drops below threshold
+// @scenario: contact_recovery :: Warning when trusted contacts below threshold
+// @scenario: contact_recovery :: Warning when removing trust drops below threshold
 #[test]
 fn test_get_recovery_readiness_returns_not_ready_below_threshold() {
     let wb = create_test_vauchi();
@@ -49,8 +49,8 @@ fn test_get_recovery_readiness_returns_not_ready_below_threshold() {
     assert_eq!(readiness.shortfall, 2, "shortfall should be 3 - 1 = 2");
 }
 
-// @scenario: contact_recovery:Recovery succeeds with trusted vouchers only
-// @scenario: contact_recovery:Mark contact as trusted for recovery
+// @scenario: contact_recovery :: Recovery succeeds with trusted vouchers only
+// @scenario: contact_recovery :: Mark contact as trusted for recovery
 #[test]
 fn test_get_recovery_readiness_returns_ready_at_threshold() {
     let wb = create_test_vauchi();
@@ -76,8 +76,8 @@ fn test_get_recovery_readiness_returns_ready_at_threshold() {
     );
 }
 
-// @scenario: contact_recovery:Recovery succeeds with trusted vouchers only
-// @scenario: contact_recovery:Mark contact as trusted for recovery
+// @scenario: contact_recovery :: Recovery succeeds with trusted vouchers only
+// @scenario: contact_recovery :: Mark contact as trusted for recovery
 #[test]
 fn test_get_recovery_readiness_returns_ready_above_threshold() {
     let wb = create_test_vauchi();
@@ -96,7 +96,7 @@ fn test_get_recovery_readiness_returns_ready_above_threshold() {
     assert_eq!(readiness.shortfall, 0);
 }
 
-// @scenario: contact_recovery:Warning when trusted contacts below threshold
+// @scenario: contact_recovery :: Warning when trusted contacts below threshold
 #[test]
 fn test_get_recovery_readiness_with_no_contacts() {
     let wb = create_test_vauchi();
@@ -112,8 +112,8 @@ fn test_get_recovery_readiness_with_no_contacts() {
     );
 }
 
-// @scenario: contact_recovery:New contacts are not recovery-trusted by default
-// @scenario: contact_recovery:Warning when trusted contacts below threshold
+// @scenario: contact_recovery :: New contacts are not recovery-trusted by default
+// @scenario: contact_recovery :: Warning when trusted contacts below threshold
 #[test]
 fn test_get_recovery_readiness_excludes_non_trusted_contacts() {
     let wb = create_test_vauchi();

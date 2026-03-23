@@ -37,8 +37,8 @@ fn create_pending_update(id: &str, contact_id: &str) -> PendingUpdate {
 
 // === Queue Size Tests ===
 
-// @scenario: sync_updates:Update queued for offline contacts
-// @scenario: sync_updates:View sync status for all contacts
+// @scenario: sync_updates :: Update queued for offline contacts
+// @scenario: sync_updates :: View sync status for all contacts
 #[test]
 fn test_count_all_pending_updates() {
     let storage = test_storage();
@@ -56,8 +56,8 @@ fn test_count_all_pending_updates() {
     assert_eq!(storage.count_all_pending_updates().unwrap(), 5);
 }
 
-// @scenario: sync_updates:Large sync queue handling
-// @scenario: message_delivery:Queue updates while offline
+// @scenario: sync_updates :: Large sync queue handling
+// @scenario: message_delivery :: Queue updates while offline
 #[test]
 fn test_offline_queue_default_limit() {
     let queue = OfflineQueue::new();
@@ -66,16 +66,16 @@ fn test_offline_queue_default_limit() {
     assert_eq!(queue.max_queue_size(), 1000);
 }
 
-// @scenario: sync_updates:Large sync queue handling
-// @scenario: message_delivery:Queue updates while offline
+// @scenario: sync_updates :: Large sync queue handling
+// @scenario: message_delivery :: Queue updates while offline
 #[test]
 fn test_offline_queue_custom_limit() {
     let queue = OfflineQueue::with_max_size(500);
     assert_eq!(queue.max_queue_size(), 500);
 }
 
-// @scenario: sync_updates:Large sync queue handling
-// @scenario: message_delivery:Handle quota exceeded
+// @scenario: sync_updates :: Large sync queue handling
+// @scenario: message_delivery :: Handle quota exceeded
 #[test]
 fn test_is_queue_full() {
     let storage = test_storage();
@@ -98,8 +98,8 @@ fn test_is_queue_full() {
     assert!(queue.is_full(&storage).unwrap());
 }
 
-// @scenario: sync_updates:Large sync queue handling
-// @scenario: message_delivery:Queue updates while offline
+// @scenario: sync_updates :: Large sync queue handling
+// @scenario: message_delivery :: Queue updates while offline
 #[test]
 fn test_can_queue_update() {
     let storage = test_storage();
@@ -121,8 +121,8 @@ fn test_can_queue_update() {
     assert!(queue.can_queue(&storage).unwrap());
 }
 
-// @scenario: sync_updates:Large sync queue handling
-// @scenario: message_delivery:Queue updates while offline
+// @scenario: sync_updates :: Large sync queue handling
+// @scenario: message_delivery :: Queue updates while offline
 #[test]
 fn test_queue_size_remaining() {
     let storage = test_storage();
@@ -143,9 +143,9 @@ fn test_queue_size_remaining() {
 
 // === Queue Ordering Tests ===
 
-// @scenario: sync_updates:Queued updates delivered when contact comes online
-// @scenario: message_delivery.feature:Receive pending updates when coming online
-// @scenario: message_delivery:Sync queue when coming online
+// @scenario: sync_updates :: Queued updates delivered when contact comes online
+// @scenario: message_delivery :: Receive pending updates when coming online
+// @scenario: message_delivery :: Sync queue when coming online
 #[test]
 fn test_pending_updates_ordered_by_creation() {
     let storage = test_storage();
@@ -182,8 +182,8 @@ fn test_pending_updates_ordered_by_creation() {
 
 // === Flush Queue Tests ===
 
-// @scenario: sync_updates:Handle contact deletion during sync
-// @scenario: sync_updates:Update queued for offline contacts
+// @scenario: sync_updates :: Handle contact deletion during sync
+// @scenario: sync_updates :: Update queued for offline contacts
 #[test]
 fn test_flush_pending_updates_for_contact() {
     let storage = test_storage();
@@ -208,9 +208,9 @@ fn test_flush_pending_updates_for_contact() {
     assert_eq!(storage.get_pending_updates("bob").unwrap().len(), 2);
 }
 
-// @scenario: sync_updates:Sync survives app restart
-// @scenario: sync_updates:View sync status for all contacts
-// @scenario: message_delivery.feature:Retry queue persists across app restarts
+// @scenario: sync_updates :: Sync survives app restart
+// @scenario: sync_updates :: View sync status for all contacts
+// @scenario: message_delivery :: Retry queue persists across app restarts
 #[test]
 fn test_clear_all_pending_updates() {
     let storage = test_storage();
@@ -232,7 +232,7 @@ fn test_clear_all_pending_updates() {
 
 // === Status Transition Tests ===
 
-// @scenario: sync_updates:View detailed sync status for a contact
+// @scenario: sync_updates :: View detailed sync status for a contact
 #[test]
 fn test_get_pending_by_status() {
     let storage = test_storage();
@@ -281,7 +281,7 @@ fn test_get_pending_by_status() {
 
 // === Grouped by Relay Tests ===
 
-// @scenario: sync_updates:Route updates to correct relay per contact
+// @scenario: sync_updates :: Route updates to correct relay per contact
 #[test]
 fn test_get_pending_updates_grouped_by_relay() {
     let storage = test_storage();
@@ -325,7 +325,7 @@ fn test_get_pending_updates_grouped_by_relay() {
     assert_eq!(home[0].contact_id, "dave");
 }
 
-// @scenario: sync_updates:All updates to same relay grouped together
+// @scenario: sync_updates :: All updates to same relay grouped together
 #[test]
 fn test_grouped_by_relay_all_same_relay() {
     let storage = test_storage();
@@ -345,7 +345,7 @@ fn test_grouped_by_relay_all_same_relay() {
     assert_eq!(relay.len(), 3);
 }
 
-// @scenario: sync_updates:All updates to home relay when no relay URL set
+// @scenario: sync_updates :: All updates to home relay when no relay URL set
 #[test]
 fn test_grouped_by_relay_all_home() {
     let storage = test_storage();
@@ -362,7 +362,7 @@ fn test_grouped_by_relay_all_home() {
     assert_eq!(home.len(), 3);
 }
 
-// @scenario: sync_updates:Empty queue returns empty grouping
+// @scenario: sync_updates :: Empty queue returns empty grouping
 #[test]
 fn test_grouped_by_relay_empty() {
     let storage = test_storage();

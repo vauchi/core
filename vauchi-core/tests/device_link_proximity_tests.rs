@@ -24,8 +24,8 @@ fn create_test_registry(identity: &Identity) -> DeviceRegistry {
     )
 }
 
-// @scenario: device_management.feature:Linking requires proximity verification
-// @scenario: device_management.feature:Prevent unauthorized device linking
+// @scenario: device_management :: Linking requires proximity verification
+// @scenario: device_management :: Prevent unauthorized device linking
 #[test]
 fn test_build_response_rejected_without_proximity() {
     let master_seed = [0x42u8; 32];
@@ -56,7 +56,7 @@ fn test_build_response_rejected_without_proximity() {
     );
 }
 
-// @scenario: device_management.feature:Linking requires proximity verification
+// @scenario: device_management :: Linking requires proximity verification
 #[test]
 fn test_build_response_succeeds_after_proximity_verified() {
     let master_seed = [0x42u8; 32];
@@ -121,7 +121,7 @@ fn test_proximity_challenge_differs_per_session() {
     assert_ne!(challenge1, challenge2);
 }
 
-// @scenario: device_management.feature:Verify device during linking
+// @scenario: device_management :: Verify device during linking
 #[test]
 fn test_both_sides_derive_same_challenge() {
     let master_seed = [0x42u8; 32];
@@ -142,7 +142,7 @@ fn test_both_sides_derive_same_challenge() {
     assert_eq!(initiator_challenge, responder_challenge);
 }
 
-// @scenario: device_management.feature:Linking requires proximity verification
+// @scenario: device_management :: Linking requires proximity verification
 #[test]
 fn test_restored_initiator_requires_proximity() {
     let master_seed = [0x42u8; 32];
@@ -222,7 +222,7 @@ fn now_unix_secs() -> u64 {
         .as_secs()
 }
 
-// @scenario: device_management.feature:Linking with ultrasonic proximity proof succeeds
+// @scenario: device_management :: Linking with ultrasonic proximity proof succeeds
 #[test]
 fn test_confirm_link_with_ultrasonic_proof_succeeds() {
     let master_seed = [0x42u8; 32];
@@ -256,7 +256,7 @@ fn test_confirm_link_with_ultrasonic_proof_succeeds() {
     assert_eq!(updated_registry.device_count(), 2);
 }
 
-// @scenario: device_management.feature:Linking with manual confirmation proof succeeds
+// @scenario: device_management :: Linking with manual confirmation proof succeeds
 #[test]
 fn test_confirm_link_with_manual_proof_succeeds() {
     let master_seed = [0x42u8; 32];
@@ -291,7 +291,7 @@ fn test_confirm_link_with_manual_proof_succeeds() {
     assert_eq!(updated_registry.device_count(), 2);
 }
 
-// @scenario: device_management.feature:Expired ultrasonic proof is rejected
+// @scenario: device_management :: Expired ultrasonic proof is rejected
 #[test]
 fn test_confirm_link_with_expired_ultrasonic_rejected() {
     let master_seed = [0x42u8; 32];
@@ -323,7 +323,7 @@ fn test_confirm_link_with_expired_ultrasonic_rejected() {
     );
 }
 
-// @scenario: device_management.feature:Expired manual confirmation is rejected
+// @scenario: device_management :: Expired manual confirmation is rejected
 #[test]
 fn test_confirm_link_with_expired_manual_rejected() {
     let master_seed = [0x42u8; 32];
@@ -356,7 +356,7 @@ fn test_confirm_link_with_expired_manual_rejected() {
     );
 }
 
-// @scenario: device_management.feature:Wrong ultrasonic challenge is rejected
+// @scenario: device_management :: Wrong ultrasonic challenge is rejected
 #[test]
 fn test_confirm_link_with_wrong_challenge_rejected() {
     let master_seed = [0x42u8; 32];
@@ -386,7 +386,7 @@ fn test_confirm_link_with_wrong_challenge_rejected() {
     );
 }
 
-// @scenario: device_management.feature:Wrong manual confirmation MAC is rejected
+// @scenario: device_management :: Wrong manual confirmation MAC is rejected
 #[test]
 fn test_confirm_link_with_wrong_mac_rejected() {
     let master_seed = [0x42u8; 32];
@@ -420,7 +420,7 @@ fn test_confirm_link_with_wrong_mac_rejected() {
 // DL-3: Cross-session replay rejection tests
 // ---------------------------------------------------------------------------
 
-// @scenario: device_management.feature:Cross-session replay attack prevented
+// @scenario: device_management :: Cross-session replay attack prevented
 #[test]
 fn test_cross_session_replay_rejected() {
     let master_seed = [0x42u8; 32];
@@ -456,7 +456,7 @@ fn test_cross_session_replay_rejected() {
     );
 }
 
-// @scenario: device_management.feature:Cross-session replay attack prevented
+// @scenario: device_management :: Cross-session replay attack prevented
 #[test]
 fn test_cross_session_manual_mac_replay_rejected() {
     let master_seed = [0x42u8; 32];
@@ -505,7 +505,7 @@ fn test_cross_session_manual_mac_replay_rejected() {
 // DL-4: Boundary tests (60s/61s)
 // ---------------------------------------------------------------------------
 
-// @scenario: device_management.feature:Proximity proof boundary timing
+// @scenario: device_management :: Proximity proof boundary timing
 #[test]
 fn test_ultrasonic_proof_at_exactly_60_seconds_accepted() {
     let master_seed = [0x42u8; 32];
@@ -535,7 +535,7 @@ fn test_ultrasonic_proof_at_exactly_60_seconds_accepted() {
     );
 }
 
-// @scenario: device_management.feature:Proximity proof boundary timing
+// @scenario: device_management :: Proximity proof boundary timing
 #[test]
 fn test_ultrasonic_proof_at_61_seconds_rejected() {
     let master_seed = [0x42u8; 32];
@@ -565,7 +565,7 @@ fn test_ultrasonic_proof_at_61_seconds_rejected() {
     );
 }
 
-// @scenario: device_management.feature:Proximity proof boundary timing
+// @scenario: device_management :: Proximity proof boundary timing
 #[test]
 fn test_manual_proof_at_exactly_60_seconds_accepted() {
     let master_seed = [0x42u8; 32];
@@ -596,7 +596,7 @@ fn test_manual_proof_at_exactly_60_seconds_accepted() {
     );
 }
 
-// @scenario: device_management.feature:Proximity proof boundary timing
+// @scenario: device_management :: Proximity proof boundary timing
 #[test]
 fn test_manual_proof_at_61_seconds_rejected() {
     let master_seed = [0x42u8; 32];
@@ -631,7 +631,7 @@ fn test_manual_proof_at_61_seconds_rejected() {
 // DL-6: Self-linking prevention tests
 // ---------------------------------------------------------------------------
 
-// @scenario: device_management.feature:Self-linking prevention
+// @scenario: device_management :: Self-linking prevention
 #[test]
 fn test_self_linking_same_device_name_rejected() {
     let master_seed = [0x42u8; 32];
@@ -663,7 +663,7 @@ fn test_self_linking_same_device_name_rejected() {
     );
 }
 
-// @scenario: device_management.feature:Self-linking prevention
+// @scenario: device_management :: Self-linking prevention
 #[test]
 fn test_self_linking_restored_initiator_rejected() {
     let master_seed = [0x42u8; 32];
@@ -701,7 +701,7 @@ fn test_self_linking_restored_initiator_rejected() {
     );
 }
 
-// @scenario: device_management.feature:Self-linking prevention
+// @scenario: device_management :: Self-linking prevention
 #[test]
 fn test_different_device_name_allowed() {
     // Sanity check: a different device name should succeed

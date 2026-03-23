@@ -20,7 +20,7 @@ use vauchi_core::{Contact, ContactCard, SigningKeyPair, SymmetricKey};
 // =============================================================================
 
 /// Scenario: Default recovery threshold
-// @scenario: contact_recovery:Default recovery threshold
+// @scenario: contact_recovery :: Default recovery threshold
 #[test]
 fn test_default_recovery_threshold() {
     let settings = RecoverySettings::default();
@@ -29,8 +29,8 @@ fn test_default_recovery_threshold() {
 }
 
 /// Scenario: Configure recovery threshold
-// @scenario: contact_recovery:Configure recovery threshold
-// @scenario: contact_recovery:Configure verification threshold
+// @scenario: contact_recovery :: Configure recovery threshold
+// @scenario: contact_recovery :: Configure verification threshold
 #[test]
 fn test_configure_recovery_threshold() {
     let settings = RecoverySettings::new(5, 3).unwrap();
@@ -39,7 +39,7 @@ fn test_configure_recovery_threshold() {
 }
 
 /// Scenario: Recovery threshold limits - too low
-// @scenario: contact_recovery:Recovery threshold limits
+// @scenario: contact_recovery :: Recovery threshold limits
 #[test]
 fn test_recovery_threshold_too_low() {
     let result = RecoverySettings::new(0, 0);
@@ -47,7 +47,7 @@ fn test_recovery_threshold_too_low() {
 }
 
 /// Scenario: Recovery threshold limits - too high
-// @scenario: contact_recovery:Recovery threshold limits
+// @scenario: contact_recovery :: Recovery threshold limits
 #[test]
 fn test_recovery_threshold_too_high() {
     let result = RecoverySettings::new(20, 10);
@@ -55,7 +55,7 @@ fn test_recovery_threshold_too_high() {
 }
 
 /// Scenario: Verification threshold limits
-// @scenario: contact_recovery:Recovery threshold limits
+// @scenario: contact_recovery :: Recovery threshold limits
 #[test]
 fn test_verification_threshold_limits() {
     // Too low
@@ -78,7 +78,7 @@ fn test_verification_threshold_limits() {
 // =============================================================================
 
 /// Scenario: Create new identity after device loss
-// @scenario: contact_recovery:Create new identity after device loss
+// @scenario: contact_recovery :: Create new identity after device loss
 #[test]
 fn test_create_recovery_claim() {
     let old_pk = [0x01u8; 32];
@@ -92,7 +92,7 @@ fn test_create_recovery_claim() {
 }
 
 /// Scenario: Recovery claim serialization roundtrip
-// @scenario: contact_recovery:Generate recovery claim QR code
+// @scenario: contact_recovery :: Generate recovery claim QR code
 #[test]
 fn test_recovery_claim_roundtrip() {
     let old_pk = [0x01u8; 32];
@@ -108,7 +108,7 @@ fn test_recovery_claim_roundtrip() {
 }
 
 /// Scenario: Recovery claim expiration (48 hours)
-// @scenario: contact_recovery:Voucher timestamp validation
+// @scenario: contact_recovery :: Voucher timestamp validation
 #[test]
 fn test_recovery_claim_expiration() {
     let old_pk = [0x01u8; 32];
@@ -131,7 +131,7 @@ fn test_recovery_claim_expiration() {
 }
 
 /// Scenario: Invalid claim format
-// @scenario: contact_recovery:Generate recovery claim QR code
+// @scenario: contact_recovery :: Generate recovery claim QR code
 #[test]
 fn test_invalid_claim_format() {
     // Too short
@@ -150,7 +150,7 @@ fn test_invalid_claim_format() {
 // =============================================================================
 
 /// Scenario: Create voucher after in-person verification
-// @scenario: contact_recovery:Create voucher after in-person verification
+// @scenario: contact_recovery :: Create voucher after in-person verification
 #[test]
 fn test_create_voucher_from_claim() {
     let old_pk = [0x01u8; 32];
@@ -171,7 +171,7 @@ fn test_create_voucher_from_claim() {
 }
 
 /// Scenario: Cannot vouch for expired claim
-// @scenario: contact_recovery:Voucher timestamp validation
+// @scenario: contact_recovery :: Voucher timestamp validation
 #[test]
 fn test_cannot_vouch_for_expired_claim() {
     let old_pk = [0x01u8; 32];
@@ -191,7 +191,7 @@ fn test_cannot_vouch_for_expired_claim() {
 }
 
 /// Scenario: Cannot vouch for own recovery (self-vouching)
-// @scenario: contact_recovery:Cannot vouch for own recovery
+// @scenario: contact_recovery :: Cannot vouch for own recovery
 #[test]
 fn test_cannot_self_vouch() {
     let old_pk = [0x01u8; 32];
@@ -206,7 +206,7 @@ fn test_cannot_self_vouch() {
 }
 
 /// Scenario: Voucher serialization roundtrip
-// @scenario: contact_recovery:Create voucher after in-person verification
+// @scenario: contact_recovery :: Create voucher after in-person verification
 #[test]
 fn test_voucher_roundtrip() {
     let old_pk = [0x01u8; 32];
@@ -223,7 +223,7 @@ fn test_voucher_roundtrip() {
 }
 
 /// Scenario: Voucher with tampered data fails verification
-// @scenario: contact_recovery:Create voucher after in-person verification
+// @scenario: contact_recovery :: Create voucher after in-person verification
 #[test]
 fn test_voucher_tamper_detection() {
     let old_pk = [0x01u8; 32];
@@ -241,8 +241,8 @@ fn test_voucher_tamper_detection() {
 }
 
 /// Scenario: Voucher does not recognize unknown identity
-// @scenario: contact_recovery:Voucher does not recognize the claimed identity
-// @scenario: contact_recovery:Voucher must have existing relationship
+// @scenario: contact_recovery :: Voucher does not recognize the claimed identity
+// @scenario: contact_recovery :: Voucher must have existing relationship
 #[test]
 fn test_voucher_requires_known_contact() {
     // This is enforced at the mobile/API layer, not in core
@@ -262,7 +262,7 @@ fn test_voucher_requires_known_contact() {
 // =============================================================================
 
 /// Scenario: Create recovery proof when threshold met
-// @scenario: contact_recovery:Create recovery proof when threshold met
+// @scenario: contact_recovery :: Create recovery proof when threshold met
 #[test]
 fn test_create_recovery_proof() {
     let old_pk = [0x01u8; 32];
@@ -277,7 +277,7 @@ fn test_create_recovery_proof() {
 }
 
 /// Scenario: Collect multiple vouchers
-// @scenario: contact_recovery:Collect multiple vouchers from trusted contacts
+// @scenario: contact_recovery :: Collect multiple vouchers from trusted contacts
 #[test]
 fn test_collect_multiple_vouchers() {
     let old_pk = [0x01u8; 32];
@@ -297,7 +297,7 @@ fn test_collect_multiple_vouchers() {
 }
 
 /// Scenario: Reject insufficient vouchers
-// @scenario: contact_recovery:Reject recovery with insufficient vouchers
+// @scenario: contact_recovery :: Reject recovery with insufficient vouchers
 #[test]
 fn test_reject_insufficient_vouchers() {
     let old_pk = [0x01u8; 32];
@@ -320,7 +320,7 @@ fn test_reject_insufficient_vouchers() {
 }
 
 /// Scenario: Reject duplicate vouchers
-// @scenario: contact_recovery:Reject duplicate vouchers
+// @scenario: contact_recovery :: Reject duplicate vouchers
 #[test]
 fn test_reject_duplicate_vouchers() {
     let old_pk = [0x01u8; 32];
@@ -339,7 +339,7 @@ fn test_reject_duplicate_vouchers() {
 }
 
 /// Scenario: Reject voucher with mismatched keys
-// @scenario: contact_recovery:Create voucher after in-person verification
+// @scenario: contact_recovery :: Create voucher after in-person verification
 #[test]
 fn test_reject_mismatched_keys() {
     let old_pk = [0x01u8; 32];
@@ -358,7 +358,7 @@ fn test_reject_mismatched_keys() {
 }
 
 /// Scenario: Reject invalid voucher signature
-// @scenario: contact_recovery:Create voucher after in-person verification
+// @scenario: contact_recovery :: Create voucher after in-person verification
 #[test]
 fn test_reject_invalid_signature() {
     let old_pk = [0x01u8; 32];
@@ -378,7 +378,7 @@ fn test_reject_invalid_signature() {
 }
 
 /// Scenario: Self-vouching rejected in proof
-// @scenario: contact_recovery:Cannot vouch for own recovery
+// @scenario: contact_recovery :: Cannot vouch for own recovery
 #[test]
 fn test_proof_rejects_self_vouching() {
     let old_pk = [0x01u8; 32];
@@ -395,7 +395,7 @@ fn test_proof_rejects_self_vouching() {
 }
 
 /// Scenario: Recovery proof serialization roundtrip
-// @scenario: contact_recovery:Create recovery proof when threshold met
+// @scenario: contact_recovery :: Create recovery proof when threshold met
 #[test]
 fn test_proof_roundtrip() {
     let old_pk = [0x01u8; 32];
@@ -424,8 +424,8 @@ fn test_proof_roundtrip() {
 // =============================================================================
 
 /// Scenario: Verify recovery with mutual contacts - high confidence
-// @scenario: contact_recovery:Automatic verification with sufficient mutual contacts
-// @scenario: contact_recovery:High trust with many mutual contacts
+// @scenario: contact_recovery :: Automatic verification with sufficient mutual contacts
+// @scenario: contact_recovery :: High trust with many mutual contacts
 #[test]
 fn test_verify_with_mutual_contacts_high() {
     let old_pk = [0x01u8; 32];
@@ -486,7 +486,7 @@ fn test_verify_with_mutual_contacts_high() {
 }
 
 /// Scenario: Verify recovery with partial mutual contacts - medium confidence
-// @scenario: contact_recovery:Verify recovery with mutual contacts
+// @scenario: contact_recovery :: Verify recovery with mutual contacts
 #[test]
 fn test_verify_with_partial_mutual_contacts() {
     let old_pk = [0x01u8; 32];
@@ -539,7 +539,7 @@ fn test_verify_with_partial_mutual_contacts() {
 }
 
 /// Scenario: Isolated contact receives recovery proof - low confidence
-// @scenario: contact_recovery:Isolated contact receives recovery proof
+// @scenario: contact_recovery :: Isolated contact receives recovery proof
 #[test]
 fn test_verify_with_no_mutual_contacts() {
     let old_pk = [0x01u8; 32];
@@ -577,7 +577,7 @@ fn test_verify_with_no_mutual_contacts() {
 // =============================================================================
 
 /// Scenario: Detect conflicting recovery claims
-// @scenario: contact_recovery:Detect conflicting recovery claims
+// @scenario: contact_recovery :: Detect conflicting recovery claims
 #[test]
 fn test_detect_conflicting_claims() {
     let old_pk = [0x01u8; 32];
@@ -615,7 +615,7 @@ fn test_detect_conflicting_claims() {
 }
 
 /// Scenario: No conflict when same new_pk
-// @scenario: contact_recovery:Detect conflicting recovery claims
+// @scenario: contact_recovery :: Detect conflicting recovery claims
 #[test]
 fn test_no_conflict_same_new_pk() {
     let old_pk = [0x01u8; 32];
@@ -629,7 +629,7 @@ fn test_no_conflict_same_new_pk() {
 }
 
 /// Scenario: No conflict with empty proofs
-// @scenario: contact_recovery:Detect conflicting recovery claims
+// @scenario: contact_recovery :: Detect conflicting recovery claims
 #[test]
 fn test_no_conflict_empty() {
     let conflict = RecoveryConflict::detect(&[]);
@@ -641,7 +641,7 @@ fn test_no_conflict_empty() {
 // =============================================================================
 
 /// Scenario: Revoke recovery proof with old private key
-// @scenario: contact_recovery:Revoke recovery proof
+// @scenario: contact_recovery :: Revoke recovery proof
 #[test]
 fn test_revoke_recovery_proof() {
     let old_keypair = SigningKeyPair::generate();
@@ -656,7 +656,7 @@ fn test_revoke_recovery_proof() {
 }
 
 /// Scenario: Revocation fails with wrong key
-// @scenario: contact_recovery:Revoke recovery proof
+// @scenario: contact_recovery :: Revoke recovery proof
 #[test]
 fn test_revocation_wrong_key() {
     let old_keypair = SigningKeyPair::generate();
@@ -672,7 +672,7 @@ fn test_revocation_wrong_key() {
 }
 
 /// Scenario: Revocation roundtrip
-// @scenario: contact_recovery:Revoke recovery proof
+// @scenario: contact_recovery :: Revoke recovery proof
 #[test]
 fn test_revocation_roundtrip() {
     let old_keypair = SigningKeyPair::generate();
@@ -693,7 +693,7 @@ fn test_revocation_roundtrip() {
 // =============================================================================
 
 /// Scenario: Remind me later - default 7 days
-// @scenario: contact_recovery:Remind me later
+// @scenario: contact_recovery :: Remind me later
 #[test]
 fn test_reminder_default_period() {
     let old_pk = [0x01u8; 32];
@@ -705,7 +705,7 @@ fn test_reminder_default_period() {
 }
 
 /// Scenario: Reminder is due after period expires
-// @scenario: contact_recovery:Remind me later
+// @scenario: contact_recovery :: Remind me later
 #[test]
 fn test_reminder_is_due() {
     let old_pk = [0x01u8; 32];
@@ -722,7 +722,7 @@ fn test_reminder_is_due() {
 }
 
 /// Scenario: Snooze reminder
-// @scenario: contact_recovery:Remind me later
+// @scenario: contact_recovery :: Remind me later
 #[test]
 fn test_snooze_reminder() {
     let old_pk = [0x01u8; 32];
@@ -750,7 +750,7 @@ fn test_snooze_reminder() {
 /// Scenario: Claim expires during voucher collection
 /// Vouchers are still individually valid, but the claim is expired
 /// New claim must be generated
-// @scenario: contact_recovery:Voucher timestamp validation
+// @scenario: contact_recovery :: Voucher timestamp validation
 #[test]
 fn test_claim_expires_during_collection() {
     let old_pk = [0x01u8; 32];
@@ -777,7 +777,7 @@ fn test_claim_expires_during_collection() {
 // =============================================================================
 
 /// Scenario: Continue collecting vouchers after threshold met
-// @scenario: contact_recovery:Continue collecting vouchers after threshold
+// @scenario: contact_recovery :: Continue collecting vouchers after threshold
 #[test]
 fn test_collect_beyond_threshold() {
     let old_pk = [0x01u8; 32];
@@ -802,7 +802,7 @@ fn test_collect_beyond_threshold() {
 // =============================================================================
 
 /// Scenario: Voucher timestamped correctly
-// @scenario: contact_recovery:Voucher timestamp validation
+// @scenario: contact_recovery :: Voucher timestamp validation
 #[test]
 fn test_voucher_timestamp() {
     let old_pk = [0x01u8; 32];
@@ -829,8 +829,8 @@ fn test_voucher_timestamp() {
 
 /// Scenario: Only trusted contacts can vouch for recovery
 /// Feature: contact_recovery.feature @recovery @trust
-// @scenario: contact_recovery:Only trusted contacts can provide valid vouchers
-// @scenario: contact_recovery:Recovery succeeds with trusted vouchers only
+// @scenario: contact_recovery :: Only trusted contacts can provide valid vouchers
+// @scenario: contact_recovery :: Recovery succeeds with trusted vouchers only
 #[test]
 fn test_trusted_voucher_accepted() {
     let old_pk = [0x01u8; 32];
@@ -853,7 +853,7 @@ fn test_trusted_voucher_accepted() {
 }
 
 /// Scenario: Untrusted voucher is rejected during proof building
-// @scenario: contact_recovery:Only trusted contacts can provide valid vouchers
+// @scenario: contact_recovery :: Only trusted contacts can provide valid vouchers
 #[test]
 fn test_untrusted_voucher_rejected() {
     let old_pk = [0x01u8; 32];
@@ -871,7 +871,7 @@ fn test_untrusted_voucher_rejected() {
 }
 
 /// Scenario: Recovery threshold only counts trusted contacts
-// @scenario: contact_recovery:Insufficient trusted vouchers even with untrusted vouchers available
+// @scenario: contact_recovery :: Insufficient trusted vouchers even with untrusted vouchers available
 #[test]
 fn test_threshold_only_counts_trusted_vouchers() {
     let old_pk = [0x01u8; 32];
@@ -914,7 +914,7 @@ fn test_threshold_only_counts_trusted_vouchers() {
 
 /// Scenario: Mixed trust-checked and unchecked voucher addition
 /// Verifies backward compat — add_voucher still works without trust check
-// @scenario: contact_recovery:Create voucher after in-person verification
+// @scenario: contact_recovery :: Create voucher after in-person verification
 #[test]
 fn test_add_voucher_still_works_without_trust_check() {
     let old_pk = [0x01u8; 32];
@@ -930,7 +930,7 @@ fn test_add_voucher_still_works_without_trust_check() {
 }
 
 /// Scenario: Trust check still validates signature and keys
-// @scenario: contact_recovery:Create voucher after in-person verification
+// @scenario: contact_recovery :: Create voucher after in-person verification
 #[test]
 fn test_trusted_voucher_still_validates_signature() {
     let old_pk = [0x01u8; 32];
@@ -955,7 +955,7 @@ fn test_trusted_voucher_still_validates_signature() {
 }
 
 /// Scenario: Duplicate trusted voucher still rejected
-// @scenario: contact_recovery:Reject duplicate vouchers
+// @scenario: contact_recovery :: Reject duplicate vouchers
 #[test]
 fn test_duplicate_trusted_voucher_rejected() {
     let old_pk = [0x01u8; 32];
@@ -982,7 +982,7 @@ fn test_duplicate_trusted_voucher_rejected() {
 }
 
 /// Scenario: Full trusted recovery flow — threshold met with trusted contacts only
-// @scenario: contact_recovery:Recovery succeeds with trusted vouchers only
+// @scenario: contact_recovery :: Recovery succeeds with trusted vouchers only
 #[test]
 fn test_full_trusted_recovery_flow() {
     let old_pk = [0x01u8; 32];

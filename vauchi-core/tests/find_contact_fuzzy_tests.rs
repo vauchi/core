@@ -23,7 +23,7 @@ fn add_named_contact(wb: &Vauchi, name: &str, pk: [u8; 32]) -> String {
     id
 }
 
-// @scenario: contacts_management:Search contacts by name
+// @scenario: contacts_management :: Search contacts by name
 #[test]
 fn test_find_contact_fuzzy_matches_name_case_insensitive() {
     let wb = create_test_vauchi();
@@ -41,7 +41,7 @@ fn test_find_contact_fuzzy_matches_name_case_insensitive() {
     assert_eq!(results[0].display_name(), "Alice Smith");
 }
 
-// @scenario: contacts_management:Search contacts by name
+// @scenario: contacts_management :: Search contacts by name
 #[test]
 fn test_find_contact_fuzzy_matches_name_substring() {
     let wb = create_test_vauchi();
@@ -94,7 +94,7 @@ fn test_find_contact_fuzzy_deduplicates_name_and_id_matches() {
     );
 }
 
-// @scenario: contacts_management:Search contacts by name
+// @scenario: contacts_management :: Search contacts by name
 #[test]
 fn test_find_contact_fuzzy_returns_empty_for_no_match() {
     let wb = create_test_vauchi();

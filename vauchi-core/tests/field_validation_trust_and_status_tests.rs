@@ -13,7 +13,7 @@ use vauchi_core::*;
 
 // === Trust Level Tests ===
 
-// @scenario: field_validation:Validation score determines trust level
+// @scenario: field_validation :: Validation score determines trust level
 #[test]
 fn test_trust_level_from_count() {
     assert_eq!(TrustLevel::from_count(0), TrustLevel::Unverified);
@@ -24,7 +24,7 @@ fn test_trust_level_from_count() {
     assert_eq!(TrustLevel::from_count(100), TrustLevel::HighConfidence);
 }
 
-// @scenario: field_validation:Validation score determines trust level
+// @scenario: field_validation :: Validation score determines trust level
 #[test]
 fn test_trust_level_labels() {
     assert_eq!(TrustLevel::Unverified.label(), "unverified");
@@ -33,7 +33,7 @@ fn test_trust_level_labels() {
     assert_eq!(TrustLevel::HighConfidence.label(), "verified");
 }
 
-// @scenario: field_validation:Validation score determines trust level
+// @scenario: field_validation :: Validation score determines trust level
 #[test]
 fn test_trust_level_colors() {
     assert_eq!(TrustLevel::Unverified.color(), "grey");
@@ -44,7 +44,7 @@ fn test_trust_level_colors() {
 
 // === Validation Status Tests ===
 
-// @scenario: field_validation:View unvalidated field
+// @scenario: field_validation :: View unvalidated field
 #[test]
 fn test_validation_status_new() {
     let status = ValidationStatus::new("@alice");
@@ -55,7 +55,7 @@ fn test_validation_status_new() {
     assert_eq!(status.field_value, "@alice");
 }
 
-// @scenario: field_validation:View unvalidated field
+// @scenario: field_validation :: View unvalidated field
 #[test]
 fn test_validation_status_display_no_validations() {
     let status = ValidationStatus::new("@alice");
@@ -64,7 +64,7 @@ fn test_validation_status_display_no_validations() {
     assert_eq!(status.display(&names), "Not verified");
 }
 
-// @scenario: field_validation:Trust level considers validator relationship
+// @scenario: field_validation :: Trust level considers validator relationship
 #[test]
 fn test_validation_status_display_with_known_names() {
     let mut status = ValidationStatus::new("@alice");
@@ -77,7 +77,7 @@ fn test_validation_status_display_with_known_names() {
     assert_eq!(status.display(&names), "Verified by Bob and 2 others");
 }
 
-// @scenario: field_validation:Blocked contact's validation is ignored
+// @scenario: field_validation :: Blocked contact's validation is ignored
 #[test]
 fn test_validation_status_from_validations_filters_blocked() {
     let validations = vec![
@@ -95,7 +95,7 @@ fn test_validation_status_from_validations_filters_blocked() {
     assert!(!status.validator_ids.contains(&"mallory".to_string()));
 }
 
-// @scenario: field_validation:Validation resets when field value changes
+// @scenario: field_validation :: Validation resets when field value changes
 #[test]
 fn test_validation_status_invalidated_on_value_change() {
     let validations = vec![ProfileValidation::new(
@@ -118,7 +118,7 @@ fn test_validation_status_invalidated_on_value_change() {
 
 // === Social Profile Validation Tests ===
 
-// @scenario: field_validation:Validate a contact's social profile
+// @scenario: field_validation :: Validate a contact's social profile
 #[test]
 fn test_validate_social_profile() {
     let validator = Identity::create("Validator");
@@ -132,8 +132,8 @@ fn test_validate_social_profile() {
     assert_eq!(validation.field_value(), "@alice");
 }
 
-// @scenario: field_validation:Validations are cryptographically signed
-// @scenario: field_validation:Cannot forge validations
+// @scenario: field_validation :: Validations are cryptographically signed
+// @scenario: field_validation :: Cannot forge validations
 #[test]
 fn test_validation_signature_prevents_tampering() {
     let validator = Identity::create("Validator");
@@ -148,7 +148,7 @@ fn test_validation_signature_prevents_tampering() {
 
 // === Email Validation Tests ===
 
-// @scenario: field_validation:Validate a contact's email address
+// @scenario: field_validation :: Validate a contact's email address
 #[test]
 fn test_validate_email_field() {
     let validator = Identity::create("Validator");
@@ -165,7 +165,7 @@ fn test_validate_email_field() {
     assert_eq!(validation.field_value(), "bob@example.com");
 }
 
-// @scenario: field_validation:Email validation shows trust level
+// @scenario: field_validation :: Email validation shows trust level
 #[test]
 fn test_email_validation_trust_levels() {
     // 3 validations with no metadata: 3 * 0.3 = 0.9 weighted score -> LowConfidence
@@ -190,7 +190,7 @@ fn test_email_validation_trust_levels() {
 
 // === Phone Validation Tests ===
 
-// @scenario: field_validation:Validate a contact's phone number
+// @scenario: field_validation :: Validate a contact's phone number
 #[test]
 fn test_validate_phone_field() {
     let validator = Identity::create("Validator");
@@ -203,7 +203,7 @@ fn test_validate_phone_field() {
     assert_eq!(validation.field_value(), "+1-555-123-4567");
 }
 
-// @scenario: field_validation:Phone validation persists when email changes
+// @scenario: field_validation :: Phone validation persists when email changes
 #[test]
 fn test_phone_validation_independent_of_email() {
     // Phone validations should not be affected by email validations
@@ -253,7 +253,7 @@ fn test_phone_validation_independent_of_email() {
 
 // === Website Validation Tests ===
 
-// @scenario: field_validation:Validate a contact's website
+// @scenario: field_validation :: Validate a contact's website
 #[test]
 fn test_validate_website_field() {
     let validator = Identity::create("Validator");
@@ -266,7 +266,7 @@ fn test_validate_website_field() {
     assert_eq!(validation.field_value(), "https://bob.dev");
 }
 
-// @scenario: field_validation:Website validation requires exact URL match
+// @scenario: field_validation :: Website validation requires exact URL match
 #[test]
 fn test_website_validation_requires_exact_url_match() {
     // Validations for old URL should not count for new URL
@@ -294,7 +294,7 @@ fn test_website_validation_requires_exact_url_match() {
 
 // === Address Validation Tests ===
 
-// @scenario: field_validation:Validate a contact's address
+// @scenario: field_validation :: Validate a contact's address
 #[test]
 fn test_validate_address_field() {
     let validator = Identity::create("Validator");
@@ -313,8 +313,8 @@ fn test_validate_address_field() {
 
 // === Custom Field Validation Tests ===
 
-// @scenario: field_validation:Validate a custom field
-// @scenario: contact_card_management.feature:Add unlisted social network as custom field
+// @scenario: field_validation :: Validate a custom field
+// @scenario: contact_card_management :: Add unlisted social network as custom field
 #[test]
 fn test_validate_custom_field() {
     let validator = Identity::create("Validator");
@@ -327,7 +327,7 @@ fn test_validate_custom_field() {
     assert_eq!(validation.field_value(), "bob.42");
 }
 
-// @scenario: field_validation:Validate a custom field
+// @scenario: field_validation :: Validate a custom field
 #[test]
 fn test_validate_custom_field_with_special_chars() {
     let validator = Identity::create("Validator");
@@ -342,7 +342,7 @@ fn test_validate_custom_field_with_special_chars() {
 
 // === Independent Validation Per Field Type Tests ===
 
-// @scenario: field_validation:Each field type has independent validation
+// @scenario: field_validation :: Each field type has independent validation
 #[test]
 fn test_independent_validation_per_field_type() {
     // Each field type should have independent validation counts
@@ -373,7 +373,7 @@ fn test_independent_validation_per_field_type() {
 
 // === Validation Reset On Field Change Tests ===
 
-// @scenario: field_validation:Validation resets when field value changes
+// @scenario: field_validation :: Validation resets when field value changes
 #[test]
 fn test_validation_reset_on_field_change() {
     // Create validations for the old value
@@ -404,7 +404,7 @@ fn test_validation_reset_on_field_change() {
 
 // === From Stored Tests ===
 
-// @scenario: field_validation:Validation is stored locally
+// @scenario: field_validation :: Validation is stored locally
 #[test]
 fn test_validation_from_stored() {
     let now = std::time::SystemTime::now()
@@ -430,7 +430,7 @@ fn test_validation_from_stored() {
 
 // === Multiple Validators Tests ===
 
-// @scenario: field_validation:View highly validated field
+// @scenario: field_validation :: View highly validated field
 #[test]
 fn test_multiple_validators_same_field() {
     let validators: Vec<_> = (0..5)
@@ -454,7 +454,7 @@ fn test_multiple_validators_same_field() {
     assert_eq!(status.trust_level, TrustLevel::PartialConfidence);
 }
 
-// @scenario: field_validation:Cannot validate same field twice
+// @scenario: field_validation :: Cannot validate same field twice
 #[test]
 fn test_validated_by_me_flag() {
     let me = Identity::create("Me");

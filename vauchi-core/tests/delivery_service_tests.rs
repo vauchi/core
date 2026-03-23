@@ -40,7 +40,7 @@ fn create_test_delivery(storage: &Storage, message_id: &str, status: DeliverySta
 
 // === ACK Handling Tests ===
 
-// @scenario: message_delivery:Relay provides storage confirmation
+// @scenario: message_delivery :: Relay provides storage confirmation
 #[test]
 fn test_handle_stored_ack_updates_delivery_record() {
     let storage = test_storage();
@@ -60,7 +60,7 @@ fn test_handle_stored_ack_updates_delivery_record() {
     );
 }
 
-// @scenario: message_delivery:Delivered ACK removes retry entry
+// @scenario: message_delivery :: Delivered ACK removes retry entry
 #[test]
 fn test_handle_delivered_ack_removes_retry_entry() {
     let storage = test_storage();
@@ -97,7 +97,7 @@ fn test_handle_delivered_ack_removes_retry_entry() {
     );
 }
 
-// @scenario: message_delivery:Failed ACK schedules retry with backoff
+// @scenario: message_delivery :: Failed ACK schedules retry with backoff
 #[test]
 fn test_handle_failed_ack_schedules_retry() {
     let storage = test_storage();
@@ -142,7 +142,7 @@ fn test_handle_failed_ack_schedules_retry() {
 
 // === AckStatus Conversion Tests ===
 
-// @scenario: message_delivery:Network ACK status converts to delivery ACK status
+// @scenario: message_delivery :: Network ACK status converts to delivery ACK status
 #[test]
 fn test_ack_status_conversion_from_network() {
     use vauchi_core::network::AckStatus;
@@ -178,7 +178,7 @@ fn test_ack_status_conversion_from_network() {
     );
 }
 
-// @scenario: message_delivery:Unknown message ACK handled gracefully
+// @scenario: message_delivery :: Unknown message ACK handled gracefully
 #[test]
 fn test_handle_ack_for_unknown_message_returns_error() {
     let storage = test_storage();
@@ -220,7 +220,7 @@ fn create_delivery_with_expiry(
     storage.create_delivery_record(&record).unwrap();
 }
 
-// @scenario: message_delivery:Expired messages are cleaned up automatically
+// @scenario: message_delivery :: Expired messages are cleaned up automatically
 #[test]
 fn test_run_cleanup_expires_old_records() {
     let storage = test_storage();
@@ -276,7 +276,7 @@ fn test_run_cleanup_expires_old_records() {
     assert_eq!(no_exp.status, DeliveryStatus::Stored);
 }
 
-// @scenario: message_delivery:Old terminal records are cleaned up
+// @scenario: message_delivery :: Old terminal records are cleaned up
 #[test]
 fn test_run_cleanup_removes_old_terminal_records() {
     let storage = test_storage();
@@ -348,7 +348,7 @@ fn create_device_record(storage: &Storage, message_id: &str, device_id: &str, re
     storage.create_device_delivery(&record).unwrap();
 }
 
-// @scenario: message_delivery:Per-device ACK tracking aggregates to full delivery
+// @scenario: message_delivery :: Per-device ACK tracking aggregates to full delivery
 #[test]
 fn test_handle_device_ack_tracks_per_device_delivery() {
     let storage = test_storage();
@@ -421,7 +421,7 @@ fn test_handle_device_ack_tracks_per_device_delivery() {
     );
 }
 
-// @scenario: message_delivery:Device ACK for unknown message returns error
+// @scenario: message_delivery :: Device ACK for unknown message returns error
 #[test]
 fn test_handle_device_ack_unknown_message_returns_error() {
     let storage = test_storage();
@@ -439,7 +439,7 @@ fn test_handle_device_ack_unknown_message_returns_error() {
     );
 }
 
-// @scenario: message_delivery:Failed device ACK does not mark message delivered
+// @scenario: message_delivery :: Failed device ACK does not mark message delivered
 #[test]
 fn test_handle_device_ack_failed_device_not_fully_delivered() {
     let storage = test_storage();

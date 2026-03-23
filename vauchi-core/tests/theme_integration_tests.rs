@@ -24,7 +24,7 @@ use vauchi_core::theme::{DesignTokens, Theme, ThemeColors, ThemeMode, validate_h
 // ============================================================
 
 /// Test: Theme has required fields
-// @scenario: theming:Theme file contains required colors
+// @scenario: theming :: Theme file contains required colors
 #[test]
 fn test_theme_has_required_fields() {
     let themes = all_themes();
@@ -38,7 +38,8 @@ fn test_theme_has_required_fields() {
 }
 
 /// Test: ThemeColors has all required color fields
-// @scenario: theming:Theme file contains required colors
+// @scenario: theming :: Theme file contains required colors
+// @scenario: theming :: Catppuccin themes use consistent semantic colors
 #[test]
 fn test_theme_colors_complete() {
     let themes = all_themes();
@@ -78,7 +79,7 @@ fn test_theme_colors_complete() {
 // ============================================================
 
 /// Test: Themes have correct mode (light/dark)
-// @scenario: theming:Theme file specifies light/dark mode
+// @scenario: theming :: Theme file specifies light/dark mode
 #[test]
 fn test_theme_modes() {
     let Some(themes) = try_all_themes() else {
@@ -102,7 +103,7 @@ fn test_theme_modes() {
 /// Test: Default theme is dark mode
 /// Feature: theming.feature @selection
 /// Scenario: Default theme on fresh install
-// @scenario: theming:Default theme on fresh install
+// @scenario: theming :: Default theme on fresh install
 #[test]
 fn test_default_theme_is_dark() {
     let Some(themes) = try_all_themes() else {
@@ -120,7 +121,7 @@ fn test_default_theme_is_dark() {
 // ============================================================
 
 /// Test: All themes pass WCAG contrast requirements
-// @scenario: theming:Theme colors meet minimum contrast
+// @scenario: theming :: Theme colors meet minimum contrast
 #[test]
 fn test_all_themes_accessible() {
     let themes = all_themes();
@@ -137,7 +138,7 @@ fn test_all_themes_accessible() {
 }
 
 /// Test: Contrast ratio calculation
-// @scenario: theming:Theme colors meet minimum contrast
+// @scenario: theming :: Theme colors meet minimum contrast
 #[test]
 fn test_contrast_ratio_calculation() {
     // White on black should have high contrast
@@ -177,7 +178,7 @@ fn test_contrast_ratio_calculation() {
 }
 
 /// Test: Low contrast should fail validation
-// @scenario: theming:Theme colors meet minimum contrast
+// @scenario: theming :: Theme colors meet minimum contrast
 #[test]
 fn test_low_contrast_fails() {
     let gray1 = "#808080";
@@ -221,8 +222,8 @@ fn test_low_contrast_fails() {
 // ============================================================
 
 /// Test: Default themes exist
-// @scenario: theming:Bundled themes always available
-// @scenario: theming:Default theme on fresh install
+// @scenario: theming :: Bundled themes always available
+// @scenario: theming :: Default theme on fresh install
 #[test]
 fn test_default_themes_exist() {
     let Some(themes) = try_all_themes() else {
@@ -236,7 +237,8 @@ fn test_default_themes_exist() {
 
 /// Test: Catppuccin themes exist
 /// Feature: theming.feature @catppuccin
-// @scenario: theming:Catppuccin flavor themes available
+// @scenario: theming :: Apply Catppuccin Mocha (dark)
+// @scenario: theming :: Apply Catppuccin Latte (light)
 #[test]
 fn test_catppuccin_themes_exist() {
     let Some(themes) = try_all_themes() else {
@@ -250,7 +252,7 @@ fn test_catppuccin_themes_exist() {
 
 /// Test: Catppuccin Mocha has correct colors
 /// Feature: theming.feature @catppuccin @dark
-// @scenario: theming:Apply Catppuccin Mocha (dark)
+// @scenario: theming :: Apply Catppuccin Mocha (dark)
 #[test]
 fn test_catppuccin_mocha_colors() {
     let theme = theme_by_id("catppuccin-mocha").unwrap();
@@ -263,7 +265,7 @@ fn test_catppuccin_mocha_colors() {
 
 /// Test: Catppuccin Latte has correct colors
 /// Feature: theming.feature @catppuccin @light
-// @scenario: theming:Apply Catppuccin Latte (light)
+// @scenario: theming :: Apply Catppuccin Latte (light)
 #[test]
 fn test_catppuccin_latte_colors() {
     let Some(themes) = try_all_themes() else {
@@ -282,7 +284,7 @@ fn test_catppuccin_latte_colors() {
 
 /// Test: Dracula theme exists and has correct colors
 /// Feature: theming.feature (implied)
-// @scenario: theming:Apply Dracula theme
+// @scenario: theming :: Apply Dracula theme
 #[test]
 fn test_dracula_theme() {
     let Some(themes) = try_all_themes() else {
@@ -298,7 +300,7 @@ fn test_dracula_theme() {
 }
 
 /// Test: Nord theme exists and has correct colors
-// @scenario: theming:Apply Nord theme
+// @scenario: theming :: Apply Nord theme
 #[test]
 fn test_nord_theme() {
     let Some(themes) = try_all_themes() else {
@@ -313,7 +315,8 @@ fn test_nord_theme() {
 }
 
 /// Test: Solarized themes exist
-// @scenario: theming:Solarized themes available
+// @scenario: theming :: Apply Solarized Dark theme
+// @scenario: theming :: Apply Solarized Light theme
 #[test]
 fn test_solarized_themes() {
     let Some(themes) = try_all_themes() else {
@@ -326,7 +329,7 @@ fn test_solarized_themes() {
 }
 
 /// Test: Gruvbox themes exist
-// @scenario: theming:Gruvbox themes available
+// @scenario: theming :: Apply Gruvbox Dark theme
 #[test]
 fn test_gruvbox_themes() {
     let Some(themes) = try_all_themes() else {
@@ -343,7 +346,7 @@ fn test_gruvbox_themes() {
 // ============================================================
 
 /// Test: Have expected number of bundled themes
-// @scenario: theming:Select theme from settings
+// @scenario: theming :: Select theme from settings
 #[test]
 fn test_bundled_theme_count() {
     let Some(themes) = try_all_themes() else {
@@ -356,7 +359,7 @@ fn test_bundled_theme_count() {
 }
 
 /// Test: All themes have unique IDs
-// @scenario: theming:Select theme from settings
+// @scenario: theming :: Select theme from settings
 #[test]
 fn test_unique_theme_ids() {
     let themes = all_themes();
@@ -372,7 +375,7 @@ fn test_unique_theme_ids() {
 // ============================================================
 
 /// Test: Valid hex colors pass validation
-// @scenario: theming:Theme file contains required colors
+// @scenario: theming :: Theme file contains required colors
 #[test]
 fn test_valid_hex_colors() {
     validate_hex_color("#ffffff").expect("expected success");
@@ -382,7 +385,7 @@ fn test_valid_hex_colors() {
 }
 
 /// Test: Invalid hex colors fail validation
-// @scenario: theming:Invalid theme file rejected
+// @scenario: theming :: Invalid theme file rejected
 #[test]
 fn test_invalid_hex_colors() {
     assert!(validate_hex_color("ffffff").is_err(), "Missing #");
@@ -396,7 +399,7 @@ fn test_invalid_hex_colors() {
 // ============================================================
 
 /// Test: Themes can be serialized to JSON
-// @scenario: theming:Theme file contains required colors
+// @scenario: theming :: Theme file contains required colors
 #[test]
 fn test_theme_serialization() {
     let theme = theme_by_id("catppuccin-mocha").unwrap();
@@ -415,7 +418,7 @@ fn test_theme_serialization() {
 // ============================================================
 
 /// Test: Third-party themes have attribution
-// @scenario: theming:Theme file contains required colors
+// @scenario: theming :: Theme file contains required colors
 #[test]
 fn test_theme_attribution() {
     let Some(themes) = try_all_themes() else {

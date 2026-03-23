@@ -28,7 +28,7 @@ fn create_batch_items(count: usize) -> Vec<SyncItem> {
 // Device Sync Checkpoint Tests (V6 table)
 // ============================================================
 
-// @scenario: platform_edge_cases:Sync state persisted atomically
+// @scenario: platform_edge_cases :: Sync state persisted atomically
 #[test]
 fn test_checkpoint_save_and_load() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
@@ -49,7 +49,7 @@ fn test_checkpoint_save_and_load() {
     assert_eq!(loaded_items.len(), 50, "All items should be preserved");
 }
 
-// @scenario: sync_updates.feature:Sync survives device reboot
+// @scenario: sync_updates :: Sync survives device reboot
 #[test]
 fn test_checkpoint_resume_from_correct_position() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();

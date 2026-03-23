@@ -7,15 +7,15 @@
 
 use vauchi_core::*;
 
-// @scenario: identity_management.feature:Create new identity on first launch
+// @scenario: identity_management :: Create new identity on first launch
 #[test]
 fn test_create_identity() {
     let identity = Identity::create("Test User");
     assert_eq!(identity.display_name(), "Test User");
 }
 
-// @scenario: identity_management.feature:Create encrypted identity backup
-// @scenario: identity_management.feature:Restore identity from backup
+// @scenario: identity_management :: Create encrypted identity backup
+// @scenario: identity_management :: Restore identity from backup
 #[test]
 fn test_backup_restore_roundtrip() {
     let original = Identity::create("Alice");
@@ -25,7 +25,7 @@ fn test_backup_restore_roundtrip() {
     assert_eq!(original.public_id(), restored.public_id());
 }
 
-// @scenario: identity_management.feature:Create new identity on first launch
+// @scenario: identity_management :: Create new identity on first launch
 #[test]
 fn test_identity_has_device_info() {
     let identity = Identity::create("Alice");
@@ -33,7 +33,7 @@ fn test_identity_has_device_info() {
     assert_eq!(identity.device_info().device_name(), "Primary Device");
 }
 
-// @scenario: identity_management.feature:Restore identity from backup
+// @scenario: identity_management :: Restore identity from backup
 #[test]
 fn test_backup_restore_preserves_device_info() {
     // Create identity with custom device info using public from_device_link
@@ -50,7 +50,7 @@ fn test_backup_restore_preserves_device_info() {
     assert_eq!(restored.device_id(), original.device_id());
 }
 
-// @scenario: identity_management.feature:Create new identity on first launch
+// @scenario: identity_management :: Create new identity on first launch
 #[test]
 fn test_device_id_deterministic() {
     let identity1 = Identity::create("Alice");
@@ -67,7 +67,7 @@ fn test_device_id_deterministic() {
 /// the derived signing public key (deterministically derived from seed via
 /// HKDF). Two identical public keys would mean identical seeds, which would
 /// indicate a catastrophic RNG failure.
-// @scenario: identity_management.feature:Create new identity on first launch
+// @scenario: identity_management :: Create new identity on first launch
 #[test]
 fn test_identity_create_produces_unique_keys() {
     let mut public_keys: Vec<[u8; 32]> = Vec::with_capacity(20);
@@ -94,7 +94,7 @@ fn test_identity_create_produces_unique_keys() {
 /// Verifies that generated identity keys are not degenerate (all-zero or
 /// all-same-byte). A degenerate key would indicate an uninitialized or
 /// stuck RNG, making all cryptographic operations insecure.
-// @scenario: identity_management.feature:Create new identity on first launch
+// @scenario: identity_management :: Create new identity on first launch
 #[test]
 fn test_identity_keys_not_degenerate() {
     let identity = Identity::create("Entropy Test");

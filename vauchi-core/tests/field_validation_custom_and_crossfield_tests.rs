@@ -19,7 +19,7 @@ use common::field_validation_helpers::MAX_VALUE_LENGTH;
 // Traces to: _private/features/field_validation.feature @validate @custom
 // =============================================================================
 
-// @scenario: field_validation:Validate a custom field
+// @scenario: field_validation :: Validate a custom field
 #[test]
 fn test_custom_field_special_characters_unicode() {
     use vauchi_core::contact_card::{ContactField, FieldType};
@@ -48,7 +48,7 @@ fn test_custom_field_special_characters_unicode() {
     }
 }
 
-// @scenario: field_validation:Validate a custom field
+// @scenario: field_validation :: Validate a custom field
 #[test]
 fn test_custom_field_special_characters_emoji() {
     use vauchi_core::contact_card::{ContactField, FieldType};
@@ -75,7 +75,7 @@ fn test_custom_field_special_characters_emoji() {
     }
 }
 
-// @scenario: field_validation:Validate a custom field
+// @scenario: field_validation :: Validate a custom field
 #[test]
 fn test_custom_field_special_characters_symbols() {
     use vauchi_core::contact_card::{ContactField, FieldType};
@@ -114,7 +114,7 @@ fn test_custom_field_special_characters_symbols() {
     }
 }
 
-// @scenario: field_validation:Validate a custom field
+// @scenario: field_validation :: Validate a custom field
 #[test]
 fn test_custom_field_mixed_scripts() {
     use vauchi_core::contact_card::{ContactField, FieldType};
@@ -137,7 +137,7 @@ fn test_custom_field_mixed_scripts() {
     }
 }
 
-// @scenario: field_validation:Validate a custom field
+// @scenario: field_validation :: Validate a custom field
 #[test]
 fn test_custom_field_control_characters() {
     use vauchi_core::contact_card::{ContactField, FieldType};
@@ -158,8 +158,8 @@ fn test_custom_field_control_characters() {
 // Traces to: _private/features/field_validation.feature @multiple @all-types
 // =============================================================================
 
-// @scenario: field_validation:Each field type has independent validation
-// @scenario: field_validation.feature:Each social field has independent validation
+// @scenario: field_validation :: Each field type has independent validation
+// @scenario: field_validation :: Each social field has independent validation
 #[test]
 fn test_cross_field_dependencies_independent_validation() {
     use vauchi_core::contact_card::{ContactCard, ContactField, FieldType};
@@ -186,7 +186,7 @@ fn test_cross_field_dependencies_independent_validation() {
     assert_eq!(card.fields().len(), 6, "All 6 fields should be added");
 }
 
-// @scenario: field_validation:Each field type has independent validation
+// @scenario: field_validation :: Each field type has independent validation
 #[test]
 fn test_cross_field_dependencies_validation_isolation() {
     use vauchi_core::contact_card::{ContactCard, ContactField, FieldType};
@@ -207,7 +207,7 @@ fn test_cross_field_dependencies_validation_isolation() {
     assert_eq!(card.fields()[0].label(), "Mobile");
 }
 
-// @scenario: field_validation:Validation persists when other fields change
+// @scenario: field_validation :: Validation persists when other fields change
 #[test]
 fn test_cross_field_dependencies_update_isolation() {
     use vauchi_core::contact_card::{ContactCard, ContactField, FieldType};
@@ -235,7 +235,7 @@ fn test_cross_field_dependencies_update_isolation() {
     );
 }
 
-// @scenario: field_validation:Each field type has independent validation
+// @scenario: field_validation :: Each field type has independent validation
 #[test]
 fn test_cross_field_validation_status_independent() {
     // Each field's validation status should be independent
@@ -302,7 +302,7 @@ fn test_cross_field_validation_status_independent() {
 // Traces to: _private/features/field_validation.feature @edge-cases
 // =============================================================================
 
-// @scenario: field_validation:Validate a custom field
+// @scenario: field_validation :: Validate a custom field
 #[test]
 fn test_max_field_length_enforcement_at_limit() {
     use vauchi_core::contact_card::{ContactField, FieldType};
@@ -317,7 +317,7 @@ fn test_max_field_length_enforcement_at_limit() {
     );
 }
 
-// @scenario: field_validation:Validate a custom field
+// @scenario: field_validation :: Validate a custom field
 #[test]
 fn test_max_field_length_enforcement_over_limit() {
     use vauchi_core::contact_card::{ContactField, FieldType, ValidationError};
@@ -336,7 +336,7 @@ fn test_max_field_length_enforcement_over_limit() {
     }
 }
 
-// @scenario: field_validation:Validate a custom field
+// @scenario: field_validation :: Validate a custom field
 #[test]
 fn test_max_field_length_enforcement_unicode_chars() {
     use vauchi_core::contact_card::{ContactField, FieldType};
@@ -355,7 +355,7 @@ fn test_max_field_length_enforcement_unicode_chars() {
     );
 }
 
-// @scenario: field_validation:Validate a custom field
+// @scenario: field_validation :: Validate a custom field
 #[test]
 fn test_max_field_length_enforcement_emoji() {
     use vauchi_core::contact_card::{ContactField, FieldType};
@@ -373,7 +373,7 @@ fn test_max_field_length_enforcement_emoji() {
     );
 }
 
-// @scenario: field_validation:Validate a custom field
+// @scenario: field_validation :: Validate a custom field
 #[test]
 fn test_max_field_length_enforcement_per_field_type() {
     use vauchi_core::contact_card::{ContactField, FieldType, ValidationError};
@@ -409,7 +409,7 @@ fn test_max_field_length_enforcement_per_field_type() {
     }
 }
 
-// @scenario: field_validation:Validate a custom field
+// @scenario: field_validation :: Validate a custom field
 #[test]
 fn test_max_field_length_card_rejects_overlong() {
     use vauchi_core::contact_card::{ContactCard, ContactField, FieldType};
@@ -427,7 +427,7 @@ fn test_max_field_length_card_rejects_overlong() {
     );
 }
 
-// @scenario: field_validation:Validate a custom field
+// @scenario: field_validation :: Validate a custom field
 #[test]
 fn test_max_field_length_update_rejects_overlong() {
     use vauchi_core::contact_card::{ContactCard, ContactField, FieldType};

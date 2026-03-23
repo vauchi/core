@@ -604,7 +604,7 @@ fn test_storage_recovery_trusted_persistence() {
 // ============================================================
 
 /// Test save and load avatar roundtrip
-// @scenario: contacts_management.feature:Contact card display
+// @scenario: contacts_management :: Contact card display
 #[test]
 fn test_save_load_avatar() {
     let storage = create_test_storage();
@@ -626,7 +626,7 @@ fn test_save_load_avatar() {
 }
 
 /// Test save_avatar fails for nonexistent contact
-// @scenario: contacts_management.feature:Contact card display
+// @scenario: contacts_management :: Contact card display
 #[test]
 fn test_save_avatar_nonexistent_contact() {
     let storage = create_test_storage();
@@ -635,7 +635,7 @@ fn test_save_avatar_nonexistent_contact() {
 }
 
 /// Test load_avatar fails for nonexistent contact
-// @scenario: contacts_management.feature:Contact card display
+// @scenario: contacts_management :: Contact card display
 #[test]
 fn test_load_avatar_nonexistent_contact() {
     let storage = create_test_storage();
@@ -644,7 +644,7 @@ fn test_load_avatar_nonexistent_contact() {
 }
 
 /// Test get_contact_limit returns default 10_000
-// @scenario: contacts_management.feature:Contact limits
+// @scenario: contacts_management :: Contact limits
 #[test]
 fn test_get_contact_limit_default() {
     let storage = create_test_storage();
@@ -653,7 +653,7 @@ fn test_get_contact_limit_default() {
 }
 
 /// Test last_delta_version defaults to 0 for new contact
-// @scenario: sync_updates.feature:Delta sync versioning
+// @scenario: sync_updates :: Delta sync versioning
 #[test]
 fn test_last_delta_version_default() {
     let storage = create_test_storage();
@@ -666,7 +666,7 @@ fn test_last_delta_version_default() {
 }
 
 /// Test record_delta_version and last_delta_version roundtrip
-// @scenario: sync_updates.feature:Delta sync versioning
+// @scenario: sync_updates :: Delta sync versioning
 #[test]
 fn test_record_and_load_delta_version() {
     let storage = create_test_storage();
@@ -685,7 +685,7 @@ fn test_record_and_load_delta_version() {
 }
 
 /// Test last_delta_version fails for nonexistent contact
-// @scenario: sync_updates.feature:Delta sync versioning
+// @scenario: sync_updates :: Delta sync versioning
 #[test]
 fn test_last_delta_version_nonexistent_contact() {
     let storage = create_test_storage();
@@ -694,7 +694,7 @@ fn test_last_delta_version_nonexistent_contact() {
 }
 
 /// Test wipe_device_data clears device_info and sync state
-// @scenario: identity_management.feature:Account deletion
+// @scenario: identity_management :: Account deletion
 #[test]
 fn test_wipe_device_data() {
     let storage = create_test_storage();
@@ -714,7 +714,7 @@ fn test_wipe_device_data() {
 }
 
 /// Test is_replay_nonce detects duplicates
-// @scenario: security.feature:Replay attack prevention
+// @scenario: security :: Replay attack prevention
 #[test]
 fn test_is_replay_nonce() {
     let storage = create_test_storage();
@@ -737,7 +737,7 @@ fn test_is_replay_nonce() {
 }
 
 /// Test cleanup_replay_nonces removes old entries
-// @scenario: security.feature:Replay attack prevention
+// @scenario: security :: Replay attack prevention
 #[test]
 fn test_cleanup_replay_nonces() {
     let storage = create_test_storage();
@@ -759,7 +759,7 @@ fn test_cleanup_replay_nonces() {
 }
 
 /// Test load_device_registry_json returns structured JSON
-// @scenario: identity_management.feature:GDPR data export
+// @scenario: identity_management :: GDPR data export
 #[test]
 fn test_load_device_registry_json() {
     use vauchi_core::crypto::SigningKeyPair;

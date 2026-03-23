@@ -16,7 +16,7 @@ fn create_vauchi_with_identity(name: &str) -> Vauchi {
     wb
 }
 
-// @scenario: visibility_control.feature:Delete last group migrates fields to field_visibility
+// @scenario: visibility_control :: Delete last group migrates fields to field_visibility
 #[test]
 fn test_transition_to_no_group_mode() {
     let wb = create_vauchi_with_identity("Alice");
@@ -63,7 +63,7 @@ fn test_transition_to_no_group_mode() {
     );
 }
 
-// @scenario: visibility_control.feature:Creating first group preserves field_visibility
+// @scenario: visibility_control :: Creating first group preserves field_visibility
 #[test]
 fn test_transition_preserves_field_visibility_when_adding_first_group() {
     let wb = create_vauchi_with_identity("Alice");
@@ -96,7 +96,7 @@ fn test_transition_preserves_field_visibility_when_adding_first_group() {
     );
 }
 
-// @scenario: visibility_control.feature:Delete non-last group does not migrate
+// @scenario: visibility_control :: Delete non-last group does not migrate
 #[test]
 fn test_delete_non_last_label_no_migration() {
     let wb = create_vauchi_with_identity("Alice");
@@ -139,7 +139,7 @@ fn test_delete_non_last_label_no_migration() {
     assert_eq!(labels.len(), 1, "one label should remain");
 }
 
-// @scenario: visibility_control.feature:set_field_shown API persists changes
+// @scenario: visibility_control :: set_field_shown API persists changes
 #[test]
 fn test_set_field_shown_api() {
     let wb = create_vauchi_with_identity("Alice");
@@ -178,7 +178,7 @@ fn test_set_field_shown_api() {
     );
 }
 
-// @scenario: visibility_control.feature:Delete last group with multiple visible fields
+// @scenario: visibility_control :: Delete last group with multiple visible fields
 #[test]
 fn test_transition_migrates_all_visible_fields() {
     let wb = create_vauchi_with_identity("Alice");
@@ -220,7 +220,7 @@ fn test_transition_migrates_all_visible_fields() {
     );
 }
 
-// @scenario: visibility_control.feature:Delete last group does not migrate hidden fields
+// @scenario: visibility_control :: Delete last group does not migrate hidden fields
 #[test]
 fn test_transition_does_not_migrate_hidden_fields() {
     let wb = create_vauchi_with_identity("Alice");

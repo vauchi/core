@@ -16,8 +16,8 @@ use vauchi_core::crypto::{SigningKeyPair, SymmetricKey, decrypt, encrypt};
 
 /// Tests that a new Ed25519 keypair can be generated
 /// Maps to: "Then a new Ed25519 keypair should be generated"
-// @scenario: identity_management.feature:Create new identity on first launch
-// @scenario: security.feature:Sufficient key lengths
+// @scenario: identity_management :: Create new identity on first launch
+// @scenario: security :: Sufficient key lengths
 #[test]
 fn test_generate_ed25519_keypair_succeeds() {
     let keypair = SigningKeyPair::generate();
@@ -31,7 +31,7 @@ fn test_generate_ed25519_keypair_succeeds() {
 
 /// Tests that generated keypairs are unique (different each time)
 /// This ensures proper randomness in key generation
-// @scenario: security.feature:Sufficient key lengths
+// @scenario: security :: Sufficient key lengths
 #[test]
 fn test_generate_ed25519_keypair_unique() {
     let keypair1 = SigningKeyPair::generate();
@@ -47,7 +47,7 @@ fn test_generate_ed25519_keypair_unique() {
 
 /// Tests that keypair can be regenerated deterministically from seed
 /// Maps to: backup/restore scenarios - "keypairs should be regenerated from the master seed"
-// @scenario: identity_management.feature:Restore identity from backup
+// @scenario: identity_management :: Restore identity from backup
 #[test]
 fn test_keypair_from_seed_deterministic() {
     let seed = [42u8; 32]; // Fixed seed for testing
@@ -64,7 +64,7 @@ fn test_keypair_from_seed_deterministic() {
 }
 
 /// Tests that public key has correct length (32 bytes for Ed25519)
-// @scenario: security.feature:Sufficient key lengths
+// @scenario: security :: Sufficient key lengths
 #[test]
 fn test_public_key_correct_length() {
     let keypair = SigningKeyPair::generate();
@@ -79,7 +79,7 @@ fn test_public_key_correct_length() {
 
 /// Tests that public key can be converted to human-readable fingerprint
 /// Maps to: "I should see my public key fingerprint"
-// @scenario: identity_management.feature:Identity verification via public key fingerprint
+// @scenario: identity_management :: Identity verification via public key fingerprint
 #[test]
 fn test_public_key_fingerprint() {
     let keypair = SigningKeyPair::generate();
@@ -102,8 +102,8 @@ fn test_public_key_fingerprint() {
 // =============================================================================
 
 /// Tests that signing a message produces a valid signature
-// @scenario: security.feature:Contact card signatures verified
-// @scenario: security.feature:Sufficient key lengths
+// @scenario: security :: Contact card signatures verified
+// @scenario: security :: Sufficient key lengths
 #[test]
 fn test_sign_message_produces_signature() {
     let keypair = SigningKeyPair::generate();
@@ -121,7 +121,7 @@ fn test_sign_message_produces_signature() {
 
 /// Tests that valid signature verifies correctly
 /// Maps to: "Contact card signatures verified"
-// @scenario: security.feature:Contact card signatures verified
+// @scenario: security :: Contact card signatures verified
 #[test]
 fn test_verify_valid_signature_succeeds() {
     let keypair = SigningKeyPair::generate();
@@ -135,8 +135,8 @@ fn test_verify_valid_signature_succeeds() {
 
 /// Tests that signature verification fails with wrong public key
 /// Maps to: "Man-in-the-middle detection during exchange"
-// @scenario: security.feature:Man-in-the-middle detection during exchange
-// @scenario: security.feature:Contact card signatures verified
+// @scenario: security :: Man-in-the-middle detection during exchange
+// @scenario: security :: Contact card signatures verified
 #[test]
 fn test_verify_signature_wrong_key_fails() {
     let keypair1 = SigningKeyPair::generate();
@@ -151,7 +151,7 @@ fn test_verify_signature_wrong_key_fails() {
 
 /// Tests that signature verification fails with tampered message
 /// Maps to: "Verify update signatures" / integrity protection
-// @scenario: security.feature:Update signatures verified
+// @scenario: security :: Update signatures verified
 #[test]
 fn test_verify_signature_tampered_message_fails() {
     let keypair = SigningKeyPair::generate();
@@ -174,7 +174,7 @@ fn test_verify_signature_tampered_message_fails() {
 
 /// Tests that encrypt/decrypt roundtrip produces original data
 /// Maps to: "Contact cards are encrypted at rest"
-// @scenario: security.feature:Contact cards are encrypted at rest
+// @scenario: security :: Contact cards are encrypted at rest
 #[test]
 fn test_encrypt_decrypt_roundtrip() {
     let key = SymmetricKey::generate();
@@ -191,7 +191,7 @@ fn test_encrypt_decrypt_roundtrip() {
 }
 
 /// Tests that ciphertext is different from plaintext
-// @scenario: security.feature:Contact cards are encrypted at rest
+// @scenario: security :: Contact cards are encrypted at rest
 #[test]
 fn test_ciphertext_differs_from_plaintext() {
     let key = SymmetricKey::generate();
@@ -208,7 +208,7 @@ fn test_ciphertext_differs_from_plaintext() {
 
 /// Tests that decryption with wrong key fails
 /// Maps to: Security - only authorized users can decrypt
-// @scenario: security.feature:Contact cards are encrypted at rest
+// @scenario: security :: Contact cards are encrypted at rest
 #[test]
 fn test_decrypt_wrong_key_fails() {
     let key1 = SymmetricKey::generate();
@@ -223,7 +223,7 @@ fn test_decrypt_wrong_key_fails() {
 
 /// Tests that tampered ciphertext is rejected
 /// Maps to: Data integrity protection
-// @scenario: security.feature:Contact cards are encrypted at rest
+// @scenario: security :: Contact cards are encrypted at rest
 #[test]
 fn test_decrypt_tampered_ciphertext_fails() {
     let key = SymmetricKey::generate();
@@ -242,7 +242,7 @@ fn test_decrypt_tampered_ciphertext_fails() {
 }
 
 /// Tests that same plaintext produces different ciphertext each time (due to random nonce)
-// @scenario: security.feature:Sufficient key lengths
+// @scenario: security :: Sufficient key lengths
 #[test]
 fn test_encryption_uses_random_nonce() {
     let key = SymmetricKey::generate();
@@ -265,7 +265,7 @@ fn test_encryption_uses_random_nonce() {
 /// for encryption security (nonce reuse → plaintext recovery).
 ///
 /// Ciphertext format: `0x02 || nonce (24 bytes) || ciphertext || tag`
-// @scenario: security.feature:Sufficient key lengths
+// @scenario: security :: Sufficient key lengths
 #[test]
 fn test_nonce_bytes_have_entropy() {
     let key = SymmetricKey::generate();
@@ -303,7 +303,7 @@ fn test_nonce_bytes_have_entropy() {
 /// With 24-byte (192-bit) nonces from OsRng, collision probability is
 /// negligible (~2^-128 for 100 samples). A collision here would indicate a
 /// catastrophic RNG failure.
-// @scenario: security.feature:Sufficient key lengths
+// @scenario: security :: Sufficient key lengths
 #[test]
 fn test_nonce_uniqueness_across_encryptions() {
     let key = SymmetricKey::generate();

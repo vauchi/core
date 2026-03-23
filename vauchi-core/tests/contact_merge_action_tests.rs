@@ -4,8 +4,8 @@
 
 //! Tests for contact merge and dismiss duplicate operations (SP-12a).
 //!
-//! @scenario: contacts_management.feature:Merge duplicate contacts
-//! @scenario: contacts_management.feature:Dismiss duplicate suggestion
+//! @scenario: contacts_management :: Merge duplicate contacts
+//! @scenario: contacts_management :: Dismiss duplicate suggestion
 
 use std::collections::HashSet;
 
@@ -28,7 +28,7 @@ fn make_contact(name: &str, fields: &[(FieldType, &str, &str)]) -> Contact {
 
 // ============================================================
 // Merge Duplicate Contacts
-// @scenario: contacts_management.feature:Merge duplicate contacts
+// @scenario: contacts_management :: Merge duplicate contacts
 // ============================================================
 
 #[test]
@@ -171,7 +171,7 @@ fn test_merge_contacts_preserves_blocked_from_primary() {
 
 // ============================================================
 // Dismiss Duplicate Suggestion
-// @scenario: contacts_management.feature:Dismiss duplicate suggestion
+// @scenario: contacts_management :: Dismiss duplicate suggestion
 // ============================================================
 
 #[test]

@@ -30,7 +30,8 @@ fn verify_ed25519(public_key: &[u8; 32], message: &[u8], signature: &[u8]) -> bo
 /// Test that refresh generates valid messages before expiration.
 ///
 /// Traces to: Scenario "Refresh pre-signed messages periodically"
-// @scenario: pre_signed_operations.feature:Refresh pre-signed messages periodically
+// @scenario: pre_signed_operations :: Refresh pre-signed messages periodically
+// @scenario: pre_signed_operations :: Pre-signed messages created at identity setup
 #[test]
 fn test_pre_signed_message_refresh() {
     // Given pre-signed messages were generated
@@ -76,7 +77,7 @@ fn test_pre_signed_message_refresh() {
 /// Test that refreshed messages have different purge tokens for replay prevention.
 ///
 /// Traces to: Scenario "Refresh generates new purge token for replay prevention"
-// @scenario: pre_signed_operations.feature:Refresh generates new purge token for replay prevention
+// @scenario: pre_signed_operations :: Refresh generates new purge token for replay prevention
 #[test]
 fn test_pre_signed_refresh_generates_new_purge_token() {
     // Given I have existing pre-signed messages with purge token A
@@ -106,7 +107,7 @@ fn test_pre_signed_refresh_generates_new_purge_token() {
 /// Even with the same identity, each generation produces a unique token.
 ///
 /// Traces to: Scenario "Refresh generates new purge token for replay prevention"
-// @scenario: pre_signed_operations.feature:Refresh generates new purge token for replay prevention
+// @scenario: pre_signed_operations :: Refresh generates new purge token for replay prevention
 #[test]
 fn test_purge_token_rotation() {
     let identity = Identity::create("Charlie");
@@ -143,8 +144,8 @@ fn test_purge_token_rotation() {
 }
 
 /// Test that token rotation maintains signature validity for each token.
-// @scenario: pre_signed_operations.feature:Refresh generates new purge token for replay prevention
-// @scenario: pre_signed_operations.feature:Pre-signed purge request has valid Ed25519 signature
+// @scenario: pre_signed_operations :: Refresh generates new purge token for replay prevention
+// @scenario: pre_signed_operations :: Pre-signed purge request has valid Ed25519 signature
 #[test]
 fn test_purge_token_rotation_maintains_signature_validity() {
     let identity = Identity::create("Dave");
@@ -199,7 +200,8 @@ fn test_purge_token_rotation_maintains_signature_validity() {
 /// This is the core DP-2 (sign-before-destroy) principle.
 ///
 /// Traces to: Scenario "Pre-signed messages remain valid after key destruction"
-// @scenario: pre_signed_operations.feature:Pre-signed messages remain valid after key destruction
+// @scenario: pre_signed_operations :: Pre-signed messages remain valid after key destruction
+// @scenario: pre_signed_operations :: Deletion notice stages
 #[test]
 fn test_pre_signed_revocation() {
     // Given I have pre-signed messages
@@ -239,7 +241,9 @@ fn test_pre_signed_revocation() {
 }
 
 /// Test that revocation via pre-signed messages includes correct public key.
-// @scenario: pre_signed_operations.feature:Pre-signed purge request has valid Ed25519 signature
+// @scenario: pre_signed_operations :: Pre-signed purge request has valid Ed25519 signature
+// @scenario: pre_signed_operations :: Pre-signed purge request contains required fields
+// @scenario: pre_signed_operations :: Pre-signed deletion notice contains required fields
 #[test]
 fn test_pre_signed_revocation_includes_public_key() {
     let identity = Identity::create("Frank");
@@ -265,7 +269,7 @@ fn test_pre_signed_revocation_includes_public_key() {
 /// They can be saved and loaded from disk without any network calls.
 ///
 /// Traces to: Scenario "Pre-signed messages stored unencrypted"
-// @scenario: pre_signed_operations.feature:Pre-signed messages stored unencrypted
+// @scenario: pre_signed_operations :: Pre-signed messages stored unencrypted
 #[test]
 fn test_pre_signed_offline_storage() {
     let dir = tempfile::tempdir().unwrap();
@@ -308,7 +312,7 @@ fn test_pre_signed_offline_storage() {
 /// Test that offline-stored messages can be loaded and used after app restart.
 ///
 /// Traces to: Scenario "Pre-signed messages survive app restarts"
-// @scenario: pre_signed_operations.feature:Pre-signed messages survive app restarts
+// @scenario: pre_signed_operations :: Pre-signed messages survive app restarts
 #[test]
 fn test_pre_signed_offline_storage_survives_restart() {
     let dir = tempfile::tempdir().unwrap();
@@ -343,7 +347,7 @@ fn test_pre_signed_offline_storage_survives_restart() {
 /// Per DP-3, pre-signed messages are stored unencrypted.
 ///
 /// Traces to: Scenario "Pre-signed messages stored unencrypted"
-// @scenario: pre_signed_operations.feature:Pre-signed messages stored unencrypted
+// @scenario: pre_signed_operations :: Pre-signed messages stored unencrypted
 #[test]
 fn test_pre_signed_offline_storage_unencrypted() {
     let dir = tempfile::tempdir().unwrap();
@@ -367,7 +371,7 @@ fn test_pre_signed_offline_storage_unencrypted() {
 
 /// Test that pre-signed messages work in airplane mode scenario.
 /// Simulates a user preparing messages before going offline.
-// @scenario: pre_signed_operations.feature:Pre-signed messages stored unencrypted
+// @scenario: pre_signed_operations :: Pre-signed messages stored unencrypted
 #[test]
 fn test_pre_signed_offline_airplane_mode() {
     let dir = tempfile::tempdir().unwrap();
@@ -403,7 +407,7 @@ fn test_pre_signed_offline_airplane_mode() {
 // === Edge Cases ===
 
 /// Test refresh with multiple identities doesn't cross-contaminate.
-// @scenario: pre_signed_operations.feature:Pre-signed purge request has valid Ed25519 signature
+// @scenario: pre_signed_operations :: Pre-signed purge request has valid Ed25519 signature
 #[test]
 fn test_pre_signed_refresh_isolation() {
     let alice = Identity::create("Alice");
@@ -437,7 +441,7 @@ fn test_pre_signed_refresh_isolation() {
 }
 
 /// Test that timestamps are reasonable (not in the past or far future).
-// @scenario: pre_signed_operations.feature:Refresh pre-signed messages periodically
+// @scenario: pre_signed_operations :: Refresh pre-signed messages periodically
 #[test]
 fn test_pre_signed_timestamp_sanity() {
     let identity = Identity::create("Kate");

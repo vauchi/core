@@ -38,7 +38,7 @@ fn test_update(id: &str, contact_id: &str) -> PendingUpdate {
 
 // === Offline Queuing Tests ===
 
-// @scenario: message_delivery:Offline message queued for later delivery
+// @scenario: message_delivery :: Offline message queued for later delivery
 #[test]
 fn test_send_or_queue_offline_enqueues() {
     let storage = test_storage();
@@ -54,7 +54,7 @@ fn test_send_or_queue_offline_enqueues() {
     assert_eq!(pending[0].id, "msg-1");
 }
 
-// @scenario: message_delivery:Online message sent directly (not queued)
+// @scenario: message_delivery :: Online message sent directly (not queued)
 #[test]
 fn test_send_or_queue_online_marks_sending() {
     let storage = test_storage();
@@ -72,7 +72,7 @@ fn test_send_or_queue_online_marks_sending() {
     );
 }
 
-// @scenario: message_delivery:Offline queue respects capacity
+// @scenario: message_delivery :: Offline queue respects capacity
 #[test]
 fn test_send_or_queue_rejects_when_full() {
     let storage = test_storage();
@@ -97,7 +97,7 @@ fn test_send_or_queue_rejects_when_full() {
 
 // === Flush Tests ===
 
-// @scenario: message_delivery:Queued messages ready for flush on reconnect
+// @scenario: message_delivery :: Queued messages ready for flush on reconnect
 #[test]
 fn test_flush_queue_returns_pending_updates() {
     let storage = test_storage();
@@ -120,7 +120,7 @@ fn test_flush_queue_returns_pending_updates() {
     );
 }
 
-// @scenario: message_delivery:Flush preserves message order
+// @scenario: message_delivery :: Flush preserves message order
 #[test]
 fn test_flush_queue_preserves_order() {
     let storage = test_storage();
@@ -145,7 +145,7 @@ fn test_flush_queue_preserves_order() {
     );
 }
 
-// @scenario: message_delivery:Queue capacity tracking
+// @scenario: message_delivery :: Queue capacity tracking
 #[test]
 fn test_queue_remaining_capacity() {
     let storage = test_storage();

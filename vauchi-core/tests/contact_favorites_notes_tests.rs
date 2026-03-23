@@ -34,7 +34,7 @@ fn create_test_storage() -> Storage {
 // Favorites Tests
 // ============================================================
 
-// @scenario: contacts_management.feature:Mark contact as favorite
+// @scenario: contacts_management :: Mark contact as favorite
 #[test]
 fn test_contact_set_favorite_marks_contact() {
     let mut contact = create_test_contact_with_name("Bob", 0x01);
@@ -53,7 +53,7 @@ fn test_contact_set_favorite_marks_contact() {
     );
 }
 
-// @scenario: contacts_management.feature:Remove favorite
+// @scenario: contacts_management :: Remove favorite
 #[test]
 fn test_contact_remove_favorite_unmarks_contact() {
     let mut contact = create_test_contact_with_name("Bob", 0x01);
@@ -70,7 +70,7 @@ fn test_contact_remove_favorite_unmarks_contact() {
     );
 }
 
-// @scenario: contacts_management.feature:Favorites appear first in list
+// @scenario: contacts_management :: Favorites appear first in list
 #[test]
 fn test_contacts_sorted_favorites_first() {
     // Alice (not favorite) and Bob (favorite)
@@ -93,7 +93,7 @@ fn test_contacts_sorted_favorites_first() {
     );
 }
 
-// @scenario: contacts_management.feature:Mark contact as favorite (storage round-trip)
+// @scenario: contacts_management :: Mark contact as favorite (storage round-trip)
 #[test]
 fn test_contact_favorite_persists_in_storage() {
     let storage = create_test_storage();
@@ -112,7 +112,7 @@ fn test_contact_favorite_persists_in_storage() {
     );
 }
 
-// @scenario: contacts_management.feature:Remove favorite (storage round-trip)
+// @scenario: contacts_management :: Remove favorite (storage round-trip)
 #[test]
 fn test_contact_remove_favorite_persists_in_storage() {
     let storage = create_test_storage();
@@ -162,7 +162,7 @@ fn test_contact_favorite_independent_of_other_flags() {
 // Notes Tests
 // ============================================================
 
-// @scenario: contacts_management.feature:Add personal note to contact
+// @scenario: contacts_management :: Add personal note to contact
 #[test]
 fn test_contact_set_note_stores_note() {
     let storage = create_test_storage();
@@ -192,7 +192,7 @@ fn test_contact_set_note_stores_note() {
     );
 }
 
-// @scenario: contacts_management.feature:Edit contact note
+// @scenario: contacts_management :: Edit contact note
 #[test]
 fn test_contact_edit_note_updates_note() {
     let storage = create_test_storage();
@@ -228,7 +228,7 @@ fn test_contact_edit_note_updates_note() {
     );
 }
 
-// @scenario: contacts_management.feature:Delete contact note
+// @scenario: contacts_management :: Delete contact note
 #[test]
 fn test_contact_delete_note_removes_note() {
     let storage = create_test_storage();
@@ -252,7 +252,7 @@ fn test_contact_delete_note_removes_note() {
     );
 }
 
-// @scenario: contacts_management.feature:Notes are not shared with contact
+// @scenario: contacts_management :: Notes are not shared with contact
 #[test]
 fn test_contact_notes_not_included_in_exchange_payload() {
     // The ExchangePayload struct (internal to encrypted_message.rs) only contains:
@@ -407,7 +407,7 @@ fn test_contact_note_empty_string() {
 // from_sync_data_full with favorite Tests
 // ============================================================
 
-// @scenario: sync_updates.feature:Contact sync includes favorite status
+// @scenario: sync_updates :: Contact sync includes favorite status
 #[test]
 fn test_contact_from_sync_data_full_with_favorite() {
     let public_key = [0x42u8; 32];

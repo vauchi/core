@@ -7,7 +7,7 @@
 
 use vauchi_core::network::simple_message::*;
 
-// @scenario: message_delivery:Relay provides storage confirmation
+// @scenario: message_delivery :: Relay provides storage confirmation
 #[test]
 fn test_encode_decode_roundtrip() {
     let handshake = SimpleHandshake {
@@ -32,7 +32,7 @@ fn test_encode_decode_roundtrip() {
     }
 }
 
-// @scenario: message_delivery:Relay provides storage confirmation
+// @scenario: message_delivery :: Relay provides storage confirmation
 #[test]
 fn test_legacy_exchange_message() {
     let msg = LegacyExchangeMessage::new("abc123", "def456", "Alice");
@@ -46,14 +46,14 @@ fn test_legacy_exchange_message() {
     assert_eq!(parsed.display_name, "Alice");
 }
 
-// @scenario: message_delivery:Relay provides storage confirmation
+// @scenario: message_delivery :: Relay provides storage confirmation
 #[test]
 fn test_legacy_exchange_response() {
     let msg = LegacyExchangeMessage::new_response("abc123", "def456", "Bob");
     assert!(msg.is_response);
 }
 
-// @scenario: message_delivery:Receive acknowledgment when update is delivered
+// @scenario: message_delivery :: Receive acknowledgment when update is delivered
 #[test]
 fn test_simple_ack() {
     let ack = create_simple_ack("msg-123", SimpleAckStatus::Delivered);
@@ -66,7 +66,7 @@ fn test_simple_ack() {
     }
 }
 
-// @scenario: security:Protocol rejects unsupported versions
+// @scenario: security :: Protocol rejects unsupported versions
 #[test]
 fn test_decode_rejects_unsupported_simple_protocol_version() {
     let mut envelope = create_simple_envelope(SimplePayload::Handshake(SimpleHandshake {
@@ -93,7 +93,7 @@ fn test_decode_rejects_unsupported_simple_protocol_version() {
     );
 }
 
-// @scenario: security:Protocol rejects version zero
+// @scenario: security :: Protocol rejects version zero
 #[test]
 fn test_decode_rejects_simple_version_zero() {
     let mut envelope = create_simple_envelope(SimplePayload::Handshake(SimpleHandshake {
@@ -111,7 +111,7 @@ fn test_decode_rejects_simple_version_zero() {
     assert!(result.is_err(), "Should reject version 0");
 }
 
-// @scenario: message_delivery:Relay provides storage confirmation
+// @scenario: message_delivery :: Relay provides storage confirmation
 #[test]
 fn test_encrypted_update() {
     let update = SimpleEncryptedUpdate {

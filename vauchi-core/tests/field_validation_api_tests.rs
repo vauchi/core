@@ -16,7 +16,7 @@ use vauchi_core::social::*;
 // Traces to: _private/features/field_validation.feature @blocked @trust
 // =============================================================================
 
-// @scenario: field_validation:Blocked contact's validation is ignored
+// @scenario: field_validation :: Blocked contact's validation is ignored
 #[test]
 fn test_get_field_validation_status_excludes_blocked_contacts() {
     use vauchi_core::contact_card::ContactCard;
@@ -107,7 +107,7 @@ fn test_get_field_validation_status_excludes_blocked_contacts() {
 // Traces to: _private/features/field_validation.feature @trust-weight
 // =============================================================================
 
-// @scenario: field_validation:Validation score determines trust level
+// @scenario: field_validation :: Validation score determines trust level
 #[test]
 fn test_from_weighted_score_thresholds() {
     // Below 0.1 -> Unverified
@@ -169,7 +169,7 @@ fn test_from_weighted_score_thresholds() {
     );
 }
 
-// @scenario: field_validation:Trust level considers validator relationship
+// @scenario: field_validation :: Trust level considers validator relationship
 #[test]
 fn test_from_validations_weighted_uses_contact_metadata() {
     use std::collections::HashMap;
@@ -251,7 +251,7 @@ fn test_from_validations_weighted_uses_contact_metadata() {
     );
 }
 
-// @scenario: field_validation:Sybil attack resistance
+// @scenario: field_validation :: Sybil attack resistance
 #[test]
 fn test_from_validations_weighted_unknown_validators_get_minimum_weight() {
     use std::collections::HashMap;
@@ -283,8 +283,8 @@ fn test_from_validations_weighted_unknown_validators_get_minimum_weight() {
     );
 }
 
-// @scenario: field_validation:Blocked contact's validation is ignored
-// @scenario: field_validation:Validation resets when field value changes
+// @scenario: field_validation :: Blocked contact's validation is ignored
+// @scenario: field_validation :: Validation resets when field value changes
 #[test]
 fn test_from_validations_weighted_filters_blocked_and_mismatched_values() {
     use std::collections::HashMap;
@@ -329,7 +329,7 @@ fn test_from_validations_weighted_filters_blocked_and_mismatched_values() {
     );
 }
 
-// @scenario: field_validation:Validation score determines trust level
+// @scenario: field_validation :: Validation score determines trust level
 #[test]
 fn test_from_validations_backward_compat() {
     // from_validations() should produce identical results to before
@@ -394,8 +394,8 @@ fn test_from_validations_backward_compat() {
 // Traces to: _private/features/field_validation.feature @delivery @sync
 // =============================================================================
 
-// @scenario: field_validation:Validate a contact's social profile
-// @scenario: field_validation:Validation count syncs from contacts
+// @scenario: field_validation :: Validate a contact's social profile
+// @scenario: field_validation :: Validation count syncs from contacts
 #[test]
 fn test_validate_field_queues_delivery_to_contact() {
     use vauchi_core::contact_card::ContactCard;
@@ -469,7 +469,7 @@ fn test_validate_field_queues_delivery_to_contact() {
     );
 }
 
-// @scenario: field_validation:Revoke validation
+// @scenario: field_validation :: Revoke validation
 #[test]
 fn test_revoke_field_validation_queues_revocation() {
     use vauchi_core::contact_card::ContactCard;
@@ -533,7 +533,7 @@ fn test_revoke_field_validation_queues_revocation() {
     );
 }
 
-// @scenario: field_validation:Validation is stored locally
+// @scenario: field_validation :: Validation is stored locally
 #[test]
 fn test_validate_field_queue_failure_does_not_fail_validation() {
     use vauchi_core::contact_card::ContactCard;
@@ -580,8 +580,8 @@ fn test_validate_field_queue_failure_does_not_fail_validation() {
 // Traces to: _private/features/field_validation.feature @incoming @sync
 // =============================================================================
 
-// @scenario: field_validation:Validations are cryptographically signed
-// @scenario: field_validation:Validation count syncs from contacts
+// @scenario: field_validation :: Validations are cryptographically signed
+// @scenario: field_validation :: Validation count syncs from contacts
 #[test]
 fn test_process_incoming_validation_verifies_and_stores() {
     use vauchi_core::contact_card::ContactCard;
@@ -638,7 +638,7 @@ fn test_process_incoming_validation_verifies_and_stores() {
     );
 }
 
-// @scenario: field_validation:Cannot forge validations
+// @scenario: field_validation :: Cannot forge validations
 #[test]
 fn test_process_incoming_validation_rejects_invalid_signature() {
     use vauchi_core::contact_card::ContactCard;
@@ -689,7 +689,7 @@ fn test_process_incoming_validation_rejects_invalid_signature() {
     );
 }
 
-// @scenario: field_validation:Cannot forge validations
+// @scenario: field_validation :: Cannot forge validations
 #[test]
 fn test_process_incoming_validation_rejects_validator_id_mismatch() {
     use vauchi_core::contact_card::ContactCard;
@@ -746,7 +746,7 @@ fn test_process_incoming_validation_rejects_validator_id_mismatch() {
     );
 }
 
-// @scenario: field_validation:Validation count syncs from contacts
+// @scenario: field_validation :: Validation count syncs from contacts
 #[test]
 fn test_process_incoming_validation_idempotent_on_duplicate() {
     use vauchi_core::contact_card::ContactCard;
@@ -801,7 +801,7 @@ fn test_process_incoming_validation_idempotent_on_duplicate() {
     );
 }
 
-// @scenario: field_validation:Revoke validation
+// @scenario: field_validation :: Revoke validation
 #[test]
 fn test_process_incoming_revocation_deletes_validation() {
     use vauchi_core::contact_card::ContactCard;
@@ -874,7 +874,7 @@ fn test_process_incoming_revocation_deletes_validation() {
     );
 }
 
-// @scenario: field_validation:Cannot forge validations
+// @scenario: field_validation :: Cannot forge validations
 #[test]
 fn test_process_incoming_revocation_rejects_validator_id_mismatch() {
     use vauchi_core::contact_card::ContactCard;

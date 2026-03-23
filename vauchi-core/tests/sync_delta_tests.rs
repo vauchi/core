@@ -9,7 +9,7 @@ use vauchi_core::contact_card::FieldType;
 use vauchi_core::sync::*;
 use vauchi_core::*;
 
-// @scenario: sync_updates.feature:Only changed fields transmitted
+// @scenario: sync_updates :: Only changed fields transmitted
 #[test]
 fn test_delta_compute_no_changes() {
     let card = ContactCard::new("Alice");
@@ -18,7 +18,7 @@ fn test_delta_compute_no_changes() {
     assert!(delta.is_empty());
 }
 
-// @scenario: sync_updates.feature:Only changed fields transmitted
+// @scenario: sync_updates :: Only changed fields transmitted
 #[test]
 fn test_delta_compute_display_name_change() {
     let old = ContactCard::new("Alice");
@@ -33,7 +33,7 @@ fn test_delta_compute_display_name_change() {
     ));
 }
 
-// @scenario: sync_updates.feature:Only changed fields transmitted
+// @scenario: sync_updates :: Only changed fields transmitted
 #[test]
 fn test_delta_compute_field_added() {
     let old = ContactCard::new("Alice");
@@ -75,7 +75,7 @@ fn test_delta_compute_field_modified() {
     assert!(!delta.is_empty());
 }
 
-// @scenario: sync_updates.feature:Only changed fields transmitted
+// @scenario: sync_updates :: Only changed fields transmitted
 #[test]
 fn test_delta_compute_field_removed() {
     let mut old = ContactCard::new("Alice");
@@ -94,7 +94,7 @@ fn test_delta_compute_field_removed() {
     ));
 }
 
-// @scenario: sync_updates.feature:Receive contact card update
+// @scenario: sync_updates :: Receive contact card update
 #[test]
 fn test_delta_apply_display_name() {
     let mut card = ContactCard::new("Alice");
@@ -115,7 +115,7 @@ fn test_delta_apply_display_name() {
     assert_eq!(card.display_name(), "Alice Smith");
 }
 
-// @scenario: sync_updates.feature:Receive contact card update
+// @scenario: sync_updates :: Receive contact card update
 #[test]
 fn test_delta_apply_add_field() {
     let mut card = ContactCard::new("Alice");
@@ -136,7 +136,7 @@ fn test_delta_apply_add_field() {
     assert_eq!(card.fields()[0].value(), "alice@example.com");
 }
 
-// @scenario: sync_updates.feature:Receive contact card update
+// @scenario: sync_updates :: Receive contact card update
 #[test]
 fn test_delta_apply_remove_field() {
     let mut card = ContactCard::new("Alice");
@@ -181,7 +181,7 @@ fn test_delta_roundtrip() {
     assert_eq!(result.fields().len(), 2);
 }
 
-// @scenario: sync_updates.feature:Verify update signatures
+// @scenario: sync_updates :: Verify update signatures
 #[test]
 fn test_delta_sign_and_verify() {
     let identity = Identity::create("Test User");
@@ -208,7 +208,7 @@ fn test_delta_sign_and_verify() {
     );
 }
 
-// @scenario: sync_updates.feature:Verify update signatures
+// @scenario: sync_updates :: Verify update signatures
 #[test]
 fn test_delta_signature_binds_sender_and_recipient() {
     let alice = Identity::create("Alice");
@@ -295,7 +295,7 @@ fn test_delta_multiple_changes() {
     assert!(has_added);
 }
 
-// @scenario: sync_updates.feature:Update only visible fields
+// @scenario: sync_updates :: Update only visible fields
 #[test]
 fn test_delta_filter_for_contact_all_visible() {
     use vauchi_core::contact::VisibilityRules;
@@ -318,7 +318,7 @@ fn test_delta_filter_for_contact_all_visible() {
     assert_eq!(filtered.changes.len(), 2);
 }
 
-// @scenario: sync_updates.feature:Update only visible fields
+// @scenario: sync_updates :: Update only visible fields
 #[test]
 fn test_delta_filter_for_contact_some_hidden() {
     use vauchi_core::contact::VisibilityRules;
@@ -345,7 +345,7 @@ fn test_delta_filter_for_contact_some_hidden() {
     );
 }
 
-// @scenario: sync_updates.feature:Update only visible fields
+// @scenario: sync_updates :: Update only visible fields
 #[test]
 fn test_delta_filter_for_contact_restricted_access() {
     use std::collections::HashSet;
@@ -374,7 +374,7 @@ fn test_delta_filter_for_contact_restricted_access() {
     assert_eq!(charlie_filtered.changes.len(), 1);
 }
 
-// @scenario: sync_updates.feature:Update only visible fields
+// @scenario: sync_updates :: Update only visible fields
 #[test]
 fn test_delta_filter_display_name_always_visible() {
     use vauchi_core::contact::VisibilityRules;
@@ -526,7 +526,7 @@ fn test_filter_with_handles_added_and_removed() {
 
 // === Zero Signature Rejection Tests (Item 102) ===
 
-// @scenario: sync_updates.feature:Verify update signatures
+// @scenario: sync_updates :: Verify update signatures
 #[test]
 fn test_unsigned_delta_rejected_by_verify() {
     let identity = Identity::create("Alice");
@@ -550,7 +550,7 @@ fn test_unsigned_delta_rejected_by_verify() {
 
 // === ValidationSummary in CardDelta Tests (Task 7 — G3) ===
 
-// @scenario: field_validation.feature:Validation counts in card updates
+// @scenario: field_validation :: Validation counts in card updates
 #[test]
 fn test_card_delta_with_validation_summary_roundtrip() {
     use std::collections::HashMap;
@@ -595,7 +595,7 @@ fn test_card_delta_with_validation_summary_roundtrip() {
     assert_eq!(entry.trust_level, "verified");
 }
 
-// @scenario: field_validation.feature:Backward compatible card updates
+// @scenario: field_validation :: Backward compatible card updates
 #[test]
 fn test_card_delta_without_summary_backward_compat() {
     // Simulate a JSON payload from an older client that has no validation_summary field
@@ -615,7 +615,7 @@ fn test_card_delta_without_summary_backward_compat() {
     );
 }
 
-// @scenario: field_validation.feature:Validation summary not serialized when empty
+// @scenario: field_validation :: Validation summary not serialized when empty
 #[test]
 fn test_card_delta_none_summary_not_serialized() {
     let old = ContactCard::new("Alice");
@@ -637,7 +637,7 @@ fn test_card_delta_none_summary_not_serialized() {
     );
 }
 
-// @scenario: field_validation.feature:Validation summary in filtered deltas
+// @scenario: field_validation :: Validation summary in filtered deltas
 #[test]
 fn test_card_delta_filter_preserves_validation_summary() {
     use std::collections::HashMap;
@@ -676,7 +676,7 @@ fn test_card_delta_filter_preserves_validation_summary() {
     assert_eq!(filtered_summary.get(&email_id).unwrap().count, 5);
 }
 
-// @scenario: field_validation.feature:Validation summary with multiple fields
+// @scenario: field_validation :: Validation summary with multiple fields
 #[test]
 fn test_card_delta_validation_summary_multiple_fields() {
     use std::collections::HashMap;

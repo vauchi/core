@@ -26,7 +26,7 @@ use vauchi_core::exchange::{
 // ============================================================
 
 /// Test: Create BLE advertisement for exchange
-// @scenario: ble_exchange.feature:Create BLE advertisement with valid token and signature
+// @scenario: ble_exchange :: Create BLE advertisement with valid token and signature
 #[test]
 fn test_create_ble_advertisement() {
     let keypair = SigningKeyPair::generate();
@@ -39,7 +39,7 @@ fn test_create_ble_advertisement() {
 }
 
 /// Test: Advertisement includes service UUID
-// @scenario: ble_exchange.feature:Advertisement includes correct Vauchi service UUID
+// @scenario: ble_exchange :: Advertisement includes correct Vauchi service UUID
 #[test]
 fn test_advertisement_service_uuid() {
     let keypair = SigningKeyPair::generate();
@@ -53,7 +53,7 @@ fn test_advertisement_service_uuid() {
 }
 
 /// Test: Advertisement payload fits in BLE limits
-// @scenario: ble_exchange.feature:Advertisement payload fits BLE limits
+// @scenario: ble_exchange :: Advertisement payload fits BLE limits
 #[test]
 fn test_advertisement_payload_size() {
     let keypair = SigningKeyPair::generate();
@@ -71,7 +71,7 @@ fn test_advertisement_payload_size() {
 }
 
 /// Test: Parse advertisement from bytes
-// @scenario: ble_exchange.feature:Advertisement serialization roundtrip
+// @scenario: ble_exchange :: Advertisement serialization roundtrip
 #[test]
 fn test_parse_advertisement() {
     let keypair = SigningKeyPair::generate();
@@ -92,7 +92,7 @@ fn test_parse_advertisement() {
 // ============================================================
 
 /// Test: Discover nearby devices
-// @scenario: ble_exchange.feature:Discover nearby devices
+// @scenario: ble_exchange :: Discover nearby devices
 #[test]
 fn test_discover_nearby_devices() {
     let device1 = BLEDevice::new("device-1", -50);
@@ -106,7 +106,7 @@ fn test_discover_nearby_devices() {
 }
 
 /// Test: Filter devices by exchange token
-// @scenario: ble_exchange.feature:Filter devices by exchange token
+// @scenario: ble_exchange :: Filter devices by exchange token
 #[test]
 fn test_filter_devices_with_exchange_token() {
     let token = [42u8; 32];
@@ -126,7 +126,7 @@ fn test_filter_devices_with_exchange_token() {
 }
 
 /// Test: Estimate distance from RSSI
-// @scenario: ble_exchange.feature:Distance estimation from RSSI
+// @scenario: ble_exchange :: Distance estimation from RSSI
 #[test]
 fn test_estimate_distance() {
     let device = BLEDevice::new("device-1", -50);
@@ -138,7 +138,7 @@ fn test_estimate_distance() {
 }
 
 /// Test: Device within range check
-// @scenario: ble_exchange.feature:Proximity verification passes for close devices
+// @scenario: ble_exchange :: Proximity verification passes for close devices
 #[test]
 fn test_device_within_range() {
     let device = BLEDevice::new("device-1", -50);
@@ -155,7 +155,7 @@ fn test_device_within_range() {
 // ============================================================
 
 /// Test: Create exchange session
-// @scenario: ble_exchange.feature:Exchange session creation
+// @scenario: ble_exchange :: Exchange session creation
 #[test]
 fn test_create_exchange_session() {
     let keypair = SigningKeyPair::generate();
@@ -166,7 +166,7 @@ fn test_create_exchange_session() {
 }
 
 /// Test: Start advertising
-// @scenario: ble_exchange.feature:Session transitions to Advertising
+// @scenario: ble_exchange :: Session transitions to Advertising
 #[test]
 fn test_start_advertising() {
     let keypair = SigningKeyPair::generate();
@@ -180,7 +180,7 @@ fn test_start_advertising() {
 }
 
 /// Test: Start scanning
-// @scenario: ble_exchange.feature:Session transitions to Scanning
+// @scenario: ble_exchange :: Session transitions to Scanning
 #[test]
 fn test_start_scanning() {
     let keypair = SigningKeyPair::generate();
@@ -192,7 +192,7 @@ fn test_start_scanning() {
 }
 
 /// Test: Connect to discovered device
-// @scenario: ble_exchange.feature:Connect to discovered device
+// @scenario: ble_exchange :: Connect to discovered device
 #[test]
 fn test_connect_to_device() {
     let keypair = SigningKeyPair::generate();
@@ -210,7 +210,7 @@ fn test_connect_to_device() {
 }
 
 /// Test: Exchange contact data
-// @scenario: ble_exchange.feature:Full mock exchange with data transfer
+// @scenario: ble_exchange :: Full mock exchange with data transfer
 #[test]
 fn test_exchange_contact_data() {
     let alice_keypair = SigningKeyPair::generate();
@@ -245,7 +245,7 @@ fn test_exchange_contact_data() {
 }
 
 /// Test: Session timeout
-// @scenario: ble_exchange.feature:Session timeout
+// @scenario: ble_exchange :: Session timeout
 #[test]
 fn test_session_timeout() {
     let keypair = SigningKeyPair::generate();
@@ -261,7 +261,7 @@ fn test_session_timeout() {
 }
 
 /// Test: Cancel session
-// @scenario: ble_exchange.feature:Cancel session
+// @scenario: ble_exchange :: Cancel session
 #[test]
 fn test_cancel_session() {
     let keypair = SigningKeyPair::generate();
@@ -279,8 +279,8 @@ fn test_cancel_session() {
 // ============================================================
 
 /// Test: Verify device proximity before exchange
-// @scenario: ble_exchange.feature:Proximity verification passes for close devices
-// @scenario: ble_exchange.feature:Proximity fails when device is too far
+// @scenario: ble_exchange :: Proximity verification passes for close devices
+// @scenario: ble_exchange :: Proximity fails when device is too far
 #[test]
 fn test_verify_proximity_before_exchange() {
     let device = BLEDevice::new("peer", -50);
@@ -297,7 +297,7 @@ fn test_verify_proximity_before_exchange() {
 }
 
 /// Test: Proximity challenge-response
-// @scenario: ble_exchange.feature:Proximity challenge and response
+// @scenario: ble_exchange :: Proximity challenge and response
 #[test]
 fn test_proximity_challenge_response() {
     let verifier = MockBLEVerifier::success_at_distance(1.0);
@@ -313,7 +313,7 @@ fn test_proximity_challenge_response() {
 }
 
 /// Test: Proximity verification fails when too far
-// @scenario: ble_exchange.feature:Proximity fails when device is too far
+// @scenario: ble_exchange :: Proximity fails when device is too far
 #[test]
 fn test_proximity_fails_when_too_far() {
     let device = BLEDevice::new("far-device", -90);
@@ -330,7 +330,7 @@ fn test_proximity_fails_when_too_far() {
 // ============================================================
 
 /// Test: Discovery failure handling
-// @scenario: ble_exchange.feature:Discovery failure handling
+// @scenario: ble_exchange :: Discovery failure handling
 #[test]
 fn test_discovery_failure() {
     let verifier = MockBLEVerifier::failure();
@@ -341,7 +341,7 @@ fn test_discovery_failure() {
 }
 
 /// Test: Connection to device without token fails
-// @scenario: ble_exchange.feature:Connection requires exchange token
+// @scenario: ble_exchange :: Connection requires exchange token
 #[test]
 fn test_connect_requires_exchange_token() {
     let keypair = SigningKeyPair::generate();
@@ -356,7 +356,7 @@ fn test_connect_requires_exchange_token() {
 }
 
 /// Test: Cannot exchange data without connection
-// @scenario: ble_exchange.feature:Cannot exchange without connection
+// @scenario: ble_exchange :: Cannot exchange without connection
 #[test]
 fn test_cannot_exchange_without_connection() {
     let keypair = SigningKeyPair::generate();
@@ -375,7 +375,7 @@ fn test_cannot_exchange_without_connection() {
 // ============================================================
 
 /// Test: Advertisement serialization roundtrip
-// @scenario: ble_exchange.feature:Advertisement serialization roundtrip
+// @scenario: ble_exchange :: Advertisement serialization roundtrip
 #[test]
 fn test_advertisement_serialization() {
     let keypair = SigningKeyPair::generate();
@@ -389,7 +389,7 @@ fn test_advertisement_serialization() {
 }
 
 /// Test: Exchange session state serialization
-// @scenario: ble_exchange.feature:Session state serialization roundtrip
+// @scenario: ble_exchange :: Session state serialization roundtrip
 #[test]
 fn test_session_state_serialization() {
     let state = BLEExchangeState::Connected {

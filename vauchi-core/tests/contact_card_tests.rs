@@ -7,7 +7,7 @@
 
 use vauchi_core::*;
 
-// @scenario: contact_card_management.feature:Create contact card with display name
+// @scenario: contact_card_management :: Create contact card with display name
 #[test]
 fn test_create_card() {
     let card = ContactCard::new("Test User");
@@ -15,8 +15,8 @@ fn test_create_card() {
     assert!(card.fields().is_empty());
 }
 
-// @scenario: contact_card_management.feature:Add field to contact card
-// @scenario: contact_card_management.feature:Remove field from contact card
+// @scenario: contact_card_management :: Add field to contact card
+// @scenario: contact_card_management :: Remove field from contact card
 #[test]
 fn test_add_and_remove_field() {
     let mut card = ContactCard::new("Test");
@@ -29,14 +29,14 @@ fn test_add_and_remove_field() {
     assert!(card.fields().is_empty());
 }
 
-// @scenario: onboarding_workflow.feature:Field visibility default empty (privacy-first)
+// @scenario: onboarding_workflow :: Field visibility default empty (privacy-first)
 #[test]
 fn test_contact_card_field_visibility_default_empty() {
     let card = ContactCard::new("Alice");
     assert!(card.field_visibility().is_empty());
 }
 
-// @scenario: onboarding_workflow.feature:Show and hide field in no-group mode
+// @scenario: onboarding_workflow :: Show and hide field in no-group mode
 #[test]
 fn test_contact_card_show_hide_field() {
     let mut card = ContactCard::new("Alice");
@@ -56,7 +56,7 @@ fn test_contact_card_show_hide_field() {
     assert!(!card.is_field_shown(&field_id));
 }
 
-// @scenario: onboarding_workflow.feature:Remove field cleans up field_visibility
+// @scenario: onboarding_workflow :: Remove field cleans up field_visibility
 #[test]
 fn test_remove_field_cleans_up_field_visibility() {
     let mut card = ContactCard::new("Alice");

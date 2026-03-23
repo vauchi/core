@@ -89,7 +89,7 @@ fn test_canonical_bytes_starts_with_domain_separator() {
 
 // === AccountRevoked Message ===
 
-// @scenario: privacy_compliance.feature:Revocation signal is cryptographically authenticated
+// @scenario: privacy_compliance :: Revocation signal is cryptographically authenticated
 #[test]
 fn test_account_revoked_sign_and_verify() {
     let identity = Identity::create("Alice Test");
@@ -103,7 +103,7 @@ fn test_account_revoked_sign_and_verify() {
     assert!(revoked.verify(identity.signing_public_key()));
 }
 
-// @scenario: privacy_compliance.feature:Spoofed revocation signal is rejected
+// @scenario: privacy_compliance :: Spoofed revocation signal is rejected
 #[test]
 fn test_account_revoked_rejects_tampered_timestamp() {
     let identity = Identity::create("Alice Test");
@@ -118,7 +118,7 @@ fn test_account_revoked_rejects_tampered_timestamp() {
     assert!(!revoked.verify(identity.signing_public_key()));
 }
 
-// @scenario: privacy_compliance.feature:Spoofed revocation signal is rejected
+// @scenario: privacy_compliance :: Spoofed revocation signal is rejected
 #[test]
 fn test_account_revoked_rejects_wrong_key() {
     let identity = Identity::create("Alice");
@@ -149,7 +149,7 @@ fn test_account_revoked_serialization_roundtrip() {
 
 // === Revocation Processing ===
 
-// @scenario: privacy_compliance.feature:Account deletion sends revocation signal to all contacts
+// @scenario: privacy_compliance :: Account deletion sends revocation signal to all contacts
 #[test]
 fn test_process_revocation_deletes_contact_and_records_tombstone() {
     let storage = test_storage();
@@ -175,7 +175,7 @@ fn test_process_revocation_deletes_contact_and_records_tombstone() {
     assert!(storage.is_sender_revoked(alice_contact.id()).unwrap());
 }
 
-// @scenario: privacy_compliance.feature:Spoofed revocation signal is rejected
+// @scenario: privacy_compliance :: Spoofed revocation signal is rejected
 #[test]
 fn test_process_revocation_rejects_invalid_signature() {
     let storage = test_storage();
@@ -203,7 +203,7 @@ fn test_process_revocation_rejects_invalid_signature() {
         .expect("expected Some");
 }
 
-// @scenario: privacy_compliance.feature:Replayed revocation for re-established contact is rejected
+// @scenario: privacy_compliance :: Replayed revocation for re-established contact is rejected
 #[test]
 fn test_process_revocation_stale_rejected() {
     let storage = test_storage();
@@ -240,7 +240,7 @@ fn test_process_revocation_unknown_sender_noop() {
     result.expect("expected success");
 }
 
-// @scenario: privacy_compliance.feature:Card update arriving after revocation is discarded
+// @scenario: privacy_compliance :: Card update arriving after revocation is discarded
 #[test]
 fn test_update_after_revocation_discarded_via_tombstone() {
     let storage = test_storage();
@@ -254,7 +254,7 @@ fn test_update_after_revocation_discarded_via_tombstone() {
     assert!(storage.is_sender_revoked("alice_id").unwrap());
 }
 
-// @scenario: privacy_compliance.feature:Account deletion sends revocation signal to all contacts
+// @scenario: privacy_compliance :: Account deletion sends revocation signal to all contacts
 #[test]
 fn test_revocation_only_deletes_matching_sender() {
     let storage = test_storage();
@@ -280,7 +280,7 @@ fn test_revocation_only_deletes_matching_sender() {
         .expect("expected Some");
 }
 
-// @scenario: security.feature:Tampered exchange data is rejected
+// @scenario: security :: Tampered exchange data is rejected
 #[test]
 fn test_revocation_with_future_timestamp() {
     let storage = test_storage();
@@ -303,7 +303,7 @@ fn test_revocation_with_future_timestamp() {
     assert!(storage.load_contact(alice_contact.id()).unwrap().is_none());
 }
 
-// @scenario: privacy_compliance.feature:Account deletion sends revocation signal to all contacts
+// @scenario: privacy_compliance :: Account deletion sends revocation signal to all contacts
 #[test]
 fn test_revocation_with_minimum_valid_timestamp() {
     let storage = test_storage();

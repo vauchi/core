@@ -13,7 +13,7 @@ use vauchi_core::contact_card::{ContactAction, ContactField, FieldType};
 // Phone Number → tel: URI
 // ============================================================
 
-// @scenario: contact_actions:Tap phone number opens dialer
+// @scenario: contact_actions :: Tap phone number opens dialer
 #[test]
 fn test_phone_field_generates_tel_uri() {
     let field = ContactField::new(FieldType::Phone, "Mobile", "+1-555-123-4567");
@@ -21,7 +21,7 @@ fn test_phone_field_generates_tel_uri() {
     assert_eq!(uri, Some("tel:+1-555-123-4567".to_string()));
 }
 
-// @scenario: contact_actions:Phone number with international format
+// @scenario: contact_actions :: Phone number with international format
 #[test]
 fn test_phone_with_spaces_generates_tel_uri() {
     let field = ContactField::new(FieldType::Phone, "International", "+44 20 7946 0958");
@@ -31,7 +31,7 @@ fn test_phone_with_spaces_generates_tel_uri() {
     assert!(uri.unwrap().starts_with("tel:"));
 }
 
-// @scenario: contact_actions:Various phone number formats are normalized for dialer
+// @scenario: contact_actions :: Various phone number formats are normalized for dialer
 #[test]
 fn test_phone_with_parentheses() {
     let field = ContactField::new(FieldType::Phone, "Home", "(555) 123-4567");
@@ -40,7 +40,7 @@ fn test_phone_with_parentheses() {
     assert!(uri.unwrap().starts_with("tel:"));
 }
 
-// @scenario: contact_actions:Tap phone number opens dialer
+// @scenario: contact_actions :: Tap phone number opens dialer
 #[test]
 fn test_phone_to_action_returns_call() {
     let field = ContactField::new(FieldType::Phone, "Mobile", "+1-555-123-4567");
@@ -52,7 +52,7 @@ fn test_phone_to_action_returns_call() {
 // Email → mailto: URI
 // ============================================================
 
-// @scenario: contact_actions:Tap email opens mail client
+// @scenario: contact_actions :: Tap email opens mail client
 #[test]
 fn test_email_field_generates_mailto_uri() {
     let field = ContactField::new(FieldType::Email, "Work", "bob@company.com");
@@ -60,7 +60,7 @@ fn test_email_field_generates_mailto_uri() {
     assert_eq!(uri, Some("mailto:bob@company.com".to_string()));
 }
 
-// @scenario: contact_actions:Email with special characters
+// @scenario: contact_actions :: Email with special characters
 #[test]
 fn test_email_with_plus_sign() {
     let field = ContactField::new(FieldType::Email, "Personal", "bob+work@company.com");
@@ -68,7 +68,7 @@ fn test_email_with_plus_sign() {
     assert_eq!(uri, Some("mailto:bob+work@company.com".to_string()));
 }
 
-// @scenario: contact_actions:Tap email opens mail client
+// @scenario: contact_actions :: Tap email opens mail client
 #[test]
 fn test_email_to_action_returns_send_email() {
     let field = ContactField::new(FieldType::Email, "Work", "bob@test.com");
@@ -80,7 +80,7 @@ fn test_email_to_action_returns_send_email() {
 // Website → https:/http: URI
 // ============================================================
 
-// @scenario: contact_actions:Tap website opens browser
+// @scenario: contact_actions :: Tap website opens browser
 #[test]
 fn test_website_with_https_preserved() {
     let field = ContactField::new(FieldType::Website, "Blog", "https://bobsmith.com");
@@ -88,7 +88,7 @@ fn test_website_with_https_preserved() {
     assert_eq!(uri, Some("https://bobsmith.com".to_string()));
 }
 
-// @scenario: contact_actions:HTTP website preserves protocol
+// @scenario: contact_actions :: HTTP website preserves protocol
 #[test]
 fn test_website_with_http_preserved() {
     let field = ContactField::new(FieldType::Website, "Legacy", "http://old-site.com");
@@ -96,7 +96,7 @@ fn test_website_with_http_preserved() {
     assert_eq!(uri, Some("http://old-site.com".to_string()));
 }
 
-// @scenario: contact_actions:Website without protocol prefix
+// @scenario: contact_actions :: Website without protocol prefix
 #[test]
 fn test_website_without_protocol_adds_https() {
     let field = ContactField::new(FieldType::Website, "Site", "bobsmith.com");
@@ -104,7 +104,7 @@ fn test_website_without_protocol_adds_https() {
     assert_eq!(uri, Some("https://bobsmith.com".to_string()));
 }
 
-// @scenario: contact_actions:Tap website opens browser
+// @scenario: contact_actions :: Tap website opens browser
 #[test]
 fn test_website_to_action_returns_open_url() {
     let field = ContactField::new(FieldType::Website, "Site", "https://example.com");
@@ -116,7 +116,7 @@ fn test_website_to_action_returns_open_url() {
 // Social → Profile URL
 // ============================================================
 
-// @scenario: contact_actions:Tap social media opens profile
+// @scenario: contact_actions :: Tap social media opens profile
 #[test]
 fn test_social_twitter_generates_profile_url() {
     let field = ContactField::new(FieldType::Social, "Twitter", "@bobsmith");
@@ -124,7 +124,7 @@ fn test_social_twitter_generates_profile_url() {
     assert_eq!(uri, Some("https://twitter.com/bobsmith".to_string()));
 }
 
-// @scenario: contact_actions:Tap social media opens profile
+// @scenario: contact_actions :: Tap social media opens profile
 #[test]
 fn test_social_twitter_without_at_sign() {
     let field = ContactField::new(FieldType::Social, "Twitter", "bobsmith");
@@ -132,7 +132,7 @@ fn test_social_twitter_without_at_sign() {
     assert_eq!(uri, Some("https://twitter.com/bobsmith".to_string()));
 }
 
-// @scenario: contact_actions:Tap social media opens profile
+// @scenario: contact_actions :: Tap social media opens profile
 #[test]
 fn test_social_github_generates_profile_url() {
     let field = ContactField::new(FieldType::Social, "GitHub", "octocat");
@@ -140,7 +140,7 @@ fn test_social_github_generates_profile_url() {
     assert_eq!(uri, Some("https://github.com/octocat".to_string()));
 }
 
-// @scenario: contact_actions:Tap social media opens profile
+// @scenario: contact_actions :: Tap social media opens profile
 #[test]
 fn test_social_linkedin_generates_profile_url() {
     let field = ContactField::new(FieldType::Social, "LinkedIn", "in/bobsmith");
@@ -148,7 +148,7 @@ fn test_social_linkedin_generates_profile_url() {
     assert_eq!(uri, Some("https://linkedin.com/in/bobsmith".to_string()));
 }
 
-// @scenario: contact_actions:Tap social media opens profile
+// @scenario: contact_actions :: Tap social media opens profile
 #[test]
 fn test_social_instagram_generates_profile_url() {
     let field = ContactField::new(FieldType::Social, "Instagram", "bob.smith");
@@ -156,7 +156,7 @@ fn test_social_instagram_generates_profile_url() {
     assert_eq!(uri, Some("https://instagram.com/bob.smith".to_string()));
 }
 
-// @scenario: contact_actions:Tap social media opens profile
+// @scenario: contact_actions :: Tap social media opens profile
 #[test]
 fn test_social_facebook_generates_profile_url() {
     let field = ContactField::new(FieldType::Social, "Facebook", "bob.smith.123");
@@ -168,7 +168,7 @@ fn test_social_facebook_generates_profile_url() {
 // These networks are in the SocialNetworkRegistry but were previously
 // not supported by the hardcoded social_url_template() function.
 
-// @scenario: contact_actions:Tap social media opens profile
+// @scenario: contact_actions :: Tap social media opens profile
 #[test]
 fn test_social_twitch_generates_profile_url() {
     let field = ContactField::new(FieldType::Social, "Twitch", "streamer42");
@@ -176,7 +176,7 @@ fn test_social_twitch_generates_profile_url() {
     assert_eq!(uri, Some("https://twitch.tv/streamer42".to_string()));
 }
 
-// @scenario: contact_actions:Tap social media opens profile
+// @scenario: contact_actions :: Tap social media opens profile
 #[test]
 fn test_social_gitlab_generates_profile_url() {
     let field = ContactField::new(FieldType::Social, "GitLab", "devuser");
@@ -184,7 +184,7 @@ fn test_social_gitlab_generates_profile_url() {
     assert_eq!(uri, Some("https://gitlab.com/devuser".to_string()));
 }
 
-// @scenario: contact_actions:Tap social media opens profile
+// @scenario: contact_actions :: Tap social media opens profile
 #[test]
 fn test_social_telegram_generates_profile_url() {
     let field = ContactField::new(FieldType::Social, "Telegram", "alice");
@@ -192,7 +192,7 @@ fn test_social_telegram_generates_profile_url() {
     assert_eq!(uri, Some("https://t.me/alice".to_string()));
 }
 
-// @scenario: contact_actions:Tap social media opens profile
+// @scenario: contact_actions :: Tap social media opens profile
 #[test]
 fn test_social_discord_generates_profile_url() {
     let field = ContactField::new(FieldType::Social, "Discord", "user123");
@@ -200,7 +200,7 @@ fn test_social_discord_generates_profile_url() {
     assert_eq!(uri, Some("https://discord.com/users/user123".to_string()));
 }
 
-// @scenario: contact_actions:Tap social media opens profile
+// @scenario: contact_actions :: Tap social media opens profile
 #[test]
 fn test_social_threads_generates_profile_url() {
     let field = ContactField::new(FieldType::Social, "Threads", "@alice");
@@ -208,7 +208,7 @@ fn test_social_threads_generates_profile_url() {
     assert_eq!(uri, Some("https://threads.net/@alice".to_string()));
 }
 
-// @scenario: contact_actions:Tap social media opens profile
+// @scenario: contact_actions :: Tap social media opens profile
 #[test]
 fn test_social_spotify_generates_profile_url() {
     let field = ContactField::new(FieldType::Social, "Spotify", "musicfan");
@@ -219,7 +219,7 @@ fn test_social_spotify_generates_profile_url() {
     );
 }
 
-// @scenario: contact_actions:Tap social media opens profile
+// @scenario: contact_actions :: Tap social media opens profile
 #[test]
 fn test_social_x_alias_resolves_to_twitter() {
     let field = ContactField::new(FieldType::Social, "X", "@alice");
@@ -227,7 +227,7 @@ fn test_social_x_alias_resolves_to_twitter() {
     assert_eq!(uri, Some("https://twitter.com/alice".to_string()));
 }
 
-// @scenario: contact_actions:Tap social media opens profile
+// @scenario: contact_actions :: Tap social media opens profile
 #[test]
 fn test_social_linkedin_with_in_prefix_no_duplication() {
     // User enters "in/johndoe" — should not produce "in/in/johndoe"
@@ -244,7 +244,7 @@ fn test_social_unknown_network_returns_none() {
     assert!(uri.is_none());
 }
 
-// @scenario: contact_actions:Tap social media opens profile
+// @scenario: contact_actions :: Tap social media opens profile
 #[test]
 fn test_social_to_action_returns_open_url() {
     let field = ContactField::new(FieldType::Social, "GitHub", "octocat");
@@ -256,7 +256,7 @@ fn test_social_to_action_returns_open_url() {
 // Address → Map Query
 // ============================================================
 
-// @scenario: contact_actions:Tap address opens maps application
+// @scenario: contact_actions :: Tap address opens maps application
 #[test]
 fn test_address_generates_map_query() {
     let field = ContactField::new(FieldType::Address, "Home", "123 Main St, City, ST 12345");
@@ -267,7 +267,7 @@ fn test_address_generates_map_query() {
     assert!(uri_str.starts_with("geo:") || uri_str.contains("maps"));
 }
 
-// @scenario: contact_actions:Address opens web maps on desktop
+// @scenario: contact_actions :: Address opens web maps on desktop
 #[test]
 fn test_address_is_url_encoded() {
     let field = ContactField::new(
@@ -282,7 +282,7 @@ fn test_address_is_url_encoded() {
     assert!(!uri_str.contains(' ') || uri_str.contains("%20") || uri_str.contains('+'));
 }
 
-// @scenario: contact_actions:Tap address opens maps application
+// @scenario: contact_actions :: Tap address opens maps application
 #[test]
 fn test_address_to_action_returns_open_map() {
     let field = ContactField::new(FieldType::Address, "Home", "123 Main St");
@@ -294,7 +294,7 @@ fn test_address_to_action_returns_open_map() {
 // Custom Field → Heuristic Detection
 // ============================================================
 
-// @scenario: contact_actions:Custom field with phone-like value offers call
+// @scenario: contact_actions :: Custom field with phone-like value offers call
 #[test]
 fn test_custom_field_with_phone_pattern_detected() {
     let field = ContactField::new(FieldType::Custom, "Signal", "+1-555-987-6543");
@@ -302,7 +302,7 @@ fn test_custom_field_with_phone_pattern_detected() {
     assert_eq!(detected, Some(FieldType::Phone));
 }
 
-// @scenario: contact_actions:Custom field with email-like value offers email
+// @scenario: contact_actions :: Custom field with email-like value offers email
 #[test]
 fn test_custom_field_with_email_pattern_detected() {
     let field = ContactField::new(FieldType::Custom, "Alternate", "bob.alt@email.com");
@@ -310,7 +310,7 @@ fn test_custom_field_with_email_pattern_detected() {
     assert_eq!(detected, Some(FieldType::Email));
 }
 
-// @scenario: contact_actions:Custom field with URL-like value offers browser
+// @scenario: contact_actions :: Custom field with URL-like value offers browser
 #[test]
 fn test_custom_field_with_url_pattern_detected() {
     let field = ContactField::new(FieldType::Custom, "Portfolio", "https://portfolio.bob.com");
@@ -318,7 +318,7 @@ fn test_custom_field_with_url_pattern_detected() {
     assert_eq!(detected, Some(FieldType::Website));
 }
 
-// @scenario: contact_actions:Custom field with plain text shows copy option
+// @scenario: contact_actions :: Custom field with plain text shows copy option
 #[test]
 fn test_custom_field_with_plain_text_not_detected() {
     let field = ContactField::new(FieldType::Custom, "Notes", "Met at conference");
@@ -326,7 +326,7 @@ fn test_custom_field_with_plain_text_not_detected() {
     assert!(detected.is_none());
 }
 
-// @scenario: contact_actions:Custom field with phone-like value offers call
+// @scenario: contact_actions :: Custom field with phone-like value offers call
 #[test]
 fn test_custom_field_uses_heuristic_for_uri() {
     let field = ContactField::new(FieldType::Custom, "Signal", "+1-555-987-6543");
@@ -336,7 +336,7 @@ fn test_custom_field_uses_heuristic_for_uri() {
     assert!(uri.unwrap().starts_with("tel:"));
 }
 
-// @scenario: contact_actions:Custom field with plain text shows copy option
+// @scenario: contact_actions :: Custom field with plain text shows copy option
 #[test]
 fn test_custom_field_plain_text_returns_none() {
     let field = ContactField::new(FieldType::Custom, "Notes", "Met at conference");
@@ -344,7 +344,7 @@ fn test_custom_field_plain_text_returns_none() {
     assert!(uri.is_none());
 }
 
-// @scenario: contact_actions:Custom field with plain text shows copy option
+// @scenario: contact_actions :: Custom field with plain text shows copy option
 #[test]
 fn test_custom_to_action_copy_for_plain_text() {
     let field = ContactField::new(FieldType::Custom, "Notes", "Met at conference");
@@ -356,7 +356,7 @@ fn test_custom_to_action_copy_for_plain_text() {
 // Security: URI Scheme Whitelist
 // ============================================================
 
-// @scenario: contact_actions:URLs are validated before opening
+// @scenario: contact_actions :: URLs are validated before opening
 #[test]
 fn test_blocked_javascript_scheme() {
     // Even if someone tries to inject javascript:, it should be blocked
@@ -365,7 +365,7 @@ fn test_blocked_javascript_scheme() {
     assert!(uri.is_none());
 }
 
-// @scenario: contact_actions:Only safe URI schemes are allowed
+// @scenario: contact_actions :: Only safe URI schemes are allowed
 #[test]
 fn test_blocked_file_scheme() {
     let field = ContactField::new(FieldType::Website, "Local", "file:///etc/passwd");
@@ -373,7 +373,7 @@ fn test_blocked_file_scheme() {
     assert!(uri.is_none());
 }
 
-// @scenario: contact_actions:Only safe URI schemes are allowed
+// @scenario: contact_actions :: Only safe URI schemes are allowed
 #[test]
 fn test_blocked_data_scheme() {
     let field = ContactField::new(
@@ -385,62 +385,62 @@ fn test_blocked_data_scheme() {
     assert!(uri.is_none());
 }
 
-// @scenario: contact_actions:Allowed URI schemes whitelist (#47)
-// @scenario: contact_actions.feature:Allowed URI schemes whitelist
+// @scenario: contact_actions :: Allowed URI schemes whitelist (#47)
+// @scenario: contact_actions :: Allowed URI schemes whitelist
 #[test]
 fn test_allowed_tel_scheme() {
     assert!(vauchi_core::contact_card::is_allowed_scheme("tel"));
 }
 
-// @scenario: contact_actions:Allowed URI schemes whitelist (#47)
+// @scenario: contact_actions :: Allowed URI schemes whitelist (#47)
 #[test]
 fn test_allowed_mailto_scheme() {
     assert!(vauchi_core::contact_card::is_allowed_scheme("mailto"));
 }
 
-// @scenario: contact_actions:Allowed URI schemes whitelist (#47)
+// @scenario: contact_actions :: Allowed URI schemes whitelist (#47)
 #[test]
 fn test_allowed_https_scheme() {
     assert!(vauchi_core::contact_card::is_allowed_scheme("https"));
 }
 
-// @scenario: contact_actions:Allowed URI schemes whitelist (#47)
+// @scenario: contact_actions :: Allowed URI schemes whitelist (#47)
 #[test]
 fn test_allowed_http_scheme() {
     assert!(vauchi_core::contact_card::is_allowed_scheme("http"));
 }
 
-// @scenario: contact_actions:Allowed URI schemes whitelist (#47)
+// @scenario: contact_actions :: Allowed URI schemes whitelist (#47)
 #[test]
 fn test_allowed_sms_scheme() {
     assert!(vauchi_core::contact_card::is_allowed_scheme("sms"));
 }
 
-// @scenario: contact_actions:Allowed URI schemes whitelist (#47)
+// @scenario: contact_actions :: Allowed URI schemes whitelist (#47)
 #[test]
 fn test_allowed_geo_scheme() {
     assert!(vauchi_core::contact_card::is_allowed_scheme("geo"));
 }
 
-// @scenario: contact_actions:Allowed URI schemes whitelist (#47)
+// @scenario: contact_actions :: Allowed URI schemes whitelist (#47)
 #[test]
 fn test_blocked_scheme_javascript() {
     assert!(!vauchi_core::contact_card::is_allowed_scheme("javascript"));
 }
 
-// @scenario: contact_actions:Allowed URI schemes whitelist (#47)
+// @scenario: contact_actions :: Allowed URI schemes whitelist (#47)
 #[test]
 fn test_blocked_scheme_file() {
     assert!(!vauchi_core::contact_card::is_allowed_scheme("file"));
 }
 
-// @scenario: contact_actions:Allowed URI schemes whitelist (#47)
+// @scenario: contact_actions :: Allowed URI schemes whitelist (#47)
 #[test]
 fn test_blocked_scheme_data() {
     assert!(!vauchi_core::contact_card::is_allowed_scheme("data"));
 }
 
-// @scenario: contact_actions:Allowed URI schemes whitelist (#47)
+// @scenario: contact_actions :: Allowed URI schemes whitelist (#47)
 #[test]
 fn test_blocked_scheme_vbscript() {
     assert!(!vauchi_core::contact_card::is_allowed_scheme("vbscript"));
@@ -464,7 +464,7 @@ fn test_whitespace_only_value_returns_none() {
     assert!(uri.is_none());
 }
 
-// @scenario: contact_actions:Email with special characters
+// @scenario: contact_actions :: Email with special characters
 #[test]
 fn test_special_characters_in_email_encoded() {
     let field = ContactField::new(FieldType::Email, "Test", "test&user@example.com");
@@ -486,11 +486,11 @@ fn test_unicode_in_address_encoded() {
 
 // ============================================================
 // Secondary Actions (Context Menus)
-// @scenario: contact_actions:Context menu shows all applicable actions
+// @scenario: contact_actions :: Context menu shows all applicable actions
 // ============================================================
 
-// @scenario: contact_actions:Phone field offers Call and SMS actions in context menu
-// @scenario: contact_actions.feature:Long press phone number shows action menu
+// @scenario: contact_actions :: Phone field offers Call and SMS actions in context menu
+// @scenario: contact_actions :: Long press phone number shows action menu
 #[test]
 fn test_phone_secondary_actions_call_and_sms() {
     let field = ContactField::new(FieldType::Phone, "Mobile", "+1-555-123-4567");
@@ -501,8 +501,8 @@ fn test_phone_secondary_actions_call_and_sms() {
     assert!(actions.contains(&ContactAction::CopyToClipboard));
 }
 
-// @scenario: contact_actions:Email field offers Send Email and Copy actions
-// @scenario: contact_actions.feature:Long press email shows action menu
+// @scenario: contact_actions :: Email field offers Send Email and Copy actions
+// @scenario: contact_actions :: Long press email shows action menu
 #[test]
 fn test_email_secondary_actions() {
     let field = ContactField::new(FieldType::Email, "Work", "bob@company.com");
@@ -512,8 +512,8 @@ fn test_email_secondary_actions() {
     assert!(actions.contains(&ContactAction::CopyToClipboard));
 }
 
-// @scenario: contact_actions:Website field offers Open URL and Copy actions
-// @scenario: contact_actions.feature:Long press website shows action menu
+// @scenario: contact_actions :: Website field offers Open URL and Copy actions
+// @scenario: contact_actions :: Long press website shows action menu
 #[test]
 fn test_website_secondary_actions() {
     let field = ContactField::new(FieldType::Website, "Blog", "https://example.com");
@@ -523,8 +523,8 @@ fn test_website_secondary_actions() {
     assert!(actions.contains(&ContactAction::CopyToClipboard));
 }
 
-// @scenario: contact_actions:Address field offers Get Directions and Open Map and Copy actions
-// @scenario: contact_actions.feature:Long press address shows action menu
+// @scenario: contact_actions :: Address field offers Get Directions and Open Map and Copy actions
+// @scenario: contact_actions :: Long press address shows action menu
 #[test]
 fn test_address_secondary_actions() {
     let field = ContactField::new(FieldType::Address, "Home", "123 Main St, City");
@@ -543,8 +543,8 @@ fn test_address_secondary_actions() {
     assert!(actions.contains(&ContactAction::CopyToClipboard));
 }
 
-// @scenario: contact_actions:Social field offers Open Profile and Copy actions
-// @scenario: contact_actions.feature:Long press social field shows action menu
+// @scenario: contact_actions :: Social field offers Open Profile and Copy actions
+// @scenario: contact_actions :: Long press social field shows action menu
 #[test]
 fn test_social_secondary_actions() {
     let field = ContactField::new(FieldType::Social, "Twitter", "@bobsmith");
@@ -553,8 +553,8 @@ fn test_social_secondary_actions() {
     assert!(actions.contains(&ContactAction::CopyToClipboard));
 }
 
-// @scenario: contact_actions:Custom field with actionable content offers actions
-// @scenario: contact_actions.feature:Long press custom field shows contextual menu
+// @scenario: contact_actions :: Custom field with actionable content offers actions
+// @scenario: contact_actions :: Long press custom field shows contextual menu
 #[test]
 fn test_custom_field_secondary_actions() {
     let field = ContactField::new(FieldType::Custom, "Notes", "+1-555-987-6543");
@@ -566,7 +566,7 @@ fn test_custom_field_secondary_actions() {
     assert!(actions.contains(&ContactAction::CopyToClipboard));
 }
 
-// @scenario: contact_actions:Empty field shows only Copy action
+// @scenario: contact_actions :: Empty field shows only Copy action
 #[test]
 fn test_empty_field_secondary_actions() {
     let field = ContactField::new(FieldType::Phone, "Mobile", "");
@@ -577,11 +577,11 @@ fn test_empty_field_secondary_actions() {
 
 // ============================================================
 // Directions URI (maps routing)
-// @scenario: contact_actions:Get directions to address
+// @scenario: contact_actions :: Get directions to address
 // ============================================================
 
-// @scenario: contact_actions:Get directions generates web maps URL
-// @scenario: contact_actions.feature:Get directions to address
+// @scenario: contact_actions :: Get directions generates web maps URL
+// @scenario: contact_actions :: Get directions to address
 #[test]
 fn test_directions_uri_basic_address() {
     let field = ContactField::new(FieldType::Address, "Home", "123 Main St, City, ST 12345");
@@ -594,7 +594,7 @@ fn test_directions_uri_basic_address() {
     assert!(uri_str.contains("123")); // Address should be encoded in the URL
 }
 
-// @scenario: contact_actions:Get directions URL-encodes special characters
+// @scenario: contact_actions :: Get directions URL-encodes special characters
 #[test]
 fn test_directions_uri_special_chars_encoded() {
     let field = ContactField::new(FieldType::Address, "Office", "123 O'Brien's Way, Suite #5");
@@ -606,7 +606,7 @@ fn test_directions_uri_special_chars_encoded() {
     assert!(!uri_str.contains('#') || uri_str.contains("%23"));
 }
 
-// @scenario: contact_actions:Get directions handles empty address
+// @scenario: contact_actions :: Get directions handles empty address
 #[test]
 fn test_directions_uri_empty_returns_none() {
     let field = ContactField::new(FieldType::Address, "Home", "");
@@ -614,7 +614,7 @@ fn test_directions_uri_empty_returns_none() {
     assert!(uri.is_none());
 }
 
-// @scenario: contact_actions:Get directions handles whitespace-only address
+// @scenario: contact_actions :: Get directions handles whitespace-only address
 #[test]
 fn test_directions_uri_whitespace_returns_none() {
     let field = ContactField::new(FieldType::Address, "Home", "   ");
@@ -622,7 +622,7 @@ fn test_directions_uri_whitespace_returns_none() {
     assert!(uri.is_none());
 }
 
-// @scenario: contact_actions:Non-address fields return None for directions
+// @scenario: contact_actions :: Non-address fields return None for directions
 #[test]
 fn test_directions_uri_non_address_returns_none() {
     let field = ContactField::new(FieldType::Phone, "Mobile", "+1-555-123-4567");
@@ -630,7 +630,7 @@ fn test_directions_uri_non_address_returns_none() {
     assert!(uri.is_none());
 }
 
-// @scenario: contact_actions:Get directions with unicode address
+// @scenario: contact_actions :: Get directions with unicode address
 #[test]
 fn test_directions_uri_unicode_address() {
     let field = ContactField::new(FieldType::Address, "Tokyo Office", "東京都渋谷区");
@@ -716,7 +716,7 @@ fn test_all_field_types_have_actions() {
 
 /// Integration test: Mastodon social handle parsing
 /// Maps to: Social media "@bob@mas.to" scenario
-// @scenario: contact_actions:Tap social media opens profile
+// @scenario: contact_actions :: Tap social media opens profile
 #[test]
 fn test_social_mastodon_handle_on_default_instance() {
     let field = ContactField::new(FieldType::Social, "Mastodon", "@bob");
@@ -724,7 +724,7 @@ fn test_social_mastodon_handle_on_default_instance() {
     assert_eq!(uri, Some("https://mastodon.social/@bob".to_string()));
 }
 
-// @scenario: contact_actions:Mastodon federated handle resolves to correct instance
+// @scenario: contact_actions :: Mastodon federated handle resolves to correct instance
 #[test]
 fn test_social_mastodon_federated_handle_at_prefix() {
     // @bob@mas.to → https://mas.to/@bob
@@ -733,7 +733,7 @@ fn test_social_mastodon_federated_handle_at_prefix() {
     assert_eq!(uri, Some("https://mas.to/@bob".to_string()));
 }
 
-// @scenario: contact_actions:Mastodon federated handle resolves to correct instance
+// @scenario: contact_actions :: Mastodon federated handle resolves to correct instance
 #[test]
 fn test_social_mastodon_federated_handle_no_prefix() {
     // bob@fosstodon.org → https://fosstodon.org/@bob
@@ -742,7 +742,7 @@ fn test_social_mastodon_federated_handle_no_prefix() {
     assert_eq!(uri, Some("https://fosstodon.org/@bob".to_string()));
 }
 
-// @scenario: contact_actions:Mastodon federated handle resolves to correct instance
+// @scenario: contact_actions :: Mastodon federated handle resolves to correct instance
 #[test]
 fn test_social_mastodon_default_instance_handle() {
     // @alice@mastodon.social → https://mastodon.social/@alice
@@ -751,7 +751,7 @@ fn test_social_mastodon_default_instance_handle() {
     assert_eq!(uri, Some("https://mastodon.social/@alice".to_string()));
 }
 
-// @scenario: contact_actions:Mastodon bare username without @ prefix
+// @scenario: contact_actions :: Mastodon bare username without @ prefix
 #[test]
 fn test_social_mastodon_bare_username() {
     let field = ContactField::new(FieldType::Social, "Mastodon", "bob");
@@ -761,7 +761,7 @@ fn test_social_mastodon_bare_username() {
 
 /// Integration test: SMS action for phone numbers
 /// Maps to: "Send SMS to phone number" scenario
-// @scenario: contact_actions:Send SMS to phone number
+// @scenario: contact_actions :: Send SMS to phone number
 #[test]
 fn test_phone_sms_uri() {
     let field = ContactField::new(FieldType::Phone, "Mobile", "+1-555-123-4567");
@@ -772,7 +772,7 @@ fn test_phone_sms_uri() {
 }
 
 /// Integration test: Website with subdomain
-// @scenario: contact_actions:Website without protocol prefix
+// @scenario: contact_actions :: Website without protocol prefix
 #[test]
 fn test_website_with_subdomain() {
     let field = ContactField::new(FieldType::Website, "Blog", "blog.example.com");
@@ -781,7 +781,7 @@ fn test_website_with_subdomain() {
 }
 
 /// Integration test: Website with path and query
-// @scenario: contact_actions:Tap website opens browser
+// @scenario: contact_actions :: Tap website opens browser
 #[test]
 fn test_website_with_path_and_query() {
     let field = ContactField::new(
@@ -794,7 +794,7 @@ fn test_website_with_path_and_query() {
 }
 
 /// Integration test: Custom field detected as URL
-// @scenario: contact_actions:Custom field with URL-like value offers browser
+// @scenario: contact_actions :: Custom field with URL-like value offers browser
 #[test]
 fn test_custom_field_http_url_detected() {
     let field = ContactField::new(FieldType::Custom, "Portfolio", "http://oldsite.example.com");
@@ -806,8 +806,8 @@ fn test_custom_field_http_url_detected() {
 
 /// Integration test: International phone numbers
 /// Maps to: "Phone number with international format" scenario
-// @scenario: contact_actions:Phone number with international format
-// @scenario: contact_actions:Various phone number formats are normalized for dialer
+// @scenario: contact_actions :: Phone number with international format
+// @scenario: contact_actions :: Various phone number formats are normalized for dialer
 #[test]
 fn test_international_phone_formats() {
     let phones = vec![
@@ -853,7 +853,7 @@ fn test_action_type_categorization() {
 
 /// Security test: XSS attempt in website field blocked
 /// Maps to: contact_actions.feature #45 — "URLs are validated before opening"
-// @scenario: contact_actions:URLs are validated before opening (#45)
+// @scenario: contact_actions :: URLs are validated before opening (#45)
 #[test]
 fn test_xss_in_website_blocked() {
     let malicious_values = vec![
@@ -872,7 +872,7 @@ fn test_xss_in_website_blocked() {
 
 /// Security test: Data URI scheme blocked
 /// Maps to: contact_actions.feature #46 — "Only safe URI schemes are allowed"
-// @scenario: contact_actions:Only safe URI schemes are allowed (#46)
+// @scenario: contact_actions :: Only safe URI schemes are allowed (#46)
 #[test]
 fn test_data_uri_blocked() {
     let data_uris = vec![
@@ -890,7 +890,7 @@ fn test_data_uri_blocked() {
 
 /// Security test: FTP scheme blocked
 /// Maps to: contact_actions.feature #46 — "Only safe URI schemes are allowed"
-// @scenario: contact_actions:Only safe URI schemes are allowed (#46)
+// @scenario: contact_actions :: Only safe URI schemes are allowed (#46)
 #[test]
 fn test_ftp_scheme_blocked() {
     let field = ContactField::new(FieldType::Website, "FTP", "ftp://files.example.com");
@@ -900,7 +900,7 @@ fn test_ftp_scheme_blocked() {
 
 /// Security test: Custom field with malicious content
 /// Maps to: contact_actions.feature #46 — "Only safe URI schemes are allowed"
-// @scenario: contact_actions:Only safe URI schemes are allowed (#46)
+// @scenario: contact_actions :: Only safe URI schemes are allowed (#46)
 #[test]
 fn test_custom_field_malicious_url_blocked() {
     let field = ContactField::new(FieldType::Custom, "Link", "javascript:void(0)");
@@ -932,7 +932,7 @@ fn test_unicode_domain_url() {
 }
 
 /// Edge case: Email with dots in local part
-// @scenario: contact_actions:Tap email opens mail client
+// @scenario: contact_actions :: Tap email opens mail client
 #[test]
 fn test_email_with_dots() {
     let field = ContactField::new(FieldType::Email, "Gmail", "first.last@gmail.com");
@@ -941,7 +941,7 @@ fn test_email_with_dots() {
 }
 
 /// Edge case: Address with special characters
-// @scenario: contact_actions:Tap address opens maps application
+// @scenario: contact_actions :: Tap address opens maps application
 #[test]
 fn test_address_special_characters() {
     let field = ContactField::new(FieldType::Address, "Office", "123 O'Brien's Way, Suite #5");
@@ -1017,7 +1017,7 @@ proptest! {
 
 // ============================================================
 // Phone Number Validation (SP-12a)
-// @scenario: contact_actions:Malformed phone number shows error
+// @scenario: contact_actions :: Malformed phone number shows error
 // ============================================================
 
 /// Feature: contact_actions.feature @error @malformed
@@ -1043,7 +1043,7 @@ fn test_validate_phone_accepts_valid_formats() {
 
 /// Feature: contact_actions.feature @error @malformed
 /// to_uri() must return None for malformed phone numbers.
-// @scenario: contact_actions:Malformed phone number shows error
+// @scenario: contact_actions :: Malformed phone number shows error
 #[test]
 fn test_malformed_phone_to_uri_returns_none() {
     let field = ContactField::new(FieldType::Phone, "Mobile", "not-a-number");
@@ -1055,7 +1055,7 @@ fn test_malformed_phone_to_uri_returns_none() {
 
 /// Feature: contact_actions.feature @error @malformed
 /// to_uri() must return None for phone with insufficient digits.
-// @scenario: contact_actions:Malformed phone number shows error
+// @scenario: contact_actions :: Malformed phone number shows error
 #[test]
 fn test_short_phone_to_uri_returns_none() {
     let field = ContactField::new(FieldType::Phone, "Mobile", "12");
@@ -1067,7 +1067,7 @@ fn test_short_phone_to_uri_returns_none() {
 
 /// Feature: contact_actions.feature @error @malformed
 /// to_action() must return CopyToClipboard for malformed phone numbers.
-// @scenario: contact_actions:Malformed phone number shows error
+// @scenario: contact_actions :: Malformed phone number shows error
 #[test]
 fn test_malformed_phone_to_action_returns_copy() {
     let field = ContactField::new(FieldType::Phone, "Mobile", "not-a-number");
@@ -1081,7 +1081,7 @@ fn test_malformed_phone_to_action_returns_copy() {
 
 /// Feature: contact_actions.feature @error @malformed
 /// Valid phone numbers must still produce a tel: URI after validation is wired in.
-// @scenario: contact_actions:Tap phone number opens dialer
+// @scenario: contact_actions :: Tap phone number opens dialer
 #[test]
 fn test_valid_phone_to_uri_still_works() {
     let field = ContactField::new(FieldType::Phone, "Mobile", "+1-555-123-4567");
@@ -1090,7 +1090,7 @@ fn test_valid_phone_to_uri_still_works() {
 }
 
 /// Edge case: phone with only whitespace should return None.
-// @scenario: contact_actions:Malformed phone number shows error
+// @scenario: contact_actions :: Malformed phone number shows error
 #[test]
 fn test_whitespace_phone_to_uri_returns_none() {
     let field = ContactField::new(FieldType::Phone, "Mobile", "   ");
@@ -1101,7 +1101,7 @@ fn test_whitespace_phone_to_uri_returns_none() {
 }
 
 /// Edge case: phone with letters mixed in should return None.
-// @scenario: contact_actions:Malformed phone number shows error
+// @scenario: contact_actions :: Malformed phone number shows error
 #[test]
 fn test_phone_with_letters_to_uri_returns_none() {
     let field = ContactField::new(FieldType::Phone, "Mobile", "555-CALL-ME");

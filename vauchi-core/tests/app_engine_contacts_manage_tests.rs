@@ -188,7 +188,7 @@ fn navigate_to_group_detail_shows_group() {
     );
 }
 
-/// @scenario: visibility_labels:Group detail shows real name and members
+/// @scenario: visibility_labels :: Group detail shows real name and members
 #[test]
 fn group_detail_shows_real_name_and_members() {
     let mut vauchi = Vauchi::in_memory().unwrap();

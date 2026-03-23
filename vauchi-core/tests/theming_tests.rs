@@ -67,7 +67,7 @@ impl ThemePreview {
 /// Test: Preview theme without persisting to storage
 /// Feature: theming.feature @selection
 /// Scenario: Preview theme before applying
-// @scenario: theming:Preview theme before applying
+// @scenario: theming :: Preview theme before applying
 #[test]
 fn test_theme_preview_before_apply() {
     let Some(_themes) = try_all_themes() else {
@@ -101,7 +101,7 @@ fn test_theme_preview_before_apply() {
 /// Test: Cancel preview returns to original theme
 /// Feature: theming.feature @selection
 /// Scenario: Preview theme before applying (Cancel path)
-// @scenario: theming:Preview theme before applying
+// @scenario: theming :: Preview theme before applying
 #[test]
 fn test_theme_preview_cancel_returns_to_original() {
     let Some(_themes) = try_all_themes() else {
@@ -128,8 +128,9 @@ fn test_theme_preview_cancel_returns_to_original() {
 
 /// Test: Preview multiple themes in sequence
 /// Feature: theming.feature @selection
-// @scenario: theming:Select theme from settings
-// @scenario: theming:Preview theme before applying
+// @scenario: theming :: Select theme from settings
+// @scenario: theming :: Preview theme before applying
+// @scenario: theming :: Apply Gruvbox Dark theme
 #[test]
 fn test_theme_preview_sequence() {
     let Some(_themes) = try_all_themes() else {
@@ -230,7 +231,7 @@ impl ThemeResolver {
 /// Test: Auto-switch with OS dark mode setting
 /// Feature: theming.feature @system
 /// Scenario: Follow system dark/light mode
-// @scenario: theming:Follow system dark/light mode
+// @scenario: theming :: Follow system dark/light mode
 #[test]
 fn test_system_dark_mode_following() {
     let Some(_themes) = try_all_themes() else {
@@ -254,7 +255,7 @@ fn test_system_dark_mode_following() {
 /// Test: Auto theme with Catppuccin family
 /// Feature: theming.feature @system @auto
 /// Scenario: Auto theme with Catppuccin
-// @scenario: theming:Auto theme with Catppuccin
+// @scenario: theming :: Auto theme with Catppuccin
 #[test]
 fn test_auto_theme_with_catppuccin() {
     let Some(_themes) = try_all_themes() else {
@@ -278,7 +279,7 @@ fn test_auto_theme_with_catppuccin() {
 /// Test: Override system preference with explicit selection
 /// Feature: theming.feature @system
 /// Scenario: Override system preference
-// @scenario: theming:Override system preference
+// @scenario: theming :: Override system preference
 #[test]
 fn test_override_system_preference() {
     // Given the system is in light mode
@@ -293,7 +294,8 @@ fn test_override_system_preference() {
 
 /// Test: Solarized auto-switching
 /// Feature: theming.feature @system
-// @scenario: theming:Follow system dark/light mode
+// @scenario: theming :: Follow system dark/light mode
+// @scenario: theming :: Apply Solarized Dark theme
 #[test]
 fn test_solarized_auto_switching() {
     let Some(_themes) = try_all_themes() else {
@@ -313,7 +315,7 @@ fn test_solarized_auto_switching() {
 
 /// Test: Force light theme regardless of system setting
 /// Feature: theming.feature @system
-// @scenario: theming:Override system preference
+// @scenario: theming :: Override system preference
 #[test]
 fn test_force_light_preference() {
     let Some(_themes) = try_all_themes() else {
@@ -432,7 +434,7 @@ impl CustomizedTheme {
 /// Test: User-defined accent colors
 /// Feature: theming.feature @accent @future
 /// Scenario: Choose accent color within theme
-// @scenario: theming:Choose accent color within theme
+// @scenario: theming :: Choose accent color within theme
 #[test]
 fn test_accent_color_customization() {
     // Given the user has selected "Catppuccin Mocha" theme
@@ -456,7 +458,7 @@ fn test_accent_color_customization() {
 
 /// Test: All Catppuccin accent colors are valid hex
 /// Feature: theming.feature @accent
-// @scenario: theming:Choose accent color within theme
+// @scenario: theming :: Choose accent color within theme
 #[test]
 fn test_catppuccin_accents_valid_hex() {
     for accent in CatppuccinAccent::all() {
@@ -472,7 +474,7 @@ fn test_catppuccin_accents_valid_hex() {
 
 /// Test: Invalid accent color is rejected
 /// Feature: theming.feature @accent
-// @scenario: theming:Choose accent color within theme
+// @scenario: theming :: Choose accent color within theme
 #[test]
 fn test_invalid_accent_rejected() {
     let Some(_themes) = try_all_themes() else {
@@ -492,7 +494,7 @@ fn test_invalid_accent_rejected() {
 /// Test: Custom accent persists (simulation)
 /// Feature: theming.feature @accent @future
 /// Scenario: Custom accent color persists
-// @scenario: theming:Custom accent color persists
+// @scenario: theming :: Custom accent color persists
 #[test]
 fn test_custom_accent_persists() {
     // Simulate persistence by creating a settings struct
@@ -555,7 +557,7 @@ fn tokyo_night_json() -> String {
 /// Test: CDN theme content refresh
 /// Feature: theming.feature @remote
 /// Scenario: Theme update with existing selection
-// @scenario: theming:Theme update with existing selection
+// @scenario: theming :: Theme update with existing selection
 #[test]
 fn test_remote_theme_updates() {
     let temp = TempDir::new().unwrap();
@@ -586,7 +588,7 @@ fn test_remote_theme_updates() {
 /// Test: New theme available after content update
 /// Feature: theming.feature @remote
 /// Scenario: New theme available after content update
-// @scenario: theming:New theme available after content update
+// @scenario: theming :: New theme available after content update
 #[test]
 fn test_new_theme_after_update() {
     let temp = TempDir::new().unwrap();
@@ -626,7 +628,7 @@ fn test_new_theme_after_update() {
 /// Test: Bundled themes always available when offline
 /// Feature: theming.feature @remote @fallback
 /// Scenario: Bundled themes always available
-// @scenario: theming:Bundled themes always available
+// @scenario: theming :: Bundled themes always available
 #[test]
 fn test_bundled_themes_always_available() {
     let Some(_themes) = try_all_themes() else {
@@ -665,7 +667,7 @@ fn test_bundled_themes_always_available() {
 /// Test: User selection preserved after theme update
 /// Feature: theming.feature @remote
 /// Scenario: Theme update with existing selection
-// @scenario: theming:Theme update with existing selection
+// @scenario: theming :: Theme update with existing selection
 #[test]
 fn test_theme_selection_preserved_after_update() {
     #[derive(Debug, Clone)]
@@ -768,7 +770,7 @@ impl QrCodeDisplay {
 /// Test: QR matches theme colors (container only)
 /// Feature: theming.feature @qr
 /// Scenario: QR code container matches theme
-// @scenario: theming:QR code container matches theme
+// @scenario: theming :: QR code container matches theme
 #[test]
 fn test_qr_code_theming_consistency() {
     // Test across all bundled themes
@@ -801,7 +803,7 @@ fn test_qr_code_theming_consistency() {
 /// Test: QR code maintains high contrast
 /// Feature: theming.feature @qr
 /// Scenario: QR code remains readable in any theme
-// @scenario: theming:QR code remains readable in any theme
+// @scenario: theming :: QR code remains readable in any theme
 #[test]
 fn test_qr_code_high_contrast() {
     // QR codes should display with high contrast
@@ -823,7 +825,7 @@ fn test_qr_code_high_contrast() {
 /// Test: QR background is white or near-white
 /// Feature: theming.feature @qr
 /// Scenario: QR code remains readable in any theme
-// @scenario: theming:QR code remains readable in any theme
+// @scenario: theming :: QR code remains readable in any theme
 #[test]
 fn test_qr_background_is_light() {
     let bg = QrCodeDisplay::STANDARD_BACKGROUND;
@@ -838,7 +840,7 @@ fn test_qr_background_is_light() {
 /// Test: QR foreground is black or near-black
 /// Feature: theming.feature @qr
 /// Scenario: QR code remains readable in any theme
-// @scenario: theming:QR code remains readable in any theme
+// @scenario: theming :: QR code remains readable in any theme
 #[test]
 fn test_qr_foreground_is_dark() {
     let fg = QrCodeDisplay::STANDARD_FOREGROUND;
@@ -852,7 +854,7 @@ fn test_qr_foreground_is_dark() {
 
 /// Test: Dark theme container provides visual separation for QR
 /// Feature: theming.feature @qr
-// @scenario: theming:QR code container matches theme
+// @scenario: theming :: QR code container matches theme
 #[test]
 fn test_qr_container_contrast_with_dark_theme() {
     let dark_theme = theme_by_id("catppuccin-mocha").unwrap();
@@ -872,7 +874,7 @@ fn test_qr_container_contrast_with_dark_theme() {
 
 /// Test: Light theme container still provides visual separation for QR
 /// Feature: theming.feature @qr
-// @scenario: theming:QR code container matches theme
+// @scenario: theming :: QR code container matches theme
 #[test]
 fn test_qr_container_with_light_theme() {
     let Some(_themes) = try_all_themes() else {

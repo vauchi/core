@@ -18,7 +18,7 @@ use vauchi_core::identity::{DeviceInfo, DeviceRegistry, MAX_DEVICES};
 
 /// Scenario: Two devices try to link simultaneously
 /// Only one should succeed when they compete for the same slot
-// @scenario: device_management:Concurrent device linking attempts
+// @scenario: device_management :: Concurrent device linking attempts
 #[test]
 fn test_concurrent_device_linking_thread_safety() {
     let master_seed = [0x42u8; 32];
@@ -58,7 +58,7 @@ fn test_concurrent_device_linking_thread_safety() {
 }
 
 /// Scenario: Concurrent adds with same device index - only one wins
-// @scenario: device_management:Concurrent device linking attempts
+// @scenario: device_management :: Concurrent device linking attempts
 #[test]
 fn test_concurrent_same_device_index() {
     let master_seed = [0x42u8; 32];
@@ -96,7 +96,7 @@ fn test_concurrent_same_device_index() {
 }
 
 /// Scenario: Concurrent revocation and addition
-// @scenario: device_management:Concurrent link and revoke
+// @scenario: device_management :: Concurrent link and revoke
 #[test]
 fn test_concurrent_revoke_and_add() {
     let master_seed = [0x42u8; 32];
@@ -146,7 +146,7 @@ fn test_concurrent_revoke_and_add() {
 // =============================================================================
 
 /// Scenario: Cannot exceed maximum devices
-// @scenario: device_management:Maximum devices reached
+// @scenario: device_management :: Maximum devices reached
 #[test]
 fn test_max_devices_enforced() {
     let master_seed = [0x42u8; 32];
@@ -174,7 +174,7 @@ fn test_max_devices_enforced() {
 }
 
 /// Scenario: Can add device after revoking one at max
-// @scenario: device_management:Maximum devices reached
+// @scenario: device_management :: Maximum devices reached
 #[test]
 fn test_add_after_revoke_at_max() {
     let master_seed = [0x42u8; 32];
@@ -215,7 +215,7 @@ fn test_add_after_revoke_at_max() {
 // =============================================================================
 
 /// Scenario: Link device that's already linked (same identity)
-// @scenario: device_management:Link same device twice
+// @scenario: device_management :: Link same device twice
 #[test]
 fn test_link_already_linked_device_same_identity() {
     let master_seed = [0x42u8; 32];
@@ -236,7 +236,7 @@ fn test_link_already_linked_device_same_identity() {
 // =============================================================================
 
 /// Scenario: Version increments correctly
-// @scenario: device_management:Device registry version tracking
+// @scenario: device_management :: Device registry version tracking
 #[test]
 fn test_version_increments_on_changes() {
     let master_seed = [0x42u8; 32];
@@ -270,7 +270,7 @@ fn test_version_increments_on_changes() {
 // =============================================================================
 
 /// Scenario: Cannot unlink last device
-// @scenario: device_management:Cannot unlink last device
+// @scenario: device_management :: Cannot unlink last device
 #[test]
 fn test_cannot_unlink_last_device() {
     let master_seed = [0x42u8; 32];

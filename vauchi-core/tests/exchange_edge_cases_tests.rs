@@ -72,7 +72,7 @@ fn advance_to_card_exchange() -> (ExchangeSession, ExchangeSession) {
 /// In the new flow both parties create sessions with `new_qr()`. If a
 /// user somehow scans their own QR the session must reject it because
 /// the QR's signing public key matches the session's identity.
-// @scenario: contact_exchange.feature:Cannot exchange with yourself
+// @scenario: contact_exchange :: Cannot exchange with yourself
 #[test]
 fn test_self_exchange_rejected() {
     let alice = Identity::create("Alice");
@@ -92,7 +92,7 @@ fn test_self_exchange_rejected() {
 }
 
 /// Scenario: Different identity scanning QR succeeds normally.
-// @scenario: contact_exchange.feature:Successful QR code exchange with proximity
+// @scenario: contact_exchange :: Successful QR code exchange with proximity
 #[test]
 fn test_different_identity_exchange_succeeds() {
     let alice = Identity::create("Alice");
@@ -121,7 +121,7 @@ fn test_different_identity_exchange_succeeds() {
 // =============================================================================
 
 /// Scenario: QR code expiration (5 minutes)
-// @scenario: contact_exchange.feature:Mutual QR rejects expired peer QR code
+// @scenario: contact_exchange :: Mutual QR rejects expired peer QR code
 #[test]
 fn test_qr_expiration() {
     let alice = Identity::create("Alice");
@@ -133,7 +133,7 @@ fn test_qr_expiration() {
 }
 
 /// Scenario: Expired QR is rejected during ProcessQR
-// @scenario: contact_exchange.feature:Mutual QR rejects expired peer QR code
+// @scenario: contact_exchange :: Mutual QR rejects expired peer QR code
 #[test]
 fn test_expired_qr_rejected_on_process() {
     let alice = Identity::create("Alice");
@@ -166,9 +166,9 @@ fn test_expired_qr_rejected_on_process() {
 // =============================================================================
 
 /// Scenario: Exchange with existing contact detected
-// @scenario: contact_exchange.feature:Exchange with existing contact shows update option
-// @scenario: contact_exchange.feature:Update existing contact via exchange
-// @scenario: contact_exchange.feature:Keep existing contact without update
+// @scenario: contact_exchange :: Exchange with existing contact shows update option
+// @scenario: contact_exchange :: Update existing contact via exchange
+// @scenario: contact_exchange :: Keep existing contact without update
 #[test]
 fn test_duplicate_contact_detection() {
     let alice = Identity::create("Alice");
@@ -202,7 +202,7 @@ fn test_duplicate_contact_detection() {
 }
 
 /// Scenario: No duplicate detected for new contact
-// @scenario: contact_exchange.feature:Exchange with existing contact shows update option
+// @scenario: contact_exchange :: Exchange with existing contact shows update option
 #[test]
 fn test_no_duplicate_for_new_contact() {
     let alice = Identity::create("Alice");
@@ -242,7 +242,7 @@ fn test_no_duplicate_for_new_contact() {
 // =============================================================================
 
 /// Scenario: Session timeout detection
-// @scenario: contact_exchange.feature:Exchange session timeout
+// @scenario: contact_exchange :: Exchange session timeout
 #[test]
 fn test_session_timeout_detection() {
     let alice = Identity::create("Alice");
@@ -253,8 +253,8 @@ fn test_session_timeout_detection() {
 }
 
 /// Scenario: Interrupted session can be resumed within window
-// @scenario: contact_exchange.feature:Exchange session timeout
-// @scenario: contact_exchange.feature:Resume interrupted exchange
+// @scenario: contact_exchange :: Exchange session timeout
+// @scenario: contact_exchange :: Resume interrupted exchange
 #[test]
 fn test_interrupted_session_resumable() {
     let alice = Identity::create("Alice");
@@ -450,7 +450,7 @@ fn test_valid_signature_accepted() {
 // =============================================================================
 
 /// Scenario: QR reuse is detected by check_qr_reuse
-// @scenario: contact_exchange.feature:Same QR scanned twice by same person
+// @scenario: contact_exchange :: Same QR scanned twice by same person
 #[test]
 fn test_qr_reuse_detected() {
     let alice = Identity::create("Alice");
@@ -487,8 +487,8 @@ fn test_different_qr_hashes_independent() {
 // =============================================================================
 
 /// Scenario: Complete exchange flow produces Complete state
-// @scenario: contact_exchange.feature:Successful QR code exchange with proximity
-// @scenario: contact_exchange.feature:Exchange creates mutual keys
+// @scenario: contact_exchange :: Successful QR code exchange with proximity
+// @scenario: contact_exchange :: Exchange creates mutual keys
 #[test]
 fn test_complete_exchange_flow() {
     let (mut alice_session, mut bob_session) = advance_to_card_exchange();

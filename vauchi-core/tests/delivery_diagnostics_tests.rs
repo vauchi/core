@@ -7,7 +7,7 @@
 
 use vauchi_core::network::delivery::ConnectivityDiagnostics;
 
-// @scenario: message_delivery:User can diagnose delivery problems
+// @scenario: message_delivery :: User can diagnose delivery problems
 #[test]
 fn test_diagnostics_reports_connectivity_state() {
     let diag = ConnectivityDiagnostics::new();
@@ -24,7 +24,7 @@ fn test_diagnostics_reports_connectivity_state() {
     );
 }
 
-// @scenario: message_delivery:Diagnostics includes retry information
+// @scenario: message_delivery :: Diagnostics includes retry information
 #[test]
 fn test_diagnostics_reports_retry_status() {
     let diag = ConnectivityDiagnostics::new();
@@ -36,7 +36,7 @@ fn test_diagnostics_reports_retry_status() {
     );
 }
 
-// @scenario: message_delivery:Diagnostics reports queue status
+// @scenario: message_delivery :: Diagnostics reports queue status
 #[test]
 fn test_diagnostics_reports_queue_capacity() {
     let diag = ConnectivityDiagnostics::new();

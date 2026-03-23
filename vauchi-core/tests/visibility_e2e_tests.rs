@@ -30,8 +30,8 @@ mod visibility_e2e_tests {
         (vauchi, work_id, personal_id)
     }
 
-    // @scenario: visibility_control.feature:Add contact to group updates their visibility
-    // @scenario: visibility_control.feature:Apply visibility group to a field
+    // @scenario: visibility_control :: Add contact to group updates their visibility
+    // @scenario: visibility_control :: Apply visibility group to a field
     #[test]
     fn test_visibility_logic_e2e() {
         let (_vauchi, _work_id, _personal_id) = setup_vauchi_with_labels();

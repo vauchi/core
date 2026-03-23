@@ -15,7 +15,7 @@ fn create_test_storage() -> Storage {
     Storage::in_memory(key).unwrap()
 }
 
-// @scenario: sync_updates:Update propagates to online contacts
+// @scenario: sync_updates :: Update propagates to online contacts
 #[test]
 fn test_sync_queue_card_update() {
     let storage = create_test_storage();
@@ -45,7 +45,7 @@ fn test_sync_queue_card_update() {
     assert_eq!(pending[0].update_type, "card_update");
 }
 
-// @scenario: sync_updates:Only changed fields transmitted
+// @scenario: sync_updates :: Only changed fields transmitted
 #[test]
 fn test_sync_no_changes() {
     let storage = create_test_storage();
@@ -57,7 +57,7 @@ fn test_sync_no_changes() {
     assert!(matches!(result, Err(SyncError::NoChanges)));
 }
 
-// @scenario: sync_updates:Update only visible fields
+// @scenario: sync_updates :: Update only visible fields
 #[test]
 fn test_sync_queue_visibility_change() {
     let storage = create_test_storage();
@@ -74,7 +74,7 @@ fn test_sync_queue_visibility_change() {
     assert_eq!(pending[0].update_type, "visibility_change");
 }
 
-// @scenario: sync_updates:Queued updates delivered when contact comes online
+// @scenario: sync_updates :: Queued updates delivered when contact comes online
 #[test]
 fn test_sync_mark_delivered() {
     let storage = create_test_storage();
@@ -105,7 +105,7 @@ fn test_sync_mark_delivered() {
     assert_eq!(manager.get_pending("contact-1").unwrap().len(), 0);
 }
 
-// @scenario: sync_updates:Retry failed sync with exponential backoff
+// @scenario: sync_updates :: Retry failed sync with exponential backoff
 #[test]
 fn test_sync_mark_failed_with_backoff() {
     let storage = create_test_storage();
@@ -137,7 +137,7 @@ fn test_sync_mark_failed_with_backoff() {
     assert!(matches!(pending[0].status, UpdateStatus::Failed { .. }));
 }
 
-// @scenario: sync_updates:Update queued for offline contacts
+// @scenario: sync_updates :: Update queued for offline contacts
 #[test]
 fn test_sync_state_pending() {
     let storage = create_test_storage();
@@ -171,7 +171,7 @@ fn test_sync_state_pending() {
     ));
 }
 
-// @scenario: sync_updates:View sync status for all contacts
+// @scenario: sync_updates :: View sync status for all contacts
 #[test]
 fn test_sync_state_synced() {
     let storage = create_test_storage();
@@ -181,7 +181,7 @@ fn test_sync_state_synced() {
     assert!(matches!(state, SyncState::Synced { .. }));
 }
 
-// @scenario: sync_updates:Retry failed sync with exponential backoff
+// @scenario: sync_updates :: Retry failed sync with exponential backoff
 #[test]
 fn test_sync_state_failed() {
     let storage = create_test_storage();
@@ -210,7 +210,7 @@ fn test_sync_state_failed() {
     assert!(matches!(state, SyncState::Failed { .. }));
 }
 
-// @scenario: sync_updates:Multiple updates coalesced for offline contact
+// @scenario: sync_updates :: Multiple updates coalesced for offline contact
 #[test]
 fn test_sync_coalesce_updates() {
     let storage = create_test_storage();
@@ -249,7 +249,7 @@ fn test_sync_coalesce_updates() {
     assert_eq!(manager.get_pending("contact-1").unwrap().len(), 1);
 }
 
-// @scenario: sync_updates:View sync status for all contacts
+// @scenario: sync_updates :: View sync status for all contacts
 #[test]
 fn test_sync_status_multiple_contacts() {
     let storage = create_test_storage();
@@ -278,7 +278,7 @@ fn test_sync_status_multiple_contacts() {
 }
 
 /// Test: last_sync timestamp is properly tracked after update delivery
-// @scenario: sync_updates:View detailed sync status for a contact
+// @scenario: sync_updates :: View detailed sync status for a contact
 #[test]
 fn test_sync_state_tracks_last_sync_timestamp() {
     let storage = create_test_storage();
@@ -332,7 +332,7 @@ fn test_sync_state_tracks_last_sync_timestamp() {
 
 // === Grouped by Relay Tests ===
 
-// @scenario: sync_updates:Route updates to correct relay per contact
+// @scenario: sync_updates :: Route updates to correct relay per contact
 #[test]
 fn test_sync_get_ready_grouped_by_relay() {
     let storage = create_test_storage();
@@ -384,7 +384,7 @@ fn test_sync_get_ready_grouped_by_relay() {
     assert_eq!(home.len(), 1);
 }
 
-// @scenario: sync_updates:Failed updates not ready are excluded from grouped query
+// @scenario: sync_updates :: Failed updates not ready are excluded from grouped query
 #[test]
 fn test_sync_grouped_excludes_not_ready_failed() {
     let storage = create_test_storage();

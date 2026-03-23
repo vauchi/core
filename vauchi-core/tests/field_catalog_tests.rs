@@ -17,7 +17,7 @@ fn default_catalog() -> FieldTypeCatalog {
     FieldTypeCatalog::new(&registry)
 }
 
-// @scenario: contacts_management.feature:Catalog includes base field types
+// @scenario: contacts_management :: Catalog includes base field types
 #[test]
 fn test_catalog_has_base_types() {
     let catalog = default_catalog();
@@ -30,7 +30,7 @@ fn test_catalog_has_base_types() {
     assert!(catalog.get("custom").is_some(), "custom must exist");
 }
 
-// @scenario: contacts_management.feature:Catalog includes social networks
+// @scenario: contacts_management :: Catalog includes social networks
 #[test]
 fn test_catalog_has_social_networks() {
     let catalog = default_catalog();
@@ -41,7 +41,7 @@ fn test_catalog_has_social_networks() {
     assert_eq!(github.unwrap().category, FieldCategory::Social);
 }
 
-// @scenario: contacts_management.feature:Catalog categories are correct
+// @scenario: contacts_management :: Catalog categories are correct
 #[test]
 fn test_catalog_category_assignment() {
     let catalog = default_catalog();
@@ -72,7 +72,7 @@ fn test_catalog_category_assignment() {
     );
 }
 
-// @scenario: contacts_management.feature:Catalog by_category filters correctly
+// @scenario: contacts_management :: Catalog by_category filters correctly
 #[test]
 fn test_catalog_by_category() {
     let catalog = default_catalog();
@@ -93,7 +93,7 @@ fn test_catalog_by_category() {
     );
 }
 
-// @scenario: contacts_management.feature:Catalog search finds matching entries
+// @scenario: contacts_management :: Catalog search finds matching entries
 #[test]
 fn test_catalog_search() {
     let catalog = default_catalog();
@@ -114,7 +114,7 @@ fn test_catalog_search() {
     assert!(results.is_empty(), "Nonsense query should return nothing");
 }
 
-// @scenario: contacts_management.feature:Catalog search is case-insensitive
+// @scenario: contacts_management :: Catalog search is case-insensitive
 #[test]
 fn test_catalog_search_case_insensitive() {
     let catalog = default_catalog();
@@ -128,7 +128,7 @@ fn test_catalog_search_case_insensitive() {
     assert!(!lower.is_empty());
 }
 
-// @scenario: contacts_management.feature:Catalog total count includes all entries
+// @scenario: contacts_management :: Catalog total count includes all entries
 #[test]
 fn test_catalog_len() {
     let catalog = default_catalog();
@@ -140,7 +140,7 @@ fn test_catalog_len() {
     assert!(!catalog.is_empty());
 }
 
-// @scenario: contacts_management.feature:Empty registry produces minimal catalog
+// @scenario: contacts_management :: Empty registry produces minimal catalog
 #[test]
 fn test_catalog_empty_registry() {
     let registry = SocialNetworkRegistry::new();
@@ -154,7 +154,7 @@ fn test_catalog_empty_registry() {
     assert!(catalog.by_category(&FieldCategory::Social).is_empty());
 }
 
-// @scenario: contacts_management.feature:Category display names
+// @scenario: contacts_management :: Category display names
 #[test]
 fn test_category_display_names() {
     assert_eq!(FieldCategory::Contact.display_name(), "Contact");
@@ -163,7 +163,7 @@ fn test_category_display_names() {
     assert_eq!(FieldCategory::Custom.display_name(), "Custom");
 }
 
-// @scenario: contacts_management.feature:All categories enumerated
+// @scenario: contacts_management :: All categories enumerated
 #[test]
 fn test_all_categories() {
     let all = FieldCategory::all();
@@ -174,7 +174,7 @@ fn test_all_categories() {
     assert_eq!(all[3], FieldCategory::Custom);
 }
 
-// @scenario: contacts_management.feature:AppEngine exposes field type catalog
+// @scenario: contacts_management :: AppEngine exposes field type catalog
 #[test]
 fn test_app_engine_field_type_catalog() {
     use vauchi_core::api::Vauchi;

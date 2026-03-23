@@ -23,7 +23,7 @@ fn create_contact_with_name(name: &str, pk_byte: u8) -> Contact {
 // list_hidden_contacts
 // ============================================================
 
-// @scenario: contacts_management:Hide contact from main list
+// @scenario: contacts_management :: Hide contact from main list
 #[test]
 fn test_list_hidden_contacts_empty_initially() {
     let wb = create_vauchi_with_identity("Alice");
@@ -32,7 +32,7 @@ fn test_list_hidden_contacts_empty_initially() {
     assert!(hidden.is_empty(), "No contacts should be hidden initially");
 }
 
-// @scenario: contacts_management:Hide contact from main list
+// @scenario: contacts_management :: Hide contact from main list
 #[test]
 fn test_hidden_contact_appears_in_hidden_list() {
     let wb = create_vauchi_with_identity("Alice");
@@ -54,7 +54,7 @@ fn test_hidden_contact_appears_in_hidden_list() {
 // hide_contact
 // ============================================================
 
-// @scenario: contacts_management:Hide contact from main list
+// @scenario: contacts_management :: Hide contact from main list
 #[test]
 fn test_hide_contact_removes_from_main_list() {
     let wb = create_vauchi_with_identity("Alice");
@@ -87,7 +87,7 @@ fn test_hide_contact_removes_from_main_list() {
     assert_eq!(hidden[0].id(), contact_id);
 }
 
-// @scenario: contacts_management:Hide contact from main list
+// @scenario: contacts_management :: Hide contact from main list
 #[test]
 fn test_hide_nonexistent_contact_fails() {
     let wb = create_vauchi_with_identity("Alice");
@@ -96,7 +96,7 @@ fn test_hide_nonexistent_contact_fails() {
     assert!(result.is_err(), "Hiding a nonexistent contact should fail");
 }
 
-// @scenario: contacts_management:Hide contact from main list
+// @scenario: contacts_management :: Hide contact from main list
 #[test]
 fn test_hide_already_hidden_contact_is_idempotent() {
     let wb = create_vauchi_with_identity("Alice");
@@ -121,7 +121,7 @@ fn test_hide_already_hidden_contact_is_idempotent() {
 // unhide_contact
 // ============================================================
 
-// @scenario: contacts_management:Hide contact from main list
+// @scenario: contacts_management :: Hide contact from main list
 #[test]
 fn test_unhide_contact_returns_to_main_list() {
     let wb = create_vauchi_with_identity("Alice");
@@ -150,7 +150,7 @@ fn test_unhide_contact_returns_to_main_list() {
     );
 }
 
-// @scenario: contacts_management:Hide contact from main list
+// @scenario: contacts_management :: Hide contact from main list
 #[test]
 fn test_unhide_already_visible_contact_is_idempotent() {
     let wb = create_vauchi_with_identity("Alice");

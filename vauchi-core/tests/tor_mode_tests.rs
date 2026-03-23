@@ -31,7 +31,7 @@ use vauchi_core::tor_config::{TorConfig, TorRelayAddress, TorStatus};
 // Scenario: Tor mode is disabled by default
 // =============================================================================
 
-// @scenario: tor_mode.feature:Tor mode is disabled by default
+// @scenario: tor_mode :: Tor mode is disabled by default
 #[test]
 fn test_tor_opt_in_default() {
     // Given I have just installed the app (fresh TorConfig)
@@ -58,7 +58,7 @@ fn test_tor_opt_in_default() {
     );
 }
 
-// @scenario: tor_mode.feature:Enable Tor mode from settings
+// @scenario: tor_mode :: Enable Tor mode from settings
 #[test]
 fn test_tor_config_enabled_requires_explicit_opt_in() {
     // Given Tor mode is disabled (default)
@@ -88,7 +88,7 @@ fn test_tor_config_enabled_requires_explicit_opt_in() {
 // Scenario: Disable Tor mode
 // =============================================================================
 
-// @scenario: tor_mode.feature:Disable Tor mode
+// @scenario: tor_mode :: Disable Tor mode
 #[test]
 fn test_tor_disable_shuts_down_connector() {
     // Given Tor mode is enabled and connected
@@ -120,7 +120,7 @@ fn test_tor_disable_shuts_down_connector() {
 // Scenario: Tor mode persists across app restarts
 // =============================================================================
 
-// @scenario: tor_mode.feature:Tor mode persists across app restarts
+// @scenario: tor_mode :: Tor mode persists across app restarts
 #[test]
 fn test_tor_config_persists_across_restarts() {
     // Given Tor mode is enabled with custom settings
@@ -153,7 +153,7 @@ fn test_tor_config_persists_across_restarts() {
 // Scenario: Automatic circuit rotation
 // =============================================================================
 
-// @scenario: tor_mode.feature:Establish new Tor circuit
+// @scenario: tor_mode :: Establish new Tor circuit
 #[test]
 fn test_tor_circuit_rotation() {
     // Given Tor mode is enabled
@@ -184,7 +184,7 @@ fn test_tor_circuit_rotation() {
     );
 }
 
-// @scenario: tor_mode.feature:Establish new Tor circuit
+// @scenario: tor_mode :: Establish new Tor circuit
 #[test]
 fn test_tor_circuit_rotation_requires_connection() {
     // Given Tor mode is enabled but not connected
@@ -219,7 +219,7 @@ fn test_tor_circuit_rotation_after_shutdown() {
     );
 }
 
-// @scenario: tor_mode.feature:Automatic circuit rotation
+// @scenario: tor_mode :: Automatic circuit rotation
 #[test]
 fn test_tor_automatic_circuit_rotation_config() {
     // Given I want automatic circuit rotation
@@ -254,7 +254,7 @@ fn test_tor_automatic_circuit_rotation_config() {
 // Scenario: Tor bootstrap failure handling
 // =============================================================================
 
-// @scenario: tor_mode.feature:Tor bootstrap progress shown
+// @scenario: tor_mode :: Tor bootstrap progress shown
 #[test]
 fn test_tor_bootstrap_progress() {
     // Given Tor mode is enabled
@@ -279,7 +279,7 @@ fn test_tor_bootstrap_progress() {
     );
 }
 
-// @scenario: tor_mode.feature:Tor bootstrap failure handling
+// @scenario: tor_mode :: Tor bootstrap failure handling
 #[test]
 fn test_tor_bootstrap_failure_handling() {
     // Given Tor mode is enabled
@@ -336,7 +336,7 @@ fn test_tor_bootstrap_percentage_status() {
 // Scenario: Pluggable transports support
 // =============================================================================
 
-// @scenario: tor_mode.feature:Configure Tor bridges
+// @scenario: tor_mode :: Configure Tor bridges
 #[test]
 fn test_tor_bridge_configuration() {
     // Given Tor mode is enabled
@@ -370,7 +370,7 @@ fn test_tor_bridge_configuration_empty_by_default() {
     assert!(config.bridges.is_empty(), "Bridges list should be empty");
 }
 
-// @scenario: tor_mode.feature:Tor mode persists across app restarts
+// @scenario: tor_mode :: Tor mode persists across app restarts
 #[test]
 fn test_tor_bridge_configuration_serialization() {
     // Given a config with bridges
@@ -410,7 +410,7 @@ fn test_tor_bridge_validation() {
 // Scenario: Fallback to clearnet relay if .onion unavailable
 // =============================================================================
 
-// @scenario: tor_mode.feature:Connect to relay .onion address
+// @scenario: tor_mode :: Connect to relay .onion address
 #[test]
 fn test_onion_address_fallback() {
     // Given Tor mode is enabled
@@ -437,7 +437,7 @@ fn test_onion_address_fallback() {
     );
 }
 
-// @scenario: tor_mode.feature:Fallback to clearnet relay if .onion unavailable
+// @scenario: tor_mode :: Fallback to clearnet relay if .onion unavailable
 #[test]
 fn test_onion_address_fallback_when_no_onion() {
     // Given the relay only has a clearnet address
@@ -492,7 +492,7 @@ fn test_relay_address_equality() {
 // Scenario: Connection fails gracefully without Tor
 // =============================================================================
 
-// @scenario: tor_mode.feature:Connection fails gracefully without Tor
+// @scenario: tor_mode :: Connection fails gracefully without Tor
 #[test]
 fn test_tor_transport_requires_bootstrap() {
     // Given Tor mode is enabled but not bootstrapped
@@ -515,7 +515,7 @@ fn test_tor_transport_requires_bootstrap() {
     );
 }
 
-// @scenario: tor_mode.feature:Relay connections use Tor when enabled
+// @scenario: tor_mode :: Relay connections use Tor when enabled
 #[test]
 fn test_tor_transport_connect_after_bootstrap() {
     // Given Tor mode is enabled and bootstrapped
@@ -617,7 +617,7 @@ fn test_tor_config_builder_chain() {
     assert_eq!(config.circuit_rotation_secs, 120);
 }
 
-// @scenario: tor_mode.feature:Automatic circuit rotation
+// @scenario: tor_mode :: Automatic circuit rotation
 #[test]
 fn test_tor_config_custom_circuit_rotation() {
     // Given I want faster circuit rotation for high-security use
@@ -627,7 +627,7 @@ fn test_tor_config_custom_circuit_rotation() {
     assert_eq!(config.circuit_rotation_secs, 60);
 }
 
-// @scenario: tor_mode.feature:Connect to relay .onion address
+// @scenario: tor_mode :: Connect to relay .onion address
 #[test]
 fn test_tor_config_prefer_onion_toggle() {
     // Given default config prefers onion
@@ -645,7 +645,7 @@ fn test_tor_config_prefer_onion_toggle() {
 // NEW: Gherkin-mapped tests for uncovered scenarios
 // =============================================================================
 
-// @scenario: tor_mode.feature:Local operations work without Tor
+// @scenario: tor_mode :: Local operations work without Tor
 #[test]
 fn test_local_operations_work_without_tor() {
     // Given Tor mode is enabled but Tor network is unavailable
@@ -674,7 +674,7 @@ fn test_local_operations_work_without_tor() {
     );
 }
 
-// @scenario: tor_mode.feature:Tor status indicator in app
+// @scenario: tor_mode :: Tor status indicator in app
 #[test]
 fn test_tor_status_indicator_variants() {
     // Given Tor mode is enabled
@@ -711,7 +711,7 @@ fn test_tor_status_indicator_variants() {
     }
 }
 
-// @scenario: tor_mode.feature:View current circuit info
+// @scenario: tor_mode :: View current circuit info
 #[test]
 fn test_tor_view_circuit_info() {
     // Given Tor mode is enabled and a circuit is established
@@ -735,7 +735,7 @@ fn test_tor_view_circuit_info() {
     );
 }
 
-// @scenario: tor_mode.feature:Tor mode not mentioned in basic onboarding
+// @scenario: tor_mode :: Tor mode not mentioned in basic onboarding
 #[test]
 fn test_tor_not_in_basic_onboarding() {
     // Given I am going through initial app setup
@@ -753,7 +753,7 @@ fn test_tor_not_in_basic_onboarding() {
     // This is verified by the existence of TorSettingsEngine as a standalone engine
 }
 
-// @scenario: tor_mode.feature:Fallback to clearnet relay if .onion unavailable (transport level)
+// @scenario: tor_mode :: Fallback to clearnet relay if .onion unavailable (transport level)
 #[test]
 fn test_clearnet_fallback_when_onion_unreachable() {
     // Given Tor mode is enabled and the relay's .onion address is unreachable

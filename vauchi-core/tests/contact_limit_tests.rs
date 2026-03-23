@@ -4,8 +4,8 @@
 
 //! Tests for contact limit enforcement (SP-12a).
 //!
-//! @scenario: contacts_management.feature:Maximum contacts reached
-//! @scenario: contacts_management.feature:Exceed maximum contacts
+//! @scenario: contacts_management :: Maximum contacts reached
+//! @scenario: contacts_management :: Exceed maximum contacts
 
 mod common;
 
@@ -19,7 +19,7 @@ fn make_contact(name: &str) -> Contact {
     Contact::from_exchange(pk, card, SymmetricKey::generate())
 }
 
-// @scenario: contacts_management.feature:Maximum contacts reached
+// @scenario: contacts_management :: Maximum contacts reached
 #[test]
 fn test_add_contact_at_limit_minus_one_succeeds() {
     let wb = common::helpers::create_vauchi_with_identity("Alice");
@@ -37,7 +37,7 @@ fn test_add_contact_at_limit_minus_one_succeeds() {
     assert_eq!(wb.contact_count().unwrap(), 3);
 }
 
-// @scenario: contacts_management.feature:Maximum contacts reached
+// @scenario: contacts_management :: Maximum contacts reached
 #[test]
 fn test_add_contact_reaches_exact_limit() {
     let wb = common::helpers::create_vauchi_with_identity("Alice");
@@ -54,7 +54,7 @@ fn test_add_contact_reaches_exact_limit() {
     assert_eq!(wb.contact_count().unwrap(), 2);
 }
 
-// @scenario: contacts_management.feature:Exceed maximum contacts
+// @scenario: contacts_management :: Exceed maximum contacts
 #[test]
 fn test_add_contact_exceeds_limit_returns_error() {
     let wb = common::helpers::create_vauchi_with_identity("Alice");
@@ -74,7 +74,7 @@ fn test_add_contact_exceeds_limit_returns_error() {
     );
 }
 
-// @scenario: contacts_management.feature:Exceed maximum contacts
+// @scenario: contacts_management :: Exceed maximum contacts
 #[test]
 fn test_exceed_limit_error_message_includes_limit() {
     let wb = common::helpers::create_vauchi_with_identity("Alice");
@@ -96,7 +96,7 @@ fn test_exceed_limit_error_message_includes_limit() {
     );
 }
 
-// @scenario: contacts_management.feature:Exceed maximum contacts
+// @scenario: contacts_management :: Exceed maximum contacts
 #[test]
 fn test_exceed_limit_contact_not_persisted() {
     let wb = common::helpers::create_vauchi_with_identity("Alice");
@@ -112,7 +112,7 @@ fn test_exceed_limit_contact_not_persisted() {
     assert_eq!(contacts[0].display_name(), "Bob");
 }
 
-// @scenario: contacts_management.feature:Maximum contacts reached
+// @scenario: contacts_management :: Maximum contacts reached
 #[test]
 fn test_add_contact_after_removal_succeeds() {
     let wb = common::helpers::create_vauchi_with_identity("Alice");
@@ -132,7 +132,7 @@ fn test_add_contact_after_removal_succeeds() {
     assert_eq!(wb.contact_count().unwrap(), 2);
 }
 
-// @scenario: contacts_management.feature:Maximum contacts reached
+// @scenario: contacts_management :: Maximum contacts reached
 #[test]
 fn test_default_limit_is_10000() {
     let wb = common::helpers::create_vauchi_with_identity("Alice");

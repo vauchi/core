@@ -9,7 +9,7 @@ use vauchi_core::crypto::*;
 
 // RFC 5869 Test Vectors for HKDF-SHA256
 
-// @scenario: security.feature:Correct algorithms used
+// @scenario: security :: Correct algorithms used
 #[test]
 fn test_hkdf_sha256_test_vector_1() {
     // Test Case 1 from RFC 5869
@@ -30,7 +30,7 @@ fn test_hkdf_sha256_test_vector_1() {
     assert_eq!(okm, expected_okm);
 }
 
-// @scenario: security.feature:Correct algorithms used
+// @scenario: security :: Correct algorithms used
 #[test]
 fn test_hkdf_sha256_test_vector_2() {
     // Test Case 2 from RFC 5869 (longer inputs/outputs)
@@ -68,7 +68,7 @@ fn test_hkdf_sha256_test_vector_2() {
     assert_eq!(okm, expected_okm);
 }
 
-// @scenario: security.feature:Correct algorithms used
+// @scenario: security :: Correct algorithms used
 #[test]
 fn test_hkdf_sha256_test_vector_3() {
     // Test Case 3 from RFC 5869 (zero-length salt and info)
@@ -90,7 +90,7 @@ fn test_hkdf_sha256_test_vector_3() {
     assert_eq!(okm, expected_okm);
 }
 
-// @scenario: security.feature:Shared key derivation via X3DH
+// @scenario: security :: Shared key derivation via X3DH
 #[test]
 fn test_hkdf_derive_convenience() {
     let ikm = b"input key material";
@@ -105,8 +105,8 @@ fn test_hkdf_derive_convenience() {
     assert_eq!(result, result2);
 }
 
-// @scenario: security.feature:Shared key derivation via X3DH
-// @scenario: security.feature:Forward secrecy via Double Ratchet
+// @scenario: security :: Shared key derivation via X3DH
+// @scenario: security :: Forward secrecy via Double Ratchet
 #[test]
 fn test_hkdf_derive_key() {
     let ikm = b"shared secret from X3DH";
@@ -120,7 +120,7 @@ fn test_hkdf_derive_key() {
     assert_eq!(key, key2);
 }
 
-// @scenario: security.feature:Forward secrecy via Double Ratchet
+// @scenario: security :: Forward secrecy via Double Ratchet
 #[test]
 fn test_hkdf_derive_key_pair() {
     let ikm = b"DH shared secret";
@@ -179,7 +179,7 @@ fn test_hkdf_different_salt_different_output() {
 /// K-S1: Verify that derive_key returns Zeroizing<[u8; 32]> whose inner value
 /// matches the equivalent derive() output. The Zeroizing wrapper ensures
 /// automatic zeroization when the caller's variable goes out of scope.
-/// @scenario: security.feature:Key material zeroized after use
+/// @scenario: security :: Key material zeroized after use
 #[test]
 fn test_hkdf_derive_key_returns_zeroizing_wrapper() {
     let ikm = b"test key material";
@@ -210,7 +210,7 @@ fn test_hkdf_derive_key_returns_zeroizing_wrapper() {
 /// K-L3: Verify that HKDF expand() zeroizes tail bytes beyond the requested
 /// length. When length is not a multiple of HASH_LEN (32), the Vec contains
 /// extra derived key material bytes that must be zeroed before truncation.
-/// @scenario: security.feature:Key material zeroized after use
+/// @scenario: security :: Key material zeroized after use
 #[test]
 fn test_hkdf_expand_no_overallocation() {
     let prk = [0x42u8; 32];

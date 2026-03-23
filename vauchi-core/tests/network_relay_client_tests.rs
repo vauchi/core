@@ -32,7 +32,7 @@ fn create_test_ratchet() -> (DoubleRatchetState, DoubleRatchetState) {
     (alice, bob)
 }
 
-// @scenario: relay_network:Automatic fallback to relay
+// @scenario: relay_network :: Automatic fallback to relay
 #[test]
 fn test_relay_client_connect_disconnect() {
     let transport = MockTransport::new();
@@ -47,7 +47,7 @@ fn test_relay_client_connect_disconnect() {
     assert!(!client.is_connected());
 }
 
-// @scenario: relay_network:Relay stores messages for offline contacts
+// @scenario: relay_network :: Relay stores messages for offline contacts
 #[test]
 fn test_relay_client_send_update() {
     let transport = MockTransport::new();
@@ -82,7 +82,7 @@ fn test_relay_client_send_update() {
     }
 }
 
-// @scenario: message_delivery:Receive acknowledgment when update is delivered
+// @scenario: message_delivery :: Receive acknowledgment when update is delivered
 #[test]
 fn test_relay_client_acknowledgment_tracking() {
     let mut transport = MockTransport::new();
@@ -119,7 +119,7 @@ fn test_relay_client_acknowledgment_tracking() {
     assert_eq!(result.ack_events[0].status, AckStatus::Delivered);
 }
 
-// @scenario: message_delivery:Failed ACK captured in ack_events
+// @scenario: message_delivery :: Failed ACK captured in ack_events
 #[test]
 fn test_process_incoming_captures_failed_ack_events() {
     let transport = MockTransport::new();
@@ -173,7 +173,7 @@ fn test_process_incoming_captures_failed_ack_events() {
     );
 }
 
-// @scenario: message_delivery:Automatic retry on transient failure
+// @scenario: message_delivery :: Automatic retry on transient failure
 #[test]
 fn test_relay_client_timeout_detection() {
     let transport = MockTransport::new();
@@ -205,7 +205,7 @@ fn test_relay_client_timeout_detection() {
     assert_eq!(client.in_flight_count(), 0);
 }
 
-// @scenario: message_delivery:Handle quota exceeded
+// @scenario: message_delivery :: Handle quota exceeded
 #[test]
 fn test_relay_client_max_pending_limit() {
     let transport = MockTransport::new();
@@ -231,7 +231,7 @@ fn test_relay_client_max_pending_limit() {
     assert!(result.unwrap_err().to_string().contains("Too many pending"));
 }
 
-// @scenario: message_delivery:See delivery status for updates
+// @scenario: message_delivery :: See delivery status for updates
 #[test]
 fn test_relay_client_in_flight_update_ids() {
     let transport = MockTransport::new();
@@ -253,7 +253,7 @@ fn test_relay_client_in_flight_update_ids() {
     assert!(ids.contains(&"update-b".to_string()));
 }
 
-// @scenario: message_delivery:See delivery status for updates
+// @scenario: message_delivery :: See delivery status for updates
 #[test]
 fn test_relay_client_has_in_flight() {
     let transport = MockTransport::new();
@@ -270,7 +270,7 @@ fn test_relay_client_has_in_flight() {
     assert!(client.has_in_flight());
 }
 
-// @scenario: relay_network:Relay only sees encrypted blobs
+// @scenario: relay_network :: Relay only sees encrypted blobs
 #[test]
 fn test_relay_client_send_raw_update() {
     let transport = MockTransport::new();
@@ -291,7 +291,7 @@ fn test_relay_client_send_raw_update() {
     assert_eq!(client.in_flight_count(), 1);
 }
 
-// @scenario: message_delivery:See delivery status for updates
+// @scenario: message_delivery :: See delivery status for updates
 #[test]
 fn test_process_result_default() {
     let result = ProcessResult::default();
@@ -306,7 +306,7 @@ fn test_process_result_default() {
 // Device sync send test removed (SP-33): DeviceSyncMessage wire type removed.
 // send_device_sync_message reimplemented via EncryptedUpdate + self-token (Task 4.3 done).
 
-// @scenario: relay_network:Automatic cleanup of stale blobs
+// @scenario: relay_network :: Automatic cleanup of stale blobs
 #[test]
 fn test_send_purge_request() {
     let transport = MockTransport::new();
@@ -335,7 +335,7 @@ fn test_send_purge_request() {
     }
 }
 
-// @scenario: relay_network:Automatic cleanup of stale blobs
+// @scenario: relay_network :: Automatic cleanup of stale blobs
 #[test]
 fn test_send_purge_request_send_error() {
     let transport = MockTransport::new();
@@ -361,8 +361,8 @@ fn test_send_purge_request_send_error() {
 
 // === Delivery Receipts Privacy Tests (SP-12b Phase 2) ===
 
-// @scenario: message_delivery:Delivery receipts can be disabled by user
-// @scenario: message_delivery.feature:Delivery receipts are optional
+// @scenario: message_delivery :: Delivery receipts can be disabled by user
+// @scenario: message_delivery :: Delivery receipts are optional
 #[test]
 fn test_delivery_receipts_disabled_config() {
     let config = RelayClientConfig {
@@ -376,7 +376,7 @@ fn test_delivery_receipts_disabled_config() {
     );
 }
 
-// @scenario: message_delivery:Delivery receipts enabled by default
+// @scenario: message_delivery :: Delivery receipts enabled by default
 #[test]
 fn test_delivery_receipts_enabled_by_default() {
     let config = RelayClientConfig::default();
@@ -388,7 +388,7 @@ fn test_delivery_receipts_enabled_by_default() {
 
 // === Suppress Presence Privacy Tests (SP-12b Phase 2) ===
 
-// @scenario: message_delivery:Suppress presence hides online status from relay
+// @scenario: message_delivery :: Suppress presence hides online status from relay
 #[test]
 fn test_suppress_presence_included_in_handshake() {
     use vauchi_core::identity::Identity;
@@ -415,7 +415,7 @@ fn test_suppress_presence_included_in_handshake() {
     );
 }
 
-// @scenario: message_delivery:Suppress presence defaults to false
+// @scenario: message_delivery :: Suppress presence defaults to false
 #[test]
 fn test_suppress_presence_defaults_to_false() {
     let config = RelayClientConfig::default();

@@ -7,7 +7,7 @@
 
 use vauchi_core::exchange::*;
 
-// @scenario: security.feature:Sufficient key lengths
+// @scenario: security :: Sufficient key lengths
 #[test]
 fn test_keypair_generation() {
     let kp = X3DHKeyPair::generate();
@@ -28,7 +28,7 @@ fn test_keypair_from_bytes_roundtrip() {
 // using it directly. Raw DH output has non-uniform distribution;
 // HKDF produces a proper pseudorandom key.
 
-// @scenario: security.feature:Shared key derivation via X3DH
+// @scenario: security :: Shared key derivation via X3DH
 #[test]
 fn test_x3dh_respond_key_differs_from_raw_dh() {
     // Generate keypairs
@@ -71,8 +71,8 @@ fn test_x3dh_respond_key_differs_from_raw_dh() {
 
 /// Wrong identity key must produce a different shared secret.
 /// With full X3DH, DH1 binds the secret to both parties' identity keys.
-// @scenario: security.feature:Shared key derivation via X3DH
-// @scenario: contact_exchange.feature:Identity mismatch detection
+// @scenario: security :: Shared key derivation via X3DH
+// @scenario: contact_exchange :: Identity mismatch detection
 #[test]
 fn test_x3dh_identity_binding_wrong_key_fails() {
     let alice_keys = X3DHKeyPair::generate();
@@ -100,7 +100,7 @@ fn test_x3dh_identity_binding_wrong_key_fails() {
 }
 
 /// Zero identity key must be rejected (non-contributory DH output).
-// @scenario: security.feature:Shared key derivation via X3DH
+// @scenario: security :: Shared key derivation via X3DH
 #[test]
 fn test_x3dh_zero_identity_rejected() {
     let bob_keys = X3DHKeyPair::generate();
@@ -114,7 +114,7 @@ fn test_x3dh_zero_identity_rejected() {
 }
 
 /// X3DH respond with zero identity key must fail.
-// @scenario: security.feature:Shared key derivation via X3DH
+// @scenario: security :: Shared key derivation via X3DH
 #[test]
 fn test_x3dh_respond_zero_identity_rejected() {
     let alice_keys = X3DHKeyPair::generate();
@@ -132,8 +132,8 @@ fn test_x3dh_respond_zero_identity_rejected() {
 
 /// Full bidirectional agreement: initiate with alice_keys + bob's public,
 /// respond with bob_keys + alice's public → same secret.
-// @scenario: contact_exchange.feature:X3DH key agreement during exchange
-// @scenario: security.feature:Shared key derivation via X3DH
+// @scenario: contact_exchange :: X3DH key agreement during exchange
+// @scenario: security :: Shared key derivation via X3DH
 #[test]
 fn test_x3dh_full_bidirectional_agreement() {
     let alice_keys = X3DHKeyPair::generate();
@@ -160,8 +160,8 @@ fn test_x3dh_full_bidirectional_agreement() {
 /// Two initiations with the same static keys and same peer must produce
 /// different ephemeral public keys, proving the ephemeral secret is freshly
 /// generated each time (not derived from static keys).
-// @scenario: security.feature:Forward secrecy via Double Ratchet
-// @scenario: contact_exchange.feature:Mutual QR uses fresh ephemeral keys for forward secrecy
+// @scenario: security :: Forward secrecy via Double Ratchet
+// @scenario: contact_exchange :: Mutual QR uses fresh ephemeral keys for forward secrecy
 #[test]
 fn test_x3dh_ephemeral_key_uniqueness() {
     let alice_keys = X3DHKeyPair::generate();
@@ -191,7 +191,7 @@ fn test_x3dh_ephemeral_key_uniqueness() {
 /// Even with the same identity keys and peer, each X3DH session must derive
 /// a unique shared secret (forward secrecy property). Compromising one
 /// session's key must not reveal others.
-// @scenario: security.feature:Forward secrecy via Double Ratchet
+// @scenario: security :: Forward secrecy via Double Ratchet
 #[test]
 fn test_x3dh_forward_secrecy_different_sessions() {
     let alice_keys = X3DHKeyPair::generate();

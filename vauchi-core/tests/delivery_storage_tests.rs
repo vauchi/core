@@ -21,7 +21,7 @@ fn now() -> u64 {
         .as_secs()
 }
 
-// @scenario: message_delivery:Relay provides storage confirmation
+// @scenario: message_delivery :: Relay provides storage confirmation
 #[test]
 fn test_create_and_retrieve_delivery_record() {
     let storage = test_storage();
@@ -56,8 +56,8 @@ fn test_get_delivery_record_not_found() {
     assert!(retrieved.is_none());
 }
 
-// @scenario: message_delivery:See delivery status for updates
-// @scenario: message_delivery:Delivery status updates in real-time
+// @scenario: message_delivery :: See delivery status for updates
+// @scenario: message_delivery :: Delivery status updates in real-time
 #[test]
 fn test_update_delivery_status() {
     let storage = test_storage();
@@ -99,7 +99,7 @@ fn test_update_delivery_status() {
     assert_eq!(retrieved.status, DeliveryStatus::Delivered);
 }
 
-// @scenario: message_delivery:Understand why delivery failed
+// @scenario: message_delivery :: Understand why delivery failed
 #[test]
 fn test_delivery_status_failed_with_reason() {
     let storage = test_storage();
@@ -132,7 +132,7 @@ fn test_delivery_status_failed_with_reason() {
     }
 }
 
-// @scenario: message_delivery:View delivery history
+// @scenario: message_delivery :: View delivery history
 #[test]
 fn test_get_delivery_records_for_recipient() {
     let storage = test_storage();
@@ -175,7 +175,7 @@ fn test_get_delivery_records_for_recipient() {
     assert_eq!(empty_records.len(), 0);
 }
 
-// @scenario: message_delivery:Pending status for offline contacts
+// @scenario: message_delivery :: Pending status for offline contacts
 #[test]
 fn test_get_pending_deliveries() {
     let storage = test_storage();
@@ -218,7 +218,7 @@ fn test_get_pending_deliveries() {
     assert!(pending_ids.contains(&"msg-3"));
 }
 
-// @scenario: message_delivery:See delivery status for updates
+// @scenario: message_delivery :: See delivery status for updates
 #[test]
 fn test_count_deliveries_by_status() {
     let storage = test_storage();
@@ -281,8 +281,8 @@ fn test_count_deliveries_by_status() {
     );
 }
 
-// @scenario: message_delivery:Message expires after TTL
-// @scenario: message_delivery.feature:Message stored with TTL
+// @scenario: message_delivery :: Message expires after TTL
+// @scenario: message_delivery :: Message stored with TTL
 #[test]
 fn test_expire_old_deliveries() {
     let storage = test_storage();
@@ -357,7 +357,7 @@ fn test_delete_delivery_record() {
     assert!(!deleted);
 }
 
-// @scenario: message_delivery:Delivery status updates in real-time
+// @scenario: message_delivery :: Delivery status updates in real-time
 #[test]
 fn test_delivery_status_progression() {
     // Test the full lifecycle: Queued -> Sent -> Stored -> Delivered
@@ -402,7 +402,7 @@ fn test_delivery_status_progression() {
 /// Scenario: Given I sent an update to an offline contact 29 days ago
 ///           When the message is approaching expiration
 ///           Then I should receive a warning notification
-// @scenario: message_delivery:Notification before message expires
+// @scenario: message_delivery :: Notification before message expires
 #[test]
 fn test_message_expiration_warning() {
     let storage = test_storage();
@@ -480,7 +480,7 @@ fn test_message_expiration_warning() {
 /// Scenario: Given I have a pending message approaching expiration
 ///           When I choose to extend the TTL
 ///           Then the message should get additional time
-// @scenario: message_delivery:Extend message TTL
+// @scenario: message_delivery :: Extend message TTL
 #[test]
 fn test_ttl_extension_request() {
     let storage = test_storage();
@@ -526,7 +526,7 @@ fn test_ttl_extension_request() {
 }
 
 /// Test: TTL extension fails for non-existent or no-expiry records.
-// @scenario: message_delivery:Extend message TTL
+// @scenario: message_delivery :: Extend message TTL
 #[test]
 fn test_ttl_extension_edge_cases() {
     let storage = test_storage();
@@ -560,7 +560,7 @@ fn test_ttl_extension_edge_cases() {
 /// Scenario: Given an update is delivered via relay
 ///           Then the relay should log minimal metadata
 ///           And no long-term tracking should occur
-// @scenario: message_delivery:Delivery metadata is minimal
+// @scenario: message_delivery :: Delivery metadata is minimal
 #[test]
 fn test_delivery_receipt_privacy() {
     let storage = test_storage();
@@ -618,8 +618,8 @@ fn test_delivery_receipt_privacy() {
 ///           When I exceed my storage quota on the relay
 ///           Then I should be notified about the quota
 ///           And pending deliveries should be prioritized
-// @scenario: message_delivery:Storage quota per user
-// @scenario: message_delivery:Handle quota exceeded
+// @scenario: message_delivery :: Storage quota per user
+// @scenario: message_delivery :: Handle quota exceeded
 #[test]
 fn test_relay_quota_exceeded() {
     use vauchi_core::storage::OfflineQueue;
@@ -700,7 +700,7 @@ fn test_relay_quota_exceeded() {
 ///           And then I update it to B
 ///           When Bob receives both updates
 ///           Then they should be applied in order
-// @scenario: message_delivery:Updates applied in order
+// @scenario: message_delivery :: Updates applied in order
 #[test]
 fn test_delivery_order_verification() {
     let storage = test_storage();
@@ -749,7 +749,7 @@ fn test_delivery_order_verification() {
 /// Scenario: Given network conditions cause out-of-order delivery
 ///           When updates arrive out of order
 ///           Then the app should reorder them by timestamp
-// @scenario: message_delivery:Out-of-order delivery handled gracefully
+// @scenario: message_delivery :: Out-of-order delivery handled gracefully
 #[test]
 fn test_out_of_order_delivery_reordering() {
     let storage = test_storage();
@@ -792,7 +792,7 @@ fn test_out_of_order_delivery_reordering() {
 
 // ============================================================
 // Automatic Cleanup (T2-12)
-// @scenario: message_delivery:Delivery records cleanup
+// @scenario: message_delivery :: Delivery records cleanup
 // ============================================================
 
 /// Test: startup maintenance cleans old terminal records but keeps recent ones

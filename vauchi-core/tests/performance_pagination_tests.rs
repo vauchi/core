@@ -42,7 +42,7 @@ fn populate_contacts(storage: &Storage, count: usize) {
 // Pagination Tests
 // ============================================================
 
-// @scenario: performance:Batch contact loading with pagination
+// @scenario: performance :: Batch contact loading with pagination
 #[test]
 fn test_list_contacts_paginated_returns_correct_subset() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
@@ -64,8 +64,8 @@ fn test_list_contacts_paginated_returns_correct_subset() {
     }
 }
 
-// @scenario: performance:Batch contact loading with pagination
-// @scenario: contacts_management.feature:Sort contacts alphabetically
+// @scenario: performance :: Batch contact loading with pagination
+// @scenario: contacts_management :: Sort contacts alphabetically
 #[test]
 fn test_list_contacts_paginated_respects_ordering() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
@@ -81,7 +81,7 @@ fn test_list_contacts_paginated_respects_ordering() {
     }
 }
 
-// @scenario: performance:Batch contact loading with pagination
+// @scenario: performance :: Batch contact loading with pagination
 #[test]
 fn test_list_contacts_paginated_last_page_partial() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
@@ -92,7 +92,7 @@ fn test_list_contacts_paginated_last_page_partial() {
     assert_eq!(page.len(), 5, "Last page should have remaining contacts");
 }
 
-// @scenario: performance:Batch contact loading with pagination
+// @scenario: performance :: Batch contact loading with pagination
 #[test]
 fn test_list_contacts_paginated_beyond_range_returns_empty() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
@@ -102,7 +102,7 @@ fn test_list_contacts_paginated_beyond_range_returns_empty() {
     assert!(page.is_empty(), "Beyond-range offset should return empty");
 }
 
-// @scenario: performance:Batch contact loading with pagination
+// @scenario: performance :: Batch contact loading with pagination
 #[test]
 fn test_list_contacts_paginated_zero_limit_returns_empty() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
@@ -112,7 +112,7 @@ fn test_list_contacts_paginated_zero_limit_returns_empty() {
     assert!(page.is_empty(), "Zero limit should return empty");
 }
 
-// @scenario: performance:Batch contact loading with pagination
+// @scenario: performance :: Batch contact loading with pagination
 #[test]
 fn test_list_contacts_paginated_all_contacts_across_pages() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
@@ -146,8 +146,8 @@ fn test_list_contacts_paginated_all_contacts_across_pages() {
 // Search Tests
 // ============================================================
 
-// @scenario: performance:Search performance with many contacts
-// @scenario: performance:Efficient database queries
+// @scenario: performance :: Search performance with many contacts
+// @scenario: performance :: Efficient database queries
 #[test]
 fn test_search_contacts_by_name() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
@@ -159,7 +159,7 @@ fn test_search_contacts_by_name() {
     assert_eq!(results[0].display_name(), "Contact 0042");
 }
 
-// @scenario: performance:Search performance with many contacts
+// @scenario: performance :: Search performance with many contacts
 #[test]
 fn test_search_contacts_partial_match() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
@@ -174,7 +174,7 @@ fn test_search_contacts_partial_match() {
     );
 }
 
-// @scenario: performance:Search performance with many contacts
+// @scenario: performance :: Search performance with many contacts
 #[test]
 fn test_search_contacts_case_insensitive() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
@@ -184,7 +184,7 @@ fn test_search_contacts_case_insensitive() {
     assert_eq!(results.len(), 10, "Search should be case-insensitive");
 }
 
-// @scenario: performance:Search performance with many contacts
+// @scenario: performance :: Search performance with many contacts
 #[test]
 fn test_search_contacts_no_match_returns_empty() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
@@ -194,7 +194,7 @@ fn test_search_contacts_no_match_returns_empty() {
     assert!(results.is_empty(), "Non-matching query should return empty");
 }
 
-// @scenario: performance:Search performance with many contacts
+// @scenario: performance :: Search performance with many contacts
 #[test]
 fn test_search_contacts_empty_query_returns_all() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
@@ -204,8 +204,8 @@ fn test_search_contacts_empty_query_returns_all() {
     assert_eq!(results.len(), 10, "Empty query should return all contacts");
 }
 
-// @scenario: performance:Search performance with many contacts
-// @scenario: performance:Efficient database queries
+// @scenario: performance :: Search performance with many contacts
+// @scenario: performance :: Efficient database queries
 #[test]
 fn test_search_contacts_with_1000_contacts() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
@@ -224,7 +224,7 @@ fn test_search_contacts_with_1000_contacts() {
 // Contact Count with Pagination
 // ============================================================
 
-// @scenario: performance:Batch contact loading with pagination
+// @scenario: performance :: Batch contact loading with pagination
 #[test]
 fn test_count_contacts_for_pagination() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();

@@ -61,7 +61,7 @@ fn test_mock_transport_send_tracks_messages() {
     assert_eq!(transport.sent_messages()[0].message_id, message.message_id);
 }
 
-// @scenario: message_delivery.feature:Handle relay unavailable gracefully
+// @scenario: message_delivery :: Handle relay unavailable gracefully
 #[test]
 fn test_mock_transport_error_injection() {
     let mut transport = MockTransport::new();
@@ -93,7 +93,7 @@ fn test_mock_transport_auto_ack() {
     }
 }
 
-// @scenario: message_delivery.feature:Handle relay unavailable gracefully
+// @scenario: message_delivery :: Handle relay unavailable gracefully
 #[test]
 fn test_mock_transport_not_connected_error() {
     let mut transport = MockTransport::new();

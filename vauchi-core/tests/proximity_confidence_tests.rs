@@ -18,14 +18,14 @@ use vauchi_core::*;
 
 // ===== ProximityConfidence enum tests =====
 
-// @scenario: contact_exchange.feature:Proximity verification prevents remote exchange
+// @scenario: contact_exchange :: Proximity verification prevents remote exchange
 #[test]
 fn test_proximity_confidence_default_is_unknown() {
     let confidence = ProximityConfidence::default();
     assert_eq!(confidence, ProximityConfidence::Unknown);
 }
 
-// @scenario: contact_exchange.feature:Proximity verification prevents remote exchange
+// @scenario: contact_exchange :: Proximity verification prevents remote exchange
 #[test]
 fn test_proximity_confidence_variants_exist() {
     let high = ProximityConfidence::High;
@@ -41,7 +41,7 @@ fn test_proximity_confidence_variants_exist() {
     assert_ne!(low, unknown);
 }
 
-// @scenario: contact_exchange.feature:Proximity verification prevents remote exchange
+// @scenario: contact_exchange :: Proximity verification prevents remote exchange
 #[test]
 fn test_proximity_confidence_copy() {
     let confidence = ProximityConfidence::High;
@@ -49,7 +49,7 @@ fn test_proximity_confidence_copy() {
     assert_eq!(confidence, copied);
 }
 
-// @scenario: contact_exchange.feature:Proximity verification prevents remote exchange
+// @scenario: contact_exchange :: Proximity verification prevents remote exchange
 #[test]
 fn test_proximity_confidence_debug() {
     let confidence = ProximityConfidence::High;
@@ -57,7 +57,7 @@ fn test_proximity_confidence_debug() {
     assert!(debug_str.contains("High"));
 }
 
-// @scenario: contact_exchange.feature:Proximity verification prevents remote exchange
+// @scenario: contact_exchange :: Proximity verification prevents remote exchange
 #[test]
 fn test_proximity_confidence_serde_roundtrip() {
     let variants = vec![
@@ -74,7 +74,7 @@ fn test_proximity_confidence_serde_roundtrip() {
     }
 }
 
-// @scenario: contact_exchange.feature:Proximity verification prevents remote exchange
+// @scenario: contact_exchange :: Proximity verification prevents remote exchange
 #[test]
 fn test_proximity_confidence_deserialize_missing_defaults_to_unknown() {
     #[derive(serde::Deserialize)]
@@ -90,7 +90,7 @@ fn test_proximity_confidence_deserialize_missing_defaults_to_unknown() {
 
 // ===== Contact integration tests =====
 
-// @scenario: contact_exchange.feature:Proximity verification prevents remote exchange
+// @scenario: contact_exchange :: Proximity verification prevents remote exchange
 #[test]
 fn test_proximity_confidence_stored_on_contact() {
     let identity = Identity::create("Alice");
@@ -105,7 +105,7 @@ fn test_proximity_confidence_stored_on_contact() {
     );
 }
 
-// @scenario: contact_exchange.feature:Proximity verification prevents remote exchange
+// @scenario: contact_exchange :: Proximity verification prevents remote exchange
 #[test]
 fn test_contact_with_proximity_confidence() {
     let identity = Identity::create("Alice");
@@ -122,7 +122,7 @@ fn test_contact_with_proximity_confidence() {
     assert_eq!(*contact.proximity_confidence(), ProximityConfidence::High);
 }
 
-// @scenario: contact_exchange.feature:Proximity verification prevents remote exchange
+// @scenario: contact_exchange :: Proximity verification prevents remote exchange
 #[test]
 fn test_legacy_contact_has_unknown_confidence() {
     let identity = Identity::create("Alice");
@@ -145,7 +145,7 @@ fn test_legacy_contact_has_unknown_confidence() {
     );
 }
 
-// @scenario: contact_exchange.feature:Proximity verification prevents remote exchange
+// @scenario: contact_exchange :: Proximity verification prevents remote exchange
 #[test]
 fn test_contact_set_proximity_confidence() {
     let identity = Identity::create("Alice");
@@ -168,7 +168,7 @@ fn test_contact_set_proximity_confidence() {
 
 // ===== ExchangeEvent tests =====
 
-// @scenario: contact_exchange.feature:Proximity verification prevents remote exchange
+// @scenario: contact_exchange :: Proximity verification prevents remote exchange
 #[test]
 fn test_proximity_check_completed_event_exists() {
     let event = ExchangeEvent::ProximityCheckCompleted {
@@ -182,7 +182,7 @@ fn test_proximity_check_completed_event_exists() {
 
 // ===== Exchange session integration tests =====
 
-// @scenario: contact_exchange.feature:Successful QR code exchange with proximity
+// @scenario: contact_exchange :: Successful QR code exchange with proximity
 #[test]
 fn test_exchange_with_proximity_sets_high_confidence() {
     let alice_identity = Identity::create("Alice");
@@ -220,7 +220,7 @@ fn test_exchange_with_proximity_sets_high_confidence() {
     }
 }
 
-// @scenario: contact_exchange.feature:Proximity verification prevents remote exchange
+// @scenario: contact_exchange :: Proximity verification prevents remote exchange
 #[test]
 fn test_exchange_without_proximity_sets_low_confidence() {
     let alice_identity = Identity::create("Alice");
@@ -258,7 +258,7 @@ fn test_exchange_without_proximity_sets_low_confidence() {
     }
 }
 
-// @scenario: contact_exchange.feature:Proximity verification prevents remote exchange
+// @scenario: contact_exchange :: Proximity verification prevents remote exchange
 #[test]
 fn test_exchange_proximity_timeout_sets_low_confidence() {
     let alice_identity = Identity::create("Alice");
@@ -296,7 +296,7 @@ fn test_exchange_proximity_timeout_sets_low_confidence() {
     }
 }
 
-// @scenario: contact_exchange.feature:Manual proximity confirmation
+// @scenario: contact_exchange :: Manual proximity confirmation
 #[test]
 fn test_manual_confirmation_sets_medium_confidence() {
     let alice_identity = Identity::create("Alice");
@@ -337,7 +337,7 @@ fn test_manual_confirmation_sets_medium_confidence() {
 
 // ===== AU-3: Audio challenge storage tests =====
 
-// @scenario: contact_exchange.feature:Proximity verification session binding
+// @scenario: contact_exchange :: Proximity verification session binding
 #[test]
 fn test_session_stores_audio_challenge_from_qr() {
     let alice_identity = Identity::create("Alice");
@@ -366,7 +366,7 @@ fn test_session_stores_audio_challenge_from_qr() {
     );
 }
 
-// @scenario: contact_exchange.feature:Proximity verification session binding
+// @scenario: contact_exchange :: Proximity verification session binding
 #[test]
 fn test_stored_audio_challenge_is_not_zeros() {
     let alice_identity = Identity::create("Alice");
@@ -393,7 +393,7 @@ fn test_stored_audio_challenge_is_not_zeros() {
 
 // ===== AU-1: Challenge used in proximity check tests =====
 
-// @scenario: contact_exchange.feature:Proximity verification session binding
+// @scenario: contact_exchange :: Proximity verification session binding
 #[test]
 fn test_proximity_check_uses_qr_challenge_not_zeros() {
     let alice_identity = Identity::create("Alice");
@@ -434,7 +434,7 @@ fn test_proximity_check_uses_qr_challenge_not_zeros() {
 
 // ===== AU-2: Auto-invoke proximity check tests =====
 
-// @scenario: contact_exchange.feature:Proximity auto-verification during exchange
+// @scenario: contact_exchange :: Proximity auto-verification during exchange
 #[test]
 fn test_key_agreement_auto_runs_proximity_check_high() {
     let alice_identity = Identity::create("Alice");
@@ -476,7 +476,7 @@ fn test_key_agreement_auto_runs_proximity_check_high() {
     }
 }
 
-// @scenario: contact_exchange.feature:Proximity auto-verification during exchange
+// @scenario: contact_exchange :: Proximity auto-verification during exchange
 #[test]
 fn test_key_agreement_auto_runs_proximity_check_medium() {
     let alice_identity = Identity::create("Alice");
@@ -518,7 +518,7 @@ fn test_key_agreement_auto_runs_proximity_check_medium() {
     }
 }
 
-// @scenario: contact_exchange.feature:Proximity auto-verification during exchange
+// @scenario: contact_exchange :: Proximity auto-verification during exchange
 #[test]
 fn test_key_agreement_auto_runs_proximity_check_low_on_failure() {
     let alice_identity = Identity::create("Alice");
@@ -561,14 +561,14 @@ fn test_key_agreement_auto_runs_proximity_check_low_on_failure() {
 
 // ===== AU-4: Trait-based confidence level tests =====
 
-// @scenario: contact_exchange.feature:Proximity verifier confidence level
+// @scenario: contact_exchange :: Proximity verifier confidence level
 #[test]
 fn test_mock_success_verifier_confidence_is_high() {
     let verifier = MockProximityVerifier::success();
     assert_eq!(verifier.confidence_level(), ProximityConfidence::High);
 }
 
-// @scenario: contact_exchange.feature:Proximity verifier confidence level
+// @scenario: contact_exchange :: Proximity verifier confidence level
 #[test]
 fn test_mock_failure_verifier_confidence_is_high() {
     // Mock failure verifier still has High intrinsic confidence level —
@@ -577,7 +577,7 @@ fn test_mock_failure_verifier_confidence_is_high() {
     assert_eq!(verifier.confidence_level(), ProximityConfidence::High);
 }
 
-// @scenario: contact_exchange.feature:Proximity verifier confidence level
+// @scenario: contact_exchange :: Proximity verifier confidence level
 #[test]
 fn test_manual_verifier_confidence_is_medium() {
     let verifier = ManualConfirmationVerifier::new();
@@ -586,7 +586,7 @@ fn test_manual_verifier_confidence_is_medium() {
 
 // ===== AU-5: Audio capability check tests =====
 
-// @scenario: contact_exchange.feature:Proximity verification on unsupported device
+// @scenario: contact_exchange :: Proximity verification on unsupported device
 #[test]
 fn test_unsupported_audio_device_returns_unknown_confidence() {
     let alice_identity = Identity::create("Alice");
@@ -630,7 +630,7 @@ fn test_unsupported_audio_device_returns_unknown_confidence() {
     }
 }
 
-// @scenario: contact_exchange.feature:Proximity verification on unsupported device
+// @scenario: contact_exchange :: Proximity verification on unsupported device
 #[test]
 fn test_unsupported_device_explicit_proximity_check_returns_unknown() {
     let alice_identity = Identity::create("Alice");
@@ -673,7 +673,7 @@ fn test_unsupported_device_explicit_proximity_check_returns_unknown() {
     }
 }
 
-// @scenario: contact_exchange.feature:Proximity verification prevents remote exchange
+// @scenario: contact_exchange :: Proximity verification prevents remote exchange
 #[test]
 fn test_complete_exchange_stores_proximity_confidence() {
     let identity = Identity::create("Alice");

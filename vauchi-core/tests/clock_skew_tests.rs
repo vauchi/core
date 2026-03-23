@@ -67,7 +67,7 @@ fn test_version_vector_merge() {
 // =============================================================================
 
 /// Scenario: Detect concurrent updates (neither dominates)
-// @scenario: sync_updates.feature:Detect truly concurrent updates
+// @scenario: sync_updates :: Detect truly concurrent updates
 #[test]
 fn test_detect_concurrent_updates() {
     let device_a = [0x01u8; 32];
@@ -138,7 +138,7 @@ fn test_identical_vectors_behavior() {
 // =============================================================================
 
 /// Scenario: Conflict resolution works regardless of wall clock time
-// @scenario: sync_updates.feature:Sync handles clock skew between devices
+// @scenario: sync_updates :: Sync handles clock skew between devices
 #[test]
 fn test_conflict_resolution_clock_independent() {
     let device_a = [0x01u8; 32];
@@ -184,8 +184,8 @@ fn test_conflict_resolution_clock_independent() {
 }
 
 /// Scenario: Version vectors handle extreme clock skew
-// @scenario: sync_updates.feature:Extreme clock skew detection
-// @scenario: device_management.feature:Backward clock jump (Clock Skew)
+// @scenario: sync_updates :: Extreme clock skew detection
+// @scenario: device_management :: Backward clock jump (Clock Skew)
 #[test]
 fn test_extreme_clock_skew() {
     let device_a = [0x01u8; 32];
@@ -318,7 +318,7 @@ fn test_detect_local_state_behind() {
 // =============================================================================
 
 /// Scenario: Last-write-wins for non-concurrent updates
-// @scenario: sync_updates.feature:Last-write-wins for single field
+// @scenario: sync_updates :: Last-write-wins for single field
 #[test]
 fn test_last_write_wins_sequential() {
     // When updates are sequential (not concurrent), last-write-wins is correct
@@ -346,7 +346,7 @@ fn test_last_write_wins_sequential() {
 }
 
 /// Scenario: Timestamps tie - deterministic resolution needed
-// @scenario: sync_updates.feature:LWW merge for complex changes
+// @scenario: sync_updates :: LWW merge for complex changes
 #[test]
 fn test_timestamp_tie_resolution() {
     let item1 = SyncItem::CardUpdated {

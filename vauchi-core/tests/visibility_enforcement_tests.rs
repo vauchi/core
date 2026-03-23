@@ -71,7 +71,7 @@ fn add_contact_with_ratchet_and_visibility(
 
 /// Tracker #201: Verify that new fields are visible to everyone by default.
 /// This is the current design — new fields default to `Everyone`.
-// @scenario: visibility_control.feature:New fields default to visible to all contacts
+// @scenario: visibility_control :: New fields default to visible to all contacts
 #[test]
 fn test_default_visibility_is_everyone() {
     let rules = VisibilityRules::new();
@@ -83,7 +83,7 @@ fn test_default_visibility_is_everyone() {
 
 /// Verify that a new field added to the card gets propagated to all contacts
 /// (because default visibility is Everyone).
-// @scenario: visibility_control.feature:New contacts see default-visible fields
+// @scenario: visibility_control :: New contacts see default-visible fields
 #[test]
 fn test_new_field_propagated_to_all_contacts_by_default() {
     let wb = create_test_vauchi();
@@ -112,7 +112,7 @@ fn test_new_field_propagated_to_all_contacts_by_default() {
 
 /// Tracker #202: Verify that `Contacts(allowed_set)` is enforced at
 /// propagation time — contact in the set sees the field, others don't.
-// @scenario: visibility_control.feature:Show a field only to specific contacts
+// @scenario: visibility_control :: Show a field only to specific contacts
 #[test]
 fn test_contacts_variant_enforced_at_propagation() {
     let wb = create_test_vauchi();
@@ -161,7 +161,7 @@ fn test_contacts_variant_enforced_at_propagation() {
 
 /// Tracker #203: Display name changes must always pass through visibility
 /// filtering — even when all fields are set to Nobody.
-// @scenario: visibility_control.feature:Encrypted updates reveal nothing about hidden fields
+// @scenario: visibility_control :: Encrypted updates reveal nothing about hidden fields
 #[test]
 fn test_display_name_change_passes_through_nobody_rules() {
     let mut rules = VisibilityRules::new();
@@ -187,7 +187,7 @@ fn test_display_name_change_passes_through_nobody_rules() {
 }
 
 /// Display name change propagates even when a hidden field is also changed.
-// @scenario: visibility_control.feature:Encrypted updates reveal nothing about hidden fields
+// @scenario: visibility_control :: Encrypted updates reveal nothing about hidden fields
 #[test]
 fn test_display_name_propagated_alongside_hidden_field() {
     let wb = create_test_vauchi();
@@ -218,7 +218,7 @@ fn test_display_name_propagated_alongside_hidden_field() {
 
 /// Removing a visibility rule should revert the field to Everyone,
 /// causing it to be included in subsequent propagation.
-// @scenario: visibility_control.feature:New fields default to visible to all contacts
+// @scenario: visibility_control :: New fields default to visible to all contacts
 #[test]
 fn test_remove_rule_reverts_to_everyone_at_delta_level() {
     let email_field = ContactField::new(FieldType::Email, "email", "alice@company.com");
@@ -259,7 +259,7 @@ fn test_remove_rule_reverts_to_everyone_at_delta_level() {
 // -- Tests: Nobody Enforcement -----------------------------------------
 
 /// Nobody visibility must exclude field for all contacts, not just one.
-// @scenario: visibility_control.feature:Make a field private (visible to none)
+// @scenario: visibility_control :: Make a field private (visible to none)
 #[test]
 fn test_nobody_excludes_from_all_contacts() {
     let email_field = ContactField::new(FieldType::Email, "email", "alice@company.com");
@@ -287,9 +287,9 @@ fn test_nobody_excludes_from_all_contacts() {
 
 /// Full integration: mixed visibility — some contacts see some fields,
 /// others don't, display name always passes.
-// @scenario: visibility_control.feature:Hide a field from a specific contact
-// @scenario: visibility_control.feature:Encrypted updates reveal nothing about hidden fields
-// @scenario: contacts_management.feature:Contact shows only fields I can see
+// @scenario: visibility_control :: Hide a field from a specific contact
+// @scenario: visibility_control :: Encrypted updates reveal nothing about hidden fields
+// @scenario: contacts_management :: Contact shows only fields I can see
 #[test]
 fn test_mixed_visibility_propagation() {
     let wb = create_test_vauchi();

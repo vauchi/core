@@ -6,7 +6,7 @@
 
 use vauchi_core::crypto::{SymmetricKey, decrypt, decrypt_with_ad, encrypt, encrypt_with_ad};
 
-// @scenario: security:Correct algorithms used
+// @scenario: security :: Correct algorithms used
 #[test]
 fn test_xchacha20_tagged_starts_with_tag() {
     let key = SymmetricKey::generate();
@@ -14,7 +14,7 @@ fn test_xchacha20_tagged_starts_with_tag() {
     assert_eq!(ciphertext[0], 0x02); // ALG_TAG_XCHACHA20
 }
 
-// @scenario: security:Contact cards are encrypted at rest
+// @scenario: security :: Contact cards are encrypted at rest
 #[test]
 fn test_decrypt_empty_ciphertext() {
     let key = SymmetricKey::generate();
@@ -22,7 +22,7 @@ fn test_decrypt_empty_ciphertext() {
     result.expect_err("expected error");
 }
 
-// @scenario: security:Contact cards are encrypted at rest
+// @scenario: security :: Contact cards are encrypted at rest
 #[test]
 fn test_decrypt_too_short_xchacha20() {
     let key = SymmetricKey::generate();
@@ -32,7 +32,7 @@ fn test_decrypt_too_short_xchacha20() {
     result.expect_err("expected error");
 }
 
-// @scenario: security:Contact cards are encrypted at rest
+// @scenario: security :: Contact cards are encrypted at rest
 #[test]
 fn test_decrypt_unknown_tag_rejected() {
     let key = SymmetricKey::generate();
@@ -42,7 +42,7 @@ fn test_decrypt_unknown_tag_rejected() {
     assert!(result.is_err(), "Unknown algorithm tag must be rejected");
 }
 
-// @scenario: security:Server cannot access plaintext
+// @scenario: security :: Server cannot access plaintext
 #[test]
 fn test_decrypt_wrong_key() {
     let key1 = SymmetricKey::generate();
@@ -52,7 +52,7 @@ fn test_decrypt_wrong_key() {
     result.expect_err("expected error");
 }
 
-// @scenario: security:Contact cards are encrypted at rest
+// @scenario: security :: Contact cards are encrypted at rest
 #[test]
 fn test_decrypt_corrupted_data() {
     let key = SymmetricKey::generate();
@@ -64,7 +64,7 @@ fn test_decrypt_corrupted_data() {
     result.expect_err("expected error");
 }
 
-// @scenario: security:Sufficient key lengths
+// @scenario: security :: Sufficient key lengths
 #[test]
 fn test_symmetric_key_generate() {
     let key1 = SymmetricKey::generate();
@@ -72,7 +72,7 @@ fn test_symmetric_key_generate() {
     assert_ne!(key1.as_bytes(), key2.as_bytes());
 }
 
-// @scenario: security:Sufficient key lengths
+// @scenario: security :: Sufficient key lengths
 #[test]
 fn test_symmetric_key_from_bytes() {
     let bytes = [0x42u8; 32];
@@ -80,7 +80,7 @@ fn test_symmetric_key_from_bytes() {
     assert_eq!(key.as_bytes(), &bytes);
 }
 
-// @scenario: security:Memory dump protection
+// @scenario: security :: Memory dump protection
 #[test]
 fn test_symmetric_key_debug_redacted() {
     let key = SymmetricKey::generate();
@@ -90,7 +90,7 @@ fn test_symmetric_key_debug_redacted() {
 }
 
 /// SP-9 #227: SymmetricKey::from_bytes rejects all-zeros (degenerate key).
-// @scenario: security:No weak cryptography
+// @scenario: security :: No weak cryptography
 #[test]
 #[should_panic(expected = "all-zeros key is degenerate")]
 fn test_symmetric_key_from_bytes_rejects_zeros() {
@@ -104,7 +104,7 @@ fn test_symmetric_key_from_bytes_unchecked_allows_zeros() {
     assert_eq!(key.as_bytes(), &[0u8; 32]);
 }
 
-// @scenario: security:Contact cards are encrypted at rest
+// @scenario: security :: Contact cards are encrypted at rest
 #[test]
 fn test_large_plaintext() {
     let key = SymmetricKey::generate();
@@ -116,7 +116,7 @@ fn test_large_plaintext() {
 
 // --- AEAD associated data binding tests ---
 
-// @scenario: security:Contact cards are encrypted in transit
+// @scenario: security :: Contact cards are encrypted in transit
 #[test]
 fn test_encrypt_with_ad_roundtrip() {
     let key = SymmetricKey::generate();
@@ -127,7 +127,7 @@ fn test_encrypt_with_ad_roundtrip() {
     assert_eq!(plaintext.to_vec(), decrypted);
 }
 
-// @scenario: security:Correct algorithms used
+// @scenario: security :: Correct algorithms used
 #[test]
 fn test_encrypt_with_ad_tag_is_0x03() {
     let key = SymmetricKey::generate();
@@ -135,7 +135,7 @@ fn test_encrypt_with_ad_tag_is_0x03() {
     assert_eq!(ciphertext[0], 0x03); // ALG_TAG_XCHACHA20_AD
 }
 
-// @scenario: security:Contact cards are encrypted in transit
+// @scenario: security :: Contact cards are encrypted in transit
 #[test]
 fn test_encrypt_with_ad_wrong_ad_fails() {
     let key = SymmetricKey::generate();
@@ -144,7 +144,7 @@ fn test_encrypt_with_ad_wrong_ad_fails() {
     assert!(result.is_err(), "Decryption with wrong AD must fail");
 }
 
-// @scenario: security:Contact cards are encrypted in transit
+// @scenario: security :: Contact cards are encrypted in transit
 #[test]
 fn test_encrypt_with_ad_empty_ad_fails_against_non_empty() {
     let key = SymmetricKey::generate();
@@ -156,7 +156,7 @@ fn test_encrypt_with_ad_empty_ad_fails_against_non_empty() {
     );
 }
 
-// @scenario: security:Contact cards are encrypted in transit
+// @scenario: security :: Contact cards are encrypted in transit
 #[test]
 fn test_encrypt_with_ad_cannot_decrypt_without_ad() {
     let key = SymmetricKey::generate();
@@ -182,7 +182,7 @@ fn test_decrypt_with_ad_backward_compat_tag_0x02() {
 
 // --- Additional coverage for edge cases and error paths ---
 
-// @scenario: security:Contact cards are encrypted at rest
+// @scenario: security :: Contact cards are encrypted at rest
 #[test]
 fn test_encrypt_with_ad_empty_plaintext() {
     let key = SymmetricKey::generate();
@@ -192,7 +192,7 @@ fn test_encrypt_with_ad_empty_plaintext() {
     assert_eq!(decrypted, Vec::<u8>::new());
 }
 
-// @scenario: security:Contact cards are encrypted at rest
+// @scenario: security :: Contact cards are encrypted at rest
 #[test]
 fn test_encrypt_with_ad_large_associated_data() {
     let key = SymmetricKey::generate();
@@ -203,7 +203,7 @@ fn test_encrypt_with_ad_large_associated_data() {
     assert_eq!(plaintext.to_vec(), decrypted);
 }
 
-// @scenario: security:Contact cards are encrypted at rest
+// @scenario: security :: Contact cards are encrypted at rest
 #[test]
 fn test_decrypt_with_ad_empty_ciphertext() {
     let key = SymmetricKey::generate();
@@ -211,7 +211,7 @@ fn test_decrypt_with_ad_empty_ciphertext() {
     assert!(result.is_err(), "Empty ciphertext must be rejected");
 }
 
-// @scenario: security:Contact cards are encrypted at rest
+// @scenario: security :: Contact cards are encrypted at rest
 #[test]
 fn test_decrypt_with_ad_too_short_xchacha20() {
     let key = SymmetricKey::generate();
@@ -221,7 +221,7 @@ fn test_decrypt_with_ad_too_short_xchacha20() {
     assert!(result.is_err(), "Too-short ciphertext must be rejected");
 }
 
-// @scenario: security:Contact cards are encrypted at rest
+// @scenario: security :: Contact cards are encrypted at rest
 #[test]
 fn test_decrypt_with_ad_unknown_tag_rejected() {
     let key = SymmetricKey::generate();
@@ -234,7 +234,7 @@ fn test_decrypt_with_ad_unknown_tag_rejected() {
     );
 }
 
-// @scenario: security:Contact cards are encrypted in transit
+// @scenario: security :: Contact cards are encrypted in transit
 #[test]
 fn test_encrypt_with_ad_empty_ad() {
     let key = SymmetricKey::generate();
@@ -244,7 +244,7 @@ fn test_encrypt_with_ad_empty_ad() {
     assert_eq!(plaintext.to_vec(), decrypted);
 }
 
-// @scenario: security:Contact cards are encrypted at rest
+// @scenario: security :: Contact cards are encrypted at rest
 #[test]
 fn test_decrypt_xchacha20_corrupted_tag() {
     let key = SymmetricKey::generate();
@@ -256,7 +256,7 @@ fn test_decrypt_xchacha20_corrupted_tag() {
     assert!(result.is_err(), "Corrupted XChaCha20 tag must fail");
 }
 
-// @scenario: security:Contact cards are encrypted in transit
+// @scenario: security :: Contact cards are encrypted in transit
 #[test]
 fn test_decrypt_xchacha20_ad_corrupted_tag() {
     let key = SymmetricKey::generate();
@@ -268,7 +268,7 @@ fn test_decrypt_xchacha20_ad_corrupted_tag() {
     assert!(result.is_err(), "Corrupted XChaCha20-AD tag must fail");
 }
 
-// @scenario: security:Contact cards are encrypted in transit
+// @scenario: security :: Contact cards are encrypted in transit
 #[test]
 fn test_encrypt_with_ad_nonce_determinism() {
     let key = SymmetricKey::generate();
@@ -283,7 +283,7 @@ fn test_encrypt_with_ad_nonce_determinism() {
     );
 }
 
-// @scenario: security:Contact cards are encrypted at rest
+// @scenario: security :: Contact cards are encrypted at rest
 #[test]
 fn test_unrecognized_tag_rejected() {
     let key = SymmetricKey::generate();
@@ -295,7 +295,7 @@ fn test_unrecognized_tag_rejected() {
     assert!(result.is_err(), "Unrecognized tag must be rejected");
 }
 
-// @scenario: security:Contact cards are encrypted at rest
+// @scenario: security :: Contact cards are encrypted at rest
 #[test]
 fn test_symmetric_key_from_bytes_single_bit_nonzero() {
     // Test that a key with only a single bit set is accepted
@@ -305,7 +305,7 @@ fn test_symmetric_key_from_bytes_single_bit_nonzero() {
     assert_eq!(key.as_bytes()[0], 1);
 }
 
-// @scenario: security:Contact cards are encrypted at rest
+// @scenario: security :: Contact cards are encrypted at rest
 #[test]
 fn test_encrypt_decrypt_minimum_ciphertext_size() {
     let key = SymmetricKey::generate();

@@ -7,7 +7,7 @@
 
 use vauchi_core::*;
 
-// @scenario: contact_recovery.feature:Generate recovery claim QR code
+// @scenario: contact_recovery :: Generate recovery claim QR code
 #[test]
 fn test_recovery_claim_roundtrip() {
     let old_pk = [0x01u8; 32];
@@ -21,7 +21,7 @@ fn test_recovery_claim_roundtrip() {
     assert_eq!(restored.new_pk(), &new_pk);
 }
 
-// @scenario: contact_recovery.feature:Recovery succeeds with trusted vouchers only
+// @scenario: contact_recovery :: Recovery succeeds with trusted vouchers only
 #[test]
 fn test_recovery_voucher_roundtrip() {
     let old_pk = [0x01u8; 32];

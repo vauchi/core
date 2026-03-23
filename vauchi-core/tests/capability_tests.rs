@@ -112,14 +112,14 @@ fn make_gate(
 
 // ===== Platform tests =====
 
-// @scenario: device_capabilities.feature:Platform detection
+// @scenario: device_capabilities :: Platform detection
 #[test]
 fn test_platform_default_is_unknown() {
     let platform = Platform::default();
     assert_eq!(platform, Platform::Unknown);
 }
 
-// @scenario: device_capabilities.feature:Platform detection
+// @scenario: device_capabilities :: Platform detection
 #[test]
 fn test_platform_variants_distinct() {
     assert_ne!(Platform::Android, Platform::Ios);
@@ -128,7 +128,7 @@ fn test_platform_variants_distinct() {
     assert_ne!(Platform::Desktop, Platform::Unknown);
 }
 
-// @scenario: device_capabilities.feature:Platform serialization
+// @scenario: device_capabilities :: Platform serialization
 #[test]
 fn test_platform_serde_roundtrip() {
     let platforms = vec![
@@ -148,7 +148,7 @@ fn test_platform_serde_roundtrip() {
 
 // ===== DeviceCapabilities tests =====
 
-// @scenario: device_capabilities.feature:Capabilities serialization
+// @scenario: device_capabilities :: Capabilities serialization
 #[test]
 fn test_device_capabilities_serde_roundtrip() {
     let caps = DeviceCapabilities {
@@ -171,7 +171,7 @@ fn test_device_capabilities_serde_roundtrip() {
 
 // ===== FeatureGate feature availability tests =====
 
-// @scenario: device_capabilities.feature:QR display always available
+// @scenario: device_capabilities :: QR display always available
 #[test]
 fn test_qr_display_always_available() {
     let caps = make_caps(false, false, false);
@@ -182,7 +182,7 @@ fn test_qr_display_always_available() {
     );
 }
 
-// @scenario: device_capabilities.feature:QR scan requires camera
+// @scenario: device_capabilities :: QR scan requires camera
 #[test]
 fn test_qr_scan_requires_camera() {
     let no_camera = make_caps(false, false, false);
@@ -197,7 +197,7 @@ fn test_qr_scan_requires_camera() {
     assert_eq!(gate.is_available(Feature::QrScan), FeatureStatus::Available);
 }
 
-// @scenario: device_capabilities.feature:NFC exchange requires NFC hardware
+// @scenario: device_capabilities :: NFC exchange requires NFC hardware
 #[test]
 fn test_nfc_exchange_requires_nfc() {
     let no_nfc = make_caps(false, false, false);
@@ -215,7 +215,7 @@ fn test_nfc_exchange_requires_nfc() {
     );
 }
 
-// @scenario: device_capabilities.feature:BLE exchange requires BLE hardware
+// @scenario: device_capabilities :: BLE exchange requires BLE hardware
 #[test]
 fn test_ble_exchange_requires_ble() {
     let no_ble = make_caps(false, false, false);
@@ -233,7 +233,7 @@ fn test_ble_exchange_requires_ble() {
     );
 }
 
-// @scenario: device_capabilities.feature:Mesh mode requires BLE
+// @scenario: device_capabilities :: Mesh mode requires BLE
 #[test]
 fn test_mesh_mode_requires_ble() {
     let no_ble = make_caps(false, false, false);
@@ -251,7 +251,7 @@ fn test_mesh_mode_requires_ble() {
     );
 }
 
-// @scenario: device_capabilities.feature:Biometric unlock requires biometric hardware
+// @scenario: device_capabilities :: Biometric unlock requires biometric hardware
 #[test]
 fn test_biometric_unlock_requires_biometrics() {
     let no_bio = make_caps(false, false, false);
@@ -273,7 +273,7 @@ fn test_biometric_unlock_requires_biometrics() {
 
 // ===== FeatureGate action gating tests =====
 
-// @scenario: device_capabilities.feature:Exchange blocked at critical battery
+// @scenario: device_capabilities :: Exchange blocked at critical battery
 #[test]
 fn test_exchange_blocked_at_critical_battery() {
     let caps = make_caps(false, false, false);
@@ -282,7 +282,7 @@ fn test_exchange_blocked_at_critical_battery() {
     assert!(matches!(status, ActionStatus::Blocked { .. }));
 }
 
-// @scenario: device_capabilities.feature:Exchange allowed at normal battery
+// @scenario: device_capabilities :: Exchange allowed at normal battery
 #[test]
 fn test_exchange_allowed_at_normal_battery() {
     let caps = make_caps(false, false, false);
@@ -291,7 +291,7 @@ fn test_exchange_allowed_at_normal_battery() {
     assert_eq!(status, ActionStatus::Allowed);
 }
 
-// @scenario: device_capabilities.feature:Relay sync blocked when offline
+// @scenario: device_capabilities :: Relay sync blocked when offline
 #[test]
 fn test_relay_sync_blocked_when_offline() {
     let caps = make_caps(false, false, false);
@@ -300,7 +300,7 @@ fn test_relay_sync_blocked_when_offline() {
     assert!(matches!(status, ActionStatus::Blocked { .. }));
 }
 
-// @scenario: device_capabilities.feature:Relay sync allowed when online
+// @scenario: device_capabilities :: Relay sync allowed when online
 #[test]
 fn test_relay_sync_allowed_when_online() {
     let caps = make_caps(false, false, false);
@@ -309,7 +309,7 @@ fn test_relay_sync_allowed_when_online() {
     assert_eq!(status, ActionStatus::Allowed);
 }
 
-// @scenario: device_capabilities.feature:Sync blocked at low storage
+// @scenario: device_capabilities :: Sync blocked at low storage
 #[test]
 fn test_sync_blocked_at_low_storage() {
     let caps = make_caps(false, false, false);
@@ -318,7 +318,7 @@ fn test_sync_blocked_at_low_storage() {
     assert!(matches!(status, ActionStatus::Blocked { .. }));
 }
 
-// @scenario: device_capabilities.feature:Mesh relay blocked at critical battery
+// @scenario: device_capabilities :: Mesh relay blocked at critical battery
 #[test]
 fn test_mesh_relay_blocked_at_critical_battery() {
     let caps = make_caps(false, false, false);
@@ -327,7 +327,7 @@ fn test_mesh_relay_blocked_at_critical_battery() {
     assert!(matches!(status, ActionStatus::Blocked { .. }));
 }
 
-// @scenario: device_capabilities.feature:Mesh relay warning at low battery
+// @scenario: device_capabilities :: Mesh relay warning at low battery
 #[test]
 fn test_mesh_relay_warning_at_low_battery() {
     let caps = make_caps(false, false, false);
@@ -338,7 +338,7 @@ fn test_mesh_relay_warning_at_low_battery() {
 
 // ===== available_exchanges tests =====
 
-// @scenario: device_capabilities.feature:Available exchanges for minimal device
+// @scenario: device_capabilities :: Available exchanges for minimal device
 #[test]
 fn test_available_exchanges_minimal_device() {
     let caps = make_caps(false, false, false);
@@ -349,7 +349,7 @@ fn test_available_exchanges_minimal_device() {
     assert!(exchanges.contains(&Feature::QrDisplay));
 }
 
-// @scenario: device_capabilities.feature:Available exchanges for full device
+// @scenario: device_capabilities :: Available exchanges for full device
 #[test]
 fn test_available_exchanges_full_device() {
     let caps = make_caps(true, true, true);
@@ -362,7 +362,7 @@ fn test_available_exchanges_full_device() {
     assert_eq!(exchanges.len(), 4);
 }
 
-// @scenario: device_capabilities.feature:Available exchanges for iOS without NFC
+// @scenario: device_capabilities :: Available exchanges for iOS without NFC
 #[test]
 fn test_available_exchanges_ios_no_nfc() {
     let mut caps = make_caps(false, true, true);
@@ -378,7 +378,7 @@ fn test_available_exchanges_ios_no_nfc() {
 
 // ===== AudioCapability serde tests =====
 
-// @scenario: device_capabilities.feature:Audio capability serialization
+// @scenario: device_capabilities :: Audio capability serialization
 #[test]
 fn test_audio_capability_serde_roundtrip() {
     let variants = vec![
@@ -397,7 +397,7 @@ fn test_audio_capability_serde_roundtrip() {
 
 // ===== BiometricType tests =====
 
-// @scenario: device_capabilities.feature:Biometric type serialization
+// @scenario: device_capabilities :: Biometric type serialization
 #[test]
 fn test_biometric_type_serde_roundtrip() {
     let types = vec![
@@ -415,7 +415,7 @@ fn test_biometric_type_serde_roundtrip() {
 
 // ===== ConnectionType tests =====
 
-// @scenario: device_capabilities.feature:Connection type variants
+// @scenario: device_capabilities :: Connection type variants
 #[test]
 fn test_connection_type_variants() {
     let variants = [

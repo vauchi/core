@@ -11,7 +11,7 @@
 // Traces to: _private/features/field_validation.feature @validate @social
 // =============================================================================
 
-// @scenario: field_validation:Validate a contact's social profile
+// @scenario: field_validation :: Validate a contact's social profile
 #[test]
 fn test_social_handle_platform_rules_twitter() {
     use vauchi_core::social::SocialNetworkRegistry;
@@ -39,7 +39,7 @@ fn test_social_handle_platform_rules_twitter() {
     }
 }
 
-// @scenario: field_validation:Validate a contact's social profile
+// @scenario: field_validation :: Validate a contact's social profile
 #[test]
 fn test_social_handle_platform_rules_instagram() {
     use vauchi_core::social::SocialNetworkRegistry;
@@ -61,7 +61,7 @@ fn test_social_handle_platform_rules_instagram() {
     }
 }
 
-// @scenario: field_validation:Validate a contact's social profile
+// @scenario: field_validation :: Validate a contact's social profile
 #[test]
 fn test_social_handle_platform_rules_github() {
     use vauchi_core::social::SocialNetworkRegistry;
@@ -83,7 +83,7 @@ fn test_social_handle_platform_rules_github() {
     }
 }
 
-// @scenario: field_validation:Validate a contact's social profile
+// @scenario: field_validation :: Validate a contact's social profile
 #[test]
 fn test_social_handle_platform_rules_mastodon() {
     use vauchi_core::social::SocialNetworkRegistry;
@@ -111,7 +111,7 @@ fn test_social_handle_platform_rules_mastodon() {
     );
 }
 
-// @scenario: field_validation:Validate a contact's social profile
+// @scenario: field_validation :: Validate a contact's social profile
 #[test]
 fn test_social_handle_platform_rules_linkedin() {
     use vauchi_core::social::SocialNetworkRegistry;
@@ -133,7 +133,7 @@ fn test_social_handle_platform_rules_linkedin() {
     }
 }
 
-// @scenario: field_validation:Validate a contact's social profile
+// @scenario: field_validation :: Validate a contact's social profile
 #[test]
 fn test_social_handle_preserves_full_urls() {
     use vauchi_core::social::SocialNetworkRegistry;

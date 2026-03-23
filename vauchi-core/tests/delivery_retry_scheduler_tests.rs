@@ -52,7 +52,7 @@ fn create_delivery(storage: &Storage, msg_id: &str) {
 
 // === Tick Processing Tests ===
 
-// @scenario: message_delivery:Automatic retry on transient failure
+// @scenario: message_delivery :: Automatic retry on transient failure
 #[test]
 fn test_tick_processes_due_retries_only() {
     let storage = test_storage();
@@ -78,7 +78,7 @@ fn test_tick_processes_due_retries_only() {
     assert_eq!(future.attempt, 0, "Future entry should not be touched");
 }
 
-// @scenario: message_delivery:Exponential backoff with jitter
+// @scenario: message_delivery :: Exponential backoff with jitter
 #[test]
 fn test_tick_increments_attempt_count() {
     let storage = test_storage();
@@ -100,7 +100,7 @@ fn test_tick_increments_attempt_count() {
     );
 }
 
-// @scenario: message_delivery:Give up after maximum retries
+// @scenario: message_delivery :: Give up after maximum retries
 #[test]
 fn test_tick_removes_max_attempt_entries() {
     let storage = test_storage();
@@ -138,7 +138,7 @@ fn test_tick_removes_max_attempt_entries() {
     assert_eq!(still_ok.attempt, 3);
 }
 
-// @scenario: message_delivery:Retry tick returns ready IDs for resend
+// @scenario: message_delivery :: Retry tick returns ready IDs for resend
 #[test]
 fn test_tick_returns_ready_message_ids() {
     let storage = test_storage();

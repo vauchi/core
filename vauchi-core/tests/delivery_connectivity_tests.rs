@@ -55,7 +55,7 @@ fn create_offline_update(storage: &Storage, manager: &OfflineManager, id: &str) 
     manager.send_or_queue(storage, update, false).unwrap();
 }
 
-// @scenario: message_delivery:Connectivity restored triggers retry and flush
+// @scenario: message_delivery :: Connectivity restored triggers retry and flush
 #[test]
 fn test_connectivity_restored_processes_retries_and_queue() {
     let storage = test_storage();
@@ -89,7 +89,7 @@ fn test_connectivity_restored_processes_retries_and_queue() {
     assert_eq!(flushed.len(), 2, "Two offline updates should be ready");
 }
 
-// @scenario: message_delivery:Empty retry and queue on connectivity restore
+// @scenario: message_delivery :: Empty retry and queue on connectivity restore
 #[test]
 fn test_connectivity_restored_with_nothing_pending() {
     let storage = test_storage();
@@ -105,7 +105,7 @@ fn test_connectivity_restored_with_nothing_pending() {
     assert!(flushed.is_empty());
 }
 
-// @scenario: message_delivery:Combined retry and offline stats
+// @scenario: message_delivery :: Combined retry and offline stats
 #[test]
 fn test_combined_retry_and_offline_counts() {
     let storage = test_storage();

@@ -69,9 +69,9 @@ fn setup_widget_test_env() -> (tempfile::TempDir, MemoryKeyStorage) {
 /// The widget panic shred should securely delete the SQLite database.
 ///
 /// Traces to: "Full panic shred per emergency_shred.feature"
-// @scenario: panic_widget:Widget triggers full panic shred
-// @scenario: emergency_shred.feature:Panic shred destroys everything immediately
-// @scenario: emergency_shred.feature:Database WAL and SHM files are cleaned up
+// @scenario: panic_widget :: Widget triggers full panic shred
+// @scenario: emergency_shred :: Panic shred destroys everything immediately
+// @scenario: emergency_shred :: Database WAL and SHM files are cleaned up
 #[test]
 fn test_widget_panic_shred_destroys_database() {
     let (dir, secure_storage) = setup_widget_test_env();
@@ -100,9 +100,9 @@ fn test_widget_panic_shred_destroys_database() {
 /// The widget panic shred should delete all key files.
 ///
 /// Traces to: "Keys destroyed"
-// @scenario: panic_widget:Widget triggers full panic shred
-// @scenario: emergency_shred.feature:Panic shred destroys everything immediately
-// @scenario: emergency_shred.feature:Files are overwritten with zeros before deletion
+// @scenario: panic_widget :: Widget triggers full panic shred
+// @scenario: emergency_shred :: Panic shred destroys everything immediately
+// @scenario: emergency_shred :: Files are overwritten with zeros before deletion
 #[test]
 fn test_widget_panic_shred_destroys_keys() {
     let (dir, secure_storage) = setup_widget_test_env();
@@ -130,9 +130,9 @@ fn test_widget_panic_shred_destroys_keys() {
 /// The widget panic shred should securely delete the identity file.
 ///
 /// Traces to: "Full panic shred per emergency_shred.feature"
-// @scenario: panic_widget:Widget triggers full panic shred
-// @scenario: emergency_shred.feature:Panic shred destroys everything immediately
-// @scenario: emergency_shred.feature:Files are overwritten with zeros before deletion
+// @scenario: panic_widget :: Widget triggers full panic shred
+// @scenario: emergency_shred :: Panic shred destroys everything immediately
+// @scenario: emergency_shred :: Files are overwritten with zeros before deletion
 #[test]
 fn test_widget_panic_shred_destroys_identity() {
     let (dir, secure_storage) = setup_widget_test_env();
@@ -161,8 +161,8 @@ fn test_widget_panic_shred_destroys_identity() {
 /// The widget panic shred should return a complete ShredReport.
 ///
 /// Traces to: "Full panic shred per emergency_shred.feature"
-// @scenario: panic_widget:Widget triggers full panic shred
-// @scenario: emergency_shred.feature:Shred report tracks what was destroyed
+// @scenario: panic_widget :: Widget triggers full panic shred
+// @scenario: emergency_shred :: Shred report tracks what was destroyed
 #[test]
 fn test_widget_panic_shred_returns_report() {
     let (dir, secure_storage) = setup_widget_test_env();
@@ -194,7 +194,7 @@ fn test_widget_panic_shred_returns_report() {
 /// This is the core requirement: widgets need to trigger shred without opening the app.
 ///
 /// Traces to: "Works without app unlock (intentional for emergency)"
-// @scenario: panic_widget:Widget works without app unlock
+// @scenario: panic_widget :: Widget works without app unlock
 #[test]
 fn test_widget_panic_shred_works_without_vauchi_init() {
     // Set up a data directory manually (no Vauchi instance created)
@@ -242,7 +242,7 @@ fn test_widget_panic_shred_works_without_vauchi_init() {
 /// This handles the case where the widget is triggered but data was already deleted.
 ///
 /// Traces to: "Works without app unlock (intentional for emergency)"
-// @scenario: panic_widget:Widget works without app unlock
+// @scenario: panic_widget :: Widget works without app unlock
 #[test]
 fn test_widget_panic_shred_on_empty_directory_succeeds() {
     let dir = tempfile::tempdir().unwrap();
@@ -261,8 +261,8 @@ fn test_widget_panic_shred_on_empty_directory_succeeds() {
 /// Widget panic shred should destroy the SMK from SecureStorage.
 ///
 /// Traces to: "Keys destroyed"
-// @scenario: panic_widget:Widget triggers full panic shred
-// @scenario: emergency_shred.feature:Panic shred destroys everything immediately
+// @scenario: panic_widget :: Widget triggers full panic shred
+// @scenario: emergency_shred :: Panic shred destroys everything immediately
 #[test]
 fn test_widget_panic_shred_destroys_smk() {
     let (dir, secure_storage) = setup_widget_test_env();
@@ -285,8 +285,9 @@ fn test_widget_panic_shred_destroys_smk() {
 /// Widget panic shred should attempt to load pre-signed messages before destroying data.
 ///
 /// Traces to: "Pre-signed messages sent FIRST"
-// @scenario: panic_widget:Widget shred sends pre-signed notifications
-// @scenario: emergency_shred.feature:Panic shred follows sign-before-destroy pattern
+// @scenario: panic_widget :: Widget shred sends pre-signed notifications
+// @scenario: emergency_shred :: Panic shred follows sign-before-destroy pattern
+// @scenario: pre_signed_operations :: Pre-signed messages used during panic shred
 #[test]
 fn test_widget_panic_shred_loads_pre_signed_before_destruction() {
     let (dir, secure_storage) = setup_widget_test_env();
@@ -316,7 +317,7 @@ fn test_widget_panic_shred_loads_pre_signed_before_destruction() {
 // =============================================================================
 
 /// Test that WidgetConfirmationMode variants are properly constructible.
-// @scenario: panic_widget:Configure widget confirmation mode
+// @scenario: panic_widget :: Configure widget confirmation mode
 #[test]
 fn test_widget_confirmation_mode_variants() {
     let mode = WidgetConfirmationMode::TapConfirm;
@@ -330,7 +331,7 @@ fn test_widget_confirmation_mode_variants() {
 }
 
 /// Test that WidgetConfirmationMode can be cloned and compared.
-// @scenario: panic_widget:Configure widget confirmation mode
+// @scenario: panic_widget :: Configure widget confirmation mode
 #[test]
 fn test_widget_confirmation_mode_clone_eq() {
     let mode1 = WidgetConfirmationMode::TapConfirm;

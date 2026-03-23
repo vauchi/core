@@ -23,7 +23,7 @@ use common::helpers::{create_vauchi_with_identity, setup_alice_bob_exchange};
 // Password KDF Tests
 // =============================================================================
 
-// @scenario: duress_pin.feature:Enable duress PIN in settings
+// @scenario: duress_mode :: Enable duress PIN in settings
 #[test]
 fn test_create_password_config_produces_valid_hash() {
     let config = AppPasswordConfig::create("secure-pin-1234").expect("create should succeed");
@@ -38,7 +38,7 @@ fn test_create_password_config_produces_valid_hash() {
     assert!(config.duress_salt().is_none());
 }
 
-// @scenario: duress_pin.feature:Normal PIN shows real contacts
+// @scenario: duress_mode :: Normal credential shows real contacts
 #[test]
 fn test_verify_correct_password_returns_normal() {
     let config = AppPasswordConfig::create("my-password").expect("create should succeed");
@@ -51,7 +51,7 @@ fn test_verify_correct_password_returns_normal() {
     );
 }
 
-// @scenario: duress_pin.feature:Wrong PIN handling
+// @scenario: duress_mode :: Wrong credential handling
 #[test]
 fn test_verify_wrong_password_returns_invalid() {
     let config = AppPasswordConfig::create("my-password").expect("create should succeed");
@@ -64,7 +64,7 @@ fn test_verify_wrong_password_returns_invalid() {
     );
 }
 
-// @scenario: duress_pin.feature:Duress PIN shows decoy contacts
+// @scenario: duress_mode :: Duress credential shows decoy contacts
 #[test]
 fn test_verify_duress_password_returns_duress() {
     let mut config = AppPasswordConfig::create("my-password").expect("create should succeed");
@@ -88,7 +88,7 @@ fn test_verify_duress_password_returns_duress() {
     );
 }
 
-// @scenario: duress_pin.feature:Both databases use strong encryption
+// @scenario: duress_mode :: Both databases use strong encryption
 #[test]
 fn test_verify_constant_time_both_checked() {
     // Both hashes should always be checked to prevent timing attacks.
@@ -110,7 +110,7 @@ fn test_verify_constant_time_both_checked() {
     );
 }
 
-// @scenario: duress_pin.feature:Both databases use strong encryption
+// @scenario: duress_mode :: Both databases use strong encryption
 #[test]
 fn test_create_different_passwords_produce_different_hashes() {
     let config1 = AppPasswordConfig::create("password-one").expect("create should succeed");
@@ -120,7 +120,7 @@ fn test_create_different_passwords_produce_different_hashes() {
     assert_ne!(config1.password_hash(), config2.password_hash());
 }
 
-// @scenario: duress_pin.feature:Duress PIN must differ from normal PIN
+// @scenario: duress_mode :: Duress PIN must differ from normal PIN
 #[test]
 fn test_setup_duress_same_as_normal_rejected() {
     // Duress password must differ from the normal password
@@ -137,7 +137,7 @@ fn test_setup_duress_same_as_normal_rejected() {
 // Password Storage Tests
 // =============================================================================
 
-// @scenario: duress_pin.feature:Duress PIN is opt-in and disabled by default
+// @scenario: duress_mode :: Duress mode is opt-in and disabled by default
 #[test]
 fn test_load_password_config_returns_none_initially() {
     let storage =
@@ -150,7 +150,7 @@ fn test_load_password_config_returns_none_initially() {
     );
 }
 
-// @scenario: duress_pin.feature:Enable duress PIN in settings
+// @scenario: duress_mode :: Enable duress PIN in settings
 #[test]
 fn test_save_load_app_password_roundtrip() {
     let storage =
@@ -182,8 +182,8 @@ fn test_save_load_app_password_roundtrip() {
     assert!(!loaded.duress_enabled());
 }
 
-// @scenario: duress_pin.feature:Enable duress PIN in settings
-// @scenario: duress_pin.feature:App update preserves duress configuration
+// @scenario: duress_mode :: Enable duress PIN in settings
+// @scenario: duress_mode :: App update preserves duress configuration
 #[test]
 fn test_save_load_duress_password_roundtrip() {
     let storage =
@@ -230,7 +230,7 @@ fn test_save_load_duress_password_roundtrip() {
     assert_eq!(loaded.duress_salt(), password_config.duress_salt());
 }
 
-// @scenario: duress_pin.feature:Disable duress PIN from settings
+// @scenario: duress_mode :: Disable duress mode from settings
 #[test]
 fn test_disable_duress_clears_data() {
     let storage =
@@ -278,7 +278,7 @@ fn test_disable_duress_clears_data() {
 // Decoy Contact Storage Tests
 // =============================================================================
 
-// @scenario: duress_pin.feature:Duress PIN is opt-in and disabled by default
+// @scenario: duress_mode :: Duress mode is opt-in and disabled by default
 #[test]
 fn test_load_decoy_contacts_empty_initially() {
     let storage =
@@ -291,8 +291,8 @@ fn test_load_decoy_contacts_empty_initially() {
     );
 }
 
-// @scenario: duress_pin.feature:Configure decoy contacts
-// @scenario: duress_pin.feature:Decoy profile has separate database
+// @scenario: duress_mode :: Configure decoy contacts
+// @scenario: duress_mode :: Decoy profile has separate database
 #[test]
 fn test_save_load_decoy_contact() {
     let storage =
@@ -310,7 +310,7 @@ fn test_save_load_decoy_contact() {
     assert_eq!(contacts[0].2.display_name(), "Fake Alice"); // card
 }
 
-// @scenario: duress_pin.feature:Configure decoy contacts
+// @scenario: duress_mode :: Configure decoy contacts
 #[test]
 fn test_delete_decoy_contact() {
     let storage =
@@ -332,7 +332,7 @@ fn test_delete_decoy_contact() {
     );
 }
 
-// @scenario: duress_pin.feature:Configure decoy contacts
+// @scenario: duress_mode :: Configure decoy contacts
 #[test]
 fn test_clear_all_decoy_contacts() {
     let storage =
@@ -362,7 +362,7 @@ fn test_clear_all_decoy_contacts() {
 // Auth Mode Tests
 // =============================================================================
 
-// @scenario: duress_pin.feature:Duress PIN is opt-in and disabled by default
+// @scenario: duress_mode :: Duress mode is opt-in and disabled by default
 #[test]
 fn test_unauthenticated_mode_default() {
     let wb = create_vauchi_with_identity("Alice");
@@ -374,7 +374,7 @@ fn test_unauthenticated_mode_default() {
     );
 }
 
-// @scenario: duress_pin.feature:Enable duress PIN in settings
+// @scenario: duress_mode :: Enable duress PIN in settings
 #[test]
 fn test_setup_app_password() {
     let mut wb = create_vauchi_with_identity("Alice");
@@ -388,7 +388,7 @@ fn test_setup_app_password() {
     );
 }
 
-// @scenario: duress_pin.feature:Normal PIN shows real contacts
+// @scenario: duress_mode :: Normal credential shows real contacts
 #[test]
 fn test_authenticate_normal_password() {
     let mut wb = create_vauchi_with_identity("Alice");
@@ -406,7 +406,7 @@ fn test_authenticate_normal_password() {
     assert_eq!(wb.auth_mode(), AuthMode::Normal);
 }
 
-// @scenario: duress_pin.feature:Wrong PIN handling
+// @scenario: duress_mode :: Wrong credential handling
 #[test]
 fn test_authenticate_invalid_password_fails() {
     let mut wb = create_vauchi_with_identity("Alice");
@@ -420,7 +420,7 @@ fn test_authenticate_invalid_password_fails() {
     assert_eq!(wb.auth_mode(), AuthMode::Unauthenticated);
 }
 
-// @scenario: duress_pin.feature:Duress PIN shows decoy contacts
+// @scenario: duress_mode :: Duress credential shows decoy contacts
 #[test]
 fn test_authenticate_duress_password_sets_mode() {
     let mut wb = create_vauchi_with_identity("Alice");
@@ -440,7 +440,7 @@ fn test_authenticate_duress_password_sets_mode() {
     assert_eq!(wb.auth_mode(), AuthMode::Duress);
 }
 
-// @scenario: duress_pin.feature:Enable duress PIN in settings
+// @scenario: duress_mode :: Enable duress PIN in settings
 #[test]
 fn test_setup_duress_password_requires_app_password_first() {
     let mut wb = create_vauchi_with_identity("Alice");
@@ -452,7 +452,7 @@ fn test_setup_duress_password_requires_app_password_first() {
     );
 }
 
-// @scenario: duress_pin.feature:Disable duress PIN from settings
+// @scenario: duress_mode :: Disable duress mode from settings
 #[test]
 fn test_disable_duress() {
     let mut wb = create_vauchi_with_identity("Alice");
@@ -473,7 +473,7 @@ fn test_disable_duress() {
 // Mode-Aware Contact Loading Tests
 // =============================================================================
 
-// @scenario: duress_pin.feature:Normal PIN shows real contacts
+// @scenario: duress_mode :: Normal credential shows real contacts
 #[test]
 fn test_list_contacts_unauthenticated_returns_real() {
     let (alice_wb, _bob_wb, _secret, _bob_id, _alice_id) = setup_alice_bob_exchange();
@@ -488,7 +488,7 @@ fn test_list_contacts_unauthenticated_returns_real() {
     );
 }
 
-// @scenario: duress_pin.feature:Normal PIN shows real contacts
+// @scenario: duress_mode :: Normal credential shows real contacts
 #[test]
 fn test_list_contacts_normal_mode_returns_real() {
     let (mut alice_wb, _bob_wb, _secret, _bob_id, _alice_id) = setup_alice_bob_exchange();
@@ -508,10 +508,10 @@ fn test_list_contacts_normal_mode_returns_real() {
     );
 }
 
-// @scenario: duress_pin.feature:Duress PIN shows decoy contacts
-// @scenario: duress_pin.feature:Cannot access real contacts from duress mode
-// @scenario: duress_pin.feature:Duress mode looks identical to normal mode
-// @scenario: duress_pin.feature:Decoy profile functions normally
+// @scenario: duress_mode :: Duress credential shows decoy contacts
+// @scenario: duress_mode :: Cannot access real contacts from duress mode
+// @scenario: duress_mode :: Duress mode looks identical to normal mode
+// @scenario: duress_mode :: Decoy profile functions normally
 #[test]
 fn test_list_contacts_duress_mode_returns_decoy() {
     let (mut alice_wb, _bob_wb, _secret, _bob_id, _alice_id) = setup_alice_bob_exchange();
@@ -550,7 +550,7 @@ fn test_list_contacts_duress_mode_returns_decoy() {
 // Duress Settings Storage Tests
 // =============================================================================
 
-// @scenario: duress_pin.feature:Duress PIN is opt-in and disabled by default
+// @scenario: duress_mode :: Duress mode is opt-in and disabled by default
 #[test]
 fn test_load_duress_settings_returns_none_initially() {
     let wb = create_vauchi_with_identity("Alice");
@@ -562,8 +562,8 @@ fn test_load_duress_settings_returns_none_initially() {
     );
 }
 
-// @scenario: duress_pin.feature:Configure trusted contacts for duress alerts
-// @scenario: duress_pin.feature:App update preserves duress configuration
+// @scenario: duress_mode :: Configure trusted contacts for duress alerts
+// @scenario: duress_mode :: App update preserves duress configuration
 #[test]
 fn test_save_load_duress_settings_roundtrip() {
     let wb = create_vauchi_with_identity("Alice");
@@ -587,7 +587,7 @@ fn test_save_load_duress_settings_roundtrip() {
     assert_eq!(loaded.include_location, settings.include_location);
 }
 
-// @scenario: duress_pin.feature:Disable duress PIN from settings
+// @scenario: duress_mode :: Disable duress mode from settings
 #[test]
 fn test_delete_duress_settings() {
     let wb = create_vauchi_with_identity("Alice");
@@ -614,9 +614,9 @@ fn test_delete_duress_settings() {
 // Duress Alert Tests
 // =============================================================================
 
-// @scenario: duress_pin.feature:Duress unlock sends silent alert to trusted contacts
-// @scenario: duress_pin.feature:Duress alert looks like normal sync traffic
-// @scenario: duress_pin.feature:Duress alerts work offline
+// @scenario: duress_mode :: Duress unlock sends silent alert to trusted contacts
+// @scenario: duress_mode :: Duress alert looks like normal sync traffic
+// @scenario: duress_mode :: Duress alerts work offline
 #[test]
 fn test_queue_duress_alert_on_duress_authenticate() {
     let mut wb = create_vauchi_with_identity("Alice");
@@ -647,7 +647,7 @@ fn test_queue_duress_alert_on_duress_authenticate() {
     );
 }
 
-// @scenario: duress_pin.feature:Duress unlock sends silent alert to trusted contacts
+// @scenario: duress_mode :: Duress unlock sends silent alert to trusted contacts
 #[test]
 fn test_queue_duress_alert_without_settings_is_noop() {
     let mut wb = create_vauchi_with_identity("Alice");
@@ -671,7 +671,7 @@ fn test_queue_duress_alert_without_settings_is_noop() {
     );
 }
 
-// @scenario: duress_pin.feature:Duress alert content
+// @scenario: duress_mode :: Duress alert content
 #[test]
 fn test_duress_alert_contains_timestamp_and_device_id() {
     let mut wb = create_vauchi_with_identity("Alice");
@@ -716,8 +716,8 @@ fn test_duress_alert_contains_timestamp_and_device_id() {
 // Full Duress Flow Test
 // =============================================================================
 
-// @scenario: duress_pin.feature:Duress PIN shows decoy contacts
-// @scenario: duress_pin.feature:Duress unlock sends silent alert to trusted contacts
+// @scenario: duress_mode :: Duress credential shows decoy contacts
+// @scenario: duress_mode :: Duress unlock sends silent alert to trusted contacts
 #[test]
 fn test_full_duress_flow_setup_to_alert() {
     let mut wb = create_vauchi_with_identity("Alice");

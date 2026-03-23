@@ -23,7 +23,7 @@ fn ensure_init() {
 }
 
 /// Test: Deterministic fallback — key present in English but absent in German (#208).
-// @scenario: internationalization:App falls back to English for unsupported languages
+// @scenario: internationalization :: App falls back to English for unsupported languages
 #[test]
 fn test_deterministic_fallback_to_english() {
     ensure_init();
@@ -49,7 +49,7 @@ fn test_deterministic_fallback_to_english() {
 }
 
 /// Test: Cache reload via `load_locale_from_bytes` updates subsequent lookups (#208).
-// @scenario: internationalization:Language change applies immediately
+// @scenario: internationalization :: Language change applies immediately
 #[test]
 fn test_locale_cache_reload() {
     ensure_init();
@@ -71,7 +71,7 @@ fn test_locale_cache_reload() {
 }
 
 /// Test: Missing key returns "Missing:" prefix even after cache operations (#208).
-// @scenario: internationalization:App falls back to English for unsupported languages
+// @scenario: internationalization :: App falls back to English for unsupported languages
 #[test]
 fn test_missing_key_after_cache_operations() {
     ensure_init();

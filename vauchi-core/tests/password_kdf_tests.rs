@@ -6,7 +6,7 @@
 
 use vauchi_core::crypto::password_kdf::derive_key_argon2id;
 
-// @scenario: security.feature:Brute force protection on backup password
+// @scenario: security :: Brute force protection on backup password
 #[test]
 fn test_argon2id_deterministic() {
     let password = b"correct-horse-battery-staple";
@@ -17,7 +17,7 @@ fn test_argon2id_deterministic() {
     assert_eq!(key1.as_bytes(), key2.as_bytes());
 }
 
-// @scenario: security.feature:Brute force protection on backup password
+// @scenario: security :: Brute force protection on backup password
 #[test]
 fn test_argon2id_different_passwords_different_keys() {
     let salt = b"same_salt_16byte";
@@ -26,7 +26,7 @@ fn test_argon2id_different_passwords_different_keys() {
     assert_ne!(key1.as_bytes(), key2.as_bytes());
 }
 
-// @scenario: security.feature:Brute force protection on backup password
+// @scenario: security :: Brute force protection on backup password
 #[test]
 fn test_argon2id_different_salts_different_keys() {
     let password = b"same_password";
@@ -35,7 +35,7 @@ fn test_argon2id_different_salts_different_keys() {
     assert_ne!(key1.as_bytes(), key2.as_bytes());
 }
 
-// @scenario: security.feature:Brute force protection on backup password
+// @scenario: security :: Brute force protection on backup password
 #[test]
 fn test_argon2id_produces_32_byte_key() {
     let key = derive_key_argon2id(b"pass", b"saltysaltysalty!!").unwrap();

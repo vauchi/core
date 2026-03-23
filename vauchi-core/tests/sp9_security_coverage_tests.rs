@@ -24,7 +24,7 @@ use vauchi_core::exchange::*;
 // =============================================================================
 
 /// Verifies that `is_timed_out()` returns false for a fresh session.
-// @scenario: security:Replay attack prevention
+// @scenario: security :: Replay attack prevention
 #[test]
 fn test_fresh_session_is_not_timed_out() {
     let identity = vauchi_core::Identity::create("Alice");
@@ -40,7 +40,7 @@ fn test_fresh_session_is_not_timed_out() {
 
 /// Verifies that the session timeout constant is reasonable (60 seconds).
 /// This is a specification test — if the constant changes, this test documents it.
-// @scenario: security:Replay attack prevention
+// @scenario: security :: Replay attack prevention
 #[test]
 fn test_session_timeout_is_60_seconds() {
     // The session uses Instant::now(), so we can't easily simulate expiry.
@@ -71,7 +71,7 @@ fn test_session_timeout_is_60_seconds() {
 // =============================================================================
 
 /// Verifies that StartQR from non-Idle state is rejected.
-// @scenario: security:Man-in-the-middle detection during exchange
+// @scenario: security :: Man-in-the-middle detection during exchange
 #[test]
 fn test_start_qr_from_non_idle_rejected() {
     let identity = vauchi_core::Identity::create("Alice");
@@ -89,7 +89,7 @@ fn test_start_qr_from_non_idle_rejected() {
 }
 
 /// Verifies that ProcessQR from Idle (without StartQR first) is rejected.
-// @scenario: security:Man-in-the-middle detection during exchange
+// @scenario: security :: Man-in-the-middle detection during exchange
 #[test]
 fn test_process_qr_from_idle_rejected() {
     let alice_identity = vauchi_core::Identity::create("Alice");
@@ -111,7 +111,7 @@ fn test_process_qr_from_idle_rejected() {
 }
 
 /// Verifies that TheyScannedOurQR from wrong state is rejected.
-// @scenario: security:Man-in-the-middle detection during exchange
+// @scenario: security :: Man-in-the-middle detection during exchange
 #[test]
 fn test_they_scanned_our_qr_from_wrong_state_rejected() {
     let identity = vauchi_core::Identity::create("Alice");
@@ -137,7 +137,7 @@ fn test_they_scanned_our_qr_from_wrong_state_rejected() {
 }
 
 /// Verifies that PerformKeyAgreement from wrong state is rejected.
-// @scenario: security:Man-in-the-middle detection during exchange
+// @scenario: security :: Man-in-the-middle detection during exchange
 #[test]
 fn test_key_agreement_from_wrong_state_rejected() {
     let identity = vauchi_core::Identity::create("Alice");
@@ -155,7 +155,7 @@ fn test_key_agreement_from_wrong_state_rejected() {
 }
 
 /// Verifies that CompleteExchange from wrong state is rejected.
-// @scenario: security:Man-in-the-middle detection during exchange
+// @scenario: security :: Man-in-the-middle detection during exchange
 #[test]
 fn test_complete_exchange_from_wrong_state_rejected() {
     let identity = vauchi_core::Identity::create("Alice");
@@ -176,7 +176,7 @@ fn test_complete_exchange_from_wrong_state_rejected() {
 /// Verifies that self-exchange (scanning your own QR) is detected and rejected.
 /// This works by having Alice generate a separate QR with the same identity key,
 /// then attempting to scan it in her own session.
-// @scenario: security:Man-in-the-middle detection during exchange
+// @scenario: security :: Man-in-the-middle detection during exchange
 #[test]
 fn test_self_exchange_detected() {
     let alice_identity = vauchi_core::Identity::create("Alice");
@@ -201,7 +201,7 @@ fn test_self_exchange_detected() {
 }
 
 /// Verifies that QR reuse is detected.
-// @scenario: security:Replay attack prevention
+// @scenario: security :: Replay attack prevention
 #[test]
 fn test_qr_reuse_rejected() {
     let identity = vauchi_core::Identity::create("Alice");
@@ -226,7 +226,7 @@ fn test_qr_reuse_rejected() {
 // =============================================================================
 
 /// Verifies that cross-ratchet messages (Alice->Bob, Bob->Alice) work correctly.
-// @scenario: security:Forward secrecy via Double Ratchet
+// @scenario: security :: Forward secrecy via Double Ratchet
 #[test]
 fn test_ratchet_bidirectional_communication() {
     let shared_secret = SymmetricKey::generate();
@@ -253,7 +253,7 @@ fn test_ratchet_bidirectional_communication() {
 }
 
 /// Verifies that messages from a completely unrelated ratchet are rejected.
-// @scenario: security:Contact cards are encrypted in transit
+// @scenario: security :: Contact cards are encrypted in transit
 #[test]
 fn test_ratchet_rejects_foreign_messages() {
     let shared_secret_1 = SymmetricKey::generate();
@@ -277,7 +277,7 @@ fn test_ratchet_rejects_foreign_messages() {
 }
 
 /// Verifies that tampered ciphertext in a ratchet message is rejected.
-// @scenario: security:Update signatures verified
+// @scenario: security :: Update signatures verified
 #[test]
 fn test_ratchet_rejects_tampered_ciphertext() {
     let shared_secret = SymmetricKey::generate();
@@ -302,7 +302,7 @@ fn test_ratchet_rejects_tampered_ciphertext() {
 }
 
 /// Verifies that truncated ciphertext is rejected.
-// @scenario: security:Update signatures verified
+// @scenario: security :: Update signatures verified
 #[test]
 fn test_ratchet_rejects_truncated_ciphertext() {
     let shared_secret = SymmetricKey::generate();
@@ -325,7 +325,7 @@ fn test_ratchet_rejects_truncated_ciphertext() {
 }
 
 /// Verifies that a forged message_index does not produce valid decryption.
-// @scenario: security:Replay attack prevention
+// @scenario: security :: Replay attack prevention
 #[test]
 fn test_ratchet_forged_message_index_rejected() {
     let shared_secret = SymmetricKey::generate();
@@ -357,7 +357,7 @@ fn test_ratchet_forged_message_index_rejected() {
 // =============================================================================
 
 /// Verifies that after rekey, data encrypted under the OLD key is unreadable.
-// @scenario: security:Contact cards are encrypted at rest
+// @scenario: security :: Contact cards are encrypted at rest
 #[test]
 fn test_rekey_makes_old_key_ciphertexts_unreadable() {
     let dir = tempfile::tempdir().unwrap();
@@ -395,8 +395,8 @@ fn test_rekey_makes_old_key_ciphertexts_unreadable() {
 }
 
 /// Verifies that rekey preserves all data types (contacts, device registry, etc.).
-// @scenario: security:Contact cards are encrypted at rest
-// @scenario: security:Local database encryption
+// @scenario: security :: Contact cards are encrypted at rest
+// @scenario: security :: Local database encryption
 #[test]
 fn test_rekey_preserves_all_encrypted_tables() {
     let dir = tempfile::tempdir().unwrap();
@@ -454,8 +454,8 @@ fn test_rekey_preserves_all_encrypted_tables() {
 // F-011: Wrong-key signature rejection
 
 /// Verifies that a message signed by one key cannot be verified by a different key.
-// @scenario: security:Contact card signatures verified
-// @scenario: security:Update signatures verified
+// @scenario: security :: Contact card signatures verified
+// @scenario: security :: Update signatures verified
 #[test]
 fn test_signature_wrong_key_rejected() {
     let alice = SigningKeyPair::generate();
@@ -472,7 +472,7 @@ fn test_signature_wrong_key_rejected() {
 }
 
 /// Verifies that a tampered message is rejected even with the correct key.
-// @scenario: security:Contact card signatures verified
+// @scenario: security :: Contact card signatures verified
 #[test]
 fn test_signature_tampered_message_rejected() {
     let kp = SigningKeyPair::generate();
@@ -490,8 +490,8 @@ fn test_signature_tampered_message_rejected() {
 }
 
 /// Verifies that a tampered signature is rejected.
-// @scenario: security:Contact card signatures verified
-// @scenario: security:Update signatures verified
+// @scenario: security :: Contact card signatures verified
+// @scenario: security :: Update signatures verified
 #[test]
 fn test_tampered_signature_rejected() {
     let kp = SigningKeyPair::generate();
@@ -512,8 +512,8 @@ fn test_tampered_signature_rejected() {
 // F-012: Wrong-key encryption rejection
 
 /// Verifies that ciphertext encrypted with one key cannot be decrypted with another.
-// @scenario: security:Contact cards are encrypted at rest
-// @scenario: security:Server cannot access plaintext
+// @scenario: security :: Contact cards are encrypted at rest
+// @scenario: security :: Server cannot access plaintext
 #[test]
 fn test_encrypt_wrong_key_decryption_fails() {
     let key1 = SymmetricKey::generate();
@@ -527,7 +527,7 @@ fn test_encrypt_wrong_key_decryption_fails() {
 }
 
 /// Verifies that tampered ciphertext is rejected by AEAD.
-// @scenario: security:Contact cards are encrypted at rest
+// @scenario: security :: Contact cards are encrypted at rest
 #[test]
 fn test_encrypt_tampered_ciphertext_rejected() {
     let key = SymmetricKey::generate();
@@ -547,7 +547,7 @@ fn test_encrypt_tampered_ciphertext_rejected() {
 }
 
 /// Verifies that truncated ciphertext is rejected.
-// @scenario: security:Contact cards are encrypted at rest
+// @scenario: security :: Contact cards are encrypted at rest
 #[test]
 fn test_encrypt_truncated_ciphertext_rejected() {
     let key = SymmetricKey::generate();
@@ -571,7 +571,7 @@ fn test_encrypt_truncated_ciphertext_rejected() {
 /// Verifies that multiple DH ratchet steps maintain correct encryption/decryption.
 /// This is the core "state machine transition" test -- each direction switch triggers
 /// a new DH ratchet step, and all messages remain correctly decryptable.
-// @scenario: security:Forward secrecy via Double Ratchet
+// @scenario: security :: Forward secrecy via Double Ratchet
 #[test]
 fn test_ratchet_multiple_dh_steps() {
     let shared_secret = SymmetricKey::generate();
@@ -618,8 +618,8 @@ fn test_ratchet_multiple_dh_steps() {
 
 /// Verifies that after many ratchet steps, old message keys are not reusable.
 /// This tests forward secrecy: old chain keys should have been ratcheted away.
-// @scenario: security:Forward secrecy via Double Ratchet
-// @scenario: security:Replay attack prevention
+// @scenario: security :: Forward secrecy via Double Ratchet
+// @scenario: security :: Replay attack prevention
 #[test]
 fn test_ratchet_forward_secrecy_across_steps() {
     let shared_secret = SymmetricKey::generate();
@@ -655,7 +655,7 @@ fn test_ratchet_forward_secrecy_across_steps() {
 // =============================================================================
 
 /// Verifies that an expired QR code is rejected during ProcessQR.
-// @scenario: security:QR code screenshot attack prevention
+// @scenario: security :: QR code screenshot attack prevention
 #[test]
 fn test_expired_qr_rejected_in_state_machine() {
     let alice_identity = vauchi_core::Identity::create("Alice");
@@ -685,7 +685,7 @@ fn test_expired_qr_rejected_in_state_machine() {
 }
 
 /// Verifies that a QR with tampered data (invalid signature) is rejected.
-// @scenario: security:Contact card signatures verified
+// @scenario: security :: Contact card signatures verified
 #[test]
 fn test_invalid_signature_qr_rejected_via_data_string() {
     use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
@@ -711,7 +711,7 @@ fn test_invalid_signature_qr_rejected_via_data_string() {
 
 /// K-L2: Verify that QR parser rejects data with trailing bytes.
 /// Accepting trailing bytes enables malleability in protocol versions.
-// @scenario: security:Contact card signatures verified
+// @scenario: security :: Contact card signatures verified
 #[test]
 fn test_qr_parser_rejects_trailing_bytes() {
     use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};

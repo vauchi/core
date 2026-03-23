@@ -9,7 +9,7 @@
 use vauchi_core::exchange::*;
 use vauchi_core::*;
 
-// @scenario: contact_exchange.feature:Default QR exchange uses mutual flow
+// @scenario: contact_exchange :: Default QR exchange uses mutual flow
 #[test]
 fn test_new_qr_starts_idle() {
     let identity = Identity::create("Alice");
@@ -22,7 +22,7 @@ fn test_new_qr_starts_idle() {
     assert_eq!(session.transport(), ExchangeTransport::Qr);
 }
 
-// @scenario: contact_exchange.feature:Generate exchange QR code
+// @scenario: contact_exchange :: Generate exchange QR code
 #[test]
 fn test_start_qr_transitions_to_displaying_qr() {
     let identity = Identity::create("Alice");
@@ -41,7 +41,7 @@ fn test_start_qr_transitions_to_displaying_qr() {
     ));
 }
 
-// @scenario: contact_exchange.feature:Mutual QR exchange with bidirectional scanning
+// @scenario: contact_exchange :: Mutual QR exchange with bidirectional scanning
 #[test]
 fn test_process_qr_transitions_to_peer_scanned() {
     let alice_identity = Identity::create("Alice");
@@ -67,7 +67,7 @@ fn test_process_qr_transitions_to_peer_scanned() {
     ));
 }
 
-// @scenario: contact_exchange.feature:Mutual QR exchange with bidirectional scanning
+// @scenario: contact_exchange :: Mutual QR exchange with bidirectional scanning
 #[test]
 fn test_process_qr_requires_displaying_qr_state() {
     let alice_identity = Identity::create("Alice");
@@ -85,7 +85,7 @@ fn test_process_qr_requires_displaying_qr_state() {
     assert!(matches!(result, Err(ExchangeError::InvalidState(_))));
 }
 
-// @scenario: contact_exchange.feature:Mutual QR rejects expired peer QR code
+// @scenario: contact_exchange :: Mutual QR rejects expired peer QR code
 #[test]
 fn test_expired_qr_rejected() {
     let alice_identity = Identity::create("Alice");
@@ -112,7 +112,7 @@ fn test_expired_qr_rejected() {
     assert!(matches!(result, Err(ExchangeError::QRExpired)));
 }
 
-// @scenario: contact_exchange.feature:Mutual QR exchange with bidirectional scanning
+// @scenario: contact_exchange :: Mutual QR exchange with bidirectional scanning
 #[test]
 fn test_they_scanned_our_qr_transitions_to_awaiting_key_agreement() {
     let alice_identity = Identity::create("Alice");
@@ -138,8 +138,8 @@ fn test_they_scanned_our_qr_transitions_to_awaiting_key_agreement() {
     ));
 }
 
-// @scenario: contact_exchange.feature:Successful QR code exchange with proximity
-// @scenario: contact_exchange.feature:Exchange creates mutual keys
+// @scenario: contact_exchange :: Successful QR code exchange with proximity
+// @scenario: contact_exchange :: Exchange creates mutual keys
 #[test]
 fn test_full_qr_exchange_flow() {
     let alice_identity = Identity::create("Alice");
@@ -179,7 +179,7 @@ fn test_full_qr_exchange_flow() {
     ));
 }
 
-// @scenario: contact_exchange.feature:Exchange session timeout
+// @scenario: contact_exchange :: Exchange session timeout
 #[test]
 fn test_session_timeout() {
     let identity = Identity::create("Alice");
@@ -192,7 +192,7 @@ fn test_session_timeout() {
     assert!(!session.is_timed_out());
 }
 
-// @scenario: contact_exchange.feature:Exchange session timeout
+// @scenario: contact_exchange :: Exchange session timeout
 #[test]
 fn test_session_resume() {
     let identity = Identity::create("Alice");
@@ -209,8 +209,8 @@ fn test_session_resume() {
     assert!(session.can_resume());
 }
 
-// @scenario: contact_exchange.feature:Exchange with existing contact shows update option
-// @scenario: contact_exchange.feature:Update existing contact via exchange
+// @scenario: contact_exchange :: Exchange with existing contact shows update option
+// @scenario: contact_exchange :: Update existing contact via exchange
 #[test]
 fn test_detect_duplicate_contact() {
     use vauchi_core::crypto::SymmetricKey;
@@ -247,7 +247,7 @@ fn test_detect_duplicate_contact() {
     assert_eq!(duplicate.unwrap().display_name(), "Alice");
 }
 
-// @scenario: contact_exchange.feature:Exchange with existing contact shows update option
+// @scenario: contact_exchange :: Exchange with existing contact shows update option
 #[test]
 fn test_no_duplicate_for_new_contact() {
     use vauchi_core::crypto::SymmetricKey;
@@ -283,8 +283,8 @@ fn test_no_duplicate_for_new_contact() {
     assert!(duplicate.is_none());
 }
 
-// @scenario: contact_exchange.feature:Update existing contact via exchange
-// @scenario: contact_exchange.feature:Keep existing contact without update
+// @scenario: contact_exchange :: Update existing contact via exchange
+// @scenario: contact_exchange :: Keep existing contact without update
 #[test]
 fn test_duplicate_action_variants() {
     // Just verify the enum variants exist and can be compared

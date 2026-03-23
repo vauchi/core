@@ -21,7 +21,7 @@ const BACKUP_VERSION_V2: u8 = 0x02;
 ///
 /// Feature: backup_format_versioning.feature
 /// Scenario: Non-v2 backup format rejected
-// @scenario: backup_format_versioning.feature:Non-v2 backup format rejected
+// @scenario: backup_format_versioning :: Non-v2 backup format rejected
 #[test]
 fn test_non_v2_format_rejected() {
     // Create a v2 backup first to get valid identity data
@@ -68,7 +68,7 @@ fn test_non_v2_format_rejected() {
 ///
 /// Feature: backup_format_versioning.feature
 /// Scenario: V2 backup uses OWASP-recommended Argon2id parameters
-// @scenario: backup_format_versioning.feature:V2 backup uses OWASP-recommended Argon2id parameters
+// @scenario: backup_format_versioning :: V2 backup uses OWASP-recommended Argon2id parameters
 #[test]
 fn test_v2_parameter_validation() {
     // Empty backup should be rejected
@@ -127,8 +127,8 @@ fn test_v2_parameter_validation() {
 ///
 /// Feature: backup_format_versioning.feature
 /// Scenario: Corrupted backup is detected
-// @scenario: backup_format_versioning.feature:Corrupted backup is detected
-// @scenario: identity_management.feature:Restore corrupted backup
+// @scenario: backup_format_versioning :: Corrupted backup is detected
+// @scenario: identity_management :: Restore corrupted backup
 #[test]
 fn test_corrupted_backup_detection() {
     // Create a valid v2 backup
@@ -200,7 +200,7 @@ fn test_corrupted_backup_detection() {
 ///
 /// Feature: backup_format_versioning.feature
 /// Scenario: Restoring legacy backup and re-exporting creates v2
-// @scenario: backup_format_versioning.feature:Restoring legacy backup and re-exporting creates v2
+// @scenario: backup_format_versioning :: Restoring legacy backup and re-exporting creates v2
 #[test]
 fn test_version_upgrade_path() {
     // Create an identity and export as v2
@@ -270,7 +270,7 @@ fn test_version_upgrade_path() {
 ///
 /// Feature: backup_format_versioning.feature
 /// Scenario: Unknown version byte is rejected
-// @scenario: backup_format_versioning.feature:Unknown version byte is rejected
+// @scenario: backup_format_versioning :: Unknown version byte is rejected
 #[test]
 fn test_future_version_rejection() {
     let password = "SecureP@ssw0rd!2024";
@@ -317,8 +317,8 @@ fn test_future_version_rejection() {
 ///
 /// Feature: backup_format_versioning.feature
 /// Scenario: Restore v2 backup with wrong password
-// @scenario: backup_format_versioning.feature:Restore v2 backup with wrong password
-// @scenario: identity_management.feature:Restore with incorrect password
+// @scenario: backup_format_versioning :: Restore v2 backup with wrong password
+// @scenario: identity_management :: Restore with incorrect password
 #[test]
 fn test_v2_wrong_password() {
     let identity = Identity::create("Password Test User");
@@ -351,8 +351,8 @@ fn test_v2_wrong_password() {
 ///
 /// Feature: backup_format_versioning.feature
 /// Scenario: V2 backup includes salt
-// @scenario: backup_format_versioning.feature:V2 backup includes salt
-// @scenario: backup_format_versioning.feature:New backups use v2 format
+// @scenario: backup_format_versioning :: V2 backup includes salt
+// @scenario: backup_format_versioning :: New backups use v2 format
 #[test]
 fn test_v2_format_structure() {
     let identity = Identity::create("Format Test User");
@@ -386,8 +386,8 @@ fn test_v2_format_structure() {
 ///
 /// Feature: backup_format_versioning.feature
 /// Scenario: Backup contains only the master seed
-// @scenario: backup_format_versioning.feature:Backup contains only the master seed
-// @scenario: identity_management.feature:Restore identity from backup
+// @scenario: backup_format_versioning :: Backup contains only the master seed
+// @scenario: identity_management :: Restore identity from backup
 #[test]
 fn test_device_info_preservation() {
     let identity = Identity::create("Device Info Test");
@@ -423,7 +423,7 @@ fn test_device_info_preservation() {
 ///
 /// Feature: backup_format_versioning.feature
 /// Scenario: Re-export backup with changed password
-// @scenario: identity_management.feature:Create encrypted identity backup
+// @scenario: identity_management :: Create encrypted identity backup
 #[test]
 fn test_re_export_with_different_password() {
     let identity = Identity::create("Password Change Test");
@@ -465,7 +465,7 @@ fn test_re_export_with_different_password() {
 ///
 /// This is a known limitation — both restored identities have the same
 /// master_seed and are cryptographically indistinguishable.
-// @scenario: identity_management.feature:Restore identity from backup
+// @scenario: identity_management :: Restore identity from backup
 #[test]
 fn test_backup_import_creates_identical_signing_keys() {
     let identity = Identity::create("Clone Test");

@@ -16,7 +16,7 @@ use common::helpers::setup_alice_bob_exchange;
 
 // === Event Variant Construction Tests ===
 
-// @scenario: field_validation:Validate a contact's social profile
+// @scenario: field_validation :: Validate a contact's social profile
 #[test]
 fn test_field_validated_event_variant_exists() {
     let event = VauchiEvent::FieldValidated {
@@ -39,7 +39,7 @@ fn test_field_validated_event_variant_exists() {
     }
 }
 
-// @scenario: field_validation:Revoke validation
+// @scenario: field_validation :: Revoke validation
 #[test]
 fn test_field_validation_revoked_event_variant_exists() {
     let event = VauchiEvent::FieldValidationRevoked {
@@ -62,7 +62,7 @@ fn test_field_validation_revoked_event_variant_exists() {
     }
 }
 
-// @scenario: field_validation:Validation resets when field value changes
+// @scenario: field_validation :: Validation resets when field value changes
 #[test]
 fn test_field_validation_reset_event_variant_exists() {
     let event = VauchiEvent::FieldValidationReset {
@@ -82,7 +82,7 @@ fn test_field_validation_reset_event_variant_exists() {
     }
 }
 
-// @scenario: field_validation:Validate a contact's social profile
+// @scenario: field_validation :: Validate a contact's social profile
 #[test]
 fn test_field_validated_event_clone() {
     let event = VauchiEvent::FieldValidated {
@@ -99,9 +99,9 @@ fn test_field_validated_event_clone() {
 
 // === Dispatch on Incoming Validation ===
 
-// @scenario: field_validation:Validate a contact's social profile
-// @scenario: field_validation:Validation count syncs from contacts
-// @scenario: field_validation:Validations are cryptographically signed
+// @scenario: field_validation :: Validate a contact's social profile
+// @scenario: field_validation :: Validation count syncs from contacts
+// @scenario: field_validation :: Validations are cryptographically signed
 #[test]
 fn test_field_validated_event_dispatched_on_incoming_validation() {
     let (alice_wb, bob_wb, _secret, bob_contact_id, alice_contact_id) = setup_alice_bob_exchange();
@@ -171,8 +171,8 @@ fn test_field_validated_event_dispatched_on_incoming_validation() {
 
 // === Dispatch on Incoming Revocation ===
 
-// @scenario: field_validation:Revoke validation
-// @scenario: field_validation:Validation count syncs from contacts
+// @scenario: field_validation :: Revoke validation
+// @scenario: field_validation :: Validation count syncs from contacts
 #[test]
 fn test_field_validation_revoked_event_dispatched_on_incoming_revocation() {
     let (alice_wb, bob_wb, _secret, bob_contact_id, alice_contact_id) = setup_alice_bob_exchange();
@@ -251,7 +251,7 @@ fn test_field_validation_revoked_event_dispatched_on_incoming_revocation() {
     }
 }
 
-// @scenario: field_validation:Cannot forge validations
+// @scenario: field_validation :: Cannot forge validations
 #[test]
 fn test_field_validation_revoked_event_not_dispatched_when_nothing_deleted() {
     let (alice_wb, _bob_wb, _secret, bob_contact_id, alice_contact_id) = setup_alice_bob_exchange();

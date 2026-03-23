@@ -11,7 +11,7 @@
 // Traces to: _private/features/field_validation.feature @validate @phone
 // =============================================================================
 
-// @scenario: field_validation:Validate a contact's phone number
+// @scenario: field_validation :: Validate a contact's phone number
 #[test]
 fn test_phone_international_format_e164_valid() {
     use vauchi_core::contact_card::{ContactField, FieldType};
@@ -38,7 +38,7 @@ fn test_phone_international_format_e164_valid() {
     }
 }
 
-// @scenario: field_validation:Validate a contact's phone number
+// @scenario: field_validation :: Validate a contact's phone number
 #[test]
 fn test_phone_international_format_with_formatting() {
     use vauchi_core::contact_card::{ContactField, FieldType};
@@ -65,7 +65,7 @@ fn test_phone_international_format_with_formatting() {
     }
 }
 
-// @scenario: field_validation:Validate a contact's phone number
+// @scenario: field_validation :: Validate a contact's phone number
 #[test]
 fn test_phone_international_format_invalid() {
     use vauchi_core::contact_card::{ContactField, FieldType, ValidationError};
@@ -100,7 +100,7 @@ fn test_phone_international_format_invalid() {
     }
 }
 
-// @scenario: field_validation:Validate a contact's phone number
+// @scenario: field_validation :: Validate a contact's phone number
 #[test]
 fn test_phone_e164_max_length() {
     use vauchi_core::contact_card::{ContactField, FieldType};
@@ -125,7 +125,7 @@ fn test_phone_e164_max_length() {
 // Traces to: _private/features/field_validation.feature @validate @email
 // =============================================================================
 
-// @scenario: field_validation:Validate a contact's email address
+// @scenario: field_validation :: Validate a contact's email address
 #[test]
 fn test_email_rfc5322_basic_valid() {
     use vauchi_core::contact_card::{ContactField, FieldType};
@@ -164,7 +164,7 @@ fn test_email_rfc5322_basic_valid() {
     }
 }
 
-// @scenario: field_validation:Validate a contact's email address
+// @scenario: field_validation :: Validate a contact's email address
 #[test]
 #[allow(unused_imports)]
 fn test_email_rfc5322_invalid() {
@@ -201,7 +201,7 @@ fn test_email_rfc5322_invalid() {
     }
 }
 
-// @scenario: field_validation:Validate a contact's email address
+// @scenario: field_validation :: Validate a contact's email address
 #[test]
 fn test_email_local_part_length() {
     use vauchi_core::contact_card::{ContactField, FieldType};
@@ -221,7 +221,7 @@ fn test_email_local_part_length() {
     let _ = field.validate(); // Just exercising the code path
 }
 
-// @scenario: field_validation:Validate a contact's email address
+// @scenario: field_validation :: Validate a contact's email address
 #[test]
 fn test_email_domain_part_length() {
     use vauchi_core::contact_card::{ContactField, FieldType};
@@ -232,7 +232,7 @@ fn test_email_domain_part_length() {
     assert!(field.validate().is_ok(), "Long domain should be valid");
 }
 
-// @scenario: field_validation:Validate a contact's email address
+// @scenario: field_validation :: Validate a contact's email address
 #[test]
 fn test_email_internationalized_domain() {
     // allow(zero_assertions): IDN support is implementation-dependent — testing no-panic only

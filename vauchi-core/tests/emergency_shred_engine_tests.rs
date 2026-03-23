@@ -54,6 +54,7 @@ fn shred_continue_to_confirm() {
     }
 }
 
+// @scenario: emergency_shred :: Hard shred requires valid shred token
 #[test]
 fn shred_confirm_requires_delete_text() {
     let mut engine = EmergencyShredEngine::new();
@@ -117,6 +118,7 @@ fn shred_confirm_wrong_text_validation_error() {
     }
 }
 
+// @scenario: emergency_shred :: Panic shred destroys everything immediately
 #[test]
 fn shred_confirm_delete_starts_wipe() {
     let mut engine = EmergencyShredEngine::new();
@@ -155,6 +157,7 @@ fn shred_confirm_delete_starts_wipe() {
     }
 }
 
+// @scenario: emergency_shred :: Shred report tracks what was destroyed
 #[test]
 fn shred_wipe_complete() {
     let mut engine = EmergencyShredEngine::new();
@@ -194,6 +197,7 @@ fn shred_wipe_complete() {
     assert_eq!(result, ActionResult::WipeComplete);
 }
 
+// @scenario: emergency_shred :: Cancel soft shred during grace period
 #[test]
 fn shred_cancel_returns_complete() {
     // Cancel from warning

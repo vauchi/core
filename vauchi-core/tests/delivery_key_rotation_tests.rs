@@ -7,8 +7,8 @@
 
 use vauchi_core::network::delivery::{KeyRotationDetector, KeyRotationError};
 
-// @scenario: message_delivery:Key rotation detected during send
-// @scenario: message_delivery.feature:Handle recipient key rotation
+// @scenario: message_delivery :: Key rotation detected during send
+// @scenario: message_delivery :: Handle recipient key rotation
 #[test]
 fn test_detect_key_rotation_on_key_mismatch() {
     let detector = KeyRotationDetector::new();
@@ -22,7 +22,7 @@ fn test_detect_key_rotation_on_key_mismatch() {
     );
 }
 
-// @scenario: message_delivery:No rotation when key matches
+// @scenario: message_delivery :: No rotation when key matches
 #[test]
 fn test_no_rotation_when_key_matches() {
     let detector = KeyRotationDetector::new();
@@ -32,7 +32,7 @@ fn test_no_rotation_when_key_matches() {
     assert!(result.is_ok(), "Should pass when keys match");
 }
 
-// @scenario: message_delivery:Key rotation error includes contact ID
+// @scenario: message_delivery :: Key rotation error includes contact ID
 #[test]
 fn test_key_rotation_error_includes_contact_id() {
     let detector = KeyRotationDetector::new();

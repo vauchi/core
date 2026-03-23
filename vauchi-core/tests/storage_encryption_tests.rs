@@ -37,7 +37,7 @@ fn make_test_registry() -> DeviceRegistry {
 
 // === Own Card Encryption ===
 
-// @scenario: security.feature:Contact cards are encrypted at rest
+// @scenario: security :: Contact cards are encrypted at rest
 #[test]
 fn test_own_card_encrypted_roundtrip() {
     let (_dir, storage) = open_storage();
@@ -56,7 +56,7 @@ fn test_own_card_encrypted_roundtrip() {
     assert_eq!(loaded.fields().len(), card.fields().len());
 }
 
-// @scenario: security.feature:Local database encryption
+// @scenario: security :: Local database encryption
 #[test]
 fn test_own_card_stored_as_encrypted_blob() {
     let (dir, storage) = open_storage();
@@ -130,7 +130,7 @@ fn test_device_registry_stored_as_encrypted_blob() {
 
 // === Device Sync State Encryption ===
 
-// @scenario: sync_updates.feature:All sync traffic is encrypted
+// @scenario: sync_updates :: All sync traffic is encrypted
 #[test]
 fn test_device_sync_state_encrypted_roundtrip() {
     let (_dir, storage) = open_storage();
@@ -145,7 +145,7 @@ fn test_device_sync_state_encrypted_roundtrip() {
     assert_eq!(loaded.device_id(), state.device_id());
 }
 
-// @scenario: sync_updates.feature:All sync traffic is encrypted
+// @scenario: sync_updates :: All sync traffic is encrypted
 #[test]
 fn test_device_sync_state_stored_as_encrypted_blob() {
     let (dir, storage) = open_storage();
@@ -416,7 +416,7 @@ fn test_rekey_preserves_visibility_labels() {
     assert_eq!(loaded.name(), "Rekey Group");
 }
 
-// @scenario: security.feature:Local database encryption
+// @scenario: security :: Local database encryption
 #[test]
 fn test_rekey_old_key_cannot_decrypt() {
     let (dir, mut storage) = open_storage();

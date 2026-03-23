@@ -24,7 +24,7 @@ fn create_test_pair() -> (DoubleRatchetState, DoubleRatchetState) {
     (alice, bob)
 }
 
-// @scenario: security.feature:Forward secrecy via Double Ratchet
+// @scenario: security :: Forward secrecy via Double Ratchet
 #[test]
 fn test_dr_encrypt_decrypt_roundtrip() {
     let (mut alice, mut bob) = create_test_pair();
@@ -37,7 +37,7 @@ fn test_dr_encrypt_decrypt_roundtrip() {
     assert_eq!(plaintext.as_slice(), decrypted.as_slice());
 }
 
-// @scenario: security.feature:Forward secrecy via Double Ratchet
+// @scenario: security :: Forward secrecy via Double Ratchet
 #[test]
 fn test_dr_bidirectional_communication() {
     let (mut alice, mut bob) = create_test_pair();
@@ -58,7 +58,7 @@ fn test_dr_bidirectional_communication() {
     assert_eq!(b"How are you?".as_slice(), dec3.as_slice());
 }
 
-// @scenario: security.feature:Forward secrecy via Double Ratchet
+// @scenario: security :: Forward secrecy via Double Ratchet
 #[test]
 fn test_dr_forward_secrecy() {
     let (mut alice, mut bob) = create_test_pair();
@@ -86,7 +86,7 @@ fn test_dr_forward_secrecy() {
     assert_eq!(b"Message 2".as_slice(), dec2.as_slice());
 }
 
-// @scenario: security.feature:Forward secrecy via Double Ratchet
+// @scenario: security :: Forward secrecy via Double Ratchet
 #[test]
 fn test_forward_secrecy_compromised_state() {
     // CRIT-04: Serialize ratchet state, advance it, then attempt to decrypt

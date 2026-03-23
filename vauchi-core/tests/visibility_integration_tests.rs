@@ -28,7 +28,7 @@ mod visibility_integration_tests {
         card
     }
 
-    // @scenario: visibility_control.feature:Create a visibility group
+    // @scenario: visibility_control :: Create a visibility group
     #[test]
     fn test_label_creation() {
         let mut manager = create_test_label_manager();
@@ -37,7 +37,7 @@ mod visibility_integration_tests {
         assert_eq!(manager.group_count(), 1);
     }
 
-    // @scenario: visibility_control.feature:Apply visibility group to a field
+    // @scenario: visibility_control :: Apply visibility group to a field
     #[test]
     fn test_field_label_association() {
         let mut manager = create_test_label_manager();
@@ -62,7 +62,7 @@ mod visibility_integration_tests {
         assert!(label.is_field_visible(field_id));
     }
 
-    // @scenario: visibility_control.feature:Apply visibility group to a field
+    // @scenario: visibility_control :: Apply visibility group to a field
     #[test]
     fn test_multiple_label_field_visibility() {
         let mut manager = create_test_label_manager();
@@ -99,7 +99,7 @@ mod visibility_integration_tests {
         );
     }
 
-    // @scenario: visibility_control.feature:Add contact to group updates their visibility
+    // @scenario: visibility_control :: Add contact to group updates their visibility
     #[test]
     fn test_contact_label_assignment() {
         let mut manager = create_test_label_manager();
@@ -119,7 +119,7 @@ mod visibility_integration_tests {
         assert_eq!(contact_labels[0].id(), label_id);
     }
 
-    // @scenario: visibility_control.feature:Add contact to group updates their visibility
+    // @scenario: visibility_control :: Add contact to group updates their visibility
     #[test]
     fn test_visibility_enforcement() {
         let mut manager = create_test_label_manager();
@@ -148,7 +148,7 @@ mod visibility_integration_tests {
         assert_eq!(can_see, Some(true));
     }
 
-    // @scenario: visibility_control.feature:Hide a field from a specific contact
+    // @scenario: visibility_control :: Hide a field from a specific contact
     #[test]
     fn test_per_contact_override() {
         let mut manager = create_test_label_manager();

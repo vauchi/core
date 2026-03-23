@@ -34,7 +34,7 @@ use vauchi_core::storage::Storage;
 // - A strong password should be practically uncrackable
 
 /// Scenario: Argon2id makes brute-force attacks computationally infeasible
-// @scenario: security:Brute force protection on backup password
+// @scenario: security :: Brute force protection on backup password
 #[test]
 fn test_brute_force_protection() {
     let password = b"correct-horse-battery-staple";
@@ -78,7 +78,7 @@ fn test_brute_force_protection() {
 }
 
 /// Scenario: Rate limiting calculation - 10k attempts/day is infeasible
-// @scenario: security:Brute force protection on backup password
+// @scenario: security :: Brute force protection on backup password
 #[test]
 fn test_brute_force_rate_calculation() {
     // With Argon2id taking ~50ms per attempt (conservative estimate),
@@ -118,7 +118,7 @@ fn test_brute_force_rate_calculation() {
 // - Audio proximity verification must also pass
 
 /// Scenario: QR code expires after timeout window
-// @scenario: security:QR code screenshot attack prevention
+// @scenario: security :: QR code screenshot attack prevention
 #[test]
 fn test_qr_screenshot_attack_prevention() {
     let identity = Identity::create("Alice");
@@ -148,7 +148,7 @@ fn test_qr_screenshot_attack_prevention() {
 }
 
 /// Scenario: Expired QR rejected during exchange session
-// @scenario: security:QR code screenshot attack prevention
+// @scenario: security :: QR code screenshot attack prevention
 #[test]
 fn test_expired_qr_rejected_in_session() {
     let alice_identity = Identity::create("Alice");
@@ -195,7 +195,7 @@ fn test_expired_qr_rejected_in_session() {
 }
 
 /// Scenario: QR with clock drift detection
-// @scenario: security:QR code screenshot attack prevention
+// @scenario: security :: QR code screenshot attack prevention
 #[test]
 fn test_qr_clock_drift_detection() {
     use vauchi_core::exchange::check_clock_drift;
@@ -235,7 +235,7 @@ fn test_qr_clock_drift_detection() {
 // - TooFar error when device is beyond allowed range
 
 /// Scenario: BLE exchange requires proximity verification
-// @scenario: security:Relay attack prevention on BLE
+// @scenario: security :: Relay attack prevention on BLE
 #[test]
 fn test_ble_relay_attack_prevention() {
     // Setup: Attacker is relaying BLE signals from 5 meters away
@@ -257,7 +257,7 @@ fn test_ble_relay_attack_prevention() {
 }
 
 /// Scenario: Exchange session blocks without mutual QR exchange
-// @scenario: security:Man-in-the-middle detection during exchange
+// @scenario: security :: Man-in-the-middle detection during exchange
 #[test]
 fn test_exchange_requires_mutual_scan() {
     let alice_identity = Identity::create("Alice");
@@ -290,7 +290,7 @@ fn test_exchange_requires_mutual_scan() {
 }
 
 /// Scenario: Successful exchange when mutual QR scan completes
-// @scenario: security:Man-in-the-middle detection during exchange
+// @scenario: security :: Man-in-the-middle detection during exchange
 #[test]
 fn test_exchange_succeeds_with_mutual_scan() {
     let alice_identity = Identity::create("Alice");
@@ -335,9 +335,9 @@ fn test_exchange_succeeds_with_mutual_scan() {
 /// Verify that Debug formatting on SymmetricKey does not leak key bytes.
 /// (core-F-003: Renamed from test_memory_dump_protection to reflect
 /// what the test actually verifies — Debug trait redaction, not memory zeroing.)
-// @scenario: security:Memory dump protection
-// @scenario: security:Private key memory protection
-// @scenario: identity_management.feature:Secure memory handling for keys
+// @scenario: security :: Memory dump protection
+// @scenario: security :: Private key memory protection
+// @scenario: identity_management :: Secure memory handling for keys
 #[test]
 fn test_debug_format_excludes_key_material() {
     let key = SymmetricKey::generate();
@@ -368,7 +368,7 @@ fn test_debug_format_excludes_key_material() {
 /// debug redaction. Instead we verify sign/verify roundtrip and that the
 /// public key is different from a second generated keypair — ensuring
 /// unique key generation. Actual memory zeroing requires unsafe/valgrind.)
-// @scenario: security:Sufficient key lengths
+// @scenario: security :: Sufficient key lengths
 #[test]
 fn test_signing_key_generation_and_uniqueness() {
     let keypair1 = SigningKeyPair::generate();
@@ -398,7 +398,7 @@ fn test_signing_key_generation_and_uniqueness() {
 }
 
 /// Scenario: Password KDF output is zeroed after use
-// @scenario: security:Private key memory protection
+// @scenario: security :: Private key memory protection
 #[test]
 fn test_kdf_output_zeroed() {
     let password = b"my-password";
@@ -435,8 +435,8 @@ fn test_kdf_output_zeroed() {
 // - Logs should be available for security review
 
 /// Scenario: Audit events are logged and retrievable
-// @scenario: security:Security events logged
-// @scenario: security:Export security log
+// @scenario: security :: Security events logged
+// @scenario: security :: Export security log
 #[test]
 fn test_audit_log_export() {
     let temp_dir = tempfile::tempdir().unwrap();
@@ -479,8 +479,8 @@ fn test_audit_log_export() {
 }
 
 /// Scenario: Audit log export contains no sensitive data
-// @scenario: security:Security events logged
-// @scenario: security:Export security log
+// @scenario: security :: Security events logged
+// @scenario: security :: Export security log
 #[test]
 fn test_audit_log_no_sensitive_data() {
     let temp_dir = tempfile::tempdir().unwrap();
@@ -524,8 +524,8 @@ fn test_audit_log_no_sensitive_data() {
 // - Key bytes should be redacted in Display/Debug traits
 
 /// Scenario: SymmetricKey Debug output is redacted
-// @scenario: security:Security events logged
-// @scenario: identity_management.feature:Private keys never exposed in logs
+// @scenario: security :: Security events logged
+// @scenario: identity_management :: Private keys never exposed in logs
 #[test]
 fn test_key_material_never_logged() {
     let key = SymmetricKey::generate();
@@ -553,7 +553,7 @@ fn test_key_material_never_logged() {
 }
 
 /// Scenario: SigningKeyPair public key is safe to log, private is not
-// @scenario: security:Private keys never exported in plaintext
+// @scenario: security :: Private keys never exported in plaintext
 #[test]
 fn test_signing_keypair_logging_safety() {
     let keypair = SigningKeyPair::generate();
@@ -577,7 +577,7 @@ fn test_signing_keypair_logging_safety() {
 }
 
 /// Scenario: Key derivation intermediate values are not leaked
-// @scenario: security:Private key memory protection
+// @scenario: security :: Private key memory protection
 #[test]
 fn test_kdf_no_intermediate_leakage() {
     let password = b"secret-password";
@@ -604,7 +604,7 @@ fn test_kdf_no_intermediate_leakage() {
 // =============================================================================
 
 /// Scenario: Exchange token is cryptographically random
-// @scenario: security:Sufficient key lengths
+// @scenario: security :: Sufficient key lengths
 #[test]
 fn test_exchange_token_randomness() {
     let identity = Identity::create("Test");
@@ -634,7 +634,7 @@ fn test_exchange_token_randomness() {
 }
 
 /// Scenario: Audio challenge seeds are cryptographically random
-// @scenario: security:Sufficient key lengths
+// @scenario: security :: Sufficient key lengths
 #[test]
 fn test_audio_challenge_randomness() {
     let identity = Identity::create("Test");
@@ -652,7 +652,7 @@ fn test_audio_challenge_randomness() {
 }
 
 /// Scenario: QR signature prevents tampering
-// @scenario: security:Contact card signatures verified
+// @scenario: security :: Contact card signatures verified
 #[test]
 fn test_qr_signature_prevents_tampering() {
     let identity = Identity::create("Alice");

@@ -60,7 +60,7 @@ fn test_migration_v18_schema_version_at_least_18() {
 
 // === Save/Load Roundtrip Tests ===
 
-// @scenario: visibility_control.feature:Visibility settings persist after app restart
+// @scenario: visibility_control :: Visibility settings persist after app restart
 #[test]
 fn test_contact_with_visibility_rules_roundtrip() {
     let (_dir, storage) = open_storage();
@@ -117,7 +117,7 @@ fn test_contact_with_visibility_rules_roundtrip() {
     );
 }
 
-// @scenario: visibility_control.feature:New fields default to visible to all contacts
+// @scenario: visibility_control :: New fields default to visible to all contacts
 #[test]
 fn test_contact_with_empty_visibility_rules_roundtrip() {
     let (_dir, storage) = open_storage();
@@ -140,7 +140,7 @@ fn test_contact_with_empty_visibility_rules_roundtrip() {
 
 // === Encryption Verification Tests ===
 
-// @scenario: visibility_control.feature:Encrypted updates reveal nothing about hidden fields
+// @scenario: visibility_control :: Encrypted updates reveal nothing about hidden fields
 #[test]
 fn test_visibility_rules_stored_encrypted_not_plaintext() {
     let (dir, storage) = open_storage();
@@ -201,7 +201,7 @@ fn test_visibility_rules_stored_encrypted_not_plaintext() {
 
 // === List/Search Tests ===
 
-// @scenario: visibility_control.feature:Visibility settings persist after app restart
+// @scenario: visibility_control :: Visibility settings persist after app restart
 #[test]
 fn test_list_contacts_with_encrypted_visibility_rules() {
     let (_dir, storage) = open_storage();

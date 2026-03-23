@@ -37,7 +37,7 @@ fn add_contact_with_ratchet(wb: &Vauchi, name: &str) -> String {
     contact_id
 }
 
-// @scenario: visibility_control.feature:Revoking visibility sends update to contact
+// @scenario: visibility_control :: Revoking visibility sends update to contact
 #[test]
 fn test_set_field_private_queues_update() {
     let wb = create_test_vauchi();
@@ -72,7 +72,7 @@ fn test_set_field_private_queues_update() {
     );
 }
 
-// @scenario: visibility_control.feature:Granting visibility sends update to contact
+// @scenario: visibility_control :: Granting visibility sends update to contact
 #[test]
 fn test_set_field_public_queues_update() {
     let wb = create_test_vauchi();
@@ -93,7 +93,7 @@ fn test_set_field_public_queues_update() {
     );
 }
 
-// @scenario: visibility_control.feature:Revoking visibility sends update to contact
+// @scenario: visibility_control :: Revoking visibility sends update to contact
 #[test]
 fn test_repropagate_skips_no_ratchet() {
     let wb = create_test_vauchi();
@@ -130,7 +130,7 @@ fn test_repropagate_skips_no_ratchet() {
     );
 }
 
-// @scenario: visibility_control.feature:Revoking visibility sends update to contact
+// @scenario: visibility_control :: Revoking visibility sends update to contact
 #[test]
 fn test_visibility_change_nonexistent_contact() {
     let wb = create_test_vauchi();
@@ -142,7 +142,7 @@ fn test_visibility_change_nonexistent_contact() {
     );
 }
 
-// @scenario: visibility_control.feature:Show a field only to specific contacts
+// @scenario: visibility_control :: Show a field only to specific contacts
 #[test]
 fn test_set_field_restricted_queues_update() {
     let wb = create_test_vauchi();
@@ -174,7 +174,7 @@ fn test_set_field_restricted_queues_update() {
 // Label-aware re-propagation tests
 // ============================================================
 
-// @scenario: visibility_control.feature:Add contact to group updates their visibility
+// @scenario: visibility_control :: Add contact to group updates their visibility
 #[test]
 fn test_add_contact_to_label_triggers_repropagate() {
     let wb = create_test_vauchi();
@@ -207,7 +207,7 @@ fn test_add_contact_to_label_triggers_repropagate() {
     );
 }
 
-// @scenario: visibility_control.feature:Remove contact from group updates their visibility
+// @scenario: visibility_control :: Remove contact from group updates their visibility
 #[test]
 fn test_remove_contact_from_label_triggers_repropagate() {
     let wb = create_test_vauchi();
@@ -236,7 +236,7 @@ fn test_remove_contact_from_label_triggers_repropagate() {
     );
 }
 
-// @scenario: visibility_control.feature:Apply visibility group to a field
+// @scenario: visibility_control :: Apply visibility group to a field
 #[test]
 fn test_set_label_field_visibility_repropagates_to_all_members() {
     let wb = create_test_vauchi();
@@ -272,7 +272,7 @@ fn test_set_label_field_visibility_repropagates_to_all_members() {
     );
 }
 
-// @scenario: visibility_control.feature:Hide a field from a specific contact
+// @scenario: visibility_control :: Hide a field from a specific contact
 #[test]
 fn test_set_contact_override_triggers_repropagate() {
     let wb = create_test_vauchi();
@@ -300,8 +300,8 @@ fn test_set_contact_override_triggers_repropagate() {
     );
 }
 
-// @scenario: visibility_control.feature:Granting visibility sends update to contact
-// @scenario: visibility_control.feature:Hide a field from a specific contact
+// @scenario: visibility_control :: Granting visibility sends update to contact
+// @scenario: visibility_control :: Hide a field from a specific contact
 #[test]
 fn test_repropagate_uses_effective_visibility() {
     let wb = create_test_vauchi();

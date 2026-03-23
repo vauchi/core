@@ -637,7 +637,7 @@ fn test_decode_versioned_payload_cek_wrapped() {
 // to real contact IDs before storage lookups.
 // ============================================================
 
-// @scenario: anonymous_sender.feature:Incoming messages with anonymous sender ID are resolved
+// @scenario: anonymous_sender :: Incoming messages with anonymous sender ID are resolved
 #[test]
 fn test_process_card_update_resolves_anonymous_sender_id() {
     use vauchi_core::network::anonymous::AnonymousSender;
@@ -688,7 +688,7 @@ fn test_process_card_update_resolves_anonymous_sender_id() {
     assert_eq!(result.skipped, 0, "No updates should be skipped");
 }
 
-// @scenario: anonymous_sender.feature:Unknown anonymous sender ID is handled gracefully
+// @scenario: anonymous_sender :: Unknown anonymous sender ID is handled gracefully
 #[test]
 fn test_process_card_update_skips_unresolvable_anonymous_id() {
     let alice_wb = create_vauchi_with_identity("Alice");

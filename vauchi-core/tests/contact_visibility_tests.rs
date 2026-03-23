@@ -8,14 +8,14 @@
 use std::collections::HashSet;
 use vauchi_core::contact::{FieldVisibility, VisibilityRules};
 
-// @scenario: visibility_control.feature:New fields default to visible to all contacts
+// @scenario: visibility_control :: New fields default to visible to all contacts
 #[test]
 fn test_default_is_everyone() {
     let rules = VisibilityRules::new();
     assert_eq!(*rules.get("any_field"), FieldVisibility::Everyone);
 }
 
-// @scenario: visibility_control.feature:Show a field only to specific contacts
+// @scenario: visibility_control :: Show a field only to specific contacts
 #[test]
 fn test_set_contacts_only() {
     let mut rules = VisibilityRules::new();
@@ -30,7 +30,7 @@ fn test_set_contacts_only() {
     assert!(!rules.can_see("phone", "charlie"));
 }
 
-// @scenario: visibility_control.feature:Make a field private (visible to none)
+// @scenario: visibility_control :: Make a field private (visible to none)
 #[test]
 fn test_set_nobody() {
     let mut rules = VisibilityRules::new();
@@ -40,10 +40,10 @@ fn test_set_nobody() {
     assert!(!rules.can_see("secret_field", "bob"));
 }
 
-// @scenario: visibility_control.feature:Show a field only to specific contacts
-// @scenario: visibility_control.feature:Make a field private (visible to none)
-// @scenario: contacts_management.feature:Contact shows only fields I can see
-// @scenario: visibility_control.feature:View what a specific contact can see
+// @scenario: visibility_control :: Show a field only to specific contacts
+// @scenario: visibility_control :: Make a field private (visible to none)
+// @scenario: contacts_management :: Contact shows only fields I can see
+// @scenario: visibility_control :: View what a specific contact can see
 #[test]
 fn test_visible_fields() {
     let mut rules = VisibilityRules::new();
@@ -70,7 +70,7 @@ fn test_visible_fields() {
 // Additional tests (added for coverage)
 // ============================================================
 
-// @scenario: visibility_control.feature:New fields default to visible to all contacts
+// @scenario: visibility_control :: New fields default to visible to all contacts
 #[test]
 fn test_set_everyone_explicit() {
     let mut rules = VisibilityRules::new();
@@ -85,7 +85,7 @@ fn test_set_everyone_explicit() {
     assert!(rules.can_see("phone", "anyone"));
 }
 
-// @scenario: visibility_control.feature:Reset all visibility to default
+// @scenario: visibility_control :: Reset all visibility to default
 #[test]
 fn test_remove_reverts_to_default() {
     let mut rules = VisibilityRules::new();
@@ -119,7 +119,7 @@ fn test_field_visibility_equality() {
     assert_eq!(v4, v5);
 }
 
-// @scenario: visibility_control.feature:Visibility settings persist after app restart
+// @scenario: visibility_control :: Visibility settings persist after app restart
 #[test]
 fn test_visibility_rules_serialization() {
     let mut rules = VisibilityRules::new();
@@ -140,7 +140,7 @@ fn test_visibility_rules_serialization() {
     assert!(!restored.can_see("restricted", "bob"));
 }
 
-// @scenario: visibility_control.feature:Show a field only to specific contacts
+// @scenario: visibility_control :: Show a field only to specific contacts
 #[test]
 fn test_empty_contacts_set() {
     let mut rules = VisibilityRules::new();
@@ -152,8 +152,8 @@ fn test_empty_contacts_set() {
     assert!(!rules.can_see("field", "bob"));
 }
 
-// @scenario: visibility_control.feature:Show a field only to specific contacts
-// @scenario: visibility_control.feature:Make a field private (visible to none)
+// @scenario: visibility_control :: Show a field only to specific contacts
+// @scenario: visibility_control :: Make a field private (visible to none)
 #[test]
 fn test_multiple_rules() {
     let mut rules = VisibilityRules::new();

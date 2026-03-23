@@ -426,7 +426,7 @@ fn form_dialog_cancel_add_field_does_not_save() {
 
 // ── Social network field routing tests ──────────────────────────────
 
-/// @scenario: contact_card_management:Add social network field from catalog
+/// @scenario: contact_card_management :: Add social network field from catalog
 #[test]
 fn form_dialog_add_social_field_stores_as_social_type() {
     let mut vauchi = Vauchi::in_memory().unwrap();
@@ -477,7 +477,7 @@ fn form_dialog_add_social_field_stores_as_social_type() {
     assert_eq!(social_fields[0].value(), "octocat");
 }
 
-/// @scenario: contact_card_management:Social field label uses display name
+/// @scenario: contact_card_management :: Social field label uses display name
 #[test]
 fn form_dialog_add_social_field_uses_display_name_as_label() {
     let mut vauchi = Vauchi::in_memory().unwrap();

@@ -4,11 +4,11 @@
 
 //! Tests for dismissed duplicate storage operations (SP-12a).
 //!
-//! @scenario: contacts_management.feature:Dismiss duplicate suggestion
+//! @scenario: contacts_management :: Dismiss duplicate suggestion
 
 mod common;
 
-// @scenario: contacts_management.feature:Dismiss duplicate suggestion
+// @scenario: contacts_management :: Dismiss duplicate suggestion
 #[test]
 fn test_dismiss_duplicate_persists() {
     let wb = common::helpers::create_vauchi_with_identity("Alice");
@@ -21,7 +21,7 @@ fn test_dismiss_duplicate_persists() {
     assert!(dismissed.contains(&("id_a".to_string(), "id_b".to_string())));
 }
 
-// @scenario: contacts_management.feature:Dismiss duplicate suggestion
+// @scenario: contacts_management :: Dismiss duplicate suggestion
 #[test]
 fn test_dismiss_duplicate_normalized_order() {
     let wb = common::helpers::create_vauchi_with_identity("Alice");
@@ -37,7 +37,7 @@ fn test_dismiss_duplicate_normalized_order() {
     assert!(!dismissed.contains(&("id_z".to_string(), "id_a".to_string())));
 }
 
-// @scenario: contacts_management.feature:Dismiss duplicate suggestion
+// @scenario: contacts_management :: Dismiss duplicate suggestion
 #[test]
 fn test_dismiss_duplicate_idempotent() {
     let wb = common::helpers::create_vauchi_with_identity("Alice");
@@ -50,7 +50,7 @@ fn test_dismiss_duplicate_idempotent() {
     assert_eq!(dismissed.len(), 1, "Duplicate dismiss should be idempotent");
 }
 
-// @scenario: contacts_management.feature:Dismiss duplicate suggestion
+// @scenario: contacts_management :: Dismiss duplicate suggestion
 #[test]
 fn test_dismiss_duplicate_reverse_also_idempotent() {
     let wb = common::helpers::create_vauchi_with_identity("Alice");
@@ -63,7 +63,7 @@ fn test_dismiss_duplicate_reverse_also_idempotent() {
     assert_eq!(dismissed.len(), 1, "Reversed dismiss should be idempotent");
 }
 
-// @scenario: contacts_management.feature:Dismiss duplicate suggestion
+// @scenario: contacts_management :: Dismiss duplicate suggestion
 #[test]
 fn test_undismiss_duplicate_removes_entry() {
     let wb = common::helpers::create_vauchi_with_identity("Alice");
@@ -79,7 +79,7 @@ fn test_undismiss_duplicate_removes_entry() {
     );
 }
 
-// @scenario: contacts_management.feature:Dismiss duplicate suggestion
+// @scenario: contacts_management :: Dismiss duplicate suggestion
 #[test]
 fn test_load_dismissed_empty_initially() {
     let wb = common::helpers::create_vauchi_with_identity("Alice");
@@ -89,7 +89,7 @@ fn test_load_dismissed_empty_initially() {
     assert!(dismissed.is_empty(), "No dismissals initially");
 }
 
-// @scenario: contacts_management.feature:Dismiss duplicate suggestion
+// @scenario: contacts_management :: Dismiss duplicate suggestion
 #[test]
 fn test_dismiss_multiple_pairs() {
     let wb = common::helpers::create_vauchi_with_identity("Alice");
@@ -103,7 +103,7 @@ fn test_dismiss_multiple_pairs() {
     assert_eq!(dismissed.len(), 3, "Should have 3 dismissed pairs");
 }
 
-// @scenario: contacts_management.feature:Dismiss duplicate suggestion
+// @scenario: contacts_management :: Dismiss duplicate suggestion
 #[test]
 fn test_dismiss_does_not_reappear_after_reload() {
     // This test verifies persistence across multiple load calls

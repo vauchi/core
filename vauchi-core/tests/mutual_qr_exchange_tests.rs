@@ -19,8 +19,8 @@ use vauchi_core::{ContactCard, Identity};
 // QR with ephemeral keys
 // ============================================================
 
-// @scenario: contact_exchange.feature:Mutual QR uses fresh ephemeral keys for forward secrecy
-// @scenario: contact_exchange.feature:Generate exchange QR code
+// @scenario: contact_exchange :: Mutual QR uses fresh ephemeral keys for forward secrecy
+// @scenario: contact_exchange :: Generate exchange QR code
 #[test]
 fn test_qr_generate_with_ephemeral() {
     let identity = Identity::create("Alice");
@@ -44,7 +44,7 @@ fn test_qr_generate_with_ephemeral() {
     assert!(!qr.is_expired());
 }
 
-// @scenario: contact_exchange.feature:Mutual QR uses fresh ephemeral keys for forward secrecy
+// @scenario: contact_exchange :: Mutual QR uses fresh ephemeral keys for forward secrecy
 #[test]
 fn test_qr_ephemeral_changes_each_call() {
     let identity = Identity::create("Alice");
@@ -70,7 +70,7 @@ fn test_qr_ephemeral_changes_each_call() {
     assert!(qr2.verify_signature());
 }
 
-// @scenario: contact_exchange.feature:Generate exchange QR code
+// @scenario: contact_exchange :: Generate exchange QR code
 #[test]
 fn test_qr_ephemeral_roundtrip_via_data_string() {
     let identity = Identity::create("Alice");
@@ -90,7 +90,7 @@ fn test_qr_ephemeral_roundtrip_via_data_string() {
 // QR state machine transitions
 // ============================================================
 
-// @scenario: contact_exchange.feature:Default QR exchange uses mutual flow
+// @scenario: contact_exchange :: Default QR exchange uses mutual flow
 #[test]
 fn test_start_qr_generates_qr() {
     let identity = Identity::create("Alice");
@@ -158,7 +158,7 @@ fn test_scan_their_qr_transitions() {
     alice_session.qr().expect("expected Some");
 }
 
-// @scenario: contact_exchange.feature:Mutual QR rejects expired peer QR code
+// @scenario: contact_exchange :: Mutual QR rejects expired peer QR code
 #[test]
 fn test_scan_rejects_expired() {
     let alice_identity = Identity::create("Alice");
@@ -185,8 +185,8 @@ fn test_scan_rejects_expired() {
     );
 }
 
-// @scenario: contact_exchange.feature:Mutual QR prevents self-exchange
-// @scenario: contact_exchange.feature:Cannot exchange with yourself
+// @scenario: contact_exchange :: Mutual QR prevents self-exchange
+// @scenario: contact_exchange :: Cannot exchange with yourself
 #[test]
 fn test_scan_rejects_self_exchange() {
     let alice_identity = Identity::create("Alice");
@@ -215,8 +215,8 @@ fn test_scan_rejects_self_exchange() {
 // Symmetric DH key agreement
 // ============================================================
 
-// @scenario: contact_exchange.feature:Successful QR code exchange with proximity
-// @scenario: contact_exchange.feature:X3DH key agreement during exchange
+// @scenario: contact_exchange :: Successful QR code exchange with proximity
+// @scenario: contact_exchange :: X3DH key agreement during exchange
 #[test]
 fn test_key_agreement_symmetric() {
     // Both sides use fresh ephemerals, so DH should be symmetric:
@@ -237,9 +237,9 @@ fn test_key_agreement_symmetric() {
 // Full QR exchange lifecycle
 // ============================================================
 
-// @scenario: contact_exchange.feature:Successful QR code exchange with proximity
-// @scenario: contact_exchange.feature:Mutual QR exchange with bidirectional scanning
-// @scenario: contact_exchange.feature:Exchange creates mutual keys
+// @scenario: contact_exchange :: Successful QR code exchange with proximity
+// @scenario: contact_exchange :: Mutual QR exchange with bidirectional scanning
+// @scenario: contact_exchange :: Exchange creates mutual keys
 #[test]
 fn test_full_qr_exchange() {
     use vauchi_core::crypto::{decrypt, encrypt};
@@ -361,7 +361,7 @@ fn test_full_qr_exchange() {
     assert_eq!(pt2, msg2);
 }
 
-// @scenario: contact_exchange.feature:Mutual QR uses fresh ephemeral keys for forward secrecy
+// @scenario: contact_exchange :: Mutual QR uses fresh ephemeral keys for forward secrecy
 #[test]
 fn test_qr_uses_fresh_ephemeral_not_identity() {
     let alice_identity = Identity::create("Alice");

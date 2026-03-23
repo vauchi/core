@@ -9,6 +9,8 @@
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
+use crate::text::normalize_text;
+
 /// Validation error types for contact field values.
 #[derive(Error, Debug)]
 pub enum ValidationError {
@@ -80,8 +82,8 @@ impl ContactField {
         ContactField {
             id,
             field_type,
-            label: label.to_string(),
-            value: value.to_string(),
+            label: normalize_text(label),
+            value: normalize_text(value),
             updated_at: now_timestamp(),
         }
     }
@@ -103,10 +105,11 @@ impl ContactField {
 
     /// Sets the field label. Truncates to MAX_LABEL_LENGTH chars (#192).
     pub fn set_label(&mut self, label: &str) {
-        if label.chars().count() > MAX_LABEL_LENGTH {
-            self.label = label.chars().take(MAX_LABEL_LENGTH).collect();
+        let normalized = normalize_text(label);
+        if normalized.chars().count() > MAX_LABEL_LENGTH {
+            self.label = normalized.chars().take(MAX_LABEL_LENGTH).collect();
         } else {
-            self.label = label.to_string();
+            self.label = normalized;
         }
     }
 
@@ -122,7 +125,7 @@ impl ContactField {
 
     /// Sets the field value and updates the timestamp.
     pub fn set_value(&mut self, value: &str) {
-        self.value = value.to_string();
+        self.value = normalize_text(value);
         self.updated_at = now_timestamp();
     }
 

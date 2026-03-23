@@ -70,3 +70,25 @@ fn test_remove_field_cleans_up_field_visibility() {
     assert!(!card.is_field_shown(&field_id));
     assert!(card.field_visibility().is_empty());
 }
+
+// @scenario: unicode_normalization :: Display name NFC normalization
+#[test]
+fn test_display_name_normalized_nfc() {
+    let card = ContactCard::new("Jose\u{0301}");
+    assert_eq!(card.display_name(), "Jos\u{00E9}");
+}
+
+// @scenario: unicode_normalization :: Display name trimmed
+#[test]
+fn test_display_name_trimmed() {
+    let card = ContactCard::new("  Alice  ");
+    assert_eq!(card.display_name(), "Alice");
+}
+
+// @scenario: unicode_normalization :: Whitespace-only display name rejected
+#[test]
+fn test_set_display_name_whitespace_only_rejected() {
+    let mut card = ContactCard::new("Alice");
+    let result = card.set_display_name("   ");
+    assert!(result.is_err());
+}

@@ -28,6 +28,7 @@ use crate::crypto::X3DHKeyPair;
 use crate::crypto::{
     HKDF, Signature, SigningKeyPair, decrypt, derive_key_argon2id, encrypt, random_bytes,
 };
+use crate::text::normalize_text;
 use thiserror::Error;
 use zeroize::{Zeroize, Zeroizing};
 
@@ -77,7 +78,7 @@ impl Identity {
         // Generate random master seed
         let master_seed: [u8; 32] = random_bytes();
 
-        Self::from_seed(master_seed, display_name.to_string())
+        Self::from_seed(master_seed, normalize_text(display_name))
     }
 
     /// Creates an identity from an existing seed with default device index 0.
@@ -96,7 +97,12 @@ impl Identity {
         device_index: u32,
         device_name: String,
     ) -> Self {
-        Self::from_seed_with_device(master_seed, display_name, device_index, device_name)
+        Self::from_seed_with_device(
+            master_seed,
+            normalize_text(&display_name),
+            device_index,
+            device_name,
+        )
     }
 
     /// Creates an identity from an existing seed with specific device info.
@@ -140,15 +146,16 @@ impl Identity {
 
     /// Sets the display name.
     pub fn set_display_name(&mut self, name: &str) {
-        self.display_name = name.to_string();
+        self.display_name = normalize_text(name);
     }
 
     /// Tries to set the display name, returning an error if invalid.
     pub fn try_set_display_name(&mut self, name: &str) -> Result<(), IdentityError> {
-        if name.is_empty() {
+        let normalized = normalize_text(name);
+        if normalized.is_empty() {
             return Err(IdentityError::EmptyDisplayName);
         }
-        self.display_name = name.to_string();
+        self.display_name = normalized;
         Ok(())
     }
 

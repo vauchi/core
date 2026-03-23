@@ -25,6 +25,7 @@ pub use uri::{ContactAction, is_allowed_scheme, is_blocked_scheme, is_safe_url, 
 
 use serde::{Deserialize, Serialize};
 
+use crate::text::normalize_text;
 use crate::types::VisibilityRules;
 use thiserror::Error;
 
@@ -94,7 +95,7 @@ impl ContactCard {
 
         ContactCard {
             id,
-            display_name: display_name.to_string(),
+            display_name: normalize_text(display_name),
             fields: Vec::new(),
             avatar: None,
             nickname: None,
@@ -114,13 +115,14 @@ impl ContactCard {
 
     /// Sets the display name.
     pub fn set_display_name(&mut self, name: &str) -> Result<(), ContactCardError> {
-        if name.is_empty() {
+        let normalized = normalize_text(name);
+        if normalized.is_empty() {
             return Err(ContactCardError::EmptyDisplayName);
         }
-        if name.chars().count() > MAX_DISPLAY_NAME_LENGTH {
+        if normalized.chars().count() > MAX_DISPLAY_NAME_LENGTH {
             return Err(ContactCardError::DisplayNameTooLong);
         }
-        self.display_name = name.to_string();
+        self.display_name = normalized;
         Ok(())
     }
 
@@ -131,11 +133,11 @@ impl ContactCard {
 
     /// Sets the local nickname annotation (max 100 chars). Empty string clears it.
     pub fn set_nickname(&mut self, nickname: &str) {
-        if nickname.is_empty() {
+        let normalized = normalize_text(nickname);
+        if normalized.is_empty() {
             self.nickname = None;
         } else {
-            // Truncate to MAX_DISPLAY_NAME_LENGTH (100 chars)
-            let truncated = nickname
+            let truncated = normalized
                 .chars()
                 .take(MAX_DISPLAY_NAME_LENGTH)
                 .collect::<String>();

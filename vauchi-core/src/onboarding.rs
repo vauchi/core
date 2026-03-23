@@ -12,6 +12,7 @@
 use std::collections::HashSet;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
+use crate::text::normalize_text;
 pub use crate::types::{OnboardingProgress, OnboardingStep};
 
 impl OnboardingStep {
@@ -216,7 +217,8 @@ impl OnboardingProgress {
 /// - "Alex" (shortened first name, if 5+ chars)
 /// - "A. Johnson" (initial + last name)
 pub fn display_name_suggestions(full_name: &str) -> Vec<String> {
-    let parts: Vec<&str> = full_name.split_whitespace().collect();
+    let normalized = normalize_text(full_name);
+    let parts: Vec<&str> = normalized.split_whitespace().collect();
 
     if parts.is_empty() {
         return vec![];

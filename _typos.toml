@@ -20,3 +20,5 @@ ba = "ba"
 identite = "identite"
 # French i18n: "Bienvenue sur Vauchi"
 sur = "sur"
+# NFC normalization test: "café" split across Unicode escape
+caf = "caf"

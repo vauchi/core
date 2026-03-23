@@ -30,6 +30,7 @@ use crate::crypto::{PublicKey, Signature};
 use crate::identity::Identity;
 #[cfg(any(feature = "network-native-tls", feature = "network-rustls"))]
 use crate::network::relay_url::validate_relay_url;
+use crate::text::normalize_text;
 
 /// Protocol version for QR codes.
 /// v1: Original format (signing key only)
@@ -339,8 +340,10 @@ impl ExchangeQR {
             return Err(ExchangeError::InvalidQRFormat);
         }
 
-        let display_name = String::from_utf8(bytes[127..name_end].to_vec())
-            .map_err(|_| ExchangeError::InvalidQRFormat)?;
+        let display_name = normalize_text(
+            &String::from_utf8(bytes[127..name_end].to_vec())
+                .map_err(|_| ExchangeError::InvalidQRFormat)?,
+        );
 
         // Parse flags byte
         let flags = bytes[name_end];

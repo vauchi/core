@@ -29,3 +29,19 @@ fn test_validate_valid_email() {
     let field = ContactField::new(FieldType::Email, "Test", "test@example.com");
     field.validate().expect("expected success");
 }
+
+// @scenario: unicode_normalization :: Field label NFC normalization
+#[test]
+fn test_field_label_normalized_nfc() {
+    let field = ContactField::new(FieldType::Phone, "Te\u{0301}le\u{0301}phone", "+41");
+    assert_eq!(field.label(), "T\u{00E9}l\u{00E9}phone");
+}
+
+// @scenario: unicode_normalization :: Field value NFC normalization
+#[test]
+fn test_field_value_normalized_nfc() {
+    let mut field = ContactField::new(FieldType::Custom, "Note", "cafe\u{0301}");
+    assert_eq!(field.value(), "caf\u{00E9}");
+    field.set_value("n\u{0303}");
+    assert_eq!(field.value(), "\u{00F1}");
+}

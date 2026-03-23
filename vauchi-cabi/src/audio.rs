@@ -11,12 +11,13 @@
 //! completes or the timeout expires.
 
 use std::os::raw::c_char;
-use std::time::Duration;
-
-use super::to_c_string;
 
 #[cfg(feature = "audio")]
+use super::to_c_string;
+#[cfg(feature = "audio")]
 use std::sync::Mutex;
+#[cfg(feature = "audio")]
+use std::time::Duration;
 
 #[cfg(feature = "audio")]
 static AUDIO_BACKEND: Mutex<Option<vauchi_core::exchange::CpalAudioBackend>> = Mutex::new(None);

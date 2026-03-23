@@ -60,12 +60,12 @@ const MIN_REQUIRED_SCORE: Score = Score::Three;
 /// use vauchi_core::identity::password::{validate_password, PasswordStrength};
 ///
 /// // Weak passwords are rejected
-/// assert!(validate_password("password").is_err());
-/// assert!(validate_password("12345678").is_err());
+/// let err = validate_password("password").unwrap_err();
+/// assert_eq!(format!("{err}"), format!("{}", vauchi_core::error::IdentityError::WeakPassword));
 ///
-/// // Strong passphrases are accepted
-/// let result = validate_password("correct-horse-battery-staple");
-/// assert!(result.is_ok());
+/// // Strong passphrases return Strong or VeryStrong
+/// let strength = validate_password("correct-horse-battery-staple").unwrap();
+/// assert!(matches!(strength, PasswordStrength::Strong | PasswordStrength::VeryStrong));
 /// ```
 pub fn validate_password(password: &str) -> Result<PasswordStrength, IdentityError> {
     // Check minimum length first

@@ -54,8 +54,15 @@ fn test_tor_manager_config_preserved() {
 #[test]
 fn test_tor_manager_connect_before_bootstrap_fails() {
     let manager = TorManager::new(TorConfig::default()).unwrap();
-    let result = manager.connect_to("example.com", 443);
-    assert!(result.is_err(), "connect before bootstrap should fail");
+    let err = manager.connect_to("example.com", 443).err();
+    assert!(err.is_some(), "connect before bootstrap should fail");
+    assert!(
+        matches!(
+            err.unwrap(),
+            vauchi_core::network::NetworkError::TorNotAvailable
+        ),
+        "expected TorNotAvailable error variant"
+    );
 }
 
 #[test]
@@ -63,14 +70,22 @@ fn test_tor_manager_rotate_before_bootstrap_fails() {
     let manager = TorManager::new(TorConfig::default()).unwrap();
     let result = manager.rotate_circuit();
     assert!(result.is_err(), "rotate before bootstrap should fail");
+    assert!(
+        matches!(
+            result.unwrap_err(),
+            vauchi_core::network::NetworkError::TorNotAvailable
+        ),
+        "expected TorNotAvailable error variant"
+    );
 }
 
 #[test]
 fn test_tor_manager_shutdown_before_bootstrap_succeeds() {
     let manager = TorManager::new(TorConfig::default()).unwrap();
     // Shutdown on an un-bootstrapped manager should succeed (no-op)
-    let result = manager.shutdown();
-    assert!(result.is_ok());
+    manager
+        .shutdown()
+        .expect("shutdown before bootstrap should succeed");
     assert_eq!(manager.status(), TorStatus::Disabled);
 }
 
@@ -87,10 +102,14 @@ fn test_tor_manager_shutdown_before_bootstrap_succeeds() {
 fn test_tor_live_bootstrap() {
     let manager = TorManager::new(TorConfig::default()).unwrap();
 
-    let result = manager.bootstrap();
-    assert!(result.is_ok(), "Tor bootstrap failed: {:?}", result.err());
+    manager
+        .bootstrap()
+        .expect("Tor bootstrap should succeed (requires network)");
     assert_eq!(manager.status(), TorStatus::Connected);
-    assert!(manager.circuit_age_secs().is_some());
+    let age = manager
+        .circuit_age_secs()
+        .expect("circuit age should be available after bootstrap");
+    assert!(age < 60, "fresh circuit age should be under 60s, got {age}");
 
     // Shutdown
     manager.shutdown().unwrap();

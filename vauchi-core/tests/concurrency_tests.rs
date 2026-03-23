@@ -33,6 +33,7 @@ fn open_with_retry(path: &std::path::Path, key: SymmetricKey, max_retries: u32) 
         match Storage::open(path, key.clone()) {
             Ok(storage) => return storage,
             Err(e) if attempt < max_retries => {
+                // nosemgrep: vauchi-cc06-no-sleep-in-tests — retry backoff for real SQLITE_BUSY, not test timing
                 std::thread::sleep(std::time::Duration::from_millis(200 * (attempt as u64 + 1)));
             }
             Err(e) => panic!("Storage::open failed after {} retries: {}", max_retries, e),

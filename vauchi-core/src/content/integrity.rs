@@ -28,7 +28,7 @@ use thiserror::Error;
 ///
 /// let data = b"hello world";
 /// let checksum = compute_checksum(data);
-/// assert!(verify_checksum(data, &checksum).is_ok());
+/// verify_checksum(data, &checksum).expect("valid checksum should verify");
 /// ```
 pub fn verify_checksum(data: &[u8], expected: &str) -> Result<(), IntegrityError> {
     // Expected format: "sha256:hexstring"

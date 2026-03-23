@@ -105,4 +105,4 @@ fn test_presence_status_values() {
 }
 
 // Device sync message tests removed (SP-33): DeviceSyncMessage wire type removed.
-// Device sync will use EncryptedUpdate + self-token in Task 4.3.
+// Device sync reimplemented via EncryptedUpdate + self-token (Task 4.3 done).

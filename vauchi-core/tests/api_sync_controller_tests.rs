@@ -390,8 +390,8 @@ fn create_test_registry(master_seed: &[u8; 32], device: &DeviceInfo) -> DeviceRe
     DeviceRegistry::new(device.to_registered(master_seed), &signing_key)
 }
 
-// test_sync_controller_send_device_sync removed (SP-33): send_device_sync now has
-// a todo!() stub — will be replaced by EncryptedUpdate + self-token in Task 4.3.
+// test_sync_controller_send_device_sync removed (SP-33): send_device_sync
+// reimplemented via EncryptedUpdate + self-token (Task 4.3 done).
 
 #[test]
 fn test_sync_controller_process_device_sync() {

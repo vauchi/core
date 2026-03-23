@@ -304,7 +304,7 @@ fn test_process_result_default() {
 }
 
 // Device sync send test removed (SP-33): DeviceSyncMessage wire type removed.
-// send_device_sync_message now has a todo!() stub — will be replaced in Task 4.3.
+// send_device_sync_message reimplemented via EncryptedUpdate + self-token (Task 4.3 done).
 
 // @scenario: relay_network:Automatic cleanup of stale blobs
 #[test]

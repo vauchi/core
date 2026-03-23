@@ -385,7 +385,7 @@ pub async fn do_sync_async(
         // internally by process_card_updates — no pre-resolution needed)
         let cards_updated = process_card_updates(identity, &storage, received.card_updates)?;
 
-        // SP-33 Task 4.3: device sync receive + send replaced by EncryptedUpdate + self-token
+        // SP-33: device sync receive + send uses EncryptedUpdate + self-token
 
         // Collect pending updates
         let pending_updates = collect_pending_updates_data(identity, &storage);

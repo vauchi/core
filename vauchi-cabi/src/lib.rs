@@ -15,10 +15,12 @@ use vauchi_core::exchange::{ExchangeSession, ManualConfirmationVerifier};
 use vauchi_core::ui::*;
 
 mod app;
+mod audio;
 mod exchange;
 mod workflow;
 
 pub use app::*;
+pub use audio::*;
 pub use exchange::*;
 pub use workflow::*;
 
@@ -984,6 +986,40 @@ mod tests {
                 );
                 vauchi_app_destroy(handle2);
             }
+        }
+    }
+
+    // ── Audio backend tests ─────────────────────────────────────────
+
+    #[test]
+    fn audio_is_available_returns_valid_result() {
+        unsafe {
+            let result = vauchi_audio_is_available();
+            assert!(result == 0 || result == 1);
+        }
+    }
+
+    #[test]
+    fn audio_emit_null_data_returns_zero() {
+        unsafe {
+            let result = vauchi_audio_emit(std::ptr::null(), 0);
+            assert_eq!(result, 0, "null data should fail gracefully");
+        }
+    }
+
+    #[test]
+    fn audio_listen_zero_timeout_returns_null() {
+        unsafe {
+            let result = vauchi_audio_listen(0);
+            assert!(result.is_null(), "zero timeout should return null");
+        }
+    }
+
+    #[test]
+    fn audio_stop_does_not_crash() {
+        // allow(zero_assertions) — no-panic boundary test
+        unsafe {
+            vauchi_audio_stop();
         }
     }
 }

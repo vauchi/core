@@ -24,6 +24,15 @@ pub fn all_themes() -> Vec<Theme> {
     }
 }
 
+/// Load themes from generated/themes.json.
+/// Returns None if file doesn't exist (themes repo not checked out / worktree).
+pub fn try_all_themes() -> Option<Vec<Theme>> {
+    let path =
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../themes/generated/themes.json");
+    let data = std::fs::read(&path).ok()?;
+    Some(load_themes_from_json(&data).expect("generated/themes.json must be valid"))
+}
+
 /// Find a theme by ID from themes.json (replaces deprecated get_theme_by_id).
 pub fn theme_by_id(id: &str) -> Option<Theme> {
     all_themes().into_iter().find(|t| t.id == id)

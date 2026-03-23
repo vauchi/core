@@ -58,6 +58,7 @@ BUILD_IOS=false
 BUILD_ANDROID=false
 BUILD_MACOS=false
 BUILD_ALL=true
+RELEASE_ONLY=false
 
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -82,15 +83,20 @@ while [[ $# -gt 0 ]]; do
             BUILD_ALL=false
             shift
             ;;
+        --release-only)
+            RELEASE_ONLY=true
+            shift
+            ;;
         --help|-h)
-            echo "Usage: $0 [--ios] [--android] [--macos] [--apple]"
+            echo "Usage: $0 [--ios] [--android] [--macos] [--apple] [--release-only]"
             echo ""
             echo "Options:"
-            echo "  --ios      Build iOS bindings only"
-            echo "  --android  Build Android bindings only"
-            echo "  --macos    Build macOS bindings only"
-            echo "  --apple    Build iOS + macOS bindings"
-            echo "  (no args)  Build all platforms"
+            echo "  --ios           Build iOS bindings only"
+            echo "  --android       Build Android bindings only"
+            echo "  --macos         Build macOS bindings only"
+            echo "  --apple         Build iOS + macOS bindings"
+            echo "  --release-only  Skip simulator/Intel targets (arm64 only)"
+            echo "  (no args)       Build all platforms, all targets"
             exit 0
             ;;
         *)
@@ -114,8 +120,9 @@ if $BUILD_IOS; then
     if [[ "$(uname)" != "Darwin" ]]; then
         echo -e "${YELLOW}SKIPPED: iOS build requires macOS${NC}"
     else
-        # Disable sccache for iOS cross-compilation (causes issues with target discovery)
-        unset RUSTC_WRAPPER
+        # sccache works with cross-compilation targets since sccache 0.8+.
+        # Previously disabled due to target discovery issues — resolved in modern versions.
+        # RUSTC_WRAPPER inherited from environment (set by CI .self-hosted template).
 
         # Set iOS deployment target to match Rust's default (10.0) to prevent
         # ___chkstk_darwin linker errors. Without this, the cc crate picks up
@@ -126,36 +133,26 @@ if $BUILD_IOS; then
         # Show toolchain info for debugging
         echo "Active Rust toolchain:"
         rustup show active-toolchain
+        echo "RUSTC_WRAPPER: ${RUSTC_WRAPPER:-<unset>}"
         echo ""
 
-        # Force reinstall iOS targets (runner may have corrupted installation)
-        echo "Reinstalling iOS targets (force)..."
-        rustup target remove aarch64-apple-ios aarch64-apple-ios-sim x86_64-apple-ios 2>/dev/null || true
-        rustup target add aarch64-apple-ios aarch64-apple-ios-sim x86_64-apple-ios
+        # Build targets based on --release-only flag
+        IOS_TARGETS="aarch64-apple-ios"
+        if ! $RELEASE_ONLY; then
+            IOS_TARGETS="$IOS_TARGETS aarch64-apple-ios-sim x86_64-apple-ios"
+        fi
 
-        # Verify targets are installed and show sysroot
-        echo "Installed iOS targets:"
-        rustup target list --installed | grep -E "ios|iOS" || echo "WARNING: No iOS targets found!"
-        echo ""
-        echo "Checking iOS sysroot exists:"
-        SYSROOT=$(rustc --print sysroot)
-        ls -la "$SYSROOT/lib/rustlib/" | grep -E "ios" || echo "WARNING: iOS libs not found in sysroot!"
-        echo ""
+        # Ensure targets are installed
+        echo "Installing iOS targets: $IOS_TARGETS"
+        for t in $IOS_TARGETS; do rustup target add "$t" 2>/dev/null || true; done
 
-        # Build for iOS device (ARM64)
-        echo -e "${YELLOW}Building for aarch64-apple-ios (device)...${NC}"
-        cargo build -p vauchi-platform --target aarch64-apple-ios --release
-        echo -e "${GREEN}iOS device build complete${NC}"
-
-        # Build for iOS simulator (ARM64 - Apple Silicon)
-        echo -e "${YELLOW}Building for aarch64-apple-ios-sim (simulator ARM64)...${NC}"
-        cargo build -p vauchi-platform --target aarch64-apple-ios-sim --release
-        echo -e "${GREEN}iOS simulator ARM64 build complete${NC}"
-
-        # Build for iOS simulator (x86_64 - Intel)
-        echo -e "${YELLOW}Building for x86_64-apple-ios (simulator x86_64)...${NC}"
-        cargo build -p vauchi-platform --target x86_64-apple-ios --release
-        echo -e "${GREEN}iOS simulator x86_64 build complete${NC}"
+        # Multi-target build: compile dependencies ONCE, cross-compile per target.
+        # Cargo 1.64+ shares dep compilation across --target flags in a single invocation.
+        TARGET_FLAGS=""
+        for t in $IOS_TARGETS; do TARGET_FLAGS="$TARGET_FLAGS --target $t"; done
+        echo -e "${YELLOW}Building iOS targets: $IOS_TARGETS${NC}"
+        cargo build -p vauchi-platform $TARGET_FLAGS --release
+        echo -e "${GREEN}iOS build complete ($(echo $IOS_TARGETS | wc -w | tr -d ' ') targets)${NC}"
 
         # Generate Swift bindings
         echo -e "${YELLOW}Generating Swift bindings...${NC}"
@@ -168,17 +165,18 @@ if $BUILD_IOS; then
 
         echo -e "${GREEN}Swift bindings generated at: $IOS_GENERATED_DIR${NC}"
 
-        # Create universal library for simulators
-        echo -e "${YELLOW}Creating universal simulator library...${NC}"
+        # Package libraries
         mkdir -p "$IOS_LIBS_DIR"
-
-        lipo -create \
-            target/aarch64-apple-ios-sim/release/libvauchi_platform.a \
-            target/x86_64-apple-ios/release/libvauchi_platform.a \
-            -output "$IOS_LIBS_DIR/libvauchi_platform_sim.a"
-
-        # Copy device library
         cp target/aarch64-apple-ios/release/libvauchi_platform.a "$IOS_LIBS_DIR/libvauchi_platform_device.a"
+
+        if ! $RELEASE_ONLY; then
+            # Create universal library for simulators (ARM64 + x86_64)
+            echo -e "${YELLOW}Creating universal simulator library...${NC}"
+            lipo -create \
+                target/aarch64-apple-ios-sim/release/libvauchi_platform.a \
+                target/x86_64-apple-ios/release/libvauchi_platform.a \
+                -output "$IOS_LIBS_DIR/libvauchi_platform_sim.a"
+        fi
 
         echo -e "${GREEN}iOS libraries:${NC}"
         ls -lh "$IOS_LIBS_DIR/"
@@ -193,34 +191,42 @@ if $BUILD_MACOS; then
     if [[ "$(uname)" != "Darwin" ]]; then
         echo -e "${YELLOW}SKIPPED: macOS build requires macOS${NC}"
     else
-        # Disable sccache for cross-compilation
-        unset RUSTC_WRAPPER
+        # sccache works with cross-compilation targets since sccache 0.8+.
+        # RUSTC_WRAPPER inherited from environment.
 
         # Set deployment target to match project.yml
         export MACOSX_DEPLOYMENT_TARGET="14.0"
 
+        # Build targets based on --release-only flag
+        MACOS_TARGETS="aarch64-apple-darwin"
+        if ! $RELEASE_ONLY; then
+            MACOS_TARGETS="$MACOS_TARGETS x86_64-apple-darwin"
+        fi
+
         # Ensure targets are installed
-        echo "Checking macOS targets..."
-        rustup target add aarch64-apple-darwin x86_64-apple-darwin 2>/dev/null || true
+        for t in $MACOS_TARGETS; do rustup target add "$t" 2>/dev/null || true; done
 
-        # Build for ARM64 (Apple Silicon)
-        echo -e "${YELLOW}Building for aarch64-apple-darwin (Apple Silicon)...${NC}"
-        cargo build -p vauchi-platform --target aarch64-apple-darwin --release
-        echo -e "${GREEN}macOS ARM64 build complete${NC}"
+        # Multi-target build: dependencies compiled once, cross-compiled per target
+        TARGET_FLAGS=""
+        for t in $MACOS_TARGETS; do TARGET_FLAGS="$TARGET_FLAGS --target $t"; done
+        echo -e "${YELLOW}Building macOS targets: $MACOS_TARGETS${NC}"
+        cargo build -p vauchi-platform $TARGET_FLAGS --release
+        echo -e "${GREEN}macOS build complete${NC}"
 
-        # Build for x86_64 (Intel)
-        echo -e "${YELLOW}Building for x86_64-apple-darwin (Intel)...${NC}"
-        cargo build -p vauchi-platform --target x86_64-apple-darwin --release
-        echo -e "${GREEN}macOS x86_64 build complete${NC}"
-
-        # Create universal macOS library
-        echo -e "${YELLOW}Creating universal macOS library...${NC}"
+        # Package libraries
         mkdir -p "$MACOS_LIBS_DIR"
 
-        lipo -create \
-            target/aarch64-apple-darwin/release/libvauchi_platform.a \
-            target/x86_64-apple-darwin/release/libvauchi_platform.a \
-            -output "$MACOS_LIBS_DIR/libvauchi_platform_macos.a"
+        if ! $RELEASE_ONLY; then
+            # Create universal macOS library (ARM64 + x86_64)
+            echo -e "${YELLOW}Creating universal macOS library...${NC}"
+            lipo -create \
+                target/aarch64-apple-darwin/release/libvauchi_platform.a \
+                target/x86_64-apple-darwin/release/libvauchi_platform.a \
+                -output "$MACOS_LIBS_DIR/libvauchi_platform_macos.a"
+        else
+            cp target/aarch64-apple-darwin/release/libvauchi_platform.a \
+                "$MACOS_LIBS_DIR/libvauchi_platform_macos.a"
+        fi
 
         echo -e "${GREEN}macOS libraries:${NC}"
         ls -lh "$MACOS_LIBS_DIR/"
@@ -267,36 +273,38 @@ if $BUILD_ANDROID; then
         exit 1
     fi
 
-    # Check for required Android targets
-    if ! rustup target list --installed | grep -q "aarch64-linux-android"; then
-        echo "Installing Android targets..."
-        rustup target add aarch64-linux-android
-        rustup target add x86_64-linux-android
-        rustup target add armv7-linux-androideabi
-    fi
-
-    # Build for ARM64 (real devices)
-    echo -e "${YELLOW}Building for aarch64-linux-android (ARM64)...${NC}"
+    # Set up NDK toolchain environment for all Android targets
     export CC_aarch64_linux_android="$NDK_TOOLCHAIN/aarch64-linux-android24-clang"
     export AR_aarch64_linux_android="$NDK_TOOLCHAIN/llvm-ar"
     export CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER="$NDK_TOOLCHAIN/aarch64-linux-android24-clang"
-    cargo build -p vauchi-platform --target aarch64-linux-android --release
-    echo -e "${GREEN}ARM64 build complete${NC}"
-
-    # Build for x86_64 (emulator)
-    echo -e "${YELLOW}Building for x86_64-linux-android (emulator)...${NC}"
     export CC_x86_64_linux_android="$NDK_TOOLCHAIN/x86_64-linux-android24-clang"
     export AR_x86_64_linux_android="$NDK_TOOLCHAIN/llvm-ar"
     export CARGO_TARGET_X86_64_LINUX_ANDROID_LINKER="$NDK_TOOLCHAIN/x86_64-linux-android24-clang"
-    cargo build -p vauchi-platform --target x86_64-linux-android --release
-    echo -e "${GREEN}x86_64 build complete${NC}"
+
+    # Build targets based on --release-only flag
+    ANDROID_TARGETS="aarch64-linux-android"
+    if ! $RELEASE_ONLY; then
+        ANDROID_TARGETS="$ANDROID_TARGETS x86_64-linux-android"
+    fi
+
+    # Ensure targets are installed
+    for t in $ANDROID_TARGETS; do rustup target add "$t" 2>/dev/null || true; done
+
+    # Multi-target build: dependencies compiled once, cross-compiled per target
+    TARGET_FLAGS=""
+    for t in $ANDROID_TARGETS; do TARGET_FLAGS="$TARGET_FLAGS --target $t"; done
+    echo -e "${YELLOW}Building Android targets: $ANDROID_TARGETS${NC}"
+    cargo build -p vauchi-platform $TARGET_FLAGS --release
+    echo -e "${GREEN}Android build complete ($(echo $ANDROID_TARGETS | wc -w | tr -d ' ') targets)${NC}"
 
     # Copy native libraries
     echo -e "${YELLOW}Copying native libraries...${NC}"
     mkdir -p "$ANDROID_JNI_DIR/arm64-v8a"
-    mkdir -p "$ANDROID_JNI_DIR/x86_64"
     cp target/aarch64-linux-android/release/libvauchi_platform.so "$ANDROID_JNI_DIR/arm64-v8a/"
-    cp target/x86_64-linux-android/release/libvauchi_platform.so "$ANDROID_JNI_DIR/x86_64/"
+    if ! $RELEASE_ONLY; then
+        mkdir -p "$ANDROID_JNI_DIR/x86_64"
+        cp target/x86_64-linux-android/release/libvauchi_platform.so "$ANDROID_JNI_DIR/x86_64/"
+    fi
 
     # Generate Kotlin bindings
     # Note: uniffi-bindgen can't read metadata from cross-compiled libraries,

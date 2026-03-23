@@ -655,7 +655,7 @@ prebuild:apple:
           - "scripts/build-bindings.sh"
           - "scripts/package-xcframework.sh"
   script:
-    - ./scripts/build-bindings.sh --apple
+    - ./scripts/build-bindings.sh --apple --release-only
     - |
       echo "Uploading Apple binding artifacts for SHA ${CI_COMMIT_SHA}..."
       tar czf bindings-apple.tar.gz -C target/bindings ios/ macos/
@@ -693,7 +693,7 @@ prebuild:android:
       fi
     - rustup target add aarch64-linux-android x86_64-linux-android
   script:
-    - ./scripts/build-bindings.sh --android
+    - ./scripts/build-bindings.sh --android --release-only
     - |
       echo "Uploading Android binding artifacts for SHA ${CI_COMMIT_SHA}..."
       tar czf bindings-android.tar.gz -C target/bindings android/

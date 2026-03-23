@@ -86,12 +86,13 @@ For details on Vauchi's security architecture, see:
 
 | Property              | Implementation                               |
 | --------------------- | -------------------------------------------- |
-| End-to-end encryption | AES-256-GCM with per-contact keys            |
-| Forward secrecy       | Double Ratchet protocol                      |
+| End-to-end encryption | XChaCha20-Poly1305 with per-contact keys     |
+| Forward secrecy       | Double Ratchet protocol (X3DH key agreement) |
 | Key derivation        | HKDF-SHA256 with domain separation           |
-| Password protection   | PBKDF2 (100k iterations) + zxcvbn validation |
+| Password protection   | Argon2id + zxcvbn validation                 |
+| Key exchange          | X25519 (Diffie-Hellman) + Ed25519 (signatures)|
 | Key zeroing           | `zeroize` crate for memory cleanup           |
-| Cryptographic library | `ring` (audited, no custom crypto)           |
+| Cryptographic library | RustCrypto audited crates (primary), aws-lc-rs for TLS only |
 
 ### Supported Versions
 

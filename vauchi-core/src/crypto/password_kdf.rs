@@ -12,6 +12,14 @@
 //! time cost to 1 iteration for faster test execution. This feature MUST NOT
 //! be enabled in production builds.
 
+// Compile-time guard: test-kdf MUST NOT be enabled in release builds.
+// It reduces Argon2id parameters to insecure levels for fast test execution.
+#[cfg(all(feature = "test-kdf", not(debug_assertions)))]
+compile_error!(
+    "The `test-kdf` feature weakens Argon2id parameters and MUST NOT be enabled in release builds. \
+     Use `--features test-kdf` only with debug/test profiles."
+);
+
 use zeroize::Zeroize;
 
 use super::SymmetricKey;

@@ -467,16 +467,68 @@ impl<'a> DeviceSyncOrchestrator<'a> {
 
     /// Builds device sync envelopes for all devices with pending items.
     ///
-    /// This is the canonical implementation of the sync orchestration logic.
-    /// All clients (CLI, Desktop, TUI, Mobile) should use this instead of
-    /// implementing their own iteration + encryption + envelope creation.
+    /// Wraps each pending sync message in a serialized `EncryptedUpdate` where
+    /// `recipient_id` is the daily self-token. The relay delivers it to all
+    /// connections that registered the matching token.
     ///
-    /// Returns a list of encoded envelopes ready to send over the wire.
+    /// Returns a list of serialized envelopes ready to send over the wire.
+    ///
+    /// SP-33 Task 4.3.
     pub fn build_outbound_envelopes(
         &self,
-        _identity: &crate::Identity,
+        identity: &crate::Identity,
     ) -> Result<Vec<Vec<u8>>, DeviceSyncError> {
-        todo!("SP-33 Task 4.3: replace with self-token EncryptedUpdate")
+        use crate::network::mailbox_token::{compute_self_token, current_day_epoch, token_hex};
+
+        let devices = self.devices_with_pending();
+        if devices.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let day = current_day_epoch();
+        let self_token = compute_self_token(identity.master_seed(), day);
+        let recipient_id = token_hex(&self_token);
+
+        let mut envelopes = Vec::with_capacity(devices.len());
+
+        for device_id in &devices {
+            let sync_msg = self.create_sync_message(device_id)?;
+            if sync_msg.items.is_empty() {
+                continue;
+            }
+
+            // Find the device's public key from the registry
+            let active = self.registry.active_devices();
+            let device = active
+                .iter()
+                .find(|d| &d.device_id == device_id)
+                .ok_or_else(|| {
+                    DeviceSyncError::Encryption(format!(
+                        "Device {} not found in registry",
+                        hex::encode(device_id)
+                    ))
+                })?;
+
+            // Serialize and encrypt payload
+            let payload_bytes = serde_json::to_vec(&sync_msg.items)
+                .map_err(|e| DeviceSyncError::Serialization(e.to_string()))?;
+            let ciphertext =
+                self.encrypt_for_device(&device.exchange_public_key, &payload_bytes)?;
+
+            // Build a simple envelope struct (recipient_id = self-token)
+            let envelope = SyncEnvelope {
+                recipient_id: recipient_id.clone(),
+                ciphertext,
+                target_device_id: *device_id,
+                version: sync_msg.version,
+            };
+
+            let encoded = serde_json::to_vec(&envelope)
+                .map_err(|e| DeviceSyncError::Serialization(e.to_string()))?;
+            envelopes.push(encoded);
+        }
+
+        Ok(envelopes)
     }
 }
 
@@ -504,6 +556,22 @@ pub fn build_device_sync_envelopes(
         DeviceSyncOrchestrator::load(storage, identity.create_device_info(), registry)?;
 
     orchestrator.build_outbound_envelopes(identity)
+}
+
+/// Serialized device sync envelope for wire transmission.
+///
+/// Contains a self-token `recipient_id` for relay routing, the encrypted
+/// payload, and metadata for the target device.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct SyncEnvelope {
+    /// Self-token hex (64 chars) — relay routes on this.
+    pub recipient_id: String,
+    /// Encrypted sync payload (XChaCha20-Poly1305).
+    pub ciphertext: Vec<u8>,
+    /// Target device ID (for the recipient to identify which device state to update).
+    pub target_device_id: [u8; 32],
+    /// Version number for deduplication.
+    pub version: u64,
 }
 
 /// A message containing pending sync items to send to another device.

@@ -75,26 +75,21 @@ async fn receive_pending(socket: &mut WsStream) -> Result<ReceivedMessages, Mobi
 
         match msg {
             Message::Binary(data) => {
-                if let Ok(envelope) = protocol::decode_message(&data) {
-                    match envelope.payload {
-                        MessagePayload::EncryptedUpdate(update) => {
-                            classify_and_store_message(
-                                update,
-                                &mut legacy_exchange_messages,
-                                &mut encrypted_exchange_messages,
-                                &mut card_updates,
-                            );
+                if let Ok(envelope) = protocol::decode_message(&data)
+                    && let MessagePayload::EncryptedUpdate(update) = envelope.payload
+                {
+                    classify_and_store_message(
+                        update,
+                        &mut legacy_exchange_messages,
+                        &mut encrypted_exchange_messages,
+                        &mut card_updates,
+                    );
 
-                            // Send acknowledgment
-                            let ack = protocol::create_ack(
-                                &envelope.message_id,
-                                AckStatus::ReceivedByRecipient,
-                            );
-                            if let Ok(ack_data) = protocol::encode_message(&ack) {
-                                let _ = socket.send(Message::Binary(ack_data)).await;
-                            }
-                        }
-                        _ => {}
+                    // Send acknowledgment
+                    let ack =
+                        protocol::create_ack(&envelope.message_id, AckStatus::ReceivedByRecipient);
+                    if let Ok(ack_data) = protocol::encode_message(&ack) {
+                        let _ = socket.send(Message::Binary(ack_data)).await;
                     }
                 }
             }

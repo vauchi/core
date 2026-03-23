@@ -427,5 +427,9 @@ name = "trust_metrics_tests"
 required-features = ["testing"]
 
 [[test]]
+name = "sp33_mailbox_send_path_tests"
+required-features = ["testing"]
+
+[[test]]
 name = "schema_gen"
 required-features = ["schema-gen"]

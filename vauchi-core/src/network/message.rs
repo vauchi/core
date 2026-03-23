@@ -46,6 +46,27 @@ pub enum MessagePayload {
     PurgeRequest(PurgeRequest),
     /// Forwarding hints from the relay indicating blobs stored on other relays.
     ForwardingHints(ForwardingHints),
+    /// Client registers mailbox tokens for message delivery routing (SP-33).
+    RegisterMailbox(RegisterMailbox),
+    /// Client deregisters mailbox tokens (SP-33).
+    DeregisterMailbox(DeregisterMailbox),
+}
+
+/// Client registers mailbox tokens for message delivery routing.
+///
+/// Sent after handshake to tell the relay which tokens to route to this
+/// connection. Tokens are opaque 64-char hex strings that rotate daily.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RegisterMailbox {
+    /// Padded batch of 256 hex-encoded mailbox tokens.
+    pub tokens: Vec<String>,
+}
+
+/// Client deregisters mailbox tokens (e.g., after historical catchup).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DeregisterMailbox {
+    /// Tokens to deregister.
+    pub tokens: Vec<String>,
 }
 
 /// Account revocation signal sent to contacts when the card owner deletes their account.

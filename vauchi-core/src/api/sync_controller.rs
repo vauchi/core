@@ -13,6 +13,7 @@ use crate::crypto::ratchet::DoubleRatchetState;
 use crate::network::delivery::{
     DeliveryAckStatus, DeliveryService, OfflineManager, RetryScheduler,
 };
+use crate::network::mailbox_token::{compute_mailbox_token, current_day_epoch, token_hex};
 use crate::network::{ConnectionState, RelayClient, Transport};
 use crate::storage::Storage;
 use crate::sync::device_sync::SyncItem;
@@ -219,7 +220,7 @@ impl<'a, T: Transport> SyncController<'a, T> {
                 }
             };
 
-            // Load contact's shared key for anonymous sender ID
+            // Load contact's shared key for anonymous sender ID and mailbox token
             let shared_key = self
                 .storage
                 .load_contact(&update.contact_id)
@@ -227,9 +228,18 @@ impl<'a, T: Transport> SyncController<'a, T> {
                 .flatten()
                 .map(|c| *c.shared_key().as_bytes());
 
+            // Compute mailbox token as recipient_id (SP-33 Task 4.1)
+            let recipient_id = match &shared_key {
+                Some(key) => {
+                    let token = compute_mailbox_token(key, current_day_epoch());
+                    token_hex(&token)
+                }
+                None => update.contact_id.clone(),
+            };
+
             // Send the update (anonymous sender ID if shared key available)
             match self.relay.send_update(
-                &update.contact_id,
+                &recipient_id,
                 ratchet,
                 &update.payload,
                 &update.id,
@@ -290,7 +300,7 @@ impl<'a, T: Transport> SyncController<'a, T> {
             }
         };
 
-        // Load contact's shared key for anonymous sender ID
+        // Load contact's shared key for anonymous sender ID and mailbox token
         let shared_key = self
             .storage
             .load_contact(contact_id)
@@ -298,12 +308,21 @@ impl<'a, T: Transport> SyncController<'a, T> {
             .flatten()
             .map(|c| *c.shared_key().as_bytes());
 
+        // Compute mailbox token as recipient_id (SP-33 Task 4.1)
+        let recipient_id = match &shared_key {
+            Some(key) => {
+                let token = compute_mailbox_token(key, current_day_epoch());
+                token_hex(&token)
+            }
+            None => contact_id.to_string(),
+        };
+
         // Get pending updates for this contact
         let updates = self.sync_manager.get_pending(contact_id)?;
 
         for update in updates {
             match self.relay.send_update(
-                contact_id,
+                &recipient_id,
                 ratchet,
                 &update.payload,
                 &update.id,
@@ -434,16 +453,49 @@ impl<'a, T: Transport> SyncController<'a, T> {
     // Device Sync Integration (Phase 7)
     // ============================================================
 
-    /// Sends pending device sync items to another device.
+    /// Sends pending device sync items to another device via self-token routing.
     ///
-    /// Creates an encrypted sync message and sends it via the relay.
+    /// Encrypts the sync payload and wraps it in an `EncryptedUpdate` where
+    /// the `recipient_id` is the daily self-token derived from the master seed.
+    /// All devices sharing the same master seed will receive this message.
+    ///
+    /// SP-33 Task 4.3.
     pub fn send_device_sync(
         &mut self,
-        _orchestrator: &DeviceSyncOrchestrator<'_>,
-        _target_device_id: &[u8; 32],
-        _target_public_key: &[u8; 32],
+        orchestrator: &DeviceSyncOrchestrator<'_>,
+        target_device_id: &[u8; 32],
+        target_public_key: &[u8; 32],
+        master_seed: &[u8; 32],
     ) -> VauchiResult<()> {
-        todo!("SP-33 Task 4.3: replace with self-token EncryptedUpdate")
+        let sync_msg = orchestrator
+            .create_sync_message(target_device_id)
+            .map_err(VauchiError::DeviceSync)?;
+
+        if sync_msg.items.is_empty() {
+            return Ok(());
+        }
+
+        // Serialize + encrypt for target device
+        let payload_bytes = serde_json::to_vec(&sync_msg.items)
+            .map_err(|e| VauchiError::InvalidState(e.to_string()))?;
+        let ciphertext = orchestrator
+            .encrypt_for_device(target_public_key, &payload_bytes)
+            .map_err(VauchiError::DeviceSync)?;
+
+        // We need a ratchet for device sync — if not available, skip
+        let device_id_hex = hex::encode(target_device_id);
+        let ratchet = self.ratchets.get_mut(&device_id_hex).ok_or_else(|| {
+            VauchiError::InvalidState(format!("No ratchet for device {}", device_id_hex))
+        })?;
+
+        let ratchet_msg = ratchet
+            .encrypt(&ciphertext)
+            .map_err(|e| VauchiError::InvalidState(e.to_string()))?;
+
+        self.relay
+            .send_device_sync_message(master_seed, ciphertext, &ratchet_msg)?;
+
+        Ok(())
     }
 
     /// Processes incoming device sync items.

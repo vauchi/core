@@ -11,6 +11,9 @@ use std::time::Instant;
 
 use super::connection::ConnectionManager;
 use super::error::NetworkError;
+use super::mailbox_token::{
+    batch_register_tokens, compute_self_token, current_day_epoch, token_hex,
+};
 use super::message::{
     AckStatus, EncryptedUpdate, MessageEnvelope, MessageId, MessagePayload, PurgeRequest,
     RatchetHeader,
@@ -208,18 +211,66 @@ impl<T: Transport> RelayClient<T> {
         Ok(message_id)
     }
 
-    /// Sends a device sync message to another device.
+    /// Registers mailbox tokens with the relay for message delivery routing.
     ///
-    /// SP-33 Task 4.3: will be replaced by EncryptedUpdate + self-token routing.
+    /// Sends a `RegisterMailbox` message containing a padded batch of 256
+    /// tokens (contact tokens + self tokens + random padding). The relay
+    /// routes incoming `EncryptedUpdate` messages to connections that have
+    /// registered the matching `recipient_id` token.
+    ///
+    /// SP-33 Task 4.2.
+    pub fn register_mailbox_tokens(
+        &mut self,
+        contact_keys: &[[u8; 32]],
+        master_seed: &[u8; 32],
+        days_offline: u64,
+    ) -> Result<MessageId, NetworkError> {
+        let day = current_day_epoch();
+        let tokens = batch_register_tokens(contact_keys, master_seed, day, days_offline);
+
+        let envelope = create_envelope(MessagePayload::RegisterMailbox(
+            super::message::RegisterMailbox { tokens },
+        ));
+        let message_id = envelope.message_id.clone();
+
+        self.connection.send(&envelope)?;
+
+        Ok(message_id)
+    }
+
+    /// Sends a device sync message via self-token EncryptedUpdate.
+    ///
+    /// Wraps the encrypted sync payload in an `EncryptedUpdate` where
+    /// `recipient_id` is the daily self-token, so all devices sharing the
+    /// same master seed receive it.
+    ///
+    /// SP-33 Task 4.3.
     pub fn send_device_sync_message(
         &mut self,
-        _sender_device_id: &[u8; 32],
-        _target_device_id: &[u8; 32],
-        _ciphertext: Vec<u8>,
-        _nonce: [u8; 12],
-        _sync_version: u64,
+        master_seed: &[u8; 32],
+        ciphertext: Vec<u8>,
+        ratchet_msg: &RatchetMessage,
     ) -> Result<MessageId, NetworkError> {
-        todo!("SP-33 Task 4.3: replace with self-token EncryptedUpdate")
+        let self_token = compute_self_token(master_seed, current_day_epoch());
+
+        let encrypted_update = EncryptedUpdate {
+            recipient_id: token_hex(&self_token),
+            sender_id: self.our_identity_id.clone(),
+            ratchet_header: RatchetHeader {
+                dh_public: ratchet_msg.dh_public,
+                dh_generation: ratchet_msg.dh_generation,
+                message_index: ratchet_msg.message_index,
+                previous_chain_length: ratchet_msg.previous_chain_length,
+            },
+            ciphertext,
+        };
+
+        let envelope = create_envelope(MessagePayload::EncryptedUpdate(encrypted_update));
+        let message_id = envelope.message_id.clone();
+
+        self.connection.send(&envelope)?;
+
+        Ok(message_id)
     }
 
     /// Sends a purge request to the relay server.

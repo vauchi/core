@@ -152,6 +152,14 @@ impl Identity {
         Ok(())
     }
 
+    /// Returns a reference to the master seed.
+    ///
+    /// Used for mailbox token derivation (SP-33). The caller must not
+    /// persist or log the seed — it is zeroized on drop.
+    pub fn master_seed(&self) -> &[u8; 32] {
+        &self.master_seed
+    }
+
     /// Returns the public signing key bytes.
     pub fn signing_public_key(&self) -> &[u8; 32] {
         &self.signing_public_key

@@ -314,15 +314,34 @@ fn test_e2e_invalid_qr_during_transfer_ignored() {
 }
 
 #[test]
-fn test_e2e_no_qr_after_finalized() {
+fn test_e2e_no_qr_after_finalized_grace_period() {
     let (mut alice, mut bob) = run_full_exchange(b"Alice".to_vec(), b"Bob".to_vec());
 
     assert_eq!(alice.get_state(), ProtocolState::Finalized);
     assert_eq!(bob.get_state(), ProtocolState::Finalized);
 
-    // After finalization, no more QR codes should be displayed.
-    assert!(alice.get_display_qr().is_none());
-    assert!(bob.get_display_qr().is_none());
+    // After finalization, RDYY QRs are still displayed for a grace period
+    // so the peer can also finalize (C3 fix: prevents asymmetric failure).
+    let qr = alice.get_display_qr();
+    assert!(qr.is_some(), "Grace period should still produce RDYY QRs");
+    assert!(
+        qr.unwrap().data.starts_with("RDYY"),
+        "Grace period QRs should be RDYY type"
+    );
+
+    // After exhausting the grace period (30 ticks), QRs stop.
+    for _ in 0..35 {
+        alice.get_display_qr();
+        bob.get_display_qr();
+    }
+    assert!(
+        alice.get_display_qr().is_none(),
+        "QRs should stop after grace period"
+    );
+    assert!(
+        bob.get_display_qr().is_none(),
+        "QRs should stop after grace period"
+    );
 }
 
 #[test]
@@ -497,4 +516,97 @@ fn test_atomicity_one_side_stops_scanning_no_finalize() {
         bob.get_received_data().is_none(),
         "Bob's data should not be available without finalization"
     );
+}
+
+/// Feature: contact_exchange.feature @atomicity
+/// Regression test for C3: asymmetric exchange failure (Samsung ↔ iPhone).
+///
+/// When one side finalizes first (scans peer's RDYY), it must continue
+/// broadcasting its own RDYY so the peer can also finalize. Without this,
+/// the first-to-finalize side stops displaying QRs and the peer times out
+/// with "peer did not confirm readiness".
+#[test]
+fn test_asymmetric_finalization_both_must_complete() {
+    let alice_card = b"Alice (iPhone)".to_vec();
+    let bob_card = b"Bob (Samsung)".to_vec();
+
+    let mut alice = MultiStageSession::new(alice_card.clone());
+    let mut bob = MultiStageSession::new(bob_card.clone());
+
+    // INIT
+    let ai = alice.get_display_qr().unwrap();
+    let bi = bob.get_display_qr().unwrap();
+    alice.process_scanned_qr(&bi.data);
+    bob.process_scanned_qr(&ai.data);
+
+    // Drive to Complete (both sides)
+    for _ in 0..500 {
+        let aq = alice.get_display_qr();
+        let bq = bob.get_display_qr();
+        if let Some(aq) = &aq {
+            bob.process_scanned_qr(&aq.data);
+        }
+        if let Some(bq) = &bq {
+            alice.process_scanned_qr(&bq.data);
+        }
+        if matches!(alice.get_state(), ProtocolState::Complete)
+            && matches!(bob.get_state(), ProtocolState::Complete)
+        {
+            break;
+        }
+    }
+
+    assert_eq!(alice.get_state(), ProtocolState::Complete);
+    assert_eq!(bob.get_state(), ProtocolState::Complete);
+
+    // Simulate asymmetric timing: Alice scans Bob's RDYY first (Alice finalizes).
+    // Then Bob must still be able to scan Alice's RDYY to also finalize.
+    // This is the exact C3 scenario: iPhone finalizes, Samsung is left behind.
+
+    // Step 1: Only Alice scans Bob's QRs until Alice finalizes
+    for _ in 0..50 {
+        let _aq = alice.get_display_qr(); // Alice displays but Bob doesn't scan
+        let bq = bob.get_display_qr();
+        if let Some(bq) = &bq {
+            alice.process_scanned_qr(&bq.data);
+        }
+        if matches!(alice.get_state(), ProtocolState::Finalized) {
+            break;
+        }
+    }
+
+    assert_eq!(
+        alice.get_state(),
+        ProtocolState::Finalized,
+        "Alice should have finalized after scanning Bob's RDYY"
+    );
+    assert_eq!(
+        bob.get_state(),
+        ProtocolState::Complete,
+        "Bob should still be in Complete (hasn't scanned Alice's RDYY yet)"
+    );
+
+    // Step 2: Now Bob scans Alice's QRs. Alice is Finalized but MUST still
+    // display RDYY so Bob can finalize too.
+    for _ in 0..50 {
+        let aq = alice.get_display_qr();
+        if let Some(aq) = &aq {
+            bob.process_scanned_qr(&aq.data);
+        }
+        let _bq = bob.get_display_qr(); // Bob displays but Alice doesn't need to scan
+        if matches!(bob.get_state(), ProtocolState::Finalized) {
+            break;
+        }
+    }
+
+    // CRITICAL: Both sides must reach Finalized — no asymmetric outcome
+    assert_eq!(
+        bob.get_state(),
+        ProtocolState::Finalized,
+        "Bob must finalize after scanning Alice's RDYY (C3 regression: was 'peer did not confirm readiness')"
+    );
+
+    // Both sides must have each other's data
+    assert_eq!(alice.get_received_data().unwrap(), bob_card);
+    assert_eq!(bob.get_received_data().unwrap(), alice_card);
 }

@@ -344,7 +344,23 @@ impl MultiStageSession {
                     })
                 }
             }
-            ProtocolState::Finalized => None,
+            ProtocolState::Finalized => {
+                // Continue broadcasting RDYY for a grace period so the peer
+                // can scan it and also finalize. Without this, the first side
+                // to finalize stops displaying and the peer times out with
+                // "peer did not confirm readiness" (C3 asymmetric failure).
+                self.display_cycle += 1;
+                if self.display_cycle > 30 {
+                    return None;
+                }
+                let ack_hash = self.compute_ready_hash();
+                let qr_data = qr_codec::format_ready_qr(&self.session_id, &ack_hash);
+                Some(QrPayload {
+                    data: qr_data,
+                    error_correction: "M".to_string(),
+                    display_duration_ms: 500,
+                })
+            }
             ProtocolState::Failed(_) => None,
         }
     }
@@ -836,6 +852,9 @@ impl MultiStageSession {
         let expected = self.compute_ready_hash();
         if bool::from(ack_hash.ct_eq(&expected)) {
             self.state = ProtocolState::Finalized;
+            // Reset display_cycle so the finalized grace period starts from 0.
+            // We continue broadcasting RDYY so the peer can also finalize.
+            self.display_cycle = 0;
         }
         // Ignore mismatched READY (could be from a different exchange)
 

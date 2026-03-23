@@ -9,6 +9,15 @@ edition.workspace = true
 license.workspace = true
 description = "Core library for Vauchi - privacy-focused contact card exchange"
 
+# SP-33: intentional breaking changes for v0.1 alpha (no deployed clients).
+# DeviceSyncMessage/Ack removed, VersionedPayload::Legacy removed,
+# send_device_sync_message signature simplified, MessageType discriminants shifted.
+[package.metadata.cargo-semver-checks.lints]
+enum_variant_missing = "allow"
+function_missing = "allow"
+function_parameter_count_changed = "allow"
+enum_no_repr_variant_discriminant_changed = "allow"
+
 [features]
 default = ["network", "storage"]
 storage = ["rusqlite"]

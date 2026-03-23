@@ -66,11 +66,20 @@ impl<'a> ContactManager<'a> {
     }
 
     /// Adds a field to the user's own card.
+    ///
+    /// During onboarding (before identity creation), creates an empty card
+    /// if none exists yet so fields can be added incrementally.
     pub fn add_field_to_own_card(&self, field: ContactField) -> VauchiResult<()> {
-        let mut card = self
-            .storage
-            .load_own_card()?
-            .ok_or(VauchiError::IdentityNotInitialized)?;
+        let mut card = match self.storage.load_own_card()? {
+            Some(c) => c,
+            None => {
+                // During onboarding the card doesn't exist yet — create empty.
+                // Identity creation later links this card to the signing keys.
+                let empty = ContactCard::new("");
+                self.storage.save_own_card(&empty)?;
+                empty
+            }
+        };
 
         card.add_field(field.clone())
             .map_err(|e| VauchiError::InvalidState(e.to_string()))?;

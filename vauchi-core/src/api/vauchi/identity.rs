@@ -42,8 +42,16 @@ impl Vauchi {
 
         let identity = Identity::create(display_name);
 
-        // Create initial contact card from identity
-        let card = ContactCard::new(display_name);
+        // Create initial contact card, or update display name on existing card.
+        // During onboarding, fields may already be saved to the card before
+        // identity creation — preserve them by loading the existing card.
+        let card = match self.storage.load_own_card()? {
+            Some(mut existing) => {
+                let _ = existing.set_display_name(display_name);
+                existing
+            }
+            None => ContactCard::new(display_name),
+        };
         self.storage.save_own_card(&card)?;
 
         // If SecureStorage is available, derive and store SMK, then rekey storage

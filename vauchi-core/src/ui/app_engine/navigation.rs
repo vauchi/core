@@ -46,11 +46,10 @@ impl AppEngine {
     }
 
     /// Screens that should never be cached — always start fresh.
+    /// Onboarding IS cacheable: user navigates to FormDialog (add field)
+    /// and back, must return to their current step with accumulated data.
     fn is_cacheable(screen: &AppScreen) -> bool {
-        !matches!(
-            screen,
-            AppScreen::Onboarding | AppScreen::Lock | AppScreen::FormDialog { .. }
-        )
+        !matches!(screen, AppScreen::Lock | AppScreen::FormDialog { .. })
     }
 
     /// Invalidates a cached engine for a specific screen.

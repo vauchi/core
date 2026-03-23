@@ -879,7 +879,27 @@ impl OnboardingEngine {
     }
 }
 
+impl OnboardingEngine {
+    /// Add a field from external source (e.g., FormDialog save during onboarding).
+    pub fn push_field(&mut self, field: FieldSetup) {
+        self.data.fields.push(field);
+    }
+
+    /// Access onboarding data (groups, fields, name) for persistence at completion.
+    pub fn onboarding_data(&self) -> &OnboardingData {
+        &self.data
+    }
+}
+
 impl WorkflowEngine for OnboardingEngine {
+    fn as_any(&self) -> Option<&dyn std::any::Any> {
+        Some(self)
+    }
+
+    fn as_any_mut(&mut self) -> Option<&mut dyn std::any::Any> {
+        Some(self)
+    }
+
     fn current_screen(&self) -> ScreenModel {
         match self.step {
             Step::IdentityCheck => self.build_identity_check(),

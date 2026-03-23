@@ -114,8 +114,32 @@ impl AppEngine {
                         };
                     }
                 };
+                // Extract onboarding groups before identity creation (engine
+                // will be discarded after navigating away from onboarding).
+                let onboarding_groups: Vec<String> = self
+                    .engine_cache
+                    .get(&AppScreen::Onboarding)
+                    .and_then(|e| {
+                        e.as_any().and_then(|a| {
+                            a.downcast_ref::<crate::ui::onboarding::OnboardingEngine>()
+                        })
+                    })
+                    .map(|ob| {
+                        ob.onboarding_data()
+                            .selected_groups
+                            .iter()
+                            .filter(|g| g.selected)
+                            .map(|g| g.name.clone())
+                            .collect()
+                    })
+                    .unwrap_or_default();
+
                 match self.vauchi.create_identity(&name) {
                     Ok(()) => {
+                        // Persist onboarding groups
+                        for group_name in &onboarding_groups {
+                            let _ = self.vauchi.create_group(group_name);
+                        }
                         let screen = self.navigate_to_internal(AppScreen::MyInfo);
                         ActionResult::NavigateTo(screen)
                     }
@@ -236,16 +260,37 @@ impl AppEngine {
                         let field =
                             crate::contact_card::ContactField::new(field_type, &label, value);
                         let field_id = field.id().to_string();
+                        let group_list: Vec<String> = _groups
+                            .split(',')
+                            .map(|s| s.trim().to_string())
+                            .filter(|s| !s.is_empty())
+                            .collect();
                         let result = self.vauchi.add_own_field(field);
                         // Apply group visibility from selected groups
-                        if result.is_ok() && !_groups.is_empty() {
-                            for group_id in _groups.split(',').map(|s| s.trim()) {
-                                if !group_id.is_empty() {
-                                    let _ = self
-                                        .vauchi
-                                        .set_group_field_visibility(group_id, &field_id, true);
-                                }
+                        if result.is_ok() && !group_list.is_empty() {
+                            for group_id in &group_list {
+                                let _ = self
+                                    .vauchi
+                                    .set_group_field_visibility(group_id, &field_id, true);
                             }
+                        }
+                        // During onboarding, also buffer the field in the cached
+                        // OnboardingEngine so build_contact_info shows it.
+                        if result.is_ok()
+                            && let Some(parent) = self.nav_history.last()
+                            && matches!(parent, AppScreen::Onboarding)
+                            && let Some(engine) = self.engine_cache.get_mut(parent)
+                            && let Some(ob) = engine.as_any_mut().and_then(|a| {
+                                a.downcast_mut::<crate::ui::onboarding::OnboardingEngine>()
+                            })
+                        {
+                            ob.push_field(crate::ui::onboarding::FieldSetup {
+                                field_type: entry_type.to_string(),
+                                label: label.clone(),
+                                value: value.to_string(),
+                                visible_to_groups: group_list,
+                                shown: true,
+                            });
                         }
                         result
                     }
@@ -257,8 +302,13 @@ impl AppEngine {
                 };
                 match result {
                     Ok(()) => {
-                        // Invalidate parent screen cache so it refreshes with updated data
-                        if let Some(parent) = self.nav_history.last() {
+                        // Invalidate parent screen cache so it refreshes with updated data.
+                        // Exception: don't invalidate Onboarding — its state machine
+                        // (step, groups, name) must survive FormDialog round-trips.
+                        // The onboarding ContactInfo screen syncs fields from storage.
+                        if let Some(parent) = self.nav_history.last()
+                            && !matches!(parent, AppScreen::Onboarding)
+                        {
                             self.engine_cache.remove(parent);
                         }
                         let screen = self.navigate_back();

@@ -250,7 +250,9 @@ mod tests {
     /// Hold the shared i18n lock and ensure locale data is loaded.
     /// Returns the lock guard so the store stays stable for the test's duration.
     fn lock_and_init() -> std::sync::MutexGuard<'static, ()> {
-        let guard = crate::i18n::I18N_TEST_LOCK.lock().unwrap();
+        let guard = crate::i18n::I18N_TEST_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
         if !crate::i18n::is_initialized() {
             let locales_dir =
                 std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../locales");

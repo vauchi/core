@@ -28,8 +28,9 @@ fn assert_fixture_fresh(screen: &ScreenModel, filename: &str) {
 
     if path.exists() {
         let existing = fs::read_to_string(&path).unwrap();
+        // Normalize CRLF → LF so fixtures work on any OS/git checkout config.
         assert_eq!(
-            existing.trim(),
+            existing.replace("\r\n", "\n").trim(),
             json.trim(),
             "Golden fixture `{}` is stale! Regenerate with:\n  \
              cargo test -p vauchi-core --test engine_golden_fixtures -- --ignored",

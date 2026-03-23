@@ -279,7 +279,11 @@ mod tests {
 
     /// Alias for convenience — delegates to module-level lock.
     fn lock_store() -> std::sync::MutexGuard<'static, ()> {
-        super::I18N_TEST_LOCK.lock().unwrap()
+        // Recover from poison: the mutex guards `()` so there's no state to corrupt.
+        // This prevents cascade failures when a test panics while holding the lock.
+        super::I18N_TEST_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
     }
 
     /// Helper: create a temp dir with locale JSON files for testing
@@ -318,7 +322,7 @@ mod tests {
 
     /// Helper: fully clear the store (only for tests that specifically test uninitialized state)
     fn clear_store() {
-        let mut lock = LOCALE_STORE.write().unwrap();
+        let mut lock = LOCALE_STORE.write().unwrap_or_else(|e| e.into_inner());
         *lock = None;
     }
 

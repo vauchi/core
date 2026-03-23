@@ -9,7 +9,9 @@
 #
 # This script triggers CI pipelines in:
 # - vauchi/vauchi-platform-swift
-# - vauchi/vauchi-platform-kotlin
+#
+# Note: vauchi-platform-kotlin is archived. Maven AAR is now published
+# directly from core's publish:maven CI job.
 #
 # Authentication:
 #   - CI: Uses CI_JOB_TOKEN (auto-provisioned, zero management)
@@ -36,7 +38,7 @@ GITLAB_URL="${CI_SERVER_URL:-https://gitlab.com}"
 
 # Project IDs
 SWIFT_PROJECT_ID="77955316"   # vauchi/vauchi-platform-swift
-ANDROID_PROJECT_ID="77955319" # vauchi/vauchi-platform-kotlin
+# ANDROID_PROJECT_ID="77955319" # vauchi/vauchi-platform-kotlin (ARCHIVED — Maven AAR published from core CI)
 
 # Colors
 RED='\033[0;31m'
@@ -98,11 +100,10 @@ trigger_pipeline() {
     fi
 }
 
-# Trigger both repos
+# Trigger platform-swift (platform-kotlin is archived — Maven AAR published from core CI)
 FAILED=false
 
 trigger_pipeline "$SWIFT_PROJECT_ID" "vauchi-platform-swift" || FAILED=true
-trigger_pipeline "$ANDROID_PROJECT_ID" "vauchi-platform-kotlin" || FAILED=true
 
 echo ""
 

@@ -285,8 +285,8 @@ fn test_vauchi_boot_with_smk_from_secure_storage() {
 
         // Should be able to load data
         let card = vauchi.own_card().unwrap();
-        card.expect("expected Some");
-        assert_eq!(card.unwrap().display_name(), "Alice");
+        let card = card.expect("expected Some");
+        assert_eq!(card.display_name(), "Alice");
     }
 }
 
@@ -324,7 +324,7 @@ fn test_vauchi_migrate_existing_to_smk() {
         let config = VauchiConfig::with_storage_path(&db_path);
         let vauchi = Vauchi::with_secure_storage(config, secure.clone()).unwrap();
         let card = vauchi.own_card().unwrap();
-        card.expect("expected Some");
-        assert_eq!(card.unwrap().display_name(), "MigrateMe");
+        let card = card.expect("expected Some");
+        assert_eq!(card.display_name(), "MigrateMe");
     }
 }

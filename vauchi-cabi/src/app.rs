@@ -448,12 +448,12 @@ pub unsafe extern "C" fn vauchi_app_create_with_keyring(
         {
             let keyring = Arc::new(vauchi_core::storage::PlatformKeyring::new("vauchi"));
             // Probe the keyring to see if it's functional
-            if keyring.load_key("_probe").is_ok() {
-                if let Ok(vauchi) = Vauchi::with_secure_storage(config.clone(), keyring) {
-                    return Box::into_raw(Box::new(VauchiApp {
-                        engine: Mutex::new(AppEngine::new(vauchi)),
-                    }));
-                }
+            if keyring.load_key("_probe").is_ok()
+                && let Ok(vauchi) = Vauchi::with_secure_storage(config.clone(), keyring)
+            {
+                return Box::into_raw(Box::new(VauchiApp {
+                    engine: Mutex::new(AppEngine::new(vauchi)),
+                }));
             }
         }
 

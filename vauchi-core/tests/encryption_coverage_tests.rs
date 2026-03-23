@@ -289,8 +289,8 @@ fn test_unrecognized_tag_rejected() {
     let key = SymmetricKey::generate();
     // Create a "ciphertext" with an unrecognized tag byte
     let mut fake_ciphertext = vec![0xFF]; // Invalid tag
-    fake_ciphertext.extend_from_slice(&vec![0; 12]); // padding
-    fake_ciphertext.extend_from_slice(&vec![0; 16]); // padding
+    fake_ciphertext.extend_from_slice(&[0; 12]); // padding
+    fake_ciphertext.extend_from_slice(&[0; 16]); // padding
     let result = decrypt(&key, &fake_ciphertext);
     assert!(result.is_err(), "Unrecognized tag must be rejected");
 }

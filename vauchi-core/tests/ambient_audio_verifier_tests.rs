@@ -13,8 +13,7 @@
 
 use std::time::Duration;
 use vauchi_core::exchange::ambient_audio::{
-    AmbientAudioBackend, AmbientAudioConfig, AmbientAudioVerifier, AudioFingerprint,
-    MockAmbientAudioBackend,
+    AmbientAudioConfig, AmbientAudioVerifier, AudioFingerprint, MockAmbientAudioBackend,
 };
 use vauchi_core::exchange::{ProximityConfidence, ProximityError, ProximityVerifier};
 
@@ -115,8 +114,7 @@ fn ambient_audio_listen_returns_local_fingerprint() {
 
     // listen_for_response returns our local fingerprint (serialized)
     let response = verifier.listen_for_response(Duration::from_secs(5));
-    response.expect("expected success");
-    let fp_bytes = response.unwrap();
+    let fp_bytes = response.expect("expected success");
     assert_eq!(
         fp_bytes.len(),
         32,

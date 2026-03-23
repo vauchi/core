@@ -17,8 +17,8 @@ fn test_get_display_qr_starts_advertising() {
     let card = b"Alice's card".to_vec();
     let mut session = MultiStageSession::new(card);
     let qr = session.get_display_qr();
-    qr.expect("expected Some");
-    assert!(qr.unwrap().data.starts_with("INIT"));
+    let qr = qr.expect("expected Some");
+    assert!(qr.data.starts_with("INIT"));
     assert!(matches!(session.get_state(), ProtocolState::Advertising));
 }
 
@@ -121,16 +121,10 @@ fn test_full_exchange_with_relay_metadata() {
     assert!(matches!(bob.get_state(), ProtocolState::Finalized));
 
     // Verify relay metadata was exchanged
-    assert_eq!(
-        alice.peer_relay_url().as_deref(),
-        Some("wss://bob-relay.example.com")
-    );
+    assert_eq!(alice.peer_relay_url(), Some("wss://bob-relay.example.com"));
     assert!(alice.peer_relay_noise_pubkey().is_none());
 
-    assert_eq!(
-        bob.peer_relay_url().as_deref(),
-        Some("wss://alice-relay.example.com")
-    );
+    assert_eq!(bob.peer_relay_url(), Some("wss://alice-relay.example.com"));
     assert_eq!(bob.peer_relay_noise_pubkey(), Some([0xAA; 32]));
 
     // Card data should still be correct

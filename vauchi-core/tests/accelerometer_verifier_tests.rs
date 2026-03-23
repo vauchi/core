@@ -12,8 +12,7 @@
 
 use std::time::Duration;
 use vauchi_core::exchange::accelerometer::{
-    AccelerometerBackend, AccelerometerConfig, AccelerometerSample, AccelerometerVerifier,
-    MockAccelerometerBackend,
+    AccelerometerConfig, AccelerometerSample, AccelerometerVerifier, MockAccelerometerBackend,
 };
 use vauchi_core::exchange::{ProximityConfidence, ProximityError, ProximityVerifier};
 
@@ -72,11 +71,10 @@ fn accelerometer_listen_returns_envelope() {
 
     verifier.emit_challenge(&challenge).unwrap();
     let response = verifier.listen_for_response(Duration::from_secs(5));
-    response.expect("expected success");
     // Response is the serialized magnitude envelope (f32 per sample, 4 bytes each)
-    let bytes = response.unwrap();
+    let bytes = response.expect("expected success");
     assert!(
-        bytes.len() > 0 && bytes.len() % 4 == 0,
+        !bytes.is_empty() && bytes.len().is_multiple_of(4),
         "Must be non-empty f32 array"
     );
 }

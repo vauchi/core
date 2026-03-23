@@ -114,7 +114,7 @@ fn test_commitment_with_context_binds_relay_url() {
 fn test_commitment_with_context_empty_context_differs_from_no_context() {
     let plaintext = b"card data";
     let commitment_no_ctx = Commitment::create(plaintext);
-    let commitment_empty_ctx = Commitment::create_with_context(plaintext, b"");
+    let _commitment_empty_ctx = Commitment::create_with_context(plaintext, b"");
 
     // Even with empty context, the hash computation path differs
     // because create() uses the legacy path (no context),

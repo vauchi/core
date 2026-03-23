@@ -371,16 +371,14 @@ impl AudioBackend for CpalAudioBackend {
 
             // Check if we have enough data and can decode
             let samples = recorded.lock().expect("mutex poisoned");
-            if samples.len() > (config.sample_rate as usize / 2) {
-                // Try to decode - if successful, we're done
-                if let Ok(data) = Self::decode_fsk_samples(&samples, config) {
-                    if !data.is_empty() {
-                        drop(samples);
-                        self.stop_signal.store(true, Ordering::SeqCst);
-                        self.is_active.store(false, Ordering::SeqCst);
-                        return Ok(data);
-                    }
-                }
+            if samples.len() > (config.sample_rate as usize / 2)
+                && let Ok(data) = Self::decode_fsk_samples(&samples, config)
+                && !data.is_empty()
+            {
+                drop(samples);
+                self.stop_signal.store(true, Ordering::SeqCst);
+                self.is_active.store(false, Ordering::SeqCst);
+                return Ok(data);
             }
         }
 

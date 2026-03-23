@@ -12,7 +12,7 @@
           {
             "icon": null,
             "title": "Backup",
-            "detail": "Create an encrypted backup of your identity and contacts."
+            "detail": "Create an encrypted backup of your identity. To preserve contacts, use device linking instead."
           }
         ]
       }

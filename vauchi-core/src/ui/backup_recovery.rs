@@ -114,7 +114,7 @@ impl BackupRecoveryEngine {
                 items: vec![InfoItem {
                     icon: None,
                     title: "Backup".into(),
-                    detail: "Create an encrypted backup of your identity and contacts.".into(),
+                    detail: "Create an encrypted backup of your identity. To preserve contacts, use device linking instead.".into(),
                 }],
             }],
             actions: vec![

@@ -61,7 +61,7 @@ const MIN_REQUIRED_SCORE: Score = Score::Three;
 ///
 /// // Weak passwords are rejected
 /// let err = validate_password("password").unwrap_err();
-/// assert_eq!(format!("{err}"), format!("{}", vauchi_core::error::IdentityError::WeakPassword));
+/// assert_eq!(format!("{err}"), format!("{}", vauchi_core::identity::IdentityError::WeakPassword));
 ///
 /// // Strong passphrases return Strong or VeryStrong
 /// let strength = validate_password("correct-horse-battery-staple").unwrap();

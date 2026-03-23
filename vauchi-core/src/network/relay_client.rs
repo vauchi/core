@@ -213,10 +213,11 @@ impl<T: Transport> RelayClient<T> {
 
     /// Registers mailbox tokens with the relay for message delivery routing.
     ///
-    /// Sends a `RegisterMailbox` message containing a padded batch of 256
-    /// tokens (contact tokens + self tokens + random padding). The relay
-    /// routes incoming `EncryptedUpdate` messages to connections that have
-    /// registered the matching `recipient_id` token.
+    /// Sends one `RegisterMailbox` message per 256-token batch. Most users
+    /// send exactly one message; users with many contacts or long offline
+    /// periods send 2–3. Each batch is padded to 256 and shuffled so the
+    /// relay cannot infer the number of real contacts or detect which tokens
+    /// persist across sessions. Returns the last sent message ID.
     ///
     /// SP-33 Task 4.2.
     pub fn register_mailbox_tokens(
@@ -226,16 +227,18 @@ impl<T: Transport> RelayClient<T> {
         days_offline: u64,
     ) -> Result<MessageId, NetworkError> {
         let day = current_day_epoch();
-        let tokens = batch_register_tokens(contact_keys, master_seed, day, days_offline);
+        let batches = batch_register_tokens(contact_keys, master_seed, day, days_offline);
 
-        let envelope = create_envelope(MessagePayload::RegisterMailbox(
-            super::message::RegisterMailbox { tokens },
-        ));
-        let message_id = envelope.message_id.clone();
+        let mut last_message_id = String::new();
+        for tokens in batches {
+            let envelope = create_envelope(MessagePayload::RegisterMailbox(
+                super::message::RegisterMailbox { tokens },
+            ));
+            last_message_id = envelope.message_id.clone();
+            self.connection.send(&envelope)?;
+        }
 
-        self.connection.send(&envelope)?;
-
-        Ok(message_id)
+        Ok(last_message_id)
     }
 
     /// Sends a device sync message via self-token EncryptedUpdate.

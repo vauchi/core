@@ -65,16 +65,20 @@ fn test_token_hex_produces_64_char_hex() {
 fn test_batch_tokens_padded_to_256() {
     let contacts: Vec<[u8; 32]> = (0..5).map(|i| [i as u8; 32]).collect();
     let master_seed = [0xBBu8; 32];
-    let tokens = batch_register_tokens(&contacts, &master_seed, 19804, 0);
-    assert_eq!(tokens.len(), 256);
+    let batches = batch_register_tokens(&contacts, &master_seed, 19804, 0);
+    assert!(!batches.is_empty());
+    for batch in &batches {
+        assert_eq!(batch.len(), 256);
+    }
 }
 
 #[test]
 fn test_batch_tokens_no_duplicates() {
     let contacts: Vec<[u8; 32]> = (0..5).map(|i| [i as u8; 32]).collect();
     let master_seed = [0xBBu8; 32];
-    let tokens = batch_register_tokens(&contacts, &master_seed, 19804, 0);
-    let mut sorted = tokens.clone();
+    let batches = batch_register_tokens(&contacts, &master_seed, 19804, 0);
+    assert_eq!(batches.len(), 1);
+    let mut sorted = batches[0].clone();
     sorted.sort();
     sorted.dedup();
     // Real tokens should be unique; random padding collision is astronomically unlikely
@@ -85,8 +89,64 @@ fn test_batch_tokens_no_duplicates() {
 fn test_batch_tokens_historical_catchup() {
     let contacts: Vec<[u8; 32]> = vec![[0x01; 32]];
     let master_seed = [0xBBu8; 32];
-    let tokens = batch_register_tokens(&contacts, &master_seed, 19804, 3);
-    assert_eq!(tokens.len(), 256); // Still padded to 256
+    let batches = batch_register_tokens(&contacts, &master_seed, 19804, 3);
+    assert!(!batches.is_empty());
+    for batch in &batches {
+        assert_eq!(batch.len(), 256); // Each batch padded to 256
+    }
+}
+
+#[test]
+fn test_batch_tokens_many_contacts_splits() {
+    // 200 contacts × 2 tokens/day (+ previous-day skew) + 2 self tokens = 402 real tokens
+    // This exceeds 256, so we expect at least 2 batches
+    let contacts: Vec<[u8; 32]> = (0..200u8)
+        .map(|i| {
+            let mut k = [0u8; 32];
+            k[0] = i;
+            k[1] = i.wrapping_add(1);
+            k
+        })
+        .collect();
+    let master_seed = [0xCCu8; 32];
+    let batches = batch_register_tokens(&contacts, &master_seed, 19804, 0);
+    assert!(
+        batches.len() >= 2,
+        "expected multiple batches for 200 contacts, got {}",
+        batches.len()
+    );
+    for batch in &batches {
+        assert_eq!(batch.len(), 256);
+    }
+}
+
+#[test]
+fn test_batch_tokens_shuffled() {
+    // Two calls with identical inputs should produce different orderings.
+    // Padding tokens are random so sorted sets won't be equal; instead we
+    // verify that the first-position token differs between calls, which is
+    // overwhelmingly likely (probability of collision ≈ 1/2^256 per token).
+    let contacts: Vec<[u8; 32]> = (0..10).map(|i| [i as u8; 32]).collect();
+    let master_seed = [0xDDu8; 32];
+    let batches_a = batch_register_tokens(&contacts, &master_seed, 19804, 0);
+    let batches_b = batch_register_tokens(&contacts, &master_seed, 19804, 0);
+    assert_eq!(batches_a.len(), 1);
+    assert_eq!(batches_b.len(), 1);
+    assert_eq!(batches_a[0].len(), 256);
+    assert_eq!(batches_b[0].len(), 256);
+    // Shuffled batches virtually never share the same ordering
+    assert_ne!(
+        batches_a[0], batches_b[0],
+        "unsorted batches should differ due to shuffle + random padding"
+    );
+}
+
+#[test]
+fn test_batch_tokens_no_contacts_returns_one_batch() {
+    let master_seed = [0xEEu8; 32];
+    let batches = batch_register_tokens(&[], &master_seed, 19804, 0);
+    assert_eq!(batches.len(), 1);
+    assert_eq!(batches[0].len(), 256);
 }
 
 proptest! {

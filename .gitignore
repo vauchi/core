@@ -51,3 +51,9 @@ vauchi-core/locales/
 
 # Git worktrees
 .worktrees/
+
+# Secrets & credentials (never commit)
+*.key
+*.pem
+credentials.json
+service-account*.json

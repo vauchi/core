@@ -292,12 +292,15 @@ impl AhaMomentTracker {
 mod tests {
     use super::*;
 
-    fn ensure_init() {
+    /// Hold the shared i18n lock and ensure locale data is loaded.
+    fn lock_and_init() -> std::sync::MutexGuard<'static, ()> {
+        let guard = crate::i18n::I18N_TEST_LOCK.lock().unwrap();
         if !crate::i18n::is_initialized() {
             let locales_dir =
                 std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../locales");
             let _ = crate::i18n::init(&locales_dir);
         }
+        guard
     }
 
     #[test]
@@ -404,21 +407,21 @@ mod tests {
 
     #[test]
     fn test_localized_title_german() {
-        ensure_init();
+        let _lock = lock_and_init();
         let title = AhaMomentType::CardCreationComplete.title_localized(Locale::German);
         assert!(title.contains("Karte"));
     }
 
     #[test]
     fn test_localized_message_german() {
-        ensure_init();
+        let _lock = lock_and_init();
         let msg = AhaMomentType::FirstEdit.message_localized(Locale::German);
         assert!(!msg.contains("Missing"));
     }
 
     #[test]
     fn test_localized_moment_with_context() {
-        ensure_init();
+        let _lock = lock_and_init();
         let moment = AhaMoment::with_context(AhaMomentType::FirstContactAdded, "Alice".to_string());
         let msg = moment.message_localized(Locale::German);
         assert!(msg.contains("Alice"));
@@ -426,7 +429,7 @@ mod tests {
 
     #[test]
     fn test_localized_outbound_with_count() {
-        ensure_init();
+        let _lock = lock_and_init();
         let moment =
             AhaMoment::with_context(AhaMomentType::FirstOutboundDelivered, "5".to_string());
         let msg = moment.message_localized(Locale::French);

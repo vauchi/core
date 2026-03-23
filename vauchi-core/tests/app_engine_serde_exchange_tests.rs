@@ -128,10 +128,12 @@ fn entry_detail_delete_returns_show_toast_with_undo() {
     // Add a field to delete
     let field = ContactField::new(FieldType::Phone, "Mobile", "+1234567890");
     let field_id = field.id().to_string();
-    if let Ok(Some(mut card)) = vauchi.own_card() {
-        card.add_field(field).unwrap();
-        vauchi.update_own_card(&card).unwrap();
-    }
+    let mut card = vauchi
+        .own_card()
+        .expect("own_card should succeed")
+        .expect("card should exist");
+    card.add_field(field).unwrap();
+    vauchi.update_own_card(&card).unwrap();
     let mut engine = AppEngine::new(vauchi);
     engine.navigate_to(AppScreen::MyInfoEntryDetail {
         field_id: field_id.clone(),
@@ -165,10 +167,12 @@ fn entry_detail_delete_undo_restores_field() {
     vauchi.create_identity("Alice").unwrap();
     let field = ContactField::new(FieldType::Phone, "Mobile", "+1234567890");
     let field_id = field.id().to_string();
-    if let Ok(Some(mut card)) = vauchi.own_card() {
-        card.add_field(field).unwrap();
-        vauchi.update_own_card(&card).unwrap();
-    }
+    let mut card = vauchi
+        .own_card()
+        .expect("own_card should succeed")
+        .expect("card should exist");
+    card.add_field(field).unwrap();
+    vauchi.update_own_card(&card).unwrap();
     let mut engine = AppEngine::new(vauchi);
     engine.navigate_to(AppScreen::MyInfoEntryDetail {
         field_id: field_id.clone(),

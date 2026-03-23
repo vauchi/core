@@ -247,12 +247,16 @@ pub fn search_faqs_localized(query: &str, locale: Locale) -> Vec<FaqItem> {
 mod tests {
     use super::*;
 
-    fn ensure_init() {
+    /// Hold the shared i18n lock and ensure locale data is loaded.
+    /// Returns the lock guard so the store stays stable for the test's duration.
+    fn lock_and_init() -> std::sync::MutexGuard<'static, ()> {
+        let guard = crate::i18n::I18N_TEST_LOCK.lock().unwrap();
         if !crate::i18n::is_initialized() {
             let locales_dir =
                 std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../locales");
             let _ = crate::i18n::init(&locales_dir);
         }
+        guard
     }
 
     #[test]
@@ -263,7 +267,7 @@ mod tests {
 
     #[test]
     fn test_faqs_not_empty() {
-        ensure_init();
+        let _lock = lock_and_init();
         let faqs = get_faqs();
         assert!(!faqs.is_empty());
         assert!(faqs.len() >= 10, "Should have at least 10 FAQs");
@@ -271,7 +275,7 @@ mod tests {
 
     #[test]
     fn test_faqs_cover_all_categories() {
-        ensure_init();
+        let _lock = lock_and_init();
         let faqs = get_faqs();
         for category in HelpCategory::all() {
             let count = faqs.iter().filter(|f| f.category == *category).count();
@@ -281,7 +285,7 @@ mod tests {
 
     #[test]
     fn test_faq_content_not_empty() {
-        ensure_init();
+        let _lock = lock_and_init();
         for faq in get_faqs() {
             assert!(!faq.id.is_empty(), "FAQ should have ID");
             assert!(!faq.question.is_empty(), "FAQ should have question");
@@ -291,7 +295,7 @@ mod tests {
 
     #[test]
     fn test_get_faqs_by_category() {
-        ensure_init();
+        let _lock = lock_and_init();
         let privacy_faqs = get_faqs_by_category(HelpCategory::Privacy);
         assert!(!privacy_faqs.is_empty());
         for faq in &privacy_faqs {
@@ -301,7 +305,7 @@ mod tests {
 
     #[test]
     fn test_get_faq_by_id() {
-        ensure_init();
+        let _lock = lock_and_init();
         let faq = get_faq_by_id("faq-phone-lost");
         assert!(faq.is_some(), "expected Some value");
         assert!(faq.unwrap().question.contains("lose my phone"));
@@ -309,14 +313,14 @@ mod tests {
 
     #[test]
     fn test_get_faq_by_id_not_found() {
-        ensure_init();
+        let _lock = lock_and_init();
         let faq = get_faq_by_id("nonexistent");
         assert!(faq.is_none());
     }
 
     #[test]
     fn test_search_faqs() {
-        ensure_init();
+        let _lock = lock_and_init();
         let results = search_faqs("encrypt");
         assert!(!results.is_empty());
 
@@ -326,7 +330,7 @@ mod tests {
 
     #[test]
     fn test_search_faqs_case_insensitive() {
-        ensure_init();
+        let _lock = lock_and_init();
         let results_lower = search_faqs("privacy");
         let results_upper = search_faqs("PRIVACY");
         assert_eq!(results_lower.len(), results_upper.len());
@@ -334,7 +338,7 @@ mod tests {
 
     #[test]
     fn test_related_faqs_exist() {
-        ensure_init();
+        let _lock = lock_and_init();
         let faqs = get_faqs();
         for faq in &faqs {
             for related_id in &faq.related {
@@ -351,7 +355,7 @@ mod tests {
 
     #[test]
     fn test_localized_faqs_german() {
-        ensure_init();
+        let _lock = lock_and_init();
         let faqs = get_faqs_localized(Locale::German);
         assert_eq!(faqs.len(), get_faqs().len());
         let phone_lost = faqs.iter().find(|f| f.id == "faq-phone-lost").unwrap();
@@ -360,7 +364,7 @@ mod tests {
 
     #[test]
     fn test_localized_faqs_french() {
-        ensure_init();
+        let _lock = lock_and_init();
         let faqs = get_faqs_localized(Locale::French);
         let phone_lost = faqs.iter().find(|f| f.id == "faq-phone-lost").unwrap();
         assert!(phone_lost.question.contains("telephone"));
@@ -368,7 +372,7 @@ mod tests {
 
     #[test]
     fn test_localized_faqs_spanish() {
-        ensure_init();
+        let _lock = lock_and_init();
         let faqs = get_faqs_localized(Locale::Spanish);
         let phone_lost = faqs.iter().find(|f| f.id == "faq-phone-lost").unwrap();
         assert!(phone_lost.question.contains("telefono"));
@@ -376,7 +380,7 @@ mod tests {
 
     #[test]
     fn test_localized_search() {
-        ensure_init();
+        let _lock = lock_and_init();
         // Search in German
         let results = search_faqs_localized("Verschluesselung", Locale::German);
         assert!(!results.is_empty());
@@ -384,7 +388,7 @@ mod tests {
 
     #[test]
     fn test_localized_faq_by_id() {
-        ensure_init();
+        let _lock = lock_and_init();
         let faq = get_faq_by_id_localized("faq-phone-lost", Locale::German);
         assert!(faq.is_some(), "expected Some value");
         assert!(faq.unwrap().question.contains("Telefon"));

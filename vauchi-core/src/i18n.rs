@@ -264,17 +264,23 @@ fn bundled_english() -> HashMap<String, String> {
         .collect()
 }
 
+/// Shared test lock: any test that mutates `LOCALE_STORE` (clear, reset, init)
+/// must hold this lock. Lives at module level so other test modules (help,
+/// aha_moments) can acquire it too, preventing inter-module races.
+#[cfg(test)]
+pub(crate) static I18N_TEST_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
 // INLINE_TEST_REQUIRED: tests access private LOCALE_STORE global state and internal init/reset
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::fs;
-    use std::sync::Mutex;
     use tempfile::TempDir;
 
-    /// All i18n tests that mutate the global LOCALE_STORE must hold this lock.
-    /// Without it, parallel tests race on reset_store()/init() and corrupt each other.
-    static TEST_LOCK: Mutex<()> = Mutex::new(());
+    /// Alias for convenience — delegates to module-level lock.
+    fn lock_store() -> std::sync::MutexGuard<'static, ()> {
+        super::I18N_TEST_LOCK.lock().unwrap()
+    }
 
     /// Helper: create a temp dir with locale JSON files for testing
     fn setup_test_locales() -> TempDir {
@@ -337,7 +343,7 @@ mod tests {
 
     #[test]
     fn test_init_loads_locales() {
-        let _lock = TEST_LOCK.lock().unwrap();
+        let _lock = lock_store();
         reset_store();
         let dir = setup_test_locales();
         init(dir.path()).unwrap();
@@ -349,7 +355,7 @@ mod tests {
 
     #[test]
     fn test_init_german_strings() {
-        let _lock = TEST_LOCK.lock().unwrap();
+        let _lock = lock_store();
         reset_store();
         let dir = setup_test_locales();
         init(dir.path()).unwrap();
@@ -360,7 +366,7 @@ mod tests {
 
     #[test]
     fn test_fallback_to_english() {
-        let _lock = TEST_LOCK.lock().unwrap();
+        let _lock = lock_store();
         reset_store();
         let dir = setup_test_locales();
         init(dir.path()).unwrap();
@@ -373,7 +379,7 @@ mod tests {
 
     #[test]
     fn test_get_string_missing() {
-        let _lock = TEST_LOCK.lock().unwrap();
+        let _lock = lock_store();
         reset_store();
         let dir = setup_test_locales();
         init(dir.path()).unwrap();
@@ -384,7 +390,7 @@ mod tests {
 
     #[test]
     fn test_interpolation() {
-        let _lock = TEST_LOCK.lock().unwrap();
+        let _lock = lock_store();
         reset_store();
         let dir = setup_test_locales();
         init(dir.path()).unwrap();
@@ -401,7 +407,7 @@ mod tests {
 
     #[test]
     fn test_meta_key_excluded() {
-        let _lock = TEST_LOCK.lock().unwrap();
+        let _lock = lock_store();
         reset_store();
         let dir = setup_test_locales();
         init(dir.path()).unwrap();
@@ -412,7 +418,7 @@ mod tests {
 
     #[test]
     fn test_reload_locale_updates_strings() {
-        let _lock = TEST_LOCK.lock().unwrap();
+        let _lock = lock_store();
         reset_store();
         let dir = setup_test_locales();
         init(dir.path()).unwrap();
@@ -436,7 +442,7 @@ mod tests {
 
     #[test]
     fn test_bundled_english_fallback() {
-        let _lock = TEST_LOCK.lock().unwrap();
+        let _lock = lock_store();
         reset_store();
         // Without init(), should fall back to bundled_english
         let s = get_string(Locale::English, "app.name");
@@ -470,7 +476,7 @@ mod tests {
     #[test]
     fn test_concurrent_read_during_reload() {
         // allow(zero_assertions): Concurrency stress test — validates no panic under contention
-        let _lock = TEST_LOCK.lock().unwrap();
+        let _lock = lock_store();
         reset_store();
         let dir = setup_test_locales();
         init(dir.path()).unwrap();
@@ -497,7 +503,7 @@ mod tests {
 
     #[test]
     fn test_init_with_nonexistent_dir() {
-        let _lock = TEST_LOCK.lock().unwrap();
+        let _lock = lock_store();
         reset_store();
         let result = init(Path::new("/tmp/nonexistent-vauchi-i18n-test"));
         // Should succeed with empty store (dir doesn't exist = no files)
@@ -506,7 +512,7 @@ mod tests {
 
     #[test]
     fn test_is_initialized_false_before_init() {
-        let _lock = TEST_LOCK.lock().unwrap();
+        let _lock = lock_store();
         clear_store();
         assert!(!is_initialized());
         // Restore for other tests
@@ -515,7 +521,7 @@ mod tests {
 
     #[test]
     fn test_load_locale_from_bytes_without_init() {
-        let _lock = TEST_LOCK.lock().unwrap();
+        let _lock = lock_store();
         clear_store();
         let data = serde_json::json!({ "app.name": "Test" });
         load_locale_from_bytes("en", data.to_string().as_bytes()).unwrap();
@@ -527,7 +533,7 @@ mod tests {
 
     #[test]
     fn test_all_strings_returns_full_map() {
-        let _lock = TEST_LOCK.lock().unwrap();
+        let _lock = lock_store();
         reset_store();
         let dir = setup_test_locales();
         init(dir.path()).unwrap();

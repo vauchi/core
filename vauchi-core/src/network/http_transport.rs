@@ -233,10 +233,42 @@ impl HttpTransport {
     }
 
     fn build_agent(&self) -> ureq::Agent {
-        ureq::Agent::config_builder()
-            .timeout_global(Some(self.timeout()))
-            .build()
-            .new_agent()
+        let mut builder = ureq::Agent::config_builder().timeout_global(Some(self.timeout()));
+
+        if let Some(proxy) = self.build_proxy() {
+            builder = builder.proxy(Some(proxy));
+        }
+
+        builder.build().new_agent()
+    }
+
+    fn build_proxy(&self) -> Option<ureq::Proxy> {
+        match &self.config.proxy {
+            ProxyConfig::None => None,
+            ProxyConfig::Socks5 {
+                host,
+                port,
+                username,
+                password,
+            } => {
+                let pb = ureq::Proxy::builder(ureq::ProxyProtocol::Socks5)
+                    .host(host)
+                    .port(*port);
+                let pb = if let (Some(u), Some(p)) = (username, password) {
+                    pb.username(u).password(p)
+                } else {
+                    pb
+                };
+                pb.build().ok()
+            }
+            ProxyConfig::HttpConnect { host, port } => {
+                ureq::Proxy::builder(ureq::ProxyProtocol::Http)
+                    .host(host)
+                    .port(*port)
+                    .build()
+                    .ok()
+            }
+        }
     }
 }
 

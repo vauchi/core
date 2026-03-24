@@ -5,6 +5,8 @@
 //! Contact detail engine — view a single contact with a toggle between
 //! "their info I can see" and "my info they can see".
 
+use std::collections::HashMap;
+
 use crate::ui::*;
 
 /// Which perspective the user is viewing.
@@ -39,6 +41,8 @@ pub struct ContactDetailEngine {
     view_mode: ContactViewMode,
     /// Private note about this contact (never shared). Stored as plain UTF-8.
     personal_note: String,
+    /// Per-field private notes (never shared). Keyed by field_id, plain UTF-8.
+    field_notes: HashMap<String, String>,
 }
 
 impl ContactDetailEngine {
@@ -50,6 +54,7 @@ impl ContactDetailEngine {
             shared_info: None,
             view_mode: ContactViewMode::TheirInfo,
             personal_note,
+            field_notes: HashMap::new(),
         }
     }
 
@@ -66,7 +71,14 @@ impl ContactDetailEngine {
             shared_info: Some(shared_info),
             view_mode: ContactViewMode::TheirInfo,
             personal_note,
+            field_notes: HashMap::new(),
         }
+    }
+
+    /// Attach per-field notes loaded from storage.
+    pub fn with_field_notes(mut self, field_notes: HashMap<String, String>) -> Self {
+        self.field_notes = field_notes;
+        self
     }
 
     /// Returns the current view mode.
@@ -111,14 +123,25 @@ impl ContactDetailEngine {
                         detail: self.contact.avatar_initials.clone(),
                     }],
                 });
-                // Their fields — read-only, no visibility column
-                components.push(Component::FieldList {
-                    id: "fields".into(),
-                    fields: self.fields.clone(),
-                    visibility_mode: VisibilityMode::ReadOnly,
-                    available_groups: vec![],
-                });
-                // Private note — only visible to me, never shared with the contact
+                // Their fields — read-only, no visibility column.
+                // Each field is followed by an inline-editable private note.
+                for field in &self.fields {
+                    components.push(Component::FieldList {
+                        id: format!("field_{}", field.id),
+                        fields: vec![field.clone()],
+                        visibility_mode: VisibilityMode::ReadOnly,
+                        available_groups: vec![],
+                    });
+                    let note_value = self.field_notes.get(&field.id).cloned().unwrap_or_default();
+                    components.push(Component::EditableText {
+                        id: format!("field_note:{}", field.id),
+                        label: "Private note for this field".into(),
+                        value: note_value,
+                        editing: false,
+                        validation_error: None,
+                    });
+                }
+                // Private note about the contact — only visible to me, never shared
                 components.push(Component::EditableText {
                     id: "personal_note".into(),
                     label: "Private note".into(),

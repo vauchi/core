@@ -351,17 +351,33 @@ impl AppEngine {
                         .and_then(|bytes| String::from_utf8(bytes).ok())
                         .unwrap_or_default();
 
+                    // Load per-field notes — convert raw bytes to UTF-8 strings
+                    let field_notes: HashMap<String, String> = vauchi
+                        .load_contact_field_notes(contact_id)
+                        .unwrap_or_default()
+                        .into_iter()
+                        .filter_map(|(field_id, bytes)| {
+                            String::from_utf8(bytes).ok().map(|s| (field_id, s))
+                        })
+                        .collect();
+
                     // Build shared info (my card as seen by this contact)
                     let shared_info = Self::build_shared_info(vauchi, contact_id);
 
                     match shared_info {
-                        Some(info) => Box::new(ContactDetailEngine::with_shared_info(
-                            item,
-                            fields,
-                            info,
-                            personal_note,
-                        )),
-                        None => Box::new(ContactDetailEngine::new(item, fields, personal_note)),
+                        Some(info) => Box::new(
+                            ContactDetailEngine::with_shared_info(
+                                item,
+                                fields,
+                                info,
+                                personal_note,
+                            )
+                            .with_field_notes(field_notes),
+                        ),
+                        None => Box::new(
+                            ContactDetailEngine::new(item, fields, personal_note)
+                                .with_field_notes(field_notes),
+                        ),
                     }
                 }
                 _ => Box::new(ContactNotFoundEngine::new(contact_id.clone())),

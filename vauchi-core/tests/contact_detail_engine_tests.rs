@@ -184,6 +184,179 @@ fn contact_detail_text_changed_saves_personal_note() {
     }
 }
 
+// ── Field notes tests (Task 9) ────────────────────────────────────────
+
+/// @scenario: contacts_management :: ContactDetail shows per-field private notes
+///
+/// Verifies that a saved field note is surfaced as an editable text
+/// component (id `field_note:{field_id}`) on the ContactDetail screen.
+#[cfg(any(feature = "network-native-tls", feature = "network-rustls"))]
+#[test]
+fn contact_detail_shows_field_notes() {
+    let mut vauchi = Vauchi::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+
+    // Add a contact with a phone field so there is a real field_id to attach the note to
+    let mut card = ContactCard::new("Bob");
+    let field = vauchi_core::contact_card::ContactField::new(
+        vauchi_core::contact_card::FieldType::Phone,
+        "Mobile",
+        "+41 79 111 22 33",
+    );
+    let field_id = field.id().to_string();
+    card.add_field(field).unwrap();
+    let shared_key = SymmetricKey::generate();
+    let contact = Contact::from_exchange([10u8; 32], card, shared_key);
+    let bob_id = contact.id().to_string();
+    vauchi.add_contact(contact).unwrap();
+
+    // Save a field note (plain UTF-8 bytes — same convention as personal_note)
+    let note_text = "Work number, call after 9am";
+    vauchi
+        .save_contact_field_note(&bob_id, &field_id, note_text.as_bytes())
+        .unwrap();
+
+    // Build the ContactDetail screen via AppEngine
+    let mut engine = AppEngine::new(vauchi);
+    let screen = engine.navigate_to(AppScreen::ContactDetail {
+        contact_id: bob_id.clone(),
+    });
+
+    assert_eq!(screen.screen_id, "contact_detail");
+
+    let expected_id = format!("field_note:{field_id}");
+
+    // The screen must contain an EditableText component with id "field_note:{field_id}"
+    let field_note_component = screen
+        .components
+        .iter()
+        .find(|c| matches!(c, Component::EditableText { id, .. } if id == &expected_id));
+
+    assert!(
+        field_note_component.is_some(),
+        "ContactDetail screen must contain an EditableText component with id '{expected_id}', \
+         got components: {:?}",
+        screen
+            .components
+            .iter()
+            .map(|c| match c {
+                Component::EditableText { id, .. } => format!("EditableText({id})"),
+                Component::InfoPanel { id, .. } => format!("InfoPanel({id})"),
+                Component::FieldList { id, .. } => format!("FieldList({id})"),
+                _ => "other".into(),
+            })
+            .collect::<Vec<_>>()
+    );
+
+    // The component must contain the saved note text
+    if let Some(Component::EditableText { value, .. }) = field_note_component {
+        assert_eq!(
+            value, note_text,
+            "field_note component must display the saved note text"
+        );
+    }
+}
+
+/// @scenario: contacts_management :: ContactDetail shows empty field note when none saved
+#[cfg(any(feature = "network-native-tls", feature = "network-rustls"))]
+#[test]
+fn contact_detail_shows_empty_field_note_when_none_saved() {
+    let mut vauchi = Vauchi::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+
+    let mut card = ContactCard::new("Carol");
+    let field = vauchi_core::contact_card::ContactField::new(
+        vauchi_core::contact_card::FieldType::Email,
+        "Work",
+        "carol@example.com",
+    );
+    let field_id = field.id().to_string();
+    card.add_field(field).unwrap();
+    let shared_key = SymmetricKey::generate();
+    let contact = Contact::from_exchange([11u8; 32], card, shared_key);
+    let carol_id = contact.id().to_string();
+    vauchi.add_contact(contact).unwrap();
+
+    // No field note saved
+    let mut engine = AppEngine::new(vauchi);
+    let screen = engine.navigate_to(AppScreen::ContactDetail {
+        contact_id: carol_id,
+    });
+
+    let expected_id = format!("field_note:{field_id}");
+    let field_note_component = screen
+        .components
+        .iter()
+        .find(|c| matches!(c, Component::EditableText { id, .. } if id == &expected_id));
+
+    assert!(
+        field_note_component.is_some(),
+        "ContactDetail must always show a field_note EditableText for each shared field"
+    );
+    if let Some(Component::EditableText { value, .. }) = field_note_component {
+        assert_eq!(value, "", "field_note must be empty when no note is saved");
+    }
+}
+
+/// @scenario: contacts_management :: Editing a field note via TextChanged persists it
+#[cfg(any(feature = "network-native-tls", feature = "network-rustls"))]
+#[test]
+fn contact_detail_text_changed_saves_field_note() {
+    let mut vauchi = Vauchi::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+
+    let mut card = ContactCard::new("Dave");
+    let field = vauchi_core::contact_card::ContactField::new(
+        vauchi_core::contact_card::FieldType::Phone,
+        "Home",
+        "+41 79 222 33 44",
+    );
+    let field_id = field.id().to_string();
+    card.add_field(field).unwrap();
+    let shared_key = SymmetricKey::generate();
+    let contact = Contact::from_exchange([12u8; 32], card, shared_key);
+    let dave_id = contact.id().to_string();
+    vauchi.add_contact(contact).unwrap();
+
+    let mut engine = AppEngine::new(vauchi);
+    engine.navigate_to(AppScreen::ContactDetail {
+        contact_id: dave_id.clone(),
+    });
+
+    let component_id = format!("field_note:{field_id}");
+
+    // Simulate typing a field note
+    let result = engine.handle_action(UserAction::TextChanged {
+        component_id: component_id.clone(),
+        value: "Prefers text messages".into(),
+    });
+
+    assert!(
+        matches!(result, ActionResult::UpdateScreen(_)),
+        "TextChanged on field_note should return UpdateScreen, got {result:?}"
+    );
+
+    // Reload the screen — saved note must appear
+    let new_screen = engine.navigate_to(AppScreen::ContactDetail {
+        contact_id: dave_id,
+    });
+    let field_note_component = new_screen
+        .components
+        .iter()
+        .find(|c| matches!(c, Component::EditableText { id, .. } if id == &component_id));
+
+    assert!(
+        field_note_component.is_some(),
+        "field_note component must be present after save"
+    );
+    if let Some(Component::EditableText { value, .. }) = field_note_component {
+        assert_eq!(
+            value, "Prefers text messages",
+            "saved field note must be reflected when screen reloads"
+        );
+    }
+}
+
 // ── ContactDetailEngine tests ───────────────────────────────────────
 
 #[test]

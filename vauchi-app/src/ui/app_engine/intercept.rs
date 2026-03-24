@@ -261,6 +261,36 @@ impl AppEngine {
         None
     }
 
+    /// Intercept per-field note edits on the ContactDetail screen and persist them.
+    ///
+    /// When the user changes a `field_note:{field_id}` EditableText component,
+    /// the note is saved immediately as raw UTF-8 bytes via
+    /// `Vauchi::save_contact_field_note`.
+    pub(super) fn intercept_field_note_change(
+        &mut self,
+        contact_id: &str,
+        action: &UserAction,
+    ) -> Option<ActionResult> {
+        if let UserAction::TextChanged {
+            component_id,
+            value,
+        } = action
+            && let Some(field_id) = component_id.strip_prefix("field_note:")
+        {
+            if let Err(e) =
+                self.vauchi
+                    .save_contact_field_note(contact_id, field_id, value.as_bytes())
+            {
+                eprintln!("Failed to save field note: {e}");
+            }
+            self.invalidate_screen(&AppScreen::ContactDetail {
+                contact_id: contact_id.to_string(),
+            });
+            return Some(ActionResult::UpdateScreen(self.engine.current_screen()));
+        }
+        None
+    }
+
     /// Handle undo actions (field delete restoration).
     pub(super) fn handle_undo(&mut self, action: &UserAction) -> Option<ActionResult> {
         if let UserAction::UndoPressed { action_id } = action

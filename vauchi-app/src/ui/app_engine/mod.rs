@@ -310,6 +310,9 @@ impl WorkflowEngine for AppEngine {
             if let Some(result) = self.intercept_personal_note_change(&contact_id, &action) {
                 return result;
             }
+            if let Some(result) = self.intercept_field_note_change(&contact_id, &action) {
+                return result;
+            }
         }
 
         if let Some(result) = self.handle_undo(&action) {

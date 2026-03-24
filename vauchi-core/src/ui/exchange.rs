@@ -38,6 +38,8 @@ pub struct ExchangeEngine {
     selected_groups: Vec<String>,
     /// ADR-031: Protocol session for hardware command/event exchange.
     session: Option<ExchangeSession>,
+    /// User-friendly error detail shown on the Failed screen (T1-2).
+    failure_detail: Option<String>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -79,6 +81,7 @@ impl ExchangeEngine {
             scanned_data: None,
             selected_groups: Vec::new(),
             session: None,
+            failure_detail: None,
         }
     }
 
@@ -110,6 +113,7 @@ impl ExchangeEngine {
                     scanned_data: None,
                     selected_groups: Vec::new(),
                     session: None,
+                    failure_detail: None,
                 };
             }
             session.emit_initial_commands();
@@ -121,6 +125,7 @@ impl ExchangeEngine {
             scanned_data: None,
             selected_groups: Vec::new(),
             session: Some(session),
+            failure_detail: None,
         }
     }
 
@@ -156,9 +161,14 @@ impl ExchangeEngine {
         self.step = ExchangeStep::Success;
     }
 
-    /// Mark the exchange as failed (called by the caller when verification
-    /// fails).
+    /// Mark the exchange as failed with an optional user-facing detail message.
     pub fn mark_failed(&mut self) {
+        self.step = ExchangeStep::Failed;
+    }
+
+    /// Mark the exchange as failed with a specific error detail for the user.
+    pub fn mark_failed_with_error(&mut self, error: &crate::exchange::ExchangeError) {
+        self.failure_detail = Some(error.user_message().to_string());
         self.step = ExchangeStep::Failed;
     }
 
@@ -333,7 +343,7 @@ impl ExchangeEngine {
                     id: "failed_status".into(),
                     icon: None,
                     title: "Exchange Failed".into(),
-                    detail: None,
+                    detail: self.failure_detail.clone(),
                     status: Status::Failed,
                 }],
                 actions: vec![
@@ -379,9 +389,10 @@ impl WorkflowEngine for ExchangeEngine {
                 return None;
             }
         };
-        if let Err(_e) = session.apply_hardware_event(event) {
+        if let Err(e) = session.apply_hardware_event(event) {
             // The session rejected the event (invalid state, malformed QR, etc.).
             // Transition to Failed so the UI reflects the error.
+            self.failure_detail = Some(e.user_message().to_string());
             self.step = ExchangeStep::Failed;
             return Some(ActionResult::UpdateScreen(self.build_screen()));
         }
@@ -392,7 +403,8 @@ impl WorkflowEngine for ExchangeEngine {
             crate::exchange::ExchangeState::Complete { .. } => {
                 self.step = ExchangeStep::Success;
             }
-            crate::exchange::ExchangeState::Failed { .. } => {
+            crate::exchange::ExchangeState::Failed { error } => {
+                self.failure_detail = Some(error.user_message().to_string());
                 self.step = ExchangeStep::Failed;
             }
             // Any state beyond DisplayingQr means verification is in progress
@@ -480,6 +492,7 @@ impl WorkflowEngine for ExchangeEngine {
                 if action_id == "retry" =>
             {
                 self.scanned_data = None;
+                self.failure_detail = None;
                 self.step = ExchangeStep::ShowQr;
                 ActionResult::NavigateTo(self.build_screen())
             }
@@ -899,5 +912,93 @@ mod tests {
 
         // Groups still selected at the end
         assert_eq!(engine.selected_groups(), &["g2".to_string()]);
+    }
+
+    // ── T1-2: Exchange error detail tests ──────────────────────────
+
+    #[test]
+    fn failed_screen_shows_error_detail_after_mark_failed_with_error() {
+        let mut engine = ExchangeEngine::new(config_no_groups());
+        engine.mark_failed_with_error(&crate::exchange::ExchangeError::SessionTimeout);
+        let screen = engine.current_screen();
+        assert_eq!(screen.screen_id, "exchange_failed");
+        let detail = screen.components.iter().find_map(|c| match c {
+            Component::StatusIndicator { detail, .. } => detail.clone(),
+            _ => None,
+        });
+        assert_eq!(
+            detail.as_deref(),
+            Some("The exchange timed out. Please try again."),
+            "Failed screen should show user-friendly error detail"
+        );
+    }
+
+    #[test]
+    fn failed_screen_has_no_detail_after_plain_mark_failed() {
+        let mut engine = ExchangeEngine::new(config_no_groups());
+        engine.mark_failed();
+        let screen = engine.current_screen();
+        let detail = screen.components.iter().find_map(|c| match c {
+            Component::StatusIndicator { detail, .. } => detail.clone(),
+            _ => None,
+        });
+        assert!(
+            detail.is_none(),
+            "Plain mark_failed should have no detail (backward-compatible)"
+        );
+    }
+
+    #[test]
+    fn retry_clears_failure_detail() {
+        let mut engine = ExchangeEngine::new(config_no_groups());
+        engine.mark_failed_with_error(&crate::exchange::ExchangeError::BleOutOfRange);
+        assert!(engine.failure_detail.is_some());
+
+        engine.handle_action(UserAction::ActionPressed {
+            action_id: "retry".into(),
+        });
+
+        assert!(
+            engine.failure_detail.is_none(),
+            "Retry should clear the failure detail"
+        );
+        assert_eq!(engine.step, ExchangeStep::ShowQr);
+    }
+
+    #[test]
+    fn user_message_covers_all_error_categories() {
+        use crate::exchange::ExchangeError;
+        // Verify a representative from each category returns non-empty
+        let cases = vec![
+            ExchangeError::QRExpired,
+            ExchangeError::SessionTimeout,
+            ExchangeError::ProximityFailed,
+            ExchangeError::DuplicateContact,
+            ExchangeError::ConsentDenied,
+            ExchangeError::NetworkDisconnected,
+            ExchangeError::LowBattery,
+            ExchangeError::ClockDrift(300),
+            ExchangeError::BleOutOfRange,
+            ExchangeError::BleNotAvailable,
+            ExchangeError::NfcNotSupported,
+            ExchangeError::CryptoError,
+            ExchangeError::HardwareFailure {
+                transport: "BLE".into(),
+                error: "test".into(),
+            },
+        ];
+        for error in &cases {
+            let msg = error.user_message();
+            assert!(
+                !msg.is_empty(),
+                "user_message should be non-empty for {:?}",
+                error
+            );
+            assert!(
+                !msg.contains("Error("),
+                "user_message should not expose internal types for {:?}",
+                error
+            );
+        }
     }
 }

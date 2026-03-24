@@ -170,3 +170,104 @@ pub enum ExchangeError {
     #[error("Hardware failure ({transport}): {error}")]
     HardwareFailure { transport: String, error: String },
 }
+
+impl ExchangeError {
+    /// User-friendly message for display in the exchange failure screen.
+    /// Avoids exposing internal details while giving actionable guidance.
+    pub fn user_message(&self) -> &str {
+        match self {
+            // Timing / expiry
+            Self::QRExpired | Self::TokenExpired | Self::DeviceLinkQRExpired => {
+                "The code has expired. Please try again with a fresh code."
+            }
+            Self::SessionTimeout => "The exchange timed out. Please try again.",
+            Self::NfcExpired | Self::BleExpired => "The connection timed out. Please try again.",
+            Self::ProximityExpired => {
+                "Proximity verification expired. Please move closer and try again."
+            }
+
+            // QR issues
+            Self::InvalidQRFormat | Self::QRAlreadyUsed => {
+                "The QR code could not be read. Please ask the other person to show a new one."
+            }
+
+            // Proximity / verification
+            Self::ProximityFailed | Self::ProximityNotVerified => {
+                "Could not verify you are nearby. Move closer to the other person and try again."
+            }
+            Self::NumericCodeMismatch => {
+                "The verification codes did not match. This might be a different person's code."
+            }
+            Self::FingerprintRequired => {
+                "Fingerprint verification is required. Please verify the fingerprint shown on both devices."
+            }
+
+            // Identity / duplicate
+            Self::DuplicateContact => "This contact already exists in your list.",
+            Self::SelfExchange => "You cannot exchange with yourself.",
+            Self::SelfLinkingNotAllowed => "This device is already linked to your identity.",
+            Self::ContactBlocked => "This contact is blocked. Unblock them first to exchange.",
+
+            // Consent
+            Self::ConsentDenied => "The other person declined the exchange.",
+            Self::Interrupted => "The exchange was interrupted. Please try again.",
+
+            // Network
+            Self::NetworkDisconnected => {
+                "Connection lost during exchange. Check your internet and try again."
+            }
+
+            // Device issues
+            Self::LowBattery => "Battery too low. Please charge your device and try again.",
+            Self::InsufficientStorage => "Not enough storage space. Free up space and try again.",
+
+            // Clock
+            Self::ClockDrift(_) => {
+                "Your device clock appears to be incorrect. Please check your date and time settings."
+            }
+
+            // BLE issues
+            Self::BleOutOfRange => "The other device is too far away. Move closer and try again.",
+            Self::BleConnectionLost | Self::NfcSessionLost => {
+                "Connection lost. Stay close to the other device and try again."
+            }
+            Self::BleNotAvailable => "Bluetooth is not available. Try using QR code instead.",
+            Self::NfcNotSupported => {
+                "NFC is not available on this device. Try using QR code instead."
+            }
+            Self::BleMtuTooSmall => "Bluetooth connection is unstable. Try using QR code instead.",
+
+            // Hardware
+            Self::HardwareFailure { transport, .. } => match transport.as_str() {
+                "BLE" => "Bluetooth encountered an error. Try using QR code instead.",
+                "NFC" => "NFC encountered an error. Try using QR code instead.",
+                _ => "A hardware error occurred. Please try a different exchange method.",
+            },
+
+            // Technical (less actionable — show generic message)
+            Self::InvalidSignature
+            | Self::IdentityMismatch
+            | Self::KeyAgreementFailed(_)
+            | Self::InvalidProtocolVersion
+            | Self::InvalidState(_)
+            | Self::CryptoError
+            | Self::SerializationFailed
+            | Self::StalePrekey
+            | Self::InvalidNfcFormat
+            | Self::NfcChainReassemblyFailed
+            | Self::NfcDecryptionFailed
+            | Self::NfcCrcMismatch
+            | Self::InvalidBleFormat
+            | Self::BleDecryptionFailed
+            | Self::BleHandshakeFailed(_)
+            | Self::BleKeyDerivationFailed
+            | Self::BleCommitmentMismatch
+            | Self::BleChunkReassemblyFailed(_)
+            | Self::BleReassemblyLimitExceeded(_)
+            | Self::DisplayNameTooLong(_)
+            | Self::InvalidDhOutput(_) => {
+                "Something went wrong during the exchange. Please try again."
+            }
+        }
+    }
+}

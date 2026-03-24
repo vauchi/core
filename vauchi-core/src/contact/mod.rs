@@ -10,6 +10,7 @@
 pub mod labels;
 pub mod merge;
 pub mod statistics;
+pub mod trust;
 pub mod warnings;
 
 #[cfg(feature = "testing")]
@@ -20,6 +21,7 @@ mod visibility;
 pub use labels::{
     Group, GroupError, GroupManager, MAX_LABELS, SUGGESTED_LABELS, resolve_visible_fields,
 };
+pub use trust::TrustLevel;
 pub use visibility::{FieldVisibility, VisibilityRules};
 
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -470,6 +472,32 @@ impl Contact {
     // ========================================
     // Trust Metrics
     // ========================================
+
+    /// Derives the trust level from cryptographic exchange facts.
+    ///
+    /// This is a pure, deterministic function — not user-editable.
+    /// Priority order (highest wins):
+    /// 1. `Cautious` — identity was recovered (ratchet may have reset)
+    /// 2. `Verified` — fingerprint manually confirmed out-of-band
+    /// 3. `High`     — high proximity confidence + NFC or BLE transport
+    /// 4. `Standard` — all other cases
+    pub fn trust_level(&self) -> TrustLevel {
+        if self.has_recovered {
+            return TrustLevel::Cautious;
+        }
+        if self.fingerprint_verified {
+            return TrustLevel::Verified;
+        }
+        if self.proximity_confidence == ProximityConfidence::High
+            && matches!(
+                self.exchange_transport,
+                ExchangeTransport::Nfc | ExchangeTransport::Ble
+            )
+        {
+            return TrustLevel::High;
+        }
+        TrustLevel::Standard
+    }
 
     /// Returns the exchange transport method.
     pub fn exchange_transport(&self) -> ExchangeTransport {

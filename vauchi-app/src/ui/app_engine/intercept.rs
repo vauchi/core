@@ -228,6 +228,29 @@ impl AppEngine {
         None
     }
 
+    /// Intercept personal note edits on the ContactDetail screen and persist them.
+    ///
+    /// When the user changes the `personal_note` EditableText component, the note
+    /// is saved immediately as raw UTF-8 bytes via `Vauchi::save_personal_notes`.
+    pub(super) fn intercept_personal_note_change(
+        &mut self,
+        contact_id: &str,
+        action: &UserAction,
+    ) -> Option<ActionResult> {
+        if let UserAction::TextChanged {
+            component_id,
+            value,
+        } = action
+            && component_id == "personal_note"
+        {
+            let _ = self
+                .vauchi
+                .save_personal_notes(contact_id, value.as_bytes());
+            return Some(ActionResult::UpdateScreen(self.engine.current_screen()));
+        }
+        None
+    }
+
     /// Handle undo actions (field delete restoration).
     pub(super) fn handle_undo(&mut self, action: &UserAction) -> Option<ActionResult> {
         if let UserAction::UndoPressed { action_id } = action

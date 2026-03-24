@@ -37,16 +37,19 @@ pub struct ContactDetailEngine {
     fields: Vec<FieldDisplay>,
     shared_info: Option<SharedInfoView>,
     view_mode: ContactViewMode,
+    /// Private note about this contact (never shared). Stored as plain UTF-8.
+    personal_note: String,
 }
 
 impl ContactDetailEngine {
     /// Create with only their info (no shared info available).
-    pub fn new(contact: ContactItem, fields: Vec<FieldDisplay>) -> Self {
+    pub fn new(contact: ContactItem, fields: Vec<FieldDisplay>, personal_note: String) -> Self {
         Self {
             contact,
             fields,
             shared_info: None,
             view_mode: ContactViewMode::TheirInfo,
+            personal_note,
         }
     }
 
@@ -55,12 +58,14 @@ impl ContactDetailEngine {
         contact: ContactItem,
         fields: Vec<FieldDisplay>,
         shared_info: SharedInfoView,
+        personal_note: String,
     ) -> Self {
         Self {
             contact,
             fields,
             shared_info: Some(shared_info),
             view_mode: ContactViewMode::TheirInfo,
+            personal_note,
         }
     }
 
@@ -112,6 +117,14 @@ impl ContactDetailEngine {
                     fields: self.fields.clone(),
                     visibility_mode: VisibilityMode::ReadOnly,
                     available_groups: vec![],
+                });
+                // Private note — only visible to me, never shared with the contact
+                components.push(Component::EditableText {
+                    id: "personal_note".into(),
+                    label: "Private note".into(),
+                    value: self.personal_note.clone(),
+                    editing: false,
+                    validation_error: None,
                 });
             }
             ContactViewMode::MyInfoForThem => {
@@ -299,7 +312,7 @@ mod tests {
 
     #[test]
     fn test_default_shows_their_info() {
-        let engine = ContactDetailEngine::new(sample_contact(), sample_fields());
+        let engine = ContactDetailEngine::new(sample_contact(), sample_fields(), String::new());
         let screen = engine.current_screen();
 
         assert_eq!(screen.screen_id, "contact_detail");
@@ -320,6 +333,7 @@ mod tests {
             sample_contact(),
             sample_fields(),
             sample_shared_info(),
+            String::new(),
         );
         let screen = engine.current_screen();
 
@@ -339,6 +353,7 @@ mod tests {
             sample_contact(),
             sample_fields(),
             sample_shared_info(),
+            String::new(),
         );
 
         // Switch to MyInfoForThem
@@ -369,6 +384,7 @@ mod tests {
             sample_contact(),
             sample_fields(),
             sample_shared_info(),
+            String::new(),
         );
 
         let _ = engine.handle_action(UserAction::ItemToggled {
@@ -395,6 +411,7 @@ mod tests {
             sample_contact(),
             sample_fields(),
             sample_shared_info(),
+            String::new(),
         );
 
         // Switch to MyInfoForThem then back
@@ -414,7 +431,7 @@ mod tests {
 
     #[test]
     fn test_edit_action_still_works() {
-        let mut engine = ContactDetailEngine::new(sample_contact(), sample_fields());
+        let mut engine = ContactDetailEngine::new(sample_contact(), sample_fields(), String::new());
         let result = engine.handle_action(UserAction::ActionPressed {
             action_id: "edit".into(),
         });
@@ -428,7 +445,7 @@ mod tests {
 
     #[test]
     fn test_back_action_completes() {
-        let mut engine = ContactDetailEngine::new(sample_contact(), sample_fields());
+        let mut engine = ContactDetailEngine::new(sample_contact(), sample_fields(), String::new());
         let result = engine.handle_action(UserAction::ActionPressed {
             action_id: "back".into(),
         });

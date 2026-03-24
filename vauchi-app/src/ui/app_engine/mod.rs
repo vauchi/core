@@ -305,6 +305,13 @@ impl WorkflowEngine for AppEngine {
             }
         }
 
+        if let AppScreen::ContactDetail { ref contact_id } = self.screen {
+            let contact_id = contact_id.clone();
+            if let Some(result) = self.intercept_personal_note_change(&contact_id, &action) {
+                return result;
+            }
+        }
+
         if let Some(result) = self.handle_undo(&action) {
             return result;
         }

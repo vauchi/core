@@ -343,14 +343,25 @@ impl AppEngine {
                             .collect(),
                     };
 
+                    // Load personal note (stored as raw UTF-8 bytes by the app layer)
+                    let personal_note = vauchi
+                        .load_personal_notes(contact_id)
+                        .ok()
+                        .flatten()
+                        .and_then(|bytes| String::from_utf8(bytes).ok())
+                        .unwrap_or_default();
+
                     // Build shared info (my card as seen by this contact)
                     let shared_info = Self::build_shared_info(vauchi, contact_id);
 
                     match shared_info {
-                        Some(info) => {
-                            Box::new(ContactDetailEngine::with_shared_info(item, fields, info))
-                        }
-                        None => Box::new(ContactDetailEngine::new(item, fields)),
+                        Some(info) => Box::new(ContactDetailEngine::with_shared_info(
+                            item,
+                            fields,
+                            info,
+                            personal_note,
+                        )),
+                        None => Box::new(ContactDetailEngine::new(item, fields, personal_note)),
                     }
                 }
                 _ => Box::new(ContactNotFoundEngine::new(contact_id.clone())),

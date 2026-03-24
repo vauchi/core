@@ -321,12 +321,19 @@ impl AppEngine {
                             visibility: UiFieldVisibility::Shown,
                         })
                         .collect();
+                    let status = if vauchi.is_contact_revoked(contact.id()) {
+                        Some("Deleted their identity".into())
+                    } else if contact.has_recovered() && !contact.is_fingerprint_verified() {
+                        Some("Recovered — re-verify recommended".into())
+                    } else {
+                        None
+                    };
                     let item = ContactItem {
                         id: contact.id().to_string(),
                         name: contact.display_name().to_string(),
                         subtitle: None,
                         avatar_initials: initials(contact.display_name()),
-                        status: None,
+                        status,
                         searchable_fields: contact
                             .card()
                             .fields()
@@ -539,12 +546,19 @@ impl AppEngine {
                         .map(|f| f.value().to_string())
                         .collect();
                     let subtitle = fields.first().cloned();
+                    let status = if vauchi.is_contact_revoked(c.id()) {
+                        Some("Deleted their identity".into())
+                    } else if c.has_recovered() && !c.is_fingerprint_verified() {
+                        Some("Recovered — re-verify recommended".into())
+                    } else {
+                        None
+                    };
                     ContactItem {
                         id: c.id().to_string(),
                         name: c.display_name().to_string(),
                         subtitle,
                         avatar_initials: initials(c.display_name()),
-                        status: None,
+                        status,
                         searchable_fields: fields,
                     }
                 })

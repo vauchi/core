@@ -86,6 +86,11 @@ impl Vauchi {
         manager.find_group_fuzzy(query)
     }
 
+    /// Checks if a contact's sender has been revoked (they deleted their identity).
+    pub fn is_contact_revoked(&self, contact_id: &str) -> bool {
+        self.storage.is_sender_revoked(contact_id).unwrap_or(false)
+    }
+
     /// Returns the number of contacts.
     pub fn contact_count(&self) -> VauchiResult<usize> {
         let manager = ContactManager::new(&self.storage, self.events.clone());

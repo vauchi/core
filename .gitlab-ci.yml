@@ -543,8 +543,8 @@ fuzz:nightly:
   allow_failure: true
   script:
     - |
-      # Install cargo-fuzz if not available
-      command -v cargo-fuzz >/dev/null 2>&1 || cargo install cargo-fuzz --locked
+      # Install cargo-fuzz if not available (--force handles stale cached binaries)
+      command -v cargo-fuzz >/dev/null 2>&1 || cargo install cargo-fuzz --locked --force
 
       cd vauchi-core/fuzz
       FUZZ_DURATION="${FUZZ_DURATION_SECS:-300}"
@@ -659,10 +659,18 @@ prebuild:apple:
     - |
       echo "Uploading Apple binding artifacts for SHA ${CI_COMMIT_SHA}..."
       tar czf bindings-apple.tar.gz -C target/bindings ios/ macos/
-      curl --fail --header "JOB-TOKEN: ${CI_JOB_TOKEN}" \
+      HTTP_CODE=$(curl -s -w '%{http_code}' -o /dev/null \
+           --header "JOB-TOKEN: ${CI_JOB_TOKEN}" \
            --upload-file bindings-apple.tar.gz \
-           "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/vauchi-prebuild/${CI_COMMIT_SHA}/bindings-apple.tar.gz"
-      echo "✓ Apple bindings cached for SHA ${CI_COMMIT_SHA}"
+           "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/vauchi-prebuild/${CI_COMMIT_SHA}/bindings-apple.tar.gz")
+      if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 300 ]; then
+        echo "✓ Apple bindings cached for SHA ${CI_COMMIT_SHA}"
+      elif [ "$HTTP_CODE" = "400" ] || [ "$HTTP_CODE" = "409" ]; then
+        echo "✓ Apple bindings already cached for SHA ${CI_COMMIT_SHA} — skipping"
+      else
+        echo "✗ Upload failed with HTTP ${HTTP_CODE}"
+        exit 1
+      fi
 
 prebuild:android:
   extends: [.linux-runner, .timeout-long]
@@ -697,10 +705,18 @@ prebuild:android:
     - |
       echo "Uploading Android binding artifacts for SHA ${CI_COMMIT_SHA}..."
       tar czf bindings-android.tar.gz -C target/bindings android/
-      curl --fail --header "JOB-TOKEN: ${CI_JOB_TOKEN}" \
+      HTTP_CODE=$(curl -s -w '%{http_code}' -o /dev/null \
+           --header "JOB-TOKEN: ${CI_JOB_TOKEN}" \
            --upload-file bindings-android.tar.gz \
-           "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/vauchi-prebuild/${CI_COMMIT_SHA}/bindings-android.tar.gz"
-      echo "✓ Android bindings cached for SHA ${CI_COMMIT_SHA}"
+           "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/vauchi-prebuild/${CI_COMMIT_SHA}/bindings-android.tar.gz")
+      if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 300 ]; then
+        echo "✓ Android bindings cached for SHA ${CI_COMMIT_SHA}"
+      elif [ "$HTTP_CODE" = "400" ] || [ "$HTTP_CODE" = "409" ]; then
+        echo "✓ Android bindings already cached for SHA ${CI_COMMIT_SHA} — skipping"
+      else
+        echo "✗ Upload failed with HTTP ${HTTP_CODE}"
+        exit 1
+      fi
 
 # ============================================================
 # Build Stage — All version tags (stable, RC, dev)

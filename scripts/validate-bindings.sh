@@ -7,7 +7,7 @@
 # This script checks that generated bindings contain all expected types.
 # Run this after regenerating bindings or in CI to catch drift early.
 
-set -e
+set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"

@@ -485,6 +485,7 @@ impl AppEngine {
                 "Unknown".into(),
                 "Unknown".into(),
                 "Field not found".into(),
+                None,
                 vec![],
                 vec![],
             ));
@@ -530,6 +531,7 @@ impl AppEngine {
             format!("{:?}", field.field_type()),
             field.label().to_string(),
             field.value().to_string(),
+            field.note().map(|s| s.to_string()),
             groups,
             visible_contacts,
         ))

@@ -36,7 +36,17 @@ impl AppEngine {
                     false
                 }
             }
-            FormDialogType::EditField { current_value, .. } => input != *current_value,
+            FormDialogType::EditField {
+                current_value,
+                current_note,
+                ..
+            } => {
+                // Format: "value\nnote"
+                let mut parts = input.splitn(2, '\n');
+                let value = parts.next().unwrap_or("");
+                let note = parts.next().unwrap_or("");
+                value != current_value.as_str() || note != current_note.as_deref().unwrap_or("")
+            }
             FormDialogType::EditName { current_name } => input != *current_name,
             FormDialogType::EditRelayUrl { current_url } => input != *current_url,
         }
@@ -223,13 +233,24 @@ impl AppEngine {
                         self.vauchi.update_display_name(&name)
                     }
                     FormDialogType::EditField { field_id, .. } => {
-                        let value = input.unwrap_or_default();
+                        let raw = input.unwrap_or_default();
+                        // Format: value\nnote
+                        let mut parts = raw.splitn(2, '\n');
+                        let value = parts.next().unwrap_or("").to_string();
+                        let note = parts.next().unwrap_or("").trim().to_string();
                         match self.vauchi.own_card() {
                             Ok(Some(mut card)) => {
                                 if let Err(e) = card.update_field_value(field_id, &value) {
                                     return ActionResult::ShowAlert {
                                         title: "Error".into(),
                                         message: format!("Failed to update field: {e}"),
+                                    };
+                                }
+                                let note_opt = if note.is_empty() { None } else { Some(note) };
+                                if let Err(e) = card.update_field_note(field_id, note_opt) {
+                                    return ActionResult::ShowAlert {
+                                        title: "Error".into(),
+                                        message: format!("Failed to update field note: {e}"),
                                     };
                                 }
                                 self.vauchi.update_own_card(&card).map(|_| ())
@@ -250,7 +271,7 @@ impl AppEngine {
                         let entry_type = lines.next().unwrap_or("custom").trim();
                         let label_input = lines.next().unwrap_or("").trim();
                         let value = lines.next().unwrap_or("").trim();
-                        let _note = lines.next().unwrap_or("").trim();
+                        let note = lines.next().unwrap_or("").trim();
                         let _groups = lines.next().unwrap_or("").trim();
                         if value.is_empty() {
                             return ActionResult::ValidationError {
@@ -280,8 +301,11 @@ impl AppEngine {
                                 .map(|c| c.to_uppercase().to_string() + &entry_type[1..])
                                 .unwrap_or_else(|| "Custom".into())
                         };
-                        let field =
+                        let mut field =
                             vauchi_core::contact_card::ContactField::new(field_type, &label, value);
+                        if !note.is_empty() {
+                            field = field.with_note(note.to_string());
+                        }
                         let field_id = field.id().to_string();
                         let group_list: Vec<String> = _groups
                             .split(',')

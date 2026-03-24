@@ -195,6 +195,22 @@ impl ContactCard {
         Ok(())
     }
 
+    /// Updates a field's private note by ID. Pass `None` to clear the note.
+    pub fn update_field_note(
+        &mut self,
+        field_id: &str,
+        note: Option<String>,
+    ) -> Result<(), ContactCardError> {
+        let field = self
+            .fields
+            .iter_mut()
+            .find(|f| f.id() == field_id)
+            .ok_or(ContactCardError::FieldNotFound)?;
+
+        field.set_note(note);
+        Ok(())
+    }
+
     /// Updates a field's label by ID.
     pub fn update_field_label(
         &mut self,

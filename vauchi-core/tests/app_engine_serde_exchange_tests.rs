@@ -92,6 +92,7 @@ fn form_dialog_type_serde_roundtrip() {
             field_id: "f1".into(),
             field_label: "Phone".into(),
             current_value: "+1234".into(),
+            current_note: None,
         },
         FormDialogType::EditName {
             current_name: "Alice".into(),

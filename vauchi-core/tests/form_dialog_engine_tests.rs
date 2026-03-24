@@ -195,6 +195,7 @@ fn form_dialog_edit_field_screen_id() {
         field_id: "f1".into(),
         field_label: "Email".into(),
         current_value: "old@example.com".into(),
+        current_note: None,
     });
     let screen = engine.current_screen();
     assert_eq!(screen.screen_id, "form_edit_field");
@@ -206,6 +207,7 @@ fn form_dialog_edit_field_prefills_current_value() {
         field_id: "f1".into(),
         field_label: "Email".into(),
         current_value: "old@example.com".into(),
+        current_note: None,
     });
     let screen = engine.current_screen();
 
@@ -226,6 +228,7 @@ fn form_dialog_edit_field_submit_completes() {
         field_id: "f1".into(),
         field_label: "Email".into(),
         current_value: String::new(),
+        current_note: None,
     });
     let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "field_value".into(),
@@ -243,6 +246,7 @@ fn form_dialog_edit_field_collected_input() {
         field_id: "f1".into(),
         field_label: "Email".into(),
         current_value: String::new(),
+        current_note: None,
     });
     let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "field_value".into(),
@@ -251,7 +255,9 @@ fn form_dialog_edit_field_collected_input() {
     let input = engine
         .collected_input()
         .expect("collected_input should return Some");
-    assert_eq!(input, "updated@example.com");
+    // Format: "value\nnote" — note is empty so input starts with value
+    let value_part = input.splitn(2, '\n').next().unwrap_or("");
+    assert_eq!(value_part, "updated@example.com");
 }
 
 // --- EditName tests ---
@@ -332,6 +338,7 @@ fn form_dialog_text_changed_updates_value() {
         field_id: "f1".into(),
         field_label: "Phone".into(),
         current_value: String::new(),
+        current_note: None,
     });
 
     let result = engine.handle_action(UserAction::TextChanged {

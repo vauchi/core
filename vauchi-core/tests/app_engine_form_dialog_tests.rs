@@ -274,6 +274,7 @@ fn form_dialog_edit_field_saves_value() {
             field_id: field_id.clone(),
             field_label: "Phone".into(),
             current_value: "+1 555 123 4567".into(),
+            current_note: None,
         },
     });
 
@@ -516,5 +517,179 @@ fn form_dialog_add_social_field_uses_display_name_as_label() {
         "GitHub",
         "Label should be 'GitHub' (catalog display name), not '{}'",
         social_field.label()
+    );
+}
+
+// ── field_note persistence tests ──────────────────────────────────────
+
+/// AddField: a note entered in field_note is persisted on the ContactField.
+#[test]
+fn form_dialog_add_field_with_note_persists_note() {
+    let mut vauchi = Vauchi::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    let mut engine = AppEngine::new(vauchi);
+
+    engine.navigate_to(AppScreen::FormDialog {
+        dialog_type: FormDialogType::AddField {
+            available_groups: vec![],
+        },
+    });
+
+    let _ = engine.handle_action(UserAction::ListItemSelected {
+        component_id: "entry_types".into(),
+        item_id: "email".into(),
+    });
+    let _ = engine.handle_action(UserAction::TextChanged {
+        component_id: "field_value".into(),
+        value: "alice@example.com".into(),
+    });
+    let _ = engine.handle_action(UserAction::TextChanged {
+        component_id: "field_note".into(),
+        value: "Work account".into(),
+    });
+
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "submit".into(),
+    });
+    assert!(
+        matches!(result, ActionResult::NavigateTo(_)),
+        "AddField submit should navigate back, got {result:?}"
+    );
+
+    let card = engine.vauchi().own_card().unwrap().unwrap();
+    let email_field = card
+        .fields()
+        .iter()
+        .find(|f| f.value() == "alice@example.com")
+        .expect("Email field should have been added");
+
+    assert_eq!(
+        email_field.note(),
+        Some("Work account"),
+        "Field note should be 'Work account', got {:?}",
+        email_field.note()
+    );
+}
+
+/// AddField: an empty note leaves the field note as None.
+#[test]
+fn form_dialog_add_field_without_note_leaves_note_none() {
+    let mut vauchi = Vauchi::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    let mut engine = AppEngine::new(vauchi);
+
+    engine.navigate_to(AppScreen::FormDialog {
+        dialog_type: FormDialogType::AddField {
+            available_groups: vec![],
+        },
+    });
+
+    let _ = engine.handle_action(UserAction::ListItemSelected {
+        component_id: "entry_types".into(),
+        item_id: "email".into(),
+    });
+    let _ = engine.handle_action(UserAction::TextChanged {
+        component_id: "field_value".into(),
+        value: "bob@example.com".into(),
+    });
+    // No field_note change — note stays empty
+
+    let _ = engine.handle_action(UserAction::ActionPressed {
+        action_id: "submit".into(),
+    });
+
+    let card = engine.vauchi().own_card().unwrap().unwrap();
+    let field = card
+        .fields()
+        .iter()
+        .find(|f| f.value() == "bob@example.com")
+        .expect("Email field should have been added");
+
+    assert_eq!(
+        field.note(),
+        None,
+        "Field note should be None when not set, got {:?}",
+        field.note()
+    );
+}
+
+/// EditField: a note entered in field_note is persisted on the existing ContactField.
+#[test]
+fn form_dialog_edit_field_with_note_persists_note() {
+    let mut vauchi = Vauchi::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+
+    let field = vauchi_core::contact_card::ContactField::new(
+        FieldType::Phone,
+        "Mobile",
+        "+41 79 000 00 00",
+    );
+    let field_id = field.id().to_string();
+    vauchi.add_own_field(field).unwrap();
+
+    let mut engine = AppEngine::new(vauchi);
+
+    engine.navigate_to(AppScreen::FormDialog {
+        dialog_type: FormDialogType::EditField {
+            field_id: field_id.clone(),
+            field_label: "Mobile".into(),
+            current_value: "+41 79 000 00 00".into(),
+            current_note: None,
+        },
+    });
+
+    // Keep same value, set a note
+    let _ = engine.handle_action(UserAction::TextChanged {
+        component_id: "field_value".into(),
+        value: "+41 79 000 00 00".into(),
+    });
+    let _ = engine.handle_action(UserAction::TextChanged {
+        component_id: "field_note".into(),
+        value: "Private number".into(),
+    });
+
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "submit".into(),
+    });
+    assert!(
+        matches!(result, ActionResult::NavigateTo(_)),
+        "EditField submit should navigate back, got {result:?}"
+    );
+
+    let card = engine.vauchi().own_card().unwrap().unwrap();
+    let updated = card
+        .fields()
+        .iter()
+        .find(|f| f.id() == field_id)
+        .expect("Field should still exist");
+
+    assert_eq!(
+        updated.note(),
+        Some("Private number"),
+        "Field note should be 'Private number', got {:?}",
+        updated.note()
+    );
+}
+
+/// EditField: an existing note is pre-populated in the form's field_note input.
+#[test]
+fn form_dialog_edit_field_prefills_current_note() {
+    let engine = vauchi_app::ui::FormDialogEngine::new(FormDialogType::EditField {
+        field_id: "f1".into(),
+        field_label: "Phone".into(),
+        current_value: "+1 555 0000".into(),
+        current_note: Some("Office direct line".into()),
+    });
+    let screen = engine.current_screen();
+
+    let note_prefilled = screen.components.iter().any(|c| {
+        matches!(c,
+            Component::TextInput { id, value, .. }
+                if id == "field_note" && value == "Office direct line"
+        )
+    });
+    assert!(
+        note_prefilled,
+        "field_note input should be prefilled with existing note"
     );
 }

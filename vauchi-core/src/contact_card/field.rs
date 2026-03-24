@@ -143,15 +143,20 @@ impl ContactField {
 
     /// Builder: set a private note on this field. Truncates to 500 chars.
     pub fn with_note(mut self, note: String) -> Self {
-        if note.is_empty() {
-            self.note = None;
-        } else if note.chars().count() > MAX_FIELD_NOTE_LEN {
-            let truncated: String = note.chars().take(MAX_FIELD_NOTE_LEN).collect();
-            self.note = Some(truncated);
-        } else {
-            self.note = Some(note);
-        }
+        self.set_note(Some(note));
         self
+    }
+
+    /// Mutably set (or clear) the private note. Truncates to 500 chars.
+    pub fn set_note(&mut self, note: Option<String>) {
+        self.note = match note {
+            None => None,
+            Some(n) if n.is_empty() => None,
+            Some(n) if n.chars().count() > MAX_FIELD_NOTE_LEN => {
+                Some(n.chars().take(MAX_FIELD_NOTE_LEN).collect())
+            }
+            Some(n) => Some(n),
+        };
     }
 
     /// Returns a clone with all private fields stripped.

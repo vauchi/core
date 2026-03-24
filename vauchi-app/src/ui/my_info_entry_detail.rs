@@ -21,6 +21,8 @@ pub struct MyInfoEntryDetailEngine {
     pub field_type: String,
     pub label: String,
     pub value: String,
+    /// Private per-field note (never shared).
+    pub note: Option<String>,
     /// All groups with their visibility state for this field.
     pub groups: Vec<(String, String, bool)>, // (group_id, group_name, is_visible)
     /// Contacts who can see this field (derived from group membership).
@@ -33,6 +35,7 @@ impl MyInfoEntryDetailEngine {
         field_type: String,
         label: String,
         value: String,
+        note: Option<String>,
         groups: Vec<(String, String, bool)>,
         visible_contacts: Vec<EntryContactInfo>,
     ) -> Self {
@@ -41,6 +44,7 @@ impl MyInfoEntryDetailEngine {
             field_type,
             label,
             value,
+            note,
             groups,
             visible_contacts,
         }

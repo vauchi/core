@@ -21,6 +21,8 @@ pub enum FormDialogType {
         field_id: String,
         field_label: String,
         current_value: String,
+        /// Current private note, if any.
+        current_note: Option<String>,
     },
     EditName {
         current_name: String,
@@ -68,8 +70,18 @@ impl FormDialogEngine {
                 ("field_label".into(), String::new()),
                 ("field_note".into(), String::new()),
             ],
-            FormDialogType::EditField { current_value, .. } => {
-                vec![("field_value".into(), current_value.clone())]
+            FormDialogType::EditField {
+                current_value,
+                current_note,
+                ..
+            } => {
+                vec![
+                    ("field_value".into(), current_value.clone()),
+                    (
+                        "field_note".into(),
+                        current_note.clone().unwrap_or_default(),
+                    ),
+                ]
             }
             FormDialogType::EditName { current_name } => {
                 vec![("display_name".into(), current_name.clone())]
@@ -262,6 +274,15 @@ impl FormDialogEngine {
                         validation_error: None,
                         input_type: InputType::Text,
                     },
+                    Component::TextInput {
+                        id: "field_note".into(),
+                        label: "Comment (your eyes only, optional)".into(),
+                        value: self.get_value("field_note").into(),
+                        placeholder: Some("Only visible to you".into()),
+                        max_length: Some(100),
+                        validation_error: None,
+                        input_type: InputType::Text,
+                    },
                 ],
                 actions: vec![
                     ScreenAction {
@@ -399,7 +420,12 @@ impl WorkflowEngine for FormDialogEngine {
                 // Format: type\nlabel\nvalue\nnote\ngroups
                 Some(format!("{entry_type}\n{label}\n{value}\n{note}\n{groups}"))
             }
-            FormDialogType::EditField { .. } => Some(self.get_value("field_value").to_string()),
+            FormDialogType::EditField { .. } => {
+                let value = self.get_value("field_value");
+                let note = self.get_value("field_note");
+                // Format: value\nnote
+                Some(format!("{value}\n{note}"))
+            }
             FormDialogType::EditName { .. } => Some(self.get_value("display_name").to_string()),
             FormDialogType::EditRelayUrl { .. } => Some(self.get_value("relay_url").to_string()),
         }

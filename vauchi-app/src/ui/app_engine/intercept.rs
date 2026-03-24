@@ -190,11 +190,13 @@ impl AppEngine {
                 {
                     let label = engine.label.clone();
                     let value = engine.value.clone();
+                    let note = engine.note.clone();
                     let screen = self.navigate_to(AppScreen::FormDialog {
                         dialog_type: FormDialogType::EditField {
                             field_id: field_id.to_string(),
                             field_label: label,
                             current_value: value,
+                            current_note: note,
                         },
                     });
                     return Some(ActionResult::NavigateTo(screen));

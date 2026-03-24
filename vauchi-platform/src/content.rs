@@ -109,7 +109,7 @@ pub struct MobileContentConfig {
     pub remote_updates_enabled: bool,
     /// Content server URL
     pub content_url: String,
-    /// Optional SOCKS5 proxy URL (e.g., for Tor)
+    /// Optional SOCKS5 proxy URL (e.g., for SOCKS5 proxy)
     pub proxy_url: Option<String>,
 }
 
@@ -135,7 +135,7 @@ impl MobileContentConfig {
             ..Default::default()
         };
 
-        // Increase timeout for Tor
+        // Increase timeout for proxy
         if self.proxy_url.is_some() {
             config.timeout = std::time::Duration::from_secs(60);
         }

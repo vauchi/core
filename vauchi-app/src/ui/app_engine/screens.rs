@@ -690,16 +690,16 @@ impl AppEngine {
                 category: "Getting Started".into(),
             },
             HelpItem {
-                id: "tor-privacy".into(),
-                question: "How does Tor routing protect my privacy?".into(),
+                id: "ip-privacy".into(),
+                question: "How is my IP address protected?".into(),
                 answer: Some(
-                    "When enabled, Vauchi routes relay connections through Tor, \
-                     hiding your IP address from the relay server. This prevents \
-                     the server from learning your location or network identity. \
-                     Enable it in Settings > Tor Privacy."
+                    "Vauchi uses a self-hosted OHTTP relay that strips your IP \
+                     address before requests reach the relay server. For additional \
+                     protection you can configure a SOCKS5 proxy in Settings. \
+                     Timing obfuscation further prevents traffic correlation."
                         .into(),
                 ),
-                answer_url: Some("https://docs.vauchi.app/faq/tor".into()),
+                answer_url: Some("https://docs.vauchi.app/faq/privacy".into()),
                 category: "Privacy".into(),
             },
         ]

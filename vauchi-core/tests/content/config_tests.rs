@@ -35,8 +35,8 @@ fn test_config_with_storage_path() {
 }
 
 #[test]
-fn test_config_with_tor() {
-    let config = ContentConfig::default().with_tor();
+fn test_config_with_proxy() {
+    let config = ContentConfig::default().with_proxy();
 
     assert_eq!(
         config.proxy_url,

@@ -7,7 +7,7 @@
 //! This module provides HTTP-based content fetching with:
 //! - Checksum verification
 //! - Size limits
-//! - Proxy support (for Tor)
+//! - Proxy support (SOCKS5)
 //! - Timeout configuration
 
 #[cfg(feature = "content-updates")]
@@ -47,7 +47,7 @@ impl ContentFetcher {
                 option_env!("CARGO_PKG_VERSION").unwrap_or("0.1.0")
             ));
 
-        // Support proxy if configured (for Tor)
+        // Support proxy if configured
         if let Some(proxy_url) = &config.proxy_url {
             builder = builder.proxy(reqwest::Proxy::all(proxy_url)?);
         }

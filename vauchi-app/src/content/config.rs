@@ -28,7 +28,7 @@ pub struct ContentConfig {
     /// Maximum content file size (bytes)
     pub max_content_size: u64,
 
-    /// Proxy URL (for Tor support)
+    /// Proxy URL (optional SOCKS5 proxy)
     pub proxy_url: Option<String>,
 
     /// Publisher's Ed25519 public key for manifest signature verification (Tracker #145).
@@ -54,18 +54,18 @@ impl Default for ContentConfig {
 }
 
 impl ContentConfig {
-    /// Configure with Tor proxy
+    /// Configure with default SOCKS5 proxy
     ///
-    /// Uses the default Tor SOCKS5 proxy at 127.0.0.1:9050 and
-    /// increases the timeout to 60 seconds to account for Tor latency.
-    pub fn with_tor(mut self) -> Self {
+    /// Uses the default SOCKS5 proxy at 127.0.0.1:9050 and
+    /// increases the timeout to 60 seconds to account for proxy latency.
+    pub fn with_proxy(mut self) -> Self {
         self.proxy_url = Some("socks5://127.0.0.1:9050".to_string());
-        self.timeout = Duration::from_secs(60); // Longer timeout for Tor
+        self.timeout = Duration::from_secs(60); // Longer timeout for proxy
         self
     }
 
-    /// Configure with custom proxy
-    pub fn with_proxy(mut self, proxy_url: String) -> Self {
+    /// Configure with custom proxy URL
+    pub fn with_custom_proxy(mut self, proxy_url: String) -> Self {
         self.proxy_url = Some(proxy_url);
         self
     }

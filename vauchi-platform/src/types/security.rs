@@ -4,7 +4,7 @@
 
 //! Security, privacy, and compliance types.
 //!
-//! Recovery, GDPR/deletion, consent, shred, Tor, duress, and emergency broadcast.
+//! Recovery, GDPR/deletion, consent, shred, duress, and emergency broadcast.
 
 /// Recovery claim data for mobile.
 #[derive(Debug, Clone, uniffi::Record)]

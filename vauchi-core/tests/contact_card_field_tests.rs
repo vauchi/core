@@ -45,3 +45,67 @@ fn test_field_value_normalized_nfc() {
     field.set_value("n\u{0303}");
     assert_eq!(field.value(), "\u{00F1}");
 }
+
+// --- note field tests ---
+
+#[test]
+fn test_field_note_default_none() {
+    let f = ContactField::new(FieldType::Phone, "Work", "+41 79 123 45 67");
+    assert_eq!(f.note(), None);
+}
+
+#[test]
+fn test_field_with_note() {
+    let f = ContactField::new(FieldType::Phone, "Work", "+41 79 123 45 67")
+        .with_note("check spam".to_string());
+    assert_eq!(f.note(), Some("check spam"));
+}
+
+#[test]
+fn test_field_note_truncated_at_500_chars() {
+    let long_note = "x".repeat(600);
+    let f = ContactField::new(FieldType::Phone, "Work", "+41...").with_note(long_note);
+    assert_eq!(f.note().unwrap().len(), 500);
+}
+
+#[test]
+fn test_field_empty_note_is_none() {
+    let f = ContactField::new(FieldType::Phone, "Work", "+41...").with_note("".to_string());
+    assert_eq!(f.note(), None);
+}
+
+#[test]
+fn test_strip_private_removes_note() {
+    let f = ContactField::new(FieldType::Phone, "Work", "+41 79 123 45 67")
+        .with_note("secret".to_string());
+    let stripped = f.strip_private();
+    assert_eq!(stripped.note(), None);
+    assert_eq!(stripped.value(), f.value());
+    assert_eq!(stripped.label(), f.label());
+    assert_eq!(stripped.id(), f.id());
+}
+
+#[test]
+fn test_strip_private_on_field_without_note() {
+    let f = ContactField::new(FieldType::Phone, "Work", "+41...");
+    let stripped = f.strip_private();
+    assert_eq!(stripped.note(), None);
+    assert_eq!(stripped.value(), f.value());
+}
+
+#[test]
+fn test_note_serde_roundtrip() {
+    let f = ContactField::new(FieldType::Phone, "Work", "+41...").with_note("my note".to_string());
+    let json = serde_json::to_string(&f).unwrap();
+    let restored: ContactField = serde_json::from_str(&json).unwrap();
+    assert_eq!(restored.note(), Some("my note"));
+}
+
+#[test]
+fn test_note_backward_compat_deserialize() {
+    // Old JSON without note field should deserialize fine
+    let json =
+        r#"{"id":"abc","field_type":"Phone","label":"Work","value":"+41...","updated_at":0}"#;
+    let f: ContactField = serde_json::from_str(json).unwrap();
+    assert_eq!(f.note(), None);
+}

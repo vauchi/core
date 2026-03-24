@@ -32,6 +32,9 @@ pub const MAX_VALUE_LENGTH: usize = 1000;
 /// Maximum length for field labels (#192).
 pub const MAX_LABEL_LENGTH: usize = 64;
 
+/// Maximum length for field notes.
+const MAX_FIELD_NOTE_LEN: usize = 500;
+
 /// Type of contact field.
 ///
 /// Note: Social networks are handled generically via `Social` type.
@@ -71,6 +74,9 @@ pub struct ContactField {
     /// Timestamp of the last update (Unix seconds). Defaults to 0 for backward compatibility.
     #[serde(default)]
     updated_at: u64,
+    /// Private per-field annotation (never sent to other contacts).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    note: Option<String>,
 }
 
 impl ContactField {
@@ -85,6 +91,7 @@ impl ContactField {
             label: normalize_text(label),
             value: normalize_text(value),
             updated_at: now_timestamp(),
+            note: None,
         }
     }
 
@@ -127,6 +134,35 @@ impl ContactField {
     pub fn set_value(&mut self, value: &str) {
         self.value = normalize_text(value);
         self.updated_at = now_timestamp();
+    }
+
+    /// Returns the private note, if any.
+    pub fn note(&self) -> Option<&str> {
+        self.note.as_deref()
+    }
+
+    /// Builder: set a private note on this field. Truncates to 500 chars.
+    pub fn with_note(mut self, note: String) -> Self {
+        if note.is_empty() {
+            self.note = None;
+        } else if note.len() > MAX_FIELD_NOTE_LEN {
+            // Truncate at char boundary to avoid splitting multi-byte UTF-8 characters.
+            let truncated: String = note.chars().take(MAX_FIELD_NOTE_LEN).collect();
+            self.note = Some(truncated);
+        } else {
+            self.note = Some(note);
+        }
+        self
+    }
+
+    /// Returns a clone with all private fields stripped.
+    ///
+    /// Used before building outbound card deltas — notes must NEVER
+    /// appear in data sent to other contacts.
+    pub fn strip_private(&self) -> Self {
+        let mut stripped = self.clone();
+        stripped.note = None;
+        stripped
     }
 
     /// Validates the field value based on its type.

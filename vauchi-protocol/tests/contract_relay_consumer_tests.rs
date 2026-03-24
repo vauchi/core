@@ -60,10 +60,7 @@ fn provider_contract_all_relay_payload_variants_constructable() {
             message_id: "m1".to_string(),
             status: AckStatus::Stored,
         }),
-        MessagePayload::PurgeResponse(PurgeResponse {
-            blobs_deleted: 0,
-            recovery_proofs_deleted: 0,
-        }),
+        MessagePayload::PurgeResponse(PurgeResponse {}),
         MessagePayload::RecoveryProofResponse(RecoveryProofResponse { proofs: vec![] }),
         MessagePayload::ForwardingHints(ForwardingHints {
             hints: vec![],

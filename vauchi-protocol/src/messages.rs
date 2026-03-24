@@ -188,13 +188,13 @@ pub struct PurgeRequest {
     pub timestamp: Option<u64>,
 }
 
-/// Server response to a [`PurgeRequest`], reporting how many items were deleted.
+/// Server response to a [`PurgeRequest`].
+///
+/// Presence of this response signals success. Counts are intentionally omitted
+/// to avoid leaking storage metadata to clients (T0-10 audit finding).
+/// The relay logs counts server-side for operational visibility.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PurgeResponse {
-    pub blobs_deleted: usize,
-    #[serde(default)]
-    pub recovery_proofs_deleted: usize,
-}
+pub struct PurgeResponse {}
 
 // =========================================================================
 // Account revocation
@@ -472,14 +472,12 @@ mod tests {
 
     #[test]
     fn test_purge_response_roundtrip() {
-        let resp = PurgeResponse {
-            blobs_deleted: 5,
-            recovery_proofs_deleted: 1,
-        };
+        let resp = PurgeResponse {};
         let json = serde_json::to_string(&resp).unwrap();
         let decoded: PurgeResponse = serde_json::from_str(&json).unwrap();
-        assert_eq!(decoded.blobs_deleted, 5);
-        assert_eq!(decoded.recovery_proofs_deleted, 1);
+        // Empty struct — presence signals success, no fields to assert
+        assert_eq!(json, "{}");
+        assert!(format!("{:?}", decoded).contains("PurgeResponse"));
     }
 
     #[test]

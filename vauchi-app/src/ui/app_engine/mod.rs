@@ -158,6 +158,8 @@ pub struct AppEngine {
     pending_field_undo: Option<(String, vauchi_core::contact_card::ContactField)>,
     /// Cached field type catalog (built once from SocialNetworkRegistry).
     field_catalog: vauchi_core::contact_card::FieldTypeCatalog,
+    /// Transient preview-as state — contact ID being previewed (not serialized).
+    pub(super) preview_as_contact: Option<String>,
 }
 
 impl AppEngine {
@@ -179,7 +181,7 @@ impl AppEngine {
         } else {
             AppScreen::MyInfo
         };
-        let engine = Self::create_engine(&vauchi, &screen);
+        let engine = Self::create_engine(&vauchi, &screen, None);
         let registry = vauchi_core::social::SocialNetworkRegistry::with_defaults();
         let field_catalog = vauchi_core::contact_card::FieldTypeCatalog::new(&registry);
         Self {
@@ -191,7 +193,18 @@ impl AppEngine {
             nav_history: Vec::new(),
             pending_field_undo: None,
             field_catalog,
+            preview_as_contact: None,
         }
+    }
+
+    /// Enter preview-as mode: show MyInfo as seen by the given contact.
+    ///
+    /// Sets transient state, invalidates the MyInfo cache, and navigates to MyInfo
+    /// in PreviewAs view mode. The state is cleared by handling "exit-preview".
+    pub fn preview_as(&mut self, contact_id: String) -> ScreenModel {
+        self.preview_as_contact = Some(contact_id);
+        self.invalidate_screen(&AppScreen::MyInfo);
+        self.navigate_to(AppScreen::MyInfo)
     }
 
     pub fn current_app_screen(&self) -> &AppScreen {
@@ -289,6 +302,10 @@ impl WorkflowEngine for AppEngine {
         }
 
         self.persist_settings_toggle(&action);
+
+        if let Some(result) = self.intercept_exit_preview(&action) {
+            return result;
+        }
 
         if let Some(result) = self.intercept_add_field(&action) {
             return result;

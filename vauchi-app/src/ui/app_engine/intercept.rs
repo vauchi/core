@@ -291,6 +291,28 @@ impl AppEngine {
         None
     }
 
+    /// Intercept the "exit-preview" action when MyInfo is in PreviewAs mode.
+    ///
+    /// Clears `preview_as_contact`, invalidates the MyInfo cache, and rebuilds
+    /// MyInfo in normal edit mode.
+    pub(super) fn intercept_exit_preview(&mut self, action: &UserAction) -> Option<ActionResult> {
+        let UserAction::ActionPressed { action_id } = action else {
+            return None;
+        };
+        if action_id != "exit-preview" {
+            return None;
+        }
+        if self.screen != AppScreen::MyInfo {
+            return None;
+        }
+        self.preview_as_contact = None;
+        self.engine_cache.remove(&AppScreen::MyInfo);
+        // Rebuild the engine in normal mode and update the current engine slot.
+        let new_engine = Self::create_engine(&self.vauchi, &AppScreen::MyInfo, None);
+        let _ = std::mem::replace(&mut self.engine, new_engine);
+        Some(ActionResult::UpdateScreen(self.engine.current_screen()))
+    }
+
     /// Handle undo actions (field delete restoration).
     pub(super) fn handle_undo(&mut self, action: &UserAction) -> Option<ActionResult> {
         if let UserAction::UndoPressed { action_id } = action

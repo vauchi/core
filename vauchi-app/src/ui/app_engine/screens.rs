@@ -42,10 +42,32 @@ use crate::ui::tor_settings::TorSettingsEngine;
 use vauchi_core::api::Vauchi;
 
 impl AppEngine {
-    pub(super) fn create_engine(vauchi: &Vauchi, screen: &AppScreen) -> Box<dyn WorkflowEngine> {
+    pub(super) fn create_engine(
+        vauchi: &Vauchi,
+        screen: &AppScreen,
+        preview_as: Option<&str>,
+    ) -> Box<dyn WorkflowEngine> {
         match screen {
             AppScreen::Onboarding => Box::new(OnboardingEngine::new()),
             AppScreen::MyInfo => {
+                // If a preview-as contact is active, build in PreviewAs view mode.
+                if let Some(contact_id) = preview_as {
+                    let contact_name = vauchi
+                        .get_contact(contact_id)
+                        .ok()
+                        .flatten()
+                        .map(|c| c.display_name().to_string())
+                        .unwrap_or_else(|| contact_id.to_string());
+                    let shared_info = Self::build_shared_info(vauchi, contact_id);
+                    let mut engine = MyInfoEngine::new(MyInfoProgress::default()).with_view_mode(
+                        crate::ui::my_info::MyInfoViewMode::PreviewAs { contact_name },
+                    );
+                    if let Some(info) = shared_info {
+                        engine = engine.with_preview(info);
+                    }
+                    return Box::new(engine);
+                }
+
                 let progress = MyInfoProgress::default();
                 let all_groups = vauchi.list_groups().unwrap_or_default();
 

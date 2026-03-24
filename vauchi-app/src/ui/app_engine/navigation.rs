@@ -22,11 +22,13 @@ impl AppEngine {
         // Swap in the new screen, get the old one back
         let old_screen = std::mem::replace(&mut self.screen, screen.clone());
 
-        // Build or restore the engine for the new screen
+        // Build or restore the engine for the new screen.
+        // Pass preview_as_contact so MyInfo is built in PreviewAs mode when active.
+        let preview_as = self.preview_as_contact.as_deref();
         let new_engine = self
             .engine_cache
             .remove(&screen)
-            .unwrap_or_else(|| Self::create_engine(&self.vauchi, &screen));
+            .unwrap_or_else(|| Self::create_engine(&self.vauchi, &screen, preview_as));
 
         // Swap in the new engine, get the old one back
         let old_engine = std::mem::replace(&mut self.engine, new_engine);

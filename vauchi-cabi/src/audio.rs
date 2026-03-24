@@ -72,6 +72,7 @@ pub unsafe extern "C" fn vauchi_audio_is_available() -> i32 {
 pub unsafe extern "C" fn vauchi_audio_emit(data: *const u8, data_len: usize) -> i32 {
     #[cfg(feature = "audio")]
     {
+        // SAFETY: data is checked non-null, len comes from the C caller. The buffer must be valid for data_len bytes.
         unsafe {
             match std::panic::catch_unwind(std::panic::AssertUnwindSafe(move || {
                 if data.is_null() || data_len == 0 {

@@ -58,6 +58,7 @@ impl ProximityVerifier for SharedManualVerifier {
 /// `app` must be a valid app handle or null.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn vauchi_exchange_create(app: *mut VauchiApp) -> *mut VauchiExchange {
+    // SAFETY: app is checked non-null inside. Box::into_raw transfers ownership to C caller.
     unsafe {
         match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             if app.is_null() {
@@ -113,6 +114,7 @@ pub unsafe extern "C" fn vauchi_exchange_create(app: *mut VauchiApp) -> *mut Vau
 /// `handle` must be a pointer returned by `vauchi_exchange_create`, or null.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn vauchi_exchange_destroy(handle: *mut VauchiExchange) {
+    // SAFETY: ptr was created by Box::into_raw in vauchi_exchange_create. Caller must not use the handle after this call.
     unsafe {
         let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             if !handle.is_null() {
@@ -131,6 +133,7 @@ pub unsafe extern "C" fn vauchi_exchange_destroy(handle: *mut VauchiExchange) {
 /// `handle` must be a valid exchange handle or null.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn vauchi_exchange_generate_qr(handle: *mut VauchiExchange) -> *mut c_char {
+    // SAFETY: handle is checked non-null. Created by Box::into_raw and not yet freed.
     unsafe {
         match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             if handle.is_null() {
@@ -170,6 +173,7 @@ pub unsafe extern "C" fn vauchi_exchange_process_qr(
     handle: *mut VauchiExchange,
     qr_data: *const c_char,
 ) -> *mut c_char {
+    // SAFETY: handle and qr_data are checked non-null. C caller must provide a valid NUL-terminated string.
     unsafe {
         match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             if handle.is_null() {
@@ -205,6 +209,7 @@ pub unsafe extern "C" fn vauchi_exchange_process_qr(
 
 /// Helper: apply a simple event to an exchange session.
 unsafe fn exchange_apply_event(handle: *mut VauchiExchange, event: ExchangeEvent) -> *mut c_char {
+    // SAFETY: handle is checked non-null. Created by Box::into_raw and not yet freed.
     unsafe {
         match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             if handle.is_null() {
@@ -237,6 +242,7 @@ unsafe fn exchange_apply_event(handle: *mut VauchiExchange, event: ExchangeEvent
 pub unsafe extern "C" fn vauchi_exchange_they_scanned_our_qr(
     handle: *mut VauchiExchange,
 ) -> *mut c_char {
+    // SAFETY: delegated to exchange_apply_event which checks the handle.
     unsafe { exchange_apply_event(handle, ExchangeEvent::TheyScannedOurQR) }
 }
 
@@ -250,6 +256,7 @@ pub unsafe extern "C" fn vauchi_exchange_they_scanned_our_qr(
 pub unsafe extern "C" fn vauchi_exchange_perform_key_agreement(
     handle: *mut VauchiExchange,
 ) -> *mut c_char {
+    // SAFETY: delegated to exchange_apply_event which checks the handle.
     unsafe { exchange_apply_event(handle, ExchangeEvent::PerformKeyAgreement) }
 }
 
@@ -265,6 +272,7 @@ pub unsafe extern "C" fn vauchi_exchange_complete(
     handle: *mut VauchiExchange,
     their_name: *const c_char,
 ) -> *mut c_char {
+    // SAFETY: handle and their_name are checked non-null. C caller must provide a valid NUL-terminated string.
     unsafe {
         match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             if handle.is_null() {
@@ -304,6 +312,7 @@ pub unsafe extern "C" fn vauchi_exchange_complete(
 /// `handle` must be a valid exchange handle or null.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn vauchi_exchange_confirm_proximity(handle: *mut VauchiExchange) {
+    // SAFETY: handle is checked non-null. Created by Box::into_raw and not yet freed.
     unsafe {
         let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             if !handle.is_null() {
@@ -324,6 +333,7 @@ pub unsafe extern "C" fn vauchi_exchange_confirm_proximity(handle: *mut VauchiEx
 /// `handle` must be a valid exchange handle or null.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn vauchi_exchange_state(handle: *mut VauchiExchange) -> *mut c_char {
+    // SAFETY: handle is checked non-null. Created by Box::into_raw and not yet freed.
     unsafe {
         match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             if handle.is_null() {
@@ -363,6 +373,7 @@ pub unsafe extern "C" fn vauchi_exchange_state(handle: *mut VauchiExchange) -> *
 /// `handle` must be a valid exchange handle or null.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn vauchi_exchange_is_timed_out(handle: *mut VauchiExchange) -> i32 {
+    // SAFETY: handle is checked non-null. Created by Box::into_raw and not yet freed.
     unsafe {
         std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             if handle.is_null() {
@@ -389,6 +400,7 @@ pub unsafe extern "C" fn vauchi_exchange_is_timed_out(handle: *mut VauchiExchang
 pub unsafe extern "C" fn vauchi_exchange_peer_display_name(
     handle: *mut VauchiExchange,
 ) -> *mut c_char {
+    // SAFETY: handle is checked non-null. Created by Box::into_raw and not yet freed.
     unsafe {
         match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             if handle.is_null() {
@@ -417,6 +429,7 @@ pub unsafe extern "C" fn vauchi_exchange_peer_display_name(
 /// `handle` must be a valid exchange handle or null.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn vauchi_exchange_enable_debug_log(handle: *mut VauchiExchange) {
+    // SAFETY: handle is checked non-null. Created by Box::into_raw and not yet freed.
     unsafe {
         let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             if !handle.is_null() {
@@ -438,6 +451,7 @@ pub unsafe extern "C" fn vauchi_exchange_enable_debug_log(handle: *mut VauchiExc
 /// `handle` must be a valid exchange handle or null.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn vauchi_exchange_debug_jsonl(handle: *mut VauchiExchange) -> *mut c_char {
+    // SAFETY: handle is checked non-null. Created by Box::into_raw and not yet freed.
     unsafe {
         match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             if handle.is_null() {
@@ -471,6 +485,7 @@ pub unsafe extern "C" fn vauchi_exchange_debug_jsonl(handle: *mut VauchiExchange
 pub unsafe extern "C" fn vauchi_exchange_debug_markdown(
     handle: *mut VauchiExchange,
 ) -> *mut c_char {
+    // SAFETY: handle is checked non-null. Created by Box::into_raw and not yet freed.
     unsafe {
         match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             if handle.is_null() {

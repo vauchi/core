@@ -55,6 +55,7 @@ pub unsafe extern "C" fn vauchi_workflow_create(
 /// `handle` must be a pointer returned by `vauchi_workflow_create`, or null.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn vauchi_workflow_destroy(handle: *mut VauchiWorkflow) {
+    // SAFETY: ptr was created by Box::into_raw in vauchi_workflow_create. Caller must not use the handle after this call.
     unsafe {
         let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             if !handle.is_null() {
@@ -78,6 +79,7 @@ pub unsafe extern "C" fn vauchi_workflow_destroy(handle: *mut VauchiWorkflow) {
 pub unsafe extern "C" fn vauchi_workflow_current_screen(
     handle: *mut VauchiWorkflow,
 ) -> *mut c_char {
+    // SAFETY: handle is checked non-null. Created by Box::into_raw and not yet freed.
     unsafe {
         match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             if handle.is_null() {
@@ -110,6 +112,7 @@ pub unsafe extern "C" fn vauchi_workflow_handle_action(
     handle: *mut VauchiWorkflow,
     action_json: *const c_char,
 ) -> *mut c_char {
+    // SAFETY: handle and action_json are checked non-null. C caller must provide a valid NUL-terminated string.
     unsafe {
         match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             if handle.is_null() {

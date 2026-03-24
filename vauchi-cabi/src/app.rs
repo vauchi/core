@@ -24,6 +24,7 @@ use super::{VauchiApp, from_c_str, to_c_string};
 /// No special requirements.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn vauchi_app_create() -> *mut VauchiApp {
+    // SAFETY: Delegates to vauchi_app_create_with_relay; catch_unwind prevents panics from unwinding into C.
     unsafe {
         match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             vauchi_app_create_with_relay(std::ptr::null())
@@ -128,6 +129,7 @@ pub unsafe extern "C" fn vauchi_app_create_with_key(
     key_bytes: *const u8,
     key_len: usize,
 ) -> *mut VauchiApp {
+    // SAFETY: key_bytes/key_len validated inside closure; from_raw_parts requires valid ptr checked above. Box::into_raw transfers ownership to C caller.
     unsafe {
         use vauchi_core::crypto::SymmetricKey;
         use zeroize::Zeroize;
@@ -180,6 +182,7 @@ pub unsafe extern "C" fn vauchi_app_create_with_key(
 /// `handle` must be a pointer returned by `vauchi_app_create`, or null.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn vauchi_app_destroy(handle: *mut VauchiApp) {
+    // SAFETY: handle was created by Box::into_raw in a _create function. Caller must not use the handle after this call.
     unsafe {
         let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             if !handle.is_null() {
@@ -195,6 +198,7 @@ pub unsafe extern "C" fn vauchi_app_destroy(handle: *mut VauchiApp) {
 /// `handle` must be a valid app handle or null.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn vauchi_app_current_screen(handle: *mut VauchiApp) -> *mut c_char {
+    // SAFETY: handle is checked non-null; ptr was created by Box::into_raw and has not been freed.
     unsafe {
         match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             if handle.is_null() {
@@ -228,6 +232,7 @@ pub unsafe extern "C" fn vauchi_app_handle_action(
     handle: *mut VauchiApp,
     action_json: *const c_char,
 ) -> *mut c_char {
+    // SAFETY: handle is checked non-null; action_json read via from_c_str which checks null and requires NUL-terminated string.
     unsafe {
         match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             if handle.is_null() {
@@ -274,6 +279,7 @@ pub unsafe extern "C" fn vauchi_app_navigate_to(
     handle: *mut VauchiApp,
     screen_name: *const c_char,
 ) -> *mut c_char {
+    // SAFETY: handle is checked non-null; screen_name read via from_c_str which checks null and requires NUL-terminated string.
     unsafe {
         match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             if handle.is_null() {
@@ -311,6 +317,7 @@ pub unsafe extern "C" fn vauchi_app_navigate_to(
 /// `handle` must be a valid app handle or null.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn vauchi_app_available_screens(handle: *mut VauchiApp) -> *mut c_char {
+    // SAFETY: handle is checked non-null; ptr was created by Box::into_raw and has not been freed.
     unsafe {
         match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             if handle.is_null() {
@@ -344,6 +351,7 @@ pub unsafe extern "C" fn vauchi_app_available_screens(handle: *mut VauchiApp) ->
 /// `handle` must be a valid app handle or null.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn vauchi_app_default_screen(handle: *mut VauchiApp) -> *mut c_char {
+    // SAFETY: handle is checked non-null; ptr was created by Box::into_raw and has not been freed.
     unsafe {
         match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             if handle.is_null() {
@@ -375,6 +383,7 @@ pub unsafe extern "C" fn vauchi_app_handle_hardware_event(
     handle: *mut VauchiApp,
     event_json: *const c_char,
 ) -> *mut c_char {
+    // SAFETY: handle is checked non-null; event_json read via from_c_str which checks null and requires NUL-terminated string.
     unsafe {
         match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             if handle.is_null() {

@@ -77,6 +77,7 @@ pub struct VauchiExchange {
 /// `ptr` must be a pointer returned by a vauchi_* function, or null.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn vauchi_string_free(ptr: *mut c_char) {
+    // SAFETY: ptr was allocated by CString::into_raw() in to_c_string(). Null check guards null case.
     unsafe {
         let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             if !ptr.is_null() {
@@ -104,6 +105,7 @@ pub(crate) fn from_c_str(ptr: *const c_char) -> Option<String> {
     if ptr.is_null() {
         return None;
     }
+    // SAFETY: ptr is checked non-null above. C caller must provide a valid NUL-terminated string.
     unsafe { CStr::from_ptr(ptr) }
         .to_str()
         .ok()
@@ -122,6 +124,7 @@ mod tests {
 
     #[test]
     fn create_onboarding_workflow_returns_non_null_handle() {
+        // SAFETY: Calling FFI with valid inputs from this test scope.
         unsafe {
             let wtype = CString::new("onboarding").unwrap();
             let handle = vauchi_workflow_create(wtype.as_ptr());
@@ -135,6 +138,7 @@ mod tests {
 
     #[test]
     fn create_emergency_shred_workflow_returns_non_null_handle() {
+        // SAFETY: Calling FFI with valid inputs from this test scope.
         unsafe {
             let wtype = CString::new("emergency_shred").unwrap();
             let handle = vauchi_workflow_create(wtype.as_ptr());
@@ -148,6 +152,7 @@ mod tests {
 
     #[test]
     fn create_lock_screen_workflow_returns_non_null_handle() {
+        // SAFETY: Calling FFI with valid inputs from this test scope.
         unsafe {
             let wtype = CString::new("lock_screen").unwrap();
             let handle = vauchi_workflow_create(wtype.as_ptr());
@@ -161,6 +166,7 @@ mod tests {
 
     #[test]
     fn create_unknown_workflow_returns_null() {
+        // SAFETY: Calling FFI with valid inputs from this test scope.
         unsafe {
             let wtype = CString::new("nonexistent").unwrap();
             let handle = vauchi_workflow_create(wtype.as_ptr());
@@ -170,6 +176,7 @@ mod tests {
 
     #[test]
     fn create_with_null_type_returns_null() {
+        // SAFETY: Calling FFI with valid inputs from this test scope.
         unsafe {
             let handle = vauchi_workflow_create(std::ptr::null());
             assert!(handle.is_null(), "null type should return null");
@@ -179,6 +186,7 @@ mod tests {
     #[test]
     fn destroy_null_handle_is_safe() {
         // allow(zero_assertions) — this test verifies no crash/UB on null input
+        // SAFETY: Calling FFI with valid inputs from this test scope.
         unsafe {
             vauchi_workflow_destroy(std::ptr::null_mut());
         }
@@ -188,6 +196,7 @@ mod tests {
 
     #[test]
     fn current_screen_returns_valid_json_with_screen_id() {
+        // SAFETY: Calling FFI with valid inputs from this test scope.
         unsafe {
             let wtype = CString::new("onboarding").unwrap();
             let handle = vauchi_workflow_create(wtype.as_ptr());
@@ -214,6 +223,7 @@ mod tests {
 
     #[test]
     fn current_screen_with_null_handle_returns_null() {
+        // SAFETY: Calling FFI with valid inputs from this test scope.
         unsafe {
             let json_ptr = vauchi_workflow_current_screen(std::ptr::null_mut());
             assert!(json_ptr.is_null());
@@ -222,6 +232,7 @@ mod tests {
 
     #[test]
     fn handle_action_advances_workflow_state() {
+        // SAFETY: Calling FFI with valid inputs from this test scope.
         unsafe {
             let wtype = CString::new("onboarding").unwrap();
             let handle = vauchi_workflow_create(wtype.as_ptr());
@@ -258,6 +269,7 @@ mod tests {
 
     #[test]
     fn handle_action_with_invalid_json_returns_error() {
+        // SAFETY: Calling FFI with valid inputs from this test scope.
         unsafe {
             let wtype = CString::new("onboarding").unwrap();
             let handle = vauchi_workflow_create(wtype.as_ptr());
@@ -275,6 +287,7 @@ mod tests {
 
     #[test]
     fn handle_action_with_null_handle_returns_null() {
+        // SAFETY: Calling FFI with valid inputs from this test scope.
         unsafe {
             let action = CString::new(r#"{"ActionPressed":{"action_id":"test"}}"#).unwrap();
             let result_ptr = vauchi_workflow_handle_action(std::ptr::null_mut(), action.as_ptr());
@@ -284,6 +297,7 @@ mod tests {
 
     #[test]
     fn handle_action_with_null_json_returns_error() {
+        // SAFETY: Calling FFI with valid inputs from this test scope.
         unsafe {
             let wtype = CString::new("onboarding").unwrap();
             let handle = vauchi_workflow_create(wtype.as_ptr());
@@ -302,6 +316,7 @@ mod tests {
 
     #[test]
     fn app_create_returns_non_null_handle() {
+        // SAFETY: Calling FFI with valid inputs from this test scope.
         unsafe {
             let handle = vauchi_app_create();
             assert!(!handle.is_null(), "app engine should create successfully");
@@ -312,6 +327,7 @@ mod tests {
     #[test]
     fn app_destroy_null_is_safe() {
         // allow(zero_assertions): No-panic boundary test — validates null input doesn't crash
+        // SAFETY: Calling FFI with valid inputs from this test scope.
         unsafe {
             vauchi_app_destroy(std::ptr::null_mut());
         }
@@ -319,6 +335,7 @@ mod tests {
 
     #[test]
     fn app_current_screen_returns_onboarding() {
+        // SAFETY: Calling FFI with valid inputs from this test scope.
         unsafe {
             let handle = vauchi_app_create();
             let json_ptr = vauchi_app_current_screen(handle);
@@ -333,6 +350,7 @@ mod tests {
 
     #[test]
     fn app_create_with_config_returns_non_null_handle() {
+        // SAFETY: Calling FFI with valid inputs from this test scope.
         unsafe {
             let dir = tempfile::tempdir().unwrap();
             let dir_cstr = CString::new(dir.path().to_str().unwrap()).unwrap();
@@ -347,6 +365,7 @@ mod tests {
 
     #[test]
     fn app_create_with_config_null_dir_returns_null() {
+        // SAFETY: Calling FFI with valid inputs from this test scope.
         unsafe {
             let handle = vauchi_app_create_with_config(std::ptr::null(), std::ptr::null());
             assert!(handle.is_null(), "null data_dir should return null");
@@ -355,6 +374,7 @@ mod tests {
 
     #[test]
     fn app_create_with_config_with_relay_url_returns_non_null() {
+        // SAFETY: Calling FFI with valid inputs from this test scope.
         unsafe {
             let dir = tempfile::tempdir().unwrap();
             let dir_cstr = CString::new(dir.path().to_str().unwrap()).unwrap();
@@ -370,6 +390,7 @@ mod tests {
 
     #[test]
     fn app_create_with_config_persists_across_reopens() {
+        // SAFETY: Calling FFI with valid inputs from this test scope.
         unsafe {
             let dir = tempfile::tempdir().unwrap();
             let dir_cstr = CString::new(dir.path().to_str().unwrap()).unwrap();
@@ -391,6 +412,7 @@ mod tests {
 
     #[test]
     fn app_available_screens_starts_with_onboarding() {
+        // SAFETY: Calling FFI with valid inputs from this test scope.
         unsafe {
             let handle = vauchi_app_create();
             let json_ptr = vauchi_app_available_screens(handle);
@@ -405,6 +427,7 @@ mod tests {
 
     #[test]
     fn app_handle_action_advances_onboarding() {
+        // SAFETY: Calling FFI with valid inputs from this test scope.
         unsafe {
             let handle = vauchi_app_create();
             let action = CString::new(r#"{"ActionPressed":{"action_id":"create_new"}}"#).unwrap();
@@ -420,6 +443,7 @@ mod tests {
 
     #[test]
     fn app_navigate_to_unknown_screen_returns_error() {
+        // SAFETY: Calling FFI with valid inputs from this test scope.
         unsafe {
             let handle = vauchi_app_create();
             let screen = CString::new("nonexistent").unwrap();
@@ -436,6 +460,7 @@ mod tests {
 
     /// Drive a VauchiApp through onboarding to create an identity.
     unsafe fn create_app_with_identity() -> *mut VauchiApp {
+        // SAFETY: Calling FFI with valid inputs from this test scope.
         unsafe {
             let handle = vauchi_app_create();
             assert!(!handle.is_null());
@@ -471,6 +496,7 @@ mod tests {
 
     #[test]
     fn exchange_create_returns_null_without_identity() {
+        // SAFETY: Calling FFI with valid inputs from this test scope.
         unsafe {
             let app = vauchi_app_create();
             let exchange = vauchi_exchange_create(app);
@@ -481,6 +507,7 @@ mod tests {
 
     #[test]
     fn exchange_create_returns_null_for_null_app() {
+        // SAFETY: Calling FFI with valid inputs from this test scope.
         unsafe {
             let exchange = vauchi_exchange_create(std::ptr::null_mut());
             assert!(exchange.is_null());
@@ -490,6 +517,7 @@ mod tests {
     #[test]
     fn exchange_destroy_null_is_safe() {
         // allow(zero_assertions) — no-panic boundary test
+        // SAFETY: Calling FFI with valid inputs from this test scope.
         unsafe {
             vauchi_exchange_destroy(std::ptr::null_mut());
         }
@@ -497,6 +525,7 @@ mod tests {
 
     #[test]
     fn exchange_create_with_identity_returns_non_null() {
+        // SAFETY: Calling FFI with valid inputs from this test scope.
         unsafe {
             let app = create_app_with_identity();
             let exchange = vauchi_exchange_create(app);
@@ -508,6 +537,7 @@ mod tests {
 
     #[test]
     fn exchange_initial_state_is_idle() {
+        // SAFETY: Calling FFI with valid inputs from this test scope.
         unsafe {
             let app = create_app_with_identity();
             let exchange = vauchi_exchange_create(app);
@@ -526,6 +556,7 @@ mod tests {
 
     #[test]
     fn exchange_state_null_handle_returns_null() {
+        // SAFETY: Calling FFI with valid inputs from this test scope.
         unsafe {
             let state_ptr = vauchi_exchange_state(std::ptr::null_mut());
             assert!(state_ptr.is_null());
@@ -534,6 +565,7 @@ mod tests {
 
     #[test]
     fn exchange_generate_qr_transitions_to_displaying() {
+        // SAFETY: Calling FFI with valid inputs from this test scope.
         unsafe {
             let app = create_app_with_identity();
             let exchange = vauchi_exchange_create(app);
@@ -561,6 +593,7 @@ mod tests {
 
     #[test]
     fn exchange_generate_qr_null_handle_returns_null() {
+        // SAFETY: Calling FFI with valid inputs from this test scope.
         unsafe {
             let qr_ptr = vauchi_exchange_generate_qr(std::ptr::null_mut());
             assert!(qr_ptr.is_null());
@@ -569,6 +602,7 @@ mod tests {
 
     #[test]
     fn exchange_is_not_timed_out_initially() {
+        // SAFETY: Calling FFI with valid inputs from this test scope.
         unsafe {
             let app = create_app_with_identity();
             let exchange = vauchi_exchange_create(app);
@@ -584,6 +618,7 @@ mod tests {
 
     #[test]
     fn exchange_is_timed_out_null_returns_error() {
+        // SAFETY: Calling FFI with valid inputs from this test scope.
         unsafe {
             let result = vauchi_exchange_is_timed_out(std::ptr::null_mut());
             assert_eq!(result, -1, "null handle should return -1");
@@ -592,6 +627,7 @@ mod tests {
 
     #[test]
     fn exchange_peer_name_null_before_scan() {
+        // SAFETY: Calling FFI with valid inputs from this test scope.
         unsafe {
             let app = create_app_with_identity();
             let exchange = vauchi_exchange_create(app);
@@ -611,6 +647,7 @@ mod tests {
     #[test]
     fn exchange_confirm_proximity_null_is_safe() {
         // allow(zero_assertions) — no-panic boundary test
+        // SAFETY: Calling FFI with valid inputs from this test scope.
         unsafe {
             vauchi_exchange_confirm_proximity(std::ptr::null_mut());
         }
@@ -618,6 +655,7 @@ mod tests {
 
     #[test]
     fn exchange_debug_log_null_before_enable() {
+        // SAFETY: Calling FFI with valid inputs from this test scope.
         unsafe {
             let app = create_app_with_identity();
             let exchange = vauchi_exchange_create(app);
@@ -642,6 +680,7 @@ mod tests {
 
     #[test]
     fn exchange_enable_debug_log_produces_output() {
+        // SAFETY: Calling FFI with valid inputs from this test scope.
         unsafe {
             let app = create_app_with_identity();
             let exchange = vauchi_exchange_create(app);
@@ -676,6 +715,7 @@ mod tests {
 
     #[test]
     fn exchange_process_qr_rejects_invalid_data() {
+        // SAFETY: Calling FFI with valid inputs from this test scope.
         unsafe {
             let app = create_app_with_identity();
             let exchange = vauchi_exchange_create(app);
@@ -703,6 +743,7 @@ mod tests {
 
     #[test]
     fn exchange_process_qr_null_data_returns_error() {
+        // SAFETY: Calling FFI with valid inputs from this test scope.
         unsafe {
             let app = create_app_with_identity();
             let exchange = vauchi_exchange_create(app);
@@ -721,6 +762,7 @@ mod tests {
 
     #[test]
     fn exchange_they_scanned_null_returns_null() {
+        // SAFETY: Calling FFI with valid inputs from this test scope.
         unsafe {
             let result_ptr = vauchi_exchange_they_scanned_our_qr(std::ptr::null_mut());
             assert!(result_ptr.is_null());
@@ -729,6 +771,7 @@ mod tests {
 
     #[test]
     fn exchange_complete_null_handle_returns_null() {
+        // SAFETY: Calling FFI with valid inputs from this test scope.
         unsafe {
             let name = CString::new("Bob").unwrap();
             let result_ptr = vauchi_exchange_complete(std::ptr::null_mut(), name.as_ptr());
@@ -738,6 +781,7 @@ mod tests {
 
     #[test]
     fn exchange_complete_null_name_returns_error() {
+        // SAFETY: Calling FFI with valid inputs from this test scope.
         unsafe {
             let app = create_app_with_identity();
             let exchange = vauchi_exchange_create(app);
@@ -758,6 +802,7 @@ mod tests {
 
     #[test]
     fn handle_hardware_event_null_handle_returns_null() {
+        // SAFETY: Calling FFI with valid inputs from this test scope.
         unsafe {
             let event = CString::new(r#"{"QrScanned":{"data":"test"}}"#).unwrap();
             let result = vauchi_app_handle_hardware_event(std::ptr::null_mut(), event.as_ptr());
@@ -767,6 +812,7 @@ mod tests {
 
     #[test]
     fn handle_hardware_event_null_json_returns_null() {
+        // SAFETY: Calling FFI with valid inputs from this test scope.
         unsafe {
             let handle = vauchi_app_create();
             let result = vauchi_app_handle_hardware_event(handle, std::ptr::null());
@@ -777,6 +823,7 @@ mod tests {
 
     #[test]
     fn handle_hardware_event_not_on_exchange_returns_null() {
+        // SAFETY: Calling FFI with valid inputs from this test scope.
         unsafe {
             // App starts on onboarding, not exchange — event should be ignored
             let handle = vauchi_app_create();
@@ -792,6 +839,7 @@ mod tests {
 
     #[test]
     fn handle_hardware_event_on_exchange_returns_result() {
+        // SAFETY: Calling FFI with valid inputs from this test scope.
         unsafe {
             let app = create_app_with_identity();
             // Navigate to exchange screen
@@ -824,6 +872,7 @@ mod tests {
     #[test]
     fn to_c_string_strips_nul_bytes_and_returns_sanitized_string() {
         let result = to_c_string("hello\0world");
+        // SAFETY: result was just allocated by to_c_string() above; CStr read + CString reclaim.
         unsafe {
             let cstr = CStr::from_ptr(result);
             assert_eq!(
@@ -839,6 +888,7 @@ mod tests {
     #[test]
     fn to_c_string_normal_string_unchanged() {
         let result = to_c_string("normal string");
+        // SAFETY: result was just allocated by to_c_string() above; CStr read + CString reclaim.
         unsafe {
             let cstr = CStr::from_ptr(result);
             assert_eq!(cstr.to_str().unwrap(), "normal string");
@@ -849,6 +899,7 @@ mod tests {
     #[test]
     fn to_c_string_empty_string_returns_empty() {
         let result = to_c_string("");
+        // SAFETY: result was just allocated by to_c_string() above; CStr read + CString reclaim.
         unsafe {
             let cstr = CStr::from_ptr(result);
             assert_eq!(cstr.to_str().unwrap(), "");
@@ -860,6 +911,7 @@ mod tests {
     fn handle_action_json_serialization_failure_returns_error_json() {
         // Verify the Ok path returns valid JSON (not empty string) for all ActionResult variants
         let wtype = CString::new("onboarding").unwrap();
+        // SAFETY: Calling FFI with valid inputs from this test scope.
         unsafe {
             let handle = vauchi_workflow_create(wtype.as_ptr());
             assert!(!handle.is_null());
@@ -885,6 +937,7 @@ mod tests {
 
     #[test]
     fn create_with_keyring_null_dir_returns_null() {
+        // SAFETY: Calling FFI with valid inputs from this test scope.
         unsafe {
             let handle = vauchi_app_create_with_keyring(std::ptr::null(), std::ptr::null());
             assert!(handle.is_null());
@@ -893,6 +946,7 @@ mod tests {
 
     #[test]
     fn create_with_keyring_valid_dir_returns_non_null() {
+        // SAFETY: Calling FFI with valid inputs from this test scope.
         unsafe {
             let dir = tempfile::tempdir().unwrap();
             let dir_cstr = CString::new(dir.path().to_str().unwrap()).unwrap();
@@ -910,6 +964,7 @@ mod tests {
 
     #[test]
     fn create_with_key_valid_returns_non_null() {
+        // SAFETY: Calling FFI with valid inputs from this test scope.
         unsafe {
             let dir = tempfile::tempdir().unwrap();
             let dir_cstr = CString::new(dir.path().to_str().unwrap()).unwrap();
@@ -923,6 +978,7 @@ mod tests {
 
     #[test]
     fn create_with_key_wrong_length_returns_null() {
+        // SAFETY: Calling FFI with valid inputs from this test scope.
         unsafe {
             let dir = tempfile::tempdir().unwrap();
             let dir_cstr = CString::new(dir.path().to_str().unwrap()).unwrap();
@@ -935,6 +991,7 @@ mod tests {
 
     #[test]
     fn create_with_key_null_key_returns_null() {
+        // SAFETY: Calling FFI with valid inputs from this test scope.
         unsafe {
             let dir = tempfile::tempdir().unwrap();
             let dir_cstr = CString::new(dir.path().to_str().unwrap()).unwrap();
@@ -950,6 +1007,7 @@ mod tests {
 
     #[test]
     fn create_with_key_null_dir_returns_null() {
+        // SAFETY: Calling FFI with valid inputs from this test scope.
         unsafe {
             let key = [0xABu8; 32];
             let handle =
@@ -960,6 +1018,7 @@ mod tests {
 
     #[test]
     fn create_with_key_persists_identity_across_reopens() {
+        // SAFETY: Calling FFI with valid inputs from this test scope.
         unsafe {
             let dir = tempfile::tempdir().unwrap();
             let dir_cstr = CString::new(dir.path().to_str().unwrap()).unwrap();
@@ -1017,6 +1076,7 @@ mod tests {
 
     #[test]
     fn create_with_key_wrong_key_cannot_read_old_data() {
+        // SAFETY: Calling FFI with valid inputs from this test scope.
         unsafe {
             let dir = tempfile::tempdir().unwrap();
             let dir_cstr = CString::new(dir.path().to_str().unwrap()).unwrap();
@@ -1068,6 +1128,7 @@ mod tests {
 
     #[test]
     fn audio_is_available_returns_valid_result() {
+        // SAFETY: Calling FFI with valid inputs from this test scope.
         unsafe {
             let result = vauchi_audio_is_available();
             assert!(result == 0 || result == 1);
@@ -1076,6 +1137,7 @@ mod tests {
 
     #[test]
     fn audio_emit_null_data_returns_zero() {
+        // SAFETY: Calling FFI with valid inputs from this test scope.
         unsafe {
             let result = vauchi_audio_emit(std::ptr::null(), 0);
             assert_eq!(result, 0, "null data should fail gracefully");
@@ -1084,6 +1146,7 @@ mod tests {
 
     #[test]
     fn audio_listen_zero_timeout_returns_null() {
+        // SAFETY: Calling FFI with valid inputs from this test scope.
         unsafe {
             let result = vauchi_audio_listen(0);
             assert!(result.is_null(), "zero timeout should return null");
@@ -1093,6 +1156,7 @@ mod tests {
     #[test]
     fn audio_stop_does_not_crash() {
         // allow(zero_assertions) — no-panic boundary test
+        // SAFETY: Calling FFI with valid inputs from this test scope.
         unsafe {
             vauchi_audio_stop();
         }

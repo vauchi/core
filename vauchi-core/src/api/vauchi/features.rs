@@ -156,25 +156,40 @@ impl Vauchi {
 
     /// Returns the current Tor status.
     ///
-    /// Without the `tor` feature enabled, this always returns `Disabled`.
+    /// **Honest status**: Returns the config-level preference only.
+    /// Tor is NOT wired into the sync path — enabling Tor saves the
+    /// preference but does NOT route traffic through Tor. See problem
+    /// record `2026-03-24-tor-ip-hiding-strategy` for details.
     pub fn tor_status(&self) -> crate::tor_config::TorStatus {
-        crate::tor_config::TorStatus::Disabled
+        if self.config.tor.enabled {
+            // Preference is saved but transport is not wired.
+            // Report Disconnected to be honest — Tor is not actually running.
+            crate::tor_config::TorStatus::Disconnected {
+                reason: "Tor transport not yet wired to sync path".to_string(),
+            }
+        } else {
+            crate::tor_config::TorStatus::Disabled
+        }
     }
 
-    /// Enables Tor with the current configuration.
+    /// Saves Tor preference to storage.
     ///
-    /// Persists the enabled state to storage.
-    /// Note: Actual Tor bootstrapping requires the `tor` feature.
+    /// **WARNING**: This saves the user's preference but does NOT actually
+    /// route traffic through Tor. The sync path (`SyncController →
+    /// RelayClient → WebSocketTransport`) does not consult this setting.
+    /// See problem record `2026-03-24-tor-ip-hiding-strategy`.
     pub fn enable_tor(&mut self) -> VauchiResult<()> {
         self.config.tor.enabled = true;
         self.storage.save_tor_config(&self.config.tor)?;
         self.events.dispatch(VauchiEvent::TorStatusChanged {
-            status: crate::tor_config::TorStatus::Disabled,
+            status: crate::tor_config::TorStatus::Disconnected {
+                reason: "Tor transport not yet wired to sync path".to_string(),
+            },
         });
         Ok(())
     }
 
-    /// Disables Tor.
+    /// Disables Tor preference.
     ///
     /// Persists the disabled state to storage.
     pub fn disable_tor(&mut self) -> VauchiResult<()> {
@@ -216,9 +231,11 @@ impl Vauchi {
 
     /// Requests a new Tor circuit rotation.
     ///
-    /// Without the `tor` feature, this is a no-op that returns Ok.
+    /// **Not functional**: Tor transport is not wired to the sync path.
+    /// This method is a no-op. See `2026-03-24-tor-ip-hiding-strategy`.
     pub fn request_new_tor_circuit(&self) -> VauchiResult<()> {
-        // Actual circuit rotation requires the `tor` feature with arti
+        // Tor transport is not wired to the sync path. This is a no-op.
+        // See problem record 2026-03-24-tor-ip-hiding-strategy.
         Ok(())
     }
 

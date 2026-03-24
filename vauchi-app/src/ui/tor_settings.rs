@@ -62,9 +62,11 @@ impl TorSettingsEngine {
                     items: vec![
                         ToggleItem {
                             id: "tor_enabled".into(),
-                            label: "Enable Tor".into(),
+                            label: "Enable Tor (preference only)".into(),
                             selected: self.enabled,
-                            subtitle: Some("Route all traffic through Tor".into()),
+                            subtitle: Some(
+                                "Not yet wired to connections — saves preference only".into(),
+                            ),
                         },
                         ToggleItem {
                             id: "prefer_onion".into(),

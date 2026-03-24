@@ -3,6 +3,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 //! Tor privacy mode operations for mobile.
+//!
+//! **WARNING**: Tor is NOT wired to the sync path. These methods save
+//! preferences but do NOT route traffic through Tor. See problem record
+//! `2026-03-24-tor-ip-hiding-strategy`.
 
 use super::VauchiPlatform;
 use super::error::MobileError;
@@ -13,10 +17,10 @@ use super::types::MobileTorStatus;
 impl VauchiPlatform {
     // === Tor Privacy Mode ===
 
-    /// Enables Tor with the current configuration.
+    /// Saves Tor preference (enabled) to storage.
     ///
-    /// Persists the enabled state to storage.
-    /// Note: Actual Tor bootstrapping requires the `tor` feature in core.
+    /// **WARNING**: This does NOT route traffic through Tor. The sync
+    /// path is not wired to use Tor. This only saves the preference.
     pub fn enable_tor(&self) -> Result<(), MobileError> {
         let mut vauchi = self.open_vauchi()?;
         vauchi.enable_tor().map_err(MobileError::from)
@@ -48,7 +52,8 @@ impl VauchiPlatform {
 
     /// Requests a new Tor circuit rotation.
     ///
-    /// Without the `tor` feature, this is a no-op that returns Ok.
+    /// **Not functional**: Tor transport is not wired to the sync path.
+    /// This is a no-op that returns Ok.
     pub fn request_new_tor_circuit(&self) -> Result<(), MobileError> {
         let vauchi = self.open_vauchi()?;
         vauchi.request_new_tor_circuit().map_err(MobileError::from)

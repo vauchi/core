@@ -209,7 +209,7 @@ impl HttpTransport {
         url: &str,
         body: &Req,
     ) -> Result<Resp, NetworkError> {
-        let agent = self.build_agent();
+        let agent = self.build_agent()?;
         let resp = agent
             .post(url)
             .send_json(body)
@@ -221,7 +221,7 @@ impl HttpTransport {
     }
 
     fn get_json<Resp: serde::de::DeserializeOwned>(&self, url: &str) -> Result<Resp, NetworkError> {
-        let agent = self.build_agent();
+        let agent = self.build_agent()?;
         let resp = agent
             .get(url)
             .call()
@@ -232,19 +232,19 @@ impl HttpTransport {
             .map_err(|e| NetworkError::Serialization(e.to_string()))
     }
 
-    fn build_agent(&self) -> ureq::Agent {
+    fn build_agent(&self) -> Result<ureq::Agent, NetworkError> {
         let mut builder = ureq::Agent::config_builder().timeout_global(Some(self.timeout()));
 
-        if let Some(proxy) = self.build_proxy() {
+        if let Some(proxy) = self.build_proxy()? {
             builder = builder.proxy(Some(proxy));
         }
 
-        builder.build().new_agent()
+        Ok(builder.build().new_agent())
     }
 
-    fn build_proxy(&self) -> Option<ureq::Proxy> {
+    fn build_proxy(&self) -> Result<Option<ureq::Proxy>, NetworkError> {
         match &self.config.proxy {
-            ProxyConfig::None => None,
+            ProxyConfig::None => Ok(None),
             ProxyConfig::Socks5 {
                 host,
                 port,
@@ -259,14 +259,20 @@ impl HttpTransport {
                 } else {
                     pb
                 };
-                pb.build().ok()
+                let proxy = pb.build().map_err(|e| {
+                    NetworkError::ConnectionFailed(format!("SOCKS5 proxy config error: {e}"))
+                })?;
+                Ok(Some(proxy))
             }
             ProxyConfig::HttpConnect { host, port } => {
-                ureq::Proxy::builder(ureq::ProxyProtocol::Http)
+                let proxy = ureq::Proxy::builder(ureq::ProxyProtocol::Http)
                     .host(host)
                     .port(*port)
                     .build()
-                    .ok()
+                    .map_err(|e| {
+                        NetworkError::ConnectionFailed(format!("HTTP proxy config error: {e}"))
+                    })?;
+                Ok(Some(proxy))
             }
         }
     }

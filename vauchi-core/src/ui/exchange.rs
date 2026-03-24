@@ -150,18 +150,15 @@ impl ExchangeEngine {
         self.session.as_mut()
     }
 
-    /// Returns the groups selected by the user for the new contact.
     pub fn selected_groups(&self) -> &[String] {
         &self.selected_groups
     }
 
-    /// Mark the exchange as successfully verified (called by the caller after
-    /// crypto verification completes).
+    /// Mark the exchange as successfully verified.
     pub fn mark_success(&mut self) {
         self.step = ExchangeStep::Success;
     }
 
-    /// Mark the exchange as failed with an optional user-facing detail message.
     pub fn mark_failed(&mut self) {
         self.step = ExchangeStep::Failed;
     }
@@ -172,7 +169,6 @@ impl ExchangeEngine {
         self.step = ExchangeStep::Failed;
     }
 
-    /// Returns the data scanned from the peer's QR code, if any.
     pub fn scanned_data(&self) -> Option<&str> {
         self.scanned_data.as_deref()
     }
@@ -954,7 +950,7 @@ mod tests {
         engine.mark_failed_with_error(&crate::exchange::ExchangeError::BleOutOfRange);
         assert!(engine.failure_detail.is_some());
 
-        engine.handle_action(UserAction::ActionPressed {
+        let _ = engine.handle_action(UserAction::ActionPressed {
             action_id: "retry".into(),
         });
 

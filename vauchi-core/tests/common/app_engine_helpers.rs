@@ -102,28 +102,28 @@ pub fn drive_onboarding(engine: &mut AppEngine) -> ActionResult {
 /// Returns the final ActionResult which should navigate to the backup screen.
 pub fn drive_onboarding_with_backup(engine: &mut AppEngine) -> ActionResult {
     // Steps 1-6: same as drive_onboarding (through backup_prompt)
-    engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "create_new".into(),
     });
-    engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "get_started".into(),
     });
-    engine.handle_action(UserAction::TextChanged {
+    let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "display_name".into(),
         value: "Alice".into(),
     });
-    engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "continue".into(),
     });
-    engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "skip_to_finish".into(),
     });
-    engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "continue".into(),
     });
 
     // Step 7: setup_backup (instead of skip) -> navigates to ready
-    engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "setup_backup".into(),
     });
 

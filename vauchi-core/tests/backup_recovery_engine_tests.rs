@@ -325,3 +325,56 @@ fn backup_processing_complete_guard_ignores_wrong_step() {
     engine.processing_failed();
     assert_eq!(engine.current_screen().screen_id, "backup_choose");
 }
+
+#[test]
+fn processing_screen_shows_kdf_explanation_for_create() {
+    let mut engine = BackupRecoveryEngine::new(Some(BackupMode::Create));
+    let _ = engine.handle_action(UserAction::TextChanged {
+        component_id: "password".into(),
+        value: "pw".into(),
+    });
+    let _ = engine.handle_action(UserAction::ActionPressed {
+        action_id: "continue".into(),
+    });
+    let _ = engine.handle_action(UserAction::TextChanged {
+        component_id: "confirm_password".into(),
+        value: "pw".into(),
+    });
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "continue".into(),
+    });
+    let ActionResult::NavigateTo(screen) = result else {
+        panic!("Expected NavigateTo");
+    };
+    let detail = match &screen.components[0] {
+        Component::StatusIndicator { detail, .. } => detail.clone(),
+        other => panic!("Expected StatusIndicator, got {other:?}"),
+    };
+    assert!(
+        detail.as_deref().unwrap_or("").contains("encryption key"),
+        "Processing screen should explain KDF delay: {detail:?}"
+    );
+}
+
+#[test]
+fn processing_screen_shows_kdf_explanation_for_restore() {
+    let mut engine = BackupRecoveryEngine::new(Some(BackupMode::Restore));
+    let _ = engine.handle_action(UserAction::TextChanged {
+        component_id: "password".into(),
+        value: "pw".into(),
+    });
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "continue".into(),
+    });
+    let ActionResult::NavigateTo(screen) = result else {
+        panic!("Expected NavigateTo");
+    };
+    let detail = match &screen.components[0] {
+        Component::StatusIndicator { detail, .. } => detail.clone(),
+        other => panic!("Expected StatusIndicator, got {other:?}"),
+    };
+    assert!(
+        detail.as_deref().unwrap_or("").contains("Decrypting"),
+        "Restore processing screen should mention decryption: {detail:?}"
+    );
+}

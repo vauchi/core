@@ -204,9 +204,17 @@ impl BackupRecoveryEngine {
     }
 
     fn processing_screen(&self) -> ScreenModel {
-        let title = match self.mode {
-            BackupMode::Create => "Creating backup…",
-            BackupMode::Restore => "Restoring backup…",
+        let (title, detail) = match self.mode {
+            BackupMode::Create => (
+                "Creating backup…",
+                "Securing your data with a strong encryption key. \
+                 This may take a few seconds on older devices.",
+            ),
+            BackupMode::Restore => (
+                "Restoring backup…",
+                "Decrypting your backup. \
+                 This may take a few seconds on older devices.",
+            ),
         };
         ScreenModel {
             screen_id: "backup_processing".into(),
@@ -216,7 +224,7 @@ impl BackupRecoveryEngine {
                 id: "processing_status".into(),
                 icon: None,
                 title: title.into(),
-                detail: None,
+                detail: Some(detail.into()),
                 status: Status::InProgress,
             }],
             actions: vec![],

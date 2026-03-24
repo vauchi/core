@@ -20,6 +20,7 @@ storage = ["rusqlite"]
 network = ["network-native-tls", "storage"]
 network-native-tls = ["tungstenite", "tungstenite/handshake", "tungstenite/native-tls", "native-tls", "snow"]
 network-rustls = ["tungstenite", "tungstenite/handshake", "tungstenite/rustls-tls-native-roots", "rustls", "webpki-roots", "snow", "storage"]
+network-http = ["ureq"]
 secure-storage = ["keyring"]
 # Platform-specific keyring backends (consumers pick the right one):
 # - Linux: kernel keyutils + D-Bus Secret Service (GNOME Keyring, KDE Wallet, KeePassXC)
@@ -132,6 +133,9 @@ keyring = { version = "3", optional = true }
 
 # Cross-platform audio for ultrasonic proximity verification (desktop only)
 cpal = { version = "0.15", optional = true }
+
+# Sync HTTP client for v2 relay protocol (no async runtime needed)
+ureq = { version = "3", features = ["json"], optional = true }
 
 # Remote content updates — module moved to vauchi-app.
 # Feature retained as empty for backward compatibility (consumers may reference it).

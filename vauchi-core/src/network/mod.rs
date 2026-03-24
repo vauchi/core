@@ -90,6 +90,8 @@ pub mod noise;
 mod noise;
 
 pub mod forwarding;
+#[cfg(feature = "network-http")]
+pub mod http_transport;
 pub mod pinning;
 pub mod relay_url;
 pub mod revocation;
@@ -147,6 +149,10 @@ pub use pinning::{PinnedCertificate, verify_pin};
 // Message classification
 mod classify;
 pub use classify::{MessageType, classify_message};
+
+// HTTP transport for relay v2 protocol
+#[cfg(feature = "network-http")]
+pub use http_transport::{FetchedBlob, HttpTransport, HttpTransportConfig};
 
 // Delivery service (message delivery tracking, retries, offline queue)
 pub mod delivery;

@@ -12,28 +12,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::i18n::{Locale, get_string, get_string_with_args};
-
-/// Types of aha moments that can be triggered
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub enum AhaMomentType {
-    /// Shown when card creation completes
-    CardCreationComplete,
-    /// Shown on first edit (before having contacts)
-    FirstEdit,
-    /// Shown when first contact is added
-    FirstContactAdded,
-    /// Shown when receiving first update from a contact
-    FirstUpdateReceived,
-    /// Shown when first outbound update is delivered
-    FirstOutboundDelivered,
-    /// Shown when the user edits a field on their card for the first time
-    /// (distinct from FirstEdit — triggers on field-level edit, not card creation)
-    FirstFieldEdit,
-    /// Shown when the user reaches three contacts
-    ThreeContactsReached,
-    /// Shown when a second device is linked
-    DeviceLinked,
-}
+pub use crate::types::{AhaMomentTracker, AhaMomentType};
 
 impl AhaMomentType {
     /// Get the user-facing title for this moment (English).
@@ -112,20 +91,6 @@ impl AhaMomentType {
             AhaMomentType::ThreeContactsReached => true,
             AhaMomentType::DeviceLinked => true,
         }
-    }
-
-    /// Get all aha moment types in order
-    pub fn all() -> &'static [AhaMomentType] {
-        &[
-            AhaMomentType::CardCreationComplete,
-            AhaMomentType::FirstEdit,
-            AhaMomentType::FirstContactAdded,
-            AhaMomentType::FirstUpdateReceived,
-            AhaMomentType::FirstOutboundDelivered,
-            AhaMomentType::FirstFieldEdit,
-            AhaMomentType::ThreeContactsReached,
-            AhaMomentType::DeviceLinked,
-        ]
     }
 }
 
@@ -209,34 +174,7 @@ impl AhaMoment {
     }
 }
 
-/// Tracks which aha moments have been seen
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct AhaMomentTracker {
-    /// Set of seen moment types
-    seen: std::collections::HashSet<AhaMomentType>,
-}
-
 impl AhaMomentTracker {
-    /// Create a new tracker
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    /// Check if a moment type has been seen
-    pub fn has_seen(&self, moment_type: AhaMomentType) -> bool {
-        self.seen.contains(&moment_type)
-    }
-
-    /// Mark a moment as seen
-    pub fn mark_seen(&mut self, moment_type: AhaMomentType) {
-        self.seen.insert(moment_type);
-    }
-
-    /// Check if a moment should be triggered (not yet seen)
-    pub fn should_trigger(&self, moment_type: AhaMomentType) -> bool {
-        !self.has_seen(moment_type)
-    }
-
     /// Try to trigger a moment, returning it if not yet seen
     pub fn try_trigger(&mut self, moment_type: AhaMomentType) -> Option<AhaMoment> {
         if self.should_trigger(moment_type) {
@@ -259,31 +197,6 @@ impl AhaMomentTracker {
         } else {
             None
         }
-    }
-
-    /// Get count of seen moments
-    pub fn seen_count(&self) -> usize {
-        self.seen.len()
-    }
-
-    /// Get count of total possible moments
-    pub fn total_count(&self) -> usize {
-        AhaMomentType::all().len()
-    }
-
-    /// Reset all seen moments (for testing/debugging)
-    pub fn reset(&mut self) {
-        self.seen.clear();
-    }
-
-    /// Serialize to JSON for storage
-    pub fn to_json(&self) -> Result<String, serde_json::Error> {
-        serde_json::to_string(self)
-    }
-
-    /// Deserialize from JSON
-    pub fn from_json(json: &str) -> Result<Self, serde_json::Error> {
-        serde_json::from_str(json)
     }
 }
 

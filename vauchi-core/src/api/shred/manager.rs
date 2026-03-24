@@ -15,7 +15,7 @@
 use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use crate::api::account::{DeletionError, DeletionManager};
+use crate::api::deletion::{DeletionError, DeletionManager};
 use crate::api::pre_signed::PreSignedShredMessages;
 use crate::identity::Identity;
 use crate::storage::secure::SecureStorage;

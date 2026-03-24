@@ -51,9 +51,9 @@ pub mod duress;
 pub mod emergency;
 
 #[cfg(feature = "testing")]
-pub mod account;
+pub mod deletion;
 #[cfg(not(feature = "testing"))]
-mod account;
+mod deletion;
 
 #[cfg(feature = "testing")]
 pub mod config;
@@ -106,7 +106,7 @@ pub mod vauchi;
 mod vauchi;
 
 // Identity Deletion
-pub use account::{DeletionError, DeletionManager, DeletionResult, delete_identity_data};
+pub use deletion::{DeletionError, DeletionManager, DeletionResult, delete_identity_data};
 
 // Consent
 pub use consent::{ConsentManager, ConsentRecord, ConsentStatus, ConsentType};

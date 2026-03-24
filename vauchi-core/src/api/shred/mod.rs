@@ -118,7 +118,7 @@ pub struct ShredVerification {
 #[derive(Debug, thiserror::Error)]
 pub enum ShredError {
     #[error("Deletion error: {0}")]
-    Deletion(#[from] crate::api::account::DeletionError),
+    Deletion(#[from] crate::api::deletion::DeletionError),
 
     #[error("Storage error: {0}")]
     Storage(#[from] crate::storage::StorageError),
@@ -151,7 +151,7 @@ pub enum WidgetConfirmationMode {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::api::account::DeletionManager;
+    use crate::api::deletion::DeletionManager;
     use crate::api::pre_signed::PreSignedShredMessages;
     use crate::crypto::SymmetricKey;
     use crate::storage::Storage;

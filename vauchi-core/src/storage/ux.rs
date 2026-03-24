@@ -10,10 +10,10 @@
 use rusqlite::params;
 
 use super::{Storage, StorageError};
-use crate::aha_moments::AhaMomentTracker;
-use crate::demo_contact::DemoContactState;
 use crate::onboarding::OnboardingProgress;
 use crate::tor_config::TorConfig;
+use crate::types::AhaMomentTracker;
+use crate::types::DemoContactState;
 
 impl Storage {
     // === Aha Moments Operations ===
@@ -335,9 +335,9 @@ impl Storage {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::aha_moments::AhaMomentType;
     use crate::crypto::SymmetricKey;
     use crate::tor_config::TorConfig;
+    use crate::types::AhaMomentType;
 
     fn test_storage() -> Storage {
         Storage::in_memory(SymmetricKey::generate()).unwrap()

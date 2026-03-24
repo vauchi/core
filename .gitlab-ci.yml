@@ -525,6 +525,8 @@ mutation:nightly:
   variables:
     MUTATION_PACKAGE: "vauchi-core"
     MUTATION_EXTRA_FLAGS: "--exclude-re theme.rs"
+    # Absolute path so cargo-mutants' /tmp/ copies can still find locales
+    VAUCHI_LOCALES_DIR: "$CI_BUILDS_DIR/$CI_PROJECT_PATH/../locales"
   before_script:
     - !reference [.self-hosted, before_script]
     - !reference [.clone-locales, before_script]
@@ -987,11 +989,18 @@ publish:core:
 
       # Upload to GitLab generic packages registry
       CRATE_FILE="target/package/vauchi-core-${VERSION}.crate"
-      curl --header "JOB-TOKEN: ${CI_JOB_TOKEN}" \
+      HTTP_CODE=$(curl -s -w '%{http_code}' -o /dev/null \
+           --header "JOB-TOKEN: ${CI_JOB_TOKEN}" \
            --upload-file "$CRATE_FILE" \
-           "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/vauchi-core/${VERSION}/vauchi-core-${VERSION}.crate"
-
-      echo "✓ Published vauchi-core $VERSION"
+           "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/vauchi-core/${VERSION}/vauchi-core-${VERSION}.crate")
+      if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 300 ]; then
+        echo "✓ Published vauchi-core $VERSION"
+      elif [ "$HTTP_CODE" = "400" ] || [ "$HTTP_CODE" = "409" ]; then
+        echo "✓ vauchi-core $VERSION already published — skipping"
+      else
+        echo "✗ Upload failed with HTTP ${HTTP_CODE}"
+        exit 1
+      fi
 
 # Publish vauchi-platform crate to GitLab package registry
 publish:platform:
@@ -1035,11 +1044,18 @@ publish:platform:
       rm -rf "$TMPDIR"
 
       # Upload to GitLab generic packages registry
-      curl --header "JOB-TOKEN: ${CI_JOB_TOKEN}" \
+      HTTP_CODE=$(curl -s -w '%{http_code}' -o /dev/null \
+           --header "JOB-TOKEN: ${CI_JOB_TOKEN}" \
            --upload-file "$CRATE_FILE" \
-           "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/vauchi-platform/${VERSION}/vauchi-platform-${VERSION}.crate"
-
-      echo "✓ Published vauchi-platform $VERSION"
+           "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/vauchi-platform/${VERSION}/vauchi-platform-${VERSION}.crate")
+      if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 300 ]; then
+        echo "✓ Published vauchi-platform $VERSION"
+      elif [ "$HTTP_CODE" = "400" ] || [ "$HTTP_CODE" = "409" ]; then
+        echo "✓ vauchi-platform $VERSION already published — skipping"
+      else
+        echo "✗ Upload failed with HTTP ${HTTP_CODE}"
+        exit 1
+      fi
 
 # Publish Android AAR to core's Maven registry (visible at group level).
 # Eliminates the vauchi-platform-kotlin intermediary repo.

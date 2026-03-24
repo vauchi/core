@@ -92,7 +92,8 @@ impl Storage {
              PRAGMA synchronous=NORMAL;
              PRAGMA cache_size=10000;
              PRAGMA secure_delete=ON;
-             PRAGMA temp_store=MEMORY;",
+             PRAGMA temp_store=MEMORY;
+             PRAGMA foreign_keys=ON;",
         )?;
         Ok(())
     }

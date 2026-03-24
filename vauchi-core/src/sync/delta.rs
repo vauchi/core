@@ -89,6 +89,9 @@ pub struct CardDelta {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum FieldChange {
     /// A new field was added.
+    ///
+    /// INVARIANT: `field` must be the result of `ContactField::strip_private()`.
+    /// Private annotations (e.g., `note`) must never appear in outbound deltas.
     Added { field: ContactField },
     /// An existing field's value was modified.
     Modified { field_id: String, new_value: String },

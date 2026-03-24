@@ -243,9 +243,19 @@ impl AppEngine {
         } = action
             && component_id == "personal_note"
         {
-            let _ = self
+            // TODO(security): personal_notes_encrypted column stores raw UTF-8, not encrypted data.
+            // This is a pre-existing gap from migration V4 — the column name implies encryption but
+            // no caller encrypts. Fix requires: choose key (SMK), add encrypt/decrypt to API layer,
+            // migrate existing plaintext notes. Filed as separate problem record.
+            if let Err(e) = self
                 .vauchi
-                .save_personal_notes(contact_id, value.as_bytes());
+                .save_personal_notes(contact_id, value.as_bytes())
+            {
+                eprintln!("Failed to save personal note: {e}");
+            }
+            self.invalidate_screen(&AppScreen::ContactDetail {
+                contact_id: contact_id.to_string(),
+            });
             return Some(ActionResult::UpdateScreen(self.engine.current_screen()));
         }
         None

@@ -33,7 +33,7 @@ pub const MAX_VALUE_LENGTH: usize = 1000;
 pub const MAX_LABEL_LENGTH: usize = 64;
 
 /// Maximum length for field notes.
-const MAX_FIELD_NOTE_LEN: usize = 500;
+pub const MAX_FIELD_NOTE_LEN: usize = 500;
 
 /// Type of contact field.
 ///

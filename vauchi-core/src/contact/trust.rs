@@ -15,12 +15,12 @@ use serde::{Deserialize, Serialize};
 /// Priority order (highest wins): Cautious > Verified > High > Standard.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum TrustLevel {
+    /// Identity was recovered — ratchet may have reset. Highest priority.
+    Cautious,
     /// User manually verified the key fingerprint out-of-band.
     Verified,
     /// High proximity confidence + close-range transport (NFC or BLE).
     High,
-    /// Normal exchange, no special indicators.
+    /// Normal exchange, no special indicators. Default.
     Standard,
-    /// Identity was recovered — ratchet may have reset, treat with caution.
-    Cautious,
 }

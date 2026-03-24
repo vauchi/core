@@ -65,7 +65,7 @@ fn test_field_with_note() {
 fn test_field_note_truncated_at_500_chars() {
     let long_note = "x".repeat(600);
     let f = ContactField::new(FieldType::Phone, "Work", "+41...").with_note(long_note);
-    assert_eq!(f.note().unwrap().len(), 500);
+    assert_eq!(f.note().unwrap().chars().count(), 500);
 }
 
 #[test]

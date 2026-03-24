@@ -473,6 +473,8 @@ impl Storage {
     ///
     /// Inserts or replaces the note for the given `(contact_id, field_id)` pair.
     /// The caller is responsible for encrypting the note before passing it in.
+    // TODO(security): note_encrypted column accepts raw bytes — callers should encrypt
+    // with the storage material key before calling. Same gap as personal_notes_encrypted.
     pub fn save_contact_field_note(
         &self,
         contact_id: &str,

@@ -113,7 +113,7 @@ fn test_note_backward_compat_deserialize() {
 #[test]
 fn test_field_note_truncated_multibyte_utf8() {
     // 600 CJK characters (3 bytes each = 1800 bytes) should truncate to 500 characters
-    let cjk_note: String = std::iter::repeat('\u{4e16}').take(600).collect(); // 世
+    let cjk_note: String = "\u{4e16}".repeat(600); // 世
     assert_eq!(cjk_note.chars().count(), 600);
     let f = ContactField::new(FieldType::Custom, "Note", "val").with_note(cjk_note);
     let note = f.note().unwrap();

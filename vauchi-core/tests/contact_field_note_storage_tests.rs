@@ -236,7 +236,7 @@ fn test_delete_leaves_other_fields_intact() {
     let notes = storage.load_contact_field_notes(&contact_id).unwrap();
     assert_eq!(notes.len(), 1, "Only f2 should remain after deleting f1");
     assert!(
-        notes.get("f1").is_none(),
+        !notes.contains_key("f1"),
         "f1 should be gone after deletion"
     );
     assert_eq!(

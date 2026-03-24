@@ -256,7 +256,7 @@ fn form_dialog_edit_field_collected_input() {
         .collected_input()
         .expect("collected_input should return Some");
     // Format: "value\nnote" — note is empty so input starts with value
-    let value_part = input.splitn(2, '\n').next().unwrap_or("");
+    let value_part = input.split('\n').next().unwrap_or("");
     assert_eq!(value_part, "updated@example.com");
 }
 

@@ -20,6 +20,11 @@ pub mod contacts;
 mod contacts;
 
 #[cfg(feature = "testing")]
+pub mod field_notes;
+#[cfg(not(feature = "testing"))]
+mod field_notes;
+
+#[cfg(feature = "testing")]
 pub mod device;
 #[cfg(not(feature = "testing"))]
 mod device;

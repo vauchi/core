@@ -168,6 +168,13 @@ when = "2024-11-28"
 user-id = 55123
 user-login = "rust-lang-owner"
 
+[[publisher.cbindgen]]
+version = "0.29.2"
+when = "2025-10-21"
+user-id = 3788
+user-login = "emilio"
+user-name = "Emilio Cobos Álvarez"
+
 [[publisher.cexpr]]
 version = "0.6.0"
 when = "2021-10-11"
@@ -882,6 +889,13 @@ user-id = 6743
 user-login = "epage"
 user-name = "Ed Page"
 
+[[publisher.serde_spanned]]
+version = "1.1.0"
+when = "2026-03-23"
+user-id = 6743
+user-login = "epage"
+user-name = "Ed Page"
+
 [[publisher.slab]]
 version = "0.4.12"
 when = "2026-01-31"
@@ -1008,6 +1022,13 @@ user-id = 6743
 user-login = "epage"
 user-name = "Ed Page"
 
+[[publisher.toml]]
+version = "0.9.12+spec-1.1.0"
+when = "2026-02-10"
+user-id = 6743
+user-login = "epage"
+user-name = "Ed Page"
+
 [[publisher.toml_datetime]]
 version = "0.6.11"
 when = "2025-06-06"
@@ -1046,6 +1067,13 @@ user-name = "Ed Page"
 [[publisher.toml_write]]
 version = "0.1.2"
 when = "2025-06-06"
+user-id = 6743
+user-login = "epage"
+user-name = "Ed Page"
+
+[[publisher.toml_writer]]
+version = "1.1.0+spec-1.1.0"
+when = "2026-03-23"
 user-id = 6743
 user-login = "epage"
 user-name = "Ed Page"
@@ -4430,6 +4458,13 @@ who = "Drew Willcoxon <adw@mozilla.com>"
 criteria = "safe-to-deploy"
 delta = "0.1.0 -> 0.1.1"
 aggregated-from = "https://hg.mozilla.org/mozilla-central/raw-file/tip/supply-chain/audits.toml"
+
+[[audits.mozilla.audits.toml_datetime]]
+who = "Jan-Erik Rediger <jrediger@mozilla.com>"
+criteria = "safe-to-deploy"
+version = "0.7.5+spec-1.1.0"
+notes = "Pure data type crate with some datetime parsing. No unsafe."
+aggregated-from = "https://raw.githubusercontent.com/mozilla/glean/main/supply-chain/audits.toml"
 
 [[audits.mozilla.audits.utf8parse]]
 who = "Nika Layzell <nika@thelayzells.com>"

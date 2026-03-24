@@ -169,6 +169,12 @@ user-id = 55123 # rust-lang-owner
 start = "2023-07-13"
 end = "2027-03-10"
 
+[[trusted.cbindgen]]
+criteria = "safe-to-deploy"
+user-id = 3788 # Emilio Cobos Álvarez (emilio)
+start = "2019-06-26"
+end = "2027-03-24"
+
 [[trusted.cc]]
 criteria = "safe-to-deploy"
 user-id = 55123 # rust-lang-owner
@@ -924,6 +930,12 @@ criteria = "safe-to-deploy"
 user-id = 6743 # Ed Page (epage)
 start = "2025-04-25"
 end = "2027-03-10"
+
+[[trusted.toml_writer]]
+criteria = "safe-to-deploy"
+user-id = 6743 # Ed Page (epage)
+start = "2025-07-08"
+end = "2027-03-24"
 
 [[trusted.tower]]
 criteria = "safe-to-deploy"

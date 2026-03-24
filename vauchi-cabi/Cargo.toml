@@ -26,4 +26,4 @@ zeroize = "1.8"
 tempfile = "3"
 
 [build-dependencies]
-cbindgen = "0.27"
+cbindgen = "0.29"

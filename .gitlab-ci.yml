@@ -290,6 +290,15 @@ lint:duplicates:
 lint:machete:
   extends: [.linux-runner-nocache, .lint-machete-job, .timeout-quick]
 
+# CABI header freshness — catch stale headers after export changes (T0-11)
+lint:cabi-header:
+  extends: [.linux-runner, .validation-rust, .timeout-quick]
+  stage: lint
+  needs: []
+  script:
+    - cargo build -p vauchi-cabi
+    - git diff --exit-code vauchi-cabi/include/vauchi.h || { echo "CABI header is stale — rebuild with 'cargo build -p vauchi-cabi' and commit the updated include/vauchi.h"; exit 1; }
+
 # REUSE compliance provided by vauchi/scripts ci-templates/reuse.yml
 
 # ============================================================

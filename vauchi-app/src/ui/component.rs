@@ -115,6 +115,12 @@ pub enum Component {
         validation_error: Option<String>,
     },
     Divider,
+    /// Informational banner with an optional action button (e.g. preview mode indicator).
+    Banner {
+        text: String,
+        action_label: String,
+        action_id: String,
+    },
 }
 
 /// Text rendering style.

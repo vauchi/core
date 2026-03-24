@@ -143,3 +143,79 @@ fn my_info_entry_selection_opens_detail() {
         "Selecting entry should open entry detail, got {result:?}"
     );
 }
+
+fn sample_shared_info_view() -> SharedInfoView {
+    SharedInfoView {
+        shared_display_name: "Me (as Bob sees me)".into(),
+        my_fields: vec![
+            FieldDisplay {
+                id: "mf1".into(),
+                field_type: "Phone".into(),
+                label: "Mobile".into(),
+                value: "+41 79 123 45 67".into(),
+                visibility: UiFieldVisibility::Shown,
+            },
+            FieldDisplay {
+                id: "mf2".into(),
+                field_type: "Email".into(),
+                label: "Work".into(),
+                value: "me@example.com".into(),
+                visibility: UiFieldVisibility::Hidden,
+            },
+        ],
+        visible_groups: vec!["Friends".into()],
+    }
+}
+
+#[test]
+fn test_preview_view_shows_banner_and_fields() {
+    let engine = MyInfoEngine::new(MyInfoProgress::default())
+        .with_own_card("Alice".into(), sample_own_fields())
+        .with_preview(sample_shared_info_view())
+        .with_view_mode(MyInfoViewMode::PreviewAs {
+            contact_name: "Bob".into(),
+        });
+
+    let screen = engine.current_screen();
+
+    // First component must be a Banner with "Viewing as Bob"
+    let first = screen
+        .components
+        .first()
+        .expect("Expected at least one component");
+    match first {
+        Component::Banner {
+            text, action_id, ..
+        } => {
+            assert!(
+                text.contains("Bob"),
+                "Banner text should contain contact name, got: {text}"
+            );
+            assert_eq!(action_id, "exit-preview");
+        }
+        other => panic!("Expected Banner as first component, got: {other:?}"),
+    }
+
+    // An action with id "exit-preview" must be present
+    let has_exit = screen.actions.iter().any(|a| a.id == "exit-preview");
+    assert!(has_exit, "Expected exit-preview action in screen actions");
+
+    // Visible field must have Shown marker, hidden field must have Hidden marker
+    let shown_field = screen.components.iter().find(|c| {
+        matches!(c, Component::FieldList { fields, .. }
+            if fields.iter().any(|f| f.id == "mf1" && f.visibility == UiFieldVisibility::Shown))
+    });
+    assert!(
+        shown_field.is_some(),
+        "Expected visible field mf1 with Shown visibility"
+    );
+
+    let hidden_field = screen.components.iter().find(|c| {
+        matches!(c, Component::FieldList { fields, .. }
+            if fields.iter().any(|f| f.id == "mf2" && f.visibility == UiFieldVisibility::Hidden))
+    });
+    assert!(
+        hidden_field.is_some(),
+        "Expected hidden field mf2 with Hidden visibility"
+    );
+}

@@ -4,6 +4,7 @@
 
 //! MyInfo screen engine — shows user's own card, entries, and visibility controls.
 
+use crate::ui::contact_detail::SharedInfoView;
 use crate::ui::*;
 
 /// Progress summary for the MyInfo screen.
@@ -34,6 +35,8 @@ pub enum MyInfoViewMode {
     EntryView,
     /// Tabs per group showing entries visible to that group.
     GroupView { selected_tab: usize },
+    /// Read-only preview showing how the card looks to a specific contact.
+    PreviewAs { contact_name: String },
 }
 
 /// Group info for the group view tabs.
@@ -52,6 +55,8 @@ pub struct MyInfoEngine {
     own_fields: Vec<OwnFieldInfo>,
     groups: Vec<MyInfoGroupTab>,
     view_mode: MyInfoViewMode,
+    /// Data for the PreviewAs view mode — my card as seen by a specific contact.
+    preview_data: Option<SharedInfoView>,
 }
 
 impl MyInfoEngine {
@@ -61,6 +66,7 @@ impl MyInfoEngine {
             own_fields: Vec::new(),
             groups: Vec::new(),
             view_mode: MyInfoViewMode::EntryView,
+            preview_data: None,
         }
     }
 
@@ -74,6 +80,18 @@ impl MyInfoEngine {
     /// Set the group tabs for group view.
     pub fn with_groups(mut self, groups: Vec<MyInfoGroupTab>) -> Self {
         self.groups = groups;
+        self
+    }
+
+    /// Set the preview data for PreviewAs view mode.
+    pub fn with_preview(mut self, data: SharedInfoView) -> Self {
+        self.preview_data = Some(data);
+        self
+    }
+
+    /// Set the view mode directly (used for testing and navigation).
+    pub fn with_view_mode(mut self, mode: MyInfoViewMode) -> Self {
+        self.view_mode = mode;
         self
     }
 
@@ -194,18 +212,77 @@ impl MyInfoEngine {
 
         components
     }
+
+    fn build_preview_view(&self, contact_name: &str) -> Vec<Component> {
+        let mut components = Vec::new();
+
+        // Banner at top — informs the user they are in preview mode
+        components.push(Component::Banner {
+            text: format!("Viewing as {contact_name}"),
+            action_label: "Exit Preview".into(),
+            action_id: "exit-preview".into(),
+        });
+
+        let Some(ref preview) = self.preview_data else {
+            return components;
+        };
+
+        // Shared display name this contact sees
+        components.push(Component::InfoPanel {
+            id: "preview_shared_name".into(),
+            icon: None,
+            title: "They see you as".into(),
+            items: vec![InfoItem {
+                icon: None,
+                title: "Display Name".into(),
+                detail: preview.shared_display_name.clone(),
+            }],
+        });
+
+        // Render each field with its visibility state
+        for field in &preview.my_fields {
+            components.push(Component::FieldList {
+                id: format!("preview_field_{}", field.id),
+                fields: vec![field.clone()],
+                visibility_mode: VisibilityMode::ReadOnly,
+                available_groups: vec![],
+            });
+        }
+
+        components
+    }
 }
 
 impl WorkflowEngine for MyInfoEngine {
     fn current_screen(&self) -> ScreenModel {
+        if let MyInfoViewMode::PreviewAs { contact_name } = &self.view_mode {
+            let components = self.build_preview_view(contact_name);
+            let actions = vec![ScreenAction {
+                id: "exit-preview".into(),
+                label: "Exit Preview".into(),
+                style: ActionStyle::Secondary,
+                enabled: true,
+            }];
+            return ScreenModel {
+                screen_id: "my_info".into(),
+                title: format!("Viewing as {contact_name}"),
+                subtitle: None,
+                components,
+                actions,
+                progress: None,
+            };
+        }
+
         let components = match &self.view_mode {
             MyInfoViewMode::EntryView => self.build_entry_view(),
             MyInfoViewMode::GroupView { selected_tab } => self.build_group_view(*selected_tab),
+            MyInfoViewMode::PreviewAs { .. } => unreachable!("handled above"),
         };
 
         let view_label = match &self.view_mode {
             MyInfoViewMode::EntryView => "Group View",
             MyInfoViewMode::GroupView { .. } => "Entry View",
+            MyInfoViewMode::PreviewAs { .. } => unreachable!("handled above"),
         };
 
         let at_field_limit = self.own_fields.len() >= vauchi_core::contact_card::MAX_FIELDS;
@@ -251,6 +328,10 @@ impl WorkflowEngine for MyInfoEngine {
                 self.view_mode = match &self.view_mode {
                     MyInfoViewMode::EntryView => MyInfoViewMode::GroupView { selected_tab: 0 },
                     MyInfoViewMode::GroupView { .. } => MyInfoViewMode::EntryView,
+                    // toggle_view is not available in preview mode — ignore
+                    MyInfoViewMode::PreviewAs { .. } => {
+                        return ActionResult::UpdateScreen(self.current_screen());
+                    }
                 };
                 ActionResult::UpdateScreen(self.current_screen())
             }

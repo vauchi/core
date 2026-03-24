@@ -24,3 +24,14 @@ pub enum TrustLevel {
     /// Normal exchange, no special indicators. Default.
     Standard,
 }
+
+impl std::fmt::Display for TrustLevel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            TrustLevel::Cautious => write!(f, "Cautious"),
+            TrustLevel::Verified => write!(f, "Verified"),
+            TrustLevel::High => write!(f, "High"),
+            TrustLevel::Standard => write!(f, "Standard"),
+        }
+    }
+}

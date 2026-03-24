@@ -386,6 +386,10 @@ impl AppEngine {
                     // Build shared info (my card as seen by this contact)
                     let shared_info = Self::build_shared_info(vauchi, contact_id);
 
+                    // Trust data
+                    let trust_level = contact.trust_level().to_string();
+                    let proposal_trusted = contact.is_proposal_trusted();
+
                     match shared_info {
                         Some(info) => Box::new(
                             ContactDetailEngine::with_shared_info(
@@ -394,11 +398,13 @@ impl AppEngine {
                                 info,
                                 personal_note,
                             )
-                            .with_field_notes(field_notes),
+                            .with_field_notes(field_notes)
+                            .with_trust(trust_level, proposal_trusted),
                         ),
                         None => Box::new(
                             ContactDetailEngine::new(item, fields, personal_note)
-                                .with_field_notes(field_notes),
+                                .with_field_notes(field_notes)
+                                .with_trust(trust_level, proposal_trusted),
                         ),
                     }
                 }

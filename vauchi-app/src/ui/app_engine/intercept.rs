@@ -8,6 +8,7 @@
 use super::AppEngine;
 use super::AppScreen;
 use crate::ui::action::{ActionResult, UserAction};
+use crate::ui::contact_detail::ContactDetailEngine;
 use crate::ui::engine::WorkflowEngine;
 use crate::ui::form_dialog::FormDialogType;
 use crate::ui::my_info_entry_detail::{EntryContactInfo, MyInfoEntryDetailEngine};
@@ -311,6 +312,45 @@ impl AppEngine {
         let new_engine = Self::create_engine(&self.vauchi, &AppScreen::MyInfo, None);
         let _ = std::mem::replace(&mut self.engine, new_engine);
         Some(ActionResult::UpdateScreen(self.engine.current_screen()))
+    }
+
+    /// Intercept proposal_trusted toggle on ContactDetail and persist to storage.
+    ///
+    /// When the user toggles the "proposal_trusted" item in the "trust_permissions"
+    /// SettingsGroup, we load the contact, flip the flag, save it, then let the
+    /// engine update its own local state.
+    pub(super) fn intercept_proposal_trust_toggle(
+        &mut self,
+        contact_id: &str,
+        action: &UserAction,
+    ) -> Option<ActionResult> {
+        let UserAction::SettingsToggled {
+            component_id,
+            item_id,
+        } = action
+        else {
+            return None;
+        };
+        if component_id != "trust_permissions" || item_id != "proposal_trusted" {
+            return None;
+        }
+
+        // Load the contact, flip the flag, save it back.
+        if let Ok(Some(mut contact)) = self.vauchi.get_contact(contact_id) {
+            contact.set_proposal_trusted(!contact.is_proposal_trusted());
+            if let Err(e) = self.vauchi.update_contact(&contact) {
+                eprintln!("Failed to save proposal_trusted: {e}");
+            }
+        }
+
+        // Let the engine update its in-memory state and return the new screen.
+        self.engine
+            .as_any_mut()
+            .and_then(|a| a.downcast_mut::<ContactDetailEngine>())
+            .map(|engine| {
+                engine.toggle_proposal_trusted();
+                ActionResult::UpdateScreen(engine.current_screen())
+            })
     }
 
     /// Handle undo actions (field delete restoration).

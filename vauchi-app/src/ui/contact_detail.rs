@@ -43,6 +43,10 @@ pub struct ContactDetailEngine {
     personal_note: String,
     /// Per-field private notes (never shared). Keyed by field_id, plain UTF-8.
     field_notes: HashMap<String, String>,
+    /// Computed trust level display string (read-only).
+    trust_level: String,
+    /// Whether this contact is trusted for simplified contact proposals (user-editable).
+    proposal_trusted: bool,
 }
 
 impl ContactDetailEngine {
@@ -55,6 +59,8 @@ impl ContactDetailEngine {
             view_mode: ContactViewMode::TheirInfo,
             personal_note,
             field_notes: HashMap::new(),
+            trust_level: String::new(),
+            proposal_trusted: false,
         }
     }
 
@@ -72,6 +78,8 @@ impl ContactDetailEngine {
             view_mode: ContactViewMode::TheirInfo,
             personal_note,
             field_notes: HashMap::new(),
+            trust_level: String::new(),
+            proposal_trusted: false,
         }
     }
 
@@ -79,6 +87,23 @@ impl ContactDetailEngine {
     pub fn with_field_notes(mut self, field_notes: HashMap<String, String>) -> Self {
         self.field_notes = field_notes;
         self
+    }
+
+    /// Attach trust data (trust level label and proposal_trusted flag).
+    pub fn with_trust(mut self, trust_level: String, proposal_trusted: bool) -> Self {
+        self.trust_level = trust_level;
+        self.proposal_trusted = proposal_trusted;
+        self
+    }
+
+    /// Returns the current proposal_trusted flag.
+    pub fn proposal_trusted(&self) -> bool {
+        self.proposal_trusted
+    }
+
+    /// Toggles proposal_trusted in-memory. Callers must persist via Vauchi.
+    pub fn toggle_proposal_trusted(&mut self) {
+        self.proposal_trusted = !self.proposal_trusted;
     }
 
     /// Returns the current view mode.
@@ -113,15 +138,24 @@ impl ContactDetailEngine {
 
         match self.view_mode {
             ContactViewMode::TheirInfo => {
+                // Build contact_info items — always show initials, add trust level if set
+                let mut contact_info_items = vec![InfoItem {
+                    icon: None,
+                    title: "Initials".into(),
+                    detail: self.contact.avatar_initials.clone(),
+                }];
+                if !self.trust_level.is_empty() {
+                    contact_info_items.push(InfoItem {
+                        icon: None,
+                        title: "Trust".into(),
+                        detail: self.trust_level.clone(),
+                    });
+                }
                 components.push(Component::InfoPanel {
                     id: "contact_info".into(),
                     icon: None,
                     title: self.contact.name.clone(),
-                    items: vec![InfoItem {
-                        icon: None,
-                        title: "Initials".into(),
-                        detail: self.contact.avatar_initials.clone(),
-                    }],
+                    items: contact_info_items,
                 });
                 // Their fields — read-only, no visibility column.
                 // Each field is followed by an inline-editable private note.
@@ -148,6 +182,18 @@ impl ContactDetailEngine {
                     value: self.personal_note.clone(),
                     editing: false,
                     validation_error: None,
+                });
+                // Trust & permissions group (local-only, never shared with the contact)
+                components.push(Component::SettingsGroup {
+                    id: "trust_permissions".into(),
+                    label: "Trust & Permissions".into(),
+                    items: vec![SettingsItem {
+                        id: "proposal_trusted".into(),
+                        label: "Can propose contacts".into(),
+                        kind: SettingsItemKind::Toggle {
+                            enabled: self.proposal_trusted,
+                        },
+                    }],
                 });
             }
             ContactViewMode::MyInfoForThem => {
@@ -211,6 +257,14 @@ impl ContactDetailEngine {
 }
 
 impl WorkflowEngine for ContactDetailEngine {
+    fn as_any(&self) -> Option<&dyn std::any::Any> {
+        Some(self)
+    }
+
+    fn as_any_mut(&mut self) -> Option<&mut dyn std::any::Any> {
+        Some(self)
+    }
+
     fn current_screen(&self) -> ScreenModel {
         self.build_screen()
     }
@@ -227,6 +281,14 @@ impl WorkflowEngine for ContactDetailEngine {
                     "my_info_for_them" => ContactViewMode::MyInfoForThem,
                     _ => return ActionResult::UpdateScreen(self.build_screen()),
                 };
+                ActionResult::UpdateScreen(self.build_screen())
+            }
+            // Proposal trust toggle (local state; AppEngine intercept persists to storage)
+            UserAction::SettingsToggled {
+                ref component_id,
+                ref item_id,
+            } if component_id == "trust_permissions" && item_id == "proposal_trusted" => {
+                self.proposal_trusted = !self.proposal_trusted;
                 ActionResult::UpdateScreen(self.build_screen())
             }
             UserAction::ActionPressed { action_id } if action_id == "edit" => {
@@ -515,6 +577,137 @@ mod tests {
             ActionResult::PreviewAs {
                 contact_id: "c1".into()
             }
+        );
+    }
+
+    // ===== Trust level and proposal_trusted tests =====
+
+    #[test]
+    fn test_contact_detail_shows_trust_level_badge() {
+        let engine = ContactDetailEngine::new(sample_contact(), sample_fields(), String::new())
+            .with_trust("Verified".into(), false);
+        let screen = engine.current_screen();
+
+        // The trust level must appear as an InfoItem inside the contact_info panel.
+        let contact_info = screen
+            .components
+            .iter()
+            .find(|c| matches!(c, Component::InfoPanel { id, .. } if id == "contact_info"));
+        assert!(contact_info.is_some(), "contact_info panel must exist");
+        if let Some(Component::InfoPanel { items, .. }) = contact_info {
+            let trust_item = items.iter().find(|i| i.title == "Trust");
+            assert!(trust_item.is_some(), "Trust InfoItem must be present");
+            assert_eq!(trust_item.unwrap().detail, "Verified");
+        }
+    }
+
+    #[test]
+    fn test_contact_detail_no_trust_badge_when_trust_level_empty() {
+        // Without with_trust, no Trust InfoItem should appear
+        let engine = ContactDetailEngine::new(sample_contact(), sample_fields(), String::new());
+        let screen = engine.current_screen();
+
+        if let Some(Component::InfoPanel { items, .. }) = screen
+            .components
+            .iter()
+            .find(|c| matches!(c, Component::InfoPanel { id, .. } if id == "contact_info"))
+        {
+            let trust_item = items.iter().find(|i| i.title == "Trust");
+            assert!(
+                trust_item.is_none(),
+                "Trust InfoItem must not appear when trust_level is empty"
+            );
+        }
+    }
+
+    #[test]
+    fn test_contact_detail_shows_proposal_trusted_toggle() {
+        let engine = ContactDetailEngine::new(sample_contact(), sample_fields(), String::new())
+            .with_trust("Standard".into(), false);
+        let screen = engine.current_screen();
+
+        // A SettingsGroup with id "trust_permissions" must exist containing "proposal_trusted"
+        let trust_group = screen.components.iter().find(
+            |c| matches!(c, Component::SettingsGroup { id, .. } if id == "trust_permissions"),
+        );
+        assert!(
+            trust_group.is_some(),
+            "trust_permissions SettingsGroup must exist"
+        );
+        if let Some(Component::SettingsGroup { items, .. }) = trust_group {
+            let toggle = items.iter().find(|i| i.id == "proposal_trusted");
+            assert!(toggle.is_some(), "proposal_trusted SettingsItem must exist");
+            assert_eq!(
+                toggle.unwrap().kind,
+                SettingsItemKind::Toggle { enabled: false }
+            );
+        }
+    }
+
+    #[test]
+    fn test_proposal_trusted_toggle_reflects_value() {
+        let engine = ContactDetailEngine::new(sample_contact(), sample_fields(), String::new())
+            .with_trust("High".into(), true);
+        let screen = engine.current_screen();
+
+        if let Some(Component::SettingsGroup { items, .. }) = screen
+            .components
+            .iter()
+            .find(|c| matches!(c, Component::SettingsGroup { id, .. } if id == "trust_permissions"))
+        {
+            let toggle = items.iter().find(|i| i.id == "proposal_trusted").unwrap();
+            assert_eq!(
+                toggle.kind,
+                SettingsItemKind::Toggle { enabled: true },
+                "Toggle must reflect proposal_trusted=true"
+            );
+        }
+    }
+
+    #[test]
+    fn test_settings_toggled_flips_proposal_trusted() {
+        let mut engine = ContactDetailEngine::new(sample_contact(), sample_fields(), String::new())
+            .with_trust("Standard".into(), false);
+
+        assert!(!engine.proposal_trusted());
+
+        let result = engine.handle_action(UserAction::SettingsToggled {
+            component_id: "trust_permissions".into(),
+            item_id: "proposal_trusted".into(),
+        });
+
+        assert!(matches!(result, ActionResult::UpdateScreen(_)));
+        assert!(
+            engine.proposal_trusted(),
+            "proposal_trusted must be true after toggle"
+        );
+
+        // Screen must reflect new state
+        if let ActionResult::UpdateScreen(screen) = result {
+            if let Some(Component::SettingsGroup { items, .. }) = screen.components.iter().find(
+                |c| matches!(c, Component::SettingsGroup { id, .. } if id == "trust_permissions"),
+            ) {
+                let toggle = items.iter().find(|i| i.id == "proposal_trusted").unwrap();
+                assert_eq!(toggle.kind, SettingsItemKind::Toggle { enabled: true });
+            }
+        }
+    }
+
+    #[test]
+    fn test_settings_toggled_back_to_false() {
+        let mut engine = ContactDetailEngine::new(sample_contact(), sample_fields(), String::new())
+            .with_trust("Standard".into(), true);
+
+        assert!(engine.proposal_trusted());
+
+        let _ = engine.handle_action(UserAction::SettingsToggled {
+            component_id: "trust_permissions".into(),
+            item_id: "proposal_trusted".into(),
+        });
+
+        assert!(
+            !engine.proposal_trusted(),
+            "proposal_trusted must be false after second toggle"
         );
     }
 }

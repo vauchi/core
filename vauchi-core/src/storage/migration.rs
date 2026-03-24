@@ -418,6 +418,11 @@ pub fn all_migrations() -> Vec<Migration> {
             name: "contact_relay_fields",
             action: MigrationAction::Sql(MIGRATION_V31_CONTACT_RELAY_FIELDS),
         },
+        Migration {
+            version: 32,
+            name: "trust_and_notes",
+            action: MigrationAction::Sql(MIGRATION_V32_TRUST_AND_NOTES),
+        },
     ]
 }
 
@@ -561,6 +566,24 @@ const MIGRATION_V31_CONTACT_RELAY_FIELDS: &str = "
     ALTER TABLE contacts ADD COLUMN relay_url TEXT;
     ALTER TABLE contacts ADD COLUMN relay_noise_pubkey BLOB;
     ALTER TABLE pending_updates ADD COLUMN target_relay_url TEXT;
+";
+
+/// Migration v32: Trust indicator and private field notes.
+///
+/// Adds `proposal_trusted` flag to `contacts` for tracking whether the user
+/// has explicitly trusted a contact's card proposal. Also creates the
+/// `contact_field_notes` table for storing per-field encrypted private notes,
+/// keyed by (contact_id, field_id). Notes are encrypted at the application
+/// layer before storage.
+const MIGRATION_V32_TRUST_AND_NOTES: &str = "
+ALTER TABLE contacts ADD COLUMN proposal_trusted INTEGER DEFAULT 0;
+CREATE TABLE IF NOT EXISTS contact_field_notes (
+    contact_id TEXT NOT NULL REFERENCES contacts(id) ON DELETE CASCADE,
+    field_id TEXT NOT NULL,
+    note_encrypted BLOB NOT NULL,
+    updated_at INTEGER NOT NULL,
+    PRIMARY KEY (contact_id, field_id)
+);
 ";
 
 /// Migration v1: Baseline schema.

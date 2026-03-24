@@ -184,6 +184,26 @@ impl AppEngine {
                 let screen = self.navigate_to_internal(AppScreen::Onboarding);
                 ActionResult::NavigateTo(screen)
             }
+            AppScreen::Privacy => {
+                // GdprEngine returns "export" or "delete" via collected_input().
+                // The actual API calls happen in the platform layer (UniFFI/CABI);
+                // here we just navigate back and show feedback.
+                let action = self.engine.collected_input().unwrap_or_default();
+                match action.as_str() {
+                    "export" => ActionResult::ShowToast {
+                        message: "Data export requested. Check your files.".into(),
+                        undo_action_id: None,
+                    },
+                    "delete" => ActionResult::ShowToast {
+                        message: "Identity deletion scheduled. You have 7 days to cancel.".into(),
+                        undo_action_id: None,
+                    },
+                    _ => {
+                        let screen = self.navigate_back();
+                        ActionResult::NavigateTo(screen)
+                    }
+                }
+            }
             AppScreen::FormDialog { dialog_type } => {
                 // Cancel navigates back without saving
                 if self.engine.was_cancelled() {

@@ -291,7 +291,16 @@ impl AppEngine {
                 ))
             }
             AppScreen::Privacy => {
-                Box::new(GdprEngine::new(None, "No data export requested".into()))
+                let contact_count = vauchi.contact_count().unwrap_or(0);
+                Box::new(
+                    GdprEngine::new(None, "Active".into()).with_deletion_summary(
+                        crate::ui::gdpr::DeletionSummary {
+                            contact_count,
+                            has_backup: false,
+                            device_count: 1,
+                        },
+                    ),
+                )
             }
             AppScreen::Support => Box::new(SupportEngine::new()),
             AppScreen::FormDialog { dialog_type } => {

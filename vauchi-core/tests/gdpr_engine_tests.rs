@@ -55,20 +55,34 @@ fn gdpr_export_collected_input() {
 }
 
 #[test]
-fn gdpr_delete_completes() {
+fn gdpr_delete_navigates_to_confirmation() {
     let mut engine = GdprEngine::new(None, "All consents granted".into());
     let result = engine.handle_action(UserAction::ActionPressed {
         action_id: "delete".into(),
     });
-    assert_eq!(result, ActionResult::Complete);
+    match result {
+        ActionResult::NavigateTo(screen) => {
+            assert_eq!(
+                screen.screen_id, "delete_identity_summary",
+                "Delete should navigate to confirmation screen"
+            );
+        }
+        other => panic!("Expected NavigateTo, got {other:?}"),
+    }
 }
 
 #[test]
-fn gdpr_delete_collected_input() {
+fn gdpr_confirm_delete_completes() {
     let mut engine = GdprEngine::new(None, "All consents granted".into());
+    // First navigate to confirmation
     let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "delete".into(),
     });
+    // Then confirm
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "confirm_delete".into(),
+    });
+    assert_eq!(result, ActionResult::Complete);
     assert_eq!(engine.collected_input(), Some("delete".into()));
 }
 

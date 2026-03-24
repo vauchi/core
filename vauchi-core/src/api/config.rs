@@ -14,8 +14,6 @@ use crate::crypto::SymmetricKey;
 use crate::network::{
     MultiRelayConfig, PinnedCertificate, ProxyConfig, RelayClientConfig, TransportConfig,
 };
-use crate::tor_config::TorConfig;
-
 /// Configuration for Vauchi instance.
 #[derive(Debug, Clone)]
 pub struct VauchiConfig {
@@ -45,9 +43,6 @@ pub struct VauchiConfig {
     /// Recovery configuration for social key recovery.
     pub recovery: RecoveryConfig,
 
-    /// Tor configuration (opt-in anonymity layer).
-    pub tor: TorConfig,
-
     /// Multi-relay configuration (for federation client support).
     pub relay_list: Option<MultiRelayConfig>,
 }
@@ -63,7 +58,6 @@ impl Default for VauchiConfig {
             delivery_receipts_enabled: true,
             suppress_presence: false,
             recovery: RecoveryConfig::default(),
-            tor: TorConfig::default(),
             relay_list: None,
         }
     }
@@ -81,12 +75,6 @@ impl VauchiConfig {
     /// Sets the relay server URL.
     pub fn with_relay_url(mut self, url: impl Into<String>) -> Self {
         self.relay.server_url = url.into();
-        self
-    }
-
-    /// Sets the Tor configuration.
-    pub fn with_tor(mut self, tor: TorConfig) -> Self {
-        self.tor = tor;
         self
     }
 
@@ -137,7 +125,7 @@ pub struct RelayConfig {
     /// Maximum message retries before giving up.
     pub max_retries: u32,
 
-    /// Proxy configuration (for Tor support).
+    /// Proxy configuration (SOCKS5 proxy support).
     pub proxy: ProxyConfig,
 
     /// Relay's Noise NK public key for inner transport encryption.
@@ -169,20 +157,6 @@ impl Default for RelayConfig {
 }
 
 impl RelayConfig {
-    /// Creates a relay config for Tor connections.
-    pub fn with_tor(server_url: &str) -> Self {
-        RelayConfig {
-            server_url: server_url.to_string(),
-            // Tor connections are slower
-            connect_timeout_ms: 60_000,
-            io_timeout_ms: 120_000,
-            max_reconnect_attempts: 3,
-            reconnect_base_delay_ms: 5_000,
-            proxy: ProxyConfig::tor_default(),
-            ..Default::default()
-        }
-    }
-
     /// Converts to TransportConfig for the network layer.
     pub fn to_transport_config(&self) -> TransportConfig {
         TransportConfig {

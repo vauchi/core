@@ -38,7 +38,6 @@ use crate::ui::recovery_status::RecoveryEngine;
 use crate::ui::settings::{SettingsConfig, SettingsEngine};
 use crate::ui::support::SupportEngine;
 use crate::ui::sync_status::SyncStatusEngine;
-use crate::ui::tor_settings::TorSettingsEngine;
 use vauchi_core::api::Vauchi;
 
 impl AppEngine {
@@ -262,7 +261,6 @@ impl AppEngine {
                 let contact_count = vauchi.list_contacts().map(|c| c.len()).unwrap_or(0);
                 Box::new(SyncStatusEngine::new(relay_url, contact_count, 0))
             }
-            AppScreen::TorSettings => Box::new(TorSettingsEngine::new(false, false)),
             AppScreen::Recovery => {
                 let contacts = Self::load_contact_items(vauchi);
                 Box::new(RecoveryEngine::new(contacts, 3))

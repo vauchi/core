@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! Feature operations: aha moments, demo contact, tor, multi-relay, hide/unhide,
+//! Feature operations: aha moments, demo contact, multi-relay, hide/unhide,
 //! block/unblock, consent, recovery readiness, and visibility re-propagation.
 
 use crate::contact::Contact;
@@ -144,89 +144,6 @@ impl Vauchi {
 
         let state = crate::demo_contact::DemoContactState::new_active();
         self.storage.save_demo_contact_state(&state)?;
-        Ok(())
-    }
-
-    // === Tor Configuration ===
-
-    /// Returns the current Tor configuration.
-    pub fn tor_config(&self) -> &crate::tor_config::TorConfig {
-        &self.config.tor
-    }
-
-    /// Returns the current Tor status.
-    ///
-    /// Without the `tor` feature enabled, this always returns `Disabled`.
-    pub fn tor_status(&self) -> crate::tor_config::TorStatus {
-        crate::tor_config::TorStatus::Disabled
-    }
-
-    /// Enables Tor with the current configuration.
-    ///
-    /// Persists the enabled state to storage.
-    /// Note: Actual Tor bootstrapping requires the `tor` feature.
-    pub fn enable_tor(&mut self) -> VauchiResult<()> {
-        self.config.tor.enabled = true;
-        self.storage.save_tor_config(&self.config.tor)?;
-        self.events.dispatch(VauchiEvent::TorStatusChanged {
-            status: crate::tor_config::TorStatus::Disabled,
-        });
-        Ok(())
-    }
-
-    /// Disables Tor.
-    ///
-    /// Persists the disabled state to storage.
-    pub fn disable_tor(&mut self) -> VauchiResult<()> {
-        self.config.tor.enabled = false;
-        self.storage.save_tor_config(&self.config.tor)?;
-        self.events.dispatch(VauchiEvent::TorStatusChanged {
-            status: crate::tor_config::TorStatus::Disabled,
-        });
-        Ok(())
-    }
-
-    /// Configures Tor bridge addresses.
-    ///
-    /// Bridges are used when direct Tor connections are blocked.
-    pub fn configure_tor_bridges(&mut self, bridges: Vec<String>) -> VauchiResult<()> {
-        self.config.tor.bridges = bridges;
-        self.storage.save_tor_config(&self.config.tor)?;
-        Ok(())
-    }
-
-    /// Toggles the prefer-onion setting.
-    ///
-    /// Returns the new prefer_onion state.
-    pub fn toggle_prefer_onion(&mut self) -> VauchiResult<bool> {
-        self.config.tor.prefer_onion = !self.config.tor.prefer_onion;
-        self.storage.save_tor_config(&self.config.tor)?;
-        Ok(self.config.tor.prefer_onion)
-    }
-
-    /// Clears all Tor bridge addresses.
-    ///
-    /// Returns the number of bridges that were cleared.
-    pub fn clear_tor_bridges(&mut self) -> VauchiResult<usize> {
-        let count = self.config.tor.bridges.len();
-        self.config.tor.bridges.clear();
-        self.storage.save_tor_config(&self.config.tor)?;
-        Ok(count)
-    }
-
-    /// Requests a new Tor circuit rotation.
-    ///
-    /// Without the `tor` feature, this is a no-op that returns Ok.
-    pub fn request_new_tor_circuit(&self) -> VauchiResult<()> {
-        // Actual circuit rotation requires the `tor` feature with arti
-        Ok(())
-    }
-
-    /// Loads the persisted Tor configuration from storage and applies it.
-    pub fn load_tor_config(&mut self) -> VauchiResult<()> {
-        if let Some(config) = self.storage.load_tor_config()? {
-            self.config.tor = config;
-        }
         Ok(())
     }
 

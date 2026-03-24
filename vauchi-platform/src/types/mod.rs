@@ -29,7 +29,7 @@ pub use security::{
     MobileConsentType, MobileDecoyContact, MobileDeletionInfo, MobileDeletionState,
     MobileDuressSettings, MobileEmergencyConfig, MobileGdprExport, MobileRecoveryClaim,
     MobileRecoveryProgress, MobileRecoveryVerification, MobileRecoveryVoucher, MobileShredReport,
-    MobileShredStatus, MobileShredToken, MobileShredVerification, MobileTorConfig, MobileTorStatus,
+    MobileShredStatus, MobileShredToken, MobileShredVerification,
 };
 pub use social::{
     MobileFieldValidation, MobileSocialNetwork, MobileTrustLevel, MobileValidationStatus,

@@ -41,9 +41,7 @@ mod screen;
 mod settings;
 mod support;
 mod sync_status;
-mod tor_settings;
-
-pub use action::{ActionResult, TorCommand, UserAction};
+pub use action::{ActionResult, UserAction};
 #[cfg(any(feature = "network-native-tls", feature = "network-rustls"))]
 pub use app_engine::{AppEngine, AppScreen};
 pub use backup_recovery::{BackupMode, BackupRecoveryEngine};
@@ -82,4 +80,3 @@ pub use screen::{ActionStyle, Progress, ScreenAction, ScreenModel};
 pub use settings::{SettingsConfig, SettingsEngine};
 pub use support::SupportEngine;
 pub use sync_status::SyncStatusEngine;
-pub use tor_settings::TorSettingsEngine;

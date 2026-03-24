@@ -48,7 +48,6 @@ pub enum AppScreen {
     EmergencyShred,
     DeliveryStatus,
     Sync,
-    TorSettings,
     Recovery,
     Groups,
     GroupDetail {
@@ -97,7 +96,6 @@ impl AppScreen {
             Self::EmergencyShred => "emergency_shred",
             Self::DeliveryStatus => "delivery_status",
             Self::Sync => "sync",
-            Self::TorSettings => "tor_settings",
             Self::Recovery => "recovery",
             Self::Groups => "groups",
             Self::GroupDetail { .. } => "group_detail",
@@ -131,7 +129,6 @@ impl AppScreen {
             "emergency_shred" => Self::EmergencyShred,
             "delivery_status" => Self::DeliveryStatus,
             "sync" => Self::Sync,
-            "tor_settings" => Self::TorSettings,
             "recovery" => Self::Recovery,
             "groups" => Self::Groups,
             "privacy" => Self::Privacy,

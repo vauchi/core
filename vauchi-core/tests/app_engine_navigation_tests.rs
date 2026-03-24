@@ -428,20 +428,6 @@ fn navigate_to_sync_shows_sync_status() {
 }
 
 #[test]
-fn navigate_to_tor_settings_shows_tor() {
-    let mut vauchi = Vauchi::in_memory().unwrap();
-    vauchi.create_identity("Alice").unwrap();
-    let mut engine = AppEngine::new(vauchi);
-    let screen = engine.navigate_to(AppScreen::TorSettings);
-    assert_eq!(screen.screen_id, "tor_settings");
-    assert_eq!(screen.title, "Tor Privacy");
-    assert!(
-        !screen.components.is_empty(),
-        "Tor screen must have at least one component"
-    );
-}
-
-#[test]
 fn navigate_to_recovery_shows_recovery_status() {
     let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
@@ -584,7 +570,6 @@ fn cabi_completeness_all_simple_screens_roundtrip_via_screen_id() {
         AppScreen::EmergencyShred,
         AppScreen::DeliveryStatus,
         AppScreen::Sync,
-        AppScreen::TorSettings,
         AppScreen::Recovery,
         AppScreen::Groups,
         AppScreen::Privacy,

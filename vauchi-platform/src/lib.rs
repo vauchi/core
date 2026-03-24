@@ -44,7 +44,6 @@ mod mobile_nfc;
 mod mobile_onboarding;
 mod mobile_recovery;
 mod mobile_security;
-mod mobile_tor;
 mod mobile_ui;
 mod mobile_verifier_event;
 mod mobile_visibility;
@@ -115,8 +114,7 @@ pub use types::{
     MobileRecoveryVerification, MobileRecoveryVoucher, MobileRetryEntry, MobileShredReport,
     MobileShredStatus, MobileShredToken, MobileShredVerification, MobileSocialNetwork,
     MobileSyncResult, MobileSyncStatus, MobileTheme, MobileThemeColors, MobileThemeMode,
-    MobileTorConfig, MobileTorStatus, MobileTrustLevel, MobileValidationStatus,
-    MobileVisibilityLabel, MobileVisibilityLabelDetail,
+    MobileTrustLevel, MobileValidationStatus, MobileVisibilityLabel, MobileVisibilityLabelDetail,
 };
 
 uniffi::setup_scaffolding!();
@@ -1100,7 +1098,6 @@ impl VauchiPlatform {
 // - mobile_exchange.rs: Contact exchange operations
 // - mobile_delivery.rs: Sync, delivery status, retry/offline queue, multi-device, backup, async sync
 // - mobile_gdpr.rs: GDPR, crypto-shredding, consent
-// - mobile_tor.rs: Tor privacy mode
 // - mobile_recovery.rs: Recovery operations
 // - mobile_device_link.rs: Device linking, relay transport, multipart QR
 // - mobile_content.rs: Content updates (feature-gated)

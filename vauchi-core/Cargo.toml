@@ -39,8 +39,6 @@ test-timings = []
 test-kdf = []
 # JSON Schema generation for UI types (dev tooling only)
 schema-gen = ["schemars", "vauchi-app/schema-gen"]
-# Tor anonymity layer (embedded arti client)
-tor = ["arti-client", "tor-rtcompat", "tokio-util", "tokio"]
 # Remote content updates — module moved to vauchi-app.
 # Feature retained as empty for backward compatibility (consumers may reference it).
 content-updates = []
@@ -140,13 +138,6 @@ cpal = { version = "0.15", optional = true }
 # reqwest/tokio deps removed (were only used by the content module).
 
 
-# Async runtime for content fetching
-tokio = { version = "1.0", features = ["rt"], optional = true }
-
-# Embedded Tor client (optional, behind tor feature)
-arti-client = { version = "0.27", optional = true, default-features = false, features = ["tokio", "native-tls"] }
-tor-rtcompat = { version = "0.27", optional = true, features = ["tokio", "native-tls"] }
-tokio-util = { version = "0.7", optional = true, features = ["io", "io-util"] }
 
 # WASM compatibility — uuid needs JS-backed RNG on wasm32
 [target.'cfg(target_arch = "wasm32")'.dependencies]
@@ -243,10 +234,6 @@ required-features = ["testing"]
 
 [[test]]
 name = "encryption_coverage_tests"
-required-features = ["testing"]
-
-[[test]]
-name = "tor_mode_tests"
 required-features = ["testing"]
 
 [[test]]

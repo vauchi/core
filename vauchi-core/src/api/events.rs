@@ -128,24 +128,6 @@ pub enum VauchiEvent {
         message: String,
     },
 
-    /// Tor bootstrap progress update.
-    TorBootstrapProgress {
-        /// Bootstrap percentage (0-100).
-        percentage: u8,
-    },
-
-    /// Tor connection status changed.
-    TorStatusChanged {
-        /// The new Tor status.
-        status: crate::tor_config::TorStatus,
-    },
-
-    /// Tor circuit was rotated.
-    TorCircuitRotated {
-        /// Age of the previous circuit in seconds.
-        circuit_age_secs: u64,
-    },
-
     /// Relay health changed (for multi-relay support).
     RelayHealthChanged {
         /// The relay URL whose health changed.

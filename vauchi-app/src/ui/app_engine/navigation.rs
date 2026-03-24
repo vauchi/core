@@ -83,7 +83,7 @@ impl AppEngine {
         }
     }
 
-    /// Returns top-level navigation screens. Sub-screens (Sync, TorSettings,
+    /// Returns top-level navigation screens. Sub-screens (Sync,
     /// Recovery, Groups, Privacy, Support) are reached via `navigate_to`.
     pub fn available_screens(&self) -> Vec<AppScreen> {
         if !self.vauchi.has_identity() {

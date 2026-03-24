@@ -93,7 +93,6 @@ pub mod forwarding;
 pub mod pinning;
 pub mod relay_url;
 pub mod revocation;
-pub mod tor;
 
 // Error types
 pub use error::NetworkError;
@@ -144,12 +143,6 @@ pub use noise::{NoiseInitiator, NoiseTransport as NoiseSession, parse_relay_nois
 
 // Certificate pinning
 pub use pinning::{PinnedCertificate, verify_pin};
-
-// Tor transport
-pub use tor::{TorConfig, TorConnector, TorRelayAddress, TorStatus, TorTransport};
-
-#[cfg(feature = "tor")]
-pub use tor::{ArtiTorConnector, TorManager};
 
 // Message classification
 mod classify;

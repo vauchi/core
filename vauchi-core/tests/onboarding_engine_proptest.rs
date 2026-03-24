@@ -495,7 +495,6 @@ proptest! {
                 | ActionResult::OpenEntryDetail { .. }
                 | ActionResult::WipeComplete
                 | ActionResult::ExchangeCommands { .. }
-                | ActionResult::TorCommand { .. }
                 | ActionResult::PreviewAs { .. }
                 | ActionResult::ShowContactPicker => {
                     // Valid external navigation/action results

@@ -20,7 +20,6 @@ pub use types::{AudioCapability, ExchangeTransport, ProximityConfidence};
 pub mod contact;
 pub mod contact_card;
 pub mod identity;
-pub mod tor_config;
 pub use contact::merge::DuplicatePair;
 pub use contact::{
     Contact, FieldVisibility, Group, GroupError, GroupManager, MAX_LABELS, SUGGESTED_LABELS,
@@ -31,7 +30,6 @@ pub use contact_card::{
     is_safe_url,
 };
 pub use identity::{Identity, IdentityBackup};
-pub use tor_config::{TorConfig, TorConfigError, TorRelayAddress, TorStatus};
 
 #[cfg(feature = "storage")]
 pub mod storage;

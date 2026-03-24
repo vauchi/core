@@ -268,12 +268,14 @@ lint:clippy:
     - !reference [.clone-themes, before_script]
 
 # SemVer compatibility check — catch breaking API changes before they cascade
-# to 10+ downstream consumers (cli, tui, e2e, relay, linux-gtk, mobile bindings)
+# to 10+ downstream consumers (cli, tui, e2e, relay, linux-gtk, mobile bindings).
+# Advisory while pre-1.0 (no deployed clients, SP-33 allows intentional breaks).
+# Flip to allow_failure: false when version reaches 1.0.0.
 lint:semver:
   extends: [.linux-runner, .validation-rust, .timeout-quick]
   stage: lint
   needs: []
-  allow_failure: false
+  allow_failure: true
   script:
     - command -v cargo-semver-checks >/dev/null 2>&1 || cargo binstall cargo-semver-checks --no-confirm 2>/dev/null || cargo install cargo-semver-checks
     - git fetch origin main

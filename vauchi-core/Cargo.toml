@@ -38,7 +38,7 @@ test-timings = []
 # MUST NOT be enabled in production builds — only for test/dev profiles.
 test-kdf = []
 # JSON Schema generation for UI types (dev tooling only)
-schema-gen = ["schemars"]
+schema-gen = ["schemars", "vauchi-app/schema-gen"]
 # Tor anonymity layer (embedded arti client)
 tor = ["arti-client", "tor-rtcompat", "tokio-util", "tokio"]
 # Remote content updates — module moved to vauchi-app.

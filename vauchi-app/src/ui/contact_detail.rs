@@ -683,13 +683,13 @@ mod tests {
         );
 
         // Screen must reflect new state
-        if let ActionResult::UpdateScreen(screen) = result {
-            if let Some(Component::SettingsGroup { items, .. }) = screen.components.iter().find(
+        if let ActionResult::UpdateScreen(screen) = result
+            && let Some(Component::SettingsGroup { items, .. }) = screen.components.iter().find(
                 |c| matches!(c, Component::SettingsGroup { id, .. } if id == "trust_permissions"),
-            ) {
-                let toggle = items.iter().find(|i| i.id == "proposal_trusted").unwrap();
-                assert_eq!(toggle.kind, SettingsItemKind::Toggle { enabled: true });
-            }
+            )
+        {
+            let toggle = items.iter().find(|i| i.id == "proposal_trusted").unwrap();
+            assert_eq!(toggle.kind, SettingsItemKind::Toggle { enabled: true });
         }
     }
 

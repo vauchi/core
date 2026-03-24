@@ -297,17 +297,17 @@ proptest! {
         let mut union_fields: Vec<String> = Vec::new();
 
         for g_idx in 0..num_groups {
-            let group = vauchi.create_group(&format!("Group_{}", g_idx)).unwrap();
+            let group = vauchi.create_group(&format!("Group_{g_idx}")).unwrap();
             let gid = group.id().to_string();
             vauchi.add_contact_to_group(&gid, &contact_id).unwrap();
 
             // Each group shows one distinct field (if enough fields)
-            if g_idx < field_count {
+            if let Some(fid) = field_ids.get(g_idx) {
                 vauchi
-                    .set_group_field_visibility(&gid, &field_ids[g_idx], true)
+                    .set_group_field_visibility(&gid, fid, true)
                     .unwrap();
-                if !union_fields.contains(&field_ids[g_idx]) {
-                    union_fields.push(field_ids[g_idx].clone());
+                if !union_fields.contains(fid) {
+                    union_fields.push(fid.clone());
                 }
             }
         }

@@ -106,11 +106,11 @@ fn group_detail_has_preview_as_member_actions() {
     // Each member should have a corresponding "preview-as-member:<id>" action.
     let action_ids: Vec<&str> = screen.actions.iter().map(|a| a.id.as_str()).collect();
     assert!(
-        action_ids.iter().any(|id| *id == "preview-as-member:c1"),
+        action_ids.contains(&"preview-as-member:c1"),
         "Expected action 'preview-as-member:c1', got: {action_ids:?}"
     );
     assert!(
-        action_ids.iter().any(|id| *id == "preview-as-member:c2"),
+        action_ids.contains(&"preview-as-member:c2"),
         "Expected action 'preview-as-member:c2', got: {action_ids:?}"
     );
 }

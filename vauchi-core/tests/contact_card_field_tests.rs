@@ -109,3 +109,15 @@ fn test_note_backward_compat_deserialize() {
     let f: ContactField = serde_json::from_str(json).unwrap();
     assert_eq!(f.note(), None);
 }
+
+#[test]
+fn test_field_note_truncated_multibyte_utf8() {
+    // 600 CJK characters (3 bytes each = 1800 bytes) should truncate to 500 characters
+    let cjk_note: String = std::iter::repeat('\u{4e16}').take(600).collect(); // 世
+    assert_eq!(cjk_note.chars().count(), 600);
+    let f = ContactField::new(FieldType::Custom, "Note", "val").with_note(cjk_note);
+    let note = f.note().unwrap();
+    assert_eq!(note.chars().count(), 500);
+    // All characters should be the same CJK character
+    assert!(note.chars().all(|c| c == '\u{4e16}'));
+}

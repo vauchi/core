@@ -145,8 +145,7 @@ impl ContactField {
     pub fn with_note(mut self, note: String) -> Self {
         if note.is_empty() {
             self.note = None;
-        } else if note.len() > MAX_FIELD_NOTE_LEN {
-            // Truncate at char boundary to avoid splitting multi-byte UTF-8 characters.
+        } else if note.chars().count() > MAX_FIELD_NOTE_LEN {
             let truncated: String = note.chars().take(MAX_FIELD_NOTE_LEN).collect();
             self.note = Some(truncated);
         } else {

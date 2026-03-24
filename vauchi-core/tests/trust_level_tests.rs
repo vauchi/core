@@ -126,3 +126,12 @@ fn test_unknown_proximity_ble_is_standard() {
     });
     assert_eq!(contact.trust_level(), TrustLevel::Standard);
 }
+
+#[test]
+fn test_low_proximity_nfc_is_standard() {
+    let contact = make_contact(|c| {
+        c.set_proximity_confidence(ProximityConfidence::Low);
+        c.set_exchange_transport(ExchangeTransport::Nfc);
+    });
+    assert_eq!(contact.trust_level(), TrustLevel::Standard);
+}

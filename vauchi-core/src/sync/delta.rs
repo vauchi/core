@@ -151,7 +151,7 @@ impl CardDelta {
         for (id, new_field) in &new_fields {
             if !old_fields.contains_key(id) {
                 changes.push(FieldChange::Added {
-                    field: (*new_field).clone(),
+                    field: new_field.strip_private(),
                 });
             }
         }

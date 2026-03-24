@@ -135,8 +135,10 @@ keyring = { version = "3", optional = true }
 # Cross-platform audio for ultrasonic proximity verification (desktop only)
 cpal = { version = "0.15", optional = true }
 
-# HTTP client for remote content updates (optional)
-reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json", "socks"], optional = true }
+# Remote content updates — module moved to vauchi-app.
+# Feature retained as empty for backward compatibility (consumers may reference it).
+# reqwest/tokio deps removed (were only used by the content module).
+
 
 # Async runtime for content fetching
 tokio = { version = "1.0", features = ["rt"], optional = true }
@@ -153,7 +155,7 @@ getrandom = { version = "0.2", features = ["js"] }
 
 [dev-dependencies]
 # App-layer modules (tests reference ui, theme, help, i18n, content)
-vauchi-app = { path = "../vauchi-app", features = ["network-native-tls"] }
+vauchi-app = { version = "0.9.0", path = "../vauchi-app", features = ["network-native-tls"] }
 # JSON Schema validation for contract tests
 jsonschema = "0.28"
 # Temporary directories for storage tests

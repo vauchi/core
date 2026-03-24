@@ -6993,7 +6993,6 @@ dependencies = [
  "proptest",
  "qrcode",
  "rand 0.8.5",
- "reqwest",
  "rusqlite",
  "rustls",
  "schemars 0.8.22",

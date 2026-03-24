@@ -7,6 +7,7 @@
 //! Provides a registry of known social networks with profile URL templates.
 //! This enables generating clickable profile links from usernames.
 
+#[cfg(feature = "content-updates")]
 use crate::content::ContentManager;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -160,6 +161,7 @@ impl SocialNetworkRegistry {
     /// Creates a registry from ContentManager (cached → bundled fallback).
     ///
     /// This allows networks to be updated remotely without app updates.
+    #[cfg(feature = "content-updates")]
     pub fn from_content_manager(content: &ContentManager) -> Self {
         let mut registry = Self::new();
         let networks = content.networks();

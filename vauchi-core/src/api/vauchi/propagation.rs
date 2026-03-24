@@ -421,6 +421,7 @@ impl Vauchi {
     ///
     /// This is the synchronous version intended for CLI, desktop, and TUI.
     /// For async mobile usage, see `vauchi-platform`'s `MobileContentUpdater`.
+    #[cfg(feature = "content-updates")]
     pub fn check_content_updates(&self) -> crate::content::UpdateStatus {
         let content_config = crate::content::ContentConfig {
             storage_path: self.config.storage_path.join("content_cache"),

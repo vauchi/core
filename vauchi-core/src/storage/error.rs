@@ -28,6 +28,7 @@ pub enum DeletionState {
 
 /// Storage error types.
 #[derive(Error, Debug)]
+#[non_exhaustive]
 pub enum StorageError {
     #[error("Database error: {0}")]
     Database(rusqlite::Error),

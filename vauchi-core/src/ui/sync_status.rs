@@ -18,19 +18,21 @@ pub struct SyncStatusEngine {
 }
 
 impl SyncStatusEngine {
-    pub fn new(
-        relay_url: String,
-        contact_count: usize,
-        pending_updates: usize,
-        connection_state: ConnectionState,
-    ) -> Self {
+    /// Creates a sync status engine (defaults to Disconnected state).
+    pub fn new(relay_url: String, contact_count: usize, pending_updates: usize) -> Self {
         Self {
             relay_url,
             contact_count,
             pending_updates,
-            connection_state,
+            connection_state: ConnectionState::Disconnected,
             last_action: None,
         }
+    }
+
+    /// Creates a sync status engine with a specific connection state.
+    pub fn with_connection_state(mut self, state: ConnectionState) -> Self {
+        self.connection_state = state;
+        self
     }
 
     fn connection_status_text(&self) -> (&str, Status) {

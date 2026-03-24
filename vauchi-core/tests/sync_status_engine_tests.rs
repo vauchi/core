@@ -6,21 +6,13 @@ use vauchi_core::network::ConnectionState;
 use vauchi_core::ui::*;
 
 fn connected_engine() -> SyncStatusEngine {
-    SyncStatusEngine::new(
-        "wss://relay.vauchi.app".into(),
-        5,
-        2,
-        ConnectionState::Connected,
-    )
+    SyncStatusEngine::new("wss://relay.vauchi.app".into(), 5, 2)
+        .with_connection_state(ConnectionState::Connected)
 }
 
 fn offline_engine() -> SyncStatusEngine {
-    SyncStatusEngine::new(
-        "wss://relay.vauchi.app".into(),
-        5,
-        3,
-        ConnectionState::Disconnected,
-    )
+    SyncStatusEngine::new("wss://relay.vauchi.app".into(), 5, 3)
+        .with_connection_state(ConnectionState::Disconnected)
 }
 
 #[test]
@@ -166,12 +158,8 @@ fn test_connection_returns_complete() {
 
 #[test]
 fn reconnecting_shows_in_progress() {
-    let engine = SyncStatusEngine::new(
-        "wss://relay.vauchi.app".into(),
-        5,
-        0,
-        ConnectionState::Reconnecting { attempt: 2 },
-    );
+    let engine = SyncStatusEngine::new("wss://relay.vauchi.app".into(), 5, 0)
+        .with_connection_state(ConnectionState::Reconnecting { attempt: 2 });
     let screen = engine.current_screen();
 
     let status = screen.components.iter().find_map(|c| match c {
@@ -185,12 +173,8 @@ fn reconnecting_shows_in_progress() {
 
 #[test]
 fn zero_pending_shows_all_up_to_date() {
-    let engine = SyncStatusEngine::new(
-        "wss://relay.vauchi.app".into(),
-        3,
-        0,
-        ConnectionState::Connected,
-    );
+    let engine = SyncStatusEngine::new("wss://relay.vauchi.app".into(), 3, 0)
+        .with_connection_state(ConnectionState::Connected);
     let screen = engine.current_screen();
 
     let pending = screen.components.iter().find_map(|c| match c {
@@ -209,12 +193,8 @@ fn zero_pending_shows_all_up_to_date() {
 
 #[test]
 fn nonzero_pending_shows_count() {
-    let engine = SyncStatusEngine::new(
-        "wss://relay.vauchi.app".into(),
-        3,
-        7,
-        ConnectionState::Disconnected,
-    );
+    let engine = SyncStatusEngine::new("wss://relay.vauchi.app".into(), 3, 7)
+        .with_connection_state(ConnectionState::Disconnected);
     let screen = engine.current_screen();
 
     let pending = screen.components.iter().find_map(|c| match c {

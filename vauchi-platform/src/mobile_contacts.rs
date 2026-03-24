@@ -9,8 +9,8 @@ use vauchi_core::ContactField;
 use super::VauchiPlatform;
 use super::error::MobileError;
 use super::types::{
-    MobileContact, MobileContactCard, MobileFieldType, MobileFieldValidation, MobileSocialNetwork,
-    MobileValidationStatus,
+    MobileContact, MobileContactCard, MobileFieldNote, MobileFieldType, MobileFieldValidation,
+    MobileSocialNetwork, MobileValidationStatus,
 };
 
 #[uniffi::export]
@@ -198,6 +198,110 @@ impl VauchiPlatform {
         let contacts = storage.list_contacts()?;
         let count = contacts.iter().filter(|c| c.is_recovery_trusted()).count();
         Ok(count as u32)
+    }
+
+    // === Personal Notes Operations ===
+
+    /// Save a personal note for a contact.
+    ///
+    /// Notes are private ("your eyes only") — they are never sent to the contact.
+    /// An empty string clears the note.
+    pub fn set_contact_note(&self, contact_id: String, note: String) -> Result<(), MobileError> {
+        let storage = self.open_storage()?;
+        storage.save_personal_notes(&contact_id, note.as_bytes())?;
+        Ok(())
+    }
+
+    /// Load the personal note for a contact, if any.
+    ///
+    /// Returns `None` if no note has been saved.
+    pub fn get_contact_note(&self, contact_id: String) -> Result<Option<String>, MobileError> {
+        let storage = self.open_storage()?;
+        let bytes = storage.load_personal_notes(&contact_id)?;
+        Ok(bytes.and_then(|b| String::from_utf8(b).ok()))
+    }
+
+    /// Delete the personal note for a contact.
+    ///
+    /// No error is returned if no note existed.
+    pub fn delete_contact_note(&self, contact_id: String) -> Result<(), MobileError> {
+        let storage = self.open_storage()?;
+        storage.delete_personal_notes(&contact_id)?;
+        Ok(())
+    }
+
+    // === Contact Field Notes Operations ===
+
+    /// Save a private note on a specific field of a contact.
+    ///
+    /// Notes are private ("your eyes only") — they are never sent to the contact.
+    /// An empty string clears the note.
+    pub fn set_contact_field_note(
+        &self,
+        contact_id: String,
+        field_id: String,
+        note: String,
+    ) -> Result<(), MobileError> {
+        let storage = self.open_storage()?;
+        storage.save_contact_field_note(&contact_id, &field_id, note.as_bytes())?;
+        Ok(())
+    }
+
+    /// Load all private field notes for a contact.
+    ///
+    /// Returns a list of `(field_id, note)` pairs. Fields with no note are omitted.
+    pub fn get_contact_field_notes(
+        &self,
+        contact_id: String,
+    ) -> Result<Vec<MobileFieldNote>, MobileError> {
+        let storage = self.open_storage()?;
+        let map = storage.load_contact_field_notes(&contact_id)?;
+        let mut notes: Vec<MobileFieldNote> = map
+            .into_iter()
+            .filter_map(|(field_id, bytes)| {
+                String::from_utf8(bytes)
+                    .ok()
+                    .map(|note| MobileFieldNote { field_id, note })
+            })
+            .collect();
+        // Stable ordering for deterministic output
+        notes.sort_by(|a, b| a.field_id.cmp(&b.field_id));
+        Ok(notes)
+    }
+
+    /// Delete the private note on a specific field of a contact.
+    ///
+    /// No error is returned if no note existed.
+    pub fn delete_contact_field_note(
+        &self,
+        contact_id: String,
+        field_id: String,
+    ) -> Result<(), MobileError> {
+        let storage = self.open_storage()?;
+        storage.delete_contact_field_note(&contact_id, &field_id)?;
+        Ok(())
+    }
+
+    // === Proposal Trust Operations ===
+
+    /// Mark a contact as trusted for simplified contact proposals.
+    ///
+    /// This is a local-only flag — the contact is never informed of their trust status.
+    pub fn set_proposal_trusted(
+        &self,
+        contact_id: String,
+        trusted: bool,
+    ) -> Result<(), MobileError> {
+        let storage = self.open_storage()?;
+
+        let mut contact = storage
+            .load_contact(&contact_id)?
+            .ok_or_else(|| MobileError::ContactNotFound(contact_id.clone()))?;
+
+        contact.set_proposal_trusted(trusted);
+        storage.save_contact(&contact)?;
+
+        Ok(())
     }
 
     // === Hidden Contact Operations ===

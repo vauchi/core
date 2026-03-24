@@ -6,7 +6,36 @@
 //!
 //! Field types, contact fields, contact cards, contacts, and exchange results.
 
+use vauchi_core::contact::trust::TrustLevel;
 use vauchi_core::{Contact, ContactCard, ContactField, FieldType};
+
+/// Mobile-friendly contact trust level derived from cryptographic exchange facts.
+///
+/// This is distinct from `MobileTrustLevel` (which reflects social validation counts).
+/// `MobileContactTrustLevel` is computed deterministically from exchange metadata —
+/// it is never user-editable.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
+pub enum MobileContactTrustLevel {
+    /// Identity was recovered — ratchet may have reset. Highest caution.
+    Cautious,
+    /// User manually verified the key fingerprint out-of-band.
+    Verified,
+    /// High proximity confidence with a close-range transport (NFC or BLE).
+    High,
+    /// Normal exchange, no special indicators. Default.
+    Standard,
+}
+
+impl From<TrustLevel> for MobileContactTrustLevel {
+    fn from(t: TrustLevel) -> Self {
+        match t {
+            TrustLevel::Cautious => MobileContactTrustLevel::Cautious,
+            TrustLevel::Verified => MobileContactTrustLevel::Verified,
+            TrustLevel::High => MobileContactTrustLevel::High,
+            TrustLevel::Standard => MobileContactTrustLevel::Standard,
+        }
+    }
+}
 
 /// Mobile-friendly field type enum.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
@@ -55,6 +84,8 @@ pub struct MobileContactField {
     pub field_type: MobileFieldType,
     pub label: String,
     pub value: String,
+    /// Private per-field annotation (your eyes only — never sent to other contacts).
+    pub note: Option<String>,
 }
 
 impl From<&ContactField> for MobileContactField {
@@ -64,6 +95,7 @@ impl From<&ContactField> for MobileContactField {
             field_type: field.field_type().into(),
             label: field.label().to_string(),
             value: field.value().to_string(),
+            note: field.note().map(|s| s.to_string()),
         }
     }
 }
@@ -95,10 +127,35 @@ pub struct MobileContact {
     pub is_hidden: bool,
     pub card: MobileContactCard,
     pub added_at: u64,
+    /// Cryptographic trust level derived from exchange facts.
+    pub trust_level: MobileContactTrustLevel,
+    /// Transport used during the original exchange (e.g. "qr", "nfc", "ble").
+    pub exchange_transport: String,
+    /// Proximity confidence from the original exchange (e.g. "high", "medium", "low", "unknown").
+    pub proximity_confidence: String,
+    /// Whether this contact is trusted for simplified contact proposals (local-only flag).
+    pub proposal_trusted: bool,
 }
 
 impl From<&Contact> for MobileContact {
     fn from(contact: &Contact) -> Self {
+        use vauchi_core::types::{ExchangeTransport, ProximityConfidence};
+
+        let exchange_transport = match contact.exchange_transport() {
+            ExchangeTransport::Qr => "qr",
+            ExchangeTransport::Nfc => "nfc",
+            ExchangeTransport::Ble => "ble",
+        }
+        .to_string();
+
+        let proximity_confidence = match contact.proximity_confidence() {
+            ProximityConfidence::High => "high",
+            ProximityConfidence::Medium => "medium",
+            ProximityConfidence::Low => "low",
+            ProximityConfidence::Unknown => "unknown",
+        }
+        .to_string();
+
         MobileContact {
             id: contact.id().to_string(),
             display_name: contact.display_name().to_string(),
@@ -108,8 +165,21 @@ impl From<&Contact> for MobileContact {
             is_hidden: contact.is_hidden(),
             card: MobileContactCard::from(contact.card()),
             added_at: contact.exchange_timestamp(),
+            trust_level: contact.trust_level().into(),
+            exchange_transport,
+            proximity_confidence,
+            proposal_trusted: contact.is_proposal_trusted(),
         }
     }
+}
+
+/// A per-field private note entry (field_id + note text).
+///
+/// Used as a Vec-based alternative to HashMap for UniFFI compatibility.
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct MobileFieldNote {
+    pub field_id: String,
+    pub note: String,
 }
 
 /// Exchange result.

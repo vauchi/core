@@ -14,7 +14,8 @@ mod social;
 mod ux;
 
 pub use core_types::{
-    MobileContact, MobileContactCard, MobileContactField, MobileExchangeResult, MobileFieldType,
+    MobileContact, MobileContactCard, MobileContactField, MobileContactTrustLevel,
+    MobileExchangeResult, MobileFieldNote, MobileFieldType,
 };
 pub use device::{
     MobileDeliveryRecord, MobileDeliveryStatus, MobileDeliverySummary, MobileDeviceDeliveryRecord,

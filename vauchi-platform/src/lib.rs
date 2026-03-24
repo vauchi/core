@@ -103,19 +103,20 @@ pub use platform_app_engine::PlatformAppEngine;
 pub use types::{
     MobileAhaMoment, MobileAhaMomentType, MobileAuthMode, MobileBroadcastResult,
     MobileConsentRecord, MobileConsentStatus, MobileConsentType, MobileContact, MobileContactCard,
-    MobileContactField, MobileDecoyContact, MobileDeletionInfo, MobileDeletionState,
-    MobileDeliveryRecord, MobileDeliveryStatus, MobileDeliverySummary, MobileDemoContact,
-    MobileDemoContactState, MobileDeviceDeliveryRecord, MobileDeviceDeliveryStatus,
-    MobileDeviceInfo, MobileDeviceJoinResult, MobileDeviceLinkConfirmation, MobileDeviceLinkData,
-    MobileDeviceLinkInfo, MobileDeviceLinkRequest, MobileDeviceLinkResult, MobileDuressSettings,
-    MobileEmergencyConfig, MobileExchangeResult, MobileFaqItem, MobileFieldType,
-    MobileFieldValidation, MobileGdprExport, MobileHelpCategory, MobileHelpCategoryInfo,
-    MobileLocale, MobileLocaleInfo, MobileOnboardingProgress, MobileOnboardingStep,
-    MobileRecoveryClaim, MobileRecoveryProgress, MobileRecoveryVerification, MobileRecoveryVoucher,
-    MobileRetryEntry, MobileShredReport, MobileShredStatus, MobileShredToken,
-    MobileShredVerification, MobileSocialNetwork, MobileSyncResult, MobileSyncStatus, MobileTheme,
-    MobileThemeColors, MobileThemeMode, MobileTorConfig, MobileTorStatus, MobileTrustLevel,
-    MobileValidationStatus, MobileVisibilityLabel, MobileVisibilityLabelDetail,
+    MobileContactField, MobileContactTrustLevel, MobileDecoyContact, MobileDeletionInfo,
+    MobileDeletionState, MobileDeliveryRecord, MobileDeliveryStatus, MobileDeliverySummary,
+    MobileDemoContact, MobileDemoContactState, MobileDeviceDeliveryRecord,
+    MobileDeviceDeliveryStatus, MobileDeviceInfo, MobileDeviceJoinResult,
+    MobileDeviceLinkConfirmation, MobileDeviceLinkData, MobileDeviceLinkInfo,
+    MobileDeviceLinkRequest, MobileDeviceLinkResult, MobileDuressSettings, MobileEmergencyConfig,
+    MobileExchangeResult, MobileFaqItem, MobileFieldNote, MobileFieldType, MobileFieldValidation,
+    MobileGdprExport, MobileHelpCategory, MobileHelpCategoryInfo, MobileLocale, MobileLocaleInfo,
+    MobileOnboardingProgress, MobileOnboardingStep, MobileRecoveryClaim, MobileRecoveryProgress,
+    MobileRecoveryVerification, MobileRecoveryVoucher, MobileRetryEntry, MobileShredReport,
+    MobileShredStatus, MobileShredToken, MobileShredVerification, MobileSocialNetwork,
+    MobileSyncResult, MobileSyncStatus, MobileTheme, MobileThemeColors, MobileThemeMode,
+    MobileTorConfig, MobileTorStatus, MobileTrustLevel, MobileValidationStatus,
+    MobileVisibilityLabel, MobileVisibilityLabelDetail,
 };
 
 uniffi::setup_scaffolding!();
@@ -1875,6 +1876,302 @@ mod tests {
         assert!(
             wb.is_suppress_presence_enabled(),
             "Suppress presence should be enabled after setting"
+        );
+    }
+
+    // ============================================================================
+    // MobileContactTrustLevel, exchange_transport, proximity_confidence, proposal_trusted
+    // Based on: features/contact_trust.feature
+    // ============================================================================
+
+    fn make_test_contact() -> vauchi_core::Contact {
+        vauchi_core::Contact::from_exchange(
+            [0xAB; 32],
+            vauchi_core::contact_card::ContactCard::new("Bob"),
+            vauchi_core::crypto::SymmetricKey::generate(),
+        )
+    }
+
+    // @scenario: contact_trust:Standard trust contact has correct fields in MobileContact
+    #[test]
+    fn test_mobile_contact_trust_level_standard() {
+        let (wb, _dir) = create_test_instance();
+        wb.create_identity("Alice".to_string()).unwrap();
+
+        let contact = make_test_contact();
+        let storage = wb.open_storage().unwrap();
+        storage.save_contact(&contact).unwrap();
+
+        let contacts = wb.list_contacts().unwrap();
+        assert_eq!(contacts.len(), 1);
+        let mc = &contacts[0];
+
+        // Default exchange has no proximity verification — must be Standard
+        assert_eq!(mc.trust_level, MobileContactTrustLevel::Standard);
+        assert_eq!(mc.exchange_transport, "qr");
+        assert_eq!(mc.proximity_confidence, "unknown");
+        assert!(!mc.proposal_trusted);
+    }
+
+    // @scenario: contact_trust:Fingerprint-verified contact maps to Verified trust level
+    #[test]
+    fn test_mobile_contact_trust_level_verified() {
+        let (wb, _dir) = create_test_instance();
+        wb.create_identity("Alice".to_string()).unwrap();
+
+        let mut contact = make_test_contact();
+        contact.mark_fingerprint_verified();
+        let storage = wb.open_storage().unwrap();
+        storage.save_contact(&contact).unwrap();
+
+        let contacts = wb.list_contacts().unwrap();
+        let mc = &contacts[0];
+        assert_eq!(mc.trust_level, MobileContactTrustLevel::Verified);
+        assert!(mc.is_verified);
+    }
+
+    // @scenario: contact_trust:proposal_trusted flag round-trips via set_proposal_trusted
+    #[test]
+    fn test_set_proposal_trusted_round_trip() {
+        let (wb, _dir) = create_test_instance();
+        wb.create_identity("Alice".to_string()).unwrap();
+
+        let contact = make_test_contact();
+        let contact_id = contact.id().to_string();
+        let storage = wb.open_storage().unwrap();
+        storage.save_contact(&contact).unwrap();
+
+        // Initially false
+        let mc = wb.get_contact(contact_id.clone()).unwrap().unwrap();
+        assert!(!mc.proposal_trusted);
+
+        // Set trusted
+        wb.set_proposal_trusted(contact_id.clone(), true).unwrap();
+        let mc = wb.get_contact(contact_id.clone()).unwrap().unwrap();
+        assert!(mc.proposal_trusted);
+
+        // Unset trusted
+        wb.set_proposal_trusted(contact_id.clone(), false).unwrap();
+        let mc = wb.get_contact(contact_id).unwrap().unwrap();
+        assert!(!mc.proposal_trusted);
+    }
+
+    // @scenario: contact_trust:set_proposal_trusted returns ContactNotFound for unknown ID
+    #[test]
+    fn test_set_proposal_trusted_contact_not_found() {
+        let (wb, _dir) = create_test_instance();
+        wb.create_identity("Alice".to_string()).unwrap();
+
+        let err = wb
+            .set_proposal_trusted("nonexistent_id".to_string(), true)
+            .unwrap_err();
+        assert!(
+            matches!(err, MobileError::ContactNotFound(_)),
+            "expected ContactNotFound, got {err:?}"
+        );
+    }
+
+    // ============================================================================
+    // Personal Notes (set_contact_note / get_contact_note / delete_contact_note)
+    // Based on: features/contact_notes.feature
+    // ============================================================================
+
+    // @scenario: contact_notes:Personal note round-trips via set/get
+    #[test]
+    fn test_personal_note_round_trip() {
+        let (wb, _dir) = create_test_instance();
+        wb.create_identity("Alice".to_string()).unwrap();
+
+        let contact = make_test_contact();
+        let contact_id = contact.id().to_string();
+        let storage = wb.open_storage().unwrap();
+        storage.save_contact(&contact).unwrap();
+
+        // No note yet
+        let note = wb.get_contact_note(contact_id.clone()).unwrap();
+        assert!(note.is_none(), "expected no note, got {note:?}");
+
+        // Save and retrieve
+        wb.set_contact_note(contact_id.clone(), "Met at conf.".to_string())
+            .unwrap();
+        let note = wb.get_contact_note(contact_id.clone()).unwrap();
+        assert_eq!(note.as_deref(), Some("Met at conf."));
+
+        // Delete clears it
+        wb.delete_contact_note(contact_id.clone()).unwrap();
+        let note = wb.get_contact_note(contact_id).unwrap();
+        assert!(note.is_none(), "note should be gone after delete");
+    }
+
+    // @scenario: contact_notes:Overwriting a note replaces the previous value
+    #[test]
+    fn test_personal_note_overwrite() {
+        let (wb, _dir) = create_test_instance();
+        wb.create_identity("Alice".to_string()).unwrap();
+
+        let contact = make_test_contact();
+        let contact_id = contact.id().to_string();
+        let storage = wb.open_storage().unwrap();
+        storage.save_contact(&contact).unwrap();
+
+        wb.set_contact_note(contact_id.clone(), "first".to_string())
+            .unwrap();
+        wb.set_contact_note(contact_id.clone(), "second".to_string())
+            .unwrap();
+
+        let note = wb.get_contact_note(contact_id).unwrap();
+        assert_eq!(note.as_deref(), Some("second"));
+    }
+
+    // ============================================================================
+    // Contact Field Notes (set/get/delete_contact_field_note)
+    // Based on: features/contact_notes.feature
+    // ============================================================================
+
+    // @scenario: contact_notes:Field note round-trips via set/get
+    #[test]
+    fn test_contact_field_note_round_trip() {
+        let (wb, _dir) = create_test_instance();
+        wb.create_identity("Alice".to_string()).unwrap();
+
+        let contact = make_test_contact();
+        let contact_id = contact.id().to_string();
+        let storage = wb.open_storage().unwrap();
+        storage.save_contact(&contact).unwrap();
+
+        // No notes initially
+        let notes = wb.get_contact_field_notes(contact_id.clone()).unwrap();
+        assert!(notes.is_empty(), "expected no notes, got {notes:?}");
+
+        // Save a note for field "field_001"
+        wb.set_contact_field_note(
+            contact_id.clone(),
+            "field_001".to_string(),
+            "home number".to_string(),
+        )
+        .unwrap();
+
+        let notes = wb.get_contact_field_notes(contact_id.clone()).unwrap();
+        assert_eq!(notes.len(), 1);
+        assert_eq!(notes[0].field_id, "field_001");
+        assert_eq!(notes[0].note, "home number");
+
+        // Delete removes it
+        wb.delete_contact_field_note(contact_id.clone(), "field_001".to_string())
+            .unwrap();
+        let notes = wb.get_contact_field_notes(contact_id).unwrap();
+        assert!(notes.is_empty(), "note should be gone after delete");
+    }
+
+    // @scenario: contact_notes:Multiple field notes are returned sorted by field_id
+    #[test]
+    fn test_contact_field_notes_multiple_sorted() {
+        let (wb, _dir) = create_test_instance();
+        wb.create_identity("Alice".to_string()).unwrap();
+
+        let contact = make_test_contact();
+        let contact_id = contact.id().to_string();
+        let storage = wb.open_storage().unwrap();
+        storage.save_contact(&contact).unwrap();
+
+        wb.set_contact_field_note(
+            contact_id.clone(),
+            "zzz_field".to_string(),
+            "last note".to_string(),
+        )
+        .unwrap();
+        wb.set_contact_field_note(
+            contact_id.clone(),
+            "aaa_field".to_string(),
+            "first note".to_string(),
+        )
+        .unwrap();
+
+        let notes = wb.get_contact_field_notes(contact_id).unwrap();
+        assert_eq!(notes.len(), 2);
+        // Sorted by field_id
+        assert_eq!(notes[0].field_id, "aaa_field");
+        assert_eq!(notes[1].field_id, "zzz_field");
+    }
+
+    // ============================================================================
+    // MobileContactField.note — field note surfaced via ContactCard
+    // Based on: features/contact_notes.feature
+    // ============================================================================
+
+    // @scenario: contact_notes:ContactField note is exposed in MobileContactField
+    #[test]
+    fn test_mobile_contact_field_note_exposed() {
+        let (wb, _dir) = create_test_instance();
+        wb.create_identity("Alice".to_string()).unwrap();
+
+        // Build a contact whose card has a field with a private note
+        let email_field = vauchi_core::ContactField::new(
+            vauchi_core::FieldType::Email,
+            "work",
+            "bob@example.com",
+        )
+        .with_note("Bob's work email".to_string());
+
+        let mut card = vauchi_core::contact_card::ContactCard::new("Bob");
+        card.add_field(email_field).unwrap();
+
+        let contact = vauchi_core::Contact::from_exchange(
+            [0xBC; 32],
+            card,
+            vauchi_core::crypto::SymmetricKey::generate(),
+        );
+
+        let storage = wb.open_storage().unwrap();
+        storage.save_contact(&contact).unwrap();
+
+        let contacts = wb.list_contacts().unwrap();
+        assert_eq!(contacts.len(), 1);
+        let field = &contacts[0].card.fields[0];
+        assert_eq!(field.label, "work");
+        assert_eq!(field.note.as_deref(), Some("Bob's work email"));
+    }
+
+    // @scenario: contact_notes:ContactField without note has None in MobileContactField
+    #[test]
+    fn test_mobile_contact_field_note_none_when_absent() {
+        let (wb, _dir) = create_test_instance();
+        wb.create_identity("Alice".to_string()).unwrap();
+
+        let contact = make_test_contact();
+        let storage = wb.open_storage().unwrap();
+        storage.save_contact(&contact).unwrap();
+
+        let contacts = wb.list_contacts().unwrap();
+        // Bob's default card has no fields — verify contact serialises cleanly
+        let mc = &contacts[0];
+        assert!(mc.card.fields.is_empty());
+
+        // Add a field without a note via the API and confirm note is None
+        let email_field = vauchi_core::ContactField::new(
+            vauchi_core::FieldType::Email,
+            "personal",
+            "bob@personal.com",
+        );
+        let mut card = vauchi_core::contact_card::ContactCard::new("Bob");
+        card.add_field(email_field).unwrap();
+
+        let contact_with_field = vauchi_core::Contact::from_exchange(
+            [0xCD; 32],
+            card,
+            vauchi_core::crypto::SymmetricKey::generate(),
+        );
+        let storage = wb.open_storage().unwrap();
+        storage.save_contact(&contact_with_field).unwrap();
+
+        let all = wb.list_contacts().unwrap();
+        let with_field = all
+            .iter()
+            .find(|c| c.exchange_transport == "qr" && !c.card.fields.is_empty())
+            .expect("should find contact with field");
+        assert!(
+            with_field.card.fields[0].note.is_none(),
+            "field without note should have note = None"
         );
     }
 }

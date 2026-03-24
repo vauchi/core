@@ -15,7 +15,9 @@
 pub mod crypto;
 pub use crypto::{DhError, PublicKey, Signature, SigningKeyPair, SymmetricKey, decrypt, encrypt};
 
+#[cfg(feature = "app-layer")]
 pub mod i18n;
+#[cfg(feature = "app-layer")]
 pub use i18n::{
     I18nError, Locale, LocaleInfo, get_all_strings, get_available_locales, get_locale_info,
     get_string, get_string_with_args,
@@ -87,6 +89,7 @@ pub use api::{
 };
 pub mod aha_moments;
 pub use aha_moments::{AhaMoment, AhaMomentTracker, AhaMomentType};
+#[cfg(feature = "app-layer")]
 pub mod content;
 pub mod demo_contact;
 pub use demo_contact::{
@@ -99,7 +102,9 @@ pub mod diagnostic;
 // Zero reverse deps into core after Phase 0 tidy.
 // Targets: i18n (above), help, theme, ui, content (above)
 // ══════════════════════════════════════════════════════════════
+#[cfg(feature = "app-layer")]
 pub mod help;
+#[cfg(feature = "app-layer")]
 pub use help::{
     FaqItem, HelpCategory, get_faq_by_id, get_faq_by_id_localized, get_faqs, get_faqs_by_category,
     get_faqs_by_category_localized, get_faqs_localized, search_faqs, search_faqs_localized,
@@ -111,9 +116,12 @@ pub use social::{
     ProfileValidation, SocialNetwork, SocialNetworkRegistry, TrustLevel, ValidationStatus,
     ValidatorMeta, calculate_trust_weight, check_sybil_resistance, filter_blocked_validations,
 };
+#[cfg(feature = "app-layer")]
 pub mod theme;
+#[cfg(feature = "app-layer")]
 pub use theme::{
     BorderRadiusTokens, DesignTokens, SpacingTokens, Theme, ThemeColors, ThemeError, ThemeMode,
     TypographyTokens, default_theme, load_themes_from_json, validate_hex_color,
 };
+#[cfg(feature = "app-layer")]
 pub mod ui;

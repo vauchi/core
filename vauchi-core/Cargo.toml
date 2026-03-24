@@ -15,7 +15,8 @@ description = "Core library for Vauchi - privacy-focused contact card exchange"
 
 
 [features]
-default = ["network", "storage"]
+default = ["app-layer", "network", "storage"]
+app-layer = []  # Presentation modules: i18n, help, theme, ui, content
 storage = ["rusqlite"]
 network = ["network-native-tls", "storage"]
 network-native-tls = ["tungstenite", "tungstenite/handshake", "tungstenite/native-tls", "native-tls", "snow"]

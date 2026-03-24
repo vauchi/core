@@ -11,6 +11,7 @@
 
 use serde::{Deserialize, Serialize};
 
+#[cfg(feature = "app-layer")]
 use crate::i18n::{Locale, get_string, get_string_with_args};
 pub use crate::types::{AhaMomentTracker, AhaMomentType};
 
@@ -55,6 +56,23 @@ impl AhaMomentType {
         }
     }
 
+    /// Whether this moment should show an animation
+    pub fn has_animation(&self) -> bool {
+        match self {
+            AhaMomentType::CardCreationComplete => true,
+            AhaMomentType::FirstEdit => true, // ripple animation
+            AhaMomentType::FirstContactAdded => true,
+            AhaMomentType::FirstUpdateReceived => true,
+            AhaMomentType::FirstOutboundDelivered => false,
+            AhaMomentType::FirstFieldEdit => true, // ripple animation
+            AhaMomentType::ThreeContactsReached => true,
+            AhaMomentType::DeviceLinked => true,
+        }
+    }
+}
+
+#[cfg(feature = "app-layer")]
+impl AhaMomentType {
     /// Get the i18n key prefix for this moment type.
     fn i18n_key(&self) -> &'static str {
         match self {
@@ -77,20 +95,6 @@ impl AhaMomentType {
     /// Get the localized message for this moment.
     pub fn message_localized(&self, locale: Locale) -> String {
         get_string(locale, &format!("{}.message", self.i18n_key()))
-    }
-
-    /// Whether this moment should show an animation
-    pub fn has_animation(&self) -> bool {
-        match self {
-            AhaMomentType::CardCreationComplete => true,
-            AhaMomentType::FirstEdit => true, // ripple animation
-            AhaMomentType::FirstContactAdded => true,
-            AhaMomentType::FirstUpdateReceived => true,
-            AhaMomentType::FirstOutboundDelivered => false,
-            AhaMomentType::FirstFieldEdit => true, // ripple animation
-            AhaMomentType::ThreeContactsReached => true,
-            AhaMomentType::DeviceLinked => true,
-        }
     }
 }
 
@@ -148,7 +152,10 @@ impl AhaMoment {
     pub fn has_animation(&self) -> bool {
         self.moment_type.has_animation()
     }
+}
 
+#[cfg(feature = "app-layer")]
+impl AhaMoment {
     /// Get the localized title for display.
     pub fn title_localized(&self, locale: Locale) -> String {
         self.moment_type.title_localized(locale)
@@ -204,17 +211,6 @@ impl AhaMomentTracker {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    /// Hold the shared i18n lock and ensure locale data is loaded.
-    fn lock_and_init() -> std::sync::MutexGuard<'static, ()> {
-        let guard = crate::i18n::I18N_TEST_LOCK.lock().unwrap();
-        if !crate::i18n::is_initialized() {
-            let locales_dir =
-                std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../locales");
-            let _ = crate::i18n::init(&locales_dir);
-        }
-        guard
-    }
 
     #[test]
     fn test_moment_type_all() {
@@ -318,34 +314,51 @@ mod tests {
         assert!(tracker.should_trigger(AhaMomentType::CardCreationComplete));
     }
 
-    #[test]
-    fn test_localized_title_german() {
-        let _lock = lock_and_init();
-        let title = AhaMomentType::CardCreationComplete.title_localized(Locale::German);
-        assert!(title.contains("Karte"));
-    }
+    // i18n-dependent tests (require app-layer feature)
+    #[cfg(feature = "app-layer")]
+    mod localized_tests {
+        use super::*;
 
-    #[test]
-    fn test_localized_message_german() {
-        let _lock = lock_and_init();
-        let msg = AhaMomentType::FirstEdit.message_localized(Locale::German);
-        assert!(!msg.contains("Missing"));
-    }
+        fn lock_and_init() -> std::sync::MutexGuard<'static, ()> {
+            let guard = crate::i18n::I18N_TEST_LOCK.lock().unwrap();
+            if !crate::i18n::is_initialized() {
+                let locales_dir =
+                    std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../locales");
+                let _ = crate::i18n::init(&locales_dir);
+            }
+            guard
+        }
 
-    #[test]
-    fn test_localized_moment_with_context() {
-        let _lock = lock_and_init();
-        let moment = AhaMoment::with_context(AhaMomentType::FirstContactAdded, "Alice".to_string());
-        let msg = moment.message_localized(Locale::German);
-        assert!(msg.contains("Alice"));
-    }
+        #[test]
+        fn test_localized_title_german() {
+            let _lock = lock_and_init();
+            let title = AhaMomentType::CardCreationComplete.title_localized(Locale::German);
+            assert!(title.contains("Karte"));
+        }
 
-    #[test]
-    fn test_localized_outbound_with_count() {
-        let _lock = lock_and_init();
-        let moment =
-            AhaMoment::with_context(AhaMomentType::FirstOutboundDelivered, "5".to_string());
-        let msg = moment.message_localized(Locale::French);
-        assert!(msg.contains("5"));
+        #[test]
+        fn test_localized_message_german() {
+            let _lock = lock_and_init();
+            let msg = AhaMomentType::FirstEdit.message_localized(Locale::German);
+            assert!(!msg.contains("Missing"));
+        }
+
+        #[test]
+        fn test_localized_moment_with_context() {
+            let _lock = lock_and_init();
+            let moment =
+                AhaMoment::with_context(AhaMomentType::FirstContactAdded, "Alice".to_string());
+            let msg = moment.message_localized(Locale::German);
+            assert!(msg.contains("Alice"));
+        }
+
+        #[test]
+        fn test_localized_outbound_with_count() {
+            let _lock = lock_and_init();
+            let moment =
+                AhaMoment::with_context(AhaMomentType::FirstOutboundDelivered, "5".to_string());
+            let msg = moment.message_localized(Locale::French);
+            assert!(msg.contains("5"));
+        }
     }
 }

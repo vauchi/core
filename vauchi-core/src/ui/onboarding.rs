@@ -51,6 +51,7 @@ pub struct OnboardingEngine {
     data: OnboardingData,
     selected_preview_group: Option<String>,
     custom_group_input: String,
+    backup_requested: bool,
 }
 
 impl Default for OnboardingEngine {
@@ -80,6 +81,7 @@ impl OnboardingEngine {
             },
             selected_preview_group: None,
             custom_group_input: String::new(),
+            backup_requested: false,
         }
     }
 
@@ -860,9 +862,11 @@ impl OnboardingEngine {
 
     fn handle_backup_prompt(&mut self, action: &UserAction) -> ActionResult {
         match action {
-            UserAction::ActionPressed { action_id }
-                if action_id == "setup_backup" || action_id == "skip" =>
-            {
+            UserAction::ActionPressed { action_id } if action_id == "setup_backup" => {
+                self.backup_requested = true;
+                self.navigate_to(Step::Ready)
+            }
+            UserAction::ActionPressed { action_id } if action_id == "skip" => {
                 self.navigate_to(Step::Ready)
             }
             _ => ActionResult::UpdateScreen(self.current_screen()),
@@ -888,6 +892,12 @@ impl OnboardingEngine {
     /// Access onboarding data (groups, fields, name) for persistence at completion.
     pub fn onboarding_data(&self) -> &OnboardingData {
         &self.data
+    }
+
+    /// Whether the user pressed "Set up backup" during onboarding.
+    /// The caller should navigate to the backup screen after identity creation.
+    pub fn backup_requested(&self) -> bool {
+        self.backup_requested
     }
 }
 

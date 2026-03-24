@@ -679,9 +679,14 @@ fn backup_prompt_has_two_actions() {
 }
 
 #[test]
-fn backup_prompt_setup_goes_to_ready() {
+fn backup_prompt_setup_goes_to_ready_and_sets_flag() {
     let mut engine = OnboardingEngine::new();
     advance_to_backup_prompt(&mut engine);
+
+    assert!(
+        !engine.backup_requested(),
+        "backup_requested should be false before pressing setup_backup"
+    );
 
     let result = engine.handle_action(UserAction::ActionPressed {
         action_id: "setup_backup".into(),
@@ -690,10 +695,30 @@ fn backup_prompt_setup_goes_to_ready() {
         ActionResult::NavigateTo(screen) => assert_eq!(screen.screen_id, "ready"),
         other => panic!("Expected NavigateTo ready, got {other:?}"),
     }
+
+    assert!(
+        engine.backup_requested(),
+        "backup_requested should be true after pressing setup_backup"
+    );
 }
 
 #[test]
-fn backup_prompt_skip_goes_to_ready() {
+fn backup_prompt_skip_does_not_set_backup_flag() {
+    let mut engine = OnboardingEngine::new();
+    advance_to_backup_prompt(&mut engine);
+
+    let _ = engine.handle_action(UserAction::ActionPressed {
+        action_id: "skip".into(),
+    });
+
+    assert!(
+        !engine.backup_requested(),
+        "backup_requested should be false after pressing skip"
+    );
+}
+
+#[test]
+fn backup_prompt_skip_navigates_to_ready() {
     let mut engine = OnboardingEngine::new();
     advance_to_backup_prompt(&mut engine);
 

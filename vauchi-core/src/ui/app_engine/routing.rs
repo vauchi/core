@@ -114,16 +114,13 @@ impl AppEngine {
                         };
                     }
                 };
-                // Extract onboarding groups before identity creation (engine
-                // will be discarded after navigating away from onboarding).
-                let onboarding_groups: Vec<String> = self
-                    .engine_cache
-                    .get(&AppScreen::Onboarding)
-                    .and_then(|e| {
-                        e.as_any().and_then(|a| {
-                            a.downcast_ref::<crate::ui::onboarding::OnboardingEngine>()
-                        })
-                    })
+                // Extract data from the active onboarding engine before identity
+                // creation (engine will be discarded after navigating away).
+                let onboarding_engine = self
+                    .engine
+                    .as_any()
+                    .and_then(|a| a.downcast_ref::<crate::ui::onboarding::OnboardingEngine>());
+                let onboarding_groups: Vec<String> = onboarding_engine
                     .map(|ob| {
                         ob.onboarding_data()
                             .selected_groups
@@ -133,6 +130,7 @@ impl AppEngine {
                             .collect()
                     })
                     .unwrap_or_default();
+                let backup_requested = onboarding_engine.is_some_and(|ob| ob.backup_requested());
 
                 match self.vauchi.create_identity(&name) {
                     Ok(()) => {
@@ -140,7 +138,12 @@ impl AppEngine {
                         for group_name in &onboarding_groups {
                             let _ = self.vauchi.create_group(group_name);
                         }
-                        let screen = self.navigate_to_internal(AppScreen::MyInfo);
+                        let target = if backup_requested {
+                            AppScreen::Backup
+                        } else {
+                            AppScreen::MyInfo
+                        };
+                        let screen = self.navigate_to_internal(target);
                         ActionResult::NavigateTo(screen)
                     }
                     Err(e) => ActionResult::ShowAlert {

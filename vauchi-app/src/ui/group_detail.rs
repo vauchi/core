@@ -46,20 +46,31 @@ impl GroupDetailEngine {
                     searchable: false,
                 },
             ],
-            actions: vec![
-                ScreenAction {
+            actions: {
+                let mut actions: Vec<ScreenAction> = self
+                    .members
+                    .iter()
+                    .map(|m| ScreenAction {
+                        id: format!("preview-as-member:{}", m.id),
+                        label: format!("Preview as {}", m.name),
+                        style: ActionStyle::Secondary,
+                        enabled: true,
+                    })
+                    .collect();
+                actions.push(ScreenAction {
                     id: "rename".into(),
                     label: "Rename".into(),
                     style: ActionStyle::Secondary,
                     enabled: true,
-                },
-                ScreenAction {
+                });
+                actions.push(ScreenAction {
                     id: "delete_group".into(),
                     label: "Delete Group".into(),
                     style: ActionStyle::Destructive,
                     enabled: true,
-                },
-            ],
+                });
+                actions
+            },
             progress: None,
         }
     }
@@ -72,17 +83,24 @@ impl WorkflowEngine for GroupDetailEngine {
 
     fn handle_action(&mut self, action: UserAction) -> ActionResult {
         match action {
-            UserAction::ActionPressed { action_id } => match action_id.as_str() {
-                "rename" => ActionResult::ShowAlert {
-                    title: "Coming Soon".into(),
-                    message: "Group renaming will be available in a future update.".into(),
-                },
-                "delete_group" => ActionResult::ShowAlert {
-                    title: "Coming Soon".into(),
-                    message: "Group deletion will be available in a future update.".into(),
-                },
-                _ => ActionResult::UpdateScreen(self.build_screen()),
-            },
+            UserAction::ActionPressed { action_id } => {
+                if let Some(contact_id) = action_id.strip_prefix("preview-as-member:") {
+                    return ActionResult::PreviewAs {
+                        contact_id: contact_id.to_string(),
+                    };
+                }
+                match action_id.as_str() {
+                    "rename" => ActionResult::ShowAlert {
+                        title: "Coming Soon".into(),
+                        message: "Group renaming will be available in a future update.".into(),
+                    },
+                    "delete_group" => ActionResult::ShowAlert {
+                        title: "Coming Soon".into(),
+                        message: "Group deletion will be available in a future update.".into(),
+                    },
+                    _ => ActionResult::UpdateScreen(self.build_screen()),
+                }
+            }
             _ => ActionResult::UpdateScreen(self.build_screen()),
         }
     }

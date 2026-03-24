@@ -228,4 +228,36 @@ impl Vauchi {
         self.storage.delete_personal_notes(contact_id)?;
         Ok(())
     }
+
+    // === Contact Field Notes Operations ===
+
+    /// Saves encrypted per-field notes for a contact.
+    pub fn save_contact_field_note(
+        &self,
+        contact_id: &str,
+        field_id: &str,
+        note_encrypted: &[u8],
+    ) -> VauchiResult<()> {
+        self.storage
+            .save_contact_field_note(contact_id, field_id, note_encrypted)?;
+        Ok(())
+    }
+
+    /// Loads all encrypted per-field notes for a contact.
+    ///
+    /// Returns a `HashMap<field_id, note_encrypted>`. Returns an empty map if
+    /// the contact has no field notes.
+    pub fn load_contact_field_notes(
+        &self,
+        contact_id: &str,
+    ) -> VauchiResult<std::collections::HashMap<String, Vec<u8>>> {
+        Ok(self.storage.load_contact_field_notes(contact_id)?)
+    }
+
+    /// Deletes the encrypted note for a specific `(contact_id, field_id)` pair.
+    pub fn delete_contact_field_note(&self, contact_id: &str, field_id: &str) -> VauchiResult<()> {
+        self.storage
+            .delete_contact_field_note(contact_id, field_id)?;
+        Ok(())
+    }
 }

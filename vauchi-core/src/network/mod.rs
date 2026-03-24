@@ -92,6 +92,8 @@ mod noise;
 pub mod forwarding;
 #[cfg(feature = "network-http")]
 pub mod http_transport;
+#[cfg(feature = "network-http")]
+pub mod ohttp_client;
 pub mod pinning;
 pub mod relay_url;
 pub mod revocation;
@@ -153,6 +155,10 @@ pub use classify::{MessageType, classify_message};
 // HTTP transport for relay v2 protocol
 #[cfg(feature = "network-http")]
 pub use http_transport::{FetchedBlob, HttpTransport, HttpTransportConfig};
+
+// OHTTP client-side encryption (RFC 9458)
+#[cfg(feature = "network-http")]
+pub use ohttp_client::{OhttpClient, ResponseDecryptor};
 
 // Delivery service (message delivery tracking, retries, offline queue)
 pub mod delivery;

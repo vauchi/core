@@ -20,7 +20,7 @@ storage = ["rusqlite"]
 network = ["network-native-tls", "storage"]
 network-native-tls = ["tungstenite", "tungstenite/handshake", "tungstenite/native-tls", "native-tls", "snow"]
 network-rustls = ["tungstenite", "tungstenite/handshake", "tungstenite/rustls-tls-native-roots", "rustls", "webpki-roots", "snow", "storage"]
-network-http = ["ureq"]
+network-http = ["ureq", "ohttp"]
 secure-storage = ["keyring"]
 # Platform-specific keyring backends (consumers pick the right one):
 # - Linux: kernel keyutils + D-Bus Secret Service (GNOME Keyring, KDE Wallet, KeePassXC)
@@ -137,6 +137,9 @@ cpal = { version = "0.15", optional = true }
 # Sync HTTP client for v2 relay protocol (no async runtime needed)
 ureq = { version = "3", features = ["json"], optional = true }
 
+# OHTTP client-side encryption (RFC 9458) for IP privacy
+ohttp = { version = "0.7", default-features = false, features = ["client", "rust-hpke"], optional = true }
+
 # Remote content updates — module moved to vauchi-app.
 # Feature retained as empty for backward compatibility (consumers may reference it).
 # reqwest/tokio deps removed (were only used by the content module).
@@ -149,6 +152,8 @@ uuid = { version = "1.0", features = ["js"] }
 getrandom = { version = "0.2", features = ["js"] }
 
 [dev-dependencies]
+# OHTTP server features for roundtrip tests (merged with optional ohttp dep)
+ohttp = { version = "0.7", default-features = false, features = ["server", "rust-hpke"] }
 # App-layer modules (tests reference ui, theme, help, i18n, content)
 vauchi-app = { version = "0.9.0", path = "../vauchi-app", features = ["network-native-tls"] }
 # JSON Schema validation for contract tests

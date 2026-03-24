@@ -13,6 +13,7 @@ use std::time::Duration;
 use serde::{Deserialize, Serialize};
 
 use super::error::NetworkError;
+use super::ohttp_client::OhttpClient;
 use super::transport::ProxyConfig;
 
 /// Configuration for the HTTP transport.
@@ -89,14 +90,35 @@ pub struct V2Response {
 ///
 /// Uses `ureq` (sync HTTP) — no async runtime required. Each method
 /// is a single HTTP request/response round-trip.
+///
+/// When an [`OhttpClient`] is set, all data requests (send, fetch, ack,
+/// register, purge) are encrypted via OHTTP and sent to `/v2/ohttp`.
+/// Health checks always use the direct endpoint.
 pub struct HttpTransport {
     config: HttpTransportConfig,
+    ohttp: Option<OhttpClient>,
 }
 
 impl HttpTransport {
     /// Creates a new HTTP transport with the given configuration.
     pub fn new(config: HttpTransportConfig) -> Self {
-        Self { config }
+        Self {
+            config,
+            ohttp: None,
+        }
+    }
+
+    /// Set the OHTTP client for encrypted requests.
+    ///
+    /// When set, all data requests are encrypted via OHTTP. Call with a fresh
+    /// client when the gateway key rotates (HTTP 400 on stale key).
+    pub fn set_ohttp(&mut self, client: OhttpClient) {
+        self.ohttp = Some(client);
+    }
+
+    /// Returns whether OHTTP encryption is active.
+    pub fn has_ohttp(&self) -> bool {
+        self.ohttp.is_some()
     }
 
     /// Returns the relay URL.
@@ -129,12 +151,11 @@ impl HttpTransport {
         recipient_id: &str,
         ciphertext_b64: &str,
     ) -> Result<String, NetworkError> {
-        let url = format!("{}/v2/send", self.config.relay_url);
         let req = V2SendRequest {
             recipient_id: recipient_id.to_string(),
             ciphertext: ciphertext_b64.to_string(),
         };
-        let resp: V2Response = self.post_json(&url, &req)?;
+        let resp = self.post_action("send", &req)?;
         if resp.status == "ok" {
             resp.blob_id
                 .ok_or_else(|| NetworkError::InvalidMessage("missing blob_id in response".into()))
@@ -148,11 +169,10 @@ impl HttpTransport {
 
     /// Fetches pending blobs for the given mailbox tokens.
     pub fn fetch(&self, mailbox_tokens: &[String]) -> Result<Vec<FetchedBlob>, NetworkError> {
-        let url = format!("{}/v2/fetch", self.config.relay_url);
         let req = V2FetchRequest {
             mailbox_tokens: mailbox_tokens.to_vec(),
         };
-        let resp: V2Response = self.post_json(&url, &req)?;
+        let resp = self.post_action("fetch", &req)?;
         if resp.status == "ok" {
             Ok(resp.blobs.unwrap_or_default())
         } else {
@@ -165,12 +185,11 @@ impl HttpTransport {
 
     /// Acknowledges receipt of a blob (removes it from the relay).
     pub fn acknowledge(&self, recipient_id: &str, blob_id: &str) -> Result<bool, NetworkError> {
-        let url = format!("{}/v2/ack", self.config.relay_url);
         let req = V2AckRequest {
             recipient_id: recipient_id.to_string(),
             blob_id: blob_id.to_string(),
         };
-        let resp: V2Response = self.post_json(&url, &req)?;
+        let resp = self.post_action("ack", &req)?;
         if resp.status == "ok" {
             Ok(resp.acknowledged.unwrap_or(false))
         } else {
@@ -183,11 +202,10 @@ impl HttpTransport {
 
     /// Purges all blobs for a recipient.
     pub fn purge(&self, recipient_id: &str) -> Result<(), NetworkError> {
-        let url = format!("{}/v2/purge", self.config.relay_url);
         let req = V2PurgeRequest {
             recipient_id: recipient_id.to_string(),
         };
-        let resp: V2Response = self.post_json(&url, &req)?;
+        let resp = self.post_action("purge", &req)?;
         if resp.status == "ok" {
             Ok(())
         } else {
@@ -202,6 +220,69 @@ impl HttpTransport {
 
     fn timeout(&self) -> Duration {
         Duration::from_millis(self.config.timeout_ms)
+    }
+
+    /// Post a request, routing through OHTTP if configured.
+    ///
+    /// When OHTTP is active: serializes as `{"action": action, ...fields}`,
+    /// encrypts, POSTs to `/v2/ohttp`, decrypts response.
+    /// When OHTTP is not active: POSTs JSON directly to the endpoint.
+    fn post_action<Req: Serialize>(
+        &self,
+        action: &str,
+        body: &Req,
+    ) -> Result<V2Response, NetworkError> {
+        if let Some(ohttp) = &self.ohttp {
+            self.post_via_ohttp(ohttp, action, body)
+        } else {
+            let url = format!("{}/v2/{action}", self.config.relay_url);
+            self.post_json(&url, body)
+        }
+    }
+
+    /// Encrypt a request via OHTTP and decrypt the response.
+    fn post_via_ohttp<Req: Serialize>(
+        &self,
+        ohttp: &OhttpClient,
+        action: &str,
+        body: &Req,
+    ) -> Result<V2Response, NetworkError> {
+        // Build inner envelope: {"action": "send", ...body_fields}
+        let mut inner =
+            serde_json::to_value(body).map_err(|e| NetworkError::Serialization(e.to_string()))?;
+        if let Some(obj) = inner.as_object_mut() {
+            obj.insert(
+                "action".to_string(),
+                serde_json::Value::String(action.to_string()),
+            );
+        }
+        let inner_bytes =
+            serde_json::to_vec(&inner).map_err(|e| NetworkError::Serialization(e.to_string()))?;
+
+        // Encrypt
+        let (encrypted, response_decryptor) = ohttp.encapsulate(&inner_bytes)?;
+
+        // POST encrypted blob
+        let agent = self.build_agent()?;
+        let ohttp_url = format!("{}/v2/ohttp", self.config.relay_url);
+        let resp = agent
+            .post(&ohttp_url)
+            .content_type("message/ohttp-req")
+            .send(encrypted)
+            .map_err(|e| NetworkError::ConnectionFailed(e.to_string()))?;
+
+        // Read raw response bytes
+        let enc_response = resp
+            .into_body()
+            .read_to_vec()
+            .map_err(|e| NetworkError::ConnectionFailed(e.to_string()))?;
+
+        // Decrypt
+        let plain_response = response_decryptor.decapsulate(&enc_response)?;
+
+        // Parse
+        serde_json::from_slice(&plain_response)
+            .map_err(|e| NetworkError::Serialization(e.to_string()))
     }
 
     fn post_json<Req: Serialize, Resp: serde::de::DeserializeOwned>(
@@ -329,6 +410,66 @@ mod tests {
             timeout_ms: 1000,
             proxy: ProxyConfig::None,
         });
+        let result = transport.send_update(&"a".repeat(64), "dGVzdA==");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_ohttp_not_configured_by_default() {
+        let transport = HttpTransport::new(HttpTransportConfig::default());
+        assert!(!transport.has_ohttp());
+    }
+
+    #[test]
+    fn test_set_ohttp_activates_encryption() {
+        use ohttp::{KeyConfig, SymmetricSuite, hpke};
+
+        let config = KeyConfig::new(
+            0,
+            hpke::Kem::X25519Sha256,
+            vec![SymmetricSuite::new(
+                hpke::Kdf::HkdfSha256,
+                hpke::Aead::Aes128Gcm,
+            )],
+        )
+        .unwrap();
+        let encoded = config.encode().unwrap();
+        let ohttp_client = OhttpClient::new(encoded).unwrap();
+
+        let mut transport = HttpTransport::new(HttpTransportConfig {
+            relay_url: "http://127.0.0.1:1".into(),
+            timeout_ms: 1000,
+            proxy: ProxyConfig::None,
+        });
+        assert!(!transport.has_ohttp());
+        transport.set_ohttp(ohttp_client);
+        assert!(transport.has_ohttp());
+    }
+
+    #[test]
+    fn test_send_via_ohttp_connection_refused() {
+        use ohttp::{KeyConfig, SymmetricSuite, hpke};
+
+        let config = KeyConfig::new(
+            0,
+            hpke::Kem::X25519Sha256,
+            vec![SymmetricSuite::new(
+                hpke::Kdf::HkdfSha256,
+                hpke::Aead::Aes128Gcm,
+            )],
+        )
+        .unwrap();
+        let encoded = config.encode().unwrap();
+        let ohttp_client = OhttpClient::new(encoded).unwrap();
+
+        let mut transport = HttpTransport::new(HttpTransportConfig {
+            relay_url: "http://127.0.0.1:1".into(),
+            timeout_ms: 1000,
+            proxy: ProxyConfig::None,
+        });
+        transport.set_ohttp(ohttp_client);
+
+        // Should try to POST to /v2/ohttp and fail (connection refused)
         let result = transport.send_update(&"a".repeat(64), "dGVzdA==");
         assert!(result.is_err());
     }

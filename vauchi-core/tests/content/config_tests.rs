@@ -6,7 +6,7 @@
 //!
 //! Scenarios from remote-content.feature:
 //! - Disable remote updates via settings
-//! - Content fetched via Tor when configured
+//! - Content fetched via proxy when configured
 
 use std::path::PathBuf;
 use std::time::Duration;
@@ -42,7 +42,7 @@ fn test_config_with_tor() {
         config.proxy_url,
         Some("socks5://127.0.0.1:9050".to_string())
     );
-    // Longer timeout for Tor
+    // Longer timeout for proxied connections
     assert_eq!(config.timeout, Duration::from_secs(60));
 }
 

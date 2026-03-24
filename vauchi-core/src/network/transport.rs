@@ -32,7 +32,7 @@ pub enum ProxyConfig {
     /// No proxy (direct connection).
     #[default]
     None,
-    /// SOCKS5 proxy (used for Tor).
+    /// SOCKS5 proxy (for Tor, VPN, or any SOCKS5-compatible proxy).
     Socks5 {
         /// Proxy host address.
         host: String,
@@ -83,7 +83,7 @@ impl ProxyConfig {
         }
     }
 
-    /// Returns true if this is a Tor-compatible proxy.
+    /// Returns true if this proxy uses a standard Tor SOCKS5 port.
     pub fn is_tor(&self) -> bool {
         matches!(
             self,
@@ -108,7 +108,7 @@ pub struct TransportConfig {
     pub max_reconnect_attempts: u32,
     /// Base delay for exponential backoff (milliseconds).
     pub reconnect_base_delay_ms: u64,
-    /// Proxy configuration (for Tor support).
+    /// Proxy configuration (optional SOCKS5 or HTTP CONNECT proxy).
     pub proxy: ProxyConfig,
     /// Relay's Noise NK public key for inner transport encryption.
     /// When set, the transport performs a Noise NK handshake after WebSocket
@@ -136,16 +136,16 @@ impl Default for TransportConfig {
 }
 
 impl TransportConfig {
-    /// Creates a config for connecting via Tor.
-    pub fn with_tor(server_url: &str) -> Self {
+    /// Creates a config with longer timeouts for proxied connections.
+    pub fn with_proxy_timeouts(server_url: &str, proxy: ProxyConfig) -> Self {
         TransportConfig {
             server_url: server_url.to_string(),
-            // Tor connections are slower, use longer timeouts
+            // Proxied connections are slower, use longer timeouts
             connect_timeout_ms: 60_000,
             io_timeout_ms: 120_000,
             max_reconnect_attempts: 3,
             reconnect_base_delay_ms: 5_000,
-            proxy: ProxyConfig::tor_default(),
+            proxy,
             relay_noise_pubkey: None,
             pinned_certs: Vec::new(),
         }

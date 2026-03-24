@@ -679,6 +679,35 @@
             }
           },
           "additionalProperties": false
+        },
+        {
+          "description": "Informational banner with an optional action button (e.g. preview mode indicator).",
+          "type": "object",
+          "required": [
+            "Banner"
+          ],
+          "properties": {
+            "Banner": {
+              "type": "object",
+              "required": [
+                "action_id",
+                "action_label",
+                "text"
+              ],
+              "properties": {
+                "action_id": {
+                  "type": "string"
+                },
+                "action_label": {
+                  "type": "string"
+                },
+                "text": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "additionalProperties": false
         }
       ]
     },

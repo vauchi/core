@@ -246,25 +246,32 @@
       "additionalProperties": false
     },
     {
-      "description": "Frontend/app layer should dispatch this Tor backend command.\n\nThe app layer forwards these to `TorManager` when the `tor` feature is enabled, or handles them as no-ops when Tor is not compiled in.",
+      "description": "App layer should navigate to MyInfo in preview mode for this contact.",
       "type": "object",
       "required": [
-        "TorCommand"
+        "PreviewAs"
       ],
       "properties": {
-        "TorCommand": {
+        "PreviewAs": {
           "type": "object",
           "required": [
-            "command"
+            "contact_id"
           ],
           "properties": {
-            "command": {
-              "$ref": "#/definitions/TorCommand"
+            "contact_id": {
+              "type": "string"
             }
           }
         }
       },
       "additionalProperties": false
+    },
+    {
+      "description": "App layer should navigate to the Contacts screen (contact picker).",
+      "type": "string",
+      "enum": [
+        "ShowContactPicker"
+      ]
     }
   ],
   "definitions": {
@@ -895,6 +902,35 @@
                   ]
                 },
                 "value": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Informational banner with an optional action button (e.g. preview mode indicator).",
+          "type": "object",
+          "required": [
+            "Banner"
+          ],
+          "properties": {
+            "Banner": {
+              "type": "object",
+              "required": [
+                "action_id",
+                "action_label",
+                "text"
+              ],
+              "properties": {
+                "action_id": {
+                  "type": "string"
+                },
+                "action_label": {
+                  "type": "string"
+                },
+                "text": {
                   "type": "string"
                 }
               }
@@ -1534,54 +1570,6 @@
           ]
         }
       }
-    },
-    "TorCommand": {
-      "description": "A command from the UI layer requesting a Tor backend operation.\n\nThese commands are emitted by `TorSettingsEngine` when the user toggles Tor settings. The app layer dispatches them to the `TorManager` (when the `tor` feature is enabled) or ignores them gracefully.\n\nThis type is unconditionally available (no feature gate) so that the UI layer compiles regardless of whether `tor` is enabled.",
-      "oneOf": [
-        {
-          "description": "Start the Tor client and establish a circuit.",
-          "type": "string",
-          "enum": [
-            "Bootstrap"
-          ]
-        },
-        {
-          "description": "Shut down the Tor client.",
-          "type": "string",
-          "enum": [
-            "Shutdown"
-          ]
-        },
-        {
-          "description": "Request a new Tor circuit (new exit node).",
-          "type": "string",
-          "enum": [
-            "RotateCircuit"
-          ]
-        },
-        {
-          "description": "Update Tor configuration (e.g., onion preference changed).",
-          "type": "object",
-          "required": [
-            "UpdateConfig"
-          ],
-          "properties": {
-            "UpdateConfig": {
-              "type": "object",
-              "required": [
-                "prefer_onion"
-              ],
-              "properties": {
-                "prefer_onion": {
-                  "description": "Whether to prefer .onion addresses.",
-                  "type": "boolean"
-                }
-              }
-            }
-          },
-          "additionalProperties": false
-        }
-      ]
     },
     "UiFieldVisibility": {
       "description": "UI-level field visibility state.\n\nNamed `UiFieldVisibility` to distinguish from `contact::FieldVisibility` which is the storage-level visibility model.",

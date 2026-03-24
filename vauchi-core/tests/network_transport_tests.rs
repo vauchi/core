@@ -27,7 +27,7 @@ fn test_proxy_config_defaults() {
     assert_eq!(proxy, ProxyConfig::None);
 }
 
-// @scenario: relay_network :: Tor support for relay access
+// @scenario: relay_network :: SOCKS5 proxy support
 #[test]
 fn test_proxy_config_tor_default() {
     let proxy = ProxyConfig::tor_default();
@@ -40,7 +40,7 @@ fn test_proxy_config_tor_default() {
     }
 }
 
-// @scenario: relay_network :: Tor support for relay access
+// @scenario: relay_network :: SOCKS5 proxy support
 #[test]
 fn test_proxy_config_tor_browser() {
     let proxy = ProxyConfig::tor_browser();
@@ -52,7 +52,7 @@ fn test_proxy_config_tor_browser() {
     }
 }
 
-// @scenario: relay_network :: Tor support for relay access
+// @scenario: relay_network :: SOCKS5 proxy support
 #[test]
 fn test_proxy_config_socks5_custom() {
     let proxy = ProxyConfig::socks5("192.168.1.1", 1080);
@@ -65,14 +65,15 @@ fn test_proxy_config_socks5_custom() {
     }
 }
 
-// @scenario: relay_network :: Tor support for relay access
+// @scenario: relay_network :: SOCKS5 proxy support
 #[test]
-fn test_transport_config_with_tor() {
-    let config = TransportConfig::with_tor("wss://relay.example.onion");
+fn test_transport_config_with_proxy_timeouts() {
+    let config =
+        TransportConfig::with_proxy_timeouts("wss://relay.example.com", ProxyConfig::tor_default());
 
-    assert_eq!(config.server_url, "wss://relay.example.onion");
+    assert_eq!(config.server_url, "wss://relay.example.com");
     assert!(config.proxy.is_tor());
-    // Tor has longer timeouts
+    // Proxied connections have longer timeouts
     assert_eq!(config.connect_timeout_ms, 60_000);
     assert_eq!(config.io_timeout_ms, 120_000);
 }

@@ -62,6 +62,9 @@ pub struct Contact {
     /// Only trusted contacts can vouch during social recovery.
     /// This is private — the contact is never told their trust status.
     recovery_trusted: bool,
+    /// Whether this contact is trusted for simplified contact proposals (opt-in).
+    /// Local-only flag — never shared with the contact.
+    proposal_trusted: bool,
     /// Whether this contact is marked as a favorite (local-only, never shared).
     favorite: bool,
     /// Proximity confidence level from the exchange.
@@ -113,6 +116,7 @@ impl Contact {
             hidden: false,
             blocked: false,
             recovery_trusted: false,
+            proposal_trusted: false,
             favorite: false,
             proximity_confidence: ProximityConfidence::Unknown,
             cek: None,
@@ -202,6 +206,7 @@ impl Contact {
             hidden,
             blocked,
             recovery_trusted,
+            proposal_trusted: false,
             favorite: false,
             proximity_confidence: ProximityConfidence::Unknown,
             cek: None,
@@ -413,6 +418,33 @@ impl Contact {
     /// Sets the recovery trust status directly.
     pub fn set_recovery_trusted(&mut self, trusted: bool) {
         self.recovery_trusted = trusted;
+    }
+
+    // ========================================
+    // Proposal Trust
+    // ========================================
+
+    /// Returns whether this contact is trusted for simplified contact proposals.
+    ///
+    /// Proposal-trusted contacts can receive simplified contact proposals (opt-in).
+    /// Trust status is private and never shared with the contact.
+    pub fn is_proposal_trusted(&self) -> bool {
+        self.proposal_trusted
+    }
+
+    /// Marks this contact as trusted for proposals.
+    pub fn trust_for_proposals(&mut self) {
+        self.proposal_trusted = true;
+    }
+
+    /// Removes proposal trust from this contact.
+    pub fn untrust_for_proposals(&mut self) {
+        self.proposal_trusted = false;
+    }
+
+    /// Sets the proposal trust status directly.
+    pub fn set_proposal_trusted(&mut self, trusted: bool) {
+        self.proposal_trusted = trusted;
     }
 
     // ========================================

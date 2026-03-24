@@ -784,3 +784,100 @@ fn test_load_device_registry_json() {
     let json_str = json.unwrap();
     assert!(json_str.contains("device_id"));
 }
+
+// ============================================================
+// proposal_trusted storage persistence (Task 3)
+// ============================================================
+
+/// Test that proposal_trusted defaults to false on a new contact.
+// @scenario: contacts_management :: Contact trust management
+#[test]
+fn test_proposal_trusted_defaults_false() {
+    let contact = create_test_contact("Default User");
+    assert!(
+        !contact.is_proposal_trusted(),
+        "proposal_trusted must default to false"
+    );
+}
+
+/// Test that proposal_trusted = true survives a save/load roundtrip.
+// @scenario: contacts_management :: Contact trust management
+#[test]
+fn test_proposal_trusted_storage_roundtrip() {
+    let storage = create_test_storage();
+
+    let pk = [0xBBu8; 32];
+    let card = ContactCard::new("Proposal Friend");
+    let shared_key = SymmetricKey::generate();
+    let visibility_rules = vauchi_core::contact::VisibilityRules::new();
+
+    let mut contact = Contact::from_sync_data_full(
+        pk,
+        card,
+        shared_key,
+        1234567890,
+        false,
+        visibility_rules,
+        false, // hidden
+        false, // blocked
+        false, // recovery_trusted
+    );
+    contact.set_proposal_trusted(true);
+
+    let contact_id = contact.id().to_string();
+    storage.save_contact(&contact).unwrap();
+
+    let loaded = storage.load_contact(&contact_id).unwrap().unwrap();
+    assert!(
+        loaded.is_proposal_trusted(),
+        "proposal_trusted must survive save/load roundtrip"
+    );
+}
+
+/// Test that proposal_trusted = false is correctly persisted and reloaded.
+// @scenario: contacts_management :: Contact trust management
+#[test]
+fn test_proposal_trusted_false_persists() {
+    let storage = create_test_storage();
+
+    let pk = [0xCCu8; 32];
+    let card = ContactCard::new("Untrusted Contact");
+    let shared_key = SymmetricKey::generate();
+    let visibility_rules = vauchi_core::contact::VisibilityRules::new();
+
+    let mut contact = Contact::from_sync_data_full(
+        pk,
+        card,
+        shared_key,
+        1234567890,
+        false,
+        visibility_rules,
+        false, // hidden
+        false, // blocked
+        false, // recovery_trusted
+    );
+    // Explicitly leave proposal_trusted as false (the default)
+
+    let contact_id = contact.id().to_string();
+    storage.save_contact(&contact).unwrap();
+
+    let loaded = storage.load_contact(&contact_id).unwrap().unwrap();
+    assert!(
+        !loaded.is_proposal_trusted(),
+        "proposal_trusted = false must persist correctly"
+    );
+
+    // Toggle true → save → load → false
+    contact.set_proposal_trusted(true);
+    storage.save_contact(&contact).unwrap();
+    let loaded = storage.load_contact(&contact_id).unwrap().unwrap();
+    assert!(loaded.is_proposal_trusted());
+
+    contact.set_proposal_trusted(false);
+    storage.save_contact(&contact).unwrap();
+    let loaded = storage.load_contact(&contact_id).unwrap().unwrap();
+    assert!(
+        !loaded.is_proposal_trusted(),
+        "proposal_trusted must be updatable back to false"
+    );
+}

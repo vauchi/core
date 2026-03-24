@@ -1054,7 +1054,7 @@ publish:platform:
 publish:maven:
   extends: .docker-runner
   stage: publish
-  image: cimg/android:2024.01
+  image: cimg/android:2025.01
   interruptible: false
   needs: [package:android]
   variables:
@@ -1089,7 +1089,7 @@ publish:maven:
 release:create:
   extends: .release-only
   stage: publish
-  image: registry.gitlab.com/gitlab-org/release-cli:latest
+  image: registry.gitlab.com/gitlab-org/release-cli:v0.24.0
   tags:
     - docker
   interruptible: false

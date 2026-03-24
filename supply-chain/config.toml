@@ -379,6 +379,10 @@ criteria = "safe-to-run"
 version = "0.12.4"
 criteria = "safe-to-deploy"
 
+[[exemptions.hpke]]
+version = "0.13.0"
+criteria = "safe-to-deploy"
+
 [[exemptions.humantime]]
 version = "2.3.0"
 criteria = "safe-to-run"
@@ -572,7 +576,7 @@ version = "3.5.0"
 criteria = "safe-to-deploy"
 
 [[exemptions.proptest]]
-version = "1.10.0"
+version = "1.11.0"
 criteria = "safe-to-run"
 
 [[exemptions.pxfm]]

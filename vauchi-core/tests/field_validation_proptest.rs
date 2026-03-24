@@ -18,22 +18,23 @@ use proptest::prelude::*;
 use vauchi_core::contact_card::ContactCard;
 use vauchi_core::crypto::SymmetricKey;
 use vauchi_core::social::{
-    ProfileValidation, TrustLevel, ValidationStatus, ValidatorMeta, calculate_trust_weight,
+    ProfileValidation, ValidationConfidence, ValidationStatus, ValidatorMeta,
+    calculate_trust_weight,
 };
 use vauchi_core::{Contact, Identity, Vauchi};
 
 // ============================================================
-// Helper: numeric ordering for TrustLevel
+// Helper: numeric ordering for ValidationConfidence
 // ============================================================
 
-/// Maps TrustLevel to a u8 for monotonicity comparisons.
+/// Maps ValidationConfidence to a u8 for monotonicity comparisons.
 /// Unverified(0) < LowConfidence(1) < PartialConfidence(2) < HighConfidence(3)
-fn trust_level_rank(level: TrustLevel) -> u8 {
+fn trust_level_rank(level: ValidationConfidence) -> u8 {
     match level {
-        TrustLevel::Unverified => 0,
-        TrustLevel::LowConfidence => 1,
-        TrustLevel::PartialConfidence => 2,
-        TrustLevel::HighConfidence => 3,
+        ValidationConfidence::Unverified => 0,
+        ValidationConfidence::LowConfidence => 1,
+        ValidationConfidence::PartialConfidence => 2,
+        ValidationConfidence::HighConfidence => 3,
     }
 }
 
@@ -44,15 +45,15 @@ fn trust_level_rank(level: TrustLevel) -> u8 {
 proptest! {
     /// Trust level is monotonically non-decreasing with count.
     ///
-    /// If count_a <= count_b, then TrustLevel::from_count(count_a)
-    /// must be <= TrustLevel::from_count(count_b).
+    /// If count_a <= count_b, then ValidationConfidence::from_count(count_a)
+    /// must be <= ValidationConfidence::from_count(count_b).
     #[test]
     fn prop_trust_level_monotonic_with_count(
         count_a in 0usize..100,
         count_b in 0usize..100
     ) {
-        let level_a = TrustLevel::from_count(count_a);
-        let level_b = TrustLevel::from_count(count_b);
+        let level_a = ValidationConfidence::from_count(count_a);
+        let level_b = ValidationConfidence::from_count(count_b);
         if count_a <= count_b {
             prop_assert!(
                 trust_level_rank(level_a) <= trust_level_rank(level_b),
@@ -65,15 +66,15 @@ proptest! {
 
     /// Weighted score thresholds are monotonically non-decreasing.
     ///
-    /// If score_a <= score_b, then TrustLevel::from_weighted_score(score_a)
-    /// must be <= TrustLevel::from_weighted_score(score_b).
+    /// If score_a <= score_b, then ValidationConfidence::from_weighted_score(score_a)
+    /// must be <= ValidationConfidence::from_weighted_score(score_b).
     #[test]
     fn prop_trust_level_monotonic_with_weighted_score(
         score_a in 0.0f32..10.0,
         score_b in 0.0f32..10.0
     ) {
-        let level_a = TrustLevel::from_weighted_score(score_a);
-        let level_b = TrustLevel::from_weighted_score(score_b);
+        let level_a = ValidationConfidence::from_weighted_score(score_a);
+        let level_b = ValidationConfidence::from_weighted_score(score_b);
         if score_a <= score_b {
             prop_assert!(
                 trust_level_rank(level_a) <= trust_level_rank(level_b),
@@ -403,7 +404,7 @@ proptest! {
             // Invariant 3: Weighted trust level must be <= count-based trust level.
             // Weighted scoring can only reduce trust (newer/unverified contacts
             // have lower weight), never increase it beyond what the raw count gives.
-            let count_based_level = TrustLevel::from_count(expected_count);
+            let count_based_level = ValidationConfidence::from_count(expected_count);
             prop_assert!(
                 trust_level_rank(status.trust_level) <= trust_level_rank(count_based_level),
                 "Weighted trust level {:?} (rank {}) must be <= count-based level {:?} (rank {}) after {:?}",
@@ -582,7 +583,7 @@ proptest! {
 
         // Each mature verified validator has weight 1.0,
         // so weighted_score = num_validators as f32.
-        let expected_weighted_level = TrustLevel::from_weighted_score(num_validators as f32);
+        let expected_weighted_level = ValidationConfidence::from_weighted_score(num_validators as f32);
 
         prop_assert_eq!(
             status.trust_level, expected_weighted_level,

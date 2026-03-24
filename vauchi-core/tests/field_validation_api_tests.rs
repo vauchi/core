@@ -97,7 +97,7 @@ fn test_get_field_validation_status_excludes_blocked_contacts() {
     );
     assert_eq!(
         status.trust_level,
-        TrustLevel::LowConfidence,
+        ValidationConfidence::LowConfidence,
         "Trust level should reflect only 1 validation"
     );
 }
@@ -112,59 +112,59 @@ fn test_get_field_validation_status_excludes_blocked_contacts() {
 fn test_from_weighted_score_thresholds() {
     // Below 0.1 -> Unverified
     assert_eq!(
-        TrustLevel::from_weighted_score(0.0),
-        TrustLevel::Unverified,
+        ValidationConfidence::from_weighted_score(0.0),
+        ValidationConfidence::Unverified,
         "Score 0.0 should be Unverified"
     );
     assert_eq!(
-        TrustLevel::from_weighted_score(0.09),
-        TrustLevel::Unverified,
+        ValidationConfidence::from_weighted_score(0.09),
+        ValidationConfidence::Unverified,
         "Score 0.09 should be Unverified"
     );
 
     // 0.1..1.0 -> LowConfidence
     assert_eq!(
-        TrustLevel::from_weighted_score(0.1),
-        TrustLevel::LowConfidence,
+        ValidationConfidence::from_weighted_score(0.1),
+        ValidationConfidence::LowConfidence,
         "Score 0.1 should be LowConfidence"
     );
     assert_eq!(
-        TrustLevel::from_weighted_score(0.5),
-        TrustLevel::LowConfidence,
+        ValidationConfidence::from_weighted_score(0.5),
+        ValidationConfidence::LowConfidence,
         "Score 0.5 should be LowConfidence"
     );
     assert_eq!(
-        TrustLevel::from_weighted_score(0.99),
-        TrustLevel::LowConfidence,
+        ValidationConfidence::from_weighted_score(0.99),
+        ValidationConfidence::LowConfidence,
         "Score 0.99 should be LowConfidence"
     );
 
     // 1.0..3.0 -> PartialConfidence
     assert_eq!(
-        TrustLevel::from_weighted_score(1.0),
-        TrustLevel::PartialConfidence,
+        ValidationConfidence::from_weighted_score(1.0),
+        ValidationConfidence::PartialConfidence,
         "Score 1.0 should be PartialConfidence"
     );
     assert_eq!(
-        TrustLevel::from_weighted_score(2.5),
-        TrustLevel::PartialConfidence,
+        ValidationConfidence::from_weighted_score(2.5),
+        ValidationConfidence::PartialConfidence,
         "Score 2.5 should be PartialConfidence"
     );
     assert_eq!(
-        TrustLevel::from_weighted_score(2.99),
-        TrustLevel::PartialConfidence,
+        ValidationConfidence::from_weighted_score(2.99),
+        ValidationConfidence::PartialConfidence,
         "Score 2.99 should be PartialConfidence"
     );
 
     // 3.0+ -> HighConfidence
     assert_eq!(
-        TrustLevel::from_weighted_score(3.0),
-        TrustLevel::HighConfidence,
+        ValidationConfidence::from_weighted_score(3.0),
+        ValidationConfidence::HighConfidence,
         "Score 3.0 should be HighConfidence"
     );
     assert_eq!(
-        TrustLevel::from_weighted_score(10.0),
-        TrustLevel::HighConfidence,
+        ValidationConfidence::from_weighted_score(10.0),
+        ValidationConfidence::HighConfidence,
         "Score 10.0 should be HighConfidence"
     );
 }
@@ -219,7 +219,7 @@ fn test_from_validations_weighted_uses_contact_metadata() {
     // 1.6 is in [1.0, 3.0) -> PartialConfidence
     assert_eq!(
         status_weighted.trust_level,
-        TrustLevel::PartialConfidence,
+        ValidationConfidence::PartialConfidence,
         "Weighted score of 1.6 should give PartialConfidence"
     );
 
@@ -246,7 +246,7 @@ fn test_from_validations_weighted_uses_contact_metadata() {
     // Weight = 1.0, so score = 1.0 -> PartialConfidence (not LowConfidence like count-based)
     assert_eq!(
         status_single.trust_level,
-        TrustLevel::PartialConfidence,
+        ValidationConfidence::PartialConfidence,
         "Single verified mature contact with weight 1.0 should give PartialConfidence"
     );
 }
@@ -278,7 +278,7 @@ fn test_from_validations_weighted_unknown_validators_get_minimum_weight() {
     // Weight for unknown = 0.3, score = 0.3 -> [0.1, 1.0) -> LowConfidence
     assert_eq!(
         status.trust_level,
-        TrustLevel::LowConfidence,
+        ValidationConfidence::LowConfidence,
         "Unknown validator with weight 0.3 should give LowConfidence"
     );
 }
@@ -340,7 +340,7 @@ fn test_from_validations_backward_compat() {
     // 0 validations -> Unverified
     let status_0 = ValidationStatus::from_validations(&[], "@alice", None, &HashSet::new());
     assert_eq!(status_0.count, 0);
-    assert_eq!(status_0.trust_level, TrustLevel::Unverified);
+    assert_eq!(status_0.trust_level, ValidationConfidence::Unverified);
 
     // 1 validation -> LowConfidence (weight 0.3 -> LowConfidence, count 1 -> LowConfidence: matches)
     let validations_1 = vec![ProfileValidation::new("field1", "@alice", "bob", [0u8; 64])];
@@ -349,7 +349,7 @@ fn test_from_validations_backward_compat() {
     assert_eq!(status_1.count, 1);
     assert_eq!(
         status_1.trust_level,
-        TrustLevel::LowConfidence,
+        ValidationConfidence::LowConfidence,
         "1 validation should still be LowConfidence"
     );
 
@@ -368,7 +368,7 @@ fn test_from_validations_backward_compat() {
     // 3 * 0.3 = 0.9, in [0.1, 1.0) -> LowConfidence
     assert_eq!(
         status_3.trust_level,
-        TrustLevel::LowConfidence,
+        ValidationConfidence::LowConfidence,
         "3 unknown validators with weight 0.3 each = 0.9 -> LowConfidence"
     );
 
@@ -386,7 +386,7 @@ fn test_from_validations_backward_compat() {
         status_blocked.count, 0,
         "Blocked validator should be excluded"
     );
-    assert_eq!(status_blocked.trust_level, TrustLevel::Unverified);
+    assert_eq!(status_blocked.trust_level, ValidationConfidence::Unverified);
 }
 
 // =============================================================================

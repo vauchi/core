@@ -26,7 +26,7 @@
 //! - **Address** (home, office, etc.)
 //! - **Custom** (any user-defined field)
 //!
-//! ## Trust Levels
+//! ## Validation Confidence Levels
 //!
 //! - **Unverified** (0 validations): Grey indicator
 //! - **Low Confidence** (1 validation): Yellow indicator
@@ -196,7 +196,7 @@ pub struct ValidatorMeta {
 
 /// Trust level based on validation count.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum TrustLevel {
+pub enum ValidationConfidence {
     /// No validations yet.
     Unverified,
     /// 1 validation.
@@ -207,14 +207,14 @@ pub enum TrustLevel {
     HighConfidence,
 }
 
-impl TrustLevel {
+impl ValidationConfidence {
     /// Determines trust level from validation count.
     pub fn from_count(count: usize) -> Self {
         match count {
-            0 => TrustLevel::Unverified,
-            1 => TrustLevel::LowConfidence,
-            2..=4 => TrustLevel::PartialConfidence,
-            _ => TrustLevel::HighConfidence,
+            0 => ValidationConfidence::Unverified,
+            1 => ValidationConfidence::LowConfidence,
+            2..=4 => ValidationConfidence::PartialConfidence,
+            _ => ValidationConfidence::HighConfidence,
         }
     }
 
@@ -230,33 +230,33 @@ impl TrustLevel {
     /// - score >= 3.0 -> HighConfidence
     pub fn from_weighted_score(score: f32) -> Self {
         if score < 0.1 {
-            TrustLevel::Unverified
+            ValidationConfidence::Unverified
         } else if score < 1.0 {
-            TrustLevel::LowConfidence
+            ValidationConfidence::LowConfidence
         } else if score < 3.0 {
-            TrustLevel::PartialConfidence
+            ValidationConfidence::PartialConfidence
         } else {
-            TrustLevel::HighConfidence
+            ValidationConfidence::HighConfidence
         }
     }
 
     /// Returns a human-readable label.
     pub fn label(&self) -> &'static str {
         match self {
-            TrustLevel::Unverified => "unverified",
-            TrustLevel::LowConfidence => "low confidence",
-            TrustLevel::PartialConfidence => "partial confidence",
-            TrustLevel::HighConfidence => "verified",
+            ValidationConfidence::Unverified => "unverified",
+            ValidationConfidence::LowConfidence => "low confidence",
+            ValidationConfidence::PartialConfidence => "partial confidence",
+            ValidationConfidence::HighConfidence => "verified",
         }
     }
 
     /// Returns a color indicator for UI.
     pub fn color(&self) -> &'static str {
         match self {
-            TrustLevel::Unverified => "grey",
-            TrustLevel::LowConfidence => "yellow",
-            TrustLevel::PartialConfidence => "light_green",
-            TrustLevel::HighConfidence => "green",
+            ValidationConfidence::Unverified => "grey",
+            ValidationConfidence::LowConfidence => "yellow",
+            ValidationConfidence::PartialConfidence => "light_green",
+            ValidationConfidence::HighConfidence => "green",
         }
     }
 }
@@ -267,7 +267,7 @@ pub struct ValidationStatus {
     /// Total number of validations.
     pub count: usize,
     /// Trust level based on count.
-    pub trust_level: TrustLevel,
+    pub trust_level: ValidationConfidence,
     /// IDs of validators (for display, may be partial).
     pub validator_ids: Vec<String>,
     /// Whether the current user has validated this.
@@ -281,7 +281,7 @@ impl ValidationStatus {
     pub fn new(field_value: &str) -> Self {
         Self {
             count: 0,
-            trust_level: TrustLevel::Unverified,
+            trust_level: ValidationConfidence::Unverified,
             validator_ids: Vec::new(),
             validated_by_me: false,
             field_value: field_value.to_string(),
@@ -346,7 +346,7 @@ impl ValidationStatus {
             })
             .sum();
 
-        let trust_level = TrustLevel::from_weighted_score(weighted_score);
+        let trust_level = ValidationConfidence::from_weighted_score(weighted_score);
 
         let validator_ids: Vec<String> = valid_validations
             .iter()

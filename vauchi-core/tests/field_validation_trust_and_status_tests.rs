@@ -16,30 +16,57 @@ use vauchi_core::*;
 // @scenario: field_validation :: Validation score determines trust level
 #[test]
 fn test_trust_level_from_count() {
-    assert_eq!(TrustLevel::from_count(0), TrustLevel::Unverified);
-    assert_eq!(TrustLevel::from_count(1), TrustLevel::LowConfidence);
-    assert_eq!(TrustLevel::from_count(2), TrustLevel::PartialConfidence);
-    assert_eq!(TrustLevel::from_count(4), TrustLevel::PartialConfidence);
-    assert_eq!(TrustLevel::from_count(5), TrustLevel::HighConfidence);
-    assert_eq!(TrustLevel::from_count(100), TrustLevel::HighConfidence);
+    assert_eq!(
+        ValidationConfidence::from_count(0),
+        ValidationConfidence::Unverified
+    );
+    assert_eq!(
+        ValidationConfidence::from_count(1),
+        ValidationConfidence::LowConfidence
+    );
+    assert_eq!(
+        ValidationConfidence::from_count(2),
+        ValidationConfidence::PartialConfidence
+    );
+    assert_eq!(
+        ValidationConfidence::from_count(4),
+        ValidationConfidence::PartialConfidence
+    );
+    assert_eq!(
+        ValidationConfidence::from_count(5),
+        ValidationConfidence::HighConfidence
+    );
+    assert_eq!(
+        ValidationConfidence::from_count(100),
+        ValidationConfidence::HighConfidence
+    );
 }
 
 // @scenario: field_validation :: Validation score determines trust level
 #[test]
 fn test_trust_level_labels() {
-    assert_eq!(TrustLevel::Unverified.label(), "unverified");
-    assert_eq!(TrustLevel::LowConfidence.label(), "low confidence");
-    assert_eq!(TrustLevel::PartialConfidence.label(), "partial confidence");
-    assert_eq!(TrustLevel::HighConfidence.label(), "verified");
+    assert_eq!(ValidationConfidence::Unverified.label(), "unverified");
+    assert_eq!(
+        ValidationConfidence::LowConfidence.label(),
+        "low confidence"
+    );
+    assert_eq!(
+        ValidationConfidence::PartialConfidence.label(),
+        "partial confidence"
+    );
+    assert_eq!(ValidationConfidence::HighConfidence.label(), "verified");
 }
 
 // @scenario: field_validation :: Validation score determines trust level
 #[test]
 fn test_trust_level_colors() {
-    assert_eq!(TrustLevel::Unverified.color(), "grey");
-    assert_eq!(TrustLevel::LowConfidence.color(), "yellow");
-    assert_eq!(TrustLevel::PartialConfidence.color(), "light_green");
-    assert_eq!(TrustLevel::HighConfidence.color(), "green");
+    assert_eq!(ValidationConfidence::Unverified.color(), "grey");
+    assert_eq!(ValidationConfidence::LowConfidence.color(), "yellow");
+    assert_eq!(
+        ValidationConfidence::PartialConfidence.color(),
+        "light_green"
+    );
+    assert_eq!(ValidationConfidence::HighConfidence.color(), "green");
 }
 
 // === Validation Status Tests ===
@@ -50,7 +77,7 @@ fn test_validation_status_new() {
     let status = ValidationStatus::new("@alice");
 
     assert_eq!(status.count, 0);
-    assert_eq!(status.trust_level, TrustLevel::Unverified);
+    assert_eq!(status.trust_level, ValidationConfidence::Unverified);
     assert!(!status.validated_by_me);
     assert_eq!(status.field_value, "@alice");
 }
@@ -185,7 +212,7 @@ fn test_email_validation_trust_levels() {
 
     assert_eq!(status.count, 3);
     // With weighted scoring (no metadata = 0.3 per validator): 3 * 0.3 = 0.9 -> LowConfidence
-    assert_eq!(status.trust_level, TrustLevel::LowConfidence);
+    assert_eq!(status.trust_level, ValidationConfidence::LowConfidence);
 }
 
 // === Phone Validation Tests ===
@@ -245,10 +272,16 @@ fn test_phone_validation_independent_of_email() {
 
     assert_eq!(phone_status.count, 5);
     // With weighted scoring (no metadata = 0.3 per validator): 5 * 0.3 = 1.5 -> PartialConfidence
-    assert_eq!(phone_status.trust_level, TrustLevel::PartialConfidence);
+    assert_eq!(
+        phone_status.trust_level,
+        ValidationConfidence::PartialConfidence
+    );
     assert_eq!(email_status.count, 2);
     // 2 * 0.3 = 0.6 -> LowConfidence
-    assert_eq!(email_status.trust_level, TrustLevel::LowConfidence);
+    assert_eq!(
+        email_status.trust_level,
+        ValidationConfidence::LowConfidence
+    );
 }
 
 // === Website Validation Tests ===
@@ -393,13 +426,16 @@ fn test_validation_reset_on_field_change() {
         ValidationStatus::from_validations(&validations, "@bob_old", None, &HashSet::new());
     assert_eq!(status_old.count, 5);
     // With weighted scoring (no metadata = 0.3 per validator): 5 * 0.3 = 1.5 -> PartialConfidence
-    assert_eq!(status_old.trust_level, TrustLevel::PartialConfidence);
+    assert_eq!(
+        status_old.trust_level,
+        ValidationConfidence::PartialConfidence
+    );
 
     // New value has 0 validations (the old validations don't count)
     let status_new =
         ValidationStatus::from_validations(&validations, "@bob_new", None, &HashSet::new());
     assert_eq!(status_new.count, 0);
-    assert_eq!(status_new.trust_level, TrustLevel::Unverified);
+    assert_eq!(status_new.trust_level, ValidationConfidence::Unverified);
 }
 
 // === From Stored Tests ===
@@ -451,7 +487,7 @@ fn test_multiple_validators_same_field() {
     let status = ValidationStatus::from_validations(&validations, "@alice", None, &HashSet::new());
     assert_eq!(status.count, 5);
     // With weighted scoring (no metadata = 0.3 per validator): 5 * 0.3 = 1.5 -> PartialConfidence
-    assert_eq!(status.trust_level, TrustLevel::PartialConfidence);
+    assert_eq!(status.trust_level, ValidationConfidence::PartialConfidence);
 }
 
 // @scenario: field_validation :: Cannot validate same field twice

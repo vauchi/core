@@ -280,7 +280,10 @@ fn test_cross_field_validation_status_independent() {
         &HashSet::new(),
     );
     // With weighted scoring (no metadata = 0.3 per validator): 5 * 0.3 = 1.5 -> PartialConfidence
-    assert_eq!(phone_status.trust_level, TrustLevel::PartialConfidence);
+    assert_eq!(
+        phone_status.trust_level,
+        ValidationConfidence::PartialConfidence
+    );
 
     let email_status = ValidationStatus::from_validations(
         &email_validations,
@@ -289,12 +292,18 @@ fn test_cross_field_validation_status_independent() {
         &HashSet::new(),
     );
     // 2 * 0.3 = 0.6 -> LowConfidence
-    assert_eq!(email_status.trust_level, TrustLevel::LowConfidence);
+    assert_eq!(
+        email_status.trust_level,
+        ValidationConfidence::LowConfidence
+    );
 
     let twitter_status =
         ValidationStatus::from_validations(&twitter_validations, "@bob", None, &HashSet::new());
     // 1 * 0.3 = 0.3 -> LowConfidence
-    assert_eq!(twitter_status.trust_level, TrustLevel::LowConfidence);
+    assert_eq!(
+        twitter_status.trust_level,
+        ValidationConfidence::LowConfidence
+    );
 }
 
 // =============================================================================

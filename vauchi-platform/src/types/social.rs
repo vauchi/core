@@ -84,15 +84,19 @@ pub enum MobileTrustLevel {
     HighConfidence,
 }
 
-impl From<vauchi_core::social::TrustLevel> for MobileTrustLevel {
-    fn from(level: vauchi_core::social::TrustLevel) -> Self {
+impl From<vauchi_core::social::ValidationConfidence> for MobileTrustLevel {
+    fn from(level: vauchi_core::social::ValidationConfidence) -> Self {
         match level {
-            vauchi_core::social::TrustLevel::Unverified => MobileTrustLevel::Unverified,
-            vauchi_core::social::TrustLevel::LowConfidence => MobileTrustLevel::LowConfidence,
-            vauchi_core::social::TrustLevel::PartialConfidence => {
+            vauchi_core::social::ValidationConfidence::Unverified => MobileTrustLevel::Unverified,
+            vauchi_core::social::ValidationConfidence::LowConfidence => {
+                MobileTrustLevel::LowConfidence
+            }
+            vauchi_core::social::ValidationConfidence::PartialConfidence => {
                 MobileTrustLevel::PartialConfidence
             }
-            vauchi_core::social::TrustLevel::HighConfidence => MobileTrustLevel::HighConfidence,
+            vauchi_core::social::ValidationConfidence::HighConfidence => {
+                MobileTrustLevel::HighConfidence
+            }
         }
     }
 }

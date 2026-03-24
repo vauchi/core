@@ -246,20 +246,20 @@ pub enum MobileThemeMode {
     Dark,
 }
 
-impl From<vauchi_core::theme::ThemeMode> for MobileThemeMode {
-    fn from(mode: vauchi_core::theme::ThemeMode) -> Self {
+impl From<vauchi_app::theme::ThemeMode> for MobileThemeMode {
+    fn from(mode: vauchi_app::theme::ThemeMode) -> Self {
         match mode {
-            vauchi_core::theme::ThemeMode::Light => MobileThemeMode::Light,
-            vauchi_core::theme::ThemeMode::Dark => MobileThemeMode::Dark,
+            vauchi_app::theme::ThemeMode::Light => MobileThemeMode::Light,
+            vauchi_app::theme::ThemeMode::Dark => MobileThemeMode::Dark,
         }
     }
 }
 
-impl From<MobileThemeMode> for vauchi_core::theme::ThemeMode {
+impl From<MobileThemeMode> for vauchi_app::theme::ThemeMode {
     fn from(mode: MobileThemeMode) -> Self {
         match mode {
-            MobileThemeMode::Light => vauchi_core::theme::ThemeMode::Light,
-            MobileThemeMode::Dark => vauchi_core::theme::ThemeMode::Dark,
+            MobileThemeMode::Light => vauchi_app::theme::ThemeMode::Light,
+            MobileThemeMode::Dark => vauchi_app::theme::ThemeMode::Dark,
         }
     }
 }
@@ -291,8 +291,8 @@ pub struct MobileThemeColors {
     pub border: String,
 }
 
-impl From<&vauchi_core::theme::ThemeColors> for MobileThemeColors {
-    fn from(colors: &vauchi_core::theme::ThemeColors) -> Self {
+impl From<&vauchi_app::theme::ThemeColors> for MobileThemeColors {
+    fn from(colors: &vauchi_app::theme::ThemeColors) -> Self {
         MobileThemeColors {
             bg_primary: colors.bg_primary.clone(),
             bg_secondary: colors.bg_secondary.clone(),
@@ -330,8 +330,8 @@ pub struct MobileTheme {
     pub colors: MobileThemeColors,
 }
 
-impl From<&vauchi_core::theme::Theme> for MobileTheme {
-    fn from(theme: &vauchi_core::theme::Theme) -> Self {
+impl From<&vauchi_app::theme::Theme> for MobileTheme {
+    fn from(theme: &vauchi_app::theme::Theme) -> Self {
         MobileTheme {
             id: theme.id.clone(),
             name: theme.name.clone(),
@@ -358,24 +358,24 @@ pub enum MobileLocale {
     Spanish,
 }
 
-impl From<vauchi_core::i18n::Locale> for MobileLocale {
-    fn from(locale: vauchi_core::i18n::Locale) -> Self {
+impl From<vauchi_app::i18n::Locale> for MobileLocale {
+    fn from(locale: vauchi_app::i18n::Locale) -> Self {
         match locale {
-            vauchi_core::i18n::Locale::English => MobileLocale::English,
-            vauchi_core::i18n::Locale::German => MobileLocale::German,
-            vauchi_core::i18n::Locale::French => MobileLocale::French,
-            vauchi_core::i18n::Locale::Spanish => MobileLocale::Spanish,
+            vauchi_app::i18n::Locale::English => MobileLocale::English,
+            vauchi_app::i18n::Locale::German => MobileLocale::German,
+            vauchi_app::i18n::Locale::French => MobileLocale::French,
+            vauchi_app::i18n::Locale::Spanish => MobileLocale::Spanish,
         }
     }
 }
 
-impl From<MobileLocale> for vauchi_core::i18n::Locale {
+impl From<MobileLocale> for vauchi_app::i18n::Locale {
     fn from(locale: MobileLocale) -> Self {
         match locale {
-            MobileLocale::English => vauchi_core::i18n::Locale::English,
-            MobileLocale::German => vauchi_core::i18n::Locale::German,
-            MobileLocale::French => vauchi_core::i18n::Locale::French,
-            MobileLocale::Spanish => vauchi_core::i18n::Locale::Spanish,
+            MobileLocale::English => vauchi_app::i18n::Locale::English,
+            MobileLocale::German => vauchi_app::i18n::Locale::German,
+            MobileLocale::French => vauchi_app::i18n::Locale::French,
+            MobileLocale::Spanish => vauchi_app::i18n::Locale::Spanish,
         }
     }
 }
@@ -393,8 +393,8 @@ pub struct MobileLocaleInfo {
     pub is_rtl: bool,
 }
 
-impl From<vauchi_core::i18n::LocaleInfo> for MobileLocaleInfo {
-    fn from(info: vauchi_core::i18n::LocaleInfo) -> Self {
+impl From<vauchi_app::i18n::LocaleInfo> for MobileLocaleInfo {
+    fn from(info: vauchi_app::i18n::LocaleInfo) -> Self {
         MobileLocaleInfo {
             code: info.code.to_string(),
             name: info.name.to_string(),
@@ -419,28 +419,28 @@ pub enum MobileHelpCategory {
     Features,
 }
 
-impl From<vauchi_core::help::HelpCategory> for MobileHelpCategory {
-    fn from(category: vauchi_core::help::HelpCategory) -> Self {
+impl From<vauchi_app::help::HelpCategory> for MobileHelpCategory {
+    fn from(category: vauchi_app::help::HelpCategory) -> Self {
         match category {
-            vauchi_core::help::HelpCategory::GettingStarted => MobileHelpCategory::GettingStarted,
-            vauchi_core::help::HelpCategory::Privacy => MobileHelpCategory::Privacy,
-            vauchi_core::help::HelpCategory::Recovery => MobileHelpCategory::Recovery,
-            vauchi_core::help::HelpCategory::Contacts => MobileHelpCategory::Contacts,
-            vauchi_core::help::HelpCategory::Updates => MobileHelpCategory::Updates,
-            vauchi_core::help::HelpCategory::Features => MobileHelpCategory::Features,
+            vauchi_app::help::HelpCategory::GettingStarted => MobileHelpCategory::GettingStarted,
+            vauchi_app::help::HelpCategory::Privacy => MobileHelpCategory::Privacy,
+            vauchi_app::help::HelpCategory::Recovery => MobileHelpCategory::Recovery,
+            vauchi_app::help::HelpCategory::Contacts => MobileHelpCategory::Contacts,
+            vauchi_app::help::HelpCategory::Updates => MobileHelpCategory::Updates,
+            vauchi_app::help::HelpCategory::Features => MobileHelpCategory::Features,
         }
     }
 }
 
-impl From<MobileHelpCategory> for vauchi_core::help::HelpCategory {
+impl From<MobileHelpCategory> for vauchi_app::help::HelpCategory {
     fn from(category: MobileHelpCategory) -> Self {
         match category {
-            MobileHelpCategory::GettingStarted => vauchi_core::help::HelpCategory::GettingStarted,
-            MobileHelpCategory::Privacy => vauchi_core::help::HelpCategory::Privacy,
-            MobileHelpCategory::Recovery => vauchi_core::help::HelpCategory::Recovery,
-            MobileHelpCategory::Contacts => vauchi_core::help::HelpCategory::Contacts,
-            MobileHelpCategory::Updates => vauchi_core::help::HelpCategory::Updates,
-            MobileHelpCategory::Features => vauchi_core::help::HelpCategory::Features,
+            MobileHelpCategory::GettingStarted => vauchi_app::help::HelpCategory::GettingStarted,
+            MobileHelpCategory::Privacy => vauchi_app::help::HelpCategory::Privacy,
+            MobileHelpCategory::Recovery => vauchi_app::help::HelpCategory::Recovery,
+            MobileHelpCategory::Contacts => vauchi_app::help::HelpCategory::Contacts,
+            MobileHelpCategory::Updates => vauchi_app::help::HelpCategory::Updates,
+            MobileHelpCategory::Features => vauchi_app::help::HelpCategory::Features,
         }
     }
 }
@@ -469,8 +469,8 @@ pub struct MobileFaqItem {
     pub related: Vec<String>,
 }
 
-impl From<&vauchi_core::help::FaqItem> for MobileFaqItem {
-    fn from(faq: &vauchi_core::help::FaqItem) -> Self {
+impl From<&vauchi_app::help::FaqItem> for MobileFaqItem {
+    fn from(faq: &vauchi_app::help::FaqItem) -> Self {
         MobileFaqItem {
             id: faq.id.clone(),
             category: faq.category.into(),
@@ -487,7 +487,7 @@ impl From<&vauchi_core::help::FaqItem> for MobileFaqItem {
 
 /// Get a localized string by key.
 pub fn mobile_get_string(locale: MobileLocale, key: String) -> String {
-    vauchi_core::i18n::get_string(locale.into(), &key)
+    vauchi_app::i18n::get_string(locale.into(), &key)
 }
 
 /// Get a localized string with argument interpolation.
@@ -497,5 +497,5 @@ pub fn mobile_get_string_with_args(
     args: HashMap<String, String>,
 ) -> String {
     let args_vec: Vec<(&str, &str)> = args.iter().map(|(k, v)| (k.as_str(), v.as_str())).collect();
-    vauchi_core::i18n::get_string_with_args(locale.into(), &key, &args_vec)
+    vauchi_app::i18n::get_string_with_args(locale.into(), &key, &args_vec)
 }

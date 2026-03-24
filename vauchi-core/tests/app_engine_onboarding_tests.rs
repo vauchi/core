@@ -9,10 +9,10 @@ mod common;
 use common::app_engine_helpers::{
     drive_onboarding, drive_onboarding_with_backup, drive_onboarding_without_name,
 };
-use vauchi_core::api::Vauchi;
-use vauchi_core::ui::{
+use vauchi_app::ui::{
     ActionResult, AppEngine, AppScreen, FormDialogType, UserAction, WorkflowEngine,
 };
+use vauchi_core::api::Vauchi;
 
 use proptest::prelude::*;
 
@@ -181,7 +181,7 @@ fn home_screen_no_setup_progress() {
     let has_progress = screen
         .components
         .iter()
-        .any(|c| matches!(c, vauchi_core::ui::Component::StatusIndicator { id, .. } if id == "setup_progress"));
+        .any(|c| matches!(c, vauchi_app::ui::Component::StatusIndicator { id, .. } if id == "setup_progress"));
     assert!(!has_progress, "MyInfo should not show setup progress");
 }
 

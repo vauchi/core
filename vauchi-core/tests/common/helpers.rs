@@ -6,11 +6,10 @@
 //!
 //! Common helper functions for setting up test scenarios.
 
+use vauchi_app::theme::{Theme, load_themes_from_json};
 use vauchi_core::{
     Contact, ContactCard, ContactField, FieldType, SymmetricKey, Vauchi,
-    crypto::ratchet::DoubleRatchetState,
-    exchange::X3DHKeyPair,
-    theme::{Theme, load_themes_from_json},
+    crypto::ratchet::DoubleRatchetState, exchange::X3DHKeyPair,
 };
 
 /// Load all themes from generated/themes.json at runtime.
@@ -20,7 +19,7 @@ pub fn all_themes() -> Vec<Theme> {
         std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../themes/generated/themes.json");
     match std::fs::read(&path) {
         Ok(data) => load_themes_from_json(&data).expect("generated/themes.json must be valid"),
-        Err(_) => vec![vauchi_core::default_theme()],
+        Err(_) => vec![vauchi_app::default_theme()],
     }
 }
 

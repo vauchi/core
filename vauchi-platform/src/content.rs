@@ -11,7 +11,7 @@
 use std::path::PathBuf;
 
 #[cfg(feature = "content-updates")]
-use vauchi_core::content::{ContentConfig, UpdateStatus};
+use vauchi_app::content::{ContentConfig, UpdateStatus};
 
 /// Content type for mobile platforms.
 #[derive(Debug, Clone, uniffi::Enum)]
@@ -26,24 +26,24 @@ pub enum MobileContentType {
     Help,
 }
 
-impl From<MobileContentType> for vauchi_core::content::ContentType {
+impl From<MobileContentType> for vauchi_app::content::ContentType {
     fn from(ct: MobileContentType) -> Self {
         match ct {
-            MobileContentType::Networks => vauchi_core::content::ContentType::Networks,
-            MobileContentType::Locales => vauchi_core::content::ContentType::Locales,
-            MobileContentType::Themes => vauchi_core::content::ContentType::Themes,
-            MobileContentType::Help => vauchi_core::content::ContentType::Help,
+            MobileContentType::Networks => vauchi_app::content::ContentType::Networks,
+            MobileContentType::Locales => vauchi_app::content::ContentType::Locales,
+            MobileContentType::Themes => vauchi_app::content::ContentType::Themes,
+            MobileContentType::Help => vauchi_app::content::ContentType::Help,
         }
     }
 }
 
-impl From<vauchi_core::content::ContentType> for MobileContentType {
-    fn from(ct: vauchi_core::content::ContentType) -> Self {
+impl From<vauchi_app::content::ContentType> for MobileContentType {
+    fn from(ct: vauchi_app::content::ContentType) -> Self {
         match ct {
-            vauchi_core::content::ContentType::Networks => MobileContentType::Networks,
-            vauchi_core::content::ContentType::Locales => MobileContentType::Locales,
-            vauchi_core::content::ContentType::Themes => MobileContentType::Themes,
-            vauchi_core::content::ContentType::Help => MobileContentType::Help,
+            vauchi_app::content::ContentType::Networks => MobileContentType::Networks,
+            vauchi_app::content::ContentType::Locales => MobileContentType::Locales,
+            vauchi_app::content::ContentType::Themes => MobileContentType::Themes,
+            vauchi_app::content::ContentType::Help => MobileContentType::Help,
         }
     }
 }

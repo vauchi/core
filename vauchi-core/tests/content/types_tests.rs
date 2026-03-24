@@ -9,7 +9,7 @@
 //! - No updates when versions match
 //! - Skip updates requiring newer app version
 
-use vauchi_core::content::{ContentEntry, ContentManifest, ContentType, UpdateStatus};
+use vauchi_app::content::{ContentEntry, ContentManifest, ContentType, UpdateStatus};
 
 #[test]
 fn test_content_manifest_deserialize() {

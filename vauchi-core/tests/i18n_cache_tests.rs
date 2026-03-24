@@ -10,14 +10,14 @@
 
 use std::path::PathBuf;
 use std::sync::Once;
-use vauchi_core::i18n::{Locale, get_string, load_locale_from_bytes};
+use vauchi_app::i18n::{Locale, get_string, load_locale_from_bytes};
 
 static INIT: Once = Once::new();
 
 fn ensure_init() {
     INIT.call_once(|| {
         let locales_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../locales");
-        vauchi_core::i18n::init(&locales_dir)
+        vauchi_app::i18n::init(&locales_dir)
             .expect("Failed to load locales from sibling locales/ repo");
     });
 }

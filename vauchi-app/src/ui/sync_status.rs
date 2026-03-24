@@ -4,8 +4,8 @@
 
 //! Sync status engine — shows relay connection state and pending updates.
 
-use crate::network::ConnectionState;
 use crate::ui::*;
+use vauchi_core::network::ConnectionState;
 
 /// Engine that displays sync status with the relay.
 #[derive(Clone, Debug)]

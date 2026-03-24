@@ -33,7 +33,7 @@ pub struct ContentFetcher {
     base_url: String,
     max_content_size: u64,
     /// Publisher key for manifest signature verification (Tracker #145).
-    publisher_public_key: Option<crate::crypto::signing::PublicKey>,
+    publisher_public_key: Option<vauchi_core::crypto::signing::PublicKey>,
 }
 
 #[cfg(feature = "content-updates")]

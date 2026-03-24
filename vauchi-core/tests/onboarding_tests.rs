@@ -1018,7 +1018,7 @@ fn test_skip_to_finish_from_wrong_step_is_noop() {
 // @scenario: onboarding:identity_check_create_new
 #[test]
 fn test_identity_check_create_new_goes_to_welcome() {
-    use vauchi_core::ui::{ActionResult, OnboardingEngine, UserAction, WorkflowEngine};
+    use vauchi_app::ui::{ActionResult, OnboardingEngine, UserAction, WorkflowEngine};
 
     let mut engine = OnboardingEngine::new();
     let screen = engine.current_screen();
@@ -1048,7 +1048,7 @@ fn test_identity_check_create_new_goes_to_welcome() {
 // @scenario: onboarding:identity_check_have_identity
 #[test]
 fn test_identity_check_have_identity_goes_to_link_choice() {
-    use vauchi_core::ui::{ActionResult, OnboardingEngine, UserAction, WorkflowEngine};
+    use vauchi_app::ui::{ActionResult, OnboardingEngine, UserAction, WorkflowEngine};
 
     let mut engine = OnboardingEngine::new();
     let result = engine.handle_action(UserAction::ActionPressed {
@@ -1069,7 +1069,7 @@ fn test_identity_check_have_identity_goes_to_link_choice() {
 // @scenario: onboarding:link_choice_link_device
 #[test]
 fn test_link_choice_link_device_returns_start_device_link() {
-    use vauchi_core::ui::{ActionResult, OnboardingEngine, UserAction, WorkflowEngine};
+    use vauchi_app::ui::{ActionResult, OnboardingEngine, UserAction, WorkflowEngine};
 
     let mut engine = OnboardingEngine::new();
     // Navigate to LinkChoice
@@ -1089,7 +1089,7 @@ fn test_link_choice_link_device_returns_start_device_link() {
 // @scenario: onboarding:link_choice_restore_backup
 #[test]
 fn test_link_choice_restore_backup_returns_start_backup_import() {
-    use vauchi_core::ui::{ActionResult, OnboardingEngine, UserAction, WorkflowEngine};
+    use vauchi_app::ui::{ActionResult, OnboardingEngine, UserAction, WorkflowEngine};
 
     let mut engine = OnboardingEngine::new();
     // Navigate to LinkChoice
@@ -1109,7 +1109,7 @@ fn test_link_choice_restore_backup_returns_start_backup_import() {
 // @scenario: onboarding:link_choice_back
 #[test]
 fn test_link_choice_back_returns_to_identity_check() {
-    use vauchi_core::ui::{ActionResult, OnboardingEngine, UserAction, WorkflowEngine};
+    use vauchi_app::ui::{ActionResult, OnboardingEngine, UserAction, WorkflowEngine};
 
     let mut engine = OnboardingEngine::new();
     // Navigate to LinkChoice
@@ -1131,7 +1131,7 @@ fn test_link_choice_back_returns_to_identity_check() {
 // @scenario: onboarding:welcome_no_restore_backup
 #[test]
 fn test_welcome_screen_has_no_restore_backup_action() {
-    use vauchi_core::ui::{OnboardingEngine, UserAction, WorkflowEngine};
+    use vauchi_app::ui::{OnboardingEngine, UserAction, WorkflowEngine};
 
     let mut engine = OnboardingEngine::new();
     // Navigate to Welcome via create_new
@@ -1152,7 +1152,7 @@ fn test_welcome_screen_has_no_restore_backup_action() {
 // @scenario: onboarding:identity_check_unknown_action
 #[test]
 fn test_identity_check_unknown_action_returns_update_screen() {
-    use vauchi_core::ui::{ActionResult, OnboardingEngine, UserAction, WorkflowEngine};
+    use vauchi_app::ui::{ActionResult, OnboardingEngine, UserAction, WorkflowEngine};
 
     let mut engine = OnboardingEngine::new();
     let result = engine.handle_action(UserAction::ActionPressed {
@@ -1167,7 +1167,7 @@ fn test_identity_check_unknown_action_returns_update_screen() {
 // @scenario: onboarding:link_choice_unknown_action
 #[test]
 fn test_link_choice_unknown_action_returns_update_screen() {
-    use vauchi_core::ui::{ActionResult, OnboardingEngine, UserAction, WorkflowEngine};
+    use vauchi_app::ui::{ActionResult, OnboardingEngine, UserAction, WorkflowEngine};
 
     let mut engine = OnboardingEngine::new();
     // Navigate to LinkChoice

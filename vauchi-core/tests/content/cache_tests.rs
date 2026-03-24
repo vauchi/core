@@ -10,7 +10,7 @@
 //! - Content resolution order
 
 use tempfile::TempDir;
-use vauchi_core::content::{
+use vauchi_app::content::{
     ContentCache, ContentEntry, ContentIndex, ContentManifest, ContentType, compute_checksum,
 };
 

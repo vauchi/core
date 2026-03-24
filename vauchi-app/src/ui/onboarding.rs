@@ -7,9 +7,9 @@
 //! dependency; the caller persists results when [`ActionResult::Complete`]
 //! is returned.
 
-use crate::contact::labels::SUGGESTED_LABELS;
-use crate::onboarding::OnboardingStep as Step;
 use crate::ui::*;
+use vauchi_core::contact::labels::SUGGESTED_LABELS;
+use vauchi_core::onboarding::OnboardingStep as Step;
 
 // ── Public data types ───────────────────────────────────────────────
 

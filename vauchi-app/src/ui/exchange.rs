@@ -9,9 +9,9 @@
 //! session is provided, transitions emit `ExchangeCommand`s that frontends
 //! dispatch to platform hardware (camera, BLE, NFC, audio).
 
-use crate::exchange::command::ExchangeCommand;
-use crate::exchange::{ExchangeEvent, ExchangeSession};
 use crate::ui::*;
+use vauchi_core::exchange::command::ExchangeCommand;
+use vauchi_core::exchange::{ExchangeEvent, ExchangeSession};
 
 /// Configuration for starting an exchange.
 #[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
@@ -164,7 +164,7 @@ impl ExchangeEngine {
     }
 
     /// Mark the exchange as failed with a specific error detail for the user.
-    pub fn mark_failed_with_error(&mut self, error: &crate::exchange::ExchangeError) {
+    pub fn mark_failed_with_error(&mut self, error: &vauchi_core::exchange::ExchangeError) {
         self.failure_detail = Some(error.user_message().to_string());
         self.step = ExchangeStep::Failed;
     }
@@ -369,13 +369,13 @@ impl WorkflowEngine for ExchangeEngine {
 
     fn handle_hardware_event(
         &mut self,
-        event: crate::exchange::ExchangeHardwareEvent,
+        event: vauchi_core::exchange::ExchangeHardwareEvent,
     ) -> Option<ActionResult> {
         // No session — handle QR scan via legacy TextChanged path
         let session = match self.session.as_mut() {
             Some(s) => s,
             None => {
-                if let crate::exchange::ExchangeHardwareEvent::QrScanned { data } = event {
+                if let vauchi_core::exchange::ExchangeHardwareEvent::QrScanned { data } = event {
                     let result = self.handle_action(UserAction::TextChanged {
                         component_id: "scanned_data".into(),
                         value: data,
@@ -396,20 +396,20 @@ impl WorkflowEngine for ExchangeEngine {
 
         // Sync engine step from session state
         match session.state() {
-            crate::exchange::ExchangeState::Complete { .. } => {
+            vauchi_core::exchange::ExchangeState::Complete { .. } => {
                 self.step = ExchangeStep::Success;
             }
-            crate::exchange::ExchangeState::Failed { error } => {
+            vauchi_core::exchange::ExchangeState::Failed { error } => {
                 self.failure_detail = Some(error.user_message().to_string());
                 self.step = ExchangeStep::Failed;
             }
             // Any state beyond DisplayingQr means verification is in progress
-            crate::exchange::ExchangeState::PeerScanned { .. }
-            | crate::exchange::ExchangeState::AwaitingKeyAgreement { .. }
-            | crate::exchange::ExchangeState::AwaitingCardExchange { .. }
-            | crate::exchange::ExchangeState::AwaitingNfcTap
-            | crate::exchange::ExchangeState::AwaitingBleConnection
-            | crate::exchange::ExchangeState::AwaitingBleVerification { .. } => {
+            vauchi_core::exchange::ExchangeState::PeerScanned { .. }
+            | vauchi_core::exchange::ExchangeState::AwaitingKeyAgreement { .. }
+            | vauchi_core::exchange::ExchangeState::AwaitingCardExchange { .. }
+            | vauchi_core::exchange::ExchangeState::AwaitingNfcTap
+            | vauchi_core::exchange::ExchangeState::AwaitingBleConnection
+            | vauchi_core::exchange::ExchangeState::AwaitingBleVerification { .. } => {
                 self.step = ExchangeStep::Verifying;
             }
             _ => {}
@@ -581,11 +581,11 @@ mod tests {
 
     // ── ADR-031: ExchangeSession integration tests ──────────────────
 
-    fn create_test_session() -> crate::exchange::ExchangeSession {
-        let identity = crate::identity::Identity::create("TestUser");
-        let card = crate::contact_card::ContactCard::new("TestUser");
-        let proximity = crate::exchange::ManualConfirmationVerifier::new();
-        crate::exchange::ExchangeSession::new_qr(identity, card, proximity)
+    fn create_test_session() -> vauchi_core::exchange::ExchangeSession {
+        let identity = vauchi_core::identity::Identity::create("TestUser");
+        let card = vauchi_core::contact_card::ContactCard::new("TestUser");
+        let proximity = vauchi_core::exchange::ManualConfirmationVerifier::new();
+        vauchi_core::exchange::ExchangeSession::new_qr(identity, card, proximity)
     }
 
     #[test]
@@ -605,7 +605,7 @@ mod tests {
         assert!(
             matches!(
                 &commands[0],
-                crate::exchange::command::ExchangeCommand::QrDisplay { .. }
+                vauchi_core::exchange::command::ExchangeCommand::QrDisplay { .. }
             ),
             "Expected QrDisplay command, got {:?}",
             commands[0]
@@ -642,7 +642,7 @@ mod tests {
                 assert!(
                     matches!(
                         &commands[0],
-                        crate::exchange::command::ExchangeCommand::QrDisplay { .. }
+                        vauchi_core::exchange::command::ExchangeCommand::QrDisplay { .. }
                     ),
                     "Expected QrDisplay command, got {:?}",
                     commands[0]
@@ -670,7 +670,7 @@ mod tests {
                 assert_eq!(commands.len(), 1);
                 assert_eq!(
                     commands[0],
-                    crate::exchange::command::ExchangeCommand::QrRequestScan
+                    vauchi_core::exchange::command::ExchangeCommand::QrRequestScan
                 );
             }
             other => panic!(
@@ -689,7 +689,7 @@ mod tests {
 
         // Simulate BLE discovery
         let result = engine.handle_hardware_event(
-            crate::exchange::ExchangeHardwareEvent::BleDeviceDiscovered {
+            vauchi_core::exchange::ExchangeHardwareEvent::BleDeviceDiscovered {
                 id: "device-1".into(),
                 rssi: -42,
                 adv_data: vec![],
@@ -702,7 +702,7 @@ mod tests {
             assert!(
                 commands.iter().any(|c| matches!(
                     c,
-                    crate::exchange::command::ExchangeCommand::BleConnect { .. }
+                    vauchi_core::exchange::command::ExchangeCommand::BleConnect { .. }
                 )),
                 "Expected BleConnect command in {:?}",
                 commands
@@ -725,7 +725,7 @@ mod tests {
 
         // handle_hardware_event handles QrScanned via legacy TextChanged path
         let result =
-            engine.handle_hardware_event(crate::exchange::ExchangeHardwareEvent::QrScanned {
+            engine.handle_hardware_event(vauchi_core::exchange::ExchangeHardwareEvent::QrScanned {
                 data: "test".into(),
             });
         assert!(
@@ -735,7 +735,7 @@ mod tests {
 
         // Non-QR events return None without session
         let result = engine.handle_hardware_event(
-            crate::exchange::ExchangeHardwareEvent::BleDeviceDiscovered {
+            vauchi_core::exchange::ExchangeHardwareEvent::BleDeviceDiscovered {
                 id: "d1".into(),
                 rssi: -40,
                 adv_data: vec![],
@@ -750,20 +750,23 @@ mod tests {
     /// Helper: create two sessions (Alice and Bob) and return Alice's engine
     /// plus Bob's QR data string (what Alice would scan).
     fn create_alice_engine_and_bob_qr() -> (ExchangeEngine, String) {
-        let alice_identity = crate::identity::Identity::create("Alice");
-        let alice_card = crate::contact_card::ContactCard::new("Alice");
-        let alice_proximity = crate::exchange::ManualConfirmationVerifier::new();
-        let alice_session =
-            crate::exchange::ExchangeSession::new_qr(alice_identity, alice_card, alice_proximity);
+        let alice_identity = vauchi_core::identity::Identity::create("Alice");
+        let alice_card = vauchi_core::contact_card::ContactCard::new("Alice");
+        let alice_proximity = vauchi_core::exchange::ManualConfirmationVerifier::new();
+        let alice_session = vauchi_core::exchange::ExchangeSession::new_qr(
+            alice_identity,
+            alice_card,
+            alice_proximity,
+        );
 
-        let bob_identity = crate::identity::Identity::create("Bob");
-        let bob_card = crate::contact_card::ContactCard::new("Bob");
-        let bob_proximity = crate::exchange::ManualConfirmationVerifier::new();
+        let bob_identity = vauchi_core::identity::Identity::create("Bob");
+        let bob_card = vauchi_core::contact_card::ContactCard::new("Bob");
+        let bob_proximity = vauchi_core::exchange::ManualConfirmationVerifier::new();
         let mut bob_session =
-            crate::exchange::ExchangeSession::new_qr(bob_identity, bob_card, bob_proximity);
+            vauchi_core::exchange::ExchangeSession::new_qr(bob_identity, bob_card, bob_proximity);
         // Start Bob's QR so we can get his data string
         bob_session
-            .apply(crate::exchange::ExchangeEvent::StartQR)
+            .apply(vauchi_core::exchange::ExchangeEvent::StartQR)
             .unwrap();
         let bob_qr = bob_session.qr().unwrap();
         let bob_qr_data = bob_qr.to_data_string();
@@ -785,7 +788,7 @@ mod tests {
 
         // Simulate scanning Bob's QR
         let result =
-            engine.handle_hardware_event(crate::exchange::ExchangeHardwareEvent::QrScanned {
+            engine.handle_hardware_event(vauchi_core::exchange::ExchangeHardwareEvent::QrScanned {
                 data: bob_qr_data,
             });
 
@@ -843,7 +846,7 @@ mod tests {
         assert_eq!(commands.len(), 1);
         assert!(matches!(
             &commands[0],
-            crate::exchange::command::ExchangeCommand::QrDisplay { .. }
+            vauchi_core::exchange::command::ExchangeCommand::QrDisplay { .. }
         ));
 
         // 2. User presses "Scan Their Code" → QrRequestScan command
@@ -855,7 +858,7 @@ mod tests {
                 assert_eq!(commands.len(), 1);
                 assert_eq!(
                     commands[0],
-                    crate::exchange::command::ExchangeCommand::QrRequestScan
+                    vauchi_core::exchange::command::ExchangeCommand::QrRequestScan
                 );
             }
             other => panic!("Expected ExchangeCommands, got {:?}", other),
@@ -863,7 +866,7 @@ mod tests {
 
         // 3. Frontend scans Bob's QR → feed as hardware event
         let result =
-            engine.handle_hardware_event(crate::exchange::ExchangeHardwareEvent::QrScanned {
+            engine.handle_hardware_event(vauchi_core::exchange::ExchangeHardwareEvent::QrScanned {
                 data: bob_qr_data,
             });
         assert!(result.is_some(), "expected Some value");
@@ -876,7 +879,7 @@ mod tests {
         assert!(
             matches!(
                 session.state(),
-                crate::exchange::ExchangeState::PeerScanned { .. }
+                vauchi_core::exchange::ExchangeState::PeerScanned { .. }
             ),
             "Session should be in PeerScanned state, got {:?}",
             session.state()
@@ -915,7 +918,7 @@ mod tests {
     #[test]
     fn failed_screen_shows_error_detail_after_mark_failed_with_error() {
         let mut engine = ExchangeEngine::new(config_no_groups());
-        engine.mark_failed_with_error(&crate::exchange::ExchangeError::SessionTimeout);
+        engine.mark_failed_with_error(&vauchi_core::exchange::ExchangeError::SessionTimeout);
         let screen = engine.current_screen();
         assert_eq!(screen.screen_id, "exchange_failed");
         let detail = screen.components.iter().find_map(|c| match c {
@@ -947,7 +950,7 @@ mod tests {
     #[test]
     fn retry_clears_failure_detail() {
         let mut engine = ExchangeEngine::new(config_no_groups());
-        engine.mark_failed_with_error(&crate::exchange::ExchangeError::BleOutOfRange);
+        engine.mark_failed_with_error(&vauchi_core::exchange::ExchangeError::BleOutOfRange);
         assert!(engine.failure_detail.is_some());
 
         let _ = engine.handle_action(UserAction::ActionPressed {
@@ -963,7 +966,7 @@ mod tests {
 
     #[test]
     fn user_message_covers_all_error_categories() {
-        use crate::exchange::ExchangeError;
+        use vauchi_core::exchange::ExchangeError;
         // Verify a representative from each category returns non-empty
         let cases = vec![
             ExchangeError::QRExpired,

@@ -6935,12 +6935,32 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ba73ea9cf16a25df0c8caa16c51acb937d5712a8429db78a3ee29d5dcacd3a65"
 
 [[package]]
+name = "vauchi-app"
+version = "0.9.0"
+dependencies = [
+ "hex",
+ "proptest",
+ "reqwest",
+ "schemars 0.8.22",
+ "serde",
+ "serde_json",
+ "sha2",
+ "subtle",
+ "tempfile",
+ "thiserror 2.0.18",
+ "tokio",
+ "vauchi-core",
+ "zeroize",
+]
+
+[[package]]
 name = "vauchi-cabi"
 version = "0.9.0"
 dependencies = [
  "cbindgen",
  "serde_json",
  "tempfile",
+ "vauchi-app",
  "vauchi-core",
  "zeroize",
 ]
@@ -6992,6 +7012,7 @@ dependencies = [
  "unicode-normalization",
  "url",
  "uuid",
+ "vauchi-app",
  "webpki-roots 0.26.11",
  "x25519-dalek",
  "zeroize",
@@ -7016,6 +7037,7 @@ dependencies = [
  "tokio",
  "tokio-tungstenite",
  "uniffi",
+ "vauchi-app",
  "vauchi-core",
  "webpki-roots 0.26.11",
  "zxcvbn",

@@ -6,7 +6,7 @@
 
 use std::os::raw::c_char;
 
-use vauchi_core::ui::*;
+use vauchi_app::ui::*;
 
 use super::{VauchiWorkflow, WorkflowEngineAny, from_c_str, to_c_string};
 

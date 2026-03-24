@@ -5,13 +5,11 @@
 //! AppEngine navigation tests: screen routing, cache, history, back navigation,
 //! available_screens, persistence, default_screen.
 
+use vauchi_app::ui::{ActionResult, ActionStyle, AppEngine, AppScreen, UserAction, WorkflowEngine};
 use vauchi_core::api::{Vauchi, VauchiConfig};
 use vauchi_core::contact::Contact;
 use vauchi_core::contact_card::ContactCard;
 use vauchi_core::crypto::SymmetricKey;
-use vauchi_core::ui::{
-    ActionResult, ActionStyle, AppEngine, AppScreen, UserAction, WorkflowEngine,
-};
 
 #[test]
 fn navigate_to_home_shows_home_screen() {
@@ -641,7 +639,7 @@ fn more_engine_has_expected_navigation_targets() {
         .components
         .iter()
         .flat_map(|c| match c {
-            vauchi_core::ui::Component::ActionList { items, .. } => {
+            vauchi_app::ui::Component::ActionList { items, .. } => {
                 items.iter().map(|item| item.id.clone()).collect::<Vec<_>>()
             }
             _ => vec![],

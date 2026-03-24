@@ -8,7 +8,6 @@
 
 use vauchi_core::api::*;
 use vauchi_core::contact_card::ContactCard;
-use vauchi_core::content::UpdateStatus;
 use vauchi_core::storage::{DeliveryRecord, DeliveryStatus};
 use vauchi_core::sync::device_sync::{ContactSyncData, SyncItem};
 
@@ -394,42 +393,4 @@ fn test_sync_result_has_changes_false_for_default() {
     );
 }
 
-// ============================================================
-// API 4: check_content_updates
-// ============================================================
-
-#[test]
-fn test_check_content_updates_returns_up_to_date_when_current() {
-    let mut wb = create_test_vauchi();
-    wb.create_identity("Alice").unwrap();
-
-    // Without any remote content configured, updates should be disabled
-    let status = wb.check_content_updates();
-    assert!(
-        matches!(status, UpdateStatus::Disabled),
-        "Without remote updates configured, should return Disabled, got: {:?}",
-        status
-    );
-}
-
-#[test]
-fn test_check_content_updates_returns_status_variant() {
-    let mut wb = create_test_vauchi();
-    wb.create_identity("Alice").unwrap();
-
-    // Verify the method returns a valid UpdateStatus
-    let status = wb.check_content_updates();
-
-    // Without remote updates, should return Disabled
-    assert!(
-        matches!(
-            status,
-            UpdateStatus::UpToDate
-                | UpdateStatus::Disabled
-                | UpdateStatus::CheckFailed(_)
-                | UpdateStatus::UpdatesAvailable(_)
-        ),
-        "Expected a valid UpdateStatus variant, got: {:?}",
-        status
-    );
-}
+// API 4: check_content_updates — moved to vauchi-app

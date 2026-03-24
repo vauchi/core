@@ -12,7 +12,7 @@
 
 use std::time::Duration;
 use tempfile::TempDir;
-use vauchi_core::content::{
+use vauchi_app::content::{
     ContentCache, ContentConfig, ContentManager, ContentType, UpdateStatus, compute_checksum,
 };
 

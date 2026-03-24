@@ -8,7 +8,7 @@
 //! BackupRecoveryEngine, DuressPinEngine, EmergencyShredEngine.
 
 use proptest::prelude::*;
-use vauchi_core::ui::*;
+use vauchi_app::ui::*;
 
 // ── Known screen IDs per engine ─────────────────────────────────────
 

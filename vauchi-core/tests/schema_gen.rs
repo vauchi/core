@@ -12,7 +12,7 @@
 use schemars::schema_for;
 use std::fs;
 use std::path::PathBuf;
-use vauchi_core::ui::{ActionResult, ScreenModel, UserAction};
+use vauchi_app::ui::{ActionResult, ScreenModel, UserAction};
 
 fn schemas_dir() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("schemas")

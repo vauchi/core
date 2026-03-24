@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-use vauchi_core::ui::*;
+use vauchi_app::ui::*;
 
 #[test]
 fn lock_screen_id() {

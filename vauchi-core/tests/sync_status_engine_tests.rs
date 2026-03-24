@@ -2,8 +2,8 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+use vauchi_app::ui::*;
 use vauchi_core::network::ConnectionState;
-use vauchi_core::ui::*;
 
 fn connected_engine() -> SyncStatusEngine {
     SyncStatusEngine::new("wss://relay.vauchi.app".into(), 5, 2)

@@ -2,8 +2,8 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+use vauchi_app::ui::*;
 use vauchi_core::tor_config::TorStatus;
-use vauchi_core::ui::*;
 
 // =============================================================================
 // Screen basics

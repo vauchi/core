@@ -6,9 +6,9 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::contact_card::{CatalogEntry, FieldTypeCatalog};
-use crate::social::SocialNetworkRegistry;
 use crate::ui::*;
+use vauchi_core::contact_card::{CatalogEntry, FieldTypeCatalog};
+use vauchi_core::social::SocialNetworkRegistry;
 
 /// The type of form dialog, determining which fields are shown.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]

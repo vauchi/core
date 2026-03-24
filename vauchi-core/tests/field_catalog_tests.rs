@@ -177,8 +177,8 @@ fn test_all_categories() {
 // @scenario: contacts_management :: AppEngine exposes field type catalog
 #[test]
 fn test_app_engine_field_type_catalog() {
+    use vauchi_app::ui::AppEngine;
     use vauchi_core::api::Vauchi;
-    use vauchi_core::ui::AppEngine;
 
     let vauchi = Vauchi::in_memory().unwrap();
     let engine = AppEngine::new(vauchi);

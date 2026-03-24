@@ -35,7 +35,7 @@ pub struct ContentConfig {
     ///
     /// When set, fetched manifests are verified against this key before use.
     /// When `None`, manifest signatures are not checked (backward-compatible).
-    pub publisher_public_key: Option<crate::crypto::signing::PublicKey>,
+    pub publisher_public_key: Option<vauchi_core::crypto::signing::PublicKey>,
 }
 
 impl Default for ContentConfig {

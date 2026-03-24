@@ -26,7 +26,7 @@ fn ensure_init() {
         // vauchi-platform/ -> ../../locales/ (sibling locales repo)
         let locales_dir =
             std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../locales");
-        let _ = vauchi_core::i18n::init(&locales_dir);
+        let _ = vauchi_app::i18n::init(&locales_dir);
     });
 }
 

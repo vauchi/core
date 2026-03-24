@@ -208,12 +208,15 @@ impl WorkflowEngine for MyInfoEngine {
             MyInfoViewMode::GroupView { .. } => "Entry View",
         };
 
-        let at_field_limit = self.own_fields.len() >= crate::contact_card::MAX_FIELDS;
+        let at_field_limit = self.own_fields.len() >= vauchi_core::contact_card::MAX_FIELDS;
         let actions = vec![
             ScreenAction {
                 id: "add_field".into(),
                 label: if at_field_limit {
-                    format!("Field limit reached ({})", crate::contact_card::MAX_FIELDS)
+                    format!(
+                        "Field limit reached ({})",
+                        vauchi_core::contact_card::MAX_FIELDS
+                    )
                 } else {
                     "Add Entry".into()
                 },

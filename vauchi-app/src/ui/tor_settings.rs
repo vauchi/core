@@ -9,8 +9,8 @@
 //! `TorManager` (when the `tor` feature is enabled) or handle them
 //! as no-ops.
 
-use crate::tor_config::TorStatus;
 use crate::ui::*;
+use vauchi_core::tor_config::TorStatus;
 
 /// Engine that displays and manages Tor privacy settings.
 ///

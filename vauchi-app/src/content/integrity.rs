@@ -96,7 +96,7 @@ pub fn compute_checksum(data: &[u8]) -> String {
 /// Currently no code path gates updates on manifest signatures.
 pub fn verify_manifest_signature(
     manifest: &super::types::ContentManifest,
-    public_key: &crate::crypto::signing::PublicKey,
+    public_key: &vauchi_core::crypto::signing::PublicKey,
 ) -> Result<(), IntegrityError> {
     let sig_hex = manifest
         .signature
@@ -114,7 +114,7 @@ pub fn verify_manifest_signature(
         return Err(IntegrityError::InvalidSignatureFormat);
     }
 
-    let signature = crate::crypto::signing::Signature::from_bytes(
+    let signature = vauchi_core::crypto::signing::Signature::from_bytes(
         sig_bytes
             .try_into()
             .map_err(|_| IntegrityError::InvalidSignatureFormat)?,
@@ -181,7 +181,7 @@ mod tests {
     #[test]
     fn test_verify_manifest_signature_valid() {
         use crate::content::types::{ContentIndex, ContentManifest};
-        use crate::crypto::signing::SigningKeyPair;
+        use vauchi_core::crypto::signing::SigningKeyPair;
 
         let keypair = SigningKeyPair::generate();
         let public_key = keypair.public_key();
@@ -212,7 +212,7 @@ mod tests {
     #[test]
     fn test_verify_manifest_signature_tampered() {
         use crate::content::types::{ContentIndex, ContentManifest};
-        use crate::crypto::signing::SigningKeyPair;
+        use vauchi_core::crypto::signing::SigningKeyPair;
 
         let keypair = SigningKeyPair::generate();
         let public_key = keypair.public_key();
@@ -245,7 +245,7 @@ mod tests {
     #[test]
     fn test_verify_manifest_signature_missing() {
         use crate::content::types::{ContentIndex, ContentManifest};
-        use crate::crypto::signing::SigningKeyPair;
+        use vauchi_core::crypto::signing::SigningKeyPair;
 
         let keypair = SigningKeyPair::generate();
         let public_key = keypair.public_key();
@@ -270,7 +270,7 @@ mod tests {
     #[test]
     fn test_verify_manifest_signature_wrong_key() {
         use crate::content::types::{ContentIndex, ContentManifest};
-        use crate::crypto::signing::SigningKeyPair;
+        use vauchi_core::crypto::signing::SigningKeyPair;
 
         let signer = SigningKeyPair::generate();
         let wrong_key = SigningKeyPair::generate().public_key();
@@ -301,8 +301,8 @@ mod tests {
     #[test]
     fn test_verify_manifest_signature_with_locales() {
         use crate::content::types::{ContentIndex, ContentManifest, FileEntry, LocalesEntry};
-        use crate::crypto::signing::SigningKeyPair;
         use std::collections::HashMap;
+        use vauchi_core::crypto::signing::SigningKeyPair;
 
         let keypair = SigningKeyPair::generate();
         let public_key = keypair.public_key();

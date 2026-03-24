@@ -17,7 +17,7 @@ use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
 
-use crate::api::Vauchi;
+use vauchi_core::api::Vauchi;
 
 use super::action::{ActionResult, UserAction};
 use super::engine::WorkflowEngine;
@@ -155,9 +155,9 @@ pub struct AppEngine {
     /// Navigation history stack for back-button support.
     nav_history: Vec<AppScreen>,
     /// Field pending undo after delete from MyInfoEntryDetail.
-    pending_field_undo: Option<(String, crate::contact_card::ContactField)>,
+    pending_field_undo: Option<(String, vauchi_core::contact_card::ContactField)>,
     /// Cached field type catalog (built once from SocialNetworkRegistry).
-    field_catalog: crate::contact_card::FieldTypeCatalog,
+    field_catalog: vauchi_core::contact_card::FieldTypeCatalog,
 }
 
 impl AppEngine {
@@ -180,8 +180,8 @@ impl AppEngine {
             AppScreen::MyInfo
         };
         let engine = Self::create_engine(&vauchi, &screen);
-        let registry = crate::social::SocialNetworkRegistry::with_defaults();
-        let field_catalog = crate::contact_card::FieldTypeCatalog::new(&registry);
+        let registry = vauchi_core::social::SocialNetworkRegistry::with_defaults();
+        let field_catalog = vauchi_core::contact_card::FieldTypeCatalog::new(&registry);
         Self {
             vauchi,
             screen,

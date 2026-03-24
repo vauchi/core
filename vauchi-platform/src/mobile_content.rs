@@ -5,7 +5,7 @@
 //! Content updates operations for mobile.
 
 #[cfg(feature = "content-updates")]
-use vauchi_core::content::{ContentConfig, ContentManager};
+use vauchi_app::content::{ContentConfig, ContentManager};
 
 use super::VauchiPlatform;
 use super::content;
@@ -138,9 +138,9 @@ impl VauchiPlatform {
         rt.block_on(async {
             match manager.apply_updates().await {
                 Ok(result) => match result {
-                    vauchi_core::content::ApplyResult::NoUpdates => MobileApplyResult::NoUpdates,
-                    vauchi_core::content::ApplyResult::Disabled => MobileApplyResult::Disabled,
-                    vauchi_core::content::ApplyResult::Applied { applied, failed } => {
+                    vauchi_app::content::ApplyResult::NoUpdates => MobileApplyResult::NoUpdates,
+                    vauchi_app::content::ApplyResult::Disabled => MobileApplyResult::Disabled,
+                    vauchi_app::content::ApplyResult::Applied { applied, failed } => {
                         MobileApplyResult::Applied {
                             applied: applied.into_iter().map(MobileContentType::from).collect(),
                             failed: failed

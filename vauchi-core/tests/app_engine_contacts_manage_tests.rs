@@ -5,13 +5,13 @@
 //! AppEngine contact management tests: my_info fields, contact detail/edit routing,
 //! contact visibility, duplicate detection, contact merge, and contact limit.
 
+use vauchi_app::ui::{
+    ActionResult, ActionStyle, AppEngine, AppScreen, Component, UserAction, WorkflowEngine,
+};
 use vauchi_core::api::Vauchi;
 use vauchi_core::contact::Contact;
 use vauchi_core::contact_card::{ContactCard, ContactField, FieldType};
 use vauchi_core::crypto::SymmetricKey;
-use vauchi_core::ui::{
-    ActionResult, ActionStyle, AppEngine, AppScreen, Component, UserAction, WorkflowEngine,
-};
 
 // ── my_info field tests ──────────────────────────────────────────────
 

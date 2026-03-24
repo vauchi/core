@@ -19,9 +19,9 @@
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
+use vauchi_app::ui::{AppEngine, WorkflowEngine};
 use vauchi_core::api::{Vauchi, VauchiConfig};
 use vauchi_core::crypto::SymmetricKey;
-use vauchi_core::ui::{AppEngine, WorkflowEngine};
 
 use crate::error::MobileError;
 use crate::json_helpers::{

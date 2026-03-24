@@ -11,8 +11,8 @@ use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
 use std::sync::{Arc, Mutex};
 
+use vauchi_app::ui::*;
 use vauchi_core::exchange::{ExchangeSession, ManualConfirmationVerifier};
-use vauchi_core::ui::*;
 
 mod app;
 mod audio;

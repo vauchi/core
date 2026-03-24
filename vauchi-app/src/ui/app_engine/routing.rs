@@ -7,10 +7,10 @@
 
 use super::AppEngine;
 use super::AppScreen;
-use crate::contact_card::FieldType;
-use crate::exchange::ExchangeHardwareEvent;
 use crate::ui::action::{ActionResult, UserAction};
 use crate::ui::form_dialog::FormDialogType;
+use vauchi_core::contact_card::FieldType;
+use vauchi_core::exchange::ExchangeHardwareEvent;
 
 impl AppEngine {
     /// Returns `true` if the current engine has user-entered data that differs
@@ -53,7 +53,7 @@ impl AppEngine {
     }
 
     /// Returns the field type catalog for the Add Field picker.
-    pub fn field_type_catalog(&self) -> &crate::contact_card::FieldTypeCatalog {
+    pub fn field_type_catalog(&self) -> &vauchi_core::contact_card::FieldTypeCatalog {
         &self.field_catalog
     }
 
@@ -281,7 +281,7 @@ impl AppEngine {
                                 .unwrap_or_else(|| "Custom".into())
                         };
                         let field =
-                            crate::contact_card::ContactField::new(field_type, &label, value);
+                            vauchi_core::contact_card::ContactField::new(field_type, &label, value);
                         let field_id = field.id().to_string();
                         let group_list: Vec<String> = _groups
                             .split(',')

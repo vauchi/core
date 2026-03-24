@@ -15,8 +15,7 @@ description = "Core library for Vauchi - privacy-focused contact card exchange"
 
 
 [features]
-default = ["app-layer", "network", "storage"]
-app-layer = []  # Presentation modules: i18n, help, theme, ui, content
+default = ["network", "storage"]
 storage = ["rusqlite"]
 network = ["network-native-tls", "storage"]
 network-native-tls = ["tungstenite", "tungstenite/handshake", "tungstenite/native-tls", "native-tls", "snow"]
@@ -42,8 +41,9 @@ test-kdf = []
 schema-gen = ["schemars"]
 # Tor anonymity layer (embedded arti client)
 tor = ["arti-client", "tor-rtcompat", "tokio-util", "tokio"]
-# Remote content updates (requires HTTP client)
-content-updates = ["reqwest", "tokio"]
+# Remote content updates — module moved to vauchi-app.
+# Feature retained as empty for backward compatibility (consumers may reference it).
+content-updates = []
 
 [dependencies]
 # Cryptography (audited libraries)
@@ -152,6 +152,8 @@ uuid = { version = "1.0", features = ["js"] }
 getrandom = { version = "0.2", features = ["js"] }
 
 [dev-dependencies]
+# App-layer modules (tests reference ui, theme, help, i18n, content)
+vauchi-app = { path = "../vauchi-app", features = ["network-native-tls"] }
 # JSON Schema validation for contract tests
 jsonschema = "0.28"
 # Temporary directories for storage tests

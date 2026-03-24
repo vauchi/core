@@ -16,7 +16,7 @@
 mod common;
 
 use common::helpers::{all_themes, theme_by_id, try_all_themes};
-use vauchi_core::theme::{DesignTokens, Theme, ThemeColors, ThemeMode, validate_hex_color};
+use vauchi_app::theme::{DesignTokens, Theme, ThemeColors, ThemeMode, validate_hex_color};
 
 // ============================================================
 // Theme Structure

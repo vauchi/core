@@ -9,7 +9,6 @@ use std::collections::HashMap;
 use super::AppEngine;
 use super::AppScreen;
 use super::initials;
-use crate::api::Vauchi;
 use crate::ui::backup_recovery::BackupRecoveryEngine;
 use crate::ui::component::{ContactItem, FieldDisplay, UiFieldVisibility};
 use crate::ui::contact_detail::{ContactDetailEngine, ContactNotFoundEngine, SharedInfoView};
@@ -40,6 +39,7 @@ use crate::ui::settings::{SettingsConfig, SettingsEngine};
 use crate::ui::support::SupportEngine;
 use crate::ui::sync_status::SyncStatusEngine;
 use crate::ui::tor_settings::TorSettingsEngine;
+use vauchi_core::api::Vauchi;
 
 impl AppEngine {
     pub(super) fn create_engine(vauchi: &Vauchi, screen: &AppScreen) -> Box<dyn WorkflowEngine> {
@@ -181,12 +181,13 @@ impl AppEngine {
                     .identity()
                     .and_then(|id_ref| {
                         let bytes = zeroize::Zeroizing::new(id_ref.to_storage_bytes());
-                        crate::identity::Identity::from_storage_bytes(&bytes).ok()
+                        vauchi_core::identity::Identity::from_storage_bytes(&bytes).ok()
                     })
                     .and_then(|identity| {
                         card.map(|c| {
-                            let proximity = crate::exchange::ManualConfirmationVerifier::new();
-                            crate::exchange::ExchangeSession::new_qr(identity, c, proximity)
+                            let proximity =
+                                vauchi_core::exchange::ManualConfirmationVerifier::new();
+                            vauchi_core::exchange::ExchangeSession::new_qr(identity, c, proximity)
                         })
                     });
 

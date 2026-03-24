@@ -6,11 +6,11 @@
 //! and the onboarding random actions proptest (CC-13).
 
 use proptest::prelude::*;
-use vauchi_core::api::Vauchi;
-use vauchi_core::contact_card::{ContactField, FieldType};
-use vauchi_core::ui::{
+use vauchi_app::ui::{
     ActionResult, AppEngine, AppScreen, FormDialogType, UserAction, WorkflowEngine,
 };
+use vauchi_core::api::Vauchi;
+use vauchi_core::contact_card::{ContactField, FieldType};
 
 // ── AppScreen / FormDialogType serde roundtrip tests ─────────────────
 
@@ -226,7 +226,7 @@ fn exchange_screen_with_identity_has_session() {
     // Verify the QR data comes from the session (ephemeral), not the static public ID.
     // This confirms ADR-031 session wiring is active.
     let qr_data = screen.components.iter().find_map(|c| match c {
-        vauchi_core::ui::Component::QrCode { data, .. } => Some(data.clone()),
+        vauchi_app::ui::Component::QrCode { data, .. } => Some(data.clone()),
         _ => None,
     });
     let qr_data = qr_data.expect("exchange screen should have a QrCode component");

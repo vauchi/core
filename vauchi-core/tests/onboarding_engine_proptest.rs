@@ -5,7 +5,7 @@
 //! Property-based tests for the OnboardingEngine state machine.
 
 use proptest::prelude::*;
-use vauchi_core::ui::*;
+use vauchi_app::ui::*;
 
 // ── Constants ───────────────────────────────────────────────────────
 

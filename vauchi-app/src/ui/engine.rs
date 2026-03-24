@@ -5,7 +5,7 @@
 use std::any::Any;
 
 use super::{ActionResult, ScreenModel, UserAction};
-use crate::exchange::ExchangeHardwareEvent;
+use vauchi_core::exchange::ExchangeHardwareEvent;
 
 /// Trait that all core-driven workflows implement.
 ///

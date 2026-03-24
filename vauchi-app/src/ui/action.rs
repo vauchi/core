@@ -5,7 +5,7 @@
 use serde::{Deserialize, Serialize};
 
 use super::screen::ScreenModel;
-use crate::exchange::ExchangeCommand;
+use vauchi_core::exchange::ExchangeCommand;
 
 /// A command from the UI layer requesting a Tor backend operation.
 ///

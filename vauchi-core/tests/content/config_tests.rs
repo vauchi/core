@@ -10,7 +10,7 @@
 
 use std::path::PathBuf;
 use std::time::Duration;
-use vauchi_core::content::ContentConfig;
+use vauchi_app::content::ContentConfig;
 
 #[test]
 fn test_config_default() {

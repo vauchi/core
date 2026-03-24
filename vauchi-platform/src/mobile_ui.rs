@@ -18,7 +18,7 @@
 
 use std::sync::Mutex;
 
-use vauchi_core::ui::{
+use vauchi_app::ui::{
     BackupMode, BackupRecoveryEngine, ContactEditEngine, ContactItem, ContactListEngine,
     DeliveryItem, DeliveryStatusEngine, DeviceLinkingEngine, DuressConfig, DuressPinEngine,
     EditableContact, EmergencyShredEngine, ExchangeConfig, ExchangeEngine, HelpEngine, HelpItem,

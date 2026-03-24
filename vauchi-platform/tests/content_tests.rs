@@ -9,7 +9,7 @@ use vauchi_platform::{MobileContentConfig, MobileContentType};
 #[test]
 fn test_content_type_networks_roundtrip() {
     let mobile = MobileContentType::Networks;
-    let core: vauchi_core::content::ContentType = mobile.into();
+    let core: vauchi_app::content::ContentType = mobile.into();
     let back: MobileContentType = core.into();
     assert!(
         matches!(back, MobileContentType::Networks),
@@ -20,7 +20,7 @@ fn test_content_type_networks_roundtrip() {
 #[test]
 fn test_content_type_locales_roundtrip() {
     let mobile = MobileContentType::Locales;
-    let core: vauchi_core::content::ContentType = mobile.into();
+    let core: vauchi_app::content::ContentType = mobile.into();
     let back: MobileContentType = core.into();
     assert!(
         matches!(back, MobileContentType::Locales),
@@ -31,7 +31,7 @@ fn test_content_type_locales_roundtrip() {
 #[test]
 fn test_content_type_themes_roundtrip() {
     let mobile = MobileContentType::Themes;
-    let core: vauchi_core::content::ContentType = mobile.into();
+    let core: vauchi_app::content::ContentType = mobile.into();
     let back: MobileContentType = core.into();
     assert!(
         matches!(back, MobileContentType::Themes),
@@ -42,7 +42,7 @@ fn test_content_type_themes_roundtrip() {
 #[test]
 fn test_content_type_help_roundtrip() {
     let mobile = MobileContentType::Help;
-    let core: vauchi_core::content::ContentType = mobile.into();
+    let core: vauchi_app::content::ContentType = mobile.into();
     let back: MobileContentType = core.into();
     assert!(
         matches!(back, MobileContentType::Help),

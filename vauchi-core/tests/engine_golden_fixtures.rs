@@ -12,7 +12,7 @@
 
 use std::fs;
 use std::path::PathBuf;
-use vauchi_core::ui::*;
+use vauchi_app::ui::*;
 
 fn fixtures_dir() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/golden")

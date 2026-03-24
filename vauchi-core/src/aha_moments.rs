@@ -11,8 +11,6 @@
 
 use serde::{Deserialize, Serialize};
 
-#[cfg(feature = "app-layer")]
-use crate::i18n::{Locale, get_string, get_string_with_args};
 pub use crate::types::{AhaMomentTracker, AhaMomentType};
 
 impl AhaMomentType {
@@ -71,32 +69,8 @@ impl AhaMomentType {
     }
 }
 
-#[cfg(feature = "app-layer")]
-impl AhaMomentType {
-    /// Get the i18n key prefix for this moment type.
-    fn i18n_key(&self) -> &'static str {
-        match self {
-            AhaMomentType::CardCreationComplete => "aha.card_creation_complete",
-            AhaMomentType::FirstEdit => "aha.first_edit",
-            AhaMomentType::FirstContactAdded => "aha.first_contact_added",
-            AhaMomentType::FirstUpdateReceived => "aha.first_update_received",
-            AhaMomentType::FirstOutboundDelivered => "aha.first_outbound_delivered",
-            AhaMomentType::FirstFieldEdit => "aha.first_field_edit",
-            AhaMomentType::ThreeContactsReached => "aha.three_contacts_reached",
-            AhaMomentType::DeviceLinked => "aha.device_linked",
-        }
-    }
-
-    /// Get the localized title for this moment.
-    pub fn title_localized(&self, locale: Locale) -> String {
-        get_string(locale, &format!("{}.title", self.i18n_key()))
-    }
-
-    /// Get the localized message for this moment.
-    pub fn message_localized(&self, locale: Locale) -> String {
-        get_string(locale, &format!("{}.message", self.i18n_key()))
-    }
-}
+// Localized methods (title_localized, message_localized) moved to vauchi-app.
+// English title() and message() methods remain above.
 
 /// An aha moment event to display to the user
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -151,33 +125,6 @@ impl AhaMoment {
     /// Whether to show animation for this moment
     pub fn has_animation(&self) -> bool {
         self.moment_type.has_animation()
-    }
-}
-
-#[cfg(feature = "app-layer")]
-impl AhaMoment {
-    /// Get the localized title for display.
-    pub fn title_localized(&self, locale: Locale) -> String {
-        self.moment_type.title_localized(locale)
-    }
-
-    /// Get the localized message for display, with context interpolation.
-    pub fn message_localized(&self, locale: Locale) -> String {
-        match (&self.moment_type, &self.context) {
-            (AhaMomentType::FirstContactAdded, Some(name)) => {
-                let key = format!("{}.message_with_name", self.moment_type.i18n_key());
-                get_string_with_args(locale, &key, &[("name", name)])
-            }
-            (AhaMomentType::FirstUpdateReceived, Some(name)) => {
-                let key = format!("{}.message_with_name", self.moment_type.i18n_key());
-                get_string_with_args(locale, &key, &[("name", name)])
-            }
-            (AhaMomentType::FirstOutboundDelivered, Some(count)) => {
-                let key = format!("{}.message_with_count", self.moment_type.i18n_key());
-                get_string_with_args(locale, &key, &[("count", count)])
-            }
-            _ => self.moment_type.message_localized(locale),
-        }
     }
 }
 
@@ -314,51 +261,5 @@ mod tests {
         assert!(tracker.should_trigger(AhaMomentType::CardCreationComplete));
     }
 
-    // i18n-dependent tests (require app-layer feature)
-    #[cfg(feature = "app-layer")]
-    mod localized_tests {
-        use super::*;
-
-        fn lock_and_init() -> std::sync::MutexGuard<'static, ()> {
-            let guard = crate::i18n::I18N_TEST_LOCK.lock().unwrap();
-            if !crate::i18n::is_initialized() {
-                let locales_dir =
-                    std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../locales");
-                let _ = crate::i18n::init(&locales_dir);
-            }
-            guard
-        }
-
-        #[test]
-        fn test_localized_title_german() {
-            let _lock = lock_and_init();
-            let title = AhaMomentType::CardCreationComplete.title_localized(Locale::German);
-            assert!(title.contains("Karte"));
-        }
-
-        #[test]
-        fn test_localized_message_german() {
-            let _lock = lock_and_init();
-            let msg = AhaMomentType::FirstEdit.message_localized(Locale::German);
-            assert!(!msg.contains("Missing"));
-        }
-
-        #[test]
-        fn test_localized_moment_with_context() {
-            let _lock = lock_and_init();
-            let moment =
-                AhaMoment::with_context(AhaMomentType::FirstContactAdded, "Alice".to_string());
-            let msg = moment.message_localized(Locale::German);
-            assert!(msg.contains("Alice"));
-        }
-
-        #[test]
-        fn test_localized_outbound_with_count() {
-            let _lock = lock_and_init();
-            let moment =
-                AhaMoment::with_context(AhaMomentType::FirstOutboundDelivered, "5".to_string());
-            let msg = moment.message_localized(Locale::French);
-            assert!(msg.contains("5"));
-        }
-    }
+    // Localized tests moved to vauchi-app (they depend on i18n).
 }

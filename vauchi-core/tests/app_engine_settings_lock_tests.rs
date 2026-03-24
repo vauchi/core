@@ -7,8 +7,8 @@
 mod common;
 
 use common::app_engine_helpers::{engine_with_password, enter_pin, find_settings_toggle};
+use vauchi_app::ui::{ActionResult, AppEngine, AppScreen, UserAction, WorkflowEngine};
 use vauchi_core::api::Vauchi;
-use vauchi_core::ui::{ActionResult, AppEngine, AppScreen, UserAction, WorkflowEngine};
 
 // ── settings toggle persistence tests (HIGH-4) ──────────────────────
 
@@ -223,7 +223,7 @@ fn lock_screen_tracks_failed_attempts() {
     let has_validation_error = screen.components.iter().any(|c| {
         matches!(
             c,
-            vauchi_core::ui::Component::PinInput {
+            vauchi_app::ui::Component::PinInput {
                 validation_error: Some(_),
                 ..
             }

@@ -5,11 +5,11 @@
 //! AppEngine FormDialog tests: add/edit field, edit name, edit relay URL,
 //! submission, validation errors, and navigation after completion.
 
-use vauchi_core::api::Vauchi;
-use vauchi_core::contact_card::FieldType;
-use vauchi_core::ui::{
+use vauchi_app::ui::{
     ActionResult, AppEngine, AppScreen, Component, FormDialogType, UserAction, WorkflowEngine,
 };
+use vauchi_core::api::Vauchi;
+use vauchi_core::contact_card::FieldType;
 
 // ── FormDialogEngine tests ────────────────────────────────────────────
 

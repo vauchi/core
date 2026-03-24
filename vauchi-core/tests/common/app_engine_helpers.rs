@@ -4,8 +4,8 @@
 
 //! Shared helpers for AppEngine test files.
 
+use vauchi_app::ui::{ActionResult, AppEngine, UserAction, WorkflowEngine};
 use vauchi_core::api::Vauchi;
-use vauchi_core::ui::{ActionResult, AppEngine, UserAction, WorkflowEngine};
 
 /// Drive through the full onboarding flow, returning the final ActionResult.
 /// Each intermediate step is asserted to produce the expected ActionResult variant (T-12).
@@ -164,11 +164,11 @@ pub fn drive_onboarding_without_name(engine: &mut AppEngine) -> ActionResult {
 
 /// Helper: find a toggle's enabled state in a settings screen.
 pub fn find_settings_toggle(
-    screen: &vauchi_core::ui::ScreenModel,
+    screen: &vauchi_app::ui::ScreenModel,
     group_id: &str,
     item_id: &str,
 ) -> bool {
-    use vauchi_core::ui::{Component, SettingsItemKind};
+    use vauchi_app::ui::{Component, SettingsItemKind};
     screen
         .components
         .iter()

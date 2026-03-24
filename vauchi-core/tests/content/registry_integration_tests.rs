@@ -9,10 +9,20 @@
 //! - Updated network URL template
 
 use tempfile::TempDir;
-use vauchi_core::content::{
+use vauchi_app::content::{
     ContentCache, ContentConfig, ContentManager, ContentType, compute_checksum,
 };
-use vauchi_core::social::SocialNetworkRegistry;
+use vauchi_core::social::{SocialNetwork, SocialNetworkRegistry};
+
+/// Build a registry from ContentManager (replaces the method that moved to vauchi-app).
+fn registry_from_content_manager(content: &ContentManager) -> SocialNetworkRegistry {
+    let mut registry = SocialNetworkRegistry::new();
+    let networks = content.networks();
+    for n in networks {
+        registry.add(SocialNetwork::new(&n.id, &n.name, &n.url).with_icon(&n.id));
+    }
+    registry
+}
 
 fn test_config(temp: &TempDir) -> ContentConfig {
     ContentConfig {
@@ -28,7 +38,7 @@ fn test_registry_from_content_manager_bundled() {
     let config = test_config(&temp);
     let content = ContentManager::new(config).unwrap();
 
-    let registry = SocialNetworkRegistry::from_content_manager(&content);
+    let registry = registry_from_content_manager(&content);
 
     // Should have bundled networks
     assert!(!registry.is_empty());
@@ -59,7 +69,7 @@ fn test_registry_from_content_manager_cached() {
     let config = test_config(&temp);
     let content = ContentManager::new(config).unwrap();
 
-    let registry = SocialNetworkRegistry::from_content_manager(&content);
+    let registry = registry_from_content_manager(&content);
 
     // Should have cached networks (not bundled)
     assert_eq!(registry.len(), 2);
@@ -74,7 +84,7 @@ fn test_registry_generates_urls() {
     let config = test_config(&temp);
     let content = ContentManager::new(config).unwrap();
 
-    let registry = SocialNetworkRegistry::from_content_manager(&content);
+    let registry = registry_from_content_manager(&content);
 
     let url = registry.profile_url("twitter", "alice");
     assert!(url.is_some(), "expected Some value");
@@ -89,7 +99,7 @@ fn test_new_network_after_cache_update() {
     // Initially use bundled (no cache)
     let config = test_config(&temp);
     let content1 = ContentManager::new(config.clone()).unwrap();
-    let registry1 = SocialNetworkRegistry::from_content_manager(&content1);
+    let registry1 = registry_from_content_manager(&content1);
 
     // "newnetwork" should not exist in bundled
     assert!(registry1.get("newnetwork").is_none());
@@ -112,7 +122,7 @@ fn test_new_network_after_cache_update() {
 
     // Create new manager to pick up cache
     let content2 = ContentManager::new(config).unwrap();
-    let registry2 = SocialNetworkRegistry::from_content_manager(&content2);
+    let registry2 = registry_from_content_manager(&content2);
 
     // Now "newnetwork" should exist
     assert!(registry2.get("newnetwork").is_some(), "expected Some value");
@@ -143,7 +153,7 @@ fn test_updated_url_template() {
 
     let config = test_config(&temp);
     let content = ContentManager::new(config).unwrap();
-    let registry = SocialNetworkRegistry::from_content_manager(&content);
+    let registry = registry_from_content_manager(&content);
 
     // Should use updated URL
     let url = registry.profile_url("twitter", "alice").unwrap();

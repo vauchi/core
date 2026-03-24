@@ -500,8 +500,8 @@ const THEMES_JSON: &[u8] = include_bytes!("../../../themes/themes.json");
 /// Get all available themes from themes.json.
 #[uniffi::export]
 pub fn get_available_themes() -> Vec<MobileTheme> {
-    vauchi_core::theme::load_themes_from_json(THEMES_JSON)
-        .unwrap_or_else(|_| vec![vauchi_core::theme::default_theme()])
+    vauchi_app::theme::load_themes_from_json(THEMES_JSON)
+        .unwrap_or_else(|_| vec![vauchi_app::theme::default_theme()])
         .iter()
         .map(MobileTheme::from)
         .collect()
@@ -512,7 +512,7 @@ pub fn get_available_themes() -> Vec<MobileTheme> {
 /// Returns None if the theme is not found.
 #[uniffi::export]
 pub fn get_theme(theme_id: String) -> Option<MobileTheme> {
-    vauchi_core::theme::load_themes_from_json(THEMES_JSON)
+    vauchi_app::theme::load_themes_from_json(THEMES_JSON)
         .unwrap_or_default()
         .iter()
         .find(|t| t.id == theme_id)
@@ -542,23 +542,23 @@ pub fn get_default_theme_id(prefer_dark: bool) -> String {
 /// (e.g., en.json, de.json, fr.json, es.json).
 #[uniffi::export]
 pub fn init_locales(resource_dir: String) -> Result<(), MobileError> {
-    vauchi_core::i18n::init(std::path::Path::new(&resource_dir))
+    vauchi_app::i18n::init(std::path::Path::new(&resource_dir))
         .map_err(|e| MobileError::InitError(e.to_string()))
 }
 
 /// Get all available locales.
 #[uniffi::export]
 pub fn get_available_locales() -> Vec<MobileLocaleInfo> {
-    vauchi_core::i18n::get_available_locales()
+    vauchi_app::i18n::get_available_locales()
         .into_iter()
-        .map(|l| MobileLocaleInfo::from(vauchi_core::i18n::get_locale_info(l)))
+        .map(|l| MobileLocaleInfo::from(vauchi_app::i18n::get_locale_info(l)))
         .collect()
 }
 
 /// Get information about a specific locale.
 #[uniffi::export]
 pub fn get_locale_info(locale: MobileLocale) -> MobileLocaleInfo {
-    MobileLocaleInfo::from(vauchi_core::i18n::get_locale_info(locale.into()))
+    MobileLocaleInfo::from(vauchi_app::i18n::get_locale_info(locale.into()))
 }
 
 /// Get a localized string by key.
@@ -588,7 +588,7 @@ pub fn get_string_with_args(
 /// Returns None if the code is not recognized.
 #[uniffi::export]
 pub fn parse_locale_code(code: String) -> Option<MobileLocale> {
-    vauchi_core::i18n::Locale::from_code(&code).map(MobileLocale::from)
+    vauchi_app::i18n::Locale::from_code(&code).map(MobileLocale::from)
 }
 
 // ============================================================
@@ -598,7 +598,7 @@ pub fn parse_locale_code(code: String) -> Option<MobileLocale> {
 /// Get all help categories with their display names.
 #[uniffi::export]
 pub fn get_help_categories() -> Vec<MobileHelpCategoryInfo> {
-    vauchi_core::help::HelpCategory::all()
+    vauchi_app::help::HelpCategory::all()
         .iter()
         .map(|c| MobileHelpCategoryInfo {
             category: (*c).into(),
@@ -610,7 +610,7 @@ pub fn get_help_categories() -> Vec<MobileHelpCategoryInfo> {
 /// Get all FAQ items.
 #[uniffi::export]
 pub fn get_faqs() -> Vec<MobileFaqItem> {
-    vauchi_core::help::get_faqs()
+    vauchi_app::help::get_faqs()
         .iter()
         .map(MobileFaqItem::from)
         .collect()
@@ -619,7 +619,7 @@ pub fn get_faqs() -> Vec<MobileFaqItem> {
 /// Get FAQ items for a specific category.
 #[uniffi::export]
 pub fn get_faqs_by_category(category: MobileHelpCategory) -> Vec<MobileFaqItem> {
-    vauchi_core::help::get_faqs_by_category(category.into())
+    vauchi_app::help::get_faqs_by_category(category.into())
         .iter()
         .map(MobileFaqItem::from)
         .collect()
@@ -630,7 +630,7 @@ pub fn get_faqs_by_category(category: MobileHelpCategory) -> Vec<MobileFaqItem> 
 /// Returns None if the FAQ is not found.
 #[uniffi::export]
 pub fn get_faq_by_id(id: String) -> Option<MobileFaqItem> {
-    vauchi_core::help::get_faq_by_id(&id).map(|f| MobileFaqItem::from(&f))
+    vauchi_app::help::get_faq_by_id(&id).map(|f| MobileFaqItem::from(&f))
 }
 
 /// Search FAQs by query text.
@@ -638,7 +638,7 @@ pub fn get_faq_by_id(id: String) -> Option<MobileFaqItem> {
 /// Searches in both questions and answers (case-insensitive).
 #[uniffi::export]
 pub fn search_faqs(query: String) -> Vec<MobileFaqItem> {
-    vauchi_core::help::search_faqs(&query)
+    vauchi_app::help::search_faqs(&query)
         .iter()
         .map(MobileFaqItem::from)
         .collect()
@@ -647,7 +647,7 @@ pub fn search_faqs(query: String) -> Vec<MobileFaqItem> {
 /// Get all FAQ items in the specified locale.
 #[uniffi::export]
 pub fn get_faqs_localized(locale: MobileLocale) -> Vec<MobileFaqItem> {
-    vauchi_core::help::get_faqs_localized(locale.into())
+    vauchi_app::help::get_faqs_localized(locale.into())
         .iter()
         .map(MobileFaqItem::from)
         .collect()
@@ -659,7 +659,7 @@ pub fn get_faqs_by_category_localized(
     category: MobileHelpCategory,
     locale: MobileLocale,
 ) -> Vec<MobileFaqItem> {
-    vauchi_core::help::get_faqs_by_category_localized(category.into(), locale.into())
+    vauchi_app::help::get_faqs_by_category_localized(category.into(), locale.into())
         .iter()
         .map(MobileFaqItem::from)
         .collect()
@@ -670,7 +670,7 @@ pub fn get_faqs_by_category_localized(
 /// Returns None if the FAQ is not found.
 #[uniffi::export]
 pub fn get_faq_by_id_localized(id: String, locale: MobileLocale) -> Option<MobileFaqItem> {
-    vauchi_core::help::get_faq_by_id_localized(&id, locale.into()).map(|f| MobileFaqItem::from(&f))
+    vauchi_app::help::get_faq_by_id_localized(&id, locale.into()).map(|f| MobileFaqItem::from(&f))
 }
 
 /// Search FAQs by query text in the specified locale.
@@ -678,7 +678,7 @@ pub fn get_faq_by_id_localized(id: String, locale: MobileLocale) -> Option<Mobil
 /// Searches in both questions and answers (case-insensitive).
 #[uniffi::export]
 pub fn search_faqs_localized(query: String, locale: MobileLocale) -> Vec<MobileFaqItem> {
-    vauchi_core::help::search_faqs_localized(&query, locale.into())
+    vauchi_app::help::search_faqs_localized(&query, locale.into())
         .iter()
         .map(MobileFaqItem::from)
         .collect()
@@ -696,11 +696,11 @@ pub fn get_aha_moment_localized(
     locale: MobileLocale,
 ) -> MobileAhaMoment {
     let core_type: vauchi_core::AhaMomentType = moment_type.into();
-    let core_locale: vauchi_core::i18n::Locale = locale.into();
+    let core_locale: vauchi_app::i18n::Locale = locale.into();
     MobileAhaMoment {
         moment_type,
-        title: core_type.title_localized(core_locale),
-        message: core_type.message_localized(core_locale),
+        title: vauchi_app::aha_moment_title_localized(core_type, core_locale),
+        message: vauchi_app::aha_moment_message_localized(core_type, core_locale),
         has_animation: core_type.has_animation(),
     }
 }

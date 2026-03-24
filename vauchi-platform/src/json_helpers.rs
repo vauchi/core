@@ -7,7 +7,7 @@
 //! These functions convert between core UI types and JSON strings for
 //! the UniFFI boundary. Both `mobile_ui` and `platform_app_engine` use them.
 
-use vauchi_core::ui::{ActionResult, AppScreen, ScreenModel, UserAction};
+use vauchi_app::ui::{ActionResult, AppScreen, ScreenModel, UserAction};
 
 use crate::error::MobileError;
 

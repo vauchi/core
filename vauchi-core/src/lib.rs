@@ -8,18 +8,19 @@
 //! Cryptographic operations use audited RustCrypto crates (`ed25519-dalek`, `x25519-dalek`,
 //! `sha2`, `hmac`, `hkdf`, `chacha20poly1305`, `argon2`). TLS uses `aws-lc-rs` via rustls.
 
-// --- future vauchi-crypto ---
+// ══════════════════════════════════════════════════════════════
+// vauchi-core: security-critical modules (crypto, protocol, storage)
+// ══════════════════════════════════════════════════════════════
+
 pub mod crypto;
 pub use crypto::{DhError, PublicKey, Signature, SigningKeyPair, SymmetricKey, decrypt, encrypt};
 
-// --- future vauchi-i18n ---
 pub mod i18n;
 pub use i18n::{
     I18nError, Locale, LocaleInfo, get_all_strings, get_available_locales, get_locale_info,
     get_string, get_string_with_args,
 };
 
-// --- future vauchi-types ---
 pub mod types;
 
 // --- text normalization ---
@@ -41,16 +42,11 @@ pub use contact_card::{
 pub use identity::{Identity, IdentityBackup};
 pub use tor_config::{TorConfig, TorConfigError, TorRelayAddress, TorStatus};
 
-// --- future vauchi-content ---
-pub mod content;
-
-// --- future vauchi-storage ---
 #[cfg(feature = "storage")]
 pub mod storage;
 #[cfg(feature = "storage")]
 pub use storage::{PendingUpdate, Storage, StorageError, UpdateStatus};
 
-// --- future vauchi-exchange ---
 pub mod exchange;
 #[cfg(any(test, feature = "testing"))]
 pub use exchange::MockProximityVerifier;
@@ -60,7 +56,6 @@ pub use exchange::{
     ExchangeQR, ExchangeSession, ProximityError, ProximityVerifier, X3DH, X3DHKeyPair,
 };
 
-// --- future vauchi-recovery ---
 pub mod recovery;
 pub use recovery::{
     ConflictingClaim, RecoveryClaim, RecoveryConflict, RecoveryError, RecoveryProof,
@@ -68,7 +63,6 @@ pub use recovery::{
     RecoveryVoucher, VerificationResult,
 };
 
-// --- future vauchi-network ---
 #[cfg(any(feature = "network-native-tls", feature = "network-rustls"))]
 pub mod network;
 #[cfg(any(feature = "network-native-tls", feature = "network-rustls"))]
@@ -93,12 +87,18 @@ pub use api::{
 };
 pub mod aha_moments;
 pub use aha_moments::{AhaMoment, AhaMomentTracker, AhaMomentType};
+pub mod content;
 pub mod demo_contact;
 pub use demo_contact::{
     DEMO_CONTACT_ID, DEMO_CONTACT_NAME, DemoContactCard, DemoContactState, DemoTip,
     DemoTipCategory, generate_demo_contact_card, get_demo_tips,
 };
 pub mod diagnostic;
+// ══════════════════════════════════════════════════════════════
+// App-layer modules — extraction target for vauchi-app crate.
+// Zero reverse deps into core after Phase 0 tidy.
+// Targets: i18n (above), help, theme, ui, content (above)
+// ══════════════════════════════════════════════════════════════
 pub mod help;
 pub use help::{
     FaqItem, HelpCategory, get_faq_by_id, get_faq_by_id_localized, get_faqs, get_faqs_by_category,

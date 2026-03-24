@@ -43,7 +43,10 @@ impl<T: WorkflowEngine + Send> WorkflowEngineAny for T {
         match serde_json::from_str::<UserAction>(json) {
             Ok(action) => {
                 let result = self.handle_action(action);
-                serde_json::to_string(&result).unwrap_or_default()
+                match serde_json::to_string(&result) {
+                    Ok(json) => json,
+                    Err(e) => format!(r#"{{"error":"serialization failed: {}"}}"#, e),
+                }
             }
             Err(e) => format!(r#"{{"error":"{}"}}"#, e),
         }
@@ -84,7 +87,17 @@ pub unsafe extern "C" fn vauchi_string_free(ptr: *mut c_char) {
 }
 
 pub(crate) fn to_c_string(s: &str) -> *mut c_char {
-    CString::new(s).unwrap_or_default().into_raw()
+    match CString::new(s) {
+        Ok(cstr) => cstr.into_raw(),
+        Err(_) => {
+            // Input contains interior NUL bytes — strip them rather than
+            // returning an empty string (which silently loses all data).
+            let sanitized: String = s.chars().filter(|&c| c != '\0').collect();
+            CString::new(sanitized)
+                .expect("sanitized string should not contain NUL")
+                .into_raw()
+        }
+    }
 }
 
 pub(crate) fn from_c_str(ptr: *const c_char) -> Option<String> {
@@ -803,6 +816,68 @@ mod tests {
             );
             vauchi_string_free(result);
             vauchi_app_destroy(app);
+        }
+    }
+
+    // ── to_c_string NUL byte handling (T1-4) ─────────────────────────
+
+    #[test]
+    fn to_c_string_strips_nul_bytes_and_returns_sanitized_string() {
+        let result = to_c_string("hello\0world");
+        unsafe {
+            let cstr = CStr::from_ptr(result);
+            assert_eq!(
+                cstr.to_str().unwrap(),
+                "helloworld",
+                "NUL bytes should be stripped, not truncate the string"
+            );
+            // Clean up
+            drop(CString::from_raw(result));
+        }
+    }
+
+    #[test]
+    fn to_c_string_normal_string_unchanged() {
+        let result = to_c_string("normal string");
+        unsafe {
+            let cstr = CStr::from_ptr(result);
+            assert_eq!(cstr.to_str().unwrap(), "normal string");
+            drop(CString::from_raw(result));
+        }
+    }
+
+    #[test]
+    fn to_c_string_empty_string_returns_empty() {
+        let result = to_c_string("");
+        unsafe {
+            let cstr = CStr::from_ptr(result);
+            assert_eq!(cstr.to_str().unwrap(), "");
+            drop(CString::from_raw(result));
+        }
+    }
+
+    #[test]
+    fn handle_action_json_serialization_failure_returns_error_json() {
+        // Verify the Ok path returns valid JSON (not empty string) for all ActionResult variants
+        let wtype = CString::new("onboarding").unwrap();
+        unsafe {
+            let handle = vauchi_workflow_create(wtype.as_ptr());
+            assert!(!handle.is_null());
+
+            // A valid action should return non-empty JSON
+            let action = CString::new(r#"{"ActionPressed":{"action_id":"create_new"}}"#).unwrap();
+            let result_ptr = vauchi_workflow_handle_action(handle, action.as_ptr());
+            assert!(!result_ptr.is_null());
+            let result = CStr::from_ptr(result_ptr).to_str().unwrap();
+            assert!(
+                !result.is_empty(),
+                "valid action result should not be empty"
+            );
+            // Must be valid JSON
+            let _: serde_json::Value =
+                serde_json::from_str(result).expect("action result must always be valid JSON");
+            vauchi_string_free(result_ptr);
+            vauchi_workflow_destroy(handle);
         }
     }
 

@@ -237,7 +237,15 @@ impl AppEngine {
             AppScreen::Sync => {
                 let relay_url = vauchi.config().relay.server_url.clone();
                 let contact_count = vauchi.list_contacts().map(|c| c.len()).unwrap_or(0);
-                Box::new(SyncStatusEngine::new(relay_url, contact_count, 0))
+                // Default to Disconnected — platform layers update this via
+                // VauchiEvent::ConnectionStateChanged when actual state is known.
+                let conn_state = crate::network::ConnectionState::Disconnected;
+                Box::new(SyncStatusEngine::new(
+                    relay_url,
+                    contact_count,
+                    0,
+                    conn_state,
+                ))
             }
             AppScreen::TorSettings => Box::new(TorSettingsEngine::new(false, false)),
             AppScreen::Recovery => {

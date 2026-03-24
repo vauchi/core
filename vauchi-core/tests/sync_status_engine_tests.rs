@@ -2,29 +2,44 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+use vauchi_core::network::ConnectionState;
 use vauchi_core::ui::*;
 
-fn sample_engine() -> SyncStatusEngine {
-    SyncStatusEngine::new("wss://relay.vauchi.app".into(), 5, 2)
+fn connected_engine() -> SyncStatusEngine {
+    SyncStatusEngine::new(
+        "wss://relay.vauchi.app".into(),
+        5,
+        2,
+        ConnectionState::Connected,
+    )
+}
+
+fn offline_engine() -> SyncStatusEngine {
+    SyncStatusEngine::new(
+        "wss://relay.vauchi.app".into(),
+        5,
+        3,
+        ConnectionState::Disconnected,
+    )
 }
 
 #[test]
 fn sync_status_screen_id() {
-    let engine = sample_engine();
+    let engine = connected_engine();
     let screen = engine.current_screen();
     assert_eq!(screen.screen_id, "sync_status");
 }
 
 #[test]
 fn sync_status_title() {
-    let engine = sample_engine();
+    let engine = connected_engine();
     let screen = engine.current_screen();
     assert_eq!(screen.title, "Sync");
 }
 
 #[test]
 fn sync_status_shows_relay_url() {
-    let engine = sample_engine();
+    let engine = connected_engine();
     let screen = engine.current_screen();
 
     let has_relay_url = screen.components.iter().any(|c| match c {
@@ -37,41 +52,187 @@ fn sync_status_shows_relay_url() {
 }
 
 #[test]
-fn sync_status_sync_now_shows_alert() {
-    let mut engine = sample_engine();
+fn connected_shows_success_status() {
+    let engine = connected_engine();
+    let screen = engine.current_screen();
+
+    let status = screen.components.iter().find_map(|c| match c {
+        Component::StatusIndicator { title, status, .. } => Some((title.as_str(), status.clone())),
+        _ => None,
+    });
+    let (title, st) = status.expect("Should have StatusIndicator");
+    assert!(
+        title.contains("Connected"),
+        "Connected engine should show 'Connected', got: {title}"
+    );
+    assert_eq!(st, Status::Success);
+}
+
+#[test]
+fn offline_shows_failed_status_with_guidance() {
+    let engine = offline_engine();
+    let screen = engine.current_screen();
+
+    let indicator = screen.components.iter().find_map(|c| match c {
+        Component::StatusIndicator {
+            title,
+            detail,
+            status,
+            ..
+        } => Some((title.clone(), detail.clone(), status.clone())),
+        _ => None,
+    });
+    let (title, detail, st) = indicator.expect("Should have StatusIndicator");
+    assert!(title.contains("Offline"), "Title: {title}");
+    assert_eq!(st, Status::Failed);
+    assert!(
+        detail
+            .as_deref()
+            .unwrap_or("")
+            .contains("will sync automatically"),
+        "Should show guidance when offline: {detail:?}"
+    );
+}
+
+#[test]
+fn offline_disables_sync_now_button() {
+    let engine = offline_engine();
+    let screen = engine.current_screen();
+
+    let sync_now = screen.actions.iter().find(|a| a.id == "sync_now").unwrap();
+    assert!(
+        !sync_now.enabled,
+        "Sync Now should be disabled when offline"
+    );
+}
+
+#[test]
+fn offline_shows_retry_connection_label() {
+    let engine = offline_engine();
+    let screen = engine.current_screen();
+
+    let test_btn = screen
+        .actions
+        .iter()
+        .find(|a| a.id == "test_connection")
+        .unwrap();
+    assert_eq!(
+        test_btn.label, "Retry Connection",
+        "Button should say 'Retry Connection' when offline"
+    );
+}
+
+#[test]
+fn connected_shows_test_connection_label() {
+    let engine = connected_engine();
+    let screen = engine.current_screen();
+
+    let test_btn = screen
+        .actions
+        .iter()
+        .find(|a| a.id == "test_connection")
+        .unwrap();
+    assert_eq!(
+        test_btn.label, "Test Connection",
+        "Button should say 'Test Connection' when connected"
+    );
+}
+
+#[test]
+fn sync_now_returns_complete() {
+    let mut engine = connected_engine();
     let result = engine.handle_action(UserAction::ActionPressed {
         action_id: "sync_now".into(),
     });
-    match result {
-        ActionResult::ShowAlert { title, message } => {
-            assert_eq!(title, "Sync");
-            assert!(!message.is_empty());
-        }
-        other => panic!("Expected ShowAlert, got {other:?}"),
-    }
+    assert!(
+        matches!(result, ActionResult::Complete),
+        "sync_now should return Complete for AppEngine to handle"
+    );
+    assert_eq!(engine.collected_input().as_deref(), Some("sync_now"));
 }
 
 #[test]
-fn sync_status_test_connection_shows_alert_with_url() {
-    let mut engine = sample_engine();
+fn test_connection_returns_complete() {
+    let mut engine = offline_engine();
     let result = engine.handle_action(UserAction::ActionPressed {
         action_id: "test_connection".into(),
     });
-    match result {
-        ActionResult::ShowAlert { title, message } => {
-            assert_eq!(title, "Connection Test");
-            assert!(
-                message.contains("wss://relay.vauchi.app"),
-                "Alert message should contain the relay URL, got: {message}"
-            );
-        }
-        other => panic!("Expected ShowAlert, got {other:?}"),
-    }
+    assert!(
+        matches!(result, ActionResult::Complete),
+        "test_connection should return Complete for AppEngine to handle"
+    );
+    assert_eq!(engine.collected_input().as_deref(), Some("test_connection"));
 }
 
 #[test]
-fn sync_status_unknown_action_returns_update_screen() {
-    let mut engine = sample_engine();
+fn reconnecting_shows_in_progress() {
+    let engine = SyncStatusEngine::new(
+        "wss://relay.vauchi.app".into(),
+        5,
+        0,
+        ConnectionState::Reconnecting { attempt: 2 },
+    );
+    let screen = engine.current_screen();
+
+    let status = screen.components.iter().find_map(|c| match c {
+        Component::StatusIndicator { status, title, .. } => Some((title.clone(), status.clone())),
+        _ => None,
+    });
+    let (title, st) = status.expect("Should have StatusIndicator");
+    assert!(title.contains("Reconnecting"), "Title: {title}");
+    assert_eq!(st, Status::InProgress);
+}
+
+#[test]
+fn zero_pending_shows_all_up_to_date() {
+    let engine = SyncStatusEngine::new(
+        "wss://relay.vauchi.app".into(),
+        3,
+        0,
+        ConnectionState::Connected,
+    );
+    let screen = engine.current_screen();
+
+    let pending = screen.components.iter().find_map(|c| match c {
+        Component::InfoPanel { items, .. } => items
+            .iter()
+            .find(|i| i.title == "Pending Updates")
+            .map(|i| i.detail.clone()),
+        _ => None,
+    });
+    assert_eq!(
+        pending.as_deref(),
+        Some("All up to date"),
+        "Zero pending should show 'All up to date'"
+    );
+}
+
+#[test]
+fn nonzero_pending_shows_count() {
+    let engine = SyncStatusEngine::new(
+        "wss://relay.vauchi.app".into(),
+        3,
+        7,
+        ConnectionState::Disconnected,
+    );
+    let screen = engine.current_screen();
+
+    let pending = screen.components.iter().find_map(|c| match c {
+        Component::InfoPanel { items, .. } => items
+            .iter()
+            .find(|i| i.title == "Pending Updates")
+            .map(|i| i.detail.clone()),
+        _ => None,
+    });
+    assert!(
+        pending.as_deref().unwrap_or("").contains("7 update(s)"),
+        "Should show pending count: {pending:?}"
+    );
+}
+
+#[test]
+fn unknown_action_returns_update_screen() {
+    let mut engine = connected_engine();
     let result = engine.handle_action(UserAction::ActionPressed {
         action_id: "nonexistent".into(),
     });

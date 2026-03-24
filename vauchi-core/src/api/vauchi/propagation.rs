@@ -550,6 +550,34 @@ impl Vauchi {
                     .storage
                     .save_deletion_state(&crate::storage::DeletionState::None)
                     .map_err(|e| e.into()),
+                SyncItem::PersonalNoteChanged {
+                    ref contact_id,
+                    ref note,
+                    ..
+                } => self
+                    .storage
+                    .save_personal_notes(contact_id, note.as_bytes())
+                    .map_err(|e| e.into()),
+                SyncItem::ContactFieldNoteChanged {
+                    ref contact_id,
+                    ref field_id,
+                    ref note,
+                    ..
+                } => self
+                    .storage
+                    .save_contact_field_note(contact_id, field_id, note.as_bytes())
+                    .map_err(|e| e.into()),
+                SyncItem::ProposalTrustChanged {
+                    ref contact_id,
+                    proposal_trusted,
+                    ..
+                } => match self.storage.load_contact(contact_id)? {
+                    Some(mut contact) => {
+                        contact.set_proposal_trusted(proposal_trusted);
+                        self.storage.save_contact(&contact).map_err(|e| e.into())
+                    }
+                    None => Ok(()), // Contact not found, skip
+                },
             };
 
             if result.is_ok() {

@@ -19,7 +19,7 @@ use crate::crypto::SymmetricKey;
 /// Serializable contact data for device sync.
 ///
 /// Contains all information needed to reconstruct a contact on a new device.
-#[derive(Debug, Clone, Serialize, Deserialize, Zeroize, ZeroizeOnDrop)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Zeroize, ZeroizeOnDrop)]
 pub struct ContactSyncData {
     /// Contact's unique ID (public key fingerprint).
     pub id: String,
@@ -170,7 +170,7 @@ pub enum DeviceSyncError {
 ///
 /// Each SyncItem represents an atomic change that needs to be
 /// synchronized across all devices belonging to the same identity.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum SyncItem {
     /// A new contact was added.
     ContactAdded {
@@ -254,6 +254,45 @@ pub enum SyncItem {
         /// Timestamp of this sync event.
         timestamp: u64,
     },
+
+    /// Personal note for a contact was created or updated.
+    ///
+    /// Notes are private ("your eyes only") — never shared with the contact.
+    PersonalNoteChanged {
+        /// Contact whose note was changed.
+        contact_id: String,
+        /// New note text (plain text; stored encrypted at rest).
+        note: String,
+        /// Timestamp of change (milliseconds since UNIX epoch).
+        timestamp: u64,
+    },
+
+    /// Per-field private note for a contact's shared field was created or updated.
+    ///
+    /// Field notes are private — never shared with the contact.
+    ContactFieldNoteChanged {
+        /// Contact whose field note was changed.
+        contact_id: String,
+        /// ID of the specific field the note is attached to.
+        field_id: String,
+        /// New note text (plain text; stored encrypted at rest).
+        note: String,
+        /// Timestamp of change (milliseconds since UNIX epoch).
+        timestamp: u64,
+    },
+
+    /// A contact's proposal-trust status changed.
+    ///
+    /// `proposal_trusted` controls whether inbound card-update proposals from
+    /// this contact are accepted automatically.
+    ProposalTrustChanged {
+        /// Contact ID whose proposal-trust status changed.
+        contact_id: String,
+        /// New proposal-trust state.
+        proposal_trusted: bool,
+        /// Timestamp of change (milliseconds since UNIX epoch).
+        timestamp: u64,
+    },
 }
 
 impl SyncItem {
@@ -268,6 +307,9 @@ impl SyncItem {
             SyncItem::ContactTrustChanged { timestamp, .. } => *timestamp,
             SyncItem::DeletionScheduled { timestamp, .. } => *timestamp,
             SyncItem::DeletionCancelled { timestamp, .. } => *timestamp,
+            SyncItem::PersonalNoteChanged { timestamp, .. } => *timestamp,
+            SyncItem::ContactFieldNoteChanged { timestamp, .. } => *timestamp,
+            SyncItem::ProposalTrustChanged { timestamp, .. } => *timestamp,
         }
     }
 

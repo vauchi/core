@@ -273,3 +273,74 @@ fn test_version_vector_concurrent_detection() {
     // Neither dominates the other - they are concurrent
     assert!(vv_a.is_concurrent_with(&vv_b));
 }
+
+// ============================================================
+// Task 18: New SyncItem variants — notes and proposal_trusted
+// ============================================================
+
+/// Verify PersonalNoteChanged serialises and deserialises correctly.
+// @scenario: device_management :: Personal note syncs to linked devices
+#[test]
+fn test_personal_note_sync_item_roundtrip() {
+    let item = SyncItem::PersonalNoteChanged {
+        contact_id: "c1".into(),
+        note: "Met at FOSDEM".into(),
+        timestamp: 1000,
+    };
+    let json = serde_json::to_string(&item).unwrap();
+    let restored: SyncItem = serde_json::from_str(&json).unwrap();
+    assert_eq!(item, restored);
+}
+
+/// Verify ContactFieldNoteChanged serialises and deserialises correctly.
+// @scenario: device_management :: Contact field note syncs to linked devices
+#[test]
+fn test_contact_field_note_sync_item_roundtrip() {
+    let item = SyncItem::ContactFieldNoteChanged {
+        contact_id: "c1".into(),
+        field_id: "f1".into(),
+        note: "His work phone".into(),
+        timestamp: 2000,
+    };
+    let json = serde_json::to_string(&item).unwrap();
+    let restored: SyncItem = serde_json::from_str(&json).unwrap();
+    assert_eq!(item, restored);
+}
+
+/// Verify ProposalTrustChanged serialises and deserialises correctly.
+// @scenario: device_management :: Proposal trust syncs to linked devices
+#[test]
+fn test_proposal_trust_sync_item_roundtrip() {
+    let item = SyncItem::ProposalTrustChanged {
+        contact_id: "c1".into(),
+        proposal_trusted: true,
+        timestamp: 3000,
+    };
+    let json = serde_json::to_string(&item).unwrap();
+    let restored: SyncItem = serde_json::from_str(&json).unwrap();
+    assert_eq!(item, restored);
+}
+
+/// timestamp() accessor works for all three new variants.
+#[test]
+fn test_new_sync_item_timestamps() {
+    let personal = SyncItem::PersonalNoteChanged {
+        contact_id: "c1".into(),
+        note: "note".into(),
+        timestamp: 111,
+    };
+    let field = SyncItem::ContactFieldNoteChanged {
+        contact_id: "c1".into(),
+        field_id: "f1".into(),
+        note: "note".into(),
+        timestamp: 222,
+    };
+    let trust = SyncItem::ProposalTrustChanged {
+        contact_id: "c1".into(),
+        proposal_trusted: false,
+        timestamp: 333,
+    };
+    assert_eq!(personal.timestamp(), 111);
+    assert_eq!(field.timestamp(), 222);
+    assert_eq!(trust.timestamp(), 333);
+}

@@ -398,6 +398,19 @@ impl<'a> DeviceSyncOrchestrator<'a> {
             }
             SyncItem::DeletionScheduled { .. } => "deletion:scheduled".to_string(),
             SyncItem::DeletionCancelled { .. } => "deletion:cancelled".to_string(),
+            SyncItem::PersonalNoteChanged { contact_id, .. } => {
+                format!("personal_note:{}", contact_id)
+            }
+            SyncItem::ContactFieldNoteChanged {
+                contact_id,
+                field_id,
+                ..
+            } => {
+                format!("field_note:{}:{}", contact_id, field_id)
+            }
+            SyncItem::ProposalTrustChanged { contact_id, .. } => {
+                format!("proposal_trust:{}", contact_id)
+            }
         }
     }
 

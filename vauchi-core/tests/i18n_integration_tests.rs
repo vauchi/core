@@ -298,7 +298,7 @@ fn test_rtl_detection() {
 ///   3. Add RTL-specific integration tests per platform
 ///   4. Remove this canary gate
 ///
-/// See: _private/docs/plans/2026-03-18-frontend-audit-investigation.md (S-04)
+/// See: _private/docs/investigations/2026-03-18-frontend-audit-investigation.md (S-04)
 /// See: _private/docs/planning/done/2026-01-20-internationalization-implementation.md (Phase 6)
 // @scenario: internationalization :: RTL layout for Arabic
 #[test]

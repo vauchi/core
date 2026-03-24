@@ -116,6 +116,14 @@ impl HttpTransport {
         self.ohttp = Some(client);
     }
 
+    /// Remove the OHTTP client, reverting to direct HTTP requests.
+    ///
+    /// Use when key bootstrap fails during rotation and the transport needs
+    /// to fall back to re-fetching the key before re-enabling OHTTP.
+    pub fn clear_ohttp(&mut self) {
+        self.ohttp = None;
+    }
+
     /// Returns whether OHTTP encryption is active.
     pub fn has_ohttp(&self) -> bool {
         self.ohttp.is_some()
@@ -250,12 +258,15 @@ impl HttpTransport {
         // Build inner envelope: {"action": "send", ...body_fields}
         let mut inner =
             serde_json::to_value(body).map_err(|e| NetworkError::Serialization(e.to_string()))?;
-        if let Some(obj) = inner.as_object_mut() {
-            obj.insert(
-                "action".to_string(),
-                serde_json::Value::String(action.to_string()),
-            );
-        }
+        let Some(obj) = inner.as_object_mut() else {
+            return Err(NetworkError::Serialization(
+                "OHTTP inner request must serialize to a JSON object".into(),
+            ));
+        };
+        obj.insert(
+            "action".to_string(),
+            serde_json::Value::String(action.to_string()),
+        );
         let inner_bytes =
             serde_json::to_vec(&inner).map_err(|e| NetworkError::Serialization(e.to_string()))?;
 

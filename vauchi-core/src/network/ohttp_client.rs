@@ -188,6 +188,20 @@ mod tests {
     }
 
     #[test]
+    fn test_same_plaintext_produces_different_ciphertexts() {
+        let (_server, encoded) = make_gateway();
+        let client = OhttpClient::new(encoded).expect("client must be created");
+
+        let (enc1, _dec1) = client.encapsulate(b"identical").expect("enc1");
+        let (enc2, _dec2) = client.encapsulate(b"identical").expect("enc2");
+
+        assert_ne!(
+            enc1, enc2,
+            "same plaintext must produce different ciphertexts (fresh ephemeral keys)"
+        );
+    }
+
+    #[test]
     fn test_multiple_requests_use_independent_state() {
         let (server, encoded) = make_gateway();
         let client = OhttpClient::new(encoded).expect("client must be created");
@@ -231,7 +245,7 @@ mod tests {
     }
 
     #[test]
-    fn test_response_decryptor_rejects_wrong_response() {
+    fn test_response_decryptor_rejects_mismatched_response() {
         let (server, encoded) = make_gateway();
         let client = OhttpClient::new(encoded).expect("client must be created");
 
@@ -240,21 +254,18 @@ mod tests {
         let (enc2, _dec2) = client.encapsulate(b"request-2").expect("enc2");
 
         // Get server responses for both
-        let (_plain1, srv1) = server.decapsulate(&enc1).expect("srv-dec1");
+        let (_plain1, _srv1) = server.decapsulate(&enc1).expect("srv-dec1");
         let (_plain2, srv2) = server.decapsulate(&enc2).expect("srv-dec2");
 
-        let resp1 = srv1.encapsulate(b"resp-1").expect("srv-enc1");
+        // Encrypt response for request-2
         let resp2 = srv2.encapsulate(b"resp-2").expect("srv-enc2");
 
-        // dec1 should only decrypt resp1, not resp2
+        // dec1 should NOT be able to decrypt resp2 (wrong session)
+        let result = dec1.decapsulate(&resp2);
         assert!(
-            dec1.decapsulate(&resp1).is_ok(),
-            "dec1 must decrypt its matching response"
+            result.is_err(),
+            "decryptor must reject response from a different OHTTP session"
         );
-        // Note: dec1 is consumed — can't test cross-decryption here since
-        // ResponseDecryptor is single-use. The wrong-response case is covered
-        // by the garbage test above.
-        let _ = resp2; // used in assertion below
     }
 
     #[test]

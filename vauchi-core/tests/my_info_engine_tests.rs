@@ -70,9 +70,10 @@ fn my_info_title_is_display_name() {
 fn my_info_has_add_entry_and_toggle_view_actions() {
     let engine = MyInfoEngine::new(MyInfoProgress::default());
     let screen = engine.current_screen();
-    assert_eq!(screen.actions.len(), 2);
+    assert_eq!(screen.actions.len(), 3);
     assert_eq!(screen.actions[0].id, "add_field");
     assert_eq!(screen.actions[1].id, "toggle_view");
+    assert_eq!(screen.actions[2].id, "preview-as-picker");
 }
 
 #[test]

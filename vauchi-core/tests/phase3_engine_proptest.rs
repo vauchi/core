@@ -154,7 +154,9 @@ fn validate_result(
         | ActionResult::ShowToast { .. }
         | ActionResult::OpenEntryDetail { .. }
         | ActionResult::ExchangeCommands { .. }
-        | ActionResult::TorCommand { .. } => {}
+        | ActionResult::TorCommand { .. }
+        | ActionResult::PreviewAs { .. }
+        | ActionResult::ShowContactPicker => {}
     }
     Ok(())
 }

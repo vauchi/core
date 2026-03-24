@@ -306,6 +306,12 @@ impl WorkflowEngine for MyInfoEngine {
                 style: ActionStyle::Secondary,
                 enabled: true,
             },
+            ScreenAction {
+                id: "preview-as-picker".into(),
+                label: "Preview as...".into(),
+                style: ActionStyle::Secondary,
+                enabled: true,
+            },
         ];
 
         ScreenModel {
@@ -323,6 +329,10 @@ impl WorkflowEngine for MyInfoEngine {
             UserAction::ActionPressed { action_id } if action_id == "add_field" => {
                 // Signal to AppEngine to navigate to AddField form
                 ActionResult::NavigateTo(self.current_screen())
+            }
+            UserAction::ActionPressed { action_id } if action_id == "preview-as-picker" => {
+                // Signal to AppEngine to navigate to the Contacts screen (contact picker)
+                ActionResult::ShowContactPicker
             }
             UserAction::ActionPressed { action_id } if action_id == "toggle_view" => {
                 self.view_mode = match &self.view_mode {
@@ -356,5 +366,62 @@ impl WorkflowEngine for MyInfoEngine {
             }
             _ => ActionResult::UpdateScreen(self.current_screen()),
         }
+    }
+}
+
+// INLINE_TEST_REQUIRED: MyInfoViewMode is module-private, cannot be tested from external tests/
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_my_info_has_preview_as_action_in_entry_view() {
+        let engine = MyInfoEngine::new(MyInfoProgress::default());
+        let screen = engine.current_screen();
+
+        let action = screen.actions.iter().find(|a| a.id == "preview-as-picker");
+        assert!(
+            action.is_some(),
+            "MyInfo (EntryView) should have 'preview-as-picker' action"
+        );
+        assert_eq!(action.unwrap().label, "Preview as...");
+    }
+
+    #[test]
+    fn test_my_info_has_preview_as_action_in_group_view() {
+        let engine = MyInfoEngine::new(MyInfoProgress::default())
+            .with_view_mode(MyInfoViewMode::GroupView { selected_tab: 0 });
+        let screen = engine.current_screen();
+
+        let action = screen.actions.iter().find(|a| a.id == "preview-as-picker");
+        assert!(
+            action.is_some(),
+            "MyInfo (GroupView) should have 'preview-as-picker' action"
+        );
+    }
+
+    #[test]
+    fn test_my_info_preview_mode_has_no_preview_as_picker_action() {
+        let engine = MyInfoEngine::new(MyInfoProgress::default()).with_view_mode(
+            MyInfoViewMode::PreviewAs {
+                contact_name: "Alice".into(),
+            },
+        );
+        let screen = engine.current_screen();
+
+        let action = screen.actions.iter().find(|a| a.id == "preview-as-picker");
+        assert!(
+            action.is_none(),
+            "MyInfo in PreviewAs mode should NOT have 'preview-as-picker' action"
+        );
+    }
+
+    #[test]
+    fn test_preview_as_picker_returns_show_contact_picker() {
+        let mut engine = MyInfoEngine::new(MyInfoProgress::default());
+        let result = engine.handle_action(UserAction::ActionPressed {
+            action_id: "preview-as-picker".into(),
+        });
+        assert_eq!(result, ActionResult::ShowContactPicker);
     }
 }

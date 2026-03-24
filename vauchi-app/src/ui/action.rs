@@ -131,4 +131,10 @@ pub enum ActionResult {
     TorCommand {
         command: TorCommand,
     },
+    /// App layer should navigate to MyInfo in preview mode for this contact.
+    PreviewAs {
+        contact_id: String,
+    },
+    /// App layer should navigate to the Contacts screen (contact picker).
+    ShowContactPicker,
 }

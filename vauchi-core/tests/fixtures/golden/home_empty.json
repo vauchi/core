@@ -23,6 +23,12 @@
       "label": "Group View",
       "style": "Secondary",
       "enabled": true
+    },
+    {
+      "id": "preview-as-picker",
+      "label": "Preview as...",
+      "style": "Secondary",
+      "enabled": true
     }
   ],
   "progress": null

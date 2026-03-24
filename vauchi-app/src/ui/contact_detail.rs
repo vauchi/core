@@ -193,6 +193,12 @@ impl ContactDetailEngine {
                     enabled: true,
                 },
                 ScreenAction {
+                    id: format!("preview-as:{}", self.contact.id),
+                    label: "What do they see?".into(),
+                    style: ActionStyle::Secondary,
+                    enabled: true,
+                },
+                ScreenAction {
                     id: "back".into(),
                     label: "Back".into(),
                     style: ActionStyle::Secondary,
@@ -225,6 +231,16 @@ impl WorkflowEngine for ContactDetailEngine {
             }
             UserAction::ActionPressed { action_id } if action_id == "edit" => {
                 ActionResult::EditContact {
+                    contact_id: self.contact.id.clone(),
+                }
+            }
+            UserAction::ActionPressed { action_id }
+                if action_id
+                    .strip_prefix("preview-as:")
+                    .map(|id| id == self.contact.id)
+                    .unwrap_or(false) =>
+            {
+                ActionResult::PreviewAs {
                     contact_id: self.contact.id.clone(),
                 }
             }
@@ -473,5 +489,32 @@ mod tests {
             action_id: "back".into(),
         });
         assert_eq!(result, ActionResult::Complete);
+    }
+
+    #[test]
+    fn test_contact_detail_has_what_they_see_action() {
+        let engine = ContactDetailEngine::new(sample_contact(), sample_fields(), String::new());
+        let screen = engine.current_screen();
+
+        let preview_action = screen.actions.iter().find(|a| a.id == "preview-as:c1");
+        assert!(
+            preview_action.is_some(),
+            "Should have 'preview-as:c1' action"
+        );
+        assert_eq!(preview_action.unwrap().label, "What do they see?");
+    }
+
+    #[test]
+    fn test_what_they_see_returns_preview_as_result() {
+        let mut engine = ContactDetailEngine::new(sample_contact(), sample_fields(), String::new());
+        let result = engine.handle_action(UserAction::ActionPressed {
+            action_id: "preview-as:c1".into(),
+        });
+        assert_eq!(
+            result,
+            ActionResult::PreviewAs {
+                contact_id: "c1".into()
+            }
+        );
     }
 }

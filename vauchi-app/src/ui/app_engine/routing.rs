@@ -405,6 +405,16 @@ impl AppEngine {
                 });
                 ActionResult::NavigateTo(screen)
             }
+            // Navigate to MyInfo in preview mode for the given contact.
+            ActionResult::PreviewAs { contact_id } => {
+                let screen = self.preview_as(contact_id);
+                ActionResult::NavigateTo(screen)
+            }
+            // Navigate to Contacts screen so the user can pick a contact to preview as.
+            ActionResult::ShowContactPicker => {
+                let screen = self.navigate_to(AppScreen::Contacts);
+                ActionResult::NavigateTo(screen)
+            }
             other => other,
         }
     }

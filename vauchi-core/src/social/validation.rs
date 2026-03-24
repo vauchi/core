@@ -194,7 +194,7 @@ pub struct ValidatorMeta {
     pub fingerprint_verified: bool,
 }
 
-/// Trust level based on validation count.
+/// Validation confidence level based on validation count.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ValidationConfidence {
     /// No validations yet.
@@ -208,7 +208,7 @@ pub enum ValidationConfidence {
 }
 
 impl ValidationConfidence {
-    /// Determines trust level from validation count.
+    /// Determines validation confidence from validation count.
     pub fn from_count(count: usize) -> Self {
         match count {
             0 => ValidationConfidence::Unverified,
@@ -218,7 +218,7 @@ impl ValidationConfidence {
         }
     }
 
-    /// Determines trust level from a weighted score.
+    /// Determines validation confidence from a weighted score.
     ///
     /// Unlike `from_count()` which uses raw validator count, this method
     /// uses the sum of individual validator weights to determine trust.
@@ -266,7 +266,7 @@ impl ValidationConfidence {
 pub struct ValidationStatus {
     /// Total number of validations.
     pub count: usize,
-    /// Trust level based on count.
+    /// Validation confidence based on count.
     pub trust_level: ValidationConfidence,
     /// IDs of validators (for display, may be partial).
     pub validator_ids: Vec<String>,

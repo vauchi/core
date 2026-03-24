@@ -71,7 +71,7 @@ impl From<&vauchi_core::Group> for MobileVisibilityLabelDetail {
     }
 }
 
-/// Trust level based on validation count.
+/// Validation confidence level based on validation count.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
 pub enum MobileTrustLevel {
     /// No validations yet.

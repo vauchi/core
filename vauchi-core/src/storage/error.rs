@@ -30,7 +30,10 @@ pub enum DeletionState {
 #[derive(Error, Debug)]
 pub enum StorageError {
     #[error("Database error: {0}")]
-    Database(#[from] rusqlite::Error),
+    Database(rusqlite::Error),
+
+    #[error("Device storage is full. Free up space and try again.")]
+    DiskFull,
 
     #[error("Serialization error: {0}")]
     Serialization(String),
@@ -52,6 +55,31 @@ pub enum StorageError {
 
     #[error("Queue full: {0}")]
     QueueFull(String),
+}
+
+impl From<rusqlite::Error> for StorageError {
+    fn from(err: rusqlite::Error) -> Self {
+        // SQLITE_FULL (code 13): database or disk is full
+        if let rusqlite::Error::SqliteFailure(ref ffi_err, _) = err
+            && ffi_err.extended_code == 13
+        {
+            return Self::DiskFull;
+        }
+        Self::Database(err)
+    }
+}
+
+impl StorageError {
+    /// Returns a user-friendly message suitable for display in the UI.
+    pub fn user_message(&self) -> &str {
+        match self {
+            Self::DiskFull => {
+                "Your device storage is full. Free up space in Settings and try again."
+            }
+            Self::QueueFull(_) => "Too many pending updates. Connect to the internet to sync.",
+            _ => "A storage error occurred. Please try again.",
+        }
+    }
 }
 
 /// Pending update status.

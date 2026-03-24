@@ -710,3 +710,113 @@ fn test_process_card_update_skips_unresolvable_anonymous_id() {
     );
     assert_eq!(result.skipped, 1, "Unknown sender should be skipped");
 }
+
+// ============================================================
+// Field Note Cleanup on Inbound FieldChange::Removed (Task 10)
+// Traces to: features/contact_field_notes.feature @inbound_field_removed
+// ============================================================
+
+// @scenario: contact_field_notes :: per-field note is deleted when contact removes that field
+// @scenario: contact_field_notes :: notes on retained fields survive when another field is removed
+#[test]
+fn test_field_note_cleaned_on_inbound_field_removed() {
+    let (alice_wb, bob_wb, _shared_secret, bob_contact_id, alice_contact_id) =
+        setup_exchange_with_ratchets();
+
+    let alice_signing_pk = *alice_wb.identity().unwrap().signing_public_key();
+
+    // Bob's card starts with TWO fields: Email (will be removed) and Phone (will be kept).
+    // Alice has a private note on both fields.
+    let mut old_card = ContactCard::new("Bob");
+    old_card
+        .add_field(ContactField::new(FieldType::Email, "Email", "bob@test.com"))
+        .unwrap();
+    old_card
+        .add_field(ContactField::new(FieldType::Phone, "Phone", "+41791234567"))
+        .unwrap();
+    let removed_field_id = old_card.fields()[0].id().to_string();
+    let retained_field_id = old_card.fields()[1].id().to_string();
+
+    // Persist the initial card into Alice's storage so her contact reflects it.
+    let mut alice_bob_contact = alice_wb
+        .storage()
+        .load_contact(&bob_contact_id)
+        .unwrap()
+        .unwrap();
+    alice_bob_contact.update_card(old_card.clone());
+    alice_wb.storage().save_contact(&alice_bob_contact).unwrap();
+
+    // Alice writes private notes on both of Bob's fields.
+    alice_wb
+        .storage()
+        .save_contact_field_note(
+            &bob_contact_id,
+            &removed_field_id,
+            b"met at conference 2026",
+        )
+        .unwrap();
+    alice_wb
+        .storage()
+        .save_contact_field_note(&bob_contact_id, &retained_field_id, b"best number to call")
+        .unwrap();
+
+    // Verify both notes exist before the update.
+    let notes_before = alice_wb
+        .storage()
+        .load_contact_field_notes(&bob_contact_id)
+        .unwrap();
+    assert_eq!(
+        notes_before.len(),
+        2,
+        "Both field notes should exist before update"
+    );
+
+    // Bob sends an update that removes only the email field; phone stays.
+    let mut new_card = ContactCard::new("Bob");
+    new_card
+        .add_field(ContactField::new(FieldType::Phone, "Phone", "+41791234567"))
+        .unwrap();
+    // Give new_card the same field_id for Phone so the delta only shows Email removed.
+    // Since field_id is random, we must copy the retained field from old_card directly.
+    let mut new_card = ContactCard::new("Bob");
+    for f in old_card.fields() {
+        if f.id() == retained_field_id {
+            new_card.add_field(f.clone()).unwrap();
+        }
+    }
+
+    let ciphertext = create_valid_update(
+        &bob_wb,
+        &alice_signing_pk,
+        &alice_contact_id,
+        &old_card,
+        &new_card,
+    );
+
+    let result = process_single_card_update(
+        alice_wb.identity().unwrap(),
+        alice_wb.storage(),
+        &bob_contact_id,
+        &ciphertext,
+    );
+    assert!(
+        result.is_ok(),
+        "Card update with field removal should succeed: {:?}",
+        result
+    );
+
+    // CRITICAL: The orphaned note for the removed field must be gone,
+    // but the note for the retained field must survive.
+    let notes_after = alice_wb
+        .storage()
+        .load_contact_field_notes(&bob_contact_id)
+        .unwrap();
+    assert!(
+        !notes_after.contains_key(&removed_field_id),
+        "Field note for removed field '{removed_field_id}' should be deleted after inbound FieldChange::Removed"
+    );
+    assert!(
+        notes_after.contains_key(&retained_field_id),
+        "Field note for retained field '{retained_field_id}' must NOT be deleted — only orphaned notes are cleaned up"
+    );
+}

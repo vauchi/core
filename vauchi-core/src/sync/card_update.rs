@@ -22,7 +22,7 @@ use crate::crypto::ratchet::RatchetMessage;
 use crate::identity::Identity;
 use crate::network::anonymous::resolve_sender_id;
 use crate::storage::{Storage, StorageError};
-use crate::sync::delta::{CardDelta, PAYLOAD_VERSION_CEK, VersionedPayload};
+use crate::sync::delta::{CardDelta, FieldChange, PAYLOAD_VERSION_CEK, VersionedPayload};
 
 /// Error returned when a single card update fails.
 ///
@@ -172,6 +172,18 @@ pub fn process_single_card_update(
 
     if let Some(cek) = new_cek {
         contact.set_cek(cek);
+    }
+
+    // 8b. Clean up orphaned per-field notes for any removed fields.
+    //
+    // When a contact removes a field from their shared card, any private note
+    // the user wrote about that field becomes orphaned in `contact_field_notes`.
+    // Best-effort: if the note doesn't exist (or cleanup fails), the card update
+    // still proceeds successfully.
+    for change in &delta.changes {
+        if let FieldChange::Removed { field_id } = change {
+            let _ = storage.delete_contact_field_note(sender_id, field_id);
+        }
     }
 
     // 9. Atomic transaction: ratchet state + replay nonce + contact card (Tracker #159)

@@ -94,14 +94,39 @@ impl Storage {
             .unwrap_or("Qr")
             .to_string();
 
+        // Use INSERT ... ON CONFLICT DO UPDATE (upsert) rather than INSERT OR REPLACE.
+        //
+        // INSERT OR REPLACE deletes the old row before inserting the new one, which
+        // triggers the ON DELETE CASCADE on `contact_field_notes` and silently wipes
+        // all per-field private notes every time a contact is updated. The upsert form
+        // updates the row in-place, preserving child rows.
         self.conn.execute(
-            "INSERT OR REPLACE INTO contacts
+            "INSERT INTO contacts
              (id, public_key, display_name, card_encrypted, shared_key_encrypted,
               visibility_rules_encrypted, exchange_timestamp, fingerprint_verified, last_sync_at,
               blocked, hidden, favorite, recovery_trusted, proposal_trusted, cek_encrypted,
               exchange_transport, has_recovered, card_updated_at,
               relay_url, relay_noise_pubkey)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20)",
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20)
+             ON CONFLICT(id) DO UPDATE SET
+               public_key              = excluded.public_key,
+               display_name            = excluded.display_name,
+               card_encrypted          = excluded.card_encrypted,
+               shared_key_encrypted    = excluded.shared_key_encrypted,
+               visibility_rules_encrypted = excluded.visibility_rules_encrypted,
+               exchange_timestamp      = excluded.exchange_timestamp,
+               fingerprint_verified    = excluded.fingerprint_verified,
+               blocked                 = excluded.blocked,
+               hidden                  = excluded.hidden,
+               favorite                = excluded.favorite,
+               recovery_trusted        = excluded.recovery_trusted,
+               proposal_trusted        = excluded.proposal_trusted,
+               cek_encrypted           = excluded.cek_encrypted,
+               exchange_transport      = excluded.exchange_transport,
+               has_recovered           = excluded.has_recovered,
+               card_updated_at         = excluded.card_updated_at,
+               relay_url               = excluded.relay_url,
+               relay_noise_pubkey      = excluded.relay_noise_pubkey",
             params![
                 contact.id(),
                 contact.public_key().as_slice(),

@@ -68,6 +68,7 @@ fn test_locale_codes() {
     assert_eq!(Locale::German.code(), "de");
     assert_eq!(Locale::French.code(), "fr");
     assert_eq!(Locale::Spanish.code(), "es");
+    assert_eq!(Locale::Italian.code(), "it");
 }
 
 /// Test: Locale can be parsed from code
@@ -79,6 +80,8 @@ fn test_locale_from_code() {
     assert_eq!(Locale::from_code("de"), Some(Locale::German));
     assert_eq!(Locale::from_code("fr"), Some(Locale::French));
     assert_eq!(Locale::from_code("es"), Some(Locale::Spanish));
+    assert_eq!(Locale::from_code("it"), Some(Locale::Italian));
+    assert_eq!(Locale::from_code("it-CH"), Some(Locale::Italian));
     assert_eq!(Locale::from_code("xx"), None);
 }
 

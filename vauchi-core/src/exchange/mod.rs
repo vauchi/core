@@ -82,7 +82,10 @@ pub mod trust_metrics;
 #[cfg(not(feature = "testing"))]
 mod trust_metrics;
 
+#[cfg(feature = "testing")]
 pub mod tcp_transport;
+#[cfg(not(feature = "testing"))]
+mod tcp_transport;
 
 #[cfg(feature = "testing")]
 pub mod exchange_payload;
@@ -196,6 +199,7 @@ pub use session::{
     DefaultPlatformCallbacks, DuplicateAction, ExchangeEvent, ExchangePlatformCallbacks,
     ExchangeSession, ExchangeState, ExchangeTransport,
 };
+pub use tcp_transport::{TcpTransportError, exchange_payloads, recv_payload, send_payload};
 pub use trust_metrics::{TransportProximity, TrustMetrics};
 pub use verifier_chain::VerifierChain;
 pub use verifier_event::{ProximityVerifierEvent, VerifierEventLog, VerifierMethod};

@@ -8,21 +8,25 @@
 //! a TCP stream. Used by platform USB adapters (Android tethering, iOS
 //! usbmuxd, desktop USB detection) and potentially local Wi-Fi exchange.
 //!
-//! Protocol:
-//! 1. Both sides send their exchange payload (4-byte big-endian length + data)
-//! 2. Both sides receive the peer's payload
-//! 3. Payloads are the same format as QR data strings (base64-encoded ExchangeQR)
+//! Protocol frame: magic (4) + version (1) + length (4 BE) + payload.
 //!
 //! The protocol is symmetric — both sides run the same code. The initiator
-//! connects, the responder listens.
+//! connects, the responder listens. Initiator sends first; responder
+//! receives first. This ordering avoids deadlock.
 
 use std::io::{self, Read, Write};
 use std::net::TcpStream;
+use std::time::Duration;
 
-/// Maximum payload size (64 KB). Exchange payloads are typically ~300 bytes.
-const MAX_PAYLOAD_SIZE: u32 = 65_536;
+/// Maximum payload size (4 KB). Exchange payloads are ~300 bytes base64.
+/// Tight limit provides defense-in-depth against malicious peers forcing
+/// large allocations. Raise only if payloads genuinely grow.
+const MAX_PAYLOAD_SIZE: u32 = 4_096;
 
-/// Vauchi exchange protocol magic bytes (sent first to identify protocol).
+/// Default I/O timeout for send/recv operations.
+const DEFAULT_TIMEOUT: Duration = Duration::from_secs(10);
+
+/// Vauchi exchange protocol magic bytes.
 const PROTOCOL_MAGIC: &[u8; 4] = b"VXCH";
 
 /// Protocol version.
@@ -43,19 +47,24 @@ pub enum TcpTransportError {
     #[error("Payload too large: {0} bytes (max {MAX_PAYLOAD_SIZE})")]
     PayloadTooLarge(u32),
 
-    #[error("Connection closed by peer")]
-    ConnectionClosed,
+    #[error("Empty payload (length field is zero)")]
+    EmptyPayload,
 }
 
 /// Send an exchange payload over a TCP stream.
 ///
 /// Writes: magic (4) + version (1) + length (4 BE) + payload.
+/// Sets a write timeout to avoid blocking indefinitely on unresponsive peers.
 pub fn send_payload(stream: &mut TcpStream, payload: &[u8]) -> Result<(), TcpTransportError> {
-    let len = payload.len() as u32;
+    let len = u32::try_from(payload.len()).unwrap_or(u32::MAX);
     if len > MAX_PAYLOAD_SIZE {
         return Err(TcpTransportError::PayloadTooLarge(len));
     }
+    if len == 0 {
+        return Err(TcpTransportError::EmptyPayload);
+    }
 
+    stream.set_write_timeout(Some(DEFAULT_TIMEOUT))?;
     stream.write_all(PROTOCOL_MAGIC)?;
     stream.write_all(&[PROTOCOL_VERSION])?;
     stream.write_all(&len.to_be_bytes())?;
@@ -67,7 +76,10 @@ pub fn send_payload(stream: &mut TcpStream, payload: &[u8]) -> Result<(), TcpTra
 /// Receive an exchange payload from a TCP stream.
 ///
 /// Reads: magic (4) + version (1) + length (4 BE) + payload.
+/// Sets a read timeout to avoid blocking indefinitely on unresponsive peers.
 pub fn recv_payload(stream: &mut TcpStream) -> Result<Vec<u8>, TcpTransportError> {
+    stream.set_read_timeout(Some(DEFAULT_TIMEOUT))?;
+
     // Read magic
     let mut magic = [0u8; 4];
     stream.read_exact(&mut magic)?;
@@ -90,7 +102,7 @@ pub fn recv_payload(stream: &mut TcpStream) -> Result<Vec<u8>, TcpTransportError
         return Err(TcpTransportError::PayloadTooLarge(len));
     }
     if len == 0 {
-        return Err(TcpTransportError::ConnectionClosed);
+        return Err(TcpTransportError::EmptyPayload);
     }
 
     // Read payload

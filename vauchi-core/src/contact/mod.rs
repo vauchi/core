@@ -204,6 +204,69 @@ impl Contact {
         }
     }
 
+    /// Creates a contact from imported data (no crypto keys).
+    ///
+    /// The ID is a UUID v4 (not derived from a public key, since imported
+    /// contacts have no keys). The display name comes from the contact card.
+    pub fn from_import(
+        card: ContactCard,
+        source: ImportSource,
+        original_uid: Option<String>,
+    ) -> Self {
+        let id = uuid::Uuid::new_v4().to_string();
+        let display_name = card.display_name().to_string();
+        let imported_at = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("Time went backwards")
+            .as_secs();
+
+        Contact {
+            id,
+            display_name,
+            card,
+            kind: ContactKind::Imported(ImportedData {
+                source,
+                imported_at,
+                original_uid,
+            }),
+            hidden: false,
+            blocked: false,
+            favorite: false,
+            cek: None,
+            card_updated_at: None,
+        }
+    }
+
+    /// Reconstructs an imported contact from storage data.
+    ///
+    /// Unlike `from_import`, this uses the existing ID and imported_at timestamp
+    /// rather than generating new ones.
+    pub(crate) fn from_import_stored(
+        id: String,
+        card: ContactCard,
+        source: ImportSource,
+        imported_at: u64,
+        original_uid: Option<String>,
+    ) -> Self {
+        let display_name = card.display_name().to_string();
+
+        Contact {
+            id,
+            display_name,
+            card,
+            kind: ContactKind::Imported(ImportedData {
+                source,
+                imported_at,
+                original_uid,
+            }),
+            hidden: false,
+            blocked: false,
+            favorite: false,
+            cek: None,
+            card_updated_at: None,
+        }
+    }
+
     // ========================================
     // Kind accessors
     // ========================================

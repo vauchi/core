@@ -8,6 +8,7 @@ use rusqlite::params;
 
 use super::{Storage, StorageError};
 use crate::contact::Contact;
+use crate::contact::ImportSource;
 use crate::contact_card::ContactCard;
 use crate::crypto::SymmetricKey;
 use crate::crypto::cek::ContentEncryptionKey;
@@ -37,6 +38,10 @@ pub(super) struct ContactRow {
     pub relay_url: Option<String>,
     pub relay_noise_pubkey: Option<Vec<u8>>,
     pub trust_metrics: Option<String>,
+    pub contact_kind: String,
+    pub import_source: Option<String>,
+    pub imported_at: Option<i64>,
+    pub original_uid: Option<String>,
 }
 
 impl Storage {
@@ -51,15 +56,6 @@ impl Storage {
     /// Legacy contacts (no CEK) use storage-key encryption with plaintext
     /// display_name (existing behavior).
     pub fn save_contact(&self, contact: &Contact) -> Result<(), StorageError> {
-        // Currently all stored contacts are exchanged. Imported contact storage
-        // will be added in a future migration (Task 3/4). For now, extract the
-        // exchanged data or return an error.
-        let ex = contact.kind().exchanged_data().ok_or_else(|| {
-            StorageError::Serialization(
-                "Cannot save imported contacts yet (storage migration pending)".into(),
-            )
-        })?;
-
         // Serialize the contact card
         let card_json = serde_json::to_vec(contact.card())
             .map_err(|e| StorageError::Serialization(e.to_string()))?;
@@ -67,48 +63,100 @@ impl Storage {
         // CEK-aware encryption: use CEK if present, otherwise storage key
         let (card_encrypted, display_name_db, cek_encrypted_param) =
             if let Some(cek) = contact.cek() {
-                // CEK path: encrypt card with CEK, empty display_name (no plaintext
-                // personal data in DB), persist CEK encrypted with storage key
                 let card_ct = cek
                     .encrypt(&card_json)
                     .map_err(|e| StorageError::Encryption(e.to_string()))?;
                 let cek_ct = crate::crypto::encrypt(&self.encryption_key, &cek.to_bytes())
                     .map_err(|e| StorageError::Encryption(e.to_string()))?;
-                // Empty string instead of NULL because column is NOT NULL.
-                // No personal data leaks — the display name is only inside the
-                // CEK-encrypted card content.
                 (card_ct, String::new(), Some(cek_ct))
             } else {
-                // Legacy path: encrypt card with storage key, plaintext display_name
                 let card_ct = crate::crypto::encrypt(&self.encryption_key, &card_json)
                     .map_err(|e| StorageError::Encryption(e.to_string()))?;
                 (card_ct, contact.display_name().to_string(), None::<Vec<u8>>)
             };
 
-        // Encrypt the shared key
-        let shared_key_encrypted =
-            crate::crypto::encrypt(&self.encryption_key, ex.shared_key.as_bytes())
+        // Branch on contact kind for crypto fields
+        let (
+            public_key_bytes,
+            shared_key_encrypted,
+            visibility_encrypted,
+            exchange_timestamp,
+            fingerprint_verified,
+            recovery_trusted,
+            proposal_trusted,
+            transport_str,
+            has_recovered,
+            relay_url,
+            relay_noise_pubkey,
+            trust_metrics_json,
+            contact_kind_str,
+            import_source_str,
+            imported_at_val,
+            original_uid_val,
+        ) = if let Some(ex) = contact.kind().exchanged_data() {
+            // Exchanged contact: encrypt all crypto fields
+            let sk_encrypted =
+                crate::crypto::encrypt(&self.encryption_key, ex.shared_key.as_bytes())
+                    .map_err(|e| StorageError::Encryption(e.to_string()))?;
+            let vis_json = serde_json::to_string(&ex.visibility_rules)
+                .map_err(|e| StorageError::Serialization(e.to_string()))?;
+            let vis_encrypted = crate::crypto::encrypt(&self.encryption_key, vis_json.as_bytes())
                 .map_err(|e| StorageError::Encryption(e.to_string()))?;
+            let transport = serde_json::to_value(ex.exchange_transport)
+                .map_err(|e| StorageError::Serialization(e.to_string()))?
+                .as_str()
+                .unwrap_or("Qr")
+                .to_string();
+            let tm_json = ex
+                .trust_metrics
+                .as_ref()
+                .map(|m| serde_json::to_string(m).expect("trust_metrics serialize"));
 
-        // Encrypt visibility rules
-        let visibility_json = serde_json::to_string(&ex.visibility_rules)
-            .map_err(|e| StorageError::Serialization(e.to_string()))?;
-        let visibility_encrypted =
-            crate::crypto::encrypt(&self.encryption_key, visibility_json.as_bytes())
-                .map_err(|e| StorageError::Encryption(e.to_string()))?;
+            (
+                ex.public_key.to_vec(),
+                sk_encrypted,
+                Some(vis_encrypted),
+                ex.exchange_timestamp as i64,
+                ex.fingerprint_verified as i32,
+                ex.recovery_trusted as i32,
+                ex.proposal_trusted as i32,
+                transport,
+                ex.has_recovered as i32,
+                ex.relay_url.clone(),
+                ex.relay_noise_pubkey.map(|k| k.to_vec()),
+                tm_json,
+                "exchanged".to_string(),
+                None::<String>,
+                None::<i64>,
+                None::<String>,
+            )
+        } else if let Some(imp) = contact.kind().imported_data() {
+            // Imported contact: empty blobs for crypto columns (HR-2 defense-in-depth).
+            // If these accidentally reach try_into::<[u8; 32]>(), they fail safely.
+            let source_str = serde_json::to_string(&imp.source)
+                .map_err(|e| StorageError::Serialization(e.to_string()))?;
 
-        // Serialize exchange_transport as its serde name ("qr"/"nfc"/"ble"/"usb"/"audio")
-        let transport_str = serde_json::to_value(ex.exchange_transport)
-            .map_err(|e| StorageError::Serialization(e.to_string()))?
-            .as_str()
-            .unwrap_or("Qr")
-            .to_string();
-
-        // Serialize trust_metrics as JSON (None → NULL)
-        let trust_metrics_json = ex
-            .trust_metrics
-            .as_ref()
-            .map(|m| serde_json::to_string(m).expect("trust_metrics serialize"));
+            (
+                vec![],        // public_key: empty blob
+                vec![],        // shared_key_encrypted: empty blob
+                None,          // visibility_rules_encrypted: NULL
+                0i64,          // exchange_timestamp: 0
+                0i32,          // fingerprint_verified: false
+                0i32,          // recovery_trusted: false
+                0i32,          // proposal_trusted: false
+                String::new(), // exchange_transport: empty
+                0i32,          // has_recovered: false
+                None,          // relay_url: None
+                None,          // relay_noise_pubkey: None
+                None,          // trust_metrics: None
+                "imported".to_string(),
+                Some(source_str),
+                Some(imp.imported_at as i64),
+                imp.original_uid.clone(),
+            )
+        } else {
+            return Err(StorageError::Serialization("Unknown contact kind".into()));
+        };
 
         // Upsert (not INSERT OR REPLACE which cascades deletes to field_notes)
         self.conn.execute(
@@ -117,8 +165,9 @@ impl Storage {
               visibility_rules_encrypted, exchange_timestamp, fingerprint_verified, last_sync_at,
               blocked, hidden, favorite, recovery_trusted, proposal_trusted, cek_encrypted,
               exchange_transport, has_recovered, card_updated_at,
-              relay_url, relay_noise_pubkey, trust_metrics)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21)
+              relay_url, relay_noise_pubkey, trust_metrics,
+              contact_kind, import_source, imported_at, original_uid)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25)
              ON CONFLICT(id) DO UPDATE SET
                public_key              = excluded.public_key,
                display_name            = excluded.display_name,
@@ -138,29 +187,37 @@ impl Storage {
                card_updated_at         = excluded.card_updated_at,
                relay_url               = excluded.relay_url,
                relay_noise_pubkey      = excluded.relay_noise_pubkey,
-               trust_metrics           = excluded.trust_metrics",
+               trust_metrics           = excluded.trust_metrics,
+               contact_kind            = excluded.contact_kind,
+               import_source           = excluded.import_source,
+               imported_at             = excluded.imported_at,
+               original_uid            = excluded.original_uid",
             params![
                 contact.id(),
-                ex.public_key.as_slice(),
+                public_key_bytes,
                 display_name_db,
                 card_encrypted,
                 shared_key_encrypted,
                 visibility_encrypted,
-                ex.exchange_timestamp as i64,
-                ex.fingerprint_verified as i32,
+                exchange_timestamp,
+                fingerprint_verified,
                 Option::<i64>::None,
                 contact.is_blocked() as i32,
                 contact.is_hidden() as i32,
                 contact.is_favorite() as i32,
-                ex.recovery_trusted as i32,
-                ex.proposal_trusted as i32,
+                recovery_trusted,
+                proposal_trusted,
                 cek_encrypted_param,
                 transport_str,
-                ex.has_recovered as i32,
+                has_recovered,
                 contact.card_updated_at().map(|t| t as i64),
-                ex.relay_url.as_deref(),
-                ex.relay_noise_pubkey.map(|k| k.to_vec()),
+                relay_url,
+                relay_noise_pubkey,
                 trust_metrics_json,
+                contact_kind_str,
+                import_source_str,
+                imported_at_val,
+                original_uid_val,
             ],
         )?;
 
@@ -174,7 +231,8 @@ impl Storage {
                     visibility_rules_json, visibility_rules_encrypted, exchange_timestamp,
                     fingerprint_verified, blocked, hidden, favorite, recovery_trusted,
                     proposal_trusted, cek_encrypted, exchange_transport, has_recovered,
-                    card_updated_at, relay_url, relay_noise_pubkey, trust_metrics
+                    card_updated_at, relay_url, relay_noise_pubkey, trust_metrics,
+                    contact_kind, import_source, imported_at, original_uid
              FROM contacts WHERE id = ?1",
         )?;
 
@@ -201,6 +259,10 @@ impl Storage {
                 relay_url: row.get(18)?,
                 relay_noise_pubkey: row.get(19)?,
                 trust_metrics: row.get(20)?,
+                contact_kind: row.get(21)?,
+                import_source: row.get(22)?,
+                imported_at: row.get(23)?,
+                original_uid: row.get(24)?,
             })
         });
 
@@ -218,7 +280,8 @@ impl Storage {
                     visibility_rules_json, visibility_rules_encrypted, exchange_timestamp,
                     fingerprint_verified, blocked, hidden, favorite, recovery_trusted,
                     proposal_trusted, cek_encrypted, exchange_transport, has_recovered,
-                    card_updated_at, relay_url, relay_noise_pubkey, trust_metrics
+                    card_updated_at, relay_url, relay_noise_pubkey, trust_metrics,
+                    contact_kind, import_source, imported_at, original_uid
              FROM contacts ORDER BY display_name",
         )?;
 
@@ -245,6 +308,10 @@ impl Storage {
                 relay_url: row.get(18)?,
                 relay_noise_pubkey: row.get(19)?,
                 trust_metrics: row.get(20)?,
+                contact_kind: row.get(21)?,
+                import_source: row.get(22)?,
+                imported_at: row.get(23)?,
+                original_uid: row.get(24)?,
             })
         })?;
 
@@ -275,7 +342,8 @@ impl Storage {
                     visibility_rules_json, visibility_rules_encrypted, exchange_timestamp,
                     fingerprint_verified, blocked, hidden, favorite, recovery_trusted,
                     proposal_trusted, cek_encrypted, exchange_transport, has_recovered,
-                    card_updated_at, relay_url, relay_noise_pubkey, trust_metrics
+                    card_updated_at, relay_url, relay_noise_pubkey, trust_metrics,
+                    contact_kind, import_source, imported_at, original_uid
              FROM contacts ORDER BY display_name
              LIMIT ?1 OFFSET ?2",
         )?;
@@ -303,6 +371,10 @@ impl Storage {
                 relay_url: row.get(18)?,
                 relay_noise_pubkey: row.get(19)?,
                 trust_metrics: row.get(20)?,
+                contact_kind: row.get(21)?,
+                import_source: row.get(22)?,
+                imported_at: row.get(23)?,
+                original_uid: row.get(24)?,
             })
         })?;
 
@@ -338,7 +410,8 @@ impl Storage {
                     visibility_rules_json, visibility_rules_encrypted, exchange_timestamp,
                     fingerprint_verified, blocked, hidden, favorite, recovery_trusted,
                     proposal_trusted, cek_encrypted, exchange_transport, has_recovered,
-                    card_updated_at, relay_url, relay_noise_pubkey, trust_metrics
+                    card_updated_at, relay_url, relay_noise_pubkey, trust_metrics,
+                    contact_kind, import_source, imported_at, original_uid
              FROM contacts
              WHERE display_name != '' AND display_name LIKE ?1 COLLATE NOCASE
              ORDER BY display_name",
@@ -367,6 +440,10 @@ impl Storage {
                 relay_url: row.get(18)?,
                 relay_noise_pubkey: row.get(19)?,
                 trust_metrics: row.get(20)?,
+                contact_kind: row.get(21)?,
+                import_source: row.get(22)?,
+                imported_at: row.get(23)?,
+                original_uid: row.get(24)?,
             })
         })?;
 
@@ -382,7 +459,8 @@ impl Storage {
                     visibility_rules_json, visibility_rules_encrypted, exchange_timestamp,
                     fingerprint_verified, blocked, hidden, favorite, recovery_trusted,
                     proposal_trusted, cek_encrypted, exchange_transport, has_recovered,
-                    card_updated_at, relay_url, relay_noise_pubkey, trust_metrics
+                    card_updated_at, relay_url, relay_noise_pubkey, trust_metrics,
+                    contact_kind, import_source, imported_at, original_uid
              FROM contacts
              WHERE display_name = ''",
         )?;
@@ -410,6 +488,10 @@ impl Storage {
                 relay_url: row.get(18)?,
                 relay_noise_pubkey: row.get(19)?,
                 trust_metrics: row.get(20)?,
+                contact_kind: row.get(21)?,
+                import_source: row.get(22)?,
+                imported_at: row.get(23)?,
+                original_uid: row.get(24)?,
             })
         })?;
 
@@ -628,6 +710,61 @@ impl Storage {
             (card, None)
         };
 
+        // Branch on contact_kind: imported contacts skip all crypto column parsing
+        if row.contact_kind == "imported" {
+            return self.row_to_imported_contact(row, card, cek);
+        }
+
+        // === Exchanged contact path (default, backward-compatible) ===
+        self.row_to_exchanged_contact(row, card, cek)
+    }
+
+    /// Reconstructs an imported contact from a database row.
+    fn row_to_imported_contact(
+        &self,
+        row: ContactRow,
+        card: ContactCard,
+        cek: Option<ContentEncryptionKey>,
+    ) -> Result<Contact, StorageError> {
+        let source: ImportSource = row
+            .import_source
+            .as_deref()
+            .map(serde_json::from_str)
+            .transpose()
+            .map_err(|e| StorageError::Serialization(e.to_string()))?
+            .unwrap_or(ImportSource::Manual);
+
+        let imported_at = row.imported_at.unwrap_or(0) as u64;
+
+        let mut contact =
+            Contact::from_import_stored(row.id, card, source, imported_at, row.original_uid);
+
+        // Restore local-only flags
+        if row.blocked != 0 {
+            contact.set_blocked(true);
+        }
+        if row.hidden != 0 {
+            contact.set_hidden(true);
+        }
+        if row.favorite != 0 {
+            contact.set_favorite(true);
+        }
+        contact.set_card_updated_at(row.card_updated_at.map(|t| t as u64));
+
+        if let Some(cek) = cek {
+            contact.set_cek(cek);
+        }
+
+        Ok(contact)
+    }
+
+    /// Reconstructs an exchanged contact from a database row.
+    fn row_to_exchanged_contact(
+        &self,
+        row: ContactRow,
+        card: ContactCard,
+        cek: Option<ContentEncryptionKey>,
+    ) -> Result<Contact, StorageError> {
         // Decrypt shared key
         let shared_key_bytes =
             crate::crypto::decrypt(&self.encryption_key, &row.shared_key_encrypted)
@@ -637,7 +774,7 @@ impl Storage {
             .map_err(|_| StorageError::Encryption("Invalid key length".into()))?;
         let shared_key = SymmetricKey::from_bytes_unchecked(shared_key_array);
 
-        // Parse public key
+        // Parse public key — HR-2: empty blob from imported contact fails safely here
         let public_key: [u8; 32] = row
             .public_key
             .try_into()
@@ -675,7 +812,6 @@ impl Storage {
         }
 
         // Restore proposal_trusted flag from storage
-        // All DB contacts are exchanged, so this unwrap is safe.
         if row.proposal_trusted != 0 {
             let _ = contact.set_proposal_trusted(true);
         }

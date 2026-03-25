@@ -428,6 +428,11 @@ pub fn all_migrations() -> Vec<Migration> {
             name: "trust_metrics_column",
             action: MigrationAction::Sql(MIGRATION_V33_TRUST_METRICS),
         },
+        Migration {
+            version: 34,
+            name: "imported_contacts",
+            action: MigrationAction::Sql(MIGRATION_V34_IMPORTED_CONTACTS),
+        },
     ]
 }
 
@@ -597,6 +602,18 @@ CREATE TABLE IF NOT EXISTS contact_field_notes (
 /// derivation from exchange signals.
 const MIGRATION_V33_TRUST_METRICS: &str = "
     ALTER TABLE contacts ADD COLUMN trust_metrics TEXT DEFAULT NULL;
+";
+
+/// Migration v34: Imported contacts support.
+///
+/// Adds columns to distinguish exchanged contacts from imported ones.
+/// Existing contacts get `contact_kind = 'exchanged'` via DEFAULT.
+/// `import_source`, `imported_at`, and `original_uid` are NULL for exchanged contacts.
+const MIGRATION_V34_IMPORTED_CONTACTS: &str = "
+    ALTER TABLE contacts ADD COLUMN contact_kind TEXT NOT NULL DEFAULT 'exchanged';
+    ALTER TABLE contacts ADD COLUMN import_source TEXT;
+    ALTER TABLE contacts ADD COLUMN imported_at INTEGER;
+    ALTER TABLE contacts ADD COLUMN original_uid TEXT;
 ";
 
 /// Migration v1: Baseline schema.

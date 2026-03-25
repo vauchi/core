@@ -152,9 +152,9 @@ getrandom = { version = "0.2", features = ["js"] }
 # OHTTP server features for roundtrip tests (merged with optional ohttp dep)
 ohttp = { version = "0.7", default-features = false, features = ["server", "rust-hpke"] }
 # Shared protocol types (v2 message formats, used by http_transport)
-vauchi-protocol = { version = "0.9.1", path = "../vauchi-protocol" }
+vauchi-protocol = { version = "0.10.0", path = "../vauchi-protocol" }
 # App-layer modules (tests reference ui, theme, help, i18n, content)
-vauchi-app = { version = "0.9.1", path = "../vauchi-app", features = ["network-native-tls"] }
+vauchi-app = { version = "0.10.0", path = "../vauchi-app", features = ["network-native-tls"] }
 # JSON Schema validation for contract tests
 jsonschema = "0.28"
 # Temporary directories for storage tests

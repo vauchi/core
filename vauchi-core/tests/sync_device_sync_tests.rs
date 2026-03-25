@@ -344,3 +344,56 @@ fn test_new_sync_item_timestamps() {
     assert_eq!(field.timestamp(), 222);
     assert_eq!(trust.timestamp(), 333);
 }
+
+// ============================================================
+// A4: DeviceSyncPayload::new() must not panic on mixed contacts
+// ============================================================
+
+fn create_imported_test_contact() -> Contact {
+    let card = ContactCard::new("Imported José");
+    Contact::from_import(card, vauchi_core::contact::ImportSource::VcardFile, None)
+}
+
+/// DeviceSyncPayload::new() with a mix of exchanged and imported contacts
+/// must not panic and must separate them into the correct fields.
+#[test]
+fn test_device_sync_payload_new_mixed_contacts_no_panic() {
+    let exchanged = create_test_contact();
+    let imported = create_imported_test_contact();
+
+    let own_card = ContactCard::new("Owner");
+    let payload = DeviceSyncPayload::new(&[exchanged, imported], &own_card, 5);
+
+    assert_eq!(payload.contacts.len(), 1, "only exchanged contacts");
+    assert_eq!(payload.imported_contacts.len(), 1, "only imported contacts");
+    assert_eq!(payload.contact_count(), 2, "total count");
+    assert_eq!(payload.version, 5);
+}
+
+/// DeviceSyncPayload with imported_contacts serializes and deserializes
+/// correctly, including backward-compat (missing field defaults to empty vec).
+#[test]
+fn test_device_sync_payload_imported_contacts_roundtrip() {
+    let exchanged = create_test_contact();
+    let imported = create_imported_test_contact();
+    let own_card = ContactCard::new("Owner");
+
+    let payload = DeviceSyncPayload::new(&[exchanged, imported], &own_card, 3);
+    let json = payload.to_json();
+    let restored = DeviceSyncPayload::from_json(&json).unwrap();
+
+    assert_eq!(restored.contacts.len(), 1);
+    assert_eq!(restored.imported_contacts.len(), 1);
+    assert_eq!(restored.imported_contacts[0].display_name, "Imported José");
+}
+
+/// Old payloads without imported_contacts field deserialize with empty vec.
+#[test]
+fn test_device_sync_payload_backward_compat_no_imported_field() {
+    // Simulate a payload from before the imported_contacts field was added
+    let json = r#"{"contacts":[],"own_card_json":"{}","version":1}"#;
+    let payload = DeviceSyncPayload::from_json(json).unwrap();
+
+    assert_eq!(payload.imported_contacts.len(), 0);
+    assert_eq!(payload.contact_count(), 0);
+}

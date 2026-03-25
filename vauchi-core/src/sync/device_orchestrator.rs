@@ -218,9 +218,17 @@ impl<'a> DeviceSyncOrchestrator<'a> {
                     .map_err(|e| DeviceSyncError::Serialization(e.to_string()))?;
             }
 
-            // Save contacts
+            // Save exchanged contacts
             for contact_data in &payload.contacts {
                 let contact = contact_data.to_contact()?;
+                self.storage
+                    .save_contact(&contact)
+                    .map_err(|e| DeviceSyncError::Serialization(e.to_string()))?;
+            }
+
+            // Save imported contacts
+            for imported_data in &payload.imported_contacts {
+                let contact = imported_data.to_contact()?;
                 self.storage
                     .save_contact(&contact)
                     .map_err(|e| DeviceSyncError::Serialization(e.to_string()))?;

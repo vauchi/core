@@ -157,8 +157,11 @@ impl ImportedContactSyncData {
 /// Payload for syncing all contacts during device linking.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DeviceSyncPayload {
-    /// All contacts to sync.
+    /// Exchanged contacts to sync (have crypto fields).
     pub contacts: Vec<ContactSyncData>,
+    /// Imported contacts to sync (no crypto fields).
+    #[serde(default)]
+    pub imported_contacts: Vec<ImportedContactSyncData>,
     /// User's own contact card.
     pub own_card_json: String,
     /// Version number for conflict resolution.
@@ -170,21 +173,33 @@ impl DeviceSyncPayload {
     pub fn empty() -> Self {
         DeviceSyncPayload {
             contacts: Vec::new(),
+            imported_contacts: Vec::new(),
             own_card_json: String::new(),
             version: 0,
         }
     }
 
     /// Creates a sync payload from contacts and card.
+    ///
+    /// Separates exchanged contacts (with crypto fields) from imported
+    /// contacts (no crypto fields) to avoid panics on mixed lists.
     pub fn new(contacts: &[Contact], own_card: &ContactCard, version: u64) -> Self {
-        let contacts_data: Vec<ContactSyncData> =
-            contacts.iter().map(ContactSyncData::from_contact).collect();
+        let mut exchanged = Vec::new();
+        let mut imported = Vec::new();
+        for contact in contacts {
+            if contact.is_exchanged() {
+                exchanged.push(ContactSyncData::from_contact(contact));
+            } else if let Some(sync_data) = ImportedContactSyncData::from_contact(contact) {
+                imported.push(sync_data);
+            }
+        }
 
         let own_card_json =
             serde_json::to_string(own_card).expect("Card serialization should not fail");
 
         DeviceSyncPayload {
-            contacts: contacts_data,
+            contacts: exchanged,
+            imported_contacts: imported,
             own_card_json,
             version,
         }
@@ -200,9 +215,9 @@ impl DeviceSyncPayload {
         serde_json::from_str(json).map_err(|e| DeviceSyncError::Deserialization(e.to_string()))
     }
 
-    /// Returns the number of contacts.
+    /// Returns the total number of contacts (exchanged + imported).
     pub fn contact_count(&self) -> usize {
-        self.contacts.len()
+        self.contacts.len() + self.imported_contacts.len()
     }
 }
 

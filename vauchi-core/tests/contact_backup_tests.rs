@@ -95,7 +95,7 @@ fn contact_backup_preserves_imported_metadata() {
     let original_uid = original_imported.original_uid.clone();
     let original_imported_at = original_imported.imported_at;
 
-    let blob = export_contact_backup(&[contact.clone()], "s3cr3t").unwrap();
+    let blob = export_contact_backup(std::slice::from_ref(&contact), "s3cr3t").unwrap();
     let restored = import_contact_backup(&blob, "s3cr3t").unwrap();
 
     assert_eq!(restored.len(), 1);

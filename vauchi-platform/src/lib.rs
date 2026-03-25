@@ -114,7 +114,8 @@ pub use types::{
     MobileRecoveryVerification, MobileRecoveryVoucher, MobileRetryEntry, MobileShredReport,
     MobileShredStatus, MobileShredToken, MobileShredVerification, MobileSocialNetwork,
     MobileSyncResult, MobileSyncStatus, MobileTheme, MobileThemeColors, MobileThemeMode,
-    MobileTrustLevel, MobileValidationStatus, MobileVisibilityLabel, MobileVisibilityLabelDetail,
+    MobileTransportProximity, MobileTrustLevel, MobileValidationStatus, MobileVisibilityLabel,
+    MobileVisibilityLabelDetail,
 };
 
 uniffi::setup_scaffolding!();

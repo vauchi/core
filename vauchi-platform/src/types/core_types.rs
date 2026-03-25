@@ -37,6 +37,27 @@ impl From<TrustLevel> for MobileContactTrustLevel {
     }
 }
 
+/// Mobile-friendly transport proximity level.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
+pub enum MobileTransportProximity {
+    Physical,
+    ContactRange,
+    Proximate,
+    None,
+}
+
+impl From<vauchi_core::exchange::TransportProximity> for MobileTransportProximity {
+    fn from(p: vauchi_core::exchange::TransportProximity) -> Self {
+        use vauchi_core::exchange::TransportProximity;
+        match p {
+            TransportProximity::Physical => Self::Physical,
+            TransportProximity::ContactRange => Self::ContactRange,
+            TransportProximity::Proximate => Self::Proximate,
+            TransportProximity::None => Self::None,
+        }
+    }
+}
+
 /// Mobile-friendly field type enum.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
 pub enum MobileFieldType {
@@ -135,6 +156,10 @@ pub struct MobileContact {
     pub proximity_confidence: String,
     /// Whether this contact is trusted for simplified contact proposals (local-only flag).
     pub proposal_trusted: bool,
+    /// Transport proximity level from the original exchange (e.g. "physical", "contact_range", "proximate", "none", "unknown").
+    pub transport_proximity: String,
+    /// Whether this contact has trust metrics recorded from a full exchange session.
+    pub has_trust_metrics: bool,
 }
 
 impl From<&Contact> for MobileContact {
@@ -158,6 +183,20 @@ impl From<&Contact> for MobileContact {
         }
         .to_string();
 
+        let (transport_proximity, has_trust_metrics) = match contact.trust_metrics() {
+            Some(m) => {
+                use vauchi_core::exchange::TransportProximity;
+                let prox = match m.transport_proximity {
+                    TransportProximity::Physical => "physical",
+                    TransportProximity::ContactRange => "contact_range",
+                    TransportProximity::Proximate => "proximate",
+                    TransportProximity::None => "none",
+                };
+                (prox.to_string(), true)
+            }
+            None => ("unknown".to_string(), false),
+        };
+
         MobileContact {
             id: contact.id().to_string(),
             display_name: contact.display_name().to_string(),
@@ -171,6 +210,8 @@ impl From<&Contact> for MobileContact {
             exchange_transport,
             proximity_confidence,
             proposal_trusted: contact.is_proposal_trusted(),
+            transport_proximity,
+            has_trust_metrics,
         }
     }
 }

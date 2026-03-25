@@ -125,6 +125,10 @@ impl HttpTransport {
     ///
     /// When set, all data requests are encrypted via OHTTP. Call with a fresh
     /// client when the gateway key rotates (HTTP 400 on stale key).
+    ///
+    /// TODO(OHTTP-03): The caller that fetches the OHTTP gateway key should
+    /// validate the `Key-Fingerprint` response header against a pinned value
+    /// before passing the key here.
     pub fn set_ohttp(&mut self, client: OhttpClient) {
         self.ohttp = Some(client);
     }
@@ -263,14 +267,12 @@ impl HttpTransport {
         }
     }
 
-    /// Encrypt a request via OHTTP and decrypt the response.
-    fn post_via_ohttp<Req: Serialize>(
-        &self,
-        ohttp: &OhttpClient,
+    /// Build the OHTTP inner envelope JSON: merges the serialized body with
+    /// `action` and `version` fields.
+    fn build_ohttp_envelope<Req: Serialize>(
         action: &str,
         body: &Req,
-    ) -> Result<V2Response, NetworkError> {
-        // Build inner envelope: {"action": "send", ...body_fields}
+    ) -> Result<Vec<u8>, NetworkError> {
         let mut inner =
             serde_json::to_value(body).map_err(|e| NetworkError::Serialization(e.to_string()))?;
         let Some(obj) = inner.as_object_mut() else {
@@ -282,8 +284,18 @@ impl HttpTransport {
             "action".to_string(),
             serde_json::Value::String(action.to_string()),
         );
-        let inner_bytes =
-            serde_json::to_vec(&inner).map_err(|e| NetworkError::Serialization(e.to_string()))?;
+        obj.insert("version".to_string(), serde_json::Value::Number(2.into()));
+        serde_json::to_vec(&inner).map_err(|e| NetworkError::Serialization(e.to_string()))
+    }
+
+    /// Encrypt a request via OHTTP and decrypt the response.
+    fn post_via_ohttp<Req: Serialize>(
+        &self,
+        ohttp: &OhttpClient,
+        action: &str,
+        body: &Req,
+    ) -> Result<V2Response, NetworkError> {
+        let inner_bytes = Self::build_ohttp_envelope(action, body)?;
 
         // Encrypt
         let (encrypted, response_decryptor) = ohttp.encapsulate(&inner_bytes)?;
@@ -537,5 +549,37 @@ mod tests {
         // Should try to POST to /v2/ohttp and fail (connection refused)
         let result = transport.send_update(&"a".repeat(64), "dGVzdA==");
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_ohttp_envelope_includes_version_2() {
+        #[derive(Serialize)]
+        struct TestBody {
+            mailbox_id: String,
+        }
+
+        let body = TestBody {
+            mailbox_id: "abc123".to_string(),
+        };
+        let envelope_bytes =
+            HttpTransport::build_ohttp_envelope("send", &body).expect("envelope must build");
+        let envelope: serde_json::Value =
+            serde_json::from_slice(&envelope_bytes).expect("envelope must be valid JSON");
+
+        assert_eq!(
+            envelope.get("version"),
+            Some(&serde_json::Value::Number(2.into())),
+            "OHTTP inner envelope must include version=2"
+        );
+        assert_eq!(
+            envelope.get("action"),
+            Some(&serde_json::Value::String("send".into())),
+            "OHTTP inner envelope must include the action field"
+        );
+        assert_eq!(
+            envelope.get("mailbox_id"),
+            Some(&serde_json::Value::String("abc123".into())),
+            "OHTTP inner envelope must include body fields"
+        );
     }
 }

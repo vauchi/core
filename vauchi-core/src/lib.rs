@@ -42,7 +42,8 @@ pub use exchange::MockProximityVerifier;
 pub use exchange::capability;
 pub use exchange::{
     EncryptedExchangeMessage, ExchangeCommand, ExchangeError, ExchangeEvent, ExchangeHardwareEvent,
-    ExchangeQR, ExchangeSession, ProximityError, ProximityVerifier, X3DH, X3DHKeyPair,
+    ExchangeQR, ExchangeSession, ProximityError, ProximityVerifier, TransportProximity,
+    TrustMetrics, X3DH, X3DHKeyPair,
 };
 
 pub mod recovery;

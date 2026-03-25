@@ -77,6 +77,8 @@ pub mod verifier_event;
 #[cfg(not(feature = "testing"))]
 mod verifier_event;
 
+pub mod trust_metrics;
+
 #[cfg(feature = "testing")]
 pub mod exchange_payload;
 #[cfg(not(feature = "testing"))]
@@ -189,6 +191,7 @@ pub use session::{
     DefaultPlatformCallbacks, DuplicateAction, ExchangeEvent, ExchangePlatformCallbacks,
     ExchangeSession, ExchangeState, ExchangeTransport,
 };
+pub use trust_metrics::{TransportProximity, TrustMetrics};
 pub use verifier_chain::VerifierChain;
 pub use verifier_event::{ProximityVerifierEvent, VerifierEventLog, VerifierMethod};
 #[cfg(any(test, feature = "testing"))]

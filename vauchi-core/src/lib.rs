@@ -26,6 +26,7 @@ pub use contact::{
     GroupManager, ImportSource, ImportedData, MAX_LABELS, SUGGESTED_LABELS, VisibilityRules,
     resolve_visible_fields,
 };
+pub use contact_card::vcard_import::{VCardImportError, import_vcf};
 pub use contact_card::{
     ContactCard, ContactField, FieldType, ValidationError, is_allowed_scheme, is_blocked_scheme,
     is_safe_url,

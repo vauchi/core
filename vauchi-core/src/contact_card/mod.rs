@@ -18,6 +18,7 @@ mod uri;
 
 pub mod catalog;
 pub mod vcard;
+pub mod vcard_import;
 
 pub use catalog::{CatalogEntry, FieldCategory, FieldTypeCatalog};
 pub use field::{ContactField, FieldType, ValidationError};

@@ -14,7 +14,8 @@ use vauchi_core::contact_card::ContactCard;
 use vauchi_core::crypto::SymmetricKey;
 use vauchi_core::exchange::{
     ExchangeEvent, ExchangeQR, ExchangeSession, ExchangeState, ExchangeTransport,
-    MockProximityVerifier, ProximityConfidence, X3DHKeyPair,
+    MockProximityVerifier, ProximityConfidence, TransportProximity, TrustMetrics, VerifierEventLog,
+    VerifierMethod, X3DHKeyPair,
 };
 use vauchi_core::{Identity, Storage};
 
@@ -470,4 +471,117 @@ fn verifier_event_log_serde_roundtrip() {
         deserialized.final_confidence(),
         Some(ProximityConfidence::Medium)
     );
+}
+
+// ============================================================
+// Task 6: TrustMetrics on Contact + storage roundtrip
+// ============================================================
+
+/// Helper: create a test contact with optional mutation.
+fn make_contact(mutate: impl FnOnce(&mut Contact)) -> Contact {
+    let mut c = Contact::from_exchange(test_public_key(), test_card(), test_key());
+    mutate(&mut c);
+    c
+}
+
+#[test]
+fn contact_trust_metrics_defaults_to_none() {
+    let contact = make_contact(|_| {});
+    assert!(contact.trust_metrics().is_none());
+}
+
+#[test]
+fn contact_stores_trust_metrics() {
+    let mut contact = make_contact(|_| {});
+    let metrics = TrustMetrics::new(
+        ExchangeTransport::Ble,
+        ProximityConfidence::High,
+        Some(VerifierMethod::Ultrasonic),
+        VerifierEventLog::new(),
+        1_711_324_800,
+    );
+    contact.set_trust_metrics(Some(metrics));
+
+    let m = contact.trust_metrics().expect("should have metrics");
+    assert_eq!(m.transport, ExchangeTransport::Ble);
+    assert_eq!(m.transport_proximity, TransportProximity::Proximate);
+}
+
+#[test]
+fn contact_trust_metrics_can_be_cleared() {
+    let mut contact = make_contact(|_| {});
+    let metrics = TrustMetrics::new(
+        ExchangeTransport::Nfc,
+        ProximityConfidence::High,
+        None,
+        VerifierEventLog::new(),
+        1_711_324_800,
+    );
+    contact.set_trust_metrics(Some(metrics));
+    assert!(contact.trust_metrics().is_some());
+
+    contact.set_trust_metrics(None);
+    assert!(contact.trust_metrics().is_none());
+}
+
+#[test]
+fn storage_roundtrip_preserves_trust_metrics() {
+    let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
+    let mut contact = make_contact(|_| {});
+    let metrics = TrustMetrics::new(
+        ExchangeTransport::Ble,
+        ProximityConfidence::High,
+        Some(VerifierMethod::Ultrasonic),
+        VerifierEventLog::new(),
+        1_711_324_800,
+    );
+    contact.set_trust_metrics(Some(metrics));
+    let id = contact.id().to_string();
+
+    storage.save_contact(&contact).unwrap();
+    let loaded = storage.load_contact(&id).unwrap().unwrap();
+
+    let m = loaded.trust_metrics().expect("must survive roundtrip");
+    assert_eq!(m.transport, ExchangeTransport::Ble);
+    assert_eq!(m.proximity, ProximityConfidence::High);
+    assert_eq!(m.verifier_method, Some(VerifierMethod::Ultrasonic));
+    assert_eq!(m.transport_proximity, TransportProximity::Proximate);
+    assert_eq!(m.timestamp, 1_711_324_800);
+}
+
+#[test]
+fn storage_roundtrip_preserves_none_trust_metrics() {
+    let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
+    let contact = make_contact(|_| {});
+    let id = contact.id().to_string();
+
+    storage.save_contact(&contact).unwrap();
+    let loaded = storage.load_contact(&id).unwrap().unwrap();
+
+    assert!(
+        loaded.trust_metrics().is_none(),
+        "Legacy contacts must have None trust_metrics after roundtrip"
+    );
+}
+
+#[test]
+fn list_contacts_preserves_trust_metrics() {
+    let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
+    let mut contact = make_contact(|_| {});
+    let metrics = TrustMetrics::new(
+        ExchangeTransport::Nfc,
+        ProximityConfidence::High,
+        None,
+        VerifierEventLog::new(),
+        1_711_400_000,
+    );
+    contact.set_trust_metrics(Some(metrics));
+
+    storage.save_contact(&contact).unwrap();
+    let contacts = storage.list_contacts().unwrap();
+
+    assert_eq!(contacts.len(), 1);
+    let m = contacts[0].trust_metrics().expect("must survive list");
+    assert_eq!(m.transport, ExchangeTransport::Nfc);
+    assert_eq!(m.transport_proximity, TransportProximity::ContactRange);
 }

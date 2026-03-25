@@ -29,7 +29,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use crate::contact_card::ContactCard;
 use crate::crypto::SymmetricKey;
 use crate::crypto::cek::ContentEncryptionKey;
-use crate::exchange::{ExchangeTransport, ProximityConfidence};
+use crate::exchange::{ExchangeTransport, ProximityConfidence, TrustMetrics};
 
 /// A contact obtained through exchange.
 ///
@@ -88,6 +88,8 @@ pub struct Contact {
     /// Relay's Noise NK public key, pinned during in-person exchange.
     /// Used to verify the relay's identity on connect (eliminates TOFU).
     relay_noise_pubkey: Option<[u8; 32]>,
+    /// Full trust metrics from the exchange. None for legacy contacts.
+    trust_metrics: Option<TrustMetrics>,
 }
 
 impl Contact {
@@ -125,6 +127,7 @@ impl Contact {
             card_updated_at: None,
             relay_url: None,
             relay_noise_pubkey: None,
+            trust_metrics: None,
         }
     }
 
@@ -215,6 +218,7 @@ impl Contact {
             card_updated_at: None,
             relay_url: None,
             relay_noise_pubkey: None,
+            trust_metrics: None,
         }
     }
 
@@ -539,6 +543,18 @@ impl Contact {
     /// Sets the exchange transport method.
     pub fn set_exchange_transport(&mut self, transport: ExchangeTransport) {
         self.exchange_transport = transport;
+    }
+
+    /// Returns the full trust metrics from the exchange, if present.
+    ///
+    /// None for legacy contacts created before trust metrics were introduced.
+    pub fn trust_metrics(&self) -> Option<&TrustMetrics> {
+        self.trust_metrics.as_ref()
+    }
+
+    /// Sets or clears the trust metrics for this contact.
+    pub fn set_trust_metrics(&mut self, metrics: Option<TrustMetrics>) {
+        self.trust_metrics = metrics;
     }
 
     /// Returns whether this contact has undergone identity recovery.

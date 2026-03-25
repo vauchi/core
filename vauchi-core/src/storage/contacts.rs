@@ -11,7 +11,7 @@ use crate::contact::Contact;
 use crate::contact_card::ContactCard;
 use crate::crypto::SymmetricKey;
 use crate::crypto::cek::ContentEncryptionKey;
-use crate::exchange::ExchangeTransport;
+use crate::exchange::{ExchangeTransport, TrustMetrics};
 
 /// Internal struct for database row data.
 #[allow(dead_code)] // Fields are used via destructuring in row_to_contact
@@ -36,6 +36,7 @@ pub(super) struct ContactRow {
     pub card_updated_at: Option<i64>,
     pub relay_url: Option<String>,
     pub relay_noise_pubkey: Option<Vec<u8>>,
+    pub trust_metrics: Option<String>,
 }
 
 impl Storage {
@@ -94,6 +95,11 @@ impl Storage {
             .unwrap_or("Qr")
             .to_string();
 
+        // Serialize trust_metrics as JSON (None → NULL)
+        let trust_metrics_json = contact
+            .trust_metrics()
+            .map(|m| serde_json::to_string(m).expect("trust_metrics serialize"));
+
         // Use INSERT ... ON CONFLICT DO UPDATE (upsert) rather than INSERT OR REPLACE.
         //
         // INSERT OR REPLACE deletes the old row before inserting the new one, which
@@ -106,8 +112,8 @@ impl Storage {
               visibility_rules_encrypted, exchange_timestamp, fingerprint_verified, last_sync_at,
               blocked, hidden, favorite, recovery_trusted, proposal_trusted, cek_encrypted,
               exchange_transport, has_recovered, card_updated_at,
-              relay_url, relay_noise_pubkey)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20)
+              relay_url, relay_noise_pubkey, trust_metrics)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21)
              ON CONFLICT(id) DO UPDATE SET
                public_key              = excluded.public_key,
                display_name            = excluded.display_name,
@@ -126,7 +132,8 @@ impl Storage {
                has_recovered           = excluded.has_recovered,
                card_updated_at         = excluded.card_updated_at,
                relay_url               = excluded.relay_url,
-               relay_noise_pubkey      = excluded.relay_noise_pubkey",
+               relay_noise_pubkey      = excluded.relay_noise_pubkey,
+               trust_metrics           = excluded.trust_metrics",
             params![
                 contact.id(),
                 contact.public_key().as_slice(),
@@ -148,6 +155,7 @@ impl Storage {
                 contact.card_updated_at().map(|t| t as i64),
                 contact.relay_url(),
                 contact.relay_noise_pubkey().map(|k| k.to_vec()),
+                trust_metrics_json,
             ],
         )?;
 
@@ -161,7 +169,7 @@ impl Storage {
                     visibility_rules_json, visibility_rules_encrypted, exchange_timestamp,
                     fingerprint_verified, blocked, hidden, favorite, recovery_trusted,
                     proposal_trusted, cek_encrypted, exchange_transport, has_recovered,
-                    card_updated_at, relay_url, relay_noise_pubkey
+                    card_updated_at, relay_url, relay_noise_pubkey, trust_metrics
              FROM contacts WHERE id = ?1",
         )?;
 
@@ -187,6 +195,7 @@ impl Storage {
                 card_updated_at: row.get(17)?,
                 relay_url: row.get(18)?,
                 relay_noise_pubkey: row.get(19)?,
+                trust_metrics: row.get(20)?,
             })
         });
 
@@ -204,7 +213,7 @@ impl Storage {
                     visibility_rules_json, visibility_rules_encrypted, exchange_timestamp,
                     fingerprint_verified, blocked, hidden, favorite, recovery_trusted,
                     proposal_trusted, cek_encrypted, exchange_transport, has_recovered,
-                    card_updated_at, relay_url, relay_noise_pubkey
+                    card_updated_at, relay_url, relay_noise_pubkey, trust_metrics
              FROM contacts ORDER BY display_name",
         )?;
 
@@ -230,6 +239,7 @@ impl Storage {
                 card_updated_at: row.get(17)?,
                 relay_url: row.get(18)?,
                 relay_noise_pubkey: row.get(19)?,
+                trust_metrics: row.get(20)?,
             })
         })?;
 
@@ -260,7 +270,7 @@ impl Storage {
                     visibility_rules_json, visibility_rules_encrypted, exchange_timestamp,
                     fingerprint_verified, blocked, hidden, favorite, recovery_trusted,
                     proposal_trusted, cek_encrypted, exchange_transport, has_recovered,
-                    card_updated_at, relay_url, relay_noise_pubkey
+                    card_updated_at, relay_url, relay_noise_pubkey, trust_metrics
              FROM contacts ORDER BY display_name
              LIMIT ?1 OFFSET ?2",
         )?;
@@ -287,6 +297,7 @@ impl Storage {
                 card_updated_at: row.get(17)?,
                 relay_url: row.get(18)?,
                 relay_noise_pubkey: row.get(19)?,
+                trust_metrics: row.get(20)?,
             })
         })?;
 
@@ -322,7 +333,7 @@ impl Storage {
                     visibility_rules_json, visibility_rules_encrypted, exchange_timestamp,
                     fingerprint_verified, blocked, hidden, favorite, recovery_trusted,
                     proposal_trusted, cek_encrypted, exchange_transport, has_recovered,
-                    card_updated_at, relay_url, relay_noise_pubkey
+                    card_updated_at, relay_url, relay_noise_pubkey, trust_metrics
              FROM contacts
              WHERE display_name != '' AND display_name LIKE ?1 COLLATE NOCASE
              ORDER BY display_name",
@@ -350,6 +361,7 @@ impl Storage {
                 card_updated_at: row.get(17)?,
                 relay_url: row.get(18)?,
                 relay_noise_pubkey: row.get(19)?,
+                trust_metrics: row.get(20)?,
             })
         })?;
 
@@ -365,7 +377,7 @@ impl Storage {
                     visibility_rules_json, visibility_rules_encrypted, exchange_timestamp,
                     fingerprint_verified, blocked, hidden, favorite, recovery_trusted,
                     proposal_trusted, cek_encrypted, exchange_transport, has_recovered,
-                    card_updated_at, relay_url, relay_noise_pubkey
+                    card_updated_at, relay_url, relay_noise_pubkey, trust_metrics
              FROM contacts
              WHERE display_name = ''",
         )?;
@@ -392,6 +404,7 @@ impl Storage {
                 card_updated_at: row.get(17)?,
                 relay_url: row.get(18)?,
                 relay_noise_pubkey: row.get(19)?,
+                trust_metrics: row.get(20)?,
             })
         })?;
 
@@ -682,6 +695,12 @@ impl Storage {
             })?;
             contact.set_relay_noise_pubkey(Some(pubkey));
         }
+
+        // Restore trust metrics from storage (JSON column, NULL for legacy contacts)
+        let trust_metrics: Option<TrustMetrics> = row
+            .trust_metrics
+            .map(|s| serde_json::from_str(&s).expect("trust_metrics deserialize"));
+        contact.set_trust_metrics(trust_metrics);
 
         Ok(contact)
     }

@@ -423,6 +423,11 @@ pub fn all_migrations() -> Vec<Migration> {
             name: "trust_and_notes",
             action: MigrationAction::Sql(MIGRATION_V32_TRUST_AND_NOTES),
         },
+        Migration {
+            version: 33,
+            name: "trust_metrics_column",
+            action: MigrationAction::Sql(MIGRATION_V33_TRUST_METRICS),
+        },
     ]
 }
 
@@ -583,6 +588,15 @@ CREATE TABLE IF NOT EXISTS contact_field_notes (
     updated_at INTEGER NOT NULL,
     PRIMARY KEY (contact_id, field_id)
 );
+";
+
+/// Migration v33: Trust metrics JSON column on contacts.
+///
+/// Stores the full `TrustMetrics` struct as JSON. NULL for legacy contacts
+/// created before trust metrics were introduced. Enables auditable trust
+/// derivation from exchange signals.
+const MIGRATION_V33_TRUST_METRICS: &str = "
+    ALTER TABLE contacts ADD COLUMN trust_metrics TEXT DEFAULT NULL;
 ";
 
 /// Migration v1: Baseline schema.

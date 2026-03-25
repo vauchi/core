@@ -52,6 +52,7 @@ include:
       - '/ci-templates/mutation.yml'
       - '/ci-templates/benchmark.yml'
       - '/ci-templates/perf.yml'
+      - '/ci-templates/image-lint.yml'
       - '/ci-templates/badges.yml'
 
 stages:
@@ -228,6 +229,9 @@ rc:security:audit:
 
 # Informational: warn when merging without a version bump.
 # Auto-tag will create a dev tag in that case (see auto-tag:version).
+lint:images:
+  extends: .image-lint
+
 lint:version-check:
   extends: [.linux-runner-nocache, .timeout-quick]
   stage: lint

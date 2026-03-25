@@ -519,16 +519,7 @@ mod tests {
             assert!(themes.size_bytes > 0, "themes must have size_bytes");
         }
 
-        println!(
-            "Contract check passed: manifest deserialized with {} content types",
-            [
-                manifest.content.networks.is_some(),
-                manifest.content.locales.is_some(),
-                manifest.content.themes.is_some(),
-            ]
-            .iter()
-            .filter(|x| **x)
-            .count()
-        );
+        // Verified: manifest deserialized with all content types present
+        // (assertions above confirm each type)
     }
 }

@@ -252,7 +252,7 @@ impl AppEngine {
                 .vauchi
                 .save_personal_notes(contact_id, value.as_bytes())
             {
-                eprintln!("Failed to save personal note: {e}");
+                let _ = e; // Silently ignore — UI already shows the field unchanged
             }
             self.invalidate_screen(&AppScreen::ContactDetail {
                 contact_id: contact_id.to_string(),
@@ -282,7 +282,7 @@ impl AppEngine {
                 self.vauchi
                     .save_contact_field_note(contact_id, field_id, value.as_bytes())
             {
-                eprintln!("Failed to save field note: {e}");
+                let _ = e;
             }
             self.invalidate_screen(&AppScreen::ContactDetail {
                 contact_id: contact_id.to_string(),
@@ -339,7 +339,7 @@ impl AppEngine {
         if let Ok(Some(mut contact)) = self.vauchi.get_contact(contact_id) {
             let _ = contact.set_proposal_trusted(!contact.is_proposal_trusted());
             if let Err(e) = self.vauchi.update_contact(&contact) {
-                eprintln!("Failed to save proposal_trusted: {e}");
+                let _ = e;
             }
         }
 

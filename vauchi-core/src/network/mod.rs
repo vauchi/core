@@ -91,6 +91,8 @@ mod noise;
 
 pub mod forwarding;
 #[cfg(feature = "network-http")]
+pub mod http_adapter;
+#[cfg(feature = "network-http")]
 pub mod http_transport;
 #[cfg(feature = "network-http")]
 pub mod ohttp_client;
@@ -159,6 +161,10 @@ pub use http_transport::{FetchedBlob, HttpTransport, HttpTransportConfig};
 // OHTTP client-side encryption (RFC 9458)
 #[cfg(feature = "network-http")]
 pub use ohttp_client::{OhttpClient, ResponseDecryptor};
+
+// HTTP transport adapter (implements Transport trait for v2 HTTP protocol)
+#[cfg(feature = "network-http")]
+pub use http_adapter::HttpTransportAdapter;
 
 // Delivery service (message delivery tracking, retries, offline queue)
 pub mod delivery;

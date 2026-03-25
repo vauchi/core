@@ -589,6 +589,23 @@ impl Vauchi {
                     }
                     None => Ok(()), // Contact not found, skip
                 },
+                SyncItem::ImportedContactAdded {
+                    ref contact_data, ..
+                } => match contact_data.to_contact() {
+                    Ok(contact) => self.storage.save_contact(&contact).map_err(|e| e.into()),
+                    Err(e) => Err(e.into()),
+                },
+                SyncItem::ImportedContactUpdated {
+                    ref contact_data, ..
+                } => match contact_data.to_contact() {
+                    Ok(contact) => self.storage.save_contact(&contact).map_err(|e| e.into()),
+                    Err(e) => Err(e.into()),
+                },
+                SyncItem::ImportedContactRemoved { ref contact_id, .. } => self
+                    .storage
+                    .delete_contact(contact_id)
+                    .map(|_| ())
+                    .map_err(|e| e.into()),
             };
 
             if result.is_ok() {

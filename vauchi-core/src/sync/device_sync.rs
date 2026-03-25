@@ -13,6 +13,7 @@ use serde::{Deserialize, Serialize};
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
 use crate::contact::Contact;
+use crate::contact::ImportSource;
 use crate::contact_card::ContactCard;
 use crate::crypto::SymmetricKey;
 
@@ -95,6 +96,61 @@ impl ContactSyncData {
         // All synced contacts are exchanged, so this always succeeds.
         let _ = contact.set_recovery_trusted(self.recovery_trusted);
         Ok(contact)
+    }
+}
+
+/// Serializable imported contact data for device sync.
+///
+/// Contains all information needed to reconstruct an imported contact on a new
+/// device. Unlike [`ContactSyncData`], this has no crypto fields — imported
+/// contacts are identified by UUID, not public-key fingerprint.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ImportedContactSyncData {
+    /// UUID v4 identifier for the imported contact.
+    pub id: String,
+    /// Contact's display name.
+    pub display_name: String,
+    /// ContactCard serialized as JSON.
+    pub card_json: String,
+    /// ImportSource serialized as JSON.
+    pub source: String,
+    /// Unix timestamp (seconds) when the contact was imported.
+    pub imported_at: u64,
+    /// Original vCard UID, if present — used for re-import dedup.
+    pub original_uid: Option<String>,
+}
+
+impl ImportedContactSyncData {
+    /// Creates sync data from an imported contact.
+    ///
+    /// Returns `None` if `contact` is not an imported contact.
+    pub fn from_contact(contact: &Contact) -> Option<Self> {
+        let imported = contact.kind().imported_data()?;
+        let card_json = serde_json::to_string(contact.card()).ok()?;
+        let source = serde_json::to_string(&imported.source).ok()?;
+        Some(Self {
+            id: contact.id().to_string(),
+            display_name: contact.display_name().to_string(),
+            card_json,
+            source,
+            imported_at: imported.imported_at,
+            original_uid: imported.original_uid.clone(),
+        })
+    }
+
+    /// Converts sync data back to an imported contact.
+    pub fn to_contact(&self) -> Result<Contact, DeviceSyncError> {
+        let card: ContactCard = serde_json::from_str(&self.card_json)
+            .map_err(|e| DeviceSyncError::Deserialization(e.to_string()))?;
+        let source: ImportSource = serde_json::from_str(&self.source)
+            .map_err(|e| DeviceSyncError::Deserialization(e.to_string()))?;
+        Ok(Contact::from_import_stored(
+            self.id.clone(),
+            card,
+            source,
+            self.imported_at,
+            self.original_uid.clone(),
+        ))
     }
 }
 
@@ -303,6 +359,30 @@ pub enum SyncItem {
         /// Timestamp of change (milliseconds since UNIX epoch).
         timestamp: u64,
     },
+
+    /// An imported contact was added on another device.
+    ImportedContactAdded {
+        /// Full imported contact data for reconstruction.
+        contact_data: ImportedContactSyncData,
+        /// Timestamp when the contact was imported.
+        timestamp: u64,
+    },
+
+    /// An imported contact's card was updated on another device.
+    ImportedContactUpdated {
+        /// Updated imported contact data.
+        contact_data: ImportedContactSyncData,
+        /// Timestamp of the update.
+        timestamp: u64,
+    },
+
+    /// An imported contact was removed on another device.
+    ImportedContactRemoved {
+        /// ID of the removed imported contact.
+        contact_id: String,
+        /// Timestamp of removal.
+        timestamp: u64,
+    },
 }
 
 impl SyncItem {
@@ -320,6 +400,9 @@ impl SyncItem {
             SyncItem::PersonalNoteChanged { timestamp, .. } => *timestamp,
             SyncItem::ContactFieldNoteChanged { timestamp, .. } => *timestamp,
             SyncItem::ProposalTrustChanged { timestamp, .. } => *timestamp,
+            SyncItem::ImportedContactAdded { timestamp, .. } => *timestamp,
+            SyncItem::ImportedContactUpdated { timestamp, .. } => *timestamp,
+            SyncItem::ImportedContactRemoved { timestamp, .. } => *timestamp,
         }
     }
 

@@ -411,6 +411,15 @@ impl<'a> DeviceSyncOrchestrator<'a> {
             SyncItem::ProposalTrustChanged { contact_id, .. } => {
                 format!("proposal_trust:{}", contact_id)
             }
+            SyncItem::ImportedContactAdded { contact_data, .. } => {
+                format!("imported_contact:{}", contact_data.id)
+            }
+            SyncItem::ImportedContactUpdated { contact_data, .. } => {
+                format!("imported_contact:{}", contact_data.id)
+            }
+            SyncItem::ImportedContactRemoved { contact_id, .. } => {
+                format!("imported_contact:{}", contact_id)
+            }
         }
     }
 

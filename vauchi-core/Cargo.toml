@@ -106,6 +106,9 @@ zxcvbn = "3"
 # URL parsing and validation (relay URL safety checks)
 url = "2.5"
 
+# Shared relay/client protocol types
+vauchi-protocol = { path = "../vauchi-protocol", version = "0.10.0" }
+
 # Database storage (optional — not available on wasm32)
 rusqlite = { version = "0.32", features = ["bundled"], optional = true }
 

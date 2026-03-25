@@ -157,7 +157,8 @@ ohttp = { version = "0.7", default-features = false, features = ["server", "rust
 # Shared protocol types (v2 message formats, used by http_transport)
 vauchi-protocol = { version = "0.10.1", path = "../vauchi-protocol" }
 # App-layer modules (tests reference ui, theme, help, i18n, content)
-vauchi-app = { version = "0.10.1", path = "../vauchi-app", features = ["network-native-tls"] }
+# Use rustls (not native-tls) — native-tls requires OpenSSL, which is unavailable on Android/WASM targets
+vauchi-app = { version = "0.10.1", path = "../vauchi-app", features = ["network-rustls"] }
 # JSON Schema validation for contract tests
 jsonschema = "0.28"
 # Temporary directories for storage tests

@@ -40,6 +40,7 @@ mod recovery_status;
 mod screen;
 mod settings;
 mod support;
+#[cfg(any(feature = "network-native-tls", feature = "network-rustls"))]
 mod sync_status;
 pub use action::{ActionResult, UserAction};
 #[cfg(any(feature = "network-native-tls", feature = "network-rustls"))]
@@ -79,4 +80,5 @@ pub use recovery_status::RecoveryEngine;
 pub use screen::{ActionStyle, Progress, ScreenAction, ScreenModel};
 pub use settings::{SettingsConfig, SettingsEngine};
 pub use support::SupportEngine;
+#[cfg(any(feature = "network-native-tls", feature = "network-rustls"))]
 pub use sync_status::SyncStatusEngine;

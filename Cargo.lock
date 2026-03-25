@@ -4563,7 +4563,7 @@ dependencies = [
 
 [[package]]
 name = "vauchi-app"
-version = "0.10.3"
+version = "0.10.4"
 dependencies = [
  "hex",
  "proptest",
@@ -4582,7 +4582,7 @@ dependencies = [
 
 [[package]]
 name = "vauchi-cabi"
-version = "0.10.3"
+version = "0.10.4"
 dependencies = [
  "cbindgen",
  "serde_json",
@@ -4594,7 +4594,7 @@ dependencies = [
 
 [[package]]
 name = "vauchi-core"
-version = "0.10.3"
+version = "0.10.4"
 dependencies = [
  "argon2",
  "async-trait",
@@ -4647,7 +4647,7 @@ dependencies = [
 
 [[package]]
 name = "vauchi-platform"
-version = "0.10.3"
+version = "0.10.4"
 dependencies = [
  "base64",
  "crc32fast",
@@ -4671,7 +4671,7 @@ dependencies = [
 
 [[package]]
 name = "vauchi-protocol"
-version = "0.10.3"
+version = "0.10.4"
 dependencies = [
  "serde",
  "serde_json",

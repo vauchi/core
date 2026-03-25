@@ -7,6 +7,7 @@
 //! Configuration types for the Vauchi API layer.
 
 use std::path::PathBuf;
+use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
 
@@ -206,6 +207,21 @@ pub struct SyncConfig {
     /// sent in subsequent sync cycles.
     /// `None` means no limit (send all pending).
     pub batch_size: Option<usize>,
+
+    /// Minimum delay before first sync after exchange (milliseconds).
+    /// Prevents timing correlation between exchange and first relay contact.
+    pub post_exchange_delay_min_ms: u64,
+
+    /// Maximum delay before first sync after exchange (milliseconds).
+    pub post_exchange_delay_max_ms: u64,
+
+    /// Jitter percentage applied to `sync_interval_ms` (0-50, default 15).
+    /// Actual interval = `sync_interval_ms` +/- jitter%.
+    pub sync_interval_jitter_percent: u32,
+
+    /// Enable payload padding to bucket sizes (256, 512, 1024, 4096).
+    /// Prevents message size analysis. Aligned with relay bucket sizes.
+    pub padding_enabled: bool,
 }
 
 impl Default for SyncConfig {
@@ -215,7 +231,45 @@ impl Default for SyncConfig {
             sync_interval_ms: 60_000, // 1 minute
             max_pending_updates: 50,
             batch_size: Some(20),
+            post_exchange_delay_min_ms: 30_000,  // 30 seconds
+            post_exchange_delay_max_ms: 300_000, // 5 minutes
+            sync_interval_jitter_percent: 15,
+            padding_enabled: true,
         }
+    }
+}
+
+impl SyncConfig {
+    /// Returns a random delay duration in the configured post-exchange range.
+    ///
+    /// Prevents timing correlation between an in-person exchange event
+    /// and the first relay contact that follows.
+    pub fn random_post_exchange_delay(&self) -> Duration {
+        use rand::Rng;
+        let min = self.post_exchange_delay_min_ms;
+        let max = self.post_exchange_delay_max_ms;
+        if min >= max {
+            return Duration::from_millis(min);
+        }
+        let ms = rand::thread_rng().gen_range(min..=max);
+        Duration::from_millis(ms)
+    }
+
+    /// Returns the sync interval with random jitter applied.
+    ///
+    /// Jitter is capped at 50% to prevent degenerate intervals.
+    pub fn jittered_sync_interval(&self) -> Duration {
+        use rand::Rng;
+        let base = self.sync_interval_ms;
+        let pct = self.sync_interval_jitter_percent.min(50) as u64;
+        if pct == 0 {
+            return Duration::from_millis(base);
+        }
+        let delta = base * pct / 100;
+        let min = base.saturating_sub(delta);
+        let max = base + delta;
+        let ms = rand::thread_rng().gen_range(min..=max);
+        Duration::from_millis(ms)
     }
 }
 

@@ -10,7 +10,10 @@
 
 use std::time::Duration;
 
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
+use vauchi_protocol::v2::{
+    FetchedBlob, V2AckRequest, V2FetchRequest, V2PurgeRequest, V2Response, V2SendRequest,
+};
 
 use super::error::NetworkError;
 use super::ohttp_client::OhttpClient;
@@ -43,54 +46,6 @@ impl Default for HttpTransportConfig {
             allow_direct: false,
         }
     }
-}
-
-/// v2 send request body.
-#[derive(Debug, Serialize)]
-pub struct V2SendRequest {
-    pub recipient_id: String,
-    pub ciphertext: String, // base64-encoded
-}
-
-/// v2 fetch request body.
-#[derive(Debug, Serialize)]
-pub struct V2FetchRequest {
-    pub mailbox_tokens: Vec<String>,
-}
-
-/// v2 acknowledge request body.
-#[derive(Debug, Serialize)]
-pub struct V2AckRequest {
-    pub recipient_id: String,
-    pub blob_id: String,
-}
-
-/// v2 purge request body.
-#[derive(Debug, Serialize)]
-pub struct V2PurgeRequest {
-    pub recipient_id: String,
-}
-
-/// A fetched blob from the relay.
-#[derive(Debug, Deserialize)]
-pub struct FetchedBlob {
-    pub blob_id: String,
-    pub ciphertext: String, // base64-encoded
-    pub created_at: u64,
-}
-
-/// Standard v2 response envelope.
-#[derive(Debug, Deserialize)]
-pub struct V2Response {
-    pub status: String,
-    #[serde(default)]
-    pub error: Option<String>,
-    #[serde(default)]
-    pub blob_id: Option<String>,
-    #[serde(default)]
-    pub blobs: Option<Vec<FetchedBlob>>,
-    #[serde(default)]
-    pub acknowledged: Option<bool>,
 }
 
 /// HTTP transport for relay v2 protocol.
@@ -226,9 +181,22 @@ impl HttpTransport {
     }
 
     /// Purges all blobs for a recipient.
-    pub fn purge(&self, recipient_id: &str) -> Result<(), NetworkError> {
+    ///
+    /// Requires Ed25519 signature authentication (same as relay-side verification).
+    pub fn purge(
+        &self,
+        recipient_id: &str,
+        public_key: &str,
+        purge_token: &str,
+        signature: &str,
+        timestamp: u64,
+    ) -> Result<(), NetworkError> {
         let req = V2PurgeRequest {
             recipient_id: recipient_id.to_string(),
+            public_key: public_key.to_string(),
+            purge_token: purge_token.to_string(),
+            signature: signature.to_string(),
+            timestamp,
         };
         let resp = self.post_action("purge", &req)?;
         if resp.status == "ok" {
@@ -408,6 +376,7 @@ impl HttpTransport {
     }
 }
 
+// INLINE_TEST_REQUIRED: tests use private HttpTransport internals (build_ohttp_envelope, agent construction)
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -9,4 +9,5 @@
 //! no crypto, no storage.
 
 pub mod messages;
+pub mod v2;
 pub use messages::*;

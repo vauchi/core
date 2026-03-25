@@ -10,6 +10,7 @@
 //! Consumer: vauchi-relay
 //! Provider: vauchi-protocol
 
+use vauchi_protocol::v2::*;
 use vauchi_protocol::*;
 
 // ============================================================
@@ -142,4 +143,102 @@ fn provider_contract_unknown_variant_for_forward_compat() {
         r#"{"version":1,"message_id":"m","timestamp":0,"payload":{"type":"UnknownFutureType"}}"#;
     let envelope: MessageEnvelope = serde_json::from_str(json).unwrap();
     assert!(matches!(envelope.payload, MessagePayload::Unknown));
+}
+
+// ============================================================
+// V2 HTTP API type roundtrip tests (OHTTP-11)
+// ============================================================
+
+#[test]
+fn v2_send_request_roundtrip() {
+    let req = V2SendRequest {
+        recipient_id: "abc".into(),
+        ciphertext: "data".into(),
+    };
+    let json = serde_json::to_string(&req).unwrap();
+    let parsed: V2SendRequest = serde_json::from_str(&json).unwrap();
+    assert_eq!(parsed.recipient_id, "abc");
+    assert_eq!(parsed.ciphertext, "data");
+}
+
+#[test]
+fn v2_purge_request_roundtrip() {
+    let req = V2PurgeRequest {
+        recipient_id: "rid".into(),
+        public_key: "aa".repeat(32),
+        purge_token: "bb".repeat(32),
+        signature: "cc".repeat(64),
+        timestamp: 1700000000,
+    };
+    let json = serde_json::to_string(&req).unwrap();
+    let parsed: V2PurgeRequest = serde_json::from_str(&json).unwrap();
+    assert_eq!(parsed.recipient_id, "rid");
+    assert_eq!(parsed.public_key, "aa".repeat(32));
+    assert_eq!(parsed.purge_token, "bb".repeat(32));
+    assert_eq!(parsed.signature, "cc".repeat(64));
+    assert_eq!(parsed.timestamp, 1700000000);
+}
+
+#[test]
+fn v2_response_roundtrip() {
+    let resp = V2Response {
+        status: "ok".into(),
+        error: None,
+        blob_id: Some("blob-1".into()),
+        blobs: None,
+        acknowledged: None,
+    };
+    let json = serde_json::to_string(&resp).unwrap();
+    let parsed: V2Response = serde_json::from_str(&json).unwrap();
+    assert_eq!(parsed.status, "ok");
+    assert_eq!(parsed.blob_id, Some("blob-1".into()));
+    assert!(parsed.error.is_none());
+}
+
+#[test]
+fn v2_response_with_blobs_roundtrip() {
+    let resp = V2Response {
+        status: "ok".into(),
+        error: None,
+        blob_id: None,
+        blobs: Some(vec![FetchedBlob {
+            blob_id: "b1".into(),
+            ciphertext: "dGVzdA==".into(),
+            created_at: 12345,
+        }]),
+        acknowledged: None,
+    };
+    let json = serde_json::to_string(&resp).unwrap();
+    let parsed: V2Response = serde_json::from_str(&json).unwrap();
+    assert_eq!(parsed.status, "ok");
+    let blobs = parsed.blobs.unwrap();
+    assert_eq!(blobs.len(), 1);
+    assert_eq!(blobs[0].blob_id, "b1");
+    assert_eq!(blobs[0].ciphertext, "dGVzdA==");
+    assert_eq!(blobs[0].created_at, 12345);
+}
+
+#[test]
+fn fetched_blob_roundtrip() {
+    let blob = FetchedBlob {
+        blob_id: "fb-1".into(),
+        ciphertext: "Y2lwaGVy".into(),
+        created_at: 99999,
+    };
+    let json = serde_json::to_string(&blob).unwrap();
+    let parsed: FetchedBlob = serde_json::from_str(&json).unwrap();
+    assert_eq!(parsed.blob_id, "fb-1");
+    assert_eq!(parsed.ciphertext, "Y2lwaGVy");
+    assert_eq!(parsed.created_at, 99999);
+}
+
+#[test]
+fn v2_response_defaults_for_missing_optional_fields() {
+    let json = r#"{"status":"ok"}"#;
+    let parsed: V2Response = serde_json::from_str(json).unwrap();
+    assert_eq!(parsed.status, "ok");
+    assert!(parsed.error.is_none());
+    assert!(parsed.blob_id.is_none());
+    assert!(parsed.blobs.is_none());
+    assert!(parsed.acknowledged.is_none());
 }

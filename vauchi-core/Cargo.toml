@@ -436,6 +436,10 @@ name = "trust_metrics_tests"
 required-features = ["testing"]
 
 [[test]]
+name = "trust_metrics_proptest"
+required-features = ["testing"]
+
+[[test]]
 name = "sp33_mailbox_send_path_tests"
 required-features = ["testing"]
 

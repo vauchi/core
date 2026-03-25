@@ -16,6 +16,21 @@ use vauchi_protocol::v2::{
 };
 
 use super::error::NetworkError;
+
+/// Default retry delay when the server doesn't specify Retry-After.
+const DEFAULT_RATE_LIMIT_RETRY_SECS: u64 = 10;
+
+/// Convert a relay error response to the appropriate NetworkError.
+/// Detects rate limit errors by checking the error string.
+fn response_error(action: &str, error_msg: &str) -> NetworkError {
+    if error_msg.contains("rate limit") || error_msg.contains("quota exceeded") {
+        NetworkError::RateLimited {
+            retry_after_secs: DEFAULT_RATE_LIMIT_RETRY_SECS,
+        }
+    } else {
+        NetworkError::InvalidMessage(format!("{action} failed: {error_msg}"))
+    }
+}
 use super::ohttp_client::OhttpClient;
 use super::transport::ProxyConfig;
 
@@ -140,10 +155,7 @@ impl HttpTransport {
             resp.blob_id
                 .ok_or_else(|| NetworkError::InvalidMessage("missing blob_id in response".into()))
         } else {
-            Err(NetworkError::InvalidMessage(format!(
-                "send failed: {}",
-                resp.error.unwrap_or_default()
-            )))
+            Err(response_error("send", &resp.error.unwrap_or_default()))
         }
     }
 
@@ -156,10 +168,7 @@ impl HttpTransport {
         if resp.status == "ok" {
             Ok(resp.blobs.unwrap_or_default())
         } else {
-            Err(NetworkError::InvalidMessage(format!(
-                "fetch failed: {}",
-                resp.error.unwrap_or_default()
-            )))
+            Err(response_error("fetch", &resp.error.unwrap_or_default()))
         }
     }
 
@@ -173,10 +182,7 @@ impl HttpTransport {
         if resp.status == "ok" {
             Ok(resp.acknowledged.unwrap_or(false))
         } else {
-            Err(NetworkError::InvalidMessage(format!(
-                "ack failed: {}",
-                resp.error.unwrap_or_default()
-            )))
+            Err(response_error("ack", &resp.error.unwrap_or_default()))
         }
     }
 
@@ -202,10 +208,7 @@ impl HttpTransport {
         if resp.status == "ok" {
             Ok(())
         } else {
-            Err(NetworkError::InvalidMessage(format!(
-                "purge failed: {}",
-                resp.error.unwrap_or_default()
-            )))
+            Err(response_error("purge", &resp.error.unwrap_or_default()))
         }
     }
 
@@ -376,7 +379,7 @@ impl HttpTransport {
     }
 }
 
-// INLINE_TEST_REQUIRED: tests use private HttpTransport internals (build_ohttp_envelope, agent construction)
+// INLINE_TEST_REQUIRED: tests use private HttpTransport internals (config, post_action, build_ohttp_envelope)
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -70,6 +70,23 @@ pub enum MobileError {
 
     #[error("BLE exchange not available: {0}")]
     BleNotAvailable(String),
+
+    #[error("Rate limited (retry after {retry_after_secs}s)")]
+    RateLimited {
+        /// Seconds to wait before retrying.
+        retry_after_secs: u64,
+    },
+}
+
+impl From<vauchi_core::network::NetworkError> for MobileError {
+    fn from(err: vauchi_core::network::NetworkError) -> Self {
+        match err {
+            vauchi_core::network::NetworkError::RateLimited { retry_after_secs } => {
+                MobileError::RateLimited { retry_after_secs }
+            }
+            other => MobileError::NetworkError(other.to_string()),
+        }
+    }
 }
 
 impl From<vauchi_core::StorageError> for MobileError {

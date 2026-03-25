@@ -52,4 +52,10 @@ pub enum NetworkError {
 
     #[error("Max retries exceeded")]
     MaxRetriesExceeded,
+
+    #[error("Rate limited (retry after {retry_after_secs}s)")]
+    RateLimited {
+        /// Seconds to wait before retrying. Defaults to 10 if server doesn't specify.
+        retry_after_secs: u64,
+    },
 }

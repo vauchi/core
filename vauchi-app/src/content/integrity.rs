@@ -24,7 +24,7 @@ use thiserror::Error;
 ///
 /// # Example
 /// ```
-/// use vauchi_core::content::{verify_checksum, compute_checksum};
+/// use vauchi_app::content::{verify_checksum, compute_checksum};
 ///
 /// let data = b"hello world";
 /// let checksum = compute_checksum(data);
@@ -64,7 +64,7 @@ pub fn verify_checksum(data: &[u8], expected: &str) -> Result<(), IntegrityError
 ///
 /// # Example
 /// ```
-/// use vauchi_core::content::compute_checksum;
+/// use vauchi_app::content::compute_checksum;
 ///
 /// let data = b"hello world";
 /// let checksum = compute_checksum(data);

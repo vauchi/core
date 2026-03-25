@@ -26,6 +26,12 @@ pub struct HttpTransportConfig {
     pub timeout_ms: u64,
     /// Optional SOCKS5 or HTTP CONNECT proxy.
     pub proxy: ProxyConfig,
+    /// Allow direct (non-OHTTP) data requests.
+    ///
+    /// When `false` (default), `post_action` returns an error if OHTTP is not
+    /// configured. This prevents accidental IP leaks. Set to `true` only for
+    /// testing or when the user explicitly opts in.
+    pub allow_direct: bool,
 }
 
 impl Default for HttpTransportConfig {
@@ -34,6 +40,7 @@ impl Default for HttpTransportConfig {
             relay_url: String::new(),
             timeout_ms: 30_000,
             proxy: ProxyConfig::None,
+            allow_direct: false,
         }
     }
 }
@@ -96,14 +103,20 @@ pub struct V2Response {
 /// Health checks always use the direct endpoint.
 pub struct HttpTransport {
     config: HttpTransportConfig,
+    agent: Result<ureq::Agent, NetworkError>,
     ohttp: Option<OhttpClient>,
 }
 
 impl HttpTransport {
     /// Creates a new HTTP transport with the given configuration.
+    ///
+    /// The ureq agent (with proxy and timeout) is built once and reused
+    /// for all requests, enabling TCP/TLS connection pooling.
     pub fn new(config: HttpTransportConfig) -> Self {
+        let agent = Self::build_agent_from_config(&config);
         Self {
             config,
+            agent,
             ohttp: None,
         }
     }
@@ -226,15 +239,13 @@ impl HttpTransport {
 
     // ── Internal helpers ────────────────────────────────────────────
 
-    fn timeout(&self) -> Duration {
-        Duration::from_millis(self.config.timeout_ms)
-    }
-
     /// Post a request, routing through OHTTP if configured.
     ///
     /// When OHTTP is active: serializes as `{"action": action, ...fields}`,
     /// encrypts, POSTs to `/v2/ohttp`, decrypts response.
-    /// When OHTTP is not active: POSTs JSON directly to the endpoint.
+    /// When OHTTP is not active and `allow_direct` is true: POSTs JSON directly.
+    /// When OHTTP is not active and `allow_direct` is false: returns error
+    /// (fail-closed — prevents accidental IP leaks).
     fn post_action<Req: Serialize>(
         &self,
         action: &str,
@@ -242,9 +253,13 @@ impl HttpTransport {
     ) -> Result<V2Response, NetworkError> {
         if let Some(ohttp) = &self.ohttp {
             self.post_via_ohttp(ohttp, action, body)
-        } else {
+        } else if self.config.allow_direct {
             let url = format!("{}/v2/{action}", self.config.relay_url);
             self.post_json(&url, body)
+        } else {
+            Err(NetworkError::ConnectionFailed(
+                "OHTTP not configured and direct connections are disabled".into(),
+            ))
         }
     }
 
@@ -274,7 +289,7 @@ impl HttpTransport {
         let (encrypted, response_decryptor) = ohttp.encapsulate(&inner_bytes)?;
 
         // POST encrypted blob
-        let agent = self.build_agent()?;
+        let agent = self.get_agent()?;
         let ohttp_url = format!("{}/v2/ohttp", self.config.relay_url);
         let resp = agent
             .post(&ohttp_url)
@@ -296,12 +311,19 @@ impl HttpTransport {
             .map_err(|e| NetworkError::Serialization(e.to_string()))
     }
 
+    /// Returns a reference to the cached agent, or the construction error.
+    fn get_agent(&self) -> Result<&ureq::Agent, NetworkError> {
+        self.agent
+            .as_ref()
+            .map_err(|e| NetworkError::ConnectionFailed(e.to_string()))
+    }
+
     fn post_json<Req: Serialize, Resp: serde::de::DeserializeOwned>(
         &self,
         url: &str,
         body: &Req,
     ) -> Result<Resp, NetworkError> {
-        let agent = self.build_agent()?;
+        let agent = self.get_agent()?;
         let resp = agent
             .post(url)
             .send_json(body)
@@ -313,7 +335,7 @@ impl HttpTransport {
     }
 
     fn get_json<Resp: serde::de::DeserializeOwned>(&self, url: &str) -> Result<Resp, NetworkError> {
-        let agent = self.build_agent()?;
+        let agent = self.get_agent()?;
         let resp = agent
             .get(url)
             .call()
@@ -324,18 +346,22 @@ impl HttpTransport {
             .map_err(|e| NetworkError::Serialization(e.to_string()))
     }
 
-    fn build_agent(&self) -> Result<ureq::Agent, NetworkError> {
-        let mut builder = ureq::Agent::config_builder().timeout_global(Some(self.timeout()));
+    /// Build an agent from config. Called once at construction.
+    fn build_agent_from_config(config: &HttpTransportConfig) -> Result<ureq::Agent, NetworkError> {
+        let timeout = Duration::from_millis(config.timeout_ms);
+        let mut builder = ureq::Agent::config_builder().timeout_global(Some(timeout));
 
-        if let Some(proxy) = self.build_proxy()? {
+        if let Some(proxy) = Self::build_proxy_from_config(config)? {
             builder = builder.proxy(Some(proxy));
         }
 
         Ok(builder.build().new_agent())
     }
 
-    fn build_proxy(&self) -> Result<Option<ureq::Proxy>, NetworkError> {
-        match &self.config.proxy {
+    fn build_proxy_from_config(
+        config: &HttpTransportConfig,
+    ) -> Result<Option<ureq::Proxy>, NetworkError> {
+        match &config.proxy {
             ProxyConfig::None => Ok(None),
             ProxyConfig::Socks5 {
                 host,
@@ -380,6 +406,10 @@ mod tests {
         assert!(config.relay_url.is_empty());
         assert_eq!(config.timeout_ms, 30_000);
         assert_eq!(config.proxy, ProxyConfig::None);
+        assert!(
+            !config.allow_direct,
+            "allow_direct must default to false (fail-closed)"
+        );
     }
 
     #[test]
@@ -388,6 +418,7 @@ mod tests {
             relay_url: "http://localhost:8080".into(),
             timeout_ms: 5000,
             proxy: ProxyConfig::None,
+            allow_direct: true,
         });
         assert_eq!(transport.relay_url(), "http://localhost:8080");
         assert_eq!(transport.proxy(), &ProxyConfig::None);
@@ -399,27 +430,48 @@ mod tests {
             relay_url: "http://relay.example.com".into(),
             timeout_ms: 5000,
             proxy: ProxyConfig::socks5("127.0.0.1", 1080),
+            allow_direct: false,
         });
         assert!(matches!(transport.proxy(), ProxyConfig::Socks5 { .. }));
     }
 
     #[test]
     fn test_health_check_connection_refused() {
+        // Health check always uses direct endpoint (not OHTTP)
         let transport = HttpTransport::new(HttpTransportConfig {
-            relay_url: "http://127.0.0.1:1".into(), // unreachable port
+            relay_url: "http://127.0.0.1:1".into(),
             timeout_ms: 1000,
             proxy: ProxyConfig::None,
+            allow_direct: false,
         });
         let result = transport.health_check();
         assert!(result.is_err());
     }
 
     #[test]
-    fn test_send_update_connection_refused() {
+    fn test_send_blocked_without_ohttp_or_allow_direct() {
         let transport = HttpTransport::new(HttpTransportConfig {
             relay_url: "http://127.0.0.1:1".into(),
             timeout_ms: 1000,
             proxy: ProxyConfig::None,
+            allow_direct: false,
+        });
+        let result = transport.send_update(&"a".repeat(64), "dGVzdA==");
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(
+            err.contains("OHTTP not configured"),
+            "should fail-closed without OHTTP, got: {err}"
+        );
+    }
+
+    #[test]
+    fn test_send_update_direct_connection_refused() {
+        let transport = HttpTransport::new(HttpTransportConfig {
+            relay_url: "http://127.0.0.1:1".into(),
+            timeout_ms: 1000,
+            proxy: ProxyConfig::None,
+            allow_direct: true,
         });
         let result = transport.send_update(&"a".repeat(64), "dGVzdA==");
         assert!(result.is_err());
@@ -451,6 +503,7 @@ mod tests {
             relay_url: "http://127.0.0.1:1".into(),
             timeout_ms: 1000,
             proxy: ProxyConfig::None,
+            allow_direct: false,
         });
         assert!(!transport.has_ohttp());
         transport.set_ohttp(ohttp_client);
@@ -477,6 +530,7 @@ mod tests {
             relay_url: "http://127.0.0.1:1".into(),
             timeout_ms: 1000,
             proxy: ProxyConfig::None,
+            allow_direct: false,
         });
         transport.set_ohttp(ohttp_client);
 

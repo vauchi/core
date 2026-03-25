@@ -478,7 +478,10 @@ impl Vauchi {
         }
 
         // Sign delta with our identity, bound to recipient
-        delta.sign(identity, contact.public_key());
+        let recipient_pk = contact.public_key().ok_or(VauchiError::InvalidState(
+            "Contact has no public key".into(),
+        ))?;
+        delta.sign(identity, recipient_pk);
 
         // Serialize delta
         let delta_bytes =

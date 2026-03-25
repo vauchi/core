@@ -62,10 +62,10 @@ pub fn compute_statistics(contacts: &[Contact]) -> ContactStatistics {
     let mut recovery_count = 0;
 
     for contact in contacts {
-        // Count exchange methods
-        *exchange_method_breakdown
-            .entry(contact.exchange_transport())
-            .or_insert(0) += 1;
+        // Count exchange methods (only for exchanged contacts)
+        if let Some(transport) = contact.exchange_transport() {
+            *exchange_method_breakdown.entry(transport).or_insert(0) += 1;
+        }
 
         // Count field types from each contact's card
         for field in contact.card().fields() {

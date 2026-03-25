@@ -22,8 +22,9 @@ pub mod contact_card;
 pub mod identity;
 pub use contact::merge::DuplicatePair;
 pub use contact::{
-    Contact, FieldVisibility, Group, GroupError, GroupManager, MAX_LABELS, SUGGESTED_LABELS,
-    VisibilityRules, resolve_visible_fields,
+    Contact, ContactError, ContactKind, ExchangedData, FieldVisibility, Group, GroupError,
+    GroupManager, ImportSource, ImportedData, MAX_LABELS, SUGGESTED_LABELS, VisibilityRules,
+    resolve_visible_fields,
 };
 pub use contact_card::{
     ContactCard, ContactField, FieldType, ValidationError, is_allowed_scheme, is_blocked_scheme,

@@ -93,26 +93,29 @@ fn test_contact_with_visibility_rules_roundtrip() {
 
     // Verify visibility rules survived the roundtrip
     assert_eq!(
-        loaded.visibility_rules().get("email-field"),
+        loaded.visibility_rules().unwrap().get("email-field"),
         &vauchi_core::contact::FieldVisibility::Everyone
     );
     assert_eq!(
-        loaded.visibility_rules().get("phone-field"),
+        loaded.visibility_rules().unwrap().get("phone-field"),
         &vauchi_core::contact::FieldVisibility::Nobody
     );
     assert!(
         loaded
             .visibility_rules()
+            .unwrap()
             .can_see("address-field", "contact-1")
     );
     assert!(
         loaded
             .visibility_rules()
+            .unwrap()
             .can_see("address-field", "contact-2")
     );
     assert!(
         !loaded
             .visibility_rules()
+            .unwrap()
             .can_see("address-field", "contact-3")
     );
 }
@@ -133,7 +136,7 @@ fn test_contact_with_empty_visibility_rules_roundtrip() {
 
     // Default visibility rules — all fields visible to everyone
     assert_eq!(
-        loaded.visibility_rules().get("any-field"),
+        loaded.visibility_rules().unwrap().get("any-field"),
         &vauchi_core::contact::FieldVisibility::Everyone
     );
 }
@@ -225,7 +228,10 @@ fn test_list_contacts_with_encrypted_visibility_rules() {
     // Each contact should have its visibility rules intact
     for (i, contact) in contacts.iter().enumerate() {
         assert_eq!(
-            contact.visibility_rules().get(&format!("field-{}", i)),
+            contact
+                .visibility_rules()
+                .unwrap()
+                .get(&format!("field-{}", i)),
             &vauchi_core::contact::FieldVisibility::Nobody
         );
     }

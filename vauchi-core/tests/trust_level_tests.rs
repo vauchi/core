@@ -39,7 +39,7 @@ fn test_recovered_contact_is_cautious() {
 fn test_recovered_overrides_verified() {
     let contact = make_contact(|c| {
         c.set_has_recovered(true);
-        c.mark_fingerprint_verified();
+        c.mark_fingerprint_verified().unwrap();
     });
     assert_eq!(contact.trust_level(), TrustLevel::Cautious);
 }
@@ -60,7 +60,9 @@ fn test_recovered_overrides_high_proximity_nfc() {
 
 #[test]
 fn test_fingerprint_verified_is_verified() {
-    let contact = make_contact(|c| c.mark_fingerprint_verified());
+    let contact = make_contact(|c| {
+        c.mark_fingerprint_verified().unwrap();
+    });
     assert_eq!(contact.trust_level(), TrustLevel::Verified);
 }
 

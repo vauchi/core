@@ -82,7 +82,7 @@ fn test_resolve_sender_finds_match() {
     let contacts = vec![contact];
 
     let epoch = 1000;
-    let anon_id = compute_anonymous_id(contacts[0].shared_key().as_bytes(), epoch);
+    let anon_id = compute_anonymous_id(contacts[0].shared_key().unwrap().as_bytes(), epoch);
 
     let result = resolve_sender(&contacts, &anon_id, epoch);
     result.expect("expected Some");
@@ -110,7 +110,7 @@ fn test_resolve_sender_previous_epoch_tolerance() {
 
     let epoch = 1000;
     // Compute ID for previous epoch
-    let prev_id = compute_anonymous_id(contacts[0].shared_key().as_bytes(), epoch - 1);
+    let prev_id = compute_anonymous_id(contacts[0].shared_key().unwrap().as_bytes(), epoch - 1);
 
     // Should still resolve when checking current epoch (boundary tolerance)
     let result = resolve_sender(&contacts, &prev_id, epoch);
@@ -134,7 +134,7 @@ fn test_resolve_sender_epoch_zero() {
     let contact = make_contact_with_key("Alice", key.clone());
     let contacts = vec![contact];
 
-    let anon_id = compute_anonymous_id(contacts[0].shared_key().as_bytes(), 0);
+    let anon_id = compute_anonymous_id(contacts[0].shared_key().unwrap().as_bytes(), 0);
     let result = resolve_sender(&contacts, &anon_id, 0);
     result.expect("expected Some");
 }
@@ -150,7 +150,7 @@ fn test_resolve_sender_multiple_contacts() {
     ];
 
     let epoch = 500;
-    let bob_id = compute_anonymous_id(contacts[1].shared_key().as_bytes(), epoch);
+    let bob_id = compute_anonymous_id(contacts[1].shared_key().unwrap().as_bytes(), epoch);
 
     let result = resolve_sender(&contacts, &bob_id, epoch);
     result.expect("expected Some");
@@ -181,7 +181,7 @@ fn test_clock_skew_tolerance() {
 
     // Sender's clock is behind (previous epoch)
     let sender_epoch = current_epoch - 1;
-    let anon_id = compute_anonymous_id(contacts[0].shared_key().as_bytes(), sender_epoch);
+    let anon_id = compute_anonymous_id(contacts[0].shared_key().unwrap().as_bytes(), sender_epoch);
 
     // Receiver resolves at current epoch - should find Alice due to tolerance
     let result = resolve_sender(&contacts, &anon_id, current_epoch);
@@ -193,7 +193,7 @@ fn test_clock_skew_tolerance() {
 
     // Two epochs back should NOT resolve (beyond tolerance window)
     let stale_epoch = current_epoch - 2;
-    let stale_id = compute_anonymous_id(contacts[0].shared_key().as_bytes(), stale_epoch);
+    let stale_id = compute_anonymous_id(contacts[0].shared_key().unwrap().as_bytes(), stale_epoch);
     let stale_result = resolve_sender(&contacts, &stale_id, current_epoch);
     assert!(
         stale_result.is_none(),
@@ -221,11 +221,11 @@ fn test_epoch_boundary_handling() {
     let epoch_n_plus_1 = 501;
 
     // Message sent at end of epoch N
-    let id_epoch_n = compute_anonymous_id(contacts[0].shared_key().as_bytes(), epoch_n);
+    let id_epoch_n = compute_anonymous_id(contacts[0].shared_key().unwrap().as_bytes(), epoch_n);
 
     // Message sent at start of epoch N+1
     let id_epoch_n_plus_1 =
-        compute_anonymous_id(contacts[0].shared_key().as_bytes(), epoch_n_plus_1);
+        compute_anonymous_id(contacts[0].shared_key().unwrap().as_bytes(), epoch_n_plus_1);
 
     // IDs should be different (epoch rotation)
     assert_ne!(
@@ -357,7 +357,8 @@ fn test_replay_prevention_epoch_binding() {
 
     // Attacker captures a message from epoch 1000
     let captured_epoch = 1000;
-    let captured_id = compute_anonymous_id(contacts[0].shared_key().as_bytes(), captured_epoch);
+    let captured_id =
+        compute_anonymous_id(contacts[0].shared_key().unwrap().as_bytes(), captured_epoch);
 
     // Original message resolves correctly at time of capture
     let original_result = resolve_sender(&contacts, &captured_id, captured_epoch);
@@ -392,7 +393,7 @@ fn test_replay_prevention_same_epoch_requires_message_dedup() {
     let contacts = vec![contact];
 
     let epoch = 1000;
-    let anon_id = compute_anonymous_id(contacts[0].shared_key().as_bytes(), epoch);
+    let anon_id = compute_anonymous_id(contacts[0].shared_key().unwrap().as_bytes(), epoch);
 
     // Same anonymous ID resolves successfully multiple times (expected)
     // This is NOT a security flaw - multiple messages in same epoch use same ID
@@ -426,7 +427,7 @@ fn test_sender_index_build_and_resolve() {
     let epoch = 1000;
     let index = SenderIndex::build(&contacts, epoch);
 
-    let anon_id = compute_anonymous_id(contacts[0].shared_key().as_bytes(), epoch);
+    let anon_id = compute_anonymous_id(contacts[0].shared_key().unwrap().as_bytes(), epoch);
     let result = index.resolve(&anon_id);
     assert!(result.is_some(), "SenderIndex should resolve known contact");
     assert_eq!(result.unwrap(), contacts[0].id());
@@ -443,7 +444,7 @@ fn test_sender_index_resolves_previous_epoch() {
     let index = SenderIndex::build(&contacts, epoch);
 
     // ID from previous epoch should resolve (boundary tolerance)
-    let prev_id = compute_anonymous_id(contacts[0].shared_key().as_bytes(), epoch - 1);
+    let prev_id = compute_anonymous_id(contacts[0].shared_key().unwrap().as_bytes(), epoch - 1);
     let result = index.resolve(&prev_id);
     assert!(
         result.is_some(),
@@ -491,7 +492,7 @@ fn test_sender_index_multiple_contacts() {
 
     // Each contact should resolve correctly
     for contact in &contacts {
-        let anon_id = compute_anonymous_id(contact.shared_key().as_bytes(), epoch);
+        let anon_id = compute_anonymous_id(contact.shared_key().unwrap().as_bytes(), epoch);
         let result = index.resolve(&anon_id);
         assert!(
             result.is_some(),
@@ -520,7 +521,7 @@ fn test_sender_index_epoch_zero() {
 
     // Epoch 0: no previous epoch to check
     let index = SenderIndex::build(&contacts, 0);
-    let anon_id = compute_anonymous_id(contacts[0].shared_key().as_bytes(), 0);
+    let anon_id = compute_anonymous_id(contacts[0].shared_key().unwrap().as_bytes(), 0);
     let result = index.resolve(&anon_id);
     assert!(result.is_some(), "Should resolve at epoch 0");
 }
@@ -535,7 +536,7 @@ fn test_sender_index_future_epoch_not_resolved() {
     let index = SenderIndex::build(&contacts, epoch);
 
     // ID from future epoch (epoch + 1) should NOT resolve
-    let future_id = compute_anonymous_id(contacts[0].shared_key().as_bytes(), epoch + 1);
+    let future_id = compute_anonymous_id(contacts[0].shared_key().unwrap().as_bytes(), epoch + 1);
     assert!(
         index.resolve(&future_id).is_none(),
         "Future epoch ID should not resolve"
@@ -707,7 +708,8 @@ fn test_adversarial_replay_stale_sender_ids() {
     let contacts = vec![contact];
 
     let original_epoch = 1000;
-    let captured_id = compute_anonymous_id(contacts[0].shared_key().as_bytes(), original_epoch);
+    let captured_id =
+        compute_anonymous_id(contacts[0].shared_key().unwrap().as_bytes(), original_epoch);
 
     // Replaying at epoch+1 (within tolerance) — resolves
     assert!(
@@ -853,7 +855,7 @@ fn test_resolve_sender_id_anonymous_mode() {
     let contacts = vec![contact.clone()];
 
     // Generate anonymous ID and hex-encode (as it would appear in EncryptedUpdate.sender_id)
-    let anon = AnonymousSender::for_current_epoch(contact.shared_key().as_bytes());
+    let anon = AnonymousSender::for_current_epoch(contact.shared_key().unwrap().as_bytes());
     let sender_id_hex = hex::encode(anon.anonymous_id);
 
     let result = vauchi_core::network::anonymous::resolve_sender_id(&contacts, &sender_id_hex);
@@ -902,7 +904,7 @@ fn test_resolve_sender_id_epoch_boundary() {
 
     // Generate anonymous ID for previous epoch
     let prev_epoch = current_epoch() - 1;
-    let anon = AnonymousSender::compute(contact.shared_key().as_bytes(), prev_epoch);
+    let anon = AnonymousSender::compute(contact.shared_key().unwrap().as_bytes(), prev_epoch);
     let sender_id_hex = hex::encode(anon.anonymous_id);
 
     // Should still resolve (±1 epoch tolerance)

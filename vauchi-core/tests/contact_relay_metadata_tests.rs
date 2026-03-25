@@ -113,7 +113,9 @@ fn relay_metadata_preserved_after_recovery() {
     contact.set_relay_url(Some("wss://relay.example.com".to_string()));
     contact.set_relay_noise_pubkey(Some([88u8; 32]));
 
-    contact.accept_recovery([5u8; 32], SymmetricKey::generate());
+    contact
+        .accept_recovery([5u8; 32], SymmetricKey::generate())
+        .unwrap();
 
     // Relay metadata should persist through recovery — the contact
     // is still reachable at the same relay.

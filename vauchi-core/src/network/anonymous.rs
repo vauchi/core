@@ -74,14 +74,18 @@ pub fn resolve_sender<'a>(
     epoch: u64,
 ) -> Option<&'a Contact> {
     // Also check previous epoch to handle clock skew at epoch boundaries
+    // Only exchanged contacts have shared keys for anonymous ID computation
     for contact in contacts {
-        let candidate = compute_anonymous_id(contact.shared_key().as_bytes(), epoch);
+        let Some(shared_key) = contact.shared_key() else {
+            continue;
+        };
+        let candidate = compute_anonymous_id(shared_key.as_bytes(), epoch);
         if bool::from(candidate.ct_eq(anonymous_id)) {
             return Some(contact);
         }
         // Check previous epoch for boundary tolerance
         if epoch > 0 {
-            let prev_candidate = compute_anonymous_id(contact.shared_key().as_bytes(), epoch - 1);
+            let prev_candidate = compute_anonymous_id(shared_key.as_bytes(), epoch - 1);
             if bool::from(prev_candidate.ct_eq(anonymous_id)) {
                 return Some(contact);
             }
@@ -131,10 +135,14 @@ impl SenderIndex {
     pub fn build(contacts: &[Contact], epoch: u64) -> Self {
         let mut lookup = HashMap::with_capacity(contacts.len() * 2);
         for contact in contacts {
-            let id_current = compute_anonymous_id(contact.shared_key().as_bytes(), epoch);
+            // Only exchanged contacts have shared keys
+            let Some(shared_key) = contact.shared_key() else {
+                continue;
+            };
+            let id_current = compute_anonymous_id(shared_key.as_bytes(), epoch);
             lookup.insert(id_current, contact.id().to_string());
             if epoch > 0 {
-                let id_prev = compute_anonymous_id(contact.shared_key().as_bytes(), epoch - 1);
+                let id_prev = compute_anonymous_id(shared_key.as_bytes(), epoch - 1);
                 lookup.insert(id_prev, contact.id().to_string());
             }
         }

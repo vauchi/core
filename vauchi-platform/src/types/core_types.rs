@@ -146,11 +146,11 @@ impl From<&Contact> for MobileContact {
         use vauchi_core::types::{ExchangeTransport, ProximityConfidence};
 
         let exchange_transport = match contact.exchange_transport() {
-            ExchangeTransport::Qr => "qr",
-            ExchangeTransport::Nfc => "nfc",
-            ExchangeTransport::Ble => "ble",
-            ExchangeTransport::Usb => "usb",
-            ExchangeTransport::Audio => "audio",
+            Some(ExchangeTransport::Qr) | None => "qr",
+            Some(ExchangeTransport::Nfc) => "nfc",
+            Some(ExchangeTransport::Ble) => "ble",
+            Some(ExchangeTransport::Usb) => "usb",
+            Some(ExchangeTransport::Audio) => "audio",
         }
         .to_string();
 
@@ -184,7 +184,7 @@ impl From<&Contact> for MobileContact {
             is_recovery_trusted: contact.is_recovery_trusted(),
             is_hidden: contact.is_hidden(),
             card: MobileContactCard::from(contact.card()),
-            added_at: contact.exchange_timestamp(),
+            added_at: contact.exchange_timestamp().unwrap_or(0),
             trust_level: contact.trust_level().into(),
             exchange_transport,
             proximity_confidence,

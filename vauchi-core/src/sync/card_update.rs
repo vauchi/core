@@ -165,7 +165,10 @@ pub fn process_single_card_update(
         serde_json::from_slice(&delta_bytes).map_err(|_| CardUpdateError::InvalidDelta)?;
 
     // 6. Verify signature (sender + recipient key binding)
-    if !delta.verify(contact.public_key(), identity.signing_public_key()) {
+    let sender_pk = contact
+        .public_key()
+        .ok_or(CardUpdateError::SignatureInvalid)?;
+    if !delta.verify(sender_pk, identity.signing_public_key()) {
         return Err(CardUpdateError::SignatureInvalid);
     }
 

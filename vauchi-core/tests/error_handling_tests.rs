@@ -437,6 +437,7 @@ fn test_visibility_on_nonexistent_field() {
     // Setting visibility on non-existent field shouldn't panic
     contact
         .visibility_rules_mut()
+        .unwrap()
         .set_nobody("nonexistent-field-id");
 
     // Save should succeed even with visibility set on nonexistent field

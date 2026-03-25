@@ -226,7 +226,7 @@ impl<'a, T: Transport> SyncController<'a, T> {
                 .load_contact(&update.contact_id)
                 .ok()
                 .flatten()
-                .map(|c| *c.shared_key().as_bytes());
+                .and_then(|c| c.shared_key().map(|k| *k.as_bytes()));
 
             // Compute mailbox token as recipient_id (SP-33 Task 4.1)
             let recipient_id = match &shared_key {
@@ -306,7 +306,7 @@ impl<'a, T: Transport> SyncController<'a, T> {
             .load_contact(contact_id)
             .ok()
             .flatten()
-            .map(|c| *c.shared_key().as_bytes());
+            .and_then(|c| c.shared_key().map(|k| *k.as_bytes()));
 
         // Compute mailbox token as recipient_id (SP-33 Task 4.1)
         let recipient_id = match &shared_key {

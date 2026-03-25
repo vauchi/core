@@ -1920,7 +1920,7 @@ mod tests {
         wb.create_identity("Alice".to_string()).unwrap();
 
         let mut contact = make_test_contact();
-        contact.mark_fingerprint_verified();
+        contact.mark_fingerprint_verified().unwrap();
         let storage = wb.open_storage().unwrap();
         storage.save_contact(&contact).unwrap();
 

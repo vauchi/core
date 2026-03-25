@@ -19,7 +19,7 @@ fn add_contact_with_recovery_trust(wb: &Vauchi, pk: [u8; 32], trusted: bool) {
     let shared_key = SymmetricKey::generate();
     let mut contact = Contact::from_exchange(pk, card, shared_key);
     if trusted {
-        contact.trust_for_recovery();
+        contact.trust_for_recovery().unwrap();
     }
     wb.add_contact(contact).unwrap();
 }

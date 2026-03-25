@@ -51,6 +51,15 @@ impl Storage {
     /// Legacy contacts (no CEK) use storage-key encryption with plaintext
     /// display_name (existing behavior).
     pub fn save_contact(&self, contact: &Contact) -> Result<(), StorageError> {
+        // Currently all stored contacts are exchanged. Imported contact storage
+        // will be added in a future migration (Task 3/4). For now, extract the
+        // exchanged data or return an error.
+        let ex = contact.kind().exchanged_data().ok_or_else(|| {
+            StorageError::Serialization(
+                "Cannot save imported contacts yet (storage migration pending)".into(),
+            )
+        })?;
+
         // Serialize the contact card
         let card_json = serde_json::to_vec(contact.card())
             .map_err(|e| StorageError::Serialization(e.to_string()))?;
@@ -78,26 +87,27 @@ impl Storage {
 
         // Encrypt the shared key
         let shared_key_encrypted =
-            crate::crypto::encrypt(&self.encryption_key, contact.shared_key().as_bytes())
+            crate::crypto::encrypt(&self.encryption_key, ex.shared_key.as_bytes())
                 .map_err(|e| StorageError::Encryption(e.to_string()))?;
 
         // Encrypt visibility rules
-        let visibility_json = serde_json::to_string(contact.visibility_rules())
+        let visibility_json = serde_json::to_string(&ex.visibility_rules)
             .map_err(|e| StorageError::Serialization(e.to_string()))?;
         let visibility_encrypted =
             crate::crypto::encrypt(&self.encryption_key, visibility_json.as_bytes())
                 .map_err(|e| StorageError::Encryption(e.to_string()))?;
 
         // Serialize exchange_transport as its serde name ("qr"/"nfc"/"ble"/"usb"/"audio")
-        let transport_str = serde_json::to_value(contact.exchange_transport())
+        let transport_str = serde_json::to_value(ex.exchange_transport)
             .map_err(|e| StorageError::Serialization(e.to_string()))?
             .as_str()
             .unwrap_or("Qr")
             .to_string();
 
         // Serialize trust_metrics as JSON (None → NULL)
-        let trust_metrics_json = contact
-            .trust_metrics()
+        let trust_metrics_json = ex
+            .trust_metrics
+            .as_ref()
             .map(|m| serde_json::to_string(m).expect("trust_metrics serialize"));
 
         // Upsert (not INSERT OR REPLACE which cascades deletes to field_notes)
@@ -131,25 +141,25 @@ impl Storage {
                trust_metrics           = excluded.trust_metrics",
             params![
                 contact.id(),
-                contact.public_key().as_slice(),
+                ex.public_key.as_slice(),
                 display_name_db,
                 card_encrypted,
                 shared_key_encrypted,
                 visibility_encrypted,
-                contact.exchange_timestamp() as i64,
-                contact.is_fingerprint_verified() as i32,
+                ex.exchange_timestamp as i64,
+                ex.fingerprint_verified as i32,
                 Option::<i64>::None,
                 contact.is_blocked() as i32,
                 contact.is_hidden() as i32,
                 contact.is_favorite() as i32,
-                contact.is_recovery_trusted() as i32,
-                contact.is_proposal_trusted() as i32,
+                ex.recovery_trusted as i32,
+                ex.proposal_trusted as i32,
                 cek_encrypted_param,
                 transport_str,
-                contact.has_recovered() as i32,
+                ex.has_recovered as i32,
                 contact.card_updated_at().map(|t| t as i64),
-                contact.relay_url(),
-                contact.relay_noise_pubkey().map(|k| k.to_vec()),
+                ex.relay_url.as_deref(),
+                ex.relay_noise_pubkey.map(|k| k.to_vec()),
                 trust_metrics_json,
             ],
         )?;
@@ -665,8 +675,9 @@ impl Storage {
         }
 
         // Restore proposal_trusted flag from storage
+        // All DB contacts are exchanged, so this unwrap is safe.
         if row.proposal_trusted != 0 {
-            contact.set_proposal_trusted(true);
+            let _ = contact.set_proposal_trusted(true);
         }
 
         // Attach CEK if this contact is CEK-protected

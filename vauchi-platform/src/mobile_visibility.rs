@@ -35,7 +35,12 @@ impl VauchiPlatform {
                 MobileError::InvalidInput(format!("Field not found: {}", field_label))
             })?;
 
-        contact.visibility_rules_mut().set_nobody(field.id());
+        contact
+            .visibility_rules_mut()
+            .ok_or(MobileError::InvalidInput(
+                "Visibility rules require an exchanged contact".to_string(),
+            ))?
+            .set_nobody(field.id());
         storage.save_contact(&contact)?;
 
         Ok(())
@@ -64,7 +69,12 @@ impl VauchiPlatform {
                 MobileError::InvalidInput(format!("Field not found: {}", field_label))
             })?;
 
-        contact.visibility_rules_mut().set_everyone(field.id());
+        contact
+            .visibility_rules_mut()
+            .ok_or(MobileError::InvalidInput(
+                "Visibility rules require an exchanged contact".to_string(),
+            ))?
+            .set_everyone(field.id());
         storage.save_contact(&contact)?;
 
         Ok(())
@@ -93,7 +103,9 @@ impl VauchiPlatform {
                 MobileError::InvalidInput(format!("Field not found: {}", field_label))
             })?;
 
-        Ok(contact.visibility_rules().can_see(field.id(), &contact_id))
+        Ok(contact
+            .visibility_rules()
+            .is_some_and(|rules| rules.can_see(field.id(), &contact_id)))
     }
 
     // === Visibility Labels ===

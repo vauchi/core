@@ -204,7 +204,10 @@ impl Vauchi {
         // Fall back to contact's default visibility rules
         // Note: The visibility rules determine what this contact can see of *our* card
         // We use their contact_id to check if they're in the allowed list
-        Ok(contact.visibility_rules().can_see(field_id, contact_id))
+        // Imported contacts have no visibility rules; default to not visible
+        Ok(contact
+            .visibility_rules()
+            .is_some_and(|rules| rules.can_see(field_id, contact_id)))
     }
 
     // === Field Validation Operations ===
@@ -311,7 +314,8 @@ impl Vauchi {
             contacts
                 .iter()
                 .map(|c| {
-                    let age_days = (now.saturating_sub(c.exchange_timestamp())) / 86400;
+                    let age_days =
+                        (now.saturating_sub(c.exchange_timestamp().unwrap_or(0))) / 86400;
                     (
                         c.id().to_string(),
                         crate::social::ValidatorMeta {
@@ -347,12 +351,21 @@ impl Vauchi {
             .load_contact(contact_id)?
             .ok_or_else(|| VauchiError::InvalidState("Contact not found".into()))?;
 
-        let current_can_see = contact.visibility_rules().can_see(field_label, contact_id);
+        let rules = contact.visibility_rules().ok_or(VauchiError::InvalidState(
+            "Visibility rules require an exchanged contact".into(),
+        ))?;
+        let current_can_see = rules.can_see(field_label, contact_id);
 
         if current_can_see {
-            contact.visibility_rules_mut().set_nobody(field_label);
+            contact
+                .visibility_rules_mut()
+                .expect("checked above")
+                .set_nobody(field_label);
         } else {
-            contact.visibility_rules_mut().set_everyone(field_label);
+            contact
+                .visibility_rules_mut()
+                .expect("checked above")
+                .set_everyone(field_label);
         }
 
         self.storage.save_contact(&contact)?;
@@ -450,7 +463,10 @@ impl Vauchi {
             .ok_or_else(|| VauchiError::ContactNotFound(sender_contact_id.to_string()))?;
 
         // 4. Verify the Ed25519 signature against the sender's public key
-        if !validation.verify(contact.public_key()) {
+        let sender_pk = contact.public_key().ok_or(VauchiError::InvalidState(
+            "Contact has no public key".into(),
+        ))?;
+        if !validation.verify(sender_pk) {
             return Err(VauchiError::SignatureInvalid);
         }
 

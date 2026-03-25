@@ -46,22 +46,31 @@ pub struct ContactSyncData {
 
 impl ContactSyncData {
     /// Creates sync data from a contact.
+    ///
+    /// Only exchanged contacts can be synced (imported contacts have no crypto
+    /// fields). Panics if called on an imported contact — callers should filter.
     pub fn from_contact(contact: &Contact) -> Self {
+        // All synced contacts are exchanged. Imported contacts are not synced.
+        let ex = contact
+            .kind()
+            .exchanged_data()
+            .expect("Only exchanged contacts can be synced");
+
         let card_json =
             serde_json::to_string(contact.card()).expect("Card serialization should not fail");
-        let visibility_rules_json = serde_json::to_string(contact.visibility_rules())
+        let visibility_rules_json = serde_json::to_string(&ex.visibility_rules)
             .expect("Visibility rules serialization should not fail");
 
         ContactSyncData {
             id: contact.id().to_string(),
-            public_key: *contact.public_key(),
+            public_key: ex.public_key,
             display_name: contact.display_name().to_string(),
             card_json,
-            shared_key: *contact.shared_key().as_bytes(),
-            exchange_timestamp: contact.exchange_timestamp(),
-            fingerprint_verified: contact.is_fingerprint_verified(),
+            shared_key: *ex.shared_key.as_bytes(),
+            exchange_timestamp: ex.exchange_timestamp,
+            fingerprint_verified: ex.fingerprint_verified,
             visibility_rules_json,
-            recovery_trusted: contact.is_recovery_trusted(),
+            recovery_trusted: ex.recovery_trusted,
         }
     }
 
@@ -83,7 +92,8 @@ impl ContactSyncData {
             self.fingerprint_verified,
             visibility_rules,
         );
-        contact.set_recovery_trusted(self.recovery_trusted);
+        // All synced contacts are exchanged, so this always succeeds.
+        let _ = contact.set_recovery_trusted(self.recovery_trusted);
         Ok(contact)
     }
 }

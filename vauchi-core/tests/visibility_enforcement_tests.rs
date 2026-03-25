@@ -57,7 +57,7 @@ fn add_contact_with_ratchet_and_visibility(
     );
     let contact_id = contact.id().to_string();
 
-    setup_rules(contact.visibility_rules_mut());
+    setup_rules(contact.visibility_rules_mut().unwrap());
     wb.add_contact(contact).unwrap();
 
     let their_dh = X3DHKeyPair::generate();

@@ -150,7 +150,9 @@ impl VauchiPlatform {
             .load_contact(&id)?
             .ok_or_else(|| MobileError::ContactNotFound(id.clone()))?;
 
-        contact.mark_fingerprint_verified();
+        contact
+            .mark_fingerprint_verified()
+            .map_err(|e| MobileError::InvalidInput(e.to_string()))?;
         storage.save_contact(&contact)?;
 
         Ok(())
@@ -172,7 +174,9 @@ impl VauchiPlatform {
             ));
         }
 
-        contact.trust_for_recovery();
+        contact
+            .trust_for_recovery()
+            .map_err(|e| MobileError::InvalidInput(e.to_string()))?;
         storage.save_contact(&contact)?;
 
         Ok(())
@@ -186,7 +190,9 @@ impl VauchiPlatform {
             .load_contact(&id)?
             .ok_or_else(|| MobileError::ContactNotFound(id.clone()))?;
 
-        contact.untrust_for_recovery();
+        contact
+            .untrust_for_recovery()
+            .map_err(|e| MobileError::InvalidInput(e.to_string()))?;
         storage.save_contact(&contact)?;
 
         Ok(())
@@ -298,7 +304,9 @@ impl VauchiPlatform {
             .load_contact(&contact_id)?
             .ok_or_else(|| MobileError::ContactNotFound(contact_id.clone()))?;
 
-        contact.set_proposal_trusted(trusted);
+        contact
+            .set_proposal_trusted(trusted)
+            .map_err(|e| MobileError::InvalidInput(e.to_string()))?;
         storage.save_contact(&contact)?;
 
         Ok(())

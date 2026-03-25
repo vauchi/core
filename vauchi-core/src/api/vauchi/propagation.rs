@@ -58,14 +58,19 @@ impl Vauchi {
                 continue;
             }
 
+            // Only exchanged contacts receive card updates
+            let Some(ex) = contact.kind().exchanged_data() else {
+                continue;
+            };
+
             // Filter delta based on visibility rules for this contact
-            let mut delta = delta.filter_for_contact(contact.id(), contact.visibility_rules());
+            let mut delta = delta.filter_for_contact(contact.id(), &ex.visibility_rules);
             if delta.is_empty() {
                 continue;
             }
 
             // Sign delta with our identity, bound to recipient
-            delta.sign(identity, contact.public_key());
+            delta.sign(identity, &ex.public_key);
 
             // Serialize delta
             let delta_bytes = serde_json::to_vec(&delta)
@@ -225,7 +230,10 @@ impl Vauchi {
             .identity
             .as_ref()
             .ok_or(VauchiError::IdentityNotInitialized)?;
-        if !delta.verify(contact.public_key(), identity.signing_public_key()) {
+        let sender_pk = contact.public_key().ok_or(VauchiError::InvalidState(
+            "Contact has no public key".into(),
+        ))?;
+        if !delta.verify(sender_pk, identity.signing_public_key()) {
             return Err(VauchiError::SignatureInvalid);
         }
 
@@ -339,7 +347,10 @@ impl Vauchi {
             // Create a no-op delta (empty changes — just carries the CEK)
             let mut delta = CardDelta::compute(&own_card, &own_card);
             // Force a nonce so the delta is processable even with no changes
-            delta.sign(identity, contact.public_key());
+            let Some(recipient_pk) = contact.public_key() else {
+                continue; // Skip imported contacts
+            };
+            delta.sign(identity, recipient_pk);
 
             // Serialize and CEK-encrypt the delta
             let delta_bytes = serde_json::to_vec(&delta)
@@ -527,7 +538,7 @@ impl Vauchi {
                 } => {
                     match self.storage.load_contact(contact_id)? {
                         Some(mut contact) => {
-                            contact.set_recovery_trusted(recovery_trusted);
+                            let _ = contact.set_recovery_trusted(recovery_trusted);
                             self.storage.save_contact(&contact).map_err(|e| e.into())
                         }
                         None => Ok(()), // Contact not found, skip
@@ -573,7 +584,7 @@ impl Vauchi {
                     ..
                 } => match self.storage.load_contact(contact_id)? {
                     Some(mut contact) => {
-                        contact.set_proposal_trusted(proposal_trusted);
+                        let _ = contact.set_proposal_trusted(proposal_trusted);
                         self.storage.save_contact(&contact).map_err(|e| e.into())
                     }
                     None => Ok(()), // Contact not found, skip

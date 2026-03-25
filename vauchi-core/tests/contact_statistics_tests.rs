@@ -82,7 +82,7 @@ fn test_statistics_exchange_method_breakdown() {
 #[test]
 fn test_statistics_recovery_count() {
     let mut alice = make_contact("Alice", ExchangeTransport::Qr);
-    alice.accept_recovery([99u8; 32], test_key());
+    alice.accept_recovery([99u8; 32], test_key()).unwrap();
     let bob = make_contact("Bob", ExchangeTransport::Nfc);
 
     let stats = compute_statistics(&[alice, bob]);

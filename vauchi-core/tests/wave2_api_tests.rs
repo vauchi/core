@@ -368,7 +368,7 @@ fn test_emergency_wipe_status_with_trusted_contacts() {
     let wb = create_vauchi_with_identity("Alice");
 
     let mut contact = create_test_contact("Bob", [1u8; 32]);
-    contact.trust_for_recovery();
+    contact.trust_for_recovery().unwrap();
     let contact_id = contact.id().to_string();
     wb.add_contact(contact).unwrap();
     // Must re-save to persist the trust flag

@@ -197,7 +197,7 @@ fn test_has_recovered_is_permanent() {
     assert!(contact.has_recovered());
 
     // Verify fingerprint can be re-verified without clearing recovery flag
-    contact.mark_fingerprint_verified();
+    contact.mark_fingerprint_verified().unwrap();
     assert!(contact.has_recovered(), "Recovery flag must never be reset");
     assert!(contact.is_fingerprint_verified());
 }

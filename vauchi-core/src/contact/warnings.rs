@@ -47,8 +47,10 @@ pub fn check_guardian_diversity(contacts: &[Contact]) -> Option<GuardianDiversit
         return None;
     }
 
-    let transports: HashSet<ExchangeTransport> =
-        guardians.iter().map(|c| c.exchange_transport()).collect();
+    let transports: HashSet<ExchangeTransport> = guardians
+        .iter()
+        .filter_map(|c| c.exchange_transport())
+        .collect();
 
     if transports.len() == 1 {
         let single_transport = *transports.iter().next().unwrap();

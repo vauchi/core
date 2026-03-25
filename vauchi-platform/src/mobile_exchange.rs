@@ -112,8 +112,14 @@ impl VauchiPlatform {
         storage.save_contact(&contact)?;
 
         // Initialize double ratchet
-        let shared_key = contact.shared_key().clone();
-        let their_exchange_key = *contact.public_key();
+        // Exchange contacts are always exchanged type
+        let shared_key = contact
+            .shared_key()
+            .expect("exchange contact has shared key")
+            .clone();
+        let their_exchange_key = *contact
+            .public_key()
+            .expect("exchange contact has public key");
         let ratchet = DoubleRatchetState::initialize_initiator(&shared_key, their_exchange_key)
             .map_err(|e| MobileError::ExchangeFailed(e.to_string()))?;
         storage.save_ratchet_state(&contact_id, &ratchet, true)?;

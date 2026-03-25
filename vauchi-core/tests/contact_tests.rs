@@ -33,7 +33,7 @@ fn test_fingerprint_verification() {
     let mut contact = create_test_contact();
 
     assert!(!contact.is_fingerprint_verified());
-    contact.mark_fingerprint_verified();
+    contact.mark_fingerprint_verified().unwrap();
     assert!(contact.is_fingerprint_verified());
 }
 
@@ -59,14 +59,19 @@ fn test_visibility_rules() {
     assert!(
         contact
             .visibility_rules()
+            .unwrap()
             .can_see("any_field", contact.id())
     );
 
     // Set a field as private
-    contact.visibility_rules_mut().set_nobody("private_field");
+    contact
+        .visibility_rules_mut()
+        .unwrap()
+        .set_nobody("private_field");
     assert!(
         !contact
             .visibility_rules()
+            .unwrap()
             .can_see("private_field", contact.id())
     );
 }
@@ -94,11 +99,12 @@ fn test_contact_from_sync_data() {
     );
 
     assert_eq!(contact.display_name(), "Synced User");
-    assert_eq!(contact.exchange_timestamp(), 1234567890);
+    assert_eq!(contact.exchange_timestamp().unwrap(), 1234567890);
     assert!(contact.is_fingerprint_verified());
     assert!(
         !contact
             .visibility_rules()
+            .unwrap()
             .can_see("private_field", "anyone")
     );
 }
@@ -146,7 +152,7 @@ fn test_contact_accessors() {
     let contact = Contact::from_exchange(public_key, card, shared_key.clone());
 
     // Test all accessors return correct values
-    assert_eq!(contact.public_key(), &public_key);
+    assert_eq!(contact.public_key().unwrap(), &public_key);
     assert_eq!(contact.card().display_name(), "Alice");
     // shared_key returns reference, just verify it's accessible
     let _ = contact.shared_key();
@@ -155,8 +161,8 @@ fn test_contact_accessors() {
         .duration_since(UNIX_EPOCH)
         .unwrap()
         .as_secs();
-    assert!(contact.exchange_timestamp() <= now);
-    assert!(contact.exchange_timestamp() > now - 60);
+    assert!(contact.exchange_timestamp().unwrap() <= now);
+    assert!(contact.exchange_timestamp().unwrap() > now - 60);
 }
 
 // @scenario: contacts_management :: View contact details
@@ -348,7 +354,7 @@ fn test_contact_trust_for_recovery() {
     let mut contact = create_test_contact();
     assert!(!contact.is_recovery_trusted());
 
-    contact.trust_for_recovery();
+    contact.trust_for_recovery().unwrap();
     assert!(contact.is_recovery_trusted());
 }
 
@@ -357,10 +363,10 @@ fn test_contact_trust_for_recovery() {
 #[test]
 fn test_contact_untrust_for_recovery() {
     let mut contact = create_test_contact();
-    contact.trust_for_recovery();
+    contact.trust_for_recovery().unwrap();
     assert!(contact.is_recovery_trusted());
 
-    contact.untrust_for_recovery();
+    contact.untrust_for_recovery().unwrap();
     assert!(!contact.is_recovery_trusted());
 }
 
@@ -369,10 +375,10 @@ fn test_contact_untrust_for_recovery() {
 fn test_contact_set_recovery_trusted() {
     let mut contact = create_test_contact();
 
-    contact.set_recovery_trusted(true);
+    contact.set_recovery_trusted(true).unwrap();
     assert!(contact.is_recovery_trusted());
 
-    contact.set_recovery_trusted(false);
+    contact.set_recovery_trusted(false).unwrap();
     assert!(!contact.is_recovery_trusted());
 }
 
@@ -410,7 +416,7 @@ fn test_recovery_trust_independent_of_blocked_hidden() {
     let mut contact = create_test_contact();
 
     // Trust + block
-    contact.trust_for_recovery();
+    contact.trust_for_recovery().unwrap();
     contact.block();
     assert!(contact.is_recovery_trusted());
     assert!(contact.is_blocked());
@@ -422,7 +428,7 @@ fn test_recovery_trust_independent_of_blocked_hidden() {
     assert!(contact.is_hidden());
 
     // Untrust doesn't affect other flags
-    contact.untrust_for_recovery();
+    contact.untrust_for_recovery().unwrap();
     assert!(!contact.is_recovery_trusted());
     assert!(contact.is_hidden());
 }

@@ -60,17 +60,20 @@ fn test_visibility_control_happy_path() {
 
     // Step 3: Set visibility rules - hide "personal" from Bob
     let mut bob_contact = alice_wb.get_contact(&bob_id).unwrap().unwrap();
-    bob_contact.visibility_rules_mut().set_nobody("personal");
+    bob_contact
+        .visibility_rules_mut()
+        .unwrap()
+        .set_nobody("personal");
     alice_wb.storage().save_contact(&bob_contact).unwrap();
 
     // Step 4: Get Alice's card filtered for each contact
     let alice_card = alice_wb.own_card().unwrap().unwrap();
 
     let bob_contact = alice_wb.get_contact(&bob_id).unwrap().unwrap();
-    let bob_rules = bob_contact.visibility_rules();
+    let bob_rules = bob_contact.visibility_rules().unwrap();
 
     let carol_contact = alice_wb.get_contact(&carol_id).unwrap().unwrap();
-    let carol_rules = carol_contact.visibility_rules();
+    let carol_rules = carol_contact.visibility_rules().unwrap();
 
     // Step 5: Verify visibility filtering
     assert!(
@@ -110,11 +113,14 @@ fn test_visibility_control_happy_path() {
 
     // Step 7: Test granting visibility back
     let mut bob_contact = alice_wb.get_contact(&bob_id).unwrap().unwrap();
-    bob_contact.visibility_rules_mut().set_everyone("personal");
+    bob_contact
+        .visibility_rules_mut()
+        .unwrap()
+        .set_everyone("personal");
     alice_wb.storage().save_contact(&bob_contact).unwrap();
 
     let bob_contact = alice_wb.get_contact(&bob_id).unwrap().unwrap();
-    let bob_rules = bob_contact.visibility_rules();
+    let bob_rules = bob_contact.visibility_rules().unwrap();
     assert!(
         bob_rules.can_see("personal", &bob_id),
         "Bob should now see personal phone"

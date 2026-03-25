@@ -1392,7 +1392,7 @@ impl ExchangeSession {
             _ => None,
         };
 
-        their_key.and_then(|key| contacts.iter().find(|c| c.public_key() == key))
+        their_key.and_then(|key| contacts.iter().find(|c| c.public_key() == Some(key)))
     }
 }
 

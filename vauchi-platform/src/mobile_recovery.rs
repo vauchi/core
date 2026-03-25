@@ -156,7 +156,7 @@ impl VauchiPlatform {
         let trusted_keys: std::collections::HashSet<[u8; 32]> = contacts
             .iter()
             .filter(|c| c.is_recovery_trusted())
-            .map(|c| *c.public_key())
+            .filter_map(|c| c.public_key().copied())
             .collect();
 
         match proof.add_voucher_trusted(voucher, &trusted_keys) {
@@ -278,8 +278,10 @@ impl VauchiPlatform {
             .list_contacts()
             .map_err(|e| MobileError::StorageError(e.to_string()))?;
 
-        let contact_pks: std::collections::HashSet<[u8; 32]> =
-            contacts.iter().map(|c| *c.public_key()).collect();
+        let contact_pks: std::collections::HashSet<[u8; 32]> = contacts
+            .iter()
+            .filter_map(|c| c.public_key().copied())
+            .collect();
 
         let known_voucher_count = proof
             .vouchers()

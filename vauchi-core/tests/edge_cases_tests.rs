@@ -338,18 +338,27 @@ fn test_visibility_all_fields_hidden() {
     let mut contact = wb.get_contact(&contact_id).unwrap().unwrap();
 
     // Hide all potential fields
-    contact.visibility_rules_mut().set_nobody("field1");
-    contact.visibility_rules_mut().set_nobody("field2");
-    contact.visibility_rules_mut().set_nobody("field3");
+    contact.visibility_rules_mut().unwrap().set_nobody("field1");
+    contact.visibility_rules_mut().unwrap().set_nobody("field2");
+    contact.visibility_rules_mut().unwrap().set_nobody("field3");
 
     wb.storage().save_contact(&contact).unwrap();
 
     // Verify all are hidden
     let loaded = wb.get_contact(&contact_id).unwrap().unwrap();
     let rules = loaded.visibility_rules();
-    assert!(matches!(rules.get("field1"), FieldVisibility::Nobody));
-    assert!(matches!(rules.get("field2"), FieldVisibility::Nobody));
-    assert!(matches!(rules.get("field3"), FieldVisibility::Nobody));
+    assert!(matches!(
+        rules.unwrap().get("field1"),
+        FieldVisibility::Nobody
+    ));
+    assert!(matches!(
+        rules.unwrap().get("field2"),
+        FieldVisibility::Nobody
+    ));
+    assert!(matches!(
+        rules.unwrap().get("field3"),
+        FieldVisibility::Nobody
+    ));
 }
 
 /// Test: Visibility default is Everyone
@@ -369,7 +378,10 @@ fn test_visibility_default_is_everyone() {
     let rules = contact.visibility_rules();
 
     // Non-configured field should default to Everyone
-    assert!(matches!(rules.get("any-field"), FieldVisibility::Everyone));
+    assert!(matches!(
+        rules.unwrap().get("any-field"),
+        FieldVisibility::Everyone
+    ));
 }
 
 // =============================================================================

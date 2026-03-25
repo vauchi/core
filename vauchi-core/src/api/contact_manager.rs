@@ -302,7 +302,9 @@ impl<'a> ContactManager<'a> {
     /// Marks a contact's fingerprint as verified.
     pub fn verify_fingerprint(&self, id: &str) -> VauchiResult<()> {
         let mut contact = self.get_contact_required(id)?;
-        contact.mark_fingerprint_verified();
+        contact
+            .mark_fingerprint_verified()
+            .map_err(|e| VauchiError::InvalidState(e.to_string()))?;
         self.storage.save_contact(&contact)?;
         Ok(())
     }
@@ -312,7 +314,12 @@ impl<'a> ContactManager<'a> {
     /// Sets a field as visible to everyone for a contact.
     pub fn set_field_public(&self, contact_id: &str, field: &str) -> VauchiResult<()> {
         let mut contact = self.get_contact_required(contact_id)?;
-        contact.visibility_rules_mut().set_everyone(field);
+        contact
+            .visibility_rules_mut()
+            .ok_or(VauchiError::InvalidState(
+                "Visibility rules require an exchanged contact".into(),
+            ))?
+            .set_everyone(field);
         self.storage.save_contact(&contact)?;
         Ok(())
     }
@@ -320,7 +327,12 @@ impl<'a> ContactManager<'a> {
     /// Sets a field as visible to nobody for a contact.
     pub fn set_field_private(&self, contact_id: &str, field: &str) -> VauchiResult<()> {
         let mut contact = self.get_contact_required(contact_id)?;
-        contact.visibility_rules_mut().set_nobody(field);
+        contact
+            .visibility_rules_mut()
+            .ok_or(VauchiError::InvalidState(
+                "Visibility rules require an exchanged contact".into(),
+            ))?
+            .set_nobody(field);
         self.storage.save_contact(&contact)?;
         Ok(())
     }
@@ -337,6 +349,9 @@ impl<'a> ContactManager<'a> {
         let allowed_set: HashSet<String> = allowed_contacts.into_iter().collect();
         contact
             .visibility_rules_mut()
+            .ok_or(VauchiError::InvalidState(
+                "Visibility rules require an exchanged contact".into(),
+            ))?
             .set_contacts(field, allowed_set);
         self.storage.save_contact(&contact)?;
         Ok(())
@@ -581,13 +596,23 @@ mod tests {
         manager.set_field_private(&contact_id, "email").unwrap();
 
         let loaded = manager.get_contact(&contact_id).unwrap().unwrap();
-        assert!(!loaded.visibility_rules().can_see("email", "anyone"));
+        assert!(
+            !loaded
+                .visibility_rules()
+                .unwrap()
+                .can_see("email", "anyone")
+        );
 
         // Set field public
         manager.set_field_public(&contact_id, "email").unwrap();
 
         let loaded = manager.get_contact(&contact_id).unwrap().unwrap();
-        assert!(loaded.visibility_rules().can_see("email", "anyone"));
+        assert!(
+            loaded
+                .visibility_rules()
+                .unwrap()
+                .can_see("email", "anyone")
+        );
     }
 
     #[test]

@@ -355,7 +355,10 @@ fn test_propagate_respects_visibility_rules() {
     let contact_id = contact.id().to_string();
 
     // Set visibility: hide the email field (by its ID) from Bob
-    contact.visibility_rules_mut().set_nobody(&email_field_id);
+    contact
+        .visibility_rules_mut()
+        .unwrap()
+        .set_nobody(&email_field_id);
     wb.add_contact(contact).unwrap();
 
     // Initialize ratchet
@@ -397,7 +400,10 @@ fn test_propagate_partial_visibility() {
     let contact_id = contact.id().to_string();
 
     // Set visibility: hide only email field (by ID) from Bob
-    contact.visibility_rules_mut().set_nobody(&email_field_id);
+    contact
+        .visibility_rules_mut()
+        .unwrap()
+        .set_nobody(&email_field_id);
     wb.add_contact(contact).unwrap();
 
     // Initialize ratchet

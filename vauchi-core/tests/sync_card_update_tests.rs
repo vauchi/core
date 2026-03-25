@@ -670,7 +670,7 @@ fn test_process_card_update_resolves_anonymous_sender_id() {
         .load_contact(&bob_contact_id)
         .unwrap()
         .unwrap();
-    let anon = AnonymousSender::for_current_epoch(bob_contact.shared_key().as_bytes());
+    let anon = AnonymousSender::for_current_epoch(bob_contact.shared_key().unwrap().as_bytes());
     let anonymous_id_hex = hex::encode(anon.anonymous_id);
 
     // Process using anonymous sender ID instead of real contact ID

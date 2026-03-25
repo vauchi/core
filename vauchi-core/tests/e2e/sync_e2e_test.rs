@@ -241,19 +241,38 @@ fn test_full_three_user_workflow() {
 
     // Set visibility - Bob sees work only, Carol sees all
     let mut bob_contact = alice_wb.get_contact(&bob_id).unwrap().unwrap();
-    bob_contact.visibility_rules_mut().set_nobody("personal");
+    bob_contact
+        .visibility_rules_mut()
+        .unwrap()
+        .set_nobody("personal");
     alice_wb.storage().save_contact(&bob_contact).unwrap();
 
     // Verify visibility rules
     let bob_contact = alice_wb.get_contact(&bob_id).unwrap().unwrap();
     let carol_contact = alice_wb.get_contact(&carol_id).unwrap().unwrap();
 
-    assert!(bob_contact.visibility_rules().can_see("work", &bob_id));
-    assert!(!bob_contact.visibility_rules().can_see("personal", &bob_id));
-    assert!(carol_contact.visibility_rules().can_see("work", &carol_id));
+    assert!(
+        bob_contact
+            .visibility_rules()
+            .unwrap()
+            .can_see("work", &bob_id)
+    );
+    assert!(
+        !bob_contact
+            .visibility_rules()
+            .unwrap()
+            .can_see("personal", &bob_id)
+    );
     assert!(
         carol_contact
             .visibility_rules()
+            .unwrap()
+            .can_see("work", &carol_id)
+    );
+    assert!(
+        carol_contact
+            .visibility_rules()
+            .unwrap()
             .can_see("personal", &carol_id)
     );
 

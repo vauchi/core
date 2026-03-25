@@ -4,8 +4,8 @@
 
 //! Contact Module
 //!
-//! Represents contacts obtained through exchange, with shared encryption keys
-//! and visibility rules.
+//! Represents contacts obtained through exchange or import, with shared encryption keys
+//! and visibility rules for exchanged contacts.
 
 pub mod kind;
 pub mod labels;
@@ -33,65 +33,41 @@ use crate::crypto::SymmetricKey;
 use crate::crypto::cek::ContentEncryptionKey;
 use crate::exchange::{ExchangeTransport, ProximityConfidence, TrustMetrics};
 
-/// A contact obtained through exchange.
+/// Error type for contact operations that require a specific contact kind.
+#[derive(Debug, Clone, thiserror::Error)]
+pub enum ContactError {
+    /// The operation requires an exchanged contact but was called on an imported one.
+    #[error("Operation requires an exchanged contact (with crypto keys)")]
+    OperationRequiresExchangedContact,
+}
+
+/// A contact obtained through exchange or import.
 ///
-/// Contains their contact card, shared encryption key, and visibility rules.
+/// Contains their contact card, and for exchanged contacts: shared encryption key,
+/// visibility rules, and trust state. Imported contacts have no crypto fields.
 #[derive(Clone, Debug)]
 pub struct Contact {
-    /// Their public key fingerprint (unique identifier)
+    // === Shared fields (both kinds) ===
+    /// Their public key fingerprint (unique identifier) for exchanged contacts,
+    /// or a UUID v4 for imported contacts.
     id: String,
-    /// Their Ed25519 public key
-    public_key: [u8; 32],
     /// Their display name (from their card)
     display_name: String,
     /// Their contact card
     card: ContactCard,
-    /// Shared symmetric key for communication
-    shared_key: SymmetricKey,
-    /// Unix timestamp of when the exchange occurred
-    exchange_timestamp: u64,
-    /// Whether the user manually verified their fingerprint
-    fingerprint_verified: bool,
-    /// Our visibility rules for this contact (what they can see of our card)
-    visibility_rules: VisibilityRules,
+    /// Distinguishes exchanged (crypto) from imported (no crypto) contacts.
+    kind: ContactKind,
+    // === Local-only flags (safe for both kinds) ===
     /// Whether this contact is hidden from the main contact list.
-    /// Hidden contacts are only visible via secret access (gesture/PIN).
     hidden: bool,
     /// Whether this contact is blocked.
-    /// Blocked contacts don't receive updates and their updates are ignored.
     blocked: bool,
-    /// Whether this contact is trusted for recovery purposes.
-    /// Only trusted contacts can vouch during social recovery.
-    /// This is private — the contact is never told their trust status.
-    recovery_trusted: bool,
-    /// Whether this contact is trusted for simplified contact proposals (opt-in).
-    /// Local-only flag — never shared with the contact.
-    proposal_trusted: bool,
     /// Whether this contact is marked as a favorite (local-only, never shared).
     favorite: bool,
-    /// Proximity confidence level from the exchange.
-    proximity_confidence: ProximityConfidence,
     /// Optional Content Encryption Key for crypto-shredding.
-    /// When present, the card is encrypted at rest with this CEK (not the storage key).
-    /// Destroying this key renders the card permanently unreadable.
     cek: Option<ContentEncryptionKey>,
-    /// How this contact was established (QR, NFC, BLE).
-    /// Persisted in storage to provide trust context.
-    exchange_transport: ExchangeTransport,
-    /// Whether this contact has undergone identity recovery.
-    /// Set to true when `accept_recovery()` is called. Never reset.
-    has_recovered: bool,
     /// Timestamp of the last card update (separate from exchange_timestamp).
-    /// None until the first `update_card()` call.
     card_updated_at: Option<u64>,
-    /// Relay URL learned during exchange (for per-contact relay routing).
-    /// When set, updates for this contact are sent to their relay instead of our home relay.
-    relay_url: Option<String>,
-    /// Relay's Noise NK public key, pinned during in-person exchange.
-    /// Used to verify the relay's identity on connect (eliminates TOFU).
-    relay_noise_pubkey: Option<[u8; 32]>,
-    /// Full trust metrics from the exchange. None for legacy contacts.
-    trust_metrics: Option<TrustMetrics>,
 }
 
 impl Contact {
@@ -110,26 +86,28 @@ impl Contact {
 
         Contact {
             id,
-            public_key,
             display_name,
             card,
-            shared_key,
-            exchange_timestamp,
-            fingerprint_verified: false,
-            visibility_rules: VisibilityRules::new(),
+            kind: ContactKind::Exchanged(ExchangedData {
+                public_key,
+                shared_key,
+                exchange_timestamp,
+                exchange_transport: ExchangeTransport::Qr,
+                fingerprint_verified: false,
+                recovery_trusted: false,
+                proposal_trusted: false,
+                proximity_confidence: ProximityConfidence::Unknown,
+                has_recovered: false,
+                relay_url: None,
+                relay_noise_pubkey: None,
+                trust_metrics: None,
+                visibility_rules: VisibilityRules::new(),
+            }),
             hidden: false,
             blocked: false,
-            recovery_trusted: false,
-            proposal_trusted: false,
             favorite: false,
-            proximity_confidence: ProximityConfidence::Unknown,
             cek: None,
-            exchange_transport: ExchangeTransport::Qr,
-            has_recovered: false,
             card_updated_at: None,
-            relay_url: None,
-            relay_noise_pubkey: None,
-            trust_metrics: None,
         }
     }
 
@@ -141,7 +119,7 @@ impl Contact {
         proximity_confidence: ProximityConfidence,
     ) -> Self {
         let mut contact = Self::from_exchange(public_key, card, shared_key);
-        contact.proximity_confidence = proximity_confidence;
+        contact.set_proximity_confidence(proximity_confidence);
         contact
     }
 
@@ -154,8 +132,8 @@ impl Contact {
         exchange_transport: ExchangeTransport,
     ) -> Self {
         let mut contact = Self::from_exchange(public_key, card, shared_key);
-        contact.proximity_confidence = proximity_confidence;
-        contact.exchange_transport = exchange_transport;
+        contact.set_proximity_confidence(proximity_confidence);
+        contact.set_exchange_transport(exchange_transport);
         contact
     }
 
@@ -201,37 +179,57 @@ impl Contact {
 
         Contact {
             id,
-            public_key,
             display_name,
             card,
-            shared_key,
-            exchange_timestamp,
-            fingerprint_verified,
-            visibility_rules,
+            kind: ContactKind::Exchanged(ExchangedData {
+                public_key,
+                shared_key,
+                exchange_timestamp,
+                exchange_transport: ExchangeTransport::Qr,
+                fingerprint_verified,
+                recovery_trusted,
+                proposal_trusted: false,
+                proximity_confidence: ProximityConfidence::Unknown,
+                has_recovered: false,
+                relay_url: None,
+                relay_noise_pubkey: None,
+                trust_metrics: None,
+                visibility_rules,
+            }),
             hidden,
             blocked,
-            recovery_trusted,
-            proposal_trusted: false,
             favorite: false,
-            proximity_confidence: ProximityConfidence::Unknown,
             cek: None,
-            exchange_transport: ExchangeTransport::Qr,
-            has_recovered: false,
             card_updated_at: None,
-            relay_url: None,
-            relay_noise_pubkey: None,
-            trust_metrics: None,
         }
     }
 
-    /// Returns the contact's unique ID (public key fingerprint).
-    pub fn id(&self) -> &str {
-        &self.id
+    // ========================================
+    // Kind accessors
+    // ========================================
+
+    /// Returns the contact kind (Exchanged or Imported).
+    pub fn kind(&self) -> &ContactKind {
+        &self.kind
     }
 
-    /// Returns the contact's public key.
-    pub fn public_key(&self) -> &[u8; 32] {
-        &self.public_key
+    /// Returns `true` if this is an exchanged (crypto) contact.
+    pub fn is_exchanged(&self) -> bool {
+        self.kind.is_exchanged()
+    }
+
+    /// Returns `true` if this is an imported (non-crypto) contact.
+    pub fn is_imported(&self) -> bool {
+        self.kind.is_imported()
+    }
+
+    // ========================================
+    // Shared getters (work for both kinds)
+    // ========================================
+
+    /// Returns the contact's unique ID (public key fingerprint or UUID).
+    pub fn id(&self) -> &str {
+        &self.id
     }
 
     /// Returns the contact's display name.
@@ -244,34 +242,151 @@ impl Contact {
         &self.card
     }
 
-    /// Returns the shared encryption key.
-    pub fn shared_key(&self) -> &SymmetricKey {
-        &self.shared_key
+    /// Returns the timestamp of the last card update, if any.
+    pub fn card_updated_at(&self) -> Option<u64> {
+        self.card_updated_at
     }
 
-    /// Returns the exchange timestamp.
-    pub fn exchange_timestamp(&self) -> u64 {
-        self.exchange_timestamp
+    /// Sets the card_updated_at timestamp.
+    pub fn set_card_updated_at(&mut self, timestamp: Option<u64>) {
+        self.card_updated_at = timestamp;
+    }
+
+    // ========================================
+    // Exchanged-only getters (return Option)
+    // ========================================
+
+    /// Returns the contact's public key, if this is an exchanged contact.
+    pub fn public_key(&self) -> Option<&[u8; 32]> {
+        self.kind.exchanged_data().map(|d| &d.public_key)
+    }
+
+    /// Returns the shared encryption key, if this is an exchanged contact.
+    pub fn shared_key(&self) -> Option<&SymmetricKey> {
+        self.kind.exchanged_data().map(|d| &d.shared_key)
+    }
+
+    /// Returns the exchange timestamp, if this is an exchanged contact.
+    pub fn exchange_timestamp(&self) -> Option<u64> {
+        self.kind.exchanged_data().map(|d| d.exchange_timestamp)
     }
 
     /// Returns whether the fingerprint was manually verified.
+    /// Returns `false` for imported contacts (no fingerprint to verify).
     pub fn is_fingerprint_verified(&self) -> bool {
-        self.fingerprint_verified
+        self.kind
+            .exchanged_data()
+            .is_some_and(|d| d.fingerprint_verified)
+    }
+
+    /// Returns a reference to the visibility rules, if this is an exchanged contact.
+    pub fn visibility_rules(&self) -> Option<&VisibilityRules> {
+        self.kind.exchanged_data().map(|d| &d.visibility_rules)
+    }
+
+    /// Returns a mutable reference to the visibility rules, if exchanged.
+    pub fn visibility_rules_mut(&mut self) -> Option<&mut VisibilityRules> {
+        self.kind
+            .exchanged_data_mut()
+            .map(|d| &mut d.visibility_rules)
+    }
+
+    /// Returns the proximity confidence level from the exchange.
+    /// Returns `Unknown` for imported contacts.
+    pub fn proximity_confidence(&self) -> &ProximityConfidence {
+        self.kind
+            .exchanged_data()
+            .map_or(&ProximityConfidence::Unknown, |d| &d.proximity_confidence)
+    }
+
+    /// Returns the exchange transport method, if this is an exchanged contact.
+    pub fn exchange_transport(&self) -> Option<ExchangeTransport> {
+        self.kind.exchanged_data().map(|d| d.exchange_transport)
+    }
+
+    /// Returns whether this contact has undergone identity recovery.
+    /// Returns `false` for imported contacts.
+    pub fn has_recovered(&self) -> bool {
+        self.kind.exchanged_data().is_some_and(|d| d.has_recovered)
+    }
+
+    /// Returns the full trust metrics from the exchange, if present.
+    pub fn trust_metrics(&self) -> Option<&TrustMetrics> {
+        self.kind
+            .exchanged_data()
+            .and_then(|d| d.trust_metrics.as_ref())
+    }
+
+    /// Returns the contact's relay URL, if known.
+    pub fn relay_url(&self) -> Option<&str> {
+        self.kind
+            .exchanged_data()
+            .and_then(|d| d.relay_url.as_deref())
+    }
+
+    /// Returns the contact's relay Noise NK public key, if known.
+    pub fn relay_noise_pubkey(&self) -> Option<&[u8; 32]> {
+        self.kind
+            .exchanged_data()
+            .and_then(|d| d.relay_noise_pubkey.as_ref())
+    }
+
+    // ========================================
+    // Exchanged-only setters
+    // ========================================
+
+    /// Sets the proximity confidence level (no-op for imported contacts).
+    pub fn set_proximity_confidence(&mut self, confidence: ProximityConfidence) {
+        if let Some(data) = self.kind.exchanged_data_mut() {
+            data.proximity_confidence = confidence;
+        }
+    }
+
+    /// Sets the exchange transport method (no-op for imported contacts).
+    pub fn set_exchange_transport(&mut self, transport: ExchangeTransport) {
+        if let Some(data) = self.kind.exchanged_data_mut() {
+            data.exchange_transport = transport;
+        }
+    }
+
+    /// Sets the has_recovered flag (no-op for imported contacts).
+    pub fn set_has_recovered(&mut self, recovered: bool) {
+        if let Some(data) = self.kind.exchanged_data_mut() {
+            data.has_recovered = recovered;
+        }
+    }
+
+    /// Sets or clears the trust metrics (no-op for imported contacts).
+    pub fn set_trust_metrics(&mut self, metrics: Option<TrustMetrics>) {
+        if let Some(data) = self.kind.exchanged_data_mut() {
+            data.trust_metrics = metrics;
+        }
+    }
+
+    /// Sets the contact's relay URL (no-op for imported contacts).
+    pub fn set_relay_url(&mut self, url: Option<String>) {
+        if let Some(data) = self.kind.exchanged_data_mut() {
+            data.relay_url = url;
+        }
+    }
+
+    /// Sets the contact's relay Noise NK public key (no-op for imported contacts).
+    pub fn set_relay_noise_pubkey(&mut self, pubkey: Option<[u8; 32]>) {
+        if let Some(data) = self.kind.exchanged_data_mut() {
+            data.relay_noise_pubkey = pubkey;
+        }
     }
 
     /// Marks the fingerprint as verified.
-    pub fn mark_fingerprint_verified(&mut self) {
-        self.fingerprint_verified = true;
-    }
-
-    /// Returns a reference to the visibility rules.
-    pub fn visibility_rules(&self) -> &VisibilityRules {
-        &self.visibility_rules
-    }
-
-    /// Returns a mutable reference to the visibility rules.
-    pub fn visibility_rules_mut(&mut self) -> &mut VisibilityRules {
-        &mut self.visibility_rules
+    ///
+    /// Returns `Err` if called on an imported contact.
+    pub fn mark_fingerprint_verified(&mut self) -> Result<(), ContactError> {
+        let data = self
+            .kind
+            .exchanged_data_mut()
+            .ok_or(ContactError::OperationRequiresExchangedContact)?;
+        data.fingerprint_verified = true;
+        Ok(())
     }
 
     /// Updates this contact's card (from a sync update).
@@ -290,17 +405,27 @@ impl Contact {
     ///
     /// This is called when the user accepts a recovery proof from this contact.
     /// The old shared secret is discarded and fingerprint verification is reset.
-    pub fn accept_recovery(&mut self, new_public_key: [u8; 32], new_shared_key: SymmetricKey) {
-        self.public_key = new_public_key;
-        self.id = hex::encode(new_public_key);
-        self.shared_key = new_shared_key;
-        self.fingerprint_verified = false;
-        self.has_recovered = true;
-        // Update exchange timestamp to mark when recovery was accepted
-        self.exchange_timestamp = SystemTime::now()
+    ///
+    /// Returns `Err` if called on an imported contact.
+    pub fn accept_recovery(
+        &mut self,
+        new_public_key: [u8; 32],
+        new_shared_key: SymmetricKey,
+    ) -> Result<(), ContactError> {
+        let data = self
+            .kind
+            .exchanged_data_mut()
+            .ok_or(ContactError::OperationRequiresExchangedContact)?;
+        data.public_key = new_public_key;
+        data.shared_key = new_shared_key;
+        data.fingerprint_verified = false;
+        data.has_recovered = true;
+        data.exchange_timestamp = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .expect("Time went backwards")
             .as_secs();
+        self.id = hex::encode(new_public_key);
+        Ok(())
     }
 
     /// Accepts a recovery with a new contact card.
@@ -311,9 +436,10 @@ impl Contact {
         new_public_key: [u8; 32],
         new_shared_key: SymmetricKey,
         new_card: ContactCard,
-    ) {
-        self.accept_recovery(new_public_key, new_shared_key);
+    ) -> Result<(), ContactError> {
+        self.accept_recovery(new_public_key, new_shared_key)?;
         self.update_card(new_card);
+        Ok(())
     }
 
     /// Updates the contact's display name.
@@ -327,9 +453,14 @@ impl Contact {
     }
 
     /// Returns a human-readable fingerprint for verification.
+    ///
+    /// Returns an empty string for imported contacts (no public key).
     pub fn fingerprint(&self) -> String {
-        // Format as groups of 4 hex chars for readability
-        let hex = hex::encode(self.public_key);
+        let pk = match self.kind.exchanged_data() {
+            Some(data) => data.public_key,
+            None => return String::new(),
+        };
+        let hex = hex::encode(pk);
         hex.chars()
             .collect::<Vec<_>>()
             .chunks(4)
@@ -344,18 +475,11 @@ impl Contact {
     // ========================================
 
     /// Returns whether this contact is hidden from the main contact list.
-    ///
-    /// Hidden contacts provide plausible deniability - they only appear when
-    /// accessed via a secret gesture, PIN, or special settings navigation.
     pub fn is_hidden(&self) -> bool {
         self.hidden
     }
 
     /// Hides this contact from the main contact list.
-    ///
-    /// The contact will only be visible via secret access methods.
-    /// Updates from hidden contacts are still received but notifications
-    /// are suppressed.
     pub fn hide(&mut self) {
         self.hidden = true;
     }
@@ -375,11 +499,6 @@ impl Contact {
     // ========================================
 
     /// Returns whether this contact is blocked.
-    ///
-    /// Blocked contacts:
-    /// - Don't receive updates from you
-    /// - Their updates to you are ignored
-    /// - Still appear in the contact list (unless also hidden)
     pub fn is_blocked(&self) -> bool {
         self.blocked
     }
@@ -404,26 +523,47 @@ impl Contact {
     // ========================================
 
     /// Returns whether this contact is trusted for recovery purposes.
-    ///
-    /// Only recovery-trusted contacts can vouch during social recovery.
-    /// Trust status is private and never shared with the contact.
+    /// Returns `false` for imported contacts.
     pub fn is_recovery_trusted(&self) -> bool {
-        self.recovery_trusted
+        self.kind
+            .exchanged_data()
+            .is_some_and(|d| d.recovery_trusted)
     }
 
     /// Marks this contact as trusted for recovery.
-    pub fn trust_for_recovery(&mut self) {
-        self.recovery_trusted = true;
+    ///
+    /// Returns `Err` if called on an imported contact.
+    pub fn trust_for_recovery(&mut self) -> Result<(), ContactError> {
+        let data = self
+            .kind
+            .exchanged_data_mut()
+            .ok_or(ContactError::OperationRequiresExchangedContact)?;
+        data.recovery_trusted = true;
+        Ok(())
     }
 
     /// Removes recovery trust from this contact.
-    pub fn untrust_for_recovery(&mut self) {
-        self.recovery_trusted = false;
+    ///
+    /// Returns `Err` if called on an imported contact.
+    pub fn untrust_for_recovery(&mut self) -> Result<(), ContactError> {
+        let data = self
+            .kind
+            .exchanged_data_mut()
+            .ok_or(ContactError::OperationRequiresExchangedContact)?;
+        data.recovery_trusted = false;
+        Ok(())
     }
 
     /// Sets the recovery trust status directly.
-    pub fn set_recovery_trusted(&mut self, trusted: bool) {
-        self.recovery_trusted = trusted;
+    ///
+    /// Returns `Err` if called on an imported contact.
+    pub fn set_recovery_trusted(&mut self, trusted: bool) -> Result<(), ContactError> {
+        let data = self
+            .kind
+            .exchanged_data_mut()
+            .ok_or(ContactError::OperationRequiresExchangedContact)?;
+        data.recovery_trusted = trusted;
+        Ok(())
     }
 
     // ========================================
@@ -431,26 +571,47 @@ impl Contact {
     // ========================================
 
     /// Returns whether this contact is trusted for simplified contact proposals.
-    ///
-    /// Proposal-trusted contacts can receive simplified contact proposals (opt-in).
-    /// Trust status is private and never shared with the contact.
+    /// Returns `false` for imported contacts.
     pub fn is_proposal_trusted(&self) -> bool {
-        self.proposal_trusted
+        self.kind
+            .exchanged_data()
+            .is_some_and(|d| d.proposal_trusted)
     }
 
     /// Marks this contact as trusted for proposals.
-    pub fn trust_for_proposals(&mut self) {
-        self.proposal_trusted = true;
+    ///
+    /// Returns `Err` if called on an imported contact.
+    pub fn trust_for_proposals(&mut self) -> Result<(), ContactError> {
+        let data = self
+            .kind
+            .exchanged_data_mut()
+            .ok_or(ContactError::OperationRequiresExchangedContact)?;
+        data.proposal_trusted = true;
+        Ok(())
     }
 
     /// Removes proposal trust from this contact.
-    pub fn untrust_for_proposals(&mut self) {
-        self.proposal_trusted = false;
+    ///
+    /// Returns `Err` if called on an imported contact.
+    pub fn untrust_for_proposals(&mut self) -> Result<(), ContactError> {
+        let data = self
+            .kind
+            .exchanged_data_mut()
+            .ok_or(ContactError::OperationRequiresExchangedContact)?;
+        data.proposal_trusted = false;
+        Ok(())
     }
 
     /// Sets the proposal trust status directly.
-    pub fn set_proposal_trusted(&mut self, trusted: bool) {
-        self.proposal_trusted = trusted;
+    ///
+    /// Returns `Err` if called on an imported contact.
+    pub fn set_proposal_trusted(&mut self, trusted: bool) -> Result<(), ContactError> {
+        let data = self
+            .kind
+            .exchanged_data_mut()
+            .ok_or(ContactError::OperationRequiresExchangedContact)?;
+        data.proposal_trusted = trusted;
+        Ok(())
     }
 
     // ========================================
@@ -474,25 +635,10 @@ impl Contact {
     }
 
     // ========================================
-    // Proximity Confidence
-    // ========================================
-
-    /// Returns the proximity confidence level from the exchange.
-    pub fn proximity_confidence(&self) -> &ProximityConfidence {
-        &self.proximity_confidence
-    }
-
-    /// Sets the proximity confidence level.
-    pub fn set_proximity_confidence(&mut self, confidence: ProximityConfidence) {
-        self.proximity_confidence = confidence;
-    }
-
-    // ========================================
     // Content Encryption Key (CEK)
     // ========================================
 
-    /// Returns the CEK if present. CEK-protected contacts have their card
-    /// encrypted at rest with this key instead of the storage master key.
+    /// Returns the CEK if present.
     pub fn cek(&self) -> Option<&ContentEncryptionKey> {
         self.cek.as_ref()
     }
@@ -508,34 +654,36 @@ impl Contact {
     }
 
     // ========================================
-    // Trust Metrics
+    // Trust Level (derived, read-only)
     // ========================================
 
     /// Derives the trust level from cryptographic exchange facts.
     ///
-    /// This is a pure, deterministic function — not user-editable.
+    /// Returns `Standard` for imported contacts (no crypto trust basis).
+    ///
     /// Priority order (highest wins):
     /// 1. `Cautious` — identity was recovered (ratchet may have reset)
     /// 2. `Verified` — fingerprint manually confirmed out-of-band
-    /// 3. `High`     — strong transport proximity (USB/NFC) or high verifier
-    ///    confidence (ultrasonic/hardware), via TrustMetrics
+    /// 3. `High`     — strong transport proximity or high verifier confidence
     /// 4. `Standard` — all other cases
-    ///
-    /// For legacy contacts without `TrustMetrics`, falls back to the original
-    /// `Nfc | Ble` + `ProximityConfidence::High` check.
     pub fn trust_level(&self) -> TrustLevel {
+        let data = match self.kind.exchanged_data() {
+            Some(d) => d,
+            None => return TrustLevel::Standard,
+        };
+
         // Priority 1: Recovery state overrides everything
-        if self.has_recovered {
+        if data.has_recovered {
             return TrustLevel::Cautious;
         }
 
         // Priority 2: Manual fingerprint verification (out-of-band)
-        if self.fingerprint_verified {
+        if data.fingerprint_verified {
             return TrustLevel::Verified;
         }
 
         // Priority 3: Use TrustMetrics if available (new path)
-        if let Some(ref metrics) = self.trust_metrics {
+        if let Some(ref metrics) = data.trust_metrics {
             let strong_transport = metrics.transport_proximity.is_strong();
             let strong_verifier = metrics.proximity == ProximityConfidence::High;
 
@@ -546,9 +694,9 @@ impl Contact {
         }
 
         // Legacy path: no TrustMetrics (pre-migration contacts)
-        if self.proximity_confidence == ProximityConfidence::High
+        if data.proximity_confidence == ProximityConfidence::High
             && matches!(
-                self.exchange_transport,
+                data.exchange_transport,
                 ExchangeTransport::Nfc | ExchangeTransport::Ble
             )
         {
@@ -557,97 +705,22 @@ impl Contact {
         TrustLevel::Standard
     }
 
-    /// Returns the exchange transport method.
-    pub fn exchange_transport(&self) -> ExchangeTransport {
-        self.exchange_transport
-    }
-
-    /// Sets the exchange transport method.
-    pub fn set_exchange_transport(&mut self, transport: ExchangeTransport) {
-        self.exchange_transport = transport;
-    }
-
-    /// Returns the full trust metrics from the exchange, if present.
-    ///
-    /// None for legacy contacts created before trust metrics were introduced.
-    pub fn trust_metrics(&self) -> Option<&TrustMetrics> {
-        self.trust_metrics.as_ref()
-    }
-
-    /// Sets or clears the trust metrics for this contact.
-    pub fn set_trust_metrics(&mut self, metrics: Option<TrustMetrics>) {
-        self.trust_metrics = metrics;
-    }
-
-    /// Returns whether this contact has undergone identity recovery.
-    pub fn has_recovered(&self) -> bool {
-        self.has_recovered
-    }
-
-    /// Sets the has_recovered flag.
-    pub fn set_has_recovered(&mut self, recovered: bool) {
-        self.has_recovered = recovered;
-    }
-
-    /// Returns the timestamp of the last card update, if any.
-    pub fn card_updated_at(&self) -> Option<u64> {
-        self.card_updated_at
-    }
-
-    /// Sets the card_updated_at timestamp.
-    pub fn set_card_updated_at(&mut self, timestamp: Option<u64>) {
-        self.card_updated_at = timestamp;
-    }
+    // ========================================
+    // Utility
+    // ========================================
 
     /// Returns true if this contact should be visible in the main contact list.
-    ///
-    /// A contact is visible if it's not hidden.
-    /// Blocked contacts can still be visible (to show they're blocked).
     pub fn is_visible_in_main_list(&self) -> bool {
         !self.hidden
     }
 
     /// Returns true if updates should be processed from this contact.
-    ///
-    /// Updates are ignored from blocked contacts.
     pub fn should_process_updates(&self) -> bool {
         !self.blocked
     }
 
     /// Returns true if updates should be sent to this contact.
-    ///
-    /// Updates are not sent to blocked contacts.
     pub fn should_send_updates(&self) -> bool {
         !self.blocked
-    }
-
-    // ========================================
-    // Relay Metadata (per-contact routing)
-    // ========================================
-
-    /// Returns the contact's relay URL, if known.
-    ///
-    /// When set, updates for this contact should be sent to this relay
-    /// instead of our home relay. Learned during in-person exchange.
-    pub fn relay_url(&self) -> Option<&str> {
-        self.relay_url.as_deref()
-    }
-
-    /// Sets the contact's relay URL.
-    pub fn set_relay_url(&mut self, url: Option<String>) {
-        self.relay_url = url;
-    }
-
-    /// Returns the contact's relay Noise NK public key, if known.
-    ///
-    /// When set, connections to this contact's relay must verify the
-    /// relay's Noise static key matches this pinned value.
-    pub fn relay_noise_pubkey(&self) -> Option<&[u8; 32]> {
-        self.relay_noise_pubkey.as_ref()
-    }
-
-    /// Sets the contact's relay Noise NK public key.
-    pub fn set_relay_noise_pubkey(&mut self, pubkey: Option<[u8; 32]>) {
-        self.relay_noise_pubkey = pubkey;
     }
 }

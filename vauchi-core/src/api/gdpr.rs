@@ -109,7 +109,7 @@ pub fn export_all_data(storage: &Storage) -> Result<GdprExport, crate::storage::
             GdprContact {
                 display_name: c.display_name().to_string(),
                 public_key_fingerprint: c.fingerprint(),
-                exchange_timestamp: c.exchange_timestamp(),
+                exchange_timestamp: c.exchange_timestamp().unwrap_or(0),
                 fingerprint_verified: c.is_fingerprint_verified(),
                 card_fields: fields,
             }

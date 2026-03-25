@@ -592,7 +592,7 @@ fn test_storage_recovery_trusted_persistence() {
     assert!(loaded.is_recovery_trusted());
 
     // Now untrust and save again
-    contact.untrust_for_recovery();
+    contact.untrust_for_recovery().unwrap();
     storage.save_contact(&contact).unwrap();
 
     let loaded = storage.load_contact(&contact_id).unwrap().unwrap();
@@ -822,7 +822,7 @@ fn test_proposal_trusted_storage_roundtrip() {
         false, // blocked
         false, // recovery_trusted
     );
-    contact.set_proposal_trusted(true);
+    contact.set_proposal_trusted(true).unwrap();
 
     let contact_id = contact.id().to_string();
     storage.save_contact(&contact).unwrap();
@@ -868,12 +868,12 @@ fn test_proposal_trusted_false_persists() {
     );
 
     // Toggle true → save → load → false
-    contact.set_proposal_trusted(true);
+    contact.set_proposal_trusted(true).unwrap();
     storage.save_contact(&contact).unwrap();
     let loaded = storage.load_contact(&contact_id).unwrap().unwrap();
     assert!(loaded.is_proposal_trusted());
 
-    contact.set_proposal_trusted(false);
+    contact.set_proposal_trusted(false).unwrap();
     storage.save_contact(&contact).unwrap();
     let loaded = storage.load_contact(&contact_id).unwrap().unwrap();
     assert!(

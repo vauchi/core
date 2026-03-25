@@ -337,7 +337,7 @@ impl AppEngine {
 
         // Load the contact, flip the flag, save it back.
         if let Ok(Some(mut contact)) = self.vauchi.get_contact(contact_id) {
-            contact.set_proposal_trusted(!contact.is_proposal_trusted());
+            let _ = contact.set_proposal_trusted(!contact.is_proposal_trusted());
             if let Err(e) = self.vauchi.update_contact(&contact) {
                 eprintln!("Failed to save proposal_trusted: {e}");
             }

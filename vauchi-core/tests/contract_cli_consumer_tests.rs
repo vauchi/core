@@ -85,8 +85,8 @@ fn contract_cli_contact_accessors_compile() {
         let _: &str = c.id();
         let _: &str = c.display_name();
         let _: &ContactCard = c.card();
-        let _: &[u8; 32] = c.public_key();
-        let _: u64 = c.exchange_timestamp();
+        let _: &[u8; 32] = c.public_key().unwrap();
+        let _: u64 = c.exchange_timestamp().unwrap();
         let _: bool = c.is_hidden();
         let _: bool = c.is_blocked();
     }

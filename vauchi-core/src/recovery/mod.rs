@@ -634,7 +634,10 @@ impl RecoveryProof {
         settings: &RecoverySettings,
     ) -> VerificationResult {
         // Find mutual contacts who vouched
-        let my_contact_pks: HashSet<_> = my_contacts.iter().map(|c| c.public_key()).collect();
+        let my_contact_pks: HashSet<[u8; 32]> = my_contacts
+            .iter()
+            .filter_map(|c| c.public_key().copied())
+            .collect();
 
         let mutual_vouchers: Vec<_> = self
             .vouchers
@@ -647,7 +650,7 @@ impl RecoveryProof {
             .filter_map(|v| {
                 my_contacts
                     .iter()
-                    .find(|c| c.public_key() == &v.voucher_pk)
+                    .find(|c| c.public_key() == Some(&v.voucher_pk))
                     .map(|c| c.display_name().to_string())
             })
             .collect();

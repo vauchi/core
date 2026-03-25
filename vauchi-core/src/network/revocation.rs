@@ -54,12 +54,19 @@ pub fn process_revocation(
     };
 
     // 2. Reject stale revocation (predates current exchange)
-    if revocation.timestamp < contact.exchange_timestamp() {
+    // Only exchanged contacts have exchange timestamps and public keys
+    let Some(exchange_ts) = contact.exchange_timestamp() else {
+        return Ok(()); // Imported contact — no revocation possible
+    };
+    if revocation.timestamp < exchange_ts {
         return Ok(());
     }
 
     // 3. Verify signature against stored public key
-    if !revocation.verify(contact.public_key()) {
+    let Some(public_key) = contact.public_key() else {
+        return Ok(()); // Imported contact — no public key to verify
+    };
+    if !revocation.verify(public_key) {
         return Ok(());
     }
 

@@ -137,9 +137,13 @@ impl Vauchi {
 
         let new_state = !contact.is_recovery_trusted();
         if new_state {
-            contact.trust_for_recovery();
+            contact
+                .trust_for_recovery()
+                .map_err(|e| VauchiError::InvalidState(e.to_string()))?;
         } else {
-            contact.untrust_for_recovery();
+            contact
+                .untrust_for_recovery()
+                .map_err(|e| VauchiError::InvalidState(e.to_string()))?;
         }
 
         self.storage.save_contact(&contact)?;

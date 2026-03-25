@@ -20,8 +20,6 @@ const MAX_FILE_SIZE: usize = 10 * 1024 * 1024;
 pub enum VCardImportError {
     #[error("File too large ({size} bytes, max {max})")]
     FileTooLarge { size: usize, max: usize },
-    #[error("Invalid UTF-8 encoding")]
-    InvalidUtf8,
 }
 
 /// Detected vCard version.
@@ -30,6 +28,30 @@ enum VCardVersion {
     V21,
     V30,
     V40,
+}
+
+/// Decodes raw bytes to a string, trying UTF-8 first with Latin-1 fallback.
+///
+/// Strips UTF-8 BOM if present. When UTF-8 decoding fails, treats bytes
+/// as ISO-8859-1 (Latin-1) which is a superset of ASCII and never fails.
+/// This handles Windows-1252 approximately (0x80-0x9F range differs but
+/// those codepoints are rare in contact data — names, phones, emails).
+fn decode_to_string(data: &[u8]) -> String {
+    // Strip UTF-8 BOM if present
+    let data = if data.starts_with(&[0xEF, 0xBB, 0xBF]) {
+        &data[3..]
+    } else {
+        data
+    };
+
+    // Try UTF-8 first (most common case)
+    if let Ok(text) = std::str::from_utf8(data) {
+        return text.to_string();
+    }
+
+    // Fallback: treat as Latin-1 (ISO-8859-1).
+    // Every byte is valid Latin-1, so this never fails.
+    data.iter().map(|&b| b as char).collect()
 }
 
 /// Import contacts from a vCard file (supports 2.1, 3.0, 4.0).
@@ -44,8 +66,8 @@ pub fn import_vcf(data: &[u8]) -> Result<Vec<(ContactCard, Option<String>)>, VCa
         });
     }
 
-    let text = std::str::from_utf8(data).map_err(|_| VCardImportError::InvalidUtf8)?;
-    let blocks = split_vcard_blocks(text);
+    let text = decode_to_string(data);
+    let blocks = split_vcard_blocks(&text);
 
     let mut results = Vec::new();
     for block in blocks {

@@ -485,3 +485,35 @@ mod proptests {
         }
     }
 }
+
+// ── Non-UTF-8 encoding support ──────────────────────────────────────
+
+#[test]
+fn import_latin1_contact() {
+    // "José" in Latin-1: J(4A) o(6F) s(73) é(E9)
+    let mut raw = b"BEGIN:VCARD\r\nVERSION:3.0\r\nFN:".to_vec();
+    raw.extend_from_slice(&[0x4A, 0x6F, 0x73, 0xE9]); // "José" in Latin-1
+    raw.extend_from_slice(b"\r\nEND:VCARD\r\n");
+
+    let cards = import_vcf(&raw).unwrap();
+    assert_eq!(cards.len(), 1);
+    assert_eq!(cards[0].0.display_name(), "Jos\u{e9}"); // "José"
+}
+
+#[test]
+fn import_utf8_bom_stripped() {
+    let mut raw = vec![0xEF, 0xBB, 0xBF]; // UTF-8 BOM
+    raw.extend_from_slice(b"BEGIN:VCARD\r\nVERSION:4.0\r\nFN:Alice\r\nEND:VCARD\r\n");
+    let cards = import_vcf(&raw).unwrap();
+    assert_eq!(cards.len(), 1);
+    assert_eq!(cards[0].0.display_name(), "Alice");
+}
+
+#[test]
+fn import_plain_utf8_still_works() {
+    // "José" in UTF-8: J(4A) o(6F) s(73) é(C3 A9)
+    let vcf = "BEGIN:VCARD\r\nVERSION:3.0\r\nFN:José\r\nEND:VCARD\r\n";
+    let cards = import_vcf(vcf.as_bytes()).unwrap();
+    assert_eq!(cards.len(), 1);
+    assert_eq!(cards[0].0.display_name(), "José");
+}

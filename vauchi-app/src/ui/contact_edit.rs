@@ -82,6 +82,8 @@ impl ContactEditEngine {
             label: field.label.clone(),
             value: field.value.clone(),
             visibility,
+            accessible_label: None,
+            accessible_hint: None,
         }
     }
 
@@ -129,6 +131,8 @@ impl ContactEditEngine {
                     max_length: None,
                     validation_error: None,
                     input_type: InputType::Text,
+                    accessible_label: None,
+                    accessible_hint: None,
                 },
                 Component::Divider,
                 Component::FieldList {
@@ -136,6 +140,8 @@ impl ContactEditEngine {
                     fields,
                     visibility_mode: VisibilityMode::ShowHide,
                     available_groups: self.available_groups.clone(),
+                    accessible_label: None,
+                    accessible_hint: None,
                 },
             ],
             actions: vec![ScreenAction {
@@ -166,6 +172,8 @@ impl ContactEditEngine {
                         label: group.clone(),
                         selected: field.visible_to_groups.contains(group),
                         subtitle: None,
+                        accessible_label: None,
+                        accessible_hint: None,
                     })
                     .collect();
 
@@ -173,6 +181,8 @@ impl ContactEditEngine {
                     id: format!("vis_{}", field.id),
                     label: field.label.clone(),
                     items,
+                    accessible_label: None,
+                    accessible_hint: None,
                 }
             })
             .collect();
@@ -221,6 +231,8 @@ impl ContactEditEngine {
                 fields,
                 group_views: self.build_group_views(),
                 selected_group: self.selected_preview_group.clone(),
+                accessible_label: None,
+                accessible_hint: None,
             }],
             actions: vec![
                 ScreenAction {

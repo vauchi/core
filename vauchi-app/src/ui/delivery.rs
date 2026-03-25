@@ -35,6 +35,8 @@ impl DeliveryStatusEngine {
                 icon: Some("checkmark".into()),
                 title: "All Delivered".into(),
                 items: vec![],
+                accessible_label: None,
+                accessible_hint: None,
             }]
         } else {
             self.items
@@ -45,6 +47,8 @@ impl DeliveryStatusEngine {
                     title: item.contact_name.clone(),
                     detail: item.detail.clone(),
                     status: item.status.clone(),
+                    accessible_label: None,
+                    accessible_hint: None,
                 })
                 .collect()
         };

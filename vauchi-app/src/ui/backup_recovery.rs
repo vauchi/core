@@ -115,7 +115,11 @@ impl BackupRecoveryEngine {
                     icon: None,
                     title: "Backup".into(),
                     detail: "Create an encrypted backup of your identity. To preserve contacts, use device linking instead.".into(),
+                    accessible_label: None,
+                    accessible_hint: None,
                 }],
+                accessible_label: None,
+                accessible_hint: None,
             }],
             actions: vec![
                 ScreenAction {
@@ -152,6 +156,8 @@ impl BackupRecoveryEngine {
                 max_length: None,
                 validation_error: None,
                 input_type: InputType::Password,
+                accessible_label: None,
+                accessible_hint: None,
             }],
             actions: vec![
                 ScreenAction {
@@ -184,6 +190,8 @@ impl BackupRecoveryEngine {
                 max_length: None,
                 validation_error: None,
                 input_type: InputType::Password,
+                accessible_label: None,
+                accessible_hint: None,
             }],
             actions: vec![
                 ScreenAction {
@@ -226,6 +234,8 @@ impl BackupRecoveryEngine {
                 title: title.into(),
                 detail: Some(detail.into()),
                 status: Status::InProgress,
+                accessible_label: None,
+                accessible_hint: None,
             }],
             actions: vec![],
             progress: self.progress(),
@@ -247,6 +257,8 @@ impl BackupRecoveryEngine {
                 title: title.into(),
                 detail: None,
                 status: Status::Success,
+                accessible_label: None,
+                accessible_hint: None,
             }],
             actions: vec![ScreenAction {
                 id: "done".into(),
@@ -273,6 +285,8 @@ impl BackupRecoveryEngine {
                 title: title.into(),
                 detail: None,
                 status: Status::Failed,
+                accessible_label: None,
+                accessible_hint: None,
             }],
             actions: vec![
                 ScreenAction {

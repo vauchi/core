@@ -103,6 +103,8 @@ impl MyInfoEngine {
                 id: "empty_hint".into(),
                 content: "No entries yet. Add your first entry to share with contacts.\n\nYou can add phone numbers, email addresses, websites, social profiles, and more. Tap \"Add Entry\" to get started.".into(),
                 style: TextStyle::Caption,
+                accessible_label: None,
+                accessible_hint: None,
             });
             return components;
         }
@@ -133,6 +135,8 @@ impl MyInfoEngine {
                     label: format!("{} ({})", f.value, f.label),
                     icon: Some(f.field_type.clone()),
                     detail,
+                    accessible_label: None,
+                    accessible_hint: None,
                 }
             })
             .collect();
@@ -140,6 +144,8 @@ impl MyInfoEngine {
         components.push(Component::ActionList {
             id: "own_entries".into(),
             items,
+            accessible_label: None,
+            accessible_hint: None,
         });
 
         components
@@ -153,6 +159,8 @@ impl MyInfoEngine {
                 id: "no_groups".into(),
                 content: "No groups created. Create groups to control field visibility.".into(),
                 style: TextStyle::Caption,
+                accessible_label: None,
+                accessible_hint: None,
             });
             return components;
         }
@@ -171,12 +179,16 @@ impl MyInfoEngine {
                 } else {
                     None
                 },
+                accessible_label: None,
+                accessible_hint: None,
             })
             .collect();
 
         components.push(Component::ActionList {
             id: "group_tabs".into(),
             items: tab_items,
+            accessible_label: None,
+            accessible_hint: None,
         });
 
         // Entries visible to selected group
@@ -189,6 +201,8 @@ impl MyInfoEngine {
                         group.group_name
                     ),
                     style: TextStyle::Caption,
+                    accessible_label: None,
+                    accessible_hint: None,
                 });
             } else {
                 let items: Vec<ActionListItem> = group
@@ -200,12 +214,16 @@ impl MyInfoEngine {
                         label: format!("{} ({})", f.value, f.label),
                         icon: Some(f.field_type.clone()),
                         detail: None,
+                        accessible_label: None,
+                        accessible_hint: None,
                     })
                     .collect();
 
                 components.push(Component::ActionList {
                     id: "group_entries".into(),
                     items,
+                    accessible_label: None,
+                    accessible_hint: None,
                 });
             }
         }
@@ -221,6 +239,8 @@ impl MyInfoEngine {
             text: format!("Viewing as {contact_name}"),
             action_label: "Exit Preview".into(),
             action_id: "exit-preview".into(),
+            accessible_label: None,
+            accessible_hint: None,
         });
 
         let Some(ref preview) = self.preview_data else {
@@ -236,7 +256,11 @@ impl MyInfoEngine {
                 icon: None,
                 title: "Display Name".into(),
                 detail: preview.shared_display_name.clone(),
+                accessible_label: None,
+                accessible_hint: None,
             }],
+            accessible_label: None,
+            accessible_hint: None,
         });
 
         // Render each field with its visibility state
@@ -246,6 +270,8 @@ impl MyInfoEngine {
                 fields: vec![field.clone()],
                 visibility_mode: VisibilityMode::ReadOnly,
                 available_groups: vec![],
+                accessible_label: None,
+                accessible_hint: None,
             });
         }
 

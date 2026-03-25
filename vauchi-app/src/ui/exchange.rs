@@ -222,6 +222,8 @@ impl ExchangeEngine {
                         label: name.clone(),
                         selected: self.selected_groups.contains(id),
                         subtitle: None,
+                        accessible_label: None,
+                        accessible_hint: None,
                     })
                     .collect();
                 ScreenModel {
@@ -232,6 +234,8 @@ impl ExchangeEngine {
                         id: "group_picker".into(),
                         label: "Groups".into(),
                         items,
+                        accessible_label: None,
+                        accessible_hint: None,
                     }],
                     actions: vec![
                         ScreenAction {
@@ -270,6 +274,8 @@ impl ExchangeEngine {
                         data: qr_data,
                         mode: QrMode::Display,
                         label: Some(self.config.own_name.clone()),
+                        accessible_label: None,
+                        accessible_hint: None,
                     }],
                     actions: vec![ScreenAction {
                         id: "continue".into(),
@@ -289,6 +295,8 @@ impl ExchangeEngine {
                     data: String::new(),
                     mode: QrMode::Scan,
                     label: None,
+                    accessible_label: None,
+                    accessible_hint: None,
                 }],
                 actions: vec![ScreenAction {
                     id: "back".into(),
@@ -308,6 +316,8 @@ impl ExchangeEngine {
                     title: "Verifying...".into(),
                     detail: None,
                     status: Status::InProgress,
+                    accessible_label: None,
+                    accessible_hint: None,
                 }],
                 actions: vec![],
                 progress: Some(self.progress()),
@@ -322,6 +332,8 @@ impl ExchangeEngine {
                     title: "Exchange Complete".into(),
                     detail: None,
                     status: Status::Success,
+                    accessible_label: None,
+                    accessible_hint: None,
                 }],
                 actions: vec![ScreenAction {
                     id: "done".into(),
@@ -341,6 +353,8 @@ impl ExchangeEngine {
                     title: "Exchange Failed".into(),
                     detail: self.failure_detail.clone(),
                     status: Status::Failed,
+                    accessible_label: None,
+                    accessible_hint: None,
                 }],
                 actions: vec![
                     ScreenAction {

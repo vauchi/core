@@ -12,6 +12,10 @@ pub enum Component {
         id: String,
         content: String,
         style: TextStyle,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        accessible_label: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        accessible_hint: Option<String>,
     },
     TextInput {
         id: String,
@@ -21,43 +25,75 @@ pub enum Component {
         max_length: Option<usize>,
         validation_error: Option<String>,
         input_type: InputType,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        accessible_label: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        accessible_hint: Option<String>,
     },
     ToggleList {
         id: String,
         label: String,
         items: Vec<ToggleItem>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        accessible_label: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        accessible_hint: Option<String>,
     },
     FieldList {
         id: String,
         fields: Vec<FieldDisplay>,
         visibility_mode: VisibilityMode,
         available_groups: Vec<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        accessible_label: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        accessible_hint: Option<String>,
     },
     CardPreview {
         name: String,
         fields: Vec<FieldDisplay>,
         group_views: Vec<GroupCardView>,
         selected_group: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        accessible_label: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        accessible_hint: Option<String>,
     },
     InfoPanel {
         id: String,
         icon: Option<String>,
         title: String,
         items: Vec<InfoItem>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        accessible_label: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        accessible_hint: Option<String>,
     },
     ContactList {
         id: String,
         contacts: Vec<ContactItem>,
         searchable: bool,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        accessible_label: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        accessible_hint: Option<String>,
     },
     SettingsGroup {
         id: String,
         label: String,
         items: Vec<SettingsItem>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        accessible_label: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        accessible_hint: Option<String>,
     },
     ActionList {
         id: String,
         items: Vec<ActionListItem>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        accessible_label: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        accessible_hint: Option<String>,
     },
     StatusIndicator {
         id: String,
@@ -65,6 +101,10 @@ pub enum Component {
         title: String,
         detail: Option<String>,
         status: Status,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        accessible_label: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        accessible_hint: Option<String>,
     },
     PinInput {
         id: String,
@@ -73,12 +113,20 @@ pub enum Component {
         filled: usize,
         masked: bool,
         validation_error: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        accessible_label: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        accessible_hint: Option<String>,
     },
     QrCode {
         id: String,
         data: String,
         mode: QrMode,
         label: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        accessible_label: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        accessible_hint: Option<String>,
     },
     ConfirmationDialog {
         id: String,
@@ -86,6 +134,10 @@ pub enum Component {
         message: String,
         confirm_text: String,
         destructive: bool,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        accessible_label: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        accessible_hint: Option<String>,
     },
     /// A non-blocking toast message with optional undo action.
     ShowToast {
@@ -95,6 +147,10 @@ pub enum Component {
         undo_action_id: Option<String>,
         /// Auto-dismiss duration in milliseconds (default: 5000).
         duration_ms: u32,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        accessible_label: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        accessible_hint: Option<String>,
     },
     /// An inline confirmation for irrevocable actions (expands in place).
     InlineConfirm {
@@ -104,6 +160,10 @@ pub enum Component {
         cancel_text: String,
         /// If true, render confirm button in destructive/red style.
         destructive: bool,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        accessible_label: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        accessible_hint: Option<String>,
     },
     /// A text field that toggles between display and edit mode.
     EditableText {
@@ -113,6 +173,10 @@ pub enum Component {
         /// When true, render as editable input. When false, render as static text with edit button.
         editing: bool,
         validation_error: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        accessible_label: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        accessible_hint: Option<String>,
     },
     Divider,
     /// Informational banner with an optional action button (e.g. preview mode indicator).
@@ -120,6 +184,10 @@ pub enum Component {
         text: String,
         action_label: String,
         action_id: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        accessible_label: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        accessible_hint: Option<String>,
     },
 }
 
@@ -163,6 +231,10 @@ pub struct ToggleItem {
     pub label: String,
     pub selected: bool,
     pub subtitle: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub accessible_label: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub accessible_hint: Option<String>,
 }
 
 /// A contact field as displayed in the UI.
@@ -174,6 +246,10 @@ pub struct FieldDisplay {
     pub label: String,
     pub value: String,
     pub visibility: UiFieldVisibility,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub accessible_label: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub accessible_hint: Option<String>,
 }
 
 /// UI-level field visibility state.
@@ -204,6 +280,10 @@ pub struct InfoItem {
     pub icon: Option<String>,
     pub title: String,
     pub detail: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub accessible_label: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub accessible_hint: Option<String>,
 }
 
 /// A lightweight contact summary for list display.
@@ -219,6 +299,10 @@ pub struct ContactItem {
     /// Not displayed directly — used by ContactListEngine for full-text search.
     #[serde(default)]
     pub searchable_fields: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub accessible_label: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub accessible_hint: Option<String>,
 }
 
 /// An item in a settings group.
@@ -228,6 +312,10 @@ pub struct SettingsItem {
     pub id: String,
     pub label: String,
     pub kind: SettingsItemKind,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub accessible_label: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub accessible_hint: Option<String>,
 }
 
 /// The kind of a settings item.
@@ -248,6 +336,10 @@ pub struct ActionListItem {
     pub label: String,
     pub icon: Option<String>,
     pub detail: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub accessible_label: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub accessible_hint: Option<String>,
 }
 
 /// Status for a status indicator component.

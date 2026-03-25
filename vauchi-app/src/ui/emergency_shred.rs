@@ -58,6 +58,8 @@ impl EmergencyShredEngine {
                         detail:
                             "Your contact cards and exchange history will be permanently removed."
                                 .into(),
+                        accessible_label: None,
+                        accessible_hint: None,
                     },
                     InfoItem {
                         icon: Some("key".into()),
@@ -65,13 +67,19 @@ impl EmergencyShredEngine {
                         detail:
                             "Encryption keys will be securely shredded and cannot be recovered."
                                 .into(),
+                        accessible_label: None,
+                        accessible_hint: None,
                     },
                     InfoItem {
                         icon: Some("warning".into()),
                         title: "This action is irreversible".into(),
                         detail: "There is no way to undo this operation.".into(),
+                        accessible_label: None,
+                        accessible_hint: None,
                     },
                 ],
+                accessible_label: None,
+                accessible_hint: None,
             }],
             actions: vec![
                 ScreenAction {
@@ -108,6 +116,8 @@ impl EmergencyShredEngine {
                 max_length: None,
                 validation_error: None,
                 input_type: InputType::Text,
+                accessible_label: None,
+                accessible_hint: None,
             }],
             actions: vec![
                 ScreenAction {
@@ -142,6 +152,8 @@ impl EmergencyShredEngine {
                 title: "Wiping data...".into(),
                 detail: None,
                 status: Status::InProgress,
+                accessible_label: None,
+                accessible_hint: None,
             }],
             actions: vec![],
             progress: Some(Progress {
@@ -163,6 +175,8 @@ impl EmergencyShredEngine {
                 title: "Data Wiped".into(),
                 detail: None,
                 status: Status::Success,
+                accessible_label: None,
+                accessible_hint: None,
             }],
             actions: vec![ScreenAction {
                 id: "done".into(),

@@ -148,12 +148,16 @@ impl FormDialogEngine {
                 } else {
                     None
                 },
+                accessible_label: None,
+                accessible_hint: None,
             })
             .collect();
 
         components.push(Component::ActionList {
             id: "entry_types".into(),
             items: type_items,
+            accessible_label: None,
+            accessible_hint: None,
         });
 
         // Value input
@@ -175,6 +179,8 @@ impl FormDialogEngine {
             max_length: Some(200),
             validation_error: None,
             input_type,
+            accessible_label: None,
+            accessible_hint: None,
         });
 
         // Display Name (optional) — the label shown next to the value
@@ -186,6 +192,8 @@ impl FormDialogEngine {
             max_length: Some(50),
             validation_error: None,
             input_type: InputType::Text,
+            accessible_label: None,
+            accessible_hint: None,
         });
 
         // Comment (your eyes only, optional) — private note
@@ -197,6 +205,8 @@ impl FormDialogEngine {
             max_length: Some(100),
             validation_error: None,
             input_type: InputType::Text,
+            accessible_label: None,
+            accessible_hint: None,
         });
 
         // Group visibility toggles
@@ -209,6 +219,8 @@ impl FormDialogEngine {
                     label: gname.clone(),
                     selected: self.selected_groups.contains(gid),
                     subtitle: None,
+                    accessible_label: None,
+                    accessible_hint: None,
                 })
                 .collect();
 
@@ -216,6 +228,8 @@ impl FormDialogEngine {
                 id: "group_visibility".into(),
                 label: "Groups Visibility".into(),
                 items: toggle_items,
+                accessible_label: None,
+                accessible_hint: None,
             });
         }
 
@@ -264,6 +278,8 @@ impl FormDialogEngine {
                         id: "field_info".into(),
                         content: format!("Editing: {field_label}"),
                         style: TextStyle::Subtitle,
+                        accessible_label: None,
+                        accessible_hint: None,
                     },
                     Component::TextInput {
                         id: "field_value".into(),
@@ -273,6 +289,8 @@ impl FormDialogEngine {
                         max_length: Some(200),
                         validation_error: None,
                         input_type: InputType::Text,
+                        accessible_label: None,
+                        accessible_hint: None,
                     },
                     Component::TextInput {
                         id: "field_note".into(),
@@ -282,6 +300,8 @@ impl FormDialogEngine {
                         max_length: Some(100),
                         validation_error: None,
                         input_type: InputType::Text,
+                        accessible_label: None,
+                        accessible_hint: None,
                     },
                 ],
                 actions: vec![
@@ -312,6 +332,8 @@ impl FormDialogEngine {
                     max_length: Some(50),
                     validation_error: None,
                     input_type: InputType::Text,
+                    accessible_label: None,
+                    accessible_hint: None,
                 }],
                 actions: vec![
                     ScreenAction {
@@ -341,6 +363,8 @@ impl FormDialogEngine {
                     max_length: Some(200),
                     validation_error: None,
                     input_type: InputType::Text,
+                    accessible_label: None,
+                    accessible_hint: None,
                 }],
                 actions: vec![
                     ScreenAction {

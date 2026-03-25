@@ -75,6 +75,8 @@ impl WorkflowEngine for MyInfoEntryDetailEngine {
             id: "field_info".into(),
             content: format!("{} ({})", self.value, self.label),
             style: TextStyle::Title,
+            accessible_label: None,
+            accessible_hint: None,
         });
 
         components.push(Component::Divider);
@@ -89,6 +91,8 @@ impl WorkflowEngine for MyInfoEntryDetailEngine {
                     label: gname.clone(),
                     selected: *visible,
                     subtitle: None,
+                    accessible_label: None,
+                    accessible_hint: None,
                 })
                 .collect();
 
@@ -96,6 +100,8 @@ impl WorkflowEngine for MyInfoEntryDetailEngine {
                 id: "group_visibility".into(),
                 label: "Visible to groups".into(),
                 items: toggle_items,
+                accessible_label: None,
+                accessible_hint: None,
             });
         }
 
@@ -107,12 +113,16 @@ impl WorkflowEngine for MyInfoEntryDetailEngine {
                 id: "no_contacts".into(),
                 content: "No contacts can see this entry.".into(),
                 style: TextStyle::Caption,
+                accessible_label: None,
+                accessible_hint: None,
             });
         } else {
             components.push(Component::Text {
                 id: "contacts_header".into(),
                 content: format!("Visible to {} contacts", self.visible_contacts.len()),
                 style: TextStyle::Subtitle,
+                accessible_label: None,
+                accessible_hint: None,
             });
 
             let contact_items: Vec<ActionListItem> = self
@@ -123,12 +133,16 @@ impl WorkflowEngine for MyInfoEntryDetailEngine {
                     label: c.name.clone(),
                     icon: None,
                     detail: Some(format!("via {}", c.via_group)),
+                    accessible_label: None,
+                    accessible_hint: None,
                 })
                 .collect();
 
             components.push(Component::ActionList {
                 id: "visible_contacts".into(),
                 items: contact_items,
+                accessible_label: None,
+                accessible_hint: None,
             });
         }
 

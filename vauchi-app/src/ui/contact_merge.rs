@@ -35,6 +35,8 @@ impl ContactMergeEngine {
                 icon: None,
                 title: f.clone(),
                 detail: String::new(),
+                accessible_label: None,
+                accessible_hint: None,
             })
             .collect();
 
@@ -46,6 +48,8 @@ impl ContactMergeEngine {
                 icon: None,
                 title: f.clone(),
                 detail: String::new(),
+                accessible_label: None,
+                accessible_hint: None,
             })
             .collect();
 
@@ -57,23 +61,31 @@ impl ContactMergeEngine {
                     self.preview.primary_name, self.preview.secondary_name
                 ),
                 style: TextStyle::Subtitle,
+                accessible_label: None,
+                accessible_hint: None,
             },
             Component::InfoPanel {
                 id: "primary_fields".into(),
                 icon: None,
                 title: format!("{} (keep)", self.preview.primary_name),
                 items: primary_items,
+                accessible_label: None,
+                accessible_hint: None,
             },
             Component::InfoPanel {
                 id: "secondary_fields".into(),
                 icon: None,
                 title: format!("{} (remove)", self.preview.secondary_name),
                 items: secondary_items,
+                accessible_label: None,
+                accessible_hint: None,
             },
             Component::Text {
                 id: "merge_note".into(),
                 content: "Unique fields from the secondary will be added to the primary. The secondary will be deleted.".into(),
                 style: TextStyle::Body,
+                accessible_label: None,
+                accessible_hint: None,
             },
         ];
 

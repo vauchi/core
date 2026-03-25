@@ -35,13 +35,19 @@ impl SupportEngine {
                         icon: Some("github".into()),
                         title: "GitHub Sponsors".into(),
                         detail: "https://github.com/sponsors/vauchi".into(),
+                        accessible_label: None,
+                        accessible_hint: None,
                     },
                     InfoItem {
                         icon: Some("liberapay".into()),
                         title: "Liberapay".into(),
                         detail: "https://liberapay.com/vauchi".into(),
+                        accessible_label: None,
+                        accessible_hint: None,
                     },
                 ],
+                accessible_label: None,
+                accessible_hint: None,
             }],
             actions: vec![
                 ScreenAction {

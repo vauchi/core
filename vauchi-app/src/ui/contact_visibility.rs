@@ -34,11 +34,15 @@ impl ContactVisibilityEngine {
                     id: "visibility_info".into(),
                     content: "Toggle which fields are visible to this contact.".into(),
                     style: TextStyle::Body,
+                    accessible_label: None,
+                    accessible_hint: None,
                 },
                 Component::ToggleList {
                     id: "field_toggles".into(),
                     label: "Field Visibility".into(),
                     items: self.fields.clone(),
+                    accessible_label: None,
+                    accessible_hint: None,
                 },
             ],
             actions: vec![ScreenAction {

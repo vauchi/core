@@ -85,7 +85,11 @@ impl DuressPinEngine {
                     detail: "A secondary PIN that, when entered, silently alerts \
                              your chosen contacts while appearing to unlock normally."
                         .into(),
+                    accessible_label: None,
+                    accessible_hint: None,
                 }],
+                accessible_label: None,
+                accessible_hint: None,
             },
             Component::ToggleList {
                 id: "duress_toggle".into(),
@@ -95,7 +99,11 @@ impl DuressPinEngine {
                     label: "Duress PIN enabled".into(),
                     selected: self.config.enabled,
                     subtitle: None,
+                    accessible_label: None,
+                    accessible_hint: None,
                 }],
+                accessible_label: None,
+                accessible_hint: None,
             },
         ];
 
@@ -126,6 +134,8 @@ impl DuressPinEngine {
                 confirm_text: "Disable".into(),
                 cancel_text: "Cancel".into(),
                 destructive: true,
+                accessible_label: None,
+                accessible_hint: None,
             });
         }
 
@@ -151,6 +161,8 @@ impl DuressPinEngine {
                 filled: self.new_pin.len(),
                 masked: true,
                 validation_error: None,
+                accessible_label: None,
+                accessible_hint: None,
             }],
             actions: vec![
                 ScreenAction {
@@ -182,6 +194,8 @@ impl DuressPinEngine {
                 filled: self.confirm_pin.len(),
                 masked: true,
                 validation_error: None,
+                accessible_label: None,
+                accessible_hint: None,
             }],
             actions: vec![
                 ScreenAction {
@@ -215,6 +229,8 @@ impl DuressPinEngine {
                     max_length: None,
                     validation_error: None,
                     input_type: InputType::Text,
+                    accessible_label: None,
+                    accessible_hint: None,
                 },
                 Component::ToggleList {
                     id: "alerts".into(),
@@ -224,7 +240,11 @@ impl DuressPinEngine {
                         label: "Include Location".into(),
                         selected: self.config.include_location,
                         subtitle: Some("Share your location in the alert".into()),
+                        accessible_label: None,
+                        accessible_hint: None,
                     }],
+                    accessible_label: None,
+                    accessible_hint: None,
                 },
             ],
             actions: vec![

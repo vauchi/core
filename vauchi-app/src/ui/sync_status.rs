@@ -69,6 +69,8 @@ impl SyncStatusEngine {
                 None
             },
             status,
+            accessible_label: None,
+            accessible_hint: None,
         }];
 
         components.push(Component::InfoPanel {
@@ -80,11 +82,15 @@ impl SyncStatusEngine {
                     icon: Some("relay".into()),
                     title: "Relay".into(),
                     detail: self.relay_url.clone(),
+                    accessible_label: None,
+                    accessible_hint: None,
                 },
                 InfoItem {
                     icon: Some("contacts".into()),
                     title: "Contacts".into(),
                     detail: format!("{}", self.contact_count),
+                    accessible_label: None,
+                    accessible_hint: None,
                 },
                 InfoItem {
                     icon: Some("pending".into()),
@@ -94,8 +100,12 @@ impl SyncStatusEngine {
                     } else {
                         format!("{} update(s) waiting to sync", self.pending_updates)
                     },
+                    accessible_label: None,
+                    accessible_hint: None,
                 },
             ],
+            accessible_label: None,
+            accessible_hint: None,
         });
 
         ScreenModel {

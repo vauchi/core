@@ -61,6 +61,8 @@ impl WorkflowEngine for LockScreenEngine {
             filled: self.entered_pin.len(),
             masked: true,
             validation_error: self.pin_validation_error(),
+            accessible_label: None,
+            accessible_hint: None,
         }];
 
         let actions = vec![ScreenAction {

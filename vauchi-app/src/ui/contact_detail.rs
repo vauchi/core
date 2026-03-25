@@ -125,14 +125,20 @@ impl ContactDetailEngine {
                         label: "Their Info".into(),
                         selected: self.view_mode == ContactViewMode::TheirInfo,
                         subtitle: Some("What they share with me".into()),
+                        accessible_label: None,
+                        accessible_hint: None,
                     },
                     ToggleItem {
                         id: "my_info_for_them".into(),
                         label: "My Info for Them".into(),
                         selected: self.view_mode == ContactViewMode::MyInfoForThem,
                         subtitle: Some("What I share with them".into()),
+                        accessible_label: None,
+                        accessible_hint: None,
                     },
                 ],
+                accessible_label: None,
+                accessible_hint: None,
             });
         }
 
@@ -143,12 +149,16 @@ impl ContactDetailEngine {
                     icon: None,
                     title: "Initials".into(),
                     detail: self.contact.avatar_initials.clone(),
+                    accessible_label: None,
+                    accessible_hint: None,
                 }];
                 if !self.trust_level.is_empty() {
                     contact_info_items.push(InfoItem {
                         icon: None,
                         title: "Trust".into(),
                         detail: self.trust_level.clone(),
+                        accessible_label: None,
+                        accessible_hint: None,
                     });
                 }
                 components.push(Component::InfoPanel {
@@ -156,6 +166,8 @@ impl ContactDetailEngine {
                     icon: None,
                     title: self.contact.name.clone(),
                     items: contact_info_items,
+                    accessible_label: None,
+                    accessible_hint: None,
                 });
                 // Their fields — read-only, no visibility column.
                 // Each field is followed by an inline-editable private note.
@@ -165,6 +177,8 @@ impl ContactDetailEngine {
                         fields: vec![field.clone()],
                         visibility_mode: VisibilityMode::ReadOnly,
                         available_groups: vec![],
+                        accessible_label: None,
+                        accessible_hint: None,
                     });
                     let note_value = self.field_notes.get(&field.id).cloned().unwrap_or_default();
                     components.push(Component::EditableText {
@@ -173,6 +187,8 @@ impl ContactDetailEngine {
                         value: note_value,
                         editing: false,
                         validation_error: None,
+                        accessible_label: None,
+                        accessible_hint: None,
                     });
                 }
                 // Private note about the contact — only visible to me, never shared
@@ -182,6 +198,8 @@ impl ContactDetailEngine {
                     value: self.personal_note.clone(),
                     editing: false,
                     validation_error: None,
+                    accessible_label: None,
+                    accessible_hint: None,
                 });
                 // Trust & permissions group (local-only, never shared with the contact)
                 components.push(Component::SettingsGroup {
@@ -193,7 +211,11 @@ impl ContactDetailEngine {
                         kind: SettingsItemKind::Toggle {
                             enabled: self.proposal_trusted,
                         },
+                        accessible_label: None,
+                        accessible_hint: None,
                     }],
+                    accessible_label: None,
+                    accessible_hint: None,
                 });
             }
             ContactViewMode::MyInfoForThem => {
@@ -206,7 +228,11 @@ impl ContactDetailEngine {
                             icon: None,
                             title: "Display Name".into(),
                             detail: shared.shared_display_name.clone(),
+                            accessible_label: None,
+                            accessible_hint: None,
                         }],
+                        accessible_label: None,
+                        accessible_hint: None,
                     });
                     // My fields — show which groups grant visibility
                     components.push(Component::FieldList {
@@ -214,6 +240,8 @@ impl ContactDetailEngine {
                         fields: shared.my_fields.clone(),
                         visibility_mode: VisibilityMode::PerGroup,
                         available_groups: shared.visible_groups.clone(),
+                        accessible_label: None,
+                        accessible_hint: None,
                     });
                 }
             }
@@ -340,7 +368,11 @@ impl WorkflowEngine for ContactNotFoundEngine {
                     icon: None,
                     title: "Error".into(),
                     detail: format!("Contact '{}' was not found.", self.contact_id),
+                    accessible_label: None,
+                    accessible_hint: None,
                 }],
+                accessible_label: None,
+                accessible_hint: None,
             }],
             actions: vec![ScreenAction {
                 id: "back".into(),
@@ -375,6 +407,8 @@ mod tests {
             avatar_initials: "A".into(),
             status: None,
             searchable_fields: vec![],
+            accessible_label: None,
+            accessible_hint: None,
         }
     }
 
@@ -385,6 +419,8 @@ mod tests {
             label: "Mobile".into(),
             value: "+41 79 123 45 67".into(),
             visibility: UiFieldVisibility::Shown,
+            accessible_label: None,
+            accessible_hint: None,
         }]
     }
 
@@ -398,6 +434,8 @@ mod tests {
                     label: "Work Email".into(),
                     value: "bob@work.com".into(),
                     visibility: UiFieldVisibility::Shown,
+                    accessible_label: None,
+                    accessible_hint: None,
                 },
                 FieldDisplay {
                     id: "mf2".into(),
@@ -405,6 +443,8 @@ mod tests {
                     label: "Personal".into(),
                     value: "+41 79 999 88 77".into(),
                     visibility: UiFieldVisibility::Hidden,
+                    accessible_label: None,
+                    accessible_hint: None,
                 },
             ],
             visible_groups: vec!["Work".into()],

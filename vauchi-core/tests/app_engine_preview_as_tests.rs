@@ -57,10 +57,10 @@ fn test_preview_as_shows_banner_component() {
 
     let screen = engine.preview_as(contact_id);
 
-    let has_banner = screen
-        .components
-        .iter()
-        .any(|c| matches!(c, Component::Banner { text, .. } if text.contains("Viewing as")));
+    let has_banner = screen.components.iter().any(|c| {
+        matches!(c, Component::Banner { text, ..
+        } if text.contains("Viewing as"))
+    });
     assert!(
         has_banner,
         "PreviewAs mode must show a Banner with 'Viewing as' text, components: {:?}",

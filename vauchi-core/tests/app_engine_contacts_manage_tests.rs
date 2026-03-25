@@ -32,10 +32,10 @@ fn my_info_shows_own_fields_via_app_engine() {
     assert_eq!(screen.screen_id, "my_info");
 
     // MyInfo should show own fields in an ActionList (entry view)
-    let has_entries = screen
-        .components
-        .iter()
-        .any(|c| matches!(c, Component::ActionList { id, .. } if id == "own_entries"));
+    let has_entries = screen.components.iter().any(|c| {
+        matches!(c, Component::ActionList { id, ..
+        } if id == "own_entries")
+    });
     assert!(has_entries, "MyInfo should show own entries ActionList");
 
     let has_contact_list = screen
@@ -205,10 +205,10 @@ fn group_detail_shows_real_name_and_members() {
         "Title should be the real group name"
     );
     // With no contacts added, members list should be empty
-    let has_member_list = screen
-        .components
-        .iter()
-        .any(|c| matches!(c, Component::ContactList { id, contacts, .. } if id == "members" && contacts.is_empty()));
+    let has_member_list = screen.components.iter().any(|c| {
+        matches!(c, Component::ContactList { id, contacts, ..
+        } if id == "members" && contacts.is_empty())
+    });
     assert!(has_member_list, "Should have an empty members ContactList");
 }
 
@@ -264,7 +264,8 @@ fn duplicate_detection_empty_shows_no_duplicates() {
     // With no pairs, should show "no duplicates" text
     assert!(
         screen.components.iter().any(|c| matches!(c,
-            Component::Text { content, .. } if content.contains("No duplicate")
+            Component::Text { content, ..
+            } if content.contains("No duplicate")
         )),
         "Empty pairs should show 'No duplicate' message, got {:?}",
         screen.components
@@ -332,7 +333,8 @@ fn contact_merge_shows_both_contacts() {
     // Should have subtitle text with both names
     assert!(
         screen.components.iter().any(|c| matches!(c,
-            Component::Text { content, .. } if content.contains("Alice") && content.contains("Bob")
+            Component::Text { content, ..
+            } if content.contains("Alice") && content.contains("Bob")
         )),
         "Merge screen should show both contact names"
     );
@@ -399,7 +401,8 @@ fn contact_limit_shows_text_input() {
         screen
             .components
             .iter()
-            .any(|c| matches!(c, Component::TextInput { id, .. } if id == "limit_input")),
+            .any(|c| matches!(c, Component::TextInput { id, ..
+            } if id == "limit_input")),
         "Should have limit_input TextInput component"
     );
 }

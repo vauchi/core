@@ -33,6 +33,7 @@ fn exchange_shows_own_qr_data() {
             data,
             mode,
             label,
+            ..
         } => {
             assert_eq!(id, "own_qr");
             assert_eq!(data, "alice-qr-payload");

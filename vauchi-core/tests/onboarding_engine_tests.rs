@@ -250,7 +250,8 @@ fn default_name_has_text_input() {
     assert_eq!(screen.screen_id, "default_name");
 
     let has_input = screen.components.iter().any(|c| {
-        matches!(c, Component::TextInput { id, input_type, max_length, .. }
+        matches!(c, Component::TextInput { id, input_type, max_length, ..
+        }
             if id == "display_name"
             && *input_type == InputType::Text
             && *max_length == Some(100))
@@ -490,10 +491,10 @@ fn contact_info_has_field_list() {
     assert_eq!(screen.screen_id, "contact_info");
     assert_eq!(screen.progress.as_ref().unwrap().current_step, 5);
 
-    let has_field_list = screen
-        .components
-        .iter()
-        .any(|c| matches!(c, Component::FieldList { id, .. } if id == "fields"));
+    let has_field_list = screen.components.iter().any(|c| {
+        matches!(c, Component::FieldList { id, ..
+        } if id == "fields")
+    });
     assert!(has_field_list, "ContactInfo should have a FieldList");
 }
 

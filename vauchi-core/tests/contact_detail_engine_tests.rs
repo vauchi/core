@@ -18,6 +18,8 @@ fn sample_contact() -> ContactItem {
         avatar_initials: "AL".into(),
         status: None,
         searchable_fields: vec![],
+        accessible_label: None,
+        accessible_hint: None,
     }
 }
 
@@ -28,6 +30,8 @@ fn sample_fields() -> Vec<FieldDisplay> {
         value: "alice@example.com".into(),
         field_type: "email".into(),
         visibility: UiFieldVisibility::Shown,
+        accessible_label: None,
+        accessible_hint: None,
     }]
 }
 
@@ -69,10 +73,10 @@ fn contact_detail_shows_personal_note() {
     assert_eq!(screen.screen_id, "contact_detail");
 
     // The screen must contain an EditableText component with id "personal_note"
-    let note_component = screen
-        .components
-        .iter()
-        .find(|c| matches!(c, Component::EditableText { id, .. } if id == "personal_note"));
+    let note_component = screen.components.iter().find(|c| {
+        matches!(c, Component::EditableText { id, ..
+        } if id == "personal_note")
+    });
     assert!(
         note_component.is_some(),
         "ContactDetail screen must contain an EditableText component with id 'personal_note', \
@@ -117,10 +121,10 @@ fn contact_detail_shows_empty_note_when_no_note_saved() {
         contact_id: carol_id,
     });
 
-    let note_component = screen
-        .components
-        .iter()
-        .find(|c| matches!(c, Component::EditableText { id, .. } if id == "personal_note"));
+    let note_component = screen.components.iter().find(|c| {
+        matches!(c, Component::EditableText { id, ..
+        } if id == "personal_note")
+    });
 
     assert!(
         note_component.is_some(),
@@ -168,10 +172,10 @@ fn contact_detail_text_changed_saves_personal_note() {
     let new_screen = engine.navigate_to(AppScreen::ContactDetail {
         contact_id: dave_id,
     });
-    let note_component = new_screen
-        .components
-        .iter()
-        .find(|c| matches!(c, Component::EditableText { id, .. } if id == "personal_note"));
+    let note_component = new_screen.components.iter().find(|c| {
+        matches!(c, Component::EditableText { id, ..
+        } if id == "personal_note")
+    });
     assert!(
         note_component.is_some(),
         "personal_note component must be present after save"
@@ -227,10 +231,10 @@ fn contact_detail_shows_field_notes() {
     let expected_id = format!("field_note:{field_id}");
 
     // The screen must contain an EditableText component with id "field_note:{field_id}"
-    let field_note_component = screen
-        .components
-        .iter()
-        .find(|c| matches!(c, Component::EditableText { id, .. } if id == &expected_id));
+    let field_note_component = screen.components.iter().find(|c| {
+        matches!(c, Component::EditableText { id, ..
+        } if id == &expected_id)
+    });
 
     assert!(
         field_note_component.is_some(),
@@ -284,10 +288,10 @@ fn contact_detail_shows_empty_field_note_when_none_saved() {
     });
 
     let expected_id = format!("field_note:{field_id}");
-    let field_note_component = screen
-        .components
-        .iter()
-        .find(|c| matches!(c, Component::EditableText { id, .. } if id == &expected_id));
+    let field_note_component = screen.components.iter().find(|c| {
+        matches!(c, Component::EditableText { id, ..
+        } if id == &expected_id)
+    });
 
     assert!(
         field_note_component.is_some(),
@@ -340,10 +344,10 @@ fn contact_detail_text_changed_saves_field_note() {
     let new_screen = engine.navigate_to(AppScreen::ContactDetail {
         contact_id: dave_id,
     });
-    let field_note_component = new_screen
-        .components
-        .iter()
-        .find(|c| matches!(c, Component::EditableText { id, .. } if id == &component_id));
+    let field_note_component = new_screen.components.iter().find(|c| {
+        matches!(c, Component::EditableText { id, ..
+        } if id == &component_id)
+    });
 
     assert!(
         field_note_component.is_some(),

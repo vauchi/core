@@ -18,28 +18,32 @@ fn form_dialog_add_field_shows_type_list_and_inputs() {
     // All components visible on single page
     let has_types = screen.components.iter().any(|c| {
         matches!(c,
-            Component::ActionList { id, .. } if id == "entry_types"
+            Component::ActionList { id, ..
+            } if id == "entry_types"
         )
     });
     assert!(has_types, "Should show entry types list");
 
     let has_value = screen.components.iter().any(|c| {
         matches!(c,
-            Component::TextInput { id, .. } if id == "field_value"
+            Component::TextInput { id, ..
+            } if id == "field_value"
         )
     });
     assert!(has_value, "Should show value input");
 
     let has_label = screen.components.iter().any(|c| {
         matches!(c,
-            Component::TextInput { id, label, .. } if id == "field_label" && label.contains("Display Name")
+            Component::TextInput { id, label, ..
+            } if id == "field_label" && label.contains("Display Name")
         )
     });
     assert!(has_label, "Should show Display Name input");
 
     let has_note = screen.components.iter().any(|c| {
         matches!(c,
-            Component::TextInput { id, label, .. } if id == "field_note" && label.contains("Comment")
+            Component::TextInput { id, label, ..
+            } if id == "field_note" && label.contains("Comment")
         )
     });
     assert!(has_note, "Should show Comment input");
@@ -159,10 +163,10 @@ fn form_dialog_add_field_group_toggle() {
 
     // Groups should be visible immediately (single-page form)
     let screen = engine.current_screen();
-    let has_toggle_list = screen
-        .components
-        .iter()
-        .any(|c| matches!(c, Component::ToggleList { id, .. } if id == "group_visibility"));
+    let has_toggle_list = screen.components.iter().any(|c| {
+        matches!(c, Component::ToggleList { id, ..
+        } if id == "group_visibility")
+    });
     assert!(has_toggle_list, "Should show group visibility toggles");
 
     // Toggle a group
@@ -213,7 +217,8 @@ fn form_dialog_edit_field_prefills_current_value() {
 
     let prefilled = screen.components.iter().any(|c| {
         matches!(c,
-            Component::TextInput { id, value, .. } if id == "field_value" && value == "old@example.com"
+            Component::TextInput { id, value, ..
+            } if id == "field_value" && value == "old@example.com"
         )
     });
     assert!(
@@ -280,7 +285,8 @@ fn form_dialog_edit_name_prefills_current_name() {
 
     let prefilled = screen.components.iter().any(|c| {
         matches!(c,
-            Component::TextInput { id, value, .. } if id == "display_name" && value == "Alice"
+            Component::TextInput { id, value, ..
+            } if id == "display_name" && value == "Alice"
         )
     });
     assert!(
@@ -348,9 +354,12 @@ fn form_dialog_text_changed_updates_value() {
 
     match result {
         ActionResult::UpdateScreen(screen) => {
-            let has_updated_value = screen.components.iter().any(|c| matches!(c,
-                Component::TextInput { id, value, .. } if id == "field_value" && value == "+1 555 000 1234"
-            ));
+            let has_updated_value = screen.components.iter().any(|c| {
+                matches!(c,
+                    Component::TextInput { id, value, ..
+                    } if id == "field_value" && value == "+1 555 000 1234"
+                )
+            });
             assert!(
                 has_updated_value,
                 "TextInput should reflect the updated value"

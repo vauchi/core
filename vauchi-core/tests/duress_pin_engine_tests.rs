@@ -54,7 +54,10 @@ fn duress_overview_shows_enable_toggle() {
     let toggle_list = screen
         .components
         .iter()
-        .find(|c| matches!(c, Component::ToggleList { id, .. } if id == "duress_toggle"))
+        .find(|c| {
+            matches!(c, Component::ToggleList { id, ..
+        } if id == "duress_toggle")
+        })
         .expect("should have a ToggleList for duress toggle");
 
     match toggle_list {
@@ -292,10 +295,10 @@ fn duress_disable_shows_inline_confirm() {
         ActionResult::UpdateScreen(s) => s,
         other => panic!("Expected UpdateScreen, got {:?}", other),
     };
-    let has_confirm = screen
-        .components
-        .iter()
-        .any(|c| matches!(c, Component::InlineConfirm { destructive, .. } if *destructive));
+    let has_confirm = screen.components.iter().any(|c| {
+        matches!(c, Component::InlineConfirm { destructive, ..
+        } if *destructive)
+    });
     assert!(
         has_confirm,
         "disable should show a destructive InlineConfirm"
@@ -507,7 +510,10 @@ fn duress_pin_backspace_removes_last_char() {
     let pin = screen
         .components
         .iter()
-        .find(|c| matches!(c, Component::PinInput { id, .. } if id == "pin"))
+        .find(|c| {
+            matches!(c, Component::PinInput { id, ..
+        } if id == "pin")
+        })
         .expect("should have PinInput");
     match pin {
         Component::PinInput { filled, .. } => {

@@ -50,7 +50,7 @@ fn help_groups_by_category() {
     assert_eq!(screen.components.len(), 2);
 
     match &screen.components[0] {
-        Component::ActionList { id, items } => {
+        Component::ActionList { id, items, .. } => {
             assert_eq!(id, "Getting Started");
             assert_eq!(items.len(), 2);
             assert_eq!(items[0].id, "q1");
@@ -60,7 +60,7 @@ fn help_groups_by_category() {
     }
 
     match &screen.components[1] {
-        Component::ActionList { id, items } => {
+        Component::ActionList { id, items, .. } => {
             assert_eq!(id, "Security");
             assert_eq!(items.len(), 1);
             assert_eq!(items[0].id, "q2");

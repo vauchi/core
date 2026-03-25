@@ -77,6 +77,7 @@ fn edit_fields_has_name_input_and_field_list() {
             fields,
             visibility_mode,
             available_groups,
+            ..
         } => {
             assert_eq!(id, "fields");
             assert_eq!(fields.len(), 2);
@@ -161,7 +162,9 @@ fn edit_visibility_shows_toggle_lists() {
     assert_eq!(screen.components.len(), 2);
 
     match &screen.components[0] {
-        Component::ToggleList { id, label, items } => {
+        Component::ToggleList {
+            id, label, items, ..
+        } => {
             assert_eq!(id, "vis_phone1");
             assert_eq!(label, "Phone");
             assert_eq!(items.len(), 3); // Family, Friends, Work
@@ -185,7 +188,9 @@ fn edit_visibility_shows_toggle_lists() {
     }
 
     match &screen.components[1] {
-        Component::ToggleList { id, label, items } => {
+        Component::ToggleList {
+            id, label, items, ..
+        } => {
             assert_eq!(id, "vis_email1");
             assert_eq!(label, "Email");
             // email1 has no groups
@@ -273,6 +278,7 @@ fn edit_preview_shows_card() {
             fields,
             group_views,
             selected_group,
+            ..
         } => {
             assert_eq!(name, "Alice");
             assert_eq!(fields.len(), 2);

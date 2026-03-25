@@ -44,10 +44,13 @@ fn groups_list_shows_groups_with_member_counts() {
     let action_list = screen
         .components
         .iter()
-        .find(|c| matches!(c, Component::ActionList { id, .. } if id == "groups"))
+        .find(|c| {
+            matches!(c, Component::ActionList { id, ..
+        } if id == "groups")
+        })
         .expect("should have groups ActionList");
     match action_list {
-        Component::ActionList { id, items } => {
+        Component::ActionList { id, items, .. } => {
             assert_eq!(id, "groups");
             assert_eq!(items.len(), 2);
             assert_eq!(items[0].id, "g1");

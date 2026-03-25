@@ -32,6 +32,7 @@ fn link_shows_qr_data() {
             data,
             mode,
             label,
+            ..
         } => {
             assert_eq!(id, "qr");
             assert_eq!(data, "vauchi://link?token=abc123");
@@ -51,7 +52,9 @@ fn link_peer_connected_shows_verify() {
     assert_eq!(screen.screen_id, "link_verify");
 
     match &screen.components[0] {
-        Component::Text { id, content, style } => {
+        Component::Text {
+            id, content, style, ..
+        } => {
             assert_eq!(id, "code");
             assert_eq!(content, "ABC-123");
             assert_eq!(style, &TextStyle::Title);

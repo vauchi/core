@@ -178,10 +178,10 @@ fn home_screen_no_setup_progress() {
     assert_eq!(screen.screen_id, "my_info");
 
     // Setup progress should no longer be shown on MyInfo
-    let has_progress = screen
-        .components
-        .iter()
-        .any(|c| matches!(c, vauchi_app::ui::Component::StatusIndicator { id, .. } if id == "setup_progress"));
+    let has_progress = screen.components.iter().any(|c| {
+        matches!(c, vauchi_app::ui::Component::StatusIndicator { id, ..
+        } if id == "setup_progress")
+    });
     assert!(!has_progress, "MyInfo should not show setup progress");
 }
 

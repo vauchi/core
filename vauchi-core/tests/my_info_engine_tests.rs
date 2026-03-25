@@ -37,10 +37,10 @@ fn my_info_shows_own_fields_in_action_list() {
         .with_own_card("Demo User".into(), sample_own_fields());
 
     let screen = engine.current_screen();
-    let list = screen
-        .components
-        .iter()
-        .find(|c| matches!(c, Component::ActionList { id, .. } if id == "own_entries"));
+    let list = screen.components.iter().find(|c| {
+        matches!(c, Component::ActionList { id, ..
+        } if id == "own_entries")
+    });
     assert!(list.is_some(), "MyInfo should show own entries ActionList");
 
     if let Some(Component::ActionList { items, .. }) = list {
@@ -83,10 +83,10 @@ fn my_info_no_setup_progress() {
         total_steps: 6,
     });
     let screen = engine.current_screen();
-    let has_progress = screen
-        .components
-        .iter()
-        .any(|c| matches!(c, Component::StatusIndicator { id, .. } if id == "setup_progress"));
+    let has_progress = screen.components.iter().any(|c| {
+        matches!(c, Component::StatusIndicator { id, ..
+        } if id == "setup_progress")
+    });
     assert!(!has_progress, "MyInfo should not show setup progress");
 }
 
@@ -94,10 +94,10 @@ fn my_info_no_setup_progress() {
 fn my_info_empty_fields_shows_hint() {
     let engine = MyInfoEngine::new(MyInfoProgress::default());
     let screen = engine.current_screen();
-    let has_hint = screen
-        .components
-        .iter()
-        .any(|c| matches!(c, Component::Text { id, .. } if id == "empty_hint"));
+    let has_hint = screen.components.iter().any(|c| {
+        matches!(c, Component::Text { id, ..
+        } if id == "empty_hint")
+    });
     assert!(has_hint, "MyInfo without entries should show hint text");
 }
 
@@ -155,6 +155,8 @@ fn sample_shared_info_view() -> SharedInfoView {
                 label: "Mobile".into(),
                 value: "+41 79 123 45 67".into(),
                 visibility: UiFieldVisibility::Shown,
+                accessible_label: None,
+                accessible_hint: None,
             },
             FieldDisplay {
                 id: "mf2".into(),
@@ -162,6 +164,8 @@ fn sample_shared_info_view() -> SharedInfoView {
                 label: "Work".into(),
                 value: "me@example.com".into(),
                 visibility: UiFieldVisibility::Hidden,
+                accessible_label: None,
+                accessible_hint: None,
             },
         ],
         visible_groups: vec!["Friends".into()],
@@ -203,7 +207,8 @@ fn test_preview_view_shows_banner_and_fields() {
 
     // Visible field must have Shown marker, hidden field must have Hidden marker
     let shown_field = screen.components.iter().find(|c| {
-        matches!(c, Component::FieldList { fields, .. }
+        matches!(c, Component::FieldList { fields, ..
+        }
             if fields.iter().any(|f| f.id == "mf1" && f.visibility == UiFieldVisibility::Shown))
     });
     assert!(
@@ -212,7 +217,8 @@ fn test_preview_view_shows_banner_and_fields() {
     );
 
     let hidden_field = screen.components.iter().find(|c| {
-        matches!(c, Component::FieldList { fields, .. }
+        matches!(c, Component::FieldList { fields, ..
+        }
             if fields.iter().any(|f| f.id == "mf2" && f.visibility == UiFieldVisibility::Hidden))
     });
     assert!(

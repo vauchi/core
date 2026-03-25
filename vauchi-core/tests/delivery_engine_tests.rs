@@ -33,6 +33,7 @@ fn delivery_empty_shows_all_delivered() {
             icon,
             title,
             items,
+            ..
         } => {
             assert_eq!(id, "empty");
             assert_eq!(icon.as_deref(), Some("checkmark"));

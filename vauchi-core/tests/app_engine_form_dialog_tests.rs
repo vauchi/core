@@ -24,10 +24,10 @@ fn form_dialog_add_field_shows_type_list() {
         },
     });
     assert_eq!(screen.screen_id, "form_add_field");
-    let has_action_list = screen
-        .components
-        .iter()
-        .any(|c| matches!(c, Component::ActionList { id, .. } if id == "entry_types"));
+    let has_action_list = screen.components.iter().any(|c| {
+        matches!(c, Component::ActionList { id, ..
+        } if id == "entry_types")
+    });
     assert!(
         has_action_list,
         "Should have an ActionList for entry type selection"
@@ -88,7 +88,8 @@ fn form_dialog_edit_name_tracks_text_changes() {
             assert_eq!(screen.screen_id, "form_edit_name");
             // Verify the TextInput now shows "New Name"
             let has_new_value = screen.components.iter().any(|c| {
-                matches!(c, Component::TextInput { id, value, .. } if id == "display_name" && value == "New Name")
+                matches!(c, Component::TextInput { id, value, ..
+                } if id == "display_name" && value == "New Name")
             });
             assert!(has_new_value, "TextInput should reflect updated value");
         }
@@ -684,7 +685,8 @@ fn form_dialog_edit_field_prefills_current_note() {
 
     let note_prefilled = screen.components.iter().any(|c| {
         matches!(c,
-            Component::TextInput { id, value, .. }
+            Component::TextInput { id, value, ..
+            }
                 if id == "field_note" && value == "Office direct line"
         )
     });

@@ -18,7 +18,10 @@ fn lock_screen_has_pin_input() {
     let pin = screen
         .components
         .iter()
-        .find(|c| matches!(c, Component::PinInput { id, .. } if id == "pin"))
+        .find(|c| {
+            matches!(c, Component::PinInput { id, ..
+        } if id == "pin")
+        })
         .expect("should have a PinInput component with id 'pin'");
     match pin {
         Component::PinInput { masked, .. } => {
@@ -106,7 +109,10 @@ fn lock_screen_failed_attempt_shows_remaining() {
     let pin = screen
         .components
         .iter()
-        .find(|c| matches!(c, Component::PinInput { id, .. } if id == "pin"))
+        .find(|c| {
+            matches!(c, Component::PinInput { id, ..
+        } if id == "pin")
+        })
         .expect("should have PinInput");
     match pin {
         Component::PinInput {
@@ -169,7 +175,10 @@ fn lock_screen_pin_accumulates_single_chars() {
     let pin = screen
         .components
         .iter()
-        .find(|c| matches!(c, Component::PinInput { id, .. } if id == "pin"))
+        .find(|c| {
+            matches!(c, Component::PinInput { id, ..
+        } if id == "pin")
+        })
         .expect("should have PinInput");
     match pin {
         Component::PinInput { filled, .. } => {
@@ -204,7 +213,10 @@ fn lock_screen_pin_backspace_removes_last_char() {
     let pin = screen
         .components
         .iter()
-        .find(|c| matches!(c, Component::PinInput { id, .. } if id == "pin"))
+        .find(|c| {
+            matches!(c, Component::PinInput { id, ..
+        } if id == "pin")
+        })
         .expect("should have PinInput");
     match pin {
         Component::PinInput { filled, .. } => {
@@ -231,7 +243,10 @@ fn lock_screen_pin_backspace_on_empty_is_noop() {
     let pin = screen
         .components
         .iter()
-        .find(|c| matches!(c, Component::PinInput { id, .. } if id == "pin"))
+        .find(|c| {
+            matches!(c, Component::PinInput { id, ..
+        } if id == "pin")
+        })
         .expect("should have PinInput");
     match pin {
         Component::PinInput { filled, .. } => {
@@ -270,7 +285,10 @@ fn lock_screen_pin_does_not_exceed_length() {
     let pin = screen
         .components
         .iter()
-        .find(|c| matches!(c, Component::PinInput { id, .. } if id == "pin"))
+        .find(|c| {
+            matches!(c, Component::PinInput { id, ..
+        } if id == "pin")
+        })
         .expect("should have PinInput");
     match pin {
         Component::PinInput { filled, length, .. } => {

@@ -51,7 +51,11 @@ fn decode_to_string(data: &[u8]) -> String {
 
     // Fallback: treat as Latin-1 (ISO-8859-1).
     // Every byte is valid Latin-1, so this never fails.
-    data.iter().map(|&b| b as char).collect()
+    // Strip NUL bytes (0x00) to prevent display truncation on mobile (W8).
+    data.iter()
+        .filter(|&&b| b != 0)
+        .map(|&b| b as char)
+        .collect()
 }
 
 /// Import contacts from a vCard file (supports 2.1, 3.0, 4.0).

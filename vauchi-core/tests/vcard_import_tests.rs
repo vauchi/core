@@ -278,13 +278,9 @@ fn test_apple_group_prefix_with_ablabel() {
 fn test_oversized_file_rejected() {
     let big = vec![b'x'; 10 * 1024 * 1024 + 1];
     let err = import_vcf(&big).unwrap_err();
-    match err {
-        VCardImportError::FileTooLarge { size, max } => {
-            assert_eq!(size, 10 * 1024 * 1024 + 1);
-            assert_eq!(max, 10 * 1024 * 1024);
-        }
-        _ => panic!("Expected FileTooLarge, got {err:?}"),
-    }
+    let VCardImportError::FileTooLarge { size, max } = err;
+    assert_eq!(size, 10 * 1024 * 1024 + 1);
+    assert_eq!(max, 10 * 1024 * 1024);
 }
 
 #[test]

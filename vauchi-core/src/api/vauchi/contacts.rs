@@ -233,6 +233,85 @@ impl Vauchi {
         Ok(())
     }
 
+    // === Imported Contact Editing ===
+
+    /// Update a field value on an imported contact.
+    ///
+    /// Imported contacts allow full local editing (the user owns the card).
+    /// Exchanged contacts reject this — their card is owned by the other party.
+    pub fn update_imported_contact_field(
+        &self,
+        id: &str,
+        field_id: &str,
+        new_value: &str,
+    ) -> VauchiResult<()> {
+        let mut contact = self
+            .storage
+            .load_contact(id)?
+            .ok_or_else(|| VauchiError::ContactNotFound(id.to_string()))?;
+        if contact.is_exchanged() {
+            return Err(VauchiError::InvalidState(
+                "Cannot edit exchanged contact fields — card is owned by the other party".into(),
+            ));
+        }
+        let mut card = contact.card().clone();
+        card.update_field_value(field_id, new_value)
+            .map_err(|e| VauchiError::InvalidState(e.to_string()))?;
+        contact.update_card(card);
+        self.storage.save_contact(&contact)?;
+        Ok(())
+    }
+
+    /// Add a field to an imported contact.
+    ///
+    /// Exchanged contacts reject this — their card is owned by the other party.
+    pub fn add_imported_contact_field(
+        &self,
+        id: &str,
+        field_type: crate::contact_card::FieldType,
+        label: &str,
+        value: &str,
+    ) -> VauchiResult<()> {
+        let mut contact = self
+            .storage
+            .load_contact(id)?
+            .ok_or_else(|| VauchiError::ContactNotFound(id.to_string()))?;
+        if contact.is_exchanged() {
+            return Err(VauchiError::InvalidState(
+                "Cannot edit exchanged contact fields — card is owned by the other party".into(),
+            ));
+        }
+        let mut card = contact.card().clone();
+        card.add_field(crate::contact_card::ContactField::new(
+            field_type, label, value,
+        ))
+        .map_err(|e| VauchiError::InvalidState(e.to_string()))?;
+        contact.update_card(card);
+        self.storage.save_contact(&contact)?;
+        Ok(())
+    }
+
+    /// Remove a field from an imported contact.
+    ///
+    /// Exchanged contacts reject this — their card is owned by the other party.
+    pub fn remove_imported_contact_field(&self, id: &str, field_id: &str) -> VauchiResult<()> {
+        let mut contact = self
+            .storage
+            .load_contact(id)?
+            .ok_or_else(|| VauchiError::ContactNotFound(id.to_string()))?;
+        if contact.is_exchanged() {
+            return Err(VauchiError::InvalidState(
+                "Cannot edit exchanged contact fields — card is owned by the other party".into(),
+            ));
+        }
+        let mut card = contact.card().clone();
+        card.remove_field(field_id)
+            .map_err(|e| VauchiError::InvalidState(e.to_string()))?;
+        contact.update_card(card);
+        self.storage.save_contact(&contact)?;
+        Ok(())
+    }
+
     // === Contact Field Notes Operations ===
 
     /// Saves encrypted per-field notes for a contact.

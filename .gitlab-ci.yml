@@ -283,9 +283,11 @@ lint:semver:
   script:
     - command -v cargo-semver-checks >/dev/null 2>&1 || cargo binstall cargo-semver-checks --no-confirm 2>/dev/null || cargo install cargo-semver-checks
     - git fetch origin main
-    - cargo semver-checks check-release -p vauchi-core --baseline-rev origin/main
+    # vauchi-core skipped: depends on vauchi-protocol (workspace path dep)
+    # which can't resolve in semver-checks' isolated temp project.
     # vauchi-platform skipped: include_bytes! references sibling themes/ repo
-    # which doesn't exist in the semver-checks baseline checkout
+    # which doesn't exist in the semver-checks baseline checkout.
+    # Only vauchi-protocol can be checked in isolation (no workspace deps).
     - cargo semver-checks check-release -p vauchi-protocol --baseline-rev origin/main
 
 # Duplicate dependency check (advisory — detects multiple versions of same crate)

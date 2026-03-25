@@ -107,7 +107,7 @@ zxcvbn = "3"
 url = "2.5"
 
 # Shared relay/client protocol types
-vauchi-protocol = { path = "../vauchi-protocol", version = "0.10.2" }
+vauchi-protocol.workspace = true
 
 # Database storage (optional — not available on wasm32)
 rusqlite = { version = "0.32", features = ["bundled"], optional = true }
@@ -154,11 +154,9 @@ getrandom = { version = "0.2", features = ["js"] }
 [dev-dependencies]
 # OHTTP server features for roundtrip tests (merged with optional ohttp dep)
 ohttp = { version = "0.7", default-features = false, features = ["server", "rust-hpke"] }
-# Shared protocol types (v2 message formats, used by http_transport)
-vauchi-protocol = { version = "0.10.2", path = "../vauchi-protocol" }
 # App-layer modules (tests reference ui, theme, help, i18n, content)
 # Use rustls (not native-tls) — native-tls requires OpenSSL, which is unavailable on Android/WASM targets
-vauchi-app = { version = "0.10.2", path = "../vauchi-app", features = ["network-rustls"] }
+vauchi-app = { workspace = true, features = ["content-updates", "network-rustls"] }
 # JSON Schema validation for contract tests
 jsonschema = "0.28"
 # Temporary directories for storage tests

@@ -458,7 +458,13 @@ mod proptests {
         fn vcard_parser_never_panics(data in proptest::collection::vec(any::<u8>(), 0..4096)) {
             // The parser must never panic, regardless of input.
             // It may return Ok or Err, but must not panic.
-            let _ = import_vcf(&data);
+            let result = import_vcf(&data);
+            // Every successful parse must return valid ContactCards
+            if let Ok(cards) = result {
+                for (card, _uid) in &cards {
+                    prop_assert!(!card.display_name().is_empty());
+                }
+            }
         }
 
         #[test]

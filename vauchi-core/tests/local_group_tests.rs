@@ -164,16 +164,22 @@ fn delete_group() {
 /// privacy boundary violation.
 #[test]
 fn group_has_no_visibility_fields() {
-    // Construct a LocalGroup and verify we can only access organizational fields.
-    // If LocalGroup ever gains a `visible_fields` member this test file must be
-    // updated, making the privacy boundary change visible in code review.
+    // LocalGroup must only have organizational fields (id, name, contact_ids,
+    // created_at). If someone adds `visible_fields`, this test forces a review
+    // of the HR-5 privacy boundary.
     let group = LocalGroup::new("Check");
-    let _ = &group.id;
-    let _ = &group.name;
-    let _ = &group.contact_ids;
-    let _ = &group.created_at;
-    // There is intentionally no assertion on visible_fields because that field
-    // must not exist on LocalGroup.
+    // Assert the struct has exactly 4 fields by exhaustive destructuring.
+    // Adding a field to LocalGroup will cause a compile error here.
+    let LocalGroup {
+        ref id,
+        ref name,
+        ref contact_ids,
+        created_at,
+    } = group;
+    assert!(!id.is_empty());
+    assert_eq!(name, "Check");
+    assert!(contact_ids.is_empty());
+    assert!(created_at > 0);
 }
 
 /// `add_to_local_group` on a non-existent group returns NotFound.

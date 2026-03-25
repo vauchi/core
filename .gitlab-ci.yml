@@ -867,8 +867,8 @@ package:sbom:
       VERSION="${CI_COMMIT_TAG#v}"
       echo "Generating SBOM for vauchi v${VERSION}..."
 
-      # Install cargo-cyclonedx (--force to handle preinstalled binary on runner)
-      cargo install cargo-cyclonedx --locked --force
+      # Install cargo-cyclonedx (prefer pre-built binary, fall back to source)
+      cargo binstall cargo-cyclonedx --no-confirm 2>/dev/null || cargo install cargo-cyclonedx --locked
 
       # Generate CycloneDX JSON for all workspace crates in one pass
       # cargo-cyclonedx v0.5.7 outputs {crate}/{crate}.cdx.json

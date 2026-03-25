@@ -433,6 +433,11 @@ pub fn all_migrations() -> Vec<Migration> {
             name: "imported_contacts",
             action: MigrationAction::Sql(MIGRATION_V34_IMPORTED_CONTACTS),
         },
+        Migration {
+            version: 35,
+            name: "local_groups",
+            action: MigrationAction::Sql(MIGRATION_V35_LOCAL_GROUPS),
+        },
     ]
 }
 
@@ -614,6 +619,20 @@ const MIGRATION_V34_IMPORTED_CONTACTS: &str = "
     ALTER TABLE contacts ADD COLUMN import_source TEXT;
     ALTER TABLE contacts ADD COLUMN imported_at INTEGER;
     ALTER TABLE contacts ADD COLUMN original_uid TEXT;
+";
+
+/// Migration v35: Local organization groups for imported contacts (HR-5).
+///
+/// Creates a table for user-defined local groups. Unlike visibility labels,
+/// local groups have NO outbound sharing semantics — they're purely for the
+/// user's local organization and are never transmitted to contacts.
+const MIGRATION_V35_LOCAL_GROUPS: &str = "
+    CREATE TABLE IF NOT EXISTS local_groups (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        contact_ids_json TEXT NOT NULL DEFAULT '[]',
+        created_at INTEGER NOT NULL
+    );
 ";
 
 /// Migration v1: Baseline schema.

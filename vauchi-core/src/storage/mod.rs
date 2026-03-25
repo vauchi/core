@@ -82,6 +82,11 @@ mod recovery;
 mod rekey;
 
 #[cfg(feature = "testing")]
+pub mod local_groups;
+#[cfg(not(feature = "testing"))]
+mod local_groups;
+
+#[cfg(feature = "testing")]
 pub mod ux;
 #[cfg(not(feature = "testing"))]
 mod ux;

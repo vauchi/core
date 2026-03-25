@@ -9,6 +9,7 @@
 
 pub mod kind;
 pub mod labels;
+pub mod local_group;
 pub mod merge;
 pub mod statistics;
 pub mod trust;
@@ -23,6 +24,7 @@ pub use kind::{ContactKind, ExchangedData, ImportSource, ImportedData};
 pub use labels::{
     Group, GroupError, GroupManager, MAX_LABELS, SUGGESTED_LABELS, resolve_visible_fields,
 };
+pub use local_group::LocalGroup;
 pub use trust::TrustLevel;
 pub use visibility::{FieldVisibility, VisibilityRules};
 

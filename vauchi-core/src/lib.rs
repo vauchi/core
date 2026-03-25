@@ -23,8 +23,8 @@ pub mod identity;
 pub use contact::merge::DuplicatePair;
 pub use contact::{
     Contact, ContactError, ContactKind, ExchangedData, FieldVisibility, Group, GroupError,
-    GroupManager, ImportSource, ImportedData, MAX_LABELS, SUGGESTED_LABELS, VisibilityRules,
-    resolve_visible_fields,
+    GroupManager, ImportSource, ImportedData, LocalGroup, MAX_LABELS, SUGGESTED_LABELS,
+    VisibilityRules, resolve_visible_fields,
 };
 pub use contact_card::vcard_import::{VCardImportError, import_vcf};
 pub use contact_card::{
@@ -78,6 +78,8 @@ pub use api::{
 };
 pub mod aha_moments;
 pub use aha_moments::{AhaMoment, AhaMomentTracker, AhaMomentType};
+pub mod backup;
+pub use backup::{BackupError, export_contact_backup, import_contact_backup};
 pub mod demo_contact;
 pub use demo_contact::{
     DEMO_CONTACT_ID, DEMO_CONTACT_NAME, DemoContactCard, DemoContactState, DemoTip,

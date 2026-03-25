@@ -82,6 +82,8 @@ pub mod trust_metrics;
 #[cfg(not(feature = "testing"))]
 mod trust_metrics;
 
+pub mod tcp_transport;
+
 #[cfg(feature = "testing")]
 pub mod exchange_payload;
 #[cfg(not(feature = "testing"))]

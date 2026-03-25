@@ -699,7 +699,7 @@ impl Storage {
         // Restore trust metrics from storage (JSON column, NULL for legacy contacts)
         let trust_metrics: Option<TrustMetrics> = row
             .trust_metrics
-            .map(|s| serde_json::from_str(&s).expect("trust_metrics deserialize"));
+            .and_then(|s| serde_json::from_str(&s).ok());
         contact.set_trust_metrics(trust_metrics);
 
         Ok(contact)

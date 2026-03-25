@@ -77,7 +77,10 @@ pub mod verifier_event;
 #[cfg(not(feature = "testing"))]
 mod verifier_event;
 
+#[cfg(feature = "testing")]
 pub mod trust_metrics;
+#[cfg(not(feature = "testing"))]
+mod trust_metrics;
 
 #[cfg(feature = "testing")]
 pub mod exchange_payload;

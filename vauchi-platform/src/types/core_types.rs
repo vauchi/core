@@ -37,27 +37,6 @@ impl From<TrustLevel> for MobileContactTrustLevel {
     }
 }
 
-/// Mobile-friendly transport proximity level.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
-pub enum MobileTransportProximity {
-    Physical,
-    ContactRange,
-    Proximate,
-    None,
-}
-
-impl From<vauchi_core::exchange::TransportProximity> for MobileTransportProximity {
-    fn from(p: vauchi_core::exchange::TransportProximity) -> Self {
-        use vauchi_core::exchange::TransportProximity;
-        match p {
-            TransportProximity::Physical => Self::Physical,
-            TransportProximity::ContactRange => Self::ContactRange,
-            TransportProximity::Proximate => Self::Proximate,
-            TransportProximity::None => Self::None,
-        }
-    }
-}
-
 /// Mobile-friendly field type enum.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
 pub enum MobileFieldType {

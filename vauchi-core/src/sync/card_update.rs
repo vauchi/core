@@ -71,6 +71,8 @@ pub struct CardUpdateResult {
     pub processed: u32,
     /// Number of updates skipped due to errors.
     pub skipped: u32,
+    /// Display names of contacts whose cards were updated.
+    pub updated_names: Vec<String>,
 }
 
 /// Processes a batch of incoming card updates with full security checks.
@@ -103,7 +105,16 @@ pub fn process_card_updates(
     for (sender_id, ciphertext) in updates {
         let resolved_id = resolve_sender_id(&contacts, &sender_id).unwrap_or(sender_id);
         match process_single_card_update(identity, storage, &resolved_id, &ciphertext) {
-            Ok(()) => result.processed += 1,
+            Ok(()) => {
+                result.processed += 1;
+                // Collect display name for the updated contact
+                if let Some(contact) = contacts.iter().find(|c| c.id() == resolved_id) {
+                    let name = contact.card().display_name().to_string();
+                    if !name.is_empty() && !result.updated_names.contains(&name) {
+                        result.updated_names.push(name);
+                    }
+                }
+            }
             Err(_) => result.skipped += 1,
         }
     }

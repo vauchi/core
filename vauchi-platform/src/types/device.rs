@@ -28,6 +28,8 @@ pub struct MobileSyncResult {
     pub total: u32,
     /// Whether any changes were synced.
     pub has_changes: bool,
+    /// Display names of contacts whose cards were updated (for UI notification).
+    pub updated_contact_names: Vec<String>,
 }
 
 /// Incoming device link request received via relay.

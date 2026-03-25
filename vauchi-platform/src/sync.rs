@@ -302,9 +302,9 @@ fn process_card_updates(
     identity: &Identity,
     storage: &Storage,
     updates: Vec<(String, Vec<u8>)>,
-) -> Result<u32, MobileError> {
+) -> Result<(u32, Vec<String>), MobileError> {
     let result = core_process_card_updates(identity, storage, updates)?;
-    Ok(result.processed)
+    Ok((result.processed, result.updated_names))
 }
 
 /// Collects pending outbound updates as serialized data for async sending.
@@ -366,7 +366,7 @@ pub async fn do_sync_async(
     let received = receive_pending(&mut socket).await?;
 
     // Phase 2: Process received messages (Storage scoped, no await)
-    let (contacts_added, exchange_responses, cards_updated, pending_updates) = {
+    let (contacts_added, exchange_responses, cards_updated, updated_contact_names, pending_updates) = {
         let storage = Storage::open(storage_path, storage_key.clone())
             .map_err(|e| MobileError::StorageError(e.to_string()))?;
 
@@ -383,14 +383,21 @@ pub async fn do_sync_async(
 
         // Process card updates (anonymous sender ID resolution is handled
         // internally by process_card_updates — no pre-resolution needed)
-        let cards_updated = process_card_updates(identity, &storage, received.card_updates)?;
+        let (cards_updated, updated_contact_names) =
+            process_card_updates(identity, &storage, received.card_updates)?;
 
         // SP-33: device sync receive + send uses EncryptedUpdate + self-token
 
         // Collect pending updates
         let pending_updates = collect_pending_updates_data(identity, &storage);
 
-        (contacts_added, responses, cards_updated, pending_updates)
+        (
+            contacts_added,
+            responses,
+            cards_updated,
+            updated_contact_names,
+            pending_updates,
+        )
         // storage dropped here
     };
 
@@ -435,6 +442,7 @@ pub async fn do_sync_async(
         updates_sent,
         total: contacts_added + cards_updated + updates_sent,
         has_changes: contacts_added > 0 || cards_updated > 0 || updates_sent > 0,
+        updated_contact_names,
     })
 }
 

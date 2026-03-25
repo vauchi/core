@@ -1471,6 +1471,7 @@ mod tests {
             updates_sent: 0,
             total: 0,
             has_changes: false,
+            updated_contact_names: vec![],
         };
         assert_eq!(empty.total, 0);
         assert!(!empty.has_changes);
@@ -1481,6 +1482,7 @@ mod tests {
             updates_sent: 3,
             total: 6,
             has_changes: true,
+            updated_contact_names: vec!["Alice".to_string()],
         };
         assert_eq!(with_changes.total, 6);
         assert!(with_changes.has_changes);
@@ -1491,6 +1493,7 @@ mod tests {
             updates_sent: 1,
             total: 1,
             has_changes: true,
+            updated_contact_names: vec![],
         };
         assert_eq!(partial.total, 1);
         assert!(partial.has_changes);

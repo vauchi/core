@@ -65,31 +65,83 @@ impl ContactKind {
 #[derive(Clone, Debug)]
 pub struct ExchangedData {
     /// Their Ed25519 public key.
-    pub public_key: [u8; 32],
+    pub(crate) public_key: [u8; 32],
     /// Shared symmetric key for communication.
-    pub shared_key: SymmetricKey,
+    pub(crate) shared_key: SymmetricKey,
     /// Unix timestamp of when the exchange occurred.
-    pub exchange_timestamp: u64,
+    pub(crate) exchange_timestamp: u64,
     /// How this contact was established (QR, NFC, BLE, etc.).
-    pub exchange_transport: ExchangeTransport,
+    pub(crate) exchange_transport: ExchangeTransport,
     /// Whether the user manually verified their fingerprint.
-    pub fingerprint_verified: bool,
+    pub(crate) fingerprint_verified: bool,
     /// Whether this contact is trusted for recovery purposes.
-    pub recovery_trusted: bool,
+    pub(crate) recovery_trusted: bool,
     /// Whether this contact is trusted for simplified contact proposals.
-    pub proposal_trusted: bool,
+    pub(crate) proposal_trusted: bool,
     /// Proximity confidence level from the exchange.
-    pub proximity_confidence: ProximityConfidence,
+    pub(crate) proximity_confidence: ProximityConfidence,
     /// Whether this contact has undergone identity recovery.
-    pub has_recovered: bool,
+    pub(crate) has_recovered: bool,
     /// Relay URL learned during exchange (for per-contact relay routing).
-    pub relay_url: Option<String>,
+    pub(crate) relay_url: Option<String>,
     /// Relay's Noise NK public key, pinned during in-person exchange.
-    pub relay_noise_pubkey: Option<[u8; 32]>,
+    pub(crate) relay_noise_pubkey: Option<[u8; 32]>,
     /// Full trust metrics from the exchange. None for legacy contacts.
-    pub trust_metrics: Option<TrustMetrics>,
+    pub(crate) trust_metrics: Option<TrustMetrics>,
     /// Our visibility rules for this contact (what they can see of our card).
-    pub visibility_rules: VisibilityRules,
+    pub(crate) visibility_rules: VisibilityRules,
+}
+
+#[cfg(any(test, feature = "testing"))]
+impl ExchangedData {
+    /// Creates an `ExchangedData` with all fields specified. Only available in tests.
+    #[allow(clippy::too_many_arguments)]
+    pub fn new_for_test(
+        public_key: [u8; 32],
+        shared_key: SymmetricKey,
+        exchange_timestamp: u64,
+        exchange_transport: ExchangeTransport,
+        fingerprint_verified: bool,
+        recovery_trusted: bool,
+        proposal_trusted: bool,
+        proximity_confidence: ProximityConfidence,
+        has_recovered: bool,
+        relay_url: Option<String>,
+        relay_noise_pubkey: Option<[u8; 32]>,
+        trust_metrics: Option<TrustMetrics>,
+        visibility_rules: VisibilityRules,
+    ) -> Self {
+        Self {
+            public_key,
+            shared_key,
+            exchange_timestamp,
+            exchange_transport,
+            fingerprint_verified,
+            recovery_trusted,
+            proposal_trusted,
+            proximity_confidence,
+            has_recovered,
+            relay_url,
+            relay_noise_pubkey,
+            trust_metrics,
+            visibility_rules,
+        }
+    }
+
+    /// Returns the public key. Only available in tests.
+    pub fn public_key(&self) -> &[u8; 32] {
+        &self.public_key
+    }
+
+    /// Returns whether the fingerprint was verified. Only available in tests.
+    pub fn fingerprint_verified(&self) -> bool {
+        self.fingerprint_verified
+    }
+
+    /// Sets the fingerprint verified flag. Only available in tests.
+    pub fn set_fingerprint_verified(&mut self, val: bool) {
+        self.fingerprint_verified = val;
+    }
 }
 
 /// Metadata for an imported (non-crypto) contact.

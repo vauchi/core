@@ -110,7 +110,10 @@ impl Storage {
             let tm_json = ex
                 .trust_metrics
                 .as_ref()
-                .map(|m| serde_json::to_string(m).expect("trust_metrics serialize"));
+                .map(|m| {
+                    serde_json::to_string(m).map_err(|e| StorageError::Serialization(e.to_string()))
+                })
+                .transpose()?;
 
             (
                 ex.public_key.to_vec(),

@@ -176,8 +176,8 @@ fn existing_exchanged_contacts_unaffected() {
     assert_eq!(loaded.display_name(), original_display);
 
     // Verify contact_kind is 'exchanged' implicitly by checking kind
-    let ex_data = loaded.kind().exchanged_data().unwrap();
-    assert_eq!(ex_data.public_key, original_pk);
+    assert!(loaded.kind().exchanged_data().is_some());
+    assert_eq!(*loaded.public_key().unwrap(), original_pk);
 }
 
 // ── Imported contacts have no crypto fields ──────────────────────

@@ -11,21 +11,21 @@ use vauchi_core::exchange::{ExchangeTransport, ProximityConfidence};
 
 /// Helper: builds a minimal ExchangedData for testing.
 fn test_exchanged_data() -> ExchangedData {
-    ExchangedData {
-        public_key: [0xAB; 32],
-        shared_key: SymmetricKey::from_bytes([1u8; 32]),
-        exchange_timestamp: 1_700_000_000,
-        exchange_transport: ExchangeTransport::Qr,
-        fingerprint_verified: false,
-        recovery_trusted: false,
-        proposal_trusted: false,
-        proximity_confidence: ProximityConfidence::Unknown,
-        has_recovered: false,
-        relay_url: None,
-        relay_noise_pubkey: None,
-        trust_metrics: None,
-        visibility_rules: VisibilityRules::new(),
-    }
+    ExchangedData::new_for_test(
+        [0xAB; 32],
+        SymmetricKey::from_bytes([1u8; 32]),
+        1_700_000_000,
+        ExchangeTransport::Qr,
+        false,
+        false,
+        false,
+        ProximityConfidence::Unknown,
+        false,
+        None,
+        None,
+        None,
+        VisibilityRules::new(),
+    )
 }
 
 /// Helper: builds a minimal ImportedData for testing.
@@ -64,7 +64,7 @@ fn exchanged_data_accessor_returns_some_for_exchanged() {
     let kind = ContactKind::Exchanged(test_exchanged_data());
     let data = kind.exchanged_data();
     assert!(data.is_some());
-    assert_eq!(data.unwrap().public_key, [0xAB; 32]);
+    assert_eq!(*data.unwrap().public_key(), [0xAB; 32]);
 }
 
 #[test]
@@ -78,10 +78,10 @@ fn exchanged_data_mut_accessor_returns_some_for_exchanged() {
     let mut kind = ContactKind::Exchanged(test_exchanged_data());
     let data = kind.exchanged_data_mut();
     assert!(data.is_some());
-    data.unwrap().fingerprint_verified = true;
+    data.unwrap().set_fingerprint_verified(true);
 
     // Verify the mutation stuck
-    assert!(kind.exchanged_data().unwrap().fingerprint_verified);
+    assert!(kind.exchanged_data().unwrap().fingerprint_verified());
 }
 
 #[test]

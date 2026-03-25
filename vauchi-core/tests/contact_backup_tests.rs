@@ -120,6 +120,28 @@ fn contact_backup_preserves_imported_metadata() {
     );
 }
 
+/// Tampered ciphertext must fail with DecryptionFailed.
+#[test]
+fn contact_backup_tampered_ciphertext_fails() {
+    let contact = make_exchanged("Eve");
+    let mut blob = export_contact_backup(&[contact], "password").unwrap();
+
+    // Flip a byte in the ciphertext region (after version byte + 16-byte salt)
+    let tamper_index = 1 + 16 + 4; // well into the ciphertext
+    assert!(
+        blob.len() > tamper_index,
+        "blob must be long enough to tamper"
+    );
+    blob[tamper_index] ^= 0xFF;
+
+    let result = import_contact_backup(&blob, "password");
+    assert!(
+        matches!(result, Err(BackupError::DecryptionFailed)),
+        "expected DecryptionFailed after tampering, got {:?}",
+        result
+    );
+}
+
 /// Truncated data returns TooShort error.
 #[test]
 fn contact_backup_truncated_data_fails() {

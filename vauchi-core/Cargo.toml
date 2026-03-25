@@ -443,5 +443,9 @@ name = "sp33_mailbox_send_path_tests"
 required-features = ["testing"]
 
 [[test]]
+name = "contact_kind_tests"
+required-features = ["testing"]
+
+[[test]]
 name = "schema_gen"
 required-features = ["schema-gen"]

@@ -228,7 +228,8 @@ fn parse_single_vcard(block: &str) -> Option<(ContactCard, Option<String>)> {
                 // ORG value may have semicolons for sub-units
                 let org = unescaped
                     .replace(';', ", ")
-                    .trim_matches(", ".chars().next().unwrap())
+                    .trim_matches(',')
+                    .trim()
                     .to_string();
                 let org = org
                     .trim_end_matches(", ")

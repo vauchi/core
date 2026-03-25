@@ -18,6 +18,7 @@
 //! The JSON payload is a `Vec<ContactBackupEntry>` — one entry per contact.
 
 use serde::{Deserialize, Serialize};
+use zeroize::{Zeroize, Zeroizing};
 
 use crate::contact::{Contact, ImportSource};
 use crate::contact_card::ContactCard;
@@ -155,13 +156,17 @@ impl ContactBackupEntry {
                     .try_into()
                     .map_err(|_| BackupError::Deserialization("bad public key length".into()))?;
 
-                let sk_bytes = BASE64
+                let mut sk_bytes = BASE64
                     .decode(shared_key_b64)
                     .map_err(|e| BackupError::Deserialization(e.to_string()))?;
-                let sk_arr: [u8; 32] = sk_bytes
+                let mut sk_arr: [u8; 32] = sk_bytes
+                    .as_slice()
                     .try_into()
                     .map_err(|_| BackupError::Deserialization("bad shared key length".into()))?;
-                let shared_key = crate::crypto::SymmetricKey::from_bytes(sk_arr);
+                sk_bytes.zeroize();
+                let shared_key = crate::crypto::SymmetricKey::try_from_bytes(sk_arr)
+                    .map_err(|_| BackupError::Deserialization("degenerate shared key".into()))?;
+                sk_arr.zeroize();
 
                 let visibility_rules = serde_json::from_str(visibility_rules_json)
                     .map_err(|e| BackupError::Deserialization(e.to_string()))?;
@@ -211,8 +216,9 @@ pub fn export_contact_backup(contacts: &[Contact], password: &str) -> Result<Vec
         .collect::<Result<Vec<_>, _>>()?;
 
     // Serialize to JSON
-    let plaintext =
-        serde_json::to_vec(&entries).map_err(|e| BackupError::Serialization(e.to_string()))?;
+    let plaintext = Zeroizing::new(
+        serde_json::to_vec(&entries).map_err(|e| BackupError::Serialization(e.to_string()))?,
+    );
 
     // Generate random 16-byte salt
     let salt: [u8; 16] = random_bytes();
@@ -255,13 +261,17 @@ fn import_v1(data: &[u8], password: &str) -> Result<Vec<Contact>, BackupError> {
         return Err(BackupError::TooShort);
     }
 
-    let salt: [u8; 16] = data[..16].try_into().expect("slice is exactly 16 bytes");
+    // SAFETY: guarded by `data.len() < 16` check above — slice is exactly 16 bytes.
+    let salt: [u8; 16] = data[..16]
+        .try_into()
+        .expect("salt slice is exactly 16 bytes");
     let ciphertext = &data[16..];
 
     let key =
         derive_key_argon2id(password.as_bytes(), &salt).map_err(|_| BackupError::KeyDerivation)?;
 
-    let plaintext = decrypt(&key, ciphertext).map_err(|_| BackupError::DecryptionFailed)?;
+    let plaintext =
+        Zeroizing::new(decrypt(&key, ciphertext).map_err(|_| BackupError::DecryptionFailed)?);
 
     let entries: Vec<ContactBackupEntry> = serde_json::from_slice(&plaintext)
         .map_err(|e| BackupError::Deserialization(e.to_string()))?;

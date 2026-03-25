@@ -287,7 +287,8 @@ lint:semver:
     # vauchi-protocol: no workspace path deps, can check directly
     - cargo semver-checks check-release -p vauchi-protocol --baseline-rev origin/main
     # vauchi-core: depends on vauchi-protocol (workspace path dep) which can't
-    # resolve in semver-checks' isolated temp project (upstream issue #638).
+    # resolve in semver-checks' isolated temp project.
+    # Upstream: https://github.com/obi1kenobi/cargo-semver-checks/issues/638
     # Workaround: pre-generate rustdoc JSON in workspace context with nightly,
     # then pass to semver-checks via --current-rustdoc / --baseline-rustdoc.
     - |

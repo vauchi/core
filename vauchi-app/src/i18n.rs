@@ -30,6 +30,8 @@ pub enum Locale {
     French,
     #[serde(rename = "es")]
     Spanish,
+    #[serde(rename = "it")]
+    Italian,
 }
 
 impl Locale {
@@ -40,6 +42,7 @@ impl Locale {
             Locale::German => "de",
             Locale::French => "fr",
             Locale::Spanish => "es",
+            Locale::Italian => "it",
         }
     }
 
@@ -50,6 +53,7 @@ impl Locale {
             "de" | "de-de" | "de-at" | "de-ch" => Some(Locale::German),
             "fr" | "fr-fr" | "fr-ca" => Some(Locale::French),
             "es" | "es-es" | "es-mx" => Some(Locale::Spanish),
+            "it" | "it-it" | "it-ch" => Some(Locale::Italian),
             _ => None,
         }
     }
@@ -91,6 +95,12 @@ pub fn get_locale_info(locale: Locale) -> LocaleInfo {
             english_name: "Spanish",
             is_rtl: false,
         },
+        Locale::Italian => LocaleInfo {
+            code: "it",
+            name: "Italiano",
+            english_name: "Italian",
+            is_rtl: false,
+        },
     }
 }
 
@@ -101,6 +111,7 @@ pub fn get_available_locales() -> Vec<Locale> {
         Locale::German,
         Locale::French,
         Locale::Spanish,
+        Locale::Italian,
     ]
 }
 
@@ -406,7 +417,7 @@ mod tests {
     #[test]
     fn test_available_locales() {
         let locales = get_available_locales();
-        assert_eq!(locales.len(), 4);
+        assert_eq!(locales.len(), 5);
     }
 
     #[test]

@@ -356,6 +356,7 @@ pub enum MobileLocale {
     German,
     French,
     Spanish,
+    Italian,
 }
 
 impl From<vauchi_app::i18n::Locale> for MobileLocale {
@@ -365,6 +366,7 @@ impl From<vauchi_app::i18n::Locale> for MobileLocale {
             vauchi_app::i18n::Locale::German => MobileLocale::German,
             vauchi_app::i18n::Locale::French => MobileLocale::French,
             vauchi_app::i18n::Locale::Spanish => MobileLocale::Spanish,
+            vauchi_app::i18n::Locale::Italian => MobileLocale::Italian,
         }
     }
 }
@@ -376,6 +378,7 @@ impl From<MobileLocale> for vauchi_app::i18n::Locale {
             MobileLocale::German => vauchi_app::i18n::Locale::German,
             MobileLocale::French => vauchi_app::i18n::Locale::French,
             MobileLocale::Spanish => vauchi_app::i18n::Locale::Spanish,
+            MobileLocale::Italian => vauchi_app::i18n::Locale::Italian,
         }
     }
 }

@@ -75,7 +75,6 @@ impl VerifierChain {
     /// The callback receives each `ProximityVerifierEvent` as it occurs,
     /// before it is stored in the event log. Currently used by integration
     /// tests; will be wired into the platform layer for live UI progress.
-    #[cfg(any(test, feature = "testing"))]
     pub fn set_event_callback(
         &mut self,
         callback: impl Fn(&ProximityVerifierEvent) + Send + Sync + 'static,

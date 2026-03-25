@@ -7,6 +7,7 @@
 //! Represents contacts obtained through exchange, with shared encryption keys
 //! and visibility rules.
 
+pub mod kind;
 pub mod labels;
 pub mod merge;
 pub mod statistics;
@@ -18,6 +19,7 @@ pub mod visibility;
 #[cfg(not(feature = "testing"))]
 mod visibility;
 
+pub use kind::{ContactKind, ExchangedData, ImportSource, ImportedData};
 pub use labels::{
     Group, GroupError, GroupManager, MAX_LABELS, SUGGESTED_LABELS, resolve_visible_fields,
 };

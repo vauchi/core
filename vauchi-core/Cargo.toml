@@ -40,9 +40,6 @@ test-timings = []
 test-kdf = []
 # JSON Schema generation for UI types (dev tooling only)
 schema-gen = ["schemars", "vauchi-app/schema-gen"]
-# Remote content updates — module moved to vauchi-app.
-# Feature retained as empty for backward compatibility (consumers may reference it).
-content-updates = []
 
 [dependencies]
 # Cryptography (audited libraries)

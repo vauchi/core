@@ -603,6 +603,7 @@ security:deny:
 security:vet:
   extends: [.linux-runner-readonly, .security-vet-job]
   script:
+    - cargo generate-lockfile
     - cargo vet
 
 # Refine semgrep-sast from security.yml: gate on lint, run only on Rust changes

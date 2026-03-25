@@ -276,19 +276,32 @@ lint:clippy:
 # Advisory while pre-1.0 (no deployed clients, SP-33 allows intentional breaks).
 # Flip to allow_failure: false when version reaches 1.0.0.
 lint:semver:
-  extends: [.linux-runner, .validation-rust, .timeout-quick]
+  extends: [.linux-runner, .validation-rust, .timeout-standard]
   stage: lint
   needs: []
   allow_failure: true
   script:
     - command -v cargo-semver-checks >/dev/null 2>&1 || cargo binstall cargo-semver-checks --no-confirm 2>/dev/null || cargo install cargo-semver-checks
+    - rustup toolchain install nightly --profile minimal --component rustdoc 2>/dev/null || true
     - git fetch origin main
-    # vauchi-core skipped: depends on vauchi-protocol (workspace path dep)
-    # which can't resolve in semver-checks' isolated temp project.
-    # vauchi-platform skipped: include_bytes! references sibling themes/ repo
-    # which doesn't exist in the semver-checks baseline checkout.
-    # Only vauchi-protocol can be checked in isolation (no workspace deps).
+    # vauchi-protocol: no workspace path deps, can check directly
     - cargo semver-checks check-release -p vauchi-protocol --baseline-rev origin/main
+    # vauchi-core: depends on vauchi-protocol (workspace path dep) which can't
+    # resolve in semver-checks' isolated temp project (upstream issue #638).
+    # Workaround: pre-generate rustdoc JSON in workspace context with nightly,
+    # then pass to semver-checks via --current-rustdoc / --baseline-rustdoc.
+    - |
+      echo "Generating current rustdoc JSON for vauchi-core..."
+      RUSTDOCFLAGS="-Z unstable-options --output-format json" cargo +nightly doc -p vauchi-core --no-deps
+      echo "Generating baseline rustdoc JSON from origin/main..."
+      git worktree add /tmp/baseline origin/main --detach
+      RUSTDOCFLAGS="-Z unstable-options --output-format json" cargo +nightly doc --manifest-path /tmp/baseline/Cargo.toml -p vauchi-core --no-deps
+      cargo semver-checks check-release -p vauchi-core \
+        --current-rustdoc target/doc/vauchi_core.json \
+        --baseline-rustdoc /tmp/baseline/target/doc/vauchi_core.json
+      git worktree remove /tmp/baseline 2>/dev/null || true
+    # vauchi-platform: include_bytes! references sibling themes/ repo —
+    # skipped until themes are vendored or a similar workaround is applied
 
 # Duplicate dependency check (advisory — detects multiple versions of same crate)
 lint:duplicates:

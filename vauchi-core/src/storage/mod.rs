@@ -14,6 +14,8 @@ mod consent;
 
 mod connection;
 
+mod contact_row;
+
 #[cfg(feature = "testing")]
 pub mod contacts;
 #[cfg(not(feature = "testing"))]

@@ -337,6 +337,8 @@ test:core:
   needs:
     - job: lint:format
       optional: true
+    - job: lint:clippy
+      optional: true
   before_script:
     - !reference [.self-hosted, before_script]
     - !reference [.clone-locales, before_script]
@@ -356,6 +358,8 @@ test:cucumber:
   needs:
     - job: lint:format
       optional: true
+    - job: lint:clippy
+      optional: true
   before_script:
     - !reference [.self-hosted, before_script]
     - if [ ! -d ../features ]; then git clone --depth=1 https://gitlab.com/vauchi/features.git ../features; else git -C ../features pull --ff-only 2>/dev/null || true; fi
@@ -367,6 +371,8 @@ test:platform:
   stage: test
   needs:
     - job: lint:format
+      optional: true
+    - job: lint:clippy
       optional: true
   before_script:
     - !reference [.self-hosted, before_script]
@@ -387,6 +393,8 @@ validate:schema:
   stage: test
   needs:
     - job: lint:format
+      optional: true
+    - job: lint:clippy
       optional: true
   script:
     - cargo test --features schema-gen -p vauchi-core --test schema_gen
@@ -800,7 +808,8 @@ build:apple:
     paths:
       - target/bindings/ios/
       - target/bindings/macos/
-    expire_in: 1 day
+    # 7 days: release pipeline retries may span multiple days
+    expire_in: 7 days
 
 build:android:
   extends: [.linux-runner, .release-or-rc, .timeout-long]
@@ -841,7 +850,8 @@ build:android:
   artifacts:
     paths:
       - target/bindings/android/
-    expire_in: 1 day
+    # 7 days: release pipeline retries may span multiple days
+    expire_in: 7 days
 
 # Validate generated bindings have all expected types
 build:validate-bindings:
@@ -948,6 +958,8 @@ publish:packages:
   needs:
     - package:xcframework
     - package:android
+    # sbom is .release-only (not RC) — must be optional here since
+    # publish:packages runs on RC tags too (.release-or-rc)
     - job: package:sbom
       optional: true
   script:

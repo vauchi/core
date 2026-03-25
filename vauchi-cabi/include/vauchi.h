@@ -10,6 +10,15 @@
 #include <stdlib.h>
 
 /**
+ * Opaque config builder for C ABI consumers.
+ *
+ * Built via `vauchi_config_new`, configured with `vauchi_config_set_*`
+ * functions, consumed by `vauchi_app_create_from_config`, and freed
+ * with `vauchi_config_free`.
+ */
+typedef struct CabiConfig CabiConfig;
+
+/**
  * Opaque handle to an AppEngine instance.
  */
 typedef struct VauchiApp VauchiApp;
@@ -23,6 +32,39 @@ typedef struct VauchiExchange VauchiExchange;
  * Opaque handle to a workflow engine instance.
  */
 typedef struct VauchiWorkflow VauchiWorkflow;
+
+/**
+ * Create a new config builder with data directory and relay URL.
+ *
+ * Returns null if `data_dir` is null.
+ * If `relay_url` is null, uses the default (`wss://relay.vauchi.app`).
+ *
+ * # Safety
+ * `data_dir` and `relay_url` must be valid null-terminated C strings, or null.
+ */
+struct CabiConfig *vauchi_config_new(const char *data_dir, const char *relay_url);
+
+/**
+ * Free a config handle.
+ *
+ * # Safety
+ * `config` must be a pointer returned by `vauchi_config_new`, or null.
+ */
+void vauchi_config_free(struct CabiConfig *config);
+
+/**
+ * Set the storage encryption key (exactly 32 bytes, must not be all-zeros).
+ *
+ * Returns `false` if key_len != 32, key is all-zeros, config is null, or key is null.
+ * Never panics across the FFI boundary.
+ *
+ * # Safety
+ * `config` must be a valid config handle or null.
+ * `key` must point to at least `key_len` readable bytes, or be null.
+ */
+bool vauchi_config_set_storage_key(struct CabiConfig *config,
+                                   const uint8_t *key,
+                                   uintptr_t key_len);
 
 /**
  * Free a string allocated by vauchi-cabi.

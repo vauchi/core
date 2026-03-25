@@ -16,6 +16,7 @@ use vauchi_core::exchange::{ExchangeSession, ManualConfirmationVerifier};
 
 mod app;
 mod audio;
+mod config;
 mod exchange;
 mod workflow;
 
@@ -23,6 +24,8 @@ pub use app::*;
 pub use audio::*;
 pub use exchange::*;
 pub use workflow::*;
+
+use config::CabiConfig;
 
 // ── Type-erased engine wrapper ──────────────────────────────────────
 
@@ -67,6 +70,87 @@ pub struct VauchiApp {
 pub struct VauchiExchange {
     pub(crate) session: Mutex<ExchangeSession>,
     pub(crate) manual_verifier: Arc<ManualConfirmationVerifier>,
+}
+
+// ── Config builder ──────────────────────────────────────────────────
+
+/// Create a new config builder with data directory and relay URL.
+///
+/// Returns null if `data_dir` is null.
+/// If `relay_url` is null, uses the default (`wss://relay.vauchi.app`).
+///
+/// # Safety
+/// `data_dir` and `relay_url` must be valid null-terminated C strings, or null.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn vauchi_config_new(
+    data_dir: *const c_char,
+    relay_url: *const c_char,
+) -> *mut CabiConfig {
+    match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        let dir = match from_c_str(data_dir) {
+            Some(s) => s,
+            None => return std::ptr::null_mut(),
+        };
+        let relay = from_c_str(relay_url).unwrap_or_else(|| "wss://relay.vauchi.app".to_string());
+
+        Box::into_raw(Box::new(CabiConfig::new(dir.into(), relay)))
+    })) {
+        Ok(result) => result,
+        Err(_) => std::ptr::null_mut(),
+    }
+}
+
+/// Free a config handle.
+///
+/// # Safety
+/// `config` must be a pointer returned by `vauchi_config_new`, or null.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn vauchi_config_free(config: *mut CabiConfig) {
+    // SAFETY: If non-null, config was allocated by Box::into_raw in vauchi_config_new.
+    unsafe {
+        let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            if !config.is_null() {
+                drop(Box::from_raw(config));
+            }
+        }));
+    }
+}
+
+/// Set the storage encryption key (exactly 32 bytes, must not be all-zeros).
+///
+/// Returns `false` if key_len != 32, key is all-zeros, config is null, or key is null.
+/// Never panics across the FFI boundary.
+///
+/// # Safety
+/// `config` must be a valid config handle or null.
+/// `key` must point to at least `key_len` readable bytes, or be null.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn vauchi_config_set_storage_key(
+    config: *mut CabiConfig,
+    key: *const u8,
+    key_len: usize,
+) -> bool {
+    std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        // SAFETY: Caller guarantees config is a valid CabiConfig pointer or null,
+        // and key points to at least key_len readable bytes or is null.
+        unsafe {
+            if config.is_null() || key.is_null() || key_len != 32 {
+                return false;
+            }
+            let key_bytes: [u8; 32] = std::slice::from_raw_parts(key, 32).try_into().unwrap();
+
+            // Use try_from_bytes to avoid panicking on degenerate (all-zeros) keys
+            match vauchi_core::crypto::SymmetricKey::try_from_bytes(key_bytes) {
+                Ok(sym_key) => {
+                    let config = &mut *config;
+                    config.storage_key = Some(sym_key);
+                    true
+                }
+                Err(_) => false,
+            }
+        }
+    }))
+    .unwrap_or_default()
 }
 
 // ── String helpers ──────────────────────────────────────────────────
@@ -1159,6 +1243,129 @@ mod tests {
         // SAFETY: Calling FFI with valid inputs from this test scope.
         unsafe {
             vauchi_audio_stop();
+        }
+    }
+
+    // ── Config builder tests ───────────────────────────────────────────
+
+    #[test]
+    fn config_new_returns_non_null() {
+        // SAFETY: Calling FFI with valid C strings.
+        unsafe {
+            let dir = CString::new("/tmp/vauchi-test").unwrap();
+            let relay = CString::new("wss://relay.vauchi.app").unwrap();
+            let config = vauchi_config_new(dir.as_ptr(), relay.as_ptr());
+            assert!(
+                !config.is_null(),
+                "config_new with valid args should return non-null"
+            );
+            vauchi_config_free(config);
+        }
+    }
+
+    #[test]
+    fn config_new_with_null_dir_returns_null() {
+        // SAFETY: Calling FFI with null data_dir.
+        unsafe {
+            let relay = CString::new("wss://relay.vauchi.app").unwrap();
+            let config = vauchi_config_new(std::ptr::null(), relay.as_ptr());
+            assert!(config.is_null(), "null data_dir should return null");
+        }
+    }
+
+    #[test]
+    fn config_new_with_null_relay_uses_default() {
+        // SAFETY: Calling FFI with null relay_url (should use default).
+        unsafe {
+            let dir = CString::new("/tmp/vauchi-test").unwrap();
+            let config = vauchi_config_new(dir.as_ptr(), std::ptr::null());
+            assert!(
+                !config.is_null(),
+                "null relay_url should succeed with default"
+            );
+            vauchi_config_free(config);
+        }
+    }
+
+    #[test]
+    fn config_free_null_is_safe() {
+        // allow(zero_assertions) — no-panic boundary test
+        // SAFETY: Calling FFI with null config.
+        unsafe {
+            vauchi_config_free(std::ptr::null_mut());
+        }
+    }
+
+    #[test]
+    fn config_set_storage_key_valid_32_bytes() {
+        // SAFETY: Calling FFI with valid config and 32-byte key.
+        unsafe {
+            let dir = CString::new("/tmp/vauchi-test").unwrap();
+            let relay = CString::new("wss://relay.vauchi.app").unwrap();
+            let config = vauchi_config_new(dir.as_ptr(), relay.as_ptr());
+
+            let key: [u8; 32] = [0xAB; 32];
+            let result = vauchi_config_set_storage_key(config, key.as_ptr(), 32);
+            assert!(result, "valid 32-byte key should succeed");
+
+            vauchi_config_free(config);
+        }
+    }
+
+    #[test]
+    fn config_set_storage_key_rejects_wrong_length() {
+        // SAFETY: Calling FFI with valid config and wrong-length key.
+        unsafe {
+            let dir = CString::new("/tmp/vauchi-test").unwrap();
+            let relay = CString::new("wss://relay.vauchi.app").unwrap();
+            let config = vauchi_config_new(dir.as_ptr(), relay.as_ptr());
+
+            let key: [u8; 16] = [0xAB; 16];
+            let result = vauchi_config_set_storage_key(config, key.as_ptr(), 16);
+            assert!(!result, "16-byte key should be rejected");
+
+            vauchi_config_free(config);
+        }
+    }
+
+    #[test]
+    fn config_set_storage_key_rejects_all_zeros() {
+        // SAFETY: Calling FFI with valid config and all-zeros key.
+        unsafe {
+            let dir = CString::new("/tmp/vauchi-test").unwrap();
+            let relay = CString::new("wss://relay.vauchi.app").unwrap();
+            let config = vauchi_config_new(dir.as_ptr(), relay.as_ptr());
+
+            let key: [u8; 32] = [0; 32];
+            let result = vauchi_config_set_storage_key(config, key.as_ptr(), 32);
+            assert!(!result, "all-zeros key should be rejected");
+
+            vauchi_config_free(config);
+        }
+    }
+
+    #[test]
+    fn config_set_storage_key_null_config_returns_false() {
+        // SAFETY: Calling FFI with null config.
+        unsafe {
+            let key: [u8; 32] = [0xAB; 32];
+            let result = vauchi_config_set_storage_key(std::ptr::null_mut(), key.as_ptr(), 32);
+            assert!(!result, "null config should return false");
+        }
+    }
+
+    #[test]
+    fn config_set_storage_key_null_key_returns_false() {
+        // SAFETY: Calling FFI with null key pointer.
+        unsafe {
+            let dir = CString::new("/tmp/vauchi-test").unwrap();
+            let relay = CString::new("wss://relay.vauchi.app").unwrap();
+            let config = vauchi_config_new(dir.as_ptr(), relay.as_ptr());
+
+            let result = vauchi_config_set_storage_key(config, std::ptr::null(), 32);
+            assert!(!result, "null key pointer should return false");
+
+            vauchi_config_free(config);
         }
     }
 }

@@ -40,9 +40,16 @@ LOCAL_ANDROID_DIR="$WORKSPACE_ROOT/android"
 LOCAL_MACOS_DIR="$WORKSPACE_ROOT/macos"
 
 # NDK paths (for Android) — auto-detect latest installed NDK if ANDROID_NDK_HOME not set
-NDK_DEFAULT=$(ls -d "$HOME/Library/Android/sdk/ndk"/*/ 2>/dev/null | sort -V | tail -1)
-NDK_DEFAULT="${NDK_DEFAULT%/}"
-NDK_HOME="${ANDROID_NDK_HOME:-${NDK_DEFAULT:-$HOME/Library/Android/sdk/ndk}}"
+# Note: must not fail under `set -euo pipefail` when NDK dirs don't exist
+NDK_DEFAULT=""
+for _ndk_search in "$HOME/Library/Android/sdk/ndk" /opt/android-sdk/ndk /opt/android-ndk "$HOME/Android/Sdk/ndk"; do
+    if [ -d "$_ndk_search" ]; then
+        NDK_DEFAULT=$(ls -d "$_ndk_search"/*/ 2>/dev/null | sort -V | tail -1 || true)
+        NDK_DEFAULT="${NDK_DEFAULT%/}"
+        [ -n "$NDK_DEFAULT" ] && break
+    fi
+done
+NDK_HOME="${ANDROID_NDK_HOME:-${NDK_DEFAULT:-}}"
 
 echo -e "${YELLOW}╔════════════════════════════════════════╗${NC}"
 echo -e "${YELLOW}║     Vauchi UniFFI Bindings Build       ║${NC}"

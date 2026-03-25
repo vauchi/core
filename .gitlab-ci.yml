@@ -998,7 +998,10 @@ publish:core:
       fi
 
       # Package the crate
-      cargo package -p vauchi-core --allow-dirty
+      # --no-verify: skip build check that resolves path deps (vauchi-protocol)
+      # from crates.io — we publish to GitLab generic packages, not crates.io,
+      # and the build was already verified in earlier CI stages.
+      cargo package -p vauchi-core --allow-dirty --no-verify
 
       # Upload to GitLab generic packages registry
       CRATE_FILE="target/package/vauchi-core-${VERSION}.crate"

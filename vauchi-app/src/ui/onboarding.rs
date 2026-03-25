@@ -453,8 +453,7 @@ impl OnboardingEngine {
                     VisibilityMode::ShowHide
                 },
                 available_groups: selected,
-                accessible_label: None,
-                accessible_hint: None,
+                accessible_label: None, accessible_hint: None,
             }],
             actions: vec![
                 ScreenAction {

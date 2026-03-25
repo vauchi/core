@@ -515,15 +515,35 @@ impl Contact {
     /// Priority order (highest wins):
     /// 1. `Cautious` — identity was recovered (ratchet may have reset)
     /// 2. `Verified` — fingerprint manually confirmed out-of-band
-    /// 3. `High`     — high proximity confidence + NFC or BLE transport
+    /// 3. `High`     — strong transport proximity (USB/NFC) or high verifier
+    ///    confidence (ultrasonic/hardware), via TrustMetrics
     /// 4. `Standard` — all other cases
+    ///
+    /// For legacy contacts without `TrustMetrics`, falls back to the original
+    /// `Nfc | Ble` + `ProximityConfidence::High` check.
     pub fn trust_level(&self) -> TrustLevel {
+        // Priority 1: Recovery state overrides everything
         if self.has_recovered {
             return TrustLevel::Cautious;
         }
+
+        // Priority 2: Manual fingerprint verification (out-of-band)
         if self.fingerprint_verified {
             return TrustLevel::Verified;
         }
+
+        // Priority 3: Use TrustMetrics if available (new path)
+        if let Some(ref metrics) = self.trust_metrics {
+            let strong_transport = metrics.transport_proximity.is_strong();
+            let strong_verifier = metrics.proximity == ProximityConfidence::High;
+
+            if strong_transport || strong_verifier {
+                return TrustLevel::High;
+            }
+            return TrustLevel::Standard;
+        }
+
+        // Legacy path: no TrustMetrics (pre-migration contacts)
         if self.proximity_confidence == ProximityConfidence::High
             && matches!(
                 self.exchange_transport,

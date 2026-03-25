@@ -135,3 +135,97 @@ fn test_low_proximity_nfc_is_standard() {
     });
     assert_eq!(contact.trust_level(), TrustLevel::Standard);
 }
+
+// ============================================================
+// TrustMetrics path: new contacts with metrics use transport
+// proximity and verifier confidence for trust derivation
+// ============================================================
+
+#[test]
+fn usb_transport_with_metrics_is_high_trust() {
+    use vauchi_core::exchange::{TrustMetrics, VerifierEventLog};
+
+    let mut contact = make_contact(|_| {});
+    let metrics = TrustMetrics::new(
+        ExchangeTransport::Usb,
+        ProximityConfidence::Unknown,
+        None,
+        VerifierEventLog::new(),
+        1711324800,
+    );
+    contact.set_trust_metrics(Some(metrics));
+    assert_eq!(contact.trust_level(), TrustLevel::High);
+}
+
+#[test]
+fn qr_with_ultrasonic_verifier_is_high_trust() {
+    use vauchi_core::exchange::{TrustMetrics, VerifierEventLog, VerifierMethod};
+
+    let mut contact = make_contact(|_| {});
+    let metrics = TrustMetrics::new(
+        ExchangeTransport::Qr,
+        ProximityConfidence::High,
+        Some(VerifierMethod::Ultrasonic),
+        VerifierEventLog::new(),
+        1711324800,
+    );
+    contact.set_trust_metrics(Some(metrics));
+    assert_eq!(contact.trust_level(), TrustLevel::High);
+}
+
+#[test]
+fn ble_with_manual_confirm_is_standard_trust() {
+    use vauchi_core::exchange::{TrustMetrics, VerifierEventLog, VerifierMethod};
+
+    let mut contact = make_contact(|_| {});
+    let metrics = TrustMetrics::new(
+        ExchangeTransport::Ble,
+        ProximityConfidence::Medium,
+        Some(VerifierMethod::ManualConfirmation),
+        VerifierEventLog::new(),
+        1711324800,
+    );
+    contact.set_trust_metrics(Some(metrics));
+    assert_eq!(contact.trust_level(), TrustLevel::Standard);
+}
+
+#[test]
+fn recovered_overrides_usb_physical() {
+    use vauchi_core::exchange::{TrustMetrics, VerifierEventLog};
+
+    let mut contact = make_contact(|_| {});
+    contact.set_has_recovered(true);
+    let metrics = TrustMetrics::new(
+        ExchangeTransport::Usb,
+        ProximityConfidence::Unknown,
+        None,
+        VerifierEventLog::new(),
+        1711324800,
+    );
+    contact.set_trust_metrics(Some(metrics));
+    assert_eq!(contact.trust_level(), TrustLevel::Cautious);
+}
+
+#[test]
+fn trust_metrics_present_no_signal_gives_standard() {
+    use vauchi_core::exchange::{TrustMetrics, VerifierEventLog};
+
+    let mut contact = make_contact(|_| {});
+    let metrics = TrustMetrics::new(
+        ExchangeTransport::Qr,
+        ProximityConfidence::Unknown,
+        None,
+        VerifierEventLog::new(),
+        1711324800,
+    );
+    contact.set_trust_metrics(Some(metrics));
+    assert_eq!(contact.trust_level(), TrustLevel::Standard);
+}
+
+#[test]
+fn legacy_contact_without_metrics_uses_old_logic() {
+    let mut contact = make_contact(|_| {});
+    contact.set_exchange_transport(ExchangeTransport::Ble);
+    contact.set_proximity_confidence(ProximityConfidence::High);
+    assert_eq!(contact.trust_level(), TrustLevel::High);
+}

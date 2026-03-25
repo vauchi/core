@@ -87,7 +87,7 @@ impl Storage {
             crate::crypto::encrypt(&self.encryption_key, visibility_json.as_bytes())
                 .map_err(|e| StorageError::Encryption(e.to_string()))?;
 
-        // Serialize exchange_transport as its serde name ("Qr"/"Nfc"/"Ble")
+        // Serialize exchange_transport as its serde name ("qr"/"nfc"/"ble"/"usb"/"audio")
         let transport_str = serde_json::to_value(contact.exchange_transport())
             .map_err(|e| StorageError::Serialization(e.to_string()))?
             .as_str()

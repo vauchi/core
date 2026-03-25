@@ -145,6 +145,8 @@ impl From<&Contact> for MobileContact {
             ExchangeTransport::Qr => "qr",
             ExchangeTransport::Nfc => "nfc",
             ExchangeTransport::Ble => "ble",
+            ExchangeTransport::Usb => "usb",
+            ExchangeTransport::Audio => "audio",
         }
         .to_string();
 

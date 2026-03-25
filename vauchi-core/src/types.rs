@@ -12,17 +12,25 @@
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, Hash, Default, serde::Serialize, serde::Deserialize,
 )]
+#[serde(rename_all = "snake_case")]
 pub enum ExchangeTransport {
     /// QR exchange: both sides display and scan QR codes.
     /// Both use fresh ephemeral X25519 keys for full forward secrecy.
     #[default]
+    #[serde(alias = "Qr")]
     Qr,
     /// NFC Active (phone-to-phone tap): single tap replaces scan + proximity.
     /// Fresh ephemeral X25519 keys on both sides.
+    #[serde(alias = "Nfc")]
     Nfc,
     /// BLE exchange: GATT-based payload exchange with proximity verification.
     /// Fresh ephemeral X25519 keys on both sides.
+    #[serde(alias = "Ble")]
     Ble,
+    /// USB cable exchange: TCP over physical cable connection.
+    Usb,
+    /// Audio data channel exchange: ultrasonic or audible payload transfer.
+    Audio,
 }
 
 /// Confidence level of physical proximity during contact exchange.

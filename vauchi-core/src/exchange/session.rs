@@ -477,6 +477,8 @@ impl ExchangeSession {
             ExchangeTransport::Qr => "qr",
             ExchangeTransport::Nfc => "nfc",
             ExchangeTransport::Ble => "ble",
+            ExchangeTransport::Usb => "usb",
+            ExchangeTransport::Audio => "audio",
         }
     }
 

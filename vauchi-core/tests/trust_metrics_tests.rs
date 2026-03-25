@@ -41,7 +41,7 @@ fn test_public_key() -> [u8; 32] {
 fn test_exchange_transport_serde_roundtrip_qr() {
     let transport = ExchangeTransport::Qr;
     let json = serde_json::to_string(&transport).unwrap();
-    assert_eq!(json, "\"Qr\"");
+    assert_eq!(json, r#""qr""#);
     let deserialized: ExchangeTransport = serde_json::from_str(&json).unwrap();
     assert_eq!(deserialized, ExchangeTransport::Qr);
 }
@@ -50,7 +50,7 @@ fn test_exchange_transport_serde_roundtrip_qr() {
 fn test_exchange_transport_serde_roundtrip_nfc() {
     let transport = ExchangeTransport::Nfc;
     let json = serde_json::to_string(&transport).unwrap();
-    assert_eq!(json, "\"Nfc\"");
+    assert_eq!(json, r#""nfc""#);
     let deserialized: ExchangeTransport = serde_json::from_str(&json).unwrap();
     assert_eq!(deserialized, ExchangeTransport::Nfc);
 }
@@ -59,9 +59,41 @@ fn test_exchange_transport_serde_roundtrip_nfc() {
 fn test_exchange_transport_serde_roundtrip_ble() {
     let transport = ExchangeTransport::Ble;
     let json = serde_json::to_string(&transport).unwrap();
-    assert_eq!(json, "\"Ble\"");
+    assert_eq!(json, r#""ble""#);
     let deserialized: ExchangeTransport = serde_json::from_str(&json).unwrap();
     assert_eq!(deserialized, ExchangeTransport::Ble);
+}
+
+// ============================================================
+// Task 4: Usb and Audio variants + serde backward compat
+// ============================================================
+
+#[test]
+fn exchange_transport_usb_serde_roundtrip() {
+    let transport = ExchangeTransport::Usb;
+    let json = serde_json::to_string(&transport).expect("serialize");
+    assert_eq!(json, r#""usb""#);
+    let deserialized: ExchangeTransport = serde_json::from_str(&json).expect("deserialize");
+    assert_eq!(deserialized, ExchangeTransport::Usb);
+}
+
+#[test]
+fn exchange_transport_audio_serde_roundtrip() {
+    let transport = ExchangeTransport::Audio;
+    let json = serde_json::to_string(&transport).expect("serialize");
+    assert_eq!(json, r#""audio""#);
+    let deserialized: ExchangeTransport = serde_json::from_str(&json).expect("deserialize");
+    assert_eq!(deserialized, ExchangeTransport::Audio);
+}
+
+#[test]
+fn exchange_transport_legacy_pascal_case_deserializes() {
+    let qr: ExchangeTransport = serde_json::from_str(r#""Qr""#).expect("legacy Qr");
+    assert_eq!(qr, ExchangeTransport::Qr);
+    let nfc: ExchangeTransport = serde_json::from_str(r#""Nfc""#).expect("legacy Nfc");
+    assert_eq!(nfc, ExchangeTransport::Nfc);
+    let ble: ExchangeTransport = serde_json::from_str(r#""Ble""#).expect("legacy Ble");
+    assert_eq!(ble, ExchangeTransport::Ble);
 }
 
 // ============================================================

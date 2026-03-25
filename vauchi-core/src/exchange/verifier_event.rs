@@ -8,10 +8,10 @@
 //! platform/UI layers to show meaningful progress and fallback status.
 
 use super::ProximityConfidence;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 /// Identifies which proximity verification method is active.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum VerifierMethod {
     Ultrasonic,
@@ -42,7 +42,7 @@ impl VerifierMethod {
 /// - Show progress bars
 /// - Indicate method failures and fallbacks
 /// - Announce completion with confidence level
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ProximityVerifierEvent {
     /// Waiting for user action before verification can proceed.
@@ -85,7 +85,7 @@ pub enum ProximityVerifierEvent {
 ///
 /// Used by the VerifierChain to track progress and by tests to assert
 /// the correct sequence of events.
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct VerifierEventLog {
     events: Vec<ProximityVerifierEvent>,
 }

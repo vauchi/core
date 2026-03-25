@@ -378,3 +378,40 @@ fn test_storage_roundtrip_default_trust_fields() {
         "Default card_updated_at must be None"
     );
 }
+
+// ============================================================
+// Task 1 (tidy): VerifierEventLog serde roundtrip
+// ============================================================
+
+#[test]
+fn verifier_event_log_serde_roundtrip() {
+    use vauchi_core::ProximityConfidence;
+    use vauchi_core::exchange::{ProximityVerifierEvent, VerifierEventLog, VerifierMethod};
+
+    let mut log = VerifierEventLog::new();
+    log.push(ProximityVerifierEvent::InProgress {
+        method: VerifierMethod::Ultrasonic,
+        progress_pct: 0,
+    });
+    log.push(ProximityVerifierEvent::MethodFailed {
+        method: VerifierMethod::Ultrasonic,
+        reason: "no microphone".to_string(),
+    });
+    log.push(ProximityVerifierEvent::FallingBack {
+        failed_method: VerifierMethod::Ultrasonic,
+        next_method: VerifierMethod::ManualConfirmation,
+    });
+    log.push(ProximityVerifierEvent::Completed {
+        method: VerifierMethod::ManualConfirmation,
+        confidence: ProximityConfidence::Medium,
+    });
+
+    let json = serde_json::to_string(&log).expect("serialize");
+    let deserialized: VerifierEventLog = serde_json::from_str(&json).expect("deserialize");
+    assert_eq!(deserialized.events().len(), 4);
+    assert!(deserialized.is_completed());
+    assert_eq!(
+        deserialized.final_confidence(),
+        Some(ProximityConfidence::Medium)
+    );
+}

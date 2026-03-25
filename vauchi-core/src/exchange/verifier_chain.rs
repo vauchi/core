@@ -28,6 +28,7 @@ struct ChainEntry {
 struct VerificationResult {
     log: VerifierEventLog,
     winning_confidence: Option<ProximityConfidence>,
+    winning_method: Option<VerifierMethod>,
 }
 
 /// Callback invoked for each event during verification.
@@ -174,6 +175,18 @@ impl VerifierChain {
             .as_ref()
             .map(|r| r.log.clone())
     }
+
+    /// Returns the winning verifier method from the last successful verification.
+    ///
+    /// Returns `None` if no verification has been performed yet, or if all
+    /// methods were exhausted without success.
+    pub fn winning_method(&self) -> Option<VerifierMethod> {
+        self.last_result
+            .lock()
+            .expect("mutex poisoned")
+            .as_ref()
+            .and_then(|r| r.winning_method)
+    }
 }
 
 impl Default for VerifierChain {
@@ -234,11 +247,13 @@ impl ProximityVerifier for VerifierChain {
     ) -> Result<(), ProximityError> {
         let log = self.verify(emit_challenge, listen_challenge, timeout, is_initiator);
         let winning_confidence = log.final_confidence();
+        let winning_method = log.final_method();
 
-        // Store log + confidence atomically in a single lock acquisition
+        // Store log + confidence + method atomically in a single lock acquisition
         *self.last_result.lock().expect("mutex poisoned") = Some(VerificationResult {
             log,
             winning_confidence,
+            winning_method,
         });
 
         if winning_confidence.is_some() {

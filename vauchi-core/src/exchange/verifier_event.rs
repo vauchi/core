@@ -128,4 +128,12 @@ impl VerifierEventLog {
             _ => None,
         })
     }
+
+    /// The winning verifier method, if verification completed.
+    pub fn final_method(&self) -> Option<VerifierMethod> {
+        self.events.iter().rev().find_map(|e| match e {
+            ProximityVerifierEvent::Completed { method, .. } => Some(*method),
+            _ => None,
+        })
+    }
 }

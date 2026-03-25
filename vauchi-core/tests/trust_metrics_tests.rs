@@ -380,6 +380,30 @@ fn test_storage_roundtrip_default_trust_fields() {
 }
 
 // ============================================================
+// Task 3 (tidy): VerifierChain winning_method accessor
+// ============================================================
+
+#[test]
+fn verifier_chain_reports_winning_method() {
+    use vauchi_core::exchange::ProximityVerifier;
+    use vauchi_core::exchange::{ManualConfirmationVerifier, VerifierChain, VerifierMethod};
+
+    let mut chain = VerifierChain::new();
+    chain.add(
+        VerifierMethod::ManualConfirmation,
+        Box::new(ManualConfirmationVerifier::pre_confirmed()),
+    );
+
+    let challenge = [0u8; 16];
+    let timeout = std::time::Duration::from_millis(100);
+    let result = chain.verify_proximity_two_way(&challenge, &challenge, timeout, true);
+    assert!(result.is_ok());
+
+    let method = chain.winning_method();
+    assert_eq!(method, Some(VerifierMethod::ManualConfirmation));
+}
+
+// ============================================================
 // Task 1 (tidy): VerifierEventLog serde roundtrip
 // ============================================================
 

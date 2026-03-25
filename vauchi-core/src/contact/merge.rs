@@ -7,6 +7,7 @@
 use std::collections::HashSet;
 
 use crate::contact::Contact;
+use crate::contact_card::FieldType;
 
 /// A detected duplicate pair with similarity score.
 #[derive(Clone, Debug)]
@@ -66,7 +67,15 @@ pub fn compute_similarity(a: &Contact, b: &Contact) -> f64 {
         for field_b in b.card().fields() {
             if field_a.field_type() == field_b.field_type() {
                 max_score += 1.0;
-                let field_sim = string_similarity(field_a.value(), field_b.value());
+                let field_sim = if field_a.field_type() == FieldType::Phone {
+                    // Normalize phone numbers before comparison to match across
+                    // different formatting conventions ("+1 (555) 123-4567" vs "15551234567").
+                    let norm_a = normalize_phone(field_a.value());
+                    let norm_b = normalize_phone(field_b.value());
+                    string_similarity(&norm_a, &norm_b)
+                } else {
+                    string_similarity(field_a.value(), field_b.value())
+                };
                 score += field_sim;
             }
         }
@@ -141,6 +150,15 @@ pub fn normalize_pair_key(id1: &str, id2: &str) -> (String, String) {
     } else {
         (id2.to_string(), id1.to_string())
     }
+}
+
+/// Normalizes a phone number by stripping all non-digit characters.
+///
+/// This allows matching "+1 (555) 123-4567" with "15551234567" across
+/// contacts imported from different sources or formatted differently.
+/// Public so callers (e.g. tests) can use it directly.
+pub fn normalize_phone(phone: &str) -> String {
+    phone.chars().filter(|c| c.is_ascii_digit()).collect()
 }
 
 /// Simple string similarity using normalized Levenshtein-like comparison.

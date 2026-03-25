@@ -307,6 +307,56 @@ fn remove_imported_contact_field_missing_field_returns_error() {
     );
 }
 
+// ── Import API: import_contacts_from_vcf ──────────────────────────────────
+
+#[test]
+fn import_vcf_creates_contacts() {
+    let wb = new_vauchi();
+
+    let vcf = b"BEGIN:VCARD\r\nVERSION:3.0\r\nFN:Alice VCF\r\nEND:VCARD\r\n\
+                BEGIN:VCARD\r\nVERSION:3.0\r\nFN:Bob VCF\r\nEND:VCARD\r\n";
+
+    let result = wb.import_contacts_from_vcf(vcf).unwrap();
+
+    assert_eq!(result.imported, 2, "two contacts must be imported");
+    assert_eq!(result.skipped, 0, "no contacts must be skipped");
+
+    let contacts = wb.list_contacts().unwrap();
+    let names: Vec<&str> = contacts.iter().map(|c| c.display_name()).collect();
+    assert!(
+        names.contains(&"Alice VCF"),
+        "Alice VCF must be in contacts"
+    );
+    assert!(names.contains(&"Bob VCF"), "Bob VCF must be in contacts");
+}
+
+#[test]
+fn import_vcf_returns_count() {
+    let wb = new_vauchi();
+
+    let vcf = b"BEGIN:VCARD\r\nVERSION:3.0\r\nFN:Carol VCF\r\nEND:VCARD\r\n";
+
+    let result = wb.import_contacts_from_vcf(vcf).unwrap();
+
+    assert_eq!(
+        result.imported, 1,
+        "ImportResult.imported must match contacts created"
+    );
+    assert_eq!(result.skipped, 0);
+    assert!(result.warnings.is_empty());
+}
+
+#[test]
+fn import_empty_vcf_returns_zero() {
+    let wb = new_vauchi();
+
+    let result = wb.import_contacts_from_vcf(b"").unwrap();
+
+    assert_eq!(result.imported, 0, "empty file must import zero contacts");
+    assert_eq!(result.skipped, 0, "empty file must skip zero contacts");
+    assert!(result.warnings.is_empty());
+}
+
 // ── Editing: multiple fields can be added and individually removed ─────────
 
 #[test]

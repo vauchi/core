@@ -13,6 +13,7 @@ mod emergency;
 mod exchange;
 mod features;
 mod identity;
+mod import;
 mod merge;
 mod onboarding;
 mod propagation;
@@ -23,6 +24,7 @@ mod visibility;
 pub use builder::VauchiBuilder;
 pub use devices::{DeviceInfo, DeviceLinkResult};
 pub use exchange::ExchangeQrData;
+pub use import::ImportResult;
 pub use setup::SetupProgress;
 
 use std::sync::{Arc, Mutex};

@@ -151,6 +151,6 @@ pub use emergency::{
 
 // Vauchi
 pub use vauchi::{
-    AuthMode, DeviceInfo, DeviceLinkResult, ExchangeQrData, RecoveryReadiness, SetupProgress,
-    Vauchi, VauchiBuilder,
+    AuthMode, DeviceInfo, DeviceLinkResult, ExchangeQrData, ImportResult, RecoveryReadiness,
+    SetupProgress, Vauchi, VauchiBuilder,
 };

@@ -4,8 +4,8 @@
 
 //! Tests for contact::merge (duplicate detection)
 
-use vauchi_core::contact::merge::find_duplicates;
-use vauchi_core::{Contact, ContactCard, ContactField, FieldType, SymmetricKey};
+use vauchi_core::contact::merge::{compute_similarity, find_duplicates, normalize_phone};
+use vauchi_core::{Contact, ContactCard, ContactField, FieldType, ImportSource, SymmetricKey};
 
 fn make_contact(name: &str, fields: &[(FieldType, &str, &str)]) -> Contact {
     let pk = *vauchi_core::SigningKeyPair::generate()
@@ -17,6 +17,15 @@ fn make_contact(name: &str, fields: &[(FieldType, &str, &str)]) -> Contact {
             .unwrap();
     }
     Contact::from_exchange(pk, card, SymmetricKey::generate())
+}
+
+fn make_imported_contact(name: &str, fields: &[(FieldType, &str, &str)]) -> Contact {
+    let mut card = ContactCard::new(name);
+    for (ft, label, value) in fields {
+        card.add_field(ContactField::new(ft.clone(), label, value))
+            .unwrap();
+    }
+    Contact::from_import(card, ImportSource::VcardFile, None)
 }
 
 #[test]
@@ -156,5 +165,63 @@ fn test_duplicate_detection_nfc_vs_nfd() {
         nfc_contact.card().display_name(),
         nfd_contact.card().display_name(),
         "NFC and NFD names should be identical after normalization"
+    );
+}
+
+// ── Phone normalization (Task 8: Dedup extension) ─────────────────────────
+
+#[test]
+fn phone_normalization_strips_formatting() {
+    assert_eq!(normalize_phone("+1 (555) 123-4567"), "15551234567");
+    assert_eq!(normalize_phone("+1-555-123-4567"), "15551234567");
+    assert_eq!(normalize_phone("15551234567"), "15551234567");
+    assert_eq!(normalize_phone("+49 170 1234567"), "491701234567");
+    assert_eq!(normalize_phone(""), "");
+}
+
+#[test]
+fn phone_normalization_retains_only_digits() {
+    // Letters, spaces, parens, dashes, plus all stripped
+    assert_eq!(normalize_phone("(800) FLOWERS"), "800");
+    assert_eq!(normalize_phone("tel:+1-800-555-1234"), "18005551234");
+}
+
+// @scenario: contacts_management :: Detect duplicate contacts across import sources
+#[test]
+fn cross_kind_dedup_finds_phone_match() {
+    // An exchanged contact and an imported contact with the same phone number
+    // but different formatting should exceed the dedup threshold.
+    let exchanged = make_contact(
+        "Alice Smith",
+        &[(FieldType::Phone, "mobile", "+1 (555) 123-4567")],
+    );
+    let imported = make_imported_contact(
+        "Alice Smith",
+        &[(FieldType::Phone, "mobile", "15551234567")],
+    );
+
+    let sim = compute_similarity(&exchanged, &imported);
+    assert!(
+        sim >= 0.7,
+        "same phone in different formats must produce similarity >= 0.7, got {}",
+        sim
+    );
+}
+
+#[test]
+fn different_phones_stay_below_threshold() {
+    // Contacts with different phone numbers should not be flagged as duplicates
+    // from phone alone (need name match too).
+    let a = make_contact(
+        "Alice Smith",
+        &[(FieldType::Phone, "mobile", "+15551110000")],
+    );
+    let b = make_contact("Bob Jones", &[(FieldType::Phone, "mobile", "+15559990000")]);
+
+    let sim = compute_similarity(&a, &b);
+    assert!(
+        sim < 0.7,
+        "different names + different phones must be below threshold, got {}",
+        sim
     );
 }

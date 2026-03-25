@@ -14,6 +14,7 @@ use super::ble_handshake::BleHandshakeSession;
 use super::ble_payload::BleCardPayload;
 use super::command::{ExchangeCommand, ExchangeHardwareEvent};
 use super::nfc_handshake::NfcHandshakeSession;
+use super::trust_metrics::TrustMetrics;
 use super::{ExchangeError, ExchangeQR, ProximityConfidence, ProximityVerifier, X3DHKeyPair};
 use crate::contact::Contact;
 use crate::contact_card::ContactCard;
@@ -433,6 +434,25 @@ impl ExchangeSession {
     /// return `None` (no event logging).
     pub fn proximity_event_log(&self) -> Option<super::VerifierEventLog> {
         self.proximity.verification_event_log()
+    }
+
+    /// Builds TrustMetrics from the current session state.
+    ///
+    /// Called internally when creating a contact after successful exchange.
+    fn build_trust_metrics(&self) -> TrustMetrics {
+        let log = self.proximity_event_log().unwrap_or_default();
+        let method = log.final_method();
+        let timestamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("Time went backwards")
+            .as_secs();
+        TrustMetrics::new(
+            self.transport,
+            self.proximity_confidence,
+            method,
+            log,
+            timestamp,
+        )
     }
 
     /// Returns a reference to the proximity verifier (test-only).
@@ -962,6 +982,9 @@ impl ExchangeSession {
         contact.set_relay_url(self.their_relay_url.take());
         contact.set_relay_noise_pubkey(self.their_relay_noise_pubkey.take());
 
+        // Record trust metrics from exchange signals
+        contact.set_trust_metrics(Some(self.build_trust_metrics()));
+
         self.state = ExchangeState::Complete {
             contact: contact.clone(),
         };
@@ -1090,6 +1113,9 @@ impl ExchangeSession {
         // Set relay metadata learned from their QR code
         contact.set_relay_url(self.their_relay_url.take());
         contact.set_relay_noise_pubkey(self.their_relay_noise_pubkey.take());
+
+        // Record trust metrics from exchange signals
+        contact.set_trust_metrics(Some(self.build_trust_metrics()));
 
         self.state = ExchangeState::Complete {
             contact: contact.clone(),

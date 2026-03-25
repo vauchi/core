@@ -81,6 +81,13 @@ impl Vauchi {
             .load_contact(secondary_id)?
             .ok_or_else(|| VauchiError::ContactNotFound(secondary_id.to_string()))?;
 
+        // W5: Prevent merging contacts of different kinds (exchanged vs imported).
+        if primary.is_exchanged() != secondary.is_exchanged() {
+            return Err(VauchiError::InvalidState(
+                "Cannot merge exchanged and imported contacts".into(),
+            ));
+        }
+
         let merged = merge_contacts(&primary, &secondary);
 
         // Save merged contact

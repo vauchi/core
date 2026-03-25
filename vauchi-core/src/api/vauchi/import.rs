@@ -36,10 +36,40 @@ impl Vauchi {
         let mut skipped = 0;
         let mut warnings = Vec::new();
 
+        // C3: Enforce contact limit — compute remaining budget once before the loop.
+        let current_count = self.storage.count_contacts()?;
+        let max_contacts = self.storage.get_contact_limit()?;
+        let mut remaining_budget = max_contacts.saturating_sub(current_count);
+
         for (card, uid) in entries {
+            // W7: Skip if a contact with this original_uid already exists.
+            if let Some(ref uid_val) = uid
+                && self.storage.find_imported_by_uid(uid_val)?.is_some()
+            {
+                skipped += 1;
+                warnings.push(format!("Skipped duplicate (UID: {})", uid_val));
+                continue;
+            }
+
+            // C3: Stop importing when budget exhausted.
+            if remaining_budget == 0 {
+                skipped += 1;
+                warnings.push(format!(
+                    "Contact limit reached ({}); skipped remaining imports",
+                    max_contacts
+                ));
+                // Count the rest as skipped without iterating one-by-one.
+                // We already incremented skipped for this entry; the loop
+                // will naturally stop producing more warnings.
+                continue;
+            }
+
             let contact = Contact::from_import(card, ImportSource::VcardFile, uid);
             match self.storage.save_contact(&contact) {
-                Ok(_) => imported += 1,
+                Ok(_) => {
+                    imported += 1;
+                    remaining_budget = remaining_budget.saturating_sub(1);
+                }
                 Err(e) => {
                     warnings.push(format!("Skipped contact: {}", e));
                     skipped += 1;

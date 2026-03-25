@@ -498,6 +498,25 @@ impl Storage {
         Ok(rows_affected > 0)
     }
 
+    // === Import Dedup ===
+
+    /// Finds an imported contact by its original UID.
+    ///
+    /// Returns `Some(contact_id)` if a contact with the given UID exists,
+    /// `None` otherwise. Only searches imported contacts (`contact_kind = 'imported'`).
+    pub fn find_imported_by_uid(&self, uid: &str) -> Result<Option<String>, StorageError> {
+        let result = self.conn.query_row(
+            "SELECT id FROM contacts WHERE original_uid = ?1 AND contact_kind = 'imported' LIMIT 1",
+            params![uid],
+            |row| row.get::<_, String>(0),
+        );
+        match result {
+            Ok(id) => Ok(Some(id)),
+            Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+            Err(e) => Err(StorageError::Database(e)),
+        }
+    }
+
     // === Personal Notes Operations ===
 
     /// Saves encrypted personal notes for a contact.

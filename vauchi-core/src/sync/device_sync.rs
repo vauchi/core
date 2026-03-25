@@ -118,6 +118,15 @@ pub struct ImportedContactSyncData {
     pub imported_at: u64,
     /// Original vCard UID, if present — used for re-import dedup.
     pub original_uid: Option<String>,
+    /// Whether this contact is hidden from the main contact list.
+    #[serde(default)]
+    pub hidden: bool,
+    /// Whether this contact is blocked.
+    #[serde(default)]
+    pub blocked: bool,
+    /// Whether this contact is a favorite.
+    #[serde(default)]
+    pub favorite: bool,
 }
 
 impl ImportedContactSyncData {
@@ -135,6 +144,9 @@ impl ImportedContactSyncData {
             source,
             imported_at: imported.imported_at,
             original_uid: imported.original_uid.clone(),
+            hidden: contact.is_hidden(),
+            blocked: contact.is_blocked(),
+            favorite: contact.is_favorite(),
         })
     }
 
@@ -144,13 +156,23 @@ impl ImportedContactSyncData {
             .map_err(|e| DeviceSyncError::Deserialization(e.to_string()))?;
         let source: ImportSource = serde_json::from_str(&self.source)
             .map_err(|e| DeviceSyncError::Deserialization(e.to_string()))?;
-        Ok(Contact::from_import_stored(
+        let mut contact = Contact::from_import_stored(
             self.id.clone(),
             card,
             source,
             self.imported_at,
             self.original_uid.clone(),
-        ))
+        );
+        if self.hidden {
+            contact.hide();
+        }
+        if self.blocked {
+            contact.block();
+        }
+        if self.favorite {
+            contact.set_favorite(true);
+        }
+        Ok(contact)
     }
 }
 

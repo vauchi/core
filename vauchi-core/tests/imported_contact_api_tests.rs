@@ -388,3 +388,80 @@ fn imported_contact_multiple_field_add_and_remove() {
     assert_eq!(after.card().fields().len(), 1, "one field must remain");
     assert_eq!(after.card().fields()[0].label(), "mobile");
 }
+
+// ── C3: Import respects contact limit ──────────────────────────────────────
+
+#[test]
+fn import_vcf_respects_contact_limit() {
+    let wb = new_vauchi();
+    wb.storage().set_contact_limit(1).unwrap();
+
+    let vcf = b"BEGIN:VCARD\r\nVERSION:3.0\r\nFN:Alice\r\nEND:VCARD\r\n\
+                BEGIN:VCARD\r\nVERSION:3.0\r\nFN:Bob\r\nEND:VCARD\r\n";
+
+    let result = wb.import_contacts_from_vcf(vcf).unwrap();
+
+    assert_eq!(result.imported, 1, "only one contact should be imported");
+    assert_eq!(result.skipped, 1, "one contact should be skipped");
+    assert!(
+        result.warnings.iter().any(|w| w.contains("limit")),
+        "warnings must mention the contact limit, got: {:?}",
+        result.warnings
+    );
+
+    let contacts = wb.list_contacts().unwrap();
+    assert_eq!(contacts.len(), 1, "only one contact persisted");
+}
+
+// ── W5: Cross-kind merge returns error ─────────────────────────────────────
+
+#[test]
+fn test_merge_cross_kind_returns_error() {
+    let wb = new_vauchi();
+    let imported_id = add_imported(&wb, "Imported Alice");
+    let exchanged_id = add_exchanged(&wb, "Exchanged Bob");
+
+    let result = wb.merge_contacts(&imported_id, &exchanged_id);
+    assert!(result.is_err(), "merging imported with exchanged must fail");
+    match result.unwrap_err() {
+        VauchiError::InvalidState(msg) => {
+            assert!(
+                msg.contains("exchanged") && msg.contains("imported"),
+                "error must mention both kinds, got: {}",
+                msg
+            );
+        }
+        other => panic!("expected InvalidState, got {:?}", other),
+    }
+
+    // Also check the reverse direction
+    let result2 = wb.merge_contacts(&exchanged_id, &imported_id);
+    assert!(
+        matches!(result2, Err(VauchiError::InvalidState(_))),
+        "reverse cross-kind merge must also fail"
+    );
+}
+
+// ── W7: Re-import same VCF produces no duplicates ──────────────────────────
+
+#[test]
+fn test_reimport_same_vcf_no_duplicates() {
+    let wb = new_vauchi();
+
+    let vcf = b"BEGIN:VCARD\r\nVERSION:3.0\r\nFN:Alice\r\nUID:unique-alice-123\r\nEND:VCARD\r\n";
+
+    let first = wb.import_contacts_from_vcf(vcf).unwrap();
+    assert_eq!(first.imported, 1, "first import should succeed");
+
+    let second = wb.import_contacts_from_vcf(vcf).unwrap();
+    assert_eq!(second.imported, 0, "second import should import nothing");
+    assert_eq!(second.skipped, 1, "second import should skip the duplicate");
+    assert!(
+        second.warnings.iter().any(|w| w.contains("duplicate")),
+        "warnings must mention duplicate, got: {:?}",
+        second.warnings
+    );
+
+    let contacts = wb.list_contacts().unwrap();
+    assert_eq!(contacts.len(), 1, "only one contact should exist");
+}

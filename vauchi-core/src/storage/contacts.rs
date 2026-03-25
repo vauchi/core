@@ -100,12 +100,7 @@ impl Storage {
             .trust_metrics()
             .map(|m| serde_json::to_string(m).expect("trust_metrics serialize"));
 
-        // Use INSERT ... ON CONFLICT DO UPDATE (upsert) rather than INSERT OR REPLACE.
-        //
-        // INSERT OR REPLACE deletes the old row before inserting the new one, which
-        // triggers the ON DELETE CASCADE on `contact_field_notes` and silently wipes
-        // all per-field private notes every time a contact is updated. The upsert form
-        // updates the row in-place, preserving child rows.
+        // Upsert (not INSERT OR REPLACE which cascades deletes to field_notes)
         self.conn.execute(
             "INSERT INTO contacts
              (id, public_key, display_name, card_encrypted, shared_key_encrypted,

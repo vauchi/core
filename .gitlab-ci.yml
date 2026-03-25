@@ -670,7 +670,11 @@ prebuild:apple:
           - "scripts/build-bindings.sh"
           - "scripts/package-xcframework.sh"
   script:
-    - ./scripts/build-bindings.sh --apple --release-only
+    # Build ALL Apple targets (device + simulator + macOS) so prebuild
+    # artifacts are complete for tag pipelines that need xcframework packaging.
+    # --release-only was removed: it skipped sim targets, making every tag
+    # pipeline fall back to a full rebuild (defeating the prebuild cache).
+    - ./scripts/build-bindings.sh --apple
     - |
       echo "Uploading Apple binding artifacts for SHA ${CI_COMMIT_SHA}..."
       tar czf bindings-apple.tar.gz -C target/bindings ios/ macos/
@@ -775,10 +779,19 @@ build:apple:
         --header "JOB-TOKEN: ${CI_JOB_TOKEN}" \
         "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/vauchi-prebuild/${CI_COMMIT_SHA}/bindings-apple.tar.gz")
       if [ "$HTTP_CODE" = "200" ]; then
-        echo "✓ Found prebuild Apple bindings — extracting (skipping ~45 min build)"
+        echo "✓ Found prebuild Apple bindings — extracting"
         mkdir -p target/bindings
         tar xzf bindings-apple.tar.gz -C target/bindings
         rm bindings-apple.tar.gz
+        # Prebuild uses --release-only (device ARM64 only, for speed).
+        # Tag pipelines need sim lib too for xcframework packaging.
+        # Self-healing: rebuild all targets if prebuild is incomplete.
+        if [ ! -f "target/bindings/ios/libs/libvauchi_platform_sim.a" ]; then
+          echo "⚠ Prebuild lacks simulator library — rebuilding full Apple targets..."
+          ./scripts/build-bindings.sh --apple
+        else
+          echo "  ✓ Prebuild complete (device + simulator)"
+        fi
       else
         echo "⚠ No prebuild found (HTTP $HTTP_CODE) — building from scratch"
         ./scripts/build-bindings.sh --apple
@@ -997,14 +1010,39 @@ publish:core:
         echo "  ✓ Version aligned: $VERSION"
       fi
 
-      # Package the crate
-      # --no-verify: skip build check that resolves path deps (vauchi-protocol)
-      # from crates.io — we publish to GitLab generic packages, not crates.io,
-      # and the build was already verified in earlier CI stages.
-      cargo package -p vauchi-core --allow-dirty --no-verify
+      # Create tarball manually (cargo package fails on workspace path deps
+      # not published to crates.io — same workaround as publish:platform)
+      TMPDIR=$(mktemp -d)
+      PKG_DIR="$TMPDIR/vauchi-core-${VERSION}"
+      mkdir -p "$PKG_DIR"
+
+      cp vauchi-core/Cargo.toml "$PKG_DIR/"
+      # Extract workspace metadata (not hardcoded — survives edition/license changes)
+      WS_EDITION=$(grep -A5 '^\[workspace\.package\]' Cargo.toml | grep '^edition' | sed 's/.*"\(.*\)"/\1/')
+      WS_LICENSE=$(grep -A5 '^\[workspace\.package\]' Cargo.toml | grep '^license' | sed 's/.*"\(.*\)"/\1/')
+      # Resolve workspace package metadata
+      sed -i "s/^version\.workspace = true/version = \"${VERSION}\"/" "$PKG_DIR/Cargo.toml"
+      sed -i "s/^edition\.workspace = true/edition = \"${WS_EDITION}\"/" "$PKG_DIR/Cargo.toml"
+      sed -i "s/^license\.workspace = true/license = \"${WS_LICENSE}\"/" "$PKG_DIR/Cargo.toml"
+      # Resolve ALL workspace dependency references (self-healing for future deps):
+      # Dotted form: any-dep.workspace = true → any-dep = { version = "X" }
+      sed -i "s/^\([a-z_-]*\)\.workspace = true/\1 = { version = \"${VERSION}\" }/" "$PKG_DIR/Cargo.toml"
+      # Inline form: { workspace = true, features = [...] } → { version = "X", features = [...] }
+      sed -i "s/workspace = true/version = \"${VERSION}\"/" "$PKG_DIR/Cargo.toml"
+      # Strip path references from inline deps (e.g. { path = "../x", version = "0.1" } → { version = "0.1" })
+      sed -i 's|path = "\.\./[^"]*", ||g' "$PKG_DIR/Cargo.toml"
+      sed -i 's|, path = "\.\./[^"]*"||g' "$PKG_DIR/Cargo.toml"
+      cp -r vauchi-core/src "$PKG_DIR/"
+      [ -f vauchi-core/build.rs ] && cp vauchi-core/build.rs "$PKG_DIR/"
+      [ -f vauchi-core/README.md ] && cp vauchi-core/README.md "$PKG_DIR/"
+      cp -r LICENSES "$PKG_DIR/"
+
+      mkdir -p target/package
+      CRATE_FILE="target/package/vauchi-core-${VERSION}.crate"
+      tar czf "$CRATE_FILE" -C "$TMPDIR" "vauchi-core-${VERSION}"
+      rm -rf "$TMPDIR"
 
       # Upload to GitLab generic packages registry
-      CRATE_FILE="target/package/vauchi-core-${VERSION}.crate"
       HTTP_CODE=$(curl -s -w '%{http_code}' -o /dev/null \
            --header "JOB-TOKEN: ${CI_JOB_TOKEN}" \
            --upload-file "$CRATE_FILE" \

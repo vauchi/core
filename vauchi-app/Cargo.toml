@@ -10,7 +10,7 @@ license.workspace = true
 description = "App-layer modules for Vauchi — themes, UI, content, i18n, help"
 
 [dependencies]
-vauchi-core = { version = "0.9.0", path = "../vauchi-core", default-features = false, features = ["storage", "network"] }
+vauchi-core = { version = "0.9.1", path = "../vauchi-core", default-features = false, features = ["storage", "network"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 thiserror = "2.0"

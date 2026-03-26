@@ -400,10 +400,20 @@ impl MultiStageSession {
 
                 self.display_cycle += 1;
 
-                // Display COMBO QR: VRFY + CONF + RDYY in one scan.
-                // A slower peer can jump from Transferring → Finalized in ONE scan
-                // instead of 4 sequential scans (VRFY, CONF, RDYY, RDYY-ack).
-                self.get_combo_qr()
+                // Interleave DATA with COMBO: if our outbound chunks aren't
+                // fully ACK'd, the peer still needs our DATA. Show DATA every
+                // 3rd cycle so the peer can receive chunks while also getting
+                // COMBO for the stages it's ready for.
+                let all_acked = self
+                    .peer_ack_bitmap
+                    .as_ref()
+                    .map(|b| b.is_complete())
+                    .unwrap_or(false);
+                if !all_acked && self.display_cycle.is_multiple_of(3) {
+                    self.get_data_chunk_qr().or_else(|| self.get_combo_qr())
+                } else {
+                    self.get_combo_qr()
+                }
             }
             ProtocolState::Finalized => {
                 // Continue broadcasting COMBO for a grace period so the peer
@@ -413,7 +423,19 @@ impl MultiStageSession {
                 if now.duration_since(entered) > FINALIZED_GRACE_DURATION {
                     return None;
                 }
-                self.get_combo_qr()
+                // Also interleave DATA if peer hasn't ACK'd all chunks.
+                let all_acked = self
+                    .peer_ack_bitmap
+                    .as_ref()
+                    .map(|b| b.is_complete())
+                    .unwrap_or(false);
+                if !all_acked && self.display_cycle.is_multiple_of(3) {
+                    self.display_cycle += 1;
+                    self.get_data_chunk_qr().or_else(|| self.get_combo_qr())
+                } else {
+                    self.display_cycle += 1;
+                    self.get_combo_qr()
+                }
             }
             ProtocolState::Failed(_) => {
                 // S5: Broadcast FAIL QR so peer aborts immediately.
@@ -980,31 +1002,37 @@ impl MultiStageSession {
     }
 
     /// Handle a COMBO QR from the peer — process VRFY + CONF + RDYY in one shot.
-    /// Allows jumping from Transferring/Verifying/Confirming straight to Finalized.
+    /// Allows jumping from Verifying/Confirming/Complete straight to Finalized.
+    ///
+    /// SAFETY: Only processes VRFY if we have all inbound chunks. If we're still
+    /// Transferring without complete data, the COMBO is treated as a stashed
+    /// reveal key (same as receiving a standalone VRFY during Transferring).
     fn handle_combo(
         &mut self,
         reveal_key: [u8; 32],
         payload_hash: [u8; 32],
         ack_hash: [u8; 32],
     ) -> ProtocolState {
-        // Process each component based on current state.
-        // The beauty of COMBO: the peer processes whichever parts it still needs.
+        // If still Transferring, stash the reveal key but don't chain further.
+        // We can't process CONF/RDYY without the actual data.
+        if matches!(self.state, ProtocolState::Transferring { .. }) {
+            // handle_verify will stash the reveal key if chunks aren't complete
+            self.handle_verify(reveal_key);
+            // Don't chain — we need more DATA chunks first
+            return self.state.clone();
+        }
 
-        // If we're in Transferring and have all chunks, process VRFY.
-        // If we're in Verifying, process VRFY.
-        if matches!(
-            self.state,
-            ProtocolState::Transferring { .. } | ProtocolState::Verifying
-        ) {
+        // In Verifying: process reveal key → should move to Confirming
+        if matches!(self.state, ProtocolState::Verifying) {
             self.handle_verify(reveal_key);
         }
 
-        // If we reached Confirming (from VRFY above or already there), process CONF.
+        // In Confirming: process payload hash → should move to Complete
         if matches!(self.state, ProtocolState::Confirming) {
             self.handle_confirm(payload_hash);
         }
 
-        // If we reached Complete (from CONF above or already there), process RDYY.
+        // In Complete/RetryReady: process ack hash → should move to Finalized
         if matches!(
             self.state,
             ProtocolState::Complete | ProtocolState::RetryReady

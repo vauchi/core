@@ -5,8 +5,12 @@
 //! Feature operations: aha moments, demo contact, multi-relay, hide/unhide,
 //! block/unblock, consent, recovery readiness, and visibility re-propagation.
 
+use crate::aha_moments::AhaMoment;
 use crate::contact::Contact;
 use crate::contact_card::ContactCard;
+use crate::demo_contact::{DemoContactCard, DemoTip, generate_demo_contact_card};
+use crate::network::MultiRelayConfig;
+use crate::types::{AhaMomentType, DemoContactState};
 
 use super::super::consent::{ConsentManager, ConsentRecord, ConsentType};
 use super::super::contact_manager::ContactManager;
@@ -23,8 +27,8 @@ impl Vauchi {
     /// Automatically persists the "seen" state.
     pub fn try_trigger_aha_moment(
         &self,
-        moment_type: crate::types::AhaMomentType,
-    ) -> VauchiResult<Option<crate::aha_moments::AhaMoment>> {
+        moment_type: AhaMomentType,
+    ) -> VauchiResult<Option<AhaMoment>> {
         let mut tracker = self.storage.load_or_create_aha_tracker()?;
         let moment = tracker.try_trigger(moment_type);
         if moment.is_some() {
@@ -38,9 +42,9 @@ impl Vauchi {
     /// Context is used for personalized messages (e.g., contact name).
     pub fn try_trigger_aha_moment_with_context(
         &self,
-        moment_type: crate::types::AhaMomentType,
+        moment_type: AhaMomentType,
         context: String,
-    ) -> VauchiResult<Option<crate::aha_moments::AhaMoment>> {
+    ) -> VauchiResult<Option<AhaMoment>> {
         let mut tracker = self.storage.load_or_create_aha_tracker()?;
         let moment = tracker.try_trigger_with_context(moment_type, context);
         if moment.is_some() {
@@ -50,10 +54,7 @@ impl Vauchi {
     }
 
     /// Checks if an aha moment has been seen.
-    pub fn has_seen_aha_moment(
-        &self,
-        moment_type: crate::types::AhaMomentType,
-    ) -> VauchiResult<bool> {
+    pub fn has_seen_aha_moment(&self, moment_type: AhaMomentType) -> VauchiResult<bool> {
         let tracker = self.storage.load_or_create_aha_tracker()?;
         Ok(tracker.has_seen(moment_type))
     }
@@ -75,7 +76,7 @@ impl Vauchi {
     // === Demo Contact Operations ===
 
     /// Gets the current demo contact state.
-    pub fn demo_contact_state(&self) -> VauchiResult<crate::types::DemoContactState> {
+    pub fn demo_contact_state(&self) -> VauchiResult<DemoContactState> {
         Ok(self.storage.load_or_create_demo_contact_state()?)
     }
 
@@ -85,13 +86,13 @@ impl Vauchi {
     }
 
     /// Gets the current demo contact card (if active).
-    pub fn demo_contact_card(&self) -> VauchiResult<Option<crate::demo_contact::DemoContactCard>> {
+    pub fn demo_contact_card(&self) -> VauchiResult<Option<DemoContactCard>> {
         let state = self.storage.load_or_create_demo_contact_state()?;
         if !state.is_active {
             return Ok(None);
         }
         match state.current_tip() {
-            Some(tip) => Ok(Some(crate::demo_contact::generate_demo_contact_card(&tip))),
+            Some(tip) => Ok(Some(generate_demo_contact_card(&tip))),
             None => Ok(None),
         }
     }
@@ -99,7 +100,7 @@ impl Vauchi {
     /// Advances the demo contact to the next tip.
     ///
     /// Returns the new tip if successful.
-    pub fn advance_demo_contact(&self) -> VauchiResult<Option<crate::demo_contact::DemoTip>> {
+    pub fn advance_demo_contact(&self) -> VauchiResult<Option<DemoTip>> {
         let mut state = self.storage.load_or_create_demo_contact_state()?;
         if !state.is_active {
             return Ok(None);
@@ -142,7 +143,7 @@ impl Vauchi {
             return Ok(());
         }
 
-        let state = crate::types::DemoContactState::new_active();
+        let state = DemoContactState::new_active();
         self.storage.save_demo_contact_state(&state)?;
         Ok(())
     }
@@ -150,12 +151,12 @@ impl Vauchi {
     // === Multi-Relay Configuration ===
 
     /// Returns the current multi-relay configuration, if any.
-    pub fn relay_list(&self) -> Option<&crate::network::MultiRelayConfig> {
+    pub fn relay_list(&self) -> Option<&MultiRelayConfig> {
         self.config.relay_list.as_ref()
     }
 
     /// Sets the multi-relay configuration.
-    pub fn set_relay_list(&mut self, config: crate::network::MultiRelayConfig) -> VauchiResult<()> {
+    pub fn set_relay_list(&mut self, config: MultiRelayConfig) -> VauchiResult<()> {
         self.config.relay_list = Some(config);
         Ok(())
     }

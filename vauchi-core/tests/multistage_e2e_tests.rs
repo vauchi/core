@@ -745,9 +745,9 @@ fn test_adaptive_display_durations() {
     }
 }
 
-/// S2: Complete state shows ONLY RDYY QRs (no VRFY/CONF interleave).
+/// S2: Complete state shows ONLY COMBO QRs (no VRFY/CONF interleave).
 #[test]
-fn test_complete_shows_only_rdyy() {
+fn test_complete_shows_only_combo() {
     let mut alice = MultiStageSession::new(b"Alice".to_vec());
     let mut bob = MultiStageSession::new(b"Bob".to_vec());
 
@@ -772,12 +772,12 @@ fn test_complete_shows_only_rdyy() {
     }
     assert_eq!(alice.get_state(), ProtocolState::Complete);
 
-    // Verify all QRs in Complete state are RDYY (start with "RDYY")
+    // Verify all QRs in Complete state are COMBO (VRFY+CONF+RDYY in one)
     for _ in 0..10 {
         if let Some(qr) = alice.get_display_qr() {
             assert!(
-                qr.data.starts_with("RDYY"),
-                "Complete state should only show RDYY, got: {}",
+                qr.data.starts_with("CMBO"),
+                "Complete state should show COMBO, got: {}",
                 &qr.data[..4]
             );
         } else {

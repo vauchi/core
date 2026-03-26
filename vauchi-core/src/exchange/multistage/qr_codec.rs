@@ -73,6 +73,14 @@ pub enum StageQr {
         session_id: [u8; 16],
         ack_hash: [u8; 32],
     },
+    /// Compound QR: VRFY + CONF + RDYY in one scan.
+    /// Lets a slower peer jump from Transferring → Finalized in a single scan.
+    Combo {
+        session_id: [u8; 16],
+        reveal_key: [u8; 32],
+        payload_hash: [u8; 32],
+        ack_hash: [u8; 32],
+    },
     /// Failure notification — tells peer to abort immediately.
     Fail { session_id: [u8; 16] },
 }
@@ -234,10 +242,33 @@ pub fn format_confirm_qr(session_id: &[u8; 16], payload_hash: &[u8; 32]) -> Stri
 ///
 /// The ack_hash is SHA-256(min(sid_a, sid_b) || max(sid_a, sid_b)),
 /// proving both sides participated in the same exchange.
+/// Kept for backward compatibility with older clients that don't understand CMBO.
+#[allow(dead_code)]
 pub fn format_ready_qr(session_id: &[u8; 16], ack_hash: &[u8; 32]) -> String {
     format!(
         "RDYY{sid}{ah}",
         sid = base45::encode(session_id),
+        ah = base45::encode(ack_hash),
+    )
+}
+
+/// Format a COMBO QR: `CMBO<sid:24><rk:48><ph:48><ah:48>`
+///
+/// Compound QR containing VRFY reveal_key + CONF payload_hash + RDYY ack_hash.
+/// A slower peer can process all three in one scan, jumping from
+/// Transferring/Verifying straight to Finalized.
+/// Total: 4 + 24 + 48 + 48 + 48 = 172 chars (well within QR capacity).
+pub fn format_combo_qr(
+    session_id: &[u8; 16],
+    reveal_key: &[u8; 32],
+    payload_hash: &[u8; 32],
+    ack_hash: &[u8; 32],
+) -> String {
+    format!(
+        "CMBO{sid}{rk}{ph}{ah}",
+        sid = base45::encode(session_id),
+        rk = base45::encode(reveal_key),
+        ph = base45::encode(payload_hash),
         ah = base45::encode(ack_hash),
     )
 }
@@ -266,6 +297,7 @@ pub fn parse_qr(raw: &str) -> Result<StageQr, QrCodecError> {
         "CONF" => parse_confirm(body),
         "RDYY" => parse_ready(body),
         "FAIL" => parse_fail(body),
+        "CMBO" => parse_combo(body),
         _ => Err(QrCodecError::UnknownPrefix),
     }
 }
@@ -422,5 +454,20 @@ fn parse_fail(body: &str) -> Result<StageQr, QrCodecError> {
 
     Ok(StageQr::Fail {
         session_id: decode_fixed(sid)?,
+    })
+}
+
+fn parse_combo(body: &str) -> Result<StageQr, QrCodecError> {
+    let mut pos = 0;
+    let sid = take(body, &mut pos, SID_LEN)?;
+    let rk = take(body, &mut pos, F32_LEN)?;
+    let ph = take(body, &mut pos, F32_LEN)?;
+    let ah = take(body, &mut pos, F32_LEN)?;
+
+    Ok(StageQr::Combo {
+        session_id: decode_fixed(sid)?,
+        reveal_key: decode_fixed(rk)?,
+        payload_hash: decode_fixed(ph)?,
+        ack_hash: decode_fixed(ah)?,
     })
 }

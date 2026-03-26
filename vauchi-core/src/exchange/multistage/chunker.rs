@@ -54,6 +54,16 @@ impl ReassemblyBuffer {
         }
     }
 
+    /// Create a buffer from already-complete data (single chunk, no reassembly needed).
+    /// Used by INID (INIT+Data) to skip the DATA phase for small payloads.
+    pub fn from_complete(data: Vec<u8>) -> Self {
+        ReassemblyBuffer {
+            chunks: vec![Some(data)],
+            received: 1,
+            total: 1,
+        }
+    }
+
     pub fn insert(&mut self, index: u8, data: Vec<u8>) {
         if index < self.total && self.chunks[index as usize].is_none() {
             self.chunks[index as usize] = Some(data);

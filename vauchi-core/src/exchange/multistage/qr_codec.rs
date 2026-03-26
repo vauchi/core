@@ -73,6 +73,20 @@ pub enum StageQr {
         session_id: [u8; 16],
         ack_hash: [u8; 32],
     },
+    /// INIT with embedded data: for small payloads (1 chunk), includes the
+    /// raw commitment ciphertext. Eliminates the DATA phase entirely.
+    /// Peer goes directly from Advertising → has all data in one scan.
+    Inid {
+        session_id: [u8; 16],
+        pubkey: [u8; 32],
+        ephemeral: [u8; 32],
+        commitment_hash: [u8; 32],
+        display_name: String,
+        relay_url: Option<String>,
+        relay_noise_pubkey: Option<[u8; 32]>,
+        /// Raw commitment ciphertext (not transport-encrypted).
+        ciphertext: Vec<u8>,
+    },
     /// Compound QR: VRFY + CONF + RDYY in one scan.
     /// Lets a slower peer jump from Transferring → Finalized in a single scan.
     Combo {
@@ -196,6 +210,67 @@ pub fn format_init_qr_with_relay(
     result
 }
 
+#[allow(clippy::too_many_arguments)]
+/// Format an INID (INIT+Data) QR for small payloads.
+///
+/// Layout: same as INIT but with prefix `INID` and appended ciphertext.
+/// `INID<sid:24><pk:48><eph:48><ch:48><name_len:2><name><flags:2>[relay]<ct_len:3><ct>`
+///
+/// The ciphertext is the raw commitment ciphertext (NOT transport-encrypted).
+/// Security: the commitment scheme provides confidentiality (ChaCha20-Poly1305
+/// with random reveal key) and integrity (commitment hash). Transport encryption
+/// is redundant for single-chunk payloads bound to this session's commitment hash.
+pub fn format_inid_qr(
+    session_id: &[u8; 16],
+    pubkey: &[u8; 32],
+    ephemeral: &[u8; 32],
+    commitment_hash: &[u8; 32],
+    display_name: &str,
+    relay_url: Option<&str>,
+    relay_noise_pubkey: Option<&[u8; 32]>,
+    ciphertext: &[u8],
+) -> String {
+    assert!(
+        display_name.len() <= 99,
+        "display_name exceeds 99-byte limit"
+    );
+
+    let mut flags: u8 = 0;
+    if relay_url.is_some() {
+        flags |= FLAG_HAS_RELAY_URL;
+    }
+    if relay_noise_pubkey.is_some() {
+        flags |= FLAG_HAS_RELAY_NOISE_PUBKEY;
+    }
+
+    let ct_encoded = base45::encode(ciphertext);
+
+    // Build same as INIT but with INID prefix, then append ciphertext at the end
+    let mut result = format!(
+        "INID{sid}{pk}{eph}{ch}{name_len:02}{name}{flags}",
+        sid = base45::encode(session_id),
+        pk = base45::encode(pubkey),
+        eph = base45::encode(ephemeral),
+        ch = base45::encode(commitment_hash),
+        name_len = display_name.len(),
+        name = display_name,
+        flags = base45::encode(&[flags]),
+    );
+
+    // Relay fields (same position as INIT)
+    if let Some(url) = relay_url {
+        result.push_str(&format!("{:03}{}", url.len(), url));
+    }
+    if let Some(npk) = relay_noise_pubkey {
+        result.push_str(&base45::encode(npk));
+    }
+
+    // Ciphertext appended at the very end with length prefix
+    result.push_str(&format!("{:03}{}", ct_encoded.len(), ct_encoded));
+
+    result
+}
+
 /// Format a DATA stage QR string with CRC-16 integrity check.
 ///
 /// Layout: `DATA<sid:24><idx:3>/<total:3><ack_len:2><ack:variable><crc:3><payload>`
@@ -292,6 +367,7 @@ pub fn parse_qr(raw: &str) -> Result<StageQr, QrCodecError> {
 
     match prefix {
         "INIT" => parse_init(body),
+        "INID" => parse_inid(body),
         "DATA" => parse_data(body),
         "VRFY" => parse_verify(body),
         "CONF" => parse_confirm(body),
@@ -358,6 +434,61 @@ fn parse_init(body: &str) -> Result<StageQr, QrCodecError> {
         display_name: name.to_string(),
         relay_url,
         relay_noise_pubkey,
+    })
+}
+
+fn parse_inid(body: &str) -> Result<StageQr, QrCodecError> {
+    let mut pos = 0;
+    let sid = take(body, &mut pos, SID_LEN)?;
+    let pk = take(body, &mut pos, F32_LEN)?;
+    let eph = take(body, &mut pos, F32_LEN)?;
+    let ch = take(body, &mut pos, F32_LEN)?;
+    let name_len_str = take(body, &mut pos, NAME_LEN_LEN)?;
+    let name_len: usize = name_len_str
+        .parse()
+        .map_err(|_| QrCodecError::InvalidFieldCount)?;
+    let name = take(body, &mut pos, name_len)?;
+    let flags_encoded = take(body, &mut pos, FLAGS_LEN)?;
+    let flags_bytes: [u8; 1] = decode_fixed(flags_encoded)?;
+    let flags = flags_bytes[0];
+
+    let relay_url = if flags & FLAG_HAS_RELAY_URL != 0 {
+        let url_len_str = take(body, &mut pos, URL_LEN_LEN)?;
+        let url_len: usize = url_len_str
+            .parse()
+            .map_err(|_| QrCodecError::InvalidFieldCount)?;
+        let url = take(body, &mut pos, url_len)?;
+        Some(url.to_string())
+    } else {
+        None
+    };
+
+    let relay_noise_pubkey = if flags & FLAG_HAS_RELAY_NOISE_PUBKEY != 0 {
+        let npk = take(body, &mut pos, F32_LEN)?;
+        Some(decode_fixed(npk)?)
+    } else if relay_url.is_some() {
+        return Err(QrCodecError::MissingRelayNoisePubkey);
+    } else {
+        None
+    };
+
+    // Ciphertext with length prefix (at the end)
+    let ct_len_str = take(body, &mut pos, 3)?;
+    let ct_len: usize = ct_len_str
+        .parse()
+        .map_err(|_| QrCodecError::InvalidFieldCount)?;
+    let ct_encoded = take(body, &mut pos, ct_len)?;
+    let ciphertext = base45::decode(ct_encoded)?;
+
+    Ok(StageQr::Inid {
+        session_id: decode_fixed(sid)?,
+        pubkey: decode_fixed(pk)?,
+        ephemeral: decode_fixed(eph)?,
+        commitment_hash: decode_fixed(ch)?,
+        display_name: name.to_string(),
+        relay_url,
+        relay_noise_pubkey,
+        ciphertext,
     })
 }
 

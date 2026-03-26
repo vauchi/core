@@ -504,6 +504,24 @@ impl MultiStageSession {
                 payload_hash,
                 ack_hash,
             } => self.handle_combo(reveal_key, payload_hash, ack_hash),
+            StageQr::Inid {
+                session_id,
+                pubkey,
+                ephemeral,
+                commitment_hash,
+                display_name: _,
+                relay_url,
+                relay_noise_pubkey,
+                ciphertext,
+            } => self.handle_inid(
+                session_id,
+                pubkey,
+                ephemeral,
+                commitment_hash,
+                relay_url,
+                relay_noise_pubkey,
+                ciphertext,
+            ),
             StageQr::Fail { session_id: _ } => self.handle_fail(),
         }
     }
@@ -511,6 +529,21 @@ impl MultiStageSession {
     // --- Private helpers ---
 
     fn build_init_qr(&self) -> String {
+        // For small payloads (1 chunk), use INID to embed data in the INIT QR.
+        // This eliminates the DATA phase — peer gets everything in one scan.
+        let ciphertext = self.commitment.ciphertext();
+        if ciphertext.len() <= CHUNK_PAYLOAD_SIZE {
+            return qr_codec::format_inid_qr(
+                &self.session_id,
+                &self.identity_pubkey,
+                self.ephemeral_public.as_bytes(),
+                self.commitment.hash(),
+                &self.display_name,
+                self.our_relay_url.as_deref(),
+                self.our_relay_noise_pubkey.as_ref(),
+                ciphertext,
+            );
+        }
         qr_codec::format_init_qr_with_relay(
             &self.session_id,
             &self.identity_pubkey,
@@ -566,6 +599,48 @@ impl MultiStageSession {
         self.prepare_outbound_chunks();
 
         // Transition to Transferring (skip Discovered for efficiency)
+        self.update_transfer_state();
+        self.state.clone()
+    }
+
+    /// Handle INID (INIT+Data) — processes INIT fields and stores embedded ciphertext.
+    /// Eliminates the DATA phase for small payloads (1 chunk).
+    #[allow(clippy::too_many_arguments)]
+    fn handle_inid(
+        &mut self,
+        session_id: [u8; 16],
+        pubkey: [u8; 32],
+        ephemeral: [u8; 32],
+        commitment_hash: [u8; 32],
+        relay_url: Option<String>,
+        relay_noise_pubkey: Option<[u8; 32]>,
+        ciphertext: Vec<u8>,
+    ) -> ProtocolState {
+        // Process the INIT portion first
+        let state = self.handle_init(
+            session_id,
+            pubkey,
+            ephemeral,
+            commitment_hash,
+            relay_url,
+            relay_noise_pubkey,
+        );
+
+        // If INIT processing failed, return the error state
+        if matches!(state, ProtocolState::Failed(_)) {
+            return state;
+        }
+
+        // Store the raw ciphertext directly in the reassembly buffer.
+        // This bypasses transport encryption (the ciphertext is already
+        // commitment-encrypted with the reveal key).
+        // Set up inbound tracking as if we received all DATA chunks.
+        self.inbound_buffer = Some(ReassemblyBuffer::from_complete(ciphertext));
+        self.inbound_bitmap = Some(ChunkBitmap::new(1));
+        self.inbound_bitmap.as_mut().unwrap().mark_received(0);
+        self.peer_chunks_total = Some(1);
+
+        // Update transfer state — with all chunks received, should advance to Verifying
         self.update_transfer_state();
         self.state.clone()
     }

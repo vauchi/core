@@ -184,7 +184,7 @@ fn test_create_key_offer_format() {
         .expect("key offer should succeed");
 
     // version(1) + identity_pub(32) + ephemeral_pub(32) + nonce(16) + timestamp(8) = 89
-    assert_eq!(offer.len(), 89, "KeyOffer must be exactly 89 bytes");
+    assert_eq!(offer.len(), 121, "v2 KeyOffer must be exactly 121 bytes");
     assert_eq!(
         offer[0], BLE_HANDSHAKE_VERSION,
         "First byte must be version tag"
@@ -230,17 +230,17 @@ fn test_responder_processes_key_offer() {
 
     let (ack_bytes, encrypted_card) = bob.process_key_offer(&offer).expect("process key offer");
 
-    // KeyAck: version(1) + identity_pub(32) + ephemeral_pub(32) + nonce(16) + commitment(32) = 113
-    assert_eq!(ack_bytes.len(), 113, "KeyAck must be exactly 113 bytes");
+    // v2 KeyAck: version(1) + identity(32) + exchange(32) + ephemeral(32) + nonce(16) + commitment(32) = 145
+    assert_eq!(ack_bytes.len(), 145, "v2 KeyAck must be exactly 145 bytes");
     assert_eq!(
         ack_bytes[0], BLE_HANDSHAKE_VERSION,
         "KeyAck version must match"
     );
 
-    // Commitment is SHA-256 of encrypted card
+    // Commitment is SHA-256 of encrypted card (at offset 113..145 in v2)
     let expected_commitment = Sha256::digest(&encrypted_card);
     assert_eq!(
-        &ack_bytes[81..113],
+        &ack_bytes[113..145],
         &expected_commitment[..],
         "Commitment in KeyAck must be SHA-256(encrypted_card)"
     );
@@ -259,7 +259,7 @@ fn test_responder_rejects_invalid_version() {
     let mut bob = BleHandshakeSession::new_responder(&bob_id, bob_card);
 
     let mut bad_offer = vec![0x99u8]; // Wrong version
-    bad_offer.extend_from_slice(&[0u8; 88]); // Pad to 89 bytes
+    bad_offer.extend_from_slice(&[0u8; 120]); // Pad to 121 bytes (v2 size)
 
     let result = bob.process_key_offer(&bad_offer);
     assert!(result.is_err(), "Invalid version must be rejected");
@@ -495,9 +495,10 @@ fn test_expired_key_offer_rejected() {
     let bob_card = make_test_card(&bob_id, "Bob");
     let mut bob = BleHandshakeSession::new_responder(&bob_id, bob_card);
 
-    // Construct an offer with a timestamp far in the past
+    // Construct a v2 offer with a timestamp far in the past
     let mut offer = vec![BLE_HANDSHAKE_VERSION];
     offer.extend_from_slice(&[1u8; 32]); // identity_pub
+    offer.extend_from_slice(&[4u8; 32]); // exchange_pub (v2)
     offer.extend_from_slice(&[2u8; 32]); // ephemeral_pub
     offer.extend_from_slice(&[3u8; 16]); // nonce
     // Timestamp: 0 (epoch) — definitely expired
@@ -562,5 +563,99 @@ fn test_process_committed_payload_in_wrong_state() {
     assert!(
         matches!(result, Err(ExchangeError::InvalidState(_))),
         "process_committed_payload in Idle state must fail"
+    );
+}
+
+// ============================================================
+// Identity Binding (Protocol v2)
+// ============================================================
+
+// @scenario: ble_exchange :: Protocol version is 0x02
+#[test]
+fn test_protocol_version_is_v2() {
+    assert_eq!(
+        BLE_HANDSHAKE_VERSION, 0x02,
+        "BLE handshake must use protocol version 2"
+    );
+}
+
+// @scenario: ble_exchange :: KeyOffer includes exchange public key
+#[test]
+fn test_key_offer_includes_exchange_key() {
+    let identity = make_test_identity();
+    let card = make_test_card(&identity, "Alice");
+    let mut session = BleHandshakeSession::new_initiator(&identity, card);
+
+    let offer = session.create_key_offer().expect("key offer");
+
+    // v2 KeyOffer: version(1) + identity_pub(32) + exchange_pub(32)
+    //   + ephemeral_pub(32) + nonce(16) + timestamp(8) = 121 bytes
+    assert_eq!(
+        offer.len(),
+        121,
+        "v2 KeyOffer must be 121 bytes (was 89 in v1)"
+    );
+
+    // identity_pub is Ed25519 signing key
+    assert_eq!(
+        &offer[1..33],
+        identity.signing_public_key(),
+        "Bytes 1..33 must be Ed25519 signing key"
+    );
+
+    // exchange_pub is X25519 key
+    assert_eq!(
+        &offer[33..65],
+        identity.exchange_public_key(),
+        "Bytes 33..65 must be X25519 exchange key"
+    );
+}
+
+// @scenario: ble_exchange :: Tampered exchange key causes decryption failure
+#[test]
+fn test_tampered_exchange_key_fails() {
+    // If an attacker modifies the exchange_pub in a KeyOffer,
+    // DH1 produces different secrets → decryption fails.
+    let alice = make_test_identity();
+    let bob = make_test_identity();
+
+    let alice_card = make_test_card(&alice, "Alice");
+    let bob_card = make_test_card(&bob, "Bob");
+
+    let mut init = BleHandshakeSession::new_initiator(&alice, alice_card);
+    let mut resp = BleHandshakeSession::new_responder(&bob, bob_card);
+
+    let mut offer = init.create_key_offer().unwrap();
+    // Tamper with exchange_pub (bytes 33..65)
+    offer[33] ^= 0xFF;
+
+    // Responder derives a different DH1 → different session key
+    let (ack, enc_bob) = resp.process_key_offer(&offer).unwrap();
+
+    // Initiator uses its real identity key for DH1 but the ack
+    // was encrypted with a mismatched key → decryption fails
+    let result = init.process_key_ack(&ack, &enc_bob);
+    assert!(
+        result.is_err(),
+        "Tampered exchange key must cause handshake failure"
+    );
+}
+
+// @scenario: ble_exchange :: v1 offer rejected by v2 responder
+#[test]
+fn test_v1_offer_rejected() {
+    let bob_id = make_test_identity();
+    let bob_card = make_test_card(&bob_id, "Bob");
+    let mut bob = BleHandshakeSession::new_responder(&bob_id, bob_card);
+
+    // Construct a v1-format offer padded to v2 length so it passes
+    // the size check and reaches the version check
+    let mut v1_offer = vec![0x01u8]; // v1 version
+    v1_offer.extend_from_slice(&[0u8; 120]); // pad to 121 bytes
+
+    let result = bob.process_key_offer(&v1_offer);
+    assert!(
+        matches!(result, Err(ExchangeError::InvalidProtocolVersion)),
+        "v1 offer must be rejected by v2 responder"
     );
 }

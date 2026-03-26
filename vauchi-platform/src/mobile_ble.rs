@@ -21,7 +21,7 @@ use std::sync::Mutex;
 use vauchi_core::exchange::{
     BLE_CHUNK_OVERHEAD, BLE_DEFAULT_USABLE, BleCardPayload, BleChunker, BleExchangeResult,
     BleHandshakeSession, BleHandshakeState, BleReassembler, CHAR_DATA_NOTIFY, CHAR_DATA_WRITE,
-    CHAR_HANDSHAKE_NOTIFY, CHAR_HANDSHAKE_WRITE,
+    CHAR_HANDSHAKE_NOTIFY, CHAR_HANDSHAKE_WRITE, X3DHKeyPair,
 };
 
 // === Error Types ===
@@ -147,6 +147,7 @@ impl MobileBleExchangeSession {
     /// * `identity_key` - 32-byte Ed25519 signing public key
     /// * `display_name` - User's display name for the contact card
     /// * `exchange_key` - 32-byte X25519 exchange public key
+    /// * `exchange_secret` - 32-byte X25519 exchange secret key (for identity DH binding)
     /// * `fields` - Contact fields as key-value pairs
     /// * `avatar` - Optional avatar image bytes
     /// * `delegate` - Platform BLE transport callback
@@ -155,6 +156,7 @@ impl MobileBleExchangeSession {
         identity_key: Vec<u8>,
         display_name: String,
         exchange_key: Vec<u8>,
+        exchange_secret: Vec<u8>,
         fields: Vec<MobileBleField>,
         avatar: Option<Vec<u8>>,
         delegate: Box<dyn MobileBleDelegate>,
@@ -173,6 +175,15 @@ impl MobileBleExchangeSession {
                     msg: "exchange_key must be exactly 32 bytes".into(),
                 })?;
 
+        let exchange_secret_arr: [u8; 32] =
+            exchange_secret
+                .try_into()
+                .map_err(|_| MobileBleError::ExchangeFailed {
+                    msg: "exchange_secret must be exactly 32 bytes".into(),
+                })?;
+
+        let identity_x3dh = X3DHKeyPair::from_bytes(exchange_secret_arr);
+
         let card_fields: Vec<(String, String)> =
             fields.into_iter().map(|f| (f.key, f.value)).collect();
 
@@ -185,7 +196,8 @@ impl MobileBleExchangeSession {
         );
 
         // Default to initiator; call set_responder() before on_connected() to switch.
-        let session = BleHandshakeSession::new_initiator_from_key(identity_key_arr, card);
+        let session =
+            BleHandshakeSession::new_initiator_from_key(identity_key_arr, identity_x3dh, card);
 
         Ok(Self {
             inner: Mutex::new(session),
@@ -676,6 +688,7 @@ mod tests {
             vec![1u8; 32],
             name.to_string(),
             vec![2u8; 32],
+            vec![3u8; 32],
             vec![MobileBleField {
                 key: "email".into(),
                 value: "test@example.com".into(),
@@ -693,6 +706,7 @@ mod tests {
             vec![1u8; 16], // too short
             "Test".into(),
             vec![2u8; 32],
+            vec![3u8; 32],
             vec![],
             None,
             delegate,
@@ -707,6 +721,7 @@ mod tests {
             vec![1u8; 32],
             "Test".into(),
             vec![2u8; 16], // too short
+            vec![3u8; 32],
             vec![],
             None,
             delegate2,

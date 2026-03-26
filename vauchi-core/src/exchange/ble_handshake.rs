@@ -23,14 +23,16 @@
 //! Phase 4 (Both sides): Reveal — verify commitments, decrypt
 //! ```
 //!
-//! ## Key Derivation
+//! ## Key Derivation (v2 — identity binding)
 //!
-//! Single ephemeral×ephemeral DH, then HKDF with sorted public keys:
+//! Two DH operations: identity binding (DH1) + forward secrecy (DH2):
 //! ```text
-//! dh_secret = our_ephemeral.dh(their_ephemeral)
+//! dh1 = our_identity_x25519.dh(their_exchange_pub)  // identity binding
+//! dh2 = our_ephemeral.dh(their_ephemeral)            // forward secrecy
+//! ikm = dh1 || dh2  (64 bytes)
 //! salt = sorted(our_nonce, their_nonce)
-//! info = b"vauchi-ble-handshake-v1" || sorted(our_pub, their_pub)
-//! session_key = HKDF(salt, dh_secret, info)
+//! info = b"vauchi-ble-handshake-v2" || sorted(our_exchange_pub, their_exchange_pub)
+//! session_key = HKDF(salt, ikm, info)
 //! ```
 //!
 //! ## Commitment Scheme
@@ -66,11 +68,11 @@ use crate::crypto::encryption::{self, SymmetricKey};
 use crate::crypto::kdf::HKDF;
 use crate::identity::Identity;
 
-/// HKDF info prefix for BLE handshake key derivation.
-pub const BLE_HANDSHAKE_INFO: &[u8] = b"vauchi-ble-handshake-v1";
+/// HKDF info prefix for BLE handshake key derivation (v2: identity binding).
+pub const BLE_HANDSHAKE_INFO: &[u8] = b"vauchi-ble-handshake-v2";
 
-/// Protocol version byte.
-pub const BLE_HANDSHAKE_VERSION: u8 = 0x01;
+/// Protocol version byte (v2: includes X25519 exchange key + identity DH).
+pub const BLE_HANDSHAKE_VERSION: u8 = 0x02;
 
 /// Maximum age of a KeyOffer before it is considered expired (seconds).
 const BLE_HANDSHAKE_EXPIRY_SECS: u64 = 60;
@@ -78,11 +80,11 @@ const BLE_HANDSHAKE_EXPIRY_SECS: u64 = 60;
 /// Size of the random nonce in KeyOffer/KeyAck messages.
 const NONCE_SIZE: usize = 16;
 
-/// KeyOffer wire size: version(1) + identity(32) + ephemeral(32) + nonce(16) + timestamp(8).
-const KEY_OFFER_SIZE: usize = 1 + 32 + 32 + NONCE_SIZE + 8;
+/// KeyOffer wire size: version(1) + identity(32) + exchange(32) + ephemeral(32) + nonce(16) + timestamp(8).
+const KEY_OFFER_SIZE: usize = 1 + 32 + 32 + 32 + NONCE_SIZE + 8;
 
-/// KeyAck wire size: version(1) + identity(32) + ephemeral(32) + nonce(16) + commitment(32).
-const KEY_ACK_SIZE: usize = 1 + 32 + 32 + NONCE_SIZE + 32;
+/// KeyAck wire size: version(1) + identity(32) + exchange(32) + ephemeral(32) + nonce(16) + commitment(32).
+const KEY_ACK_SIZE: usize = 1 + 32 + 32 + 32 + NONCE_SIZE + 32;
 
 /// State of a BLE handshake session.
 ///
@@ -147,8 +149,10 @@ pub struct BleExchangeResult {
 pub struct BleHandshakeSession {
     state: BleHandshakeState,
     our_x3dh: X3DHKeyPair,
+    our_identity_x3dh: X3DHKeyPair,
     our_nonce: [u8; NONCE_SIZE],
     our_identity_key: [u8; 32],
+    our_exchange_key: [u8; 32],
     our_card: BleCardPayload,
     our_timestamp: u64,
     session_key: Option<SymmetricKey>,
@@ -178,27 +182,51 @@ impl BleHandshakeSession {
         Self::new(identity, card)
     }
 
-    /// Creates an initiator session from a raw 32-byte identity key.
+    /// Creates an initiator session from raw key bytes.
     ///
     /// Used by mobile bindings that don't have access to a full `Identity` object.
-    pub fn new_initiator_from_key(identity_key: [u8; 32], card: BleCardPayload) -> Self {
-        Self::new_from_key(identity_key, card)
+    /// Requires both the Ed25519 signing key and the X25519 exchange keypair.
+    pub fn new_initiator_from_key(
+        identity_key: [u8; 32],
+        identity_x3dh: X3DHKeyPair,
+        card: BleCardPayload,
+    ) -> Self {
+        let exchange_key = *identity_x3dh.public_key();
+        Self::new_from_keys(identity_key, identity_x3dh, exchange_key, card)
     }
 
-    /// Creates a responder session from a raw 32-byte identity key.
+    /// Creates a responder session from raw key bytes.
     ///
     /// Used by mobile bindings that don't have access to a full `Identity` object.
-    pub fn new_responder_from_key(identity_key: [u8; 32], card: BleCardPayload) -> Self {
-        Self::new_from_key(identity_key, card)
+    /// Requires both the Ed25519 signing key and the X25519 exchange keypair.
+    pub fn new_responder_from_key(
+        identity_key: [u8; 32],
+        identity_x3dh: X3DHKeyPair,
+        card: BleCardPayload,
+    ) -> Self {
+        let exchange_key = *identity_x3dh.public_key();
+        Self::new_from_keys(identity_key, identity_x3dh, exchange_key, card)
     }
 
     /// Internal constructor shared by initiator and responder.
     fn new(identity: &Identity, card: BleCardPayload) -> Self {
-        Self::new_from_key(*identity.signing_public_key(), card)
+        let identity_x3dh = identity.x3dh_keypair();
+        let exchange_key = *identity_x3dh.public_key();
+        Self::new_from_keys(
+            *identity.signing_public_key(),
+            identity_x3dh,
+            exchange_key,
+            card,
+        )
     }
 
-    /// Internal constructor from raw identity key bytes.
-    fn new_from_key(identity_key: [u8; 32], card: BleCardPayload) -> Self {
+    /// Internal constructor from raw key material.
+    fn new_from_keys(
+        identity_key: [u8; 32],
+        identity_x3dh: X3DHKeyPair,
+        exchange_key: [u8; 32],
+        card: BleCardPayload,
+    ) -> Self {
         let nonce: [u8; NONCE_SIZE] = crate::crypto::random_bytes();
 
         let timestamp = SystemTime::now()
@@ -209,8 +237,10 @@ impl BleHandshakeSession {
         Self {
             state: BleHandshakeState::Idle,
             our_x3dh: X3DHKeyPair::generate(),
+            our_identity_x3dh: identity_x3dh,
             our_nonce: nonce,
             our_identity_key: identity_key,
+            our_exchange_key: exchange_key,
             our_card: card,
             our_timestamp: timestamp,
             session_key: None,
@@ -231,8 +261,8 @@ impl BleHandshakeSession {
 
     /// Phase 1 (Initiator): Create and serialize a KeyOffer message.
     ///
-    /// Produces a 89-byte message:
-    /// `[version(1)][identity_pub(32)][ephemeral_pub(32)][nonce(16)][timestamp(8)]`
+    /// Produces a 121-byte v2 message:
+    /// `[version(1)][identity_pub(32)][exchange_pub(32)][ephemeral_pub(32)][nonce(16)][timestamp(8)]`
     ///
     /// Transitions: `Idle → KeyOfferSent`
     pub fn create_key_offer(&mut self) -> Result<Vec<u8>, ExchangeError> {
@@ -245,6 +275,7 @@ impl BleHandshakeSession {
         let mut offer = Vec::with_capacity(KEY_OFFER_SIZE);
         offer.push(BLE_HANDSHAKE_VERSION);
         offer.extend_from_slice(&self.our_identity_key);
+        offer.extend_from_slice(&self.our_exchange_key);
         offer.extend_from_slice(self.our_x3dh.public_key());
         offer.extend_from_slice(&self.our_nonce);
         offer.extend_from_slice(&self.our_timestamp.to_be_bytes());
@@ -257,9 +288,10 @@ impl BleHandshakeSession {
 
     /// Phase 2 (Responder): Process a KeyOffer, derive session key, return KeyAck + encrypted card.
     ///
-    /// Parses the initiator's 89-byte KeyOffer, validates version and timestamp,
-    /// detects self-exchange, derives the shared session key via single DH + HKDF,
-    /// encrypts our card, and computes commitment.
+    /// Parses the initiator's 121-byte v2 KeyOffer, validates version and
+    /// timestamp, detects self-exchange, derives the shared session key via
+    /// DH1 (identity binding) + DH2 (forward secrecy) + HKDF, encrypts our
+    /// card, and computes commitment.
     ///
     /// Returns `(key_ack_bytes, encrypted_card_bytes)`.
     ///
@@ -274,7 +306,7 @@ impl BleHandshakeSession {
             ));
         }
 
-        // Parse KeyOffer
+        // Parse v2 KeyOffer
         if their_offer.len() < KEY_OFFER_SIZE {
             return Err(ExchangeError::InvalidBleFormat);
         }
@@ -287,14 +319,17 @@ impl BleHandshakeSession {
         let their_identity: [u8; 32] = their_offer[1..33]
             .try_into()
             .map_err(|_| ExchangeError::InvalidBleFormat)?;
-        let their_ephemeral: [u8; 32] = their_offer[33..65]
+        let their_exchange: [u8; 32] = their_offer[33..65]
             .try_into()
             .map_err(|_| ExchangeError::InvalidBleFormat)?;
-        let their_nonce: [u8; NONCE_SIZE] = their_offer[65..81]
+        let their_ephemeral: [u8; 32] = their_offer[65..97]
+            .try_into()
+            .map_err(|_| ExchangeError::InvalidBleFormat)?;
+        let their_nonce: [u8; NONCE_SIZE] = their_offer[97..113]
             .try_into()
             .map_err(|_| ExchangeError::InvalidBleFormat)?;
         let their_timestamp = u64::from_be_bytes(
-            their_offer[81..89]
+            their_offer[113..121]
                 .try_into()
                 .map_err(|_| ExchangeError::InvalidBleFormat)?,
         );
@@ -322,13 +357,16 @@ impl BleHandshakeSession {
             ));
         }
 
-        // Derive session key: ephemeral × ephemeral DH + HKDF
-        let session_key = derive_session_key(
-            &self.our_x3dh,
-            &their_ephemeral,
-            &self.our_nonce,
-            &their_nonce,
-        )?;
+        // Derive session key: DH1 (identity binding) + DH2 (forward secrecy) + HKDF
+        let session_key = derive_session_key(&SessionKeyParams {
+            our_identity: &self.our_identity_x3dh,
+            their_exchange_pub: &their_exchange,
+            our_ephemeral: &self.our_x3dh,
+            their_ephemeral: &their_ephemeral,
+            our_exchange_pub: &self.our_exchange_key,
+            our_nonce: &self.our_nonce,
+            their_nonce: &their_nonce,
+        })?;
 
         // Build AAD: sender_identity || receiver_identity || timestamp
         let aad = build_aad(&self.our_identity_key, &their_identity, self.our_timestamp);
@@ -344,10 +382,11 @@ impl BleHandshakeSession {
         // Compute commitment: SHA-256(encrypted_card)
         let commitment = compute_commitment(&encrypted_card);
 
-        // Build KeyAck: version(1) + identity(32) + ephemeral(32) + nonce(16) + commitment(32) = 113
+        // Build v2 KeyAck: version(1) + identity(32) + exchange(32) + ephemeral(32) + nonce(16) + commitment(32)
         let mut ack = Vec::with_capacity(KEY_ACK_SIZE);
         ack.push(BLE_HANDSHAKE_VERSION);
         ack.extend_from_slice(&self.our_identity_key);
+        ack.extend_from_slice(&self.our_exchange_key);
         ack.extend_from_slice(self.our_x3dh.public_key());
         ack.extend_from_slice(&self.our_nonce);
         ack.extend_from_slice(&commitment);
@@ -366,10 +405,10 @@ impl BleHandshakeSession {
 
     /// Phase 2 (Initiator): Process KeyAck + encrypted card from responder.
     ///
-    /// Parses the responder's 113-byte KeyAck, derives the session key,
-    /// verifies the responder's commitment against their encrypted card,
-    /// decrypts the responder's card, encrypts our own card, and computes
-    /// our commitment.
+    /// Parses the responder's 145-byte v2 KeyAck, derives the session key
+    /// via DH1 + DH2, verifies the responder's commitment against their
+    /// encrypted card, decrypts the responder's card, encrypts our own card,
+    /// and computes our commitment.
     ///
     /// Returns `(our_commitment, our_encrypted_card)`.
     ///
@@ -388,7 +427,7 @@ impl BleHandshakeSession {
             }
         };
 
-        // Parse KeyAck
+        // Parse v2 KeyAck
         if their_ack.len() < KEY_ACK_SIZE {
             return Err(ExchangeError::InvalidBleFormat);
         }
@@ -401,13 +440,16 @@ impl BleHandshakeSession {
         let their_identity: [u8; 32] = their_ack[1..33]
             .try_into()
             .map_err(|_| ExchangeError::InvalidBleFormat)?;
-        let their_ephemeral: [u8; 32] = their_ack[33..65]
+        let their_exchange: [u8; 32] = their_ack[33..65]
             .try_into()
             .map_err(|_| ExchangeError::InvalidBleFormat)?;
-        let their_nonce: [u8; NONCE_SIZE] = their_ack[65..81]
+        let their_ephemeral: [u8; 32] = their_ack[65..97]
             .try_into()
             .map_err(|_| ExchangeError::InvalidBleFormat)?;
-        let their_commitment: [u8; 32] = their_ack[81..113]
+        let their_nonce: [u8; NONCE_SIZE] = their_ack[97..113]
+            .try_into()
+            .map_err(|_| ExchangeError::InvalidBleFormat)?;
+        let their_commitment: [u8; 32] = their_ack[113..145]
             .try_into()
             .map_err(|_| ExchangeError::InvalidBleFormat)?;
 
@@ -417,13 +459,16 @@ impl BleHandshakeSession {
             return Err(ExchangeError::BleCommitmentMismatch);
         }
 
-        // Derive session key: same DH as responder, same HKDF
-        let session_key = derive_session_key(
-            &self.our_x3dh,
-            &their_ephemeral,
-            &self.our_nonce,
-            &their_nonce,
-        )?;
+        // Derive session key: DH1 (identity binding) + DH2 (forward secrecy)
+        let session_key = derive_session_key(&SessionKeyParams {
+            our_identity: &self.our_identity_x3dh,
+            their_exchange_pub: &their_exchange,
+            our_ephemeral: &self.our_x3dh,
+            their_ephemeral: &their_ephemeral,
+            our_exchange_pub: &self.our_exchange_key,
+            our_nonce: &self.our_nonce,
+            their_nonce: &their_nonce,
+        })?;
 
         // Decrypt their card
         let their_aad = build_aad(&their_identity, &self.our_identity_key, self.our_timestamp);
@@ -610,40 +655,57 @@ impl Drop for BleHandshakeSession {
     }
 }
 
-/// Derives the session key from ephemeral DH + HKDF.
+/// Parameters for v2 session key derivation.
+struct SessionKeyParams<'a> {
+    our_identity: &'a X3DHKeyPair,
+    their_exchange_pub: &'a [u8; 32],
+    our_ephemeral: &'a X3DHKeyPair,
+    their_ephemeral: &'a [u8; 32],
+    our_exchange_pub: &'a [u8; 32],
+    our_nonce: &'a [u8; NONCE_SIZE],
+    their_nonce: &'a [u8; NONCE_SIZE],
+}
+
+/// Derives the session key via DH1 (identity binding) + DH2 (forward secrecy) + HKDF.
 ///
-/// Uses single DH (ephemeral × ephemeral), HKDF with sorted nonces as salt
-/// and sorted public keys in the info string.
-fn derive_session_key(
-    our_keys: &X3DHKeyPair,
-    their_ephemeral: &[u8; 32],
-    our_nonce: &[u8; NONCE_SIZE],
-    their_nonce: &[u8; NONCE_SIZE],
-) -> Result<SymmetricKey, ExchangeError> {
-    let dh_secret = our_keys.diffie_hellman(their_ephemeral)?;
+/// DH1: our_identity × their_exchange (identity binding — same on both sides)
+/// DH2: our_ephemeral × their_ephemeral (forward secrecy — same on both sides)
+/// IKM: DH1 ‖ DH2 (64 bytes)
+/// Salt: sorted nonces
+/// Info: handshake info prefix + sorted exchange public keys
+fn derive_session_key(p: &SessionKeyParams<'_>) -> Result<SymmetricKey, ExchangeError> {
+    // DH1: identity binding (our_identity × their_exchange)
+    let dh1 = p.our_identity.diffie_hellman(p.their_exchange_pub)?;
+    // DH2: forward secrecy (our_ephemeral × their_ephemeral)
+    let dh2 = p.our_ephemeral.diffie_hellman(p.their_ephemeral)?;
+
+    // Concatenate DH1 ‖ DH2 as IKM
+    let mut ikm = [0u8; 64];
+    ikm[..32].copy_from_slice(&*dh1);
+    ikm[32..].copy_from_slice(&*dh2);
 
     // Salt: sorted nonces for deterministic derivation
     let mut salt = [0u8; NONCE_SIZE * 2];
-    if our_nonce <= their_nonce {
-        salt[..NONCE_SIZE].copy_from_slice(our_nonce);
-        salt[NONCE_SIZE..].copy_from_slice(their_nonce);
+    if p.our_nonce <= p.their_nonce {
+        salt[..NONCE_SIZE].copy_from_slice(p.our_nonce);
+        salt[NONCE_SIZE..].copy_from_slice(p.their_nonce);
     } else {
-        salt[..NONCE_SIZE].copy_from_slice(their_nonce);
-        salt[NONCE_SIZE..].copy_from_slice(our_nonce);
+        salt[..NONCE_SIZE].copy_from_slice(p.their_nonce);
+        salt[NONCE_SIZE..].copy_from_slice(p.our_nonce);
     }
 
-    // Info: handshake info + sorted public keys
-    let our_pub = our_keys.public_key();
+    // Info: handshake info + sorted exchange public keys (identity binding context)
     let mut info = BLE_HANDSHAKE_INFO.to_vec();
-    if our_pub <= their_ephemeral {
-        info.extend_from_slice(our_pub);
-        info.extend_from_slice(their_ephemeral);
+    if p.our_exchange_pub <= p.their_exchange_pub {
+        info.extend_from_slice(p.our_exchange_pub);
+        info.extend_from_slice(p.their_exchange_pub);
     } else {
-        info.extend_from_slice(their_ephemeral);
-        info.extend_from_slice(our_pub);
+        info.extend_from_slice(p.their_exchange_pub);
+        info.extend_from_slice(p.our_exchange_pub);
     }
 
-    let derived = HKDF::derive_key(Some(&salt), &*dh_secret, &info);
+    let derived = HKDF::derive_key(Some(&salt), &ikm, &info);
+    ikm.zeroize();
     Ok(SymmetricKey::from_bytes(*derived))
 }
 

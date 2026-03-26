@@ -147,7 +147,7 @@ fn ble_full_initiator_flow_via_command_event() {
         })
         .expect("initiator should emit KeyOffer write");
 
-    assert_eq!(key_offer.len(), 89, "KeyOffer should be 89 bytes");
+    assert_eq!(key_offer.len(), 121, "v2 KeyOffer should be 121 bytes");
 
     // --- Step 2: Responder processes KeyOffer (simulated) ---
     // Use Bob's BleHandshakeSession directly to produce the response
@@ -156,7 +156,7 @@ fn ble_full_initiator_flow_via_command_event() {
         .expect("Bob should have a BLE handshake session");
     let (key_ack, bob_encrypted_card) = bob_hs.process_key_offer(&key_offer).unwrap();
 
-    assert_eq!(key_ack.len(), 113, "KeyAck should be 113 bytes");
+    assert_eq!(key_ack.len(), 145, "v2 KeyAck should be 145 bytes");
 
     // Feed KeyAck and encrypted card back to initiator as hardware events
     initiator

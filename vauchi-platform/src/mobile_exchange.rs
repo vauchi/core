@@ -101,14 +101,9 @@ impl VauchiPlatform {
         let contact_id = contact.id().to_string();
         let contact_name = contact.display_name().to_string();
 
-        // Check for duplicate
-        if storage.load_contact(&contact_id)?.is_some() {
-            return Err(MobileError::ExchangeFailed(
-                "Contact already exists".to_string(),
-            ));
-        }
-
-        // Save contact
+        // Upsert: save_contact uses INSERT ON CONFLICT UPDATE, so
+        // repeated exchanges with the same peer update the card data
+        // rather than failing.
         storage.save_contact(&contact)?;
 
         // Initialize double ratchet
@@ -175,14 +170,9 @@ impl VauchiPlatform {
         let contact_id = contact.id().to_string();
         let contact_name = contact.display_name().to_string();
 
-        // Check for duplicate
-        if storage.load_contact(&contact_id)?.is_some() {
-            return Err(MobileError::ExchangeFailed(
-                "Contact already exists".to_string(),
-            ));
-        }
-
-        // Save contact
+        // Upsert: save_contact uses INSERT ON CONFLICT UPDATE, so
+        // repeated exchanges with the same peer update the card data
+        // rather than failing.
         storage.save_contact(&contact)?;
 
         // Initialize double ratchet with transport-derived shared key

@@ -13,7 +13,7 @@ use std::collections::HashSet;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use crate::text::normalize_text;
-pub use crate::types::{OnboardingProgress, OnboardingStep};
+use crate::types::{OnboardingProgress, OnboardingStep};
 
 impl OnboardingStep {
     /// Returns all steps in order.

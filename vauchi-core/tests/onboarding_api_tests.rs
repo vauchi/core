@@ -12,7 +12,7 @@
 //! - Identity check and link choice engine tests
 
 use vauchi_core::Vauchi;
-use vauchi_core::onboarding::OnboardingStep;
+use vauchi_core::types::OnboardingStep;
 
 fn create_test_vauchi() -> Vauchi {
     Vauchi::in_memory().unwrap()

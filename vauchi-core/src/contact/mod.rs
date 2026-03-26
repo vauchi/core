@@ -33,7 +33,8 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use crate::contact_card::ContactCard;
 use crate::crypto::SymmetricKey;
 use crate::crypto::cek::ContentEncryptionKey;
-use crate::exchange::{ExchangeTransport, ProximityConfidence, TrustMetrics};
+use crate::exchange::TrustMetrics;
+use crate::types::{ExchangeTransport, ProximityConfidence};
 
 /// Error type for contact operations that require a specific contact kind.
 #[derive(Debug, Clone, thiserror::Error)]

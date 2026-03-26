@@ -11,7 +11,7 @@
 
 use serde::{Deserialize, Serialize};
 
-pub use crate::types::{AhaMomentTracker, AhaMomentType};
+use crate::types::{AhaMomentTracker, AhaMomentType};
 
 impl AhaMomentType {
     /// Get the user-facing title for this moment (English).

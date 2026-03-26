@@ -9,7 +9,7 @@
 
 use crate::ui::*;
 use vauchi_core::contact::labels::SUGGESTED_LABELS;
-use vauchi_core::onboarding::OnboardingStep as Step;
+use vauchi_core::types::OnboardingStep as Step;
 
 // ── Public data types ───────────────────────────────────────────────
 

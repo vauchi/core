@@ -33,5 +33,3 @@ pub enum DuressAlertType {
     /// A panic shred was triggered.
     Shred,
 }
-
-pub use crate::types::DuressSettings;

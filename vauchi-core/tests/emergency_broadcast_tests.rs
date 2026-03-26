@@ -16,7 +16,7 @@ mod common;
 
 use std::sync::{Arc, Mutex};
 
-use vauchi_core::api::emergency::EmergencyBroadcastConfig;
+use vauchi_core::types::EmergencyBroadcastConfig;
 use vauchi_core::{
     CallbackHandler, EmergencyAlert, GeoLocation, Storage, SymmetricKey, VauchiEvent,
 };

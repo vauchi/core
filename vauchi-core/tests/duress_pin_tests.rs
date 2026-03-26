@@ -568,7 +568,7 @@ fn test_load_duress_settings_returns_none_initially() {
 fn test_save_load_duress_settings_roundtrip() {
     let wb = create_vauchi_with_identity("Alice");
 
-    let settings = vauchi_core::api::duress::DuressSettings {
+    let settings = vauchi_core::types::DuressSettings {
         alert_contact_ids: vec!["contact-1".to_string(), "contact-2".to_string()],
         alert_message: "I need help".to_string(),
         include_location: true,
@@ -592,7 +592,7 @@ fn test_save_load_duress_settings_roundtrip() {
 fn test_delete_duress_settings() {
     let wb = create_vauchi_with_identity("Alice");
 
-    let settings = vauchi_core::api::duress::DuressSettings {
+    let settings = vauchi_core::types::DuressSettings {
         alert_contact_ids: vec!["contact-1".to_string()],
         alert_message: "Help".to_string(),
         include_location: false,
@@ -627,7 +627,7 @@ fn test_queue_duress_alert_on_duress_authenticate() {
         .expect("setup duress should succeed");
 
     // Configure duress settings with trusted contacts
-    let settings = vauchi_core::api::duress::DuressSettings {
+    let settings = vauchi_core::types::DuressSettings {
         alert_contact_ids: vec!["trusted-contact-1".to_string()],
         alert_message: "I'm in danger".to_string(),
         include_location: false,
@@ -681,7 +681,7 @@ fn test_duress_alert_contains_timestamp_and_device_id() {
     wb.setup_duress_password("duress-999")
         .expect("setup duress should succeed");
 
-    let settings = vauchi_core::api::duress::DuressSettings {
+    let settings = vauchi_core::types::DuressSettings {
         alert_contact_ids: vec!["trusted-1".to_string()],
         alert_message: "Help".to_string(),
         include_location: false,
@@ -736,7 +736,7 @@ fn test_full_duress_flow_setup_to_alert() {
         .expect("add decoy should succeed");
 
     // 4. Configure duress alert settings
-    let settings = vauchi_core::api::duress::DuressSettings {
+    let settings = vauchi_core::types::DuressSettings {
         alert_contact_ids: vec!["trusted-contact-1".to_string()],
         alert_message: "Emergency - duress unlock".to_string(),
         include_location: true,

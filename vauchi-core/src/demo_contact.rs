@@ -12,7 +12,7 @@
 use serde::{Deserialize, Serialize};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-pub use crate::types::DemoContactState;
+use crate::types::DemoContactState;
 
 /// Demo contact display name
 pub const DEMO_CONTACT_NAME: &str = "Vauchi Tips";

@@ -7,10 +7,11 @@
 use std::sync::Arc;
 
 use super::super::app_password::{AppPasswordConfig, AuthResult};
-use super::super::duress::{DuressAlert, DuressAlertType, DuressSettings};
+use super::super::duress::{DuressAlert, DuressAlertType};
 use super::super::error::{VauchiError, VauchiResult};
 use super::super::events::{EventHandler, VauchiEvent};
 use super::{AuthMode, Vauchi};
+use crate::types::DuressSettings;
 
 impl Vauchi {
     // === Delivery Status Operations ===

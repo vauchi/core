@@ -23,7 +23,7 @@ impl Vauchi {
     /// Automatically persists the "seen" state.
     pub fn try_trigger_aha_moment(
         &self,
-        moment_type: crate::aha_moments::AhaMomentType,
+        moment_type: crate::types::AhaMomentType,
     ) -> VauchiResult<Option<crate::aha_moments::AhaMoment>> {
         let mut tracker = self.storage.load_or_create_aha_tracker()?;
         let moment = tracker.try_trigger(moment_type);
@@ -38,7 +38,7 @@ impl Vauchi {
     /// Context is used for personalized messages (e.g., contact name).
     pub fn try_trigger_aha_moment_with_context(
         &self,
-        moment_type: crate::aha_moments::AhaMomentType,
+        moment_type: crate::types::AhaMomentType,
         context: String,
     ) -> VauchiResult<Option<crate::aha_moments::AhaMoment>> {
         let mut tracker = self.storage.load_or_create_aha_tracker()?;
@@ -52,7 +52,7 @@ impl Vauchi {
     /// Checks if an aha moment has been seen.
     pub fn has_seen_aha_moment(
         &self,
-        moment_type: crate::aha_moments::AhaMomentType,
+        moment_type: crate::types::AhaMomentType,
     ) -> VauchiResult<bool> {
         let tracker = self.storage.load_or_create_aha_tracker()?;
         Ok(tracker.has_seen(moment_type))
@@ -75,7 +75,7 @@ impl Vauchi {
     // === Demo Contact Operations ===
 
     /// Gets the current demo contact state.
-    pub fn demo_contact_state(&self) -> VauchiResult<crate::demo_contact::DemoContactState> {
+    pub fn demo_contact_state(&self) -> VauchiResult<crate::types::DemoContactState> {
         Ok(self.storage.load_or_create_demo_contact_state()?)
     }
 
@@ -142,7 +142,7 @@ impl Vauchi {
             return Ok(());
         }
 
-        let state = crate::demo_contact::DemoContactState::new_active();
+        let state = crate::types::DemoContactState::new_active();
         self.storage.save_demo_contact_state(&state)?;
         Ok(())
     }

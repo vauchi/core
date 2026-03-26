@@ -19,8 +19,6 @@ pub const MAX_TRUSTED_CONTACTS: usize = 10;
 /// Default emergency message.
 pub const DEFAULT_EMERGENCY_MESSAGE: &str = "I may be in danger. Please check on me.";
 
-pub use crate::types::EmergencyBroadcastConfig;
-
 /// Result of a broadcast operation.
 #[derive(Debug, Clone)]
 pub struct BroadcastResult {

@@ -10,7 +10,8 @@ use crate::contact::ImportSource;
 use crate::contact_card::ContactCard;
 use crate::crypto::SymmetricKey;
 use crate::crypto::cek::ContentEncryptionKey;
-use crate::exchange::{ExchangeTransport, TrustMetrics};
+use crate::exchange::TrustMetrics;
+use crate::types::ExchangeTransport;
 
 /// Internal struct for database row data.
 #[allow(dead_code)] // Fields are used via destructuring in row_to_contact

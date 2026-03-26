@@ -11,7 +11,7 @@
 use rusqlite::params;
 
 use super::{Storage, StorageError};
-use crate::api::duress::DuressSettings;
+use crate::types::DuressSettings;
 
 impl Storage {
     /// Saves duress alert settings.

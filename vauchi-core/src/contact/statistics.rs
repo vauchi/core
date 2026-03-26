@@ -12,7 +12,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::contact::Contact;
 use crate::contact_card::FieldType;
-use crate::exchange::ExchangeTransport;
+use crate::types::ExchangeTransport;
 
 /// Freshness threshold: contacts updated within this many seconds are "fresh".
 const FRESHNESS_THRESHOLD_SECS: u64 = 90 * 24 * 60 * 60; // 90 days

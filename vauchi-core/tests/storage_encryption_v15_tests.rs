@@ -12,13 +12,12 @@
 //! - `consent_records`: consent decisions (type, granted) aren't personal data;
 //!   columns are needed for functional queries (`check_consent`)
 
-use vauchi_core::aha_moments::{AhaMomentTracker, AhaMomentType};
 use vauchi_core::contact::Contact;
 use vauchi_core::contact_card::ContactCard;
 use vauchi_core::crypto::SymmetricKey;
-use vauchi_core::demo_contact::DemoContactState;
 use vauchi_core::social::ProfileValidation;
 use vauchi_core::storage::Storage;
+use vauchi_core::types::{AhaMomentTracker, AhaMomentType, DemoContactState};
 
 fn open_storage() -> (tempfile::TempDir, Storage) {
     let dir = tempfile::tempdir().unwrap();

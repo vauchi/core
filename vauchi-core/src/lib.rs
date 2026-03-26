@@ -16,7 +16,11 @@ pub use crypto::{DhError, PublicKey, Signature, SigningKeyPair, SymmetricKey, de
 pub mod types;
 
 pub mod text;
-pub use types::{AudioCapability, ExchangeTransport, ProximityConfidence};
+pub use types::{
+    AhaMomentTracker, AhaMomentType, AudioCapability, DemoContactState, DuressSettings,
+    EmergencyBroadcastConfig, ExchangeTransport, OnboardingProgress, OnboardingStep,
+    ProximityConfidence,
+};
 pub mod contact;
 pub mod contact_card;
 pub mod identity;
@@ -72,22 +76,21 @@ pub mod api;
 #[cfg(any(feature = "network-native-tls", feature = "network-rustls"))]
 pub use api::{
     AppPasswordConfig, AuthMode, AuthResult, BroadcastResult, CallbackHandler, ConsentStatus,
-    DuressAlert, DuressAlertType, DuressSettings, EmergencyBroadcastConfig, EmergencyWipeStatus,
-    HandlerId, RecoveryReadiness, SetupProgress, Vauchi, VauchiBuilder, VauchiConfig, VauchiError,
-    VauchiEvent, VauchiResult,
+    DuressAlert, DuressAlertType, EmergencyWipeStatus, HandlerId, RecoveryReadiness, SetupProgress,
+    Vauchi, VauchiBuilder, VauchiConfig, VauchiError, VauchiEvent, VauchiResult,
 };
 pub mod aha_moments;
-pub use aha_moments::{AhaMoment, AhaMomentTracker, AhaMomentType};
+pub use aha_moments::AhaMoment;
 pub mod backup;
 pub use backup::{BackupError, export_contact_backup, import_contact_backup};
 pub mod demo_contact;
 pub use demo_contact::{
-    DEMO_CONTACT_ID, DEMO_CONTACT_NAME, DemoContactCard, DemoContactState, DemoTip,
-    DemoTipCategory, generate_demo_contact_card, get_demo_tips,
+    DEMO_CONTACT_ID, DEMO_CONTACT_NAME, DemoContactCard, DemoTip, DemoTipCategory,
+    generate_demo_contact_card, get_demo_tips,
 };
 pub mod diagnostic;
 pub mod onboarding;
-pub use onboarding::{OnboardingProgress, OnboardingStep, display_name_suggestions};
+pub use onboarding::display_name_suggestions;
 pub mod social;
 pub use social::{
     ProfileValidation, SocialNetwork, SocialNetworkRegistry, ValidationConfidence,

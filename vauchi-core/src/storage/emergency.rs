@@ -11,7 +11,7 @@
 use rusqlite::params;
 
 use super::{Storage, StorageError};
-use crate::api::emergency::EmergencyBroadcastConfig;
+use crate::types::EmergencyBroadcastConfig;
 
 impl Storage {
     /// Saves emergency broadcast configuration.

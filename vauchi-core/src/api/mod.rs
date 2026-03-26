@@ -142,12 +142,10 @@ pub use sync_controller::{SyncController, SyncResult};
 pub use app_password::{AppPasswordConfig, AuthResult};
 
 // Duress Alert System
-pub use duress::{DuressAlert, DuressAlertType, DuressSettings};
+pub use duress::{DuressAlert, DuressAlertType};
 
 // Emergency Broadcast System
-pub use emergency::{
-    BroadcastResult, EmergencyBroadcastConfig, EmergencyWipeStatus, MAX_TRUSTED_CONTACTS,
-};
+pub use emergency::{BroadcastResult, EmergencyWipeStatus, MAX_TRUSTED_CONTACTS};
 
 // Vauchi
 pub use vauchi::{

@@ -10,9 +10,9 @@
 use rusqlite::params;
 
 use super::{Storage, StorageError};
-use crate::onboarding::OnboardingProgress;
 use crate::types::AhaMomentTracker;
 use crate::types::DemoContactState;
+use crate::types::OnboardingProgress;
 
 impl Storage {
     // === Aha Moments Operations ===

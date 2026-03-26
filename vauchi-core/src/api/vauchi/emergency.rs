@@ -11,12 +11,11 @@ use crate::contact_card::ContactCard;
 use crate::storage::Storage;
 
 use super::super::config::VauchiConfig;
-use super::super::emergency::{
-    BroadcastResult, EmergencyBroadcastConfig, EmergencyWipeStatus, MAX_TRUSTED_CONTACTS,
-};
+use super::super::emergency::{BroadcastResult, EmergencyWipeStatus, MAX_TRUSTED_CONTACTS};
 use super::super::error::{VauchiError, VauchiResult};
 use super::super::events::{EventDispatcher, VauchiEvent};
 use super::Vauchi;
+use crate::types::EmergencyBroadcastConfig;
 
 impl Vauchi {
     // === Emergency Broadcast ===

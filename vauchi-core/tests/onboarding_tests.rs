@@ -17,7 +17,8 @@
 //! - Backward transitions (#23)
 //! - JSON serialization roundtrip
 
-use vauchi_core::onboarding::{OnboardingProgress, OnboardingStep, display_name_suggestions};
+use vauchi_core::onboarding::display_name_suggestions;
+use vauchi_core::types::{OnboardingProgress, OnboardingStep};
 
 // =============================================================================
 // OnboardingStep Tests

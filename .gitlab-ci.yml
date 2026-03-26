@@ -1253,6 +1253,41 @@ update:swift-bindings:
       CHECKSUM=$(cat dist/VauchiPlatformFFI.xcframework.zip.sha256 | tr -d '[:space:]')
       echo "XCFramework checksum: $CHECKSUM"
 
+      # Verify cosign signature on the checksum file
+      CHECKSUM_FILE="dist/VauchiPlatformFFI.xcframework.zip.sha256"
+      BUNDLE_FILE="${CHECKSUM_FILE}.bundle"
+      COSIGN_PUB="cosign.pub"
+
+      if ! command -v cosign &>/dev/null; then
+        echo "Installing cosign..."
+        curl -sSfL https://github.com/sigstore/cosign/releases/latest/download/cosign-linux-amd64 \
+          -o /usr/local/bin/cosign || { echo "ERROR: cosign install failed"; exit 1; }
+        chmod +x /usr/local/bin/cosign
+      fi
+
+      if [[ ! -f "$BUNDLE_FILE" ]]; then
+        echo "ERROR: cosign bundle not found: $BUNDLE_FILE"
+        echo "Signing may have been skipped or failed in package:xcframework"
+        exit 1
+      fi
+
+      if [[ ! -f "$COSIGN_PUB" ]]; then
+        echo "ERROR: cosign public key not found: $COSIGN_PUB"
+        exit 1
+      fi
+
+      echo "Verifying cosign signature..."
+      if cosign verify-blob --key "$COSIGN_PUB" --bundle "$BUNDLE_FILE" "$CHECKSUM_FILE"; then
+        echo "✓ Cosign signature verified"
+      else
+        if [[ "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+          echo "ERROR: cosign verification FAILED for release $VERSION"
+          exit 1
+        else
+          echo "WARNING: cosign verification failed for pre-release $VERSION (non-blocking)"
+        fi
+      fi
+
       # Extract Swift bindings from local artifact
       unzip -o -j dist/VauchiPlatform-${CLEAN_VERSION}.zip \
         "VauchiPlatform-${CLEAN_VERSION}/Sources/vauchi_platform.swift" \

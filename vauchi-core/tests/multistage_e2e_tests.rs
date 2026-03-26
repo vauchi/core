@@ -329,11 +329,8 @@ fn test_e2e_no_qr_after_finalized_grace_period() {
         "Grace period QRs should be RDYY type"
     );
 
-    // After exhausting the grace period (30 ticks), QRs stop.
-    for _ in 0..35 {
-        alice.get_display_qr();
-        bob.get_display_qr();
-    }
+    // Wall-clock grace period: wait for it to expire (20s + margin).
+    std::thread::sleep(std::time::Duration::from_secs(22));
     assert!(
         alice.get_display_qr().is_none(),
         "QRs should stop after grace period"
@@ -609,4 +606,182 @@ fn test_asymmetric_finalization_both_must_complete() {
     // Both sides must have each other's data
     assert_eq!(alice.get_received_data().unwrap(), bob_card);
     assert_eq!(bob.get_received_data().unwrap(), alice_card);
+}
+
+// ── Resilience tests (Solutions S1–S6) ──────────────────────────────────
+
+/// S4: Verify data is NOT available in Complete state (only in Finalized).
+#[test]
+fn test_data_not_available_in_complete() {
+    let mut alice = MultiStageSession::new(b"Alice".to_vec());
+    let mut bob = MultiStageSession::new(b"Bob".to_vec());
+
+    // Exchange INIT
+    let ai = alice.get_display_qr().unwrap();
+    let bi = bob.get_display_qr().unwrap();
+    alice.process_scanned_qr(&bi.data);
+    bob.process_scanned_qr(&ai.data);
+
+    // Drive to Complete (both sides exchange data/vrfy/conf)
+    for _ in 0..500 {
+        let aq = alice.get_display_qr();
+        let bq = bob.get_display_qr();
+        if let Some(aq) = &aq {
+            bob.process_scanned_qr(&aq.data);
+        }
+        if let Some(bq) = &bq {
+            alice.process_scanned_qr(&bq.data);
+        }
+        if matches!(alice.get_state(), ProtocolState::Complete) {
+            break;
+        }
+    }
+    assert_eq!(alice.get_state(), ProtocolState::Complete);
+
+    // Data must NOT be available until Finalized
+    assert!(alice.get_received_data().is_none());
+}
+
+/// S5: FAIL QR type — when one side fails, peer can detect it.
+#[test]
+fn test_fail_qr_roundtrip() {
+    use vauchi_core::exchange::multistage::qr_codec;
+
+    let session_id: [u8; 16] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16];
+    let qr = qr_codec::format_fail_qr(&session_id);
+    assert!(qr.starts_with("FAIL"));
+
+    let parsed = qr_codec::parse_qr(&qr).unwrap();
+    match parsed {
+        qr_codec::StageQr::Fail { session_id: sid } => {
+            assert_eq!(sid, session_id);
+        }
+        _ => panic!("Expected Fail variant, got {:?}", parsed),
+    }
+}
+
+/// S5: FAIL QR causes peer to abort when not yet Finalized.
+#[test]
+fn test_fail_qr_aborts_peer() {
+    let mut alice = MultiStageSession::new(b"Alice".to_vec());
+
+    // Move to Advertising
+    let _ai = alice.get_display_qr().unwrap();
+    assert_eq!(alice.get_state(), ProtocolState::Advertising);
+
+    // Receive FAIL while in Advertising → should abort
+    use vauchi_core::exchange::multistage::qr_codec;
+    let fail_qr = qr_codec::format_fail_qr(&[0u8; 16]);
+    let state = alice.process_scanned_qr(&fail_qr);
+    assert_eq!(
+        state,
+        ProtocolState::Failed("peer reported failure".to_string())
+    );
+}
+
+/// S5: FAIL QR does NOT override Finalized state.
+#[test]
+fn test_fail_qr_ignored_when_finalized() {
+    let (mut alice, _bob) = run_full_exchange(b"Alice".to_vec(), b"Bob".to_vec());
+    assert_eq!(alice.get_state(), ProtocolState::Finalized);
+
+    // Late FAIL from peer should be ignored
+    use vauchi_core::exchange::multistage::qr_codec;
+    let fail_qr = qr_codec::format_fail_qr(&[0u8; 16]);
+    let state = alice.process_scanned_qr(&fail_qr);
+    assert_eq!(state, ProtocolState::Finalized);
+}
+
+/// S3: Adaptive display durations — each stage has appropriate timing with jitter.
+#[test]
+fn test_adaptive_display_durations() {
+    let mut alice = MultiStageSession::new(b"Alice".to_vec());
+    let mut bob = MultiStageSession::new(b"Bob".to_vec());
+
+    // INIT should be ~1000ms (±20% jitter: 800–1200ms)
+    let init_qr = alice.get_display_qr().unwrap();
+    assert!(
+        (800..=1200).contains(&init_qr.display_duration_ms),
+        "INIT display should be ~1000ms, got {}",
+        init_qr.display_duration_ms
+    );
+
+    // Exchange INITs
+    let bi = bob.get_display_qr().unwrap();
+    alice.process_scanned_qr(&bi.data);
+    bob.process_scanned_qr(&init_qr.data);
+
+    // DATA should be ~300ms (±20%: 240–360ms)
+    let data_qr = alice.get_display_qr().unwrap();
+    assert!(
+        (240..=360).contains(&data_qr.display_duration_ms),
+        "DATA display should be ~300ms, got {}",
+        data_qr.display_duration_ms
+    );
+
+    // Drive to Complete
+    for _ in 0..500 {
+        let aq = alice.get_display_qr();
+        let bq = bob.get_display_qr();
+        if let Some(aq) = &aq {
+            bob.process_scanned_qr(&aq.data);
+        }
+        if let Some(bq) = &bq {
+            alice.process_scanned_qr(&bq.data);
+        }
+        if matches!(alice.get_state(), ProtocolState::Complete) {
+            break;
+        }
+    }
+
+    // RDYY should be ~700ms (±20%: 560–840ms)
+    if matches!(alice.get_state(), ProtocolState::Complete) {
+        let rdyy_qr = alice.get_display_qr().unwrap();
+        assert!(
+            (560..=840).contains(&rdyy_qr.display_duration_ms),
+            "RDYY display should be ~700ms, got {}",
+            rdyy_qr.display_duration_ms
+        );
+    }
+}
+
+/// S2: Complete state shows ONLY RDYY QRs (no VRFY/CONF interleave).
+#[test]
+fn test_complete_shows_only_rdyy() {
+    let mut alice = MultiStageSession::new(b"Alice".to_vec());
+    let mut bob = MultiStageSession::new(b"Bob".to_vec());
+
+    // Drive to Complete
+    let ai = alice.get_display_qr().unwrap();
+    let bi = bob.get_display_qr().unwrap();
+    alice.process_scanned_qr(&bi.data);
+    bob.process_scanned_qr(&ai.data);
+
+    for _ in 0..500 {
+        let aq = alice.get_display_qr();
+        let bq = bob.get_display_qr();
+        if let Some(aq) = &aq {
+            bob.process_scanned_qr(&aq.data);
+        }
+        if let Some(bq) = &bq {
+            alice.process_scanned_qr(&bq.data);
+        }
+        if matches!(alice.get_state(), ProtocolState::Complete) {
+            break;
+        }
+    }
+    assert_eq!(alice.get_state(), ProtocolState::Complete);
+
+    // Verify all QRs in Complete state are RDYY (start with "RDYY")
+    for _ in 0..10 {
+        if let Some(qr) = alice.get_display_qr() {
+            assert!(
+                qr.data.starts_with("RDYY"),
+                "Complete state should only show RDYY, got: {}",
+                &qr.data[..4]
+            );
+        } else {
+            break;
+        }
+    }
 }

@@ -5,11 +5,21 @@
 //! Multi-stage exchange session state machine.
 //!
 //! Manages the full 5-stage atomic QR exchange protocol:
-//! `IDLE → ADVERTISING → DISCOVERED → TRANSFERRING → VERIFYING → CONFIRMING → COMPLETE`
+//! `IDLE → ADVERTISING → DISCOVERED → TRANSFERRING → VERIFYING → CONFIRMING → COMPLETE → FINALIZED`
 //!
 //! Each session holds local card data, ephemeral X25519 keys for transport
 //! encryption, an Ed25519 identity keypair, and a commitment scheme that
 //! ensures atomicity (neither side can decrypt until both reveal keys are exchanged).
+//!
+//! Resilience features:
+//! - Wall-clock timeouts with progress extension (not tick-based)
+//! - RDYY-only display in Complete state for maximum scan reliability
+//! - Adaptive QR display durations per stage
+//! - Graduated retry: Complete → RetryReady → Failed (one auto-retry)
+//! - FAIL QR type for immediate peer abort notification
+//! - Scan acknowledgment via RDYY payload
+
+use std::time::{Duration, Instant};
 
 use chacha20poly1305::ChaCha20Poly1305;
 use chacha20poly1305::aead::{Aead, KeyInit, Payload};
@@ -31,6 +41,46 @@ const CHUNK_PAYLOAD_SIZE: usize = 472;
 
 /// HKDF info string for transport key derivation.
 const HKDF_INFO: &[u8] = b"vauchi-multistage-v1";
+
+/// Wall-clock timeout for the RDYY phase (Complete + RetryReady).
+/// From device testing: Samsung S7 finalizes ~18s after Pixel.
+/// 30s base gives comfortable margin for slow devices.
+const RDYY_BASE_TIMEOUT: Duration = Duration::from_secs(30);
+
+/// How much extra time is granted when the peer shows progress (e.g. scan detected).
+const RDYY_PROGRESS_EXTENSION: Duration = Duration::from_secs(10);
+
+/// Absolute maximum time in the RDYY phase (prevents infinite extension).
+const RDYY_MAX_TIMEOUT: Duration = Duration::from_secs(45);
+
+/// How long to broadcast FAIL QR after entering Failed state.
+const FAIL_BROADCAST_DURATION: Duration = Duration::from_secs(5);
+
+/// How long to continue broadcasting RDYY after Finalized (grace period for peer).
+/// From device testing: Samsung finalizes ~18s after Pixel. 20s gives margin.
+/// Must be long enough for the slow side to scan, short enough for good UX.
+const FINALIZED_GRACE_DURATION: Duration = Duration::from_secs(20);
+
+/// Base display durations per QR type (jitter added at runtime).
+const DISPLAY_MS_INIT: u32 = 1000;
+const DISPLAY_MS_DATA: u32 = 300;
+const DISPLAY_MS_VRFY: u32 = 500;
+const DISPLAY_MS_CONF: u32 = 500;
+const DISPLAY_MS_RDYY: u32 = 700;
+const DISPLAY_MS_FAIL: u32 = 500;
+
+/// Add ±20% jitter to prevent synchronization lock between two devices.
+/// When both devices cycle QRs at identical cadence, they can stay in phase
+/// and always scan during the other's transition — missing every QR.
+/// Jitter breaks the phase alignment.
+fn jittered(base_ms: u32) -> u32 {
+    let jitter_range = base_ms / 5; // ±20%
+    let jitter: u32 = crate::crypto::random_bytes::<4>()
+        .iter()
+        .fold(0u32, |acc, &b| acc.wrapping_add(b as u32))
+        % (jitter_range * 2 + 1);
+    base_ms - jitter_range + jitter
+}
 
 /// Multi-stage exchange session managing the full 5-stage protocol.
 ///
@@ -91,6 +141,16 @@ pub struct MultiStageSession {
     // Display cycle counter — every Nth cycle, re-show INIT so a slower
     // peer still in Advertising can discover us.
     display_cycle: u32,
+
+    // Wall-clock timestamps for timeout management.
+    phase_entered_at: Option<Instant>,
+    last_progress_at: Option<Instant>,
+
+    // Track whether we've already used the auto-retry.
+    retry_used: bool,
+
+    // When Failed, continue broadcasting FAIL QR until this deadline.
+    fail_broadcast_until: Option<Instant>,
 
     // Our relay metadata (included in our INIT QR)
     our_relay_url: Option<String>,
@@ -162,6 +222,10 @@ impl MultiStageSession {
             init_qr_cache: None,
             current_chunk_idx: 0,
             display_cycle: 0,
+            phase_entered_at: None,
+            last_progress_at: None,
+            retry_used: false,
+            fail_broadcast_until: None,
             our_relay_url: relay_url,
             our_relay_noise_pubkey: relay_noise_pubkey,
             peer_relay_url: None,
@@ -224,7 +288,7 @@ impl MultiStageSession {
                 Some(QrPayload {
                     data: qr_data,
                     error_correction: "M".to_string(),
-                    display_duration_ms: 1000,
+                    display_duration_ms: jittered(DISPLAY_MS_INIT),
                 })
             }
             ProtocolState::Advertising => {
@@ -235,7 +299,7 @@ impl MultiStageSession {
                 Some(QrPayload {
                     data: qr_data,
                     error_correction: "M".to_string(),
-                    display_duration_ms: 1000,
+                    display_duration_ms: jittered(DISPLAY_MS_INIT),
                 })
             }
             ProtocolState::Discovered => {
@@ -258,7 +322,7 @@ impl MultiStageSession {
                     Some(QrPayload {
                         data: qr_data,
                         error_correction: "M".to_string(),
-                        display_duration_ms: 500,
+                        display_duration_ms: jittered(DISPLAY_MS_DATA), // S3: adaptive
                     })
                 } else {
                     self.get_data_chunk_qr()
@@ -271,7 +335,7 @@ impl MultiStageSession {
                 let qr = QrPayload {
                     data: qr_data,
                     error_correction: "M".to_string(),
-                    display_duration_ms: 500,
+                    display_duration_ms: jittered(DISPLAY_MS_VRFY), // S3: adaptive
                 };
                 // If we stashed the peer's reveal key (received VRFY while still
                 // Transferring), process it now that we've generated our own VRFY
@@ -289,7 +353,7 @@ impl MultiStageSession {
                     Some(QrPayload {
                         data: qr_data,
                         error_correction: "M".to_string(),
-                        display_duration_ms: 500,
+                        display_duration_ms: jittered(DISPLAY_MS_VRFY),
                     })
                 } else {
                     // CONF contains hash of our original plaintext card
@@ -298,59 +362,63 @@ impl MultiStageSession {
                     Some(QrPayload {
                         data: qr_data,
                         error_correction: "M".to_string(),
-                        display_duration_ms: 500,
+                        display_duration_ms: jittered(DISPLAY_MS_CONF),
                     })
                 }
             }
-            ProtocolState::Complete => {
-                // Show READY QR to confirm mutual completion.
-                // Also interleave VRFY/CONF so slower peers can catch up.
-                self.display_cycle += 1;
-                if self.display_cycle > 30 {
-                    // Timeout: peer never sent READY
-                    self.state =
-                        ProtocolState::Failed("peer did not confirm readiness".to_string());
-                    return None;
+            ProtocolState::Complete | ProtocolState::RetryReady => {
+                // S1: Wall-clock timeout with progress extension.
+                let now = Instant::now();
+                let entered = *self.phase_entered_at.get_or_insert(now);
+
+                // Compute deadline: base + extension from last progress, capped at max.
+                let progress_deadline = self
+                    .last_progress_at
+                    .map(|p| p + RDYY_PROGRESS_EXTENSION)
+                    .unwrap_or(entered + RDYY_BASE_TIMEOUT);
+                let deadline = progress_deadline
+                    .max(entered + RDYY_BASE_TIMEOUT)
+                    .min(entered + RDYY_MAX_TIMEOUT);
+
+                if now > deadline {
+                    // S4: Graduated retry — try once more before failing.
+                    if !self.retry_used {
+                        self.retry_used = true;
+                        self.state = ProtocolState::RetryReady;
+                        self.phase_entered_at = Some(now);
+                        self.last_progress_at = None;
+                        self.display_cycle = 0;
+                        // Fall through to display RDYY
+                    } else {
+                        // Both attempts exhausted — fail with FAIL broadcast.
+                        self.state =
+                            ProtocolState::Failed("peer did not confirm readiness".to_string());
+                        self.fail_broadcast_until = Some(now + FAIL_BROADCAST_DURATION);
+                        return self.get_fail_qr();
+                    }
                 }
 
-                if self.display_cycle.is_multiple_of(4) {
-                    // Show VRFY for peers still in Verifying
-                    let qr_data =
-                        qr_codec::format_verify_qr(&self.session_id, self.commitment.reveal_key());
-                    Some(QrPayload {
-                        data: qr_data,
-                        error_correction: "M".to_string(),
-                        display_duration_ms: 500,
-                    })
-                } else if !self.display_cycle.is_multiple_of(4)
-                    && self.display_cycle.is_multiple_of(3)
-                {
-                    // Show CONF for peers in Confirming
-                    let card_hash = self.compute_card_hash(&self.local_card);
-                    let qr_data = qr_codec::format_confirm_qr(&self.session_id, &card_hash);
-                    Some(QrPayload {
-                        data: qr_data,
-                        error_correction: "M".to_string(),
-                        display_duration_ms: 500,
-                    })
-                } else {
-                    // Show READY for mutual confirmation
-                    let ack_hash = self.compute_ready_hash();
-                    let qr_data = qr_codec::format_ready_qr(&self.session_id, &ack_hash);
-                    Some(QrPayload {
-                        data: qr_data,
-                        error_correction: "M".to_string(),
-                        display_duration_ms: 500,
-                    })
-                }
+                self.display_cycle += 1;
+
+                // S2: RDYY-only display — maximize scan opportunity.
+                // Show RDYY exclusively. The peer should already have our
+                // VRFY/CONF from earlier stages. Pure RDYY = 100% scan window.
+                let ack_hash = self.compute_ready_hash();
+                let qr_data = qr_codec::format_ready_qr(&self.session_id, &ack_hash);
+                Some(QrPayload {
+                    data: qr_data,
+                    error_correction: "M".to_string(),
+                    display_duration_ms: jittered(DISPLAY_MS_RDYY), // S3: adaptive duration
+                })
             }
             ProtocolState::Finalized => {
                 // Continue broadcasting RDYY for a grace period so the peer
                 // can scan it and also finalize. Without this, the first side
                 // to finalize stops displaying and the peer times out with
                 // "peer did not confirm readiness" (C3 asymmetric failure).
-                self.display_cycle += 1;
-                if self.display_cycle > 30 {
+                let now = Instant::now();
+                let entered = *self.phase_entered_at.get_or_insert(now);
+                if now.duration_since(entered) > FINALIZED_GRACE_DURATION {
                     return None;
                 }
                 let ack_hash = self.compute_ready_hash();
@@ -358,10 +426,19 @@ impl MultiStageSession {
                 Some(QrPayload {
                     data: qr_data,
                     error_correction: "M".to_string(),
-                    display_duration_ms: 500,
+                    display_duration_ms: jittered(DISPLAY_MS_RDYY),
                 })
             }
-            ProtocolState::Failed(_) => None,
+            ProtocolState::Failed(_) => {
+                // S5: Broadcast FAIL QR so peer aborts immediately.
+                if self
+                    .fail_broadcast_until
+                    .is_some_and(|until| Instant::now() <= until)
+                {
+                    return self.get_fail_qr();
+                }
+                None
+            }
         }
     }
 
@@ -411,6 +488,7 @@ impl MultiStageSession {
                 session_id: _,
                 ack_hash,
             } => self.handle_ready(ack_hash),
+            StageQr::Fail { session_id: _ } => self.handle_fail(),
         }
     }
 
@@ -638,9 +716,9 @@ impl MultiStageSession {
 
         if bool::from(payload_hash.ct_eq(&expected_hash)) {
             self.state = ProtocolState::Complete;
-            // Reset display_cycle so the grace period starts from 0.
-            // Without this, display_cycle accumulated during Transferring/
-            // Verifying/Confirming would already exceed the grace limit.
+            // S1: Start wall-clock timer for the RDYY phase.
+            self.phase_entered_at = Some(Instant::now());
+            self.last_progress_at = None;
             self.display_cycle = 0;
         } else {
             self.state = ProtocolState::Failed("confirmation mismatch".to_string());
@@ -706,7 +784,7 @@ impl MultiStageSession {
                 return Some(QrPayload {
                     data: qr_data,
                     error_correction: "L".to_string(),
-                    display_duration_ms: 500,
+                    display_duration_ms: jittered(DISPLAY_MS_DATA),
                 });
             }
         }
@@ -726,7 +804,7 @@ impl MultiStageSession {
         Some(QrPayload {
             data: qr_data,
             error_correction: "L".to_string(),
-            display_duration_ms: 500,
+            display_duration_ms: jittered(DISPLAY_MS_DATA),
         })
     }
 
@@ -843,22 +921,52 @@ impl MultiStageSession {
     }
 
     fn handle_ready(&mut self, ack_hash: [u8; 32]) -> ProtocolState {
-        // Only accept READY in Complete state
-        if !matches!(self.state, ProtocolState::Complete) {
+        // Accept READY in Complete or RetryReady states.
+        if !matches!(
+            self.state,
+            ProtocolState::Complete | ProtocolState::RetryReady
+        ) {
             return self.state.clone();
         }
 
-        // Verify ack_hash matches our computation
+        // S6: Any RDYY scan is progress — extend the deadline.
+        self.last_progress_at = Some(Instant::now());
+
+        // Verify ack_hash matches our computation.
         let expected = self.compute_ready_hash();
         if bool::from(ack_hash.ct_eq(&expected)) {
             self.state = ProtocolState::Finalized;
-            // Reset display_cycle so the finalized grace period starts from 0.
-            // We continue broadcasting RDYY so the peer can also finalize.
+            // Reset for the finalized grace period (wall-clock based).
+            self.phase_entered_at = Some(Instant::now());
             self.display_cycle = 0;
         }
         // Ignore mismatched READY (could be from a different exchange)
 
         self.state.clone()
+    }
+
+    /// Handle a FAIL QR from the peer — abort immediately.
+    fn handle_fail(&mut self) -> ProtocolState {
+        // Don't overwrite Finalized — if we already succeeded, ignore peer's failure.
+        if matches!(self.state, ProtocolState::Finalized) {
+            return self.state.clone();
+        }
+        // Don't overwrite existing failure.
+        if matches!(self.state, ProtocolState::Failed(_)) {
+            return self.state.clone();
+        }
+        self.state = ProtocolState::Failed("peer reported failure".to_string());
+        self.state.clone()
+    }
+
+    /// Generate a FAIL QR payload for broadcasting failure to peer.
+    fn get_fail_qr(&self) -> Option<QrPayload> {
+        let qr_data = qr_codec::format_fail_qr(&self.session_id);
+        Some(QrPayload {
+            data: qr_data,
+            error_correction: "L".to_string(),
+            display_duration_ms: jittered(DISPLAY_MS_FAIL),
+        })
     }
 
     /// Compute the READY acknowledgment hash.

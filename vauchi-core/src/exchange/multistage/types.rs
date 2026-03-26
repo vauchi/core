@@ -36,6 +36,9 @@ pub enum ProtocolState {
     Verifying,
     Confirming,
     Complete,
+    /// Auto-retry of the RDYY phase after first timeout.
+    /// One retry is attempted before transitioning to Failed.
+    RetryReady,
     Finalized,
     Failed(String),
 }

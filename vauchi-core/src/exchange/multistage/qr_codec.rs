@@ -73,6 +73,8 @@ pub enum StageQr {
         session_id: [u8; 16],
         ack_hash: [u8; 32],
     },
+    /// Failure notification — tells peer to abort immediately.
+    Fail { session_id: [u8; 16] },
 }
 
 /// Base45-encoded widths for fixed-size binary fields.
@@ -240,6 +242,13 @@ pub fn format_ready_qr(session_id: &[u8; 16], ack_hash: &[u8; 32]) -> String {
     )
 }
 
+/// Format a FAIL QR: `FAIL<sid:24>`
+///
+/// Broadcast to peer so they abort immediately instead of waiting for timeout.
+pub fn format_fail_qr(session_id: &[u8; 16]) -> String {
+    format!("FAIL{sid}", sid = base45::encode(session_id),)
+}
+
 // ── Parsing ─────────────────────────────────────────────────────────────
 
 /// Parse a QR string into a [`StageQr`] variant.
@@ -256,6 +265,7 @@ pub fn parse_qr(raw: &str) -> Result<StageQr, QrCodecError> {
         "VRFY" => parse_verify(body),
         "CONF" => parse_confirm(body),
         "RDYY" => parse_ready(body),
+        "FAIL" => parse_fail(body),
         _ => Err(QrCodecError::UnknownPrefix),
     }
 }
@@ -403,5 +413,14 @@ fn parse_ready(body: &str) -> Result<StageQr, QrCodecError> {
     Ok(StageQr::Ready {
         session_id: decode_fixed(sid)?,
         ack_hash: decode_fixed(ah)?,
+    })
+}
+
+fn parse_fail(body: &str) -> Result<StageQr, QrCodecError> {
+    let mut pos = 0;
+    let sid = take(body, &mut pos, SID_LEN)?;
+
+    Ok(StageQr::Fail {
+        session_id: decode_fixed(sid)?,
     })
 }

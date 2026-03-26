@@ -698,11 +698,11 @@ fn test_adaptive_display_durations() {
     let mut alice = MultiStageSession::new(b"Alice".to_vec());
     let mut bob = MultiStageSession::new(b"Bob".to_vec());
 
-    // INIT should be ~1000ms (±20% jitter: 800–1200ms)
+    // INIT should be ~600ms (±20% jitter: 480–720ms)
     let init_qr = alice.get_display_qr().unwrap();
     assert!(
-        (800..=1200).contains(&init_qr.display_duration_ms),
-        "INIT display should be ~1000ms, got {}",
+        (480..=720).contains(&init_qr.display_duration_ms),
+        "INIT display should be ~600ms, got {}",
         init_qr.display_duration_ms
     );
 
@@ -711,11 +711,11 @@ fn test_adaptive_display_durations() {
     alice.process_scanned_qr(&bi.data);
     bob.process_scanned_qr(&init_qr.data);
 
-    // DATA should be ~300ms (±20%: 240–360ms)
+    // DATA should be ~250ms (±20%: 200–300ms)
     let data_qr = alice.get_display_qr().unwrap();
     assert!(
-        (240..=360).contains(&data_qr.display_duration_ms),
-        "DATA display should be ~300ms, got {}",
+        (200..=300).contains(&data_qr.display_duration_ms),
+        "DATA display should be ~250ms, got {}",
         data_qr.display_duration_ms
     );
 
@@ -734,13 +734,13 @@ fn test_adaptive_display_durations() {
         }
     }
 
-    // RDYY should be ~700ms (±20%: 560–840ms)
+    // COMBO/RDYY should be ~500ms (±20%: 400–600ms)
     if matches!(alice.get_state(), ProtocolState::Complete) {
-        let rdyy_qr = alice.get_display_qr().unwrap();
+        let combo_qr = alice.get_display_qr().unwrap();
         assert!(
-            (560..=840).contains(&rdyy_qr.display_duration_ms),
-            "RDYY display should be ~700ms, got {}",
-            rdyy_qr.display_duration_ms
+            (400..=600).contains(&combo_qr.display_duration_ms),
+            "COMBO display should be ~500ms, got {}",
+            combo_qr.display_duration_ms
         );
     }
 }

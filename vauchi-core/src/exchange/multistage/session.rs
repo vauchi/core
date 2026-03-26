@@ -62,12 +62,14 @@ const FAIL_BROADCAST_DURATION: Duration = Duration::from_secs(5);
 const FINALIZED_GRACE_DURATION: Duration = Duration::from_secs(20);
 
 /// Base display durations per QR type (jitter added at runtime).
-const DISPLAY_MS_INIT: u32 = 1000;
-const DISPLAY_MS_DATA: u32 = 300;
-const DISPLAY_MS_VRFY: u32 = 500;
-const DISPLAY_MS_CONF: u32 = 500;
-const DISPLAY_MS_RDYY: u32 = 700;
-const DISPLAY_MS_FAIL: u32 = 500;
+/// Tuned for <5s total exchange on typical hardware.
+/// Shorter = more scan opportunities per second = faster convergence.
+const DISPLAY_MS_INIT: u32 = 600;
+const DISPLAY_MS_DATA: u32 = 250;
+const DISPLAY_MS_VRFY: u32 = 400;
+const DISPLAY_MS_CONF: u32 = 400;
+const DISPLAY_MS_RDYY: u32 = 500;
+const DISPLAY_MS_FAIL: u32 = 400;
 
 /// Add ±20% jitter to prevent synchronization lock between two devices.
 /// When both devices cycle QRs at identical cadence, they can stay in phase

@@ -155,8 +155,6 @@ fn sample_shared_info_view() -> SharedInfoView {
                 label: "Mobile".into(),
                 value: "+41 79 123 45 67".into(),
                 visibility: UiFieldVisibility::Shown,
-                accessible_label: None,
-                accessible_hint: None,
             },
             FieldDisplay {
                 id: "mf2".into(),
@@ -164,8 +162,6 @@ fn sample_shared_info_view() -> SharedInfoView {
                 label: "Work".into(),
                 value: "me@example.com".into(),
                 visibility: UiFieldVisibility::Hidden,
-                accessible_label: None,
-                accessible_hint: None,
             },
         ],
         visible_groups: vec!["Friends".into()],

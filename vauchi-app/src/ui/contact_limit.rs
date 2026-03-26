@@ -47,15 +47,11 @@ impl ContactLimitEngine {
                 id: "info".into(),
                 content: "Set a maximum number of contacts to manage storage.".into(),
                 style: TextStyle::Body,
-                accessible_label: None,
-                accessible_hint: None,
             },
             Component::Text {
                 id: "usage".into(),
                 content: usage,
                 style: TextStyle::Subtitle,
-                accessible_label: None,
-                accessible_hint: None,
             },
             Component::TextInput {
                 id: "limit_input".into(),
@@ -65,8 +61,6 @@ impl ContactLimitEngine {
                 max_length: Some(6),
                 validation_error: None,
                 input_type: InputType::Text,
-                accessible_label: None,
-                accessible_hint: None,
             },
         ];
 

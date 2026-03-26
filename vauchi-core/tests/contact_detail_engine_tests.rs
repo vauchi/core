@@ -18,8 +18,6 @@ fn sample_contact() -> ContactItem {
         avatar_initials: "AL".into(),
         status: None,
         searchable_fields: vec![],
-        accessible_label: None,
-        accessible_hint: None,
     }
 }
 
@@ -30,8 +28,6 @@ fn sample_fields() -> Vec<FieldDisplay> {
         value: "alice@example.com".into(),
         field_type: "email".into(),
         visibility: UiFieldVisibility::Shown,
-        accessible_label: None,
-        accessible_hint: None,
     }]
 }
 

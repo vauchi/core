@@ -57,16 +57,12 @@ impl WorkflowEngine for HelpEngine {
                         label: item.question.clone(),
                         icon: None,
                         detail: None,
-                        accessible_label: None,
-                        accessible_hint: None,
                     })
                     .collect();
 
                 Component::ActionList {
                     id: category,
                     items,
-                    accessible_label: None,
-                    accessible_hint: None,
                 }
             })
             .collect();

@@ -33,8 +33,6 @@ impl DuplicateDetectionEngine {
                 id: "no_duplicates".into(),
                 content: "No duplicate contacts detected.".into(),
                 style: TextStyle::Body,
-                accessible_label: None,
-                accessible_hint: None,
             }]
         } else {
             vec![
@@ -42,8 +40,6 @@ impl DuplicateDetectionEngine {
                     id: "header".into(),
                     content: format!("{} potential duplicate(s) found", self.pairs.len()),
                     style: TextStyle::Subtitle,
-                    accessible_label: None,
-                    accessible_hint: None,
                 },
                 Component::ActionList {
                     id: "duplicate_pairs".into(),
@@ -58,13 +54,9 @@ impl DuplicateDetectionEngine {
                                 label: format!("{} <-> {}", pair.name1, pair.name2),
                                 icon: None,
                                 detail: Some(format!("{pct}% similar")),
-                                accessible_label: None,
-                                accessible_hint: None,
                             }
                         })
                         .collect(),
-                    accessible_label: None,
-                    accessible_hint: None,
                 },
             ]
         };

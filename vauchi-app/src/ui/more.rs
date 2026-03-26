@@ -47,8 +47,6 @@ impl WorkflowEngine for MoreEngine {
                 label: (*label).into(),
                 icon: None,
                 detail: None,
-                accessible_label: None,
-                accessible_hint: None,
             })
             .collect();
 
@@ -59,8 +57,6 @@ impl WorkflowEngine for MoreEngine {
             components: vec![Component::ActionList {
                 id: "more_menu".into(),
                 items,
-                accessible_label: None,
-                accessible_hint: None,
             }],
             actions: vec![],
             progress: None,

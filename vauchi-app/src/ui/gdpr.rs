@@ -71,19 +71,13 @@ impl GdprEngine {
                             icon: None,
                             title: "Deletion Status".into(),
                             detail: deletion_detail,
-                            accessible_label: None,
-                            accessible_hint: None,
                         },
                         InfoItem {
                             icon: None,
                             title: "Consent".into(),
                             detail: self.consent_summary.clone(),
-                            accessible_label: None,
-                            accessible_hint: None,
                         },
                     ],
-                    accessible_label: None,
-                    accessible_hint: None,
                 },
                 Component::ActionList {
                     id: "consent_actions".into(),
@@ -93,20 +87,14 @@ impl GdprEngine {
                             label: "View My Data".into(),
                             icon: Some("data".into()),
                             detail: Some("See what data is stored locally".into()),
-                            accessible_label: None,
-                            accessible_hint: None,
                         },
                         ActionListItem {
                             id: "manage_consent".into(),
                             label: "Manage Consent".into(),
                             icon: Some("consent".into()),
                             detail: Some("Review and update data consent".into()),
-                            accessible_label: None,
-                            accessible_hint: None,
                         },
                     ],
-                    accessible_label: None,
-                    accessible_hint: None,
                 },
             ],
             actions: vec![
@@ -134,29 +122,21 @@ impl GdprEngine {
                 icon: Some("identity".into()),
                 title: "Your identity".into(),
                 detail: "Cryptographic keys and display name — permanently destroyed".into(),
-                accessible_label: None,
-                accessible_hint: None,
             },
             InfoItem {
                 icon: Some("contacts".into()),
                 title: format!("{} contact(s)", s.contact_count),
                 detail: "All contact cards and exchange history — permanently deleted".into(),
-                accessible_label: None,
-                accessible_hint: None,
             },
             InfoItem {
                 icon: Some("cloud".into()),
                 title: "Relay data".into(),
                 detail: "Revocation broadcast sent to contacts, relay blobs purged".into(),
-                accessible_label: None,
-                accessible_hint: None,
             },
             InfoItem {
                 icon: Some("key".into()),
                 title: "Keychain entry".into(),
                 detail: "Device keystore/keychain entry — removed".into(),
-                accessible_label: None,
-                accessible_hint: None,
             },
         ];
 
@@ -165,8 +145,6 @@ impl GdprEngine {
                 icon: Some("devices".into()),
                 title: format!("{} linked device(s)", s.device_count - 1),
                 detail: "Other devices will lose access to this identity".into(),
-                accessible_label: None,
-                accessible_hint: None,
             });
         }
 
@@ -176,8 +154,6 @@ impl GdprEngine {
             detail: "After a 7-day grace period, all data is permanently destroyed. \
                      You can cancel during the grace period."
                 .into(),
-            accessible_label: None,
-            accessible_hint: None,
         });
 
         ScreenModel {
@@ -189,8 +165,6 @@ impl GdprEngine {
                 icon: Some("warning".into()),
                 title: "The following will be deleted".into(),
                 items,
-                accessible_label: None,
-                accessible_hint: None,
             }],
             actions: vec![
                 ScreenAction {

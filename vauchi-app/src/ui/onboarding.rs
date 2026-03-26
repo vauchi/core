@@ -115,19 +115,13 @@ impl OnboardingEngine {
                         title: "Private by design".into(),
                         detail: "Your data is end-to-end encrypted and never leaves your control."
                             .into(),
-                        accessible_label: None,
-                        accessible_hint: None,
                     },
                     InfoItem {
                         icon: Some("devices".into()),
                         title: "Multi-device".into(),
                         detail: "Use Vauchi on all your devices with seamless sync.".into(),
-                        accessible_label: None,
-                        accessible_hint: None,
                     },
                 ],
-                accessible_label: None,
-                accessible_hint: None,
             }],
             actions: vec![
                 ScreenAction {
@@ -161,19 +155,13 @@ impl OnboardingEngine {
                         icon: Some("link".into()),
                         title: "Link from another device".into(),
                         detail: "Scan a QR code on your other device to link this one.".into(),
-                        accessible_label: None,
-                        accessible_hint: None,
                     },
                     InfoItem {
                         icon: Some("backup".into()),
                         title: "Restore from backup".into(),
                         detail: "Import your identity from a backup file.".into(),
-                        accessible_label: None,
-                        accessible_hint: None,
                     },
                 ],
-                accessible_label: None,
-                accessible_hint: None,
             }],
             actions: vec![
                 ScreenAction {
@@ -213,26 +201,18 @@ impl OnboardingEngine {
                         icon: Some("lock".into()),
                         title: "Private".into(),
                         detail: "End-to-end encrypted contact cards".into(),
-                        accessible_label: None,
-                        accessible_hint: None,
                     },
                     InfoItem {
                         icon: Some("refresh".into()),
                         title: "Always up to date".into(),
                         detail: "Update your card and contacts see changes automatically".into(),
-                        accessible_label: None,
-                        accessible_hint: None,
                     },
                     InfoItem {
                         icon: Some("people".into()),
                         title: "You decide who sees what".into(),
                         detail: "Share different info with different groups".into(),
-                        accessible_label: None,
-                        accessible_hint: None,
                     },
                 ],
-                accessible_label: None,
-                accessible_hint: None,
             }],
             actions: vec![ScreenAction {
                 id: "get_started".into(),
@@ -255,8 +235,6 @@ impl OnboardingEngine {
                     id: "name_instruction".into(),
                     content: "Enter the name you'd like to show on your contact card.".into(),
                     style: TextStyle::Body,
-                    accessible_label: None,
-                    accessible_hint: None,
                 },
                 Component::TextInput {
                     id: "display_name".into(),
@@ -266,8 +244,6 @@ impl OnboardingEngine {
                     max_length: Some(100),
                     validation_error: None,
                     input_type: InputType::Text,
-                    accessible_label: None,
-                    accessible_hint: None,
                 },
             ],
             actions: vec![ScreenAction {
@@ -294,26 +270,18 @@ impl OnboardingEngine {
                         icon: Some("group".into()),
                         title: "Groups".into(),
                         detail: "Organize contacts into groups like Family, Friends, etc.".into(),
-                        accessible_label: None,
-                        accessible_hint: None,
                     },
                     InfoItem {
                         icon: Some("card".into()),
                         title: "Contact info".into(),
                         detail: "Add phone, email, and other fields to your card.".into(),
-                        accessible_label: None,
-                        accessible_hint: None,
                     },
                     InfoItem {
                         icon: Some("eye".into()),
                         title: "Visibility".into(),
                         detail: "Choose what each group can see.".into(),
-                        accessible_label: None,
-                        accessible_hint: None,
                     },
                 ],
-                accessible_label: None,
-                accessible_hint: None,
             }],
             actions: vec![
                 ScreenAction {
@@ -343,8 +311,6 @@ impl OnboardingEngine {
                 label: g.name.clone(),
                 selected: g.selected,
                 subtitle: g.name_override.clone(),
-                accessible_label: None,
-                accessible_hint: None,
             })
             .collect();
 
@@ -363,15 +329,11 @@ impl OnboardingEngine {
                               They let you control exactly who sees what on your card."
                         .into(),
                     style: TextStyle::Body,
-                    accessible_label: None,
-                    accessible_hint: None,
                 },
                 Component::ToggleList {
                     id: "groups".into(),
                     label: "Suggested groups".into(),
                     items,
-                    accessible_label: None,
-                    accessible_hint: None,
                 },
                 Component::TextInput {
                     id: "custom_group".into(),
@@ -381,8 +343,6 @@ impl OnboardingEngine {
                     max_length: Some(50),
                     validation_error: None,
                     input_type: InputType::Text,
-                    accessible_label: None,
-                    accessible_hint: None,
                 },
             ],
             actions: vec![
@@ -435,8 +395,6 @@ impl OnboardingEngine {
                 } else {
                     UiFieldVisibility::Hidden
                 },
-                accessible_label: None,
-                accessible_hint: None,
             })
             .collect();
 
@@ -453,7 +411,6 @@ impl OnboardingEngine {
                     VisibilityMode::ShowHide
                 },
                 available_groups: selected,
-                accessible_label: None, accessible_hint: None,
             }],
             actions: vec![
                 ScreenAction {
@@ -497,8 +454,6 @@ impl OnboardingEngine {
                 } else {
                     UiFieldVisibility::Hidden
                 },
-                accessible_label: None,
-                accessible_hint: None,
             })
             .collect();
 
@@ -517,8 +472,6 @@ impl OnboardingEngine {
                         label: f.label.clone(),
                         value: f.value.clone(),
                         visibility: UiFieldVisibility::Shown,
-                        accessible_label: None,
-                        accessible_hint: None,
                     })
                     .collect();
 
@@ -547,8 +500,6 @@ impl OnboardingEngine {
                 fields,
                 group_views,
                 selected_group: self.selected_preview_group.clone(),
-                accessible_label: None,
-                accessible_hint: None,
             }],
             actions: vec![
                 ScreenAction {
@@ -582,26 +533,18 @@ impl OnboardingEngine {
                         icon: Some("lock".into()),
                         title: "End-to-end encryption".into(),
                         detail: "Only you and your contacts can read your data.".into(),
-                        accessible_label: None,
-                        accessible_hint: None,
                     },
                     InfoItem {
                         icon: Some("server".into()),
                         title: "Decentralized".into(),
                         detail: "No central server stores your contacts.".into(),
-                        accessible_label: None,
-                        accessible_hint: None,
                     },
                     InfoItem {
                         icon: Some("key".into()),
                         title: "You own your keys".into(),
                         detail: "Your cryptographic keys never leave your device.".into(),
-                        accessible_label: None,
-                        accessible_hint: None,
                     },
                 ],
-                accessible_label: None,
-                accessible_hint: None,
             }],
             actions: vec![ScreenAction {
                 id: "continue".into(),
@@ -628,19 +571,13 @@ impl OnboardingEngine {
                         title: "No account recovery".into(),
                         detail: "If you lose your device without a backup, your identity is lost."
                             .into(),
-                        accessible_label: None,
-                        accessible_hint: None,
                     },
                     InfoItem {
                         icon: Some("devices".into()),
                         title: "Multi-device".into(),
                         detail: "Backups let you use Vauchi on multiple devices.".into(),
-                        accessible_label: None,
-                        accessible_hint: None,
                     },
                 ],
-                accessible_label: None,
-                accessible_hint: None,
             }],
             actions: vec![
                 ScreenAction {
@@ -674,19 +611,13 @@ impl OnboardingEngine {
                         icon: Some("share".into()),
                         title: "Share your card".into(),
                         detail: "Exchange contact cards in person.".into(),
-                        accessible_label: None,
-                        accessible_hint: None,
                     },
                     InfoItem {
                         icon: Some("edit".into()),
                         title: "Edit anytime".into(),
                         detail: "Update your card whenever you like.".into(),
-                        accessible_label: None,
-                        accessible_hint: None,
                     },
                 ],
-                accessible_label: None,
-                accessible_hint: None,
             }],
             actions: vec![ScreenAction {
                 id: "start".into(),

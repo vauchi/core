@@ -119,8 +119,6 @@ impl WorkflowEngine for ContactListEngine {
                 id: "contacts".into(),
                 contacts: self.filtered_contacts(),
                 searchable: true,
-                accessible_label: None,
-                accessible_hint: None,
             }],
             actions,
             progress: None,

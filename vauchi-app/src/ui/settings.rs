@@ -43,19 +43,13 @@ impl WorkflowEngine for SettingsEngine {
                         kind: SettingsItemKind::Value {
                             value: self.config.display_name.clone(),
                         },
-                        accessible_label: None,
-                        accessible_hint: None,
                     },
                     SettingsItem {
                         id: "edit_profile".into(),
                         label: "Edit Profile".into(),
                         kind: SettingsItemKind::Link { detail: None },
-                        accessible_label: None,
-                        accessible_hint: None,
                     },
                 ],
-                accessible_label: None,
-                accessible_hint: None,
             },
             Component::SettingsGroup {
                 id: "privacy".into(),
@@ -67,8 +61,6 @@ impl WorkflowEngine for SettingsEngine {
                         kind: SettingsItemKind::Toggle {
                             enabled: self.config.delivery_receipts_enabled,
                         },
-                        accessible_label: None,
-                        accessible_hint: None,
                     },
                     SettingsItem {
                         id: "suppress_presence".into(),
@@ -76,12 +68,8 @@ impl WorkflowEngine for SettingsEngine {
                         kind: SettingsItemKind::Toggle {
                             enabled: self.config.suppress_presence,
                         },
-                        accessible_label: None,
-                        accessible_hint: None,
                     },
                 ],
-                accessible_label: None,
-                accessible_hint: None,
             },
             Component::SettingsGroup {
                 id: "security".into(),
@@ -91,8 +79,6 @@ impl WorkflowEngine for SettingsEngine {
                         id: "change_password".into(),
                         label: "Change Password".into(),
                         kind: SettingsItemKind::Link { detail: None },
-                        accessible_label: None,
-                        accessible_hint: None,
                     },
                     SettingsItem {
                         id: "devices".into(),
@@ -104,19 +90,13 @@ impl WorkflowEngine for SettingsEngine {
                                 format!("{} devices", self.config.device_count)
                             }),
                         },
-                        accessible_label: None,
-                        accessible_hint: None,
                     },
                     SettingsItem {
                         id: "duress_pin".into(),
                         label: "Duress PIN".into(),
                         kind: SettingsItemKind::Link { detail: None },
-                        accessible_label: None,
-                        accessible_hint: None,
                     },
                 ],
-                accessible_label: None,
-                accessible_hint: None,
             },
             Component::SettingsGroup {
                 id: "network".into(),
@@ -127,11 +107,7 @@ impl WorkflowEngine for SettingsEngine {
                     kind: SettingsItemKind::Value {
                         value: self.config.relay_url.clone(),
                     },
-                    accessible_label: None,
-                    accessible_hint: None,
                 }],
-                accessible_label: None,
-                accessible_hint: None,
             },
             Component::SettingsGroup {
                 id: "danger".into(),
@@ -142,11 +118,7 @@ impl WorkflowEngine for SettingsEngine {
                     kind: SettingsItemKind::Destructive {
                         label: "Wipe All Data".into(),
                     },
-                    accessible_label: None,
-                    accessible_hint: None,
                 }],
-                accessible_label: None,
-                accessible_hint: None,
             },
         ];
 

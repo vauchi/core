@@ -241,8 +241,6 @@ impl AppEngine {
                                     avatar_initials: initials(c.display_name()),
                                     status: None,
                                     searchable_fields: vec![],
-                                    accessible_label: None,
-                                    accessible_hint: None,
                                 })
                             })
                             .collect();
@@ -304,8 +302,6 @@ impl AppEngine {
                         avatar_initials: initials(c.display_name()),
                         status: None,
                         searchable_fields: vec![],
-                        accessible_label: None,
-                        accessible_hint: None,
                     })
                     .collect();
                 members.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
@@ -344,8 +340,6 @@ impl AppEngine {
                             label: f.label().to_string(),
                             value: f.value().to_string(),
                             visibility: UiFieldVisibility::Shown,
-                            accessible_label: None,
-                            accessible_hint: None,
                         })
                         .collect();
                     let status = if vauchi.is_contact_revoked(contact.id()) {
@@ -367,8 +361,6 @@ impl AppEngine {
                             .iter()
                             .map(|f| f.value().to_string())
                             .collect(),
-                        accessible_label: None,
-                        accessible_hint: None,
                     };
 
                     // Load personal note (stored as raw UTF-8 bytes by the app layer)
@@ -429,8 +421,6 @@ impl AppEngine {
                                 label: f.label().to_string(),
                                 selected: true,
                                 subtitle: None,
-                                accessible_label: None,
-                                accessible_hint: None,
                             })
                             .collect();
                         (name, items)
@@ -520,8 +510,6 @@ impl AppEngine {
                     } else {
                         UiFieldVisibility::Hidden
                     },
-                    accessible_label: None,
-                    accessible_hint: None,
                 }
             })
             .collect();
@@ -628,8 +616,6 @@ impl AppEngine {
                         avatar_initials: initials(c.display_name()),
                         status,
                         searchable_fields: fields,
-                        accessible_label: None,
-                        accessible_hint: None,
                     }
                 })
                 .collect(),

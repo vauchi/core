@@ -82,6 +82,10 @@ pub enum ActionResult {
         message: String,
     },
     /// Frontend should open the camera for QR scanning.
+    ///
+    /// Deprecated per ADR-022 Addendum D: use `ExchangeCommands` with
+    /// `ExchangeCommand::QrRequestScan` instead. Will be removed after
+    /// all frontends adopt the command/event protocol.
     RequestCamera,
     /// Frontend should open the entry detail view for a MyInfo field.
     OpenEntryDetail {

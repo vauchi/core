@@ -38,18 +38,12 @@ impl GroupDetailEngine {
                         icon: Some("members".into()),
                         title: "Members".into(),
                         detail: format!("{}", self.members.len()),
-                        accessible_label: None,
-                        accessible_hint: None,
                     }],
-                    accessible_label: None,
-                    accessible_hint: None,
                 },
                 Component::ContactList {
                     id: "members".into(),
                     contacts: self.members.clone(),
                     searchable: false,
-                    accessible_label: None,
-                    accessible_hint: None,
                 },
             ],
             actions: {

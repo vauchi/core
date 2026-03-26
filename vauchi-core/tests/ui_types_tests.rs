@@ -19,11 +19,7 @@ fn test_screen_model_serde_roundtrip() {
                     icon: None,
                     title: "Privacy".to_string(),
                     detail: "Your data stays yours".to_string(),
-                    accessible_label: None,
-                    accessible_hint: None,
                 }],
-                accessible_label: None,
-                accessible_hint: None,
             },
             Component::Divider,
         ],
@@ -230,8 +226,6 @@ fn test_component_text_input_roundtrip() {
         max_length: Some(50),
         validation_error: None,
         input_type: InputType::Text,
-        accessible_label: None,
-        accessible_hint: None,
     };
 
     let json = serde_json::to_string(&component).unwrap();
@@ -270,20 +264,14 @@ fn test_component_toggle_list_roundtrip() {
                 label: "Family".into(),
                 selected: true,
                 subtitle: Some("Close family members".into()),
-                accessible_label: None,
-                accessible_hint: None,
             },
             ToggleItem {
                 id: "work".into(),
                 label: "Work".into(),
                 selected: false,
                 subtitle: None,
-                accessible_label: None,
-                accessible_hint: None,
             },
         ],
-        accessible_label: None,
-        accessible_hint: None,
     };
 
     let json = serde_json::to_string(&component).unwrap();
@@ -316,12 +304,8 @@ fn test_component_field_list_roundtrip() {
             label: "Email".into(),
             value: "alice@example.com".into(),
             visibility: UiFieldVisibility::Groups(vec!["friends".into()]),
-            accessible_label: None,
-            accessible_hint: None,
         }],
         visibility_mode: VisibilityMode::PerGroup,
-        accessible_label: None,
-        accessible_hint: None,
         available_groups: vec!["friends".into(), "family".into()],
     };
 
@@ -360,8 +344,6 @@ fn test_component_card_preview_roundtrip() {
             label: "Phone".into(),
             value: "+1234567890".into(),
             visibility: UiFieldVisibility::Shown,
-            accessible_label: None,
-            accessible_hint: None,
         }],
         group_views: vec![GroupCardView {
             group_name: "family".into(),
@@ -372,13 +354,9 @@ fn test_component_card_preview_roundtrip() {
                 label: "Phone".into(),
                 value: "+1234567890".into(),
                 visibility: UiFieldVisibility::Shown,
-                accessible_label: None,
-                accessible_hint: None,
             }],
         }],
         selected_group: Some("family".into()),
-        accessible_label: None,
-        accessible_hint: None,
     };
 
     let json = serde_json::to_string(&component).unwrap();
@@ -438,8 +416,6 @@ fn test_text_style_variants() {
             id: "t".into(),
             content: "hello".into(),
             style: style.clone(),
-            accessible_label: None,
-            accessible_hint: None,
         };
         let json = serde_json::to_string(&component).unwrap();
         let restored: Component = serde_json::from_str(&json).unwrap();
@@ -521,68 +497,6 @@ fn test_screen_action_disabled() {
     assert!(!restored.enabled);
 }
 
-// === ShowToast component ===
-
-#[test]
-fn test_component_show_toast_roundtrip() {
-    let component = Component::ShowToast {
-        id: "toast-1".into(),
-        message: "Contact deleted".into(),
-        undo_action_id: Some("undo-delete".into()),
-        duration_ms: 5000,
-        accessible_label: None,
-        accessible_hint: None,
-    };
-
-    let json = serde_json::to_string(&component).unwrap();
-    let restored: Component = serde_json::from_str(&json).unwrap();
-    match restored {
-        Component::ShowToast {
-            id,
-            message,
-            undo_action_id,
-            duration_ms,
-            ..
-        } => {
-            assert_eq!(id, "toast-1");
-            assert_eq!(message, "Contact deleted");
-            assert_eq!(undo_action_id.as_deref(), Some("undo-delete"));
-            assert_eq!(duration_ms, 5000);
-        }
-        other => panic!("Expected ShowToast, got {:?}", other),
-    }
-}
-
-#[test]
-fn test_component_show_toast_without_undo_roundtrip() {
-    let component = Component::ShowToast {
-        id: "toast-2".into(),
-        message: "Saved".into(),
-        undo_action_id: None,
-        duration_ms: 3000,
-        accessible_label: None,
-        accessible_hint: None,
-    };
-
-    let json = serde_json::to_string(&component).unwrap();
-    let restored: Component = serde_json::from_str(&json).unwrap();
-    match restored {
-        Component::ShowToast {
-            id,
-            message,
-            undo_action_id,
-            duration_ms,
-            ..
-        } => {
-            assert_eq!(id, "toast-2");
-            assert_eq!(message, "Saved");
-            assert!(undo_action_id.is_none());
-            assert_eq!(duration_ms, 3000);
-        }
-        other => panic!("Expected ShowToast, got {:?}", other),
-    }
-}
-
 // === InlineConfirm component ===
 
 #[test]
@@ -593,8 +507,6 @@ fn test_component_inline_confirm_roundtrip() {
         confirm_text: "Delete Forever".into(),
         cancel_text: "Cancel".into(),
         destructive: true,
-        accessible_label: None,
-        accessible_hint: None,
     };
 
     let json = serde_json::to_string(&component).unwrap();
@@ -626,8 +538,6 @@ fn test_component_inline_confirm_non_destructive_roundtrip() {
         confirm_text: "Yes".into(),
         cancel_text: "No".into(),
         destructive: false,
-        accessible_label: None,
-        accessible_hint: None,
     };
 
     let json = serde_json::to_string(&component).unwrap();
@@ -661,8 +571,6 @@ fn test_component_editable_text_display_mode_roundtrip() {
         value: "Alice".into(),
         editing: false,
         validation_error: None,
-        accessible_label: None,
-        accessible_hint: None,
     };
 
     let json = serde_json::to_string(&component).unwrap();
@@ -694,8 +602,6 @@ fn test_component_editable_text_editing_with_error_roundtrip() {
         value: "".into(),
         editing: true,
         validation_error: Some("Name cannot be empty".into()),
-        accessible_label: None,
-        accessible_hint: None,
     };
 
     let json = serde_json::to_string(&component).unwrap();

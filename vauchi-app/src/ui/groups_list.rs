@@ -60,20 +60,14 @@ impl GroupsEngine {
                     label: "Members".into(),
                     selected: self.mode == GroupsMode::Members,
                     subtitle: Some("Which contacts are in each group".into()),
-                    accessible_label: None,
-                    accessible_hint: None,
                 },
                 ToggleItem {
                     id: "visibility".into(),
                     label: "Visibility".into(),
                     selected: self.mode == GroupsMode::Visibility,
                     subtitle: Some("Which of your fields each group sees".into()),
-                    accessible_label: None,
-                    accessible_hint: None,
                 },
             ],
-            accessible_label: None,
-            accessible_hint: None,
         });
 
         // Group list with mode-dependent detail text
@@ -104,8 +98,6 @@ impl GroupsEngine {
                     label: g.name.clone(),
                     icon: Some("group".into()),
                     detail: Some(detail),
-                    accessible_label: None,
-                    accessible_hint: None,
                 }
             })
             .collect();
@@ -113,8 +105,6 @@ impl GroupsEngine {
         components.push(Component::ActionList {
             id: "groups".into(),
             items,
-            accessible_label: None,
-            accessible_hint: None,
         });
 
         if self.pending_delete {
@@ -126,8 +116,6 @@ impl GroupsEngine {
                 confirm_text: "Delete Group".into(),
                 cancel_text: "Cancel".into(),
                 destructive: true,
-                accessible_label: None,
-                accessible_hint: None,
             });
         }
 

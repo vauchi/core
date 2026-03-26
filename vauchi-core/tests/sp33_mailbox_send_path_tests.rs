@@ -7,7 +7,7 @@
 //! Tests that the send path uses mailbox tokens as recipient_id,
 //! that the client registers mailbox tokens after connect,
 //! that device sync uses self-token EncryptedUpdate, and
-//! that AccountRevoked verification works correctly.
+//! that IdentityRevoked verification works correctly.
 
 use vauchi_core::crypto::{DoubleRatchetState, SymmetricKey};
 use vauchi_core::exchange::X3DHKeyPair;
@@ -15,7 +15,7 @@ use vauchi_core::identity::Identity;
 use vauchi_core::network::mailbox_token::{
     compute_mailbox_token, compute_self_token, current_day_epoch, token_hex,
 };
-use vauchi_core::network::message::AccountRevoked;
+use vauchi_core::network::message::IdentityRevoked;
 use vauchi_core::network::*;
 
 fn create_test_config() -> RelayClientConfig {
@@ -219,16 +219,16 @@ fn test_device_sync_uses_self_token_as_recipient_id() {
 }
 
 // ============================================================
-// Task 4.4: AccountRevoked Ed25519 verification (client-side)
+// Task 4.4: IdentityRevoked Ed25519 verification (client-side)
 // ============================================================
 
-/// Valid AccountRevoked signature is accepted.
+/// Valid IdentityRevoked signature is accepted.
 #[test]
-fn test_account_revoked_valid_signature_accepted() {
+fn test_identity_revoked_valid_signature_accepted() {
     let identity = Identity::create("Alice");
     let recipient_id = hex::encode([0xBB; 32]);
 
-    let revoked = AccountRevoked::create(&identity, &recipient_id, 1700000000);
+    let revoked = IdentityRevoked::create(&identity, &recipient_id, 1700000000);
 
     assert!(
         revoked.verify(identity.signing_public_key()),
@@ -238,11 +238,11 @@ fn test_account_revoked_valid_signature_accepted() {
 
 /// Forged signature is rejected (CC-14 adversarial).
 #[test]
-fn test_account_revoked_forged_signature_rejected() {
+fn test_identity_revoked_forged_signature_rejected() {
     let identity = Identity::create("Alice");
     let recipient_id = hex::encode([0xBB; 32]);
 
-    let mut revoked = AccountRevoked::create(&identity, &recipient_id, 1700000000);
+    let mut revoked = IdentityRevoked::create(&identity, &recipient_id, 1700000000);
 
     // Tamper with the signature
     revoked.signature[0] ^= 0xFF;
@@ -256,12 +256,12 @@ fn test_account_revoked_forged_signature_rejected() {
 
 /// Unknown sender's public key fails verification (CC-14 adversarial).
 #[test]
-fn test_account_revoked_unknown_sender_rejected() {
+fn test_identity_revoked_unknown_sender_rejected() {
     let alice = Identity::create("Alice");
     let bob = Identity::create("Bob");
     let recipient_id = hex::encode([0xBB; 32]);
 
-    let revoked = AccountRevoked::create(&alice, &recipient_id, 1700000000);
+    let revoked = IdentityRevoked::create(&alice, &recipient_id, 1700000000);
 
     // Verify with Bob's key — should fail
     assert!(
@@ -272,11 +272,11 @@ fn test_account_revoked_unknown_sender_rejected() {
 
 /// Tampered timestamp makes signature invalid (CC-14 adversarial).
 #[test]
-fn test_account_revoked_tampered_timestamp_rejected() {
+fn test_identity_revoked_tampered_timestamp_rejected() {
     let identity = Identity::create("Alice");
     let recipient_id = hex::encode([0xBB; 32]);
 
-    let mut revoked = AccountRevoked::create(&identity, &recipient_id, 1700000000);
+    let mut revoked = IdentityRevoked::create(&identity, &recipient_id, 1700000000);
 
     // Tamper with the timestamp
     revoked.timestamp += 1;
@@ -289,11 +289,11 @@ fn test_account_revoked_tampered_timestamp_rejected() {
 
 /// Tampered recipient_id makes signature invalid (CC-14 adversarial).
 #[test]
-fn test_account_revoked_tampered_recipient_rejected() {
+fn test_identity_revoked_tampered_recipient_rejected() {
     let identity = Identity::create("Alice");
     let recipient_id = hex::encode([0xBB; 32]);
 
-    let mut revoked = AccountRevoked::create(&identity, &recipient_id, 1700000000);
+    let mut revoked = IdentityRevoked::create(&identity, &recipient_id, 1700000000);
 
     // Tamper with recipient
     revoked.recipient_id = hex::encode([0xCC; 32]);
@@ -306,11 +306,11 @@ fn test_account_revoked_tampered_recipient_rejected() {
 
 /// Empty/zero public key fails verification.
 #[test]
-fn test_account_revoked_zero_pubkey_rejected() {
+fn test_identity_revoked_zero_pubkey_rejected() {
     let identity = Identity::create("Alice");
     let recipient_id = hex::encode([0xBB; 32]);
 
-    let revoked = AccountRevoked::create(&identity, &recipient_id, 1700000000);
+    let revoked = IdentityRevoked::create(&identity, &recipient_id, 1700000000);
 
     assert!(
         !revoked.verify(&[0u8; 32]),

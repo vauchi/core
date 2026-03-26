@@ -59,7 +59,7 @@ pub enum MessagePayload {
     HandshakeAck(HandshakeAck),
     PurgeRequest(PurgeRequest),
     PurgeResponse(PurgeResponse),
-    AccountRevoked(AccountRevoked),
+    IdentityRevoked(IdentityRevoked),
     ForwardingHints(ForwardingHints),
     DeviceLinkRelay(DeviceLinkRelay),
     RegisterMailbox(RegisterMailbox),
@@ -202,7 +202,7 @@ pub struct PurgeResponse {}
 
 /// Signed notification that a sender's account has been revoked, invalidating their contact card.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AccountRevoked {
+pub struct IdentityRevoked {
     pub sender_id: String,
     pub recipient_id: String,
     pub timestamp: u64,

@@ -183,7 +183,7 @@ impl<'a> ShredManager<'a> {
             let contacts = self.storage.list_contacts().unwrap_or_default();
             contacts
                 .iter()
-                .map(|c| crate::network::AccountRevoked::create(self.identity, c.id(), now))
+                .map(|c| crate::network::IdentityRevoked::create(self.identity, c.id(), now))
                 .collect::<Vec<_>>()
         };
 

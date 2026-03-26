@@ -46,7 +46,7 @@ pub trait RevocationSender {
     /// or `Err` if sending failed entirely.
     fn send_revocation(
         &mut self,
-        revocation: &crate::network::AccountRevoked,
+        revocation: &crate::network::IdentityRevoked,
     ) -> Result<bool, ShredError>;
 }
 
@@ -526,7 +526,7 @@ mod tests {
     impl RevocationSender for MockRevocationSender {
         fn send_revocation(
             &mut self,
-            revocation: &crate::network::AccountRevoked,
+            revocation: &crate::network::IdentityRevoked,
         ) -> Result<bool, ShredError> {
             if self.should_fail {
                 return Err(ShredError::FileError("mock revocation failure".into()));

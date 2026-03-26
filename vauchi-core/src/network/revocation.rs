@@ -4,11 +4,11 @@
 
 //! Revocation protocol: canonical signature format and processing logic.
 //!
-//! When a card owner destroys their identity, they send an `AccountRevoked`
+//! When a card owner destroys their identity, they send an `IdentityRevoked`
 //! message to each contact. The recipient verifies the Ed25519 signature,
 //! then crypto-shreds the CEK, deletes the contact, and records a tombstone.
 
-use super::message::AccountRevoked;
+use super::message::IdentityRevoked;
 use crate::storage::Storage;
 
 /// Domain separator for revocation signatures.
@@ -44,7 +44,7 @@ pub fn canonical_revocation_bytes(
 /// 6. Delete contact row
 /// 7. Record tombstone in revoked_senders
 pub fn process_revocation(
-    revocation: &AccountRevoked,
+    revocation: &IdentityRevoked,
     storage: &Storage,
 ) -> Result<(), crate::storage::StorageError> {
     // 1. Look up contact

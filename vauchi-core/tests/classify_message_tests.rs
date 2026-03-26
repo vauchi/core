@@ -55,8 +55,8 @@ fn test_classify_message_returns_handshake_for_handshake_payload() {
 // DeviceSync classify test removed (SP-33): wire type removed.
 
 #[test]
-fn test_classify_message_returns_account_revoked_for_revoked_payload() {
-    let envelope = create_simple_envelope(SimplePayload::AccountRevoked(SimpleAccountRevoked {
+fn test_classify_message_returns_identity_revoked_for_revoked_payload() {
+    let envelope = create_simple_envelope(SimplePayload::IdentityRevoked(SimpleIdentityRevoked {
         sender_id: "sender-1".to_string(),
         recipient_id: "recipient-1".to_string(),
         timestamp: 1700000000,
@@ -66,7 +66,7 @@ fn test_classify_message_returns_account_revoked_for_revoked_payload() {
 
     let result = vauchi_core::network::classify_message(&bytes);
 
-    assert_eq!(result, MessageType::AccountRevoked);
+    assert_eq!(result, MessageType::IdentityRevoked);
 }
 
 #[test]
@@ -118,7 +118,7 @@ mod proptest_classify {
                 MessageType::EncryptedUpdate
                     | MessageType::Acknowledgment
                     | MessageType::Handshake
-                    | MessageType::AccountRevoked
+                    | MessageType::IdentityRevoked
                     | MessageType::ValidationRecord
                     | MessageType::ValidationRevocation
                     | MessageType::Unknown

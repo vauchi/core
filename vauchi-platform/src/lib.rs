@@ -750,7 +750,7 @@ pub fn widget_panic_shred(
 /// Sends account revocation messages to contacts via the relay.
 ///
 /// Opens a one-shot WebSocket connection per call and sends
-/// the revocation as `SimplePayload::AccountRevoked`.
+/// the revocation as `SimplePayload::IdentityRevoked`.
 struct MobileRevocationSender {
     relay_url: String,
     pinned_cert: Option<String>,
@@ -780,15 +780,15 @@ impl MobileRevocationSender {
 impl vauchi_core::api::RevocationSender for MobileRevocationSender {
     fn send_revocation(
         &mut self,
-        revocation: &vauchi_core::network::AccountRevoked,
+        revocation: &vauchi_core::network::IdentityRevoked,
     ) -> Result<bool, vauchi_core::api::ShredError> {
-        let simple = protocol::AccountRevoked {
+        let simple = protocol::IdentityRevoked {
             sender_id: revocation.sender_id.clone(),
             recipient_id: revocation.recipient_id.clone(),
             timestamp: revocation.timestamp,
             signature: revocation.signature.to_vec(),
         };
-        let envelope = protocol::create_envelope(protocol::MessagePayload::AccountRevoked(simple));
+        let envelope = protocol::create_envelope(protocol::MessagePayload::IdentityRevoked(simple));
         let data = protocol::encode_message(&envelope)
             .map_err(|e| vauchi_core::api::ShredError::FileError(format!("Encode: {}", e)))?;
 
@@ -1511,14 +1511,14 @@ mod tests {
     // @scenario: security:Contact card signatures verified
     #[test]
     fn test_revocation_to_simple_conversion() {
-        // Core AccountRevoked should convert to SimpleAccountRevoked correctly
-        let core_revoked = vauchi_core::network::AccountRevoked {
+        // Core IdentityRevoked should convert to SimpleIdentityRevoked correctly
+        let core_revoked = vauchi_core::network::IdentityRevoked {
             sender_id: "sender_hex".to_string(),
             recipient_id: "recipient_hex".to_string(),
             timestamp: 1700000000,
             signature: [0xAB; 64],
         };
-        let simple = protocol::AccountRevoked {
+        let simple = protocol::IdentityRevoked {
             sender_id: core_revoked.sender_id.clone(),
             recipient_id: core_revoked.recipient_id.clone(),
             timestamp: core_revoked.timestamp,

@@ -11,7 +11,7 @@
 use std::path::Path;
 
 use crate::identity::Identity;
-use crate::network::AccountRevoked;
+use crate::network::IdentityRevoked;
 use crate::storage::{DeletionState, Storage, StorageError};
 
 /// Duration of deletion grace period in seconds (7 days).
@@ -64,8 +64,8 @@ pub enum DeletionError {
 /// The caller is responsible for relay delivery and subsequent database file deletion.
 #[derive(Debug, Clone)]
 pub struct DeletionResult {
-    /// `AccountRevoked` messages to send to contacts via relay.
-    pub revocations: Vec<AccountRevoked>,
+    /// `IdentityRevoked` messages to send to contacts via relay.
+    pub revocations: Vec<IdentityRevoked>,
 }
 
 /// Manages identity deletion with a 7-day grace period.
@@ -128,7 +128,7 @@ impl<'a> DeletionManager<'a> {
     /// This performs the GDPR-compliant deletion protocol:
     /// 1. Verifies the grace period has elapsed
     /// 2. Loads all contacts
-    /// 3. For each contact: generates an `AccountRevoked` message and shreds the CEK
+    /// 3. For each contact: generates an `IdentityRevoked` message and shreds the CEK
     /// 4. Marks the deletion state as `Executed`
     ///
     /// Returns a `DeletionResult` containing the revocation messages that the caller
@@ -155,8 +155,8 @@ impl<'a> DeletionManager<'a> {
                 let mut revocations = Vec::with_capacity(contacts.len());
 
                 for contact in &contacts {
-                    // Generate signed AccountRevoked message
-                    let revoked = AccountRevoked::create(identity, contact.id(), now);
+                    // Generate signed IdentityRevoked message
+                    let revoked = IdentityRevoked::create(identity, contact.id(), now);
                     revocations.push(revoked);
 
                     // Crypto-shred: delete CEK (card becomes permanently unreadable)

@@ -39,7 +39,7 @@ pub enum MessagePayload {
     /// Presence/status update.
     Presence(PresenceUpdate),
     /// Account revocation signal (sent when card owner deletes account).
-    AccountRevoked(AccountRevoked),
+    IdentityRevoked(IdentityRevoked),
     /// Account deletion notification sent to contacts.
     AccountDeletionNotice(AccountDeletionNotice),
     /// Relay purge request (sent during shred to delete server-side data).
@@ -75,7 +75,7 @@ pub struct DeregisterMailbox {
 /// the ratchet state is corrupted or missing. The signature is Ed25519 over a
 /// canonical byte string (see [`crate::network::revocation::canonical_revocation_bytes`]).
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AccountRevoked {
+pub struct IdentityRevoked {
     /// Owner's public key fingerprint (hex-encoded signing public key).
     pub sender_id: String,
     /// Contact's public key fingerprint (hex-encoded).
@@ -335,7 +335,7 @@ pub fn negotiate_version(local: &VersionNegotiation, remote: &VersionNegotiation
     Some(*common.last().unwrap())
 }
 
-impl AccountRevoked {
+impl IdentityRevoked {
     /// Creates and signs a revocation message.
     pub fn create(
         identity: &crate::identity::Identity,
@@ -361,7 +361,7 @@ impl AccountRevoked {
         );
         let signature = identity.sign(&canonical);
 
-        AccountRevoked {
+        IdentityRevoked {
             sender_id,
             recipient_id: recipient_id.to_string(),
             timestamp,

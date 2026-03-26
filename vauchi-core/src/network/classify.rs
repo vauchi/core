@@ -23,7 +23,7 @@ pub enum MessageType {
     /// Connection handshake message.
     Handshake,
     /// Account revocation signal.
-    AccountRevoked,
+    IdentityRevoked,
     /// Signed field validation record.
     ValidationRecord,
     /// Field validation revocation.
@@ -68,7 +68,7 @@ pub fn classify_message(data: &[u8]) -> MessageType {
         SimplePayload::EncryptedUpdate(_) => MessageType::EncryptedUpdate,
         SimplePayload::Acknowledgment(_) => MessageType::Acknowledgment,
         SimplePayload::Handshake(_) => MessageType::Handshake,
-        SimplePayload::AccountRevoked(_) => MessageType::AccountRevoked,
+        SimplePayload::IdentityRevoked(_) => MessageType::IdentityRevoked,
         SimplePayload::ValidationRecord(_) => MessageType::ValidationRecord,
         SimplePayload::ValidationRevocation(_) => MessageType::ValidationRevocation,
         SimplePayload::Unknown => MessageType::Unknown,

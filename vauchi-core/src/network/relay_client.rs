@@ -297,11 +297,11 @@ impl<T: Transport> RelayClient<T> {
     /// Used during identity deletion (hard_shred / panic_shred) to notify
     /// contacts that this identity has been revoked. The message is signed
     /// (not encrypted) so it can be processed even without ratchet state.
-    pub fn send_account_revoked(
+    pub fn send_identity_revoked(
         &mut self,
-        revoked: &super::message::AccountRevoked,
+        revoked: &super::message::IdentityRevoked,
     ) -> Result<MessageId, NetworkError> {
-        let envelope = create_envelope(MessagePayload::AccountRevoked(revoked.clone()));
+        let envelope = create_envelope(MessagePayload::IdentityRevoked(revoked.clone()));
         let message_id = envelope.message_id.clone();
 
         self.connection.send(&envelope)?;
@@ -464,9 +464,9 @@ impl<T: Transport> crate::api::PurgeSender for RelayClient<T> {
 impl<T: Transport> crate::api::RevocationSender for RelayClient<T> {
     fn send_revocation(
         &mut self,
-        revocation: &crate::network::AccountRevoked,
+        revocation: &crate::network::IdentityRevoked,
     ) -> Result<bool, crate::api::ShredError> {
-        match self.send_account_revoked(revocation) {
+        match self.send_identity_revoked(revocation) {
             Ok(_) => Ok(true),
             Err(e) => Err(crate::api::ShredError::FileError(format!(
                 "Relay revocation failed: {}",

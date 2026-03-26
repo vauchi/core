@@ -53,7 +53,7 @@ pub enum SimplePayload {
     /// Client handshake for relay registration.
     Handshake(SimpleHandshake),
     /// Account revocation signal (signed, not encrypted).
-    AccountRevoked(SimpleAccountRevoked),
+    IdentityRevoked(SimpleIdentityRevoked),
     /// Signed field validation record (encrypted in transit).
     ValidationRecord(SimpleValidationRecord),
     /// Field validation revocation (encrypted in transit).
@@ -65,10 +65,10 @@ pub enum SimplePayload {
 
 /// Account revocation for the simple protocol.
 ///
-/// Wire-compatible with `vauchi_protocol::AccountRevoked` so the relay
+/// Wire-compatible with `vauchi_protocol::IdentityRevoked` so the relay
 /// can route it to the recipient without changes.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SimpleAccountRevoked {
+pub struct SimpleIdentityRevoked {
     pub sender_id: String,
     pub recipient_id: String,
     pub timestamp: u64,
@@ -399,40 +399,40 @@ mod tests {
     }
 
     #[test]
-    fn test_account_revoked_simple_roundtrip() {
-        let revoked = SimpleAccountRevoked {
+    fn test_identity_revoked_simple_roundtrip() {
+        let revoked = SimpleIdentityRevoked {
             sender_id: "sender123".to_string(),
             recipient_id: "recipient456".to_string(),
             timestamp: 1700000000,
             signature: vec![0xAB; 64],
         };
-        let envelope = create_simple_envelope(SimplePayload::AccountRevoked(revoked));
+        let envelope = create_simple_envelope(SimplePayload::IdentityRevoked(revoked));
         let encoded = encode_simple_message(&envelope).unwrap();
         let decoded = decode_simple_message(&encoded).unwrap();
         match decoded.payload {
-            SimplePayload::AccountRevoked(r) => {
+            SimplePayload::IdentityRevoked(r) => {
                 assert_eq!(r.sender_id, "sender123");
                 assert_eq!(r.recipient_id, "recipient456");
                 assert_eq!(r.timestamp, 1700000000);
                 assert_eq!(r.signature.len(), 64);
                 assert!(r.signature.iter().all(|b| *b == 0xAB));
             }
-            _ => panic!("Expected AccountRevoked"),
+            _ => panic!("Expected IdentityRevoked"),
         }
     }
 
     #[test]
-    fn test_account_revoked_wire_compatible_with_protocol() {
-        // The type tag must match vauchi-protocol's MessagePayload::AccountRevoked
-        let revoked = SimpleAccountRevoked {
+    fn test_identity_revoked_wire_compatible_with_protocol() {
+        // The type tag must match vauchi-protocol's MessagePayload::IdentityRevoked
+        let revoked = SimpleIdentityRevoked {
             sender_id: "s".to_string(),
             recipient_id: "r".to_string(),
             timestamp: 1000,
             signature: vec![1, 2, 3],
         };
-        let payload = SimplePayload::AccountRevoked(revoked);
+        let payload = SimplePayload::IdentityRevoked(revoked);
         let json = serde_json::to_string(&payload).unwrap();
-        assert!(json.contains(r#""type":"AccountRevoked""#));
+        assert!(json.contains(r#""type":"IdentityRevoked""#));
         assert!(json.contains(r#""sender_id":"s""#));
         assert!(json.contains(r#""recipient_id":"r""#));
     }

@@ -16,8 +16,8 @@ use vauchi_core::crypto::{DoubleRatchetState, HKDF, SymmetricKey, derive_key_arg
 use vauchi_core::exchange::X3DHKeyPair;
 use vauchi_core::identity::Identity;
 use vauchi_core::network::{
-    AccountDeletionNotice, AccountRevoked, AckStatus, Acknowledgment, DeletionStage,
-    EncryptedUpdate, ForwardingHint, ForwardingHints, Handshake, MessageEnvelope, MessagePayload,
+    AccountDeletionNotice, AckStatus, Acknowledgment, DeletionStage, EncryptedUpdate,
+    ForwardingHint, ForwardingHints, Handshake, IdentityRevoked, MessageEnvelope, MessagePayload,
     PROTOCOL_VERSION, PresenceStatus, PresenceUpdate, PurgeRequest, RatchetHeader,
     VersionNegotiation,
 };
@@ -497,9 +497,9 @@ proptest! {
 
     // DeviceSync roundtrip property test removed (SP-33): wire type removed.
 
-    /// Property: AccountRevoked payload roundtrips through JSON serialization.
+    /// Property: IdentityRevoked payload roundtrips through JSON serialization.
     #[test]
-    fn prop_account_revoked_roundtrip(
+    fn prop_identity_revoked_roundtrip(
         sender_id in hex_id_strategy(),
         recipient_id in hex_id_strategy(),
         timestamp in timestamp_strategy(),
@@ -518,7 +518,7 @@ proptest! {
             version: PROTOCOL_VERSION,
             message_id: msg_id.clone(),
             timestamp: env_timestamp,
-            payload: MessagePayload::AccountRevoked(AccountRevoked {
+            payload: MessagePayload::IdentityRevoked(IdentityRevoked {
                 sender_id: sender_id.clone(),
                 recipient_id: recipient_id.clone(),
                 timestamp,
@@ -530,13 +530,13 @@ proptest! {
         let restored: MessageEnvelope = serde_json::from_str(&json)
             .expect("deserialization should succeed");
 
-        if let MessagePayload::AccountRevoked(r) = &restored.payload {
+        if let MessagePayload::IdentityRevoked(r) = &restored.payload {
             prop_assert_eq!(&r.sender_id, &sender_id);
             prop_assert_eq!(&r.recipient_id, &recipient_id);
             prop_assert_eq!(r.timestamp, timestamp);
             prop_assert_eq!(r.signature, signature);
         } else {
-            prop_assert!(false, "Expected AccountRevoked variant");
+            prop_assert!(false, "Expected IdentityRevoked variant");
         }
     }
 

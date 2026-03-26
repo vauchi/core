@@ -105,11 +105,11 @@ pub use error::NetworkError;
 
 // Message types
 pub use message::{
-    AccountDeletionNotice, AccountRevoked, AckStatus, Acknowledgment, DeletionStage,
-    DeregisterMailbox, EmergencyAlert, EncryptedUpdate, ForwardingHint, ForwardingHints,
-    GeoLocation, Handshake, MessageEnvelope, MessageId, MessagePayload, PROTOCOL_VERSION,
-    PresenceStatus, PresenceUpdate, PurgeRequest, RatchetHeader, RegisterMailbox,
-    VersionNegotiation, negotiate_version,
+    AccountDeletionNotice, AckStatus, Acknowledgment, DeletionStage, DeregisterMailbox,
+    EmergencyAlert, EncryptedUpdate, ForwardingHint, ForwardingHints, GeoLocation, Handshake,
+    IdentityRevoked, MessageEnvelope, MessageId, MessagePayload, PROTOCOL_VERSION, PresenceStatus,
+    PresenceUpdate, PurgeRequest, RatchetHeader, RegisterMailbox, VersionNegotiation,
+    negotiate_version,
 };
 
 // Protocol utilities

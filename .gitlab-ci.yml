@@ -490,6 +490,20 @@ validate:content-contracts:
           - "vauchi-core/src/content/**/*.rs"
           - "scripts/validate-content-contracts.sh"
 
+lint:module-boundaries:
+  extends: [.linux-runner-nocache]
+  stage: lint
+  needs: []
+  script:
+    - bash scripts/check-module-boundaries.sh
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes:
+        compare_to: refs/heads/$CI_DEFAULT_BRANCH
+        paths:
+          - "vauchi-core/src/**/*.rs"
+          - "scripts/check-module-boundaries.sh"
+
 # Coverage job: run on main merges only (not MRs) — llvm-cov is too slow
 # for per-push feedback but still needed for coverage tracking/badges.
 # Measures both vauchi-core and vauchi-platform in a single instrumentation

@@ -56,6 +56,24 @@ include:
       - '/ci-templates/badges.yml'
       - '/ci-templates/github-mirror.yml'
 
+# Cosign pinned version + checksum (used by update:swift-bindings and publish:maven)
+# Single source of truth for cosign binary integrity — update BOTH values together.
+.cosign-install:
+  script:
+    - |
+      COSIGN_VERSION="v3.0.5"
+      COSIGN_SHA256="db15cc99e6e4837daabab023742aaddc3841ce57f193d11b7c3e06c8003642b2"
+      if ! command -v cosign &>/dev/null; then
+        echo "Installing cosign ${COSIGN_VERSION}..."
+        curl -sSfL "https://github.com/sigstore/cosign/releases/download/${COSIGN_VERSION}/cosign-linux-amd64" \
+          -o /usr/local/bin/cosign || { echo "ERROR: cosign install failed"; exit 1; }
+        echo "${COSIGN_SHA256}  /usr/local/bin/cosign" | sha256sum -c - || {
+          echo "ERROR: cosign binary checksum mismatch — possible supply chain compromise"
+          rm -f /usr/local/bin/cosign; exit 1
+        }
+        chmod +x /usr/local/bin/cosign
+      fi
+
 stages:
   - auto-tag
   - lint
@@ -939,13 +957,13 @@ package:sbom:
         sha256sum "$f" | awk '{print $1}' > "${f}.sha256"
       done
 
-      # Sign with cosign if available
+      # Sign SBOM checksums with cosign (required in CI, matches xcframework/android guards)
       # GitLab masked file variables store base64-encoded content — decode if needed.
       if [[ -n "${COSIGN_KEY:-}" ]]; then
         COSIGN_KEY_FILE="$COSIGN_KEY"
         if ! head -1 "$COSIGN_KEY" | grep -q -- "-----BEGIN"; then
           COSIGN_KEY_FILE=$(mktemp)
-          base64 -d "$COSIGN_KEY" > "$COSIGN_KEY_FILE"
+          base64 -d < "$COSIGN_KEY" > "$COSIGN_KEY_FILE"
         fi
         for f in dist/*.sbom.json.sha256; do
           cosign sign-blob --yes --key "$COSIGN_KEY_FILE" \
@@ -953,6 +971,9 @@ package:sbom:
         done
         [[ "$COSIGN_KEY_FILE" != "$COSIGN_KEY" ]] && rm -f "$COSIGN_KEY_FILE"
         echo "SBOMs signed"
+      elif [[ -n "${CI:-}" ]]; then
+        echo "ERROR: COSIGN_KEY is required in CI for SBOM signing"
+        exit 1
       fi
 
       echo "SBOM generation complete"
@@ -1153,13 +1174,40 @@ publish:maven:
     - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/
     - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+-rc\.\d+$/
   script:
+    - !reference [.cosign-install, script]
     - |
       CLEAN_VERSION="${CI_COMMIT_TAG#v}"
       echo "Publishing Maven AAR version $CLEAN_VERSION"
 
+      # Verify cosign signature on the zip before repackaging as AAR
+      CHECKSUM_FILE="dist/vauchi-platform-kotlin-${CLEAN_VERSION}.zip.sha256"
+      BUNDLE_FILE="${CHECKSUM_FILE}.bundle"
+      COSIGN_PUB="cosign.pub"
+
+      if [[ -f "$BUNDLE_FILE" ]] && [[ -f "$COSIGN_PUB" ]]; then
+        cosign verify-blob --key "$COSIGN_PUB" --bundle "$BUNDLE_FILE" "$CHECKSUM_FILE" || {
+          echo "ERROR: Android zip cosign verification FAILED — refusing to publish"
+          exit 1
+        }
+        echo "✓ Android zip cosign signature verified"
+      else
+        echo "ERROR: cosign bundle or public key missing — cannot verify Android zip"
+        exit 1
+      fi
+
+      # Verify the zip checksum matches the actual file
+      EXPECTED=$(cat "$CHECKSUM_FILE" | tr -d '[:space:]')
+      ACTUAL=$(sha256sum "dist/vauchi-platform-kotlin-${CLEAN_VERSION}.zip" | cut -d' ' -f1)
+      if [[ "$EXPECTED" != "$ACTUAL" ]]; then
+        echo "ERROR: zip checksum mismatch (expected $EXPECTED, got $ACTUAL)"
+        exit 1
+      fi
+      echo "✓ Android zip checksum verified"
+
       # Extract pre-packaged Android bindings (zip has version-prefixed top dir)
       mkdir -p ci/maven-publish/vauchi-platform/src/main/jniLibs
       mkdir -p ci/maven-publish/vauchi-platform/src/main/kotlin
+      rm -rf /tmp/android-bindings
       unzip -o dist/vauchi-platform-kotlin-${CLEAN_VERSION}.zip -d /tmp/android-bindings
 
       # Copy JNI libs (arm64-v8a, x86_64)
@@ -1259,6 +1307,7 @@ update:swift-bindings:
     - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/
     - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+-rc\.\d+$/
   script:
+    - !reference [.cosign-install, script]
     - |
       VERSION="${CI_COMMIT_TAG}"
       CLEAN_VERSION="${VERSION#v}"
@@ -1273,13 +1322,6 @@ update:swift-bindings:
       BUNDLE_FILE="${CHECKSUM_FILE}.bundle"
       COSIGN_PUB="cosign.pub"
 
-      if ! command -v cosign &>/dev/null; then
-        echo "Installing cosign..."
-        curl -sSfL https://github.com/sigstore/cosign/releases/latest/download/cosign-linux-amd64 \
-          -o /usr/local/bin/cosign || { echo "ERROR: cosign install failed"; exit 1; }
-        chmod +x /usr/local/bin/cosign
-      fi
-
       if [[ ! -f "$BUNDLE_FILE" ]]; then
         echo "ERROR: cosign bundle not found: $BUNDLE_FILE"
         echo "Signing may have been skipped or failed in package:xcframework"
@@ -1292,23 +1334,20 @@ update:swift-bindings:
       fi
 
       echo "Verifying cosign signature..."
-      if cosign verify-blob --key "$COSIGN_PUB" --bundle "$BUNDLE_FILE" "$CHECKSUM_FILE"; then
-        echo "✓ Cosign signature verified"
-      else
-        if [[ "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-          echo "ERROR: cosign verification FAILED for release $VERSION"
-          exit 1
-        else
-          echo "WARNING: cosign verification failed for pre-release $VERSION (non-blocking)"
-        fi
-      fi
+      cosign verify-blob --key "$COSIGN_PUB" --bundle "$BUNDLE_FILE" "$CHECKSUM_FILE" || {
+        echo "ERROR: cosign verification FAILED for $VERSION"
+        exit 1
+      }
+      echo "✓ Cosign signature verified"
 
-      # Extract Swift bindings from local artifact
+      # Extract Swift bindings from local artifact (clean stale dirs from shared runners)
+      rm -rf /tmp/swift-bindings
       unzip -o -j dist/VauchiPlatform-${CLEAN_VERSION}.zip \
         "VauchiPlatform-${CLEAN_VERSION}/Sources/vauchi_platform.swift" \
         -d /tmp/swift-bindings/
 
-      # Clone platform-swift repo
+      # Clone platform-swift repo (clean up stale dir from previous runs on shared runners)
+      rm -rf /tmp/platform-swift
       git clone --depth 1 "https://vauchi-gitlab-runner:${PROJECT_ACCESS_TOKEN}@gitlab.com/vauchi/vauchi-platform-swift.git" /tmp/platform-swift
       cd /tmp/platform-swift
 

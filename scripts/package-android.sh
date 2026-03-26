@@ -195,7 +195,7 @@ if [[ -n "${COSIGN_KEY:-}" ]]; then
     COSIGN_KEY_FILE="$COSIGN_KEY"
     if ! head -1 "$COSIGN_KEY" | grep -q -- "-----BEGIN"; then
         COSIGN_KEY_FILE=$(mktemp)
-        base64 -d "$COSIGN_KEY" > "$COSIGN_KEY_FILE"
+        base64 -d < "$COSIGN_KEY" > "$COSIGN_KEY_FILE"
     fi
     echo -e "${YELLOW}Signing checksum with cosign...${NC}"
     cosign sign-blob --yes --key "$COSIGN_KEY_FILE" \

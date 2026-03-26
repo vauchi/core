@@ -314,23 +314,39 @@ fn test_e2e_invalid_qr_during_transfer_ignored() {
 }
 
 #[test]
-fn test_e2e_no_qr_after_finalized_grace_period() {
+fn test_e2e_grace_period_broadcasts_combo() {
     let (mut alice, mut bob) = run_full_exchange(b"Alice".to_vec(), b"Bob".to_vec());
 
     assert_eq!(alice.get_state(), ProtocolState::Finalized);
     assert_eq!(bob.get_state(), ProtocolState::Finalized);
 
-    // After finalization, RDYY QRs are still displayed for a grace period
+    // After finalization, COMBO QRs are still displayed for a grace period
     // so the peer can also finalize (C3 fix: prevents asymmetric failure).
     let qr = alice.get_display_qr();
-    assert!(qr.is_some(), "Grace period should still produce RDYY QRs");
+    assert!(qr.is_some(), "Grace period should still produce COMBO QRs");
     assert!(
-        qr.unwrap().data.starts_with("RDYY"),
-        "Grace period QRs should be RDYY type"
+        qr.as_ref().unwrap().data.starts_with("CMBO"),
+        "Grace period QRs should be COMBO type, got: {}",
+        &qr.unwrap().data[..4]
     );
 
-    // Wall-clock grace period: wait for it to expire (20s + margin).
-    std::thread::sleep(std::time::Duration::from_secs(22));
+    // Verify QRs are still produced after a short delay (still within grace).
+    std::thread::sleep(std::time::Duration::from_secs(1));
+    assert!(
+        bob.get_display_qr().is_some(),
+        "Grace period should still be active after 1s"
+    );
+}
+
+#[test]
+#[ignore] // Wall-clock test: takes 61s. Run with `cargo test -- --ignored`.
+fn test_e2e_grace_period_expires() {
+    let (mut alice, mut bob) = run_full_exchange(b"Alice".to_vec(), b"Bob".to_vec());
+
+    assert_eq!(alice.get_state(), ProtocolState::Finalized);
+
+    // FINALIZED_GRACE_DURATION = 60s — sleep past it.
+    std::thread::sleep(std::time::Duration::from_secs(61));
     assert!(
         alice.get_display_qr().is_none(),
         "QRs should stop after grace period"

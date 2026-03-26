@@ -13,7 +13,7 @@
 //!
 //! Resilience features:
 //! - Wall-clock timeouts with progress extension (not tick-based)
-//! - RDYY-only display in Complete state for maximum scan reliability
+//! - COMBO QR (VRFY+CONF+RDYY) display in Complete state for single-scan finalization
 //! - Adaptive QR display durations per stage
 //! - Graduated retry: Complete → RetryReady → Failed (one auto-retry)
 //! - FAIL QR type for immediate peer abort notification
@@ -281,7 +281,8 @@ impl MultiStageSession {
 
     /// Get the QR payload to display based on current state.
     ///
-    /// Returns `None` if no QR should be displayed (Complete or Failed).
+    /// Returns `None` after the finalized grace period expires or after
+    /// the FAIL broadcast window closes.
     pub fn get_display_qr(&mut self) -> Option<QrPayload> {
         match &self.state {
             ProtocolState::Idle => {
@@ -998,8 +999,13 @@ impl MultiStageSession {
         relay_url: Option<&str>,
         relay_noise_pubkey: Option<&[u8; 32]>,
     ) -> Vec<u8> {
+        // Length-delimited encoding prevents ambiguity between
+        // (url_A || pubkey_A) and (url_B || pubkey_B) where url_A is a
+        // prefix of url_B. Without delimiters, SHA-256 pre-images could collide.
         let mut context = Vec::new();
         if let Some(url) = relay_url {
+            let len = (url.len() as u32).to_be_bytes();
+            context.extend_from_slice(&len);
             context.extend_from_slice(url.as_bytes());
         }
         if let Some(pk) = relay_noise_pubkey {
@@ -1144,6 +1150,9 @@ impl MultiStageSession {
         if let Some(ref mut key) = self.transport_key {
             key.zeroize();
         }
+        if let Some(ref mut key) = self.peer_reveal_key {
+            key.zeroize();
+        }
         if let Some(ref mut key) = self.our_relay_noise_pubkey {
             key.zeroize();
         }
@@ -1151,8 +1160,10 @@ impl MultiStageSession {
             key.zeroize();
         }
         self.transport_key = None;
+        self.peer_reveal_key = None;
         self.ephemeral_secret = None;
         self.outbound_chunks.clear();
+        self.inbound_buffer = None;
         self.received_data = None;
     }
 }

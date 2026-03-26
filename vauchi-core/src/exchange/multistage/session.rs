@@ -57,9 +57,10 @@ const RDYY_MAX_TIMEOUT: Duration = Duration::from_secs(45);
 const FAIL_BROADCAST_DURATION: Duration = Duration::from_secs(5);
 
 /// How long to continue broadcasting RDYY after Finalized (grace period for peer).
-/// From device testing: Samsung finalizes ~18s after Pixel. 20s gives margin.
-/// Must be long enough for the slow side to scan, short enough for good UX.
-const FINALIZED_GRACE_DURATION: Duration = Duration::from_secs(20);
+/// MUST be >= RDYY_MAX_TIMEOUT so the fast device never stops before the slow
+/// device's timeout expires. The user sees "Contact exchanged!" immediately
+/// (save on Finalized) while QRs continue in the background.
+const FINALIZED_GRACE_DURATION: Duration = Duration::from_secs(60);
 
 /// Base display durations per QR type (jitter added at runtime).
 /// Tuned for <5s total exchange on typical hardware.
@@ -287,9 +288,11 @@ impl MultiStageSession {
                 let qr_data = self.build_init_qr();
                 self.init_qr_cache = Some(qr_data.clone());
                 self.state = ProtocolState::Advertising;
+                // Use "L" error correction for INIT/INID — produces less dense QR
+                // that scans faster on older cameras (Samsung S7).
                 Some(QrPayload {
                     data: qr_data,
-                    error_correction: "M".to_string(),
+                    error_correction: "L".to_string(),
                     display_duration_ms: jittered(DISPLAY_MS_INIT),
                 })
             }
@@ -300,7 +303,7 @@ impl MultiStageSession {
                     .unwrap_or_else(|| self.build_init_qr());
                 Some(QrPayload {
                     data: qr_data,
-                    error_correction: "M".to_string(),
+                    error_correction: "L".to_string(),
                     display_duration_ms: jittered(DISPLAY_MS_INIT),
                 })
             }
@@ -529,21 +532,15 @@ impl MultiStageSession {
     // --- Private helpers ---
 
     fn build_init_qr(&self) -> String {
-        // For small payloads (1 chunk), use INID to embed data in the INIT QR.
-        // This eliminates the DATA phase — peer gets everything in one scan.
-        let ciphertext = self.commitment.ciphertext();
-        if ciphertext.len() <= CHUNK_PAYLOAD_SIZE {
-            return qr_codec::format_inid_qr(
-                &self.session_id,
-                &self.identity_pubkey,
-                self.ephemeral_public.as_bytes(),
-                self.commitment.hash(),
-                &self.display_name,
-                self.our_relay_url.as_deref(),
-                self.our_relay_noise_pubkey.as_ref(),
-                ciphertext,
-            );
-        }
+        // INID (INIT+Data) disabled for now — the combined QR is too dense for
+        // older cameras (Samsung S7). The COMBO QR still optimizes the RDYY phase.
+        // TODO: re-enable when QR scanning reliability improves (bigger screens,
+        // better cameras, or binary QR mode).
+        //
+        // let ciphertext = self.commitment.ciphertext();
+        // if ciphertext.len() <= CHUNK_PAYLOAD_SIZE {
+        //     return qr_codec::format_inid_qr(...);
+        // }
         qr_codec::format_init_qr_with_relay(
             &self.session_id,
             &self.identity_pubkey,

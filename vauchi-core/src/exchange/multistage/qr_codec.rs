@@ -220,6 +220,7 @@ pub fn format_init_qr_with_relay(
 /// Security: the commitment scheme provides confidentiality (ChaCha20-Poly1305
 /// with random reveal key) and integrity (commitment hash). Transport encryption
 /// is redundant for single-chunk payloads bound to this session's commitment hash.
+#[allow(dead_code)]
 pub fn format_inid_qr(
     session_id: &[u8; 16],
     pubkey: &[u8; 32],

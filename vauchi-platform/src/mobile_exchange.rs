@@ -89,6 +89,16 @@ impl VauchiPlatform {
     /// and initializes the double ratchet. No relay notification is sent — face-to-face
     /// exchange completes locally on both devices.
     ///
+    /// On repeat exchange with the same peer, the contact card is upserted and the
+    /// ratchet state is re-initialized with fresh keys. Any relay messages in flight
+    /// from the previous ratchet epoch become permanently undecryptable. This is
+    /// intentional: a face-to-face re-exchange is a deliberate key ceremony that
+    /// establishes fresh forward secrecy.
+    ///
+    /// Old mailbox tokens (derived from the previous shared key) self-heal
+    /// via the relay's 30-day blob TTL — no active deregistration needed.
+    /// `exchange_timestamp` is updated by the SQL upsert in `save_contact()`.
+    ///
     /// The session must be in the Complete state (i.e., the state machine has been
     /// driven through all steps).
     pub fn finalize_exchange(
@@ -145,6 +155,9 @@ impl VauchiPlatform {
     /// Deserializes the peer's exchange payload (public key + contact card),
     /// creates a Contact using the transport key as the shared secret,
     /// saves it to storage, and initializes the double ratchet.
+    ///
+    /// On repeat exchange: same ratchet-reset semantics as `finalize_exchange` —
+    /// card is upserted, ratchet re-initialized, in-flight messages lost.
     ///
     /// The session must be in the Complete state with received data available.
     pub fn finalize_multistage_exchange(

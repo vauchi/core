@@ -339,7 +339,7 @@ pub enum SyncItem {
         timestamp: u64,
     },
 
-    /// Account deletion has been scheduled on another device.
+    /// Identity deletion has been scheduled on another device.
     ///
     /// Propagated via device sync so all linked devices can show the
     /// deletion countdown and execute at the same time.
@@ -352,7 +352,7 @@ pub enum SyncItem {
         timestamp: u64,
     },
 
-    /// Account deletion has been cancelled on another device.
+    /// Identity deletion has been cancelled on another device.
     DeletionCancelled {
         /// Timestamp of this sync event.
         timestamp: u64,

@@ -307,7 +307,7 @@ impl From<&vauchi_core::api::ShredVerification> for MobileShredVerification {
     }
 }
 
-/// Current shred status for the account.
+/// Current shred status for the identity.
 #[derive(Debug, Clone, PartialEq, Eq, uniffi::Enum)]
 pub enum MobileShredStatus {
     /// No shred operation in progress.

@@ -2,10 +2,10 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! Tests for the account revocation protocol.
+//! Tests for the identity revocation protocol.
 //!
 //! Traces to features/privacy_compliance.feature:
-//!   - "Account deletion sends revocation signal to all contacts"
+//!   - "Identity deletion sends revocation signal to all contacts"
 //!   - "Revocation signal is cryptographically authenticated"
 //!   - "Spoofed revocation signal is rejected"
 //!   - "Card update arriving after revocation is discarded"
@@ -149,7 +149,7 @@ fn test_identity_revoked_serialization_roundtrip() {
 
 // === Revocation Processing ===
 
-// @scenario: privacy_compliance :: Account deletion sends revocation signal to all contacts
+// @scenario: privacy_compliance :: Identity deletion sends revocation signal to all contacts
 #[test]
 fn test_process_revocation_deletes_contact_and_records_tombstone() {
     let storage = test_storage();
@@ -254,7 +254,7 @@ fn test_update_after_revocation_discarded_via_tombstone() {
     assert!(storage.is_sender_revoked("alice_id").unwrap());
 }
 
-// @scenario: privacy_compliance :: Account deletion sends revocation signal to all contacts
+// @scenario: privacy_compliance :: Identity deletion sends revocation signal to all contacts
 #[test]
 fn test_revocation_only_deletes_matching_sender() {
     let storage = test_storage();
@@ -303,7 +303,7 @@ fn test_revocation_with_future_timestamp() {
     assert!(storage.load_contact(alice_contact.id()).unwrap().is_none());
 }
 
-// @scenario: privacy_compliance :: Account deletion sends revocation signal to all contacts
+// @scenario: privacy_compliance :: Identity deletion sends revocation signal to all contacts
 #[test]
 fn test_revocation_with_minimum_valid_timestamp() {
     let storage = test_storage();

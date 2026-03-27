@@ -7,7 +7,7 @@
 //! Traces to features/privacy_compliance.feature:
 //!   - "Card updates use per-contact content encryption key"
 //!   - "Crypto-shredding renders card unreadable without key"
-//!   - "Account deletion destroys all content encryption keys"
+//!   - "Identity deletion destroys all content encryption keys"
 
 use vauchi_core::crypto::cek::ContentEncryptionKey;
 

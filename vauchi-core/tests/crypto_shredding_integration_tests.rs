@@ -56,7 +56,7 @@ fn test_smk_destruction_makes_data_irrecoverable() {
 
 /// FKEK encrypts file keys; after SMK destruction those file keys
 /// are irrecoverable.
-// @scenario: privacy_compliance :: Account deletion destroys all content encryption keys
+// @scenario: privacy_compliance :: Identity deletion destroys all content encryption keys
 #[test]
 fn test_fkek_protects_file_keys() {
     let identity = Identity::create("Alice");

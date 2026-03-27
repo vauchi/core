@@ -22,7 +22,7 @@ pub enum MessageType {
     Acknowledgment,
     /// Connection handshake message.
     Handshake,
-    /// Account revocation signal.
+    /// Identity revocation signal.
     IdentityRevoked,
     /// Signed field validation record.
     ValidationRecord,

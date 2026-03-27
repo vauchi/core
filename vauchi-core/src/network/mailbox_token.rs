@@ -41,7 +41,7 @@ pub fn compute_mailbox_token(shared_key: &[u8; 32], day_epoch: u64) -> [u8; 32] 
 ///
 /// All devices sharing the same `master_seed` derive the same token for a
 /// given day, allowing the relay to deliver device-sync messages without a
-/// persistent account identifier.
+/// persistent identity identifier.
 ///
 /// - `master_seed`: the identity master seed (32 bytes).
 /// - `day_epoch`: current day as Unix timestamp / 86400 (UTC).

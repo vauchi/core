@@ -963,7 +963,7 @@ const MIGRATION_V12_CONTACTS_INDEX: &str = "
 ///   re-appear as a trusted contact.
 /// - **Minimal data**: Only `sender_id` (a hash of the public key, not PII)
 ///   and `revoked_at` timestamp are stored. No names, messages, or content.
-/// - **Full deletion path**: Account shredding (hard_shred / panic_shred)
+/// - **Full deletion path**: Identity shredding (hard_shred / panic_shred)
 ///   destroys the entire SQLite database including all tombstones. Users
 ///   who exercise their right to erasure (Art 17) get complete deletion.
 const MIGRATION_V13_CRYPTO_SHREDDING: &str = "

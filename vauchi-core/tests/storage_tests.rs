@@ -654,7 +654,7 @@ fn test_last_delta_version_nonexistent_contact() {
 }
 
 /// Test wipe_device_data clears device_info and sync state
-// @scenario: identity_management :: Account deletion
+// @scenario: identity_management :: Identity deletion
 #[test]
 fn test_wipe_device_data() {
     let storage = create_test_storage();

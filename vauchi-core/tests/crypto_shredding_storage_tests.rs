@@ -6,7 +6,7 @@
 //!
 //! Traces to features/privacy_compliance.feature:
 //!   - "Card updates use per-contact content encryption key"
-//!   - "Account deletion destroys all content encryption keys"
+//!   - "Identity deletion destroys all content encryption keys"
 //!   - "Card update arriving after revocation is discarded"
 
 use vauchi_core::contact::Contact;

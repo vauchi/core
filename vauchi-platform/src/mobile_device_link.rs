@@ -263,7 +263,7 @@ impl VauchiPlatform {
     /// and its keys will be rotated out. Returns true if the device was
     /// found and unlinked.
     ///
-    /// Note: Cannot unlink the current device (use account deletion instead).
+    /// Note: Cannot unlink the current device (use identity deletion instead).
     /// The device_index is the position in the devices list (0-based).
     pub fn unlink_device(&self, device_index: u32) -> Result<bool, MobileError> {
         let storage = self.open_storage()?;

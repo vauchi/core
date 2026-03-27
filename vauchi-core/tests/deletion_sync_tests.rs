@@ -5,11 +5,11 @@
 //! Tests for multi-device deletion sync via SyncItem.
 //!
 //! Traces to features/privacy_compliance.feature:
-//!   - "Account deletion propagates across all user devices"
+//!   - "Identity deletion propagates across all user devices"
 
 use vauchi_core::sync::device_sync::SyncItem;
 
-// @scenario: privacy_compliance :: Account deletion propagates across all user devices
+// @scenario: privacy_compliance :: Identity deletion propagates across all user devices
 #[test]
 fn test_deletion_scheduled_sync_item() {
     let item = SyncItem::DeletionScheduled {

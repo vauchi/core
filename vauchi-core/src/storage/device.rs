@@ -373,7 +373,7 @@ impl Storage {
     /// Wipes all device-specific data from storage.
     ///
     /// Deletes rows from: `device_info`, `device_sync_state`, and
-    /// `device_sync_checkpoints`. This is used during account deletion
+    /// `device_sync_checkpoints`. This is used during identity deletion
     /// or device unlinking to ensure no device-specific data remains.
     pub fn wipe_device_data(&self) -> Result<(), StorageError> {
         self.conn.execute("DELETE FROM device_info", [])?;

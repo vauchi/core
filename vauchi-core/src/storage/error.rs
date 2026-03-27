@@ -7,7 +7,7 @@
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-/// State of account deletion (stored in the database).
+/// State of identity deletion (stored in the database).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum DeletionState {
     /// No deletion scheduled.

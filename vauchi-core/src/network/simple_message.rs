@@ -52,7 +52,7 @@ pub enum SimplePayload {
     Acknowledgment(SimpleAcknowledgment),
     /// Client handshake for relay registration.
     Handshake(SimpleHandshake),
-    /// Account revocation signal (signed, not encrypted).
+    /// Identity revocation signal (signed, not encrypted).
     IdentityRevoked(SimpleIdentityRevoked),
     /// Signed field validation record (encrypted in transit).
     ValidationRecord(SimpleValidationRecord),
@@ -63,7 +63,7 @@ pub enum SimplePayload {
     Unknown,
 }
 
-/// Account revocation for the simple protocol.
+/// Identity revocation for the simple protocol.
 ///
 /// Wire-compatible with `vauchi_protocol::IdentityRevoked` so the relay
 /// can route it to the recipient without changes.

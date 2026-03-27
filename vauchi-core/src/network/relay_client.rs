@@ -279,7 +279,7 @@ impl<T: Transport> RelayClient<T> {
     /// Sends a purge request to the relay server.
     ///
     /// Requests the relay to delete all stored messages and data for this identity.
-    /// Used during account shredding (hard_shred / panic_shred).
+    /// Used during identity shredding (hard_shred / panic_shred).
     pub fn send_purge_request(
         &mut self,
         request: &PurgeRequest,
@@ -292,7 +292,7 @@ impl<T: Transport> RelayClient<T> {
         Ok(message_id)
     }
 
-    /// Sends an account revocation message to a contact via the relay.
+    /// Sends an identity revocation message to a contact via the relay.
     ///
     /// Used during identity deletion (hard_shred / panic_shred) to notify
     /// contacts that this identity has been revoked. The message is signed

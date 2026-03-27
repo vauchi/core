@@ -197,10 +197,10 @@ pub struct PurgeRequest {
 pub struct PurgeResponse {}
 
 // =========================================================================
-// Account revocation
+// Identity revocation
 // =========================================================================
 
-/// Signed notification that a sender's account has been revoked, invalidating their contact card.
+/// Signed notification that a sender's identity has been revoked, invalidating their contact card.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct IdentityRevoked {
     pub sender_id: String,

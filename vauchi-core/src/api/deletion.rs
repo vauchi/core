@@ -86,7 +86,7 @@ impl<'a> DeletionManager<'a> {
         Ok(self.storage.load_deletion_state()?)
     }
 
-    /// Schedules account deletion with a 7-day grace period.
+    /// Schedules identity deletion with a 7-day grace period.
     pub fn schedule_deletion(&self) -> Result<(), DeletionError> {
         let current = self.storage.load_deletion_state()?;
         if matches!(current, DeletionState::Scheduled { .. }) {

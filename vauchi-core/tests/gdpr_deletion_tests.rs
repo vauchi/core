@@ -135,7 +135,7 @@ fn test_cancel_deletion_when_not_scheduled() {
     assert!(result.is_ok(), "Cancel when not scheduled should be ok");
 }
 
-// @scenario: privacy_compliance :: Delete my account
+// @scenario: privacy_compliance :: Delete my identity
 #[test]
 fn test_schedule_deletion_when_already_scheduled() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();

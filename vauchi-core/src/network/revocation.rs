@@ -12,7 +12,7 @@ use super::message::IdentityRevoked;
 use crate::storage::Storage;
 
 /// Domain separator for revocation signatures.
-/// 25 bytes: `b"vauchi-account-revoked-v1"`.
+/// 25 bytes: `b"vauchi-account-revoked-v1"` (kept for backward compatibility).
 pub const REVOCATION_DOMAIN_SEPARATOR: &[u8] = b"vauchi-account-revoked-v1";
 
 /// Computes the canonical byte string for revocation signature.

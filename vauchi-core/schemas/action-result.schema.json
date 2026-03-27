@@ -160,7 +160,7 @@
       "additionalProperties": false
     },
     {
-      "description": "Frontend should open the camera for QR scanning.",
+      "description": "Frontend should open the camera for QR scanning.\n\nDeprecated per ADR-022 Addendum D: use `ExchangeCommands` with `ExchangeCommand::QrRequestScan` instead. Will be removed after all frontends adopt the command/event protocol.",
       "type": "string",
       "enum": [
         "RequestCamera"
@@ -750,81 +750,6 @@
                 },
                 "mode": {
                   "$ref": "#/definitions/QrMode"
-                }
-              }
-            }
-          },
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
-          "required": [
-            "ConfirmationDialog"
-          ],
-          "properties": {
-            "ConfirmationDialog": {
-              "type": "object",
-              "required": [
-                "confirm_text",
-                "destructive",
-                "id",
-                "message",
-                "title"
-              ],
-              "properties": {
-                "confirm_text": {
-                  "type": "string"
-                },
-                "destructive": {
-                  "type": "boolean"
-                },
-                "id": {
-                  "type": "string"
-                },
-                "message": {
-                  "type": "string"
-                },
-                "title": {
-                  "type": "string"
-                }
-              }
-            }
-          },
-          "additionalProperties": false
-        },
-        {
-          "description": "A non-blocking toast message with optional undo action.",
-          "type": "object",
-          "required": [
-            "ShowToast"
-          ],
-          "properties": {
-            "ShowToast": {
-              "type": "object",
-              "required": [
-                "duration_ms",
-                "id",
-                "message"
-              ],
-              "properties": {
-                "duration_ms": {
-                  "description": "Auto-dismiss duration in milliseconds (default: 5000).",
-                  "type": "integer",
-                  "format": "uint32",
-                  "minimum": 0.0
-                },
-                "id": {
-                  "type": "string"
-                },
-                "message": {
-                  "type": "string"
-                },
-                "undo_action_id": {
-                  "description": "If set, show an Undo button that emits UndoPressed with this action_id.",
-                  "type": [
-                    "string",
-                    "null"
-                  ]
                 }
               }
             }

@@ -24,10 +24,6 @@ pub enum MessageType {
     Handshake,
     /// Identity revocation signal.
     IdentityRevoked,
-    /// Signed field validation record.
-    ValidationRecord,
-    /// Field validation revocation.
-    ValidationRevocation,
     /// Unrecognized or unparsable message.
     Unknown,
 }
@@ -69,8 +65,6 @@ pub fn classify_message(data: &[u8]) -> MessageType {
         SimplePayload::Acknowledgment(_) => MessageType::Acknowledgment,
         SimplePayload::Handshake(_) => MessageType::Handshake,
         SimplePayload::IdentityRevoked(_) => MessageType::IdentityRevoked,
-        SimplePayload::ValidationRecord(_) => MessageType::ValidationRecord,
-        SimplePayload::ValidationRevocation(_) => MessageType::ValidationRevocation,
         SimplePayload::Unknown => MessageType::Unknown,
     }
 }

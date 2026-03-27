@@ -204,56 +204,6 @@ impl<'a> SyncManager<'a> {
         Ok(update_id)
     }
 
-    /// Queues a validation record for delivery to the validated contact.
-    ///
-    /// After a user validates a contact's field locally, this method queues
-    /// the signed validation record for delivery through the relay so the
-    /// contact can see the validation.
-    pub fn queue_validation_delivery(
-        &self,
-        contact_id: &str,
-        validation_bytes: Vec<u8>,
-    ) -> Result<String, SyncError> {
-        let update_id = Uuid::new_v4().to_string();
-        let update = PendingUpdate {
-            id: update_id.clone(),
-            contact_id: contact_id.to_string(),
-            update_type: "validation_record".to_string(),
-            payload: validation_bytes,
-            created_at: current_timestamp(),
-            retry_count: 0,
-            status: UpdateStatus::Pending,
-            target_relay_url: None,
-        };
-        self.storage.queue_update(&update)?;
-        Ok(update_id)
-    }
-
-    /// Queues a validation revocation for delivery to the contact.
-    ///
-    /// When a user revokes their validation of a contact's field, this method
-    /// queues the revocation notice for delivery so the contact's validation
-    /// count is updated.
-    pub fn queue_validation_revocation(
-        &self,
-        contact_id: &str,
-        revocation_bytes: Vec<u8>,
-    ) -> Result<String, SyncError> {
-        let update_id = Uuid::new_v4().to_string();
-        let update = PendingUpdate {
-            id: update_id.clone(),
-            contact_id: contact_id.to_string(),
-            update_type: "validation_revocation".to_string(),
-            payload: revocation_bytes,
-            created_at: current_timestamp(),
-            retry_count: 0,
-            status: UpdateStatus::Pending,
-            target_relay_url: None,
-        };
-        self.storage.queue_update(&update)?;
-        Ok(update_id)
-    }
-
     /// Gets pending updates for a specific contact.
     pub fn get_pending(&self, contact_id: &str) -> Result<Vec<PendingUpdate>, SyncError> {
         Ok(self.storage.get_pending_updates(contact_id)?)

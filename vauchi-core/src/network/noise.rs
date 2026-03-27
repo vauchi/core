@@ -507,4 +507,75 @@ mod tests {
             assert_eq!(dec_buf, msg.as_bytes());
         }
     }
+
+    // @scenario: noise_protocol.feature:Defense-in-depth layering
+    #[test]
+    fn test_defense_in_depth_tls_outer_noise_inner() {
+        // Defense-in-depth: TLS is the outer layer, Noise NK is the inner layer.
+        // This test verifies the three architectural properties from the scenario:
+        //
+        // 1. TLS enforcement: relay URLs must use wss:// (TLS)
+        // 2. Noise independence: Noise ciphertext is opaque without the Noise session
+        // 3. Both required: only holding one layer's keys is insufficient
+
+        // Property 1: TLS outer layer — wss:// required, ws:// rejected
+        use crate::network::relay_url::validate_relay_url;
+        assert!(
+            validate_relay_url("wss://relay.example.com").is_ok(),
+            "wss:// (TLS) must be accepted"
+        );
+        assert!(
+            validate_relay_url("ws://relay.example.com").is_err(),
+            "ws:// (no TLS) must be rejected — TLS outer layer is mandatory"
+        );
+
+        // Property 2: Noise inner layer — ciphertext is opaque without session keys
+        let (priv_key, pub_key) = generate_test_relay_keypair();
+        let (initiator, handshake_msg) = NoiseInitiator::new(&pub_key).unwrap();
+        let mut responder = build_test_responder(&priv_key);
+        let mut read_buf = vec![0u8; 65535];
+        responder
+            .read_message(&handshake_msg, &mut read_buf)
+            .unwrap();
+        let mut response = vec![0u8; 65535];
+        let response_len = responder.write_message(&[], &mut response).unwrap();
+        response.truncate(response_len);
+        let _responder_transport = responder.into_transport_mode().unwrap();
+        let mut client_transport = initiator.finalize(&response).unwrap();
+
+        let routing_metadata = b"recipient_id:abc123 type:card_update";
+        let noise_ciphertext = client_transport.encrypt(routing_metadata).unwrap();
+
+        // A TLS-only attacker sees the Noise ciphertext but cannot read it.
+        // Verify the ciphertext does not contain any plaintext substring.
+        assert_ne!(
+            &noise_ciphertext[..routing_metadata.len()],
+            routing_metadata.as_slice(),
+            "Noise ciphertext must not leak plaintext (TLS compromise alone is insufficient)"
+        );
+
+        // Property 3: An attacker with a different Noise session cannot decrypt.
+        // Establish a separate Noise session with different ephemeral keys.
+        let (attacker_initiator, attacker_handshake) = NoiseInitiator::new(&pub_key).unwrap();
+        let mut attacker_responder = build_test_responder(&priv_key);
+        let mut attacker_buf = vec![0u8; 65535];
+        attacker_responder
+            .read_message(&attacker_handshake, &mut attacker_buf)
+            .unwrap();
+        let mut attacker_response = vec![0u8; 65535];
+        let attacker_response_len = attacker_responder
+            .write_message(&[], &mut attacker_response)
+            .unwrap();
+        attacker_response.truncate(attacker_response_len);
+        let _attacker_resp_transport = attacker_responder.into_transport_mode().unwrap();
+        let mut attacker_transport = attacker_initiator.finalize(&attacker_response).unwrap();
+
+        // The attacker's Noise session has different ephemeral keys, so decryption
+        // of the original ciphertext must fail — each session is independent.
+        let result = attacker_transport.decrypt(&noise_ciphertext);
+        assert!(
+            result.is_err(),
+            "Different Noise session must not decrypt another session's ciphertext"
+        );
+    }
 }

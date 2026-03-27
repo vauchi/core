@@ -92,8 +92,4 @@ pub mod diagnostic;
 pub mod onboarding;
 pub use onboarding::display_name_suggestions;
 pub mod social;
-pub use social::{
-    ProfileValidation, SocialNetwork, SocialNetworkRegistry, ValidationConfidence,
-    ValidationStatus, ValidatorMeta, calculate_trust_weight, check_sybil_resistance,
-    filter_blocked_validations,
-};
+pub use social::{ProfileValidation, SocialNetwork, SocialNetworkRegistry};

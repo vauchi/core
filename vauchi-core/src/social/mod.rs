@@ -6,7 +6,7 @@
 //!
 //! This module provides:
 //! - A registry of known social networks with profile URL templates
-//! - Crowd-sourced validation of social profile ownership
+//! - Signed validation records for field attestation
 
 #[cfg(feature = "testing")]
 pub mod registry;
@@ -19,7 +19,4 @@ pub mod validation;
 mod validation;
 
 pub use registry::{SocialNetwork, SocialNetworkRegistry};
-pub use validation::{
-    ProfileValidation, ValidationConfidence, ValidationStatus, ValidatorMeta,
-    calculate_trust_weight, check_sybil_resistance, filter_blocked_validations,
-};
+pub use validation::ProfileValidation;

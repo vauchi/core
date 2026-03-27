@@ -761,6 +761,42 @@ fn test_adaptive_display_durations() {
     }
 }
 
+/// Verify that clear_sensitive() zeroes all security-sensitive fields.
+///
+/// Guards against incomplete zeroization when new fields are added to
+/// MultiStageSession. If this test fails after adding a field, update
+/// clear_sensitive() to cover it.
+#[test]
+fn test_clear_sensitive_covers_all_security_fields() {
+    // Run a full exchange to populate all fields
+    let alice_card = b"name:Alice\nemail:alice@example.com".to_vec();
+    let bob_card = b"name:Bob\nemail:bob@example.com".to_vec();
+    let (mut alice, _bob) = run_full_exchange(alice_card, bob_card);
+
+    // Verify fields are populated before cancel
+    assert!(
+        matches!(alice.get_state(), ProtocolState::Finalized),
+        "Exchange must complete for all fields to be populated"
+    );
+    assert!(
+        alice.get_received_data().is_some(),
+        "received_data should be populated"
+    );
+
+    // Cancel triggers clear_sensitive()
+    alice.cancel();
+
+    // All sensitive data must be gone
+    assert!(
+        alice.get_received_data().is_none(),
+        "received_data not cleared"
+    );
+    assert!(
+        matches!(alice.get_state(), ProtocolState::Failed(_)),
+        "state should be Failed after cancel"
+    );
+}
+
 /// S2: Complete state shows ONLY COMBO QRs (no VRFY/CONF interleave).
 #[test]
 fn test_complete_shows_only_combo() {

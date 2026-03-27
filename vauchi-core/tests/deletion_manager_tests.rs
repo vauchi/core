@@ -9,7 +9,7 @@
 //!   - "Identity deletion sends revocation signal to all contacts"
 //!   - "Identity deletion propagates across all user devices"
 
-use vauchi_core::api::account::{DeletionError, DeletionManager};
+use vauchi_core::api::deletion::{DeletionError, DeletionManager};
 use vauchi_core::contact::Contact;
 use vauchi_core::contact_card::{ContactCard, ContactField, FieldType};
 use vauchi_core::crypto::SymmetricKey;

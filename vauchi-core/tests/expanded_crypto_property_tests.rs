@@ -16,8 +16,8 @@ use vauchi_core::crypto::{DoubleRatchetState, HKDF, SymmetricKey, derive_key_arg
 use vauchi_core::exchange::X3DHKeyPair;
 use vauchi_core::identity::Identity;
 use vauchi_core::network::{
-    AccountDeletionNotice, AckStatus, Acknowledgment, DeletionStage, EncryptedUpdate,
-    ForwardingHint, ForwardingHints, Handshake, IdentityRevoked, MessageEnvelope, MessagePayload,
+    AckStatus, Acknowledgment, DeletionStage, EncryptedUpdate, ForwardingHint, ForwardingHints,
+    Handshake, IdentityDeletionNotice, IdentityRevoked, MessageEnvelope, MessagePayload,
     PROTOCOL_VERSION, PresenceStatus, PresenceUpdate, PurgeRequest, RatchetHeader,
     VersionNegotiation,
 };
@@ -540,9 +540,9 @@ proptest! {
         }
     }
 
-    /// Property: AccountDeletionNotice payload roundtrips through JSON serialization.
+    /// Property: IdentityDeletionNotice payload roundtrips through JSON serialization.
     #[test]
-    fn prop_account_deletion_notice_roundtrip(
+    fn prop_identity_deletion_notice_roundtrip(
         stage in prop_oneof![
             Just(DeletionStage::Pending),
             Just(DeletionStage::Confirmed),
@@ -565,7 +565,7 @@ proptest! {
             version: PROTOCOL_VERSION,
             message_id: msg_id.clone(),
             timestamp: env_timestamp,
-            payload: MessagePayload::AccountDeletionNotice(AccountDeletionNotice {
+            payload: MessagePayload::IdentityDeletionNotice(IdentityDeletionNotice {
                 stage,
                 public_key,
                 timestamp,
@@ -577,13 +577,13 @@ proptest! {
         let restored: MessageEnvelope = serde_json::from_str(&json)
             .expect("deserialization should succeed");
 
-        if let MessagePayload::AccountDeletionNotice(n) = &restored.payload {
+        if let MessagePayload::IdentityDeletionNotice(n) = &restored.payload {
             prop_assert_eq!(n.stage, stage);
             prop_assert_eq!(n.public_key, public_key);
             prop_assert_eq!(n.timestamp, timestamp);
             prop_assert_eq!(n.signature, signature);
         } else {
-            prop_assert!(false, "Expected AccountDeletionNotice variant");
+            prop_assert!(false, "Expected IdentityDeletionNotice variant");
         }
     }
 

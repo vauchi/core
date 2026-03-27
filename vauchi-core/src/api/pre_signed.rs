@@ -17,7 +17,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use serde::{Deserialize, Serialize};
 
 use crate::identity::Identity;
-use crate::network::{AccountDeletionNotice, DeletionStage};
+use crate::network::{DeletionStage, IdentityDeletionNotice};
 
 /// Pre-signed messages for emergency (panic) shred.
 ///
@@ -29,8 +29,8 @@ use crate::network::{AccountDeletionNotice, DeletionStage};
 /// and signatures — no secret material.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PreSignedShredMessages {
-    /// Pre-signed AccountDeletionNotice(Confirmed) for contacts.
-    pub deletion_notice: AccountDeletionNotice,
+    /// Pre-signed IdentityDeletionNotice(Confirmed) for contacts.
+    pub deletion_notice: IdentityDeletionNotice,
     /// Pre-signed purge request fields for the relay.
     pub purge_request: PreSignedPurgeRequest,
     /// When these messages were last generated/refreshed (unix seconds).
@@ -60,7 +60,7 @@ impl PreSignedShredMessages {
     /// Generates pre-signed shred messages from the given identity.
     ///
     /// Creates:
-    /// 1. An AccountDeletionNotice(Confirmed) signed by the identity
+    /// 1. An IdentityDeletionNotice(Confirmed) signed by the identity
     /// 2. A relay PurgeRequest with a random purge_token signed by the identity
     pub fn generate(identity: &Identity) -> Self {
         let now = SystemTime::now()
@@ -117,14 +117,14 @@ impl PreSignedShredMessages {
             .map_err(|e| PreSignedError::DeserializationFailed(e.to_string()))
     }
 
-    /// Signs an AccountDeletionNotice(Confirmed).
+    /// Signs an IdentityDeletionNotice(Confirmed).
     ///
     /// Signed message format: public_key || stage_byte || timestamp_be_bytes
     fn sign_deletion_notice(
         identity: &Identity,
         public_key: [u8; 32],
         timestamp: u64,
-    ) -> AccountDeletionNotice {
+    ) -> IdentityDeletionNotice {
         let stage = DeletionStage::Confirmed;
         let stage_byte = match stage {
             DeletionStage::Pending => 0u8,
@@ -139,7 +139,7 @@ impl PreSignedShredMessages {
 
         let signature = identity.sign(&message);
 
-        AccountDeletionNotice {
+        IdentityDeletionNotice {
             stage,
             public_key,
             timestamp,

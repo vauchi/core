@@ -38,10 +38,11 @@ pub enum MessagePayload {
     Handshake(Handshake),
     /// Presence/status update.
     Presence(PresenceUpdate),
-    /// Account revocation signal (sent when card owner deletes account).
+    /// Identity revocation signal (sent when card owner deletes identity).
     IdentityRevoked(IdentityRevoked),
-    /// Account deletion notification sent to contacts.
-    AccountDeletionNotice(AccountDeletionNotice),
+    /// Identity deletion notification sent to contacts.
+    #[serde(alias = "AccountDeletionNotice")]
+    IdentityDeletionNotice(IdentityDeletionNotice),
     /// Relay purge request (sent during shred to delete server-side data).
     PurgeRequest(PurgeRequest),
     /// Forwarding hints from the relay indicating blobs stored on other relays.
@@ -69,7 +70,7 @@ pub struct DeregisterMailbox {
     pub tokens: Vec<String>,
 }
 
-/// Account revocation signal sent to contacts when the card owner deletes their account.
+/// Identity revocation signal sent to contacts when the card owner deletes their identity.
 ///
 /// NOT Double Ratchet encrypted — signed only — so it can be processed even if
 /// the ratchet state is corrupted or missing. The signature is Ed25519 over a
@@ -171,13 +172,13 @@ pub enum PresenceStatus {
     Offline,
 }
 
-/// Account deletion notification sent to contacts.
+/// Identity deletion notification sent to contacts.
 ///
-/// Informs contacts that the sender is deleting their account.
+/// Informs contacts that the sender is deleting their identity.
 /// Cryptographically signed by the sender's identity key so contacts
 /// can verify the notice is authentic (not spoofed).
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AccountDeletionNotice {
+pub struct IdentityDeletionNotice {
     /// Current deletion stage.
     pub stage: DeletionStage,
     /// Sender's public signing key (for signature verification).
@@ -190,10 +191,10 @@ pub struct AccountDeletionNotice {
     pub signature: [u8; 64],
 }
 
-/// Relay purge request sent during account shredding.
+/// Relay purge request sent during identity shredding.
 ///
 /// Requests the relay to delete all stored messages and data for this identity.
-/// Signed by the account's Ed25519 key so the relay can verify authenticity.
+/// Signed by the identity's Ed25519 key so the relay can verify authenticity.
 /// Contains a one-time purge_token for replay prevention.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PurgeRequest {
@@ -261,12 +262,12 @@ impl ForwardingHints {
     }
 }
 
-/// Stages of account deletion.
+/// Stages of identity deletion.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 pub enum DeletionStage {
     /// Deletion scheduled, grace period active. Can still be cancelled.
     Pending,
-    /// Deletion confirmed and executed. Account is irrecoverably destroyed.
+    /// Deletion confirmed and executed. Identity is irrecoverably destroyed.
     Confirmed,
     /// Deletion cancelled during grace period.
     Cancelled,
@@ -538,8 +539,8 @@ mod tests {
     }
 
     #[test]
-    fn test_account_deletion_notice_serde_roundtrip() {
-        let notice = AccountDeletionNotice {
+    fn test_identity_deletion_notice_serde_roundtrip() {
+        let notice = IdentityDeletionNotice {
             stage: DeletionStage::Pending,
             public_key: [0x42; 32],
             timestamp: 1700000000,
@@ -547,7 +548,7 @@ mod tests {
         };
 
         let json = serde_json::to_string(&notice).unwrap();
-        let deserialized: AccountDeletionNotice = serde_json::from_str(&json).unwrap();
+        let deserialized: IdentityDeletionNotice = serde_json::from_str(&json).unwrap();
 
         assert_eq!(deserialized.stage, DeletionStage::Pending);
         assert_eq!(deserialized.public_key, [0x42; 32]);
@@ -569,34 +570,34 @@ mod tests {
     }
 
     #[test]
-    fn test_account_deletion_notice_in_payload() {
-        let notice = AccountDeletionNotice {
+    fn test_identity_deletion_notice_in_payload() {
+        let notice = IdentityDeletionNotice {
             stage: DeletionStage::Confirmed,
             public_key: [0x01; 32],
             timestamp: 1700000000,
             signature: [0x02; 64],
         };
 
-        let payload = MessagePayload::AccountDeletionNotice(notice);
+        let payload = MessagePayload::IdentityDeletionNotice(notice);
         let json = serde_json::to_string(&payload).unwrap();
         let deserialized: MessagePayload = serde_json::from_str(&json).unwrap();
 
         match deserialized {
-            MessagePayload::AccountDeletionNotice(n) => {
+            MessagePayload::IdentityDeletionNotice(n) => {
                 assert_eq!(n.stage, DeletionStage::Confirmed);
                 assert_eq!(n.public_key, [0x01; 32]);
             }
-            _ => panic!("Expected AccountDeletionNotice variant"),
+            _ => panic!("Expected IdentityDeletionNotice variant"),
         }
     }
 
     #[test]
-    fn test_account_deletion_notice_in_envelope() {
+    fn test_identity_deletion_notice_in_envelope() {
         let envelope = MessageEnvelope {
             version: PROTOCOL_VERSION,
             message_id: "test-id-123".to_string(),
             timestamp: 1700000000,
-            payload: MessagePayload::AccountDeletionNotice(AccountDeletionNotice {
+            payload: MessagePayload::IdentityDeletionNotice(IdentityDeletionNotice {
                 stage: DeletionStage::Pending,
                 public_key: [0xFF; 32],
                 timestamp: 1700000000,
@@ -610,10 +611,10 @@ mod tests {
         assert_eq!(deserialized.version, PROTOCOL_VERSION);
         assert_eq!(deserialized.message_id, "test-id-123");
         match deserialized.payload {
-            MessagePayload::AccountDeletionNotice(n) => {
+            MessagePayload::IdentityDeletionNotice(n) => {
                 assert_eq!(n.stage, DeletionStage::Pending);
             }
-            _ => panic!("Expected AccountDeletionNotice"),
+            _ => panic!("Expected IdentityDeletionNotice"),
         }
     }
 

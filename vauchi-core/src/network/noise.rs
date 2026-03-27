@@ -63,7 +63,11 @@ impl NoiseInitiator {
     /// Returns the initiator and the 48-byte handshake message (-> e, es)
     /// to send to the relay.
     pub fn new(relay_pubkey: &[u8; 32]) -> Result<(Self, Vec<u8>), NoiseError> {
-        let builder = Builder::new(NOISE_PATTERN.parse().unwrap());
+        let builder = Builder::new(
+            NOISE_PATTERN
+                .parse()
+                .expect("static Noise pattern is valid"),
+        );
         let mut state = builder
             .remote_public_key(relay_pubkey)
             .build_initiator()
@@ -160,7 +164,11 @@ mod tests {
 
     /// Helper: generate a relay keypair for testing.
     fn generate_test_relay_keypair() -> ([u8; 32], [u8; 32]) {
-        let builder = Builder::new(NOISE_PATTERN.parse().unwrap());
+        let builder = Builder::new(
+            NOISE_PATTERN
+                .parse()
+                .expect("static Noise pattern is valid"),
+        );
         let keypair = builder.generate_keypair().unwrap();
         let mut private = [0u8; 32];
         let mut public = [0u8; 32];
@@ -171,7 +179,11 @@ mod tests {
 
     /// Helper: build a snow responder for testing interop.
     fn build_test_responder(private_key: &[u8; 32]) -> snow::HandshakeState {
-        let builder = Builder::new(NOISE_PATTERN.parse().unwrap());
+        let builder = Builder::new(
+            NOISE_PATTERN
+                .parse()
+                .expect("static Noise pattern is valid"),
+        );
         builder
             .local_private_key(private_key)
             .build_responder()
@@ -391,7 +403,11 @@ mod tests {
         // Verify the builder does not accept a local static key for NK initiator:
         // building with local_private_key on an NK initiator would be an error or
         // would be ignored. The pattern itself guarantees no static key is sent.
-        let builder = Builder::new(NOISE_PATTERN.parse().unwrap());
+        let builder = Builder::new(
+            NOISE_PATTERN
+                .parse()
+                .expect("static Noise pattern is valid"),
+        );
         let dummy_key = [0xAA; 32];
         // NK initiator with a static key set should still produce the same 48-byte message
         // (snow ignores the static key for NK initiators), confirming the pattern

@@ -53,7 +53,7 @@ pub fn check_guardian_diversity(contacts: &[Contact]) -> Option<GuardianDiversit
         .collect();
 
     if transports.len() == 1 {
-        let single_transport = *transports.iter().next().unwrap();
+        let &single_transport = transports.iter().next()?;
         Some(GuardianDiversityWarning {
             single_transport,
             guardian_count: guardians.len(),

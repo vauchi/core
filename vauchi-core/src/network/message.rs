@@ -332,7 +332,7 @@ pub fn negotiate_version(local: &VersionNegotiation, remote: &VersionNegotiation
     }
 
     common.sort_unstable();
-    Some(*common.last().unwrap())
+    common.last().copied()
 }
 
 impl IdentityRevoked {

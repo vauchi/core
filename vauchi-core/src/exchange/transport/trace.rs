@@ -150,10 +150,11 @@ impl TraceLog {
             }
         }
 
-        let total_duration_us = if self.events.len() >= 2 {
-            self.events.last().unwrap().timestamp_us - self.events.first().unwrap().timestamp_us
-        } else {
-            0
+        let total_duration_us = match (self.events.first(), self.events.last()) {
+            (Some(first), Some(last)) if self.events.len() >= 2 => {
+                last.timestamp_us - first.timestamp_us
+            }
+            _ => 0,
         };
 
         TraceSummary {

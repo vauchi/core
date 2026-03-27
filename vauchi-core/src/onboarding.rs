@@ -244,7 +244,9 @@ pub fn display_name_suggestions(full_name: &str) -> Vec<String> {
 
     // Initial + last name (only if there are multiple parts)
     if parts.len() >= 2 {
-        let initial = first.chars().next().unwrap();
+        let Some(initial) = first.chars().next() else {
+            return suggestions;
+        };
         let last = parts[parts.len() - 1];
         suggestions.push(format!("{}. {}", initial, last));
     }

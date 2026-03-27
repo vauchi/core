@@ -95,7 +95,10 @@ impl MultiRelayConfig {
             RelaySelector::Random => {
                 // Non-crypto RNG: relay load balancing, not security-sensitive
                 let mut rng = rand::thread_rng();
-                self.relays.choose(&mut rng).unwrap().clone()
+                self.relays
+                    .choose(&mut rng)
+                    .expect("relays list is non-empty (validated at construction)")
+                    .clone()
             }
             RelaySelector::PrimaryFirst => {
                 if let Some(primary) = &self.primary {
@@ -143,7 +146,12 @@ impl MultiRelayConfig {
                 } else {
                     // Non-crypto RNG: relay load balancing, not security-sensitive
                     let mut rng = rand::thread_rng();
-                    Some(healthy.choose(&mut rng).unwrap().to_string())
+                    Some(
+                        healthy
+                            .choose(&mut rng)
+                            .expect("healthy is non-empty (checked above)")
+                            .to_string(),
+                    )
                 }
             }
         }

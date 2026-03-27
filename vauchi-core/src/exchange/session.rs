@@ -882,14 +882,13 @@ impl ExchangeSession {
 
         // Process when both arrive
         if self.ble_pending_handshake.is_some() && self.ble_pending_card.is_some() {
-            let key_ack = self.ble_pending_handshake.take().unwrap();
-            let their_encrypted_card = self.ble_pending_card.take().unwrap();
+            let key_ack = self.ble_pending_handshake.take().expect("checked Some");
+            let their_card = self.ble_pending_card.take().expect("checked Some");
+            let hs = self.ble_handshake.as_mut().ok_or_else(|| {
+                ExchangeError::InvalidState("BLE handshake not initialized".into())
+            })?;
+            let (our_commitment, our_encrypted_card) = hs.process_key_ack(&key_ack, &their_card)?;
 
-            let hs = self.ble_handshake.as_mut().unwrap();
-            let (our_commitment, our_encrypted_card) =
-                hs.process_key_ack(&key_ack, &their_encrypted_card)?;
-
-            // Phase 3: send our commitment + encrypted card
             self.emit_command(ExchangeCommand::BleWriteCharacteristic {
                 uuid: super::CHAR_HANDSHAKE_WRITE.to_string(),
                 data: our_commitment,
@@ -914,13 +913,14 @@ impl ExchangeSession {
             self.ble_pending_card = Some(data);
         }
 
-        // Process when both arrive
+        // Process when both arrive (guard without consuming)
         if self.ble_pending_handshake.is_some() && self.ble_pending_card.is_some() {
-            let their_commitment = self.ble_pending_handshake.take().unwrap();
-            let their_encrypted_card = self.ble_pending_card.take().unwrap();
-
-            let hs = self.ble_handshake.as_mut().unwrap();
-            let reveal = hs.process_committed_payload(&their_commitment, &their_encrypted_card)?;
+            let their_commitment = self.ble_pending_handshake.take().expect("checked Some");
+            let their_card = self.ble_pending_card.take().expect("checked Some");
+            let hs = self.ble_handshake.as_mut().ok_or_else(|| {
+                ExchangeError::InvalidState("BLE handshake not initialized".into())
+            })?;
+            let reveal = hs.process_committed_payload(&their_commitment, &their_card)?;
 
             // Send reveal back
             self.emit_command(ExchangeCommand::BleWriteCharacteristic {

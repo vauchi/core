@@ -629,16 +629,16 @@ impl MultiStageSession {
             return state;
         }
 
-        // Store the raw ciphertext directly in the reassembly buffer.
-        // This bypasses transport encryption (the ciphertext is already
-        // commitment-encrypted with the reveal key).
+        // Store ciphertext directly (already commitment-encrypted).
         // Set up inbound tracking as if we received all DATA chunks.
         self.inbound_buffer = Some(ReassemblyBuffer::from_complete(ciphertext));
-        self.inbound_bitmap = Some(ChunkBitmap::new(1));
-        self.inbound_bitmap.as_mut().unwrap().mark_received(0);
+        self.inbound_bitmap = Some({
+            let mut b = ChunkBitmap::new(1);
+            b.mark_received(0);
+            b
+        });
         self.peer_chunks_total = Some(1);
-
-        // Update transfer state — with all chunks received, should advance to Verifying
+        // All chunks received — should advance to Verifying
         self.update_transfer_state();
         self.state.clone()
     }

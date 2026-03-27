@@ -634,6 +634,17 @@ fuzz:nightly:
     expire_in: 1 month
     when: on_failure
 
+# Slow property tests — timing-sensitive exchange tests with wall-clock jitter.
+# Runs #[ignore] tests that are too slow for per-push CI (~2 min).
+test:slow:
+  extends: [.linux-runner, .timeout-standard]
+  stage: mutation
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule" && $SLOW_TESTS_ENABLED == "true"
+  allow_failure: true
+  script:
+    - cargo test --workspace -- --ignored --nocapture
+
 # ============================================================
 # Security Stage (MR only, gated by lint, parallel with test)
 # ============================================================

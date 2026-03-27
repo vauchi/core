@@ -108,13 +108,13 @@ pub use types::{
     MobileDeviceDeliveryStatus, MobileDeviceInfo, MobileDeviceJoinResult,
     MobileDeviceLinkConfirmation, MobileDeviceLinkData, MobileDeviceLinkInfo,
     MobileDeviceLinkRequest, MobileDeviceLinkResult, MobileDuressSettings, MobileEmergencyConfig,
-    MobileExchangeResult, MobileFaqItem, MobileFieldNote, MobileFieldType, MobileFieldValidation,
-    MobileGdprExport, MobileHelpCategory, MobileHelpCategoryInfo, MobileLocale, MobileLocaleInfo,
+    MobileExchangeResult, MobileFaqItem, MobileFieldNote, MobileFieldType, MobileGdprExport,
+    MobileHelpCategory, MobileHelpCategoryInfo, MobileLocale, MobileLocaleInfo,
     MobileOnboardingProgress, MobileOnboardingStep, MobileRecoveryClaim, MobileRecoveryProgress,
     MobileRecoveryVerification, MobileRecoveryVoucher, MobileRetryEntry, MobileShredReport,
     MobileShredStatus, MobileShredToken, MobileShredVerification, MobileSocialNetwork,
     MobileSyncResult, MobileSyncStatus, MobileTheme, MobileThemeColors, MobileThemeMode,
-    MobileTrustLevel, MobileValidationStatus, MobileVisibilityLabel, MobileVisibilityLabelDetail,
+    MobileVisibilityLabel, MobileVisibilityLabelDetail,
 };
 
 uniffi::setup_scaffolding!();

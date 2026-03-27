@@ -2,15 +2,14 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! Contact card, contact CRUD, hidden contacts, field validation, and social network operations.
+//! Contact card, contact CRUD, hidden contacts, and social network operations.
 
 use vauchi_core::ContactField;
 
 use super::VauchiPlatform;
 use super::error::MobileError;
 use super::types::{
-    MobileContact, MobileContactCard, MobileFieldNote, MobileFieldType, MobileFieldValidation,
-    MobileSocialNetwork, MobileValidationStatus,
+    MobileContact, MobileContactCard, MobileFieldNote, MobileFieldType, MobileSocialNetwork,
 };
 
 #[uniffi::export]
@@ -383,143 +382,5 @@ impl VauchiPlatform {
     /// Get profile URL for a social field.
     pub fn get_profile_url(&self, network_id: String, username: String) -> Option<String> {
         self.social_registry.profile_url(&network_id, &username)
-    }
-
-    // === Field Validation Operations ===
-
-    /// Validate a contact's field.
-    ///
-    /// Creates a cryptographically signed validation record attesting
-    /// that you believe this field value belongs to this contact.
-    /// Returns the created validation.
-    pub fn validate_field(
-        &self,
-        contact_id: String,
-        field_id: String,
-        field_value: String,
-    ) -> Result<MobileFieldValidation, MobileError> {
-        let identity = self.get_identity()?;
-        let storage = self.open_storage()?;
-
-        let my_id = hex::encode(identity.signing_public_key());
-        if contact_id == my_id {
-            return Err(MobileError::InvalidInput(
-                "Cannot validate your own field".to_string(),
-            ));
-        }
-
-        let validator_id = hex::encode(identity.signing_public_key());
-        if storage.has_validated(&contact_id, &field_id, &validator_id)? {
-            return Err(MobileError::InvalidInput(
-                "You have already validated this field".to_string(),
-            ));
-        }
-
-        let validation = vauchi_core::social::ProfileValidation::create_signed(
-            &identity,
-            &field_id,
-            &field_value,
-            &contact_id,
-        );
-
-        storage.save_validation(&validation)?;
-
-        Ok(MobileFieldValidation::from(&validation))
-    }
-
-    /// Get validation status for a contact's field.
-    ///
-    /// Returns aggregated validation information including count, trust level,
-    /// and whether you have validated this field.
-    pub fn get_field_validation_status(
-        &self,
-        contact_id: String,
-        field_id: String,
-        field_value: String,
-    ) -> Result<MobileValidationStatus, MobileError> {
-        let storage = self.open_storage()?;
-        let validations = storage.load_validations_for_field(&contact_id, &field_id)?;
-
-        let my_id = {
-            let data = self.identity_data.lock().unwrap();
-            if data.is_some() {
-                match self.get_identity() {
-                    Ok(identity) => Some(hex::encode(identity.signing_public_key())),
-                    Err(_) => None,
-                }
-            } else {
-                None
-            }
-        };
-
-        let blocked = std::collections::HashSet::new();
-        let status = vauchi_core::social::ValidationStatus::from_validations(
-            &validations,
-            &field_value,
-            my_id.as_deref(),
-            &blocked,
-        );
-
-        Ok(MobileValidationStatus::from(&status))
-    }
-
-    /// Revoke your validation of a contact's field.
-    ///
-    /// Returns true if a validation was revoked, false if you hadn't validated.
-    pub fn revoke_field_validation(
-        &self,
-        contact_id: String,
-        field_id: String,
-    ) -> Result<bool, MobileError> {
-        let identity = self.get_identity()?;
-        let storage = self.open_storage()?;
-
-        let validator_id = hex::encode(identity.signing_public_key());
-        let deleted = storage.delete_validation(&contact_id, &field_id, &validator_id)?;
-
-        Ok(deleted)
-    }
-
-    /// List all validations you have made.
-    ///
-    /// Returns a list of all fields you have validated, sorted by
-    /// validation timestamp (most recent first).
-    pub fn list_my_validations(&self) -> Result<Vec<MobileFieldValidation>, MobileError> {
-        let identity = self.get_identity()?;
-        let storage = self.open_storage()?;
-
-        let validator_id = hex::encode(identity.signing_public_key());
-        let validations = storage.load_validations_by_validator(&validator_id)?;
-
-        Ok(validations
-            .iter()
-            .map(MobileFieldValidation::from)
-            .collect())
-    }
-
-    /// Check if you have validated a specific field.
-    pub fn has_validated_field(
-        &self,
-        contact_id: String,
-        field_id: String,
-    ) -> Result<bool, MobileError> {
-        let identity = self.get_identity()?;
-        let storage = self.open_storage()?;
-
-        let validator_id = hex::encode(identity.signing_public_key());
-        let validated = storage.has_validated(&contact_id, &field_id, &validator_id)?;
-
-        Ok(validated)
-    }
-
-    /// Get the validation count for a field (quick check without full status).
-    pub fn get_field_validation_count(
-        &self,
-        contact_id: String,
-        field_id: String,
-    ) -> Result<u32, MobileError> {
-        let storage = self.open_storage()?;
-        let count = storage.count_validations_for_field(&contact_id, &field_id)?;
-        Ok(count as u32)
     }
 }

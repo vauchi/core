@@ -31,10 +31,7 @@ pub use security::{
     MobileRecoveryProgress, MobileRecoveryVerification, MobileRecoveryVoucher, MobileShredReport,
     MobileShredStatus, MobileShredToken, MobileShredVerification,
 };
-pub use social::{
-    MobileFieldValidation, MobileSocialNetwork, MobileTrustLevel, MobileValidationStatus,
-    MobileVisibilityLabel, MobileVisibilityLabelDetail,
-};
+pub use social::{MobileSocialNetwork, MobileVisibilityLabel, MobileVisibilityLabelDetail};
 pub use ux::{
     MobileAhaMoment, MobileAhaMomentType, MobileDemoContact, MobileDemoContactState, MobileFaqItem,
     MobileHelpCategory, MobileHelpCategoryInfo, MobileLocale, MobileLocaleInfo,

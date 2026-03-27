@@ -492,3 +492,208 @@ fn test_rekey_preserves_audit_log() {
         .unwrap();
     assert_eq!(count, 1);
 }
+
+// === Rekey: personal notes and field notes self-healing ===
+
+// @scenario: security :: Rekey heals plaintext personal notes
+#[test]
+fn test_rekey_heals_plaintext_personal_notes() {
+    let (dir, mut storage) = open_storage();
+    let contact = make_contact("Notes Rekey");
+    storage.save_contact(&contact).unwrap();
+    let contact_id = contact.id().to_string();
+
+    // Write plaintext directly to the DB column, simulating the legacy gap
+    // where callers wrote raw UTF-8 to personal_notes_encrypted.
+    let db_path = dir.path().join("vauchi.db");
+    {
+        let raw_conn = rusqlite::Connection::open(&db_path).unwrap();
+        raw_conn
+            .execute(
+                "UPDATE contacts SET personal_notes_encrypted = ?1 WHERE id = ?2",
+                rusqlite::params!["Met at conference".as_bytes(), &contact_id],
+            )
+            .unwrap();
+    }
+
+    // Rekey should NOT crash — rekey_or_heal detects plaintext, encrypts it.
+    let new_key = SymmetricKey::generate();
+    storage.rekey(new_key).unwrap();
+
+    // Data should be readable after rekey (load decrypts transparently).
+    let loaded = storage.load_personal_notes(&contact_id).unwrap().unwrap();
+    assert_eq!(
+        String::from_utf8(loaded).unwrap(),
+        "Met at conference",
+        "Plaintext notes should survive rekey via self-healing"
+    );
+
+    // Verify the DB column now contains encrypted data (starts with algorithm tag).
+    {
+        let raw_conn = rusqlite::Connection::open(&db_path).unwrap();
+        let raw: Vec<u8> = raw_conn
+            .query_row(
+                "SELECT personal_notes_encrypted FROM contacts WHERE id = ?1",
+                rusqlite::params![&contact_id],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert!(
+            raw[0] == 0x02 || raw[0] == 0x03,
+            "After rekey, DB should contain encrypted data (tag 0x02 or 0x03), got 0x{:02x}",
+            raw[0]
+        );
+    }
+}
+
+// @scenario: security :: Rekey preserves encrypted personal notes
+#[test]
+fn test_rekey_preserves_encrypted_personal_notes() {
+    let (_dir, mut storage) = open_storage();
+    let contact = make_contact("Enc Notes Rekey");
+    storage.save_contact(&contact).unwrap();
+    let contact_id = contact.id().to_string();
+
+    // Write notes through the API (encrypts at storage layer).
+    let note_text = "Properly encrypted note";
+    storage
+        .save_personal_notes(&contact_id, note_text.as_bytes())
+        .unwrap();
+
+    // Rekey
+    let new_key = SymmetricKey::generate();
+    storage.rekey(new_key).unwrap();
+
+    // Data should still be readable.
+    let loaded = storage.load_personal_notes(&contact_id).unwrap().unwrap();
+    assert_eq!(
+        String::from_utf8(loaded).unwrap(),
+        note_text,
+        "Encrypted notes should survive rekey via normal decrypt+re-encrypt"
+    );
+}
+
+// @scenario: security :: Rekey heals plaintext contact field notes
+#[test]
+fn test_rekey_heals_plaintext_field_notes() {
+    let (dir, mut storage) = open_storage();
+    let contact = make_contact("Field Notes Rekey");
+    storage.save_contact(&contact).unwrap();
+    let contact_id = contact.id().to_string();
+    let field_id = "email-1";
+
+    // Write plaintext directly to the DB, simulating the legacy gap.
+    let db_path = dir.path().join("vauchi.db");
+    {
+        let raw_conn = rusqlite::Connection::open(&db_path).unwrap();
+        raw_conn
+            .execute(
+                "INSERT INTO contact_field_notes (contact_id, field_id, note_encrypted, updated_at) VALUES (?1, ?2, ?3, ?4)",
+                rusqlite::params![&contact_id, field_id, "work email".as_bytes(), 1000i64],
+            )
+            .unwrap();
+    }
+
+    // Rekey should NOT crash.
+    let new_key = SymmetricKey::generate();
+    storage.rekey(new_key).unwrap();
+
+    // Data should be readable after rekey.
+    let loaded = storage.load_contact_field_notes(&contact_id).unwrap();
+    assert_eq!(loaded.len(), 1, "Should have one field note");
+    assert_eq!(
+        String::from_utf8(loaded[field_id].clone()).unwrap(),
+        "work email",
+        "Plaintext field notes should survive rekey via self-healing"
+    );
+
+    // Verify the DB column now contains encrypted data.
+    {
+        let raw_conn = rusqlite::Connection::open(&db_path).unwrap();
+        let raw: Vec<u8> = raw_conn
+            .query_row(
+                "SELECT note_encrypted FROM contact_field_notes WHERE contact_id = ?1 AND field_id = ?2",
+                rusqlite::params![&contact_id, field_id],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert!(
+            raw[0] == 0x02 || raw[0] == 0x03,
+            "After rekey, field note should be encrypted (tag 0x02 or 0x03), got 0x{:02x}",
+            raw[0]
+        );
+    }
+}
+
+// @scenario: security :: Rekey preserves encrypted contact field notes
+#[test]
+fn test_rekey_preserves_encrypted_field_notes() {
+    let (_dir, mut storage) = open_storage();
+    let contact = make_contact("Enc Field Rekey");
+    storage.save_contact(&contact).unwrap();
+    let contact_id = contact.id().to_string();
+    let field_id = "phone-1";
+
+    // Write notes through the API (encrypts at storage layer).
+    storage
+        .save_contact_field_note(&contact_id, field_id, b"personal phone")
+        .unwrap();
+
+    // Rekey
+    let new_key = SymmetricKey::generate();
+    storage.rekey(new_key).unwrap();
+
+    // Data should still be readable.
+    let loaded = storage.load_contact_field_notes(&contact_id).unwrap();
+    assert_eq!(
+        String::from_utf8(loaded[field_id].clone()).unwrap(),
+        "personal phone",
+        "Encrypted field notes should survive rekey via normal decrypt+re-encrypt"
+    );
+}
+
+// @scenario: security :: Notes stored at rest are encrypted
+#[test]
+fn test_notes_stored_encrypted_at_rest() {
+    let (dir, storage) = open_storage();
+    let contact = make_contact("AtRest Test");
+    storage.save_contact(&contact).unwrap();
+    let contact_id = contact.id().to_string();
+
+    // Save via API
+    storage
+        .save_personal_notes(&contact_id, b"secret note")
+        .unwrap();
+    storage
+        .save_contact_field_note(&contact_id, "f1", b"field secret")
+        .unwrap();
+    drop(storage);
+
+    // Open raw DB — plaintext should NOT be visible.
+    let db_path = dir.path().join("vauchi.db");
+    let raw_conn = rusqlite::Connection::open(&db_path).unwrap();
+
+    let raw_notes: Vec<u8> = raw_conn
+        .query_row(
+            "SELECT personal_notes_encrypted FROM contacts WHERE id = ?1",
+            rusqlite::params![&contact_id],
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert_ne!(
+        raw_notes, b"secret note",
+        "Personal notes must be encrypted at rest, not plaintext"
+    );
+
+    let raw_field: Vec<u8> = raw_conn
+        .query_row(
+            "SELECT note_encrypted FROM contact_field_notes WHERE contact_id = ?1",
+            rusqlite::params![&contact_id],
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert_ne!(
+        raw_field, b"field secret",
+        "Field notes must be encrypted at rest, not plaintext"
+    );
+}

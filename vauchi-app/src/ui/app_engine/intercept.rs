@@ -244,10 +244,9 @@ impl AppEngine {
         } = action
             && component_id == "personal_note"
         {
-            // TODO(security): personal_notes_encrypted column stores raw UTF-8, not encrypted data.
-            // This is a pre-existing gap from migration V4 — the column name implies encryption but
-            // no caller encrypts. Fix requires: choose key (SMK), add encrypt/decrypt to API layer,
-            // migrate existing plaintext notes. Filed as separate problem record.
+            // Encryption handled at the storage layer (save_personal_notes encrypts
+            // with the storage encryption key). Legacy plaintext rows are self-healed
+            // on next load+save cycle. See: problems/2026-03-27-notes-encryption-gap.
             if let Err(e) = self
                 .vauchi
                 .save_personal_notes(contact_id, value.as_bytes())

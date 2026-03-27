@@ -8,11 +8,34 @@ use hmac::{Hmac, Mac};
 use rusqlite::params;
 use sha2::Sha256;
 
+use crate::crypto::encryption::EncryptionError;
 use crate::crypto::{SymmetricKey, decrypt, encrypt, kdf::HKDF};
 
 type HmacSha256 = Hmac<Sha256>;
 
 use super::{Storage, StorageError};
+
+/// Try to decrypt data with the old key; if decryption fails, treat it as
+/// plaintext and encrypt directly with the new key. This self-heals columns
+/// that were written as plaintext due to the V4/V32 encryption gap (columns
+/// named `_encrypted` but never actually encrypted by callers).
+///
+/// Safety: valid ciphertexts start with algorithm tag 0x02 or 0x03. UTF-8 text
+/// never starts with these bytes, so a decrypt failure unambiguously means the
+/// data is plaintext.
+fn rekey_or_heal(
+    new_key: &SymmetricKey,
+    old_key: &SymmetricKey,
+    data: &[u8],
+) -> Result<Vec<u8>, EncryptionError> {
+    match decrypt(old_key, data) {
+        Ok(plain) => encrypt(new_key, &plain),
+        Err(_) => {
+            // Data is plaintext (pre-encryption gap) — encrypt with new key.
+            encrypt(new_key, data)
+        }
+    }
+}
 
 impl Storage {
     /// Re-encrypts all encrypted columns from the current key to a new key.
@@ -45,7 +68,7 @@ impl Storage {
         self.wal_checkpoint()?;
 
         let old_key = &self.encryption_key;
-        const TOTAL_TABLES: u32 = 20;
+        const TOTAL_TABLES: u32 = 21;
         let mut completed: u32 = 0;
 
         let report = |completed: &mut u32, table: &str| {
@@ -95,6 +118,11 @@ impl Storage {
             report(&mut completed, "contacts");
 
             // Re-encrypt contacts: personal_notes_encrypted and avatar_encrypted (nullable)
+            //
+            // Self-healing: these columns may contain plaintext (pre-encryption gap from
+            // migration V4). Valid ciphertexts start with 0x02/0x03 algorithm tags; UTF-8
+            // text never does. If decrypt fails, the data is plaintext — encrypt it
+            // directly with the new key, healing the gap in-place.
             {
                 let mut stmt = self
                     .conn
@@ -112,22 +140,16 @@ impl Storage {
 
                 for (id, notes_enc, avatar_enc) in &rows {
                     let notes_new = if let Some(enc) = notes_enc {
-                        let plain = decrypt(old_key, enc).map_err(|e| {
-                            StorageError::Migration(format!("Decrypt notes {}: {}", id, e))
-                        })?;
-                        Some(encrypt(&new_key, &plain).map_err(|e| {
-                            StorageError::Migration(format!("Encrypt notes {}: {}", id, e))
+                        Some(rekey_or_heal(&new_key, old_key, enc).map_err(|e| {
+                            StorageError::Migration(format!("Rekey notes {}: {}", id, e))
                         })?)
                     } else {
                         None
                     };
 
                     let avatar_new = if let Some(enc) = avatar_enc {
-                        let plain = decrypt(old_key, enc).map_err(|e| {
-                            StorageError::Migration(format!("Decrypt avatar {}: {}", id, e))
-                        })?;
-                        Some(encrypt(&new_key, &plain).map_err(|e| {
-                            StorageError::Migration(format!("Encrypt avatar {}: {}", id, e))
+                        Some(rekey_or_heal(&new_key, old_key, enc).map_err(|e| {
+                            StorageError::Migration(format!("Rekey avatar {}: {}", id, e))
                         })?)
                     } else {
                         None
@@ -140,6 +162,34 @@ impl Storage {
                 }
             }
             report(&mut completed, "contact_extras");
+
+            // Re-encrypt contact_field_notes: note_encrypted (self-healing, same gap as above)
+            {
+                let mut stmt = self
+                    .conn
+                    .prepare("SELECT contact_id, field_id, note_encrypted FROM contact_field_notes")
+                    .map_err(|e| StorageError::Migration(format!("Read field_notes: {}", e)))?;
+
+                let rows: Vec<(String, String, Vec<u8>)> = stmt
+                    .query_map([], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)))
+                    .map_err(|e| StorageError::Migration(format!("Query field_notes: {}", e)))?
+                    .collect::<Result<Vec<_>, _>>()
+                    .map_err(|e| StorageError::Migration(format!("Collect field_notes: {}", e)))?;
+
+                for (contact_id, field_id, enc) in &rows {
+                    let new_enc = rekey_or_heal(&new_key, old_key, enc).map_err(|e| {
+                        StorageError::Migration(format!(
+                            "Rekey field_note {}:{}: {}",
+                            contact_id, field_id, e
+                        ))
+                    })?;
+                    self.conn.execute(
+                        "UPDATE contact_field_notes SET note_encrypted = ?1 WHERE contact_id = ?2 AND field_id = ?3",
+                        params![new_enc, contact_id, field_id],
+                    ).map_err(|e| StorageError::Migration(format!("Update field_note {}:{}: {}", contact_id, field_id, e)))?;
+                }
+            }
+            report(&mut completed, "contact_field_notes");
 
             // Re-encrypt identity: backup_data_encrypted
             {

@@ -13,18 +13,19 @@ use rusqlite::params;
 use super::{Storage, StorageError};
 
 impl Storage {
-    /// Saves an encrypted per-field note for a contact.
+    /// Saves a per-field note for a contact, encrypting at the storage layer.
     ///
     /// Inserts or replaces the note for the given `(contact_id, field_id)` pair.
-    /// The caller is responsible for encrypting the note before passing it in.
-    // TODO(security): note_encrypted column accepts raw bytes — callers should encrypt
-    // with the storage material key before calling. Same gap as personal_notes_encrypted.
+    /// The caller passes plaintext bytes; this method encrypts with the storage
+    /// encryption key before writing to the `note_encrypted` column.
     pub fn save_contact_field_note(
         &self,
         contact_id: &str,
         field_id: &str,
-        note_encrypted: &[u8],
+        note: &[u8],
     ) -> Result<(), StorageError> {
+        let encrypted = crate::crypto::encrypt(&self.encryption_key, note)
+            .map_err(|e| StorageError::Migration(format!("Encrypt field note: {}", e)))?;
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .expect("system time before UNIX epoch")
@@ -33,15 +34,17 @@ impl Storage {
             "INSERT OR REPLACE INTO contact_field_notes
              (contact_id, field_id, note_encrypted, updated_at)
              VALUES (?1, ?2, ?3, ?4)",
-            params![contact_id, field_id, note_encrypted, now as i64],
+            params![contact_id, field_id, encrypted, now as i64],
         )?;
         Ok(())
     }
 
-    /// Loads all encrypted per-field notes for a contact.
+    /// Loads all per-field notes for a contact, decrypting at the storage layer.
     ///
-    /// Returns a `HashMap<field_id, note_encrypted>`. Returns an empty map if
+    /// Returns a `HashMap<field_id, plaintext_note>`. Returns an empty map if
     /// the contact has no field notes.
+    /// Self-healing: legacy plaintext rows are returned as-is — the next save
+    /// will encrypt them properly.
     pub fn load_contact_field_notes(
         &self,
         contact_id: &str,
@@ -56,8 +59,10 @@ impl Storage {
         })?;
         let mut map = std::collections::HashMap::new();
         for row in rows {
-            let (field_id, note) = row?;
-            map.insert(field_id, note);
+            let (field_id, encrypted) = row?;
+            let plain =
+                crate::crypto::decrypt(&self.encryption_key, &encrypted).unwrap_or(encrypted); // Legacy plaintext: return as-is
+            map.insert(field_id, plain);
         }
         Ok(map)
     }

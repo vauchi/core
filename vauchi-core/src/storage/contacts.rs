@@ -519,18 +519,16 @@ impl Storage {
 
     // === Personal Notes Operations ===
 
-    /// Saves encrypted personal notes for a contact.
+    /// Saves personal notes for a contact, encrypting at the storage layer.
     ///
-    /// Updates the `personal_notes_encrypted` column for the given contact.
-    /// The caller is responsible for encrypting the notes before passing them in.
-    pub fn save_personal_notes(
-        &self,
-        contact_id: &str,
-        notes_encrypted: &[u8],
-    ) -> Result<(), StorageError> {
+    /// The caller passes plaintext bytes; this method encrypts with the storage
+    /// encryption key before writing to the `personal_notes_encrypted` column.
+    pub fn save_personal_notes(&self, contact_id: &str, notes: &[u8]) -> Result<(), StorageError> {
+        let encrypted = crate::crypto::encrypt(&self.encryption_key, notes)
+            .map_err(|e| StorageError::Migration(format!("Encrypt personal notes: {}", e)))?;
         let rows_affected = self.conn.execute(
             "UPDATE contacts SET personal_notes_encrypted = ?1 WHERE id = ?2",
-            params![notes_encrypted, contact_id],
+            params![encrypted, contact_id],
         )?;
 
         if rows_affected == 0 {
@@ -543,9 +541,11 @@ impl Storage {
         Ok(())
     }
 
-    /// Loads encrypted personal notes for a contact.
+    /// Loads personal notes for a contact, decrypting at the storage layer.
     ///
-    /// Returns `None` if the contact has no personal notes stored.
+    /// Returns decrypted plaintext bytes, or `None` if no notes are stored.
+    /// Self-healing: if the stored data is legacy plaintext (pre-encryption gap),
+    /// returns it as-is — the next save will encrypt it properly.
     pub fn load_personal_notes(&self, contact_id: &str) -> Result<Option<Vec<u8>>, StorageError> {
         let result = self.conn.query_row(
             "SELECT personal_notes_encrypted FROM contacts WHERE id = ?1",
@@ -554,7 +554,12 @@ impl Storage {
         );
 
         match result {
-            Ok(notes) => Ok(notes),
+            Ok(Some(encrypted)) => {
+                let plain =
+                    crate::crypto::decrypt(&self.encryption_key, &encrypted).unwrap_or(encrypted); // Legacy plaintext: return as-is
+                Ok(Some(plain))
+            }
+            Ok(None) => Ok(None),
             Err(rusqlite::Error::QueryReturnedNoRows) => Err(StorageError::NotFound(format!(
                 "Contact not found: {}",
                 contact_id

@@ -165,3 +165,50 @@ proptest! {
         );
     }
 }
+
+// ─── Layer 2: Wall-clock jitter (nightly, run with `just test-slow`) ────
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(10))]
+
+    /// Both sides must finalize despite asymmetric cycle delays.
+    ///
+    /// Simulates fast device (0ms) vs slow device (up to 100ms per cycle).
+    /// Guards against timeout value regressions — if RDYY_BASE_TIMEOUT or
+    /// FINALIZED_GRACE_DURATION are reduced, this test will catch it.
+    ///
+    /// Runs via `just test-slow` or nightly CI. ~10-60s per case.
+    #[test]
+    #[ignore]
+    fn test_exchange_completes_with_asymmetric_delays(
+        alice_ms in 0u64..100,
+        bob_ms in 0u64..100,
+    ) {
+        let alice_payload = vec![0xAA; 200];
+        let bob_payload = vec![0xBB; 200];
+
+        let (alice_state, bob_state) = run_asymmetric_exchange(
+            &alice_payload,
+            &bob_payload,
+            1, // no scan skipping — isolate timing variable
+            1,
+            Some(Duration::from_millis(alice_ms)),
+            Some(Duration::from_millis(bob_ms)),
+        );
+
+        prop_assert!(
+            matches!(alice_state, ProtocolState::Finalized),
+            "Alice did not finalize (delay={}ms), got: {:?}. \
+             If Failed, RDYY timeout values may be too aggressive for \
+             asymmetric device speeds.",
+            alice_ms, alice_state
+        );
+        prop_assert!(
+            matches!(bob_state, ProtocolState::Finalized),
+            "Bob did not finalize (delay={}ms), got: {:?}. \
+             If Failed, RDYY timeout values may be too aggressive for \
+             asymmetric device speeds.",
+            bob_ms, bob_state
+        );
+    }
+}

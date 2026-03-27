@@ -211,7 +211,53 @@ impl Vauchi {
 
     // === Personal Notes Operations ===
 
-    /// Saves encrypted personal notes for a contact.
+    /// Adds or replaces a personal note for a contact.
+    ///
+    /// Encrypts the plaintext note using the contact's shared key.
+    /// Frontends MUST use this instead of calling crypto::encrypt directly.
+    pub fn add_personal_note(&self, contact_id: &str, note_text: &str) -> VauchiResult<()> {
+        use crate::crypto::encrypt;
+
+        let contact = self
+            .storage
+            .load_contact(contact_id)?
+            .ok_or_else(|| VauchiError::ContactNotFound(contact_id.to_string()))?;
+        let shared_key = contact
+            .shared_key()
+            .ok_or_else(|| VauchiError::Configuration("Contact has no shared key".into()))?;
+        let encrypted = encrypt(shared_key, note_text.as_bytes())
+            .map_err(|e| VauchiError::Configuration(format!("Encryption failed: {}", e)))?;
+        self.storage.save_personal_notes(contact_id, &encrypted)?;
+        Ok(())
+    }
+
+    /// Reads the personal note for a contact, decrypting it.
+    ///
+    /// Returns None if no note exists.
+    pub fn read_personal_note(&self, contact_id: &str) -> VauchiResult<Option<String>> {
+        use crate::crypto::decrypt;
+
+        let encrypted = match self.storage.load_personal_notes(contact_id)? {
+            Some(data) => data,
+            None => return Ok(None),
+        };
+        let contact = self
+            .storage
+            .load_contact(contact_id)?
+            .ok_or_else(|| VauchiError::ContactNotFound(contact_id.to_string()))?;
+        let shared_key = contact
+            .shared_key()
+            .ok_or_else(|| VauchiError::Configuration("Contact has no shared key".into()))?;
+        let plaintext = decrypt(shared_key, &encrypted)
+            .map_err(|e| VauchiError::Configuration(format!("Decryption failed: {}", e)))?;
+        Ok(Some(String::from_utf8(plaintext).map_err(|e| {
+            VauchiError::Configuration(format!("Note is not valid UTF-8: {}", e))
+        })?))
+    }
+
+    /// Saves encrypted personal notes for a contact (raw bytes).
+    ///
+    /// Low-level API for sync/migration. Prefer `add_personal_note()`.
     pub fn save_personal_notes(
         &self,
         contact_id: &str,
@@ -222,7 +268,9 @@ impl Vauchi {
         Ok(())
     }
 
-    /// Loads encrypted personal notes for a contact.
+    /// Loads encrypted personal notes for a contact (raw bytes).
+    ///
+    /// Low-level API for sync/migration. Prefer `read_personal_note()`.
     pub fn load_personal_notes(&self, contact_id: &str) -> VauchiResult<Option<Vec<u8>>> {
         Ok(self.storage.load_personal_notes(contact_id)?)
     }

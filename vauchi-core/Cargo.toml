@@ -318,6 +318,10 @@ name = "multistage_proptest"
 required-features = ["testing"]
 
 [[test]]
+name = "multistage_timing_proptest"
+required-features = ["testing"]
+
+[[test]]
 name = "multistage_e2e_tests"
 required-features = ["testing"]
 

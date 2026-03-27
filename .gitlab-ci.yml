@@ -968,6 +968,8 @@ package:sbom:
         for f in dist/*.sbom.json.sha256; do
           cosign sign-blob --yes --key "$COSIGN_KEY_FILE" \
             --bundle "${f}.bundle" "$f"
+          # Ensure bundle is world-readable so downstream Docker jobs can access artifacts
+          chmod 644 "${f}.bundle"
         done
         [[ "$COSIGN_KEY_FILE" != "$COSIGN_KEY" ]] && rm -f "$COSIGN_KEY_FILE"
         echo "SBOMs signed"

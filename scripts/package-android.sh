@@ -202,6 +202,8 @@ if [[ -n "${COSIGN_KEY:-}" ]]; then
         --bundle "$DIST_DIR/vauchi-platform-kotlin-$VERSION.zip.sha256.bundle" \
         "$DIST_DIR/vauchi-platform-kotlin-$VERSION.zip.sha256"
     [[ "$COSIGN_KEY_FILE" != "$COSIGN_KEY" ]] && rm -f "$COSIGN_KEY_FILE"
+    # Ensure bundle is world-readable so downstream Docker jobs can access the artifact
+    chmod 644 "$DIST_DIR/vauchi-platform-kotlin-$VERSION.zip.sha256.bundle"
     echo -e "${GREEN}Checksum signed${NC}"
 elif [[ -n "${CI:-}" ]] && [[ "$VERSION" != dev-* ]]; then
     echo -e "${RED}ERROR: COSIGN_KEY is required in CI for release signing${NC}"

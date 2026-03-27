@@ -72,11 +72,6 @@ pub mod ratchet;
 mod ratchet;
 
 #[cfg(feature = "testing")]
-pub mod validation;
-#[cfg(not(feature = "testing"))]
-mod validation;
-
-#[cfg(feature = "testing")]
 pub mod recovery;
 #[cfg(not(feature = "testing"))]
 mod recovery;

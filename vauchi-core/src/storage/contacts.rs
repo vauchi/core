@@ -589,52 +589,6 @@ impl Storage {
 
     // Contact field notes: see storage/field_notes.rs
 
-    // === Avatar Operations ===
-
-    /// Saves an encrypted avatar for a contact.
-    ///
-    /// Updates the `avatar_encrypted` column for the given contact.
-    /// The caller is responsible for encrypting the avatar before passing it in.
-    pub fn save_avatar(
-        &self,
-        contact_id: &str,
-        avatar_encrypted: &[u8],
-    ) -> Result<(), StorageError> {
-        let rows_affected = self.conn.execute(
-            "UPDATE contacts SET avatar_encrypted = ?1 WHERE id = ?2",
-            params![avatar_encrypted, contact_id],
-        )?;
-
-        if rows_affected == 0 {
-            return Err(StorageError::NotFound(format!(
-                "Contact not found: {}",
-                contact_id
-            )));
-        }
-
-        Ok(())
-    }
-
-    /// Loads an encrypted avatar for a contact.
-    ///
-    /// Returns `None` if the contact has no avatar stored.
-    pub fn load_avatar(&self, contact_id: &str) -> Result<Option<Vec<u8>>, StorageError> {
-        let result = self.conn.query_row(
-            "SELECT avatar_encrypted FROM contacts WHERE id = ?1",
-            params![contact_id],
-            |row| row.get::<_, Option<Vec<u8>>>(0),
-        );
-
-        match result {
-            Ok(avatar) => Ok(avatar),
-            Err(rusqlite::Error::QueryReturnedNoRows) => Err(StorageError::NotFound(format!(
-                "Contact not found: {}",
-                contact_id
-            ))),
-            Err(e) => Err(StorageError::Database(e)),
-        }
-    }
-
     // === Contact Count & Limits ===
 
     /// Counts the total number of contacts in storage.

@@ -603,46 +603,6 @@ fn test_storage_recovery_trusted_persistence() {
 // Coverage gap tests — avatar, contact_limit, delta_version
 // ============================================================
 
-/// Test save and load avatar roundtrip
-// @scenario: contacts_management :: Contact card display
-#[test]
-fn test_save_load_avatar() {
-    let storage = create_test_storage();
-    let contact = create_test_contact("Alice");
-    let contact_id = contact.id().to_string();
-    storage.save_contact(&contact).unwrap();
-
-    // No avatar initially
-    let loaded = storage.load_avatar(&contact_id).unwrap();
-    assert!(loaded.is_none());
-
-    // Save an avatar
-    let avatar_data = b"encrypted-png-data-here";
-    storage.save_avatar(&contact_id, avatar_data).unwrap();
-
-    // Load it back
-    let loaded = storage.load_avatar(&contact_id).unwrap();
-    assert_eq!(loaded.unwrap(), avatar_data);
-}
-
-/// Test save_avatar fails for nonexistent contact
-// @scenario: contacts_management :: Contact card display
-#[test]
-fn test_save_avatar_nonexistent_contact() {
-    let storage = create_test_storage();
-    let result = storage.save_avatar("nonexistent", b"data");
-    assert!(result.is_err(), "expected error");
-}
-
-/// Test load_avatar fails for nonexistent contact
-// @scenario: contacts_management :: Contact card display
-#[test]
-fn test_load_avatar_nonexistent_contact() {
-    let storage = create_test_storage();
-    let result = storage.load_avatar("nonexistent");
-    assert!(result.is_err(), "expected error");
-}
-
 /// Test get_contact_limit returns default 10_000
 // @scenario: contacts_management :: Contact limits
 #[test]

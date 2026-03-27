@@ -9,9 +9,6 @@
 
 mod common;
 
-use std::collections::HashSet;
-use vauchi_core::social::*;
-
 use common::field_validation_helpers::MAX_VALUE_LENGTH;
 
 // =============================================================================
@@ -232,77 +229,6 @@ fn test_cross_field_dependencies_update_isolation() {
         email_field.value(),
         "test@example.com",
         "Email should be unchanged"
-    );
-}
-
-// @scenario: field_validation :: Each field type has independent validation
-#[test]
-fn test_cross_field_validation_status_independent() {
-    // Each field's validation status should be independent
-    let phone_validations: Vec<_> = (0..5)
-        .map(|i| {
-            ProfileValidation::new(
-                "bob:mobile",
-                "+1-555-123-4567",
-                &format!("validator_{}", i),
-                [0u8; 64],
-            )
-        })
-        .collect();
-
-    let email_validations: Vec<_> = (0..2)
-        .map(|i| {
-            ProfileValidation::new(
-                "bob:email",
-                "bob@example.com",
-                &format!("validator_{}", i),
-                [0u8; 64],
-            )
-        })
-        .collect();
-
-    let twitter_validations: Vec<_> = (0..1)
-        .map(|i| {
-            ProfileValidation::new(
-                "bob:twitter",
-                "@bob",
-                &format!("validator_{}", i),
-                [0u8; 64],
-            )
-        })
-        .collect();
-
-    // Each has independent status
-    let phone_status = ValidationStatus::from_validations(
-        &phone_validations,
-        "+1-555-123-4567",
-        None,
-        &HashSet::new(),
-    );
-    // With weighted scoring (no metadata = 0.3 per validator): 5 * 0.3 = 1.5 -> PartialConfidence
-    assert_eq!(
-        phone_status.trust_level,
-        ValidationConfidence::PartialConfidence
-    );
-
-    let email_status = ValidationStatus::from_validations(
-        &email_validations,
-        "bob@example.com",
-        None,
-        &HashSet::new(),
-    );
-    // 2 * 0.3 = 0.6 -> LowConfidence
-    assert_eq!(
-        email_status.trust_level,
-        ValidationConfidence::LowConfidence
-    );
-
-    let twitter_status =
-        ValidationStatus::from_validations(&twitter_validations, "@bob", None, &HashSet::new());
-    // 1 * 0.3 = 0.3 -> LowConfidence
-    assert_eq!(
-        twitter_status.trust_level,
-        ValidationConfidence::LowConfidence
     );
 }
 

@@ -119,8 +119,6 @@ mod proptest_classify {
                     | MessageType::Acknowledgment
                     | MessageType::Handshake
                     | MessageType::IdentityRevoked
-                    | MessageType::ValidationRecord
-                    | MessageType::ValidationRevocation
                     | MessageType::Unknown
             ));
         }

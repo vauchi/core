@@ -568,7 +568,7 @@ impl OnboardingEngine {
                 items: vec![
                     InfoItem {
                         icon: Some("warning".into()),
-                        title: "No account recovery".into(),
+                        title: "No identity recovery".into(),
                         detail: "If you lose your device without a backup, your identity is lost."
                             .into(),
                     },

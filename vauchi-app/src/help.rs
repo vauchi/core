@@ -20,7 +20,7 @@ pub enum HelpCategory {
     GettingStarted,
     /// Privacy and security questions
     Privacy,
-    /// Account and device recovery
+    /// Identity and device recovery
     Recovery,
     /// Contact management
     Contacts,

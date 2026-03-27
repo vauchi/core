@@ -729,7 +729,7 @@ pub enum MobileWidgetConfirmationMode {
 /// - `data_dir`: The app's data directory path (String for UniFFI compat)
 /// - `keychain`: Platform keychain callback for SMK destruction
 ///
-/// **WARNING**: This operation is irreversible and immediate. All account
+/// **WARNING**: This operation is irreversible and immediate. All identity
 /// data in the specified directory will be permanently destroyed.
 #[uniffi::export]
 pub fn widget_panic_shred(
@@ -747,7 +747,7 @@ pub fn widget_panic_shred(
 
 // === Revocation Sender ===
 
-/// Sends account revocation messages to contacts via the relay.
+/// Sends identity revocation messages to contacts via the relay.
 ///
 /// Opens a one-shot WebSocket connection per call and sends
 /// the revocation as `SimplePayload::IdentityRevoked`.
@@ -1359,7 +1359,7 @@ mod tests {
         assert!(parsed["settings"].is_object());
     }
 
-    // @scenario: privacy_compliance:User schedules account deletion
+    // @scenario: privacy_compliance:User schedules identity deletion
     #[test]
     fn test_schedule_cancel_deletion() {
         let (wb, _dir) = create_test_instance();
@@ -1370,13 +1370,13 @@ mod tests {
         assert_eq!(info.state, MobileDeletionState::None);
 
         // Schedule deletion
-        let info = wb.schedule_account_deletion().unwrap();
+        let info = wb.schedule_identity_deletion().unwrap();
         assert_eq!(info.state, MobileDeletionState::Scheduled);
         assert!(info.scheduled_at > 0);
         assert!(info.execute_at > info.scheduled_at);
 
         // Cancel deletion
-        wb.cancel_account_deletion().unwrap();
+        wb.cancel_identity_deletion().unwrap();
         let info = wb.get_deletion_state().unwrap();
         assert_eq!(info.state, MobileDeletionState::None);
     }

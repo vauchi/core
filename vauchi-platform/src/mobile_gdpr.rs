@@ -33,8 +33,8 @@ impl VauchiPlatform {
         })
     }
 
-    /// Schedule account deletion with 7-day grace period.
-    pub fn schedule_account_deletion(&self) -> Result<MobileDeletionInfo, MobileError> {
+    /// Schedule identity deletion with 7-day grace period.
+    pub fn schedule_identity_deletion(&self) -> Result<MobileDeletionInfo, MobileError> {
         let storage = self.open_storage()?;
         let manager = vauchi_core::api::DeletionManager::new(&storage);
         manager
@@ -47,8 +47,8 @@ impl VauchiPlatform {
         Ok(MobileDeletionInfo::from(&state))
     }
 
-    /// Cancel a scheduled account deletion.
-    pub fn cancel_account_deletion(&self) -> Result<(), MobileError> {
+    /// Cancel a scheduled identity deletion.
+    pub fn cancel_identity_deletion(&self) -> Result<(), MobileError> {
         let storage = self.open_storage()?;
         let manager = vauchi_core::api::DeletionManager::new(&storage);
         manager
@@ -57,12 +57,12 @@ impl VauchiPlatform {
         Ok(())
     }
 
-    /// Execute account deletion (only after grace period).
+    /// Execute identity deletion (only after grace period).
     ///
     /// Generates revocation messages for all contacts and shreds CEKs.
     /// Returns the number of revocation messages generated (caller should
     /// arrange relay delivery).
-    pub fn execute_account_deletion(&self) -> Result<u32, MobileError> {
+    pub fn execute_identity_deletion(&self) -> Result<u32, MobileError> {
         let storage = self.open_storage()?;
         let identity = self.get_identity()?;
         let manager = vauchi_core::api::DeletionManager::new(&storage);
@@ -133,7 +133,7 @@ impl VauchiPlatform {
     /// Requires the grace period to have elapsed. Destroys all key material,
     /// secure-deletes the database, and removes all local data.
     ///
-    /// **WARNING**: This operation is irreversible. All account data will be
+    /// **WARNING**: This operation is irreversible. All identity data will be
     /// permanently destroyed.
     pub fn hard_shred(&self, token: MobileShredToken) -> Result<MobileShredReport, MobileError> {
         let storage = self.open_storage()?;

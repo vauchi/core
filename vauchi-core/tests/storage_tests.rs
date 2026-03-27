@@ -600,7 +600,7 @@ fn test_storage_recovery_trusted_persistence() {
 }
 
 // ============================================================
-// Coverage gap tests — avatar, contact_limit, delta_version
+// Coverage gap tests — contact_limit, delta_version
 // ============================================================
 
 /// Test get_contact_limit returns default 10_000

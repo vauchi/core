@@ -190,6 +190,27 @@ impl AppEngine {
                 let screen = self.navigate_to_internal(AppScreen::Contacts);
                 ActionResult::NavigateTo(screen)
             }
+            AppScreen::ContactVisibility { contact_id } => {
+                if let Some(input) = self.engine.collected_input() {
+                    // Parse "field_id:visible,field_id:hidden,..." and persist
+                    let contact_id = contact_id.clone();
+                    for pair in input.split(',') {
+                        let mut parts = pair.splitn(2, ':');
+                        if let (Some(field_id), Some(state)) = (parts.next(), parts.next()) {
+                            let should_show = state == "visible";
+                            let is_visible = self
+                                .vauchi
+                                .get_effective_field_visibility(&contact_id, field_id)
+                                .unwrap_or(true);
+                            if should_show != is_visible {
+                                let _ = self.vauchi.toggle_field_visibility(&contact_id, field_id);
+                            }
+                        }
+                    }
+                }
+                let screen = self.navigate_back();
+                ActionResult::NavigateTo(screen)
+            }
             AppScreen::EmergencyShred => {
                 let screen = self.navigate_to_internal(AppScreen::Onboarding);
                 ActionResult::NavigateTo(screen)

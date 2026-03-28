@@ -24,6 +24,7 @@ use crate::ui::duress_pin::{DuressConfig, DuressPinEngine};
 use crate::ui::emergency_shred::EmergencyShredEngine;
 use crate::ui::engine::WorkflowEngine;
 use crate::ui::exchange::{ExchangeConfig, ExchangeEngine};
+use crate::ui::fingerprint_verify::FingerprintVerifyEngine;
 use crate::ui::form_dialog::FormDialogEngine;
 use crate::ui::gdpr::GdprEngine;
 use crate::ui::group_detail::GroupDetailEngine;
@@ -474,6 +475,27 @@ impl AppEngine {
             AppScreen::ContactLimit => {
                 let contact_count = vauchi.list_contacts().map(|c| c.len()).unwrap_or(0);
                 Box::new(ContactLimitEngine::new(contact_count, 0))
+            }
+            AppScreen::VerifyFingerprint { contact_id } => {
+                let their_fp = vauchi
+                    .get_contact(contact_id)
+                    .ok()
+                    .flatten()
+                    .map(|c| c.fingerprint())
+                    .unwrap_or_default();
+                let our_fp = vauchi.own_fingerprint().unwrap_or_default();
+                let is_verified = vauchi
+                    .get_contact(contact_id)
+                    .ok()
+                    .flatten()
+                    .map(|c| c.is_fingerprint_verified())
+                    .unwrap_or(false);
+                Box::new(FingerprintVerifyEngine::new(
+                    contact_id,
+                    &their_fp,
+                    &our_fp,
+                    is_verified,
+                ))
             }
         }
     }

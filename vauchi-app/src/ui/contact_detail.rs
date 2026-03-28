@@ -239,6 +239,12 @@ impl ContactDetailEngine {
                     enabled: true,
                 },
                 ScreenAction {
+                    id: "verify_fingerprint".into(),
+                    label: "Verify Fingerprint".into(),
+                    style: ActionStyle::Secondary,
+                    enabled: true,
+                },
+                ScreenAction {
                     id: format!("preview-as:{}", self.contact.id),
                     label: "What do they see?".into(),
                     style: ActionStyle::Secondary,
@@ -294,6 +300,12 @@ impl WorkflowEngine for ContactDetailEngine {
             UserAction::ActionPressed { action_id } if action_id == "edit" => {
                 ActionResult::EditContact {
                     contact_id: self.contact.id.clone(),
+                }
+            }
+            UserAction::ActionPressed { action_id } if action_id == "verify_fingerprint" => {
+                // Routed by AppEngine to AppScreen::VerifyFingerprint
+                ActionResult::OpenContact {
+                    contact_id: format!("verify:{}", self.contact.id),
                 }
             }
             UserAction::ActionPressed { action_id }

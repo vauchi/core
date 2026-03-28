@@ -69,6 +69,9 @@ pub enum AppScreen {
         secondary_fields: Vec<String>,
     },
     ContactLimit,
+    VerifyFingerprint {
+        contact_id: String,
+    },
     More,
 }
 
@@ -106,6 +109,7 @@ impl AppScreen {
             Self::ContactDuplicates => "contact_duplicates",
             Self::ContactMerge { .. } => "contact_merge",
             Self::ContactLimit => "contact_limit",
+            Self::VerifyFingerprint { .. } => "verify_fingerprint",
             Self::More => "more",
         }
     }

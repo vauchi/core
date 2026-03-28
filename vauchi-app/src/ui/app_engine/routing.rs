@@ -211,6 +211,13 @@ impl AppEngine {
                 let screen = self.navigate_back();
                 ActionResult::NavigateTo(screen)
             }
+            AppScreen::VerifyFingerprint { contact_id } => {
+                if !self.engine.was_cancelled() {
+                    let _ = self.vauchi.verify_contact_fingerprint(contact_id);
+                }
+                let screen = self.navigate_back();
+                ActionResult::NavigateTo(screen)
+            }
             AppScreen::EmergencyShred => {
                 let screen = self.navigate_to_internal(AppScreen::Onboarding);
                 ActionResult::NavigateTo(screen)
@@ -405,6 +412,14 @@ impl AppEngine {
             }
             ActionResult::OpenEntryDetail { field_id } => {
                 let screen = self.navigate_to(AppScreen::MyInfoEntryDetail { field_id });
+                ActionResult::NavigateTo(screen)
+            }
+            // ContactDetailEngine uses "verify:{id}" to navigate to fingerprint verification.
+            ActionResult::OpenContact { ref contact_id } if contact_id.starts_with("verify:") => {
+                let real_id = contact_id.strip_prefix("verify:").unwrap().to_string();
+                let screen = self.navigate_to(AppScreen::VerifyFingerprint {
+                    contact_id: real_id,
+                });
                 ActionResult::NavigateTo(screen)
             }
             // MoreEngine reuses OpenContact to signal menu selection.

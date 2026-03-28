@@ -303,9 +303,8 @@ impl WorkflowEngine for ContactDetailEngine {
                 }
             }
             UserAction::ActionPressed { action_id } if action_id == "verify_fingerprint" => {
-                // Routed by AppEngine to AppScreen::VerifyFingerprint
-                ActionResult::OpenContact {
-                    contact_id: format!("verify:{}", self.contact.id),
+                ActionResult::VerifyFingerprint {
+                    contact_id: self.contact.id.clone(),
                 }
             }
             UserAction::ActionPressed { action_id }

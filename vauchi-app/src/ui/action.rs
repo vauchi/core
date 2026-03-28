@@ -110,4 +110,8 @@ pub enum ActionResult {
     },
     /// App layer should navigate to the Contacts screen (contact picker).
     ShowContactPicker,
+    /// App layer should navigate to the fingerprint verification screen.
+    VerifyFingerprint {
+        contact_id: String,
+    },
 }

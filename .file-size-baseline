@@ -15,14 +15,14 @@ vauchi-platform/src/types.rs 1547
 vauchi-platform/src/lib.rs 2177
 
 # EXEMPT — state machine: scattered transitions create protocol bugs
-vauchi-core/src/exchange/session.rs 1443
+vauchi-core/src/exchange/session.rs 1446
 vauchi-core/src/exchange/multistage/session.rs 1175
 
 # EXEMPT — security-critical: crypto + verification belong together
-vauchi-core/src/recovery/mod.rs 1064
+vauchi-core/src/recovery/mod.rs 1067
 
 # EXEMPT — migration ledger: coherence over size, version history must be co-located
-vauchi-core/src/storage/migration.rs 1630
+vauchi-core/src/storage/migration.rs 1631
 
 # SPLIT — Phase 3: extract connection management
 vauchi-core/src/storage/mod.rs 1079

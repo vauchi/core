@@ -1076,7 +1076,10 @@ impl MultiStageSession {
         );
         Some(QrPayload {
             data: qr_data,
-            error_correction: "M".to_string(),
+            // COMBO is the densest QR (~172 chars). Use Q (25% error recovery)
+            // instead of M (15%) — compensates for brightness asymmetry and
+            // camera-screen distance at the scanning margin.
+            error_correction: "Q".to_string(),
             display_duration_ms: jittered(DISPLAY_MS_RDYY),
         })
     }

@@ -832,6 +832,13 @@ fn test_complete_shows_only_combo() {
                 "Complete state should show COMBO, got: {}",
                 &qr.data[..4]
             );
+            // COMBO QR uses "Q" error correction for better scan reliability
+            // at high density (172 chars). See: iphone-exchange-completion-delay.
+            assert_eq!(
+                qr.error_correction, "Q",
+                "COMBO QR should use Q (25%) error correction, got {}",
+                qr.error_correction
+            );
         } else {
             break;
         }

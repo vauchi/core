@@ -9,6 +9,7 @@
 //! the Double Ratchet — all within core (ADR-021 compliance).
 
 use vauchi_core::Vauchi;
+use vauchi_core::VauchiError;
 use vauchi_core::exchange::{X3DH, X3DHKeyPair};
 
 /// Helper: create a Vauchi instance with identity.
@@ -107,4 +108,51 @@ fn test_accept_relay_exchange_requires_identity() {
     let result =
         wb.accept_relay_exchange(bob_identity.public_key(), bob_ephemeral.public_key(), "Bob");
     assert!(result.is_err(), "Exchange without identity must fail");
+}
+
+// @scenario: contact_recovery.feature - Relay contacts cannot be recovery-trusted
+//
+// Principle 2: "Trust is earned in person."
+// A contact created via relay exchange has Standard trust (no proximity
+// verification). Granting recovery trust to such a contact would allow
+// an unverified remote party to vouch for identity restoration.
+#[test]
+fn test_relay_contact_cannot_be_recovery_trusted() {
+    let wb = setup_vauchi("Alice");
+
+    let bob_identity = X3DHKeyPair::generate();
+    let bob_ephemeral = X3DHKeyPair::generate();
+
+    let alice_identity = wb.identity().unwrap();
+    let alice_x3dh = alice_identity.x3dh_keypair();
+
+    let (_, bob_ephemeral_pub) = X3DH::initiate(&bob_ephemeral, alice_x3dh.public_key()).unwrap();
+
+    let contact_id = wb
+        .accept_relay_exchange(bob_identity.public_key(), &bob_ephemeral_pub, "Bob")
+        .unwrap();
+
+    // Relay-exchanged contact has Standard trust — no proximity
+    let contact = wb.get_contact(&contact_id).unwrap().unwrap();
+    assert_eq!(
+        contact.trust_level(),
+        vauchi_core::contact::TrustLevel::Standard,
+        "Relay-exchanged contact must have Standard trust"
+    );
+
+    // Attempting to grant recovery trust must fail
+    let result = wb.toggle_recovery_trust(&contact_id);
+    assert!(
+        result.is_err(),
+        "Standard-trust contact must not be grantable recovery trust"
+    );
+    match result.unwrap_err() {
+        VauchiError::InvalidState(msg) => {
+            assert!(
+                msg.contains("trust"),
+                "Error must mention trust requirement: {msg}"
+            );
+        }
+        other => panic!("Expected InvalidState, got: {other:?}"),
+    }
 }

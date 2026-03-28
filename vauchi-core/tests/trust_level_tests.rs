@@ -36,10 +36,24 @@ fn test_recovered_contact_is_cautious() {
 }
 
 #[test]
-fn test_recovered_overrides_verified() {
+fn test_recovered_then_verified_restores_trust() {
+    // Fingerprint re-verification is an in-person act that
+    // clears has_recovered and restores Verified trust.
     let contact = make_contact(|c| {
         c.set_has_recovered(true);
         c.mark_fingerprint_verified().unwrap();
+    });
+    assert_eq!(contact.trust_level(), TrustLevel::Verified);
+}
+
+#[test]
+fn test_recovered_without_reverification_stays_cautious() {
+    // Without re-verification, recovered stays Cautious.
+    // set_has_recovered is the raw setter (sync/restore path),
+    // not mark_fingerprint_verified (in-person path).
+    let contact = make_contact(|c| {
+        c.mark_fingerprint_verified().unwrap();
+        c.set_has_recovered(true);
     });
     assert_eq!(contact.trust_level(), TrustLevel::Cautious);
 }

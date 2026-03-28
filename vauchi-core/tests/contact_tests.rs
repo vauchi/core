@@ -6,6 +6,7 @@
 //! Extracted from mod.rs
 
 use std::time::{SystemTime, UNIX_EPOCH};
+use vauchi_core::contact::TrustLevel;
 use vauchi_core::crypto::SymmetricKey;
 use vauchi_core::*;
 
@@ -370,6 +371,41 @@ fn test_contact_trust_for_recovery_rejects_standard_trust() {
         result.is_err(),
         "Standard-trust contact must not be recovery-trusted"
     );
+}
+
+// @scenario: contact_recovery :: Recovered contact trust lifecycle
+//
+// Principle 2: a recovered identity drops to Cautious. Recovery
+// trust is blocked until the user re-verifies the fingerprint
+// in person, which clears the recovered flag and restores
+// Verified trust.
+#[test]
+fn test_recovered_contact_trust_lifecycle() {
+    let mut contact = create_test_contact();
+    contact.mark_fingerprint_verified().unwrap();
+    assert_eq!(contact.trust_level(), TrustLevel::Verified);
+    contact.trust_for_recovery().unwrap();
+
+    // Simulate recovery: trust drops to Cautious
+    contact.untrust_for_recovery().unwrap();
+    let new_key = SymmetricKey::generate();
+    contact.accept_recovery([99u8; 32], new_key).unwrap();
+    assert_eq!(contact.trust_level(), TrustLevel::Cautious);
+
+    // Cautious blocks recovery trust
+    let result = contact.trust_for_recovery();
+    assert!(
+        result.is_err(),
+        "Cautious contact must not be recovery-trusted"
+    );
+
+    // Re-verify fingerprint in person: clears recovered flag
+    contact.mark_fingerprint_verified().unwrap();
+    assert_eq!(contact.trust_level(), TrustLevel::Verified);
+
+    // Now recovery trust works again
+    contact.trust_for_recovery().unwrap();
+    assert!(contact.is_recovery_trusted());
 }
 
 // @scenario: identity_management :: Social recovery setup

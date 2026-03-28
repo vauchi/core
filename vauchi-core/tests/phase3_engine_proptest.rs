@@ -155,7 +155,8 @@ fn validate_result(
         | ActionResult::OpenEntryDetail { .. }
         | ActionResult::ExchangeCommands { .. }
         | ActionResult::PreviewAs { .. }
-        | ActionResult::ShowContactPicker => {}
+        | ActionResult::ShowContactPicker
+        | ActionResult::VerifyFingerprint { .. } => {}
     }
     Ok(())
 }

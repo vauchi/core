@@ -14,13 +14,9 @@ impl Vauchi {
 
     /// Propagates own card update to all contacts.
     ///
-    /// For each contact with an established ratchet:
-    /// 1. Computes delta between old and new card
-    /// 2. Signs delta with our identity
-    /// 3. If contact has CEK: wraps in `CekWrappedPayload` (version 0x02), rotates CEK
-    /// 4. If contact has no CEK: uses legacy format (raw JSON bytes)
-    /// 5. Encrypts with contact's ratchet
-    /// 6. Queues for delivery via relay
+    /// Delegates to `prepare_card_update_for_contact()` for each eligible
+    /// contact, then queues the encrypted result for relay delivery.
+    /// Single crypto path — no duplication.
     ///
     /// Returns the number of contacts queued for update.
     pub fn propagate_card_update(
@@ -28,93 +24,22 @@ impl Vauchi {
         old_card: &ContactCard,
         new_card: &ContactCard,
     ) -> VauchiResult<usize> {
-        use crate::crypto::cek::ContentEncryptionKey;
         use crate::storage::{PendingUpdate, UpdateStatus};
-        use crate::sync::delta::{CardDelta, CekWrappedPayload, VersionedPayload};
-
-        let identity = self
-            .identity
-            .as_ref()
-            .ok_or(VauchiError::IdentityNotInitialized)?;
 
         let contacts = self.storage.list_contacts()?;
         let mut queued = 0;
 
-        for mut contact in contacts {
-            // Skip blocked contacts
-            if contact.is_blocked() {
-                continue;
-            }
+        for contact in contacts {
+            let encrypted =
+                match self.prepare_card_update_for_contact(contact.id(), old_card, new_card) {
+                    Ok(data) => data,
+                    // Expected skips: blocked, no ratchet, empty delta, not exchanged
+                    Err(VauchiError::ContactBlocked(_))
+                    | Err(VauchiError::NotFound(_))
+                    | Err(VauchiError::InvalidState(_)) => continue,
+                    Err(e) => return Err(e),
+                };
 
-            // Skip contacts without ratchet (not yet synced)
-            let (mut ratchet, is_initiator) = match self.storage.load_ratchet_state(contact.id())? {
-                Some(r) => r,
-                None => continue,
-            };
-
-            // Compute delta
-            let delta = CardDelta::compute(old_card, new_card);
-            if delta.is_empty() {
-                continue;
-            }
-
-            // Only exchanged contacts receive card updates
-            let Some(ex) = contact.kind().exchanged_data() else {
-                continue;
-            };
-
-            // Filter delta based on visibility rules for this contact
-            let mut delta = delta.filter_for_contact(contact.id(), &ex.visibility_rules);
-            if delta.is_empty() {
-                continue;
-            }
-
-            // Sign delta with our identity, bound to recipient
-            delta.sign(identity, &ex.public_key);
-
-            // Serialize delta
-            let delta_bytes = serde_json::to_vec(&delta)
-                .map_err(|e| VauchiError::Serialization(e.to_string()))?;
-
-            // Always use CEK format (version 0x02) — process_card_update
-            // rejects legacy payloads. Generate/rotate CEK for every send.
-            let new_cek = ContentEncryptionKey::generate();
-            let cek_ciphertext = new_cek
-                .encrypt(&delta_bytes)
-                .map_err(|e| VauchiError::Crypto(format!("CEK encrypt: {:?}", e)))?;
-            let wrapped = CekWrappedPayload {
-                cek: new_cek.to_bytes(),
-                cek_ciphertext,
-                signature: delta.signature,
-                nonce: delta.nonce,
-            };
-            let payload_bytes = VersionedPayload::encode_cek(&wrapped);
-
-            // Encrypt with ratchet
-            let ratchet_msg = ratchet
-                .encrypt(&payload_bytes)
-                .map_err(|e| VauchiError::Crypto(format!("{:?}", e)))?;
-            let encrypted = serde_json::to_vec(&ratchet_msg)
-                .map_err(|e| VauchiError::Serialization(e.to_string()))?;
-
-            // Save CEK and ratchet state atomically
-            self.storage.begin_transaction()?;
-            let save_result = (|| -> VauchiResult<()> {
-                contact.set_cek(new_cek);
-                self.storage.save_contact(&contact)?;
-                self.storage
-                    .save_ratchet_state(contact.id(), &ratchet, is_initiator)?;
-                Ok(())
-            })();
-            match save_result {
-                Ok(()) => self.storage.commit()?,
-                Err(e) => {
-                    self.storage.rollback();
-                    return Err(e);
-                }
-            }
-
-            // Queue for delivery
             let now = std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .map(|d| d.as_secs())
@@ -139,8 +64,12 @@ impl Vauchi {
 
     /// Prepares an encrypted card update for a single contact.
     ///
-    /// Encapsulates delta computation, signing, CEK wrapping, and ratchet
-    /// encryption — keeping all crypto out of frontend code (ADR-021).
+    /// Single crypto path for card propagation (ADR-021). Handles:
+    /// delta computation, version tracking, signing, CEK wrapping,
+    /// ratchet encryption, and atomic state persistence.
+    ///
+    /// Used directly by CLI for relay transport, and indirectly by
+    /// `propagate_card_update()` for batch queuing.
     ///
     /// Returns the encrypted ciphertext ready for relay delivery.
     /// Returns `Err` if the delta is empty (no changes to send).
@@ -187,6 +116,14 @@ impl Vauchi {
             ));
         }
 
+        // Version tracking for downgrade detection (#42)
+        let next_version = self
+            .storage
+            .last_sent_delta_version(contact_id)
+            .unwrap_or(0)
+            + 1;
+        delta.set_version(next_version);
+
         // Sign delta with our identity, bound to recipient
         let public_key = ex.public_key;
         delta.sign(identity, &public_key);
@@ -221,13 +158,15 @@ impl Vauchi {
         let encrypted = serde_json::to_vec(&ratchet_msg)
             .map_err(|e| VauchiError::Serialization(e.to_string()))?;
 
-        // Save CEK and ratchet state atomically
+        // Save CEK, ratchet state, and sent version atomically
         self.storage.begin_transaction()?;
         let save_result = (|| -> VauchiResult<()> {
             contact.set_cek(new_cek);
             self.storage.save_contact(&contact)?;
             self.storage
                 .save_ratchet_state(contact_id, &ratchet, is_initiator)?;
+            self.storage
+                .record_sent_delta_version(contact_id, next_version)?;
             Ok(())
         })();
         match save_result {

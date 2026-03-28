@@ -150,6 +150,65 @@ impl Vauchi {
         Ok(contact_id)
     }
 
+    /// Accepts an encrypted relay exchange message (ADR-021).
+    ///
+    /// Decrypts the EncryptedExchangeMessage, extracts identity and display
+    /// name, creates the contact, and initializes the Double Ratchet.
+    /// All crypto stays in core — frontends pass opaque bytes.
+    ///
+    /// Returns the new contact ID.
+    pub fn accept_encrypted_relay_exchange(&self, message_bytes: &[u8]) -> VauchiResult<String> {
+        use crate::exchange::EncryptedExchangeMessage;
+
+        let identity = self
+            .identity
+            .as_ref()
+            .ok_or(VauchiError::IdentityNotInitialized)?;
+
+        let encrypted_msg = EncryptedExchangeMessage::from_bytes(message_bytes)
+            .map_err(|e| VauchiError::Serialization(format!("exchange message: {:?}", e)))?;
+
+        let our_x3dh = identity.x3dh_keypair();
+        let (payload, _shared_secret) = encrypted_msg
+            .decrypt(&our_x3dh)
+            .map_err(|e| VauchiError::Crypto(format!("exchange decrypt: {:?}", e)))?;
+
+        self.accept_relay_exchange(
+            &payload.identity_key,
+            &payload.exchange_key,
+            &payload.display_name,
+        )
+    }
+
+    /// Creates an encrypted exchange response message (ADR-021).
+    ///
+    /// Encrypts our identity key and display name for the recipient.
+    /// Frontends call this to get opaque bytes for relay transport.
+    pub fn create_encrypted_exchange_response(
+        &self,
+        recipient_exchange_key: &[u8; 32],
+    ) -> VauchiResult<Vec<u8>> {
+        use crate::exchange::EncryptedExchangeMessage;
+
+        let identity = self
+            .identity
+            .as_ref()
+            .ok_or(VauchiError::IdentityNotInitialized)?;
+
+        let our_x3dh = identity.x3dh_keypair();
+        let (encrypted_msg, _) = EncryptedExchangeMessage::create(
+            &our_x3dh,
+            recipient_exchange_key,
+            identity.signing_public_key(),
+            identity.display_name(),
+        )
+        .map_err(|e| VauchiError::Crypto(format!("exchange encrypt: {:?}", e)))?;
+
+        encrypted_msg
+            .to_bytes()
+            .map_err(|e| VauchiError::Serialization(format!("exchange serialize: {:?}", e)))
+    }
+
     /// Adds a new contact from an exchange.
     pub fn add_contact(&self, contact: Contact) -> VauchiResult<()> {
         let manager = ContactManager::new(&self.storage, self.events.clone());

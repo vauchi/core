@@ -4,7 +4,7 @@
 
 //! Contact and double ratchet operations.
 
-use crate::contact::{Contact, TrustLevel};
+use crate::contact::Contact;
 use crate::crypto::SymmetricKey;
 use crate::crypto::ratchet::DoubleRatchetState;
 
@@ -189,16 +189,6 @@ impl Vauchi {
         }
 
         let new_state = !contact.is_recovery_trusted();
-        if new_state
-            && !matches!(
-                contact.trust_level(),
-                TrustLevel::High | TrustLevel::Verified
-            )
-        {
-            return Err(VauchiError::InvalidState(
-                "Only in-person verified contacts can be trusted for recovery".into(),
-            ));
-        }
         if new_state {
             contact
                 .trust_for_recovery()

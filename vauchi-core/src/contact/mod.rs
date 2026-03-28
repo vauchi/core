@@ -42,6 +42,13 @@ pub enum ContactError {
     /// The operation requires an exchanged contact but was called on an imported one.
     #[error("Operation requires an exchanged contact (with crypto keys)")]
     OperationRequiresExchangedContact,
+
+    /// Recovery trust requires in-person verified contact (High or Verified trust).
+    #[error(
+        "Only in-person verified contacts can be trusted for recovery \
+         (current level: {0:?})"
+    )]
+    InsufficientTrustLevel(TrustLevel),
 }
 
 /// A contact obtained through exchange or import.
@@ -610,8 +617,20 @@ impl Contact {
 
     /// Marks this contact as trusted for recovery.
     ///
-    /// Returns `Err` if called on an imported contact.
+    /// Returns `Err` if called on an imported contact or if
+    /// trust level is below High (not in-person verified).
     pub fn trust_for_recovery(&mut self) -> Result<(), ContactError> {
+        let _data = self
+            .kind
+            .exchanged_data_mut()
+            .ok_or(ContactError::OperationRequiresExchangedContact)?;
+
+        let level = self.trust_level();
+        if !matches!(level, TrustLevel::High | TrustLevel::Verified) {
+            return Err(ContactError::InsufficientTrustLevel(level));
+        }
+
+        // Re-borrow after trust_level() released the immutable ref
         let data = self
             .kind
             .exchanged_data_mut()

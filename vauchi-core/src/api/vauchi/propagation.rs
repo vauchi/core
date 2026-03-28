@@ -166,6 +166,10 @@ impl Vauchi {
             .load_contact(contact_id)?
             .ok_or_else(|| VauchiError::NotFound(format!("contact: {}", contact_id)))?;
 
+        if contact.is_blocked() {
+            return Err(VauchiError::ContactBlocked(contact_id.to_string()));
+        }
+
         // Compute delta
         let delta = CardDelta::compute(old_card, new_card);
         if delta.is_empty() {

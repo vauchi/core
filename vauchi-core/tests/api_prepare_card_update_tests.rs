@@ -138,3 +138,25 @@ fn test_prepare_card_update_empty_delta_returns_error() {
         "Empty delta should return error, not send empty update"
     );
 }
+
+// @scenario: sync.feature - Prepare card update rejects blocked contacts
+#[test]
+fn test_prepare_card_update_rejects_blocked_contact() {
+    let wb = setup_with_card("Alice");
+    let contact_id = exchange_as_initiator(&wb);
+
+    // Block the contact
+    wb.block_contact(&contact_id).unwrap();
+
+    let empty_card = ContactCard::new("Alice");
+    let current_card = wb.storage().load_own_card().unwrap().unwrap();
+    let result = wb.prepare_card_update_for_contact(&contact_id, &empty_card, &current_card);
+
+    assert!(result.is_err(), "Must reject blocked contacts");
+    let err = result.unwrap_err();
+    assert!(
+        format!("{:?}", err).contains("Blocked"),
+        "Error must indicate contact is blocked, got: {:?}",
+        err
+    );
+}

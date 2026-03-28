@@ -352,6 +352,8 @@ fn test_contact_default_not_recovery_trusted() {
 #[test]
 fn test_contact_trust_for_recovery() {
     let mut contact = create_test_contact();
+    // Must be fingerprint-verified (Verified trust) to grant recovery
+    contact.mark_fingerprint_verified().unwrap();
     assert!(!contact.is_recovery_trusted());
 
     contact.trust_for_recovery().unwrap();
@@ -359,10 +361,23 @@ fn test_contact_trust_for_recovery() {
 }
 
 // @scenario: identity_management :: Social recovery setup
+#[test]
+fn test_contact_trust_for_recovery_rejects_standard_trust() {
+    let mut contact = create_test_contact();
+    // Standard trust (no verification) — must be rejected
+    let result = contact.trust_for_recovery();
+    assert!(
+        result.is_err(),
+        "Standard-trust contact must not be recovery-trusted"
+    );
+}
+
+// @scenario: identity_management :: Social recovery setup
 // @scenario: contact_recovery :: Remove recovery trust from contact
 #[test]
 fn test_contact_untrust_for_recovery() {
     let mut contact = create_test_contact();
+    contact.mark_fingerprint_verified().unwrap();
     contact.trust_for_recovery().unwrap();
     assert!(contact.is_recovery_trusted());
 
@@ -414,6 +429,7 @@ fn test_contact_from_sync_data_full_with_recovery_trusted() {
 #[test]
 fn test_recovery_trust_independent_of_blocked_hidden() {
     let mut contact = create_test_contact();
+    contact.mark_fingerprint_verified().unwrap();
 
     // Trust + block
     contact.trust_for_recovery().unwrap();

@@ -453,12 +453,17 @@ impl Contact {
     /// Marks the fingerprint as verified.
     ///
     /// Returns `Err` if called on an imported contact.
+    /// Marks this contact's key fingerprint as manually verified.
+    ///
+    /// Clears `has_recovered` — fingerprint verification is an
+    /// in-person act that re-establishes trust after recovery.
     pub fn mark_fingerprint_verified(&mut self) -> Result<(), ContactError> {
         let data = self
             .kind
             .exchanged_data_mut()
             .ok_or(ContactError::OperationRequiresExchangedContact)?;
         data.fingerprint_verified = true;
+        data.has_recovered = false;
         Ok(())
     }
 
@@ -769,7 +774,11 @@ impl Contact {
             None => return TrustLevel::Standard,
         };
 
-        // Priority 1: Recovery state overrides everything
+        // Priority 1: Recovery state overrides everything.
+        // A recovered identity drops to Cautious until the user
+        // re-verifies the fingerprint in person — which clears
+        // has_recovered via mark_fingerprint_verified().
+        // Principle 2: "trust is earned in person."
         if data.has_recovered {
             return TrustLevel::Cautious;
         }

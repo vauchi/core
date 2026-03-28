@@ -13,16 +13,16 @@ members = [
 ]
 
 [workspace.package]
-version = "0.10.6"
+version = "0.11.0"
 edition = "2024"
 license = "GPL-3.0-or-later"
 repository = "https://gitlab.com/vauchi/core"
 authors = ["Vauchi Contributors"]
 
 [workspace.dependencies]
-vauchi-core = { path = "vauchi-core", version = "0.10.4", default-features = false }
-vauchi-app = { path = "vauchi-app", version = "0.10.4", default-features = false }
-vauchi-protocol = { path = "vauchi-protocol", version = "0.10.4" }
+vauchi-core = { path = "vauchi-core", version = "0.11.0", default-features = false }
+vauchi-app = { path = "vauchi-app", version = "0.11.0", default-features = false }
+vauchi-protocol = { path = "vauchi-protocol", version = "0.11.0" }
 
 # Release profile: optimized for size (mobile binaries)
 [profile.release]

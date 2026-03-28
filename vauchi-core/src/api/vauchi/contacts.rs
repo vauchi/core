@@ -97,6 +97,59 @@ impl Vauchi {
         manager.contact_count()
     }
 
+    /// Accepts an incoming exchange from the relay.
+    ///
+    /// Performs X3DH key agreement, creates the contact, and
+    /// initializes the Double Ratchet — all within core.
+    /// Frontends call this instead of doing X3DH directly.
+    ///
+    /// Returns the created contact's ID.
+    pub fn accept_relay_exchange(
+        &self,
+        identity_key: &[u8; 32],
+        ephemeral_key: &[u8; 32],
+        display_name: &str,
+    ) -> VauchiResult<String> {
+        use crate::exchange::{X3DH, X3DHKeyPair};
+
+        let identity = self
+            .identity
+            .as_ref()
+            .ok_or(VauchiError::IdentityNotInitialized)?;
+
+        // Check if contact already exists
+        let public_id = hex::encode(identity_key);
+        if self.storage.load_contact(&public_id)?.is_some() {
+            return Err(VauchiError::Configuration(format!(
+                "Contact {} already exists",
+                public_id
+            )));
+        }
+
+        // X3DH key agreement as responder
+        let our_x3dh = identity.x3dh_keypair();
+        let shared_secret = X3DH::respond(&our_x3dh, identity_key, ephemeral_key).map_err(|e| {
+            VauchiError::Exchange(crate::exchange::ExchangeError::KeyAgreementFailed(format!(
+                "X3DH failed: {:?}",
+                e
+            )))
+        })?;
+
+        // Create contact
+        let card = crate::ContactCard::new(display_name);
+        let contact = Contact::from_exchange(*identity_key, card, shared_secret.clone());
+        let contact_id = contact.id().to_string();
+
+        let manager = ContactManager::new(&self.storage, self.events.clone());
+        manager.add_contact(contact)?;
+
+        // Initialize Double Ratchet
+        let ratchet_dh = X3DHKeyPair::from_bytes(*our_x3dh.secret_bytes());
+        self.create_ratchet_as_responder(&contact_id, &shared_secret, ratchet_dh)?;
+
+        Ok(contact_id)
+    }
+
     /// Adds a new contact from an exchange.
     pub fn add_contact(&self, contact: Contact) -> VauchiResult<()> {
         let manager = ContactManager::new(&self.storage, self.events.clone());

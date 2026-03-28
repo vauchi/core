@@ -9,7 +9,7 @@
 
 use vauchi_core::contact_card::ContactCard;
 use vauchi_core::exchange::{X3DH, X3DHKeyPair};
-use vauchi_core::{ContactField, FieldType, Vauchi};
+use vauchi_core::{Contact, ContactField, FieldType, SymmetricKey, Vauchi};
 
 /// Helper: create Vauchi with identity and own card fields.
 fn setup_with_card(name: &str) -> Vauchi {
@@ -24,22 +24,39 @@ fn setup_with_card(name: &str) -> Vauchi {
     wb
 }
 
-/// Helper: perform exchange so contact has ratchet.
-fn exchange_with_bob(wb: &Vauchi) -> String {
-    let bob_identity = X3DHKeyPair::generate();
-    let bob_ephemeral = X3DHKeyPair::generate();
+/// Helper: simulate exchange where Alice is the INITIATOR.
+///
+/// The initiator can send first (has sending chain), unlike the
+/// responder who must receive before sending.
+fn exchange_as_initiator(wb: &Vauchi) -> String {
     let alice_identity = wb.identity().unwrap();
     let alice_x3dh = alice_identity.x3dh_keypair();
-    let (_, bob_ephemeral_pub) = X3DH::initiate(&bob_ephemeral, alice_x3dh.public_key()).unwrap();
-    wb.accept_relay_exchange(bob_identity.public_key(), &bob_ephemeral_pub, "Bob")
-        .unwrap()
+
+    // Bob's keys (simulated remote peer)
+    let bob_identity = X3DHKeyPair::generate();
+    let bob_x3dh = X3DHKeyPair::generate();
+
+    // Alice initiates X3DH toward Bob
+    let (shared_secret, _) = X3DH::initiate(&alice_x3dh, bob_x3dh.public_key()).unwrap();
+
+    // Create contact
+    let card = ContactCard::new("Bob");
+    let contact = Contact::from_exchange(*bob_identity.public_key(), card, shared_secret.clone());
+    let contact_id = contact.id().to_string();
+    wb.add_contact(contact).unwrap();
+
+    // Create ratchet as initiator (can send first)
+    wb.create_ratchet_as_initiator(&contact_id, &shared_secret, *bob_x3dh.public_key())
+        .unwrap();
+
+    contact_id
 }
 
 // @scenario: sync.feature - Prepare card update encrypts for contact
 #[test]
 fn test_prepare_card_update_returns_ciphertext() {
     let wb = setup_with_card("Alice");
-    let contact_id = exchange_with_bob(&wb);
+    let contact_id = exchange_as_initiator(&wb);
 
     let empty_card = ContactCard::new("Alice");
     let current_card = wb.storage().load_own_card().unwrap().unwrap();
@@ -55,7 +72,7 @@ fn test_prepare_card_update_returns_ciphertext() {
 #[test]
 fn test_prepare_card_update_advances_ratchet() {
     let wb = setup_with_card("Alice");
-    let contact_id = exchange_with_bob(&wb);
+    let contact_id = exchange_as_initiator(&wb);
 
     let empty_card = ContactCard::new("Alice");
     let current_card = wb.storage().load_own_card().unwrap().unwrap();
@@ -81,11 +98,8 @@ fn test_prepare_card_update_requires_ratchet() {
     wb.create_identity("Alice").unwrap();
 
     // Add contact without exchange (no ratchet)
-    let contact = vauchi_core::Contact::from_exchange(
-        [1u8; 32],
-        ContactCard::new("Bob"),
-        vauchi_core::SymmetricKey::generate(),
-    );
+    let contact =
+        Contact::from_exchange([1u8; 32], ContactCard::new("Bob"), SymmetricKey::generate());
     let contact_id = contact.id().to_string();
     wb.add_contact(contact).unwrap();
 
@@ -113,7 +127,7 @@ fn test_prepare_card_update_requires_identity() {
 #[test]
 fn test_prepare_card_update_empty_delta_returns_error() {
     let wb = setup_with_card("Alice");
-    let contact_id = exchange_with_bob(&wb);
+    let contact_id = exchange_as_initiator(&wb);
 
     // Same card for old and new → empty delta
     let card = wb.storage().load_own_card().unwrap().unwrap();

@@ -140,6 +140,98 @@ impl Vauchi {
         Ok(queued)
     }
 
+    /// Prepares an encrypted card update for a single contact.
+    ///
+    /// Encapsulates delta computation, signing, CEK wrapping, and ratchet
+    /// encryption — keeping all crypto out of frontend code (ADR-021).
+    ///
+    /// Returns the encrypted ciphertext ready for relay delivery.
+    /// Returns `Err` if the delta is empty (no changes to send).
+    pub fn prepare_card_update_for_contact(
+        &self,
+        contact_id: &str,
+        old_card: &ContactCard,
+        new_card: &ContactCard,
+    ) -> VauchiResult<Vec<u8>> {
+        use crate::crypto::cek::ContentEncryptionKey;
+        use crate::sync::delta::{CardDelta, CekWrappedPayload, VersionedPayload};
+
+        let identity = self
+            .identity
+            .as_ref()
+            .ok_or(VauchiError::IdentityNotInitialized)?;
+
+        let mut contact = self
+            .storage
+            .load_contact(contact_id)?
+            .ok_or_else(|| VauchiError::NotFound(format!("contact: {}", contact_id)))?;
+
+        // Compute delta
+        let delta = CardDelta::compute(old_card, new_card);
+        if delta.is_empty() {
+            return Err(VauchiError::InvalidState("empty delta".into()));
+        }
+
+        // Only exchanged contacts have public keys for signing
+        let ex = contact
+            .kind()
+            .exchanged_data()
+            .ok_or_else(|| VauchiError::InvalidState("contact not exchanged".into()))?;
+
+        // Filter delta based on visibility rules
+        let mut delta = delta.filter_for_contact(contact_id, &ex.visibility_rules);
+        if delta.is_empty() {
+            return Err(VauchiError::InvalidState(
+                "empty delta after visibility filter".into(),
+            ));
+        }
+
+        // Sign delta with our identity, bound to recipient
+        let public_key = ex.public_key;
+        delta.sign(identity, &public_key);
+
+        // Serialize delta
+        let delta_bytes =
+            serde_json::to_vec(&delta).map_err(|e| VauchiError::Serialization(e.to_string()))?;
+
+        // Wrap with CEK if contact has one (version 0x02), otherwise legacy
+        let payload_bytes = if contact.cek().is_some() {
+            let new_cek = ContentEncryptionKey::generate();
+            let cek_ciphertext = new_cek
+                .encrypt(&delta_bytes)
+                .map_err(|e| VauchiError::Crypto(format!("CEK encrypt: {:?}", e)))?;
+            let wrapped = CekWrappedPayload {
+                cek: new_cek.to_bytes(),
+                cek_ciphertext,
+                signature: delta.signature,
+                nonce: delta.nonce,
+            };
+            contact.set_cek(new_cek);
+            self.storage.save_contact(&contact)?;
+            VersionedPayload::encode_cek(&wrapped)
+        } else {
+            delta_bytes
+        };
+
+        // Load ratchet and encrypt
+        let (mut ratchet, is_initiator) = self
+            .storage
+            .load_ratchet_state(contact_id)?
+            .ok_or_else(|| VauchiError::NotFound("ratchet state".into()))?;
+
+        let ratchet_msg = ratchet
+            .encrypt(&payload_bytes)
+            .map_err(|e| VauchiError::Crypto(format!("{:?}", e)))?;
+        let encrypted = serde_json::to_vec(&ratchet_msg)
+            .map_err(|e| VauchiError::Serialization(e.to_string()))?;
+
+        // Save updated ratchet state
+        self.storage
+            .save_ratchet_state(contact_id, &ratchet, is_initiator)?;
+
+        Ok(encrypted)
+    }
+
     /// Processes an encrypted card update from a contact.
     ///
     /// 1. Checks revoked_senders tombstone — rejects updates from revoked senders

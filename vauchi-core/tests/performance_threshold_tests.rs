@@ -91,7 +91,12 @@ fn test_query_under_50ms_with_1000_contacts() {
     let results = storage.search_contacts("User 05").unwrap();
     let elapsed = start.elapsed();
 
-    assert!(!results.is_empty(), "Search should return results");
+    // "User 05" matches User 050..User 059, User 050x..User 059x = 100 contacts
+    assert_eq!(
+        results.len(),
+        100,
+        "Search for 'User 05' should match exactly 100 contacts (050-059, 0500-0599)"
+    );
     assert!(
         elapsed < Duration::from_millis(50),
         "Query took {:?}, expected < 50ms",
@@ -272,11 +277,11 @@ fn test_queue_100_pending_updates_under_2s() {
     );
 }
 
-/// 10 concurrent ratchet encryptions complete correctly.
+/// 10 sequential ratchet encrypt/decrypt roundtrips complete under 500ms.
 /// Traces to: features/performance.feature @stress
 // @scenario: performance :: Handle many simultaneous operations
 #[test]
-fn test_concurrent_ratchet_operations() {
+fn test_sequential_ratchet_operations() {
     use vauchi_core::crypto::ratchet::DoubleRatchetState;
     use vauchi_core::exchange::X3DHKeyPair;
 
@@ -305,8 +310,8 @@ fn test_concurrent_ratchet_operations() {
         assert_eq!(result, b"Hello from contact");
     }
     assert!(
-        elapsed < Duration::from_secs(5),
-        "10 ratchet roundtrips took {:?}, expected < 5s",
+        elapsed < Duration::from_millis(500),
+        "10 ratchet roundtrips took {:?}, expected < 500ms",
         elapsed
     );
 }

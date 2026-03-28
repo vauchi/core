@@ -325,8 +325,16 @@ fn test_full_update_propagation() {
         .unwrap();
     let ratchet_msg: vauchi_core::crypto::ratchet::RatchetMessage =
         serde_json::from_slice(&pending[0].payload).unwrap();
-    let delta_bytes = bob_ratchet.decrypt(&ratchet_msg).unwrap();
+    let payload_bytes = bob_ratchet.decrypt(&ratchet_msg).unwrap();
 
+    // Unwrap CEK-wrapped payload (version 0x02)
+    let vp = vauchi_core::sync::delta::VersionedPayload::decode(&payload_bytes).unwrap();
+    let delta_bytes = match vp {
+        vauchi_core::sync::delta::VersionedPayload::CekWrapped(wrapped) => {
+            let cek = vauchi_core::crypto::cek::ContentEncryptionKey::from_bytes(wrapped.cek);
+            cek.decrypt(&wrapped.cek_ciphertext).unwrap()
+        }
+    };
     let delta: vauchi_core::sync::CardDelta = serde_json::from_slice(&delta_bytes).unwrap();
 
     // Apply to Bob's view of Alice

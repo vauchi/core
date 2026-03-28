@@ -258,7 +258,18 @@ fn test_field_modification_and_removal_propagation() {
             .unwrap();
         let ratchet_msg: vauchi_core::crypto::ratchet::RatchetMessage =
             serde_json::from_slice(&pending[0].payload).unwrap();
-        let delta_bytes = ratchet.decrypt(&ratchet_msg).unwrap();
+        let payload_bytes = ratchet.decrypt(&ratchet_msg).unwrap();
+
+        // Payload is CEK-wrapped (version 0x02) — unwrap to get delta
+        use vauchi_core::sync::delta::VersionedPayload;
+        let vp = VersionedPayload::decode(&payload_bytes).unwrap();
+        let delta_bytes = match vp {
+            VersionedPayload::CekWrapped(wrapped) => {
+                use vauchi_core::crypto::cek::ContentEncryptionKey;
+                let cek = ContentEncryptionKey::from_bytes(wrapped.cek);
+                cek.decrypt(&wrapped.cek_ciphertext).unwrap()
+            }
+        };
         let delta: CardDelta = serde_json::from_slice(&delta_bytes).unwrap();
 
         // Verify the delta contains the added field

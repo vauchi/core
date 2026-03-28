@@ -123,11 +123,12 @@ fn test_propagate_with_cek_rotates_cek() {
 }
 
 #[test]
-fn test_propagate_without_cek_still_works() {
-    // Contact without CEK should use legacy format (no regression)
+fn test_propagate_without_cek_generates_one() {
+    // Contact without CEK gets a generated CEK — all updates use
+    // version 0x02 format (process_card_update rejects legacy payloads).
     let (alice, bob_id) = setup_alice_as_sender_to_bob();
 
-    // No CEK set for Bob (legacy contact)
+    // No CEK set for Bob initially
     assert!(alice.storage().load_contact_cek(&bob_id).unwrap().is_none());
 
     let old_card = alice.own_card().unwrap().unwrap();
@@ -141,8 +142,8 @@ fn test_propagate_without_cek_still_works() {
     let queued = alice.propagate_card_update(&old_card, &new_card).unwrap();
     assert_eq!(queued, 1);
 
-    // Should still have no CEK (legacy path doesn't generate one)
-    assert!(alice.storage().load_contact_cek(&bob_id).unwrap().is_none());
+    // CEK must now be set (always-CEK format)
+    assert!(alice.storage().load_contact_cek(&bob_id).unwrap().is_some());
 }
 
 // =============================================================================

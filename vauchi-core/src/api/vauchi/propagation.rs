@@ -76,35 +76,19 @@ impl Vauchi {
             let delta_bytes = serde_json::to_vec(&delta)
                 .map_err(|e| VauchiError::Serialization(e.to_string()))?;
 
-            // Wrap with CEK if contact has one (version 0x02), otherwise legacy
-            let payload_bytes = if contact.cek().is_some() {
-                // Rotate CEK
-                let new_cek = ContentEncryptionKey::generate();
-
-                // Encrypt delta with new CEK
-                let cek_ciphertext = new_cek
-                    .encrypt(&delta_bytes)
-                    .map_err(|e| VauchiError::Crypto(format!("CEK encrypt: {:?}", e)))?;
-
-                // Build wrapped payload
-                let wrapped = CekWrappedPayload {
-                    cek: new_cek.to_bytes(),
-                    cek_ciphertext,
-                    signature: delta.signature,
-                    nonce: delta.nonce,
-                };
-
-                // Update contact with rotated CEK and re-save
-                // (re-encrypts card at rest with new CEK)
-                contact.set_cek(new_cek);
-                self.storage.save_contact(&contact)?;
-
-                // Version-tagged encoding
-                VersionedPayload::encode_cek(&wrapped)
-            } else {
-                // Legacy format: raw delta JSON bytes
-                delta_bytes
+            // Always use CEK format (version 0x02) — process_card_update
+            // rejects legacy payloads. Generate/rotate CEK for every send.
+            let new_cek = ContentEncryptionKey::generate();
+            let cek_ciphertext = new_cek
+                .encrypt(&delta_bytes)
+                .map_err(|e| VauchiError::Crypto(format!("CEK encrypt: {:?}", e)))?;
+            let wrapped = CekWrappedPayload {
+                cek: new_cek.to_bytes(),
+                cek_ciphertext,
+                signature: delta.signature,
+                nonce: delta.nonce,
             };
+            let payload_bytes = VersionedPayload::encode_cek(&wrapped);
 
             // Encrypt with ratchet
             let ratchet_msg = ratchet
@@ -113,9 +97,22 @@ impl Vauchi {
             let encrypted = serde_json::to_vec(&ratchet_msg)
                 .map_err(|e| VauchiError::Serialization(e.to_string()))?;
 
-            // Save updated ratchet state
-            self.storage
-                .save_ratchet_state(contact.id(), &ratchet, is_initiator)?;
+            // Save CEK and ratchet state atomically
+            self.storage.begin_transaction()?;
+            let save_result = (|| -> VauchiResult<()> {
+                contact.set_cek(new_cek);
+                self.storage.save_contact(&contact)?;
+                self.storage
+                    .save_ratchet_state(contact.id(), &ratchet, is_initiator)?;
+                Ok(())
+            })();
+            match save_result {
+                Ok(()) => self.storage.commit()?,
+                Err(e) => {
+                    self.storage.rollback();
+                    return Err(e);
+                }
+            }
 
             // Queue for delivery
             let now = std::time::SystemTime::now()
@@ -198,24 +195,19 @@ impl Vauchi {
         let delta_bytes =
             serde_json::to_vec(&delta).map_err(|e| VauchiError::Serialization(e.to_string()))?;
 
-        // Wrap with CEK if contact has one (version 0x02), otherwise legacy
-        let payload_bytes = if contact.cek().is_some() {
-            let new_cek = ContentEncryptionKey::generate();
-            let cek_ciphertext = new_cek
-                .encrypt(&delta_bytes)
-                .map_err(|e| VauchiError::Crypto(format!("CEK encrypt: {:?}", e)))?;
-            let wrapped = CekWrappedPayload {
-                cek: new_cek.to_bytes(),
-                cek_ciphertext,
-                signature: delta.signature,
-                nonce: delta.nonce,
-            };
-            contact.set_cek(new_cek);
-            self.storage.save_contact(&contact)?;
-            VersionedPayload::encode_cek(&wrapped)
-        } else {
-            delta_bytes
+        // Always use CEK format (version 0x02) — process_card_update rejects
+        // legacy payloads, so contacts without CEK need one generated.
+        let new_cek = ContentEncryptionKey::generate();
+        let cek_ciphertext = new_cek
+            .encrypt(&delta_bytes)
+            .map_err(|e| VauchiError::Crypto(format!("CEK encrypt: {:?}", e)))?;
+        let wrapped = CekWrappedPayload {
+            cek: new_cek.to_bytes(),
+            cek_ciphertext,
+            signature: delta.signature,
+            nonce: delta.nonce,
         };
+        let payload_bytes = VersionedPayload::encode_cek(&wrapped);
 
         // Load ratchet and encrypt
         let (mut ratchet, is_initiator) = self
@@ -229,9 +221,22 @@ impl Vauchi {
         let encrypted = serde_json::to_vec(&ratchet_msg)
             .map_err(|e| VauchiError::Serialization(e.to_string()))?;
 
-        // Save updated ratchet state
-        self.storage
-            .save_ratchet_state(contact_id, &ratchet, is_initiator)?;
+        // Save CEK and ratchet state atomically
+        self.storage.begin_transaction()?;
+        let save_result = (|| -> VauchiResult<()> {
+            contact.set_cek(new_cek);
+            self.storage.save_contact(&contact)?;
+            self.storage
+                .save_ratchet_state(contact_id, &ratchet, is_initiator)?;
+            Ok(())
+        })();
+        match save_result {
+            Ok(()) => self.storage.commit()?,
+            Err(e) => {
+                self.storage.rollback();
+                return Err(e);
+            }
+        }
 
         Ok(encrypted)
     }
@@ -242,7 +247,7 @@ impl Vauchi {
     /// 2. Decrypts the update using the contact's ratchet
     /// 3. Detects payload version:
     ///    - Version 0x02 (CEK-wrapped): extracts CEK, decrypts delta, saves CEK
-    ///    - Version 0x01 or raw JSON (legacy): parses delta directly
+    ///    - Other versions: rejected (legacy raw JSON is no longer supported)
     /// 4. Verifies the signature using the contact's public key
     /// 5. Applies the delta to the contact's card
     ///

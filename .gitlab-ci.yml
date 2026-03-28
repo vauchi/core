@@ -1480,6 +1480,73 @@ update:swift-bindings:
 
       echo "✓ Updated vauchi-platform-swift to $VERSION"
 
+# Update windows/ repo with new CABI DLL version + SHA.
+# Mirrors update:swift-bindings pattern.
+trigger:windows:
+  extends: [.linux-runner, .timeout-quick]
+  stage: trigger
+  interruptible: false
+  needs: [build:cabi-windows]
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/
+    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+-rc\.\d+$/
+  script:
+    - !reference [.cosign-install, script]
+    - |
+      VERSION="${CI_COMMIT_TAG}"
+      CLEAN_VERSION="${VERSION#v}"
+      echo "Updating windows/ CABI version to $CLEAN_VERSION"
+
+      # Read checksum from build artifact
+      DLL_SHA256=$(cat dist/vauchi_cabi.dll.sha256 | tr -d '[:space:]')
+      echo "DLL checksum: $DLL_SHA256"
+
+      # Verify cosign signature before propagating
+      CHECKSUM_FILE="dist/vauchi_cabi.dll.sha256"
+      BUNDLE_FILE="${CHECKSUM_FILE}.bundle"
+      COSIGN_PUB="cosign.pub"
+
+      if [[ ! -f "$BUNDLE_FILE" ]]; then
+        echo "ERROR: cosign bundle not found: $BUNDLE_FILE"
+        exit 1
+      fi
+
+      cosign verify-blob --key "$COSIGN_PUB" --bundle "$BUNDLE_FILE" "$CHECKSUM_FILE" || {
+        echo "ERROR: cosign verification FAILED for CABI DLL"
+        exit 1
+      }
+      echo "✓ Cosign signature verified"
+
+      # Clone windows/ and update cabi-version.json
+      WINDOWS_REPO="https://project-access-token:${PROJECT_ACCESS_TOKEN}@gitlab.com/vauchi/windows.git"
+      git clone --depth 1 "$WINDOWS_REPO" windows-checkout
+      cd windows-checkout
+
+      cat > cabi-version.json << JSONEOF
+      {
+        "version": "$CLEAN_VERSION",
+        "sha256": "$DLL_SHA256",
+        "source_commit": "$CI_COMMIT_SHA"
+      }
+      JSONEOF
+
+      # Sync cosign.pub if it changed
+      if ! diff -q ../cosign.pub cosign.pub >/dev/null 2>&1; then
+        cp ../cosign.pub cosign.pub
+        echo "✓ cosign.pub updated"
+      fi
+
+      git config user.email "ci@vauchi.app"
+      git config user.name "Vauchi CI"
+      git add cabi-version.json cosign.pub
+      git diff --cached --quiet && { echo "No changes to push"; exit 0; }
+      git commit -m "chore: update CABI DLL to $CLEAN_VERSION
+
+      SHA-256: $DLL_SHA256
+      Source: $CI_COMMIT_SHA"
+      git push origin main
+      echo "✓ windows/ updated to CABI $CLEAN_VERSION"
+
 # Trigger consumer apps directly (no intermediary repos)
 trigger:ios:
   stage: trigger

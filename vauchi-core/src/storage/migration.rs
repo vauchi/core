@@ -438,6 +438,11 @@ pub fn all_migrations() -> Vec<Migration> {
             name: "local_groups",
             action: MigrationAction::Sql(MIGRATION_V35_LOCAL_GROUPS),
         },
+        Migration {
+            version: 36,
+            name: "sent_delta_version_tracking",
+            action: MigrationAction::Sql(MIGRATION_V36_SENT_DELTA_VERSION),
+        },
     ]
 }
 
@@ -626,6 +631,15 @@ const MIGRATION_V34_IMPORTED_CONTACTS: &str = "
 /// Creates a table for user-defined local groups. Unlike visibility labels,
 /// local groups have NO outbound sharing semantics — they're purely for the
 /// user's local organization and are never transmitted to contacts.
+/// Migration v36: Add `last_sent_delta_version` column to contacts.
+///
+/// Tracks the highest delta version SENT to each contact,
+/// enabling proper downgrade detection on the receiver side.
+/// Complements `last_delta_version` (which tracks received versions).
+const MIGRATION_V36_SENT_DELTA_VERSION: &str = "
+    ALTER TABLE contacts ADD COLUMN last_sent_delta_version INTEGER DEFAULT 0;
+";
+
 const MIGRATION_V35_LOCAL_GROUPS: &str = "
     CREATE TABLE IF NOT EXISTS local_groups (
         id TEXT PRIMARY KEY,

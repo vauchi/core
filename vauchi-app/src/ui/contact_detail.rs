@@ -47,6 +47,8 @@ pub struct ContactDetailEngine {
     trust_level: String,
     /// Whether this contact is trusted for simplified contact proposals (user-editable).
     proposal_trusted: bool,
+    /// Whether this contact is hidden from the main contact list.
+    is_hidden: bool,
 }
 
 impl ContactDetailEngine {
@@ -61,6 +63,7 @@ impl ContactDetailEngine {
             field_notes: HashMap::new(),
             trust_level: String::new(),
             proposal_trusted: false,
+            is_hidden: false,
         }
     }
 
@@ -80,6 +83,7 @@ impl ContactDetailEngine {
             field_notes: HashMap::new(),
             trust_level: String::new(),
             proposal_trusted: false,
+            is_hidden: false,
         }
     }
 
@@ -94,6 +98,22 @@ impl ContactDetailEngine {
         self.trust_level = trust_level;
         self.proposal_trusted = proposal_trusted;
         self
+    }
+
+    /// Attach hidden state.
+    pub fn with_hidden(mut self, is_hidden: bool) -> Self {
+        self.is_hidden = is_hidden;
+        self
+    }
+
+    /// Toggles hidden state in-memory. Callers must persist via Vauchi.
+    pub fn toggle_hidden(&mut self) {
+        self.is_hidden = !self.is_hidden;
+    }
+
+    /// Returns the current hidden state.
+    pub fn is_hidden(&self) -> bool {
+        self.is_hidden
     }
 
     /// Returns the current proposal_trusted flag.
@@ -247,6 +267,16 @@ impl ContactDetailEngine {
                 ScreenAction {
                     id: format!("preview-as:{}", self.contact.id),
                     label: "What do they see?".into(),
+                    style: ActionStyle::Secondary,
+                    enabled: true,
+                },
+                ScreenAction {
+                    id: "toggle_hidden".into(),
+                    label: if self.is_hidden {
+                        "Unhide contact".into()
+                    } else {
+                        "Hide contact".into()
+                    },
                     style: ActionStyle::Secondary,
                     enabled: true,
                 },

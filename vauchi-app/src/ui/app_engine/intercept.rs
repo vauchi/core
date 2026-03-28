@@ -352,6 +352,49 @@ impl AppEngine {
             })
     }
 
+    /// Intercept hide/unhide toggle on ContactDetail and persist to storage.
+    pub(super) fn intercept_hide_toggle(
+        &mut self,
+        contact_id: &str,
+        action: &UserAction,
+    ) -> Option<ActionResult> {
+        let UserAction::ActionPressed { action_id } = action else {
+            return None;
+        };
+        if action_id != "toggle_hidden" {
+            return None;
+        }
+
+        let is_hidden = self
+            .engine
+            .as_any()
+            .and_then(|a| a.downcast_ref::<ContactDetailEngine>())
+            .map(|e| e.is_hidden())
+            .unwrap_or(false);
+
+        if is_hidden {
+            let _ = self.vauchi.unhide_contact(contact_id);
+        } else {
+            let _ = self.vauchi.hide_contact(contact_id);
+        }
+
+        self.engine
+            .as_any_mut()
+            .and_then(|a| a.downcast_mut::<ContactDetailEngine>())
+            .map(|engine| {
+                engine.toggle_hidden();
+                let message = if engine.is_hidden() {
+                    "Contact hidden"
+                } else {
+                    "Contact unhidden"
+                };
+                ActionResult::ShowToast {
+                    message: message.into(),
+                    undo_action_id: None,
+                }
+            })
+    }
+
     /// Handle undo actions (field delete restoration).
     pub(super) fn handle_undo(&mut self, action: &UserAction) -> Option<ActionResult> {
         if let UserAction::UndoPressed { action_id } = action

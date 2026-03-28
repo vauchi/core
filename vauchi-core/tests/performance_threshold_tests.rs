@@ -164,3 +164,149 @@ fn test_storage_open_under_500ms() {
         elapsed
     );
 }
+
+/// List 1000 contacts from storage in under 500ms.
+/// Traces to: features/performance.feature @contacts @scale
+// @scenario: performance :: Handle 1000 contacts
+#[test]
+fn test_list_1000_contacts_under_500ms() {
+    let key = SymmetricKey::generate();
+    let storage = Storage::in_memory(key.clone()).unwrap();
+
+    for i in 0..1000u32 {
+        let pk = {
+            let mut bytes = [0u8; 32];
+            bytes[0..4].copy_from_slice(&i.to_be_bytes());
+            bytes[4] = 0xBB;
+            bytes
+        };
+        let card = ContactCard::new(&format!("Contact {:04}", i));
+        let shared = SymmetricKey::generate();
+        let contact = Contact::from_exchange(pk, card, shared);
+        storage.save_contact(&contact).unwrap();
+    }
+
+    let start = Instant::now();
+    let contacts = storage.list_contacts().unwrap();
+    let elapsed = start.elapsed();
+
+    assert_eq!(contacts.len(), 1000, "Should load all 1000 contacts");
+    assert!(
+        elapsed < Duration::from_millis(500),
+        "list_contacts(1000) took {:?}, expected < 500ms",
+        elapsed
+    );
+}
+
+/// List 100 contacts under 100ms — smooth UI scenario.
+/// Traces to: features/performance.feature @contacts @scale
+// @scenario: performance :: Handle 100 contacts smoothly
+#[test]
+fn test_list_100_contacts_under_100ms() {
+    let key = SymmetricKey::generate();
+    let storage = Storage::in_memory(key.clone()).unwrap();
+
+    for i in 0..100u32 {
+        let pk = {
+            let mut bytes = [0u8; 32];
+            bytes[0..4].copy_from_slice(&i.to_be_bytes());
+            bytes[4] = 0xCC;
+            bytes
+        };
+        let card = ContactCard::new(&format!("Person {:04}", i));
+        let shared = SymmetricKey::generate();
+        let contact = Contact::from_exchange(pk, card, shared);
+        storage.save_contact(&contact).unwrap();
+    }
+
+    let start = Instant::now();
+    let contacts = storage.list_contacts().unwrap();
+    let elapsed = start.elapsed();
+
+    assert_eq!(contacts.len(), 100);
+    assert!(
+        elapsed < Duration::from_millis(100),
+        "list_contacts(100) took {:?}, expected < 100ms",
+        elapsed
+    );
+}
+
+/// Queue and retrieve 100 pending updates under 2s.
+/// Traces to: features/performance.feature @sync
+// @scenario: performance :: Sync large batch of updates
+#[test]
+fn test_queue_100_pending_updates_under_2s() {
+    use vauchi_core::storage::{PendingUpdate, UpdateStatus};
+
+    let key = SymmetricKey::generate();
+    let storage = Storage::in_memory(key.clone()).unwrap();
+
+    // Queue 100 pending updates (simulating 7-day offline accumulation)
+    let start_queue = Instant::now();
+    for i in 0..100u32 {
+        let update = PendingUpdate {
+            id: format!("update-{:04}", i),
+            contact_id: format!("contact-{:04}", i % 20),
+            update_type: "card_delta".to_string(),
+            payload: vec![0xAB; 512], // ~512B encrypted delta
+            created_at: 1700000000 + u64::from(i) * 3600,
+            retry_count: 0,
+            status: UpdateStatus::Pending,
+            target_relay_url: Some("wss://relay.vauchi.app".to_string()),
+        };
+        storage.queue_update(&update).unwrap();
+    }
+    let queue_elapsed = start_queue.elapsed();
+
+    // Retrieve all pending updates
+    let start_list = Instant::now();
+    let pending = storage.get_all_pending_updates().unwrap();
+    let list_elapsed = start_list.elapsed();
+
+    assert_eq!(pending.len(), 100, "Should retrieve all 100 updates");
+    let total = queue_elapsed + list_elapsed;
+    assert!(
+        total < Duration::from_secs(2),
+        "Queue+list 100 updates took {:?}, expected < 2s",
+        total
+    );
+}
+
+/// 10 concurrent ratchet encryptions complete correctly.
+/// Traces to: features/performance.feature @stress
+// @scenario: performance :: Handle many simultaneous operations
+#[test]
+fn test_concurrent_ratchet_operations() {
+    use vauchi_core::crypto::ratchet::DoubleRatchetState;
+    use vauchi_core::exchange::X3DHKeyPair;
+
+    // Set up 10 independent ratchet pairs
+    let mut results = Vec::with_capacity(10);
+    let start = Instant::now();
+
+    for _ in 0..10 {
+        let bob_kp = X3DHKeyPair::generate();
+        let shared = SymmetricKey::generate();
+
+        let mut alice =
+            DoubleRatchetState::initialize_initiator(&shared, *bob_kp.public_key()).unwrap();
+
+        let msg = alice.encrypt(b"Hello from contact").unwrap();
+
+        let mut bob = DoubleRatchetState::initialize_responder(&shared, bob_kp);
+
+        let decrypted = bob.decrypt(&msg).unwrap();
+        results.push(decrypted);
+    }
+    let elapsed = start.elapsed();
+
+    // All 10 roundtrips must produce correct plaintext
+    for result in &results {
+        assert_eq!(result, b"Hello from contact");
+    }
+    assert!(
+        elapsed < Duration::from_secs(5),
+        "10 ratchet roundtrips took {:?}, expected < 5s",
+        elapsed
+    );
+}

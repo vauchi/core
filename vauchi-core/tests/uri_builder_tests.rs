@@ -117,123 +117,37 @@ fn test_website_to_action_returns_open_url() {
 // ============================================================
 
 // @scenario: contact_actions :: Tap social media opens profile
-#[test]
-fn test_social_twitter_generates_profile_url() {
-    let field = ContactField::new(FieldType::Social, "Twitter", "@bobsmith");
-    let uri = field.to_uri();
-    assert_eq!(uri, Some("https://twitter.com/bobsmith".to_string()));
-}
-
-// @scenario: contact_actions :: Tap social media opens profile
-#[test]
-fn test_social_twitter_without_at_sign() {
-    let field = ContactField::new(FieldType::Social, "Twitter", "bobsmith");
-    let uri = field.to_uri();
-    assert_eq!(uri, Some("https://twitter.com/bobsmith".to_string()));
-}
-
-// @scenario: contact_actions :: Tap social media opens profile
-#[test]
-fn test_social_github_generates_profile_url() {
-    let field = ContactField::new(FieldType::Social, "GitHub", "octocat");
-    let uri = field.to_uri();
-    assert_eq!(uri, Some("https://github.com/octocat".to_string()));
-}
-
-// @scenario: contact_actions :: Tap social media opens profile
-#[test]
-fn test_social_linkedin_generates_profile_url() {
-    let field = ContactField::new(FieldType::Social, "LinkedIn", "in/bobsmith");
-    let uri = field.to_uri();
-    assert_eq!(uri, Some("https://linkedin.com/in/bobsmith".to_string()));
-}
-
-// @scenario: contact_actions :: Tap social media opens profile
-#[test]
-fn test_social_instagram_generates_profile_url() {
-    let field = ContactField::new(FieldType::Social, "Instagram", "bob.smith");
-    let uri = field.to_uri();
-    assert_eq!(uri, Some("https://instagram.com/bob.smith".to_string()));
-}
-
-// @scenario: contact_actions :: Tap social media opens profile
-#[test]
-fn test_social_facebook_generates_profile_url() {
-    let field = ContactField::new(FieldType::Social, "Facebook", "bob.smith.123");
-    let uri = field.to_uri();
-    assert_eq!(uri, Some("https://facebook.com/bob.smith.123".to_string()));
-}
-
-// ---- Registry-backed social networks (SP-20 Phase 1) ----
-// These networks are in the SocialNetworkRegistry but were previously
-// not supported by the hardcoded social_url_template() function.
-
-// @scenario: contact_actions :: Tap social media opens profile
-#[test]
-fn test_social_twitch_generates_profile_url() {
-    let field = ContactField::new(FieldType::Social, "Twitch", "streamer42");
-    let uri = field.to_uri();
-    assert_eq!(uri, Some("https://twitch.tv/streamer42".to_string()));
-}
-
-// @scenario: contact_actions :: Tap social media opens profile
-#[test]
-fn test_social_gitlab_generates_profile_url() {
-    let field = ContactField::new(FieldType::Social, "GitLab", "devuser");
-    let uri = field.to_uri();
-    assert_eq!(uri, Some("https://gitlab.com/devuser".to_string()));
-}
-
-// @scenario: contact_actions :: Tap social media opens profile
-#[test]
-fn test_social_telegram_generates_profile_url() {
-    let field = ContactField::new(FieldType::Social, "Telegram", "alice");
-    let uri = field.to_uri();
-    assert_eq!(uri, Some("https://t.me/alice".to_string()));
-}
-
-// @scenario: contact_actions :: Tap social media opens profile
-#[test]
-fn test_social_discord_generates_profile_url() {
-    let field = ContactField::new(FieldType::Social, "Discord", "user123");
-    let uri = field.to_uri();
-    assert_eq!(uri, Some("https://discord.com/users/user123".to_string()));
-}
-
-// @scenario: contact_actions :: Tap social media opens profile
-#[test]
-fn test_social_threads_generates_profile_url() {
-    let field = ContactField::new(FieldType::Social, "Threads", "@alice");
-    let uri = field.to_uri();
-    assert_eq!(uri, Some("https://threads.net/@alice".to_string()));
-}
-
-// @scenario: contact_actions :: Tap social media opens profile
-#[test]
-fn test_social_spotify_generates_profile_url() {
-    let field = ContactField::new(FieldType::Social, "Spotify", "musicfan");
+// Parameterized: each case tests (label, username, expected_url).
+#[rstest::rstest]
+#[case("Twitter", "@bobsmith", "https://twitter.com/bobsmith")]
+#[case("Twitter", "bobsmith", "https://twitter.com/bobsmith")]
+#[case("GitHub", "octocat", "https://github.com/octocat")]
+#[case("LinkedIn", "in/bobsmith", "https://linkedin.com/in/bobsmith")]
+#[case("Instagram", "bob.smith", "https://instagram.com/bob.smith")]
+#[case("Facebook", "bob.smith.123", "https://facebook.com/bob.smith.123")]
+#[case("Twitch", "streamer42", "https://twitch.tv/streamer42")]
+#[case("GitLab", "devuser", "https://gitlab.com/devuser")]
+#[case("Telegram", "alice", "https://t.me/alice")]
+#[case("Discord", "user123", "https://discord.com/users/user123")]
+#[case("Threads", "@alice", "https://threads.net/@alice")]
+#[case("Spotify", "musicfan", "https://open.spotify.com/user/musicfan")]
+#[case("X", "@alice", "https://twitter.com/alice")]
+#[case("LinkedIn", "in/johndoe", "https://linkedin.com/in/johndoe")]
+fn test_social_network_generates_profile_url(
+    #[case] label: &str,
+    #[case] username: &str,
+    #[case] expected: &str,
+) {
+    let field = ContactField::new(FieldType::Social, label, username);
     let uri = field.to_uri();
     assert_eq!(
         uri,
-        Some("https://open.spotify.com/user/musicfan".to_string())
+        Some(expected.to_string()),
+        "{} with '{}' should produce '{}'",
+        label,
+        username,
+        expected
     );
-}
-
-// @scenario: contact_actions :: Tap social media opens profile
-#[test]
-fn test_social_x_alias_resolves_to_twitter() {
-    let field = ContactField::new(FieldType::Social, "X", "@alice");
-    let uri = field.to_uri();
-    assert_eq!(uri, Some("https://twitter.com/alice".to_string()));
-}
-
-// @scenario: contact_actions :: Tap social media opens profile
-#[test]
-fn test_social_linkedin_with_in_prefix_no_duplication() {
-    // User enters "in/johndoe" — should not produce "in/in/johndoe"
-    let field = ContactField::new(FieldType::Social, "LinkedIn", "in/johndoe");
-    let uri = field.to_uri();
-    assert_eq!(uri, Some("https://linkedin.com/in/johndoe".to_string()));
 }
 
 #[test]

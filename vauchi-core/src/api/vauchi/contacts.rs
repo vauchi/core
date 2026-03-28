@@ -156,8 +156,12 @@ impl Vauchi {
     /// name, creates the contact, and initializes the Double Ratchet.
     /// All crypto stays in core — frontends pass opaque bytes.
     ///
-    /// Returns the new contact ID.
-    pub fn accept_encrypted_relay_exchange(&self, message_bytes: &[u8]) -> VauchiResult<String> {
+    /// Returns (contact_id, sender_exchange_key) — the exchange key is needed
+    /// by the frontend to send an encrypted response via relay.
+    pub fn accept_encrypted_relay_exchange(
+        &self,
+        message_bytes: &[u8],
+    ) -> VauchiResult<(String, [u8; 32])> {
         use crate::exchange::EncryptedExchangeMessage;
 
         let identity = self
@@ -173,11 +177,14 @@ impl Vauchi {
             .decrypt(&our_x3dh)
             .map_err(|e| VauchiError::Crypto(format!("exchange decrypt: {:?}", e)))?;
 
-        self.accept_relay_exchange(
+        let exchange_key = payload.exchange_key;
+        let contact_id = self.accept_relay_exchange(
             &payload.identity_key,
-            &payload.exchange_key,
+            &exchange_key,
             &payload.display_name,
-        )
+        )?;
+
+        Ok((contact_id, exchange_key))
     }
 
     /// Creates an encrypted exchange response message (ADR-021).

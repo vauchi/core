@@ -34,7 +34,7 @@ fn test_fingerprint_screen_shows_both_fingerprints() {
 
 // @scenario: fingerprint.feature - Confirm match marks contact verified
 #[test]
-fn test_confirm_match_completes() {
+fn test_confirm_match_completes_not_cancelled() {
     let mut engine = FingerprintVerifyEngine::new(
         "contact-123",
         "AB12 CD34 EF56 7890",
@@ -47,6 +47,10 @@ fn test_confirm_match_completes() {
     });
 
     assert_eq!(result, ActionResult::Complete);
+    assert!(
+        !engine.was_cancelled(),
+        "Confirm must NOT set cancelled — routing uses this to call verify_contact_fingerprint"
+    );
 }
 
 // @scenario: fingerprint.feature - Already verified shows status
@@ -68,9 +72,9 @@ fn test_already_verified_shows_status() {
     );
 }
 
-// @scenario: fingerprint.feature - Back navigates away
+// @scenario: fingerprint.feature - Back navigates away without verifying
 #[test]
-fn test_back_completes() {
+fn test_back_completes_with_cancelled() {
     let mut engine = FingerprintVerifyEngine::new(
         "contact-123",
         "AB12 CD34 EF56 7890",
@@ -83,4 +87,8 @@ fn test_back_completes() {
     });
 
     assert_eq!(result, ActionResult::Complete);
+    assert!(
+        engine.was_cancelled(),
+        "Back must set cancelled — routing uses this to skip verify_contact_fingerprint"
+    );
 }

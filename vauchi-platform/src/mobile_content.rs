@@ -152,6 +152,9 @@ impl VauchiPlatform {
                                 .collect(),
                         }
                     }
+                    _ => MobileApplyResult::Error {
+                        error: "unknown apply result".to_string(),
+                    },
                 },
                 Err(e) => MobileApplyResult::Error {
                     error: e.to_string(),

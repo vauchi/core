@@ -9,6 +9,7 @@ use thiserror::Error;
 
 /// State of identity deletion (stored in the database).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum DeletionState {
     /// No deletion scheduled.
     None,
@@ -85,6 +86,7 @@ impl StorageError {
 
 /// Pending update status.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum UpdateStatus {
     Pending,
     Sending,
@@ -109,6 +111,7 @@ pub struct PendingUpdate {
 
 /// Delivery status for tracking message delivery progression.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum DeliveryStatus {
     /// Message queued locally, not yet sent.
     Queued,
@@ -236,6 +239,7 @@ impl Default for OfflineQueue {
 
 /// Delivery status for a specific device.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum DeviceDeliveryStatus {
     /// Message pending delivery to this device.
     Pending,

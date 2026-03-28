@@ -12,6 +12,7 @@ use crate::ui::*;
 /// Which perspective the user is viewing.
 #[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[non_exhaustive]
 pub enum ContactViewMode {
     /// Their shared fields (default — what they share with me).
     TheirInfo,

@@ -265,6 +265,7 @@ impl MobileExchangeSession {
             ExchangeState::AwaitingNfcTap => MobileExchangeState::Idle,
             ExchangeState::AwaitingBleConnection => MobileExchangeState::Idle,
             ExchangeState::AwaitingBleVerification { .. } => MobileExchangeState::Idle,
+            _ => MobileExchangeState::Idle,
         }
     }
 
@@ -521,6 +522,7 @@ impl From<ExchangeCommand> for MobileExchangeCommand {
                 Self::AudioListenForResponse { timeout_ms }
             }
             ExchangeCommand::AudioStop => Self::AudioStop,
+            _ => Self::QrRequestScan,
         }
     }
 }

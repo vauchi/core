@@ -48,6 +48,7 @@ impl SyncStatusEngine {
                 }
             }
             ConnectionState::Disconnected => ("Offline", Status::Failed),
+            _ => ("Unknown", Status::InProgress),
         }
     }
 

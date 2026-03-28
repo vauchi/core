@@ -146,6 +146,7 @@ impl From<vauchi_core::identity::DeviceType> for MobileDeviceType {
             vauchi_core::identity::DeviceType::Watch => MobileDeviceType::Watch,
             vauchi_core::identity::DeviceType::Desktop => MobileDeviceType::Desktop,
             vauchi_core::identity::DeviceType::Unknown => MobileDeviceType::Unknown,
+            _ => MobileDeviceType::Unknown,
         }
     }
 }
@@ -177,6 +178,7 @@ impl From<&vauchi_core::storage::DeliveryStatus> for MobileDeliveryStatus {
             DeliveryStatus::Delivered => MobileDeliveryStatus::Delivered,
             DeliveryStatus::Expired => MobileDeliveryStatus::Expired,
             DeliveryStatus::Failed { .. } => MobileDeliveryStatus::Failed,
+            _ => MobileDeliveryStatus::Queued,
         }
     }
 }
@@ -273,6 +275,7 @@ impl From<&vauchi_core::storage::DeviceDeliveryStatus> for MobileDeviceDeliveryS
             DeviceDeliveryStatus::Stored => MobileDeviceDeliveryStatus::Stored,
             DeviceDeliveryStatus::Delivered => MobileDeviceDeliveryStatus::Delivered,
             DeviceDeliveryStatus::Failed => MobileDeviceDeliveryStatus::Failed,
+            _ => MobileDeviceDeliveryStatus::Pending,
         }
     }
 }

@@ -29,6 +29,7 @@ pub(crate) const CONTACT_BACKUP_VERSION: u8 = 0x01;
 
 /// Error type for contact backup operations.
 #[derive(Debug, Clone, thiserror::Error)]
+#[non_exhaustive]
 pub enum BackupError {
     #[error("Backup encryption failed: {0}")]
     EncryptionFailed(String),

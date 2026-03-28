@@ -30,6 +30,7 @@ pub use crate::types::ExchangeTransport;
 
 /// State of an exchange session.
 #[derive(Debug)]
+#[non_exhaustive]
 pub enum ExchangeState {
     /// Initial state
     Idle,
@@ -70,6 +71,7 @@ pub enum ExchangeState {
 
 /// Events that drive the exchange state machine.
 #[derive(Debug)]
+#[non_exhaustive]
 pub enum ExchangeEvent {
     /// Start a QR exchange (generates our QR with fresh ephemeral).
     StartQR,
@@ -1426,6 +1428,7 @@ impl ExchangePlatformCallbacks for DefaultPlatformCallbacks {
 
 /// Action to take when a duplicate contact is detected.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum DuplicateAction {
     /// Update the existing contact with new information
     Update,

@@ -11,6 +11,7 @@ use serde::{Deserialize, Serialize};
 /// Each variant maps to a logical screen, not a platform-specific view.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[non_exhaustive]
 pub enum ScreenId {
     Onboarding,
     Home,
@@ -36,6 +37,7 @@ pub enum ScreenId {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
+#[non_exhaustive]
 pub enum LogEventKind {
     // --- Camera / QR tuner events ---
     DecodeSuccess {

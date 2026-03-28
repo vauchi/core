@@ -37,6 +37,7 @@ impl Default for AnimatedQrConfig {
 
 /// Progress indicator returned after processing a received frame.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum AnimatedQrProgress {
     /// Some chunks still missing.
     Partial { received: usize, total: usize },
@@ -46,6 +47,7 @@ pub enum AnimatedQrProgress {
 
 /// Errors specific to animated QR framing.
 #[derive(Debug, Error)]
+#[non_exhaustive]
 pub enum AnimatedQrError {
     #[error("malformed frame: {reason}")]
     MalformedFrame { reason: String },

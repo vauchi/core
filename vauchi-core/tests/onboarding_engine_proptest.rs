@@ -497,7 +497,8 @@ proptest! {
                 | ActionResult::ExchangeCommands { .. }
                 | ActionResult::PreviewAs { .. }
                 | ActionResult::ShowContactPicker
-                | ActionResult::VerifyFingerprint { .. } => {
+                | ActionResult::VerifyFingerprint { .. }
+                | _ => {
                     // Valid external navigation/action results
                 }
             }

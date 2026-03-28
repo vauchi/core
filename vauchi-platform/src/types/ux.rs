@@ -48,6 +48,7 @@ impl From<vauchi_core::AhaMomentType> for MobileAhaMomentType {
                 MobileAhaMomentType::ThreeContactsReached
             }
             vauchi_core::AhaMomentType::DeviceLinked => MobileAhaMomentType::DeviceLinked,
+            _ => MobileAhaMomentType::CardCreationComplete,
         }
     }
 }
@@ -174,6 +175,7 @@ impl From<vauchi_core::OnboardingStep> for MobileOnboardingStep {
             }
             vauchi_core::OnboardingStep::BackupPrompt => MobileOnboardingStep::BackupPrompt,
             vauchi_core::OnboardingStep::Ready => MobileOnboardingStep::Ready,
+            _ => MobileOnboardingStep::IdentityCheck,
         }
     }
 }
@@ -251,6 +253,7 @@ impl From<vauchi_app::theme::ThemeMode> for MobileThemeMode {
         match mode {
             vauchi_app::theme::ThemeMode::Light => MobileThemeMode::Light,
             vauchi_app::theme::ThemeMode::Dark => MobileThemeMode::Dark,
+            _ => MobileThemeMode::Light,
         }
     }
 }
@@ -367,6 +370,7 @@ impl From<vauchi_app::i18n::Locale> for MobileLocale {
             vauchi_app::i18n::Locale::French => MobileLocale::French,
             vauchi_app::i18n::Locale::Spanish => MobileLocale::Spanish,
             vauchi_app::i18n::Locale::Italian => MobileLocale::Italian,
+            _ => MobileLocale::English,
         }
     }
 }
@@ -431,6 +435,7 @@ impl From<vauchi_app::help::HelpCategory> for MobileHelpCategory {
             vauchi_app::help::HelpCategory::Contacts => MobileHelpCategory::Contacts,
             vauchi_app::help::HelpCategory::Updates => MobileHelpCategory::Updates,
             vauchi_app::help::HelpCategory::Features => MobileHelpCategory::Features,
+            _ => MobileHelpCategory::GettingStarted,
         }
     }
 }

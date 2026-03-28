@@ -158,6 +158,7 @@ impl ContentFetcher {
 
 /// Errors that can occur during content fetching
 #[derive(Debug, Error)]
+#[non_exhaustive]
 pub enum FetchError {
     /// HTTP error with status code
     #[error("HTTP error: {0}")]

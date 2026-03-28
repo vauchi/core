@@ -19,6 +19,7 @@ const FRESHNESS_THRESHOLD_SECS: u64 = 90 * 24 * 60 * 60; // 90 days
 
 /// Categorization of card freshness.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum FreshnessCategory {
     /// Card updated within the freshness threshold.
     Fresh,

@@ -15,6 +15,7 @@ use super::simple_message::{FRAME_HEADER_SIZE, SimpleEnvelope, SimplePayload};
 /// Represents the type of a relay message determined from the wire format.
 /// Used by clients to route incoming messages to the appropriate handler.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum MessageType {
     /// Encrypted card update (Double Ratchet encrypted payload).
     EncryptedUpdate,

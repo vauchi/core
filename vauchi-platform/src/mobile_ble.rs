@@ -583,6 +583,7 @@ fn map_state(state: &BleHandshakeState) -> MobileBleState {
         BleHandshakeState::Failed { reason } => MobileBleState::Failed {
             error: format!("{reason:?}"),
         },
+        _ => MobileBleState::Connecting,
     }
 }
 

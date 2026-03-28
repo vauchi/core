@@ -12,6 +12,7 @@ use thiserror::Error;
 
 /// Errors that can occur during proximity verification.
 #[derive(Error, Debug)]
+#[non_exhaustive]
 pub enum ProximityError {
     #[error("Proximity verification timed out")]
     Timeout,

@@ -44,6 +44,7 @@ pub struct Migration {
 }
 
 /// The action a migration performs.
+#[non_exhaustive]
 pub enum MigrationAction {
     /// Pure SQL migration.
     Sql(&'static str),

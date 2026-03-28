@@ -17,6 +17,7 @@ use crate::sync::device_sync::DeviceSyncError;
 
 /// Unified error type for Vauchi operations.
 #[derive(Error, Debug)]
+#[non_exhaustive]
 pub enum VauchiError {
     /// Contact card validation failed.
     #[error("validation error: {0}")]

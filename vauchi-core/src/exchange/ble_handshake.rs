@@ -91,6 +91,7 @@ const KEY_ACK_SIZE: usize = 1 + 32 + 32 + 32 + NONCE_SIZE + 32;
 /// Tracks the 4-phase protocol progression from key exchange through
 /// commitment verification to completed card exchange.
 #[derive(Debug)]
+#[non_exhaustive]
 pub enum BleHandshakeState {
     /// Session created, no action taken yet.
     Idle,

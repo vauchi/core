@@ -10,6 +10,7 @@ use zeroize::Zeroize;
 /// Whether the user is creating or restoring a backup.
 #[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[non_exhaustive]
 pub enum BackupMode {
     Create,
     Restore,

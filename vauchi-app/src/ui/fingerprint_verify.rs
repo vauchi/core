@@ -12,6 +12,7 @@ use crate::ui::*;
 
 /// What action the user took on the fingerprint verification screen.
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum VerifyAction {
     /// No action — user pressed Back.
     None,

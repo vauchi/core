@@ -22,6 +22,7 @@ use serde::{Deserialize, Serialize};
 /// [`ExchangeHardwareEvent::HardwareUnavailable`].
 #[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum ExchangeCommand {
     // ── QR ───────────────────────────────────────────────────────────
     /// Display a QR code containing `data`.
@@ -67,6 +68,7 @@ pub enum ExchangeCommand {
 /// asynchronous hardware notifications (e.g., BLE discovery, NFC tap).
 #[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum ExchangeHardwareEvent {
     // ── QR ───────────────────────────────────────────────────────────
     /// The user scanned a QR code containing `data`.
@@ -103,6 +105,7 @@ pub enum ExchangeHardwareEvent {
     HardwareUnavailable { transport: String },
 }
 
+// INLINE_TEST_REQUIRED: serde roundtrip tests need private enum variant access
 #[cfg(test)]
 mod tests {
     use super::*;

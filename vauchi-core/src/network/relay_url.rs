@@ -18,6 +18,7 @@ const MAX_URL_LENGTH: usize = 1024;
 
 /// Errors from relay URL validation.
 #[derive(Error, Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum RelayUrlError {
     #[error("Relay URL is empty")]
     Empty,

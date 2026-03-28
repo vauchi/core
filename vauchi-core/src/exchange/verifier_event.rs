@@ -13,6 +13,7 @@ use serde::{Deserialize, Serialize};
 /// Identifies which proximity verification method is active.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[non_exhaustive]
 pub enum VerifierMethod {
     Ultrasonic,
     AmbientAudio,
@@ -44,6 +45,7 @@ impl VerifierMethod {
 /// - Announce completion with confidence level
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
+#[non_exhaustive]
 pub enum ProximityVerifierEvent {
     /// Waiting for user action before verification can proceed.
     /// e.g., "Hold phones together" for accelerometer.

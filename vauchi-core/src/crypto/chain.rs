@@ -20,6 +20,7 @@ const MAX_SKIP: u32 = 1000;
 
 /// Chain key ratcheting error types.
 #[derive(Error, Debug)]
+#[non_exhaustive]
 pub enum ChainError {
     #[error("Chain generation limit exceeded (max {MAX_CHAIN_GENERATIONS})")]
     GenerationLimitExceeded,

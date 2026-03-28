@@ -37,6 +37,7 @@ pub const PAYLOAD_VERSION_CEK: u8 = 0x02;
 
 /// Delta encoding error types.
 #[derive(Error, Debug)]
+#[non_exhaustive]
 pub enum DeltaError {
     #[error("Version mismatch: expected {expected}, got {actual}")]
     VersionMismatch { expected: u32, actual: u32 },
@@ -87,6 +88,7 @@ pub struct CardDelta {
 
 /// Represents a single field change.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[non_exhaustive]
 pub enum FieldChange {
     /// A new field was added.
     ///
@@ -499,6 +501,7 @@ impl CekWrappedPayload {
 /// The first byte determines the format:
 /// - `0x02`: CEK-wrapped payload (remaining bytes are `CekWrappedPayload`)
 #[derive(Debug)]
+#[non_exhaustive]
 pub enum VersionedPayload {
     /// CEK-wrapped format: contains rotated CEK + CEK-encrypted delta (version 0x02).
     CekWrapped(CekWrappedPayload),

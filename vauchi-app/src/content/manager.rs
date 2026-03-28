@@ -38,6 +38,7 @@ pub type LocaleStrings = HashMap<String, String>;
 
 /// Result of applying content updates
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub enum ApplyResult {
     /// No updates were available
     NoUpdates,
@@ -567,6 +568,7 @@ fn bundled_english() -> LocaleStrings {
 
 /// Errors that can occur with the content manager
 #[derive(Debug, Error)]
+#[non_exhaustive]
 pub enum ContentError {
     /// Cache error
     #[error("Cache error: {0}")]

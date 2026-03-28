@@ -30,6 +30,7 @@ pub struct OwnFieldInfo {
 
 /// View mode for the MyInfo screen.
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum MyInfoViewMode {
     /// List of entries with group info and contact count.
     EntryView,

@@ -9,6 +9,7 @@ use crate::ui::*;
 /// Which aspect of groups is being managed.
 #[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[non_exhaustive]
 pub enum GroupsMode {
     /// Show group membership (which contacts are in each group).
     Members,

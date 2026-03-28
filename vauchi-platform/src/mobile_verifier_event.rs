@@ -27,6 +27,7 @@ impl From<ProximityConfidence> for MobileProximityConfidence {
             ProximityConfidence::Medium => Self::Medium,
             ProximityConfidence::Low => Self::Low,
             ProximityConfidence::Unknown => Self::Unknown,
+            _ => Self::Unknown,
         }
     }
 }
@@ -65,6 +66,7 @@ impl From<VerifierMethod> for MobileVerifierMethod {
             VerifierMethod::ManualConfirmation => Self::ManualConfirmation,
             VerifierMethod::Nfc => Self::Nfc,
             VerifierMethod::Ble => Self::Ble,
+            _ => Self::ManualConfirmation,
         }
     }
 }
@@ -146,6 +148,7 @@ impl From<ProximityVerifierEvent> for MobileProximityVerifierEvent {
                 confidence: confidence.into(),
             },
             ProximityVerifierEvent::AllMethodsExhausted => Self::AllMethodsExhausted,
+            _ => Self::AllMethodsExhausted,
         }
     }
 }

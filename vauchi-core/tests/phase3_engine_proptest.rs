@@ -157,6 +157,7 @@ fn validate_result(
         | ActionResult::PreviewAs { .. }
         | ActionResult::ShowContactPicker
         | ActionResult::VerifyFingerprint { .. } => {}
+        _ => {}
     }
     Ok(())
 }

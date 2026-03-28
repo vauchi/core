@@ -35,6 +35,7 @@ pub trait RuntimeStateProvider: Send + Sync {
 
 /// Type of network connection available.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum ConnectionType {
     /// Connected via WiFi.
     WiFi,

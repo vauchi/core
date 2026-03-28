@@ -22,6 +22,7 @@ pub struct QrPayload {
 
 /// Protocol state machine states.
 #[derive(Debug, Clone, Default, PartialEq)]
+#[non_exhaustive]
 pub enum ProtocolState {
     #[default]
     Idle,

@@ -10,6 +10,7 @@ use thiserror::Error;
 
 /// Network and transport error types.
 #[derive(Error, Debug, Clone)]
+#[non_exhaustive]
 pub enum NetworkError {
     #[error("Connection failed: {0}")]
     ConnectionFailed(String),

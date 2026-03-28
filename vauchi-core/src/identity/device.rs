@@ -19,6 +19,7 @@ use thiserror::Error;
 /// The classification logic lives in core so all platforms
 /// produce consistent results.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum DeviceType {
     Phone,
     Tablet,
@@ -59,6 +60,7 @@ pub const MAX_DEVICES: usize = 10;
 
 /// Device-related errors.
 #[derive(Error, Debug)]
+#[non_exhaustive]
 pub enum DeviceError {
     #[error("Maximum devices ({MAX_DEVICES}) reached")]
     MaxDevicesReached,

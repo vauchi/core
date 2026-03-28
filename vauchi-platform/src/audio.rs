@@ -363,6 +363,7 @@ impl MobileProximityVerifier {
                 AudioCapability::EmitOnly => "emit_only",
                 AudioCapability::ReceiveOnly => "receive_only",
                 AudioCapability::None => "none",
+                _ => "none",
             })
             .unwrap_or("none")
             .to_string()

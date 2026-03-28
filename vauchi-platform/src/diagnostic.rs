@@ -180,6 +180,7 @@ fn ec_to_mobile(ec: &ErrorCorrectionLevel) -> MobileErrorCorrectionLevel {
         ErrorCorrectionLevel::M => MobileErrorCorrectionLevel::M,
         ErrorCorrectionLevel::Q => MobileErrorCorrectionLevel::Q,
         ErrorCorrectionLevel::H => MobileErrorCorrectionLevel::H,
+        _ => MobileErrorCorrectionLevel::M,
     }
 }
 

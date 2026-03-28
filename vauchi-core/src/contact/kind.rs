@@ -16,6 +16,7 @@ use crate::types::{ExchangeTransport, ProximityConfidence};
 
 /// Distinguishes exchanged contacts (with crypto) from imported contacts (no crypto).
 #[derive(Clone, Debug)]
+#[non_exhaustive]
 pub enum ContactKind {
     /// A contact obtained through in-person cryptographic exchange.
     Exchanged(ExchangedData),
@@ -159,6 +160,7 @@ pub struct ImportedData {
 /// The source from which a contact was imported.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[non_exhaustive]
 pub enum ImportSource {
     /// Imported from a vCard (.vcf) file.
     VcardFile,

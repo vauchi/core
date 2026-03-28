@@ -15,6 +15,7 @@ use crate::i18n::{Locale, get_string};
 
 /// Categories of help content
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum HelpCategory {
     /// Getting started and basic usage
     GettingStarted,

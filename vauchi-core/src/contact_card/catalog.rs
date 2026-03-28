@@ -12,6 +12,7 @@ use crate::social::SocialNetworkRegistry;
 
 /// Category grouping for field types in the picker UI.
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum FieldCategory {
     /// Phone, Email, Website
     Contact,

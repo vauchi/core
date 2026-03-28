@@ -10,6 +10,7 @@ use vauchi_core::exchange::ExchangeCommand;
 /// An action the user performed in the UI.
 #[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum UserAction {
     TextChanged {
         component_id: String,
@@ -52,6 +53,7 @@ pub enum UserAction {
 #[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[must_use]
+#[non_exhaustive]
 pub enum ActionResult {
     UpdateScreen(ScreenModel),
     NavigateTo(ScreenModel),

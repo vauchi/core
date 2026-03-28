@@ -18,6 +18,7 @@ use zeroize::Zeroizing;
 
 /// KDF error types.
 #[derive(Error, Debug)]
+#[non_exhaustive]
 pub enum KDFError {
     #[error("Output length exceeds maximum (255 * hash_len)")]
     OutputTooLong,

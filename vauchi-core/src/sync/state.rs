@@ -26,6 +26,7 @@ fn current_timestamp() -> u64 {
 
 /// Sync error types.
 #[derive(Error, Debug)]
+#[non_exhaustive]
 pub enum SyncError {
     #[error("Storage error: {0}")]
     Storage(#[from] StorageError),
@@ -42,6 +43,7 @@ pub enum SyncError {
 
 /// Synchronization state for a contact.
 #[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
 pub enum SyncState {
     /// Fully synchronized with no pending updates.
     Synced {

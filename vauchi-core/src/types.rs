@@ -13,6 +13,7 @@
     Debug, Clone, Copy, PartialEq, Eq, Hash, Default, serde::Serialize, serde::Deserialize,
 )]
 #[serde(rename_all = "snake_case")]
+#[non_exhaustive]
 pub enum ExchangeTransport {
     /// QR exchange: both sides display and scan QR codes.
     /// Both use fresh ephemeral X25519 keys for full forward secrecy.
@@ -35,6 +36,7 @@ pub enum ExchangeTransport {
 
 /// Confidence level of physical proximity during contact exchange.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[non_exhaustive]
 pub enum ProximityConfidence {
     /// High confidence: verified by ultrasonic audio or NFC tap.
     High,
@@ -49,6 +51,7 @@ pub enum ProximityConfidence {
 
 /// Represents device audio capabilities.
 #[derive(Debug, Clone, Default, PartialEq, serde::Serialize, serde::Deserialize)]
+#[non_exhaustive]
 pub enum AudioCapability {
     /// Device supports full ultrasonic audio (speaker + microphone)
     Full,
@@ -102,6 +105,7 @@ pub struct EmergencyBroadcastConfig {
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize, PartialOrd, Ord,
 )]
+#[non_exhaustive]
 pub enum OnboardingStep {
     /// Pre-gate: does the user already have an identity?
     IdentityCheck,
@@ -171,6 +175,7 @@ pub struct DemoContactState {
 
 /// Visibility setting for a single field.
 #[derive(Clone, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[non_exhaustive]
 pub enum FieldVisibility {
     /// Visible to everyone (default for new fields)
     #[default]
@@ -193,6 +198,7 @@ pub struct VisibilityRules {
 
 /// Types of aha moments that can be triggered
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[non_exhaustive]
 pub enum AhaMomentType {
     /// Shown when card creation completes
     CardCreationComplete,

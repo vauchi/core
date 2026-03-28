@@ -13,6 +13,7 @@ use super::channel::{TransportChannel, TransportError, TransportType};
 
 /// Policy for what happens when falling back to a different transport.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum FallbackPolicy {
     /// Keep the existing session state across transport switch.
     PreserveSession,

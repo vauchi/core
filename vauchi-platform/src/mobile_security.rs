@@ -60,6 +60,7 @@ impl VauchiPlatform {
             vauchi_core::AuthMode::Normal => Ok(MobileAuthMode::Normal),
             vauchi_core::AuthMode::Duress => Ok(MobileAuthMode::Duress),
             vauchi_core::AuthMode::Unauthenticated => Ok(MobileAuthMode::Normal),
+            _ => Ok(MobileAuthMode::Normal),
         }
     }
 

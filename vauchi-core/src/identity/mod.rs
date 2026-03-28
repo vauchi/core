@@ -34,6 +34,7 @@ use zeroize::{Zeroize, Zeroizing};
 
 /// Identity-related errors.
 #[derive(Error, Debug)]
+#[non_exhaustive]
 pub enum IdentityError {
     #[error("Display name cannot be empty")]
     EmptyDisplayName,

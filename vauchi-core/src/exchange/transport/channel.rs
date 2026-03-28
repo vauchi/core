@@ -16,6 +16,7 @@ use thiserror::Error;
 /// Identifies a transport mechanism.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
 #[serde(rename_all = "snake_case")]
+#[non_exhaustive]
 pub enum TransportType {
     WifiAware,
     Ble,
@@ -66,6 +67,7 @@ pub struct PeerInfo {
 
 /// Transport-level errors.
 #[derive(Debug, Error)]
+#[non_exhaustive]
 pub enum TransportError {
     #[error("transport {transport} unavailable: {reason}")]
     Unavailable {

@@ -44,6 +44,7 @@ impl From<vauchi_app::content::ContentType> for MobileContentType {
             vauchi_app::content::ContentType::Locales => MobileContentType::Locales,
             vauchi_app::content::ContentType::Themes => MobileContentType::Themes,
             vauchi_app::content::ContentType::Help => MobileContentType::Help,
+            _ => MobileContentType::Help,
         }
     }
 }
@@ -71,6 +72,9 @@ impl From<UpdateStatus> for MobileUpdateStatus {
             },
             UpdateStatus::CheckFailed(err) => MobileUpdateStatus::CheckFailed { error: err },
             UpdateStatus::Disabled => MobileUpdateStatus::Disabled,
+            _ => MobileUpdateStatus::CheckFailed {
+                error: "unknown update status".to_string(),
+            },
         }
     }
 }

@@ -54,6 +54,7 @@ impl From<ProtocolState> for MobileProtocolState {
             ProtocolState::Complete | ProtocolState::RetryReady => MobileProtocolState::Complete,
             ProtocolState::Finalized => MobileProtocolState::Finalized,
             ProtocolState::Failed(reason) => MobileProtocolState::Failed { reason },
+            _ => MobileProtocolState::Idle,
         }
     }
 }

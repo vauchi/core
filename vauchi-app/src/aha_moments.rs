@@ -24,6 +24,7 @@ pub fn aha_moment_title_localized(moment: AhaMomentType, locale: Locale) -> Stri
         AhaMomentType::FirstFieldEdit => "aha.first_field_edit.title",
         AhaMomentType::ThreeContactsReached => "aha.three_contacts_reached.title",
         AhaMomentType::DeviceLinked => "aha.device_linked.title",
+        _ => "aha.unknown.title",
     };
     let s = get_string(locale, key);
     // get_string returns the key itself when no translation is found;
@@ -48,6 +49,7 @@ pub fn aha_moment_message_localized(moment: AhaMomentType, locale: Locale) -> St
         AhaMomentType::FirstFieldEdit => "aha.first_field_edit.message",
         AhaMomentType::ThreeContactsReached => "aha.three_contacts_reached.message",
         AhaMomentType::DeviceLinked => "aha.device_linked.message",
+        _ => "aha.unknown.message",
     };
     let s = get_string(locale, key);
     if s == key {

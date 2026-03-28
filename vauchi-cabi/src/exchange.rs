@@ -356,6 +356,7 @@ pub unsafe extern "C" fn vauchi_exchange_state(handle: *mut VauchiExchange) -> *
                 ExchangeState::AwaitingBleVerification { .. } => "awaiting_ble_verification",
                 ExchangeState::Complete { .. } => "complete",
                 ExchangeState::Failed { .. } => "failed",
+                _ => "unknown",
             };
             to_c_string(label)
         })) {

@@ -22,6 +22,7 @@ pub const SUGGESTED_LABELS: &[&str] = &["Family", "Friends", "Coworkers", "Busin
 
 /// Error type for group operations.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum GroupError {
     /// Group with this name already exists.
     DuplicateName(String),

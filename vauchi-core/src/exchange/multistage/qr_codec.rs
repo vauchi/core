@@ -24,6 +24,7 @@ use super::crc16;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
+#[non_exhaustive]
 pub enum QrCodecError {
     #[error("unknown QR stage prefix")]
     UnknownPrefix,
@@ -43,6 +44,7 @@ pub enum QrCodecError {
 
 /// Parsed stage QR payload.
 #[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
 pub enum StageQr {
     Init {
         session_id: [u8; 16],

@@ -77,6 +77,7 @@ impl From<&vauchi_core::storage::DeletionState> for MobileDeletionState {
             vauchi_core::storage::DeletionState::None => MobileDeletionState::None,
             vauchi_core::storage::DeletionState::Scheduled { .. } => MobileDeletionState::Scheduled,
             vauchi_core::storage::DeletionState::Executed { .. } => MobileDeletionState::Executed,
+            _ => MobileDeletionState::None,
         }
     }
 }
@@ -126,6 +127,12 @@ impl From<&vauchi_core::storage::DeletionState> for MobileDeletionInfo {
                 execute_at: 0,
                 days_remaining: 0,
             },
+            _ => MobileDeletionInfo {
+                state: MobileDeletionState::None,
+                scheduled_at: 0,
+                execute_at: 0,
+                days_remaining: 0,
+            },
         }
     }
 }
@@ -168,6 +175,7 @@ impl From<&vauchi_core::api::ConsentType> for MobileConsentType {
             vauchi_core::api::ConsentType::DataProcessing => MobileConsentType::DataProcessing,
             vauchi_core::api::ConsentType::ContactSharing => MobileConsentType::ContactSharing,
             vauchi_core::api::ConsentType::RecoveryVouching => MobileConsentType::RecoveryVouching,
+            _ => MobileConsentType::DataProcessing,
         }
     }
 }

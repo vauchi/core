@@ -149,6 +149,7 @@ fn unescape_vcard(s: &str) -> String {
 
 /// vCard parsing errors.
 #[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
 pub enum VCardError {
     #[error("Invalid vCard format: {0}")]
     InvalidFormat(String),

@@ -54,6 +54,7 @@ impl From<AnimatedQrProgress> for MobileAnimatedQrProgress {
                 total: total as u32,
             },
             AnimatedQrProgress::Complete => MobileAnimatedQrProgress::Complete,
+            _ => MobileAnimatedQrProgress::Complete,
         }
     }
 }

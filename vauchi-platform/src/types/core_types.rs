@@ -33,6 +33,7 @@ impl From<TrustLevel> for MobileContactTrustLevel {
             TrustLevel::Verified => MobileContactTrustLevel::Verified,
             TrustLevel::High => MobileContactTrustLevel::High,
             TrustLevel::Standard => MobileContactTrustLevel::Standard,
+            _ => MobileContactTrustLevel::Standard,
         }
     }
 }
@@ -59,6 +60,7 @@ impl From<FieldType> for MobileFieldType {
             FieldType::Social => MobileFieldType::Social,
             FieldType::Birthday => MobileFieldType::Birthday,
             FieldType::Custom => MobileFieldType::Custom,
+            _ => MobileFieldType::Custom,
         }
     }
 }
@@ -151,6 +153,7 @@ impl From<&Contact> for MobileContact {
             Some(ExchangeTransport::Ble) => "ble",
             Some(ExchangeTransport::Usb) => "usb",
             Some(ExchangeTransport::Audio) => "audio",
+            _ => "qr",
         }
         .to_string();
 
@@ -159,6 +162,7 @@ impl From<&Contact> for MobileContact {
             ProximityConfidence::Medium => "medium",
             ProximityConfidence::Low => "low",
             ProximityConfidence::Unknown => "unknown",
+            _ => "unknown",
         }
         .to_string();
 
@@ -170,6 +174,7 @@ impl From<&Contact> for MobileContact {
                     TransportProximity::ContactRange => "contact_range",
                     TransportProximity::Proximate => "proximate",
                     TransportProximity::None => "none",
+                    _ => "unknown",
                 };
                 (prox.to_string(), true)
             }

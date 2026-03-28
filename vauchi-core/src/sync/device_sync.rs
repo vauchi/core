@@ -245,6 +245,7 @@ impl DeviceSyncPayload {
 
 /// Errors that can occur during device sync.
 #[derive(Debug, Clone, thiserror::Error)]
+#[non_exhaustive]
 pub enum DeviceSyncError {
     #[error("Serialization failed: {0}")]
     Serialization(String),
@@ -274,6 +275,7 @@ pub enum DeviceSyncError {
 /// Each SyncItem represents an atomic change that needs to be
 /// synchronized across all devices belonging to the same identity.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum SyncItem {
     /// A new contact was added.
     ContactAdded {

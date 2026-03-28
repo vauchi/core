@@ -28,6 +28,7 @@ pub const V2_MAGIC: [u8; 3] = [0x00, b'V', b'2'];
 
 /// Error type for Noise operations.
 #[derive(Debug)]
+#[non_exhaustive]
 pub enum NoiseError {
     Handshake(String),
     Encrypt(String),

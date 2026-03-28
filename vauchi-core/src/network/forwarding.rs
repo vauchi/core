@@ -23,6 +23,7 @@ use super::message::{ForwardingHint, ForwardingHints, MessageEnvelope};
 
 /// Errors from verifying forwarding hint signatures.
 #[derive(Error, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum HintVerificationError {
     #[error("unsigned")]
     Unsigned,

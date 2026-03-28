@@ -12,6 +12,7 @@ use vauchi_core::social::SocialNetworkRegistry;
 
 /// The type of form dialog, determining which fields are shown.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum FormDialogType {
     AddField {
         /// Available groups for visibility selection: (group_id, group_name).

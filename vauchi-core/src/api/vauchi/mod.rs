@@ -61,6 +61,7 @@ pub struct RecoveryReadiness {
 /// opt-in: without a password, the mode is `Unauthenticated` and behaves
 /// identically to the legacy (pre-password) behavior.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum AuthMode {
     /// The normal (real) password was used — show real contacts.
     Normal,

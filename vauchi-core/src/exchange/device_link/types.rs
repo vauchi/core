@@ -40,6 +40,7 @@ pub(super) const CONFIRMATION_MAC_DOMAIN: &[u8] = b"vauchi-device-link-confirm-m
 /// Platforms must construct this from real session data — not a bare boolean.
 /// Core validates the proof before releasing the master seed.
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub enum ProximityProof {
     /// Ultrasonic challenge-response completed successfully.
     Ultrasonic {

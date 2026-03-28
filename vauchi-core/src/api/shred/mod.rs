@@ -116,6 +116,7 @@ pub struct ShredVerification {
 
 /// Errors from shred operations.
 #[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
 pub enum ShredError {
     #[error("Deletion error: {0}")]
     Deletion(#[from] crate::api::deletion::DeletionError),
@@ -138,6 +139,7 @@ pub enum ShredError {
 /// Defines how the user confirms a panic shred from the home screen widget,
 /// providing a safety mechanism against accidental triggers.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[non_exhaustive]
 pub enum WidgetConfirmationMode {
     /// Default: tap once, then confirm in a dialog.
     TapConfirm,

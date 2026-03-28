@@ -10,6 +10,7 @@
 use thiserror::Error;
 
 #[derive(Debug, Error)]
+#[non_exhaustive]
 pub enum Base45Error {
     #[error("invalid base45 character: {0}")]
     InvalidCharacter(char),

@@ -44,6 +44,7 @@ pub const MAX_AVATAR_SIZE: usize = 262144;
 
 /// Contact card errors.
 #[derive(Error, Debug)]
+#[non_exhaustive]
 pub enum ContactCardError {
     #[error("Display name cannot be empty")]
     EmptyDisplayName,

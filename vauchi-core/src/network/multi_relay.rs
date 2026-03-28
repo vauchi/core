@@ -18,6 +18,7 @@ use crate::contact::Contact;
 
 /// Multi-relay configuration errors
 #[derive(Error, Debug)]
+#[non_exhaustive]
 pub enum MultiRelayError {
     #[error("At least one relay URL is required")]
     NoRelays,
@@ -29,6 +30,7 @@ pub enum MultiRelayError {
 /// Relay selection strategy
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
+#[non_exhaustive]
 pub enum RelaySelector {
     /// Cycle through relays in order
     RoundRobin,

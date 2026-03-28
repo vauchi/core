@@ -142,6 +142,7 @@ pub fn verify_manifest_signature(
 
 /// Errors that can occur during integrity verification
 #[derive(Debug, Error)]
+#[non_exhaustive]
 pub enum IntegrityError {
     /// Checksum format is invalid (missing "sha256:" prefix)
     #[error("Invalid checksum format, expected 'sha256:...'")]

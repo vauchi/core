@@ -29,6 +29,7 @@ pub struct MessageEnvelope {
 
 /// Types of messages that can be sent over the network.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum MessagePayload {
     /// Encrypted update message (Double Ratchet encrypted).
     EncryptedUpdate(EncryptedUpdate),
@@ -130,6 +131,7 @@ pub struct Acknowledgment {
 
 /// Acknowledgment status for message delivery tracking.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum AckStatus {
     /// Message stored by relay (persisted, awaiting recipient).
     Stored,
@@ -166,6 +168,7 @@ pub struct PresenceUpdate {
 
 /// Presence status values.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum PresenceStatus {
     Online,
     Away,
@@ -264,6 +267,7 @@ impl ForwardingHints {
 
 /// Stages of identity deletion.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum DeletionStage {
     /// Deletion scheduled, grace period active. Can still be cancelled.
     Pending,

@@ -174,6 +174,7 @@ impl PreSignedShredMessages {
 
 /// Errors from pre-signed message operations.
 #[derive(Debug)]
+#[non_exhaustive]
 pub enum PreSignedError {
     /// Failed to serialize pre-signed messages.
     SerializationFailed(String),

@@ -29,6 +29,7 @@ use crate::sync::delta::{CardDelta, FieldChange, PAYLOAD_VERSION_CEK, VersionedP
 /// Individual update failures do not prevent processing of subsequent
 /// updates in a batch — they are logged and skipped.
 #[derive(Debug)]
+#[non_exhaustive]
 pub enum CardUpdateError {
     /// Sender has been revoked (tombstone exists).
     SenderRevoked,

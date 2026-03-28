@@ -17,6 +17,7 @@ use crate::storage::{
 /// This is a transport-agnostic representation of delivery acknowledgments,
 /// decoupled from network feature flags.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum DeliveryAckStatus {
     /// Relay confirmed message storage.
     Stored,

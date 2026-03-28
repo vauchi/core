@@ -99,6 +99,7 @@ pub struct FileEntry {
 
 /// Update check result
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub enum UpdateStatus {
     /// All content is up to date
     UpToDate,
@@ -112,6 +113,7 @@ pub enum UpdateStatus {
 
 /// Types of remotely updatable content
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
 pub enum ContentType {
     /// Social network definitions
     Networks,

@@ -40,6 +40,7 @@ pub struct ScreenAction {
 /// Visual style for a screen action.
 #[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum ActionStyle {
     Primary,
     Secondary,

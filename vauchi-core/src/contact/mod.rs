@@ -38,6 +38,7 @@ use crate::types::{ExchangeTransport, ProximityConfidence};
 
 /// Error type for contact operations that require a specific contact kind.
 #[derive(Debug, Clone, thiserror::Error)]
+#[non_exhaustive]
 pub enum ContactError {
     /// The operation requires an exchanged contact but was called on an imported one.
     #[error("Operation requires an exchanged contact (with crypto keys)")]

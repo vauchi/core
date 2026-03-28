@@ -290,6 +290,7 @@ impl BLEAdvertisement {
 /// State of a BLE exchange session.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "state", rename_all = "snake_case")]
+#[non_exhaustive]
 pub enum BLEExchangeState {
     /// Session created but not active.
     Idle,
@@ -321,6 +322,7 @@ pub enum BLEExchangeState {
 
 /// BLE exchange errors.
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub enum BLEError {
     /// Invalid payload format.
     InvalidPayload(String),

@@ -21,6 +21,7 @@ const STORAGE_MIN_MB: u64 = 10;
 
 /// A feature that can be checked for availability.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Feature {
     /// Display a QR code for exchange (always available).
     QrDisplay,
@@ -38,6 +39,7 @@ pub enum Feature {
 
 /// Result of checking feature availability.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum FeatureStatus {
     /// Feature is available and can be used.
     Available,
@@ -47,6 +49,7 @@ pub enum FeatureStatus {
 
 /// An action that can be checked against runtime state.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Action {
     /// Perform a contact exchange (blocked when battery < 5%).
     Exchange,
@@ -60,6 +63,7 @@ pub enum Action {
 
 /// Result of checking whether an action can be performed.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum ActionStatus {
     /// Action is allowed.
     Allowed,

@@ -18,6 +18,7 @@ static DEFAULT_REGISTRY: LazyLock<SocialNetworkRegistry> =
 
 /// Actions that can be performed on a contact field.
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum ContactAction {
     /// Open phone dialer with number
     Call(String),

@@ -15,6 +15,7 @@ use std::time::Instant;
 /// Events that occur during a contact exchange flow.
 #[derive(Debug, Clone, Serialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
+#[non_exhaustive]
 pub enum ExchangeDebugEvent {
     /// Exchange session started.
     SessionStarted { transport: String },

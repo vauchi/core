@@ -127,6 +127,7 @@ fn atomic_write(path: &Path, data: &[u8]) -> Result<(), CacheError> {
 
 /// Errors that can occur with the content cache
 #[derive(Debug, Error)]
+#[non_exhaustive]
 pub enum CacheError {
     /// IO error
     #[error("IO error: {0}")]

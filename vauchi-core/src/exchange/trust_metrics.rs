@@ -15,6 +15,7 @@ use crate::types::{ExchangeTransport, ProximityConfidence};
 /// Inherent proximity guarantee of the transport channel,
 /// independent of any additional verifier.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum TransportProximity {
     /// Physical connection (USB cable) — strongest, no relay possible.
     Physical,

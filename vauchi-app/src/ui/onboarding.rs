@@ -923,6 +923,7 @@ impl WorkflowEngine for OnboardingEngine {
             Step::SecurityExplanation => self.build_security_explanation(),
             Step::BackupPrompt => self.build_backup_prompt(),
             Step::Ready => self.build_ready(),
+            _ => self.build_welcome(),
         }
     }
 
@@ -939,6 +940,7 @@ impl WorkflowEngine for OnboardingEngine {
             Step::SecurityExplanation => self.handle_security_explanation(&action),
             Step::BackupPrompt => self.handle_backup_prompt(&action),
             Step::Ready => self.handle_ready(&action),
+            _ => ActionResult::UpdateScreen(self.current_screen()),
         }
     }
 }

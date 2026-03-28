@@ -18,6 +18,7 @@ use zeroize::Zeroize;
 
 /// Encryption error types.
 #[derive(Error, Debug)]
+#[non_exhaustive]
 pub enum EncryptionError {
     #[error("Encryption failed")]
     EncryptionFailed,

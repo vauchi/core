@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 /// A UI component that core tells frontends to render.
 #[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum Component {
     Text {
         id: String,
@@ -110,6 +111,7 @@ pub enum Component {
 /// Text rendering style.
 #[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum TextStyle {
     Title,
     Subtitle,
@@ -120,6 +122,7 @@ pub enum TextStyle {
 /// Input field type hint for frontends.
 #[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum InputType {
     Text,
     Phone,
@@ -130,6 +133,7 @@ pub enum InputType {
 /// How field visibility is controlled in the UI.
 #[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum VisibilityMode {
     /// No visibility column — display fields read-only.
     ReadOnly,
@@ -166,6 +170,7 @@ pub struct FieldDisplay {
 /// which is the storage-level visibility model.
 #[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum UiFieldVisibility {
     Shown,
     Hidden,
@@ -217,6 +222,7 @@ pub struct SettingsItem {
 /// The kind of a settings item.
 #[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum SettingsItemKind {
     Toggle { enabled: bool },
     Value { value: String },
@@ -237,6 +243,7 @@ pub struct ActionListItem {
 /// Status for a status indicator component.
 #[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum Status {
     Pending,
     InProgress,
@@ -248,6 +255,7 @@ pub enum Status {
 /// QR code display mode.
 #[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum QrMode {
     Display,
     Scan,

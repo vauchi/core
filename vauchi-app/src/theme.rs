@@ -14,6 +14,7 @@ use thiserror::Error;
 
 /// Theme validation errors
 #[derive(Debug, Error)]
+#[non_exhaustive]
 pub enum ThemeError {
     #[error("Invalid hex color: {0}")]
     InvalidHexColor(String),
@@ -31,6 +32,7 @@ pub enum ThemeError {
 /// Theme mode (light or dark)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
+#[non_exhaustive]
 pub enum ThemeMode {
     Light,
     Dark,

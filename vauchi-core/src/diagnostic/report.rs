@@ -9,6 +9,7 @@ use super::snapshot::SnapshotMetadata;
 use super::tuner::{DeviceCapabilityProfile, Platform, TuningResult, rank_configs};
 
 #[derive(Debug)]
+#[non_exhaustive]
 pub enum ReportError {
     FormatError(std::fmt::Error),
 }

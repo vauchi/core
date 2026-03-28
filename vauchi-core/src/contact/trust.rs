@@ -14,6 +14,7 @@ use serde::{Deserialize, Serialize};
 /// Derived deterministically from `Contact` fields; not user-editable.
 /// Priority order (highest wins): Cautious > Verified > High > Standard.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum TrustLevel {
     /// Identity was recovered — ratchet may have reset. Highest priority.
     Cautious,

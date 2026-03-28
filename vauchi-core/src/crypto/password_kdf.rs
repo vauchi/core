@@ -60,6 +60,7 @@ pub fn derive_key_argon2id(password: &[u8], salt: &[u8]) -> Result<SymmetricKey,
 
 /// Password KDF error types.
 #[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
 pub enum PasswordKdfError {
     #[error("Key derivation failed: {0}")]
     DerivationFailed(String),

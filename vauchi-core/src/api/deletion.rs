@@ -44,6 +44,7 @@ pub fn delete_identity_data<P: AsRef<Path>>(db_path: P) -> Result<(), DeletionEr
 
 /// Identity deletion errors.
 #[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
 pub enum DeletionError {
     #[error("Identity deletion failed: {0}")]
     DeletionFailed(String),

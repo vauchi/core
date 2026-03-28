@@ -20,6 +20,7 @@ use thiserror::Error;
 
 /// Supported locales
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
+#[non_exhaustive]
 pub enum Locale {
     #[serde(rename = "en")]
     #[default]
@@ -160,6 +161,7 @@ static LOCALE_STORE: RwLock<Option<HashMap<String, HashMap<String, String>>>> = 
 
 /// Errors from i18n operations
 #[derive(Debug, Error)]
+#[non_exhaustive]
 pub enum I18nError {
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),

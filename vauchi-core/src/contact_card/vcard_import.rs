@@ -17,6 +17,7 @@ const MAX_FILE_SIZE: usize = 10 * 1024 * 1024;
 
 /// vCard import errors (only for unrecoverable issues).
 #[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
 pub enum VCardImportError {
     #[error("File too large ({size} bytes, max {max})")]
     FileTooLarge { size: usize, max: usize },

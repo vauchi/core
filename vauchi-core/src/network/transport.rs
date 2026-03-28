@@ -15,6 +15,7 @@ pub type TransportResult<T> = Result<T, NetworkError>;
 
 /// Connection state.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum ConnectionState {
     /// Not connected to any server.
     Disconnected,
@@ -28,6 +29,7 @@ pub enum ConnectionState {
 
 /// Proxy configuration for transport connections.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[non_exhaustive]
 pub enum ProxyConfig {
     /// No proxy (direct connection).
     #[default]

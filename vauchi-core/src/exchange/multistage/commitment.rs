@@ -22,6 +22,7 @@ use zeroize::Zeroize;
 
 /// Errors that can occur during commitment operations.
 #[derive(Debug, Error)]
+#[non_exhaustive]
 pub enum CommitmentError {
     /// Encryption failed (RNG or AEAD error).
     #[error("encryption failed")]

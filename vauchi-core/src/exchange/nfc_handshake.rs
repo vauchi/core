@@ -30,6 +30,7 @@ const NFC_HANDSHAKE_INFO: &[u8] = b"vauchi-nfc-handshake-v1";
 
 /// State of an NFC handshake session.
 #[derive(Debug)]
+#[non_exhaustive]
 pub enum NfcHandshakeState {
     /// Session created, no action taken yet.
     Idle,

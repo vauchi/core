@@ -9,6 +9,7 @@ use thiserror::Error;
 
 /// Errors that can occur during contact exchange.
 #[derive(Error, Debug, Clone)]
+#[non_exhaustive]
 pub enum ExchangeError {
     #[error("QR code has expired")]
     QRExpired,

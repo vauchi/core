@@ -13,6 +13,7 @@ use crate::text::normalize_text;
 
 /// Validation error types for contact field values.
 #[derive(Error, Debug)]
+#[non_exhaustive]
 pub enum ValidationError {
     #[error("Invalid phone number format")]
     InvalidPhone,
@@ -42,6 +43,7 @@ pub const MAX_FIELD_NOTE_LEN: usize = 500;
 /// Future: A configurable social network registry will provide validation rules
 /// and identity verification methods for each network.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum FieldType {
     Phone,
     Email,

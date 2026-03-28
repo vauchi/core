@@ -28,6 +28,7 @@ const MAX_SKIPPED_KEYS: usize = 1000;
 
 /// Double Ratchet error types.
 #[derive(Error, Debug)]
+#[non_exhaustive]
 pub enum RatchetError {
     #[error("Chain error: {0}")]
     Chain(#[from] ChainError),

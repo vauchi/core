@@ -27,6 +27,7 @@ pub struct DuressAlert {
 
 /// The type of duress event that triggered the alert.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum DuressAlertType {
     /// The app was unlocked with the duress PIN.
     Unlock,

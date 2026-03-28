@@ -17,6 +17,7 @@ pub type HandlerId = u64;
 
 /// Events emitted by Vauchi.
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub enum VauchiEvent {
     /// A contact was added.
     ContactAdded {

@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 
 /// Types of consent that can be granted or revoked.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum ConsentType {
     /// Consent for local data processing (required for operation).
     DataProcessing,

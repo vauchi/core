@@ -25,6 +25,7 @@ use super::screen::ScreenModel;
 
 /// Top-level screens in the application.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum AppScreen {
     Onboarding,
     MyInfo,

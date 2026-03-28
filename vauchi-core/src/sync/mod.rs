@@ -26,6 +26,7 @@ pub use state::{ReplayDetector, SyncError, SyncManager, SyncState};
 
 /// Error from sending binary messages over a transport.
 #[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
 pub enum BinarySendError {
     #[error("{0}")]
     SendFailed(String),

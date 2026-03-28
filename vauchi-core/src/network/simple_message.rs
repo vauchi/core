@@ -16,6 +16,7 @@ use thiserror::Error;
 
 /// Errors from encoding/decoding simple relay messages.
 #[derive(Error, Debug)]
+#[non_exhaustive]
 pub enum SimpleMessageError {
     #[error("Frame too short")]
     FrameTooShort,
@@ -45,6 +46,7 @@ pub struct SimpleEnvelope {
 /// Payload types for simple relay messages.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]
+#[non_exhaustive]
 pub enum SimplePayload {
     /// Encrypted update (ciphertext contains full message including any headers).
     EncryptedUpdate(SimpleEncryptedUpdate),
@@ -92,6 +94,7 @@ pub struct SimpleAcknowledgment {
 /// Must stay aligned with the relay's `protocol::AckStatus` enum
 /// to ensure wire compatibility for JSON deserialization.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum SimpleAckStatus {
     /// Relay has persisted the message (store-and-forward).
     Stored,

@@ -72,11 +72,15 @@ fn test_versioned_payload_cek_roundtrip() {
     assert_eq!(encoded[0], PAYLOAD_VERSION_CEK);
 
     let decoded = VersionedPayload::decode(&encoded).unwrap();
-    let VersionedPayload::CekWrapped(p) = decoded;
-    assert_eq!(p.cek, cek.to_bytes());
-    assert_eq!(p.cek_ciphertext, cek_ciphertext);
-    assert_eq!(p.signature, [0x11u8; 64]);
-    assert_eq!(p.nonce, [0x22u8; 32]);
+    match decoded {
+        VersionedPayload::CekWrapped(p) => {
+            assert_eq!(p.cek, cek.to_bytes());
+            assert_eq!(p.cek_ciphertext, cek_ciphertext);
+            assert_eq!(p.signature, [0x11u8; 64]);
+            assert_eq!(p.nonce, [0x22u8; 32]);
+        }
+        _ => panic!("expected CekWrapped variant"),
+    }
 }
 
 #[test]
@@ -112,10 +116,14 @@ fn test_cek_wrapped_with_real_encryption() {
 
     // Recipient side
     let decoded = VersionedPayload::decode(&versioned_bytes).unwrap();
-    let VersionedPayload::CekWrapped(p) = decoded;
-    let recipient_cek = ContentEncryptionKey::from_bytes(p.cek);
-    let decrypted = recipient_cek.decrypt(&p.cek_ciphertext).unwrap();
-    assert_eq!(decrypted, delta_json);
+    match decoded {
+        VersionedPayload::CekWrapped(p) => {
+            let recipient_cek = ContentEncryptionKey::from_bytes(p.cek);
+            let decrypted = recipient_cek.decrypt(&p.cek_ciphertext).unwrap();
+            assert_eq!(decrypted, delta_json);
+        }
+        _ => panic!("expected CekWrapped variant"),
+    }
 }
 
 #[test]

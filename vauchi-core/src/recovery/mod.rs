@@ -27,6 +27,7 @@ use crate::crypto::{PublicKey, Signature, SigningKeyPair};
 
 /// Recovery-related errors.
 #[derive(Error, Debug)]
+#[non_exhaustive]
 pub enum RecoveryError {
     #[error("Insufficient vouchers: need at least {0}")]
     InsufficientVouchers(u32),
@@ -88,6 +89,7 @@ pub enum RecoveryError {
 /// - Reject: refuse the claim (potential impostor)
 /// - RemindMeLater: defer the decision for later review
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum RecoveryResponse {
     /// Accept the recovery claim and update contact identity.
     Accept,
@@ -689,6 +691,7 @@ impl RecoveryProof {
 
 /// Result of verifying a recovery proof against local contacts.
 #[derive(Clone, Debug)]
+#[non_exhaustive]
 pub enum VerificationResult {
     /// Sufficient mutual contacts vouched (threshold met).
     HighConfidence {

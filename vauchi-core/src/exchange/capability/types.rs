@@ -51,6 +51,7 @@ pub struct DeviceCapabilities {
 
 /// Type of biometric hardware available on the device.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum BiometricType {
     /// Fingerprint sensor (Touch ID, Android fingerprint).
     Fingerprint,
@@ -62,6 +63,7 @@ pub enum BiometricType {
 
 /// Platform the app is running on.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum Platform {
     Android,
     Ios,

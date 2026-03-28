@@ -24,6 +24,7 @@ pub struct TraceEvent {
 /// The kind of trace event recorded during an exchange.
 #[derive(Debug, Clone, Serialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
+#[non_exhaustive]
 pub enum TraceEventKind {
     PeerDiscovered {
         peer_id: String,

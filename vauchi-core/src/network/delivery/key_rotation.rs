@@ -11,6 +11,7 @@ use subtle::ConstantTimeEq;
 
 /// Error type for key rotation detection.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum KeyRotationError {
     /// Recipient's signing key has changed.
     RecipientKeyChanged { contact_id: String },

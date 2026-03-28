@@ -334,6 +334,7 @@ fn test_full_update_propagation() {
             let cek = vauchi_core::crypto::cek::ContentEncryptionKey::from_bytes(wrapped.cek);
             cek.decrypt(&wrapped.cek_ciphertext).unwrap()
         }
+        _ => panic!("expected CekWrapped variant"),
     };
     let delta: vauchi_core::sync::CardDelta = serde_json::from_slice(&delta_bytes).unwrap();
 

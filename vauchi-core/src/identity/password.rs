@@ -12,6 +12,7 @@ use zxcvbn::Score;
 
 /// Password strength levels based on zxcvbn scores.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum PasswordStrength {
     /// Score 0: Too guessable (risky password)
     TooWeak,

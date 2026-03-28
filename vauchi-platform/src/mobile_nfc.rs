@@ -251,6 +251,7 @@ fn map_state(state: &NfcHandshakeState) -> MobileNfcState {
             error: format!("{:?}", reason),
         },
         NfcHandshakeState::RelayFallback { .. } => MobileNfcState::RelayFallback,
+        _ => MobileNfcState::Idle,
     }
 }
 

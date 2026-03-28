@@ -249,6 +249,7 @@ impl VauchiPlatform {
                 })
             }
             vauchi_core::storage::DeletionState::Executed { .. } => Ok(MobileShredStatus::Executed),
+            _ => Ok(MobileShredStatus::None),
         }
     }
 

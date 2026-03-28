@@ -269,6 +269,7 @@ fn test_field_modification_and_removal_propagation() {
                 let cek = ContentEncryptionKey::from_bytes(wrapped.cek);
                 cek.decrypt(&wrapped.cek_ciphertext).unwrap()
             }
+            _ => panic!("expected CekWrapped variant"),
         };
         let delta: CardDelta = serde_json::from_slice(&delta_bytes).unwrap();
 

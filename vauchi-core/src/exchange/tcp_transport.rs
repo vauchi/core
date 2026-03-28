@@ -30,6 +30,7 @@ const PROTOCOL_VERSION: u8 = 1;
 
 /// Errors from TCP transport operations.
 #[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
 pub enum TcpTransportError {
     #[error("IO error: {0}")]
     Io(#[from] io::Error),

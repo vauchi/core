@@ -455,6 +455,18 @@ impl Contact {
         Ok(())
     }
 
+    /// Removes fingerprint verification.
+    ///
+    /// Returns `Err` if called on an imported contact.
+    pub fn mark_fingerprint_unverified(&mut self) -> Result<(), ContactError> {
+        let data = self
+            .kind
+            .exchanged_data_mut()
+            .ok_or(ContactError::OperationRequiresExchangedContact)?;
+        data.fingerprint_verified = false;
+        Ok(())
+    }
+
     /// Updates this contact's card (from a sync update).
     pub fn update_card(&mut self, card: ContactCard) {
         self.display_name = card.display_name().to_string();

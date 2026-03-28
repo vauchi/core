@@ -6,8 +6,20 @@
 //!
 //! Displays both fingerprints (ours and theirs) for in-person comparison.
 //! The user confirms they match, marking the contact as verified.
+//! Verified contacts can also be unverified.
 
 use crate::ui::*;
+
+/// What action the user took on the fingerprint verification screen.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum VerifyAction {
+    /// No action — user pressed Back.
+    None,
+    /// User confirmed fingerprint match.
+    Verified,
+    /// User removed fingerprint verification.
+    Unverified,
+}
 
 /// Engine for the fingerprint verification screen.
 #[derive(Clone, Debug)]
@@ -16,7 +28,7 @@ pub struct FingerprintVerifyEngine {
     their_fingerprint: String,
     our_fingerprint: String,
     is_verified: bool,
-    cancelled: bool,
+    action: VerifyAction,
 }
 
 impl FingerprintVerifyEngine {
@@ -31,12 +43,16 @@ impl FingerprintVerifyEngine {
             their_fingerprint: their_fingerprint.to_string(),
             our_fingerprint: our_fingerprint.to_string(),
             is_verified,
-            cancelled: false,
+            action: VerifyAction::None,
         }
     }
 
     pub fn contact_id(&self) -> &str {
         &self.contact_id
+    }
+
+    pub fn completion_action(&self) -> VerifyAction {
+        self.action.clone()
     }
 
     fn build_screen(&self) -> ScreenModel {
@@ -87,7 +103,14 @@ impl FingerprintVerifyEngine {
         }
 
         let mut actions = Vec::new();
-        if !self.is_verified {
+        if self.is_verified {
+            actions.push(ScreenAction {
+                id: "unverify".into(),
+                label: "Remove verification".into(),
+                style: ActionStyle::Secondary,
+                enabled: true,
+            });
+        } else {
             actions.push(ScreenAction {
                 id: "confirm_match".into(),
                 label: "I've verified in person".into(),
@@ -114,6 +137,10 @@ impl FingerprintVerifyEngine {
 }
 
 impl WorkflowEngine for FingerprintVerifyEngine {
+    fn as_any(&self) -> Option<&dyn std::any::Any> {
+        Some(self)
+    }
+
     fn current_screen(&self) -> ScreenModel {
         self.build_screen()
     }
@@ -121,14 +148,17 @@ impl WorkflowEngine for FingerprintVerifyEngine {
     fn handle_action(&mut self, action: UserAction) -> ActionResult {
         match action {
             UserAction::ActionPressed { action_id } => match action_id.as_str() {
-                "confirm_match" => {
+                "confirm_match" if !self.is_verified => {
                     self.is_verified = true;
+                    self.action = VerifyAction::Verified;
                     ActionResult::Complete
                 }
-                "back" => {
-                    self.cancelled = true;
+                "unverify" if self.is_verified => {
+                    self.is_verified = false;
+                    self.action = VerifyAction::Unverified;
                     ActionResult::Complete
                 }
+                "back" => ActionResult::Complete,
                 _ => ActionResult::UpdateScreen(self.build_screen()),
             },
             _ => ActionResult::UpdateScreen(self.build_screen()),
@@ -136,6 +166,6 @@ impl WorkflowEngine for FingerprintVerifyEngine {
     }
 
     fn was_cancelled(&self) -> bool {
-        self.cancelled
+        self.action == VerifyAction::None
     }
 }

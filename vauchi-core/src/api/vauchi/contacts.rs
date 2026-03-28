@@ -209,6 +209,19 @@ impl Vauchi {
         manager.verify_fingerprint(id)
     }
 
+    /// Removes fingerprint verification from a contact.
+    pub fn unverify_contact_fingerprint(&self, id: &str) -> VauchiResult<()> {
+        let mut contact = self
+            .storage
+            .load_contact(id)?
+            .ok_or_else(|| VauchiError::NotFound(format!("contact: {}", id)))?;
+        contact
+            .mark_fingerprint_unverified()
+            .map_err(|e| VauchiError::InvalidState(format!("unverify fingerprint: {}", e)))?;
+        self.storage.save_contact(&contact)?;
+        Ok(())
+    }
+
     // === Double Ratchet Operations ===
 
     /// Gets the Double Ratchet state for a contact.

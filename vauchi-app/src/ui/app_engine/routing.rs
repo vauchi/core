@@ -212,8 +212,21 @@ impl AppEngine {
                 ActionResult::NavigateTo(screen)
             }
             AppScreen::VerifyFingerprint { contact_id } => {
-                if !self.engine.was_cancelled() {
-                    let _ = self.vauchi.verify_contact_fingerprint(contact_id);
+                use crate::ui::fingerprint_verify::VerifyAction;
+                let fp_engine = self
+                    .engine
+                    .as_any()
+                    .and_then(|a| a.downcast_ref::<crate::ui::FingerprintVerifyEngine>());
+                if let Some(fp_engine) = fp_engine {
+                    match fp_engine.completion_action() {
+                        VerifyAction::Verified => {
+                            let _ = self.vauchi.verify_contact_fingerprint(contact_id);
+                        }
+                        VerifyAction::Unverified => {
+                            let _ = self.vauchi.unverify_contact_fingerprint(contact_id);
+                        }
+                        VerifyAction::None => {}
+                    }
                 }
                 let screen = self.navigate_back();
                 ActionResult::NavigateTo(screen)

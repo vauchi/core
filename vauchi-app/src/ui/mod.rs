@@ -67,7 +67,7 @@ pub use duress_pin::{DuressConfig, DuressPinEngine};
 pub use emergency_shred::EmergencyShredEngine;
 pub use engine::WorkflowEngine;
 pub use exchange::{ExchangeConfig, ExchangeEngine};
-pub use fingerprint_verify::FingerprintVerifyEngine;
+pub use fingerprint_verify::{FingerprintVerifyEngine, VerifyAction};
 pub use form_dialog::{FormDialogEngine, FormDialogType};
 pub use gdpr::GdprEngine;
 pub use group_detail::GroupDetailEngine;

@@ -383,15 +383,7 @@ impl AppEngine {
             .and_then(|a| a.downcast_mut::<ContactDetailEngine>())
             .map(|engine| {
                 engine.toggle_hidden();
-                let message = if engine.is_hidden() {
-                    "Contact hidden"
-                } else {
-                    "Contact unhidden"
-                };
-                ActionResult::ShowToast {
-                    message: message.into(),
-                    undo_action_id: None,
-                }
+                ActionResult::UpdateScreen(engine.current_screen())
             })
     }
 

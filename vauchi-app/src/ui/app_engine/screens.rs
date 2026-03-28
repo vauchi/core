@@ -477,17 +477,14 @@ impl AppEngine {
                 Box::new(ContactLimitEngine::new(contact_count, 0))
             }
             AppScreen::VerifyFingerprint { contact_id } => {
-                let their_fp = vauchi
-                    .get_contact(contact_id)
-                    .ok()
-                    .flatten()
+                let contact = vauchi.get_contact(contact_id).ok().flatten();
+                let their_fp = contact
+                    .as_ref()
                     .map(|c| c.fingerprint())
                     .unwrap_or_default();
                 let our_fp = vauchi.own_fingerprint().unwrap_or_default();
-                let is_verified = vauchi
-                    .get_contact(contact_id)
-                    .ok()
-                    .flatten()
+                let is_verified = contact
+                    .as_ref()
                     .map(|c| c.is_fingerprint_verified())
                     .unwrap_or(false);
                 Box::new(FingerprintVerifyEngine::new(

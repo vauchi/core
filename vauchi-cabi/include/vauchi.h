@@ -406,6 +406,57 @@ char *vauchi_exchange_debug_jsonl(struct VauchiExchange *handle);
 char *vauchi_exchange_debug_markdown(struct VauchiExchange *handle);
 
 /**
+ * Get a translated string for the given locale and key.
+ *
+ * Returns the translated string, falling back to English if the
+ * locale lacks the key, or `"Missing: <key>"` if no translation
+ * exists at all. Returns null if `locale_code` or `key` is null,
+ * or `locale_code` is not a recognised locale.
+ *
+ * The caller must free the returned string with `vauchi_string_free`.
+ *
+ * # Safety
+ * `locale_code` and `key` must be valid null-terminated C strings,
+ * or null.
+ */
+char *vauchi_i18n_get_string(const char *locale_code, const char *key);
+
+/**
+ * Return a JSON array of all available locale codes.
+ *
+ * Example: `["en","de","fr","es","it"]`
+ *
+ * The caller must free the returned string with `vauchi_string_free`.
+ *
+ * # Safety
+ * No special requirements.
+ */
+char *vauchi_i18n_available_locales(void);
+
+/**
+ * Initialise the i18n system from a directory of JSON locale files.
+ *
+ * Each `*.json` file in `resource_dir` is loaded as a locale
+ * (filename stem = locale code, e.g. `de.json` → `"de"`).
+ *
+ * Returns 0 on success, 1 on failure.
+ *
+ * # Safety
+ * `resource_dir` must be a valid null-terminated C string, or null.
+ */
+int32_t vauchi_i18n_init(const char *resource_dir);
+
+/**
+ * Check whether the i18n system has been initialised.
+ *
+ * Returns 1 if at least one locale has been loaded, 0 otherwise.
+ *
+ * # Safety
+ * No special requirements.
+ */
+int32_t vauchi_i18n_is_initialized(void);
+
+/**
  * Create a new workflow engine instance.
  *
  * Supported `workflow_type` values:

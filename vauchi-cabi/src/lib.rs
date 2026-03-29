@@ -18,11 +18,13 @@ mod app;
 mod audio;
 mod config;
 mod exchange;
+mod i18n;
 mod workflow;
 
 pub use app::*;
 pub use audio::*;
 pub use exchange::*;
+pub use i18n::*;
 pub use workflow::*;
 
 use config::CabiConfig;

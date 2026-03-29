@@ -65,6 +65,7 @@ pub struct ThemeColors {
 /// Provides spacing, typography, border radius, touch target, and
 /// motion values that all platform clients use for layout consistency.
 /// Source of truth: themes/tokens.json (validated by check-core-contract.py).
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DesignTokens {
     pub spacing: SpacingTokens,
@@ -76,6 +77,7 @@ pub struct DesignTokens {
 }
 
 /// Spacing scale for margins, padding, and gaps.
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SpacingTokens {
     pub xs: u16,
@@ -86,6 +88,7 @@ pub struct SpacingTokens {
 }
 
 /// Font size tokens for text hierarchy.
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TypographyTokens {
     pub title_size: u16,
@@ -95,6 +98,7 @@ pub struct TypographyTokens {
 }
 
 /// Directional spacing tokens for content and list items.
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SpacingDirectionTokens {
     pub content_start: u16,
@@ -104,6 +108,7 @@ pub struct SpacingDirectionTokens {
 }
 
 /// Border radius tokens for rounded corners.
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct BorderRadiusTokens {
     pub sm: u16,
@@ -113,12 +118,14 @@ pub struct BorderRadiusTokens {
 }
 
 /// Touch target size tokens for accessibility.
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TouchTargetTokens {
     pub minimum: u16,
 }
 
 /// Motion/animation duration tokens in milliseconds.
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MotionTokens {
     pub enter_duration_ms: u16,

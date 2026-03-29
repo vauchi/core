@@ -70,6 +70,45 @@ impl ScreenModel {
     }
 }
 
+// INLINE_TEST_REQUIRED: backward-compat + schema_version tests
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Old JSON (pre-schema_version) must still parse. The serde
+    /// defaults fill schema_version and tokens automatically.
+    #[test]
+    fn legacy_json_without_new_fields_parses() {
+        let legacy = r#"{
+            "screen_id": "test",
+            "title": "Test Screen",
+            "subtitle": null,
+            "components": [],
+            "actions": [],
+            "progress": null
+        }"#;
+        let m: ScreenModel = serde_json::from_str(legacy).expect("legacy JSON must parse");
+        assert_eq!(m.schema_version, CURRENT_SCHEMA_VERSION);
+        assert_eq!(m.tokens, DesignTokens::default());
+    }
+
+    #[test]
+    fn screen_model_json_includes_schema_version() {
+        let m = ScreenModel::new("test", "Title", vec![], vec![]);
+        let json = serde_json::to_string(&m).unwrap();
+        assert!(json.contains("\"schema_version\":1"));
+    }
+
+    #[test]
+    fn screen_model_json_includes_tokens() {
+        let m = ScreenModel::new("test", "Title", vec![], vec![]);
+        let json = serde_json::to_string(&m).unwrap();
+        assert!(json.contains("\"spacing\""));
+        assert!(json.contains("\"border_radius\""));
+        assert!(json.contains("\"md_lg\":12"));
+    }
+}
+
 /// Step progress indicator.
 #[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]

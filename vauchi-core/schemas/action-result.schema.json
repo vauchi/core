@@ -333,6 +333,38 @@
         "Destructive"
       ]
     },
+    "BorderRadiusTokens": {
+      "description": "Border radius tokens for rounded corners.",
+      "type": "object",
+      "required": [
+        "lg",
+        "md",
+        "md_lg",
+        "sm"
+      ],
+      "properties": {
+        "lg": {
+          "type": "integer",
+          "format": "uint16",
+          "minimum": 0.0
+        },
+        "md": {
+          "type": "integer",
+          "format": "uint16",
+          "minimum": 0.0
+        },
+        "md_lg": {
+          "type": "integer",
+          "format": "uint16",
+          "minimum": 0.0
+        },
+        "sm": {
+          "type": "integer",
+          "format": "uint16",
+          "minimum": 0.0
+        }
+      }
+    },
     "Component": {
       "description": "A UI component that core tells frontends to render.",
       "oneOf": [
@@ -926,6 +958,38 @@
         }
       }
     },
+    "DesignTokens": {
+      "description": "Design tokens for consistent cross-platform rendering.\n\nProvides spacing, typography, border radius, touch target, and motion values that all platform clients use for layout consistency. Source of truth: themes/tokens.json (validated by check-core-contract.py).",
+      "type": "object",
+      "required": [
+        "border_radius",
+        "motion",
+        "spacing",
+        "spacing_direction",
+        "touch_target",
+        "typography"
+      ],
+      "properties": {
+        "border_radius": {
+          "$ref": "#/definitions/BorderRadiusTokens"
+        },
+        "motion": {
+          "$ref": "#/definitions/MotionTokens"
+        },
+        "spacing": {
+          "$ref": "#/definitions/SpacingTokens"
+        },
+        "spacing_direction": {
+          "$ref": "#/definitions/SpacingDirectionTokens"
+        },
+        "touch_target": {
+          "$ref": "#/definitions/TouchTargetTokens"
+        },
+        "typography": {
+          "$ref": "#/definitions/TypographyTokens"
+        }
+      }
+    },
     "ExchangeCommand": {
       "description": "A command from core to the frontend requesting a hardware action.\n\nFrontends match on these and dispatch to platform-specific APIs (camera, BLE stack, NFC reader, audio subsystem). Commands that the platform cannot fulfil should be answered with [`ExchangeHardwareEvent::HardwareUnavailable`].",
       "oneOf": [
@@ -1261,6 +1325,32 @@
         "Password"
       ]
     },
+    "MotionTokens": {
+      "description": "Motion/animation duration tokens in milliseconds.",
+      "type": "object",
+      "required": [
+        "emphasis_duration_ms",
+        "enter_duration_ms",
+        "exit_duration_ms"
+      ],
+      "properties": {
+        "emphasis_duration_ms": {
+          "type": "integer",
+          "format": "uint16",
+          "minimum": 0.0
+        },
+        "enter_duration_ms": {
+          "type": "integer",
+          "format": "uint16",
+          "minimum": 0.0
+        },
+        "exit_duration_ms": {
+          "type": "integer",
+          "format": "uint16",
+          "minimum": 0.0
+        }
+      }
+    },
     "Progress": {
       "description": "Step progress indicator.",
       "type": "object",
@@ -1351,6 +1441,13 @@
             }
           ]
         },
+        "schema_version": {
+          "description": "Schema version — shells ignore components from higher versions.",
+          "default": 1,
+          "type": "integer",
+          "format": "uint16",
+          "minimum": 0.0
+        },
         "screen_id": {
           "type": "string"
         },
@@ -1362,6 +1459,49 @@
         },
         "title": {
           "type": "string"
+        },
+        "tokens": {
+          "description": "Resolved design tokens for layout consistency. Frontends read spacing, radius, typography from here — never hardcode values.",
+          "default": {
+            "border_radius": {
+              "lg": 16,
+              "md": 8,
+              "md_lg": 12,
+              "sm": 4
+            },
+            "motion": {
+              "emphasis_duration_ms": 300,
+              "enter_duration_ms": 200,
+              "exit_duration_ms": 150
+            },
+            "spacing": {
+              "lg": 24,
+              "md": 16,
+              "sm": 8,
+              "xl": 32,
+              "xs": 4
+            },
+            "spacing_direction": {
+              "content_end": 16,
+              "content_start": 16,
+              "list_item_end": 8,
+              "list_item_start": 8
+            },
+            "touch_target": {
+              "minimum": 44
+            },
+            "typography": {
+              "body_size": 16,
+              "caption_size": 14,
+              "subtitle_size": 18,
+              "title_size": 24
+            }
+          },
+          "allOf": [
+            {
+              "$ref": "#/definitions/DesignTokens"
+            }
+          ]
         }
       }
     },
@@ -1470,6 +1610,76 @@
         }
       ]
     },
+    "SpacingDirectionTokens": {
+      "description": "Directional spacing tokens for content and list items.",
+      "type": "object",
+      "required": [
+        "content_end",
+        "content_start",
+        "list_item_end",
+        "list_item_start"
+      ],
+      "properties": {
+        "content_end": {
+          "type": "integer",
+          "format": "uint16",
+          "minimum": 0.0
+        },
+        "content_start": {
+          "type": "integer",
+          "format": "uint16",
+          "minimum": 0.0
+        },
+        "list_item_end": {
+          "type": "integer",
+          "format": "uint16",
+          "minimum": 0.0
+        },
+        "list_item_start": {
+          "type": "integer",
+          "format": "uint16",
+          "minimum": 0.0
+        }
+      }
+    },
+    "SpacingTokens": {
+      "description": "Spacing scale for margins, padding, and gaps.",
+      "type": "object",
+      "required": [
+        "lg",
+        "md",
+        "sm",
+        "xl",
+        "xs"
+      ],
+      "properties": {
+        "lg": {
+          "type": "integer",
+          "format": "uint16",
+          "minimum": 0.0
+        },
+        "md": {
+          "type": "integer",
+          "format": "uint16",
+          "minimum": 0.0
+        },
+        "sm": {
+          "type": "integer",
+          "format": "uint16",
+          "minimum": 0.0
+        },
+        "xl": {
+          "type": "integer",
+          "format": "uint16",
+          "minimum": 0.0
+        },
+        "xs": {
+          "type": "integer",
+          "format": "uint16",
+          "minimum": 0.0
+        }
+      }
+    },
     "Status": {
       "description": "Status for a status indicator component.",
       "type": "string",
@@ -1514,6 +1724,52 @@
             "string",
             "null"
           ]
+        }
+      }
+    },
+    "TouchTargetTokens": {
+      "description": "Touch target size tokens for accessibility.",
+      "type": "object",
+      "required": [
+        "minimum"
+      ],
+      "properties": {
+        "minimum": {
+          "type": "integer",
+          "format": "uint16",
+          "minimum": 0.0
+        }
+      }
+    },
+    "TypographyTokens": {
+      "description": "Font size tokens for text hierarchy.",
+      "type": "object",
+      "required": [
+        "body_size",
+        "caption_size",
+        "subtitle_size",
+        "title_size"
+      ],
+      "properties": {
+        "body_size": {
+          "type": "integer",
+          "format": "uint16",
+          "minimum": 0.0
+        },
+        "caption_size": {
+          "type": "integer",
+          "format": "uint16",
+          "minimum": 0.0
+        },
+        "subtitle_size": {
+          "type": "integer",
+          "format": "uint16",
+          "minimum": 0.0
+        },
+        "title_size": {
+          "type": "integer",
+          "format": "uint16",
+          "minimum": 0.0
         }
       }
     },

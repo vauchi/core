@@ -18,9 +18,7 @@ pub struct CabiConfig {
     pub(crate) data_dir: PathBuf,
     pub(crate) relay_url: String,
     pub(crate) storage_key: Option<SymmetricKey>,
-    #[allow(dead_code)] // consumed by config_enable_ble (Task 3)
     pub(crate) ble_enabled: bool,
-    #[allow(dead_code)] // consumed by config_enable_audio (Task 3)
     pub(crate) audio_enabled: bool,
 }
 

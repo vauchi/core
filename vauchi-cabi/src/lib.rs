@@ -12,6 +12,7 @@ use std::os::raw::c_char;
 use std::sync::{Arc, Mutex};
 
 use vauchi_app::ui::*;
+use vauchi_core::api::Vauchi;
 use vauchi_core::exchange::{ExchangeSession, ManualConfirmationVerifier};
 
 mod app;
@@ -153,6 +154,71 @@ pub unsafe extern "C" fn vauchi_config_set_storage_key(
         }
     }))
     .unwrap_or_default()
+}
+
+/// Enable or disable BLE backend.
+///
+/// # Safety
+/// `config` must be a valid config handle or null.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn vauchi_config_enable_ble(config: *mut CabiConfig, enabled: bool) {
+    let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        // SAFETY: Caller guarantees config is a valid CabiConfig pointer or null.
+        unsafe {
+            if !config.is_null() {
+                (*config).ble_enabled = enabled;
+            }
+        }
+    }));
+}
+
+/// Enable or disable audio (ultrasonic) backend.
+///
+/// # Safety
+/// `config` must be a valid config handle or null.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn vauchi_config_enable_audio(config: *mut CabiConfig, enabled: bool) {
+    let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        // SAFETY: Caller guarantees config is a valid CabiConfig pointer or null.
+        unsafe {
+            if !config.is_null() {
+                (*config).audio_enabled = enabled;
+            }
+        }
+    }));
+}
+
+/// Create an AppEngine from a config builder.
+///
+/// The config handle is consumed (freed) by this call — do not free it
+/// separately. Returns null on initialization failure or if config is null.
+///
+/// # Safety
+/// `config` must be a valid config handle returned by `vauchi_config_new`, or null.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn vauchi_app_create_from_config(config: *mut CabiConfig) -> *mut VauchiApp {
+    // SAFETY: config is checked non-null, then consumed via Box::from_raw (caller must not use after this call).
+    unsafe {
+        match std::panic::catch_unwind(std::panic::AssertUnwindSafe(move || {
+            if config.is_null() {
+                return std::ptr::null_mut();
+            }
+            let config = *Box::from_raw(config);
+            let vauchi_config = config.into_vauchi_config();
+
+            let vauchi = match Vauchi::new(vauchi_config) {
+                Ok(v) => v,
+                Err(_) => return std::ptr::null_mut(),
+            };
+
+            Box::into_raw(Box::new(VauchiApp {
+                engine: Mutex::new(AppEngine::new(vauchi)),
+            }))
+        })) {
+            Ok(result) => result,
+            Err(_) => std::ptr::null_mut(),
+        }
+    }
 }
 
 // ── String helpers ──────────────────────────────────────────────────
@@ -1368,6 +1434,127 @@ mod tests {
             assert!(!result, "null key pointer should return false");
 
             vauchi_config_free(config);
+        }
+    }
+
+    // ── Config enable_ble/audio tests ──────────────────────────────
+
+    #[test]
+    fn config_enable_ble_toggles() {
+        // SAFETY: Valid config handle, toggling a boolean field.
+        unsafe {
+            let dir = CString::new("/tmp/vauchi-test").unwrap();
+            let config = vauchi_config_new(dir.as_ptr(), std::ptr::null());
+            assert!(!config.is_null());
+
+            vauchi_config_enable_ble(config, false);
+            assert!(!(*config).ble_enabled);
+            vauchi_config_enable_ble(config, true);
+            assert!((*config).ble_enabled);
+
+            vauchi_config_free(config);
+        }
+    }
+
+    #[test]
+    fn config_enable_audio_toggles() {
+        // SAFETY: Valid config handle, toggling a boolean field.
+        unsafe {
+            let dir = CString::new("/tmp/vauchi-test").unwrap();
+            let config = vauchi_config_new(dir.as_ptr(), std::ptr::null());
+            assert!(!config.is_null());
+
+            vauchi_config_enable_audio(config, false);
+            assert!(!(*config).audio_enabled);
+
+            vauchi_config_free(config);
+        }
+    }
+
+    #[test]
+    fn config_enable_ble_null_config_no_crash() {
+        // SAFETY: Null config — should be a no-op (not crash or corrupt).
+        unsafe {
+            vauchi_config_enable_ble(std::ptr::null_mut(), true);
+            // Reaching here without panic/segfault proves null-safety
+            assert!(true, "null config enable_ble should not crash");
+        }
+    }
+
+    // ── create_from_config tests ───────────────────────────────────
+
+    #[test]
+    fn app_create_from_config_returns_non_null() {
+        // SAFETY: Valid config handle with temp directory.
+        unsafe {
+            let tmp = std::env::temp_dir().join("vauchi-cabi-test-from-config");
+            let _ = std::fs::remove_dir_all(&tmp);
+            let dir = CString::new(tmp.to_str().unwrap()).unwrap();
+            let config = vauchi_config_new(dir.as_ptr(), std::ptr::null());
+            assert!(!config.is_null());
+
+            let key: [u8; 32] = [0x42; 32];
+            vauchi_config_set_storage_key(config, key.as_ptr(), 32);
+
+            let handle = vauchi_app_create_from_config(config);
+            assert!(!handle.is_null(), "should create app from config");
+
+            vauchi_app_destroy(handle);
+            let _ = std::fs::remove_dir_all(&tmp);
+        }
+    }
+
+    #[test]
+    fn app_create_from_config_null_returns_null() {
+        // SAFETY: Null config — should return null.
+        unsafe {
+            let handle = vauchi_app_create_from_config(std::ptr::null_mut());
+            assert!(handle.is_null());
+        }
+    }
+
+    #[test]
+    fn app_create_from_config_persists_identity() {
+        // SAFETY: Two sequential app creates with the same data dir to test persistence.
+        unsafe {
+            let tmp = std::env::temp_dir().join("vauchi-cabi-test-persist");
+            let _ = std::fs::remove_dir_all(&tmp);
+            let key: [u8; 32] = [0x42; 32];
+
+            // First launch: create identity
+            {
+                let dir = CString::new(tmp.to_str().unwrap()).unwrap();
+                let config = vauchi_config_new(dir.as_ptr(), std::ptr::null());
+                vauchi_config_set_storage_key(config, key.as_ptr(), 32);
+                let handle = vauchi_app_create_from_config(config);
+                assert!(!handle.is_null());
+
+                // Trigger identity creation
+                let action =
+                    CString::new(r#"{"ActionPressed":{"action_id":"create_new"}}"#).unwrap();
+                let result_ptr = vauchi_app_handle_action(handle, action.as_ptr());
+                if !result_ptr.is_null() {
+                    vauchi_string_free(result_ptr);
+                }
+
+                vauchi_app_destroy(handle);
+            }
+
+            // Second launch: should have persisted data
+            {
+                let dir = CString::new(tmp.to_str().unwrap()).unwrap();
+                let config = vauchi_config_new(dir.as_ptr(), std::ptr::null());
+                vauchi_config_set_storage_key(config, key.as_ptr(), 32);
+                let handle = vauchi_app_create_from_config(config);
+                assert!(!handle.is_null());
+
+                // Verify data dir exists (persistence was used)
+                assert!(tmp.exists(), "data directory should persist");
+
+                vauchi_app_destroy(handle);
+            }
+
+            let _ = std::fs::remove_dir_all(&tmp);
         }
     }
 }

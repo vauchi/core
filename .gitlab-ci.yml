@@ -114,8 +114,14 @@ auto-tag:version:
       echo "Cargo.toml version: ${VERSION}"
       echo "Expected tag: ${TAG}"
 
-      git config user.name "${GITLAB_USER_NAME}"
-      git config user.email "${GITLAB_USER_EMAIL}"
+      # Use bot's verified commit_email — GITLAB_USER_EMAIL may be a human's
+      # email that isn't verified on the bot account pushing via PROJECT_ACCESS_TOKEN.
+      BOT_USER=$(curl -fsSL --header "PRIVATE-TOKEN: ${PROJECT_ACCESS_TOKEN}" \
+        "${CI_SERVER_URL}/api/v4/user" 2>/dev/null || true)
+      BOT_EMAIL=$(echo "$BOT_USER" | jq -r '.commit_email // .email // empty')
+      BOT_NAME=$(echo "$BOT_USER" | jq -r '.name // empty')
+      git config user.name "${BOT_NAME:-${GITLAB_USER_NAME}}"
+      git config user.email "${BOT_EMAIL:-${GITLAB_USER_EMAIL}}"
 
       # Use project access token for push — CI_JOB_TOKEN cannot be used here
       # because pushes via CI_JOB_TOKEN do not trigger new pipelines, and the
@@ -1132,7 +1138,14 @@ publish:core:
           git remote set-url origin "$REPO_URL" 2>/dev/null || git remote add origin "$REPO_URL"
           git checkout -b "$BRANCH_NAME"
           git add Cargo.toml
-          git -c user.name="${GITLAB_USER_NAME}" -c user.email="${GITLAB_USER_EMAIL}" \
+          # Use bot's verified commit_email — GITLAB_USER_EMAIL is the
+          # human who pushed the tag, rejected by "unverified email" push rule.
+          BOT_INFO=$(curl -fsSL --header "JOB-TOKEN: ${CI_JOB_TOKEN}" \
+            "${CI_SERVER_URL}/api/v4/user" 2>/dev/null || true)
+          _EMAIL=$(echo "$BOT_INFO" | jq -r '.commit_email // .email // empty')
+          _NAME=$(echo "$BOT_INFO" | jq -r '.name // empty')
+          git -c user.name="${_NAME:-${GITLAB_USER_NAME}}" \
+              -c user.email="${_EMAIL:-${GITLAB_USER_EMAIL}}" \
             commit -m "chore: Bump version to $VERSION"
           git push -u origin "$BRANCH_NAME" && \
           MR_RESP=$(curl --silent --header "JOB-TOKEN: ${CI_JOB_TOKEN}" \

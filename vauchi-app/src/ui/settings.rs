@@ -129,6 +129,7 @@ impl WorkflowEngine for SettingsEngine {
             components,
             actions: vec![],
             progress: None,
+            ..Default::default()
         }
     }
 

@@ -112,6 +112,7 @@ impl GdprEngine {
                 },
             ],
             progress: None,
+            ..Default::default()
         }
     }
 
@@ -181,6 +182,7 @@ impl GdprEngine {
                 },
             ],
             progress: None,
+            ..Default::default()
         }
     }
 

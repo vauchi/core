@@ -81,6 +81,7 @@ impl DuplicateDetectionEngine {
                 },
             ],
             progress: None,
+            ..Default::default()
         }
     }
 }

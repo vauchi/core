@@ -250,6 +250,7 @@ impl FormDialogEngine {
                 },
             ],
             progress: None,
+            ..Default::default()
         }
     }
 
@@ -300,6 +301,7 @@ impl FormDialogEngine {
                     },
                 ],
                 progress: None,
+                ..Default::default()
             },
             FormDialogType::EditName { .. } => ScreenModel {
                 screen_id: "form_edit_name".into(),
@@ -329,6 +331,7 @@ impl FormDialogEngine {
                     },
                 ],
                 progress: None,
+                ..Default::default()
             },
             FormDialogType::EditRelayUrl { .. } => ScreenModel {
                 screen_id: "form_edit_relay_url".into(),
@@ -358,6 +361,7 @@ impl FormDialogEngine {
                     },
                 ],
                 progress: None,
+                ..Default::default()
             },
         }
     }

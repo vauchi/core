@@ -271,6 +271,7 @@ impl WorkflowEngine for MyInfoEngine {
                 components,
                 actions,
                 progress: None,
+                ..Default::default()
             };
         }
 
@@ -322,6 +323,7 @@ impl WorkflowEngine for MyInfoEngine {
             components,
             actions,
             progress: None,
+            ..Default::default()
         }
     }
 

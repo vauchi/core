@@ -97,6 +97,7 @@ impl ContactMergeEngine {
                 },
             ],
             progress: None,
+            ..Default::default()
         }
     }
 }

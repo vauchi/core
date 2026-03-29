@@ -289,6 +289,7 @@ impl ContactDetailEngine {
                 },
             ],
             progress: None,
+            ..Default::default()
         }
     }
 }
@@ -391,6 +392,7 @@ impl WorkflowEngine for ContactNotFoundEngine {
                 enabled: true,
             }],
             progress: None,
+            ..Default::default()
         }
     }
 

@@ -95,6 +95,7 @@ impl ContactLimitEngine {
             components,
             actions,
             progress: None,
+            ..Default::default()
         }
     }
 }

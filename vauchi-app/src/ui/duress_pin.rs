@@ -136,6 +136,7 @@ impl DuressPinEngine {
             components,
             actions,
             progress: Some(self.progress()),
+            ..Default::default()
         }
     }
 
@@ -167,6 +168,7 @@ impl DuressPinEngine {
                 },
             ],
             progress: Some(self.progress()),
+            ..Default::default()
         }
     }
 
@@ -198,6 +200,7 @@ impl DuressPinEngine {
                 },
             ],
             progress: Some(self.progress()),
+            ..Default::default()
         }
     }
 
@@ -242,6 +245,7 @@ impl DuressPinEngine {
                 },
             ],
             progress: Some(self.progress()),
+            ..Default::default()
         }
     }
 }

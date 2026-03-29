@@ -138,6 +138,7 @@ impl OnboardingEngine {
                 },
             ],
             progress: None,
+            ..Default::default()
         }
     }
 
@@ -184,6 +185,7 @@ impl OnboardingEngine {
                 },
             ],
             progress: None,
+            ..Default::default()
         }
     }
 
@@ -221,6 +223,7 @@ impl OnboardingEngine {
                 enabled: true,
             }],
             progress: self.progress(1),
+            ..Default::default()
         }
     }
 
@@ -253,6 +256,7 @@ impl OnboardingEngine {
                 enabled: name_filled,
             }],
             progress: self.progress(2),
+            ..Default::default()
         }
     }
 
@@ -298,6 +302,7 @@ impl OnboardingEngine {
                 },
             ],
             progress: self.progress(3),
+            ..Default::default()
         }
     }
 
@@ -360,6 +365,7 @@ impl OnboardingEngine {
                 },
             ],
             progress: self.progress(4),
+            ..Default::default()
         }
     }
 
@@ -433,6 +439,7 @@ impl OnboardingEngine {
                 },
             ],
             progress: self.progress(5),
+        ..Default::default()
         }
     }
 
@@ -516,6 +523,7 @@ impl OnboardingEngine {
                 },
             ],
             progress: self.progress(6),
+            ..Default::default()
         }
     }
 
@@ -553,6 +561,7 @@ impl OnboardingEngine {
                 enabled: true,
             }],
             progress: self.progress(7),
+            ..Default::default()
         }
     }
 
@@ -594,6 +603,7 @@ impl OnboardingEngine {
                 },
             ],
             progress: self.progress(8),
+            ..Default::default()
         }
     }
 
@@ -626,6 +636,7 @@ impl OnboardingEngine {
                 enabled: true,
             }],
             progress: self.progress(9),
+            ..Default::default()
         }
     }
 

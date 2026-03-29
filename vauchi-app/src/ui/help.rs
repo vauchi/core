@@ -74,6 +74,7 @@ impl WorkflowEngine for HelpEngine {
             components,
             actions: vec![],
             progress: None,
+            ..Default::default()
         }
     }
 

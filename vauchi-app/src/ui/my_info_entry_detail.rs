@@ -158,6 +158,7 @@ impl WorkflowEngine for MyInfoEntryDetailEngine {
                 },
             ],
             progress: None,
+            ..Default::default()
         }
     }
 

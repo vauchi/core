@@ -149,6 +149,7 @@ impl ContactEditEngine {
                 total_steps: 3,
                 label: None,
             }),
+            ..Default::default()
         }
     }
 
@@ -201,6 +202,7 @@ impl ContactEditEngine {
                 total_steps: 3,
                 label: None,
             }),
+            ..Default::default()
         }
     }
 
@@ -241,6 +243,7 @@ impl ContactEditEngine {
                 total_steps: 3,
                 label: None,
             }),
+            ..Default::default()
         }
     }
 

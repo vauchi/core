@@ -122,6 +122,7 @@ impl WorkflowEngine for ContactListEngine {
             }],
             actions,
             progress: None,
+            ..Default::default()
         }
     }
 

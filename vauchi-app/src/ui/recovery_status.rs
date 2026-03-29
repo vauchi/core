@@ -68,6 +68,7 @@ impl RecoveryEngine {
                 },
             ],
             progress: None,
+            ..Default::default()
         }
     }
 }

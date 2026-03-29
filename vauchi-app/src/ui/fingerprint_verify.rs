@@ -133,6 +133,7 @@ impl FingerprintVerifyEngine {
             components,
             actions,
             progress: None,
+            ..Default::default()
         }
     }
 }

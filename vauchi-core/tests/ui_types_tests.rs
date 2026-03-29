@@ -34,6 +34,7 @@ fn test_screen_model_serde_roundtrip() {
             total_steps: 9,
             label: Some("Welcome".to_string()),
         }),
+        ..Default::default()
     };
 
     let json = serde_json::to_string(&screen).unwrap();
@@ -152,6 +153,7 @@ fn test_action_result_update_screen_roundtrip() {
         components: vec![],
         actions: vec![],
         progress: None,
+        ..Default::default()
     };
 
     let result = ActionResult::UpdateScreen(screen);
@@ -177,6 +179,7 @@ fn test_action_result_navigate_to_roundtrip() {
         components: vec![],
         actions: vec![],
         progress: None,
+        ..Default::default()
     };
 
     let result = ActionResult::NavigateTo(screen);
@@ -472,6 +475,7 @@ fn test_screen_model_empty_components() {
         components: vec![],
         actions: vec![],
         progress: None,
+        ..Default::default()
     };
 
     let json = serde_json::to_string(&screen).unwrap();

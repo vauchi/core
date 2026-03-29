@@ -86,6 +86,7 @@ impl DeviceLinkingEngine {
                     enabled: true,
                 }],
                 progress: self.progress(),
+                ..Default::default()
             },
             DeviceLinkStep::VerifyCode => {
                 let code = self.verification_code.as_deref().unwrap_or("------");
@@ -125,6 +126,7 @@ impl DeviceLinkingEngine {
                         },
                     ],
                     progress: self.progress(),
+                    ..Default::default()
                 }
             }
             DeviceLinkStep::Syncing => ScreenModel {
@@ -140,6 +142,7 @@ impl DeviceLinkingEngine {
                 }],
                 actions: vec![],
                 progress: self.progress(),
+                ..Default::default()
             },
             DeviceLinkStep::Complete => ScreenModel {
                 screen_id: "link_complete".into(),
@@ -159,6 +162,7 @@ impl DeviceLinkingEngine {
                     enabled: true,
                 }],
                 progress: self.progress(),
+                ..Default::default()
             },
         }
     }

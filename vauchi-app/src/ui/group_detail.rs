@@ -72,6 +72,7 @@ impl GroupDetailEngine {
                 actions
             },
             progress: None,
+            ..Default::default()
         }
     }
 }

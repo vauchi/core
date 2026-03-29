@@ -60,6 +60,7 @@ impl WorkflowEngine for MoreEngine {
             }],
             actions: vec![],
             progress: None,
+            ..Default::default()
         }
     }
 

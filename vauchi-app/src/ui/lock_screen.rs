@@ -77,6 +77,7 @@ impl WorkflowEngine for LockScreenEngine {
             components,
             actions,
             progress: None,
+            ..Default::default()
         }
     }
 

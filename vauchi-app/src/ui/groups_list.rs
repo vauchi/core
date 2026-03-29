@@ -152,6 +152,7 @@ impl GroupsEngine {
                 },
             ],
             progress: None,
+            ..Default::default()
         }
     }
 }

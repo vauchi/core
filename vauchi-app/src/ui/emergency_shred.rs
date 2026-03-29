@@ -92,6 +92,7 @@ impl EmergencyShredEngine {
                 total_steps: 3,
                 label: None,
             }),
+            ..Default::default()
         }
     }
 
@@ -128,6 +129,7 @@ impl EmergencyShredEngine {
                 total_steps: 3,
                 label: None,
             }),
+            ..Default::default()
         }
     }
 
@@ -149,6 +151,7 @@ impl EmergencyShredEngine {
                 total_steps: 3,
                 label: None,
             }),
+            ..Default::default()
         }
     }
 
@@ -175,6 +178,7 @@ impl EmergencyShredEngine {
                 total_steps: 3,
                 label: None,
             }),
+            ..Default::default()
         }
     }
 }

@@ -248,6 +248,7 @@ impl ExchangeEngine {
                         },
                     ],
                     progress: Some(self.progress()),
+                    ..Default::default()
                 }
             }
             ExchangeStep::ShowQr => {
@@ -278,6 +279,7 @@ impl ExchangeEngine {
                         enabled: true,
                     }],
                     progress: Some(self.progress()),
+                    ..Default::default()
                 }
             }
             ExchangeStep::ScanQr => ScreenModel {
@@ -297,6 +299,7 @@ impl ExchangeEngine {
                     enabled: true,
                 }],
                 progress: Some(self.progress()),
+                ..Default::default()
             },
             ExchangeStep::Verifying => ScreenModel {
                 screen_id: "exchange_verifying".into(),
@@ -311,6 +314,7 @@ impl ExchangeEngine {
                 }],
                 actions: vec![],
                 progress: Some(self.progress()),
+                ..Default::default()
             },
             ExchangeStep::Success => ScreenModel {
                 screen_id: "exchange_success".into(),
@@ -330,6 +334,7 @@ impl ExchangeEngine {
                     enabled: true,
                 }],
                 progress: Some(self.progress()),
+                ..Default::default()
             },
             ExchangeStep::Failed => ScreenModel {
                 screen_id: "exchange_failed".into(),
@@ -357,6 +362,7 @@ impl ExchangeEngine {
                     },
                 ],
                 progress: Some(self.progress()),
+                ..Default::default()
             },
         }
     }

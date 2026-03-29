@@ -123,6 +123,7 @@ impl SyncStatusEngine {
                 },
             ],
             progress: None,
+            ..Default::default()
         }
     }
 }

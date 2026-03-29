@@ -58,6 +58,7 @@ impl SupportEngine {
                 },
             ],
             progress: None,
+            ..Default::default()
         }
     }
 }

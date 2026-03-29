@@ -162,6 +162,7 @@ fn action_result_variants_validate_against_schema() {
         components: vec![],
         actions: vec![],
         progress: None,
+        ..Default::default()
     };
 
     let results = vec![

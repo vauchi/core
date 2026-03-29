@@ -133,6 +133,7 @@ impl BackupRecoveryEngine {
                 },
             ],
             progress: None,
+        ..Default::default()
         }
     }
 
@@ -169,6 +170,7 @@ impl BackupRecoveryEngine {
                 },
             ],
             progress: self.progress(),
+            ..Default::default()
         }
     }
 
@@ -201,6 +203,7 @@ impl BackupRecoveryEngine {
                 },
             ],
             progress: self.progress(),
+            ..Default::default()
         }
     }
 
@@ -230,6 +233,7 @@ impl BackupRecoveryEngine {
             }],
             actions: vec![],
             progress: self.progress(),
+            ..Default::default()
         }
     }
 
@@ -256,6 +260,7 @@ impl BackupRecoveryEngine {
                 enabled: true,
             }],
             progress: self.progress(),
+            ..Default::default()
         }
     }
 
@@ -290,6 +295,7 @@ impl BackupRecoveryEngine {
                 },
             ],
             progress: self.progress(),
+            ..Default::default()
         }
     }
 }

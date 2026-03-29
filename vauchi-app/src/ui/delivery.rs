@@ -67,6 +67,7 @@ impl DeliveryStatusEngine {
             components,
             actions,
             progress: None,
+            ..Default::default()
         }
     }
 }

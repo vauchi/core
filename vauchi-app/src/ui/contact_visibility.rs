@@ -48,6 +48,7 @@ impl ContactVisibilityEngine {
                 enabled: true,
             }],
             progress: None,
+            ..Default::default()
         }
     }
 }

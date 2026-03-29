@@ -312,6 +312,108 @@ impl From<&vauchi_app::theme::ThemeColors> for MobileThemeColors {
     }
 }
 
+/// Design tokens: spacing scale.
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct MobileSpacingTokens {
+    pub xs: u16,
+    pub sm: u16,
+    pub md: u16,
+    pub lg: u16,
+    pub xl: u16,
+}
+
+/// Design tokens: directional spacing.
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct MobileSpacingDirectionTokens {
+    pub content_start: u16,
+    pub content_end: u16,
+    pub list_item_start: u16,
+    pub list_item_end: u16,
+}
+
+/// Design tokens: typography sizes.
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct MobileTypographyTokens {
+    pub title_size: u16,
+    pub subtitle_size: u16,
+    pub body_size: u16,
+    pub caption_size: u16,
+}
+
+/// Design tokens: border radius.
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct MobileBorderRadiusTokens {
+    pub sm: u16,
+    pub md: u16,
+    pub md_lg: u16,
+    pub lg: u16,
+}
+
+/// Design tokens: touch target sizes.
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct MobileTouchTargetTokens {
+    pub minimum: u16,
+}
+
+/// Design tokens: animation durations in milliseconds.
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct MobileMotionTokens {
+    pub enter_duration_ms: u16,
+    pub exit_duration_ms: u16,
+    pub emphasis_duration_ms: u16,
+}
+
+/// Complete design tokens for cross-platform rendering consistency.
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct MobileDesignTokens {
+    pub spacing: MobileSpacingTokens,
+    pub spacing_direction: MobileSpacingDirectionTokens,
+    pub typography: MobileTypographyTokens,
+    pub border_radius: MobileBorderRadiusTokens,
+    pub touch_target: MobileTouchTargetTokens,
+    pub motion: MobileMotionTokens,
+}
+
+impl From<&vauchi_app::theme::DesignTokens> for MobileDesignTokens {
+    fn from(t: &vauchi_app::theme::DesignTokens) -> Self {
+        MobileDesignTokens {
+            spacing: MobileSpacingTokens {
+                xs: t.spacing.xs,
+                sm: t.spacing.sm,
+                md: t.spacing.md,
+                lg: t.spacing.lg,
+                xl: t.spacing.xl,
+            },
+            spacing_direction: MobileSpacingDirectionTokens {
+                content_start: t.spacing_direction.content_start,
+                content_end: t.spacing_direction.content_end,
+                list_item_start: t.spacing_direction.list_item_start,
+                list_item_end: t.spacing_direction.list_item_end,
+            },
+            typography: MobileTypographyTokens {
+                title_size: t.typography.title_size,
+                subtitle_size: t.typography.subtitle_size,
+                body_size: t.typography.body_size,
+                caption_size: t.typography.caption_size,
+            },
+            border_radius: MobileBorderRadiusTokens {
+                sm: t.border_radius.sm,
+                md: t.border_radius.md,
+                md_lg: t.border_radius.md_lg,
+                lg: t.border_radius.lg,
+            },
+            touch_target: MobileTouchTargetTokens {
+                minimum: t.touch_target.minimum,
+            },
+            motion: MobileMotionTokens {
+                enter_duration_ms: t.motion.enter_duration_ms,
+                exit_duration_ms: t.motion.exit_duration_ms,
+                emphasis_duration_ms: t.motion.emphasis_duration_ms,
+            },
+        }
+    }
+}
+
 /// A complete theme definition.
 #[derive(Debug, Clone, uniffi::Record)]
 pub struct MobileTheme {
@@ -331,6 +433,8 @@ pub struct MobileTheme {
     pub mode: MobileThemeMode,
     /// Theme colors.
     pub colors: MobileThemeColors,
+    /// Design tokens for layout consistency.
+    pub tokens: MobileDesignTokens,
 }
 
 impl From<&vauchi_app::theme::Theme> for MobileTheme {
@@ -344,6 +448,7 @@ impl From<&vauchi_app::theme::Theme> for MobileTheme {
             source: theme.source.clone(),
             mode: theme.mode.into(),
             colors: MobileThemeColors::from(&theme.colors),
+            tokens: MobileDesignTokens::from(&theme.tokens),
         }
     }
 }

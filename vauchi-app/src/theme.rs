@@ -108,6 +108,7 @@ pub struct SpacingDirectionTokens {
 pub struct BorderRadiusTokens {
     pub sm: u16,
     pub md: u16,
+    pub md_lg: u16,
     pub lg: u16,
 }
 
@@ -150,6 +151,7 @@ impl Default for DesignTokens {
             border_radius: BorderRadiusTokens {
                 sm: 4,
                 md: 8,
+                md_lg: 12,
                 lg: 16,
             },
             touch_target: TouchTargetTokens { minimum: 44 },
@@ -517,6 +519,7 @@ mod tests {
         let tokens = DesignTokens::default();
         assert_eq!(tokens.border_radius.sm, 4);
         assert_eq!(tokens.border_radius.md, 8);
+        assert_eq!(tokens.border_radius.md_lg, 12);
         assert_eq!(tokens.border_radius.lg, 16);
     }
 

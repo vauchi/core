@@ -557,3 +557,39 @@ fn test_confirmation_mac_contract_deterministic_and_accepted() {
         result.err()
     );
 }
+
+// ── Design Tokens FFI Boundary ───────────────────────────────
+
+// @scenario: theming :: MobileTheme includes design tokens
+#[test]
+fn test_mobile_theme_includes_design_tokens() {
+    let theme = vauchi_app::theme::default_theme();
+    let mobile: vauchi_platform::MobileTheme = (&theme).into();
+
+    // Verify tokens are carried through the FFI boundary
+    assert_eq!(mobile.tokens.spacing.md, 16);
+    assert_eq!(mobile.tokens.spacing.lg, 24);
+    assert_eq!(mobile.tokens.border_radius.md_lg, 12);
+    assert_eq!(mobile.tokens.typography.body_size, 16);
+    assert_eq!(mobile.tokens.touch_target.minimum, 44);
+    assert_eq!(mobile.tokens.motion.enter_duration_ms, 200);
+}
+
+// @scenario: theming :: MobileDesignTokens matches DesignTokens::default
+#[test]
+fn test_mobile_design_tokens_matches_core_defaults() {
+    let core_tokens = vauchi_app::theme::DesignTokens::default();
+    let mobile: vauchi_platform::MobileDesignTokens = (&core_tokens).into();
+
+    assert_eq!(mobile.spacing.xs, core_tokens.spacing.xs);
+    assert_eq!(mobile.spacing.xl, core_tokens.spacing.xl);
+    assert_eq!(
+        mobile.spacing_direction.content_start,
+        core_tokens.spacing_direction.content_start
+    );
+    assert_eq!(mobile.border_radius.md_lg, core_tokens.border_radius.md_lg);
+    assert_eq!(
+        mobile.motion.emphasis_duration_ms,
+        core_tokens.motion.emphasis_duration_ms
+    );
+}

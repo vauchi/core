@@ -100,21 +100,22 @@ pub use mobile_wifi_aware::{MobileWifiAwareStatus, wifi_aware_check_availability
 pub use multipart_qr::{MobileMultipartDecoder, MultipartDecoder, encode_multipart};
 pub use platform_app_engine::PlatformAppEngine;
 pub use types::{
-    MobileAhaMoment, MobileAhaMomentType, MobileAuthMode, MobileBroadcastResult,
-    MobileConsentRecord, MobileConsentStatus, MobileConsentType, MobileContact, MobileContactCard,
-    MobileContactField, MobileContactTrustLevel, MobileDecoyContact, MobileDeletionInfo,
-    MobileDeletionState, MobileDeliveryRecord, MobileDeliveryStatus, MobileDeliverySummary,
-    MobileDemoContact, MobileDemoContactState, MobileDeviceDeliveryRecord,
-    MobileDeviceDeliveryStatus, MobileDeviceInfo, MobileDeviceJoinResult,
-    MobileDeviceLinkConfirmation, MobileDeviceLinkData, MobileDeviceLinkInfo,
-    MobileDeviceLinkRequest, MobileDeviceLinkResult, MobileDuressSettings, MobileEmergencyConfig,
-    MobileExchangeResult, MobileFaqItem, MobileFieldNote, MobileFieldType, MobileGdprExport,
-    MobileHelpCategory, MobileHelpCategoryInfo, MobileLocale, MobileLocaleInfo,
-    MobileOnboardingProgress, MobileOnboardingStep, MobileRecoveryClaim, MobileRecoveryProgress,
-    MobileRecoveryVerification, MobileRecoveryVoucher, MobileRetryEntry, MobileShredReport,
-    MobileShredStatus, MobileShredToken, MobileShredVerification, MobileSocialNetwork,
-    MobileSyncResult, MobileSyncStatus, MobileTheme, MobileThemeColors, MobileThemeMode,
-    MobileVisibilityLabel, MobileVisibilityLabelDetail,
+    MobileAhaMoment, MobileAhaMomentType, MobileAuthMode, MobileBorderRadiusTokens,
+    MobileBroadcastResult, MobileConsentRecord, MobileConsentStatus, MobileConsentType,
+    MobileContact, MobileContactCard, MobileContactField, MobileContactTrustLevel,
+    MobileDecoyContact, MobileDeletionInfo, MobileDeletionState, MobileDeliveryRecord,
+    MobileDeliveryStatus, MobileDeliverySummary, MobileDemoContact, MobileDemoContactState,
+    MobileDesignTokens, MobileDeviceDeliveryRecord, MobileDeviceDeliveryStatus, MobileDeviceInfo,
+    MobileDeviceJoinResult, MobileDeviceLinkConfirmation, MobileDeviceLinkData,
+    MobileDeviceLinkInfo, MobileDeviceLinkRequest, MobileDeviceLinkResult, MobileDuressSettings,
+    MobileEmergencyConfig, MobileExchangeResult, MobileFaqItem, MobileFieldNote, MobileFieldType,
+    MobileGdprExport, MobileHelpCategory, MobileHelpCategoryInfo, MobileLocale, MobileLocaleInfo,
+    MobileMotionTokens, MobileOnboardingProgress, MobileOnboardingStep, MobileRecoveryClaim,
+    MobileRecoveryProgress, MobileRecoveryVerification, MobileRecoveryVoucher, MobileRetryEntry,
+    MobileShredReport, MobileShredStatus, MobileShredToken, MobileShredVerification,
+    MobileSocialNetwork, MobileSpacingDirectionTokens, MobileSpacingTokens, MobileSyncResult,
+    MobileSyncStatus, MobileTheme, MobileThemeColors, MobileThemeMode, MobileTouchTargetTokens,
+    MobileTypographyTokens, MobileVisibilityLabel, MobileVisibilityLabelDetail,
 };
 
 uniffi::setup_scaffolding!();

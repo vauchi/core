@@ -6,6 +6,17 @@
 All notable changes to vauchi-core are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.11.1] — 2026-03-29
+
+### Fixed
+
+- COMBO QR error correction test guard (multistage_e2e_tests)
+
+### Changed
+
+- Minimum Rust version set to 1.93 in workspace manifest
+- Added rstest dependency for parameterized social URI tests
+
 ## [0.11.0] — 2026-03-28
 
 ### Added

@@ -67,6 +67,33 @@ bool vauchi_config_set_storage_key(struct CabiConfig *config,
                                    uintptr_t key_len);
 
 /**
+ * Enable or disable BLE backend.
+ *
+ * # Safety
+ * `config` must be a valid config handle or null.
+ */
+void vauchi_config_enable_ble(struct CabiConfig *config, bool enabled);
+
+/**
+ * Enable or disable audio (ultrasonic) backend.
+ *
+ * # Safety
+ * `config` must be a valid config handle or null.
+ */
+void vauchi_config_enable_audio(struct CabiConfig *config, bool enabled);
+
+/**
+ * Create an AppEngine from a config builder.
+ *
+ * The config handle is consumed (freed) by this call — do not free it
+ * separately. Returns null on initialization failure or if config is null.
+ *
+ * # Safety
+ * `config` must be a valid config handle returned by `vauchi_config_new`, or null.
+ */
+struct VauchiApp *vauchi_app_create_from_config(struct CabiConfig *config);
+
+/**
  * Free a string allocated by vauchi-cabi.
  *
  * # Safety

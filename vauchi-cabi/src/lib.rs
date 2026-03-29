@@ -1473,11 +1473,15 @@ mod tests {
 
     #[test]
     fn config_enable_ble_null_config_no_crash() {
-        // SAFETY: Null config — should be a no-op (not crash or corrupt).
+        // SAFETY: Null config — should be a no-op. Verify a separate config is unaffected.
         unsafe {
             vauchi_config_enable_ble(std::ptr::null_mut(), true);
-            // Reaching here without panic/segfault proves null-safety
-            assert!(true, "null config enable_ble should not crash");
+            // Prove we didn't corrupt memory: create a real config and verify default
+            let dir = CString::new("/tmp/vauchi-test").unwrap();
+            let config = vauchi_config_new(dir.as_ptr(), std::ptr::null());
+            assert!(!config.is_null());
+            assert!((*config).ble_enabled, "default should be true");
+            vauchi_config_free(config);
         }
     }
 

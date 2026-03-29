@@ -62,13 +62,17 @@ pub struct ThemeColors {
 
 /// Design tokens for consistent cross-platform rendering.
 ///
-/// Provides spacing, typography, and border radius values that
-/// all platform clients use for layout consistency.
+/// Provides spacing, typography, border radius, touch target, and
+/// motion values that all platform clients use for layout consistency.
+/// Source of truth: themes/tokens.json (validated by check-core-contract.py).
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DesignTokens {
     pub spacing: SpacingTokens,
+    pub spacing_direction: SpacingDirectionTokens,
     pub typography: TypographyTokens,
     pub border_radius: BorderRadiusTokens,
+    pub touch_target: TouchTargetTokens,
+    pub motion: MotionTokens,
 }
 
 /// Spacing scale for margins, padding, and gaps.
@@ -90,12 +94,35 @@ pub struct TypographyTokens {
     pub caption_size: u16,
 }
 
+/// Directional spacing tokens for content and list items.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SpacingDirectionTokens {
+    pub content_start: u16,
+    pub content_end: u16,
+    pub list_item_start: u16,
+    pub list_item_end: u16,
+}
+
 /// Border radius tokens for rounded corners.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct BorderRadiusTokens {
     pub sm: u16,
     pub md: u16,
     pub lg: u16,
+}
+
+/// Touch target size tokens for accessibility.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TouchTargetTokens {
+    pub minimum: u16,
+}
+
+/// Motion/animation duration tokens in milliseconds.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MotionTokens {
+    pub enter_duration_ms: u16,
+    pub exit_duration_ms: u16,
+    pub emphasis_duration_ms: u16,
 }
 
 impl Default for DesignTokens {
@@ -108,6 +135,12 @@ impl Default for DesignTokens {
                 lg: 24,
                 xl: 32,
             },
+            spacing_direction: SpacingDirectionTokens {
+                content_start: 16,
+                content_end: 16,
+                list_item_start: 8,
+                list_item_end: 8,
+            },
             typography: TypographyTokens {
                 title_size: 24,
                 subtitle_size: 18,
@@ -118,6 +151,12 @@ impl Default for DesignTokens {
                 sm: 4,
                 md: 8,
                 lg: 16,
+            },
+            touch_target: TouchTargetTokens { minimum: 44 },
+            motion: MotionTokens {
+                enter_duration_ms: 200,
+                exit_duration_ms: 150,
+                emphasis_duration_ms: 300,
             },
         }
     }
@@ -479,6 +518,29 @@ mod tests {
         assert_eq!(tokens.border_radius.sm, 4);
         assert_eq!(tokens.border_radius.md, 8);
         assert_eq!(tokens.border_radius.lg, 16);
+    }
+
+    #[test]
+    fn test_design_tokens_default_spacing_direction() {
+        let tokens = DesignTokens::default();
+        assert_eq!(tokens.spacing_direction.content_start, 16);
+        assert_eq!(tokens.spacing_direction.content_end, 16);
+        assert_eq!(tokens.spacing_direction.list_item_start, 8);
+        assert_eq!(tokens.spacing_direction.list_item_end, 8);
+    }
+
+    #[test]
+    fn test_design_tokens_default_touch_target() {
+        let tokens = DesignTokens::default();
+        assert_eq!(tokens.touch_target.minimum, 44);
+    }
+
+    #[test]
+    fn test_design_tokens_default_motion() {
+        let tokens = DesignTokens::default();
+        assert_eq!(tokens.motion.enter_duration_ms, 200);
+        assert_eq!(tokens.motion.exit_duration_ms, 150);
+        assert_eq!(tokens.motion.emphasis_duration_ms, 300);
     }
 
     #[test]

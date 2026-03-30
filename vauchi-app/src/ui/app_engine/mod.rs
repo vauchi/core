@@ -146,6 +146,22 @@ impl AppScreen {
     }
 }
 
+/// Tracks which contact undo is pending (delete or archive).
+///
+/// The `contact_id` field exists for debugging and potential future use
+/// (e.g. confirming the undo matches the expected contact).
+#[derive(Clone, Debug)]
+pub(super) enum PendingContactUndo {
+    SoftDelete {
+        #[allow(dead_code)]
+        contact_id: String,
+    },
+    Archive {
+        #[allow(dead_code)]
+        contact_id: String,
+    },
+}
+
 /// Unified orchestrator for all frontends.
 pub struct AppEngine {
     vauchi: Vauchi,
@@ -158,6 +174,8 @@ pub struct AppEngine {
     nav_history: Vec<AppScreen>,
     /// Field pending undo after delete from MyInfoEntryDetail.
     pending_field_undo: Option<(String, vauchi_core::contact_card::ContactField)>,
+    /// Contact pending undo after soft-delete or archive.
+    pending_contact_undo: Option<PendingContactUndo>,
     /// Cached field type catalog (built once from SocialNetworkRegistry).
     field_catalog: vauchi_core::contact_card::FieldTypeCatalog,
     /// Transient preview-as state — contact ID being previewed (not serialized).
@@ -194,6 +212,7 @@ impl AppEngine {
             pending_display_name: None,
             nav_history: Vec::new(),
             pending_field_undo: None,
+            pending_contact_undo: None,
             field_catalog,
             preview_as_contact: None,
         }
@@ -336,6 +355,9 @@ impl WorkflowEngine for AppEngine {
                 return result;
             }
             if let Some(result) = self.intercept_hide_toggle(&contact_id, &action) {
+                return result;
+            }
+            if let Some(result) = self.intercept_contact_delete_archive(&contact_id, &action) {
                 return result;
             }
         }

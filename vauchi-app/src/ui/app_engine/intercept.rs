@@ -387,11 +387,53 @@ impl AppEngine {
             })
     }
 
-    /// Handle undo actions (field delete restoration).
+    /// Intercept delete/archive actions on ContactDetail, perform the side effect,
+    /// store undo state, and return a ShowToast with the undo action ID.
+    pub(super) fn intercept_contact_delete_archive(
+        &mut self,
+        contact_id: &str,
+        action: &UserAction,
+    ) -> Option<ActionResult> {
+        let UserAction::ActionPressed { action_id } = action else {
+            return None;
+        };
+
+        match action_id.as_str() {
+            "delete_contact" => {
+                let _ = self.vauchi.soft_delete_imported_contact(contact_id);
+                self.pending_contact_undo = Some(super::PendingContactUndo::SoftDelete {
+                    contact_id: contact_id.to_string(),
+                });
+                self.engine_cache.remove(&AppScreen::Contacts);
+                self.navigate_back();
+                Some(ActionResult::ShowToast {
+                    message: "Contact deleted".into(),
+                    undo_action_id: Some(format!("undo_delete_contact:{contact_id}")),
+                })
+            }
+            "archive_contact" => {
+                let _ = self.vauchi.archive_contact(contact_id);
+                self.pending_contact_undo = Some(super::PendingContactUndo::Archive {
+                    contact_id: contact_id.to_string(),
+                });
+                self.engine_cache.remove(&AppScreen::Contacts);
+                self.navigate_back();
+                Some(ActionResult::ShowToast {
+                    message: "Contact archived".into(),
+                    undo_action_id: Some(format!("undo_archive_contact:{contact_id}")),
+                })
+            }
+            _ => None,
+        }
+    }
+
+    /// Handle undo actions (field delete restoration, contact delete/archive undo).
     pub(super) fn handle_undo(&mut self, action: &UserAction) -> Option<ActionResult> {
-        if let UserAction::UndoPressed { action_id } = action
-            && action_id.starts_with("undo_delete_field:")
-        {
+        let UserAction::UndoPressed { action_id } = action else {
+            return None;
+        };
+
+        if action_id.starts_with("undo_delete_field:") {
             if let Some((field_id, field)) = self.pending_field_undo.take() {
                 let mut restored = false;
                 if let Ok(Some(mut card)) = self.vauchi.own_card()
@@ -408,6 +450,27 @@ impl AppEngine {
             }
             return Some(ActionResult::UpdateScreen(self.engine.current_screen()));
         }
+
+        if let Some(contact_id) = action_id.strip_prefix("undo_delete_contact:") {
+            let _ = self.vauchi.undo_delete_imported_contact(contact_id);
+            self.pending_contact_undo = None;
+            self.engine_cache.remove(&AppScreen::Contacts);
+            let screen = self.navigate_to(AppScreen::ContactDetail {
+                contact_id: contact_id.to_string(),
+            });
+            return Some(ActionResult::NavigateTo(screen));
+        }
+
+        if let Some(contact_id) = action_id.strip_prefix("undo_archive_contact:") {
+            let _ = self.vauchi.unarchive_contact(contact_id);
+            self.pending_contact_undo = None;
+            self.engine_cache.remove(&AppScreen::Contacts);
+            let screen = self.navigate_to(AppScreen::ContactDetail {
+                contact_id: contact_id.to_string(),
+            });
+            return Some(ActionResult::NavigateTo(screen));
+        }
+
         None
     }
 }

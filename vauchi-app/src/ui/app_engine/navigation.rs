@@ -10,8 +10,9 @@ use crate::ui::screen::{ScreenModel, TabInfo};
 
 impl AppEngine {
     pub fn navigate_to(&mut self, screen: AppScreen) -> ScreenModel {
-        // Clear stale undo data — field PII should not linger after user-initiated navigation
+        // Clear stale undo data — PII should not linger after user-initiated navigation
         self.pending_field_undo = None;
+        self.pending_contact_undo = None;
         // Push the current screen to nav history before switching
         self.nav_history.push(self.screen.clone());
         self.navigate_to_internal(screen)

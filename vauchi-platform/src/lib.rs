@@ -2235,11 +2235,8 @@ mod tests {
 
         let result = wb.import_contacts_from_vcf(Vec::new());
         // Empty data is either zero imports or an error — both acceptable
-        match result {
-            Ok(r) => {
-                assert_eq!(r.imported, 0);
-            }
-            Err(_) => {} // Parser rejection of empty input is fine
+        if let Ok(r) = result {
+            assert_eq!(r.imported, 0);
         }
     }
 }

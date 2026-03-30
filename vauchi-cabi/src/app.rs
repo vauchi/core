@@ -421,6 +421,9 @@ pub unsafe extern "C" fn vauchi_app_create_identity(
             app.engine
                 .lock()
                 .map(|mut engine| {
+                    if engine.vauchi().has_identity() {
+                        return 0; // Already has identity — true no-op
+                    }
                     engine
                         .vauchi_mut()
                         .create_identity(&name)

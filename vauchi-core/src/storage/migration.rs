@@ -448,7 +448,7 @@ pub fn all_migrations() -> Vec<Migration> {
 }
 
 // DEPRECATED: Tor support removed (2026-03-24). Column remains for
-// DB schema compatibility. See 2026-03-24-tor-ip-hiding-strategy.
+// DB schema compatibility. See 2026-03-24-ip-privacy-ohttp-strategy.
 /// Migration v17: Add tor_config_encrypted column to ux_state table.
 const MIGRATION_V17_TOR_CONFIG: &str = "
     ALTER TABLE ux_state ADD COLUMN tor_config_encrypted BLOB;

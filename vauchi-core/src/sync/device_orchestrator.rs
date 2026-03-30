@@ -428,6 +428,12 @@ impl<'a> DeviceSyncOrchestrator<'a> {
             SyncItem::ImportedContactRemoved { contact_id, .. } => {
                 format!("imported_contact:{}", contact_id)
             }
+            SyncItem::ContactArchived { contact_id, .. } => {
+                format!("archive:{}", contact_id)
+            }
+            SyncItem::ContactUnarchived { contact_id, .. } => {
+                format!("archive:{}", contact_id)
+            }
         }
     }
 

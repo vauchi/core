@@ -646,6 +646,26 @@ impl Vauchi {
                     .delete_contact(contact_id)
                     .map(|_| ())
                     .map_err(|e| e.into()),
+                SyncItem::ContactArchived {
+                    ref contact_id,
+                    timestamp,
+                    ..
+                } => match self.storage.load_contact(contact_id)? {
+                    Some(mut contact) => {
+                        contact.archive(timestamp);
+                        self.storage.save_contact(&contact).map_err(|e| e.into())
+                    }
+                    None => Ok(()), // Contact not found, skip
+                },
+                SyncItem::ContactUnarchived { ref contact_id, .. } => {
+                    match self.storage.load_contact(contact_id)? {
+                        Some(mut contact) => {
+                            contact.unarchive();
+                            self.storage.save_contact(&contact).map_err(|e| e.into())
+                        }
+                        None => Ok(()), // Contact not found, skip
+                    }
+                }
             };
 
             if result.is_ok() {

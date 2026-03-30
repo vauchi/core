@@ -422,6 +422,22 @@ pub enum SyncItem {
         /// Timestamp of removal.
         timestamp: u64,
     },
+
+    /// A contact was archived on another device.
+    ContactArchived {
+        /// ID of the archived contact.
+        contact_id: String,
+        /// Timestamp of archival.
+        timestamp: u64,
+    },
+
+    /// A contact was unarchived on another device.
+    ContactUnarchived {
+        /// ID of the unarchived contact.
+        contact_id: String,
+        /// Timestamp of unarchival.
+        timestamp: u64,
+    },
 }
 
 impl SyncItem {
@@ -442,6 +458,8 @@ impl SyncItem {
             SyncItem::ImportedContactAdded { timestamp, .. } => *timestamp,
             SyncItem::ImportedContactUpdated { timestamp, .. } => *timestamp,
             SyncItem::ImportedContactRemoved { timestamp, .. } => *timestamp,
+            SyncItem::ContactArchived { timestamp, .. } => *timestamp,
+            SyncItem::ContactUnarchived { timestamp, .. } => *timestamp,
         }
     }
 

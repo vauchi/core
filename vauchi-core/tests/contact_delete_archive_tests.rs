@@ -12,6 +12,7 @@ use vauchi_core::contact::Contact;
 use vauchi_core::contact::ImportSource;
 use vauchi_core::contact_card::ContactCard;
 use vauchi_core::crypto::SymmetricKey;
+use vauchi_core::sync::device_sync::SyncItem;
 use vauchi_core::{Identity, Storage, Vauchi, VauchiError};
 
 fn create_test_contact(name: &str, key_byte: u8) -> Contact {
@@ -494,5 +495,131 @@ fn undo_delete_after_hard_delete_returns_error() {
         matches!(result, Err(VauchiError::ContactNotFound(_))),
         "Undo after hard-delete should return ContactNotFound, got: {:?}",
         result
+    );
+}
+
+// ============================================================
+// Task 5: SyncItem roundtrip serialization tests
+// ============================================================
+
+#[test]
+fn sync_item_contact_archived_roundtrip() {
+    let item = SyncItem::ContactArchived {
+        contact_id: "abc123".to_string(),
+        timestamp: 1_700_000_000,
+    };
+
+    let json = item.to_json();
+    let deserialized = SyncItem::from_json(&json).unwrap();
+
+    assert_eq!(item, deserialized, "Roundtrip should preserve equality");
+    assert_eq!(
+        deserialized.timestamp(),
+        1_700_000_000,
+        "Timestamp should be preserved"
+    );
+
+    // Verify the contact_id is in the JSON
+    assert!(
+        json.contains("abc123"),
+        "JSON should contain the contact_id"
+    );
+}
+
+#[test]
+fn sync_item_contact_unarchived_roundtrip() {
+    let item = SyncItem::ContactUnarchived {
+        contact_id: "def456".to_string(),
+        timestamp: 1_700_000_500,
+    };
+
+    let json = item.to_json();
+    let deserialized = SyncItem::from_json(&json).unwrap();
+
+    assert_eq!(item, deserialized, "Roundtrip should preserve equality");
+    assert_eq!(
+        deserialized.timestamp(),
+        1_700_000_500,
+        "Timestamp should be preserved"
+    );
+
+    assert!(
+        json.contains("def456"),
+        "JSON should contain the contact_id"
+    );
+}
+
+#[test]
+fn apply_sync_contact_archived_sets_flag() {
+    let mut wb = create_test_vauchi();
+    wb.create_identity("Alice").unwrap();
+
+    let bob = create_exchanged_contact("Bob");
+    let bob_id = bob.id().to_string();
+    wb.add_contact(bob).unwrap();
+
+    let items = vec![SyncItem::ContactArchived {
+        contact_id: bob_id.clone(),
+        timestamp: 1_700_000_000,
+    }];
+
+    let applied = wb.apply_sync_items(items).unwrap();
+    assert_eq!(applied, 1, "Should apply 1 item");
+
+    let loaded = wb.get_contact(&bob_id).unwrap().unwrap();
+    assert!(
+        loaded.is_archived(),
+        "Contact should be archived after sync"
+    );
+    assert_eq!(
+        loaded.archived_at(),
+        Some(1_700_000_000),
+        "archived_at should match sync timestamp"
+    );
+}
+
+#[test]
+fn apply_sync_contact_unarchived_clears_flag() {
+    let mut wb = create_test_vauchi();
+    wb.create_identity("Alice").unwrap();
+
+    let bob = create_exchanged_contact("Bob");
+    let bob_id = bob.id().to_string();
+    wb.add_contact(bob).unwrap();
+
+    // First archive
+    wb.archive_contact(&bob_id).unwrap();
+
+    // Then unarchive via sync
+    let items = vec![SyncItem::ContactUnarchived {
+        contact_id: bob_id.clone(),
+        timestamp: 1_700_001_000,
+    }];
+
+    let applied = wb.apply_sync_items(items).unwrap();
+    assert_eq!(applied, 1, "Should apply 1 item");
+
+    let loaded = wb.get_contact(&bob_id).unwrap().unwrap();
+    assert!(
+        !loaded.is_archived(),
+        "Contact should not be archived after sync unarchive"
+    );
+    assert_eq!(loaded.archived_at(), None);
+}
+
+#[test]
+fn apply_sync_archive_nonexistent_contact_skips() {
+    let mut wb = create_test_vauchi();
+    wb.create_identity("Alice").unwrap();
+
+    let items = vec![SyncItem::ContactArchived {
+        contact_id: "nonexistent".to_string(),
+        timestamp: 1_700_000_000,
+    }];
+
+    let applied = wb.apply_sync_items(items).unwrap();
+    assert_eq!(
+        applied, 1,
+        "Should still count as applied (skip is non-fatal)"
     );
 }

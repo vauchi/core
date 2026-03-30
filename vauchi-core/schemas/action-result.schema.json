@@ -1431,6 +1431,13 @@
             "$ref": "#/definitions/Component"
           }
         },
+        "deprecated_components": {
+          "description": "Component types scheduled for removal. Frontends rendering these should display a migration hint in debug builds. Empty unless a deprecation cycle is in progress (2 major versions before removal).",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
         "progress": {
           "anyOf": [
             {

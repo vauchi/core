@@ -22,7 +22,7 @@ vauchi-core/src/exchange/multistage/session.rs 1178
 vauchi-core/src/recovery/mod.rs 1067
 
 # EXEMPT — migration ledger: coherence over size, version history must be co-located
-vauchi-core/src/storage/migration.rs 1631
+vauchi-core/src/storage/migration.rs 1648
 
 # SPLIT — Phase 3: extract connection management
 vauchi-core/src/storage/mod.rs 1079

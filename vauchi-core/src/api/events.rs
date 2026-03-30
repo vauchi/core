@@ -157,24 +157,6 @@ pub enum VauchiEvent {
         contact_id: String,
     },
 
-    /// A contact was soft-deleted (moved to trash).
-    ContactSoftDeleted {
-        /// The contact ID.
-        contact_id: String,
-    },
-
-    /// A contact was archived.
-    ContactArchived {
-        /// The contact ID.
-        contact_id: String,
-    },
-
-    /// A contact was unarchived.
-    ContactUnarchived {
-        /// The contact ID.
-        contact_id: String,
-    },
-
     /// A contact was blocked.
     ContactBlocked {
         /// The contact ID.
@@ -213,6 +195,24 @@ pub enum VauchiEvent {
         sent_count: usize,
         /// Total number of trusted contacts in the config.
         total: usize,
+    },
+
+    /// A contact was soft-deleted (moved to trash).
+    ContactSoftDeleted {
+        /// The contact ID.
+        contact_id: String,
+    },
+
+    /// A contact was archived.
+    ContactArchived {
+        /// The contact ID.
+        contact_id: String,
+    },
+
+    /// A contact was unarchived.
+    ContactUnarchived {
+        /// The contact ID.
+        contact_id: String,
     },
 }
 

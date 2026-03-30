@@ -444,6 +444,11 @@ pub fn all_migrations() -> Vec<Migration> {
             name: "sent_delta_version_tracking",
             action: MigrationAction::Sql(MIGRATION_V36_SENT_DELTA_VERSION),
         },
+        Migration {
+            version: 37,
+            name: "contact_delete_archive",
+            action: MigrationAction::Sql(MIGRATION_V37_CONTACT_DELETE_ARCHIVE),
+        },
     ]
 }
 
@@ -639,6 +644,18 @@ const MIGRATION_V34_IMPORTED_CONTACTS: &str = "
 /// Complements `last_delta_version` (which tracks received versions).
 const MIGRATION_V36_SENT_DELTA_VERSION: &str = "
     ALTER TABLE contacts ADD COLUMN last_sent_delta_version INTEGER DEFAULT 0;
+";
+
+/// Migration v37: Add soft-delete and archive columns to contacts.
+///
+/// Supports the contact delete/archive feature:
+/// - `deleted_at`: timestamp of soft-deletion (NULL = not deleted)
+/// - `archived`: flag for archived contacts (0 = not archived)
+/// - `archived_at`: timestamp of archival (NULL = not archived)
+const MIGRATION_V37_CONTACT_DELETE_ARCHIVE: &str = "
+    ALTER TABLE contacts ADD COLUMN deleted_at INTEGER;
+    ALTER TABLE contacts ADD COLUMN archived INTEGER NOT NULL DEFAULT 0;
+    ALTER TABLE contacts ADD COLUMN archived_at INTEGER;
 ";
 
 const MIGRATION_V35_LOCAL_GROUPS: &str = "

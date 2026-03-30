@@ -455,5 +455,13 @@ name = "contact_kind_tests"
 required-features = ["testing"]
 
 [[test]]
+name = "migration_v37_test"
+required-features = ["testing"]
+
+[[test]]
+name = "contact_delete_archive_tests"
+required-features = ["testing"]
+
+[[test]]
 name = "schema_gen"
 required-features = ["schema-gen"]

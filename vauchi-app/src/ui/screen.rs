@@ -97,6 +97,7 @@ mod tests {
         let m: ScreenModel = serde_json::from_str(legacy).expect("legacy JSON must parse");
         assert_eq!(m.schema_version, CURRENT_SCHEMA_VERSION);
         assert_eq!(m.tokens, DesignTokens::default());
+        assert!(m.deprecated_components.is_empty());
     }
 
     #[test]
@@ -113,6 +114,26 @@ mod tests {
         assert!(json.contains("\"spacing\""));
         assert!(json.contains("\"border_radius\""));
         assert!(json.contains("\"md_lg\":12"));
+    }
+
+    #[test]
+    fn deprecated_components_omitted_when_empty() {
+        let m = ScreenModel::new("test", "Title", vec![], vec![]);
+        let json = serde_json::to_string(&m).unwrap();
+        assert!(
+            !json.contains("deprecated_components"),
+            "empty deprecated_components must be omitted: {json}"
+        );
+    }
+
+    #[test]
+    fn deprecated_components_roundtrips() {
+        let mut m = ScreenModel::new("test", "Title", vec![], vec![]);
+        m.deprecated_components = vec!["OldWidget".to_string()];
+        let json = serde_json::to_string(&m).unwrap();
+        assert!(json.contains("\"deprecated_components\""));
+        let restored: ScreenModel = serde_json::from_str(&json).unwrap();
+        assert_eq!(restored.deprecated_components, vec!["OldWidget"]);
     }
 }
 

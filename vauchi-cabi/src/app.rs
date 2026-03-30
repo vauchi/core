@@ -369,6 +369,70 @@ pub unsafe extern "C" fn vauchi_app_default_screen(handle: *mut VauchiApp) -> *m
     }
 }
 
+/// Check whether the app has an identity.
+///
+/// Returns 1 if an identity exists, 0 if not, -1 on error (null handle, lock failure).
+///
+/// # Safety
+/// `handle` must be a valid app handle or null.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn vauchi_app_has_identity(handle: *mut VauchiApp) -> i32 {
+    // SAFETY: handle is checked non-null; engine lock prevents concurrent access.
+    unsafe {
+        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            if handle.is_null() {
+                return -1;
+            }
+            let app = &*handle;
+            app.engine
+                .lock()
+                .map(|engine| i32::from(engine.vauchi().has_identity()))
+                .unwrap_or(-1)
+        }))
+        .unwrap_or(-1)
+    }
+}
+
+/// Create a test identity (DEBUG/testing only).
+///
+/// Creates an identity with the given display name. No-op if an identity
+/// already exists. Returns 0 on success, -1 on error.
+///
+/// # Safety
+/// `handle` must be a valid app handle or null.
+/// `display_name` must be a valid null-terminated C string, or null (defaults to "Test User").
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn vauchi_app_create_identity(
+    handle: *mut VauchiApp,
+    display_name: *const c_char,
+) -> i32 {
+    // SAFETY: handle is checked non-null; display_name is checked null or valid C string.
+    unsafe {
+        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            if handle.is_null() {
+                return -1;
+            }
+            let app = &mut *handle;
+            let name = if display_name.is_null() {
+                "Test User".to_string()
+            } else {
+                from_c_str(display_name).unwrap_or_else(|| "Test User".to_string())
+            };
+            app.engine
+                .lock()
+                .map(|mut engine| {
+                    engine
+                        .vauchi_mut()
+                        .create_identity(&name)
+                        .map(|()| 0)
+                        .unwrap_or(-1)
+                })
+                .unwrap_or(-1)
+        }))
+        .unwrap_or(-1)
+    }
+}
+
 /// Handle a hardware event during an exchange (ADR-031).
 ///
 /// `event_json` must be a JSON-encoded `ExchangeHardwareEvent`.

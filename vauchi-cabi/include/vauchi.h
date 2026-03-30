@@ -214,6 +214,28 @@ char *vauchi_app_available_screens(struct VauchiApp *handle);
 char *vauchi_app_default_screen(struct VauchiApp *handle);
 
 /**
+ * Check whether the app has an identity.
+ *
+ * Returns 1 if an identity exists, 0 if not, -1 on error (null handle, lock failure).
+ *
+ * # Safety
+ * `handle` must be a valid app handle or null.
+ */
+int32_t vauchi_app_has_identity(struct VauchiApp *handle);
+
+/**
+ * Create a test identity (DEBUG/testing only).
+ *
+ * Creates an identity with the given display name. No-op if an identity
+ * already exists. Returns 0 on success, -1 on error.
+ *
+ * # Safety
+ * `handle` must be a valid app handle or null.
+ * `display_name` must be a valid null-terminated C string, or null (defaults to "Test User").
+ */
+int32_t vauchi_app_create_identity(struct VauchiApp *handle, const char *display_name);
+
+/**
  * Handle a hardware event during an exchange (ADR-031).
  *
  * `event_json` must be a JSON-encoded `ExchangeHardwareEvent`.

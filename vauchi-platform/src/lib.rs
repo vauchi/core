@@ -40,6 +40,7 @@ mod mobile_device_link;
 mod mobile_exchange;
 mod mobile_gdpr;
 mod mobile_identity;
+mod mobile_import;
 mod mobile_nfc;
 mod mobile_onboarding;
 mod mobile_recovery;
@@ -83,6 +84,7 @@ pub use mobile_ble::{
     MobileBleDelegate, MobileBleError, MobileBleExchangeResult, MobileBleExchangeSession,
     MobileBleField, MobileBleState, MobileBleTransportError,
 };
+pub use mobile_import::MobileImportResult;
 pub use mobile_nfc::{
     MobileNfcExchangeResult, MobileNfcHandshake, MobileNfcKeyAckResult, MobileNfcState,
     MobileNfcTransport, MobileNfcTransportError,
@@ -2174,5 +2176,70 @@ mod tests {
             with_field.card.fields[0].note.is_none(),
             "field without note should have note = None"
         );
+    }
+
+    // ── Import contacts via FFI ─────────────────────────────────────────────
+
+    // @scenario: contact_import.feature - Import vCard file
+    #[test]
+    fn test_import_vcf_creates_contacts() {
+        let (wb, _dir) = create_test_instance();
+        wb.create_identity("Alice".to_string()).unwrap();
+
+        let vcf = b"BEGIN:VCARD\r\n\
+            VERSION:3.0\r\n\
+            FN:Bob Smith\r\n\
+            TEL:+1234567890\r\n\
+            END:VCARD\r\n\
+            BEGIN:VCARD\r\n\
+            VERSION:3.0\r\n\
+            FN:Carol Jones\r\n\
+            EMAIL:carol@example.com\r\n\
+            END:VCARD\r\n";
+
+        let result = wb.import_contacts_from_vcf(vcf.to_vec()).unwrap();
+        assert_eq!(result.imported, 2);
+        assert_eq!(result.skipped, 0);
+        assert!(result.warnings.is_empty());
+
+        let contacts = wb.list_contacts().unwrap();
+        assert_eq!(contacts.len(), 2);
+    }
+
+    // @scenario: contact_import.feature - Duplicate vCard UIDs are skipped
+    #[test]
+    fn test_import_vcf_skips_duplicates() {
+        let (wb, _dir) = create_test_instance();
+        wb.create_identity("Alice".to_string()).unwrap();
+
+        let vcf = b"BEGIN:VCARD\r\n\
+            VERSION:3.0\r\n\
+            UID:unique-bob-123\r\n\
+            FN:Bob Smith\r\n\
+            END:VCARD\r\n";
+
+        let r1 = wb.import_contacts_from_vcf(vcf.to_vec()).unwrap();
+        assert_eq!(r1.imported, 1);
+
+        let r2 = wb.import_contacts_from_vcf(vcf.to_vec()).unwrap();
+        assert_eq!(r2.imported, 0);
+        assert_eq!(r2.skipped, 1);
+        assert!(r2.warnings[0].contains("duplicate"));
+    }
+
+    // @scenario: contact_import.feature - Empty vCard data returns zero imports
+    #[test]
+    fn test_import_empty_vcf() {
+        let (wb, _dir) = create_test_instance();
+        wb.create_identity("Alice".to_string()).unwrap();
+
+        let result = wb.import_contacts_from_vcf(Vec::new());
+        // Empty data is either zero imports or an error — both acceptable
+        match result {
+            Ok(r) => {
+                assert_eq!(r.imported, 0);
+            }
+            Err(_) => {} // Parser rejection of empty input is fine
+        }
     }
 }

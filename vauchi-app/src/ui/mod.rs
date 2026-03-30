@@ -79,7 +79,7 @@ pub use my_info::{MyInfoEngine, MyInfoGroupTab, MyInfoProgress, MyInfoViewMode, 
 pub use my_info_entry_detail::{EntryContactInfo, MyInfoEntryDetailEngine};
 pub use onboarding::{FieldSetup, GroupSetup, OnboardingData, OnboardingEngine};
 pub use recovery_status::RecoveryEngine;
-pub use screen::{ActionStyle, Progress, ScreenAction, ScreenModel};
+pub use screen::{ActionStyle, CURRENT_SCHEMA_VERSION, Progress, ScreenAction, ScreenModel};
 pub use settings::{SettingsConfig, SettingsEngine};
 pub use support::SupportEngine;
 #[cfg(any(feature = "network-native-tls", feature = "network-rustls"))]

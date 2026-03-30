@@ -12,7 +12,9 @@
 
 use std::fs;
 use std::path::PathBuf;
-use vauchi_app::ui::{ActionResult, OnboardingEngine, ScreenModel, UserAction, WorkflowEngine};
+use vauchi_app::ui::{
+    ActionResult, CURRENT_SCHEMA_VERSION, OnboardingEngine, ScreenModel, UserAction, WorkflowEngine,
+};
 
 fn fixtures_dir() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/golden")
@@ -245,9 +247,56 @@ fn ready_fixture_is_fresh() {
     assert_fixture_fresh(screen, "ready.json");
 }
 
+// ── Version metadata ──────────────────────────────────────────────
+
+/// Writes a `.version` metadata file alongside golden fixtures.
+/// Frontend contract tests use this to verify fixture/binding version alignment.
+fn write_version_file(fixture_count: usize) {
+    let version = env!("CARGO_PKG_VERSION");
+    let content = format!(
+        "{{\n  \"core_version\": \"{version}\",\n  \
+         \"schema_version\": {CURRENT_SCHEMA_VERSION},\n  \
+         \"fixture_count\": {fixture_count}\n}}\n"
+    );
+    fs::write(fixtures_dir().join(".version"), content).unwrap();
+}
+
+#[test]
+fn version_metadata_file_exists_and_is_valid() {
+    let path = fixtures_dir().join(".version");
+    assert!(path.exists(), ".version file missing — regenerate fixtures");
+
+    let content = fs::read_to_string(&path).unwrap();
+    let parsed: serde_json::Value =
+        serde_json::from_str(&content).expect(".version is not valid JSON");
+
+    assert_eq!(
+        parsed["core_version"].as_str().unwrap(),
+        env!("CARGO_PKG_VERSION"),
+        ".version core_version mismatch"
+    );
+    assert_eq!(
+        parsed["schema_version"].as_u64().unwrap(),
+        u64::from(CURRENT_SCHEMA_VERSION),
+        ".version schema_version mismatch"
+    );
+
+    // fixture_count must match actual .json files
+    let json_count = fs::read_dir(fixtures_dir())
+        .unwrap()
+        .filter_map(|e| e.ok())
+        .filter(|e| e.path().extension().is_some_and(|ext| ext == "json"))
+        .count();
+    assert_eq!(
+        parsed["fixture_count"].as_u64().unwrap(),
+        json_count as u64,
+        ".version fixture_count does not match actual .json file count"
+    );
+}
+
 // ── Regenerate all fixtures (run with --ignored) ───────────────────
 
-/// Regenerate all golden fixtures.
+/// Regenerate all golden fixtures and the `.version` metadata file.
 /// Run with: `cargo test -p vauchi-core --test golden_fixtures -- --ignored`
 #[test]
 #[ignore]
@@ -264,4 +313,13 @@ fn regenerate_all_fixtures() {
         fs::write(dir.join(&filename), &json).unwrap();
         println!("Generated {filename}");
     }
+
+    // Count all .json files (including engine fixtures)
+    let json_count = fs::read_dir(&dir)
+        .unwrap()
+        .filter_map(|e| e.ok())
+        .filter(|e| e.path().extension().is_some_and(|ext| ext == "json"))
+        .count();
+    write_version_file(json_count);
+    println!("Generated .version (count={json_count})");
 }

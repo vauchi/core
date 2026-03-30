@@ -8,10 +8,11 @@
 //! - Contact struct: soft_delete, undo_soft_delete, archive, unarchive
 //! - Storage layer: persist and filter deleted/archived contacts
 
-use vauchi_core::Storage;
 use vauchi_core::contact::Contact;
+use vauchi_core::contact::ImportSource;
 use vauchi_core::contact_card::ContactCard;
 use vauchi_core::crypto::SymmetricKey;
+use vauchi_core::{Identity, Storage, Vauchi, VauchiError};
 
 fn create_test_contact(name: &str, key_byte: u8) -> Contact {
     let public_key = [key_byte; 32];
@@ -23,6 +24,24 @@ fn create_test_contact(name: &str, key_byte: u8) -> Contact {
 fn create_test_storage() -> Storage {
     let key = SymmetricKey::generate();
     Storage::in_memory(key).unwrap()
+}
+
+fn create_test_vauchi() -> Vauchi {
+    Vauchi::in_memory().unwrap()
+}
+
+fn create_exchanged_contact(name: &str) -> Contact {
+    let identity = Identity::create(name);
+    Contact::from_exchange(
+        *identity.signing_public_key(),
+        ContactCard::new(name),
+        SymmetricKey::generate(),
+    )
+}
+
+fn create_imported_contact(name: &str) -> Contact {
+    let card = ContactCard::new(name);
+    Contact::from_import(card, ImportSource::Manual, None)
 }
 
 // ============================================================
@@ -244,4 +263,236 @@ fn find_stale_soft_deletes_returns_old_deletions() {
     let stale = storage.find_stale_soft_deletes(300).unwrap();
     assert_eq!(stale.len(), 1, "Should find exactly one stale deletion");
     assert_eq!(stale[0], contact_old.id());
+}
+
+// ============================================================
+// Task 4: ContactManager API via Vauchi facade
+// ============================================================
+
+#[test]
+fn soft_delete_imported_contact_sets_deleted_at() {
+    let mut wb = create_test_vauchi();
+    wb.create_identity("Alice").unwrap();
+
+    let imported = create_imported_contact("Bob Imported");
+    let id = imported.id().to_string();
+    wb.add_contact(imported).unwrap();
+
+    wb.soft_delete_imported_contact(&id).unwrap();
+
+    let loaded = wb.get_contact(&id).unwrap().unwrap();
+    assert!(loaded.is_soft_deleted(), "Contact should be soft-deleted");
+    assert!(loaded.deleted_at().is_some(), "deleted_at should be set");
+}
+
+#[test]
+fn undo_delete_imported_contact_clears_deleted_at() {
+    let mut wb = create_test_vauchi();
+    wb.create_identity("Alice").unwrap();
+
+    let imported = create_imported_contact("Bob Imported");
+    let id = imported.id().to_string();
+    wb.add_contact(imported).unwrap();
+
+    wb.soft_delete_imported_contact(&id).unwrap();
+    wb.undo_delete_imported_contact(&id).unwrap();
+
+    let loaded = wb.get_contact(&id).unwrap().unwrap();
+    assert!(
+        !loaded.is_soft_deleted(),
+        "Contact should not be soft-deleted after undo"
+    );
+    assert_eq!(loaded.deleted_at(), None, "deleted_at should be None");
+}
+
+#[test]
+fn hard_delete_imported_contact_removes_from_storage() {
+    let mut wb = create_test_vauchi();
+    wb.create_identity("Alice").unwrap();
+
+    let imported = create_imported_contact("Bob Imported");
+    let id = imported.id().to_string();
+    wb.add_contact(imported).unwrap();
+
+    wb.hard_delete_imported_contact(&id).unwrap();
+
+    let loaded = wb.get_contact(&id).unwrap();
+    assert!(loaded.is_none(), "Contact should be removed from storage");
+}
+
+#[test]
+fn archive_exchanged_contact_sets_archived() {
+    let mut wb = create_test_vauchi();
+    wb.create_identity("Alice").unwrap();
+
+    let bob = create_exchanged_contact("Bob");
+    let bob_id = bob.id().to_string();
+    wb.add_contact(bob).unwrap();
+
+    wb.archive_contact(&bob_id).unwrap();
+
+    let loaded = wb.get_contact(&bob_id).unwrap().unwrap();
+    assert!(loaded.is_archived(), "Contact should be archived");
+    assert!(loaded.archived_at().is_some(), "archived_at should be set");
+}
+
+#[test]
+fn unarchive_contact_clears_archived() {
+    let mut wb = create_test_vauchi();
+    wb.create_identity("Alice").unwrap();
+
+    let bob = create_exchanged_contact("Bob");
+    let bob_id = bob.id().to_string();
+    wb.add_contact(bob).unwrap();
+
+    wb.archive_contact(&bob_id).unwrap();
+    wb.unarchive_contact(&bob_id).unwrap();
+
+    let loaded = wb.get_contact(&bob_id).unwrap().unwrap();
+    assert!(!loaded.is_archived(), "Contact should not be archived");
+    assert_eq!(loaded.archived_at(), None, "archived_at should be None");
+}
+
+#[test]
+fn vauchi_list_archived_contacts_excludes_from_active() {
+    let mut wb = create_test_vauchi();
+    wb.create_identity("Alice").unwrap();
+
+    let bob = create_exchanged_contact("Bob");
+    let bob_id = bob.id().to_string();
+    wb.add_contact(bob).unwrap();
+
+    let carol = create_exchanged_contact("Carol");
+    wb.add_contact(carol).unwrap();
+
+    wb.archive_contact(&bob_id).unwrap();
+
+    let archived = wb.list_archived_contacts().unwrap();
+    assert_eq!(
+        archived.len(),
+        1,
+        "Should have exactly one archived contact"
+    );
+    assert_eq!(archived[0].id(), bob_id);
+
+    // Active list should exclude archived
+    let active = wb.list_contacts().unwrap();
+    assert_eq!(active.len(), 1, "Active list should exclude archived");
+    assert_ne!(active[0].id(), bob_id);
+}
+
+// ============================================================
+// Task 6: Adversarial tests
+// ============================================================
+
+#[test]
+fn delete_nonexistent_contact_returns_error() {
+    let mut wb = create_test_vauchi();
+    wb.create_identity("Alice").unwrap();
+
+    let result = wb.soft_delete_imported_contact("nonexistent-id");
+    assert!(
+        matches!(result, Err(VauchiError::ContactNotFound(_))),
+        "Should return ContactNotFound, got: {:?}",
+        result
+    );
+}
+
+#[test]
+fn delete_already_deleted_contact_is_idempotent() {
+    let mut wb = create_test_vauchi();
+    wb.create_identity("Alice").unwrap();
+
+    let imported = create_imported_contact("Bob");
+    let id = imported.id().to_string();
+    wb.add_contact(imported).unwrap();
+
+    wb.soft_delete_imported_contact(&id).unwrap();
+    let first_ts = wb.get_contact(&id).unwrap().unwrap().deleted_at().unwrap();
+
+    // Second soft-delete should succeed (idempotent) and update timestamp
+    wb.soft_delete_imported_contact(&id).unwrap();
+    let second_ts = wb.get_contact(&id).unwrap().unwrap().deleted_at().unwrap();
+
+    assert!(
+        second_ts >= first_ts,
+        "Second delete timestamp should be >= first"
+    );
+    assert!(
+        wb.get_contact(&id).unwrap().unwrap().is_soft_deleted(),
+        "Contact should still be soft-deleted"
+    );
+}
+
+#[test]
+fn archive_imported_contact_returns_error() {
+    let mut wb = create_test_vauchi();
+    wb.create_identity("Alice").unwrap();
+
+    let imported = create_imported_contact("Bob");
+    let id = imported.id().to_string();
+    wb.add_contact(imported).unwrap();
+
+    let result = wb.archive_contact(&id);
+    assert!(
+        matches!(result, Err(VauchiError::InvalidState(_))),
+        "Archiving imported contact should return InvalidState, got: {:?}",
+        result
+    );
+}
+
+#[test]
+fn delete_exchanged_contact_returns_error() {
+    let mut wb = create_test_vauchi();
+    wb.create_identity("Alice").unwrap();
+
+    let bob = create_exchanged_contact("Bob");
+    let bob_id = bob.id().to_string();
+    wb.add_contact(bob).unwrap();
+
+    let result = wb.soft_delete_imported_contact(&bob_id);
+    assert!(
+        matches!(result, Err(VauchiError::InvalidState(_))),
+        "Soft-deleting exchanged contact should return InvalidState, got: {:?}",
+        result
+    );
+}
+
+#[test]
+fn unarchive_non_archived_contact_is_idempotent() {
+    let mut wb = create_test_vauchi();
+    wb.create_identity("Alice").unwrap();
+
+    let bob = create_exchanged_contact("Bob");
+    let bob_id = bob.id().to_string();
+    wb.add_contact(bob).unwrap();
+
+    // Unarchiving a non-archived contact should succeed (idempotent)
+    wb.unarchive_contact(&bob_id).unwrap();
+
+    let loaded = wb.get_contact(&bob_id).unwrap().unwrap();
+    assert!(!loaded.is_archived(), "Contact should not be archived");
+    assert_eq!(loaded.archived_at(), None);
+}
+
+#[test]
+fn undo_delete_after_hard_delete_returns_error() {
+    let mut wb = create_test_vauchi();
+    wb.create_identity("Alice").unwrap();
+
+    let imported = create_imported_contact("Bob");
+    let id = imported.id().to_string();
+    wb.add_contact(imported).unwrap();
+
+    // Soft-delete then hard-delete
+    wb.soft_delete_imported_contact(&id).unwrap();
+    wb.hard_delete_imported_contact(&id).unwrap();
+
+    // Undo should fail because contact no longer exists
+    let result = wb.undo_delete_imported_contact(&id);
+    assert!(
+        matches!(result, Err(VauchiError::ContactNotFound(_))),
+        "Undo after hard-delete should return ContactNotFound, got: {:?}",
+        result
+    );
 }

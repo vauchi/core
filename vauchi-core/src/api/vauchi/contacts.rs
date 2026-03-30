@@ -288,6 +288,44 @@ impl Vauchi {
         Ok(())
     }
 
+    // === Soft-Delete / Archive Operations ===
+
+    /// Soft-deletes an imported contact.
+    pub fn soft_delete_imported_contact(&self, id: &str) -> VauchiResult<()> {
+        let manager = ContactManager::new(&self.storage, self.events.clone());
+        manager.soft_delete_imported_contact(id)
+    }
+
+    /// Undoes a soft-delete on an imported contact.
+    pub fn undo_delete_imported_contact(&self, id: &str) -> VauchiResult<()> {
+        let manager = ContactManager::new(&self.storage, self.events.clone());
+        manager.undo_delete_imported_contact(id)
+    }
+
+    /// Permanently deletes an imported contact from storage.
+    pub fn hard_delete_imported_contact(&self, id: &str) -> VauchiResult<()> {
+        let manager = ContactManager::new(&self.storage, self.events.clone());
+        manager.hard_delete_imported_contact(id)
+    }
+
+    /// Archives an exchanged contact.
+    pub fn archive_contact(&self, id: &str) -> VauchiResult<()> {
+        let manager = ContactManager::new(&self.storage, self.events.clone());
+        manager.archive_contact(id)
+    }
+
+    /// Unarchives an exchanged contact.
+    pub fn unarchive_contact(&self, id: &str) -> VauchiResult<()> {
+        let manager = ContactManager::new(&self.storage, self.events.clone());
+        manager.unarchive_contact(id)
+    }
+
+    /// Lists all archived contacts.
+    pub fn list_archived_contacts(&self) -> VauchiResult<Vec<Contact>> {
+        let manager = ContactManager::new(&self.storage, self.events.clone());
+        manager.list_archived_contacts()
+    }
+
     // === Double Ratchet Operations ===
 
     /// Gets the Double Ratchet state for a contact.

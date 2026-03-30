@@ -357,6 +357,100 @@ impl<'a> ContactManager<'a> {
         Ok(())
     }
 
+    // === Soft-Delete Operations (imported contacts only) ===
+
+    /// Soft-deletes an imported contact by setting `deleted_at` to now.
+    ///
+    /// Only imported contacts can be soft-deleted. Exchanged contacts should
+    /// be archived instead.
+    pub fn soft_delete_imported_contact(&self, id: &str) -> VauchiResult<()> {
+        let mut contact = self.get_contact_required(id)?;
+        if contact.is_exchanged() {
+            return Err(VauchiError::InvalidState(
+                "Cannot soft-delete an exchanged contact; use archive instead".into(),
+            ));
+        }
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+        contact.soft_delete(now);
+        self.storage.save_contact(&contact)?;
+        self.events.dispatch(VauchiEvent::ContactSoftDeleted {
+            contact_id: id.to_string(),
+        });
+        Ok(())
+    }
+
+    /// Undoes a soft-delete on an imported contact.
+    ///
+    /// Clears the `deleted_at` timestamp. Returns `ContactNotFound` if the
+    /// contact doesn't exist (e.g., already hard-deleted).
+    pub fn undo_delete_imported_contact(&self, id: &str) -> VauchiResult<()> {
+        let mut contact = self.get_contact_required(id)?;
+        contact.undo_soft_delete();
+        self.storage.save_contact(&contact)?;
+        Ok(())
+    }
+
+    /// Permanently deletes an imported contact from storage.
+    ///
+    /// Only imported contacts can be hard-deleted. Dispatches `ContactRemoved`.
+    pub fn hard_delete_imported_contact(&self, id: &str) -> VauchiResult<()> {
+        let contact = self.get_contact_required(id)?;
+        if contact.is_exchanged() {
+            return Err(VauchiError::InvalidState(
+                "Cannot hard-delete an exchanged contact; use archive instead".into(),
+            ));
+        }
+        self.storage.delete_contact(id)?;
+        self.events.dispatch(VauchiEvent::ContactRemoved {
+            contact_id: id.to_string(),
+        });
+        Ok(())
+    }
+
+    // === Archive Operations (exchanged contacts only) ===
+
+    /// Archives an exchanged contact.
+    ///
+    /// Archived contacts are hidden from the main list but retained with
+    /// their crypto state intact so they can be restored later.
+    pub fn archive_contact(&self, id: &str) -> VauchiResult<()> {
+        let mut contact = self.get_contact_required(id)?;
+        if contact.is_imported() {
+            return Err(VauchiError::InvalidState(
+                "Cannot archive an imported contact; use soft-delete instead".into(),
+            ));
+        }
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+        contact.archive(now);
+        self.storage.save_contact(&contact)?;
+        self.events.dispatch(VauchiEvent::ContactArchived {
+            contact_id: id.to_string(),
+        });
+        Ok(())
+    }
+
+    /// Unarchives an exchanged contact, returning it to the main list.
+    pub fn unarchive_contact(&self, id: &str) -> VauchiResult<()> {
+        let mut contact = self.get_contact_required(id)?;
+        contact.unarchive();
+        self.storage.save_contact(&contact)?;
+        self.events.dispatch(VauchiEvent::ContactUnarchived {
+            contact_id: id.to_string(),
+        });
+        Ok(())
+    }
+
+    /// Lists all archived contacts.
+    pub fn list_archived_contacts(&self) -> VauchiResult<Vec<Contact>> {
+        Ok(self.storage.list_archived_contacts()?)
+    }
+
     // === Helper Methods ===
 
     /// Computes which fields changed between two cards.

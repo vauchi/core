@@ -41,6 +41,9 @@ pub(super) struct ContactRow {
     pub import_source: Option<String>,
     pub imported_at: Option<i64>,
     pub original_uid: Option<String>,
+    pub deleted_at: Option<i64>,
+    pub archived: i32,
+    pub archived_at: Option<i64>,
 }
 
 impl Storage {
@@ -115,6 +118,18 @@ impl Storage {
             contact.set_favorite(true);
         }
         contact.set_card_updated_at(row.card_updated_at.map(|t| t as u64));
+
+        // Restore soft-delete / archive state
+        if let Some(ts) = row.deleted_at {
+            contact.soft_delete(ts as u64);
+        }
+        if row.archived != 0 {
+            if let Some(ts) = row.archived_at {
+                contact.archive(ts as u64);
+            } else {
+                contact.archive(0);
+            }
+        }
 
         if let Some(cek) = cek {
             contact.set_cek(cek);
@@ -208,6 +223,18 @@ impl Storage {
             .trust_metrics
             .and_then(|s| serde_json::from_str(&s).ok());
         contact.set_trust_metrics(trust_metrics);
+
+        // Restore soft-delete / archive state
+        if let Some(ts) = row.deleted_at {
+            contact.soft_delete(ts as u64);
+        }
+        if row.archived != 0 {
+            if let Some(ts) = row.archived_at {
+                contact.archive(ts as u64);
+            } else {
+                contact.archive(0);
+            }
+        }
 
         Ok(contact)
     }

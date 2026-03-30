@@ -137,8 +137,9 @@ impl Storage {
               blocked, hidden, favorite, recovery_trusted, proposal_trusted, cek_encrypted,
               exchange_transport, has_recovered, card_updated_at,
               relay_url, relay_noise_pubkey, trust_metrics,
-              contact_kind, import_source, imported_at, original_uid)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25)
+              contact_kind, import_source, imported_at, original_uid,
+              deleted_at, archived, archived_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25, ?26, ?27, ?28)
              ON CONFLICT(id) DO UPDATE SET
                public_key              = excluded.public_key,
                display_name            = excluded.display_name,
@@ -162,7 +163,10 @@ impl Storage {
                contact_kind            = excluded.contact_kind,
                import_source           = excluded.import_source,
                imported_at             = excluded.imported_at,
-               original_uid            = excluded.original_uid",
+               original_uid            = excluded.original_uid,
+               deleted_at              = excluded.deleted_at,
+               archived                = excluded.archived,
+               archived_at             = excluded.archived_at",
             params![
                 contact.id(),
                 public_key_bytes,
@@ -189,6 +193,9 @@ impl Storage {
                 import_source_str,
                 imported_at_val,
                 original_uid_val,
+                contact.deleted_at().map(|t| t as i64),
+                contact.is_archived() as i32,
+                contact.archived_at().map(|t| t as i64),
             ],
         )?;
 
@@ -203,7 +210,8 @@ impl Storage {
                     fingerprint_verified, blocked, hidden, favorite, recovery_trusted,
                     proposal_trusted, cek_encrypted, exchange_transport, has_recovered,
                     card_updated_at, relay_url, relay_noise_pubkey, trust_metrics,
-                    contact_kind, import_source, imported_at, original_uid
+                    contact_kind, import_source, imported_at, original_uid,
+                    deleted_at, archived, archived_at
              FROM contacts WHERE id = ?1",
         )?;
 
@@ -234,6 +242,9 @@ impl Storage {
                 import_source: row.get(22)?,
                 imported_at: row.get(23)?,
                 original_uid: row.get(24)?,
+                deleted_at: row.get(25)?,
+                archived: row.get(26)?,
+                archived_at: row.get(27)?,
             })
         });
 
@@ -244,7 +255,7 @@ impl Storage {
         }
     }
 
-    /// Lists all contacts.
+    /// Lists all contacts, excluding soft-deleted and archived contacts.
     pub fn list_contacts(&self) -> Result<Vec<Contact>, StorageError> {
         let mut stmt = self.conn.prepare(
             "SELECT id, public_key, display_name, card_encrypted, shared_key_encrypted,
@@ -252,8 +263,11 @@ impl Storage {
                     fingerprint_verified, blocked, hidden, favorite, recovery_trusted,
                     proposal_trusted, cek_encrypted, exchange_transport, has_recovered,
                     card_updated_at, relay_url, relay_noise_pubkey, trust_metrics,
-                    contact_kind, import_source, imported_at, original_uid
-             FROM contacts ORDER BY display_name",
+                    contact_kind, import_source, imported_at, original_uid,
+                    deleted_at, archived, archived_at
+             FROM contacts
+             WHERE deleted_at IS NULL AND archived = 0
+             ORDER BY display_name",
         )?;
 
         let rows = stmt.query_map([], |row| {
@@ -283,6 +297,9 @@ impl Storage {
                 import_source: row.get(22)?,
                 imported_at: row.get(23)?,
                 original_uid: row.get(24)?,
+                deleted_at: row.get(25)?,
+                archived: row.get(26)?,
+                archived_at: row.get(27)?,
             })
         })?;
 
@@ -314,8 +331,11 @@ impl Storage {
                     fingerprint_verified, blocked, hidden, favorite, recovery_trusted,
                     proposal_trusted, cek_encrypted, exchange_transport, has_recovered,
                     card_updated_at, relay_url, relay_noise_pubkey, trust_metrics,
-                    contact_kind, import_source, imported_at, original_uid
-             FROM contacts ORDER BY display_name
+                    contact_kind, import_source, imported_at, original_uid,
+                    deleted_at, archived, archived_at
+             FROM contacts
+             WHERE deleted_at IS NULL AND archived = 0
+             ORDER BY display_name
              LIMIT ?1 OFFSET ?2",
         )?;
 
@@ -346,6 +366,9 @@ impl Storage {
                 import_source: row.get(22)?,
                 imported_at: row.get(23)?,
                 original_uid: row.get(24)?,
+                deleted_at: row.get(25)?,
+                archived: row.get(26)?,
+                archived_at: row.get(27)?,
             })
         })?;
 
@@ -382,9 +405,11 @@ impl Storage {
                     fingerprint_verified, blocked, hidden, favorite, recovery_trusted,
                     proposal_trusted, cek_encrypted, exchange_transport, has_recovered,
                     card_updated_at, relay_url, relay_noise_pubkey, trust_metrics,
-                    contact_kind, import_source, imported_at, original_uid
+                    contact_kind, import_source, imported_at, original_uid,
+                    deleted_at, archived, archived_at
              FROM contacts
              WHERE display_name != '' AND display_name LIKE ?1 COLLATE NOCASE
+               AND deleted_at IS NULL AND archived = 0
              ORDER BY display_name",
         )?;
 
@@ -415,6 +440,9 @@ impl Storage {
                 import_source: row.get(22)?,
                 imported_at: row.get(23)?,
                 original_uid: row.get(24)?,
+                deleted_at: row.get(25)?,
+                archived: row.get(26)?,
+                archived_at: row.get(27)?,
             })
         })?;
 
@@ -431,9 +459,10 @@ impl Storage {
                     fingerprint_verified, blocked, hidden, favorite, recovery_trusted,
                     proposal_trusted, cek_encrypted, exchange_transport, has_recovered,
                     card_updated_at, relay_url, relay_noise_pubkey, trust_metrics,
-                    contact_kind, import_source, imported_at, original_uid
+                    contact_kind, import_source, imported_at, original_uid,
+                    deleted_at, archived, archived_at
              FROM contacts
-             WHERE display_name = ''",
+             WHERE display_name = '' AND deleted_at IS NULL AND archived = 0",
         )?;
 
         let cek_rows = cek_stmt.query_map([], |row| {
@@ -463,6 +492,9 @@ impl Storage {
                 import_source: row.get(22)?,
                 imported_at: row.get(23)?,
                 original_uid: row.get(24)?,
+                deleted_at: row.get(25)?,
+                archived: row.get(26)?,
+                archived_at: row.get(27)?,
             })
         })?;
 
@@ -496,6 +528,85 @@ impl Storage {
             .conn
             .execute("DELETE FROM contacts WHERE id = ?1", params![id])?;
         Ok(rows_affected > 0)
+    }
+
+    // === Archived Contacts ===
+
+    /// Lists contacts that are archived (but not soft-deleted).
+    pub fn list_archived_contacts(&self) -> Result<Vec<Contact>, StorageError> {
+        let mut stmt = self.conn.prepare(
+            "SELECT id, public_key, display_name, card_encrypted, shared_key_encrypted,
+                    visibility_rules_json, visibility_rules_encrypted, exchange_timestamp,
+                    fingerprint_verified, blocked, hidden, favorite, recovery_trusted,
+                    proposal_trusted, cek_encrypted, exchange_transport, has_recovered,
+                    card_updated_at, relay_url, relay_noise_pubkey, trust_metrics,
+                    contact_kind, import_source, imported_at, original_uid,
+                    deleted_at, archived, archived_at
+             FROM contacts
+             WHERE archived = 1 AND deleted_at IS NULL
+             ORDER BY display_name",
+        )?;
+
+        let rows = stmt.query_map([], |row| {
+            Ok(ContactRow {
+                id: row.get(0)?,
+                public_key: row.get(1)?,
+                display_name: row.get(2)?,
+                card_encrypted: row.get(3)?,
+                shared_key_encrypted: row.get(4)?,
+                visibility_rules_json: row.get(5)?,
+                visibility_rules_encrypted: row.get(6)?,
+                exchange_timestamp: row.get(7)?,
+                fingerprint_verified: row.get(8)?,
+                blocked: row.get(9)?,
+                hidden: row.get(10)?,
+                favorite: row.get(11)?,
+                recovery_trusted: row.get(12)?,
+                proposal_trusted: row.get(13)?,
+                cek_encrypted: row.get(14)?,
+                exchange_transport: row.get(15)?,
+                has_recovered: row.get(16)?,
+                card_updated_at: row.get(17)?,
+                relay_url: row.get(18)?,
+                relay_noise_pubkey: row.get(19)?,
+                trust_metrics: row.get(20)?,
+                contact_kind: row.get(21)?,
+                import_source: row.get(22)?,
+                imported_at: row.get(23)?,
+                original_uid: row.get(24)?,
+                deleted_at: row.get(25)?,
+                archived: row.get(26)?,
+                archived_at: row.get(27)?,
+            })
+        })?;
+
+        let mut contacts = Vec::new();
+        for row_result in rows {
+            let row = row_result?;
+            contacts.push(self.row_to_contact(row)?);
+        }
+
+        Ok(contacts)
+    }
+
+    // === Stale Soft-Delete Cleanup ===
+
+    /// Finds contact IDs that were soft-deleted before the given timestamp.
+    ///
+    /// Used by the garbage collector to find contacts eligible for permanent deletion.
+    pub fn find_stale_soft_deletes(&self, older_than: u64) -> Result<Vec<String>, StorageError> {
+        let mut stmt = self
+            .conn
+            .prepare("SELECT id FROM contacts WHERE deleted_at IS NOT NULL AND deleted_at < ?1")?;
+
+        let rows = stmt.query_map(params![older_than as i64], |row| row.get::<_, String>(0))?;
+
+        let mut ids = Vec::new();
+        for row_result in rows {
+            ids.push(row_result?);
+        }
+
+        Ok(ids)
     }
 
     // === Import Dedup ===

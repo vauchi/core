@@ -135,3 +135,113 @@ fn imported_contact_defaults_not_deleted_not_archived() {
     assert_eq!(contact.deleted_at(), None);
     assert_eq!(contact.archived_at(), None);
 }
+
+// ============================================================
+// Storage layer tests
+// ============================================================
+
+#[test]
+fn storage_persists_deleted_at() {
+    let storage = create_test_storage();
+    let mut contact = create_test_contact("Alice", 0x10);
+    let ts = 1_700_000_000u64;
+    contact.soft_delete(ts);
+    storage.save_contact(&contact).unwrap();
+
+    let loaded = storage.load_contact(contact.id()).unwrap().unwrap();
+    assert_eq!(
+        loaded.deleted_at(),
+        Some(ts),
+        "deleted_at should be persisted and loaded"
+    );
+    assert!(loaded.is_soft_deleted());
+}
+
+#[test]
+fn storage_persists_archived_flag() {
+    let storage = create_test_storage();
+    let mut contact = create_test_contact("Bob", 0x11);
+    let ts = 1_700_000_000u64;
+    contact.archive(ts);
+    storage.save_contact(&contact).unwrap();
+
+    let loaded = storage.load_contact(contact.id()).unwrap().unwrap();
+    assert!(loaded.is_archived(), "archived flag should be persisted");
+    assert_eq!(
+        loaded.archived_at(),
+        Some(ts),
+        "archived_at should be persisted and loaded"
+    );
+}
+
+#[test]
+fn list_contacts_excludes_soft_deleted() {
+    let storage = create_test_storage();
+
+    let contact_a = create_test_contact("Active", 0x20);
+    storage.save_contact(&contact_a).unwrap();
+
+    let mut contact_d = create_test_contact("Deleted", 0x21);
+    contact_d.soft_delete(1_700_000_000);
+    storage.save_contact(&contact_d).unwrap();
+
+    let list = storage.list_contacts().unwrap();
+    assert_eq!(list.len(), 1, "list_contacts should exclude soft-deleted");
+    assert_eq!(list[0].id(), contact_a.id());
+}
+
+#[test]
+fn list_contacts_excludes_archived() {
+    let storage = create_test_storage();
+
+    let contact_a = create_test_contact("Active", 0x30);
+    storage.save_contact(&contact_a).unwrap();
+
+    let mut contact_arch = create_test_contact("Archived", 0x31);
+    contact_arch.archive(1_700_000_000);
+    storage.save_contact(&contact_arch).unwrap();
+
+    let list = storage.list_contacts().unwrap();
+    assert_eq!(list.len(), 1, "list_contacts should exclude archived");
+    assert_eq!(list[0].id(), contact_a.id());
+}
+
+#[test]
+fn list_archived_contacts_returns_only_archived() {
+    let storage = create_test_storage();
+
+    let contact_a = create_test_contact("Active", 0x40);
+    storage.save_contact(&contact_a).unwrap();
+
+    let mut contact_arch = create_test_contact("Archived", 0x41);
+    contact_arch.archive(1_700_000_000);
+    storage.save_contact(&contact_arch).unwrap();
+
+    let archived = storage.list_archived_contacts().unwrap();
+    assert_eq!(archived.len(), 1, "Should return only archived contacts");
+    assert_eq!(archived[0].id(), contact_arch.id());
+}
+
+#[test]
+fn find_stale_soft_deletes_returns_old_deletions() {
+    let storage = create_test_storage();
+
+    // Contact deleted at timestamp 100 (old)
+    let mut contact_old = create_test_contact("Old", 0x50);
+    contact_old.soft_delete(100);
+    storage.save_contact(&contact_old).unwrap();
+
+    // Contact deleted at timestamp 500 (recent)
+    let mut contact_new = create_test_contact("New", 0x51);
+    contact_new.soft_delete(500);
+    storage.save_contact(&contact_new).unwrap();
+
+    // Active contact (not deleted)
+    let contact_active = create_test_contact("Active", 0x52);
+    storage.save_contact(&contact_active).unwrap();
+
+    // Find deletions older than 300
+    let stale = storage.find_stale_soft_deletes(300).unwrap();
+    assert_eq!(stale.len(), 1, "Should find exactly one stale deletion");
+    assert_eq!(stale[0], contact_old.id());
+}

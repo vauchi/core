@@ -1,0 +1,7 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: vauchi-core
+Upstream-Contact: Mattia Egloff <mattia.egloff@pm.me>
+
+Files: vauchi-core/tests/fixtures/golden/.version
+Copyright: 2026 Mattia Egloff <mattia.egloff@pm.me>
+License: GPL-3.0-or-later

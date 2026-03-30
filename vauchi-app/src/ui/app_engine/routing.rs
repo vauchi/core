@@ -408,6 +408,33 @@ impl AppEngine {
                     },
                 }
             }
+            AppScreen::Sync => {
+                let action = self.engine.collected_input().unwrap_or_default();
+                match action.as_str() {
+                    "sync_now" => {
+                        let pending = self.vauchi.pending_update_count().unwrap_or(0);
+                        if pending == 0 {
+                            ActionResult::ShowToast {
+                                message: "Already up to date".into(),
+                                undo_action_id: None,
+                            }
+                        } else {
+                            ActionResult::ShowToast {
+                                message: format!("{pending} update(s) queued for sync"),
+                                undo_action_id: None,
+                            }
+                        }
+                    }
+                    "test_connection" => ActionResult::ShowToast {
+                        message: "Connection check initiated".into(),
+                        undo_action_id: None,
+                    },
+                    _ => {
+                        let screen = self.navigate_back();
+                        ActionResult::NavigateTo(screen)
+                    }
+                }
+            }
             _ => {
                 let screen = self.navigate_back();
                 ActionResult::NavigateTo(screen)

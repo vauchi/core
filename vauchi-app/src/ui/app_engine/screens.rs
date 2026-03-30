@@ -263,7 +263,8 @@ impl AppEngine {
             AppScreen::Sync => {
                 let relay_url = vauchi.config().relay.server_url.clone();
                 let contact_count = vauchi.list_contacts().map(|c| c.len()).unwrap_or(0);
-                Box::new(SyncStatusEngine::new(relay_url, contact_count, 0))
+                let pending = vauchi.pending_update_count().unwrap_or(0) as usize;
+                Box::new(SyncStatusEngine::new(relay_url, contact_count, pending))
             }
             AppScreen::Recovery => {
                 let contacts = Self::load_contact_items(vauchi);

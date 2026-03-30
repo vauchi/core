@@ -28,6 +28,11 @@ pub struct ScreenModel {
     /// spacing, radius, typography from here — never hardcode values.
     #[serde(default)]
     pub tokens: DesignTokens,
+    /// Component types scheduled for removal. Frontends rendering these
+    /// should display a migration hint in debug builds. Empty unless a
+    /// deprecation cycle is in progress (2 major versions before removal).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub deprecated_components: Vec<String>,
 }
 
 fn default_schema_version() -> u16 {
@@ -45,6 +50,7 @@ impl Default for ScreenModel {
             actions: Vec::new(),
             progress: None,
             tokens: DesignTokens::default(),
+            deprecated_components: Vec::new(),
         }
     }
 }
@@ -66,6 +72,7 @@ impl ScreenModel {
             actions,
             progress: None,
             tokens: DesignTokens::default(),
+            deprecated_components: Vec::new(),
         }
     }
 }

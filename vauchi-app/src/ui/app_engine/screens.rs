@@ -222,8 +222,11 @@ impl AppEngine {
             AppScreen::Backup => Box::new(BackupRecoveryEngine::new(None)),
             AppScreen::Lock => Box::new(LockScreenEngine::new(5)),
             AppScreen::DeviceLinking => {
-                let qr = vauchi.public_id().unwrap_or_default();
-                Box::new(DeviceLinkingEngine::new(qr))
+                let qr_data = vauchi
+                    .generate_device_link()
+                    .map(|r| r.data_string)
+                    .unwrap_or_default();
+                Box::new(DeviceLinkingEngine::new(qr_data))
             }
             AppScreen::DuressPin => {
                 let config = vauchi

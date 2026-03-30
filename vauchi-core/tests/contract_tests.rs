@@ -131,6 +131,12 @@ fn user_action_variants_validate_against_schema() {
                 item_id: "notifications".into(),
             },
         ),
+        (
+            "UndoPressed",
+            UserAction::UndoPressed {
+                action_id: "undo_delete_field:f1".into(),
+            },
+        ),
     ];
 
     for (variant_name, action) in &actions {
@@ -215,6 +221,40 @@ fn action_result_variants_validate_against_schema() {
             variant_name,
             serde_json::to_string_pretty(&json_value).unwrap(),
             validation.err().map(|e| e.to_string()).unwrap_or_default()
+        );
+    }
+}
+
+/// Contract: deserializing an unknown UserAction variant returns a serde error,
+/// not a panic. Frontends may send actions from a newer version; core must
+/// handle this gracefully at the deserialization boundary.
+#[test]
+fn unknown_user_action_variant_returns_error_not_panic() {
+    let unknown_json = r#"{"FutureAction": {"widget_id": "x"}}"#;
+    let result = serde_json::from_str::<UserAction>(unknown_json);
+    assert!(
+        result.is_err(),
+        "Deserializing unknown UserAction variant should return Err, got: {:?}",
+        result
+    );
+    let err_msg = result.unwrap_err().to_string();
+    assert!(
+        err_msg.contains("unknown variant"),
+        "Error should mention 'unknown variant', got: {}",
+        err_msg
+    );
+}
+
+/// Contract: deserializing malformed JSON for UserAction returns an error.
+#[test]
+fn malformed_user_action_json_returns_error_not_panic() {
+    let cases = [r#""JustAString""#, r#"null"#, r#"42"#, r#"[]"#, r#"{}"#];
+    for json in &cases {
+        let result = serde_json::from_str::<UserAction>(json);
+        assert!(
+            result.is_err(),
+            "Malformed UserAction JSON should fail: {}",
+            json
         );
     }
 }

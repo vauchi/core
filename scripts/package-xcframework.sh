@@ -216,6 +216,18 @@ cp -r "$XCFRAMEWORK_PATH" "$PACKAGE_DIR/"
 mkdir -p "$PACKAGE_DIR/Sources"
 cp "$IOS_GENERATED_DIR/vauchi_platform.swift" "$PACKAGE_DIR/Sources/"
 
+# Copy golden fixtures for frontend contract tests
+GOLDEN_SRC="$PROJECT_ROOT/vauchi-core/tests/fixtures/golden"
+if [[ -d "$GOLDEN_SRC" ]]; then
+    echo -e "${YELLOW}Copying golden fixtures...${NC}"
+    mkdir -p "$PACKAGE_DIR/GoldenFixtures"
+    cp "$GOLDEN_SRC"/*.json "$PACKAGE_DIR/GoldenFixtures/"
+    if [[ -f "$GOLDEN_SRC/.version" ]]; then
+        cp "$GOLDEN_SRC/.version" "$PACKAGE_DIR/GoldenFixtures/"
+    fi
+    echo "  $(ls "$PACKAGE_DIR/GoldenFixtures/"*.json | wc -l | tr -d ' ') fixtures copied"
+fi
+
 # Create README
 cat > "$PACKAGE_DIR/README.md" << EOF
 # VauchiPlatform v$VERSION

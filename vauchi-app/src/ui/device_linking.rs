@@ -73,12 +73,20 @@ impl DeviceLinkingEngine {
                 screen_id: "link_show_qr".into(),
                 title: "Link Device".into(),
                 subtitle: None,
-                components: vec![Component::QrCode {
-                    id: "qr".into(),
-                    data: self.qr_data.clone(),
-                    mode: QrMode::Display,
-                    label: Some("Scan on new device".into()),
-                }],
+                components: vec![
+                    Component::QrCode {
+                        id: "qr".into(),
+                        data: self.qr_data.clone(),
+                        mode: QrMode::Display,
+                        label: Some("Scan on new device".into()),
+                    },
+                    Component::Text {
+                        id: "join_hint".into(),
+                        content: "To join from another device, use: vauchi device join <qr_data>"
+                            .into(),
+                        style: TextStyle::Caption,
+                    },
+                ],
                 actions: vec![ScreenAction {
                     id: "cancel".into(),
                     label: "Cancel".into(),

@@ -561,4 +561,22 @@ impl Vauchi {
             .delete_contact_field_note(contact_id, field_id)?;
         Ok(())
     }
+
+    /// Cleans up stale soft-deleted contacts (older than 30 seconds).
+    ///
+    /// Should be called on startup to hard-delete contacts whose undo window
+    /// expired while the app was not running (e.g., crash during undo window).
+    pub fn cleanup_stale_soft_deletes(&self) -> VauchiResult<usize> {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+        let threshold = now.saturating_sub(30);
+        let stale_ids = self.storage.find_stale_soft_deletes(threshold)?;
+        let count = stale_ids.len();
+        for id in stale_ids {
+            self.storage.delete_contact(id.as_str())?;
+        }
+        Ok(count)
+    }
 }

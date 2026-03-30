@@ -158,6 +158,34 @@ fn link_done_completes() {
 }
 
 #[test]
+fn peer_connected_is_noop_outside_show_qr() {
+    let mut engine = DeviceLinkingEngine::new("data".to_string());
+    engine.peer_connected("ABC-123".to_string());
+    // Now in VerifyCode — calling peer_connected again should be a no-op
+    engine.peer_connected("XYZ-999".to_string());
+    let screen = engine.current_screen();
+    assert_eq!(screen.screen_id, "link_verify");
+    // Original code is preserved, not overwritten
+    match &screen.components[0] {
+        Component::Text { content, .. } => assert_eq!(content, "ABC-123"),
+        other => panic!("expected Text, got {:?}", other),
+    }
+}
+
+#[test]
+fn sync_complete_is_noop_outside_syncing() {
+    let mut engine = DeviceLinkingEngine::new("data".to_string());
+    // In ShowQr — sync_complete should be a no-op
+    engine.sync_complete();
+    assert_eq!(engine.current_screen().screen_id, "link_show_qr");
+
+    // In VerifyCode — sync_complete should be a no-op
+    engine.peer_connected("ABC-123".to_string());
+    engine.sync_complete();
+    assert_eq!(engine.current_screen().screen_id, "link_verify");
+}
+
+#[test]
 fn link_cancel_from_show_qr() {
     let mut engine = DeviceLinkingEngine::new("data".to_string());
 

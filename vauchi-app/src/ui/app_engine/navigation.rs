@@ -6,7 +6,7 @@
 
 use super::AppEngine;
 use super::AppScreen;
-use crate::ui::screen::ScreenModel;
+use crate::ui::screen::{ScreenModel, TabInfo};
 
 impl AppEngine {
     pub fn navigate_to(&mut self, screen: AppScreen) -> ScreenModel {
@@ -96,5 +96,32 @@ impl AppEngine {
             AppScreen::Groups,
             AppScreen::More,
         ]
+    }
+
+    /// Returns tab metadata with labels and icon names.
+    /// Frontends can render tabs without hardcoding any strings or icons.
+    ///
+    /// Labels are English for now — will use `i18n::get_string(locale, "nav.*")`
+    /// when the i18n system is wired into the UI layer.
+    pub fn tab_info(&self) -> Vec<TabInfo> {
+        self.available_screens()
+            .into_iter()
+            .map(|screen| {
+                let (label, icon) = match &screen {
+                    AppScreen::MyInfo => ("My Card", "person.crop.rectangle"),
+                    AppScreen::Contacts => ("Contacts", "person.2"),
+                    AppScreen::Exchange => ("Exchange", "qrcode"),
+                    AppScreen::Groups => ("Groups", "folder"),
+                    AppScreen::More => ("More", "ellipsis.circle"),
+                    _ => ("Home", "house"),
+                };
+                TabInfo {
+                    id: screen.screen_id().to_string(),
+                    label: label.to_string(),
+                    icon: icon.to_string(),
+                    badge_count: 0,
+                }
+            })
+            .collect()
     }
 }

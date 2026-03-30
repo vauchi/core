@@ -135,6 +135,22 @@ pub struct ScreenAction {
     pub enabled: bool,
 }
 
+/// Metadata for a navigation tab. Core resolves localized labels so
+/// frontends never hardcode tab strings or icon names.
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TabInfo {
+    /// Stable identifier matching `AppScreen::screen_id()`.
+    pub id: String,
+    /// Localized display label (resolved by core from `nav.*` keys).
+    pub label: String,
+    /// Icon name (SF Symbol on iOS, Material icon on Android).
+    pub icon: String,
+    /// Badge count (e.g., pending contact updates). Zero means no badge.
+    #[serde(default)]
+    pub badge_count: u32,
+}
+
 /// Visual style for a screen action.
 #[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]

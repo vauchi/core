@@ -165,7 +165,8 @@ pub struct TabInfo {
     pub id: String,
     /// Localized display label (resolved by core from `nav.*` keys).
     pub label: String,
-    /// Icon name (SF Symbol on iOS, Material icon on Android).
+    /// Icon name (SF Symbol format). Frontends map to platform equivalents
+    /// (e.g., Material Icons on Android, SF Symbols on iOS).
     pub icon: String,
     /// Badge count (e.g., pending contact updates). Zero means no badge.
     #[serde(default)]

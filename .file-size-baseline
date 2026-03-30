@@ -11,8 +11,8 @@
 vauchi-cabi/src/lib.rs 1799
 vauchi-platform/src/types.rs 1547
 
-# EXEMPT — UniFFI facade: splitting breaks binding generation (trust/notes/preview exports added)
-vauchi-platform/src/lib.rs 2178
+# EXEMPT — UniFFI facade: splitting breaks binding generation (trust/notes/preview/import exports added)
+vauchi-platform/src/lib.rs 2242
 
 # EXEMPT — state machine: scattered transitions create protocol bugs
 vauchi-core/src/exchange/session.rs 1446

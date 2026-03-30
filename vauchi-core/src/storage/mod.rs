@@ -17,6 +17,11 @@ mod connection;
 mod contact_row;
 
 #[cfg(feature = "testing")]
+pub mod contact_ops;
+#[cfg(not(feature = "testing"))]
+mod contact_ops;
+
+#[cfg(feature = "testing")]
 pub mod contacts;
 #[cfg(not(feature = "testing"))]
 mod contacts;

@@ -79,6 +79,12 @@ pub struct Contact {
     cek: Option<ContentEncryptionKey>,
     /// Timestamp of the last card update (separate from exchange_timestamp).
     card_updated_at: Option<u64>,
+    /// Timestamp of soft-deletion (None = not deleted).
+    deleted_at: Option<u64>,
+    /// Whether this contact is archived.
+    archived: bool,
+    /// Timestamp of archival (None = not archived).
+    archived_at: Option<u64>,
 }
 
 impl Contact {
@@ -119,6 +125,9 @@ impl Contact {
             favorite: false,
             cek: None,
             card_updated_at: None,
+            deleted_at: None,
+            archived: false,
+            archived_at: None,
         }
     }
 
@@ -212,6 +221,9 @@ impl Contact {
             favorite: false,
             cek: None,
             card_updated_at: None,
+            deleted_at: None,
+            archived: false,
+            archived_at: None,
         }
     }
 
@@ -245,6 +257,9 @@ impl Contact {
             favorite: false,
             cek: None,
             card_updated_at: None,
+            deleted_at: None,
+            archived: false,
+            archived_at: None,
         }
     }
 
@@ -275,6 +290,9 @@ impl Contact {
             favorite: false,
             cek: None,
             card_updated_at: None,
+            deleted_at: None,
+            archived: false,
+            archived_at: None,
         }
     }
 
@@ -735,6 +753,56 @@ impl Contact {
     pub fn effective_sort_key(&self) -> String {
         let prefix = if self.favorite { "0" } else { "1" };
         format!("{}:{}", prefix, self.display_name.to_lowercase())
+    }
+
+    // ========================================
+    // Soft-Delete
+    // ========================================
+
+    /// Returns the soft-deletion timestamp, if set.
+    pub fn deleted_at(&self) -> Option<u64> {
+        self.deleted_at
+    }
+
+    /// Returns whether this contact has been soft-deleted.
+    pub fn is_soft_deleted(&self) -> bool {
+        self.deleted_at.is_some()
+    }
+
+    /// Soft-deletes this contact, recording the given timestamp.
+    pub fn soft_delete(&mut self, timestamp: u64) {
+        self.deleted_at = Some(timestamp);
+    }
+
+    /// Undoes a soft-delete, clearing the deletion timestamp.
+    pub fn undo_soft_delete(&mut self) {
+        self.deleted_at = None;
+    }
+
+    // ========================================
+    // Archive
+    // ========================================
+
+    /// Returns whether this contact is archived.
+    pub fn is_archived(&self) -> bool {
+        self.archived
+    }
+
+    /// Returns the archive timestamp, if set.
+    pub fn archived_at(&self) -> Option<u64> {
+        self.archived_at
+    }
+
+    /// Archives this contact, recording the given timestamp.
+    pub fn archive(&mut self, timestamp: u64) {
+        self.archived = true;
+        self.archived_at = Some(timestamp);
+    }
+
+    /// Unarchives this contact, clearing the archived flag and timestamp.
+    pub fn unarchive(&mut self) {
+        self.archived = false;
+        self.archived_at = None;
     }
 
     // ========================================

@@ -389,6 +389,7 @@ impl AppEngine {
                     let trust_level = contact.trust_level().to_string();
                     let proposal_trusted = contact.is_proposal_trusted();
                     let is_hidden = contact.is_hidden();
+                    let is_imported = contact.is_imported();
 
                     match shared_info {
                         Some(info) => Box::new(
@@ -400,13 +401,15 @@ impl AppEngine {
                             )
                             .with_field_notes(field_notes)
                             .with_trust(trust_level, proposal_trusted)
-                            .with_hidden(is_hidden),
+                            .with_hidden(is_hidden)
+                            .with_imported(is_imported),
                         ),
                         None => Box::new(
                             ContactDetailEngine::new(item, fields, personal_note)
                                 .with_field_notes(field_notes)
                                 .with_trust(trust_level, proposal_trusted)
-                                .with_hidden(is_hidden),
+                                .with_hidden(is_hidden)
+                                .with_imported(is_imported),
                         ),
                     }
                 }

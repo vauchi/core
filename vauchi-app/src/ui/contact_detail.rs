@@ -50,6 +50,8 @@ pub struct ContactDetailEngine {
     proposal_trusted: bool,
     /// Whether this contact is hidden from the main contact list.
     is_hidden: bool,
+    /// Whether this is an imported (non-crypto) contact vs. exchanged.
+    is_imported: bool,
 }
 
 impl ContactDetailEngine {
@@ -65,6 +67,7 @@ impl ContactDetailEngine {
             trust_level: String::new(),
             proposal_trusted: false,
             is_hidden: false,
+            is_imported: false,
         }
     }
 
@@ -85,6 +88,7 @@ impl ContactDetailEngine {
             trust_level: String::new(),
             proposal_trusted: false,
             is_hidden: false,
+            is_imported: false,
         }
     }
 
@@ -105,6 +109,17 @@ impl ContactDetailEngine {
     pub fn with_hidden(mut self, is_hidden: bool) -> Self {
         self.is_hidden = is_hidden;
         self
+    }
+
+    /// Attach imported flag (true for imported contacts, false for exchanged).
+    pub fn with_imported(mut self, is_imported: bool) -> Self {
+        self.is_imported = is_imported;
+        self
+    }
+
+    /// Returns whether this contact is imported (non-crypto).
+    pub fn is_imported(&self) -> bool {
+        self.is_imported
     }
 
     /// Toggles hidden state in-memory. Callers must persist via Vauchi.
@@ -281,6 +296,21 @@ impl ContactDetailEngine {
                     style: ActionStyle::Secondary,
                     enabled: true,
                 },
+                if self.is_imported {
+                    ScreenAction {
+                        id: "delete_contact".into(),
+                        label: "Delete Contact".into(),
+                        style: ActionStyle::Destructive,
+                        enabled: true,
+                    }
+                } else {
+                    ScreenAction {
+                        id: "archive_contact".into(),
+                        label: "Archive Contact".into(),
+                        style: ActionStyle::Secondary,
+                        enabled: true,
+                    }
+                },
                 ScreenAction {
                     id: "back".into(),
                     label: "Back".into(),
@@ -347,6 +377,18 @@ impl WorkflowEngine for ContactDetailEngine {
             {
                 ActionResult::PreviewAs {
                     contact_id: self.contact.id.clone(),
+                }
+            }
+            UserAction::ActionPressed { action_id } if action_id == "delete_contact" => {
+                ActionResult::ShowToast {
+                    message: "Contact deleted".into(),
+                    undo_action_id: Some(format!("undo_delete_contact:{}", self.contact.id)),
+                }
+            }
+            UserAction::ActionPressed { action_id } if action_id == "archive_contact" => {
+                ActionResult::ShowToast {
+                    message: "Contact archived".into(),
+                    undo_action_id: Some(format!("undo_archive_contact:{}", self.contact.id)),
                 }
             }
             UserAction::ActionPressed { action_id } if action_id == "back" => {
@@ -753,5 +795,97 @@ mod tests {
             !engine.proposal_trusted(),
             "proposal_trusted must be false after second toggle"
         );
+    }
+
+    // ===== Delete/Archive action tests =====
+
+    #[test]
+    fn test_imported_contact_shows_delete_action() {
+        let engine = ContactDetailEngine::new(sample_contact(), sample_fields(), String::new())
+            .with_imported(true);
+        let screen = engine.current_screen();
+
+        let delete_action = screen.actions.iter().find(|a| a.id == "delete_contact");
+        assert!(
+            delete_action.is_some(),
+            "Imported contact must have delete_contact action"
+        );
+        assert_eq!(delete_action.unwrap().label, "Delete Contact");
+        assert_eq!(delete_action.unwrap().style, ActionStyle::Destructive);
+
+        let archive_action = screen.actions.iter().find(|a| a.id == "archive_contact");
+        assert!(
+            archive_action.is_none(),
+            "Imported contact must not have archive_contact action"
+        );
+    }
+
+    #[test]
+    fn test_exchanged_contact_shows_archive_action() {
+        let engine = ContactDetailEngine::new(sample_contact(), sample_fields(), String::new())
+            .with_imported(false);
+        let screen = engine.current_screen();
+
+        let archive_action = screen.actions.iter().find(|a| a.id == "archive_contact");
+        assert!(
+            archive_action.is_some(),
+            "Exchanged contact must have archive_contact action"
+        );
+        assert_eq!(archive_action.unwrap().label, "Archive Contact");
+        assert_eq!(archive_action.unwrap().style, ActionStyle::Secondary);
+
+        let delete_action = screen.actions.iter().find(|a| a.id == "delete_contact");
+        assert!(
+            delete_action.is_none(),
+            "Exchanged contact must not have delete_contact action"
+        );
+    }
+
+    #[test]
+    fn test_delete_action_returns_show_toast_with_undo() {
+        let mut engine = ContactDetailEngine::new(sample_contact(), sample_fields(), String::new())
+            .with_imported(true);
+        let result = engine.handle_action(UserAction::ActionPressed {
+            action_id: "delete_contact".into(),
+        });
+        assert_eq!(
+            result,
+            ActionResult::ShowToast {
+                message: "Contact deleted".into(),
+                undo_action_id: Some("undo_delete_contact:c1".into()),
+            }
+        );
+    }
+
+    #[test]
+    fn test_archive_action_returns_show_toast_with_undo() {
+        let mut engine = ContactDetailEngine::new(sample_contact(), sample_fields(), String::new())
+            .with_imported(false);
+        let result = engine.handle_action(UserAction::ActionPressed {
+            action_id: "archive_contact".into(),
+        });
+        assert_eq!(
+            result,
+            ActionResult::ShowToast {
+                message: "Contact archived".into(),
+                undo_action_id: Some("undo_archive_contact:c1".into()),
+            }
+        );
+    }
+
+    #[test]
+    fn test_is_imported_defaults_to_false() {
+        let engine = ContactDetailEngine::new(sample_contact(), sample_fields(), String::new());
+        assert!(
+            !engine.is_imported(),
+            "Default contact must not be imported"
+        );
+    }
+
+    #[test]
+    fn test_with_imported_sets_flag() {
+        let engine = ContactDetailEngine::new(sample_contact(), sample_fields(), String::new())
+            .with_imported(true);
+        assert!(engine.is_imported(), "with_imported(true) must set flag");
     }
 }

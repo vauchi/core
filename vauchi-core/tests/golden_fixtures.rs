@@ -252,12 +252,12 @@ fn ready_fixture_is_fresh() {
 /// Writes a `.version` metadata file alongside golden fixtures.
 /// Frontend contract tests use this to verify fixture/binding version alignment.
 fn write_version_file(fixture_count: usize) {
-    let version = env!("CARGO_PKG_VERSION");
-    let content = format!(
-        "{{\n  \"core_version\": \"{version}\",\n  \
-         \"schema_version\": {CURRENT_SCHEMA_VERSION},\n  \
-         \"fixture_count\": {fixture_count}\n}}\n"
-    );
+    let meta = serde_json::json!({
+        "core_version": env!("CARGO_PKG_VERSION"),
+        "schema_version": CURRENT_SCHEMA_VERSION,
+        "fixture_count": fixture_count,
+    });
+    let content = serde_json::to_string_pretty(&meta).unwrap() + "\n";
     fs::write(fixtures_dir().join(".version"), content).unwrap();
 }
 

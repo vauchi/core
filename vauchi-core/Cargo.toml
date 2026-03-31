@@ -463,5 +463,9 @@ name = "contact_delete_archive_tests"
 required-features = ["testing"]
 
 [[test]]
+name = "exchange_mode_proptests"
+required-features = ["testing"]
+
+[[test]]
 name = "schema_gen"
 required-features = ["schema-gen"]

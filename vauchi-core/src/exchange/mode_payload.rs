@@ -43,6 +43,11 @@ impl ExchangeModePayload {
     pub fn is_mode_compatible(&self, expected: ExchangeMode) -> bool {
         self.mode == expected
     }
+
+    /// Whether this payload has expired.
+    pub fn is_expired(&self, now_secs: u64) -> bool {
+        now_secs > self.timestamp + u64::from(self.ttl_seconds)
+    }
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
@@ -109,5 +114,30 @@ mod tests {
             !payload.is_mode_compatible(ExchangeMode::Link),
             "different mode must not be compatible"
         );
+    }
+
+    #[test]
+    fn is_expired_respects_ttl() {
+        let payload = ExchangeModePayload {
+            mode: ExchangeMode::Hover,
+            capabilities: DeviceCapabilities::default(),
+            exchange_id: ExchangeId::generate(),
+            timestamp: 1000,
+            ttl_seconds: 60,
+        };
+        assert!(!payload.is_expired(1059)); // within TTL
+        assert!(payload.is_expired(1061)); // past TTL
+    }
+
+    #[test]
+    fn zero_ttl_immediately_expired() {
+        let payload = ExchangeModePayload {
+            mode: ExchangeMode::Link,
+            capabilities: DeviceCapabilities::default(),
+            exchange_id: ExchangeId::generate(),
+            timestamp: 1000,
+            ttl_seconds: 0,
+        };
+        assert!(payload.is_expired(1001));
     }
 }

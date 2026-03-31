@@ -60,6 +60,7 @@ mod multistage;
 pub mod capability;
 pub mod command;
 pub mod device_link;
+pub mod exchange_id;
 pub mod mode;
 
 #[allow(deprecated)]

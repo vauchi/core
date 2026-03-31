@@ -1239,6 +1239,152 @@
           "enum": [
             "AudioStop"
           ]
+        },
+        {
+          "description": "Start accelerometer sampling for proximity verification.",
+          "type": "string",
+          "enum": [
+            "AccelerometerStart"
+          ]
+        },
+        {
+          "description": "Stop accelerometer sampling.",
+          "type": "string",
+          "enum": [
+            "AccelerometerStop"
+          ]
+        },
+        {
+          "description": "Deposit encrypted card into relay escrow gate.",
+          "type": "object",
+          "required": [
+            "RelayEscrowDeposit"
+          ],
+          "properties": {
+            "RelayEscrowDeposit": {
+              "type": "object",
+              "required": [
+                "encrypted_card",
+                "gate_hash",
+                "slot_hash",
+                "ttl_seconds"
+              ],
+              "properties": {
+                "encrypted_card": {
+                  "type": "array",
+                  "items": {
+                    "type": "integer",
+                    "format": "uint8",
+                    "minimum": 0.0
+                  }
+                },
+                "gate_hash": {
+                  "type": "array",
+                  "items": {
+                    "type": "integer",
+                    "format": "uint8",
+                    "minimum": 0.0
+                  }
+                },
+                "slot_hash": {
+                  "type": "array",
+                  "items": {
+                    "type": "integer",
+                    "format": "uint8",
+                    "minimum": 0.0
+                  }
+                },
+                "ttl_seconds": {
+                  "type": "integer",
+                  "format": "uint32",
+                  "minimum": 0.0
+                }
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Check relay escrow gate readiness.",
+          "type": "object",
+          "required": [
+            "RelayEscrowCheck"
+          ],
+          "properties": {
+            "RelayEscrowCheck": {
+              "type": "object",
+              "required": [
+                "gate_hash"
+              ],
+              "properties": {
+                "gate_hash": {
+                  "type": "array",
+                  "items": {
+                    "type": "integer",
+                    "format": "uint8",
+                    "minimum": 0.0
+                  }
+                }
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Retrieve blob from relay escrow gate.",
+          "type": "object",
+          "required": [
+            "RelayEscrowRetrieve"
+          ],
+          "properties": {
+            "RelayEscrowRetrieve": {
+              "type": "object",
+              "required": [
+                "gate_hash",
+                "slot_hash"
+              ],
+              "properties": {
+                "gate_hash": {
+                  "type": "array",
+                  "items": {
+                    "type": "integer",
+                    "format": "uint8",
+                    "minimum": 0.0
+                  }
+                },
+                "slot_hash": {
+                  "type": "array",
+                  "items": {
+                    "type": "integer",
+                    "format": "uint8",
+                    "minimum": 0.0
+                  }
+                }
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Show system share sheet with a URL.",
+          "type": "object",
+          "required": [
+            "ShowShareSheet"
+          ],
+          "properties": {
+            "ShowShareSheet": {
+              "type": "object",
+              "required": [
+                "url"
+              ],
+              "properties": {
+                "url": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "additionalProperties": false
         }
       ]
     },

@@ -46,7 +46,7 @@ impl ExchangeModePayload {
 
     /// Whether this payload has expired.
     pub fn is_expired(&self, now_secs: u64) -> bool {
-        now_secs > self.timestamp + u64::from(self.ttl_seconds)
+        now_secs > self.timestamp.saturating_add(u64::from(self.ttl_seconds))
     }
 }
 

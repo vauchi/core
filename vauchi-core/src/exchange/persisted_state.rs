@@ -77,7 +77,7 @@ impl PersistedExchangeState {
     ///
     /// Expiry is defined as: `now_secs > created_at + ttl_seconds`.
     pub fn is_expired(&self, now_secs: u64) -> bool {
-        now_secs > self.created_at + u64::from(self.ttl_seconds)
+        now_secs > self.created_at.saturating_add(u64::from(self.ttl_seconds))
     }
 }
 

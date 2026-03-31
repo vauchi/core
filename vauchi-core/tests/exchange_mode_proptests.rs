@@ -6,7 +6,7 @@ use proptest::prelude::*;
 use vauchi_core::exchange::capability::types::DeviceCapabilities;
 use vauchi_core::exchange::mode::{DataTransport, ExchangeContext, ProximityMethod};
 use vauchi_core::exchange::{
-    ExchangeId, ExchangeMode, ExchangeRecord, ExchangeTrustLevel, ProximityResult,
+    AudioCapability, ExchangeId, ExchangeMode, ExchangeRecord, ExchangeTrustLevel, ProximityResult,
     check_mode_availability, recommend_mode,
 };
 
@@ -25,6 +25,15 @@ fn arb_exchange_mode() -> impl Strategy<Value = ExchangeMode> {
     ]
 }
 
+fn arb_audio() -> impl Strategy<Value = AudioCapability> {
+    prop_oneof![
+        Just(AudioCapability::Full),
+        Just(AudioCapability::EmitOnly),
+        Just(AudioCapability::ReceiveOnly),
+        Just(AudioCapability::None),
+    ]
+}
+
 fn arb_capabilities() -> impl Strategy<Value = DeviceCapabilities> {
     (
         any::<bool>(),
@@ -32,13 +41,15 @@ fn arb_capabilities() -> impl Strategy<Value = DeviceCapabilities> {
         any::<bool>(),
         any::<bool>(),
         any::<bool>(),
+        arb_audio(),
     )
-        .prop_map(|(cam, ble, nfc, accel, inet)| DeviceCapabilities {
+        .prop_map(|(cam, ble, nfc, accel, inet, audio)| DeviceCapabilities {
             has_camera: cam,
             has_ble: ble,
             has_nfc: nfc,
             has_accelerometer: accel,
             has_internet: inet,
+            audio,
             ..Default::default()
         })
 }

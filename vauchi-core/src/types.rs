@@ -64,13 +64,6 @@ pub enum AudioCapability {
     None,
 }
 
-impl AudioCapability {
-    /// Returns true if any audio hardware is available.
-    pub fn is_available(&self) -> bool {
-        !matches!(self, Self::None)
-    }
-}
-
 // --- API types used by storage (breaks storage→api circular dep) ---
 
 /// Duress settings for emergency alert configuration.

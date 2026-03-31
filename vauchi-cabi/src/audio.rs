@@ -47,8 +47,9 @@ pub unsafe extern "C" fn vauchi_audio_is_available() -> i32 {
     #[cfg(feature = "audio")]
     {
         match std::panic::catch_unwind(|| {
-            use vauchi_core::exchange::AudioBackend;
-            with_backend(|b| b.check_capability().is_available()).unwrap_or(false) as i32
+            use vauchi_core::exchange::{AudioBackend, AudioCapability};
+            with_backend(|b| matches!(b.check_capability(), AudioCapability::Full)).unwrap_or(false)
+                as i32
         }) {
             Ok(result) => result,
             Err(_) => 0,

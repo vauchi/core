@@ -106,7 +106,14 @@ impl ExchangeRecord {
 
         if succeeded.is_empty() {
             return match self.context {
+                // In-person base: 0.1 — minimal trust for physical presence
+                // without electronic proximity proof. Glance (QR only) gets
+                // this base. Design decision: both Glance (0.1) and Link (0.0)
+                // map to the Lowest trust tier, but the numeric distinction is
+                // preserved for future differentiation (e.g. a visual-
+                // confirmation proximity method could raise Glance above Link).
                 ExchangeContext::InPerson => 0.1,
+                // Remote/async: 0.0 — no co-presence signal whatsoever.
                 ExchangeContext::Remote | ExchangeContext::RemoteAsync => 0.0,
             };
         }

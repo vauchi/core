@@ -9,6 +9,16 @@
 [semgrep]
   description = "Semgrep with Rust community + vauchi security rules"
 
+  # Disable community unsafe-usage rule: vauchi-cabi is a C ABI crate where
+  # unsafe is inherent (extern "C" fn, raw pointers, no_mangle).
+  # Replaced by custom vauchi-no-unsafe-in-core (in vauchi-security.yml)
+  # which targets vauchi-core/src/** only — preserving the zero-unsafe guarantee.
+  [[semgrep.ruleset]]
+    disable = true
+    [semgrep.ruleset.identifier]
+      type = "semgrep_id"
+      value = "rust.lang.security.unsafe-usage.unsafe-usage"
+
   [[semgrep.passthrough]]
     type = "url"
     value = "https://semgrep.dev/c/p/rust"

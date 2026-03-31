@@ -35,6 +35,11 @@ impl CardSnapshot {
         }
     }
 
+    /// Freeze with an explicit timestamp (for testing).
+    pub fn freeze_at(card: ContactCard, created_at: u64) -> Self {
+        Self { card, created_at }
+    }
+
     /// Returns a reference to the frozen card.
     pub fn card(&self) -> &ContactCard {
         &self.card
@@ -160,5 +165,12 @@ mod tests {
         let json = serde_json::to_string(&snapshot).unwrap();
         let decoded: CardSnapshot = serde_json::from_str(&json).unwrap();
         assert_eq!(decoded.display_name(), "Serde");
+    }
+
+    #[test]
+    fn freeze_at_uses_explicit_timestamp() {
+        let card = ContactCard::new("Dana");
+        let snapshot = CardSnapshot::freeze_at(card, 1711900000);
+        assert_eq!(snapshot.created_at(), 1711900000);
     }
 }

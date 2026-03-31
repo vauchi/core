@@ -20,7 +20,7 @@ use crate::types::AudioCapability;
 pub enum ModeAvailability {
     /// All required hardware is present and fully functional.
     Available,
-    /// Mode can run in a reduced capacity (reserved for future degradation logic).
+    /// Usable but with reduced functionality (reserved for future degraded-mode logic).
     Degraded { reason: String },
     /// One or more required hardware capabilities are absent.
     Unavailable { reason: String },
@@ -73,7 +73,9 @@ pub fn check_mode_availability(mode: ExchangeMode, caps: &DeviceCapabilities) ->
 /// Modes are tried in priority order: Hover, Magic, Shake, TapHoverShake,
 /// TapTap, Bump, Glance, Broadcast, Web, Link. The first `Available` mode is
 /// returned. Link is always available when `has_internet` is true; if nothing
-/// else works, Link is returned as the final fallback regardless.
+/// else works, [`ExchangeMode::Link`] is returned as the ultimate fallback even
+/// if Link itself is unavailable (no internet). The UI layer is responsible for
+/// showing the mode as unavailable in that case.
 pub fn recommend_mode(caps: &DeviceCapabilities) -> ExchangeMode {
     const PRIORITY: &[ExchangeMode] = &[
         ExchangeMode::Hover,
@@ -94,8 +96,8 @@ pub fn recommend_mode(caps: &DeviceCapabilities) -> ExchangeMode {
         }
     }
 
-    // Final fallback — Link only needs internet, and even without internet it
-    // is the least-hardware mode.
+    // Final fallback — returned even if Link itself is unavailable (no
+    // internet). The UI layer shows it as unavailable in that case.
     ExchangeMode::Link
 }
 

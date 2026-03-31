@@ -62,6 +62,7 @@ pub mod command;
 pub mod device_link;
 pub mod exchange_id;
 pub mod mode;
+pub mod mode_availability;
 
 #[allow(deprecated)]
 pub mod transport;

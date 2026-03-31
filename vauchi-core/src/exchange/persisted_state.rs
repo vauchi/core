@@ -49,13 +49,16 @@ pub struct PersistedExchangeState {
     pub mode: ExchangeMode,
     /// Current lifecycle phase.
     pub state: ExchangeLifecycleState,
-    /// Hash of the escrow gate (relay escrow modes only).
+    /// Relay escrow gate hash (32 bytes). Length enforced at
+    /// construction by the escrow client (Tier 1).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub escrow_gate_hash: Option<Vec<u8>>,
-    /// Our encrypted escrow slot (relay escrow modes only).
+    /// Our encrypted escrow slot handle (32 bytes). Length enforced at
+    /// construction by the escrow client (Tier 1).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub escrow_our_slot: Option<Vec<u8>>,
-    /// Their encrypted escrow slot (relay escrow modes only).
+    /// Their encrypted escrow slot handle (32 bytes). Length enforced at
+    /// construction by the escrow client (Tier 1).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub escrow_their_slot: Option<Vec<u8>>,
     /// Their encrypted contact card blob (set once received).

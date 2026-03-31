@@ -69,6 +69,10 @@ impl ExchangeRecord {
     ///
     /// Both axes are in [0.0, 1.0]; the product is also in [0.0, 1.0].
     pub fn trust_score(&self) -> f64 {
+        debug_assert!(
+            !(self.transport_used == DataTransport::Relay && self.relay_fallback),
+            "relay_fallback should not be true when primary transport is Relay"
+        );
         let locality = self.transport_locality();
         let proximity = self.proximity_confidence();
         locality * proximity
@@ -97,6 +101,18 @@ impl ExchangeRecord {
 
     /// Proximity-axis score using diminishing-returns stacking over succeeded results.
     fn proximity_confidence(&self) -> f64 {
+        // In-person base: 0.1 — minimal trust for physical presence
+        // without electronic proximity proof. Glance (QR only) gets
+        // this base. Design decision: both Glance (0.1) and Link (0.0)
+        // map to the Lowest trust tier, but the numeric distinction is
+        // preserved for future differentiation (e.g. a visual-
+        // confirmation proximity method could raise Glance above Link).
+        let base = match self.context {
+            ExchangeContext::InPerson => 0.1,
+            // Remote/async: 0.0 — no co-presence signal whatsoever.
+            ExchangeContext::Remote | ExchangeContext::RemoteAsync => 0.0,
+        };
+
         let succeeded: Vec<f64> = self
             .proximity_results
             .iter()
@@ -105,21 +121,14 @@ impl ExchangeRecord {
             .collect();
 
         if succeeded.is_empty() {
-            return match self.context {
-                // In-person base: 0.1 — minimal trust for physical presence
-                // without electronic proximity proof. Glance (QR only) gets
-                // this base. Design decision: both Glance (0.1) and Link (0.0)
-                // map to the Lowest trust tier, but the numeric distinction is
-                // preserved for future differentiation (e.g. a visual-
-                // confirmation proximity method could raise Glance above Link).
-                ExchangeContext::InPerson => 0.1,
-                // Remote/async: 0.0 — no co-presence signal whatsoever.
-                ExchangeContext::Remote | ExchangeContext::RemoteAsync => 0.0,
-            };
+            return base;
         }
 
         // 1 − ∏(1 − cᵢ)  — diminishing-returns combination.
-        1.0 - succeeded.iter().fold(1.0_f64, |acc, &c| acc * (1.0 - c))
+        // Floor at context base so a zero-confidence succeeded check never
+        // scores below "no check at all".
+        let stacked = 1.0 - succeeded.iter().fold(1.0_f64, |acc, &c| acc * (1.0 - c));
+        stacked.max(base)
     }
 }
 
@@ -131,6 +140,7 @@ impl ExchangeRecord {
 /// trust) — this enum captures the quality of a single exchange event.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[non_exhaustive]
 pub enum ExchangeTrustLevel {
     /// Score 0.0 – 0.15: no meaningful verification.
     Lowest,
@@ -149,6 +159,9 @@ pub enum ExchangeTrustLevel {
 impl ExchangeTrustLevel {
     /// Map a continuous score in [0.0, 1.0] to a discrete trust tier.
     pub fn from_score(score: f64) -> Self {
+        if score.is_nan() || score < 0.0 {
+            return Self::Lowest;
+        }
         if score < 0.15 {
             Self::Lowest
         } else if score < 0.35 {
@@ -473,5 +486,39 @@ mod tests {
         let score = record.trust_score();
         assert!(score >= 0.0, "score must not be negative, got {}", score);
         assert!(score <= 1.0, "score must not exceed 1.0, got {}", score);
+    }
+
+    // 11. from_score: NaN input returns Lowest (Fix 2)
+    #[test]
+    fn from_score_nan_returns_lowest() {
+        assert_eq!(
+            ExchangeTrustLevel::from_score(f64::NAN),
+            ExchangeTrustLevel::Lowest,
+        );
+    }
+
+    // 12. Zero-confidence succeeded result must not undercut context base (Fix 3)
+    #[test]
+    fn zero_confidence_does_not_undercut_base() {
+        let record = ExchangeRecord {
+            mode: ExchangeMode::Glance,
+            context: ExchangeContext::InPerson,
+            transport_used: DataTransport::QrMultiStage,
+            relay_fallback: false,
+            proximity_results: vec![ProximityResult {
+                method: ProximityMethod::Audio,
+                confidence: 0.0,
+                succeeded: true,
+            }],
+            timestamp: 0,
+            reverifications: vec![],
+        };
+        let score = record.trust_score();
+        // transport_locality = 1.0; proximity must be at least the in-person base (0.1)
+        assert!(
+            score >= 0.1,
+            "zero-confidence succeeded result should not undercut base, got {}",
+            score
+        );
     }
 }

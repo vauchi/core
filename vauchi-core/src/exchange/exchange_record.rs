@@ -103,7 +103,7 @@ impl ExchangeRecord {
             .proximity_results
             .iter()
             .filter(|r| r.succeeded)
-            .map(|r| r.confidence)
+            .map(|r| r.confidence.clamp(0.0, 1.0))
             .collect();
 
         if succeeded.is_empty() {
@@ -426,5 +426,47 @@ mod tests {
             ExchangeTrustLevel::from_score(1.0),
             ExchangeTrustLevel::Highest
         );
+    }
+
+    // 9. Adversarial: confidence > 1.0 must be clamped — trust score must not exceed 1.0
+    #[test]
+    fn adversarial_confidence_clamped() {
+        let record = ExchangeRecord {
+            mode: ExchangeMode::Hover,
+            context: ExchangeContext::InPerson,
+            transport_used: DataTransport::QrMultiStage,
+            relay_fallback: false,
+            proximity_results: vec![ProximityResult {
+                method: ProximityMethod::Audio,
+                confidence: 1.5, // adversarial: > 1.0
+                succeeded: true,
+            }],
+            timestamp: 0,
+            reverifications: vec![],
+        };
+        let score = record.trust_score();
+        assert!(score <= 1.0, "score must not exceed 1.0, got {}", score);
+        assert!(score >= 0.0, "score must not be negative, got {}", score);
+    }
+
+    // 10. Adversarial: negative confidence must be clamped — trust score must not be negative
+    #[test]
+    fn negative_confidence_clamped() {
+        let record = ExchangeRecord {
+            mode: ExchangeMode::Hover,
+            context: ExchangeContext::InPerson,
+            transport_used: DataTransport::QrMultiStage,
+            relay_fallback: false,
+            proximity_results: vec![ProximityResult {
+                method: ProximityMethod::Audio,
+                confidence: -0.5, // adversarial: negative
+                succeeded: true,
+            }],
+            timestamp: 0,
+            reverifications: vec![],
+        };
+        let score = record.trust_score();
+        assert!(score >= 0.0, "score must not be negative, got {}", score);
+        assert!(score <= 1.0, "score must not exceed 1.0, got {}", score);
     }
 }

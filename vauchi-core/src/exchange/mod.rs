@@ -66,6 +66,7 @@ pub mod exchange_record;
 pub mod mode;
 pub mod mode_availability;
 pub mod mode_payload;
+pub mod persisted_state;
 
 #[allow(deprecated)]
 pub mod transport;

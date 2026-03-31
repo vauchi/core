@@ -114,8 +114,7 @@ impl ExchangeRecord {
         }
 
         // 1 − ∏(1 − cᵢ)  — diminishing-returns combination.
-        let combined = 1.0 - succeeded.iter().fold(1.0_f64, |acc, &c| acc * (1.0 - c));
-        combined
+        1.0 - succeeded.iter().fold(1.0_f64, |acc, &c| acc * (1.0 - c))
     }
 }
 

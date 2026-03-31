@@ -15,7 +15,7 @@ vauchi-platform/src/types.rs 1547
 vauchi-platform/src/lib.rs 2242
 
 # EXEMPT — state machine: scattered transitions create protocol bugs
-vauchi-core/src/exchange/session.rs 1446
+vauchi-core/src/exchange/session.rs 1455
 vauchi-core/src/exchange/multistage/session.rs 1178
 
 # EXEMPT — security-critical: crypto + verification belong together

@@ -217,7 +217,9 @@ pub use multistage::types::{ProtocolState, QrPayload};
 // Exchange mode foundation re-exports
 pub use card_snapshot::CardSnapshot;
 pub use exchange_id::ExchangeId;
-pub use exchange_record::{ExchangeRecord, ProximityResult, ReverificationRecord, TrustLevel};
+pub use exchange_record::{
+    ExchangeRecord, ExchangeTrustLevel, ProximityResult, ReverificationRecord,
+};
 pub use mode::{
     BootstrapMethod, DataTransport, DeviceRequirement, ExchangeContext, ExchangeMode, ModeCategory,
     ModeConfig, ProximityMethod,

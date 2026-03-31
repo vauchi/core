@@ -6,8 +6,8 @@ use proptest::prelude::*;
 use vauchi_core::exchange::capability::types::DeviceCapabilities;
 use vauchi_core::exchange::mode::{DataTransport, ExchangeContext, ProximityMethod};
 use vauchi_core::exchange::{
-    ExchangeId, ExchangeMode, ExchangeRecord, ProximityResult, TrustLevel, check_mode_availability,
-    recommend_mode,
+    ExchangeId, ExchangeMode, ExchangeRecord, ExchangeTrustLevel, ProximityResult,
+    check_mode_availability, recommend_mode,
 };
 
 fn arb_exchange_mode() -> impl Strategy<Value = ExchangeMode> {
@@ -69,7 +69,7 @@ proptest! {
 
     #[test]
     fn trust_level_covers_all_scores(score in 0.0f64..=1.0) {
-        let level = TrustLevel::from_score(score);
+        let level = ExchangeTrustLevel::from_score(score);
         // display_text must return a non-empty string for every level
         prop_assert!(!level.display_text().is_empty());
     }

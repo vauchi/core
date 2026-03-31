@@ -6,7 +6,7 @@
 //!
 //! [`ExchangeRecord`] captures the full outcome of a single exchange attempt —
 //! transport used, proximity signals collected, relay fallback, and context —
-//! and derives a [`TrustLevel`] via a two-axis score:
+//! and derives an [`ExchangeTrustLevel`] via a two-axis score:
 //! `transport_locality × proximity_confidence`.
 
 use serde::{Deserialize, Serialize};
@@ -74,9 +74,9 @@ impl ExchangeRecord {
         locality * proximity
     }
 
-    /// Derive a discrete [`TrustLevel`] from the computed trust score.
-    pub fn trust_level(&self) -> TrustLevel {
-        TrustLevel::from_score(self.trust_score())
+    /// Derive a discrete [`ExchangeTrustLevel`] from the computed trust score.
+    pub fn trust_level(&self) -> ExchangeTrustLevel {
+        ExchangeTrustLevel::from_score(self.trust_score())
     }
 
     // ── Private helpers ──────────────────────────────────────────────────────
@@ -118,12 +118,15 @@ impl ExchangeRecord {
     }
 }
 
-// ── TrustLevel ───────────────────────────────────────────────────────────────
+// ── ExchangeTrustLevel ────────────────────────────────────────────────────────
 
-/// Discrete trust tier derived from a two-axis trust score.
+/// Discrete trust tier derived from a two-axis exchange trust score.
+///
+/// Distinct from `contact::trust::TrustLevel` (which tracks long-term contact
+/// trust) — this enum captures the quality of a single exchange event.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum TrustLevel {
+pub enum ExchangeTrustLevel {
     /// Score 0.0 – 0.15: no meaningful verification.
     Lowest,
     /// Score 0.15 – 0.35: remote exchange, no proximity.
@@ -138,7 +141,7 @@ pub enum TrustLevel {
     Highest,
 }
 
-impl TrustLevel {
+impl ExchangeTrustLevel {
     /// Map a continuous score in [0.0, 1.0] to a discrete trust tier.
     pub fn from_score(score: f64) -> Self {
         if score < 0.15 {
@@ -208,7 +211,7 @@ mod tests {
         let score = rec.trust_score();
         // transport_locality = 0.3, proximity = 0.0 → 0.0
         assert!((score - 0.0).abs() < 0.01, "expected ~0.0, got {score}");
-        assert_eq!(rec.trust_level(), TrustLevel::Lowest);
+        assert_eq!(rec.trust_level(), ExchangeTrustLevel::Lowest);
     }
 
     // 2. Hover with Audio 0.85: QrMultiStage + InPerson → score ≈ 0.85
@@ -228,7 +231,7 @@ mod tests {
         let score = rec.trust_score();
         // transport_locality = 1.0, proximity = 0.85 → 0.85
         assert!((score - 0.85).abs() < 0.01, "expected ~0.85, got {score}");
-        assert_eq!(rec.trust_level(), TrustLevel::High);
+        assert_eq!(rec.trust_level(), ExchangeTrustLevel::High);
     }
 
     // 3. relay_fallback=true halves transport locality to 0.5
@@ -299,7 +302,7 @@ mod tests {
         // transport_locality = 1.0
         // proximity = 1 - (1-0.95)*(1-0.85)*(1-0.5) = 1 - 0.05*0.15*0.5 = 1 - 0.00375 ≈ 0.99625
         assert!(score > 0.99, "expected >0.99, got {score}");
-        assert_eq!(rec.trust_level(), TrustLevel::Highest);
+        assert_eq!(rec.trust_level(), ExchangeTrustLevel::Highest);
     }
 
     // 5. Glance (QrMultiStage + InPerson + no proximity) → base 0.1 × 1.0 = 0.1
@@ -314,7 +317,7 @@ mod tests {
         );
         let score = rec.trust_score();
         assert!((score - 0.1).abs() < 0.01, "expected ~0.1, got {score}");
-        assert_eq!(rec.trust_level(), TrustLevel::Lowest);
+        assert_eq!(rec.trust_level(), ExchangeTrustLevel::Lowest);
     }
 
     // 6. Failed proximity results are not counted — falls to base
@@ -375,17 +378,53 @@ mod tests {
     // 8. TrustLevel threshold boundaries
     #[test]
     fn trust_level_from_score() {
-        assert_eq!(TrustLevel::from_score(0.0), TrustLevel::Lowest);
-        assert_eq!(TrustLevel::from_score(0.14), TrustLevel::Lowest);
-        assert_eq!(TrustLevel::from_score(0.15), TrustLevel::Low);
-        assert_eq!(TrustLevel::from_score(0.34), TrustLevel::Low);
-        assert_eq!(TrustLevel::from_score(0.35), TrustLevel::Medium);
-        assert_eq!(TrustLevel::from_score(0.54), TrustLevel::Medium);
-        assert_eq!(TrustLevel::from_score(0.55), TrustLevel::MediumHigh);
-        assert_eq!(TrustLevel::from_score(0.74), TrustLevel::MediumHigh);
-        assert_eq!(TrustLevel::from_score(0.75), TrustLevel::High);
-        assert_eq!(TrustLevel::from_score(0.89), TrustLevel::High);
-        assert_eq!(TrustLevel::from_score(0.90), TrustLevel::Highest);
-        assert_eq!(TrustLevel::from_score(1.0), TrustLevel::Highest);
+        assert_eq!(
+            ExchangeTrustLevel::from_score(0.0),
+            ExchangeTrustLevel::Lowest
+        );
+        assert_eq!(
+            ExchangeTrustLevel::from_score(0.14),
+            ExchangeTrustLevel::Lowest
+        );
+        assert_eq!(
+            ExchangeTrustLevel::from_score(0.15),
+            ExchangeTrustLevel::Low
+        );
+        assert_eq!(
+            ExchangeTrustLevel::from_score(0.34),
+            ExchangeTrustLevel::Low
+        );
+        assert_eq!(
+            ExchangeTrustLevel::from_score(0.35),
+            ExchangeTrustLevel::Medium
+        );
+        assert_eq!(
+            ExchangeTrustLevel::from_score(0.54),
+            ExchangeTrustLevel::Medium
+        );
+        assert_eq!(
+            ExchangeTrustLevel::from_score(0.55),
+            ExchangeTrustLevel::MediumHigh
+        );
+        assert_eq!(
+            ExchangeTrustLevel::from_score(0.74),
+            ExchangeTrustLevel::MediumHigh
+        );
+        assert_eq!(
+            ExchangeTrustLevel::from_score(0.75),
+            ExchangeTrustLevel::High
+        );
+        assert_eq!(
+            ExchangeTrustLevel::from_score(0.89),
+            ExchangeTrustLevel::High
+        );
+        assert_eq!(
+            ExchangeTrustLevel::from_score(0.90),
+            ExchangeTrustLevel::Highest
+        );
+        assert_eq!(
+            ExchangeTrustLevel::from_score(1.0),
+            ExchangeTrustLevel::Highest
+        );
     }
 }

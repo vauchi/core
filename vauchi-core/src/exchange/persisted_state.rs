@@ -133,7 +133,34 @@ mod tests {
         assert!(!state.is_expired(999_999));
     }
 
-    // 3. Serde roundtrip with escrow fields populated
+    // 3. is_expired exact boundary
+    #[test]
+    fn is_expired_exact_boundary_not_expired() {
+        let state = PersistedExchangeState {
+            exchange_id: ExchangeId::from_bytes([0u8; 32]),
+            mode: ExchangeMode::Hover,
+            state: ExchangeLifecycleState::Transferring,
+            escrow_gate_hash: None,
+            escrow_our_slot: None,
+            escrow_their_slot: None,
+            their_encrypted_card: None,
+            proximity_results: vec![],
+            created_at: 1000,
+            ttl_seconds: 60,
+        };
+        // Exact boundary (1060) — NOT expired (strict >)
+        assert!(
+            !state.is_expired(1060),
+            "exact boundary must not be expired"
+        );
+        // One second past boundary — expired
+        assert!(
+            state.is_expired(1061),
+            "one second past boundary must be expired"
+        );
+    }
+
+    // 4. Serde roundtrip with escrow fields populated
     #[test]
     fn serde_roundtrip() {
         let state = PersistedExchangeState {

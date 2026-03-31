@@ -22,6 +22,11 @@ use crate::exchange::mode::ExchangeMode;
 /// Sent by the initiator to declare the proposed mode, the device's
 /// capabilities (so the peer can validate compatibility), the session ID, and
 /// timing information used to detect stale or replayed payloads.
+///
+/// **Serde compatibility:** Since this struct is exchanged between peers that
+/// may run different app versions, any future field additions MUST use
+/// `#[serde(default)]` to maintain backward compatibility with older peers
+/// that do not know about the new field.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ExchangeModePayload {
     /// The exchange mode the sender is proposing.
@@ -139,5 +144,43 @@ mod tests {
             ttl_seconds: 0,
         };
         assert!(payload.is_expired(1001));
+    }
+
+    #[test]
+    fn is_expired_exact_boundary_not_expired() {
+        let payload = ExchangeModePayload {
+            mode: ExchangeMode::Hover,
+            capabilities: DeviceCapabilities::default(),
+            exchange_id: ExchangeId::generate(),
+            timestamp: 1000,
+            ttl_seconds: 60,
+        };
+        // At the exact boundary (1060), NOT expired — expiry is strict >
+        assert!(
+            !payload.is_expired(1060),
+            "exact boundary must not be expired"
+        );
+        // One second past boundary — expired
+        assert!(
+            payload.is_expired(1061),
+            "one second past boundary must be expired"
+        );
+    }
+
+    #[test]
+    fn is_expired_overflow_safe() {
+        // Saturating add: u64::MAX + any ttl must not wrap to a value < now
+        let payload = ExchangeModePayload {
+            mode: ExchangeMode::Hover,
+            capabilities: DeviceCapabilities::default(),
+            exchange_id: ExchangeId::generate(),
+            timestamp: u64::MAX,
+            ttl_seconds: 60,
+        };
+        // saturating_add clamps to u64::MAX — any now_secs <= u64::MAX is not expired
+        assert!(
+            !payload.is_expired(u64::MAX),
+            "saturating overflow must not produce a false expiry"
+        );
     }
 }

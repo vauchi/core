@@ -474,7 +474,9 @@ mod tests {
     /// match will cause a compile error, making the omission impossible to miss.
     #[test]
     fn all_covers_every_variant() {
-        for &mode in ExchangeMode::all() {
+        let modes = ExchangeMode::all();
+        assert_eq!(modes.len(), 10, "update this count when adding variants");
+        for &mode in modes {
             match mode {
                 ExchangeMode::Glance
                 | ExchangeMode::Hover

@@ -8,6 +8,8 @@
 //! subsequent mutations to the original card (or the identity layer above) do
 //! not affect the data being transmitted mid-exchange.
 
+use serde::{Deserialize, Serialize};
+
 use crate::contact_card::ContactCard;
 
 // ── CardSnapshot type ────────────────────────────────────────────────────────
@@ -17,7 +19,7 @@ use crate::contact_card::ContactCard;
 /// Created via [`CardSnapshot::freeze`] which takes ownership of the card and
 /// records the current Unix timestamp. The card is then only accessible through
 /// the read-only accessor methods.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CardSnapshot {
     card: ContactCard,
     created_at: u64,
@@ -149,5 +151,14 @@ mod tests {
             snapshot.created_at() > 0,
             "created_at should be a positive Unix timestamp"
         );
+    }
+
+    #[test]
+    fn serde_roundtrip() {
+        let card = ContactCard::new("Serde");
+        let snapshot = CardSnapshot::freeze(card);
+        let json = serde_json::to_string(&snapshot).unwrap();
+        let decoded: CardSnapshot = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.display_name(), "Serde");
     }
 }

@@ -83,17 +83,15 @@ impl ExchangeRecord {
 
     /// Transport-axis score (how local / trustworthy the data channel is).
     fn transport_locality(&self) -> f64 {
-        match self.transport_used {
-            // Direct local channels — full locality.
-            DataTransport::QrMultiStage | DataTransport::Ble if !self.relay_fallback => 1.0,
+        match (self.transport_used, self.relay_fallback) {
             // Fell back to relay even though a local transport was configured.
-            _ if self.relay_fallback => 0.5,
+            (_, true) => 0.5,
+            // Direct local channels — full locality.
+            (DataTransport::QrMultiStage | DataTransport::Ble, false) => 1.0,
             // Primary relay transport with in-person context (e.g. Web mode).
-            DataTransport::Relay if self.context == ExchangeContext::InPerson => 0.5,
+            (DataTransport::Relay, false) if self.context == ExchangeContext::InPerson => 0.5,
             // Primary relay transport for remote / async.
-            DataTransport::Relay => 0.3,
-            // Catch-all (relay_fallback already handled above).
-            _ => 1.0,
+            (DataTransport::Relay, false) => 0.3,
         }
     }
 

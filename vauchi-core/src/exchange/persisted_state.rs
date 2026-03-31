@@ -23,6 +23,7 @@ use super::mode::ExchangeMode;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[repr(u8)]
 #[serde(rename_all = "snake_case")]
+#[non_exhaustive]
 pub enum ExchangeLifecycleState {
     /// Data transfer is in progress (QR scanning, BLE pairing, etc.).
     Transferring = 0,

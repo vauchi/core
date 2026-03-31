@@ -119,6 +119,7 @@ pub enum ModeCategory {
 /// Primary data transport channel for a mode.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[non_exhaustive]
 pub enum DataTransport {
     QrMultiStage,
     Ble,
@@ -128,6 +129,7 @@ pub enum DataTransport {
 /// How the two peers discover / bootstrap the session.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[non_exhaustive]
 pub enum BootstrapMethod {
     QrMutualScan,
     QrOneToMany,
@@ -141,6 +143,7 @@ pub enum BootstrapMethod {
 /// Physical proximity signal used to verify co-presence.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[non_exhaustive]
 pub enum ProximityMethod {
     Audio,
     NfcRange,
@@ -151,6 +154,7 @@ pub enum ProximityMethod {
 /// Whether the exchange requires both parties to be physically present.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[non_exhaustive]
 pub enum ExchangeContext {
     InPerson,
     Remote,
@@ -160,6 +164,7 @@ pub enum ExchangeContext {
 /// Device capability required to perform a mode.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[non_exhaustive]
 pub enum DeviceRequirement {
     Camera,
     Ble,
@@ -274,6 +279,9 @@ static MODE_TAP_HOVER_SHAKE: ModeConfig = ModeConfig {
     ],
 };
 
+// Broadcast: BLE is the preferred data transport but relay serves
+// as fallback — BLE is deliberately not in `requires` because the
+// mode functions (degraded) without it. See spec footnote.
 static MODE_BROADCAST: ModeConfig = ModeConfig {
     data_transport: DataTransport::Ble,
     bootstrap: BootstrapMethod::QrOneToMany,

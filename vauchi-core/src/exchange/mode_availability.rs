@@ -16,6 +16,7 @@ use crate::types::AudioCapability;
 
 /// Availability status of an [`ExchangeMode`] on a specific device.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum ModeAvailability {
     /// All required hardware is present and fully functional.
     Available,

@@ -62,6 +62,7 @@ pub mod card_snapshot;
 pub mod command;
 pub mod device_link;
 pub mod exchange_id;
+pub mod exchange_record;
 pub mod mode;
 pub mod mode_availability;
 pub mod mode_payload;

@@ -100,6 +100,8 @@ fn make_caps(nfc: bool, ble: bool, camera: bool) -> DeviceCapabilities {
         biometric_type: None,
         has_secure_enclave: false,
         platform: Platform::Unknown,
+        has_accelerometer: false,
+        has_internet: false,
     }
 }
 
@@ -160,6 +162,8 @@ fn test_device_capabilities_serde_roundtrip() {
         biometric_type: Some(BiometricType::FaceId),
         has_secure_enclave: true,
         platform: Platform::Ios,
+        has_accelerometer: false,
+        has_internet: false,
     };
 
     let json = serde_json::to_string(&caps).expect("serialize");
@@ -479,6 +483,8 @@ mod proptest_capability {
             arb_biometric_type(),
             any::<bool>(), // has_secure_enclave
             arb_platform(),
+            any::<bool>(), // has_accelerometer
+            any::<bool>(), // has_internet
         )
             .prop_map(
                 |(
@@ -490,6 +496,8 @@ mod proptest_capability {
                     biometric_type,
                     has_secure_enclave,
                     platform,
+                    has_accelerometer,
+                    has_internet,
                 )| {
                     DeviceCapabilities {
                         has_nfc,
@@ -500,6 +508,8 @@ mod proptest_capability {
                         biometric_type,
                         has_secure_enclave,
                         platform,
+                        has_accelerometer,
+                        has_internet,
                     }
                 },
             )

@@ -47,6 +47,14 @@ pub struct DeviceCapabilities {
     /// Platform identifier.
     #[serde(default)]
     pub platform: Platform,
+
+    /// Device has an accelerometer (for Bump/Shake proximity).
+    #[serde(default)]
+    pub has_accelerometer: bool,
+
+    /// Device has internet connectivity (for relay/Link/Web modes).
+    #[serde(default)]
+    pub has_internet: bool,
 }
 
 /// Type of biometric hardware available on the device.
@@ -71,4 +79,48 @@ pub enum Platform {
     Web,
     #[default]
     Unknown,
+}
+
+// INLINE_TEST_REQUIRED: tests verify backward-compat deserialization against DeviceCapabilities
+// struct internals and serde(default) behaviour — must live alongside the type definition
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn new_fields_default_to_false() {
+        let caps = DeviceCapabilities::default();
+        assert!(
+            !caps.has_accelerometer,
+            "has_accelerometer should default to false"
+        );
+        assert!(!caps.has_internet, "has_internet should default to false");
+    }
+
+    #[test]
+    fn backward_compat_deserialize_without_new_fields() {
+        // Old JSON that was serialized before these fields were added.
+        let old_json = r#"{"has_nfc":true,"has_ble":false,"has_camera":true}"#;
+        let caps: DeviceCapabilities =
+            serde_json::from_str(old_json).expect("deserialize old JSON");
+        assert!(
+            !caps.has_accelerometer,
+            "missing field should default to false"
+        );
+        assert!(!caps.has_internet, "missing field should default to false");
+        assert!(caps.has_nfc, "existing field must still be true");
+    }
+
+    #[test]
+    fn roundtrip_with_new_fields() {
+        let caps = DeviceCapabilities {
+            has_accelerometer: true,
+            has_internet: true,
+            ..Default::default()
+        };
+        let json = serde_json::to_string(&caps).expect("serialize");
+        let decoded: DeviceCapabilities = serde_json::from_str(&json).expect("deserialize");
+        assert!(decoded.has_accelerometer);
+        assert!(decoded.has_internet);
+    }
 }

@@ -15,6 +15,7 @@ use serde::{Deserialize, Serialize};
 /// All fields use `#[serde(default)]` for backward compatibility when
 /// deserializing from older versions that may not include newer fields.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct DeviceCapabilities {
     /// Device has NFC hardware (for NFC Active exchange).
     #[serde(default)]

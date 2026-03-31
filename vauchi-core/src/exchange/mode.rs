@@ -467,4 +467,26 @@ mod tests {
         assert!(link.requires.contains(&DeviceRequirement::Internet));
         assert!(!link.requires.contains(&DeviceRequirement::Camera));
     }
+
+    /// Exhaustive match over every variant in `all()`.
+    ///
+    /// Adding a new variant to `ExchangeMode` without updating `all()` AND this
+    /// match will cause a compile error, making the omission impossible to miss.
+    #[test]
+    fn all_covers_every_variant() {
+        for &mode in ExchangeMode::all() {
+            match mode {
+                ExchangeMode::Glance
+                | ExchangeMode::Hover
+                | ExchangeMode::Bump
+                | ExchangeMode::Shake
+                | ExchangeMode::Magic
+                | ExchangeMode::TapTap
+                | ExchangeMode::TapHoverShake
+                | ExchangeMode::Broadcast
+                | ExchangeMode::Web
+                | ExchangeMode::Link => {}
+            }
+        }
+    }
 }

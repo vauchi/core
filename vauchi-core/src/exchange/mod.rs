@@ -58,6 +58,7 @@ pub mod multistage;
 mod multistage;
 
 pub mod capability;
+pub mod card_snapshot;
 pub mod command;
 pub mod device_link;
 pub mod exchange_id;

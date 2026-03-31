@@ -60,6 +60,32 @@ pub enum ExchangeCommand {
     AudioListenForResponse { timeout_ms: u64 },
     /// Stop all audio operations.
     AudioStop,
+
+    // ── Accelerometer ───────────────────────────────────────────────
+    /// Start accelerometer sampling for proximity verification.
+    AccelerometerStart,
+    /// Stop accelerometer sampling.
+    AccelerometerStop,
+
+    // ── Relay escrow ────────────────────────────────────────────────
+    /// Deposit encrypted card into relay escrow gate.
+    RelayEscrowDeposit {
+        gate_hash: Vec<u8>,
+        slot_hash: Vec<u8>,
+        encrypted_card: Vec<u8>,
+        ttl_seconds: u32,
+    },
+    /// Check relay escrow gate readiness.
+    RelayEscrowCheck { gate_hash: Vec<u8> },
+    /// Retrieve blob from relay escrow gate.
+    RelayEscrowRetrieve {
+        gate_hash: Vec<u8>,
+        slot_hash: Vec<u8>,
+    },
+
+    // ── Link mode ───────────────────────────────────────────────────
+    /// Show system share sheet with a URL.
+    ShowShareSheet { url: String },
 }
 
 /// A hardware event reported by the frontend back to core.
@@ -103,6 +129,35 @@ pub enum ExchangeHardwareEvent {
     HardwareError { transport: String, error: String },
     /// The requested hardware is not available on this platform.
     HardwareUnavailable { transport: String },
+
+    // ── Accelerometer ───────────────────────────────────────────────
+    /// Accelerometer sample from the device.
+    ///
+    /// Acceleration is reported in milli-g (thousandths of standard gravity)
+    /// to avoid `f32` and keep the type `Eq`-compatible across FFI boundaries.
+    AccelerometerData {
+        timestamp_ms: u64,
+        x_milli_g: i32,
+        y_milli_g: i32,
+        z_milli_g: i32,
+    },
+    /// Impact detected by the device accelerometer.
+    ImpactDetected {
+        timestamp_ms: u64,
+        magnitude_milli_g: i32,
+    },
+
+    // ── Relay escrow ────────────────────────────────────────────────
+    /// Relay escrow gate has reached required deposit count.
+    RelayEscrowReady { gate_hash: Vec<u8> },
+    /// Relay escrow deposit/retrieve failed or gate expired.
+    RelayEscrowFailed { gate_hash: Vec<u8>, reason: String },
+
+    // ── Link mode ───────────────────────────────────────────────────
+    /// User shared the link via share sheet.
+    LinkShared,
+    /// Link was opened by peer, providing their public key.
+    LinkOpened { peer_public_key: Vec<u8> },
 }
 
 // INLINE_TEST_REQUIRED: serde roundtrip tests need private enum variant access
@@ -210,6 +265,24 @@ mod tests {
             },
             ExchangeCommand::AudioListenForResponse { timeout_ms: 3000 },
             ExchangeCommand::AudioStop,
+            ExchangeCommand::AccelerometerStart,
+            ExchangeCommand::AccelerometerStop,
+            ExchangeCommand::RelayEscrowDeposit {
+                gate_hash: vec![0xAB; 32],
+                slot_hash: vec![0xCD; 32],
+                encrypted_card: vec![0x01; 64],
+                ttl_seconds: 3600,
+            },
+            ExchangeCommand::RelayEscrowCheck {
+                gate_hash: vec![0xAB; 32],
+            },
+            ExchangeCommand::RelayEscrowRetrieve {
+                gate_hash: vec![0xAB; 32],
+                slot_hash: vec![0xCD; 32],
+            },
+            ExchangeCommand::ShowShareSheet {
+                url: "https://vauchi.app/link/abc123".into(),
+            },
         ];
         for cmd in &commands {
             let json = serde_json::to_string(cmd).expect("serialize");
@@ -247,6 +320,27 @@ mod tests {
             },
             ExchangeHardwareEvent::HardwareUnavailable {
                 transport: "NFC".into(),
+            },
+            ExchangeHardwareEvent::AccelerometerData {
+                timestamp_ms: 1_000,
+                x_milli_g: 1_000, // ~1 g lateral
+                y_milli_g: 0,
+                z_milli_g: -9_800, // ~-9.8 g (gravity)
+            },
+            ExchangeHardwareEvent::ImpactDetected {
+                timestamp_ms: 2_000,
+                magnitude_milli_g: 3_500, // ~3.5 g impact
+            },
+            ExchangeHardwareEvent::RelayEscrowReady {
+                gate_hash: vec![0xDE; 32],
+            },
+            ExchangeHardwareEvent::RelayEscrowFailed {
+                gate_hash: vec![0xDE; 32],
+                reason: "gate expired".into(),
+            },
+            ExchangeHardwareEvent::LinkShared,
+            ExchangeHardwareEvent::LinkOpened {
+                peer_public_key: vec![0x04; 32],
             },
         ];
         for evt in &events {
@@ -306,9 +400,23 @@ mod tests {
             ExchangeCommand::AudioEmitChallenge { data: vec![] },
             ExchangeCommand::AudioListenForResponse { timeout_ms: 0 },
             ExchangeCommand::AudioStop,
+            ExchangeCommand::AccelerometerStart,
+            ExchangeCommand::AccelerometerStop,
+            ExchangeCommand::RelayEscrowDeposit {
+                gate_hash: vec![],
+                slot_hash: vec![],
+                encrypted_card: vec![],
+                ttl_seconds: 0,
+            },
+            ExchangeCommand::RelayEscrowCheck { gate_hash: vec![] },
+            ExchangeCommand::RelayEscrowRetrieve {
+                gate_hash: vec![],
+                slot_hash: vec![],
+            },
+            ExchangeCommand::ShowShareSheet { url: "".into() },
         ];
-        // 13 total command variants
-        assert_eq!(variants.len(), 13);
+        // 19 total command variants
+        assert_eq!(variants.len(), 19);
     }
 
     #[test]
@@ -341,8 +449,27 @@ mod tests {
             ExchangeHardwareEvent::HardwareUnavailable {
                 transport: "".into(),
             },
+            ExchangeHardwareEvent::AccelerometerData {
+                timestamp_ms: 0,
+                x_milli_g: 0,
+                y_milli_g: 0,
+                z_milli_g: 0,
+            },
+            ExchangeHardwareEvent::ImpactDetected {
+                timestamp_ms: 0,
+                magnitude_milli_g: 0,
+            },
+            ExchangeHardwareEvent::RelayEscrowReady { gate_hash: vec![] },
+            ExchangeHardwareEvent::RelayEscrowFailed {
+                gate_hash: vec![],
+                reason: "".into(),
+            },
+            ExchangeHardwareEvent::LinkShared,
+            ExchangeHardwareEvent::LinkOpened {
+                peer_public_key: vec![],
+            },
         ];
-        // 10 total event variants
-        assert_eq!(variants.len(), 10);
+        // 16 total event variants
+        assert_eq!(variants.len(), 16);
     }
 }

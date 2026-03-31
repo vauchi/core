@@ -670,6 +670,15 @@ impl ExchangeSession {
                 self.attempt_transport_fallback(&transport);
                 Ok(())
             }
+            // New hardware event variants — not yet wired into the session state machine.
+            // Frontends may send these; they are acknowledged without state change until
+            // the corresponding session logic is implemented.
+            ExchangeHardwareEvent::AccelerometerData { .. }
+            | ExchangeHardwareEvent::ImpactDetected { .. }
+            | ExchangeHardwareEvent::RelayEscrowReady { .. }
+            | ExchangeHardwareEvent::RelayEscrowFailed { .. }
+            | ExchangeHardwareEvent::LinkShared
+            | ExchangeHardwareEvent::LinkOpened { .. } => Ok(()),
         }
     }
 

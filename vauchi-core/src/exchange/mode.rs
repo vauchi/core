@@ -43,8 +43,8 @@ pub enum ExchangeMode {
 
 impl ExchangeMode {
     /// Returns all ten variants in declaration order.
-    pub fn all() -> [Self; 10] {
-        [
+    pub fn all() -> &'static [Self] {
+        &[
             Self::Glance,
             Self::Hover,
             Self::Bump,
@@ -104,7 +104,9 @@ impl ExchangeMode {
 
 // ── Supporting enums ────────────────────────────────────────────────────────
 
-/// UI grouping for exchange modes.
+/// UI grouping for mode selection screen.
+///
+/// Not serialized — used for display grouping only, not persisted.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ModeCategory {
     Quick,
@@ -319,7 +321,7 @@ mod tests {
 
     #[test]
     fn exchange_mode_serde_roundtrip() {
-        for mode in ExchangeMode::all() {
+        for &mode in ExchangeMode::all() {
             let json = serde_json::to_string(&mode).expect("serialize");
             let back: ExchangeMode = serde_json::from_str(&json).expect("deserialize");
             assert_eq!(mode, back);
@@ -358,11 +360,17 @@ mod tests {
     #[test]
     fn exchange_mode_display_names() {
         assert_eq!(ExchangeMode::Glance.display_name(), "Glance");
+        assert_eq!(ExchangeMode::Hover.display_name(), "Hover");
+        assert_eq!(ExchangeMode::Bump.display_name(), "Bump");
+        assert_eq!(ExchangeMode::Shake.display_name(), "Shake");
+        assert_eq!(ExchangeMode::Magic.display_name(), "Magic");
         assert_eq!(ExchangeMode::TapTap.display_name(), "Tap tap");
         assert_eq!(
             ExchangeMode::TapHoverShake.display_name(),
             "Tap hover shake"
         );
+        assert_eq!(ExchangeMode::Broadcast.display_name(), "Broadcast");
+        assert_eq!(ExchangeMode::Web.display_name(), "Web");
         assert_eq!(ExchangeMode::Link.display_name(), "Link");
     }
 
@@ -382,7 +390,7 @@ mod tests {
 
     #[test]
     fn every_mode_has_config() {
-        for mode in ExchangeMode::all() {
+        for &mode in ExchangeMode::all() {
             let cfg = mode.config();
             assert!(cfg.timeout > Duration::ZERO, "{:?} has zero timeout", mode);
         }
@@ -427,7 +435,7 @@ mod tests {
 
     #[test]
     fn all_in_person_modes_have_relay_fallback() {
-        for mode in ExchangeMode::all() {
+        for &mode in ExchangeMode::all() {
             let cfg = mode.config();
             if cfg.context == ExchangeContext::InPerson {
                 assert_eq!(

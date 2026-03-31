@@ -213,3 +213,15 @@ pub use x3dh::{X3DH, X3DHKeyPair};
 // Multi-stage exchange re-exports
 pub use multistage::session::MultiStageSession;
 pub use multistage::types::{ProtocolState, QrPayload};
+
+// Exchange mode foundation re-exports
+pub use card_snapshot::CardSnapshot;
+pub use exchange_id::ExchangeId;
+pub use exchange_record::{ExchangeRecord, ProximityResult, ReverificationRecord, TrustLevel};
+pub use mode::{
+    BootstrapMethod, DataTransport, DeviceRequirement, ExchangeContext, ExchangeMode, ModeCategory,
+    ModeConfig, ProximityMethod,
+};
+pub use mode_availability::{ModeAvailability, check_mode_availability, recommend_mode};
+pub use mode_payload::ExchangeModePayload;
+pub use persisted_state::{ExchangeLifecycleState, PersistedExchangeState};

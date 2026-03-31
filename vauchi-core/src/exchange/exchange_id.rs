@@ -131,4 +131,27 @@ mod tests {
         );
         assert_eq!(s, "ca".repeat(32));
     }
+
+    // CC-11: failure paths — deserializer must reject malformed inputs
+    #[test]
+    fn deserialize_rejects_wrong_length() {
+        // 32 hex chars (only 16 bytes decoded) — need 64 hex chars (32 bytes)
+        let short = format!("\"{}\"", "ab".repeat(16));
+        let result = serde_json::from_str::<ExchangeId>(&short);
+        assert!(result.is_err(), "should reject 32-char hex (need 64)");
+    }
+
+    #[test]
+    fn deserialize_rejects_invalid_hex() {
+        // 64 chars but not valid hex
+        let bad = format!("\"{}\"", "zz".repeat(32));
+        let result = serde_json::from_str::<ExchangeId>(&bad);
+        assert!(result.is_err(), "should reject non-hex characters");
+    }
+
+    #[test]
+    fn deserialize_rejects_empty_string() {
+        let result = serde_json::from_str::<ExchangeId>("\"\"");
+        assert!(result.is_err(), "should reject empty string");
+    }
 }

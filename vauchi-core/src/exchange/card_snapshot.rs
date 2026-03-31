@@ -50,11 +50,12 @@ impl CardSnapshot {
 
     /// Serialize the card to JSON bytes.
     ///
-    /// Returns the raw UTF-8 JSON encoding of the inner [`ContactCard`].
+    /// Returns the raw UTF-8 JSON encoding of the inner [`ContactCard`], or a
+    /// [`serde_json::Error`] if serialization fails.
     /// The `created_at` timestamp is **not** included in the byte output —
     /// callers that need it should store it alongside the bytes.
-    pub fn to_bytes(&self) -> Vec<u8> {
-        serde_json::to_vec(&self.card).expect("ContactCard serialization is infallible")
+    pub fn to_bytes(&self) -> Result<Vec<u8>, serde_json::Error> {
+        serde_json::to_vec(&self.card)
     }
 
     /// Deserialize a snapshot from bytes previously produced by [`to_bytes`].
@@ -62,6 +63,7 @@ impl CardSnapshot {
     /// The `created_at` timestamp is set to `now` because the original
     /// timestamp is not encoded in the bytes; callers that need round-trip
     /// fidelity should persist the timestamp separately.
+    /// Returns a [`serde_json::Error`] if the bytes are not valid JSON.
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, serde_json::Error> {
         let card: ContactCard = serde_json::from_slice(bytes)?;
         Ok(Self {
@@ -132,7 +134,7 @@ mod tests {
         let card = ContactCard::new("Carol");
         let snapshot = CardSnapshot::freeze(card);
 
-        let bytes = snapshot.to_bytes();
+        let bytes = snapshot.to_bytes().unwrap();
         assert!(!bytes.is_empty(), "to_bytes must produce non-empty output");
 
         let recovered = CardSnapshot::from_bytes(&bytes).expect("from_bytes");

@@ -16,7 +16,7 @@ use super::mode::{DataTransport, ExchangeContext, ExchangeMode, ProximityMethod}
 // ── ProximityResult ──────────────────────────────────────────────────────────
 
 /// Outcome of a single proximity verification attempt during an exchange.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ProximityResult {
     /// The proximity method that was attempted.
     pub method: ProximityMethod,
@@ -29,7 +29,7 @@ pub struct ProximityResult {
 // ── ReverificationRecord ─────────────────────────────────────────────────────
 
 /// A post-exchange proximity check used to re-confirm a contact's presence.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ReverificationRecord {
     /// The proximity method used.
     pub method: ProximityMethod,
@@ -45,7 +45,7 @@ pub struct ReverificationRecord {
 ///
 /// Captures transport, context, proximity signals, and relay fallback so that
 /// trust can be scored and audited after the fact.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ExchangeRecord {
     /// Which exchange mode was used.
     pub mode: ExchangeMode,

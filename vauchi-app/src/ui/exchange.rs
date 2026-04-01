@@ -9,6 +9,7 @@
 //! session is provided, transitions emit `ExchangeCommand`s that frontends
 //! dispatch to platform hardware (camera, BLE, NFC, audio).
 
+use crate::ui::exchange_qr::{self, QrActionOutcome, QrStep};
 use crate::ui::*;
 use vauchi_core::exchange::command::ExchangeCommand;
 use vauchi_core::exchange::{ExchangeEvent, ExchangeSession};
@@ -46,9 +47,8 @@ pub struct ExchangeEngine {
 enum ExchangeStep {
     /// Pick groups for the new contact (shown only if groups exist).
     GroupSelection,
-    ShowQr,
-    ScanQr,
-    Verifying,
+    /// QR exchange sub-flow (Glance/Hover modes).
+    Qr(QrStep),
     Success,
     Failed,
 }
@@ -57,21 +57,20 @@ impl ExchangeStep {
     fn step_number(&self) -> u8 {
         match self {
             Self::GroupSelection => 1,
-            Self::ShowQr => 2,
-            Self::ScanQr => 3,
-            Self::Verifying => 4,
-            Self::Success => 5,
-            Self::Failed => 6,
+            // QR steps start at 2 (after group selection)
+            Self::Qr(qr) => qr.step_number(2),
+            Self::Success => 2 + QrStep::STEP_COUNT,
+            Self::Failed => 3 + QrStep::STEP_COUNT,
         }
     }
 }
 
-const TOTAL_STEPS: u8 = 6;
+const TOTAL_STEPS: u8 = 1 + QrStep::STEP_COUNT + 2; // group + qr + success/failed
 
 impl ExchangeEngine {
     pub fn new(config: ExchangeConfig) -> Self {
         let step = if config.available_groups.is_empty() {
-            ExchangeStep::ShowQr
+            ExchangeStep::Qr(QrStep::ShowQr)
         } else {
             ExchangeStep::GroupSelection
         };
@@ -96,14 +95,14 @@ impl ExchangeEngine {
     /// `QrDisplay` command after construction.
     pub fn with_session(config: ExchangeConfig, mut session: ExchangeSession) -> Self {
         let step = if config.available_groups.is_empty() {
-            ExchangeStep::ShowQr
+            ExchangeStep::Qr(QrStep::ShowQr)
         } else {
             ExchangeStep::GroupSelection
         };
 
         // If starting directly at ShowQr, kick off the session now.
         // StartQR should always succeed on a fresh Idle session.
-        if step == ExchangeStep::ShowQr {
+        if step == ExchangeStep::Qr(QrStep::ShowQr) {
             if session.apply(ExchangeEvent::StartQR).is_err() {
                 // Session failed to start — proceed without a session so the
                 // UI still works (falls back to static QR data).
@@ -251,71 +250,16 @@ impl ExchangeEngine {
                     ..Default::default()
                 }
             }
-            ExchangeStep::ShowQr => {
-                // ADR-031: Use session QR data when available (cryptographically
-                // generated with ephemeral keys), falling back to config for
-                // legacy UI-only mode.
-                let qr_data = self
-                    .session
-                    .as_ref()
-                    .and_then(|s| s.qr())
-                    .map(|qr| qr.to_data_string())
-                    .unwrap_or_else(|| self.config.own_qr_data.clone());
-
-                ScreenModel {
-                    screen_id: "exchange_show_qr".into(),
-                    title: "Share Your Code".into(),
-                    subtitle: None,
-                    components: vec![Component::QrCode {
-                        id: "own_qr".into(),
-                        data: qr_data,
-                        mode: QrMode::Display,
-                        label: Some(self.config.own_name.clone()),
-                    }],
-                    actions: vec![ScreenAction {
-                        id: "continue".into(),
-                        label: "Scan Their Code".into(),
-                        style: ActionStyle::Primary,
-                        enabled: true,
-                    }],
-                    progress: Some(self.progress()),
-                    ..Default::default()
-                }
+            ExchangeStep::Qr(QrStep::ShowQr) => exchange_qr::build_show_qr_screen(
+                self.session.as_ref(),
+                &self.config.own_name,
+                &self.config.own_qr_data,
+                self.progress(),
+            ),
+            ExchangeStep::Qr(QrStep::ScanQr) => exchange_qr::build_scan_qr_screen(self.progress()),
+            ExchangeStep::Qr(QrStep::Verifying) => {
+                exchange_qr::build_verifying_screen(self.progress())
             }
-            ExchangeStep::ScanQr => ScreenModel {
-                screen_id: "exchange_scan_qr".into(),
-                title: "Scan Their Code".into(),
-                subtitle: None,
-                components: vec![Component::QrCode {
-                    id: "scan_qr".into(),
-                    data: String::new(),
-                    mode: QrMode::Scan,
-                    label: None,
-                }],
-                actions: vec![ScreenAction {
-                    id: "back".into(),
-                    label: "Back".into(),
-                    style: ActionStyle::Secondary,
-                    enabled: true,
-                }],
-                progress: Some(self.progress()),
-                ..Default::default()
-            },
-            ExchangeStep::Verifying => ScreenModel {
-                screen_id: "exchange_verifying".into(),
-                title: "Verifying".into(),
-                subtitle: None,
-                components: vec![Component::StatusIndicator {
-                    id: "verifying_status".into(),
-                    icon: None,
-                    title: "Verifying...".into(),
-                    detail: None,
-                    status: Status::InProgress,
-                }],
-                actions: vec![],
-                progress: Some(self.progress()),
-                ..Default::default()
-            },
             ExchangeStep::Success => ScreenModel {
                 screen_id: "exchange_success".into(),
                 title: "Success".into(),
@@ -416,7 +360,7 @@ impl WorkflowEngine for ExchangeEngine {
             | vauchi_core::exchange::ExchangeState::AwaitingNfcTap
             | vauchi_core::exchange::ExchangeState::AwaitingBleConnection
             | vauchi_core::exchange::ExchangeState::AwaitingBleVerification { .. } => {
-                self.step = ExchangeStep::Verifying;
+                self.step = ExchangeStep::Qr(QrStep::Verifying);
             }
             _ => {}
         }
@@ -452,38 +396,38 @@ impl WorkflowEngine for ExchangeEngine {
                 if action_id == "skip" {
                     self.selected_groups.clear();
                 }
-                self.step = ExchangeStep::ShowQr;
+                self.step = ExchangeStep::Qr(QrStep::ShowQr);
                 self.start_session_if_needed()
             }
-            (ExchangeStep::ShowQr, UserAction::ActionPressed { action_id })
-                if action_id == "continue" =>
-            {
-                self.step = ExchangeStep::ScanQr;
-                // ADR-031: emit QrRequestScan command if session is active
-                if self.session.is_some() {
-                    ActionResult::ExchangeCommands {
-                        commands: vec![ExchangeCommand::QrRequestScan],
+            // QR sub-flow actions — delegated to exchange_qr module
+            (ExchangeStep::Qr(qr_step), ref user_action) => {
+                if let Some(outcome) =
+                    exchange_qr::handle_qr_action(qr_step, user_action, self.session.is_some())
+                {
+                    match outcome {
+                        QrActionOutcome::AdvanceToScan { session_active } => {
+                            self.step = ExchangeStep::Qr(QrStep::ScanQr);
+                            if session_active {
+                                ActionResult::ExchangeCommands {
+                                    commands: vec![ExchangeCommand::QrRequestScan],
+                                }
+                            } else {
+                                ActionResult::RequestCamera
+                            }
+                        }
+                        QrActionOutcome::BackToShowQr => {
+                            self.step = ExchangeStep::Qr(QrStep::ShowQr);
+                            ActionResult::NavigateTo(self.build_screen())
+                        }
+                        QrActionOutcome::QrScanned { data } => {
+                            self.scanned_data = Some(data);
+                            self.step = ExchangeStep::Qr(QrStep::Verifying);
+                            ActionResult::NavigateTo(self.build_screen())
+                        }
                     }
                 } else {
-                    ActionResult::RequestCamera
+                    ActionResult::UpdateScreen(self.build_screen())
                 }
-            }
-            (ExchangeStep::ScanQr, UserAction::ActionPressed { action_id })
-                if action_id == "back" =>
-            {
-                self.step = ExchangeStep::ShowQr;
-                ActionResult::NavigateTo(self.build_screen())
-            }
-            (
-                ExchangeStep::ScanQr,
-                UserAction::TextChanged {
-                    component_id,
-                    value,
-                },
-            ) if component_id == "scanned_data" => {
-                self.scanned_data = Some(value);
-                self.step = ExchangeStep::Verifying;
-                ActionResult::NavigateTo(self.build_screen())
             }
             (ExchangeStep::Success, UserAction::ActionPressed { action_id })
                 if action_id == "done" =>
@@ -495,7 +439,7 @@ impl WorkflowEngine for ExchangeEngine {
             {
                 self.scanned_data = None;
                 self.failure_detail = None;
-                self.step = ExchangeStep::ShowQr;
+                self.step = ExchangeStep::Qr(QrStep::ShowQr);
                 ActionResult::NavigateTo(self.build_screen())
             }
             (ExchangeStep::Failed, UserAction::ActionPressed { action_id })
@@ -536,7 +480,7 @@ mod tests {
     fn test_no_groups_skips_selection() {
         let engine = ExchangeEngine::new(config_no_groups());
         // Should start directly at ShowQr when no groups available
-        assert_eq!(engine.step, ExchangeStep::ShowQr);
+        assert_eq!(engine.step, ExchangeStep::Qr(QrStep::ShowQr));
         let screen = engine.current_screen();
         assert_eq!(screen.screen_id, "exchange_show_qr");
     }
@@ -566,7 +510,7 @@ mod tests {
             action_id: "continue".into(),
         });
         assert!(matches!(result, ActionResult::NavigateTo(_)));
-        assert_eq!(engine.step, ExchangeStep::ShowQr);
+        assert_eq!(engine.step, ExchangeStep::Qr(QrStep::ShowQr));
 
         // Selected groups should be remembered
         assert_eq!(engine.selected_groups(), &["g1".to_string()]);
@@ -581,7 +525,7 @@ mod tests {
             action_id: "skip".into(),
         });
         assert!(matches!(result, ActionResult::NavigateTo(_)));
-        assert_eq!(engine.step, ExchangeStep::ShowQr);
+        assert_eq!(engine.step, ExchangeStep::Qr(QrStep::ShowQr));
         assert!(engine.selected_groups().is_empty());
     }
 
@@ -603,7 +547,7 @@ mod tests {
         assert!(engine.session().is_some(), "expected Some value");
 
         // Should be at ShowQr step
-        assert_eq!(engine.step, ExchangeStep::ShowQr);
+        assert_eq!(engine.step, ExchangeStep::Qr(QrStep::ShowQr));
 
         // Should have a QrDisplay command ready to drain
         let commands = engine.drain_commands();
@@ -656,7 +600,7 @@ mod tests {
             }
             other => panic!("Expected ExchangeCommands, got {:?}", other),
         }
-        assert_eq!(engine.step, ExchangeStep::ShowQr);
+        assert_eq!(engine.step, ExchangeStep::Qr(QrStep::ShowQr));
     }
 
     #[test]
@@ -684,7 +628,7 @@ mod tests {
                 other
             ),
         }
-        assert_eq!(engine.step, ExchangeStep::ScanQr);
+        assert_eq!(engine.step, ExchangeStep::Qr(QrStep::ScanQr));
     }
 
     #[test]
@@ -790,7 +734,7 @@ mod tests {
         let _ = engine.handle_action(UserAction::ActionPressed {
             action_id: "continue".into(),
         });
-        assert_eq!(engine.step, ExchangeStep::ScanQr);
+        assert_eq!(engine.step, ExchangeStep::Qr(QrStep::ScanQr));
 
         // Simulate scanning Bob's QR
         let result =
@@ -802,7 +746,7 @@ mod tests {
         assert!(result.is_some(), "expected Some value");
         assert_eq!(
             engine.step,
-            ExchangeStep::Verifying,
+            ExchangeStep::Qr(QrStep::Verifying),
             "After QrScanned, engine step should be Verifying"
         );
     }
@@ -878,7 +822,7 @@ mod tests {
         assert!(result.is_some(), "expected Some value");
 
         // 4. Engine should be in Verifying step
-        assert_eq!(engine.step, ExchangeStep::Verifying);
+        assert_eq!(engine.step, ExchangeStep::Qr(QrStep::Verifying));
 
         // 5. Session should be in PeerScanned state
         let session = engine.session().unwrap();
@@ -967,7 +911,7 @@ mod tests {
             engine.failure_detail.is_none(),
             "Retry should clear the failure detail"
         );
-        assert_eq!(engine.step, ExchangeStep::ShowQr);
+        assert_eq!(engine.step, ExchangeStep::Qr(QrStep::ShowQr));
     }
 
     #[test]

@@ -26,6 +26,7 @@ mod duress_pin;
 mod emergency_shred;
 mod engine;
 mod exchange;
+mod exchange_qr;
 mod fingerprint_verify;
 mod form_dialog;
 mod gdpr;

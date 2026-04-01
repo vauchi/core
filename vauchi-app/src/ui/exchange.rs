@@ -1185,4 +1185,69 @@ mod tests {
 
         assert_eq!(engine.step, ExchangeStep::GroupSelection);
     }
+
+    // ── Hover / Glance mode tests ──────────────────────────────────
+
+    #[test]
+    fn hover_mode_routes_through_qr_flow() {
+        let mut engine = ExchangeEngine::new(config_mode_selection());
+
+        // Pick Hover
+        let _ = engine.handle_action(UserAction::ListItemSelected {
+            component_id: "category:standard".into(),
+            item_id: "mode:hover".into(),
+        });
+        assert_eq!(engine.config.mode, Some(ExchangeMode::Hover));
+        assert_eq!(engine.step, ExchangeStep::Qr(QrStep::ShowQr));
+
+        // Verify QR screen renders
+        let screen = engine.current_screen();
+        assert_eq!(screen.screen_id, "exchange_show_qr");
+    }
+
+    #[test]
+    fn glance_mode_routes_through_qr_flow() {
+        let mut engine = ExchangeEngine::new(config_mode_selection());
+
+        // Pick Glance
+        let _ = engine.handle_action(UserAction::ListItemSelected {
+            component_id: "category:quick".into(),
+            item_id: "mode:glance".into(),
+        });
+        assert_eq!(engine.config.mode, Some(ExchangeMode::Glance));
+        assert_eq!(engine.step, ExchangeStep::Qr(QrStep::ShowQr));
+
+        // QR flow works identically for both modes at engine level
+        let result = engine.handle_action(UserAction::ActionPressed {
+            action_id: "continue".into(),
+        });
+        assert!(matches!(result, ActionResult::RequestCamera));
+        assert_eq!(engine.step, ExchangeStep::Qr(QrStep::ScanQr));
+    }
+
+    #[test]
+    fn field_preview_change_groups_returns_to_group_selection() {
+        let mut config = config_mode_selection();
+        config.available_groups = vec![("g1".into(), "Work".into())];
+        let mut engine = ExchangeEngine::new(config);
+
+        // Mode selection → GroupSelection
+        let _ = engine.handle_action(UserAction::ListItemSelected {
+            component_id: "category:quick".into(),
+            item_id: "mode:glance".into(),
+        });
+        assert_eq!(engine.step, ExchangeStep::GroupSelection);
+
+        // Continue → FieldPreview
+        let _ = engine.handle_action(UserAction::ActionPressed {
+            action_id: "continue".into(),
+        });
+        assert_eq!(engine.step, ExchangeStep::FieldPreview);
+
+        // Change groups → back to GroupSelection
+        let _ = engine.handle_action(UserAction::ActionPressed {
+            action_id: "change_groups".into(),
+        });
+        assert_eq!(engine.step, ExchangeStep::GroupSelection);
+    }
 }

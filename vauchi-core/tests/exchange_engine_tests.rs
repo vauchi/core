@@ -9,6 +9,7 @@ fn make_engine() -> ExchangeEngine {
         own_name: "Alice".to_string(),
         own_qr_data: "alice-qr-payload".to_string(),
         available_groups: vec![],
+        mode: None,
     })
 }
 

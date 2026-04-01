@@ -245,6 +245,7 @@ fn sample_exchange_config() -> ExchangeConfig {
         own_name: "Alice".into(),
         own_qr_data: "vauchi://exchange?token=abc123".into(),
         available_groups: vec![],
+        mode: None,
     }
 }
 

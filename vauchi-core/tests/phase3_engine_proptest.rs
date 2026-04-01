@@ -169,6 +169,7 @@ fn make_exchange() -> ExchangeEngine {
         own_name: "Test User".to_string(),
         own_qr_data: "test-qr-data-12345".to_string(),
         available_groups: vec![],
+        mode: None,
     })
 }
 
@@ -479,6 +480,7 @@ proptest! {
             own_name: name,
             own_qr_data: "my-qr".to_string(),
             available_groups: vec![],
+            mode: None,
         });
 
         // ShowQr → ScanQr

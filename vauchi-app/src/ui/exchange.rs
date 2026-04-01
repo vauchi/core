@@ -23,6 +23,9 @@ pub struct ExchangeConfig {
     /// Available groups for pre-selection (id, name). Empty = no group picker.
     #[serde(default)]
     pub available_groups: Vec<(String, String)>,
+    /// Selected exchange mode. `None` = legacy QR flow (backward compat).
+    #[serde(default)]
+    pub mode: Option<vauchi_core::exchange::mode::ExchangeMode>,
 }
 
 /// Engine that drives the QR exchange workflow.
@@ -474,6 +477,7 @@ mod tests {
             own_name: "Alice".into(),
             own_qr_data: "qr-data".into(),
             available_groups: vec![],
+            mode: None,
         }
     }
 
@@ -485,6 +489,7 @@ mod tests {
                 ("g1".into(), "Family".into()),
                 ("g2".into(), "Friends".into()),
             ],
+            mode: None,
         }
     }
 

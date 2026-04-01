@@ -211,45 +211,11 @@ impl ExchangeEngine {
 
     fn build_screen(&self) -> ScreenModel {
         match self.step {
-            ExchangeStep::GroupSelection => {
-                let items: Vec<ToggleItem> = self
-                    .config
-                    .available_groups
-                    .iter()
-                    .map(|(id, name)| ToggleItem {
-                        id: id.clone(),
-                        label: name.clone(),
-                        selected: self.selected_groups.contains(id),
-                        subtitle: None,
-                    })
-                    .collect();
-                ScreenModel {
-                    screen_id: "exchange_group_selection".into(),
-                    title: "Assign to Groups".into(),
-                    subtitle: Some("Choose which groups the new contact will be in".into()),
-                    components: vec![Component::ToggleList {
-                        id: "group_picker".into(),
-                        label: "Groups".into(),
-                        items,
-                    }],
-                    actions: vec![
-                        ScreenAction {
-                            id: "continue".into(),
-                            label: "Continue".into(),
-                            style: ActionStyle::Primary,
-                            enabled: true,
-                        },
-                        ScreenAction {
-                            id: "skip".into(),
-                            label: "Skip".into(),
-                            style: ActionStyle::Secondary,
-                            enabled: true,
-                        },
-                    ],
-                    progress: Some(self.progress()),
-                    ..Default::default()
-                }
-            }
+            ExchangeStep::GroupSelection => build_group_selection_screen(
+                &self.config.available_groups,
+                &self.selected_groups,
+                self.progress(),
+            ),
             ExchangeStep::Qr(QrStep::ShowQr) => exchange_qr::build_show_qr_screen(
                 self.session.as_ref(),
                 &self.config.own_name,
@@ -309,6 +275,52 @@ impl ExchangeEngine {
                 ..Default::default()
             },
         }
+    }
+}
+
+/// Builds the group selection screen for exchange pre-selection.
+///
+/// Extracted as a standalone function so it can be reused by
+/// the mode-aware exchange flow (field preview also shows groups).
+fn build_group_selection_screen(
+    available_groups: &[(String, String)],
+    selected_groups: &[String],
+    progress: Progress,
+) -> ScreenModel {
+    let items: Vec<ToggleItem> = available_groups
+        .iter()
+        .map(|(id, name)| ToggleItem {
+            id: id.clone(),
+            label: name.clone(),
+            selected: selected_groups.contains(id),
+            subtitle: None,
+        })
+        .collect();
+    ScreenModel {
+        screen_id: "exchange_group_selection".into(),
+        title: "Assign to Groups".into(),
+        subtitle: Some("Choose which groups the new contact will be in".into()),
+        components: vec![Component::ToggleList {
+            id: "group_picker".into(),
+            label: "Groups".into(),
+            items,
+        }],
+        actions: vec![
+            ScreenAction {
+                id: "continue".into(),
+                label: "Continue".into(),
+                style: ActionStyle::Primary,
+                enabled: true,
+            },
+            ScreenAction {
+                id: "skip".into(),
+                label: "Skip".into(),
+                style: ActionStyle::Secondary,
+                enabled: true,
+            },
+        ],
+        progress: Some(progress),
+        ..Default::default()
     }
 }
 

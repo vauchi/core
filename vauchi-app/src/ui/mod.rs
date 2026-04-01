@@ -26,6 +26,8 @@ mod duress_pin;
 mod emergency_shred;
 mod engine;
 mod exchange;
+#[allow(dead_code)] // Wired into ExchangeEngine in Phase 2.2
+mod exchange_field_preview;
 mod exchange_mode_selection;
 mod exchange_qr;
 mod fingerprint_verify;

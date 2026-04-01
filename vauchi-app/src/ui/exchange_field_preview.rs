@@ -1,0 +1,248 @@
+// SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+//
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+//! Field preview engine — read-only preview of the card about to
+//! be shared, filtered by group visibility.
+//!
+//! Shows which fields will be shared and which are excluded,
+//! with display name override applied if set.
+
+use std::collections::HashSet;
+
+use crate::ui::*;
+use vauchi_core::contact_card::ContactCard;
+
+/// Configuration for the field preview screen.
+pub(super) struct FieldPreviewConfig {
+    /// The full card to preview.
+    pub card: ContactCard,
+    /// Display name to show (group override or card default).
+    pub display_name: String,
+    /// Field IDs that are visible (shared). Empty = share all.
+    pub visible_field_ids: HashSet<String>,
+}
+
+/// Result of handling an action in the field preview engine.
+pub(super) enum FieldPreviewResult {
+    /// User pressed "Start exchange" — proceed with frozen card.
+    StartExchange,
+    /// User pressed "Change groups" — go back to group selection.
+    ChangeGroups,
+    /// Screen update.
+    Screen(Box<ScreenModel>),
+}
+
+/// Build a field preview screen from the config.
+pub(super) fn build_field_preview_screen(
+    config: &FieldPreviewConfig,
+    progress: Progress,
+) -> ScreenModel {
+    let share_all = config.visible_field_ids.is_empty();
+
+    let fields: Vec<FieldDisplay> = config
+        .card
+        .fields()
+        .iter()
+        .map(|f| {
+            let visible = share_all || config.visible_field_ids.contains(f.id());
+            FieldDisplay {
+                id: f.id().to_string(),
+                label: f.label().to_string(),
+                value: f.value().to_string(),
+                field_type: format!("{:?}", f.field_type()),
+                visibility: if visible {
+                    UiFieldVisibility::Shown
+                } else {
+                    UiFieldVisibility::Hidden
+                },
+            }
+        })
+        .collect();
+
+    ScreenModel {
+        screen_id: "exchange_field_preview".into(),
+        title: "You will share".into(),
+        subtitle: None,
+        components: vec![
+            Component::Text {
+                id: "preview_name".into(),
+                content: config.display_name.clone(),
+                style: TextStyle::Title,
+            },
+            Component::FieldList {
+                id: "preview_fields".into(),
+                fields,
+                visibility_mode: VisibilityMode::ReadOnly,
+                available_groups: vec![],
+            },
+        ],
+        actions: vec![
+            ScreenAction {
+                id: "start_exchange".into(),
+                label: "Start Exchange".into(),
+                style: ActionStyle::Primary,
+                enabled: true,
+            },
+            ScreenAction {
+                id: "change_groups".into(),
+                label: "Change Groups".into(),
+                style: ActionStyle::Secondary,
+                enabled: true,
+            },
+        ],
+        progress: Some(progress),
+        ..Default::default()
+    }
+}
+
+/// Handle a user action on the field preview screen.
+pub(super) fn handle_field_preview_action(action: &UserAction) -> Option<FieldPreviewResult> {
+    if let UserAction::ActionPressed { action_id } = action {
+        match action_id.as_str() {
+            "start_exchange" => return Some(FieldPreviewResult::StartExchange),
+            "change_groups" => return Some(FieldPreviewResult::ChangeGroups),
+            _ => {}
+        }
+    }
+    None
+}
+
+// INLINE_TEST_REQUIRED: Tests access private FieldPreviewConfig, FieldPreviewResult, and builder functions
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use vauchi_core::contact_card::{ContactField, FieldType};
+
+    fn sample_card() -> ContactCard {
+        let mut card = ContactCard::new("Alice");
+        card.add_field(ContactField::new(
+            FieldType::Email,
+            "email",
+            "alice@example.com",
+        ))
+        .unwrap();
+        card.add_field(ContactField::new(FieldType::Phone, "phone", "+1234567890"))
+            .unwrap();
+        card
+    }
+
+    fn sample_progress() -> Progress {
+        Progress {
+            current_step: 3,
+            total_steps: 7,
+            label: None,
+        }
+    }
+
+    #[test]
+    fn preview_shows_all_fields_when_no_visibility_filter() {
+        let config = FieldPreviewConfig {
+            card: sample_card(),
+            display_name: "Alice".into(),
+            visible_field_ids: HashSet::new(), // empty = share all
+        };
+        let screen = build_field_preview_screen(&config, sample_progress());
+        assert_eq!(screen.screen_id, "exchange_field_preview");
+
+        let fields = extract_fields(&screen);
+        assert_eq!(fields.len(), 2);
+        assert!(
+            fields
+                .iter()
+                .all(|f| f.visibility == UiFieldVisibility::Shown),
+            "All fields should be visible"
+        );
+    }
+
+    #[test]
+    fn preview_dims_excluded_fields() {
+        let card = sample_card();
+        let email_id = card.fields()[0].id().to_string();
+        let config = FieldPreviewConfig {
+            card,
+            display_name: "Alice".into(),
+            visible_field_ids: HashSet::from([email_id.clone()]),
+        };
+        let screen = build_field_preview_screen(&config, sample_progress());
+
+        let fields = extract_fields(&screen);
+        let email = fields.iter().find(|f| f.id == email_id).unwrap();
+        assert_eq!(
+            email.visibility,
+            UiFieldVisibility::Shown,
+            "Visible field should be Shown"
+        );
+
+        let phone = fields.iter().find(|f| f.id != email_id).unwrap();
+        assert_eq!(
+            phone.visibility,
+            UiFieldVisibility::Hidden,
+            "Excluded field should be Hidden"
+        );
+    }
+
+    #[test]
+    fn preview_shows_display_name_override() {
+        let config = FieldPreviewConfig {
+            card: sample_card(),
+            display_name: "Dr. Egloff".into(),
+            visible_field_ids: HashSet::new(),
+        };
+        let screen = build_field_preview_screen(&config, sample_progress());
+
+        let name = screen.components.iter().find_map(|c| match c {
+            Component::Text { content, .. } => Some(content.as_str()),
+            _ => None,
+        });
+        assert_eq!(name, Some("Dr. Egloff"));
+    }
+
+    #[test]
+    fn start_exchange_action_returns_start() {
+        let result = handle_field_preview_action(&UserAction::ActionPressed {
+            action_id: "start_exchange".into(),
+        });
+        assert!(matches!(result, Some(FieldPreviewResult::StartExchange)));
+    }
+
+    #[test]
+    fn change_groups_action_returns_change() {
+        let result = handle_field_preview_action(&UserAction::ActionPressed {
+            action_id: "change_groups".into(),
+        });
+        assert!(matches!(result, Some(FieldPreviewResult::ChangeGroups)));
+    }
+
+    #[test]
+    fn unknown_action_returns_none() {
+        let result = handle_field_preview_action(&UserAction::ActionPressed {
+            action_id: "something_else".into(),
+        });
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn preview_has_both_actions() {
+        let config = FieldPreviewConfig {
+            card: sample_card(),
+            display_name: "Alice".into(),
+            visible_field_ids: HashSet::new(),
+        };
+        let screen = build_field_preview_screen(&config, sample_progress());
+        assert_eq!(screen.actions.len(), 2);
+        assert_eq!(screen.actions[0].id, "start_exchange");
+        assert_eq!(screen.actions[1].id, "change_groups");
+    }
+
+    fn extract_fields(screen: &ScreenModel) -> &[FieldDisplay] {
+        screen
+            .components
+            .iter()
+            .find_map(|c| match c {
+                Component::FieldList { fields, .. } => Some(fields.as_slice()),
+                _ => None,
+            })
+            .unwrap()
+    }
+}

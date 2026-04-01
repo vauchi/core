@@ -224,7 +224,7 @@ fn exchange_screen_with_identity_has_session() {
     assert_eq!(screen.screen_id, "exchange_mode_selection");
 
     // Pick a mode to advance to QR
-    engine.handle_action(UserAction::ListItemSelected {
+    let _ = engine.handle_action(UserAction::ListItemSelected {
         component_id: "category:quick".into(),
         item_id: "mode:glance".into(),
     });

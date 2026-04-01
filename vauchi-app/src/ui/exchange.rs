@@ -26,6 +26,10 @@ pub struct ExchangeConfig {
     /// Selected exchange mode. `None` = legacy QR flow (backward compat).
     #[serde(default)]
     pub mode: Option<vauchi_core::exchange::mode::ExchangeMode>,
+    /// Frozen card snapshot for exchange. `None` = snapshot at exchange start.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "schema-gen", schemars(skip))]
+    pub card_snapshot: Option<vauchi_core::exchange::card_snapshot::CardSnapshot>,
 }
 
 /// Engine that drives the QR exchange workflow.
@@ -478,6 +482,7 @@ mod tests {
             own_qr_data: "qr-data".into(),
             available_groups: vec![],
             mode: None,
+            card_snapshot: None,
         }
     }
 
@@ -490,6 +495,7 @@ mod tests {
                 ("g2".into(), "Friends".into()),
             ],
             mode: None,
+            card_snapshot: None,
         }
     }
 

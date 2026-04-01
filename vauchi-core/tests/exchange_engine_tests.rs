@@ -10,6 +10,7 @@ fn make_engine() -> ExchangeEngine {
         own_qr_data: "alice-qr-payload".to_string(),
         available_groups: vec![],
         mode: None,
+        card_snapshot: None,
     })
 }
 

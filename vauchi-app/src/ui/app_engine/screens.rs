@@ -194,6 +194,7 @@ impl AppEngine {
                     own_qr_data: vauchi.public_id().unwrap_or_default(),
                     available_groups,
                     mode: None,
+                    card_snapshot: None,
                 };
 
                 // ADR-031: Create a protocol session if identity + card are available.

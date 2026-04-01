@@ -8,6 +8,7 @@
 //! clients and the relay server. It is intentionally minimal: serde only,
 //! no crypto, no storage.
 
+pub mod escrow;
 pub mod messages;
 pub mod v2;
 pub use messages::*;

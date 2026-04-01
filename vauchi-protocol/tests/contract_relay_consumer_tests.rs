@@ -10,6 +10,7 @@
 //! Consumer: vauchi-relay
 //! Provider: vauchi-protocol
 
+use vauchi_protocol::escrow::*;
 use vauchi_protocol::v2::*;
 use vauchi_protocol::*;
 
@@ -241,4 +242,104 @@ fn v2_response_defaults_for_missing_optional_fields() {
     assert!(parsed.blob_id.is_none());
     assert!(parsed.blobs.is_none());
     assert!(parsed.acknowledged.is_none());
+}
+
+// ============================================================
+// Escrow protocol types (relay consumer contract)
+// ============================================================
+
+#[test]
+fn provider_contract_escrow_constants() {
+    assert_eq!(MAX_BLOB_BYTES, 65_536);
+    assert_eq!(MAX_TTL_SECONDS, 604_800);
+    assert_eq!(MAX_SLOTS_PER_GATE, 2);
+    assert_eq!(HASH_HEX_LENGTH, 64);
+}
+
+#[test]
+fn provider_contract_escrow_message_all_variants_constructable() {
+    let hash = "ff".repeat(32);
+    let messages = [
+        EscrowMessage::Put {
+            gate_hash: hash.clone(),
+            slot_hash: hash.clone(),
+            blob: "dGVzdA==".to_string(),
+            ttl_seconds: 3600,
+        },
+        EscrowMessage::Get {
+            gate_hash: hash.clone(),
+            slot_hash: hash.clone(),
+        },
+        EscrowMessage::Count {
+            gate_hash: hash.clone(),
+        },
+    ];
+    assert_eq!(messages.len(), 3, "EscrowMessage must have 3 variants");
+}
+
+#[test]
+fn provider_contract_escrow_response_all_variants_constructable() {
+    let responses = [
+        EscrowResponse::Stored,
+        EscrowResponse::AlreadyExists,
+        EscrowResponse::GateFull,
+        EscrowResponse::BlobTooLarge,
+        EscrowResponse::Blob {
+            blob: "dGVzdA==".to_string(),
+        },
+        EscrowResponse::NotReady { count: 1 },
+        EscrowResponse::Count { count: 2 },
+        EscrowResponse::NotFound,
+    ];
+    assert_eq!(responses.len(), 8, "EscrowResponse must have 8 variants");
+}
+
+#[test]
+fn provider_contract_escrow_put_roundtrip() {
+    let msg = EscrowMessage::Put {
+        gate_hash: "aa".repeat(32),
+        slot_hash: "bb".repeat(32),
+        blob: "dGVzdA==".to_string(),
+        ttl_seconds: 86400,
+    };
+    let json = serde_json::to_string(&msg).unwrap();
+    let parsed: EscrowMessage = serde_json::from_str(&json).unwrap();
+    assert_eq!(parsed, msg);
+}
+
+#[test]
+fn provider_contract_escrow_blob_response_roundtrip() {
+    let resp = EscrowResponse::Blob {
+        blob: "Y2lwaGVy".to_string(),
+    };
+    let json = serde_json::to_string(&resp).unwrap();
+    let parsed: EscrowResponse = serde_json::from_str(&json).unwrap();
+    assert_eq!(parsed, resp);
+}
+
+#[test]
+fn provider_contract_escrow_tagged_discriminator() {
+    // Relay dispatches on "action" tag for messages
+    let msg = EscrowMessage::Count {
+        gate_hash: "cc".repeat(32),
+    };
+    let json = serde_json::to_string(&msg).unwrap();
+    assert!(json.contains(r#""action":"Count"#));
+
+    // Relay builds responses with "status" tag
+    let resp = EscrowResponse::Stored;
+    let json = serde_json::to_string(&resp).unwrap();
+    assert!(json.contains(r#""status":"Stored"#));
+}
+
+#[test]
+fn provider_contract_escrow_validation_rejects_bad_input() {
+    let msg = EscrowMessage::Put {
+        gate_hash: "short".to_string(),
+        slot_hash: "also_short".to_string(),
+        blob: "dGVzdA==".to_string(),
+        ttl_seconds: MAX_TTL_SECONDS + 1,
+    };
+    let errs = msg.validate().unwrap_err();
+    assert!(errs.len() >= 3, "should report gate, slot, and ttl errors");
 }

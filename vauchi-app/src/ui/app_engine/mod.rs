@@ -18,6 +18,7 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 use vauchi_core::api::Vauchi;
+use vauchi_core::exchange::capability::types::DeviceCapabilities;
 
 use super::action::{ActionResult, UserAction};
 use super::engine::WorkflowEngine;
@@ -180,6 +181,9 @@ pub struct AppEngine {
     field_catalog: vauchi_core::contact_card::FieldTypeCatalog,
     /// Transient preview-as state — contact ID being previewed (not serialized).
     pub(super) preview_as_contact: Option<String>,
+    /// Device hardware capabilities reported by the frontend at startup.
+    /// Used to determine exchange mode availability.
+    pub(super) device_capabilities: DeviceCapabilities,
 }
 
 impl AppEngine {
@@ -191,6 +195,15 @@ impl AppEngine {
     /// Returns a mutable reference to the inner Vauchi instance.
     pub fn vauchi_mut(&mut self) -> &mut Vauchi {
         &mut self.vauchi
+    }
+
+    /// Set device hardware capabilities (reported by frontend at startup).
+    ///
+    /// Invalidates the exchange screen cache so mode availability is
+    /// recalculated on next visit.
+    pub fn set_device_capabilities(&mut self, caps: DeviceCapabilities) {
+        self.device_capabilities = caps;
+        self.engine_cache.remove(&AppScreen::Exchange);
     }
 
     pub fn new(vauchi: Vauchi) -> Self {
@@ -215,6 +228,7 @@ impl AppEngine {
             pending_contact_undo: None,
             field_catalog,
             preview_as_contact: None,
+            device_capabilities: DeviceCapabilities::default(),
         }
     }
 

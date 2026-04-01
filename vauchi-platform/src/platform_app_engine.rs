@@ -236,4 +236,23 @@ impl PlatformAppEngine {
             .map_err(|e| MobileError::Internal(format!("Lock failed: {e}")))?;
         Ok(engine.form_has_data())
     }
+
+    /// Report device hardware capabilities.
+    ///
+    /// Call once at startup after querying platform hardware APIs.
+    /// Determines which exchange modes are available.
+    pub fn set_device_capabilities_json(
+        &self,
+        capabilities_json: String,
+    ) -> Result<(), MobileError> {
+        let caps: vauchi_core::exchange::capability::types::DeviceCapabilities =
+            serde_json::from_str(&capabilities_json)
+                .map_err(|e| MobileError::Internal(format!("Invalid capabilities JSON: {e}")))?;
+        let mut engine = self
+            .engine
+            .lock()
+            .map_err(|e| MobileError::Internal(format!("Lock failed: {e}")))?;
+        engine.set_device_capabilities(caps);
+        Ok(())
+    }
 }

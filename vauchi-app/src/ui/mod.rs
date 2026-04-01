@@ -26,6 +26,8 @@ mod duress_pin;
 mod emergency_shred;
 mod engine;
 mod exchange;
+#[allow(dead_code)] // Consumed by inline tests; wired in Phase 1.2
+pub(crate) mod exchange_mode_selection;
 mod exchange_qr;
 mod fingerprint_verify;
 mod form_dialog;

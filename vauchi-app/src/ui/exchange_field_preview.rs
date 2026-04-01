@@ -128,7 +128,7 @@ mod tests {
     fn sample_progress() -> Progress {
         Progress {
             current_step: 3,
-            total_steps: 7,
+            total_steps: 8,
             label: None,
         }
     }
@@ -231,6 +231,24 @@ mod tests {
         assert_eq!(screen.actions.len(), 2);
         assert_eq!(screen.actions[0].id, "start_exchange");
         assert_eq!(screen.actions[1].id, "change_groups");
+    }
+
+    #[test]
+    fn preview_with_populated_card_shows_field_values() {
+        let card = sample_card();
+        let email_value = card.fields()[0].value().to_string();
+        let config = FieldPreviewConfig {
+            card,
+            display_name: "Alice".into(),
+            visible_field_ids: HashSet::new(),
+        };
+        let screen = build_field_preview_screen(&config, sample_progress());
+        let fields = extract_fields(&screen);
+        assert_eq!(fields.len(), 2, "Card with 2 fields should show 2 entries");
+        assert_eq!(
+            fields[0].value, email_value,
+            "Field value should be preserved"
+        );
     }
 
     fn extract_fields(screen: &ScreenModel) -> &[FieldDisplay] {

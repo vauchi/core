@@ -1020,18 +1020,28 @@ mod tests {
             component_id: "group_picker".into(),
             item_id: "g2".into(),
         });
+        // Continue → FieldPreview
         let _ = engine.handle_action(UserAction::ActionPressed {
             action_id: "continue".into(),
         });
+        assert_eq!(engine.step, ExchangeStep::FieldPreview);
+
+        // Start exchange from FieldPreview → ShowQr
+        let _ = engine.handle_action(UserAction::ActionPressed {
+            action_id: "start_exchange".into(),
+        });
+        assert_eq!(engine.step, ExchangeStep::Qr(QrStep::ShowQr));
 
         // Continue through ShowQr → ScanQr → Verifying → Success
         let _ = engine.handle_action(UserAction::ActionPressed {
             action_id: "continue".into(),
         });
+        assert_eq!(engine.step, ExchangeStep::Qr(QrStep::ScanQr));
         let _ = engine.handle_action(UserAction::TextChanged {
             component_id: "scanned_data".into(),
             value: "their-qr".into(),
         });
+        assert_eq!(engine.step, ExchangeStep::Qr(QrStep::Verifying));
         engine.mark_success();
 
         // Groups still selected at the end

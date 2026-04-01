@@ -9,6 +9,7 @@
 //! session is provided, transitions emit `ExchangeCommand`s that frontends
 //! dispatch to platform hardware (camera, BLE, NFC, audio).
 
+use crate::ui::exchange_field_preview::{self, FieldPreviewConfig, FieldPreviewResult};
 use crate::ui::exchange_mode_selection::{ModeSelectionEngine, ModeSelectionResult};
 use crate::ui::exchange_qr::{self, QrActionOutcome, QrStep};
 use crate::ui::*;
@@ -57,6 +58,8 @@ pub struct ExchangeEngine {
     failure_detail: Option<String>,
     /// Mode selection sub-engine (created on demand).
     mode_selection: Option<ModeSelectionEngine>,
+    /// Field preview config (built when entering FieldPreview step).
+    field_preview: Option<FieldPreviewConfig>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -65,6 +68,8 @@ enum ExchangeStep {
     ModeSelection,
     /// Pick groups for the new contact (shown only if groups exist).
     GroupSelection,
+    /// Read-only preview of what will be shared (after group selection).
+    FieldPreview,
     /// QR exchange sub-flow (Glance/Hover modes).
     Qr(QrStep),
     Success,
@@ -76,15 +81,17 @@ impl ExchangeStep {
         match self {
             Self::ModeSelection => 1,
             Self::GroupSelection => 2,
-            // QR steps start at 3 (after mode selection + group selection)
-            Self::Qr(qr) => qr.step_number(3),
-            Self::Success => 3 + QrStep::STEP_COUNT,
-            Self::Failed => 4 + QrStep::STEP_COUNT,
+            Self::FieldPreview => 3,
+            // QR steps start at 4 (after mode + group + preview)
+            Self::Qr(qr) => qr.step_number(4),
+            Self::Success => 4 + QrStep::STEP_COUNT,
+            Self::Failed => 5 + QrStep::STEP_COUNT,
         }
     }
 }
 
-const TOTAL_STEPS: u8 = 2 + QrStep::STEP_COUNT + 2; // mode + group + qr + success/failed
+// mode + group + preview + qr + success/failed
+const TOTAL_STEPS: u8 = 3 + QrStep::STEP_COUNT + 2;
 
 impl ExchangeEngine {
     /// Determine the initial step based on config.
@@ -117,6 +124,7 @@ impl ExchangeEngine {
             session: None,
             failure_detail: None,
             mode_selection,
+            field_preview: None,
         }
     }
 
@@ -149,6 +157,7 @@ impl ExchangeEngine {
                     session: None,
                     failure_detail: None,
                     mode_selection,
+                    field_preview: None,
                 };
             }
             session.emit_initial_commands();
@@ -162,6 +171,7 @@ impl ExchangeEngine {
             session: Some(session),
             failure_detail: None,
             mode_selection,
+            field_preview: None,
         }
     }
 
@@ -238,6 +248,27 @@ impl ExchangeEngine {
         ActionResult::NavigateTo(self.build_screen())
     }
 
+    /// Build a FieldPreviewConfig from the current state.
+    ///
+    /// Uses own_name as display name (group override would come from
+    /// storage, which this engine doesn't have access to yet — deferred
+    /// to Phase 2 full integration when AppEngine passes group data).
+    fn build_field_preview_config(&self) -> FieldPreviewConfig {
+        use vauchi_core::contact_card::ContactCard;
+        // Build a preview card from config data
+        let card = self
+            .config
+            .card_snapshot
+            .as_ref()
+            .map(|s| s.card().clone())
+            .unwrap_or_else(|| ContactCard::new(&self.config.own_name));
+        FieldPreviewConfig {
+            card,
+            display_name: self.config.own_name.clone(),
+            visible_field_ids: std::collections::HashSet::new(), // TODO: resolve from groups
+        }
+    }
+
     fn progress(&self) -> Progress {
         Progress {
             current_step: self.step.step_number(),
@@ -261,6 +292,13 @@ impl ExchangeEngine {
                 &self.selected_groups,
                 self.progress(),
             ),
+            ExchangeStep::FieldPreview => {
+                if let Some(ref fp) = self.field_preview {
+                    exchange_field_preview::build_field_preview_screen(fp, self.progress())
+                } else {
+                    ScreenModel::default()
+                }
+            }
             ExchangeStep::Qr(QrStep::ShowQr) => exchange_qr::build_show_qr_screen(
                 self.session.as_ref(),
                 &self.config.own_name,
@@ -476,9 +514,33 @@ impl WorkflowEngine for ExchangeEngine {
             {
                 if action_id == "skip" {
                     self.selected_groups.clear();
+                    // Skip → go straight to QR (no preview needed)
+                    self.step = ExchangeStep::Qr(QrStep::ShowQr);
+                    return self.start_session_if_needed();
                 }
-                self.step = ExchangeStep::Qr(QrStep::ShowQr);
-                self.start_session_if_needed()
+                // Continue with groups → show field preview
+                self.field_preview = Some(self.build_field_preview_config());
+                self.step = ExchangeStep::FieldPreview;
+                ActionResult::NavigateTo(self.build_screen())
+            }
+            // Field preview actions
+            (ExchangeStep::FieldPreview, ref user_action) => {
+                if let Some(outcome) =
+                    exchange_field_preview::handle_field_preview_action(user_action)
+                {
+                    match outcome {
+                        FieldPreviewResult::StartExchange => {
+                            self.step = ExchangeStep::Qr(QrStep::ShowQr);
+                            return self.start_session_if_needed();
+                        }
+                        FieldPreviewResult::ChangeGroups => {
+                            self.field_preview = None;
+                            self.step = ExchangeStep::GroupSelection;
+                            return ActionResult::NavigateTo(self.build_screen());
+                        }
+                    }
+                }
+                ActionResult::UpdateScreen(self.build_screen())
             }
             // QR sub-flow actions — delegated to exchange_qr module
             (ExchangeStep::Qr(qr_step), ref user_action) => {
@@ -608,12 +670,12 @@ mod tests {
         });
         assert!(matches!(result, ActionResult::UpdateScreen(_)));
 
-        // Continue to ShowQr
+        // Continue → field preview (not directly to QR)
         let result = engine.handle_action(UserAction::ActionPressed {
             action_id: "continue".into(),
         });
         assert!(matches!(result, ActionResult::NavigateTo(_)));
-        assert_eq!(engine.step, ExchangeStep::Qr(QrStep::ShowQr));
+        assert_eq!(engine.step, ExchangeStep::FieldPreview);
 
         // Selected groups should be remembered
         assert_eq!(engine.selected_groups(), &["g1".to_string()]);
@@ -679,13 +741,23 @@ mod tests {
     }
 
     #[test]
-    fn test_with_session_group_continue_starts_qr() {
+    fn test_with_session_group_continue_shows_field_preview() {
         let session = create_test_session();
         let mut engine = ExchangeEngine::with_session(config_with_groups(), session);
 
-        // Continue from group selection → ShowQr
+        // Continue from group selection → FieldPreview (not QR directly)
         let result = engine.handle_action(UserAction::ActionPressed {
             action_id: "continue".into(),
+        });
+        assert!(
+            matches!(result, ActionResult::NavigateTo(_)),
+            "Expected NavigateTo for field preview"
+        );
+        assert_eq!(engine.step, ExchangeStep::FieldPreview);
+
+        // Start exchange from field preview → QR with session
+        let result = engine.handle_action(UserAction::ActionPressed {
+            action_id: "start_exchange".into(),
         });
 
         // Should emit ExchangeCommands with QrDisplay

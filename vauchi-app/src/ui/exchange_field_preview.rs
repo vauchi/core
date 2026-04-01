@@ -29,8 +29,6 @@ pub(super) enum FieldPreviewResult {
     StartExchange,
     /// User pressed "Change groups" — go back to group selection.
     ChangeGroups,
-    /// Screen update.
-    Screen(Box<ScreenModel>),
 }
 
 /// Build a field preview screen from the config.

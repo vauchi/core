@@ -9,9 +9,12 @@
 //! session is provided, transitions emit `ExchangeCommand`s that frontends
 //! dispatch to platform hardware (camera, BLE, NFC, audio).
 
+use crate::ui::exchange_mode_selection::{ModeSelectionEngine, ModeSelectionResult};
 use crate::ui::exchange_qr::{self, QrActionOutcome, QrStep};
 use crate::ui::*;
+use vauchi_core::exchange::capability::types::DeviceCapabilities;
 use vauchi_core::exchange::command::ExchangeCommand;
+use vauchi_core::exchange::mode::ExchangeMode;
 use vauchi_core::exchange::{ExchangeEvent, ExchangeSession};
 
 /// Configuration for starting an exchange.
@@ -23,9 +26,13 @@ pub struct ExchangeConfig {
     /// Available groups for pre-selection (id, name). Empty = no group picker.
     #[serde(default)]
     pub available_groups: Vec<(String, String)>,
-    /// Selected exchange mode. `None` = legacy QR flow (backward compat).
+    /// Device hardware capabilities for mode availability checking.
     #[serde(default)]
-    pub mode: Option<vauchi_core::exchange::mode::ExchangeMode>,
+    #[cfg_attr(feature = "schema-gen", schemars(skip))]
+    pub device_capabilities: DeviceCapabilities,
+    /// Selected exchange mode. `None` = show mode selection first.
+    #[serde(default)]
+    pub mode: Option<ExchangeMode>,
     /// Frozen card snapshot for exchange. `None` = snapshot at exchange start.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[cfg_attr(feature = "schema-gen", schemars(skip))]
@@ -48,10 +55,14 @@ pub struct ExchangeEngine {
     session: Option<ExchangeSession>,
     /// User-friendly error detail shown on the Failed screen (T1-2).
     failure_detail: Option<String>,
+    /// Mode selection sub-engine (created on demand).
+    mode_selection: Option<ModeSelectionEngine>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
 enum ExchangeStep {
+    /// User picks an exchange mode (first step when mode is not pre-set).
+    ModeSelection,
     /// Pick groups for the new contact (shown only if groups exist).
     GroupSelection,
     /// QR exchange sub-flow (Glance/Hover modes).
@@ -63,23 +74,40 @@ enum ExchangeStep {
 impl ExchangeStep {
     fn step_number(&self) -> u8 {
         match self {
-            Self::GroupSelection => 1,
-            // QR steps start at 2 (after group selection)
-            Self::Qr(qr) => qr.step_number(2),
-            Self::Success => 2 + QrStep::STEP_COUNT,
-            Self::Failed => 3 + QrStep::STEP_COUNT,
+            Self::ModeSelection => 1,
+            Self::GroupSelection => 2,
+            // QR steps start at 3 (after mode selection + group selection)
+            Self::Qr(qr) => qr.step_number(3),
+            Self::Success => 3 + QrStep::STEP_COUNT,
+            Self::Failed => 4 + QrStep::STEP_COUNT,
         }
     }
 }
 
-const TOTAL_STEPS: u8 = 1 + QrStep::STEP_COUNT + 2; // group + qr + success/failed
+const TOTAL_STEPS: u8 = 2 + QrStep::STEP_COUNT + 2; // mode + group + qr + success/failed
 
 impl ExchangeEngine {
-    pub fn new(config: ExchangeConfig) -> Self {
-        let step = if config.available_groups.is_empty() {
+    /// Determine the initial step based on config.
+    ///
+    /// If mode is pre-set, skip mode selection (backward compat / tests).
+    /// Otherwise start at ModeSelection.
+    fn initial_step(config: &ExchangeConfig) -> ExchangeStep {
+        if config.mode.is_none() {
+            return ExchangeStep::ModeSelection;
+        }
+        if config.available_groups.is_empty() {
             ExchangeStep::Qr(QrStep::ShowQr)
         } else {
             ExchangeStep::GroupSelection
+        }
+    }
+
+    pub fn new(config: ExchangeConfig) -> Self {
+        let step = Self::initial_step(&config);
+        let mode_selection = if step == ExchangeStep::ModeSelection {
+            Some(ModeSelectionEngine::new(config.device_capabilities.clone()))
+        } else {
+            None
         };
         Self {
             step,
@@ -88,6 +116,7 @@ impl ExchangeEngine {
             selected_groups: Vec::new(),
             session: None,
             failure_detail: None,
+            mode_selection,
         }
     }
 
@@ -101,18 +130,17 @@ impl ExchangeEngine {
     /// (StartQR applied). Use `drain_commands()` to get the initial
     /// `QrDisplay` command after construction.
     pub fn with_session(config: ExchangeConfig, mut session: ExchangeSession) -> Self {
-        let step = if config.available_groups.is_empty() {
-            ExchangeStep::Qr(QrStep::ShowQr)
+        let step = Self::initial_step(&config);
+        let mode_selection = if step == ExchangeStep::ModeSelection {
+            Some(ModeSelectionEngine::new(config.device_capabilities.clone()))
         } else {
-            ExchangeStep::GroupSelection
+            None
         };
 
         // If starting directly at ShowQr, kick off the session now.
         // StartQR should always succeed on a fresh Idle session.
         if step == ExchangeStep::Qr(QrStep::ShowQr) {
             if session.apply(ExchangeEvent::StartQR).is_err() {
-                // Session failed to start — proceed without a session so the
-                // UI still works (falls back to static QR data).
                 return Self {
                     step,
                     config,
@@ -120,6 +148,7 @@ impl ExchangeEngine {
                     selected_groups: Vec::new(),
                     session: None,
                     failure_detail: None,
+                    mode_selection,
                 };
             }
             session.emit_initial_commands();
@@ -132,6 +161,7 @@ impl ExchangeEngine {
             selected_groups: Vec::new(),
             session: Some(session),
             failure_detail: None,
+            mode_selection,
         }
     }
 
@@ -218,6 +248,14 @@ impl ExchangeEngine {
 
     fn build_screen(&self) -> ScreenModel {
         match self.step {
+            ExchangeStep::ModeSelection => {
+                if let Some(ref ms) = self.mode_selection {
+                    ms.screen()
+                } else {
+                    // Shouldn't happen — mode_selection is always Some when step is ModeSelection
+                    ScreenModel::default()
+                }
+            }
             ExchangeStep::GroupSelection => build_group_selection_screen(
                 &self.config.available_groups,
                 &self.selected_groups,
@@ -392,6 +430,30 @@ impl WorkflowEngine for ExchangeEngine {
     }
 
     fn handle_action(&mut self, action: UserAction) -> ActionResult {
+        // Mode selection — delegated to ModeSelectionEngine
+        if self.step == ExchangeStep::ModeSelection {
+            if let Some(ref ms) = self.mode_selection {
+                match ms.handle_action(&action) {
+                    ModeSelectionResult::Selected(mode) => {
+                        self.config.mode = Some(mode);
+                        self.mode_selection = None;
+                        // Advance to group selection or directly to QR
+                        if self.config.available_groups.is_empty() {
+                            self.step = ExchangeStep::Qr(QrStep::ShowQr);
+                            return self.start_session_if_needed();
+                        } else {
+                            self.step = ExchangeStep::GroupSelection;
+                            return ActionResult::NavigateTo(self.build_screen());
+                        }
+                    }
+                    ModeSelectionResult::Screen(screen) => {
+                        return ActionResult::UpdateScreen(*screen);
+                    }
+                }
+            }
+            return ActionResult::UpdateScreen(self.build_screen());
+        }
+
         match (&self.step, action) {
             // Group selection: toggle group membership
             (
@@ -481,7 +543,9 @@ mod tests {
             own_name: "Alice".into(),
             own_qr_data: "qr-data".into(),
             available_groups: vec![],
-            mode: None,
+            device_capabilities: DeviceCapabilities::default(),
+            // Pre-set mode to skip mode selection (tests focus on QR flow)
+            mode: Some(ExchangeMode::Glance),
             card_snapshot: None,
         }
     }
@@ -494,7 +558,23 @@ mod tests {
                 ("g1".into(), "Family".into()),
                 ("g2".into(), "Friends".into()),
             ],
-            mode: None,
+            device_capabilities: DeviceCapabilities::default(),
+            mode: Some(ExchangeMode::Glance),
+            card_snapshot: None,
+        }
+    }
+
+    fn config_mode_selection() -> ExchangeConfig {
+        ExchangeConfig {
+            own_name: "Alice".into(),
+            own_qr_data: "qr-data".into(),
+            available_groups: vec![],
+            device_capabilities: DeviceCapabilities {
+                has_camera: true,
+                has_internet: true,
+                ..Default::default()
+            },
+            mode: None, // triggers mode selection
             card_snapshot: None,
         }
     }
@@ -972,5 +1052,65 @@ mod tests {
                 error
             );
         }
+    }
+
+    // ── Mode selection integration tests ───────────────────────────
+
+    #[test]
+    fn mode_none_starts_at_mode_selection() {
+        let engine = ExchangeEngine::new(config_mode_selection());
+        assert_eq!(engine.step, ExchangeStep::ModeSelection);
+        let screen = engine.current_screen();
+        assert_eq!(screen.screen_id, "exchange_mode_selection");
+    }
+
+    #[test]
+    fn mode_preset_skips_mode_selection() {
+        let engine = ExchangeEngine::new(config_no_groups());
+        // config_no_groups() sets mode = Some(Glance)
+        assert_eq!(engine.step, ExchangeStep::Qr(QrStep::ShowQr));
+    }
+
+    #[test]
+    fn mode_selection_pick_advances_to_qr() {
+        let mut engine = ExchangeEngine::new(config_mode_selection());
+        assert_eq!(engine.step, ExchangeStep::ModeSelection);
+
+        // Pick Glance mode
+        let result = engine.handle_action(UserAction::ListItemSelected {
+            component_id: "category:quick".into(),
+            item_id: "mode:glance".into(),
+        });
+
+        // Should advance past mode selection
+        assert_ne!(engine.step, ExchangeStep::ModeSelection);
+        // Mode should be stored in config
+        assert_eq!(engine.config.mode, Some(ExchangeMode::Glance));
+        // Should navigate to QR (no groups in this config)
+        assert!(
+            matches!(engine.step, ExchangeStep::Qr(QrStep::ShowQr)),
+            "Expected Qr(ShowQr), got {:?}",
+            engine.step
+        );
+        assert!(
+            matches!(result, ActionResult::NavigateTo(_)),
+            "Expected NavigateTo, got {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn mode_selection_pick_with_groups_goes_to_group_selection() {
+        let mut config = config_mode_selection();
+        config.available_groups = vec![("g1".into(), "Work".into())];
+        let mut engine = ExchangeEngine::new(config);
+        assert_eq!(engine.step, ExchangeStep::ModeSelection);
+
+        let _ = engine.handle_action(UserAction::ListItemSelected {
+            component_id: "category:quick".into(),
+            item_id: "mode:glance".into(),
+        });
+
+        assert_eq!(engine.step, ExchangeStep::GroupSelection);
     }
 }

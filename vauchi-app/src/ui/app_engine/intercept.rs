@@ -308,7 +308,12 @@ impl AppEngine {
         self.preview_as_contact = None;
         self.engine_cache.remove(&AppScreen::MyInfo);
         // Rebuild the engine in normal mode and update the current engine slot.
-        let new_engine = Self::create_engine(&self.vauchi, &AppScreen::MyInfo, None);
+        let new_engine = Self::create_engine(
+            &self.vauchi,
+            &AppScreen::MyInfo,
+            None,
+            &self.device_capabilities,
+        );
         let _ = std::mem::replace(&mut self.engine, new_engine);
         Some(ActionResult::UpdateScreen(self.engine.current_screen()))
     }

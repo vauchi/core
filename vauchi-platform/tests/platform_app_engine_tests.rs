@@ -134,7 +134,7 @@ fn navigate_to_json_simple_variant() {
         .navigate_to_json(r#""Exchange""#.into())
         .expect("navigate");
     let screen: serde_json::Value = serde_json::from_str(&result).expect("parse");
-    assert_eq!(screen["screen_id"], "exchange_show_qr");
+    assert_eq!(screen["screen_id"], "exchange_mode_selection");
 }
 
 #[test]

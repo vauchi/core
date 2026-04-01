@@ -46,6 +46,7 @@ impl AppEngine {
         vauchi: &Vauchi,
         screen: &AppScreen,
         preview_as: Option<&str>,
+        device_capabilities: &vauchi_core::exchange::capability::types::DeviceCapabilities,
     ) -> Box<dyn WorkflowEngine> {
         match screen {
             AppScreen::Onboarding => Box::new(OnboardingEngine::new()),
@@ -193,7 +194,8 @@ impl AppEngine {
                         .unwrap_or_default(),
                     own_qr_data: vauchi.public_id().unwrap_or_default(),
                     available_groups,
-                    mode: None,
+                    device_capabilities: device_capabilities.clone(),
+                    mode: None, // triggers mode selection screen
                     card_snapshot: None,
                 };
 

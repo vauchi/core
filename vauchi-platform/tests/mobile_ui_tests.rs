@@ -391,7 +391,8 @@ fn exchange_workflow_returns_screen() {
     let workflow = MobileExchangeWorkflow::new(config.into()).expect("should construct");
     let json = workflow.current_screen_json().expect("should serialize");
     let screen: serde_json::Value = serde_json::from_str(&json).expect("should parse");
-    assert_eq!(screen["screen_id"], "exchange_show_qr");
+    // With no mode set, starts at mode selection
+    assert_eq!(screen["screen_id"], "exchange_mode_selection");
 }
 
 // ============================================================================

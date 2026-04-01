@@ -214,7 +214,8 @@ impl AppEngine {
         } else {
             AppScreen::MyInfo
         };
-        let engine = Self::create_engine(&vauchi, &screen, None);
+        let caps = DeviceCapabilities::default();
+        let engine = Self::create_engine(&vauchi, &screen, None, &caps);
         let registry = vauchi_core::social::SocialNetworkRegistry::with_defaults();
         let field_catalog = vauchi_core::contact_card::FieldTypeCatalog::new(&registry);
         Self {

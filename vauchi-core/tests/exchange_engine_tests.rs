@@ -9,7 +9,8 @@ fn make_engine() -> ExchangeEngine {
         own_name: "Alice".to_string(),
         own_qr_data: "alice-qr-payload".to_string(),
         available_groups: vec![],
-        mode: None,
+        device_capabilities: Default::default(),
+        mode: Some(vauchi_core::exchange::mode::ExchangeMode::Glance),
         card_snapshot: None,
     })
 }
@@ -19,8 +20,8 @@ fn exchange_starts_at_show_qr() {
     let engine = make_engine();
     let screen = engine.current_screen();
     assert_eq!(screen.screen_id, "exchange_show_qr");
-    assert_eq!(screen.progress.as_ref().unwrap().current_step, 2);
-    assert_eq!(screen.progress.as_ref().unwrap().total_steps, 6);
+    assert_eq!(screen.progress.as_ref().unwrap().current_step, 3);
+    assert_eq!(screen.progress.as_ref().unwrap().total_steps, 7);
 }
 
 #[test]
@@ -57,7 +58,7 @@ fn exchange_continue_to_scan() {
 
     let screen = engine.current_screen();
     assert_eq!(screen.screen_id, "exchange_scan_qr");
-    assert_eq!(screen.progress.as_ref().unwrap().current_step, 3);
+    assert_eq!(screen.progress.as_ref().unwrap().current_step, 4);
 
     // Verify scan QR component
     match &screen.components[0] {
@@ -92,7 +93,7 @@ fn exchange_scan_receives_data() {
     assert_eq!(engine.scanned_data(), Some("bob-qr-payload"));
 
     let screen = engine.current_screen();
-    assert_eq!(screen.progress.as_ref().unwrap().current_step, 4);
+    assert_eq!(screen.progress.as_ref().unwrap().current_step, 5);
     assert!(screen.actions.is_empty());
 }
 
@@ -112,7 +113,7 @@ fn exchange_mark_success() {
 
     let screen = engine.current_screen();
     assert_eq!(screen.screen_id, "exchange_success");
-    assert_eq!(screen.progress.as_ref().unwrap().current_step, 5);
+    assert_eq!(screen.progress.as_ref().unwrap().current_step, 6);
 
     match &screen.components[0] {
         Component::StatusIndicator { title, status, .. } => {
@@ -138,7 +139,7 @@ fn exchange_mark_failed() {
 
     let screen = engine.current_screen();
     assert_eq!(screen.screen_id, "exchange_failed");
-    assert_eq!(screen.progress.as_ref().unwrap().current_step, 6);
+    assert_eq!(screen.progress.as_ref().unwrap().current_step, 7);
 
     match &screen.components[0] {
         Component::StatusIndicator { title, status, .. } => {

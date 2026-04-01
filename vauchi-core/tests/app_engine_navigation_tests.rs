@@ -39,12 +39,13 @@ fn navigate_to_settings_shows_settings() {
 }
 
 #[test]
-fn navigate_to_exchange_shows_qr() {
+fn navigate_to_exchange_shows_mode_selection() {
     let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
     let mut engine = AppEngine::new(vauchi);
     let screen = engine.navigate_to(AppScreen::Exchange);
-    assert_eq!(screen.screen_id, "exchange_show_qr");
+    // Mode selection is the first screen when no mode is pre-set
+    assert_eq!(screen.screen_id, "exchange_mode_selection");
 }
 
 #[test]
@@ -178,11 +179,22 @@ fn navigate_away_and_back_preserves_engine_state() {
     vauchi.create_identity("Alice").unwrap();
     let mut engine = AppEngine::new(vauchi);
 
-    // Navigate to Exchange — starts on exchange_show_qr
+    // Navigate to Exchange — starts on mode selection
     let first_visit = engine.navigate_to(AppScreen::Exchange);
-    assert_eq!(first_visit.screen_id, "exchange_show_qr");
+    assert_eq!(first_visit.screen_id, "exchange_mode_selection");
 
-    // Intermediate step — advance to scan; screen_id asserted on next line
+    // Pick Glance mode via ListItemSelected → advances to QR
+    let _ = engine.handle_action(UserAction::ListItemSelected {
+        component_id: "category:quick".into(),
+        item_id: "mode:glance".into(),
+    });
+    let qr_screen = engine.current_screen();
+    assert_eq!(
+        qr_screen.screen_id, "exchange_show_qr",
+        "after mode pick, should be at show_qr"
+    );
+
+    // Advance to scan
     let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "continue".into(),
     });

@@ -245,7 +245,8 @@ fn sample_exchange_config() -> ExchangeConfig {
         own_name: "Alice".into(),
         own_qr_data: "vauchi://exchange?token=abc123".into(),
         available_groups: vec![],
-        mode: None,
+        device_capabilities: Default::default(),
+        mode: Some(vauchi_core::exchange::mode::ExchangeMode::Glance),
         card_snapshot: None,
     }
 }

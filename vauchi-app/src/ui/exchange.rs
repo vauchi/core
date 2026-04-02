@@ -328,7 +328,10 @@ impl ExchangeEngine {
                     let hs_gate = hex::decode(&li.handshake_slot)
                         .expect("hex from hex::encode is always valid");
                     if gate_hash == hs_gate {
-                        // Handshake gate ready — retrieve responder's epk
+                        // Handshake gate ready — retrieve responder's epk.
+                        // GET authenticates with our presence_slot and returns
+                        // the OTHER slot's blob (responder's epk).
+                        self.step = ExchangeStep::Link(LinkStep::Retrieving);
                         let slot = hex::decode(&li.presence_slot)
                             .expect("hex from hex::encode is always valid");
                         return Some(ActionResult::ExchangeCommands {
@@ -1618,7 +1621,7 @@ mod tests {
 
     // @internal
     #[test]
-    fn test_link_escrow_ready_emits_retrieve() {
+    fn test_link_escrow_ready_emits_retrieve_and_transitions_to_retrieving() {
         let mut engine = ExchangeEngine::new(ExchangeConfig {
             mode: Some(ExchangeMode::Link),
             ..config_no_groups()
@@ -1627,19 +1630,36 @@ mod tests {
         let _ = engine.handle_action(UserAction::ActionPressed {
             action_id: "share".into(),
         });
+        assert_eq!(
+            engine.step,
+            ExchangeStep::Link(LinkStep::WaitingForResponse)
+        );
         // Simulate handshake gate ready
-        let hs_gate =
-            hex::decode(&engine.link_initiation.as_ref().unwrap().handshake_slot).unwrap();
+        let li = engine.link_initiation.as_ref().unwrap();
+        let hs_gate = hex::decode(&li.handshake_slot).unwrap();
+        let expected_slot = hex::decode(&li.presence_slot).unwrap();
         let result = engine.handle_hardware_event(
             vauchi_core::exchange::ExchangeHardwareEvent::RelayEscrowReady { gate_hash: hs_gate },
         );
+        // Must transition to Retrieving
+        assert_eq!(
+            engine.step,
+            ExchangeStep::Link(LinkStep::Retrieving),
+            "Must transition to Retrieving after handshake gate ready"
+        );
+        // Must emit RelayEscrowRetrieve with presence_slot (authenticates
+        // with OUR slot; relay returns the OTHER slot's blob = responder's epk)
         match result {
             Some(ActionResult::ExchangeCommands { commands }) => {
                 assert_eq!(commands.len(), 1);
-                assert!(
-                    matches!(&commands[0], ExchangeCommand::RelayEscrowRetrieve { .. }),
-                    "EscrowReady for handshake gate must trigger retrieve"
-                );
+                if let ExchangeCommand::RelayEscrowRetrieve { slot_hash, .. } = &commands[0] {
+                    assert_eq!(
+                        slot_hash, &expected_slot,
+                        "retrieve must use presence_slot for auth"
+                    );
+                } else {
+                    panic!("expected RelayEscrowRetrieve");
+                }
             }
             other => panic!("Expected ExchangeCommands, got {:?}", other),
         }
@@ -1664,5 +1684,35 @@ mod tests {
         );
         assert!(result.is_some());
         assert_eq!(engine.step, ExchangeStep::Failed);
+        assert_eq!(
+            engine.failure_detail.as_deref(),
+            Some("gate expired"),
+            "failure reason must propagate to UI"
+        );
+    }
+
+    // @internal
+    #[test]
+    fn test_link_unknown_gate_hash_ignored() {
+        let mut engine = ExchangeEngine::new(ExchangeConfig {
+            mode: Some(ExchangeMode::Link),
+            ..config_no_groups()
+        });
+        let _ = engine.drain_commands();
+        let _ = engine.handle_action(UserAction::ActionPressed {
+            action_id: "share".into(),
+        });
+        // Unknown gate_hash — should be ignored (returns None)
+        let result = engine.handle_hardware_event(
+            vauchi_core::exchange::ExchangeHardwareEvent::RelayEscrowReady {
+                gate_hash: vec![0xAA; 32],
+            },
+        );
+        assert!(result.is_none(), "unknown gate must be silently ignored");
+        assert_eq!(
+            engine.step,
+            ExchangeStep::Link(LinkStep::WaitingForResponse),
+            "step must not change for unknown gate"
+        );
     }
 }

@@ -75,8 +75,16 @@ pub enum ExchangeCommand {
         encrypted_card: Vec<u8>,
         ttl_seconds: u32,
     },
-    /// Check relay escrow gate readiness.
-    RelayEscrowCheck { gate_hash: Vec<u8> },
+    /// Check relay escrow gate readiness (poll until ready).
+    ///
+    /// Frontends should poll at `suggested_interval_ms` with exponential
+    /// backoff (cap at 5 min). Report `RelayEscrowReady` when gate has
+    /// ≥2 deposits, or `RelayEscrowFailed` on error/timeout.
+    RelayEscrowCheck {
+        gate_hash: Vec<u8>,
+        /// Suggested initial polling interval in milliseconds.
+        suggested_interval_ms: u32,
+    },
     /// Retrieve blob from relay escrow gate.
     RelayEscrowRetrieve {
         gate_hash: Vec<u8>,
@@ -275,6 +283,7 @@ mod tests {
             },
             ExchangeCommand::RelayEscrowCheck {
                 gate_hash: vec![0xAB; 32],
+                suggested_interval_ms: 30_000,
             },
             ExchangeCommand::RelayEscrowRetrieve {
                 gate_hash: vec![0xAB; 32],
@@ -408,7 +417,10 @@ mod tests {
                 encrypted_card: vec![],
                 ttl_seconds: 0,
             },
-            ExchangeCommand::RelayEscrowCheck { gate_hash: vec![] },
+            ExchangeCommand::RelayEscrowCheck {
+                gate_hash: vec![],
+                suggested_interval_ms: 0,
+            },
             ExchangeCommand::RelayEscrowRetrieve {
                 gate_hash: vec![],
                 slot_hash: vec![],

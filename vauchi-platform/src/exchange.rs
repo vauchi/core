@@ -516,6 +516,7 @@ pub enum MobileExchangeCommand {
     },
     RelayEscrowCheck {
         gate_hash: Vec<u8>,
+        suggested_interval_ms: u32,
     },
     RelayEscrowRetrieve {
         gate_hash: Vec<u8>,
@@ -568,7 +569,13 @@ impl From<ExchangeCommand> for MobileExchangeCommand {
                 encrypted_card,
                 ttl_seconds,
             },
-            ExchangeCommand::RelayEscrowCheck { gate_hash } => Self::RelayEscrowCheck { gate_hash },
+            ExchangeCommand::RelayEscrowCheck {
+                gate_hash,
+                suggested_interval_ms,
+            } => Self::RelayEscrowCheck {
+                gate_hash,
+                suggested_interval_ms,
+            },
             ExchangeCommand::RelayEscrowRetrieve {
                 gate_hash,
                 slot_hash,

@@ -311,6 +311,60 @@ impl VauchiPlatform {
         Ok(())
     }
 
+    // === Contact Lifecycle Operations ===
+
+    /// Soft-delete an imported contact (30-second undo window).
+    ///
+    /// The contact disappears from `list_contacts()` but can be restored
+    /// with `undo_delete_imported_contact()` within the undo window.
+    /// Only works for imported contacts — exchanged contacts must be archived.
+    pub fn soft_delete_imported_contact(&self, id: String) -> Result<(), MobileError> {
+        let vauchi = self.open_vauchi()?;
+        vauchi.soft_delete_imported_contact(&id)?;
+        Ok(())
+    }
+
+    /// Undo a soft-delete, restoring the contact to the visible list.
+    pub fn undo_delete_imported_contact(&self, id: String) -> Result<(), MobileError> {
+        let vauchi = self.open_vauchi()?;
+        vauchi.undo_delete_imported_contact(&id)?;
+        Ok(())
+    }
+
+    /// Permanently delete an imported contact from storage.
+    ///
+    /// Only works for imported contacts. This is irreversible.
+    pub fn hard_delete_imported_contact(&self, id: String) -> Result<(), MobileError> {
+        let vauchi = self.open_vauchi()?;
+        vauchi.hard_delete_imported_contact(&id)?;
+        Ok(())
+    }
+
+    /// Archive an exchanged contact.
+    ///
+    /// The contact disappears from `list_contacts()` but retains its
+    /// crypto state (shared key, ratchet). Reversible via `unarchive_contact()`.
+    /// Only works for exchanged contacts — imported contacts must be soft-deleted.
+    pub fn archive_contact(&self, id: String) -> Result<(), MobileError> {
+        let vauchi = self.open_vauchi()?;
+        vauchi.archive_contact(&id)?;
+        Ok(())
+    }
+
+    /// Unarchive an exchanged contact, restoring it to the main list.
+    pub fn unarchive_contact(&self, id: String) -> Result<(), MobileError> {
+        let vauchi = self.open_vauchi()?;
+        vauchi.unarchive_contact(&id)?;
+        Ok(())
+    }
+
+    /// List all archived contacts.
+    pub fn list_archived_contacts(&self) -> Result<Vec<MobileContact>, MobileError> {
+        let vauchi = self.open_vauchi()?;
+        let contacts = vauchi.list_archived_contacts()?;
+        Ok(contacts.iter().map(MobileContact::from).collect())
+    }
+
     // === Hidden Contact Operations ===
 
     /// Hides a contact from the main contact list.

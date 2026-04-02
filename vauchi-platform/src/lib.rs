@@ -855,6 +855,19 @@ impl VauchiPlatform {
         Vauchi::new(config).map_err(|e| MobileError::Internal(e.to_string()))
     }
 
+    /// Save a contact directly to storage.
+    ///
+    /// Used by integration tests that need exchanged or imported contacts
+    /// without running a full exchange flow or VCF import.
+    /// Not exported via UniFFI (outside `#[uniffi::export]` block).
+    #[doc(hidden)]
+    pub fn save_test_contact(&self, contact: &vauchi_core::Contact) -> Result<(), MobileError> {
+        let storage = self.open_storage()?;
+        storage
+            .save_contact(contact)
+            .map_err(|e| MobileError::StorageError(e.to_string()))
+    }
+
     /// Returns the data directory (parent of the database file).
     pub(crate) fn data_dir(&self) -> PathBuf {
         self.storage_path

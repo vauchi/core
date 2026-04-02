@@ -11,7 +11,8 @@
 use crate::ui::*;
 use vauchi_core::exchange::ExchangeHardwareEvent;
 use vauchi_core::exchange::command::ExchangeCommand;
-use vauchi_core::exchange::link_mode::LinkInitiation;
+use vauchi_core::exchange::escrow::EscrowKeys;
+use vauchi_core::exchange::link_mode::{self, LinkInitiation, LinkModeError};
 
 /// Link mode polling interval (30s per design spec, backoff to 5 min).
 pub(super) const LINK_POLL_INTERVAL_MS: u32 = 30_000;
@@ -148,14 +149,25 @@ pub(super) enum LinkHardwareOutcome {
     PollHandshakeGate { commands: Vec<ExchangeCommand> },
     /// Handshake gate ready — retrieve responder's epk.
     RetrieveFromHandshake { commands: Vec<ExchangeCommand> },
+    /// Responder's epk received — DH done, card deposited, polling escrow gate.
+    /// Engine must store the returned `EscrowKeys` for later decryption.
+    DhCompleteCardDeposited {
+        commands: Vec<ExchangeCommand>,
+        escrow_keys: EscrowKeys,
+    },
+    /// Escrow gate ready — retrieve responder's encrypted card.
+    RetrieveFromEscrow { commands: Vec<ExchangeCommand> },
+    /// Responder's card decrypted — exchange complete.
+    /// `card_bytes` contains the deserialized contact card (saved by AppEngine).
+    #[allow(dead_code)] // Used once contact saving is wired via AppEngine callback
+    ExchangeComplete { card_bytes: Vec<u8> },
     /// Relay escrow failed — show error to user.
     Failed { reason: String },
 }
 
-/// Handle a hardware event during Link mode.
+/// Handle a hardware event during the handshake phase (before DH).
 ///
 /// Returns `Some(outcome)` if the event was handled, `None` if ignored.
-/// The parent engine interprets the outcome (state transitions, screen updates).
 pub(super) fn handle_link_hw_event(
     li: &LinkInitiation,
     event: &ExchangeHardwareEvent,
@@ -176,9 +188,6 @@ pub(super) fn handle_link_hw_event(
             let hs_gate =
                 hex::decode(&li.handshake_slot).expect("hex from hex::encode is always valid");
             if *gate_hash == hs_gate {
-                // Handshake gate ready — retrieve responder's epk.
-                // GET authenticates with our presence_slot and returns
-                // the OTHER slot's blob (responder's epk).
                 let slot =
                     hex::decode(&li.presence_slot).expect("hex from hex::encode is always valid");
                 return Some(LinkHardwareOutcome::RetrieveFromHandshake {
@@ -188,8 +197,83 @@ pub(super) fn handle_link_hw_event(
                     }],
                 });
             }
-            // Escrow gate ready — handled after initiator_complete when escrow_keys are set
             None
+        }
+
+        ExchangeHardwareEvent::RelayEscrowFailed { reason, .. } => {
+            Some(LinkHardwareOutcome::Failed {
+                reason: reason.clone(),
+            })
+        }
+
+        _ => None,
+    }
+}
+
+/// Handle `LinkOpened` — the responder's epk has been retrieved.
+///
+/// Performs ECDH, encrypts the initiator's card, and returns commands
+/// to deposit + poll the escrow gate.
+pub(super) fn handle_link_opened(
+    li: &LinkInitiation,
+    peer_public_key: &[u8],
+    card_plaintext: &[u8],
+) -> Result<LinkHardwareOutcome, LinkModeError> {
+    let epk: [u8; 32] = peer_public_key
+        .try_into()
+        .map_err(|_| LinkModeError::NonContributoryDh)?;
+
+    let keys = link_mode::initiator_derive_keys(&li.secret_key_bytes, &epk)?;
+    let encrypted_card = keys
+        .encrypt_card(card_plaintext)
+        .map_err(|_| LinkModeError::NonContributoryDh)?;
+
+    let mut commands = link_mode::build_initiator_deposit(&keys, encrypted_card);
+
+    // Immediately start polling the escrow gate (responder already deposited)
+    let escrow_gate = hex::decode(&keys.gate_hash).expect("hex from hex::encode is always valid");
+    commands.push(ExchangeCommand::RelayEscrowCheck {
+        gate_hash: escrow_gate,
+        suggested_interval_ms: 1_000, // 1s — user is actively waiting
+    });
+
+    Ok(LinkHardwareOutcome::DhCompleteCardDeposited {
+        commands,
+        escrow_keys: keys,
+    })
+}
+
+/// Handle hardware events during the escrow phase (after DH, keys known).
+///
+/// Returns `Some(outcome)` if the event was handled, `None` if ignored.
+pub(super) fn handle_escrow_hw_event(
+    keys: &EscrowKeys,
+    event: &ExchangeHardwareEvent,
+) -> Option<LinkHardwareOutcome> {
+    match event {
+        ExchangeHardwareEvent::RelayEscrowReady { gate_hash } => {
+            let expected =
+                hex::decode(&keys.gate_hash).expect("hex from hex::encode is always valid");
+            if *gate_hash == expected {
+                let slot =
+                    hex::decode(&keys.our_slot).expect("hex from hex::encode is always valid");
+                return Some(LinkHardwareOutcome::RetrieveFromEscrow {
+                    commands: vec![ExchangeCommand::RelayEscrowRetrieve {
+                        gate_hash: gate_hash.clone(),
+                        slot_hash: slot,
+                    }],
+                });
+            }
+            None
+        }
+
+        ExchangeHardwareEvent::RelayEscrowBlobReceived { blob, .. } => {
+            match keys.decrypt_card(blob) {
+                Ok(card_bytes) => Some(LinkHardwareOutcome::ExchangeComplete { card_bytes }),
+                Err(e) => Some(LinkHardwareOutcome::Failed {
+                    reason: format!("Card decryption failed: {e}"),
+                }),
+            }
         }
 
         ExchangeHardwareEvent::RelayEscrowFailed { reason, .. } => {

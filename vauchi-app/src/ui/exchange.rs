@@ -16,6 +16,7 @@ use crate::ui::exchange_qr::{self, QrActionOutcome, QrStep};
 use crate::ui::*;
 use vauchi_core::exchange::capability::types::DeviceCapabilities;
 use vauchi_core::exchange::command::ExchangeCommand;
+use vauchi_core::exchange::escrow::EscrowKeys;
 use vauchi_core::exchange::link_mode::{self, LinkInitiation};
 use vauchi_core::exchange::mode::ExchangeMode;
 use vauchi_core::exchange::{ExchangeEvent, ExchangeSession};
@@ -68,6 +69,9 @@ pub struct ExchangeEngine {
     /// Pending Link mode commands (presence deposit, relay calls).
     /// Drained via `drain_commands()` same as session commands.
     pending_link_commands: Vec<ExchangeCommand>,
+    /// Escrow keys derived after DH with responder (Link mode only).
+    /// Populated on `LinkOpened` event, used for card retrieval + decryption.
+    escrow_keys: Option<EscrowKeys>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -152,6 +156,7 @@ impl ExchangeEngine {
             field_preview: None,
             link_initiation,
             pending_link_commands,
+            escrow_keys: None,
         }
     }
 
@@ -187,6 +192,7 @@ impl ExchangeEngine {
                     field_preview: None,
                     link_initiation: None,
                     pending_link_commands: Vec::new(),
+                    escrow_keys: None,
                 };
             }
             session.emit_initial_commands();
@@ -203,6 +209,7 @@ impl ExchangeEngine {
             field_preview: None,
             link_initiation: None,
             pending_link_commands: Vec::new(),
+            escrow_keys: None,
         }
     }
 
@@ -301,26 +308,82 @@ impl ExchangeEngine {
 
     /// Handle Link mode hardware events (ADR-031).
     ///
-    /// Delegates to `exchange_link::handle_link_hw_event` for protocol logic,
-    /// then interprets the outcome (state transitions, command emission).
+    /// Routes to handshake-phase or escrow-phase handler depending on
+    /// whether ECDH has completed (escrow_keys present).
     fn handle_link_hardware_event(
         &mut self,
         event: vauchi_core::exchange::ExchangeHardwareEvent,
     ) -> Option<ActionResult> {
+        // Special case: LinkOpened triggers DH + card encryption
+        if let vauchi_core::exchange::ExchangeHardwareEvent::LinkOpened {
+            ref peer_public_key,
+        } = event
+        {
+            return self.handle_link_opened(peer_public_key);
+        }
+
+        // Escrow phase: keys are known, handle card exchange events
+        if let Some(ref keys) = self.escrow_keys
+            && let Some(outcome) = exchange_link::handle_escrow_hw_event(keys, &event)
+        {
+            return Some(self.apply_link_outcome(outcome));
+        }
+
+        // Handshake phase: waiting for responder's epk
         let li = self.link_initiation.as_ref()?;
         let outcome = exchange_link::handle_link_hw_event(li, &event)?;
+        Some(self.apply_link_outcome(outcome))
+    }
+
+    /// Process LinkOpened: derive keys, encrypt card, deposit + poll.
+    fn handle_link_opened(&mut self, peer_public_key: &[u8]) -> Option<ActionResult> {
+        let li = self.link_initiation.as_ref()?;
+        let card_bytes = self
+            .config
+            .card_snapshot
+            .as_ref()
+            .map(|cs| serde_json::to_vec(cs).unwrap_or_default())
+            .unwrap_or_default();
+
+        match exchange_link::handle_link_opened(li, peer_public_key, &card_bytes) {
+            Ok(outcome) => Some(self.apply_link_outcome(outcome)),
+            Err(e) => {
+                self.failure_detail = Some(e.to_string());
+                self.step = ExchangeStep::Failed;
+                Some(ActionResult::UpdateScreen(self.build_screen()))
+            }
+        }
+    }
+
+    /// Apply a LinkHardwareOutcome — shared dispatch for all Link events.
+    fn apply_link_outcome(&mut self, outcome: LinkHardwareOutcome) -> ActionResult {
         match outcome {
             LinkHardwareOutcome::PollHandshakeGate { commands } => {
-                Some(ActionResult::ExchangeCommands { commands })
+                ActionResult::ExchangeCommands { commands }
             }
             LinkHardwareOutcome::RetrieveFromHandshake { commands } => {
                 self.step = ExchangeStep::Link(LinkStep::Retrieving);
-                Some(ActionResult::ExchangeCommands { commands })
+                ActionResult::ExchangeCommands { commands }
+            }
+            LinkHardwareOutcome::DhCompleteCardDeposited {
+                commands,
+                escrow_keys,
+            } => {
+                self.escrow_keys = Some(escrow_keys);
+                ActionResult::ExchangeCommands { commands }
+            }
+            LinkHardwareOutcome::RetrieveFromEscrow { commands } => {
+                ActionResult::ExchangeCommands { commands }
+            }
+            LinkHardwareOutcome::ExchangeComplete { card_bytes: _ } => {
+                // TODO: save contact from card_bytes via AppEngine callback
+                self.step = ExchangeStep::Success;
+                ActionResult::UpdateScreen(self.build_screen())
             }
             LinkHardwareOutcome::Failed { reason } => {
                 self.failure_detail = Some(reason);
                 self.step = ExchangeStep::Failed;
-                Some(ActionResult::UpdateScreen(self.build_screen()))
+                ActionResult::UpdateScreen(self.build_screen())
             }
         }
     }

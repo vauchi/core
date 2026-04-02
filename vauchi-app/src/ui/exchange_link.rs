@@ -219,14 +219,17 @@ pub(super) fn handle_link_opened(
     peer_public_key: &[u8],
     card_plaintext: &[u8],
 ) -> Result<LinkHardwareOutcome, LinkModeError> {
-    let epk: [u8; 32] = peer_public_key
-        .try_into()
-        .map_err(|_| LinkModeError::NonContributoryDh)?;
+    let epk: [u8; 32] =
+        peer_public_key
+            .try_into()
+            .map_err(|_| LinkModeError::MalformedPeerKey {
+                received: peer_public_key.len(),
+            })?;
 
     let keys = link_mode::initiator_derive_keys(&li.secret_key_bytes, &epk)?;
     let encrypted_card = keys
         .encrypt_card(card_plaintext)
-        .map_err(|_| LinkModeError::NonContributoryDh)?;
+        .map_err(|e| LinkModeError::CardCryptoFailed(e.to_string()))?;
 
     let mut commands = link_mode::build_initiator_deposit(&keys, encrypted_card);
 

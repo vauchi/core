@@ -31,9 +31,17 @@ const LINK_URL_PREFIX: &str = "vauchi://exchange";
 #[derive(Debug, thiserror::Error)]
 pub enum LinkModeError {
     /// The peer's public key is a small-order point (non-contributory DH).
-    /// This indicates either a malicious peer or corrupted data.
     #[error("non-contributory Diffie-Hellman output (small-order point)")]
     NonContributoryDh,
+    /// The peer's public key has invalid length (expected 32 bytes).
+    #[error("malformed peer public key: expected 32 bytes, got {received}")]
+    MalformedPeerKey { received: usize },
+    /// Card encryption or decryption failed.
+    #[error("card crypto failed: {0}")]
+    CardCryptoFailed(String),
+    /// No card data available to send.
+    #[error("no card snapshot available for exchange")]
+    NoCardToSend,
 }
 
 // =========================================================================

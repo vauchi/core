@@ -338,14 +338,23 @@ impl ExchangeEngine {
     /// Process LinkOpened: derive keys, encrypt card, deposit + poll.
     fn handle_link_opened(&mut self, peer_public_key: &[u8]) -> Option<ActionResult> {
         let li = self.link_initiation.as_ref()?;
-        let card_bytes = self
-            .config
-            .card_snapshot
-            .as_ref()
-            .map(|cs| serde_json::to_vec(cs).unwrap_or_default())
-            .unwrap_or_default();
 
-        match exchange_link::handle_link_opened(li, peer_public_key, &card_bytes) {
+        let result =
+            (|| -> Result<LinkHardwareOutcome, vauchi_core::exchange::link_mode::LinkModeError> {
+                let cs = self
+                    .config
+                    .card_snapshot
+                    .as_ref()
+                    .ok_or(vauchi_core::exchange::link_mode::LinkModeError::NoCardToSend)?;
+                let card_bytes = serde_json::to_vec(cs).map_err(|e| {
+                    vauchi_core::exchange::link_mode::LinkModeError::CardCryptoFailed(format!(
+                        "card serialization: {e}"
+                    ))
+                })?;
+                exchange_link::handle_link_opened(li, peer_public_key, &card_bytes)
+            })();
+
+        match result {
             Ok(outcome) => Some(self.apply_link_outcome(outcome)),
             Err(e) => {
                 self.failure_detail = Some(e.to_string());

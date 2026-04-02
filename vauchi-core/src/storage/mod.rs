@@ -108,6 +108,11 @@ pub mod emergency;
 #[cfg(not(feature = "testing"))]
 mod emergency;
 
+#[cfg(feature = "testing")]
+pub mod exchange_state;
+#[cfg(not(feature = "testing"))]
+mod exchange_state;
+
 pub mod local_keys;
 pub mod migration;
 pub mod secure;

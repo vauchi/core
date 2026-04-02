@@ -449,6 +449,11 @@ pub fn all_migrations() -> Vec<Migration> {
             name: "contact_delete_archive",
             action: MigrationAction::Sql(MIGRATION_V37_CONTACT_DELETE_ARCHIVE),
         },
+        Migration {
+            version: 38,
+            name: "exchange_states",
+            action: MigrationAction::Sql(MIGRATION_V38_EXCHANGE_STATES),
+        },
     ]
 }
 
@@ -656,6 +661,21 @@ const MIGRATION_V37_CONTACT_DELETE_ARCHIVE: &str = "
     ALTER TABLE contacts ADD COLUMN deleted_at INTEGER;
     ALTER TABLE contacts ADD COLUMN archived INTEGER NOT NULL DEFAULT 0;
     ALTER TABLE contacts ADD COLUMN archived_at INTEGER;
+";
+
+/// Migration v38: Persisted exchange state for crash recovery (Link mode).
+///
+/// Encrypted blob contains the full `PersistedExchangeState` JSON.
+/// `exchange_id` is a 64-char hex string (TEXT) for readable lookups.
+/// `expires_at` index enables efficient TTL sweep.
+const MIGRATION_V38_EXCHANGE_STATES: &str = "
+    CREATE TABLE IF NOT EXISTS exchange_states (
+        exchange_id TEXT PRIMARY KEY,
+        encrypted_blob BLOB NOT NULL,
+        created_at INTEGER NOT NULL,
+        expires_at INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_exchange_states_expires ON exchange_states(expires_at);
 ";
 
 const MIGRATION_V35_LOCAL_GROUPS: &str = "

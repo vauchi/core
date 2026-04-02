@@ -129,13 +129,14 @@ fn test_data_qr_crc_integrity() {
 // === Relay URL in INIT QR ===
 
 #[test]
-fn test_init_qr_with_relay_url() {
+fn test_init_qr_with_relay_url_but_no_noise_pubkey_is_rejected() {
     let session_id = [10u8; 16];
     let pubkey = [11u8; 32];
     let ephemeral = [12u8; 32];
     let commitment = [13u8; 32];
     let relay_url = "wss://relay.example.com";
 
+    // Format encodes whatever is given — the fail-closed check is at parse time
     let qr = format_init_qr_with_relay(
         &session_id,
         &pubkey,
@@ -146,27 +147,12 @@ fn test_init_qr_with_relay_url() {
         None,
     );
 
-    let parsed = parse_qr(&qr).unwrap();
-    match parsed {
-        StageQr::Init {
-            session_id: sid,
-            pubkey: pk,
-            ephemeral: eph,
-            commitment_hash,
-            display_name,
-            relay_url: url,
-            relay_noise_pubkey: npk,
-        } => {
-            assert_eq!(sid, session_id);
-            assert_eq!(pk, pubkey);
-            assert_eq!(eph, ephemeral);
-            assert_eq!(commitment_hash, commitment);
-            assert_eq!(display_name, "Bob");
-            assert_eq!(url.as_deref(), Some(relay_url));
-            assert!(npk.is_none());
-        }
-        _ => panic!("expected Init"),
-    }
+    // Parser enforces: relay URL without Noise pubkey → MissingRelayNoisePubkey
+    let err = parse_qr(&qr).unwrap_err();
+    assert!(
+        format!("{err:?}").contains("MissingRelayNoisePubkey"),
+        "relay URL without noise pubkey must be rejected, got: {err:?}"
+    );
 }
 
 #[test]

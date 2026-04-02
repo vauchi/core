@@ -95,11 +95,15 @@ fn test_full_exchange_produces_matching_shared_keys() {
 
     // Get the shared keys from completed contacts
     let alice_shared_key = match alice_session.state() {
-        ExchangeState::Complete { contact } => contact.shared_key().clone(),
+        ExchangeState::Complete { contact } => contact
+            .shared_key()
+            .expect("Alice's completed contact should have a shared key"),
         _ => panic!("Alice should be complete"),
     };
     let bob_shared_key = match bob_session.state() {
-        ExchangeState::Complete { contact } => contact.shared_key().clone(),
+        ExchangeState::Complete { contact } => contact
+            .shared_key()
+            .expect("Bob's completed contact should have a shared key"),
         _ => panic!("Bob should be complete"),
     };
 
@@ -112,13 +116,13 @@ fn test_full_exchange_produces_matching_shared_keys() {
 
     // Verify encryption/decryption works bidirectionally
     let message = b"Hello from Alice!";
-    let ciphertext = encrypt(&alice_shared_key, message).unwrap();
-    let decrypted = decrypt(&bob_shared_key, &ciphertext).unwrap();
+    let ciphertext = encrypt(alice_shared_key, message).unwrap();
+    let decrypted = decrypt(bob_shared_key, &ciphertext).unwrap();
     assert_eq!(decrypted, message, "Bob should decrypt Alice's message");
 
     let message2 = b"Hello from Bob!";
-    let ciphertext2 = encrypt(&bob_shared_key, message2).unwrap();
-    let decrypted2 = decrypt(&alice_shared_key, &ciphertext2).unwrap();
+    let ciphertext2 = encrypt(bob_shared_key, message2).unwrap();
+    let decrypted2 = decrypt(alice_shared_key, &ciphertext2).unwrap();
     assert_eq!(decrypted2, message2, "Alice should decrypt Bob's message");
 }
 

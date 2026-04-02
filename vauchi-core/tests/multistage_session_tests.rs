@@ -89,7 +89,7 @@ fn test_full_exchange_with_relay_metadata() {
     let mut bob = MultiStageSession::new_with_relay(
         bob_card.clone(),
         Some("wss://bob-relay.example.com".to_string()),
-        None,
+        Some([0xBB; 32]),
     );
 
     // Stage 1: Both display INIT QRs
@@ -122,7 +122,7 @@ fn test_full_exchange_with_relay_metadata() {
 
     // Verify relay metadata was exchanged
     assert_eq!(alice.peer_relay_url(), Some("wss://bob-relay.example.com"));
-    assert!(alice.peer_relay_noise_pubkey().is_none());
+    assert_eq!(alice.peer_relay_noise_pubkey(), Some([0xBB; 32]));
 
     assert_eq!(bob.peer_relay_url(), Some("wss://alice-relay.example.com"));
     assert_eq!(bob.peer_relay_noise_pubkey(), Some([0xAA; 32]));

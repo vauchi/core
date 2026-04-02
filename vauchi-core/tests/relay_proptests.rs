@@ -36,23 +36,25 @@ fn noise_pubkey_strategy() -> impl Strategy<Value = [u8; 32]> {
 proptest! {
     #[test]
     fn qr_v3_roundtrip_preserves_relay_url(
-        relay_url in valid_relay_url_strategy()
+        relay_url in valid_relay_url_strategy(),
+        noise_pk in noise_pubkey_strategy()
     ) {
         let identity = Identity::create("PropTest");
         let ephemeral = X3DHKeyPair::generate();
 
+        // Parser enforces fail-closed: relay URL requires noise pubkey
         let qr = ExchangeQR::generate_with_relay(
             &identity,
             &ephemeral,
             Some(relay_url.clone()),
-            None,
+            Some(noise_pk),
         );
 
         let data = qr.to_data_string();
         let parsed = ExchangeQR::from_data_string(&data).unwrap();
 
         prop_assert_eq!(parsed.relay_url().unwrap(), &relay_url);
-        prop_assert!(parsed.relay_noise_pubkey().is_none());
+        prop_assert_eq!(*parsed.relay_noise_pubkey().unwrap(), noise_pk);
         prop_assert!(parsed.verify_signature());
     }
 

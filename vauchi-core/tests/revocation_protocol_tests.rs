@@ -162,7 +162,7 @@ fn test_process_revocation_deletes_contact_and_records_tombstone() {
     storage.save_contact(&alice_contact).unwrap();
 
     // Use a future timestamp (must be >= exchange_timestamp to not be stale)
-    let future_ts = alice_contact.exchange_timestamp() + 1;
+    let future_ts = alice_contact.exchange_timestamp().unwrap() + 1;
     let revoked = IdentityRevoked::create(&identity, &bob_id, future_ts);
 
     let result = process_revocation(&revoked, &storage);
@@ -189,7 +189,7 @@ fn test_process_revocation_rejects_invalid_signature() {
     storage.save_contact(&alice_contact).unwrap();
 
     // Create revocation signed by Mallory but claiming to be from Alice
-    let future_ts = alice_contact.exchange_timestamp() + 1;
+    let future_ts = alice_contact.exchange_timestamp().unwrap() + 1;
     let mut spoofed = IdentityRevoked::create(&mallory, &bob_id, future_ts);
     spoofed.sender_id = alice_contact.id().to_string();
 
@@ -291,7 +291,7 @@ fn test_revocation_with_future_timestamp() {
     let alice_contact = make_contact_with_pk(*alice.signing_public_key(), "Alice");
     storage.save_contact(&alice_contact).unwrap();
 
-    let exchange_ts = alice_contact.exchange_timestamp();
+    let exchange_ts = alice_contact.exchange_timestamp().unwrap();
     // Far future timestamp
     let future_ts = exchange_ts + 10000;
 
@@ -314,7 +314,7 @@ fn test_revocation_with_minimum_valid_timestamp() {
     let alice_contact = make_contact_with_pk(*alice.signing_public_key(), "Alice");
     storage.save_contact(&alice_contact).unwrap();
 
-    let exchange_ts = alice_contact.exchange_timestamp();
+    let exchange_ts = alice_contact.exchange_timestamp().unwrap();
     // Minimum valid timestamp (equal to exchange_timestamp, not less than)
     let min_valid_ts = exchange_ts;
 

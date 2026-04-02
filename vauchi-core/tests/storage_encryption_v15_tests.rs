@@ -15,7 +15,6 @@
 use vauchi_core::contact::Contact;
 use vauchi_core::contact_card::ContactCard;
 use vauchi_core::crypto::SymmetricKey;
-use vauchi_core::social::ProfileValidation;
 use vauchi_core::storage::Storage;
 use vauchi_core::types::{AhaMomentTracker, AhaMomentType, DemoContactState};
 
@@ -111,146 +110,6 @@ fn test_schema_version_at_least_16() {
         version >= 16,
         "schema version should be at least 16, got {}",
         version
-    );
-}
-
-// === field_validations roundtrip tests ===
-
-#[test]
-fn test_field_validation_roundtrip() {
-    let (_dir, storage) = open_storage();
-
-    let contact = make_contact("Test User");
-    storage.save_contact(&contact).unwrap();
-    let contact_id = contact.id();
-
-    let field_id = format!("{}:email", contact_id);
-    let signature = [42u8; 64];
-    let validation = ProfileValidation::from_stored(
-        &field_id,
-        "test@example.com",
-        "validator-123",
-        1700000000,
-        signature,
-    );
-
-    storage.save_validation(&validation).unwrap();
-
-    let loaded = storage
-        .load_validations_for_field(contact_id, "email")
-        .unwrap();
-    assert_eq!(loaded.len(), 1);
-    assert_eq!(loaded[0].field_value(), "test@example.com");
-    assert_eq!(loaded[0].validator_id(), "validator-123");
-    assert_eq!(loaded[0].validated_at(), 1700000000);
-    assert_eq!(*loaded[0].signature(), signature);
-}
-
-#[test]
-fn test_field_validation_encrypted_in_db() {
-    let (dir, storage) = open_storage();
-
-    let contact = make_contact("Test User");
-    storage.save_contact(&contact).unwrap();
-    let contact_id = contact.id();
-
-    let field_id = format!("{}:phone", contact_id);
-    let validation = ProfileValidation::from_stored(
-        &field_id,
-        "+1234567890",
-        "validator-456",
-        1700000000,
-        [99u8; 64],
-    );
-
-    storage.save_validation(&validation).unwrap();
-    drop(storage);
-
-    // Check raw DB: field_value should be cleared, encrypted column should have data
-    let db_path = dir.path().join("vauchi.db");
-    let raw_conn = rusqlite::Connection::open(&db_path).unwrap();
-
-    type ValidationRow = (String, Option<Vec<u8>>, Vec<u8>, Option<Vec<u8>>);
-    let (fv_plain, fv_enc, sig_plain, sig_enc): ValidationRow = raw_conn
-        .query_row(
-            "SELECT field_value, field_value_encrypted, signature, signature_encrypted FROM field_validations LIMIT 1",
-            [],
-            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
-        )
-        .unwrap();
-
-    assert!(
-        fv_plain.is_empty(),
-        "plaintext field_value should be cleared"
-    );
-    assert!(
-        fv_enc.is_some() && !fv_enc.unwrap().is_empty(),
-        "field_value_encrypted should have data"
-    );
-    assert!(
-        sig_plain.is_empty(),
-        "plaintext signature should be cleared"
-    );
-    assert!(
-        sig_enc.is_some() && !sig_enc.unwrap().is_empty(),
-        "signature_encrypted should have data"
-    );
-}
-
-#[test]
-fn test_field_validation_by_validator_roundtrip() {
-    let (_dir, storage) = open_storage();
-
-    let contact = make_contact("Test User");
-    storage.save_contact(&contact).unwrap();
-    let contact_id = contact.id();
-
-    let field_id = format!("{}:email", contact_id);
-    let validation = ProfileValidation::from_stored(
-        &field_id,
-        "user@example.com",
-        "my-validator-id",
-        1700000000,
-        [11u8; 64],
-    );
-
-    storage.save_validation(&validation).unwrap();
-
-    let loaded = storage
-        .load_validations_by_validator("my-validator-id")
-        .unwrap();
-    assert_eq!(loaded.len(), 1);
-    assert_eq!(loaded[0].field_value(), "user@example.com");
-}
-
-#[test]
-fn test_field_validation_has_validated_works() {
-    let (_dir, storage) = open_storage();
-
-    let contact = make_contact("Test User");
-    storage.save_contact(&contact).unwrap();
-    let contact_id = contact.id();
-
-    let field_id = format!("{}:email", contact_id);
-    let validation = ProfileValidation::from_stored(
-        &field_id,
-        "user@example.com",
-        "validator-xyz",
-        1700000000,
-        [22u8; 64],
-    );
-
-    storage.save_validation(&validation).unwrap();
-
-    assert!(
-        storage
-            .has_validated(contact_id, "email", "validator-xyz")
-            .unwrap()
-    );
-    assert!(
-        !storage
-            .has_validated(contact_id, "email", "other-validator")
-            .unwrap()
     );
 }
 
@@ -422,36 +281,6 @@ fn test_audit_log_null_details_no_encryption() {
 }
 
 // === Rekey tests ===
-
-#[test]
-fn test_rekey_preserves_field_validations() {
-    let (_dir, mut storage) = open_storage();
-
-    let contact = make_contact("Rekey Test");
-    storage.save_contact(&contact).unwrap();
-    let contact_id = contact.id().to_string();
-
-    let field_id = format!("{}:email", contact_id);
-    let validation = ProfileValidation::from_stored(
-        &field_id,
-        "rekey@example.com",
-        "validator-rekey",
-        1700000000,
-        [77u8; 64],
-    );
-    storage.save_validation(&validation).unwrap();
-
-    // Rekey
-    let new_key = SymmetricKey::generate();
-    storage.rekey(new_key).unwrap();
-
-    let loaded = storage
-        .load_validations_for_field(&contact_id, "email")
-        .unwrap();
-    assert_eq!(loaded.len(), 1);
-    assert_eq!(loaded[0].field_value(), "rekey@example.com");
-    assert_eq!(*loaded[0].signature(), [77u8; 64]);
-}
 
 #[test]
 fn test_rekey_preserves_ux_state() {

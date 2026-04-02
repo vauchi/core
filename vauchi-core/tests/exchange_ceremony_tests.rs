@@ -70,11 +70,11 @@ fn test_qr_ceremony_shared_keys_match_and_encrypt() {
         .unwrap();
 
     let alice_key = match alice_session.state() {
-        ExchangeState::Complete { contact } => contact.shared_key().clone(),
+        ExchangeState::Complete { contact } => contact.shared_key().unwrap().clone(),
         _ => panic!("Alice should be in Complete state"),
     };
     let bob_key = match bob_session.state() {
-        ExchangeState::Complete { contact } => contact.shared_key().clone(),
+        ExchangeState::Complete { contact } => contact.shared_key().unwrap().clone(),
         _ => panic!("Bob should be in Complete state"),
     };
 
@@ -255,7 +255,7 @@ fn test_independent_sessions_produce_different_secrets() {
         .unwrap();
 
     let qr_key = match qr_alice.state() {
-        ExchangeState::Complete { contact } => contact.shared_key().clone(),
+        ExchangeState::Complete { contact } => contact.shared_key().unwrap().clone(),
         _ => panic!("QR Alice should be complete"),
     };
 
@@ -287,7 +287,7 @@ fn test_independent_sessions_produce_different_secrets() {
         .unwrap();
 
     let qr2_key = match qr2_alice.state() {
-        ExchangeState::Complete { contact } => contact.shared_key().clone(),
+        ExchangeState::Complete { contact } => contact.shared_key().unwrap().clone(),
         _ => panic!("QR2 Alice should be complete"),
     };
 

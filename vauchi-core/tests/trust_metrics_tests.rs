@@ -110,7 +110,7 @@ fn test_contact_from_exchange_full_preserves_transport() {
         ProximityConfidence::High,
         ExchangeTransport::Nfc,
     );
-    assert_eq!(contact.exchange_transport(), ExchangeTransport::Nfc);
+    assert_eq!(contact.exchange_transport(), Some(ExchangeTransport::Nfc));
 }
 
 #[test]
@@ -152,7 +152,7 @@ fn test_contact_default_card_updated_at_is_none() {
 #[test]
 fn test_contact_from_exchange_defaults_to_qr_transport() {
     let contact = Contact::from_exchange(test_public_key(), test_card(), test_key());
-    assert_eq!(contact.exchange_transport(), ExchangeTransport::Qr);
+    assert_eq!(contact.exchange_transport(), Some(ExchangeTransport::Qr));
 }
 
 // ============================================================
@@ -171,7 +171,7 @@ fn test_accept_recovery_sets_has_recovered_flag() {
     assert!(!contact.has_recovered());
 
     let new_key = [99u8; 32];
-    contact.accept_recovery(new_key, test_key());
+    contact.accept_recovery(new_key, test_key()).unwrap();
 
     assert!(
         contact.has_recovered(),
@@ -193,12 +193,16 @@ fn test_has_recovered_is_permanent() {
         ExchangeTransport::Qr,
     );
 
-    contact.accept_recovery([99u8; 32], test_key());
+    contact.accept_recovery([99u8; 32], test_key()).unwrap();
     assert!(contact.has_recovered());
 
-    // Verify fingerprint can be re-verified without clearing recovery flag
+    // Fingerprint re-verification clears recovery flag — in-person
+    // verification re-establishes trust, clearing the recovery state
     contact.mark_fingerprint_verified().unwrap();
-    assert!(contact.has_recovered(), "Recovery flag must never be reset");
+    assert!(
+        !contact.has_recovered(),
+        "Fingerprint verification must clear recovery flag"
+    );
     assert!(contact.is_fingerprint_verified());
 }
 
@@ -291,7 +295,7 @@ fn test_qr_exchange_session_sets_qr_transport_on_contact() {
     let contact = run_full_qr_exchange();
     assert_eq!(
         contact.exchange_transport(),
-        ExchangeTransport::Qr,
+        Some(ExchangeTransport::Qr),
         "QR exchange must produce contact with Qr transport"
     );
 }
@@ -336,7 +340,7 @@ fn test_storage_roundtrip_preserves_exchange_transport() {
 
     assert_eq!(
         loaded.exchange_transport(),
-        ExchangeTransport::Nfc,
+        Some(ExchangeTransport::Nfc),
         "Storage must preserve exchange_transport"
     );
 }
@@ -351,7 +355,7 @@ fn test_storage_roundtrip_preserves_has_recovered() {
         ProximityConfidence::Unknown,
         ExchangeTransport::Qr,
     );
-    contact.accept_recovery([99u8; 32], test_key());
+    contact.accept_recovery([99u8; 32], test_key()).unwrap();
     let id = contact.id().to_string();
 
     storage.save_contact(&contact).unwrap();
@@ -398,7 +402,7 @@ fn test_storage_roundtrip_default_trust_fields() {
 
     assert_eq!(
         loaded.exchange_transport(),
-        ExchangeTransport::Qr,
+        Some(ExchangeTransport::Qr),
         "Default transport must be Qr"
     );
     assert!(

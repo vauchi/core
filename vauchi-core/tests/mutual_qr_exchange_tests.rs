@@ -335,11 +335,11 @@ fn test_full_qr_exchange() {
 
     // Verify matching shared keys
     let alice_shared = match alice_session.state() {
-        ExchangeState::Complete { contact } => contact.shared_key().clone(),
+        ExchangeState::Complete { contact } => contact.shared_key().unwrap().clone(),
         _ => panic!("Expected Complete"),
     };
     let bob_shared = match bob_session.state() {
-        ExchangeState::Complete { contact } => contact.shared_key().clone(),
+        ExchangeState::Complete { contact } => contact.shared_key().unwrap().clone(),
         _ => panic!("Expected Complete"),
     };
 

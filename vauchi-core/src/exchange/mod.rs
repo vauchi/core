@@ -7,24 +7,47 @@
 //! Handles peer-to-peer contact exchange via QR codes, audio proximity,
 //! and X3DH key agreement.
 
-#[cfg(feature = "testing")]
-pub mod accelerometer;
-#[cfg(not(feature = "testing"))]
-mod accelerometer;
+/// Modules that are `pub` under `feature = "testing"` and private otherwise.
+/// This allows integration tests and downstream test crates to access internals
+/// while keeping them private in production builds.
+macro_rules! test_pub_mod {
+    ($($name:ident),+ $(,)?) => {
+        $(
+            #[cfg(feature = "testing")]
+            pub mod $name;
+            #[cfg(not(feature = "testing"))]
+            mod $name;
+        )+
+    };
+}
 
-#[cfg(feature = "testing")]
-pub mod ambient_audio;
-#[cfg(not(feature = "testing"))]
-mod ambient_audio;
+test_pub_mod!(
+    accelerometer,
+    ambient_audio,
+    audio,
+    ble_chunking,
+    ble_handshake,
+    ble_payload,
+    ble_rollback,
+    encrypted_message,
+    error,
+    exchange_payload,
+    multistage,
+    nfc_active,
+    nfc_apdu_chaining,
+    nfc_card_payload,
+    nfc_handshake,
+    nfc_rollback,
+    proximity,
+    qr,
+    session,
+    trust_metrics,
+    verifier_chain,
+    verifier_event,
+    x3dh,
+);
 
-#[cfg(feature = "testing")]
-pub mod audio;
-#[cfg(not(feature = "testing"))]
-mod audio;
-
-#[cfg(feature = "audio-cpal")]
-pub mod audio_cpal;
-
+// ble has additional #[allow(deprecated)] (ADR-031 transport deprecation)
 #[cfg(feature = "testing")]
 #[allow(deprecated)]
 pub mod ble;
@@ -32,30 +55,8 @@ pub mod ble;
 #[allow(deprecated)]
 mod ble;
 
-#[cfg(feature = "testing")]
-pub mod ble_chunking;
-#[cfg(not(feature = "testing"))]
-mod ble_chunking;
-
-#[cfg(feature = "testing")]
-pub mod ble_handshake;
-#[cfg(not(feature = "testing"))]
-mod ble_handshake;
-
-#[cfg(feature = "testing")]
-pub mod ble_payload;
-#[cfg(not(feature = "testing"))]
-mod ble_payload;
-
-#[cfg(feature = "testing")]
-pub mod ble_rollback;
-#[cfg(not(feature = "testing"))]
-mod ble_rollback;
-
-#[cfg(feature = "testing")]
-pub mod multistage;
-#[cfg(not(feature = "testing"))]
-mod multistage;
+#[cfg(feature = "audio-cpal")]
+pub mod audio_cpal;
 
 pub mod capability;
 pub mod card_snapshot;
@@ -69,89 +70,13 @@ pub mod mode;
 pub mod mode_availability;
 pub mod mode_payload;
 pub mod persisted_state;
+pub mod tcp_transport;
 
 #[allow(deprecated)]
 pub mod transport;
 
-#[cfg(feature = "testing")]
-pub mod verifier_chain;
-#[cfg(not(feature = "testing"))]
-mod verifier_chain;
-
 #[cfg(any(test, feature = "testing"))]
 pub mod verifier_harness;
-
-#[cfg(feature = "testing")]
-pub mod verifier_event;
-#[cfg(not(feature = "testing"))]
-mod verifier_event;
-
-#[cfg(feature = "testing")]
-pub mod trust_metrics;
-#[cfg(not(feature = "testing"))]
-mod trust_metrics;
-
-pub mod tcp_transport;
-
-#[cfg(feature = "testing")]
-pub mod exchange_payload;
-#[cfg(not(feature = "testing"))]
-mod exchange_payload;
-
-#[cfg(feature = "testing")]
-pub mod nfc_active;
-#[cfg(not(feature = "testing"))]
-mod nfc_active;
-
-#[cfg(feature = "testing")]
-pub mod nfc_apdu_chaining;
-#[cfg(not(feature = "testing"))]
-mod nfc_apdu_chaining;
-
-#[cfg(feature = "testing")]
-pub mod nfc_card_payload;
-#[cfg(not(feature = "testing"))]
-mod nfc_card_payload;
-
-#[cfg(feature = "testing")]
-pub mod nfc_handshake;
-#[cfg(not(feature = "testing"))]
-mod nfc_handshake;
-
-#[cfg(feature = "testing")]
-pub mod nfc_rollback;
-#[cfg(not(feature = "testing"))]
-mod nfc_rollback;
-
-#[cfg(feature = "testing")]
-pub mod encrypted_message;
-#[cfg(not(feature = "testing"))]
-mod encrypted_message;
-
-#[cfg(feature = "testing")]
-pub mod error;
-#[cfg(not(feature = "testing"))]
-mod error;
-
-#[cfg(feature = "testing")]
-pub mod proximity;
-#[cfg(not(feature = "testing"))]
-mod proximity;
-
-#[cfg(feature = "testing")]
-pub mod qr;
-#[cfg(not(feature = "testing"))]
-mod qr;
-
-#[cfg(feature = "testing")]
-pub mod session;
-#[cfg(not(feature = "testing"))]
-mod session;
-
-#[cfg(feature = "testing")]
-pub mod x3dh;
-#[cfg(not(feature = "testing"))]
-mod x3dh;
 
 pub use accelerometer::{
     AccelerometerBackend, AccelerometerConfig, AccelerometerSample, AccelerometerVerifier,

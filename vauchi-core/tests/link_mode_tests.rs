@@ -97,7 +97,7 @@ fn responder_produces_two_deposit_commands() {
     let init = initiator_generate();
     let parsed = parse_link_url(&init.url).unwrap();
 
-    let (_, commands) = responder_respond(&parsed, b"encrypted_card".to_vec());
+    let (_, commands) = responder_respond(&parsed, b"encrypted_card".to_vec()).unwrap();
     assert_eq!(commands.len(), 2, "responder emits 2 deposits");
 
     // First command: handshake slot deposit (epk)
@@ -117,7 +117,7 @@ fn responder_produces_two_deposit_commands() {
 fn responder_handshake_deposit_contains_32_byte_epk() {
     let init = initiator_generate();
     let parsed = parse_link_url(&init.url).unwrap();
-    let (_, commands) = responder_respond(&parsed, b"card".to_vec());
+    let (_, commands) = responder_respond(&parsed, b"card".to_vec()).unwrap();
 
     if let ExchangeCommand::RelayEscrowDeposit { encrypted_card, .. } = &commands[0] {
         assert_eq!(
@@ -145,7 +145,8 @@ fn initiator_complete_produces_one_deposit() {
         &init.secret_key_bytes,
         &peer_epk,
         b"encrypted_card".to_vec(),
-    );
+    )
+    .unwrap();
     assert_eq!(commands.len(), 1);
     assert!(matches!(
         &commands[0],
@@ -168,7 +169,7 @@ fn initiator_and_responder_derive_same_gate_hash() {
     let parsed = parse_link_url(&init.url).unwrap();
 
     // Step 2: Responder responds (produces commands + keys)
-    let (resp_keys, resp_commands) = responder_respond(&parsed, b"bob_card".to_vec());
+    let (resp_keys, resp_commands) = responder_respond(&parsed, b"bob_card".to_vec()).unwrap();
 
     // Step 3: Extract responder's epk from handshake deposit
     let resp_epk: [u8; 32] =
@@ -180,7 +181,7 @@ fn initiator_and_responder_derive_same_gate_hash() {
 
     // Step 4: Initiator completes with responder's epk
     let (init_keys, _) =
-        initiator_complete(&init.secret_key_bytes, &resp_epk, b"alice_card".to_vec());
+        initiator_complete(&init.secret_key_bytes, &resp_epk, b"alice_card".to_vec()).unwrap();
 
     // Critical assertion: same gate, swapped slots
     assert_eq!(
@@ -206,7 +207,7 @@ fn initiator_and_responder_derive_same_gate_hash() {
 fn handshake_slot_unrelated_to_gate_hash() {
     let init = initiator_generate();
     let parsed = parse_link_url(&init.url).unwrap();
-    let (keys, _) = responder_respond(&parsed, b"card".to_vec());
+    let (keys, _) = responder_respond(&parsed, b"card".to_vec()).unwrap();
 
     assert_ne!(
         init.handshake_slot, keys.gate_hash,
@@ -235,8 +236,8 @@ fn handshake_slot_derived_from_nonce_not_secret() {
     // We can't call derive_handshake_slot directly (private), but we
     // can verify through the responder flow that the handshake deposits
     // go to the same gate.
-    let (_, cmds1) = responder_respond(&parsed1, b"a".to_vec());
-    let (_, cmds2) = responder_respond(&parsed2, b"b".to_vec());
+    let (_, cmds1) = responder_respond(&parsed1, b"a".to_vec()).unwrap();
+    let (_, cmds2) = responder_respond(&parsed2, b"b".to_vec()).unwrap();
 
     // Extract handshake gate_hash from first command of each
     let gate1 = match &cmds1[0] {
@@ -251,5 +252,22 @@ fn handshake_slot_derived_from_nonce_not_secret() {
     assert_eq!(
         gate1, gate2,
         "Same nonce → same handshake slot, regardless of public key"
+    );
+}
+
+// ================================================================
+// Security: small-order point rejection
+// ================================================================
+
+// @internal
+#[test]
+fn initiator_rejects_small_order_point() {
+    let init = initiator_generate();
+    // All-zeros is a small-order point on Curve25519
+    let zero_key = [0u8; 32];
+    let result = initiator_complete(&init.secret_key_bytes, &zero_key, b"card".to_vec());
+    assert!(
+        result.is_err(),
+        "DH with small-order point must be rejected"
     );
 }

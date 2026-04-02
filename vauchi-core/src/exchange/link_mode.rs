@@ -27,6 +27,15 @@ const DEFAULT_TTL_SECONDS: u32 = 604_800;
 /// URL scheme for link exchange.
 const LINK_URL_PREFIX: &str = "vauchi://exchange";
 
+/// Error from Link mode operations.
+#[derive(Debug, thiserror::Error)]
+pub enum LinkModeError {
+    /// The peer's public key is a small-order point (non-contributory DH).
+    /// This indicates either a malicious peer or corrupted data.
+    #[error("non-contributory Diffie-Hellman output (small-order point)")]
+    NonContributoryDh,
+}
+
 // =========================================================================
 // Initiator
 // =========================================================================
@@ -74,14 +83,21 @@ pub fn initiator_generate() -> LinkInitiation {
 ///
 /// Called when the handshake slot is polled and the responder's epk is found.
 /// Returns the escrow keys and commands to deposit the initiator's card.
+///
+/// Returns `LinkModeError::NonContributoryDh` if the peer's public key is
+/// a small-order point (attack mitigation — matches all other DH sites).
 pub fn initiator_complete(
     secret_key_bytes: &[u8; 32],
     peer_public_key: &[u8; 32],
     encrypted_card: Vec<u8>,
-) -> (EscrowKeys, Vec<ExchangeCommand>) {
-    let our_secret = x25519_dalek::StaticSecret::from(*secret_key_bytes);
+) -> Result<(EscrowKeys, Vec<ExchangeCommand>), LinkModeError> {
+    let our_secret = StaticSecret::from(*secret_key_bytes);
     let their_public = PublicKey::from(*peer_public_key);
     let shared_secret = our_secret.diffie_hellman(&their_public);
+
+    if !shared_secret.was_contributory() {
+        return Err(LinkModeError::NonContributoryDh);
+    }
 
     let keys = EscrowKeys::derive(shared_secret.as_bytes(), EscrowRole::Initiator);
 
@@ -92,7 +108,7 @@ pub fn initiator_complete(
         ttl_seconds: DEFAULT_TTL_SECONDS,
     }];
 
-    (keys, commands)
+    Ok((keys, commands))
 }
 
 // =========================================================================
@@ -154,19 +170,26 @@ pub fn parse_link_url(url: &str) -> Option<ParsedLinkUrl> {
 /// Performs ECDH, derives escrow keys, and produces commands to:
 /// 1. Deposit our ephemeral public key to the handshake slot
 /// 2. Deposit our encrypted card to the escrow gate
+///
+/// Returns `LinkModeError::NonContributoryDh` if the initiator's public key
+/// is a small-order point.
 pub fn responder_respond(
     parsed: &ParsedLinkUrl,
     encrypted_card: Vec<u8>,
-) -> (EscrowKeys, Vec<ExchangeCommand>) {
+) -> Result<(EscrowKeys, Vec<ExchangeCommand>), LinkModeError> {
     let secret = EphemeralSecret::random_from_rng(OsRng);
     let our_public = PublicKey::from(&secret);
     let their_public = PublicKey::from(parsed.initiator_public_key);
     let shared_secret = secret.diffie_hellman(&their_public);
 
+    if !shared_secret.was_contributory() {
+        return Err(LinkModeError::NonContributoryDh);
+    }
+
     let keys = EscrowKeys::derive(shared_secret.as_bytes(), EscrowRole::Responder);
 
     let handshake_slot = derive_handshake_slot(&parsed.nonce);
-    let epk_slot = derive_epk_slot();
+    let epk_slot = derive_epk_slot(&parsed.nonce);
 
     let commands = vec![
         // 1. Bootstrap: deposit our public key to handshake slot
@@ -185,7 +208,7 @@ pub fn responder_respond(
         },
     ];
 
-    (keys, commands)
+    Ok((keys, commands))
 }
 
 // =========================================================================
@@ -206,7 +229,10 @@ fn derive_handshake_slot(nonce: &[u8; 32]) -> String {
 
 /// Derive the slot hash for the ephemeral public key deposit.
 ///
-/// `epk_slot = H("epk")` — fixed, since only one party deposits here.
-fn derive_epk_slot() -> String {
-    hex::encode(Sha256::digest(b"epk"))
+/// `epk_slot = H(nonce || "epk")` — derived from the nonce so the relay
+/// cannot fingerprint Link mode exchanges by a constant slot hash.
+fn derive_epk_slot(nonce: &[u8; 32]) -> String {
+    let mut input = nonce.to_vec();
+    input.extend_from_slice(b"epk");
+    hex::encode(Sha256::digest(&input))
 }

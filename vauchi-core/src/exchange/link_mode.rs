@@ -101,18 +101,18 @@ pub fn initiator_generate() -> (LinkInitiation, Vec<ExchangeCommand>) {
     (initiation, commands)
 }
 
-/// Commands for initiator after receiving the responder's public key.
+/// Perform ECDH and derive escrow keys from the shared secret.
 ///
-/// Called when the handshake slot is polled and the responder's epk is found.
-/// Returns the escrow keys and commands to deposit the initiator's card.
+/// This is the first step after receiving the responder's public key.
+/// The returned `EscrowKeys` contains the `card_key` needed to encrypt
+/// the initiator's card before calling [`build_initiator_deposit`].
 ///
 /// Returns `LinkModeError::NonContributoryDh` if the peer's public key is
 /// a small-order point (attack mitigation — matches all other DH sites).
-pub fn initiator_complete(
+pub fn initiator_derive_keys(
     secret_key_bytes: &[u8; 32],
     peer_public_key: &[u8; 32],
-    encrypted_card: Vec<u8>,
-) -> Result<(EscrowKeys, Vec<ExchangeCommand>), LinkModeError> {
+) -> Result<EscrowKeys, LinkModeError> {
     let our_secret = StaticSecret::from(*secret_key_bytes);
     let their_public = PublicKey::from(*peer_public_key);
     let shared_secret = our_secret.diffie_hellman(&their_public);
@@ -121,15 +121,35 @@ pub fn initiator_complete(
         return Err(LinkModeError::NonContributoryDh);
     }
 
-    let keys = EscrowKeys::derive(shared_secret.as_bytes(), EscrowRole::Initiator);
+    Ok(EscrowKeys::derive(
+        shared_secret.as_bytes(),
+        EscrowRole::Initiator,
+    ))
+}
 
-    let commands = vec![ExchangeCommand::RelayEscrowDeposit {
+/// Build the deposit command for the initiator's encrypted card.
+///
+/// Call after [`initiator_derive_keys`] and encrypting the card with
+/// `EscrowKeys::encrypt_card`.
+pub fn build_initiator_deposit(keys: &EscrowKeys, encrypted_card: Vec<u8>) -> Vec<ExchangeCommand> {
+    vec![ExchangeCommand::RelayEscrowDeposit {
         gate_hash: hex::decode(&keys.gate_hash).expect("hex from hex::encode is always valid"),
         slot_hash: hex::decode(&keys.our_slot).expect("hex from hex::encode is always valid"),
         encrypted_card,
         ttl_seconds: DEFAULT_TTL_SECONDS,
-    }];
+    }]
+}
 
+/// Convenience: derive keys + build deposit in one call (for pre-encrypted cards).
+///
+/// Combines [`initiator_derive_keys`] + [`build_initiator_deposit`].
+pub fn initiator_complete(
+    secret_key_bytes: &[u8; 32],
+    peer_public_key: &[u8; 32],
+    encrypted_card: Vec<u8>,
+) -> Result<(EscrowKeys, Vec<ExchangeCommand>), LinkModeError> {
+    let keys = initiator_derive_keys(secret_key_bytes, peer_public_key)?;
+    let commands = build_initiator_deposit(&keys, encrypted_card);
     Ok((keys, commands))
 }
 

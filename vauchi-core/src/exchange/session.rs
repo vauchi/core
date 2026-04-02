@@ -676,6 +676,7 @@ impl ExchangeSession {
             ExchangeHardwareEvent::AccelerometerData { .. }
             | ExchangeHardwareEvent::ImpactDetected { .. }
             | ExchangeHardwareEvent::RelayEscrowReady { .. }
+            | ExchangeHardwareEvent::RelayEscrowBlobReceived { .. }
             | ExchangeHardwareEvent::RelayEscrowFailed { .. }
             | ExchangeHardwareEvent::LinkShared
             | ExchangeHardwareEvent::LinkOpened { .. } => Ok(()),

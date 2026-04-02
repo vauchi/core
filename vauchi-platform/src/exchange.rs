@@ -642,6 +642,10 @@ pub enum MobileExchangeHardwareEvent {
     RelayEscrowReady {
         gate_hash: Vec<u8>,
     },
+    RelayEscrowBlobReceived {
+        gate_hash: Vec<u8>,
+        blob: Vec<u8>,
+    },
     RelayEscrowFailed {
         gate_hash: Vec<u8>,
         reason: String,
@@ -710,6 +714,9 @@ impl From<MobileExchangeHardwareEvent> for ExchangeHardwareEvent {
             },
             MobileExchangeHardwareEvent::RelayEscrowReady { gate_hash } => {
                 Self::RelayEscrowReady { gate_hash }
+            }
+            MobileExchangeHardwareEvent::RelayEscrowBlobReceived { gate_hash, blob } => {
+                Self::RelayEscrowBlobReceived { gate_hash, blob }
             }
             MobileExchangeHardwareEvent::RelayEscrowFailed { gate_hash, reason } => {
                 Self::RelayEscrowFailed { gate_hash, reason }

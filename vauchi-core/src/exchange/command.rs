@@ -158,8 +158,6 @@ pub enum ExchangeHardwareEvent {
     // ── Relay escrow ────────────────────────────────────────────────
     /// Relay escrow gate has reached required deposit count.
     RelayEscrowReady { gate_hash: Vec<u8> },
-    /// Blob retrieved from relay escrow gate (response to `RelayEscrowRetrieve`).
-    RelayEscrowBlobReceived { gate_hash: Vec<u8>, blob: Vec<u8> },
     /// Relay escrow deposit/retrieve failed or gate expired.
     RelayEscrowFailed { gate_hash: Vec<u8>, reason: String },
 
@@ -168,6 +166,10 @@ pub enum ExchangeHardwareEvent {
     LinkShared,
     /// Link was opened by peer, providing their public key.
     LinkOpened { peer_public_key: Vec<u8> },
+
+    // ── Relay escrow (added after v0.13 — append-only to preserve discriminants) ──
+    /// Blob retrieved from relay escrow gate (response to `RelayEscrowRetrieve`).
+    RelayEscrowBlobReceived { gate_hash: Vec<u8>, blob: Vec<u8> },
 }
 
 // INLINE_TEST_REQUIRED: serde roundtrip tests need private enum variant access

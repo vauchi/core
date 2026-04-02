@@ -72,6 +72,9 @@ pub struct ExchangeEngine {
     /// Escrow keys derived after DH with responder (Link mode only).
     /// Populated on `LinkOpened` event, used for card retrieval + decryption.
     escrow_keys: Option<EscrowKeys>,
+    /// Decrypted card bytes from Link mode exchange (set on ExchangeComplete).
+    /// Callers check `link_received_card_bytes()` after Success to save the contact.
+    link_received_card: Option<Vec<u8>>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -157,6 +160,7 @@ impl ExchangeEngine {
             link_initiation,
             pending_link_commands,
             escrow_keys: None,
+            link_received_card: None,
         }
     }
 
@@ -193,6 +197,7 @@ impl ExchangeEngine {
                     link_initiation: None,
                     pending_link_commands: Vec::new(),
                     escrow_keys: None,
+                    link_received_card: None,
                 };
             }
             session.emit_initial_commands();
@@ -210,6 +215,7 @@ impl ExchangeEngine {
             link_initiation: None,
             pending_link_commands: Vec::new(),
             escrow_keys: None,
+            link_received_card: None,
         }
     }
 
@@ -236,6 +242,15 @@ impl ExchangeEngine {
     /// Returns a mutable reference to the protocol session, if any (ADR-031).
     pub fn session_mut(&mut self) -> Option<&mut ExchangeSession> {
         self.session.as_mut()
+    }
+
+    /// Returns the decrypted contact card bytes from a completed Link exchange.
+    ///
+    /// Available after `ExchangeComplete` is processed (step is `Success`).
+    /// The caller (AppEngine/PlatformAppEngine) should deserialize and save
+    /// the contact, matching the QR path's `session.extract_contact()` pattern.
+    pub fn link_received_card_bytes(&self) -> Option<&[u8]> {
+        self.link_received_card.as_deref()
     }
 
     pub fn selected_groups(&self) -> &[String] {
@@ -384,8 +399,8 @@ impl ExchangeEngine {
             LinkHardwareOutcome::RetrieveFromEscrow { commands } => {
                 ActionResult::ExchangeCommands { commands }
             }
-            LinkHardwareOutcome::ExchangeComplete { card_bytes: _ } => {
-                // TODO: save contact from card_bytes via AppEngine callback
+            LinkHardwareOutcome::ExchangeComplete { card_bytes } => {
+                self.link_received_card = Some(card_bytes);
                 self.step = ExchangeStep::Success;
                 ActionResult::UpdateScreen(self.build_screen())
             }

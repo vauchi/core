@@ -64,6 +64,13 @@ pub struct PersistedExchangeState {
     /// Their encrypted contact card blob (set once received).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub their_encrypted_card: Option<Vec<u8>>,
+    /// Link mode: initiator's ephemeral secret key (32 bytes, Zeroize on drop).
+    /// Needed to complete DH after crash recovery. Encrypted by SEK in storage.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub link_secret_key: Option<Vec<u8>>,
+    /// Link mode: random nonce (32 bytes) for handshake slot derivation.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub link_nonce: Option<Vec<u8>>,
     /// Proximity verification results collected so far.
     pub proximity_results: Vec<ProximityResult>,
     /// Unix timestamp (seconds) when the exchange was initiated.
@@ -121,6 +128,8 @@ mod tests {
             escrow_our_slot: None,
             escrow_their_slot: None,
             their_encrypted_card: None,
+            link_secret_key: None,
+            link_nonce: None,
             proximity_results: vec![],
             created_at: 1_000_000,
             ttl_seconds: 300,
@@ -144,6 +153,8 @@ mod tests {
             escrow_our_slot: None,
             escrow_their_slot: None,
             their_encrypted_card: None,
+            link_secret_key: None,
+            link_nonce: None,
             proximity_results: vec![],
             created_at: 1000,
             ttl_seconds: 60,
@@ -171,6 +182,8 @@ mod tests {
             escrow_our_slot: Some(vec![5, 6, 7, 8]),
             escrow_their_slot: Some(vec![9, 10, 11, 12]),
             their_encrypted_card: Some(vec![0xca, 0xfe]),
+            link_secret_key: Some(vec![0xAA; 32]),
+            link_nonce: Some(vec![0xBB; 32]),
             proximity_results: vec![ProximityResult {
                 method: ProximityMethod::Audio,
                 confidence: 0.75,

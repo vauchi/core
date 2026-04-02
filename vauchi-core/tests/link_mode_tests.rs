@@ -15,7 +15,7 @@ use vauchi_core::exchange::link_mode::*;
 // @internal
 #[test]
 fn generate_produces_valid_url() {
-    let init = initiator_generate();
+    let (init, _) = initiator_generate();
     assert!(
         init.url.starts_with("vauchi://exchange?"),
         "URL must use vauchi scheme"
@@ -27,8 +27,8 @@ fn generate_produces_valid_url() {
 // @internal
 #[test]
 fn two_generations_produce_different_urls() {
-    let a = initiator_generate();
-    let b = initiator_generate();
+    let (a, _) = initiator_generate();
+    let (b, _) = initiator_generate();
     assert_ne!(a.url, b.url, "Each generation uses fresh randomness");
     assert_ne!(
         a.secret_key_bytes, b.secret_key_bytes,
@@ -40,7 +40,7 @@ fn two_generations_produce_different_urls() {
 // @internal
 #[test]
 fn handshake_slot_is_64_hex_chars() {
-    let init = initiator_generate();
+    let (init, _) = initiator_generate();
     assert_eq!(init.handshake_slot.len(), 64);
     assert!(init.handshake_slot.chars().all(|c| c.is_ascii_hexdigit()));
 }
@@ -52,7 +52,7 @@ fn handshake_slot_is_64_hex_chars() {
 // @internal
 #[test]
 fn parse_valid_url_roundtrips() {
-    let init = initiator_generate();
+    let (init, _) = initiator_generate();
     let parsed = parse_link_url(&init.url).expect("valid URL must parse");
     assert_eq!(parsed.nonce, init.nonce, "nonce must roundtrip");
 }
@@ -94,7 +94,7 @@ fn parse_rejects_invalid_base64() {
 // @internal
 #[test]
 fn responder_produces_two_deposit_commands() {
-    let init = initiator_generate();
+    let (init, _) = initiator_generate();
     let parsed = parse_link_url(&init.url).unwrap();
 
     let (_, commands) = responder_respond(&parsed, b"encrypted_card".to_vec()).unwrap();
@@ -115,7 +115,7 @@ fn responder_produces_two_deposit_commands() {
 // @internal
 #[test]
 fn responder_handshake_deposit_contains_32_byte_epk() {
-    let init = initiator_generate();
+    let (init, _) = initiator_generate();
     let parsed = parse_link_url(&init.url).unwrap();
     let (_, commands) = responder_respond(&parsed, b"card".to_vec()).unwrap();
 
@@ -139,7 +139,7 @@ fn responder_handshake_deposit_contains_32_byte_epk() {
 fn initiator_complete_produces_one_deposit() {
     // Simulate: responder generated an epk, initiator retrieves it
     let peer_epk = [0x42u8; 32]; // fake responder public key
-    let init = initiator_generate();
+    let (init, _) = initiator_generate();
 
     let (_, commands) = initiator_complete(
         &init.secret_key_bytes,
@@ -165,7 +165,7 @@ fn initiator_and_responder_derive_same_gate_hash() {
     // the escrow gate despite using different code paths.
 
     // Step 1: Initiator generates URL
-    let init = initiator_generate();
+    let (init, _) = initiator_generate();
     let parsed = parse_link_url(&init.url).unwrap();
 
     // Step 2: Responder responds (produces commands + keys)
@@ -205,7 +205,7 @@ fn initiator_and_responder_derive_same_gate_hash() {
 // @internal
 #[test]
 fn handshake_slot_unrelated_to_gate_hash() {
-    let init = initiator_generate();
+    let (init, _) = initiator_generate();
     let parsed = parse_link_url(&init.url).unwrap();
     let (keys, _) = responder_respond(&parsed, b"card".to_vec()).unwrap();
 
@@ -256,13 +256,93 @@ fn handshake_slot_derived_from_nonce_not_secret() {
 }
 
 // ================================================================
+// Initiator presence deposit (D5 fix)
+// ================================================================
+
+// @internal
+#[test]
+fn initiator_generate_returns_presence_deposit_command() {
+    let (_init, commands) = initiator_generate();
+    assert_eq!(
+        commands.len(),
+        1,
+        "initiator must emit exactly 1 presence deposit command"
+    );
+    assert!(matches!(
+        &commands[0],
+        ExchangeCommand::RelayEscrowDeposit { .. }
+    ));
+}
+
+// @internal
+#[test]
+fn presence_deposit_targets_handshake_gate() {
+    let (init, commands) = initiator_generate();
+    if let ExchangeCommand::RelayEscrowDeposit { gate_hash, .. } = &commands[0] {
+        let handshake_gate = hex::decode(&init.handshake_slot).unwrap();
+        assert_eq!(
+            gate_hash, &handshake_gate,
+            "presence deposit must target the handshake gate"
+        );
+    } else {
+        panic!("expected RelayEscrowDeposit");
+    }
+}
+
+// @internal
+#[test]
+fn presence_deposit_uses_initiator_epk_as_blob() {
+    let (_init, commands) = initiator_generate();
+    if let ExchangeCommand::RelayEscrowDeposit { encrypted_card, .. } = &commands[0] {
+        assert_eq!(
+            encrypted_card.len(),
+            32,
+            "presence blob must be 32-byte public key"
+        );
+    } else {
+        panic!("expected RelayEscrowDeposit");
+    }
+}
+
+// @internal
+#[test]
+fn presence_and_responder_epk_use_different_slots() {
+    let (init, init_cmds) = initiator_generate();
+    let parsed = parse_link_url(&init.url).unwrap();
+    let (_, resp_cmds) = responder_respond(&parsed, b"card".to_vec()).unwrap();
+
+    // Extract slot hashes from handshake deposits
+    let init_slot = match &init_cmds[0] {
+        ExchangeCommand::RelayEscrowDeposit { slot_hash, .. } => slot_hash.clone(),
+        _ => panic!(),
+    };
+    let resp_slot = match &resp_cmds[0] {
+        ExchangeCommand::RelayEscrowDeposit { slot_hash, .. } => slot_hash.clone(),
+        _ => panic!(),
+    };
+
+    assert_ne!(
+        init_slot, resp_slot,
+        "presence slot and epk slot must be different (distinct domain tags)"
+    );
+}
+
+// @internal
+#[test]
+fn presence_slot_is_64_hex_chars() {
+    let (init, _) = initiator_generate();
+    assert_eq!(init.presence_slot.len(), 64);
+    assert!(init.presence_slot.chars().all(|c| c.is_ascii_hexdigit()));
+}
+
+// ================================================================
 // Security: small-order point rejection
 // ================================================================
 
 // @internal
 #[test]
 fn initiator_rejects_small_order_point() {
-    let init = initiator_generate();
+    let (init, _) = initiator_generate();
     // All-zeros is a small-order point on Curve25519
     let zero_key = [0u8; 32];
     let result = initiator_complete(&init.secret_key_bytes, &zero_key, b"card".to_vec());

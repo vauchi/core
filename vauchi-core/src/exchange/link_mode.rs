@@ -49,15 +49,23 @@ pub struct LinkInitiation {
     /// Ephemeral secret key bytes (zeroized on drop). Must be persisted
     /// for later ECDH when the responder's public key arrives.
     pub secret_key_bytes: Zeroizing<[u8; 32]>,
-    /// Handshake slot hash (hex) where the responder deposits their epk.
+    /// Handshake gate hash (hex) — gate where initiator presence + responder epk are deposited.
     pub handshake_slot: String,
+    /// Initiator's presence slot hash (hex) within the handshake gate.
+    /// Used for GET authentication when retrieving the responder's epk.
+    pub presence_slot: String,
 }
 
-/// Generate a Link mode URL and ephemeral keypair.
+/// Generate a Link mode URL, ephemeral keypair, and presence deposit command.
+///
+/// Returns the initiation data and a command to deposit the initiator's
+/// presence to the handshake gate. The presence deposit must be executed
+/// before sharing the URL — it creates the initiator's slot in the
+/// handshake gate so that GET works after the responder deposits their epk.
 ///
 /// The caller must persist `secret_key_bytes` and `nonce` for later
 /// use in [`initiator_complete`].
-pub fn initiator_generate() -> LinkInitiation {
+pub fn initiator_generate() -> (LinkInitiation, Vec<ExchangeCommand>) {
     // Use StaticSecret (not EphemeralSecret) because we need to persist
     // the secret key bytes for later ECDH. StaticSecret supports to_bytes().
     let secret = StaticSecret::random_from_rng(OsRng);
@@ -69,14 +77,28 @@ pub fn initiator_generate() -> LinkInitiation {
     let url = format!("{LINK_URL_PREFIX}?pk={pk_b64}&n={nonce_b64}");
 
     let handshake_slot = derive_handshake_slot(&nonce);
+    let presence_slot = derive_initiator_presence_slot(&nonce);
     let secret_bytes = Zeroizing::new(secret.to_bytes());
 
-    LinkInitiation {
+    // Deposit initiator's public key as presence in the handshake gate.
+    // This creates the initiator's slot so GET(handshake, presence_slot)
+    // works after the responder deposits their epk as the second slot.
+    let commands = vec![ExchangeCommand::RelayEscrowDeposit {
+        gate_hash: hex::decode(&handshake_slot).expect("hex from hex::encode is always valid"),
+        slot_hash: hex::decode(&presence_slot).expect("hex from hex::encode is always valid"),
+        encrypted_card: public.as_bytes().to_vec(),
+        ttl_seconds: DEFAULT_TTL_SECONDS,
+    }];
+
+    let initiation = LinkInitiation {
         url,
         nonce,
         secret_key_bytes: secret_bytes,
         handshake_slot,
-    }
+        presence_slot,
+    };
+
+    (initiation, commands)
 }
 
 /// Commands for initiator after receiving the responder's public key.
@@ -234,5 +256,18 @@ fn derive_handshake_slot(nonce: &[u8; 32]) -> String {
 fn derive_epk_slot(nonce: &[u8; 32]) -> String {
     let mut input = nonce.to_vec();
     input.extend_from_slice(b"epk");
+    hex::encode(Sha256::digest(&input))
+}
+
+/// Derive the initiator's presence slot in the handshake gate.
+///
+/// `presence_slot = H(nonce || "initiator_presence")`
+///
+/// The initiator deposits their public key to this slot before sharing
+/// the URL. This ensures the handshake gate has 2 slots (presence + epk)
+/// so the relay's GET authentication works correctly.
+fn derive_initiator_presence_slot(nonce: &[u8; 32]) -> String {
+    let mut input = nonce.to_vec();
+    input.extend_from_slice(b"initiator_presence");
     hex::encode(Sha256::digest(&input))
 }

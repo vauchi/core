@@ -11,6 +11,8 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use vauchi_core::exchange::{AudioBackend, AudioCapability, AudioConfig, ProximityError};
 
+use crate::error::LOCK_POISON_MSG;
+
 /// Callback interface for platform-specific audio operations.
 ///
 /// Implement this trait in Swift (iOS) or Kotlin (Android) to provide
@@ -378,7 +380,7 @@ impl MobileProximityVerifier {
         let Ok(guard) = self.backend.lock() else {
             return MobileProximityResult {
                 success: false,
-                error: "Internal error: lock poisoned".to_string(),
+                error: LOCK_POISON_MSG.into(),
             };
         };
         let backend = match guard.as_ref() {

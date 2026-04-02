@@ -9,6 +9,8 @@
 
 use std::sync::Mutex;
 
+use crate::error::LOCK_POISON_MSG;
+
 use vauchi_core::exchange::{MultiStageSession, ProtocolState, QrPayload};
 
 /// Mobile-friendly protocol state enum (UniFFI-compatible).
@@ -105,7 +107,7 @@ impl MobileMultiStageSession {
     pub fn process_scanned_qr(&self, raw: String) -> MobileProtocolState {
         let Ok(mut session) = self.inner.lock() else {
             return MobileProtocolState::Failed {
-                reason: "Internal error: lock poisoned".to_string(),
+                reason: LOCK_POISON_MSG.into(),
             };
         };
         session.process_scanned_qr(&raw).into()
@@ -115,7 +117,7 @@ impl MobileMultiStageSession {
     pub fn get_state(&self) -> MobileProtocolState {
         let Ok(session) = self.inner.lock() else {
             return MobileProtocolState::Failed {
-                reason: "Internal error: lock poisoned".to_string(),
+                reason: LOCK_POISON_MSG.into(),
             };
         };
         session.get_state().into()

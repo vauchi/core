@@ -18,6 +18,8 @@
 
 use std::sync::Mutex;
 
+use crate::error::LOCK_POISON_MSG;
+
 use vauchi_core::exchange::{
     BLE_CHUNK_OVERHEAD, BLE_DEFAULT_USABLE, BleCardPayload, BleChunker, BleExchangeResult,
     BleHandshakeSession, BleHandshakeState, BleReassembler, CHAR_DATA_NOTIFY, CHAR_DATA_WRITE,
@@ -229,7 +231,7 @@ impl MobileBleExchangeSession {
         self.delegate.on_state_changed(MobileBleState::Handshaking);
 
         let Ok(is_initiator_guard) = self.is_initiator.lock() else {
-            self.fail("Internal error: lock poisoned".into());
+            self.fail(LOCK_POISON_MSG.into());
             return;
         };
         let is_initiator = *is_initiator_guard;
@@ -238,7 +240,7 @@ impl MobileBleExchangeSession {
         if is_initiator {
             // Initiator: send KeyOffer via handshake write characteristic
             let Ok(mut inner) = self.inner.lock() else {
-                self.fail("Internal error: lock poisoned".into());
+                self.fail(LOCK_POISON_MSG.into());
                 return;
             };
             match inner.create_key_offer() {
@@ -292,7 +294,7 @@ impl MobileBleExchangeSession {
     pub fn on_mtu_negotiated(&self, mtu: u32) {
         let usable = (mtu as usize).saturating_sub(3);
         let Ok(mut mtu_usable) = self.mtu_usable.lock() else {
-            self.fail("Internal error: lock poisoned".into());
+            self.fail(LOCK_POISON_MSG.into());
             return;
         };
         *mtu_usable = usable.max(BLE_CHUNK_OVERHEAD + 1);
@@ -301,7 +303,7 @@ impl MobileBleExchangeSession {
     /// Called when the BLE connection is lost.
     pub fn on_disconnected(&self) {
         let Ok(inner) = self.inner.lock() else {
-            self.fail("Internal error: lock poisoned".into());
+            self.fail(LOCK_POISON_MSG.into());
             return;
         };
         if !matches!(inner.state(), BleHandshakeState::Complete { .. }) {
@@ -314,7 +316,7 @@ impl MobileBleExchangeSession {
     pub fn get_state(&self) -> MobileBleState {
         let Ok(inner) = self.inner.lock() else {
             return MobileBleState::Failed {
-                error: "Internal error: lock poisoned".into(),
+                error: LOCK_POISON_MSG.into(),
             };
         };
         map_state(inner.state())
@@ -337,7 +339,7 @@ impl MobileBleExchangeSession {
     /// Responder receives KeyOffer here, or initiator's commitment + encrypted card.
     fn handle_handshake_write(&self, data: Vec<u8>) {
         let Ok(is_initiator_guard) = self.is_initiator.lock() else {
-            self.fail("Internal error: lock poisoned".into());
+            self.fail(LOCK_POISON_MSG.into());
             return;
         };
         let is_initiator = *is_initiator_guard;
@@ -346,7 +348,7 @@ impl MobileBleExchangeSession {
         if !is_initiator {
             // Responder: check if this is a KeyOffer (Phase 1) or committed payload (Phase 3)
             let Ok(mut inner) = self.inner.lock() else {
-                self.fail("Internal error: lock poisoned".into());
+                self.fail(LOCK_POISON_MSG.into());
                 return;
             };
             match inner.state() {
@@ -357,7 +359,7 @@ impl MobileBleExchangeSession {
                             // Store our encrypted card for chunked transfer
                             let Ok(mut guard) = self.pending_encrypted.lock() else {
                                 drop(inner);
-                                self.fail("Internal error: lock poisoned".into());
+                                self.fail(LOCK_POISON_MSG.into());
                                 return;
                             };
                             *guard = Some(encrypted_card);
@@ -398,7 +400,7 @@ impl MobileBleExchangeSession {
                         // Store commitment, encrypted card arrives via data chunks
                         let Ok(mut guard) = self.pending_encrypted.lock() else {
                             drop(inner);
-                            self.fail("Internal error: lock poisoned".into());
+                            self.fail(LOCK_POISON_MSG.into());
                             return;
                         };
                         *guard = Some(commitment);
@@ -413,7 +415,7 @@ impl MobileBleExchangeSession {
     /// Initiator receives KeyAck here, or responder's reveal.
     fn handle_handshake_notify(&self, data: Vec<u8>) {
         let Ok(is_initiator_guard) = self.is_initiator.lock() else {
-            self.fail("Internal error: lock poisoned".into());
+            self.fail(LOCK_POISON_MSG.into());
             return;
         };
         let is_initiator = *is_initiator_guard;
@@ -421,7 +423,7 @@ impl MobileBleExchangeSession {
 
         if is_initiator {
             let Ok(inner) = self.inner.lock() else {
-                self.fail("Internal error: lock poisoned".into());
+                self.fail(LOCK_POISON_MSG.into());
                 return;
             };
             match inner.state() {
@@ -430,7 +432,7 @@ impl MobileBleExchangeSession {
                     // Store the ack, wait for data chunks to complete.
                     drop(inner);
                     let Ok(mut guard) = self.pending_encrypted.lock() else {
-                        self.fail("Internal error: lock poisoned".into());
+                        self.fail(LOCK_POISON_MSG.into());
                         return;
                     };
                     *guard = Some(data);
@@ -455,7 +457,7 @@ impl MobileBleExchangeSession {
         } else {
             // Responder: receive reveal from initiator (Phase 4)
             let Ok(inner) = self.inner.lock() else {
-                self.fail("Internal error: lock poisoned".into());
+                self.fail(LOCK_POISON_MSG.into());
                 return;
             };
             if matches!(inner.state(), BleHandshakeState::PayloadsExchanged { .. }) {
@@ -474,7 +476,7 @@ impl MobileBleExchangeSession {
         let total = u16::from_le_bytes([data[2], data[3]]);
 
         let Ok(mut reassembler_guard) = self.reassembler.lock() else {
-            self.fail("Internal error: lock poisoned".into());
+            self.fail(LOCK_POISON_MSG.into());
             return;
         };
         if reassembler_guard.is_none() {
@@ -505,7 +507,7 @@ impl MobileBleExchangeSession {
     /// Called when all chunks of the remote encrypted card have been received.
     fn on_remote_encrypted_card_received(&self, encrypted_card: Vec<u8>) {
         let Ok(is_initiator_guard) = self.is_initiator.lock() else {
-            self.fail("Internal error: lock poisoned".into());
+            self.fail(LOCK_POISON_MSG.into());
             return;
         };
         let is_initiator = *is_initiator_guard;
@@ -514,7 +516,7 @@ impl MobileBleExchangeSession {
         if is_initiator {
             // We have the KeyAck in pending_encrypted and now the full encrypted card.
             let Ok(mut pending_guard) = self.pending_encrypted.lock() else {
-                self.fail("Internal error: lock poisoned".into());
+                self.fail(LOCK_POISON_MSG.into());
                 return;
             };
             let ack_data = pending_guard.take();
@@ -525,7 +527,7 @@ impl MobileBleExchangeSession {
             };
 
             let Ok(mut inner) = self.inner.lock() else {
-                self.fail("Internal error: lock poisoned".into());
+                self.fail(LOCK_POISON_MSG.into());
                 return;
             };
             match inner.process_key_ack(&ack_bytes, &encrypted_card) {
@@ -545,7 +547,7 @@ impl MobileBleExchangeSession {
 
                     // Send our encrypted card chunks via data write
                     let Ok(mut guard) = self.pending_encrypted.lock() else {
-                        self.fail("Internal error: lock poisoned".into());
+                        self.fail(LOCK_POISON_MSG.into());
                         return;
                     };
                     *guard = Some(our_encrypted);
@@ -554,7 +556,7 @@ impl MobileBleExchangeSession {
 
                     // Reset reassembler for any further data
                     let Ok(mut guard) = self.reassembler.lock() else {
-                        self.fail("Internal error: lock poisoned".into());
+                        self.fail(LOCK_POISON_MSG.into());
                         return;
                     };
                     *guard = None;
@@ -568,7 +570,7 @@ impl MobileBleExchangeSession {
             // Responder: received initiator's encrypted card.
             // We should have the commitment in pending_encrypted.
             let Ok(mut pending_guard) = self.pending_encrypted.lock() else {
-                self.fail("Internal error: lock poisoned".into());
+                self.fail(LOCK_POISON_MSG.into());
                 return;
             };
             let commitment_data = pending_guard.take();
@@ -579,7 +581,7 @@ impl MobileBleExchangeSession {
             };
 
             let Ok(mut inner) = self.inner.lock() else {
-                self.fail("Internal error: lock poisoned".into());
+                self.fail(LOCK_POISON_MSG.into());
                 return;
             };
             match inner.process_committed_payload(&commitment, &encrypted_card) {
@@ -598,7 +600,7 @@ impl MobileBleExchangeSession {
 
                     // Reset reassembler
                     let Ok(mut guard) = self.reassembler.lock() else {
-                        self.fail("Internal error: lock poisoned".into());
+                        self.fail(LOCK_POISON_MSG.into());
                         return;
                     };
                     *guard = None;
@@ -614,7 +616,7 @@ impl MobileBleExchangeSession {
     /// Send the pending encrypted card in chunks via the specified characteristic.
     fn send_pending_encrypted(&self, characteristic: &str) {
         let Ok(mut pending_guard) = self.pending_encrypted.lock() else {
-            self.fail("Internal error: lock poisoned".into());
+            self.fail(LOCK_POISON_MSG.into());
             return;
         };
         let encrypted = pending_guard.take();
@@ -624,7 +626,7 @@ impl MobileBleExchangeSession {
         };
 
         let Ok(mtu_guard) = self.mtu_usable.lock() else {
-            self.fail("Internal error: lock poisoned".into());
+            self.fail(LOCK_POISON_MSG.into());
             return;
         };
         let mtu_usable = *mtu_guard;
@@ -646,7 +648,7 @@ impl MobileBleExchangeSession {
     /// Complete the exchange with the reveal data.
     fn complete_exchange(&self, reveal: Vec<u8>) {
         let Ok(mut inner) = self.inner.lock() else {
-            self.fail("Internal error: lock poisoned".into());
+            self.fail(LOCK_POISON_MSG.into());
             return;
         };
         match inner.complete_exchange(&reveal) {

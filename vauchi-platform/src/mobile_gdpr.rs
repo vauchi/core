@@ -90,6 +90,10 @@ impl VauchiPlatform {
     /// access to the platform's native secure storage (iOS Keychain,
     /// Android KeyStore) for SMK management.
     pub fn set_platform_keychain(&self, keychain: Box<dyn MobilePlatformKeychain>) {
+        // NOTE: Silent failure on lock poison means subsequent shred operations
+        // will fail with "keychain not set" instead of surfacing the root cause.
+        // Acceptable for now since poison here requires a prior panic in the same
+        // process, which is already a terminal state on mobile.
         let Ok(mut lock) = self.platform_keychain.lock() else {
             return;
         };

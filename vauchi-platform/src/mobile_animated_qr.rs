@@ -8,7 +8,7 @@
 
 use std::sync::Mutex;
 
-use crate::error::lock_or;
+use crate::error::{LOCK_POISON_MSG, lock_or};
 use vauchi_core::exchange::transport::animated_qr::{
     AnimatedQrConfig, AnimatedQrProgress, AnimatedQrSession,
 };
@@ -97,7 +97,7 @@ impl MobileAnimatedQrSender {
     pub fn frame_at(&self, index: u32) -> Result<String, MobileAnimatedQrError> {
         lock_or(&self.session)
             .map_err(|_| MobileAnimatedQrError::FrameError {
-                reason: "Internal error: lock poisoned".to_string(),
+                reason: LOCK_POISON_MSG.into(),
             })?
             .frame_at(index as usize)
             .map_err(|e| MobileAnimatedQrError::FrameError {
@@ -128,7 +128,7 @@ impl MobileAnimatedQrReceiver {
     ) -> Result<MobileAnimatedQrProgress, MobileAnimatedQrError> {
         lock_or(&self.session)
             .map_err(|_| MobileAnimatedQrError::FrameError {
-                reason: "Internal error: lock poisoned".to_string(),
+                reason: LOCK_POISON_MSG.into(),
             })?
             .process_frame(frame)
             .map(MobileAnimatedQrProgress::from)
@@ -141,7 +141,7 @@ impl MobileAnimatedQrReceiver {
     pub fn reassemble(&self) -> Result<Vec<u8>, MobileAnimatedQrError> {
         lock_or(&self.session)
             .map_err(|_| MobileAnimatedQrError::ReassemblyFailed {
-                reason: "Internal error: lock poisoned".to_string(),
+                reason: LOCK_POISON_MSG.into(),
             })?
             .reassemble()
             .map_err(|e| MobileAnimatedQrError::ReassemblyFailed {

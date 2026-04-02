@@ -39,9 +39,15 @@ impl VauchiPlatform {
             pinned_cert.as_deref(),
         ));
 
+        // Status update is best-effort — never override the real sync result
+        // if the status lock happens to be poisoned.
         match &result {
-            Ok(_) => *lock_or(&self.sync_status)? = MobileSyncStatus::Idle,
-            Err(_) => *lock_or(&self.sync_status)? = MobileSyncStatus::Error,
+            Ok(_) => {
+                let _ = lock_or(&self.sync_status).map(|mut g| *g = MobileSyncStatus::Idle);
+            }
+            Err(_) => {
+                let _ = lock_or(&self.sync_status).map(|mut g| *g = MobileSyncStatus::Error);
+            }
         }
 
         result
@@ -401,9 +407,15 @@ impl VauchiPlatform {
         )
         .await;
 
+        // Status update is best-effort — never override the real sync result
+        // if the status lock happens to be poisoned.
         match &result {
-            Ok(_) => *lock_or(&self.sync_status)? = MobileSyncStatus::Idle,
-            Err(_) => *lock_or(&self.sync_status)? = MobileSyncStatus::Error,
+            Ok(_) => {
+                let _ = lock_or(&self.sync_status).map(|mut g| *g = MobileSyncStatus::Idle);
+            }
+            Err(_) => {
+                let _ = lock_or(&self.sync_status).map(|mut g| *g = MobileSyncStatus::Error);
+            }
         }
 
         result

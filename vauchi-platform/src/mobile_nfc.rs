@@ -16,7 +16,7 @@ use vauchi_core::exchange::{
 use vauchi_core::identity::Identity;
 
 use crate::VauchiPlatform;
-use crate::error::{MobileError, lock_or};
+use crate::error::{LOCK_POISON_MSG, MobileError, lock_or};
 
 // === Callback Interface ===
 
@@ -107,7 +107,7 @@ impl MobileNfcHandshake {
     pub fn state(&self) -> MobileNfcState {
         let Ok(inner) = self.inner.lock() else {
             return MobileNfcState::Failed {
-                error: "Internal error: lock poisoned".into(),
+                error: LOCK_POISON_MSG.into(),
             };
         };
         map_state(inner.state())

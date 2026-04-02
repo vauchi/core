@@ -19,7 +19,7 @@ use vauchi_core::exchange::{
     VerifierMethod,
 };
 
-use crate::error::lock_or;
+use crate::error::{LOCK_POISON_MSG, lock_or};
 use vauchi_core::identity::Identity;
 
 use crate::error::MobileError;
@@ -250,7 +250,7 @@ impl MobileExchangeSession {
     pub fn state(&self) -> MobileExchangeState {
         let Ok(inner) = self.inner.lock() else {
             return MobileExchangeState::Failed {
-                error: "Internal error: lock poisoned".into(),
+                error: LOCK_POISON_MSG.into(),
             };
         };
         match inner.state() {
@@ -366,7 +366,7 @@ impl MobileExchangeSession {
     pub fn verification_confidence(
         &self,
     ) -> crate::mobile_verifier_event::MobileProximityConfidence {
-        let Ok(inner) = lock_or(&self.inner) else {
+        let Ok(inner) = self.inner.lock() else {
             return vauchi_core::exchange::ProximityConfidence::Unknown.into();
         };
         inner.proximity_confidence().into()

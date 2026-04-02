@@ -9,6 +9,12 @@
 //! action handler returning an outcome for the parent engine.
 
 use crate::ui::*;
+use vauchi_core::exchange::ExchangeHardwareEvent;
+use vauchi_core::exchange::command::ExchangeCommand;
+use vauchi_core::exchange::link_mode::LinkInitiation;
+
+/// Link mode polling interval (30s per design spec, backoff to 5 min).
+pub(super) const LINK_POLL_INTERVAL_MS: u32 = 30_000;
 
 /// Steps specific to the Link exchange sub-flow.
 #[derive(Clone, Debug, PartialEq)]
@@ -19,7 +25,6 @@ pub(super) enum LinkStep {
     WaitingForResponse,
     /// Retrieving and decrypting the responder's card.
     /// Entered when RelayEscrowReady event arrives (hardware event path).
-    #[allow(dead_code)]
     Retrieving,
 }
 
@@ -135,4 +140,64 @@ pub(super) enum LinkActionOutcome {
     ShareRequested,
     /// User cancelled the link exchange.
     Cancelled,
+}
+
+/// Outcome of a Link hardware event, interpreted by the parent engine.
+pub(super) enum LinkHardwareOutcome {
+    /// Start polling the handshake gate for the responder's epk.
+    PollHandshakeGate { commands: Vec<ExchangeCommand> },
+    /// Handshake gate ready — retrieve responder's epk.
+    RetrieveFromHandshake { commands: Vec<ExchangeCommand> },
+    /// Relay escrow failed — show error to user.
+    Failed { reason: String },
+}
+
+/// Handle a hardware event during Link mode.
+///
+/// Returns `Some(outcome)` if the event was handled, `None` if ignored.
+/// The parent engine interprets the outcome (state transitions, screen updates).
+pub(super) fn handle_link_hw_event(
+    li: &LinkInitiation,
+    event: &ExchangeHardwareEvent,
+) -> Option<LinkHardwareOutcome> {
+    match event {
+        ExchangeHardwareEvent::LinkShared => {
+            let gate =
+                hex::decode(&li.handshake_slot).expect("hex from hex::encode is always valid");
+            Some(LinkHardwareOutcome::PollHandshakeGate {
+                commands: vec![ExchangeCommand::RelayEscrowCheck {
+                    gate_hash: gate,
+                    suggested_interval_ms: LINK_POLL_INTERVAL_MS,
+                }],
+            })
+        }
+
+        ExchangeHardwareEvent::RelayEscrowReady { gate_hash } => {
+            let hs_gate =
+                hex::decode(&li.handshake_slot).expect("hex from hex::encode is always valid");
+            if *gate_hash == hs_gate {
+                // Handshake gate ready — retrieve responder's epk.
+                // GET authenticates with our presence_slot and returns
+                // the OTHER slot's blob (responder's epk).
+                let slot =
+                    hex::decode(&li.presence_slot).expect("hex from hex::encode is always valid");
+                return Some(LinkHardwareOutcome::RetrieveFromHandshake {
+                    commands: vec![ExchangeCommand::RelayEscrowRetrieve {
+                        gate_hash: gate_hash.clone(),
+                        slot_hash: slot,
+                    }],
+                });
+            }
+            // Escrow gate ready — handled after initiator_complete when escrow_keys are set
+            None
+        }
+
+        ExchangeHardwareEvent::RelayEscrowFailed { reason, .. } => {
+            Some(LinkHardwareOutcome::Failed {
+                reason: reason.clone(),
+            })
+        }
+
+        _ => None,
+    }
 }

@@ -10,7 +10,7 @@
 //! dispatch to platform hardware (camera, BLE, NFC, audio).
 
 use crate::ui::exchange_field_preview::{self, FieldPreviewConfig, FieldPreviewResult};
-use crate::ui::exchange_link::{self, LinkActionOutcome, LinkStep};
+use crate::ui::exchange_link::{self, LinkActionOutcome, LinkHardwareOutcome, LinkStep};
 use crate::ui::exchange_mode_selection::{ModeSelectionEngine, ModeSelectionResult};
 use crate::ui::exchange_qr::{self, QrActionOutcome, QrStep};
 use crate::ui::*;
@@ -301,61 +301,27 @@ impl ExchangeEngine {
 
     /// Handle Link mode hardware events (ADR-031).
     ///
-    /// Link mode doesn't use ExchangeSession — it has its own event handling.
-    /// Events arrive from frontends after executing relay commands.
+    /// Delegates to `exchange_link::handle_link_hw_event` for protocol logic,
+    /// then interprets the outcome (state transitions, command emission).
     fn handle_link_hardware_event(
         &mut self,
         event: vauchi_core::exchange::ExchangeHardwareEvent,
     ) -> Option<ActionResult> {
-        use vauchi_core::exchange::ExchangeHardwareEvent;
-
-        match event {
-            // User completed the share sheet — start polling handshake gate
-            ExchangeHardwareEvent::LinkShared => {
-                if let Some(ref li) = self.link_initiation {
-                    let gate = hex::decode(&li.handshake_slot)
-                        .expect("hex from hex::encode is always valid");
-                    return Some(ActionResult::ExchangeCommands {
-                        commands: vec![ExchangeCommand::RelayEscrowCheck { gate_hash: gate }],
-                    });
-                }
-                None
+        let li = self.link_initiation.as_ref()?;
+        let outcome = exchange_link::handle_link_hw_event(li, &event)?;
+        match outcome {
+            LinkHardwareOutcome::PollHandshakeGate { commands } => {
+                Some(ActionResult::ExchangeCommands { commands })
             }
-
-            // Handshake gate ready — retrieve responder's epk
-            ExchangeHardwareEvent::RelayEscrowReady { gate_hash } => {
-                if let Some(ref li) = self.link_initiation {
-                    let hs_gate = hex::decode(&li.handshake_slot)
-                        .expect("hex from hex::encode is always valid");
-                    if gate_hash == hs_gate {
-                        // Handshake gate ready — retrieve responder's epk.
-                        // GET authenticates with our presence_slot and returns
-                        // the OTHER slot's blob (responder's epk).
-                        self.step = ExchangeStep::Link(LinkStep::Retrieving);
-                        let slot = hex::decode(&li.presence_slot)
-                            .expect("hex from hex::encode is always valid");
-                        return Some(ActionResult::ExchangeCommands {
-                            commands: vec![ExchangeCommand::RelayEscrowRetrieve {
-                                gate_hash,
-                                slot_hash: slot,
-                            }],
-                        });
-                    }
-                    // Escrow gate ready — retrieve responder's encrypted card
-                    // (handled after initiator_complete when escrow_keys are set)
-                }
-                None
+            LinkHardwareOutcome::RetrieveFromHandshake { commands } => {
+                self.step = ExchangeStep::Link(LinkStep::Retrieving);
+                Some(ActionResult::ExchangeCommands { commands })
             }
-
-            // Relay escrow failed — show error
-            ExchangeHardwareEvent::RelayEscrowFailed { reason, .. } => {
+            LinkHardwareOutcome::Failed { reason } => {
                 self.failure_detail = Some(reason);
                 self.step = ExchangeStep::Failed;
                 Some(ActionResult::UpdateScreen(self.build_screen()))
             }
-
-            // Other events not relevant to Link mode
-            _ => None,
         }
     }
 

@@ -118,7 +118,10 @@ Delta-based sync for efficient updates.
 
 | Crate | Purpose |
 |-------|---------|
-| `ring` | Audited cryptographic operations |
+| `chacha20poly1305` | XChaCha20-Poly1305 authenticated encryption |
+| `ed25519-dalek` | Ed25519 digital signatures |
+| `x25519-dalek` | X25519 key agreement |
+| `sha2` / `hmac` / `hkdf` | Hashing and key derivation |
 | `rusqlite` | SQLite database |
 | `serde` | Serialization |
 | `uuid` | Unique identifiers |

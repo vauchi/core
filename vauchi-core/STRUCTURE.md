@@ -37,12 +37,12 @@ The main entry point for applications using Vauchi.
 | `error.rs` | Unified `VauchiError` type |
 
 ### `crypto/` - Cryptographic Primitives
-Low-level cryptographic operations using the `ring` crate.
+Low-level cryptographic operations using RustCrypto crates.
 
 | File | Purpose |
 |------|---------|
 | `signing.rs` | Ed25519 signatures (`SigningKey`, `VerifyingKey`) |
-| `encryption.rs` | AES-256-GCM encryption (`SymmetricKey`) |
+| `encryption.rs` | XChaCha20-Poly1305 encryption (`SymmetricKey`) |
 | `key_exchange.rs` | X25519 key agreement (`ExchangeKey`) |
 | `kdf.rs` | HKDF key derivation |
 | `chain.rs` | Symmetric ratchet chain |

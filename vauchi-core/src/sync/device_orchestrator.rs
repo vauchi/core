@@ -313,8 +313,7 @@ impl<'a> DeviceSyncOrchestrator<'a> {
     ///
     /// Uses the current device's exchange key to perform ECDH with the sender
     /// device's public key, derives a decryption key via HKDF, and decrypts
-    /// the data. Supports both XChaCha20-Poly1305 and legacy AES-256-GCM
-    /// via algorithm tag dispatch.
+    /// the data.
     pub fn decrypt_from_device(
         &self,
         sender_public_key: &[u8; 32],

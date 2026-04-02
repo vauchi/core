@@ -626,7 +626,12 @@ impl WorkflowEngine for ExchangeEngine {
             {
                 self.scanned_data = None;
                 self.failure_detail = None;
-                self.step = ExchangeStep::Qr(QrStep::ShowQr);
+                // Restore to the correct sub-flow based on selected mode
+                if self.config.mode == Some(ExchangeMode::Link) {
+                    self.step = ExchangeStep::Link(LinkStep::ShareUrl);
+                } else {
+                    self.step = ExchangeStep::Qr(QrStep::ShowQr);
+                }
                 ActionResult::NavigateTo(self.build_screen())
             }
             (ExchangeStep::Failed, UserAction::ActionPressed { action_id })

@@ -187,6 +187,10 @@ impl AppEngine {
                     .iter()
                     .map(|g| (g.id().to_string(), g.name().to_string()))
                     .collect();
+                let card_snapshot = card
+                    .as_ref()
+                    .cloned()
+                    .map(vauchi_core::exchange::card_snapshot::CardSnapshot::freeze);
                 let config = ExchangeConfig {
                     own_name: card
                         .as_ref()
@@ -196,7 +200,7 @@ impl AppEngine {
                     available_groups,
                     device_capabilities: device_capabilities.clone(),
                     mode: None, // triggers mode selection screen
-                    card_snapshot: None,
+                    card_snapshot,
                 };
 
                 // ADR-031: Create a protocol session if identity + card are available.

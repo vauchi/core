@@ -346,7 +346,7 @@ impl ExchangeEngine {
                     .card_snapshot
                     .as_ref()
                     .ok_or(vauchi_core::exchange::link_mode::LinkModeError::NoCardToSend)?;
-                let card_bytes = serde_json::to_vec(cs).map_err(|e| {
+                let card_bytes = cs.to_bytes().map_err(|e| {
                     vauchi_core::exchange::link_mode::LinkModeError::CardCryptoFailed(format!(
                         "card serialization: {e}"
                     ))

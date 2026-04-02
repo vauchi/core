@@ -286,7 +286,7 @@ impl MultipartDecoder {
 
 // === UniFFI Wrapper ===
 
-use crate::error::MobileError;
+use crate::error::{MobileError, lock_or};
 
 /// UniFFI-friendly wrapper around `MultipartDecoder`.
 ///
@@ -316,39 +316,40 @@ impl MobileMultipartDecoder {
 
     /// Add a scanned QR chunk string. Returns `true` if new, `false` if duplicate.
     pub fn add_chunk(&self, chunk: String) -> Result<bool, MobileError> {
-        self.inner
-            .lock()
-            .unwrap()
+        lock_or(&self.inner)?
             .add_chunk(&chunk)
             .map_err(|e| MobileError::InvalidInput(e.to_string()))
     }
 
     /// Number of unique chunks received so far.
     pub fn received(&self) -> u32 {
-        self.inner.lock().unwrap().received() as u32
+        let Ok(guard) = self.inner.lock() else {
+            return 0;
+        };
+        guard.received() as u32
     }
 
     /// Expected total number of chunks, if at least one has been received.
     pub fn expected_total(&self) -> Option<u32> {
-        self.inner
-            .lock()
-            .unwrap()
-            .expected_total()
-            .map(|t| t as u32)
+        let Ok(guard) = self.inner.lock() else {
+            return None;
+        };
+        guard.expected_total().map(|t| t as u32)
     }
 
     /// Whether all chunks have been received.
     pub fn is_complete(&self) -> bool {
-        self.inner.lock().unwrap().is_complete()
+        let Ok(guard) = self.inner.lock() else {
+            return false;
+        };
+        guard.is_complete()
     }
 
     /// Reassemble the complete payload from received chunks.
     ///
     /// Only valid when `is_complete()` returns `true`.
     pub fn assemble(&self) -> Result<Vec<u8>, MobileError> {
-        self.inner
-            .lock()
-            .unwrap()
+        lock_or(&self.inner)?
             .assemble()
             .map_err(|e| MobileError::InvalidInput(e.to_string()))
     }

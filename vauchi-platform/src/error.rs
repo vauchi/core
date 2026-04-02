@@ -76,6 +76,16 @@ pub enum MobileError {
         /// Seconds to wait before retrying.
         retry_after_secs: u64,
     },
+
+    #[error("Internal lock poisoned — a prior operation panicked")]
+    LockPoisoned,
+}
+
+/// Acquire a mutex lock, converting poison errors to `MobileError::LockPoisoned`.
+pub(crate) fn lock_or<T>(
+    mutex: &std::sync::Mutex<T>,
+) -> Result<std::sync::MutexGuard<'_, T>, MobileError> {
+    mutex.lock().map_err(|_| MobileError::LockPoisoned)
 }
 
 impl From<vauchi_core::network::NetworkError> for MobileError {

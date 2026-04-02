@@ -70,6 +70,7 @@ pub use diagnostic::{
     MobileTuningResult, diagnostic_generate_qr_test_patterns, diagnostic_generate_sweep_matrix,
     diagnostic_rank_configs, diagnostic_score_config,
 };
+use error::lock_or;
 pub use error::{KeychainError, MobileError};
 pub use exchange::{
     MobileBleExchangeStatus, MobileExchangeCommand, MobileExchangeHardwareEvent,
@@ -153,12 +154,18 @@ pub struct MobileDeviceLinkInitiator {
 impl MobileDeviceLinkInitiator {
     /// Returns the QR data string for display.
     pub fn qr_data(&self) -> String {
-        self.inner.lock().unwrap().qr().to_data_string()
+        let Ok(guard) = lock_or(&self.inner) else {
+            return String::new();
+        };
+        guard.qr().to_data_string()
     }
 
     /// Returns the 16-byte proximity challenge.
     pub fn proximity_challenge(&self) -> Vec<u8> {
-        self.inner.lock().unwrap().proximity_challenge().to_vec()
+        let Ok(guard) = lock_or(&self.inner) else {
+            return Vec::new();
+        };
+        guard.proximity_challenge().to_vec()
     }
 
     /// Decrypts an incoming link request and returns confirmation details.
@@ -168,13 +175,13 @@ impl MobileDeviceLinkInitiator {
         &self,
         encrypted_request: Vec<u8>,
     ) -> Result<MobileDeviceLinkConfirmation, MobileError> {
-        let initiator = self.inner.lock().unwrap();
+        let initiator = lock_or(&self.inner)?;
         let (confirmation, request) = initiator
             .prepare_confirmation(&encrypted_request)
             .map_err(|e| MobileError::ExchangeFailed(e.to_string()))?;
 
         // Store request for confirm_link
-        *self.pending_request.lock().unwrap() = Some(request);
+        *lock_or(&self.pending_request)? = Some(request);
 
         Ok(MobileDeviceLinkConfirmation {
             device_name: confirmation.device_name,
@@ -217,7 +224,7 @@ impl MobileDeviceLinkInitiator {
         confirmation_code: String,
         confirmed_at: u64,
     ) -> Result<MobileDeviceLinkResult, MobileError> {
-        let initiator = self.inner.lock().unwrap();
+        let initiator = lock_or(&self.inner)?;
         let mac = compute_confirmation_mac(initiator.qr().link_key(), &confirmation_code);
         drop(initiator); // Release lock before calling confirm_link_with_proof
 
@@ -235,13 +242,13 @@ impl MobileDeviceLinkInitiator {
         &self,
         proof: &ProximityProof,
     ) -> Result<MobileDeviceLinkResult, MobileError> {
-        let request = self.pending_request.lock().unwrap().take().ok_or_else(|| {
+        let request = lock_or(&self.pending_request)?.take().ok_or_else(|| {
             MobileError::ExchangeFailed(
                 "No pending request — call prepare_confirmation first".into(),
             )
         })?;
 
-        let initiator = self.inner.lock().unwrap();
+        let initiator = lock_or(&self.inner)?;
         let (encrypted_response, _registry, device_info) = initiator
             .confirm_link(&request, proof)
             .map_err(|e| MobileError::ExchangeFailed(e.to_string()))?;
@@ -266,25 +273,24 @@ pub struct MobileDeviceLinkResponder {
 impl MobileDeviceLinkResponder {
     /// Creates an encrypted request to send to the existing device.
     pub fn create_request(&self) -> Result<Vec<u8>, MobileError> {
-        self.inner
-            .lock()
-            .unwrap()
+        lock_or(&self.inner)?
             .create_request()
             .map_err(|e| MobileError::ExchangeFailed(e.to_string()))
     }
 
     /// Computes the confirmation code (must call create_request first).
     pub fn compute_confirmation_code(&self) -> Result<String, MobileError> {
-        self.inner
-            .lock()
-            .unwrap()
+        lock_or(&self.inner)?
             .compute_confirmation_code()
             .map_err(|e| MobileError::ExchangeFailed(e.to_string()))
     }
 
     /// Returns the identity fingerprint from the QR.
     pub fn identity_fingerprint(&self) -> String {
-        self.inner.lock().unwrap().identity_fingerprint()
+        let Ok(guard) = lock_or(&self.inner) else {
+            return String::new();
+        };
+        guard.identity_fingerprint()
     }
 
     /// Processes the encrypted response from the existing device.
@@ -292,7 +298,7 @@ impl MobileDeviceLinkResponder {
         &self,
         encrypted_response: Vec<u8>,
     ) -> Result<MobileDeviceJoinResult, MobileError> {
-        let responder = self.inner.lock().unwrap();
+        let responder = lock_or(&self.inner)?;
         let response = responder
             .process_response(&encrypted_response)
             .map_err(|e| MobileError::ExchangeFailed(e.to_string()))?;
@@ -878,7 +884,7 @@ impl VauchiPlatform {
 
     /// Gets the platform keychain bridge for shred operations.
     pub(crate) fn get_keychain_bridge(&self) -> Result<KeychainBridge, MobileError> {
-        let lock = self.platform_keychain.lock().unwrap();
+        let lock = lock_or(&self.platform_keychain)?;
         let callback = lock
             .as_ref()
             .ok_or_else(|| {
@@ -892,7 +898,7 @@ impl VauchiPlatform {
 
     /// Gets the identity from stored data.
     pub(crate) fn get_identity(&self) -> Result<Identity, MobileError> {
-        let data = self.identity_data.lock().unwrap();
+        let data = lock_or(&self.identity_data)?;
         let identity_data = data.as_ref().ok_or(MobileError::IdentityNotFound)?;
 
         let backup = IdentityBackup::new(identity_data.backup_data.clone());
@@ -902,7 +908,10 @@ impl VauchiPlatform {
 
     /// Get pinned certificate if set.
     pub(crate) fn get_pinned_cert(&self) -> Option<String> {
-        self.pinned_cert_pem.lock().unwrap().clone()
+        let Ok(guard) = lock_or(&self.pinned_cert_pem) else {
+            return None;
+        };
+        guard.clone()
     }
 
     /// Get our contact card, or create a default one from the identity.
@@ -1091,7 +1100,9 @@ impl VauchiPlatform {
     /// The certificate should be in PEM format. Once set, only connections
     /// to relay servers presenting this exact certificate will be allowed.
     pub fn set_pinned_certificate(&self, cert_pem: String) {
-        let mut pinned = self.pinned_cert_pem.lock().unwrap();
+        let Ok(mut pinned) = lock_or(&self.pinned_cert_pem) else {
+            return;
+        };
         if cert_pem.is_empty() {
             *pinned = None;
         } else {
@@ -1101,7 +1112,10 @@ impl VauchiPlatform {
 
     /// Check if certificate pinning is enabled.
     pub fn is_certificate_pinning_enabled(&self) -> bool {
-        self.pinned_cert_pem.lock().unwrap().is_some()
+        let Ok(guard) = lock_or(&self.pinned_cert_pem) else {
+            return false;
+        };
+        guard.is_some()
     }
 }
 

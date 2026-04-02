@@ -6,7 +6,7 @@
 
 use vauchi_core::{ContactCard, Identity};
 
-use super::error::MobileError;
+use super::error::{MobileError, lock_or};
 use super::types::{
     MobileAhaMoment, MobileAhaMomentType, MobileDemoContact, MobileDemoContactState,
 };
@@ -19,7 +19,9 @@ impl VauchiPlatform {
     /// Check if identity exists.
     pub fn has_identity(&self) -> bool {
         {
-            let data = self.identity_data.lock().unwrap();
+            let Ok(data) = self.identity_data.lock() else {
+                return false;
+            };
             if data.is_some() {
                 return true;
             }
@@ -32,7 +34,10 @@ impl VauchiPlatform {
                 backup_data,
                 display_name,
             };
-            *self.identity_data.lock().unwrap() = Some(identity_data);
+            let Ok(mut lock) = self.identity_data.lock() else {
+                return false;
+            };
+            *lock = Some(identity_data);
             return true;
         }
 
@@ -42,7 +47,7 @@ impl VauchiPlatform {
     /// Create a new identity.
     pub fn create_identity(&self, display_name: String) -> Result<(), MobileError> {
         {
-            let data = self.identity_data.lock().unwrap();
+            let data = lock_or(&self.identity_data)?;
             if data.is_some() {
                 return Err(MobileError::AlreadyInitialized);
             }
@@ -63,7 +68,7 @@ impl VauchiPlatform {
             backup_data,
             display_name: display_name.clone(),
         };
-        *self.identity_data.lock().unwrap() = Some(identity_data);
+        *lock_or(&self.identity_data)? = Some(identity_data);
 
         let card = ContactCard::new(&display_name);
         storage.save_own_card(&card)?;

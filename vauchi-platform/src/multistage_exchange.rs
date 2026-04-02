@@ -95,25 +95,37 @@ impl MobileMultiStageSession {
 
     /// Get the QR payload the app should display right now.
     pub fn get_display_qr(&self) -> Option<MobileQrPayload> {
-        let mut session = self.inner.lock().unwrap();
+        let Ok(mut session) = self.inner.lock() else {
+            return None;
+        };
         session.get_display_qr().map(MobileQrPayload::from)
     }
 
     /// Feed a scanned QR string into the protocol engine.
     pub fn process_scanned_qr(&self, raw: String) -> MobileProtocolState {
-        let mut session = self.inner.lock().unwrap();
+        let Ok(mut session) = self.inner.lock() else {
+            return MobileProtocolState::Failed {
+                reason: "Internal error: lock poisoned".to_string(),
+            };
+        };
         session.process_scanned_qr(&raw).into()
     }
 
     /// Poll current state.
     pub fn get_state(&self) -> MobileProtocolState {
-        let session = self.inner.lock().unwrap();
+        let Ok(session) = self.inner.lock() else {
+            return MobileProtocolState::Failed {
+                reason: "Internal error: lock poisoned".to_string(),
+            };
+        };
         session.get_state().into()
     }
 
     /// On Complete: retrieve the peer's decrypted contact card.
     pub fn get_received_data(&self) -> Option<Vec<u8>> {
-        let session = self.inner.lock().unwrap();
+        let Ok(session) = self.inner.lock() else {
+            return None;
+        };
         session.get_received_data()
     }
 
@@ -122,13 +134,17 @@ impl MobileMultiStageSession {
     /// Used by `VauchiPlatform::finalize_multistage_exchange` to derive
     /// the shared secret for the double ratchet.
     pub fn get_transport_key(&self) -> Option<Vec<u8>> {
-        let session = self.inner.lock().unwrap();
+        let Ok(session) = self.inner.lock() else {
+            return None;
+        };
         session.get_transport_key().map(|k| k.to_vec())
     }
 
     /// Abort and wipe session.
     pub fn cancel(&self) {
-        let mut session = self.inner.lock().unwrap();
+        let Ok(mut session) = self.inner.lock() else {
+            return;
+        };
         session.cancel();
     }
 }

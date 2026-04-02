@@ -8,7 +8,7 @@ use std::sync::Arc;
 
 use vauchi_core::{ContactCard, Identity, IdentityBackup};
 
-use super::error::MobileError;
+use super::error::{MobileError, lock_or};
 use super::types::{
     MobileDeliveryRecord, MobileDeliveryStatus, MobileDeliverySummary, MobileDeviceDeliveryRecord,
     MobileRetryEntry, MobileSyncResult, MobileSyncStatus,
@@ -21,7 +21,7 @@ impl VauchiPlatform {
 
     /// Sync with relay server.
     pub fn sync(&self) -> Result<MobileSyncResult, MobileError> {
-        *self.sync_status.lock().unwrap() = MobileSyncStatus::Syncing;
+        *lock_or(&self.sync_status)? = MobileSyncStatus::Syncing;
 
         let identity = self.get_identity()?;
         let pinned_cert = self.get_pinned_cert();
@@ -40,8 +40,8 @@ impl VauchiPlatform {
         ));
 
         match &result {
-            Ok(_) => *self.sync_status.lock().unwrap() = MobileSyncStatus::Idle,
-            Err(_) => *self.sync_status.lock().unwrap() = MobileSyncStatus::Error,
+            Ok(_) => *lock_or(&self.sync_status)? = MobileSyncStatus::Idle,
+            Err(_) => *lock_or(&self.sync_status)? = MobileSyncStatus::Error,
         }
 
         result
@@ -49,7 +49,10 @@ impl VauchiPlatform {
 
     /// Get sync status.
     pub fn get_sync_status(&self) -> MobileSyncStatus {
-        *self.sync_status.lock().unwrap()
+        let Ok(guard) = self.sync_status.lock() else {
+            return MobileSyncStatus::Error;
+        };
+        *guard
     }
 
     /// Get pending update count.
@@ -68,22 +71,34 @@ impl VauchiPlatform {
 
     /// Returns whether delivery receipts (ReceivedByRecipient ACKs) are enabled.
     pub fn is_delivery_receipts_enabled(&self) -> bool {
-        *self.delivery_receipts_enabled.lock().unwrap()
+        let Ok(guard) = self.delivery_receipts_enabled.lock() else {
+            return false;
+        };
+        *guard
     }
 
     /// Sets whether delivery receipts are enabled.
     pub fn set_delivery_receipts_enabled(&self, enabled: bool) {
-        *self.delivery_receipts_enabled.lock().unwrap() = enabled;
+        let Ok(mut guard) = self.delivery_receipts_enabled.lock() else {
+            return;
+        };
+        *guard = enabled;
     }
 
     /// Returns whether presence suppression is enabled.
     pub fn is_suppress_presence_enabled(&self) -> bool {
-        *self.suppress_presence.lock().unwrap()
+        let Ok(guard) = self.suppress_presence.lock() else {
+            return false;
+        };
+        *guard
     }
 
     /// Sets whether presence suppression is enabled.
     pub fn set_suppress_presence_enabled(&self, enabled: bool) {
-        *self.suppress_presence.lock().unwrap() = enabled;
+        let Ok(mut guard) = self.suppress_presence.lock() else {
+            return;
+        };
+        *guard = enabled;
     }
 
     // === Delivery Status Operations ===
@@ -321,7 +336,7 @@ impl VauchiPlatform {
     /// Import backup.
     pub fn import_backup(&self, backup_data: String, password: String) -> Result<(), MobileError> {
         {
-            let data = self.identity_data.lock().unwrap();
+            let data = lock_or(&self.identity_data)?;
             if data.is_some() {
                 return Err(MobileError::AlreadyInitialized);
             }
@@ -350,7 +365,7 @@ impl VauchiPlatform {
             backup_data: internal_backup_data,
             display_name: display_name.clone(),
         };
-        *self.identity_data.lock().unwrap() = Some(identity_data);
+        *lock_or(&self.identity_data)? = Some(identity_data);
 
         if storage.load_own_card()?.is_none() {
             let card = ContactCard::new(&display_name);
@@ -372,7 +387,7 @@ impl VauchiPlatform {
     /// Storage is opened in scoped blocks and dropped before `.await` to keep
     /// the future `Send` (required by UniFFI async exports).
     pub async fn sync_async(self: Arc<Self>) -> Result<MobileSyncResult, MobileError> {
-        *self.sync_status.lock().unwrap() = MobileSyncStatus::Syncing;
+        *lock_or(&self.sync_status)? = MobileSyncStatus::Syncing;
 
         let identity = self.get_identity()?;
         let pinned_cert = self.get_pinned_cert();
@@ -387,8 +402,8 @@ impl VauchiPlatform {
         .await;
 
         match &result {
-            Ok(_) => *self.sync_status.lock().unwrap() = MobileSyncStatus::Idle,
-            Err(_) => *self.sync_status.lock().unwrap() = MobileSyncStatus::Error,
+            Ok(_) => *lock_or(&self.sync_status)? = MobileSyncStatus::Idle,
+            Err(_) => *lock_or(&self.sync_status)? = MobileSyncStatus::Error,
         }
 
         result

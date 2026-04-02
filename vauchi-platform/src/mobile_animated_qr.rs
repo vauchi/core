@@ -7,6 +7,8 @@
 //! Wraps `AnimatedQrSession` for mobile (Android/iOS) usage.
 
 use std::sync::Mutex;
+
+use crate::error::lock_or;
 use vauchi_core::exchange::transport::animated_qr::{
     AnimatedQrConfig, AnimatedQrProgress, AnimatedQrSession,
 };
@@ -76,20 +78,27 @@ impl MobileAnimatedQrSender {
 
     /// Total number of frames in the sequence.
     pub fn frame_count(&self) -> u32 {
-        self.session.lock().unwrap().frame_count() as u32
+        let Ok(guard) = self.session.lock() else {
+            return 0;
+        };
+        guard.frame_count() as u32
     }
 
     /// Get the next frame string (cycles automatically).
     /// Returns `None` if the session has no frames (receiver-only).
     pub fn next_frame(&self) -> Option<String> {
-        self.session.lock().unwrap().next_frame()
+        let Ok(mut guard) = self.session.lock() else {
+            return None;
+        };
+        guard.next_frame()
     }
 
     /// Get a specific frame by index.
     pub fn frame_at(&self, index: u32) -> Result<String, MobileAnimatedQrError> {
-        self.session
-            .lock()
-            .unwrap()
+        lock_or(&self.session)
+            .map_err(|_| MobileAnimatedQrError::FrameError {
+                reason: "Internal error: lock poisoned".to_string(),
+            })?
             .frame_at(index as usize)
             .map_err(|e| MobileAnimatedQrError::FrameError {
                 reason: format!("{}", e),
@@ -117,9 +126,10 @@ impl MobileAnimatedQrReceiver {
         &self,
         frame: &str,
     ) -> Result<MobileAnimatedQrProgress, MobileAnimatedQrError> {
-        self.session
-            .lock()
-            .unwrap()
+        lock_or(&self.session)
+            .map_err(|_| MobileAnimatedQrError::FrameError {
+                reason: "Internal error: lock poisoned".to_string(),
+            })?
             .process_frame(frame)
             .map(MobileAnimatedQrProgress::from)
             .map_err(|e| MobileAnimatedQrError::FrameError {
@@ -129,11 +139,14 @@ impl MobileAnimatedQrReceiver {
 
     /// Reassemble the complete payload after all frames received.
     pub fn reassemble(&self) -> Result<Vec<u8>, MobileAnimatedQrError> {
-        self.session.lock().unwrap().reassemble().map_err(|e| {
-            MobileAnimatedQrError::ReassemblyFailed {
+        lock_or(&self.session)
+            .map_err(|_| MobileAnimatedQrError::ReassemblyFailed {
+                reason: "Internal error: lock poisoned".to_string(),
+            })?
+            .reassemble()
+            .map_err(|e| MobileAnimatedQrError::ReassemblyFailed {
                 reason: format!("{}", e),
-            }
-        })
+            })
     }
 }
 

@@ -16,7 +16,7 @@ use vauchi_core::exchange::{
 use vauchi_core::identity::Identity;
 
 use crate::VauchiPlatform;
-use crate::error::MobileError;
+use crate::error::{MobileError, lock_or};
 
 // === Callback Interface ===
 
@@ -105,14 +105,18 @@ pub struct MobileNfcHandshake {
 impl MobileNfcHandshake {
     /// Get the current state of the handshake.
     pub fn state(&self) -> MobileNfcState {
-        let inner = self.inner.lock().unwrap();
+        let Ok(inner) = self.inner.lock() else {
+            return MobileNfcState::Failed {
+                error: "Internal error: lock poisoned".into(),
+            };
+        };
         map_state(inner.state())
     }
 
     /// Phase 1 (Initiator): Create key offer APDU payload.
     pub fn create_key_offer(&self) -> Result<Vec<u8>, MobileError> {
-        let mut inner = self.inner.lock().unwrap();
-        let identity = self.identity.lock().unwrap();
+        let mut inner = lock_or(&self.inner)?;
+        let identity = lock_or(&self.identity)?;
         inner
             .create_key_offer(&identity)
             .map_err(exchange_error_to_mobile)
@@ -123,8 +127,8 @@ impl MobileNfcHandshake {
         &self,
         their_offer_bytes: Vec<u8>,
     ) -> Result<MobileNfcKeyAckResult, MobileError> {
-        let mut inner = self.inner.lock().unwrap();
-        let identity = self.identity.lock().unwrap();
+        let mut inner = lock_or(&self.inner)?;
+        let identity = lock_or(&self.identity)?;
         let (ack_bytes, encrypted_card) = inner
             .process_key_offer(&identity, &their_offer_bytes)
             .map_err(exchange_error_to_mobile)?;
@@ -142,7 +146,7 @@ impl MobileNfcHandshake {
         their_ack_bytes: Vec<u8>,
         their_encrypted_card: Vec<u8>,
     ) -> Result<Vec<u8>, MobileError> {
-        let mut inner = self.inner.lock().unwrap();
+        let mut inner = lock_or(&self.inner)?;
         inner
             .process_key_ack(&their_ack_bytes, &their_encrypted_card)
             .map_err(exchange_error_to_mobile)
@@ -153,7 +157,7 @@ impl MobileNfcHandshake {
         &self,
         their_encrypted_card: Vec<u8>,
     ) -> Result<MobileNfcExchangeResult, MobileError> {
-        let mut inner = self.inner.lock().unwrap();
+        let mut inner = lock_or(&self.inner)?;
         let result = inner
             .process_encrypted_card(&their_encrypted_card)
             .map_err(exchange_error_to_mobile)?;
@@ -162,7 +166,7 @@ impl MobileNfcHandshake {
 
     /// Confirm that Phase 3 send succeeded (Initiator).
     pub fn confirm_send_success(&self) -> Result<MobileNfcExchangeResult, MobileError> {
-        let mut inner = self.inner.lock().unwrap();
+        let mut inner = lock_or(&self.inner)?;
         let result = inner
             .confirm_send_success()
             .map_err(exchange_error_to_mobile)?;
@@ -173,7 +177,7 @@ impl MobileNfcHandshake {
     ///
     /// Returns the exchange_id bytes (for relay routing).
     pub fn enter_relay_fallback(&self) -> Result<Vec<u8>, MobileError> {
-        let mut inner = self.inner.lock().unwrap();
+        let mut inner = lock_or(&self.inner)?;
         let (exchange_id, _shared_key) = inner
             .enter_relay_fallback()
             .map_err(exchange_error_to_mobile)?;

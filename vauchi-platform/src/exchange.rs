@@ -18,6 +18,8 @@ use vauchi_core::exchange::{
     ExchangeState, ManualConfirmationVerifier, ProximityError, ProximityVerifier, VerifierChain,
     VerifierMethod,
 };
+
+use crate::error::lock_or;
 use vauchi_core::identity::Identity;
 
 use crate::error::MobileError;
@@ -232,7 +234,7 @@ impl MobileExchangeSession {
 
     /// Extract the contact from a completed session (used by finalize_exchange).
     pub fn extract_contact(&self) -> Result<Contact, MobileError> {
-        let inner = self.inner.lock().unwrap();
+        let inner = lock_or(&self.inner)?;
         match inner.state() {
             ExchangeState::Complete { contact } => Ok(contact.clone()),
             _ => Err(MobileError::ExchangeFailed(
@@ -246,7 +248,11 @@ impl MobileExchangeSession {
 impl MobileExchangeSession {
     /// Get the current state of the exchange session.
     pub fn state(&self) -> MobileExchangeState {
-        let inner = self.inner.lock().unwrap();
+        let Ok(inner) = self.inner.lock() else {
+            return MobileExchangeState::Failed {
+                error: "Internal error: lock poisoned".into(),
+            };
+        };
         match inner.state() {
             ExchangeState::Idle => MobileExchangeState::Idle,
             ExchangeState::DisplayingQr { our_qr } => MobileExchangeState::DisplayingQr {
@@ -271,7 +277,7 @@ impl MobileExchangeSession {
 
     /// Generate and display a QR code. Transitions Idle -> DisplayingQr.
     pub fn generate_qr(&self) -> Result<String, MobileError> {
-        let mut inner = self.inner.lock().unwrap();
+        let mut inner = lock_or(&self.inner)?;
         inner
             .apply(ExchangeEvent::StartQR)
             .map_err(|e| MobileError::ExchangeFailed(format!("{:?}", e)))?;
@@ -288,7 +294,7 @@ impl MobileExchangeSession {
         let data_str = qr_data.strip_prefix("wb://").unwrap_or(&qr_data);
         let qr = ExchangeQR::from_data_string(data_str).map_err(|_| MobileError::InvalidQrCode)?;
 
-        let mut inner = self.inner.lock().unwrap();
+        let mut inner = lock_or(&self.inner)?;
         inner
             .apply(ExchangeEvent::ProcessQR(qr))
             .map_err(|e| MobileError::ExchangeFailed(format!("{:?}", e)))
@@ -296,7 +302,7 @@ impl MobileExchangeSession {
 
     /// Signal that the other party scanned our QR. Transitions PeerScanned -> AwaitingKeyAgreement.
     pub fn they_scanned_our_qr(&self) -> Result<(), MobileError> {
-        let mut inner = self.inner.lock().unwrap();
+        let mut inner = lock_or(&self.inner)?;
         inner
             .apply(ExchangeEvent::TheyScannedOurQR)
             .map_err(|e| MobileError::ExchangeFailed(format!("{:?}", e)))
@@ -304,7 +310,7 @@ impl MobileExchangeSession {
 
     /// Perform key agreement. Transitions AwaitingKeyAgreement -> AwaitingCardExchange.
     pub fn perform_key_agreement(&self) -> Result<(), MobileError> {
-        let mut inner = self.inner.lock().unwrap();
+        let mut inner = lock_or(&self.inner)?;
         inner
             .apply(ExchangeEvent::PerformKeyAgreement)
             .map_err(|e| MobileError::ExchangeFailed(format!("{:?}", e)))
@@ -316,7 +322,7 @@ impl MobileExchangeSession {
     /// The real card will be received via relay sync.
     pub fn complete_card_exchange(&self, their_card_name: String) -> Result<(), MobileError> {
         let card = ContactCard::new(&their_card_name);
-        let mut inner = self.inner.lock().unwrap();
+        let mut inner = lock_or(&self.inner)?;
         inner
             .apply(ExchangeEvent::CompleteExchange(card))
             .map_err(|e| MobileError::ExchangeFailed(format!("{:?}", e)))
@@ -338,18 +344,20 @@ impl MobileExchangeSession {
 
     /// Check if the session has timed out.
     pub fn is_timed_out(&self) -> bool {
-        self.inner.lock().unwrap().is_timed_out()
+        let Ok(inner) = self.inner.lock() else {
+            return true;
+        };
+        inner.is_timed_out()
     }
 
     /// Returns the peer's display name extracted from their QR code.
     ///
     /// Available after `process_qr()` has been called successfully.
     pub fn peer_display_name(&self) -> Option<String> {
-        self.inner
-            .lock()
-            .unwrap()
-            .their_display_name()
-            .map(String::from)
+        let Ok(inner) = self.inner.lock() else {
+            return None;
+        };
+        inner.their_display_name().map(String::from)
     }
 
     /// Returns the proximity confidence from the last verification.
@@ -358,7 +366,10 @@ impl MobileExchangeSession {
     pub fn verification_confidence(
         &self,
     ) -> crate::mobile_verifier_event::MobileProximityConfidence {
-        self.inner.lock().unwrap().proximity_confidence().into()
+        let Ok(inner) = lock_or(&self.inner) else {
+            return vauchi_core::exchange::ProximityConfidence::Unknown.into();
+        };
+        inner.proximity_confidence().into()
     }
 
     /// Enable exchange debug logging.
@@ -368,29 +379,30 @@ impl MobileExchangeSession {
     /// (QR generation, scan, key agreement, proximity, completion/failure).
     /// Call once before `generate_qr()`. Idempotent.
     pub fn enable_debug_log(&self) {
-        self.inner.lock().unwrap().enable_debug_log();
+        let Ok(mut inner) = self.inner.lock() else {
+            return;
+        };
+        inner.enable_debug_log();
     }
 
     /// Returns the exchange debug log as JSONL, if enabled.
     ///
     /// Production API: intended for diagnostic export (share sheet, clipboard).
     pub fn get_exchange_debug_jsonl(&self) -> Option<String> {
-        self.inner
-            .lock()
-            .unwrap()
-            .exchange_debug_log()
-            .map(|log| log.to_jsonl())
+        let Ok(inner) = self.inner.lock() else {
+            return None;
+        };
+        inner.exchange_debug_log().map(|log| log.to_jsonl())
     }
 
     /// Returns the exchange debug log as Markdown, if enabled.
     ///
     /// Production API: intended for diagnostic export (share sheet, clipboard).
     pub fn get_exchange_debug_markdown(&self) -> Option<String> {
-        self.inner
-            .lock()
-            .unwrap()
-            .exchange_debug_log()
-            .map(|log| log.to_markdown())
+        let Ok(inner) = self.inner.lock() else {
+            return None;
+        };
+        inner.exchange_debug_log().map(|log| log.to_markdown())
     }
 
     // ── ADR-031: Command/Event API ──────────────────────────────────
@@ -403,9 +415,10 @@ impl MobileExchangeSession {
     ///
     /// Returns an empty list if no commands are pending.
     pub fn drain_pending_commands(&self) -> Vec<MobileExchangeCommand> {
-        self.inner
-            .lock()
-            .unwrap()
+        let Ok(mut inner) = self.inner.lock() else {
+            return Vec::new();
+        };
+        inner
             .drain_commands()
             .into_iter()
             .map(MobileExchangeCommand::from)
@@ -423,9 +436,7 @@ impl MobileExchangeSession {
         &self,
         event: MobileExchangeHardwareEvent,
     ) -> Result<(), MobileError> {
-        self.inner
-            .lock()
-            .unwrap()
+        lock_or(&self.inner)?
             .apply_hardware_event(event.into())
             .map_err(|e| MobileError::ExchangeFailed(format!("{:?}", e)))
     }
@@ -438,9 +449,10 @@ impl MobileExchangeSession {
     pub fn get_verification_events(
         &self,
     ) -> Vec<crate::mobile_verifier_event::MobileProximityVerifierEvent> {
-        self.inner
-            .lock()
-            .unwrap()
+        let Ok(inner) = self.inner.lock() else {
+            return Vec::new();
+        };
+        inner
             .proximity_event_log()
             .map(|log| log.events().iter().cloned().map(Into::into).collect())
             .unwrap_or_default()

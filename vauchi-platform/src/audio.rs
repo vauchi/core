@@ -342,9 +342,10 @@ impl MobileProximityVerifier {
 
     /// Check if proximity verification is supported.
     pub fn is_supported(&self) -> bool {
-        self.backend
-            .lock()
-            .unwrap()
+        let Ok(guard) = self.backend.lock() else {
+            return false;
+        };
+        guard
             .as_ref()
             .map(|b| b.capability != AudioCapability::None)
             .unwrap_or(false)
@@ -354,9 +355,10 @@ impl MobileProximityVerifier {
     ///
     /// Returns: "full", "emit_only", "receive_only", or "none"
     pub fn get_capability(&self) -> String {
-        self.backend
-            .lock()
-            .unwrap()
+        let Ok(guard) = self.backend.lock() else {
+            return "none".to_string();
+        };
+        guard
             .as_ref()
             .map(|b| match b.capability {
                 AudioCapability::Full => "full",
@@ -373,7 +375,12 @@ impl MobileProximityVerifier {
     ///
     /// The challenge should be 16 bytes from the QR code.
     pub fn emit_challenge(&self, challenge: Vec<u8>) -> MobileProximityResult {
-        let guard = self.backend.lock().unwrap();
+        let Ok(guard) = self.backend.lock() else {
+            return MobileProximityResult {
+                success: false,
+                error: "Internal error: lock poisoned".to_string(),
+            };
+        };
         let backend = match guard.as_ref() {
             Some(b) => b,
             None => {
@@ -410,7 +417,9 @@ impl MobileProximityVerifier {
     ///
     /// Returns the received challenge bytes, or empty on timeout.
     pub fn listen_for_response(&self, timeout_ms: u64) -> Vec<u8> {
-        let guard = self.backend.lock().unwrap();
+        let Ok(guard) = self.backend.lock() else {
+            return Vec::new();
+        };
         let backend = match guard.as_ref() {
             Some(b) => b,
             None => return Vec::new(),
@@ -436,7 +445,10 @@ impl MobileProximityVerifier {
 
     /// Stop any ongoing audio operation.
     pub fn stop(&self) {
-        if let Some(backend) = self.backend.lock().unwrap().as_ref() {
+        let Ok(guard) = self.backend.lock() else {
+            return;
+        };
+        if let Some(backend) = guard.as_ref() {
             backend.stop();
         }
     }

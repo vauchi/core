@@ -6,7 +6,7 @@
 
 use std::sync::Arc;
 
-use super::error::MobileError;
+use super::error::{MobileError, lock_or};
 use super::types::{
     MobileConsentRecord, MobileConsentStatus, MobileConsentType, MobileDeletionInfo,
     MobileGdprExport, MobileShredReport, MobileShredStatus, MobileShredToken,
@@ -90,7 +90,9 @@ impl VauchiPlatform {
     /// access to the platform's native secure storage (iOS Keychain,
     /// Android KeyStore) for SMK management.
     pub fn set_platform_keychain(&self, keychain: Box<dyn MobilePlatformKeychain>) {
-        let mut lock = self.platform_keychain.lock().unwrap();
+        let Ok(mut lock) = self.platform_keychain.lock() else {
+            return;
+        };
         *lock = Some(Arc::from(keychain));
     }
 
@@ -147,7 +149,7 @@ impl VauchiPlatform {
         let (mut revocation_sender, rev_error) = match MobileRevocationSender::new(
             &self.relay_url,
             &identity.public_id(),
-            self.pinned_cert_pem.lock().unwrap().clone(),
+            lock_or(&self.pinned_cert_pem)?.clone(),
         ) {
             Ok(sender) => (Some(sender), None),
             Err(e) => (None, Some(e.to_string())),
@@ -188,7 +190,7 @@ impl VauchiPlatform {
         let (mut revocation_sender, rev_error) = match MobileRevocationSender::new(
             &self.relay_url,
             &identity.public_id(),
-            self.pinned_cert_pem.lock().unwrap().clone(),
+            lock_or(&self.pinned_cert_pem)?.clone(),
         ) {
             Ok(sender) => (Some(sender), None),
             Err(e) => (None, Some(e.to_string())),

@@ -49,6 +49,7 @@ fn mixed_unicode_strategy() -> impl Strategy<Value = String> {
 
 proptest! {
     /// CJK text survives normalize → serialize → deserialize → normalize.
+    // @internal
     #[test]
     fn prop_cjk_normalization_roundtrip(name in cjk_strategy()) {
         let normalized = normalize_text(&name);
@@ -59,6 +60,7 @@ proptest! {
     }
 
     /// Arabic text survives normalize → serialize → deserialize → normalize.
+    // @internal
     #[test]
     fn prop_arabic_normalization_roundtrip(name in arabic_strategy()) {
         let normalized = normalize_text(&name);
@@ -69,6 +71,7 @@ proptest! {
     }
 
     /// Devanagari text survives normalize → serialize → deserialize → normalize.
+    // @internal
     #[test]
     fn prop_devanagari_normalization_roundtrip(name in devanagari_strategy()) {
         let normalized = normalize_text(&name);
@@ -79,6 +82,7 @@ proptest! {
     }
 
     /// Thai text survives normalize → serialize → deserialize → normalize.
+    // @internal
     #[test]
     fn prop_thai_normalization_roundtrip(name in thai_strategy()) {
         let normalized = normalize_text(&name);
@@ -89,6 +93,7 @@ proptest! {
     }
 
     /// Mixed Unicode letters survive roundtrip.
+    // @internal
     #[test]
     fn prop_mixed_unicode_normalization_roundtrip(name in mixed_unicode_strategy()) {
         let normalized = normalize_text(&name);
@@ -104,6 +109,7 @@ proptest! {
 // 2. Emoji & ZWJ sequences
 // ============================================================
 
+// @internal
 #[test]
 fn test_family_emoji_zwj_roundtrip() {
     // Family: man + ZWJ + woman + ZWJ + girl + ZWJ + boy
@@ -114,6 +120,7 @@ fn test_family_emoji_zwj_roundtrip() {
     assert_eq!(restored.display_name(), normalize_text(family));
 }
 
+// @internal
 #[test]
 fn test_flag_sequence_roundtrip() {
     // Swiss flag: Regional Indicator C + H
@@ -124,6 +131,7 @@ fn test_flag_sequence_roundtrip() {
     assert_eq!(restored.display_name(), normalize_text(flag));
 }
 
+// @internal
 #[test]
 fn test_skin_tone_modifier_roundtrip() {
     // Waving hand + medium skin tone
@@ -134,6 +142,7 @@ fn test_skin_tone_modifier_roundtrip() {
     assert_eq!(restored.display_name(), normalize_text(emoji));
 }
 
+// @internal
 #[test]
 fn test_emoji_in_field_value_roundtrip() {
     let emoji_value = "Call me \u{1F4DE} or \u{1F4E7}";
@@ -151,6 +160,7 @@ fn test_emoji_in_field_value_roundtrip() {
 // 3. Homoglyph confusion — cross-script
 // ============================================================
 
+// @internal
 #[test]
 fn test_latin_vs_cyrillic_homoglyphs_differ() {
     let latin_a = "a"; // U+0061
@@ -162,6 +172,7 @@ fn test_latin_vs_cyrillic_homoglyphs_differ() {
     assert_ne!(norm_latin, norm_cyrillic);
 }
 
+// @internal
 #[test]
 fn test_latin_vs_cyrillic_display_names_differ() {
     let card_latin = ContactCard::new("Alice");
@@ -175,6 +186,7 @@ fn test_latin_vs_cyrillic_display_names_differ() {
     );
 }
 
+// @internal
 #[test]
 fn test_greek_vs_latin_omicron_differ() {
     let latin_o = "o"; // U+006F
@@ -187,6 +199,7 @@ fn test_greek_vs_latin_omicron_differ() {
 // 4. Combining characters — NFC composition
 // ============================================================
 
+// @internal
 #[test]
 fn test_combining_acute_normalizes_to_precomposed() {
     let decomposed = "e\u{0301}"; // e + combining acute
@@ -199,6 +212,7 @@ fn test_combining_acute_normalizes_to_precomposed() {
     );
 }
 
+// @internal
 #[test]
 fn test_combining_diaeresis_normalizes() {
     let decomposed = "u\u{0308}"; // u + combining diaeresis
@@ -207,6 +221,7 @@ fn test_combining_diaeresis_normalizes() {
     assert_eq!(normalize_text(decomposed), normalize_text(precomposed));
 }
 
+// @internal
 #[test]
 fn test_multiple_combining_marks() {
     // a + combining ring above + combining acute = normalization to NFC
@@ -216,6 +231,7 @@ fn test_multiple_combining_marks() {
     assert_eq!(once, twice, "NFC normalization must be idempotent");
 }
 
+// @internal
 #[test]
 fn test_combining_chars_in_card_roundtrip() {
     let nfd_name = "Jose\u{0301}"; // NFD form
@@ -232,6 +248,7 @@ fn test_combining_chars_in_card_roundtrip() {
 // 5. Zero-width characters — preserved by NFC
 // ============================================================
 
+// @internal
 #[test]
 fn test_zwj_preserved_in_normalization() {
     let with_zwj = "test\u{200D}name"; // ZWJ between words
@@ -242,6 +259,7 @@ fn test_zwj_preserved_in_normalization() {
     );
 }
 
+// @internal
 #[test]
 fn test_zwnj_preserved_in_normalization() {
     let with_zwnj = "test\u{200C}name"; // ZWNJ
@@ -252,6 +270,7 @@ fn test_zwnj_preserved_in_normalization() {
     );
 }
 
+// @internal
 #[test]
 fn test_zws_preserved_in_normalization() {
     let with_zws = "test\u{200B}name"; // Zero-width space
@@ -262,6 +281,7 @@ fn test_zws_preserved_in_normalization() {
     );
 }
 
+// @internal
 #[test]
 fn test_zero_width_chars_survive_card_roundtrip() {
     let name = "A\u{200D}B\u{200C}C\u{200B}D";
@@ -278,6 +298,7 @@ fn test_zero_width_chars_survive_card_roundtrip() {
 // 6. Bidi overrides — survive roundtrip
 // ============================================================
 
+// @internal
 #[test]
 fn test_rlo_survives_roundtrip() {
     // Right-to-Left Override (U+202E) — security-sensitive for display names
@@ -292,6 +313,7 @@ fn test_rlo_survives_roundtrip() {
     );
 }
 
+// @internal
 #[test]
 fn test_lro_survives_roundtrip() {
     // Left-to-Right Override (U+202D)
@@ -302,6 +324,7 @@ fn test_lro_survives_roundtrip() {
     assert_eq!(restored.display_name(), normalize_text(name));
 }
 
+// @internal
 #[test]
 fn test_bidi_in_field_value() {
     let value = "\u{202E}reversed text\u{202C}"; // RLO + PDF (Pop Directional Format)
@@ -319,6 +342,7 @@ fn test_bidi_in_field_value() {
 // 7. Null bytes
 // ============================================================
 
+// @internal
 #[test]
 fn test_null_byte_in_display_name() {
     let name_with_null = "Alice\0Bob";
@@ -330,6 +354,7 @@ fn test_null_byte_in_display_name() {
     assert_eq!(restored.display_name(), normalize_text(name_with_null));
 }
 
+// @internal
 #[test]
 fn test_null_byte_in_field_value() {
     let value = "before\0after";
@@ -343,6 +368,7 @@ fn test_null_byte_in_field_value() {
     assert_eq!(restored_field.value(), normalize_text(value));
 }
 
+// @internal
 #[test]
 fn test_only_null_bytes() {
     let nulls = "\0\0\0";
@@ -356,6 +382,7 @@ fn test_only_null_bytes() {
 // 8. Max-length edge — byte vs char count
 // ============================================================
 
+// @internal
 #[test]
 fn test_max_length_multibyte_field_value() {
     // CJK characters are 3 bytes each in UTF-8.
@@ -372,6 +399,7 @@ fn test_max_length_multibyte_field_value() {
     );
 }
 
+// @internal
 #[test]
 fn test_max_length_multibyte_over_limit() {
     // 334 CJK chars = 1002 bytes (over 1000 byte limit).
@@ -387,6 +415,7 @@ fn test_max_length_multibyte_over_limit() {
     );
 }
 
+// @internal
 #[test]
 fn test_max_length_4byte_chars() {
     // Emoji characters are 4 bytes each in UTF-8.
@@ -403,6 +432,7 @@ fn test_max_length_4byte_chars() {
     );
 }
 
+// @internal
 #[test]
 fn test_max_length_4byte_chars_over() {
     // 251 emoji = 1004 bytes (over limit).
@@ -424,6 +454,7 @@ fn test_max_length_4byte_chars_over() {
 
 proptest! {
     /// Arbitrary Unicode strings survive ContactCard → JSON → ContactCard.
+    // @internal
     #[test]
     fn prop_arbitrary_unicode_card_roundtrip(
         name in mixed_unicode_strategy(),
@@ -448,6 +479,7 @@ proptest! {
     }
 
     /// Normalization is idempotent for all Unicode scripts.
+    // @internal
     #[test]
     fn prop_normalization_idempotent_all_scripts(
         s in prop_oneof![
@@ -464,6 +496,7 @@ proptest! {
     }
 
     /// CJK field values survive ContactCard roundtrip.
+    // @internal
     #[test]
     fn prop_cjk_field_value_roundtrip(value in cjk_strategy()) {
         let normalized = normalize_text(&value);
@@ -479,6 +512,7 @@ proptest! {
     }
 
     /// Arabic field values survive ContactCard roundtrip.
+    // @internal
     #[test]
     fn prop_arabic_field_value_roundtrip(value in arabic_strategy()) {
         let normalized = normalize_text(&value);

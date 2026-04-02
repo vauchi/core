@@ -7,12 +7,20 @@
 
 Vauchi uses established cryptographic protocols to ensure privacy:
 
-- **X3DH** (Extended Triple Diffie-Hellman) - Establishes shared secrets during contact exchange without requiring both parties to be online simultaneously
-- **Double Ratchet** - Provides forward secrecy and break-in recovery; each message uses a unique key
+- **X3DH** (Extended Triple Diffie-Hellman) - Establishes shared
+  secrets during contact exchange without requiring both parties
+  to be online simultaneously
+- **Double Ratchet** - Provides forward secrecy and break-in
+  recovery; each message uses a unique key
 - **Ed25519** - Digital signatures for identity verification
-- **XChaCha20-Poly1305** - Authenticated encryption for all stored and transmitted data
+- **XChaCha20-Poly1305** - Authenticated encryption for all
+  stored and transmitted data
 
-All cryptographic operations use audited RustCrypto crates (`ed25519-dalek`, `x25519-dalek`, `chacha20poly1305`, `sha2`, `hmac`, `hkdf`). See [Cryptography](../../docs/docs/developers/crypto.md) for full specification.
+All cryptographic operations use audited RustCrypto crates
+(`ed25519-dalek`, `x25519-dalek`, `chacha20poly1305`,
+`sha2`, `hmac`, `hkdf`). See
+[Cryptography](../../docs/docs/developers/crypto.md)
+for full specification.
 
 ## Data Flow
 

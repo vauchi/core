@@ -5,7 +5,7 @@
 
 ## Module Organization
 
-```
+```text
 vauchi-platform/
 ├── src/
 │   └── lib.rs           # All mobile bindings in one file

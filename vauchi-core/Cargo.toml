@@ -475,5 +475,9 @@ name = "full_backup_tests"
 required-features = ["testing"]
 
 [[test]]
+name = "unicode_adversarial_tests"
+required-features = ["testing"]
+
+[[test]]
 name = "schema_gen"
 required-features = ["schema-gen"]

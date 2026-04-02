@@ -492,6 +492,27 @@ pub enum MobileExchangeCommand {
         timeout_ms: u64,
     },
     AudioStop,
+    // Accelerometer
+    AccelerometerStart,
+    AccelerometerStop,
+    // Relay escrow
+    RelayEscrowDeposit {
+        gate_hash: Vec<u8>,
+        slot_hash: Vec<u8>,
+        encrypted_card: Vec<u8>,
+        ttl_seconds: u32,
+    },
+    RelayEscrowCheck {
+        gate_hash: Vec<u8>,
+    },
+    RelayEscrowRetrieve {
+        gate_hash: Vec<u8>,
+        slot_hash: Vec<u8>,
+    },
+    // Link mode
+    ShowShareSheet {
+        url: String,
+    },
 }
 
 impl From<ExchangeCommand> for MobileExchangeCommand {
@@ -522,6 +543,28 @@ impl From<ExchangeCommand> for MobileExchangeCommand {
                 Self::AudioListenForResponse { timeout_ms }
             }
             ExchangeCommand::AudioStop => Self::AudioStop,
+            ExchangeCommand::AccelerometerStart => Self::AccelerometerStart,
+            ExchangeCommand::AccelerometerStop => Self::AccelerometerStop,
+            ExchangeCommand::RelayEscrowDeposit {
+                gate_hash,
+                slot_hash,
+                encrypted_card,
+                ttl_seconds,
+            } => Self::RelayEscrowDeposit {
+                gate_hash,
+                slot_hash,
+                encrypted_card,
+                ttl_seconds,
+            },
+            ExchangeCommand::RelayEscrowCheck { gate_hash } => Self::RelayEscrowCheck { gate_hash },
+            ExchangeCommand::RelayEscrowRetrieve {
+                gate_hash,
+                slot_hash,
+            } => Self::RelayEscrowRetrieve {
+                gate_hash,
+                slot_hash,
+            },
+            ExchangeCommand::ShowShareSheet { url } => Self::ShowShareSheet { url },
             _ => Self::QrRequestScan,
         }
     }
@@ -565,6 +608,30 @@ pub enum MobileExchangeHardwareEvent {
     AudioResponseReceived {
         data: Vec<u8>,
     },
+    // Accelerometer
+    AccelerometerData {
+        timestamp_ms: u64,
+        x_milli_g: i32,
+        y_milli_g: i32,
+        z_milli_g: i32,
+    },
+    ImpactDetected {
+        timestamp_ms: u64,
+        magnitude_milli_g: i32,
+    },
+    // Relay escrow
+    RelayEscrowReady {
+        gate_hash: Vec<u8>,
+    },
+    RelayEscrowFailed {
+        gate_hash: Vec<u8>,
+        reason: String,
+    },
+    // Link mode
+    LinkShared,
+    LinkOpened {
+        peer_public_key: Vec<u8>,
+    },
     // Errors
     HardwareError {
         transport: String,
@@ -603,6 +670,34 @@ impl From<MobileExchangeHardwareEvent> for ExchangeHardwareEvent {
             }
             MobileExchangeHardwareEvent::HardwareUnavailable { transport } => {
                 Self::HardwareUnavailable { transport }
+            }
+            MobileExchangeHardwareEvent::AccelerometerData {
+                timestamp_ms,
+                x_milli_g,
+                y_milli_g,
+                z_milli_g,
+            } => Self::AccelerometerData {
+                timestamp_ms,
+                x_milli_g,
+                y_milli_g,
+                z_milli_g,
+            },
+            MobileExchangeHardwareEvent::ImpactDetected {
+                timestamp_ms,
+                magnitude_milli_g,
+            } => Self::ImpactDetected {
+                timestamp_ms,
+                magnitude_milli_g,
+            },
+            MobileExchangeHardwareEvent::RelayEscrowReady { gate_hash } => {
+                Self::RelayEscrowReady { gate_hash }
+            }
+            MobileExchangeHardwareEvent::RelayEscrowFailed { gate_hash, reason } => {
+                Self::RelayEscrowFailed { gate_hash, reason }
+            }
+            MobileExchangeHardwareEvent::LinkShared => Self::LinkShared,
+            MobileExchangeHardwareEvent::LinkOpened { peer_public_key } => {
+                Self::LinkOpened { peer_public_key }
             }
         }
     }

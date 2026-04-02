@@ -55,7 +55,7 @@ pub enum BackupError {
 
 /// Internal representation of a single contact in the backup JSON payload.
 #[derive(Debug, Serialize, Deserialize)]
-struct ContactBackupEntry {
+pub(crate) struct ContactBackupEntry {
     /// Unique ID (public key hex for exchanged, UUID for imported).
     id: String,
     /// Display name.
@@ -69,7 +69,7 @@ struct ContactBackupEntry {
 /// Kind-specific data stored in the backup.
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
-enum ContactBackupKind {
+pub(crate) enum ContactBackupKind {
     Exchanged {
         /// Ed25519/X25519 public key (32 bytes, base64-encoded).
         public_key_b64: String,
@@ -96,7 +96,7 @@ enum ContactBackupKind {
 
 impl ContactBackupEntry {
     /// Creates a backup entry from a `Contact`.
-    fn from_contact(contact: &Contact) -> Result<Self, BackupError> {
+    pub(crate) fn from_contact(contact: &Contact) -> Result<Self, BackupError> {
         let card_json = serde_json::to_string(contact.card())
             .map_err(|e| BackupError::Serialization(e.to_string()))?;
 
@@ -136,7 +136,7 @@ impl ContactBackupEntry {
     }
 
     /// Reconstructs a `Contact` from this backup entry.
-    fn to_contact(&self) -> Result<Contact, BackupError> {
+    pub(crate) fn to_contact(&self) -> Result<Contact, BackupError> {
         let card: ContactCard = serde_json::from_str(&self.card_json)
             .map_err(|e| BackupError::Deserialization(e.to_string()))?;
 

@@ -5,7 +5,7 @@
 
 ## Module Organization
 
-```
+```text
 vauchi-core/
 ├── src/
 │   ├── lib.rs              # Crate root, public exports
@@ -25,6 +25,7 @@ vauchi-core/
 ## Modules
 
 ### `api/` - High-Level API
+
 The main entry point for applications using Vauchi.
 
 | File | Purpose |
@@ -37,6 +38,7 @@ The main entry point for applications using Vauchi.
 | `error.rs` | Unified `VauchiError` type |
 
 ### `crypto/` - Cryptographic Primitives
+
 Low-level cryptographic operations using RustCrypto crates.
 
 | File | Purpose |
@@ -49,6 +51,7 @@ Low-level cryptographic operations using RustCrypto crates.
 | `ratchet.rs` | Double Ratchet implementation |
 
 ### `identity/` - Identity Management
+
 User identity derived from a master seed.
 
 | File | Purpose |
@@ -57,6 +60,7 @@ User identity derived from a master seed.
 | `backup.rs` | Seed backup and recovery |
 
 ### `contact_card/` - Contact Card Structure
+
 The core data model for contact information.
 
 | File | Purpose |
@@ -66,6 +70,7 @@ The core data model for contact information.
 | `validation.rs` | Field value validation (email, phone, URL) |
 
 ### `exchange/` - Contact Exchange
+
 Protocols for exchanging keys with new contacts.
 
 | File | Purpose |
@@ -78,6 +83,7 @@ Protocols for exchanging keys with new contacts.
 | `error.rs` | Exchange-specific errors |
 
 ### `contact/` - Contact Management
+
 Contact storage and visibility controls.
 
 | File | Purpose |
@@ -86,6 +92,7 @@ Contact storage and visibility controls.
 | `visibility.rs` | Per-field visibility rules |
 
 ### `storage/` - Persistence
+
 SQLite-based encrypted storage.
 
 | File | Purpose |
@@ -93,6 +100,7 @@ SQLite-based encrypted storage.
 | `mod.rs` | `Storage` with encrypted blob storage |
 
 ### `network/` - Transport Layer
+
 Network abstraction for relay communication.
 
 | File | Purpose |
@@ -106,6 +114,7 @@ Network abstraction for relay communication.
 | `error.rs` | Network-specific errors |
 
 ### `sync/` - Synchronization Protocol
+
 Delta-based sync for efficient updates.
 
 | File | Purpose |
@@ -128,9 +137,3 @@ Delta-based sync for efficient updates.
 | `thiserror` | Error type derivation |
 | `base64` | Binary encoding |
 | `qrcode` | QR code generation |
-
-## Test Coverage
-
-- 267 tests across all modules
-- Unit tests in each module
-- Integration tests in `tests/integration_tests.rs`

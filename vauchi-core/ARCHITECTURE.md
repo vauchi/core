@@ -16,7 +16,7 @@ All cryptographic operations use audited RustCrypto crates (`ed25519-dalek`, `x2
 
 ## Data Flow
 
-```
+```text
 ┌─────────────┐     QR Code      ┌─────────────┐
 │   Alice     │ ───────────────► │    Bob      │
 │  (Device)   │ ◄─────────────── │  (Device)   │
@@ -38,23 +38,29 @@ All cryptographic operations use audited RustCrypto crates (`ed25519-dalek`, `x2
 ## Key Components
 
 ### Identity
+
 Each user has a master seed that deterministically derives:
+
 - Ed25519 signing keypair (identity verification)
 - X25519 exchange keypair (key agreement)
 
 ### Contact Cards
+
 Structured data with typed fields (email, phone, etc.) and:
+
 - Per-field visibility rules
 - Delta-based sync (only changes transmitted)
 - Signature verification
 
 ### Sync Protocol
+
 - Offline-first with queue-based delivery
 - Automatic retry with exponential backoff
 - Acknowledgment tracking
 - Update coalescing to reduce bandwidth
 
 ### Transport Layer
+
 - Abstract `Transport` trait for platform implementations
 - Connection management with auto-reconnect
 - Message framing and versioning

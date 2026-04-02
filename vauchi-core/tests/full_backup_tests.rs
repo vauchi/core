@@ -48,6 +48,7 @@ fn make_imported(name: &str, source: ImportSource) -> Contact {
 // ── Tests ──────────────────────────────────────────────────────────────────
 
 /// Round-trip with identity only (no contacts, no own card, no labels).
+// @scenario: backup_format_versioning :: Restore v2 backup with correct password
 #[test]
 fn v3_roundtrip_identity_only() {
     let id_data = test_identity_data();
@@ -71,6 +72,7 @@ fn v3_roundtrip_identity_only() {
 }
 
 /// Round-trip with mixed contacts (exchanged + imported).
+// @scenario: backup_format_versioning :: Restore v2 backup with correct password
 #[test]
 fn v3_roundtrip_with_contacts() {
     let id_data = test_identity_data();
@@ -107,6 +109,7 @@ fn v3_roundtrip_with_contacts() {
 }
 
 /// Own card survives the round-trip.
+// @scenario: backup_format_versioning :: Restore v2 backup with correct password
 #[test]
 fn v3_roundtrip_with_own_card() {
     let id_data = test_identity_data();
@@ -128,6 +131,7 @@ fn v3_roundtrip_with_own_card() {
 }
 
 /// Labels survive the round-trip.
+// @scenario: backup_format_versioning :: Restore v2 backup with correct password
 #[test]
 fn v3_roundtrip_with_labels() {
     let id_data = test_identity_data();
@@ -157,6 +161,7 @@ fn v3_roundtrip_with_labels() {
 }
 
 /// Wrong password must return DecryptionFailed.
+// @scenario: backup_format_versioning :: Restore v2 backup with wrong password
 #[test]
 fn v3_wrong_password_fails() {
     let id_data = test_identity_data();
@@ -170,6 +175,7 @@ fn v3_wrong_password_fails() {
 }
 
 /// Flipping a byte in the ciphertext must fail (AEAD integrity).
+// @scenario: backup_format_versioning :: Corrupted backup is detected
 #[test]
 fn v3_corrupted_data_fails() {
     let id_data = test_identity_data();
@@ -188,6 +194,7 @@ fn v3_corrupted_data_fails() {
 
 /// Two exports with the same data and password produce different ciphertext
 /// (because each uses a fresh random salt).
+// @scenario: backup_format_versioning :: V2 backup includes salt
 #[test]
 fn v3_different_salt_different_ciphertext() {
     let id_data1 = test_identity_data();
@@ -212,6 +219,7 @@ fn v3_different_salt_different_ciphertext() {
 }
 
 /// v2 identity backup still imports via existing code (no regression).
+// @scenario: backup_format_versioning :: Restore v2 backup with correct password
 #[test]
 fn v2_backward_compat() {
     let identity = vauchi_core::Identity::create("V2 Compat Test");
@@ -230,6 +238,7 @@ fn v2_backward_compat() {
 }
 
 /// v1 contact backup still imports via existing code (no regression).
+// @scenario: backup_format_versioning :: Version byte identifies backup format
 #[test]
 fn v1_contact_backward_compat() {
     let contact = make_exchanged("BackwardCompat");
@@ -243,6 +252,7 @@ fn v1_contact_backward_compat() {
 }
 
 /// Truncated data returns TooShort.
+// @scenario: backup_format_versioning :: Corrupted backup is detected
 #[test]
 fn v3_truncated_data_fails() {
     let result = import_full_backup(&[0x03, 0x01], PASSWORD);
@@ -253,6 +263,7 @@ fn v3_truncated_data_fails() {
 }
 
 /// Unknown version byte returns UnsupportedVersion.
+// @scenario: backup_format_versioning :: Unknown version byte is rejected
 #[test]
 fn v3_wrong_version_fails() {
     let mut fake = vec![0xFFu8];

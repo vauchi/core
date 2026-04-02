@@ -16,6 +16,7 @@ use crate::ui::exchange_qr::{self, QrActionOutcome, QrStep};
 use crate::ui::*;
 use vauchi_core::exchange::capability::types::DeviceCapabilities;
 use vauchi_core::exchange::command::ExchangeCommand;
+use vauchi_core::exchange::link_mode::{self, LinkInitiation};
 use vauchi_core::exchange::mode::ExchangeMode;
 use vauchi_core::exchange::{ExchangeEvent, ExchangeSession};
 
@@ -61,6 +62,12 @@ pub struct ExchangeEngine {
     mode_selection: Option<ModeSelectionEngine>,
     /// Field preview config (built when entering FieldPreview step).
     field_preview: Option<FieldPreviewConfig>,
+    /// Link mode initiation data (URL, nonce, secret key, handshake slot).
+    /// Populated when entering Link(ShareUrl) via `initiator_generate()`.
+    link_initiation: Option<LinkInitiation>,
+    /// Pending Link mode commands (presence deposit, relay calls).
+    /// Drained via `drain_commands()` same as session commands.
+    pending_link_commands: Vec<ExchangeCommand>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -125,6 +132,15 @@ impl ExchangeEngine {
         } else {
             None
         };
+        // If starting directly at Link mode, generate initiation data now.
+        // The presence deposit command is available via `drain_commands()`.
+        let (link_initiation, pending_link_commands) =
+            if step == ExchangeStep::Link(LinkStep::ShareUrl) {
+                let (init, cmds) = link_mode::initiator_generate();
+                (Some(init), cmds)
+            } else {
+                (None, Vec::new())
+            };
         Self {
             step,
             config,
@@ -134,6 +150,8 @@ impl ExchangeEngine {
             failure_detail: None,
             mode_selection,
             field_preview: None,
+            link_initiation,
+            pending_link_commands,
         }
     }
 
@@ -167,6 +185,8 @@ impl ExchangeEngine {
                     failure_detail: None,
                     mode_selection,
                     field_preview: None,
+                    link_initiation: None,
+                    pending_link_commands: Vec::new(),
                 };
             }
             session.emit_initial_commands();
@@ -181,14 +201,20 @@ impl ExchangeEngine {
             failure_detail: None,
             mode_selection,
             field_preview: None,
+            link_initiation: None,
+            pending_link_commands: Vec::new(),
         }
     }
 
-    /// Drains any pending commands from the session (ADR-031).
+    /// Drains any pending commands from the session or Link mode (ADR-031).
     ///
     /// Call this after construction with `with_session()` to get the
-    /// initial `QrDisplay` command.
+    /// initial `QrDisplay` command, or after `new()` with Link mode to get
+    /// the initial presence deposit command.
     pub fn drain_commands(&mut self) -> Vec<ExchangeCommand> {
+        if !self.pending_link_commands.is_empty() {
+            return std::mem::take(&mut self.pending_link_commands);
+        }
         self.session
             .as_mut()
             .map(|s| s.drain_commands())
@@ -257,6 +283,22 @@ impl ExchangeEngine {
         ActionResult::NavigateTo(self.build_screen())
     }
 
+    /// Start Link mode: generate URL, store initiation data, emit presence
+    /// deposit command (ADR-031).
+    ///
+    /// Returns `ExchangeCommands` with the presence deposit for the handshake
+    /// gate, or `NavigateTo` if no commands are needed (shouldn't happen).
+    fn start_link_mode(&mut self) -> ActionResult {
+        self.step = ExchangeStep::Link(LinkStep::ShareUrl);
+        let (initiation, commands) = link_mode::initiator_generate();
+        self.link_initiation = Some(initiation);
+        if commands.is_empty() {
+            ActionResult::NavigateTo(self.build_screen())
+        } else {
+            ActionResult::ExchangeCommands { commands }
+        }
+    }
+
     /// Build a FieldPreviewConfig from the current state.
     ///
     /// Uses own_name as display name (group override would come from
@@ -319,10 +361,12 @@ impl ExchangeEngine {
                 exchange_qr::build_verifying_screen(self.progress())
             }
             ExchangeStep::Link(LinkStep::ShareUrl) => {
-                exchange_link::build_share_url_screen(
-                    &self.config.own_qr_data, // TODO: replace with generated link URL
-                    self.progress(),
-                )
+                let url = self
+                    .link_initiation
+                    .as_ref()
+                    .map(|li| li.url.as_str())
+                    .unwrap_or("generating...");
+                exchange_link::build_share_url_screen(url, self.progress())
             }
             ExchangeStep::Link(LinkStep::WaitingForResponse) => {
                 exchange_link::build_waiting_screen(self.progress())
@@ -499,8 +543,7 @@ impl WorkflowEngine for ExchangeEngine {
                         // Advance to group selection or directly to sub-flow
                         if self.config.available_groups.is_empty() {
                             if mode == ExchangeMode::Link {
-                                self.step = ExchangeStep::Link(LinkStep::ShareUrl);
-                                return ActionResult::NavigateTo(self.build_screen());
+                                return self.start_link_mode();
                             }
                             self.step = ExchangeStep::Qr(QrStep::ShowQr);
                             return self.start_session_if_needed();
@@ -557,8 +600,7 @@ impl WorkflowEngine for ExchangeEngine {
                         FieldPreviewResult::StartExchange => {
                             // Route to sub-flow based on selected mode
                             if self.config.mode == Some(ExchangeMode::Link) {
-                                self.step = ExchangeStep::Link(LinkStep::ShareUrl);
-                                return ActionResult::NavigateTo(self.build_screen());
+                                return self.start_link_mode();
                             }
                             self.step = ExchangeStep::Qr(QrStep::ShowQr);
                             return self.start_session_if_needed();
@@ -608,6 +650,14 @@ impl WorkflowEngine for ExchangeEngine {
                     match outcome {
                         LinkActionOutcome::ShareRequested => {
                             self.step = ExchangeStep::Link(LinkStep::WaitingForResponse);
+                            // Emit ShowShareSheet so the frontend presents the share UI
+                            if let Some(ref li) = self.link_initiation {
+                                return ActionResult::ExchangeCommands {
+                                    commands: vec![ExchangeCommand::ShowShareSheet {
+                                        url: li.url.clone(),
+                                    }],
+                                };
+                            }
                             ActionResult::NavigateTo(self.build_screen())
                         }
                         LinkActionOutcome::Cancelled => ActionResult::Complete,
@@ -628,10 +678,9 @@ impl WorkflowEngine for ExchangeEngine {
                 self.failure_detail = None;
                 // Restore to the correct sub-flow based on selected mode
                 if self.config.mode == Some(ExchangeMode::Link) {
-                    self.step = ExchangeStep::Link(LinkStep::ShareUrl);
-                } else {
-                    self.step = ExchangeStep::Qr(QrStep::ShowQr);
+                    return self.start_link_mode();
                 }
+                self.step = ExchangeStep::Qr(QrStep::ShowQr);
                 ActionResult::NavigateTo(self.build_screen())
             }
             (ExchangeStep::Failed, UserAction::ActionPressed { action_id })
@@ -1395,5 +1444,82 @@ mod tests {
             ExchangeStep::Link(LinkStep::ShareUrl),
             "Retry in Link mode must return to Link, not QR"
         );
+    }
+
+    // @internal
+    #[test]
+    fn test_link_mode_generates_initiation_on_construction() {
+        let engine = ExchangeEngine::new(ExchangeConfig {
+            mode: Some(ExchangeMode::Link),
+            ..config_no_groups()
+        });
+        assert!(
+            engine.link_initiation.is_some(),
+            "link_initiation must be populated at construction"
+        );
+        let li = engine.link_initiation.as_ref().unwrap();
+        assert!(li.url.starts_with("vauchi://exchange?"));
+    }
+
+    // @internal
+    #[test]
+    fn test_link_mode_drain_commands_returns_presence_deposit() {
+        let mut engine = ExchangeEngine::new(ExchangeConfig {
+            mode: Some(ExchangeMode::Link),
+            ..config_no_groups()
+        });
+        let commands = engine.drain_commands();
+        assert_eq!(commands.len(), 1, "must emit 1 presence deposit command");
+        assert!(matches!(
+            &commands[0],
+            ExchangeCommand::RelayEscrowDeposit { .. }
+        ));
+        // Second drain is empty
+        assert!(engine.drain_commands().is_empty());
+    }
+
+    // @internal
+    #[test]
+    fn test_link_mode_share_url_screen_shows_generated_url() {
+        let engine = ExchangeEngine::new(ExchangeConfig {
+            mode: Some(ExchangeMode::Link),
+            ..config_no_groups()
+        });
+        let screen = engine.current_screen();
+        let url_text = screen
+            .components
+            .iter()
+            .find_map(|c| match c {
+                Component::Text { content, .. } => Some(content.as_str()),
+                _ => None,
+            })
+            .expect("ShareUrl screen must have a Text component");
+        assert!(
+            url_text.starts_with("vauchi://exchange?"),
+            "URL must be the generated link, not placeholder"
+        );
+    }
+
+    // @internal
+    #[test]
+    fn test_link_mode_share_emits_show_share_sheet() {
+        let mut engine = ExchangeEngine::new(ExchangeConfig {
+            mode: Some(ExchangeMode::Link),
+            ..config_no_groups()
+        });
+        let _ = engine.drain_commands(); // drain presence deposit
+        let result = engine.handle_action(UserAction::ActionPressed {
+            action_id: "share".into(),
+        });
+        match result {
+            ActionResult::ExchangeCommands { commands } => {
+                assert_eq!(commands.len(), 1);
+                assert!(
+                    matches!(&commands[0], ExchangeCommand::ShowShareSheet { url } if url.starts_with("vauchi://exchange?")),
+                    "Share must emit ShowShareSheet with the link URL"
+                );
+            }
+            other => panic!("Expected ExchangeCommands, got {:?}", other),
+        }
     }
 }

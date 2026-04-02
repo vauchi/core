@@ -1376,4 +1376,24 @@ mod tests {
         });
         assert_eq!(engine.step, ExchangeStep::Link(LinkStep::ShareUrl));
     }
+
+    // @internal
+    #[test]
+    fn test_link_mode_retry_stays_in_link() {
+        let mut engine = ExchangeEngine::new(ExchangeConfig {
+            mode: Some(ExchangeMode::Link),
+            ..config_no_groups()
+        });
+        engine.mark_failed();
+        assert_eq!(engine.step, ExchangeStep::Failed);
+
+        let _ = engine.handle_action(UserAction::ActionPressed {
+            action_id: "retry".into(),
+        });
+        assert_eq!(
+            engine.step,
+            ExchangeStep::Link(LinkStep::ShareUrl),
+            "Retry in Link mode must return to Link, not QR"
+        );
+    }
 }

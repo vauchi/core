@@ -271,3 +271,18 @@ fn initiator_rejects_small_order_point() {
         "DH with small-order point must be rejected"
     );
 }
+
+// @internal
+#[test]
+fn responder_rejects_small_order_point_in_url() {
+    // Craft a URL containing an all-zeros public key (small-order point)
+    let zero_pk = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode([0u8; 32]);
+    let nonce = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode([0xAA; 32]);
+    let url = format!("vauchi://exchange?pk={zero_pk}&n={nonce}");
+    let parsed = parse_link_url(&url).unwrap();
+    let result = responder_respond(&parsed, b"card".to_vec());
+    assert!(
+        result.is_err(),
+        "Responder DH with small-order point must be rejected"
+    );
+}

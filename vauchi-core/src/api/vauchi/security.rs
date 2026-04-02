@@ -4,12 +4,10 @@
 
 //! Delivery status, events, app password, duress PIN, and duress settings.
 
-use std::sync::Arc;
-
 use super::super::app_password::{AppPasswordConfig, AuthResult};
 use super::super::duress::{DuressAlert, DuressAlertType};
 use super::super::error::{VauchiError, VauchiResult};
-use super::super::events::{EventHandler, VauchiEvent};
+use super::super::events::{EventCallback, VauchiEvent};
 use super::{AuthMode, Vauchi};
 use crate::types::DuressSettings;
 
@@ -48,10 +46,7 @@ impl Vauchi {
     /// Returns the handler ID which can be used with `remove_event_handler()`.
     /// No longer requires `&mut self` — registration works even when the
     /// dispatcher is shared with SyncController.
-    pub fn add_event_handler(
-        &self,
-        handler: Arc<dyn EventHandler>,
-    ) -> crate::api::events::HandlerId {
+    pub fn add_event_handler(&self, handler: EventCallback) -> crate::api::events::HandlerId {
         self.events.add_handler(handler)
     }
 

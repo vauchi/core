@@ -716,10 +716,9 @@ mod tests {
         let event_count = Arc::new(AtomicUsize::new(0));
 
         let count = event_count.clone();
-        let handler = Arc::new(super::super::events::CallbackHandler::new(move |_| {
+        dispatcher.on_event(move |_| {
             count.fetch_add(1, Ordering::SeqCst);
-        }));
-        dispatcher.add_handler(handler);
+        });
 
         let events = Arc::new(dispatcher);
         let manager = ContactManager::new(&storage, events);

@@ -17,9 +17,7 @@ mod common;
 use std::sync::{Arc, Mutex};
 
 use vauchi_core::types::EmergencyBroadcastConfig;
-use vauchi_core::{
-    CallbackHandler, EmergencyAlert, GeoLocation, Storage, SymmetricKey, VauchiEvent,
-};
+use vauchi_core::{EmergencyAlert, GeoLocation, Storage, SymmetricKey, VauchiEvent};
 
 use common::helpers::{create_vauchi_with_identity, setup_alice_bob_exchange, setup_ratchets};
 
@@ -256,9 +254,9 @@ fn test_broadcast_dispatches_event() {
 
     let events: Arc<Mutex<Vec<VauchiEvent>>> = Arc::new(Mutex::new(Vec::new()));
     let events_clone = events.clone();
-    alice_wb.add_event_handler(Arc::new(CallbackHandler::new(move |event| {
+    alice_wb.add_event_handler(Arc::new(move |event: VauchiEvent| {
         events_clone.lock().unwrap().push(event);
-    })));
+    }));
 
     alice_wb
         .configure_emergency_broadcast(vec![bob_id], "Emergency!".to_string(), false)

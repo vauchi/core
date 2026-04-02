@@ -75,9 +75,9 @@ pub use sync::{CardDelta, DeltaError, FieldChange, SyncError, SyncManager, SyncS
 pub mod api;
 #[cfg(any(feature = "network-native-tls", feature = "network-rustls"))]
 pub use api::{
-    AppPasswordConfig, AuthMode, AuthResult, BroadcastResult, CallbackHandler, ConsentStatus,
-    DuressAlert, DuressAlertType, EmergencyWipeStatus, HandlerId, RecoveryReadiness, SetupProgress,
-    Vauchi, VauchiBuilder, VauchiConfig, VauchiError, VauchiEvent, VauchiResult,
+    AppPasswordConfig, AuthMode, AuthResult, BroadcastResult, ConsentStatus, DuressAlert,
+    DuressAlertType, EmergencyWipeStatus, HandlerId, RecoveryReadiness, SetupProgress, Vauchi,
+    VauchiBuilder, VauchiConfig, VauchiError, VauchiEvent, VauchiResult,
 };
 pub mod aha_moments;
 pub use aha_moments::AhaMoment;

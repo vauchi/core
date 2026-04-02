@@ -29,11 +29,12 @@ fn test_callback_handler() {
     let count = Arc::new(AtomicUsize::new(0));
     let count_clone = count.clone();
 
-    let handler = CallbackHandler::new(move |_event| {
+    let dispatcher = EventDispatcher::new();
+    dispatcher.on_event(move |_event| {
         count_clone.fetch_add(1, Ordering::SeqCst);
     });
 
-    handler.on_event(VauchiEvent::ContactAdded {
+    dispatcher.dispatch(VauchiEvent::ContactAdded {
         contact_id: "test".into(),
     });
 
@@ -46,8 +47,7 @@ fn test_event_dispatcher_add_handler() {
 
     assert_eq!(dispatcher.handler_count(), 0);
 
-    let handler = Arc::new(CallbackHandler::new(|_| {}));
-    let id = dispatcher.add_handler(handler);
+    let id = dispatcher.on_event(|_| {});
 
     assert_eq!(dispatcher.handler_count(), 1);
     assert!(id > 0, "HandlerId should be positive");
@@ -60,11 +60,9 @@ fn test_event_dispatcher_dispatch() {
 
     let dispatcher = EventDispatcher::new();
 
-    let handler = Arc::new(CallbackHandler::new(move |_| {
+    dispatcher.on_event(move |_| {
         count_clone.fetch_add(1, Ordering::SeqCst);
-    }));
-
-    dispatcher.add_handler(handler);
+    });
 
     dispatcher.dispatch(VauchiEvent::ContactAdded {
         contact_id: "test".into(),
@@ -82,10 +80,9 @@ fn test_event_dispatcher_multiple_handlers() {
     // Add 3 handlers
     for _ in 0..3 {
         let count_clone = count.clone();
-        let handler = Arc::new(CallbackHandler::new(move |_| {
+        dispatcher.on_event(move |_| {
             count_clone.fetch_add(1, Ordering::SeqCst);
-        }));
-        dispatcher.add_handler(handler);
+        });
     }
 
     dispatcher.dispatch(VauchiEvent::ContactAdded {
@@ -100,8 +97,7 @@ fn test_event_dispatcher_multiple_handlers() {
 fn test_event_dispatcher_clear_handlers() {
     let dispatcher = EventDispatcher::new();
 
-    let handler = Arc::new(CallbackHandler::new(|_| {}));
-    dispatcher.add_handler(handler);
+    dispatcher.on_event(|_| {});
 
     assert_eq!(dispatcher.handler_count(), 1);
 
@@ -119,16 +115,14 @@ fn test_event_dispatcher_remove_handler() {
     let dispatcher = EventDispatcher::new();
 
     let count_a_clone = count_a.clone();
-    let handler_a = Arc::new(CallbackHandler::new(move |_| {
+    let id_a = dispatcher.on_event(move |_| {
         count_a_clone.fetch_add(1, Ordering::SeqCst);
-    }));
-    let id_a = dispatcher.add_handler(handler_a);
+    });
 
     let count_b_clone = count_b.clone();
-    let handler_b = Arc::new(CallbackHandler::new(move |_| {
+    dispatcher.on_event(move |_| {
         count_b_clone.fetch_add(1, Ordering::SeqCst);
-    }));
-    dispatcher.add_handler(handler_b);
+    });
 
     // Both fire on dispatch
     dispatcher.dispatch(VauchiEvent::ContactAdded {

@@ -11,7 +11,7 @@
 mod common;
 
 use std::sync::{Arc, Mutex};
-use vauchi_core::api::events::{CallbackHandler, EventDispatcher, VauchiEvent};
+use vauchi_core::api::events::{EventDispatcher, VauchiEvent};
 
 /// Verify SyncProgress event variant exists and can be constructed.
 // @scenario: sync_updates :: Large sync queue handling
@@ -45,13 +45,11 @@ fn test_sync_progress_dispatched_via_handler() {
     let received_clone = received.clone();
 
     let dispatcher = EventDispatcher::new();
-    let handler = Arc::new(CallbackHandler::new(move |event: VauchiEvent| {
+    dispatcher.on_event(move |event: VauchiEvent| {
         if let VauchiEvent::SyncProgress { .. } = &event {
             received_clone.lock().unwrap().push(event);
         }
-    }));
-
-    dispatcher.add_handler(handler);
+    });
 
     // Dispatch a series of progress events
     for i in 0..5 {
@@ -85,13 +83,11 @@ fn test_sync_progress_total_matches_ready_updates() {
     let received_clone = received.clone();
 
     let dispatcher = EventDispatcher::new();
-    let handler = Arc::new(CallbackHandler::new(move |event: VauchiEvent| {
+    dispatcher.on_event(move |event: VauchiEvent| {
         if let VauchiEvent::SyncProgress { .. } = &event {
             received_clone.lock().unwrap().push(event);
         }
-    }));
-
-    dispatcher.add_handler(handler);
+    });
 
     // Simulate 3 ready updates
     let total = 3;

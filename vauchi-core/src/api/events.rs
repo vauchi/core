@@ -216,42 +216,8 @@ pub enum VauchiEvent {
     },
 }
 
-/// Event handler trait.
-///
-/// Implement this trait to receive Vauchi events.
-pub trait EventHandler: Send + Sync {
-    /// Called when an event occurs.
-    fn on_event(&self, event: VauchiEvent);
-}
-
-/// Simple callback-based event handler.
-///
-/// Wraps a closure for easy event handling.
-pub struct CallbackHandler<F>
-where
-    F: Fn(VauchiEvent) + Send + Sync,
-{
-    callback: F,
-}
-
-impl<F> CallbackHandler<F>
-where
-    F: Fn(VauchiEvent) + Send + Sync,
-{
-    /// Creates a new callback handler.
-    pub fn new(callback: F) -> Self {
-        CallbackHandler { callback }
-    }
-}
-
-impl<F> EventHandler for CallbackHandler<F>
-where
-    F: Fn(VauchiEvent) + Send + Sync,
-{
-    fn on_event(&self, event: VauchiEvent) {
-        (self.callback)(event);
-    }
-}
+/// Type alias for event handler callbacks.
+pub type EventCallback = Arc<dyn Fn(VauchiEvent) + Send + Sync>;
 
 /// Event dispatcher for managing multiple handlers (#87, #89, #94).
 ///
@@ -259,7 +225,7 @@ where
 /// take `&self` instead of `&mut self`. This allows handler registration even
 /// when the dispatcher is shared via `Arc` (e.g., with `SyncController`).
 pub struct EventDispatcher {
-    handlers: Mutex<Vec<(HandlerId, Arc<dyn EventHandler>)>>,
+    handlers: Mutex<Vec<(HandlerId, EventCallback)>>,
     next_id: AtomicU64,
 }
 
@@ -278,15 +244,20 @@ impl EventDispatcher {
         }
     }
 
-    /// Adds an event handler and returns its unique ID (#87, #94).
+    /// Adds an event callback and returns its unique ID (#87, #94).
     ///
     /// Takes `&self` (not `&mut self`) thanks to interior mutability.
     /// The returned `HandlerId` can be used with `remove_handler()`.
-    pub fn add_handler(&self, handler: Arc<dyn EventHandler>) -> HandlerId {
+    pub fn add_handler(&self, handler: EventCallback) -> HandlerId {
         let id = self.next_id.fetch_add(1, Ordering::Relaxed);
         let mut handlers = self.handlers.lock().expect("EventDispatcher lock poisoned");
         handlers.push((id, handler));
         id
+    }
+
+    /// Convenience: wraps a closure in `Arc` and registers it.
+    pub fn on_event(&self, callback: impl Fn(VauchiEvent) + Send + Sync + 'static) -> HandlerId {
+        self.add_handler(Arc::new(callback))
     }
 
     /// Removes a handler by its ID (#89). Returns true if a handler was removed.
@@ -317,7 +288,7 @@ impl EventDispatcher {
     pub fn dispatch(&self, event: VauchiEvent) {
         let handlers = self.handlers.lock().expect("EventDispatcher lock poisoned");
         for (_, handler) in handlers.iter() {
-            handler.on_event(event.clone());
+            handler(event.clone());
         }
     }
 }

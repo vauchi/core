@@ -1307,6 +1307,7 @@ mod tests {
 
     // ── Link mode routing ─────────────────────────────────────────
 
+    // @internal
     #[test]
     fn test_link_mode_starts_at_share_url() {
         let engine = ExchangeEngine::new(ExchangeConfig {
@@ -1318,6 +1319,7 @@ mod tests {
         assert_eq!(screen.screen_id, "exchange_share_url");
     }
 
+    // @internal
     #[test]
     fn test_link_mode_share_advances_to_waiting() {
         let mut engine = ExchangeEngine::new(ExchangeConfig {
@@ -1335,6 +1337,7 @@ mod tests {
         assert_eq!(screen.screen_id, "exchange_link_waiting");
     }
 
+    // @internal
     #[test]
     fn test_link_mode_cancel_completes() {
         let mut engine = ExchangeEngine::new(ExchangeConfig {
@@ -1347,6 +1350,7 @@ mod tests {
         assert_eq!(result, ActionResult::Complete);
     }
 
+    // @internal
     #[test]
     fn test_link_mode_with_groups_goes_through_preview() {
         let mut engine = ExchangeEngine::new(ExchangeConfig {

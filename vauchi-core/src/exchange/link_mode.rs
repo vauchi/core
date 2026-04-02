@@ -86,8 +86,8 @@ pub fn initiator_complete(
     let keys = EscrowKeys::derive(shared_secret.as_bytes(), EscrowRole::Initiator);
 
     let commands = vec![ExchangeCommand::RelayEscrowDeposit {
-        gate_hash: hex::decode(&keys.gate_hash).unwrap_or_default(),
-        slot_hash: hex::decode(&keys.our_slot).unwrap_or_default(),
+        gate_hash: hex::decode(&keys.gate_hash).expect("hex from hex::encode is always valid"),
+        slot_hash: hex::decode(&keys.our_slot).expect("hex from hex::encode is always valid"),
         encrypted_card,
         ttl_seconds: DEFAULT_TTL_SECONDS,
     }];
@@ -171,15 +171,15 @@ pub fn responder_respond(
     let commands = vec![
         // 1. Bootstrap: deposit our public key to handshake slot
         ExchangeCommand::RelayEscrowDeposit {
-            gate_hash: hex::decode(&handshake_slot).unwrap_or_default(),
-            slot_hash: hex::decode(&epk_slot).unwrap_or_default(),
+            gate_hash: hex::decode(&handshake_slot).expect("hex from hex::encode is always valid"),
+            slot_hash: hex::decode(&epk_slot).expect("hex from hex::encode is always valid"),
             encrypted_card: our_public.as_bytes().to_vec(),
             ttl_seconds: DEFAULT_TTL_SECONDS,
         },
         // 2. Deposit encrypted card to escrow gate
         ExchangeCommand::RelayEscrowDeposit {
-            gate_hash: hex::decode(&keys.gate_hash).unwrap_or_default(),
-            slot_hash: hex::decode(&keys.our_slot).unwrap_or_default(),
+            gate_hash: hex::decode(&keys.gate_hash).expect("hex from hex::encode is always valid"),
+            slot_hash: hex::decode(&keys.our_slot).expect("hex from hex::encode is always valid"),
             encrypted_card,
             ttl_seconds: DEFAULT_TTL_SECONDS,
         },

@@ -12,6 +12,7 @@ use vauchi_core::exchange::link_mode::*;
 // URL generation
 // ================================================================
 
+// @internal
 #[test]
 fn generate_produces_valid_url() {
     let init = initiator_generate();
@@ -23,6 +24,7 @@ fn generate_produces_valid_url() {
     assert!(init.url.contains("n="), "URL must contain nonce param");
 }
 
+// @internal
 #[test]
 fn two_generations_produce_different_urls() {
     let a = initiator_generate();
@@ -35,6 +37,7 @@ fn two_generations_produce_different_urls() {
     assert_ne!(a.nonce, b.nonce, "Different nonces");
 }
 
+// @internal
 #[test]
 fn handshake_slot_is_64_hex_chars() {
     let init = initiator_generate();
@@ -46,6 +49,7 @@ fn handshake_slot_is_64_hex_chars() {
 // URL parsing
 // ================================================================
 
+// @internal
 #[test]
 fn parse_valid_url_roundtrips() {
     let init = initiator_generate();
@@ -53,11 +57,13 @@ fn parse_valid_url_roundtrips() {
     assert_eq!(parsed.nonce, init.nonce, "nonce must roundtrip");
 }
 
+// @internal
 #[test]
 fn parse_rejects_wrong_scheme() {
     assert!(parse_link_url("https://example.com?pk=abc&n=def").is_none());
 }
 
+// @internal
 #[test]
 fn parse_rejects_missing_pk() {
     let n_b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode([0u8; 32]);
@@ -65,6 +71,7 @@ fn parse_rejects_missing_pk() {
     assert!(parse_link_url(&url).is_none());
 }
 
+// @internal
 #[test]
 fn parse_rejects_short_pk() {
     let short = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode([0u8; 16]);
@@ -73,6 +80,7 @@ fn parse_rejects_short_pk() {
     assert!(parse_link_url(&url).is_none());
 }
 
+// @internal
 #[test]
 fn parse_rejects_invalid_base64() {
     let url = "vauchi://exchange?pk=!!!invalid!!!&n=!!!also!!!";
@@ -83,6 +91,7 @@ fn parse_rejects_invalid_base64() {
 // Responder commands
 // ================================================================
 
+// @internal
 #[test]
 fn responder_produces_two_deposit_commands() {
     let init = initiator_generate();
@@ -103,6 +112,7 @@ fn responder_produces_two_deposit_commands() {
     ));
 }
 
+// @internal
 #[test]
 fn responder_handshake_deposit_contains_32_byte_epk() {
     let init = initiator_generate();
@@ -124,6 +134,7 @@ fn responder_handshake_deposit_contains_32_byte_epk() {
 // Initiator completion
 // ================================================================
 
+// @internal
 #[test]
 fn initiator_complete_produces_one_deposit() {
     // Simulate: responder generated an epk, initiator retrieves it
@@ -146,6 +157,7 @@ fn initiator_complete_produces_one_deposit() {
 // End-to-end: initiator + responder derive same gate
 // ================================================================
 
+// @internal
 #[test]
 fn initiator_and_responder_derive_same_gate_hash() {
     // This is the critical security property: both sides agree on
@@ -189,6 +201,7 @@ fn initiator_and_responder_derive_same_gate_hash() {
 // Security: handshake slot unrelated to gate hash
 // ================================================================
 
+// @internal
 #[test]
 fn handshake_slot_unrelated_to_gate_hash() {
     let init = initiator_generate();
@@ -201,6 +214,7 @@ fn handshake_slot_unrelated_to_gate_hash() {
     );
 }
 
+// @internal
 #[test]
 fn handshake_slot_derived_from_nonce_not_secret() {
     // Same nonce → same handshake slot, regardless of keypair

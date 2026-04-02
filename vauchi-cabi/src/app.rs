@@ -268,7 +268,7 @@ pub unsafe extern "C" fn vauchi_app_handle_action(
 /// Supported screen names: "home", "contacts", "exchange", "settings",
 /// "help", "backup", "lock", "onboarding", "emergency_shred",
 /// "device_linking", "duress_pin", "delivery_status", "sync",
-/// "tor_settings", "recovery", "groups", "privacy", "support",
+/// "recovery", "groups", "privacy", "support",
 /// "contact_duplicates", "contact_limit", "more".
 ///
 /// # Safety

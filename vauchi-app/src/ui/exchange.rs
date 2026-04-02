@@ -299,6 +299,63 @@ impl ExchangeEngine {
         }
     }
 
+    /// Handle Link mode hardware events (ADR-031).
+    ///
+    /// Link mode doesn't use ExchangeSession — it has its own event handling.
+    /// Events arrive from frontends after executing relay commands.
+    fn handle_link_hardware_event(
+        &mut self,
+        event: vauchi_core::exchange::ExchangeHardwareEvent,
+    ) -> Option<ActionResult> {
+        use vauchi_core::exchange::ExchangeHardwareEvent;
+
+        match event {
+            // User completed the share sheet — start polling handshake gate
+            ExchangeHardwareEvent::LinkShared => {
+                if let Some(ref li) = self.link_initiation {
+                    let gate = hex::decode(&li.handshake_slot)
+                        .expect("hex from hex::encode is always valid");
+                    return Some(ActionResult::ExchangeCommands {
+                        commands: vec![ExchangeCommand::RelayEscrowCheck { gate_hash: gate }],
+                    });
+                }
+                None
+            }
+
+            // Handshake gate ready — retrieve responder's epk
+            ExchangeHardwareEvent::RelayEscrowReady { gate_hash } => {
+                if let Some(ref li) = self.link_initiation {
+                    let hs_gate = hex::decode(&li.handshake_slot)
+                        .expect("hex from hex::encode is always valid");
+                    if gate_hash == hs_gate {
+                        // Handshake gate ready — retrieve responder's epk
+                        let slot = hex::decode(&li.presence_slot)
+                            .expect("hex from hex::encode is always valid");
+                        return Some(ActionResult::ExchangeCommands {
+                            commands: vec![ExchangeCommand::RelayEscrowRetrieve {
+                                gate_hash,
+                                slot_hash: slot,
+                            }],
+                        });
+                    }
+                    // Escrow gate ready — retrieve responder's encrypted card
+                    // (handled after initiator_complete when escrow_keys are set)
+                }
+                None
+            }
+
+            // Relay escrow failed — show error
+            ExchangeHardwareEvent::RelayEscrowFailed { reason, .. } => {
+                self.failure_detail = Some(reason);
+                self.step = ExchangeStep::Failed;
+                Some(ActionResult::UpdateScreen(self.build_screen()))
+            }
+
+            // Other events not relevant to Link mode
+            _ => None,
+        }
+    }
+
     /// Build a FieldPreviewConfig from the current state.
     ///
     /// Uses own_name as display name (group override would come from
@@ -481,6 +538,11 @@ impl WorkflowEngine for ExchangeEngine {
         &mut self,
         event: vauchi_core::exchange::ExchangeHardwareEvent,
     ) -> Option<ActionResult> {
+        // Link mode events — handled without ExchangeSession
+        if matches!(self.step, ExchangeStep::Link(_)) {
+            return self.handle_link_hardware_event(event);
+        }
+
         // No session — handle QR scan via legacy TextChanged path
         let session = match self.session.as_mut() {
             Some(s) => s,
@@ -1521,5 +1583,86 @@ mod tests {
             }
             other => panic!("Expected ExchangeCommands, got {:?}", other),
         }
+    }
+
+    // @internal
+    #[test]
+    fn test_link_shared_event_emits_escrow_check() {
+        let mut engine = ExchangeEngine::new(ExchangeConfig {
+            mode: Some(ExchangeMode::Link),
+            ..config_no_groups()
+        });
+        let _ = engine.drain_commands(); // drain presence deposit
+        // Move to WaitingForResponse
+        let _ = engine.handle_action(UserAction::ActionPressed {
+            action_id: "share".into(),
+        });
+        assert_eq!(
+            engine.step,
+            ExchangeStep::Link(LinkStep::WaitingForResponse)
+        );
+        // Frontend reports LinkShared
+        let result =
+            engine.handle_hardware_event(vauchi_core::exchange::ExchangeHardwareEvent::LinkShared);
+        match result {
+            Some(ActionResult::ExchangeCommands { commands }) => {
+                assert_eq!(commands.len(), 1);
+                assert!(
+                    matches!(&commands[0], ExchangeCommand::RelayEscrowCheck { .. }),
+                    "LinkShared must trigger escrow check polling"
+                );
+            }
+            other => panic!("Expected ExchangeCommands, got {:?}", other),
+        }
+    }
+
+    // @internal
+    #[test]
+    fn test_link_escrow_ready_emits_retrieve() {
+        let mut engine = ExchangeEngine::new(ExchangeConfig {
+            mode: Some(ExchangeMode::Link),
+            ..config_no_groups()
+        });
+        let _ = engine.drain_commands();
+        let _ = engine.handle_action(UserAction::ActionPressed {
+            action_id: "share".into(),
+        });
+        // Simulate handshake gate ready
+        let hs_gate =
+            hex::decode(&engine.link_initiation.as_ref().unwrap().handshake_slot).unwrap();
+        let result = engine.handle_hardware_event(
+            vauchi_core::exchange::ExchangeHardwareEvent::RelayEscrowReady { gate_hash: hs_gate },
+        );
+        match result {
+            Some(ActionResult::ExchangeCommands { commands }) => {
+                assert_eq!(commands.len(), 1);
+                assert!(
+                    matches!(&commands[0], ExchangeCommand::RelayEscrowRetrieve { .. }),
+                    "EscrowReady for handshake gate must trigger retrieve"
+                );
+            }
+            other => panic!("Expected ExchangeCommands, got {:?}", other),
+        }
+    }
+
+    // @internal
+    #[test]
+    fn test_link_escrow_failed_shows_error() {
+        let mut engine = ExchangeEngine::new(ExchangeConfig {
+            mode: Some(ExchangeMode::Link),
+            ..config_no_groups()
+        });
+        let _ = engine.drain_commands();
+        let _ = engine.handle_action(UserAction::ActionPressed {
+            action_id: "share".into(),
+        });
+        let result = engine.handle_hardware_event(
+            vauchi_core::exchange::ExchangeHardwareEvent::RelayEscrowFailed {
+                gate_hash: vec![],
+                reason: "gate expired".into(),
+            },
+        );
+        assert!(result.is_some());
+        assert_eq!(engine.step, ExchangeStep::Failed);
     }
 }

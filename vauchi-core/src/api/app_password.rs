@@ -14,21 +14,7 @@
 use subtle::ConstantTimeEq;
 
 use super::error::{VauchiError, VauchiResult};
-
-/// Argon2id memory cost in KiB — matches password_kdf module.
-#[cfg(not(feature = "test-kdf"))]
-const ARGON2_M_COST: u32 = 65536; // 64 MB (OWASP recommended)
-#[cfg(feature = "test-kdf")]
-const ARGON2_M_COST: u32 = 8 * 1024; // 8 MB (reduced for fast tests)
-
-/// Argon2id time cost (iterations).
-#[cfg(not(feature = "test-kdf"))]
-const ARGON2_T_COST: u32 = 3;
-#[cfg(feature = "test-kdf")]
-const ARGON2_T_COST: u32 = 1; // 1 iteration (reduced for fast tests)
-
-/// Argon2id parallelism.
-const ARGON2_P_COST: u32 = 4;
+use crate::crypto::password_kdf::{ARGON2_M_COST, ARGON2_P_COST, ARGON2_T_COST};
 
 /// Result of password verification.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

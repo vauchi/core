@@ -220,27 +220,27 @@ fn failed_retry_preserves_link_mode() {
 
 // @internal
 #[test]
-fn progress_steps_are_consistent_across_modes() {
-    // Glance flow
-    let glance = ExchangeEngine::new(ExchangeConfig {
-        mode: Some(ExchangeMode::Glance),
-        available_groups: vec![],
-        ..config_with_mode_selection()
-    });
-    let glance_screen = glance.current_screen();
-    let glance_total = glance_screen.progress.as_ref().unwrap().total_steps;
-
-    // Link flow
-    let link = ExchangeEngine::new(ExchangeConfig {
+fn progress_advances_through_link_flow() {
+    let mut engine = ExchangeEngine::new(ExchangeConfig {
         mode: Some(ExchangeMode::Link),
         available_groups: vec![],
         ..config_with_mode_selection()
     });
-    let link_screen = link.current_screen();
-    let link_total = link_screen.progress.as_ref().unwrap().total_steps;
 
-    assert_eq!(
-        glance_total, link_total,
-        "Total steps must be the same across modes for consistent progress bar"
+    // Link starts at step 4 (after mode=1, groups=2, preview=3)
+    let s1 = engine.current_screen();
+    let step1 = s1.progress.as_ref().unwrap().current_step;
+
+    // Share → Waiting (step should advance)
+    let _ = engine.handle_action(UserAction::ActionPressed {
+        action_id: "share".to_string(),
+    });
+    let s2 = engine.current_screen();
+    let step2 = s2.progress.as_ref().unwrap().current_step;
+
+    assert!(
+        step2 > step1,
+        "Step must advance from ShareUrl ({step1}) to WaitingForResponse ({step2})"
     );
+    assert_eq!(s2.progress.as_ref().unwrap().total_steps, 8);
 }

@@ -82,7 +82,11 @@ pub use api::{
 pub mod aha_moments;
 pub use aha_moments::AhaMoment;
 pub mod backup;
-pub use backup::{BackupError, export_contact_backup, import_contact_backup};
+pub use backup::{
+    BackupError, BackupSections, FullBackupEnvelope, FullBackupIdentityData, IdentitySection,
+    LabelSection, export_contact_backup, export_full_backup, extract_master_seed,
+    import_contact_backup, import_full_backup, restore_contacts_from_envelope,
+};
 pub mod demo_contact;
 pub use demo_contact::{
     DEMO_CONTACT_ID, DEMO_CONTACT_NAME, DemoContactCard, DemoTip, DemoTipCategory,

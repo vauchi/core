@@ -76,7 +76,7 @@ fn parse_rejects_short_pk() {
 #[test]
 fn parse_rejects_invalid_base64() {
     let url = "vauchi://exchange?pk=!!!invalid!!!&n=!!!also!!!";
-    assert!(parse_link_url(&url).is_none());
+    assert!(parse_link_url(url).is_none());
 }
 
 // ================================================================

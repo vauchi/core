@@ -10,6 +10,7 @@
 //! dispatch to platform hardware (camera, BLE, NFC, audio).
 
 use crate::ui::exchange_field_preview::{self, FieldPreviewConfig, FieldPreviewResult};
+use crate::ui::exchange_link::{self, LinkActionOutcome, LinkStep};
 use crate::ui::exchange_mode_selection::{ModeSelectionEngine, ModeSelectionResult};
 use crate::ui::exchange_qr::{self, QrActionOutcome, QrStep};
 use crate::ui::*;
@@ -72,6 +73,8 @@ enum ExchangeStep {
     FieldPreview,
     /// QR exchange sub-flow (Glance/Hover modes).
     Qr(QrStep),
+    /// Link exchange sub-flow (async relay-mediated).
+    Link(LinkStep),
     Success,
     Failed,
 }
@@ -82,15 +85,18 @@ impl ExchangeStep {
             Self::ModeSelection => 1,
             Self::GroupSelection => 2,
             Self::FieldPreview => 3,
-            // QR steps start at 4 (after mode + group + preview)
+            // Sub-flow steps start at 4 (after mode + group + preview)
             Self::Qr(qr) => qr.step_number(4),
+            Self::Link(link) => link.step_number(4),
             Self::Success => 4 + QrStep::STEP_COUNT,
             Self::Failed => 5 + QrStep::STEP_COUNT,
         }
     }
 }
 
-// mode + group + preview + qr + success/failed
+// mode + group + preview + sub-flow + success/failed
+// QR and Link sub-flows must have the same step count for consistent progress.
+const _: () = assert!(QrStep::STEP_COUNT == LinkStep::STEP_COUNT);
 const TOTAL_STEPS: u8 = 3 + QrStep::STEP_COUNT + 2;
 
 impl ExchangeEngine {
@@ -103,6 +109,9 @@ impl ExchangeEngine {
             return ExchangeStep::ModeSelection;
         }
         if config.available_groups.is_empty() {
+            if config.mode == Some(ExchangeMode::Link) {
+                return ExchangeStep::Link(LinkStep::ShareUrl);
+            }
             ExchangeStep::Qr(QrStep::ShowQr)
         } else {
             ExchangeStep::GroupSelection
@@ -309,6 +318,18 @@ impl ExchangeEngine {
             ExchangeStep::Qr(QrStep::Verifying) => {
                 exchange_qr::build_verifying_screen(self.progress())
             }
+            ExchangeStep::Link(LinkStep::ShareUrl) => {
+                exchange_link::build_share_url_screen(
+                    &self.config.own_qr_data, // TODO: replace with generated link URL
+                    self.progress(),
+                )
+            }
+            ExchangeStep::Link(LinkStep::WaitingForResponse) => {
+                exchange_link::build_waiting_screen(self.progress())
+            }
+            ExchangeStep::Link(LinkStep::Retrieving) => {
+                exchange_link::build_retrieving_screen(self.progress())
+            }
             ExchangeStep::Success => ScreenModel {
                 screen_id: "exchange_success".into(),
                 title: "Success".into(),
@@ -475,8 +496,12 @@ impl WorkflowEngine for ExchangeEngine {
                     ModeSelectionResult::Selected(mode) => {
                         self.config.mode = Some(mode);
                         self.mode_selection = None;
-                        // Advance to group selection or directly to QR
+                        // Advance to group selection or directly to sub-flow
                         if self.config.available_groups.is_empty() {
+                            if mode == ExchangeMode::Link {
+                                self.step = ExchangeStep::Link(LinkStep::ShareUrl);
+                                return ActionResult::NavigateTo(self.build_screen());
+                            }
                             self.step = ExchangeStep::Qr(QrStep::ShowQr);
                             return self.start_session_if_needed();
                         } else {
@@ -530,6 +555,11 @@ impl WorkflowEngine for ExchangeEngine {
                 {
                     match outcome {
                         FieldPreviewResult::StartExchange => {
+                            // Route to sub-flow based on selected mode
+                            if self.config.mode == Some(ExchangeMode::Link) {
+                                self.step = ExchangeStep::Link(LinkStep::ShareUrl);
+                                return ActionResult::NavigateTo(self.build_screen());
+                            }
                             self.step = ExchangeStep::Qr(QrStep::ShowQr);
                             return self.start_session_if_needed();
                         }
@@ -567,6 +597,20 @@ impl WorkflowEngine for ExchangeEngine {
                             self.step = ExchangeStep::Qr(QrStep::Verifying);
                             ActionResult::NavigateTo(self.build_screen())
                         }
+                    }
+                } else {
+                    ActionResult::UpdateScreen(self.build_screen())
+                }
+            }
+            // Link sub-flow actions
+            (ExchangeStep::Link(link_step), ref user_action) => {
+                if let Some(outcome) = exchange_link::handle_link_action(link_step, user_action) {
+                    match outcome {
+                        LinkActionOutcome::ShareRequested => {
+                            self.step = ExchangeStep::Link(LinkStep::WaitingForResponse);
+                            ActionResult::NavigateTo(self.build_screen())
+                        }
+                        LinkActionOutcome::Cancelled => ActionResult::Complete,
                     }
                 } else {
                     ActionResult::UpdateScreen(self.build_screen())
@@ -1259,5 +1303,68 @@ mod tests {
             action_id: "change_groups".into(),
         });
         assert_eq!(engine.step, ExchangeStep::GroupSelection);
+    }
+
+    // ── Link mode routing ─────────────────────────────────────────
+
+    #[test]
+    fn test_link_mode_starts_at_share_url() {
+        let engine = ExchangeEngine::new(ExchangeConfig {
+            mode: Some(ExchangeMode::Link),
+            ..config_no_groups()
+        });
+        assert_eq!(engine.step, ExchangeStep::Link(LinkStep::ShareUrl));
+        let screen = engine.current_screen();
+        assert_eq!(screen.screen_id, "exchange_share_url");
+    }
+
+    #[test]
+    fn test_link_mode_share_advances_to_waiting() {
+        let mut engine = ExchangeEngine::new(ExchangeConfig {
+            mode: Some(ExchangeMode::Link),
+            ..config_no_groups()
+        });
+        let _ = engine.handle_action(UserAction::ActionPressed {
+            action_id: "share".into(),
+        });
+        assert_eq!(
+            engine.step,
+            ExchangeStep::Link(LinkStep::WaitingForResponse)
+        );
+        let screen = engine.current_screen();
+        assert_eq!(screen.screen_id, "exchange_link_waiting");
+    }
+
+    #[test]
+    fn test_link_mode_cancel_completes() {
+        let mut engine = ExchangeEngine::new(ExchangeConfig {
+            mode: Some(ExchangeMode::Link),
+            ..config_no_groups()
+        });
+        let result = engine.handle_action(UserAction::ActionPressed {
+            action_id: "cancel".into(),
+        });
+        assert_eq!(result, ActionResult::Complete);
+    }
+
+    #[test]
+    fn test_link_mode_with_groups_goes_through_preview() {
+        let mut engine = ExchangeEngine::new(ExchangeConfig {
+            mode: Some(ExchangeMode::Link),
+            ..config_with_groups()
+        });
+        assert_eq!(engine.step, ExchangeStep::GroupSelection);
+
+        // Continue → FieldPreview
+        let _ = engine.handle_action(UserAction::ActionPressed {
+            action_id: "continue".into(),
+        });
+        assert_eq!(engine.step, ExchangeStep::FieldPreview);
+
+        // Start exchange → Link ShareUrl (not QR)
+        let _ = engine.handle_action(UserAction::ActionPressed {
+            action_id: "start_exchange".into(),
+        });
+        assert_eq!(engine.step, ExchangeStep::Link(LinkStep::ShareUrl));
     }
 }

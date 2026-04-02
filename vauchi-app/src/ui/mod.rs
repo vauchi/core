@@ -27,6 +27,7 @@ mod emergency_shred;
 mod engine;
 mod exchange;
 mod exchange_field_preview;
+mod exchange_link;
 mod exchange_mode_selection;
 mod exchange_qr;
 mod fingerprint_verify;

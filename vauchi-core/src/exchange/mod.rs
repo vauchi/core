@@ -61,6 +61,7 @@ pub mod capability;
 pub mod card_snapshot;
 pub mod command;
 pub mod device_link;
+pub mod escrow;
 pub mod exchange_id;
 pub mod exchange_record;
 pub mod mode;

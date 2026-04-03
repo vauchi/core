@@ -105,6 +105,14 @@ pub struct SpacingDirectionTokens {
     pub content_end: u16,
     pub list_item_start: u16,
     pub list_item_end: u16,
+    #[serde(default = "default_list_item_inline")]
+    pub list_item_inline_start: u16,
+    #[serde(default = "default_list_item_inline")]
+    pub list_item_inline_end: u16,
+}
+
+fn default_list_item_inline() -> u16 {
+    12
 }
 
 /// Border radius tokens for rounded corners.
@@ -148,6 +156,8 @@ impl Default for DesignTokens {
                 content_end: 16,
                 list_item_start: 8,
                 list_item_end: 8,
+                list_item_inline_start: 12,
+                list_item_inline_end: 12,
             },
             typography: TypographyTokens {
                 title_size: 24,
@@ -537,6 +547,8 @@ mod tests {
         assert_eq!(tokens.spacing_direction.content_end, 16);
         assert_eq!(tokens.spacing_direction.list_item_start, 8);
         assert_eq!(tokens.spacing_direction.list_item_end, 8);
+        assert_eq!(tokens.spacing_direction.list_item_inline_start, 12);
+        assert_eq!(tokens.spacing_direction.list_item_inline_end, 12);
     }
 
     #[test]

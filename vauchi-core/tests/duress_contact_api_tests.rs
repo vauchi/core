@@ -70,13 +70,18 @@ fn test_get_contact_duress_hides_real_contacts() {
 fn test_get_contact_duress_returns_decoy() {
     let (wb, _bob_id) = setup_duress_with_decoy();
 
-    // Decoy contact must be accessible in duress mode
+    // Decoy contact IDs are derived (SHA256 of storage ID, hex-encoded).
+    // Look up via list_contacts first to get the actual ID.
+    let contacts = wb.list_contacts().expect("list should work");
+    assert_eq!(contacts.len(), 1);
+    let decoy_id = contacts[0].id().to_string();
+
     let result = wb
-        .get_contact("decoy-dana")
+        .get_contact(&decoy_id)
         .expect("get_contact should not error");
     assert!(
         result.is_some(),
-        "get_contact('decoy-dana') must return the decoy in duress mode"
+        "get_contact with decoy ID must return the decoy in duress mode"
     );
     assert_eq!(result.unwrap().display_name(), "Decoy Dana");
 }

@@ -16,8 +16,27 @@ use super::{AuthMode, Vauchi};
 impl Vauchi {
     // === Contact Operations ===
 
+    /// Converts decoy contact tuples into `Contact` objects (display-only).
+    fn decoy_contacts_as_contacts(&self) -> VauchiResult<Vec<Contact>> {
+        let decoys = self.storage.load_decoy_contacts()?;
+        Ok(decoys
+            .into_iter()
+            .map(|(id, _display_name, card)| {
+                Contact::from_exchange(decoy_id_to_fake_pk(&id), card, SymmetricKey::generate())
+            })
+            .collect())
+    }
+
     /// Gets a contact by ID.
+    ///
+    /// In duress mode, only decoy contacts are accessible.
     pub fn get_contact(&self, id: &str) -> VauchiResult<Option<Contact>> {
+        if self.auth_mode == AuthMode::Duress {
+            return Ok(self
+                .decoy_contacts_as_contacts()?
+                .into_iter()
+                .find(|c| c.id() == id));
+        }
         let manager = ContactManager::new(&self.storage, self.events.clone());
         manager.get_contact(id)
     }
@@ -28,51 +47,60 @@ impl Vauchi {
     ///   by hidden status, as before).
     /// - **Duress**: Returns decoy contacts only, presented as real contacts.
     pub fn list_contacts(&self) -> VauchiResult<Vec<Contact>> {
-        match self.auth_mode {
-            AuthMode::Duress => {
-                // Load decoy contacts and convert to Contact structs
-                let decoys = self.storage.load_decoy_contacts()?;
-                Ok(decoys
-                    .into_iter()
-                    .map(|(id, _display_name, card)| {
-                        Contact::from_exchange(
-                            // Use a deterministic "public key" derived from the ID
-                            // (decoys don't have real keys — this is display-only)
-                            decoy_id_to_fake_pk(&id),
-                            card,
-                            crate::crypto::SymmetricKey::generate(),
-                        )
-                    })
-                    .collect())
-            }
-            AuthMode::Normal | AuthMode::Unauthenticated => {
-                let manager = ContactManager::new(&self.storage, self.events.clone());
-                manager.list_contacts()
-            }
+        if self.auth_mode == AuthMode::Duress {
+            return self.decoy_contacts_as_contacts();
         }
+        let manager = ContactManager::new(&self.storage, self.events.clone());
+        manager.list_contacts()
     }
 
     /// Lists contacts with pagination.
+    ///
+    /// In duress mode, paginates over decoy contacts only.
     pub fn list_contacts_paginated(
         &self,
         offset: usize,
         limit: usize,
     ) -> VauchiResult<Vec<Contact>> {
+        if self.auth_mode == AuthMode::Duress {
+            let all = self.decoy_contacts_as_contacts()?;
+            return Ok(all.into_iter().skip(offset).take(limit).collect());
+        }
         let manager = ContactManager::new(&self.storage, self.events.clone());
         manager.list_contacts_paginated(offset, limit)
     }
 
     /// Searches contacts by display name.
+    ///
+    /// In duress mode, searches decoy contacts only.
     pub fn search_contacts(&self, query: &str) -> VauchiResult<Vec<Contact>> {
+        if self.auth_mode == AuthMode::Duress {
+            let query_lower = query.to_lowercase();
+            return Ok(self
+                .decoy_contacts_as_contacts()?
+                .into_iter()
+                .filter(|c| c.display_name().to_lowercase().contains(&query_lower))
+                .collect());
+        }
         let manager = ContactManager::new(&self.storage, self.events.clone());
         manager.search_contacts(query)
     }
 
     /// Finds contacts by fuzzy matching on display name or ID prefix.
     ///
-    /// Combines case-insensitive name substring matching with ID prefix matching.
-    /// Returns the union of both result sets, deduplicated.
+    /// In duress mode, fuzzy-matches decoy contacts only.
     pub fn find_contact_fuzzy(&self, query: &str) -> VauchiResult<Vec<Contact>> {
+        if self.auth_mode == AuthMode::Duress {
+            let query_lower = query.to_lowercase();
+            return Ok(self
+                .decoy_contacts_as_contacts()?
+                .into_iter()
+                .filter(|c| {
+                    c.display_name().to_lowercase().contains(&query_lower)
+                        || c.id().starts_with(query)
+                })
+                .collect());
+        }
         let manager = ContactManager::new(&self.storage, self.events.clone());
         manager.find_contact_fuzzy(query)
     }
@@ -92,7 +120,12 @@ impl Vauchi {
     }
 
     /// Returns the number of contacts.
+    ///
+    /// In duress mode, returns the decoy contact count.
     pub fn contact_count(&self) -> VauchiResult<usize> {
+        if self.auth_mode == AuthMode::Duress {
+            return Ok(self.storage.load_decoy_contacts()?.len());
+        }
         let manager = ContactManager::new(&self.storage, self.events.clone());
         manager.contact_count()
     }

@@ -11,6 +11,27 @@
 #![cfg(feature = "network-http")]
 
 use vauchi_core::api::{Vauchi, VauchiSyncOutcome};
+use vauchi_core::network::OhttpClient;
+
+/// Build a valid OHTTP key using the ohttp crate's server-side KeyConfig.
+///
+/// Uses the same cipher suite as the unit tests in `ohttp_client.rs`.
+/// Only available because dev-dependencies include the `server` feature of `ohttp`.
+#[cfg(feature = "testing")]
+fn make_test_ohttp_client() -> OhttpClient {
+    use ohttp::{KeyConfig, SymmetricSuite, hpke};
+    let config = KeyConfig::new(
+        0,
+        hpke::Kem::X25519Sha256,
+        vec![SymmetricSuite::new(
+            hpke::Kdf::HkdfSha256,
+            hpke::Aead::Aes128Gcm,
+        )],
+    )
+    .expect("KeyConfig::new must succeed");
+    let encoded = config.encode().expect("encode must succeed");
+    OhttpClient::new(encoded).expect("OhttpClient::new must succeed with valid config")
+}
 
 /// connect() requires an identity — must return IdentityNotInitialized.
 #[test]
@@ -50,12 +71,18 @@ fn test_sync_not_connected_returns_not_connected() {
 }
 
 /// sync() called before the timing deadline returns TooSoon (C1/C2 gate).
+///
+/// Requires a valid OHTTP key to be injected so the NotConnected gate is bypassed
+/// and the timing check is actually reached.
 #[test]
+#[cfg(feature = "testing")]
 fn test_sync_too_soon_returns_too_soon() {
     use std::time::{Duration, Instant};
 
     let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Test User").unwrap();
+    // Inject a valid OHTTP key so NotConnected gate passes.
+    vauchi.set_ohttp_key_for_testing(make_test_ohttp_client());
     vauchi.set_next_sync_allowed(Instant::now() + Duration::from_secs(3600));
     let result = vauchi.sync().unwrap();
     assert!(
@@ -75,4 +102,132 @@ fn test_disconnect_clears_ohttp_state() {
         matches!(result, VauchiSyncOutcome::NotConnected),
         "expected NotConnected after disconnect, got: {result:?}"
     );
+}
+
+/// set_post_exchange_delay() sets a timing deadline that causes sync() to return TooSoon.
+///
+/// Requires a valid OHTTP key to be injected so the NotConnected gate is bypassed.
+#[test]
+#[cfg(feature = "testing")]
+fn test_set_post_exchange_delay_blocks_sync() {
+    let mut vauchi = Vauchi::in_memory().unwrap();
+    vauchi.create_identity("Test User").unwrap();
+
+    // Inject a valid OHTTP key so the NotConnected gate passes.
+    vauchi.set_ohttp_key_for_testing(make_test_ohttp_client());
+
+    // set_post_exchange_delay() records a future deadline (C1 post-exchange jitter).
+    vauchi.set_post_exchange_delay();
+
+    // With a valid OHTTP key and a future deadline, TooSoon must be returned.
+    let result = vauchi.sync().unwrap();
+    assert!(
+        matches!(result, VauchiSyncOutcome::TooSoon),
+        "expected TooSoon after set_post_exchange_delay, got: {result:?}"
+    );
+}
+
+/// After connect() fails (no real relay), disconnect() still leaves sync() returning NotConnected.
+#[test]
+fn test_sync_outcome_not_connected_after_disconnect() {
+    let mut vauchi = Vauchi::in_memory().unwrap();
+    vauchi.create_identity("Test User").unwrap();
+
+    // connect() will fail — no relay is running. That is expected.
+    let _ = vauchi.connect();
+
+    // Disconnect clears any partial OHTTP state.
+    vauchi.disconnect();
+
+    let result = vauchi.sync().unwrap();
+    assert!(
+        matches!(result, VauchiSyncOutcome::NotConnected),
+        "expected NotConnected after disconnect, got: {result:?}"
+    );
+}
+
+/// OhttpConfig::default() has the correct production defaults.
+#[test]
+fn test_ohttp_config_defaults() {
+    use vauchi_core::api::OhttpConfig;
+
+    let cfg = OhttpConfig::default();
+    assert_eq!(
+        cfg.key_ttl_secs, 43200,
+        "default key_ttl_secs must be 43200 (12 h)"
+    );
+    assert!(
+        !cfg.allow_direct,
+        "allow_direct must be false in production defaults"
+    );
+}
+
+/// Storage roundtrip: save an OHTTP key via storage, load it back, verify bytes match.
+#[test]
+fn test_ohttp_cache_roundtrip_via_storage() {
+    let vauchi = Vauchi::in_memory().unwrap();
+    let storage = vauchi.storage();
+
+    let relay_url = "https://relay.example.test";
+    let key_bytes: Vec<u8> = vec![0xDE, 0xAD, 0xBE, 0xEF, 0xCA, 0xFE];
+
+    storage.save_ohttp_key(relay_url, &key_bytes).unwrap();
+
+    let loaded = storage.load_ohttp_key(relay_url).unwrap();
+    assert!(loaded.is_some(), "loaded key must be present after save");
+
+    let (loaded_bytes, fetched_at) = loaded.unwrap();
+    assert_eq!(
+        loaded_bytes, key_bytes,
+        "loaded bytes must match saved bytes"
+    );
+    assert!(fetched_at > 0, "fetched_at timestamp must be non-zero");
+}
+
+/// Sync gate ordering: NoIdentity is checked before NotConnected,
+/// and NotConnected is checked before TooSoon.
+#[test]
+#[cfg(feature = "testing")]
+fn test_sync_gate_ordering() {
+    use std::time::{Duration, Instant};
+
+    // Gate 1: NoIdentity — no identity, no OHTTP key, TooSoon deadline set.
+    // Must return NoIdentity, not NotConnected or TooSoon.
+    {
+        let mut vauchi = Vauchi::in_memory().unwrap();
+        vauchi.set_next_sync_allowed(Instant::now() + Duration::from_secs(3600));
+        let result = vauchi.sync().unwrap();
+        assert!(
+            matches!(result, VauchiSyncOutcome::NoIdentity),
+            "identity gate must fire before connection gate, got: {result:?}"
+        );
+    }
+
+    // Gate 2: NotConnected — identity present, no OHTTP key, TooSoon deadline set.
+    // Must return NotConnected, not TooSoon.
+    {
+        let mut vauchi = Vauchi::in_memory().unwrap();
+        vauchi.create_identity("Test User").unwrap();
+        vauchi.set_next_sync_allowed(Instant::now() + Duration::from_secs(3600));
+        // No connect() — ohttp_key is None
+        let result = vauchi.sync().unwrap();
+        assert!(
+            matches!(result, VauchiSyncOutcome::NotConnected),
+            "connection gate must fire before timing gate, got: {result:?}"
+        );
+    }
+
+    // Gate 3: TooSoon — identity present, valid OHTTP key injected, future deadline set.
+    // Must return TooSoon (both identity and connection gates pass).
+    {
+        let mut vauchi = Vauchi::in_memory().unwrap();
+        vauchi.create_identity("Test User").unwrap();
+        vauchi.set_ohttp_key_for_testing(make_test_ohttp_client());
+        vauchi.set_next_sync_allowed(Instant::now() + Duration::from_secs(3600));
+        let result = vauchi.sync().unwrap();
+        assert!(
+            matches!(result, VauchiSyncOutcome::TooSoon),
+            "timing gate must fire after identity+connection gates pass, got: {result:?}"
+        );
+    }
 }

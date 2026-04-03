@@ -484,7 +484,7 @@ required-features = ["testing"]
 
 [[test]]
 name = "vauchi_sync_http_tests"
-required-features = ["network-http"]
+required-features = ["network-http", "testing"]
 
 [[test]]
 name = "schema_gen"

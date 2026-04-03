@@ -27,12 +27,10 @@ use super::{Vauchi, VauchiSyncOutcome};
 use crate::api::error::{VauchiError, VauchiResult};
 use crate::api::sync_controller::SyncController;
 use crate::network::mailbox_token::{batch_register_tokens, current_day_epoch};
-use crate::network::message::{AckStatus, Acknowledgment, MessagePayload, RegisterMailbox};
-use crate::network::protocol::create_envelope;
-use crate::network::transport::{Transport, TransportConfig};
 use crate::network::{
-    HttpTransport, HttpTransportAdapter, HttpTransportConfig, OhttpClient, RelayClient,
-    RelayClientConfig,
+    AckStatus, Acknowledgment, HttpTransport, HttpTransportAdapter, HttpTransportConfig,
+    MessagePayload, OhttpClient, RegisterMailbox, RelayClient, RelayClientConfig, Transport,
+    TransportConfig, create_envelope,
 };
 use crate::sync::card_update::process_single_card_update;
 
@@ -155,6 +153,15 @@ impl Vauchi {
     #[cfg(any(test, feature = "testing"))]
     pub fn set_next_sync_allowed(&mut self, deadline: Instant) {
         self.next_sync_allowed = Some(deadline);
+    }
+
+    /// Test helper: inject a pre-built OHTTP key so tests can reach the
+    /// timing gates without calling `connect()` against a real relay.
+    ///
+    /// Only available with the `testing` feature.
+    #[cfg(feature = "testing")]
+    pub fn set_ohttp_key_for_testing(&mut self, client: OhttpClient) {
+        self.ohttp_key = Some(client);
     }
 
     /// Connect to the relay, bootstrapping the OHTTP key.

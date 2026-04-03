@@ -45,6 +45,11 @@ pub const MAX_CARD_SIZE_BYTES: usize = 65536;
 /// Maximum avatar data size in bytes (256 KB).
 pub const MAX_AVATAR_SIZE: usize = 262144;
 
+/// Current ContactCard schema version.
+/// Incremented when the serialized format changes.
+/// v0 = legacy (no schema_version field), v1 = first versioned format.
+pub const CURRENT_CARD_SCHEMA_VERSION: u32 = 1;
+
 /// Contact card errors.
 #[derive(Error, Debug)]
 #[non_exhaustive]
@@ -70,6 +75,10 @@ pub enum ContactCardError {
 /// A user's contact card containing personal information fields.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ContactCard {
+    /// Schema version for forward/backward compatibility.
+    /// Legacy data (pre-versioning) defaults to 0 via `#[serde(default)]`.
+    #[serde(default)]
+    schema_version: u32,
     /// Unique identifier for this card.
     id: String,
     /// User's display name.
@@ -99,6 +108,7 @@ impl ContactCard {
         let id = hex::encode(rand_id);
 
         ContactCard {
+            schema_version: CURRENT_CARD_SCHEMA_VERSION,
             id,
             display_name: normalize_text(display_name),
             fields: Vec::new(),
@@ -106,6 +116,12 @@ impl ContactCard {
             nickname: None,
             field_visibility: VisibilityRules::new(),
         }
+    }
+
+    /// Returns the schema version of this card's serialized format.
+    /// 0 = legacy (pre-versioning), 1 = first versioned format.
+    pub fn schema_version(&self) -> u32 {
+        self.schema_version
     }
 
     /// Returns the card's unique ID.

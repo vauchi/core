@@ -71,6 +71,24 @@ pub enum AuthMode {
     Unauthenticated,
 }
 
+/// Outcome of a `Vauchi::sync()` call.
+#[derive(Debug)]
+pub enum VauchiSyncOutcome {
+    /// Sync completed — received and sent counts.
+    Ok {
+        received: usize,
+        sent: usize,
+        acknowledged: usize,
+        errors: Vec<String>,
+    },
+    /// Called too soon (C1 post-exchange or C2 jitter).
+    TooSoon,
+    /// Not connected — call connect() first.
+    NotConnected,
+    /// Identity not created yet.
+    NoIdentity,
+}
+
 /// Main Vauchi orchestrator.
 ///
 /// This is the primary entry point for using Vauchi. It coordinates:

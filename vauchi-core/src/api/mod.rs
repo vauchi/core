@@ -150,5 +150,5 @@ pub use emergency::{BroadcastResult, EmergencyWipeStatus, MAX_TRUSTED_CONTACTS};
 // Vauchi
 pub use vauchi::{
     AuthMode, DeviceInfo, DeviceLinkResult, ExchangeQrData, ImportResult, RecoveryReadiness,
-    SetupProgress, Vauchi, VauchiBuilder,
+    SetupProgress, Vauchi, VauchiBuilder, VauchiSyncOutcome,
 };

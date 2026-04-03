@@ -1305,7 +1305,7 @@
           "additionalProperties": false
         },
         {
-          "description": "Check relay escrow gate readiness.",
+          "description": "Check relay escrow gate readiness (poll until ready).\n\nFrontends should poll at `suggested_interval_ms` with exponential backoff (cap at 5 min). Report `RelayEscrowReady` when gate has ≥2 deposits, or `RelayEscrowFailed` on error/timeout.",
           "type": "object",
           "required": [
             "RelayEscrowCheck"
@@ -1314,7 +1314,8 @@
             "RelayEscrowCheck": {
               "type": "object",
               "required": [
-                "gate_hash"
+                "gate_hash",
+                "suggested_interval_ms"
               ],
               "properties": {
                 "gate_hash": {
@@ -1324,6 +1325,12 @@
                     "format": "uint8",
                     "minimum": 0.0
                   }
+                },
+                "suggested_interval_ms": {
+                  "description": "Suggested initial polling interval in milliseconds.",
+                  "type": "integer",
+                  "format": "uint32",
+                  "minimum": 0.0
                 }
               }
             }
@@ -1638,6 +1645,8 @@
               "content_end": 16,
               "content_start": 16,
               "list_item_end": 8,
+              "list_item_inline_end": 12,
+              "list_item_inline_start": 12,
               "list_item_start": 8
             },
             "touch_target": {
@@ -1784,6 +1793,18 @@
           "minimum": 0.0
         },
         "list_item_end": {
+          "type": "integer",
+          "format": "uint16",
+          "minimum": 0.0
+        },
+        "list_item_inline_end": {
+          "default": 12,
+          "type": "integer",
+          "format": "uint16",
+          "minimum": 0.0
+        },
+        "list_item_inline_start": {
+          "default": 12,
           "type": "integer",
           "format": "uint16",
           "minimum": 0.0

@@ -12,7 +12,8 @@ use std::time::Duration;
 
 use serde::Serialize;
 use vauchi_protocol::v2::{
-    FetchedBlob, V2AckRequest, V2FetchRequest, V2PurgeRequest, V2Response, V2SendRequest,
+    FetchedBlob, V2AckRequest, V2ExchangeClaimRequest, V2ExchangeCompleteRequest,
+    V2ExchangeOfferRequest, V2FetchRequest, V2PurgeRequest, V2Response, V2SendRequest,
 };
 
 use super::error::NetworkError;
@@ -233,6 +234,78 @@ impl HttpTransport {
             Ok(())
         } else {
             Err(response_error("purge", &resp.error.unwrap_or_default()))
+        }
+    }
+
+    /// Posts an exchange offer payload to the relay.
+    ///
+    /// Returns the exchange code on success, which the initiator displays
+    /// as a short numeric code for the other party to enter.
+    pub fn exchange_offer(
+        &self,
+        payload_b64: &str,
+        expires_secs: Option<u64>,
+    ) -> Result<String, NetworkError> {
+        let req = V2ExchangeOfferRequest {
+            payload: payload_b64.to_string(),
+            expires_secs,
+        };
+        let resp = self.post_action("exchange_offer", &req)?;
+        if resp.status == "ok" {
+            resp.code
+                .ok_or_else(|| NetworkError::InvalidMessage("missing code in response".into()))
+        } else {
+            Err(response_error(
+                "exchange_offer",
+                &resp.error.unwrap_or_default(),
+            ))
+        }
+    }
+
+    /// Claims an exchange offer by code, submitting the responder's payload.
+    ///
+    /// Returns the initiator's payload (from the offer) on success.
+    pub fn exchange_claim(&self, code: &str, response_b64: &str) -> Result<String, NetworkError> {
+        let req = V2ExchangeClaimRequest {
+            code: code.to_string(),
+            response: response_b64.to_string(),
+        };
+        let resp = self.post_action("exchange_claim", &req)?;
+        if resp.status == "ok" {
+            resp.payload
+                .ok_or_else(|| NetworkError::InvalidMessage("missing payload in response".into()))
+        } else {
+            Err(response_error(
+                "exchange_claim",
+                &resp.error.unwrap_or_default(),
+            ))
+        }
+    }
+
+    /// Polls for the responder's payload after the initiator's offer has been claimed.
+    ///
+    /// Returns `Ok(Some(payload))` when the responder has claimed the offer,
+    /// `Ok(None)` when the offer has not yet been claimed ("not yet claimed"),
+    /// or an error for other failure cases.
+    pub fn exchange_complete(&self, code: &str) -> Result<Option<String>, NetworkError> {
+        let req = V2ExchangeCompleteRequest {
+            code: code.to_string(),
+        };
+        let resp = self.post_action("exchange_complete", &req);
+        match resp {
+            Ok(r) if r.status == "ok" => Ok(r.response),
+            Ok(r) => {
+                let err_msg = r.error.unwrap_or_default();
+                if err_msg.contains("not yet claimed") {
+                    Ok(None)
+                } else {
+                    Err(response_error("exchange_complete", &err_msg))
+                }
+            }
+            Err(NetworkError::InvalidMessage(ref msg)) if msg.contains("not yet claimed") => {
+                Ok(None)
+            }
+            Err(e) => Err(e),
         }
     }
 

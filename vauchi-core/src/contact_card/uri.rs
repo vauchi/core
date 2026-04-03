@@ -603,6 +603,7 @@ mod tests {
         assert!(!is_blocked_scheme("tel"));
     }
 
+    // @scenario: security:Relay URL validation
     #[test]
     fn test_relay_url_wss_requires_host() {
         assert!(is_valid_relay_url("wss://relay.vauchi.app"));
@@ -614,12 +615,14 @@ mod tests {
         assert!(!is_valid_relay_url("wss:///"));
     }
 
+    // @scenario: security:Relay URL validation
     #[test]
     fn test_relay_url_rejects_null_bytes() {
         assert!(!is_valid_relay_url("wss://relay.vauchi.app\0"));
         assert!(!is_valid_relay_url("wss://evil\0.example.com"));
     }
 
+    // @scenario: security:Relay URL validation
     #[test]
     fn test_relay_url_ws_localhost_only() {
         assert!(is_valid_relay_url("ws://localhost:9001"));
@@ -628,6 +631,7 @@ mod tests {
         assert!(!is_valid_relay_url("ws://relay.example.com"));
     }
 
+    // @scenario: security:Relay URL validation
     #[test]
     fn test_relay_url_rejects_other_schemes() {
         assert!(!is_valid_relay_url("https://relay.example.com"));

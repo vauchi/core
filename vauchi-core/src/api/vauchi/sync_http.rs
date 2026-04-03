@@ -482,7 +482,7 @@ impl Vauchi {
     ///
     /// Converts `wss://` to `https://` and `ws://` to `http://`.
     /// Falls through unchanged for URLs that are already `http(s)://`.
-    fn http_relay_url(&self) -> String {
+    pub(crate) fn http_relay_url(&self) -> String {
         let url = &self.config.relay.server_url;
         if let Some(rest) = url.strip_prefix("wss://") {
             format!("https://{rest}")

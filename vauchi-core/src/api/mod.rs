@@ -152,3 +152,5 @@ pub use vauchi::{
     AuthMode, DeviceInfo, DeviceLinkResult, ExchangeQrData, ImportResult, RecoveryReadiness,
     SetupProgress, Vauchi, VauchiBuilder, VauchiSyncOutcome,
 };
+#[cfg(feature = "network-http")]
+pub use vauchi::{RelayExchangeOffer, RelayExchangeResult};

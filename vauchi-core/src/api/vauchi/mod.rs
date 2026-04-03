@@ -11,6 +11,8 @@ mod contacts;
 mod devices;
 mod emergency;
 mod exchange;
+#[cfg(feature = "network-http")]
+mod exchange_relay;
 mod features;
 mod identity;
 mod import;
@@ -26,6 +28,8 @@ mod visibility;
 pub use builder::VauchiBuilder;
 pub use devices::{DeviceInfo, DeviceLinkResult};
 pub use exchange::ExchangeQrData;
+#[cfg(feature = "network-http")]
+pub use exchange_relay::{RelayExchangeOffer, RelayExchangeResult};
 pub use import::ImportResult;
 pub use setup::SetupProgress;
 

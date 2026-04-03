@@ -126,6 +126,30 @@ impl HttpTransport {
         &self.config.proxy
     }
 
+    /// Fetch the relay's OHTTP gateway public key.
+    ///
+    /// Always uses direct HTTP (not OHTTP) — this is the
+    /// bootstrap step before OHTTP can be activated.
+    /// Returns the raw encoded key config bytes (RFC 9458).
+    pub fn fetch_ohttp_key(&self) -> Result<Vec<u8>, NetworkError> {
+        let agent = self.agent.as_ref().map_err(|e| e.clone())?;
+        let url = format!("{}/v2/ohttp-key", self.config.relay_url);
+        let resp = agent
+            .get(&url)
+            .call()
+            .map_err(|e| NetworkError::ConnectionFailed(e.to_string()))?;
+        let body = resp
+            .into_body()
+            .read_to_vec()
+            .map_err(|e| NetworkError::ConnectionFailed(e.to_string()))?;
+        if body.is_empty() {
+            return Err(NetworkError::InvalidMessage(
+                "empty OHTTP key response".into(),
+            ));
+        }
+        Ok(body)
+    }
+
     /// Checks if the relay is reachable.
     pub fn health_check(&self) -> Result<(), NetworkError> {
         let url = format!("{}/v2/health", self.config.relay_url);

@@ -19,6 +19,8 @@ mod onboarding;
 mod propagation;
 mod security;
 mod setup;
+#[cfg(feature = "network-http")]
+mod sync_http;
 mod visibility;
 
 pub use builder::VauchiBuilder;
@@ -150,7 +152,6 @@ pub struct Vauchi {
 
     /// Cached OHTTP key (loaded from Storage on connect).
     #[cfg(feature = "network-http")]
-    #[allow(dead_code)]
     ohttp_key: Option<crate::network::OhttpClient>,
     /// Deadline before which sync() returns TooSoon.
     #[allow(dead_code)]

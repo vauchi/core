@@ -483,5 +483,9 @@ name = "ohttp_key_cache_tests"
 required-features = ["testing"]
 
 [[test]]
+name = "vauchi_sync_http_tests"
+required-features = ["network-http"]
+
+[[test]]
 name = "schema_gen"
 required-features = ["schema-gen"]

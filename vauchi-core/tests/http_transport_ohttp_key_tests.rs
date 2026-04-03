@@ -13,6 +13,7 @@
 use vauchi_core::network::http_transport::{HttpTransport, HttpTransportConfig};
 use vauchi_core::network::transport::ProxyConfig;
 
+// @scenario: sync:OHTTP key fetch
 #[test]
 fn test_fetch_ohttp_key_builds_correct_url() {
     let config = HttpTransportConfig {
@@ -34,6 +35,7 @@ fn test_fetch_ohttp_key_builds_correct_url() {
     );
 }
 
+// @scenario: sync:OHTTP key fetch
 #[test]
 fn test_fetch_ohttp_key_empty_response_is_error() {
     // This test verifies the method exists and returns

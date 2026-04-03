@@ -33,6 +33,7 @@ fn make_test_ohttp_client() -> OhttpClient {
     OhttpClient::new(encoded).expect("OhttpClient::new must succeed with valid config")
 }
 
+// @scenario: sync_privacy:OHTTP sync gate checks
 /// connect() requires an identity — must return IdentityNotInitialized.
 #[test]
 fn test_connect_without_identity_returns_error() {
@@ -46,6 +47,7 @@ fn test_connect_without_identity_returns_error() {
     );
 }
 
+// @scenario: sync_privacy:OHTTP sync gate checks
 /// sync() without an identity returns NoIdentity.
 #[test]
 fn test_sync_no_identity_returns_no_identity() {
@@ -57,6 +59,7 @@ fn test_sync_no_identity_returns_no_identity() {
     );
 }
 
+// @scenario: sync_privacy:OHTTP sync gate checks
 /// sync() without calling connect() first returns NotConnected.
 #[test]
 fn test_sync_not_connected_returns_not_connected() {
@@ -70,6 +73,7 @@ fn test_sync_not_connected_returns_not_connected() {
     );
 }
 
+// @scenario: sync_privacy:OHTTP sync gate checks
 /// sync() called before the timing deadline returns TooSoon (C1/C2 gate).
 ///
 /// Requires a valid OHTTP key to be injected so the NotConnected gate is bypassed
@@ -91,6 +95,7 @@ fn test_sync_too_soon_returns_too_soon() {
     );
 }
 
+// @scenario: sync_privacy:OHTTP key bootstrap on connect
 /// disconnect() clears the OHTTP key so sync() returns NotConnected.
 #[test]
 fn test_disconnect_clears_ohttp_state() {
@@ -104,6 +109,7 @@ fn test_disconnect_clears_ohttp_state() {
     );
 }
 
+// @scenario: sync_privacy:OHTTP sync gate checks
 /// set_post_exchange_delay() sets a timing deadline that causes sync() to return TooSoon.
 ///
 /// Requires a valid OHTTP key to be injected so the NotConnected gate is bypassed.
@@ -127,6 +133,7 @@ fn test_set_post_exchange_delay_blocks_sync() {
     );
 }
 
+// @scenario: sync_privacy:OHTTP key bootstrap on connect
 /// After connect() fails (no real relay), disconnect() still leaves sync() returning NotConnected.
 #[test]
 fn test_sync_outcome_not_connected_after_disconnect() {
@@ -146,6 +153,7 @@ fn test_sync_outcome_not_connected_after_disconnect() {
     );
 }
 
+// @scenario: sync_privacy:OHTTP key bootstrap on connect
 /// OhttpConfig::default() has the correct production defaults.
 #[test]
 fn test_ohttp_config_defaults() {
@@ -162,6 +170,7 @@ fn test_ohttp_config_defaults() {
     );
 }
 
+// @scenario: sync_privacy:OHTTP key cache persistence
 /// Storage roundtrip: save an OHTTP key via storage, load it back, verify bytes match.
 #[test]
 fn test_ohttp_cache_roundtrip_via_storage() {
@@ -184,6 +193,7 @@ fn test_ohttp_cache_roundtrip_via_storage() {
     assert!(fetched_at > 0, "fetched_at timestamp must be non-zero");
 }
 
+// @scenario: sync_privacy:OHTTP sync gate checks
 /// Sync gate ordering: NoIdentity is checked before NotConnected,
 /// and NotConnected is checked before TooSoon.
 #[test]

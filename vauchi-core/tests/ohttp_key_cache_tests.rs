@@ -11,6 +11,7 @@ fn open_storage() -> Storage {
     Storage::in_memory(SymmetricKey::generate()).unwrap()
 }
 
+// @scenario: sync:OHTTP key cache persistence
 #[test]
 fn test_ohttp_cache_save_and_load() {
     let storage = open_storage();
@@ -24,6 +25,7 @@ fn test_ohttp_cache_save_and_load() {
     assert!(fetched_at > 0);
 }
 
+// @scenario: sync:OHTTP key cache persistence
 #[test]
 fn test_ohttp_cache_returns_none_when_empty() {
     let storage = open_storage();
@@ -31,6 +33,7 @@ fn test_ohttp_cache_returns_none_when_empty() {
     assert!(cached.is_none());
 }
 
+// @scenario: sync:OHTTP key cache persistence
 #[test]
 fn test_ohttp_cache_clear() {
     let storage = open_storage();
@@ -41,6 +44,7 @@ fn test_ohttp_cache_clear() {
     assert!(cached.is_none());
 }
 
+// @scenario: sync:OHTTP key cache persistence
 #[test]
 fn test_ohttp_cache_upsert_overwrites() {
     let storage = open_storage();

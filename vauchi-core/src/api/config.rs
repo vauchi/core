@@ -16,8 +16,15 @@ use crate::network::{
     MultiRelayConfig, PinnedCertificate, ProxyConfig, RelayClientConfig, TransportConfig,
 };
 /// Configuration for Vauchi instance.
+///
+/// Use `VauchiConfig::default()` with field overrides:
+/// ```ignore
+/// let config = VauchiConfig {
+///     storage_path: "/custom/path".into(),
+///     ..Default::default()
+/// };
+/// ```
 #[derive(Debug, Clone)]
-#[non_exhaustive]
 pub struct VauchiConfig {
     /// Storage directory for identity, contacts, and sync state.
     pub storage_path: PathBuf,

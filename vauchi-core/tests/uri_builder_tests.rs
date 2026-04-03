@@ -44,8 +44,7 @@ fn test_phone_with_parentheses() {
 #[test]
 fn test_phone_to_action_returns_call() {
     let field = ContactField::new(FieldType::Phone, "Mobile", "+1-555-123-4567");
-    let action = field.to_action();
-    assert!(matches!(action, ContactAction::Call(_)));
+    assert!(matches!(field.to_action(), ContactAction::Call(_)));
 }
 
 // ============================================================
@@ -208,36 +207,23 @@ fn test_address_to_action_returns_open_map() {
 // Custom Field → Heuristic Detection
 // ============================================================
 
-// @scenario: contact_actions :: Custom field with phone-like value offers call
-#[test]
-fn test_custom_field_with_phone_pattern_detected() {
-    let field = ContactField::new(FieldType::Custom, "Signal", "+1-555-987-6543");
-    let detected = field.detect_value_type();
-    assert_eq!(detected, Some(FieldType::Phone));
-}
-
-// @scenario: contact_actions :: Custom field with email-like value offers email
-#[test]
-fn test_custom_field_with_email_pattern_detected() {
-    let field = ContactField::new(FieldType::Custom, "Alternate", "bob.alt@email.com");
-    let detected = field.detect_value_type();
-    assert_eq!(detected, Some(FieldType::Email));
-}
-
-// @scenario: contact_actions :: Custom field with URL-like value offers browser
-#[test]
-fn test_custom_field_with_url_pattern_detected() {
-    let field = ContactField::new(FieldType::Custom, "Portfolio", "https://portfolio.bob.com");
-    let detected = field.detect_value_type();
-    assert_eq!(detected, Some(FieldType::Website));
-}
-
-// @scenario: contact_actions :: Custom field with plain text shows copy option
-#[test]
-fn test_custom_field_with_plain_text_not_detected() {
-    let field = ContactField::new(FieldType::Custom, "Notes", "Met at conference");
-    let detected = field.detect_value_type();
-    assert!(detected.is_none());
+// @scenario: contact_actions :: Custom field heuristic detection
+#[rstest::rstest]
+#[case("Signal", "+1-555-987-6543", Some(FieldType::Phone))]
+#[case("Alternate", "bob.alt@email.com", Some(FieldType::Email))]
+#[case("Portfolio", "https://portfolio.bob.com", Some(FieldType::Website))]
+#[case("Notes", "Met at conference", None)]
+fn test_custom_field_value_type_detection(
+    #[case] label: &str,
+    #[case] value: &str,
+    #[case] expected: Option<FieldType>,
+) {
+    let field = ContactField::new(FieldType::Custom, label, value);
+    assert_eq!(
+        field.detect_value_type(),
+        expected,
+        "Custom field '{label}' with '{value}' detection mismatch"
+    );
 }
 
 // @scenario: contact_actions :: Custom field with phone-like value offers call
@@ -271,93 +257,43 @@ fn test_custom_to_action_copy_for_plain_text() {
 // ============================================================
 
 // @scenario: contact_actions :: URLs are validated before opening
-#[test]
-fn test_blocked_javascript_scheme() {
-    // Even if someone tries to inject javascript:, it should be blocked
-    let field = ContactField::new(FieldType::Website, "Malicious", "javascript:alert(1)");
+// @scenario: contact_actions :: Only safe URI schemes are allowed
+#[rstest::rstest]
+#[case("javascript:alert(1)")]
+#[case("file:///etc/passwd")]
+#[case("data:text/html,<script>alert(1)</script>")]
+fn test_blocked_uri_scheme_returns_none(#[case] value: &str) {
+    let field = ContactField::new(FieldType::Website, "Test", value);
     let uri = field.to_uri();
-    assert!(uri.is_none());
+    assert!(uri.is_none(), "{value} should be blocked");
 }
 
-// @scenario: contact_actions :: Only safe URI schemes are allowed
-#[test]
-fn test_blocked_file_scheme() {
-    let field = ContactField::new(FieldType::Website, "Local", "file:///etc/passwd");
-    let uri = field.to_uri();
-    assert!(uri.is_none());
-}
-
-// @scenario: contact_actions :: Only safe URI schemes are allowed
-#[test]
-fn test_blocked_data_scheme() {
-    let field = ContactField::new(
-        FieldType::Website,
-        "Data",
-        "data:text/html,<script>alert(1)</script>",
+// @scenario: contact_actions :: Allowed URI schemes whitelist (#47)
+#[rstest::rstest]
+#[case("tel")]
+#[case("mailto")]
+#[case("https")]
+#[case("http")]
+#[case("sms")]
+#[case("geo")]
+fn test_allowed_scheme(#[case] scheme: &str) {
+    assert!(
+        vauchi_core::contact_card::is_allowed_scheme(scheme),
+        "{scheme} should be allowed"
     );
-    let uri = field.to_uri();
-    assert!(uri.is_none());
 }
 
 // @scenario: contact_actions :: Allowed URI schemes whitelist (#47)
-// @scenario: contact_actions :: Allowed URI schemes whitelist
-#[test]
-fn test_allowed_tel_scheme() {
-    assert!(vauchi_core::contact_card::is_allowed_scheme("tel"));
-}
-
-// @scenario: contact_actions :: Allowed URI schemes whitelist (#47)
-#[test]
-fn test_allowed_mailto_scheme() {
-    assert!(vauchi_core::contact_card::is_allowed_scheme("mailto"));
-}
-
-// @scenario: contact_actions :: Allowed URI schemes whitelist (#47)
-#[test]
-fn test_allowed_https_scheme() {
-    assert!(vauchi_core::contact_card::is_allowed_scheme("https"));
-}
-
-// @scenario: contact_actions :: Allowed URI schemes whitelist (#47)
-#[test]
-fn test_allowed_http_scheme() {
-    assert!(vauchi_core::contact_card::is_allowed_scheme("http"));
-}
-
-// @scenario: contact_actions :: Allowed URI schemes whitelist (#47)
-#[test]
-fn test_allowed_sms_scheme() {
-    assert!(vauchi_core::contact_card::is_allowed_scheme("sms"));
-}
-
-// @scenario: contact_actions :: Allowed URI schemes whitelist (#47)
-#[test]
-fn test_allowed_geo_scheme() {
-    assert!(vauchi_core::contact_card::is_allowed_scheme("geo"));
-}
-
-// @scenario: contact_actions :: Allowed URI schemes whitelist (#47)
-#[test]
-fn test_blocked_scheme_javascript() {
-    assert!(!vauchi_core::contact_card::is_allowed_scheme("javascript"));
-}
-
-// @scenario: contact_actions :: Allowed URI schemes whitelist (#47)
-#[test]
-fn test_blocked_scheme_file() {
-    assert!(!vauchi_core::contact_card::is_allowed_scheme("file"));
-}
-
-// @scenario: contact_actions :: Allowed URI schemes whitelist (#47)
-#[test]
-fn test_blocked_scheme_data() {
-    assert!(!vauchi_core::contact_card::is_allowed_scheme("data"));
-}
-
-// @scenario: contact_actions :: Allowed URI schemes whitelist (#47)
-#[test]
-fn test_blocked_scheme_vbscript() {
-    assert!(!vauchi_core::contact_card::is_allowed_scheme("vbscript"));
+#[rstest::rstest]
+#[case("javascript")]
+#[case("file")]
+#[case("data")]
+#[case("vbscript")]
+fn test_blocked_scheme(#[case] scheme: &str) {
+    assert!(
+        !vauchi_core::contact_card::is_allowed_scheme(scheme),
+        "{scheme} should be blocked"
+    );
 }
 
 // ============================================================

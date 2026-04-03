@@ -454,6 +454,11 @@ pub fn all_migrations() -> Vec<Migration> {
             name: "exchange_states",
             action: MigrationAction::Sql(MIGRATION_V38_EXCHANGE_STATES),
         },
+        Migration {
+            version: 39,
+            name: "ohttp_key_cache",
+            action: MigrationAction::Sql(MIGRATION_V39_OHTTP_KEY_CACHE),
+        },
     ]
 }
 
@@ -676,6 +681,19 @@ const MIGRATION_V38_EXCHANGE_STATES: &str = "
         expires_at INTEGER NOT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_exchange_states_expires ON exchange_states(expires_at);
+";
+
+/// Migration v39: OHTTP key cache for relay-fetched keys.
+///
+/// Stores the most recently fetched OHTTP key per relay URL so that
+/// callers can avoid redundant fetches across sessions. `fetched_at`
+/// is a Unix-epoch seconds timestamp for TTL checking.
+const MIGRATION_V39_OHTTP_KEY_CACHE: &str = "
+    CREATE TABLE IF NOT EXISTS ohttp_key_cache (
+        relay_url TEXT PRIMARY KEY,
+        key_bytes BLOB NOT NULL,
+        fetched_at INTEGER NOT NULL
+    );
 ";
 
 const MIGRATION_V35_LOCAL_GROUPS: &str = "

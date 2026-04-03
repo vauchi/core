@@ -156,7 +156,9 @@ pub use classify::{MessageType, classify_message};
 
 // HTTP transport for relay v2 protocol
 #[cfg(feature = "network-http")]
-pub use http_transport::{FetchedBlob, HttpTransport, HttpTransportConfig};
+pub use http_transport::{HttpTransport, HttpTransportConfig};
+#[cfg(feature = "network-http")]
+pub use vauchi_protocol::v2::FetchedBlob;
 
 // OHTTP client-side encryption (RFC 9458)
 #[cfg(feature = "network-http")]

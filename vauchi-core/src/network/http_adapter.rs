@@ -19,12 +19,13 @@ use std::collections::VecDeque;
 use base64::Engine;
 
 use super::error::NetworkError;
-use super::http_transport::{FetchedBlob, HttpTransport, HttpTransportConfig};
+use super::http_transport::{HttpTransport, HttpTransportConfig};
 use super::message::{
     EncryptedUpdate, MessageEnvelope, MessagePayload, PROTOCOL_VERSION, RatchetHeader,
 };
 use super::ohttp_client::OhttpClient;
 use super::transport::{ConnectionState, TransportConfig, TransportResult};
+use vauchi_protocol::v2::FetchedBlob;
 
 /// Adapts [`HttpTransport`] to the [`Transport`] trait.
 ///

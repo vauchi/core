@@ -124,13 +124,16 @@ fn test_claim_exchange_needs_identity() {
 #[cfg(feature = "testing")]
 #[test]
 fn test_complete_exchange_needs_identity() {
-    use vauchi_core::api::RelayExchangeOffer;
-
     let vauchi = Vauchi::in_memory().unwrap();
     // We can't construct RelayExchangeOffer directly (private fields),
-    // so we test that start_relay_exchange fails first.
+    // so we verify the identity gate via start_relay_exchange.
     let result = vauchi.start_relay_exchange(None);
     assert!(result.is_err());
+    let err = result.unwrap_err().to_string();
+    assert!(
+        err.contains("identity"),
+        "expected identity error, got: {err}"
+    );
 }
 
 #[test]

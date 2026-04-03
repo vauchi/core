@@ -1,0 +1,20 @@
+{
+  "id": "v0fixture0001",
+  "display_name": "Alice Fixture",
+  "fields": [
+    {
+      "id": "f001",
+      "field_type": "Phone",
+      "label": "Mobile",
+      "value": "+1-555-0100",
+      "updated_at": 0
+    },
+    {
+      "id": "f002",
+      "field_type": "Email",
+      "label": "Work",
+      "value": "alice@example.com",
+      "updated_at": 0
+    }
+  ]
+}

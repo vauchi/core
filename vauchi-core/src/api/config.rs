@@ -46,6 +46,9 @@ pub struct VauchiConfig {
 
     /// Multi-relay configuration (for federation client support).
     pub relay_list: Option<MultiRelayConfig>,
+
+    /// OHTTP privacy configuration.
+    pub ohttp: OhttpConfig,
 }
 
 impl Default for VauchiConfig {
@@ -60,6 +63,7 @@ impl Default for VauchiConfig {
             suppress_presence: false,
             recovery: RecoveryConfig::default(),
             relay_list: None,
+            ohttp: OhttpConfig::default(),
         }
     }
 }
@@ -270,6 +274,25 @@ impl SyncConfig {
         let max = base + delta;
         let ms = rand::thread_rng().gen_range(min..=max);
         Duration::from_millis(ms)
+    }
+}
+
+/// OHTTP privacy configuration.
+#[derive(Debug, Clone)]
+pub struct OhttpConfig {
+    /// Client-side key TTL in seconds (default 43200 = 12h).
+    pub key_ttl_secs: u64,
+    /// Allow direct (non-OHTTP) data requests.
+    /// Only for dev/testing — production must be false.
+    pub allow_direct: bool,
+}
+
+impl Default for OhttpConfig {
+    fn default() -> Self {
+        Self {
+            key_ttl_secs: 43200,
+            allow_direct: false,
+        }
     }
 }
 

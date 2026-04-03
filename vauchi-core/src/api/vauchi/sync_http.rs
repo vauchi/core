@@ -29,8 +29,8 @@ use crate::api::sync_controller::SyncController;
 use crate::network::mailbox_token::{batch_register_tokens, current_day_epoch};
 use crate::network::{
     AckStatus, Acknowledgment, HttpTransport, HttpTransportAdapter, HttpTransportConfig,
-    MessagePayload, OhttpClient, RegisterMailbox, RelayClient, RelayClientConfig, Transport,
-    TransportConfig, create_envelope,
+    MessagePayload, OhttpClient, RegisterMailbox, RelayClient, Transport, TransportConfig,
+    create_envelope,
 };
 use crate::sync::card_update::process_single_card_update;
 
@@ -56,10 +56,11 @@ impl Vauchi {
         }
 
         // C1 / C2 timing gate
-        if let Some(deadline) = self.next_sync_allowed {
-            if Instant::now() < deadline {
-                return Ok(VauchiSyncOutcome::TooSoon);
-            }
+        if self
+            .next_sync_allowed
+            .is_some_and(|deadline| Instant::now() < deadline)
+        {
+            return Ok(VauchiSyncOutcome::TooSoon);
         }
 
         // 2. Attempt sync, with one retry on stale OHTTP key
@@ -71,7 +72,7 @@ impl Vauchi {
             Err(ref e) if is_ohttp_key_error(e) => {
                 // Key is stale — evict cache, re-fetch, retry once
                 let relay_url = self.http_relay_url();
-                let _ = self.storage.save_ohttp_key(&relay_url, &[]);
+                let _ = self.storage.clear_ohttp_key(&relay_url);
                 let key_bytes = self.fetch_and_cache_ohttp_key(&relay_url)?;
                 let client = OhttpClient::new(key_bytes).map_err(VauchiError::Network)?;
                 self.ohttp_key = Some(client);
@@ -220,23 +221,18 @@ impl Vauchi {
 
         // 2. Fetch all pending blobs
         let mut ciphertexts: Vec<(String, Vec<u8>)> = Vec::new();
-        loop {
-            match adapter.receive().map_err(VauchiError::Network)? {
-                Some(envelope) => {
-                    if let MessagePayload::EncryptedUpdate(update) = envelope.payload {
-                        // Queue ACK for this blob
-                        let ack_envelope =
-                            create_envelope(MessagePayload::Acknowledgment(Acknowledgment {
-                                message_id: envelope.message_id,
-                                status: AckStatus::ReceivedByRecipient,
-                                error: None,
-                            }));
-                        let _ = adapter.send(&ack_envelope);
+        while let Some(envelope) = adapter.receive().map_err(VauchiError::Network)? {
+            if let MessagePayload::EncryptedUpdate(update) = envelope.payload {
+                // Queue ACK for this blob
+                let ack_envelope =
+                    create_envelope(MessagePayload::Acknowledgment(Acknowledgment {
+                        message_id: envelope.message_id,
+                        status: AckStatus::ReceivedByRecipient,
+                        error: None,
+                    }));
+                let _ = adapter.send(&ack_envelope);
 
-                        ciphertexts.push((update.sender_id, update.ciphertext));
-                    }
-                }
-                None => break,
+                ciphertexts.push((update.sender_id, update.ciphertext));
             }
         }
 
@@ -324,7 +320,11 @@ impl Vauchi {
         let our_id = hex::encode(identity.signing_public_key());
 
         // Build RelayClient wrapping the adapter
-        let relay = RelayClient::new(adapter, RelayClientConfig::default(), our_id);
+        let relay_config = self.config.relay.to_relay_client_config(
+            self.config.delivery_receipts_enabled,
+            self.config.suppress_presence,
+        );
+        let relay = RelayClient::new(adapter, relay_config, our_id);
 
         // Build SyncController
         let mut ctrl = SyncController::new(
@@ -365,7 +365,21 @@ impl Vauchi {
         );
 
         // Run the sync cycle (sends pending updates, processes ACKs)
-        ctrl.sync()
+        let result = ctrl.sync()?;
+
+        // Persist advanced ratchet states.
+        // SyncController.sync() advances ratchets via .encrypt() but
+        // does not save them. Without this, ratchet state is lost on
+        // drop, causing desync on next sync cycle.
+        let ratchets = ctrl.into_ratchets();
+        for (contact_id, ratchet) in &ratchets {
+            // Best-effort: if save fails for one contact, continue
+            // with others. The ratchet is still advanced in the
+            // recipient's state, so worst case we re-derive on retry.
+            let _ = self.storage.save_ratchet_state(contact_id, ratchet, false);
+        }
+
+        Ok(result)
     }
 
     // =====================================================================
@@ -473,12 +487,15 @@ impl Vauchi {
 
 /// Heuristic: does this error look like a stale/rejected OHTTP key?
 ///
-/// Checks for HTTP 400 responses or error messages containing "ohttp" or
-/// "key" — common signals when the relay rejects an outdated OHTTP config.
-/// This is intentionally broad: a false positive causes one extra key fetch,
-/// which is cheap. A false negative means the caller sees a transient error
-/// and retries on the next sync cycle.
+/// Checks for HTTP 400 responses or error messages containing "ohttp" —
+/// common signals when the relay rejects an outdated OHTTP config.
+/// A false positive causes one extra key fetch (cheap). A false negative
+/// means the caller sees a transient error and retries on the next sync.
 fn is_ohttp_key_error(err: &VauchiError) -> bool {
-    let msg = err.to_string().to_lowercase();
-    msg.contains("400") || msg.contains("ohttp") || msg.contains("key")
+    if let VauchiError::Network(ne) = err {
+        let msg = ne.to_string().to_lowercase();
+        msg.contains("400") || msg.contains("ohttp")
+    } else {
+        false
+    }
 }

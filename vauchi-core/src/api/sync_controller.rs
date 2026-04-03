@@ -376,6 +376,14 @@ impl<'a, T: Transport> SyncController<'a, T> {
         &mut self.relay
     }
 
+    /// Returns the ratchet states, consuming the controller.
+    ///
+    /// Use after `sync()` to persist advanced ratchet states
+    /// that were modified during encryption.
+    pub fn into_ratchets(self) -> HashMap<String, DoubleRatchetState> {
+        self.ratchets
+    }
+
     /// Returns a reference to the sync manager.
     pub fn sync_manager(&self) -> &SyncManager<'a> {
         &self.sync_manager

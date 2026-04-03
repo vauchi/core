@@ -219,31 +219,21 @@ impl Vauchi {
         // 1. Register mailbox tokens so the adapter knows what to fetch
         self.register_tokens(identity, adapter)?;
 
-        // 2. Fetch all pending blobs
-        let mut ciphertexts: Vec<(String, Vec<u8>)> = Vec::new();
+        // 2. Fetch all pending blobs (collect before processing)
+        let mut blobs: Vec<(String, String, Vec<u8>)> = Vec::new(); // (message_id, sender_id, ciphertext)
         while let Some(envelope) = adapter.receive().map_err(VauchiError::Network)? {
             if let MessagePayload::EncryptedUpdate(update) = envelope.payload {
-                // Queue ACK for this blob
-                let ack_envelope =
-                    create_envelope(MessagePayload::Acknowledgment(Acknowledgment {
-                        message_id: envelope.message_id,
-                        status: AckStatus::ReceivedByRecipient,
-                        error: None,
-                    }));
-                let _ = adapter.send(&ack_envelope);
-
-                ciphertexts.push((update.sender_id, update.ciphertext));
+                blobs.push((envelope.message_id, update.sender_id, update.ciphertext));
             }
         }
 
-        if ciphertexts.is_empty() {
+        if blobs.is_empty() {
             return Ok(0);
         }
 
-        // 3. For each ciphertext, try processing against each contact.
-        //    process_single_card_update loads the ratchet from storage,
-        //    attempts decryption, and only persists on success. Failed
-        //    attempts are harmless (ratchet not advanced).
+        // 3. For each blob: try decrypt → apply → ACK.
+        //    ACK is sent AFTER decryption attempt, not before.
+        //    If no ratchet matches, ACK anyway to prevent infinite redelivery.
         let contacts = self.storage.list_contacts().unwrap_or_default();
         let contact_ids: Vec<String> = contacts
             .iter()
@@ -252,18 +242,34 @@ impl Vauchi {
             .collect();
 
         let mut received = 0usize;
-        for (_sender_id, ciphertext) in &ciphertexts {
+        for (message_id, _sender_id, ciphertext) in &blobs {
             // Try each contact — the one whose ratchet decrypts successfully
-            // is the sender. This is O(contacts * messages) but both numbers
+            // is the sender. This is O(contacts × messages) but both numbers
             // are small for a personal contact app.
+            let mut decrypted = false;
             for contact_id in &contact_ids {
                 if process_single_card_update(identity, &self.storage, contact_id, ciphertext)
                     .is_ok()
                 {
                     received += 1;
+                    decrypted = true;
                     break;
                 }
             }
+
+            // ACK after attempting decryption — whether it succeeded or not.
+            // Success: message processed, relay can discard.
+            // Failure: undecryptable message, ACK prevents infinite redelivery.
+            let ack_envelope = create_envelope(MessagePayload::Acknowledgment(Acknowledgment {
+                message_id: message_id.clone(),
+                status: if decrypted {
+                    AckStatus::ReceivedByRecipient
+                } else {
+                    AckStatus::Stored // best-effort ACK for undecryptable
+                },
+                error: None,
+            }));
+            let _ = adapter.send(&ack_envelope);
         }
 
         Ok(received)

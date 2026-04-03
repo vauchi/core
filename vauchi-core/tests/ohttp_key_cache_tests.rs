@@ -54,3 +54,48 @@ fn test_ohttp_cache_upsert_overwrites() {
     let (bytes, _) = storage.load_ohttp_key(relay).unwrap().unwrap();
     assert_eq!(bytes, vec![3, 4]);
 }
+
+/// W-6: Clearing one relay's key must not affect other relays.
+///
+/// Verifies that the cache key includes the relay URL so that entries
+/// are truly isolated — a stale-key eviction for relay-A never silently
+/// removes relay-B's still-valid key.
+#[test]
+fn test_ohttp_cache_clear_does_not_affect_other_relays() {
+    let storage = open_storage();
+
+    storage
+        .save_ohttp_key("https://relay-a.example.com", &[1, 2])
+        .unwrap();
+    storage
+        .save_ohttp_key("https://relay-b.example.com", &[3, 4])
+        .unwrap();
+
+    // Clear only relay-a.
+    storage
+        .clear_ohttp_key("https://relay-a.example.com")
+        .unwrap();
+
+    // relay-b must be unaffected.
+    let b = storage
+        .load_ohttp_key("https://relay-b.example.com")
+        .unwrap();
+    assert!(
+        b.is_some(),
+        "relay-b key must still be present after clearing relay-a"
+    );
+    assert_eq!(
+        b.unwrap().0,
+        vec![3u8, 4],
+        "relay-b key bytes must be unchanged"
+    );
+
+    // relay-a must be gone.
+    let a = storage
+        .load_ohttp_key("https://relay-a.example.com")
+        .unwrap();
+    assert!(
+        a.is_none(),
+        "relay-a key must be absent after clear_ohttp_key"
+    );
+}

@@ -505,3 +505,119 @@ fn is_ohttp_key_error(err: &VauchiError) -> bool {
         false
     }
 }
+
+// INLINE_TEST_REQUIRED: is_ohttp_key_error and http_relay_url() are private
+// free functions / methods — they cannot be reached from tests/ without making
+// them pub(crate). Inline tests are the least-invasive way to cover them.
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::network::NetworkError;
+    use crate::storage::StorageError;
+
+    // =========================================================================
+    // W-3: is_ohttp_key_error heuristic
+    // =========================================================================
+
+    #[test]
+    fn test_is_ohttp_key_error_http_400() {
+        let err = VauchiError::Network(NetworkError::ConnectionFailed(
+            "400 Bad Request".to_string(),
+        ));
+        assert!(
+            is_ohttp_key_error(&err),
+            "Network error containing '400' must be classified as an OHTTP key error"
+        );
+    }
+
+    #[test]
+    fn test_is_ohttp_key_error_ohttp_in_message() {
+        let err = VauchiError::Network(NetworkError::RelayRejected(
+            "ohttp decapsulation failed".to_string(),
+        ));
+        assert!(
+            is_ohttp_key_error(&err),
+            "Network error containing 'ohttp' must be classified as an OHTTP key error"
+        );
+    }
+
+    #[test]
+    fn test_is_ohttp_key_error_storage_error_is_false() {
+        let err = VauchiError::Storage(StorageError::NotFound("key".to_string()));
+        assert!(
+            !is_ohttp_key_error(&err),
+            "Storage error must NOT be classified as an OHTTP key error"
+        );
+    }
+
+    #[test]
+    fn test_is_ohttp_key_error_connection_refused_is_false() {
+        let err = VauchiError::Network(NetworkError::ConnectionFailed(
+            "connection refused".to_string(),
+        ));
+        assert!(
+            !is_ohttp_key_error(&err),
+            "Connection-refused error must NOT be classified as an OHTTP key error"
+        );
+    }
+
+    #[test]
+    fn test_is_ohttp_key_error_timeout_is_false() {
+        let err = VauchiError::Network(NetworkError::Timeout);
+        assert!(
+            !is_ohttp_key_error(&err),
+            "Timeout error must NOT be classified as an OHTTP key error"
+        );
+    }
+
+    // =========================================================================
+    // W-4: http_relay_url() scheme conversion
+    // =========================================================================
+
+    fn vauchi_with_server_url(url: &str) -> Vauchi {
+        use crate::api::VauchiConfig;
+        let mut cfg = VauchiConfig::default();
+        cfg.relay.server_url = url.to_string();
+        Vauchi::new(cfg).expect("Vauchi::new must succeed")
+    }
+
+    #[test]
+    fn test_http_relay_url_wss_converts_to_https() {
+        let v = vauchi_with_server_url("wss://relay.example.com/ws");
+        assert_eq!(
+            v.http_relay_url(),
+            "https://relay.example.com/ws",
+            "wss:// must be converted to https://"
+        );
+    }
+
+    #[test]
+    fn test_http_relay_url_ws_converts_to_http() {
+        let v = vauchi_with_server_url("ws://relay.local/ws");
+        assert_eq!(
+            v.http_relay_url(),
+            "http://relay.local/ws",
+            "ws:// must be converted to http://"
+        );
+    }
+
+    #[test]
+    fn test_http_relay_url_https_unchanged() {
+        let v = vauchi_with_server_url("https://relay.example.com");
+        assert_eq!(
+            v.http_relay_url(),
+            "https://relay.example.com",
+            "https:// must pass through unchanged"
+        );
+    }
+
+    #[test]
+    fn test_http_relay_url_http_unchanged() {
+        let v = vauchi_with_server_url("http://relay.local");
+        assert_eq!(
+            v.http_relay_url(),
+            "http://relay.local",
+            "http:// must pass through unchanged"
+        );
+    }
+}

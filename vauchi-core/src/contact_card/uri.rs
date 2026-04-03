@@ -135,6 +135,39 @@ pub fn is_safe_url(url: &str) -> bool {
     }
 }
 
+/// Validate a relay WebSocket URL.
+///
+/// Accepts:
+/// - `wss://` for any host (production relay)
+/// - `ws://` only for localhost/loopback (development)
+///
+/// Rejects all other schemes and non-loopback `ws://` hosts.
+pub fn is_valid_relay_url(url: &str) -> bool {
+    let url = url.trim();
+    let lower = url.to_lowercase();
+
+    if let Some(rest) = lower.strip_prefix("wss://") {
+        // wss:// is always allowed if there's a host
+        !rest.is_empty()
+    } else if let Some(rest) = lower.strip_prefix("ws://") {
+        // ws:// only for loopback
+        let authority = rest.split('/').next().unwrap_or("");
+        // Handle IPv6 bracket notation: [::1]:port
+        let host = if authority.starts_with('[') {
+            authority
+                .split(']')
+                .next()
+                .unwrap_or("")
+                .trim_start_matches('[')
+        } else {
+            authority.split(':').next().unwrap_or("")
+        };
+        host == "localhost" || host == "127.0.0.1" || host == "::1"
+    } else {
+        false
+    }
+}
+
 /// Extract scheme from a URI string.
 fn extract_scheme(uri: &str) -> Option<&str> {
     uri.split(':').next()

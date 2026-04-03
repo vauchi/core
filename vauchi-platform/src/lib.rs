@@ -483,6 +483,15 @@ pub fn is_safe_url(url: String) -> bool {
     vauchi_core::is_safe_url(&url)
 }
 
+/// Validate a relay WebSocket URL.
+///
+/// Accepts `wss://` for any host, `ws://` only for localhost/loopback.
+/// Use this to validate user-entered relay URLs before saving.
+#[uniffi::export]
+pub fn is_valid_relay_url(url: String) -> bool {
+    vauchi_core::is_valid_relay_url(&url)
+}
+
 /// Check if a URL scheme is in the allowed list.
 ///
 /// Allowed schemes: tel, mailto, sms, https, http, geo.

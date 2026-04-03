@@ -459,9 +459,17 @@ impl AppEngine {
                             alert_message: config.alert_message.clone(),
                             include_location: config.include_location,
                         };
-                        let _ = self.vauchi.save_duress_settings(&settings);
-                    } else {
-                        let _ = self.vauchi.disable_duress();
+                        if let Err(e) = self.vauchi.save_duress_settings(&settings) {
+                            return ActionResult::ShowAlert {
+                                title: "Error".into(),
+                                message: format!("Failed to save duress settings: {e}"),
+                            };
+                        }
+                    } else if let Err(e) = self.vauchi.disable_duress() {
+                        return ActionResult::ShowAlert {
+                            title: "Error".into(),
+                            message: format!("Failed to disable duress: {e}"),
+                        };
                     }
                 }
                 let screen = self.navigate_back();

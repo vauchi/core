@@ -435,6 +435,38 @@ impl AppEngine {
                     }
                 }
             }
+            AppScreen::DuressPin => {
+                let dp_engine = self
+                    .engine
+                    .as_any()
+                    .and_then(|a| a.downcast_ref::<crate::ui::DuressPinEngine>());
+                if let Some(dp_engine) = dp_engine {
+                    let config = dp_engine.config();
+                    if config.enabled {
+                        let pin = dp_engine.pin();
+                        if let Err(e) = self.vauchi.setup_duress_password(pin) {
+                            return ActionResult::ShowAlert {
+                                title: "Error".into(),
+                                message: format!("Failed to set duress PIN: {e}"),
+                            };
+                        }
+                        let settings = vauchi_core::types::DuressSettings {
+                            alert_contact_ids: config
+                                .alert_contacts
+                                .iter()
+                                .map(|c| c.id.clone())
+                                .collect(),
+                            alert_message: config.alert_message.clone(),
+                            include_location: config.include_location,
+                        };
+                        let _ = self.vauchi.save_duress_settings(&settings);
+                    } else {
+                        let _ = self.vauchi.disable_duress();
+                    }
+                }
+                let screen = self.navigate_back();
+                ActionResult::NavigateTo(screen)
+            }
             _ => {
                 let screen = self.navigate_back();
                 ActionResult::NavigateTo(screen)

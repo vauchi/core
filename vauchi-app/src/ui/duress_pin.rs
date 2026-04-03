@@ -59,6 +59,11 @@ impl DuressPinEngine {
         &self.config
     }
 
+    /// Returns the confirmed PIN (only valid after save completion).
+    pub fn pin(&self) -> &str {
+        &self.new_pin
+    }
+
     fn progress(&self) -> Progress {
         let current_step = match self.step {
             DuressPinStep::Overview => 1,
@@ -406,5 +411,9 @@ impl WorkflowEngine for DuressPinEngine {
             // --- Fallback ---
             _ => ActionResult::UpdateScreen(self.current_screen()),
         }
+    }
+
+    fn as_any(&self) -> Option<&dyn std::any::Any> {
+        Some(self)
     }
 }

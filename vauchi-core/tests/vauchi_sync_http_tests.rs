@@ -48,3 +48,31 @@ fn test_sync_not_connected_returns_not_connected() {
         "expected NotConnected, got: {result:?}"
     );
 }
+
+/// sync() called before the timing deadline returns TooSoon (C1/C2 gate).
+#[test]
+fn test_sync_too_soon_returns_too_soon() {
+    use std::time::{Duration, Instant};
+
+    let mut vauchi = Vauchi::in_memory().unwrap();
+    vauchi.create_identity("Test User").unwrap();
+    vauchi.set_next_sync_allowed(Instant::now() + Duration::from_secs(3600));
+    let result = vauchi.sync().unwrap();
+    assert!(
+        matches!(result, VauchiSyncOutcome::TooSoon),
+        "expected TooSoon, got: {result:?}"
+    );
+}
+
+/// disconnect() clears the OHTTP key so sync() returns NotConnected.
+#[test]
+fn test_disconnect_clears_ohttp_state() {
+    let mut vauchi = Vauchi::in_memory().unwrap();
+    vauchi.create_identity("Test User").unwrap();
+    vauchi.disconnect();
+    let result = vauchi.sync().unwrap();
+    assert!(
+        matches!(result, VauchiSyncOutcome::NotConnected),
+        "expected NotConnected after disconnect, got: {result:?}"
+    );
+}

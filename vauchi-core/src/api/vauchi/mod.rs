@@ -154,10 +154,10 @@ pub struct Vauchi {
     #[cfg(feature = "network-http")]
     ohttp_key: Option<crate::network::OhttpClient>,
     /// Deadline before which sync() returns TooSoon.
-    #[allow(dead_code)]
+    #[cfg(feature = "network-http")]
     next_sync_allowed: Option<std::time::Instant>,
     /// Timestamp of last successful exchange (for C1 post-exchange delay).
-    #[allow(dead_code)]
+    #[cfg(feature = "network-http")]
     last_exchange_time: Option<std::time::Instant>,
 }
 
@@ -255,7 +255,9 @@ impl Vauchi {
             duress_alerts: Vec::new(),
             #[cfg(feature = "network-http")]
             ohttp_key: None,
+            #[cfg(feature = "network-http")]
             next_sync_allowed: None,
+            #[cfg(feature = "network-http")]
             last_exchange_time: None,
         })
     }
@@ -307,7 +309,9 @@ impl Vauchi {
             duress_alerts: Vec::new(),
             #[cfg(feature = "network-http")]
             ohttp_key: None,
+            #[cfg(feature = "network-http")]
             next_sync_allowed: None,
+            #[cfg(feature = "network-http")]
             last_exchange_time: None,
         })
     }

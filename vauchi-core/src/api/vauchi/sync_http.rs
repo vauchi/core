@@ -21,7 +21,7 @@
 //! 5. Send phase: delegates to `SyncController` for outbound updates + ACKs.
 //! 6. Returns combined `VauchiSyncOutcome`.
 
-use std::time::SystemTime;
+use std::time::{Duration, Instant, SystemTime};
 
 use super::{Vauchi, VauchiSyncOutcome};
 use crate::api::error::{VauchiError, VauchiResult};
@@ -44,44 +44,74 @@ impl Vauchi {
     /// # Flow
     ///
     /// 1. Gate checks (identity, OHTTP key, timing).
-    /// 2. Create ephemeral `HttpTransportAdapter` with OHTTP encryption.
-    /// 3. Connect adapter (relay health check).
-    /// 4. **Receive phase**: register mailbox tokens, fetch blobs, decrypt + apply.
-    /// 5. **Send phase**: delegate to `SyncController` for outgoing updates.
-    /// 6. Update timing (stub — Task 10 implements C1/C2 jitter).
-    /// 7. Return combined outcome.
+    /// 2. Attempt sync. On OHTTP key error, refresh key and retry once.
+    /// 3. Update timing (C1/C2 jitter) on success.
+    /// 4. Return combined outcome.
     pub fn sync(&mut self) -> VauchiResult<VauchiSyncOutcome> {
         // 1. Gate checks
-        let identity = match &self.identity {
-            Some(id) => id,
-            None => return Ok(VauchiSyncOutcome::NoIdentity),
-        };
+        if self.identity.is_none() {
+            return Ok(VauchiSyncOutcome::NoIdentity);
+        }
 
-        let ohttp_key = match &self.ohttp_key {
-            Some(key) => key,
-            None => return Ok(VauchiSyncOutcome::NotConnected),
-        };
+        if self.ohttp_key.is_none() {
+            return Ok(VauchiSyncOutcome::NotConnected);
+        }
 
-        // TODO(Task 10): check next_sync_allowed — return TooSoon if too early
+        // C1 / C2 timing gate
+        if let Some(deadline) = self.next_sync_allowed {
+            if Instant::now() < deadline {
+                return Ok(VauchiSyncOutcome::TooSoon);
+            }
+        }
 
-        // 2. Create ephemeral adapter with OHTTP key
+        // 2. Attempt sync, with one retry on stale OHTTP key
+        match self.sync_inner() {
+            Ok(outcome) => {
+                self.update_timing_after_sync();
+                Ok(outcome)
+            }
+            Err(ref e) if is_ohttp_key_error(e) => {
+                // Key is stale — evict cache, re-fetch, retry once
+                let relay_url = self.http_relay_url();
+                let _ = self.storage.save_ohttp_key(&relay_url, &[]);
+                let key_bytes = self.fetch_and_cache_ohttp_key(&relay_url)?;
+                let client = OhttpClient::new(key_bytes).map_err(VauchiError::Network)?;
+                self.ohttp_key = Some(client);
+
+                // Retry
+                let outcome = self.sync_inner()?;
+                self.update_timing_after_sync();
+                Ok(outcome)
+            }
+            Err(e) => Err(e),
+        }
+    }
+
+    /// Inner sync body — assumes gate checks already passed.
+    ///
+    /// Extracted so that `sync()` can retry on stale OHTTP key errors.
+    fn sync_inner(&mut self) -> VauchiResult<VauchiSyncOutcome> {
+        let identity = self.identity.as_ref().expect("identity checked in sync()");
+        let ohttp_key = self
+            .ohttp_key
+            .as_ref()
+            .expect("ohttp_key checked in sync()");
+
+        // Create ephemeral adapter with OHTTP key
         let mut adapter = self.create_ohttp_adapter(ohttp_key)?;
 
-        // 3. Connect adapter (health check)
+        // Connect adapter (relay health check)
         adapter
             .connect(&TransportConfig::default())
             .map_err(VauchiError::Network)?;
 
-        // 4. Receive phase
+        // Receive phase
         let received = self.run_receive_phase(identity, &mut adapter)?;
 
-        // 5. Send phase — adapter moves into RelayClient → SyncController
+        // Send phase — adapter moves into RelayClient → SyncController
         let send_result = self.run_send_phase(identity, adapter)?;
 
-        // 6. Update timing (stub for Task 10)
-        self.update_timing_after_sync();
-
-        // 7. Combine results
+        // Combine results
         let mut errors: Vec<String> = Vec::new();
         for (ctx, msg) in &send_result.errors {
             errors.push(format!("{ctx}: {msg}"));
@@ -93,6 +123,38 @@ impl Vauchi {
             acknowledged: send_result.acknowledged,
             errors,
         })
+    }
+
+    /// Set the post-exchange delay (C1).
+    ///
+    /// Call this after a successful in-person exchange. Computes a random delay
+    /// in the range `[post_exchange_delay_min_ms, post_exchange_delay_max_ms]`
+    /// and sets `next_sync_allowed` to `MAX(existing deadline, new deadline)`.
+    ///
+    /// Also records `last_exchange_time` for use by `update_timing_after_sync`.
+    pub fn set_post_exchange_delay(&mut self) {
+        let delay = self.config.sync.random_post_exchange_delay();
+        let new_deadline = Instant::now() + delay;
+        self.next_sync_allowed = Some(match self.next_sync_allowed {
+            Some(existing) => existing.max(new_deadline),
+            None => new_deadline,
+        });
+        self.last_exchange_time = Some(Instant::now());
+    }
+
+    /// Disconnect: clear the cached OHTTP key and sync timing state.
+    ///
+    /// After calling this, `sync()` returns `NotConnected` until `connect()` is
+    /// called again.
+    pub fn disconnect(&mut self) {
+        self.ohttp_key = None;
+        self.next_sync_allowed = None;
+    }
+
+    /// Test helper: directly set the `next_sync_allowed` deadline.
+    #[cfg(any(test, feature = "testing"))]
+    pub fn set_next_sync_allowed(&mut self, deadline: Instant) {
+        self.next_sync_allowed = Some(deadline);
     }
 
     /// Connect to the relay, bootstrapping the OHTTP key.
@@ -321,9 +383,28 @@ impl Vauchi {
         Ok(HttpTransportAdapter::new(transport))
     }
 
-    /// Stub for timing update — Task 10 implements C1 + C2 jitter.
+    /// Update sync timing after a successful sync (C1 + C2).
+    ///
+    /// Computes the C2 deadline using a jittered sync interval. If the last
+    /// exchange was recent (within `post_exchange_delay_max_ms`), a C1 deadline
+    /// is also computed and the MAX of C1 and C2 is used.
     fn update_timing_after_sync(&mut self) {
-        // No-op: timing logic will be added in Task 10.
+        let c2_deadline = Instant::now() + self.config.sync.jittered_sync_interval();
+
+        let deadline = if let Some(exchange_time) = self.last_exchange_time {
+            let max_delay = Duration::from_millis(self.config.sync.post_exchange_delay_max_ms);
+            if exchange_time.elapsed() < max_delay {
+                // Exchange was recent — enforce C1 as well
+                let c1_deadline = exchange_time + self.config.sync.random_post_exchange_delay();
+                c1_deadline.max(c2_deadline)
+            } else {
+                c2_deadline
+            }
+        } else {
+            c2_deadline
+        };
+
+        self.next_sync_allowed = Some(deadline);
     }
 
     /// Resolve the OHTTP key: use cache if fresh, otherwise fetch and cache.
@@ -381,4 +462,16 @@ impl Vauchi {
             url.clone()
         }
     }
+}
+
+/// Heuristic: does this error look like a stale/rejected OHTTP key?
+///
+/// Checks for HTTP 400 responses or error messages containing "ohttp" or
+/// "key" — common signals when the relay rejects an outdated OHTTP config.
+/// This is intentionally broad: a false positive causes one extra key fetch,
+/// which is cheap. A false negative means the caller sees a transient error
+/// and retries on the next sync cycle.
+fn is_ohttp_key_error(err: &VauchiError) -> bool {
+    let msg = err.to_string().to_lowercase();
+    msg.contains("400") || msg.contains("ohttp") || msg.contains("key")
 }

@@ -479,5 +479,9 @@ name = "unicode_adversarial_tests"
 required-features = ["testing"]
 
 [[test]]
+name = "ohttp_key_cache_tests"
+required-features = ["testing"]
+
+[[test]]
 name = "schema_gen"
 required-features = ["schema-gen"]

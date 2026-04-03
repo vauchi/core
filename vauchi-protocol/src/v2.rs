@@ -96,4 +96,10 @@ pub struct V2Response {
     pub blobs: Option<Vec<FetchedBlob>>,
     #[serde(default)]
     pub acknowledged: Option<bool>,
+    #[serde(default)]
+    pub code: Option<String>,
+    #[serde(default)]
+    pub payload: Option<String>,
+    #[serde(default)]
+    pub response: Option<String>,
 }

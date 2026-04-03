@@ -188,6 +188,9 @@ fn v2_response_roundtrip() {
         blob_id: Some("blob-1".into()),
         blobs: None,
         acknowledged: None,
+        code: None,
+        payload: None,
+        response: None,
     };
     let json = serde_json::to_string(&resp).unwrap();
     let parsed: V2Response = serde_json::from_str(&json).unwrap();
@@ -208,6 +211,9 @@ fn v2_response_with_blobs_roundtrip() {
             created_at: 12345,
         }]),
         acknowledged: None,
+        code: None,
+        payload: None,
+        response: None,
     };
     let json = serde_json::to_string(&resp).unwrap();
     let parsed: V2Response = serde_json::from_str(&json).unwrap();

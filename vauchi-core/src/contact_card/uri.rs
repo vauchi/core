@@ -138,17 +138,22 @@ pub fn is_safe_url(url: &str) -> bool {
 /// Validate a relay WebSocket URL.
 ///
 /// Accepts:
-/// - `wss://` for any host (production relay)
+/// - `wss://` with a non-empty host (production relay)
 /// - `ws://` only for localhost/loopback (development)
 ///
-/// Rejects all other schemes and non-loopback `ws://` hosts.
+/// Rejects all other schemes, non-loopback `ws://` hosts,
+/// and URLs containing null bytes.
 pub fn is_valid_relay_url(url: &str) -> bool {
     let url = url.trim();
+    if url.contains('\0') {
+        return false;
+    }
     let lower = url.to_lowercase();
 
     if let Some(rest) = lower.strip_prefix("wss://") {
-        // wss:// is always allowed if there's a host
-        !rest.is_empty()
+        // wss:// requires a non-empty host (reject "wss:///path")
+        let authority = rest.split('/').next().unwrap_or("");
+        !authority.is_empty()
     } else if let Some(rest) = lower.strip_prefix("ws://") {
         // ws:// only for loopback
         let authority = rest.split('/').next().unwrap_or("");
@@ -596,5 +601,37 @@ mod tests {
         assert!(is_blocked_scheme("data"));
         assert!(!is_blocked_scheme("https"));
         assert!(!is_blocked_scheme("tel"));
+    }
+
+    #[test]
+    fn test_relay_url_wss_requires_host() {
+        assert!(is_valid_relay_url("wss://relay.vauchi.app"));
+        assert!(is_valid_relay_url("wss://relay.example.com/ws"));
+        assert!(is_valid_relay_url("wss://192.168.1.1:8443"));
+        // No host — must be rejected
+        assert!(!is_valid_relay_url("wss://"));
+        assert!(!is_valid_relay_url("wss:///path"));
+        assert!(!is_valid_relay_url("wss:///"));
+    }
+
+    #[test]
+    fn test_relay_url_rejects_null_bytes() {
+        assert!(!is_valid_relay_url("wss://relay.vauchi.app\0"));
+        assert!(!is_valid_relay_url("wss://evil\0.example.com"));
+    }
+
+    #[test]
+    fn test_relay_url_ws_localhost_only() {
+        assert!(is_valid_relay_url("ws://localhost:9001"));
+        assert!(is_valid_relay_url("ws://127.0.0.1:9001"));
+        assert!(is_valid_relay_url("ws://[::1]:9001"));
+        assert!(!is_valid_relay_url("ws://relay.example.com"));
+    }
+
+    #[test]
+    fn test_relay_url_rejects_other_schemes() {
+        assert!(!is_valid_relay_url("https://relay.example.com"));
+        assert!(!is_valid_relay_url("http://localhost:9001"));
+        assert!(!is_valid_relay_url(""));
     }
 }

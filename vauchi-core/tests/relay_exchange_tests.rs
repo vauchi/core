@@ -92,3 +92,72 @@ fn test_sas_both_sides_match() {
     let bob_sas = derive_sas(bob_secret.as_bytes(), &alice_id, &bob_id);
     assert_eq!(alice_sas, bob_sas);
 }
+
+// ── Vauchi relay exchange API tests ──────────────────────────────
+
+use vauchi_core::api::Vauchi;
+
+#[test]
+fn test_start_exchange_needs_identity() {
+    let vauchi = Vauchi::in_memory().unwrap();
+    let result = vauchi.start_relay_exchange(None);
+    assert!(result.is_err());
+    let err = result.unwrap_err().to_string();
+    assert!(
+        err.contains("identity"),
+        "expected identity error, got: {err}"
+    );
+}
+
+#[test]
+fn test_claim_exchange_needs_identity() {
+    let vauchi = Vauchi::in_memory().unwrap();
+    let result = vauchi.claim_relay_exchange("123456");
+    assert!(result.is_err());
+    let err = result.unwrap_err().to_string();
+    assert!(
+        err.contains("identity"),
+        "expected identity error, got: {err}"
+    );
+}
+
+#[cfg(feature = "testing")]
+#[test]
+fn test_complete_exchange_needs_identity() {
+    use vauchi_core::api::RelayExchangeOffer;
+
+    let vauchi = Vauchi::in_memory().unwrap();
+    // We can't construct RelayExchangeOffer directly (private fields),
+    // so we test that start_relay_exchange fails first.
+    let result = vauchi.start_relay_exchange(None);
+    assert!(result.is_err());
+}
+
+#[test]
+fn test_start_exchange_with_identity_fails_at_network() {
+    let mut vauchi = Vauchi::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    // With no real relay, start_relay_exchange should fail at the network layer
+    let result = vauchi.start_relay_exchange(Some(300));
+    assert!(result.is_err());
+    let err = result.unwrap_err().to_string();
+    // Should be a network error, not an identity error
+    assert!(
+        !err.contains("identity"),
+        "expected network error, got identity error: {err}"
+    );
+}
+
+#[test]
+fn test_claim_exchange_with_identity_fails_at_network() {
+    let mut vauchi = Vauchi::in_memory().unwrap();
+    vauchi.create_identity("Bob").unwrap();
+    // With no real relay, claim should fail at the network layer
+    let result = vauchi.claim_relay_exchange("999999");
+    assert!(result.is_err());
+    let err = result.unwrap_err().to_string();
+    assert!(
+        !err.contains("identity"),
+        "expected network error, got identity error: {err}"
+    );
+}

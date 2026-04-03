@@ -26,6 +26,7 @@ use std::time::{Duration, Instant, SystemTime};
 use super::{Vauchi, VauchiSyncOutcome};
 use crate::api::error::{VauchiError, VauchiResult};
 use crate::api::sync_controller::SyncController;
+use crate::contact::Contact;
 use crate::network::mailbox_token::{batch_register_tokens, current_day_epoch};
 use crate::network::{
     AckStatus, Acknowledgment, HttpTransport, HttpTransportAdapter, HttpTransportConfig,
@@ -96,6 +97,9 @@ impl Vauchi {
             .as_ref()
             .expect("ohttp_key checked in sync()");
 
+        // Load contacts once — shared by register_tokens, receive, and send phases.
+        let contacts = self.storage.list_contacts().unwrap_or_default();
+
         // Create ephemeral adapter with OHTTP key
         let mut adapter = self.create_ohttp_adapter(ohttp_key)?;
 
@@ -105,10 +109,10 @@ impl Vauchi {
             .map_err(VauchiError::Network)?;
 
         // Receive phase
-        let received = self.run_receive_phase(identity, &mut adapter)?;
+        let received = self.run_receive_phase(identity, &contacts, &mut adapter)?;
 
         // Send phase — adapter moves into RelayClient → SyncController
-        let send_result = self.run_send_phase(identity, adapter)?;
+        let send_result = self.run_send_phase(identity, &contacts, adapter)?;
 
         // Combine results
         let mut errors: Vec<String> = Vec::new();
@@ -214,10 +218,11 @@ impl Vauchi {
     fn run_receive_phase(
         &self,
         identity: &crate::identity::Identity,
+        contacts: &[Contact],
         adapter: &mut HttpTransportAdapter,
     ) -> VauchiResult<usize> {
         // 1. Register mailbox tokens so the adapter knows what to fetch
-        self.register_tokens(identity, adapter)?;
+        self.register_tokens(identity, contacts, adapter)?;
 
         // 2. Fetch all pending blobs (collect before processing)
         let mut blobs: Vec<(String, String, Vec<u8>)> = Vec::new(); // (message_id, sender_id, ciphertext)
@@ -234,7 +239,6 @@ impl Vauchi {
         // 3. For each blob: try decrypt → apply → ACK.
         //    ACK is sent AFTER decryption attempt, not before.
         //    If no ratchet matches, ACK anyway to prevent infinite redelivery.
-        let contacts = self.storage.list_contacts().unwrap_or_default();
         let contact_ids: Vec<String> = contacts
             .iter()
             .filter(|c| c.is_exchanged() && !c.is_blocked())
@@ -283,10 +287,9 @@ impl Vauchi {
     fn register_tokens(
         &self,
         identity: &crate::identity::Identity,
+        contacts: &[Contact],
         adapter: &mut HttpTransportAdapter,
     ) -> VauchiResult<()> {
-        let contacts = self.storage.list_contacts().unwrap_or_default();
-
         // Collect shared keys from exchanged contacts
         let contact_keys: Vec<[u8; 32]> = contacts
             .iter()
@@ -321,6 +324,7 @@ impl Vauchi {
     fn run_send_phase(
         &self,
         identity: &crate::identity::Identity,
+        contacts: &[Contact],
         adapter: HttpTransportAdapter,
     ) -> VauchiResult<crate::api::sync_controller::SyncResult> {
         let our_id = hex::encode(identity.signing_public_key());
@@ -347,8 +351,7 @@ impl Vauchi {
         ctrl.connect()?;
 
         // Load ratchet states for all contacts
-        let contacts = self.storage.list_contacts().unwrap_or_default();
-        for contact in &contacts {
+        for contact in contacts {
             if !contact.is_exchanged() || contact.is_blocked() {
                 continue;
             }

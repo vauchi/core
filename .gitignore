@@ -3,6 +3,10 @@
 **/target/
 *.log
 
+# Test database artifacts
+vauchi_data
+vauchi_data.*
+
 # Cargo lock file (optional for libraries)
 # Cargo.lock
 

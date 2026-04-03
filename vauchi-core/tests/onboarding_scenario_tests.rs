@@ -36,6 +36,7 @@ fn test_go_back_preserves_data() {
     assert!(progress.completion_percentage() > 0);
 }
 
+// @scenario: onboarding :: Can go back to previous steps
 #[test]
 fn test_go_back_from_first_step_returns_none() {
     let progress = OnboardingProgress::new();
@@ -46,6 +47,7 @@ fn test_go_back_from_first_step_returns_none() {
     );
 }
 
+// @scenario: onboarding :: Can go back to previous steps
 #[test]
 fn test_every_step_except_first_has_previous() {
     for step in &OnboardingStep::all()[1..] {
@@ -88,6 +90,7 @@ fn test_onboarding_progress_survives_serialization() {
     );
 }
 
+// @scenario: onboarding :: Exit and resume onboarding
 #[test]
 fn test_onboarding_resume_after_skip_gate() {
     let mut progress = OnboardingProgress::new();
@@ -133,6 +136,7 @@ fn test_reset_clears_all_progress() {
     assert!(!progress.is_complete(), "reset should clear completion");
 }
 
+// @scenario: onboarding :: Replay onboarding from settings
 #[test]
 fn test_reset_does_not_destroy_identity() {
     // This is a guard-rail: reset_onboarding should NOT touch
@@ -202,7 +206,7 @@ fn test_completion_without_exchange_is_valid() {
 // This scenario tests that the contacts list shows guidance when empty.
 // Core provides the "demo contact" as the guidance mechanism (DemoContactCard).
 // The actual UI rendering is frontend-specific.
-
+// @scenario: onboarding :: Empty state with guidance
 #[test]
 fn test_demo_contact_available_for_empty_state() {
     use vauchi_core::demo_contact::{generate_demo_contact_card, get_demo_tips};

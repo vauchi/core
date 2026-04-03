@@ -372,7 +372,7 @@ impl<'a> ContactManager<'a> {
         }
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
+            .unwrap_or_default()
             .as_secs();
         contact.soft_delete(now);
         self.storage.save_contact(&contact)?;
@@ -425,7 +425,7 @@ impl<'a> ContactManager<'a> {
         }
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
+            .unwrap_or_default()
             .as_secs();
         contact.archive(now);
         self.storage.save_contact(&contact)?;

@@ -129,6 +129,17 @@ pub struct Vauchi {
     /// drained by the sync system and sent as card updates to trusted
     /// contacts, indistinguishable from normal sync traffic.
     duress_alerts: Vec<DuressAlert>,
+
+    /// Cached OHTTP key (loaded from Storage on connect).
+    #[cfg(feature = "network-http")]
+    #[allow(dead_code)]
+    ohttp_key: Option<crate::network::OhttpClient>,
+    /// Deadline before which sync() returns TooSoon.
+    #[allow(dead_code)]
+    next_sync_allowed: Option<std::time::Instant>,
+    /// Timestamp of last successful exchange (for C1 post-exchange delay).
+    #[allow(dead_code)]
+    last_exchange_time: Option<std::time::Instant>,
 }
 
 impl Vauchi {
@@ -223,6 +234,10 @@ impl Vauchi {
             replay_detector: Mutex::new(ReplayDetector::default_tolerance()),
             auth_mode: AuthMode::Unauthenticated,
             duress_alerts: Vec::new(),
+            #[cfg(feature = "network-http")]
+            ohttp_key: None,
+            next_sync_allowed: None,
+            last_exchange_time: None,
         })
     }
 
@@ -271,6 +286,10 @@ impl Vauchi {
             replay_detector: Mutex::new(ReplayDetector::default_tolerance()),
             auth_mode: AuthMode::Unauthenticated,
             duress_alerts: Vec::new(),
+            #[cfg(feature = "network-http")]
+            ohttp_key: None,
+            next_sync_allowed: None,
+            last_exchange_time: None,
         })
     }
 }

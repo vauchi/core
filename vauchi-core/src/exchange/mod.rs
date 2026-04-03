@@ -70,6 +70,7 @@ pub mod mode;
 pub mod mode_availability;
 pub mod mode_payload;
 pub mod persisted_state;
+pub mod relay_exchange;
 pub mod tcp_transport;
 
 #[allow(deprecated)]

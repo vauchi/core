@@ -120,6 +120,94 @@ fn duress_pin_screen_renders_with_defaults() {
     assert_eq!(screen.title, "Duress PIN");
 }
 
+// @scenario: duress_password :: Duress PIN setup persists through AppEngine
+#[test]
+fn duress_pin_setup_persists_via_handle_completion() {
+    let mut vauchi = Vauchi::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    vauchi.setup_app_password("123456").unwrap();
+    let mut engine = AppEngine::new(vauchi);
+
+    // Navigate to DuressPin screen
+    engine.navigate_to(AppScreen::DuressPin);
+
+    // Step 1: Press "configure" on overview
+    let _ = engine.handle_action(UserAction::ActionPressed {
+        action_id: "configure".into(),
+    });
+
+    // Step 2: Enter PIN digits
+    let _ = engine.handle_action(UserAction::TextChanged {
+        component_id: "pin".into(),
+        value: "654321".into(),
+    });
+    let _ = engine.handle_action(UserAction::ActionPressed {
+        action_id: "continue".into(),
+    });
+
+    // Step 3: Confirm PIN
+    let _ = engine.handle_action(UserAction::TextChanged {
+        component_id: "confirm_pin".into(),
+        value: "654321".into(),
+    });
+    let _ = engine.handle_action(UserAction::ActionPressed {
+        action_id: "continue".into(),
+    });
+
+    // Step 4: Save (triggers Complete → handle_completion)
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "save".into(),
+    });
+
+    // Should navigate back (not show error alert)
+    assert!(
+        matches!(result, ActionResult::NavigateTo(_)),
+        "save should navigate back, got {:?}",
+        result
+    );
+
+    // Verify duress was actually persisted in storage
+    let vauchi = engine.vauchi();
+    assert!(
+        vauchi.is_duress_enabled().unwrap(),
+        "duress must be enabled after completing setup flow"
+    );
+}
+
+// @scenario: duress_password :: Disabling duress PIN persists
+#[test]
+fn duress_pin_disable_persists_via_handle_completion() {
+    let mut vauchi = Vauchi::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    vauchi.setup_app_password("123456").unwrap();
+    vauchi.setup_duress_password("654321").unwrap();
+    assert!(vauchi.is_duress_enabled().unwrap());
+    let mut engine = AppEngine::new(vauchi);
+
+    // Navigate to DuressPin screen
+    engine.navigate_to(AppScreen::DuressPin);
+
+    // Press "disable" then "confirm_disable"
+    let _ = engine.handle_action(UserAction::ActionPressed {
+        action_id: "disable".into(),
+    });
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "confirm_disable".into(),
+    });
+
+    assert!(
+        matches!(result, ActionResult::NavigateTo(_)),
+        "confirm_disable should navigate back, got {:?}",
+        result
+    );
+
+    let vauchi = engine.vauchi();
+    assert!(
+        !vauchi.is_duress_enabled().unwrap(),
+        "duress must be disabled after confirm_disable"
+    );
+}
+
 // ── lock screen password verification tests (CRIT-3) ─────────────────
 
 #[test]

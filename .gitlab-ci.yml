@@ -730,6 +730,10 @@ prebuild:apple:
           - "**/Cargo.lock"
           - "scripts/build-bindings.sh"
           - "scripts/package-xcframework.sh"
+  before_script:
+    - !reference [.self-hosted, before_script]
+    - !reference [.clone-locales, before_script]
+    - !reference [.clone-themes, before_script]
   script:
     # Build ALL Apple targets (device + simulator + macOS) so prebuild
     # artifacts are complete for tag pipelines that need xcframework packaging.
@@ -767,6 +771,8 @@ prebuild:android:
           - "scripts/package-android.sh"
   before_script:
     - !reference [.self-hosted, before_script]
+    - !reference [.clone-locales, before_script]
+    - !reference [.clone-themes, before_script]
     - |
       for ndk_path in /opt/android-sdk/ndk/* /opt/android-ndk $HOME/Android/Sdk/ndk/*; do
         if [ -d "$ndk_path" ]; then

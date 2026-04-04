@@ -194,11 +194,17 @@ impl super::transport::Transport for HttpTransportAdapter {
         }
 
         // Relay accepts at most 100 tokens per fetch request.
+        // On rate-limit errors, return what we have so far rather than failing.
         const MAX_FETCH_TOKENS: usize = 100;
         for chunk in self.registered_tokens.chunks(MAX_FETCH_TOKENS) {
-            let blobs = self.http.fetch(chunk)?;
-            for blob in blobs {
-                self.pending_blobs.push_back(blob);
+            match self.http.fetch(chunk) {
+                Ok(blobs) => {
+                    for blob in blobs {
+                        self.pending_blobs.push_back(blob);
+                    }
+                }
+                Err(NetworkError::RateLimited { .. }) if !self.pending_blobs.is_empty() => break,
+                Err(e) => return Err(e),
             }
         }
 

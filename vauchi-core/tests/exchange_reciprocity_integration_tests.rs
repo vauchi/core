@@ -47,6 +47,7 @@ fn drive_mutual_qr_exchange() -> (ExchangeSession, ExchangeSession) {
     (session_a, session_b)
 }
 
+// @internal
 #[test]
 fn tokens_cross_match_between_sessions() {
     let (session_a, session_b) = drive_mutual_qr_exchange();
@@ -65,6 +66,7 @@ fn tokens_cross_match_between_sessions() {
     assert_ne!(b_our, b_their, "B's tokens must differ (echo protection)");
 }
 
+// @internal
 #[test]
 fn escrow_keys_share_gate_but_swap_slots() {
     let (session_a, session_b) = drive_mutual_qr_exchange();
@@ -86,6 +88,7 @@ fn escrow_keys_share_gate_but_swap_slots() {
     );
 }
 
+// @internal
 #[test]
 fn different_sessions_produce_different_tokens() {
     let (session_a1, _) = drive_mutual_qr_exchange();

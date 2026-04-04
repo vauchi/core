@@ -8,6 +8,7 @@ use vauchi_core::crypto::SymmetricKey;
 use vauchi_core::exchange::reciprocity::{ConfirmationChannel, Reciprocity};
 use vauchi_core::storage::Storage;
 
+// @internal
 #[test]
 fn reciprocity_serde_roundtrip() {
     for variant in [
@@ -22,6 +23,7 @@ fn reciprocity_serde_roundtrip() {
     }
 }
 
+// @internal
 #[test]
 fn confirmation_channel_serde_roundtrip() {
     for variant in [
@@ -36,6 +38,7 @@ fn confirmation_channel_serde_roundtrip() {
     }
 }
 
+// @internal
 #[test]
 fn reciprocity_snake_case_serialization() {
     assert_eq!(
@@ -56,12 +59,14 @@ fn make_test_contact() -> Contact {
     )
 }
 
+// @internal
 #[test]
 fn contact_reciprocity_defaults_to_unknown() {
     let contact = make_test_contact();
     assert_eq!(contact.reciprocity(), Reciprocity::Unknown);
 }
 
+// @internal
 #[test]
 fn contact_set_reciprocity() {
     let mut contact = make_test_contact();
@@ -69,6 +74,7 @@ fn contact_set_reciprocity() {
     assert_eq!(contact.reciprocity(), Reciprocity::Confirmed);
 }
 
+// @internal
 #[test]
 fn contact_set_confirmation_channel() {
     let mut contact = make_test_contact();
@@ -79,6 +85,7 @@ fn contact_set_confirmation_channel() {
     );
 }
 
+// @internal
 #[test]
 fn reciprocity_storage_roundtrip() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
@@ -97,6 +104,7 @@ fn reciprocity_storage_roundtrip() {
     );
 }
 
+// @internal
 #[test]
 fn reciprocity_storage_null_defaults_to_unknown() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
@@ -113,6 +121,7 @@ fn reciprocity_storage_null_defaults_to_unknown() {
 
 // ── Stretch: storage query + confirmation_state persistence ──
 
+// @internal
 #[test]
 fn list_contacts_by_reciprocity_filters_correctly() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
@@ -144,6 +153,7 @@ fn list_contacts_by_reciprocity_filters_correctly() {
     assert!(empty.is_empty());
 }
 
+// @internal
 #[test]
 fn confirmation_state_persistence_roundtrip() {
     use vauchi_app::ui::reciprocity_confirmer::ConfirmationState;
@@ -173,6 +183,7 @@ fn confirmation_state_persistence_roundtrip() {
     assert!(loaded.deposit_sent);
 }
 
+// @internal
 #[test]
 fn confirmation_state_none_for_new_contact() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
@@ -189,6 +200,7 @@ fn confirmation_state_none_for_new_contact() {
 use vauchi_core::exchange::confirmation_escrow::ConfirmationEscrowKeys;
 use vauchi_core::exchange::escrow::EscrowRole;
 
+// @internal
 #[test]
 fn confirmation_escrow_keys_derive_produces_different_slots() {
     let shared_secret = [42u8; 32];
@@ -197,6 +209,7 @@ fn confirmation_escrow_keys_derive_produces_different_slots() {
     assert!(!keys.gate_hash.is_empty());
 }
 
+// @internal
 #[test]
 fn confirmation_escrow_keys_roles_are_symmetric() {
     let shared_secret = [42u8; 32];
@@ -209,6 +222,7 @@ fn confirmation_escrow_keys_roles_are_symmetric() {
     assert_eq!(init.their_slot, resp.our_slot);
 }
 
+// @internal
 #[test]
 fn confirmation_escrow_keys_differ_from_card_escrow() {
     use vauchi_core::exchange::escrow::EscrowKeys;
@@ -233,6 +247,7 @@ fn make_contact_with_timestamp(ts: u64) -> Contact {
     )
 }
 
+// @internal
 #[test]
 fn reciprocity_pending_within_7_days_stays_pending() {
     let now = std::time::SystemTime::now()
@@ -244,6 +259,7 @@ fn reciprocity_pending_within_7_days_stays_pending() {
     assert_eq!(contact.reciprocity(), Reciprocity::Pending);
 }
 
+// @internal
 #[test]
 fn reciprocity_pending_expires_after_7_days() {
     let now = std::time::SystemTime::now()
@@ -255,6 +271,7 @@ fn reciprocity_pending_expires_after_7_days() {
     assert_eq!(contact.reciprocity(), Reciprocity::Unreciprocated);
 }
 
+// @internal
 #[test]
 fn unreciprocated_upgrades_to_confirmed_on_late_arrival() {
     let mut contact = make_test_contact();
@@ -264,6 +281,7 @@ fn unreciprocated_upgrades_to_confirmed_on_late_arrival() {
     assert_eq!(contact.reciprocity(), Reciprocity::Confirmed);
 }
 
+// @internal
 #[test]
 fn confirmed_not_affected_by_timer() {
     let now = std::time::SystemTime::now()
@@ -280,6 +298,7 @@ fn confirmed_not_affected_by_timer() {
 use vauchi_core::exchange::{ExchangeEvent, ExchangeSession, MockProximityVerifier};
 use vauchi_core::identity::Identity;
 
+// @internal
 #[test]
 fn key_agreement_derives_confirmation_tokens() {
     let identity_a = Identity::create("Alice");

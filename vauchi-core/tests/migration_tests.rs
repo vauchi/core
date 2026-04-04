@@ -1179,6 +1179,7 @@ fn test_migration_callback_failure_rolls_back() {
     assert_eq!(version, 0, "Version should be 0 after callback rollback");
 }
 
+// @internal
 #[test]
 fn test_migration_v40_adds_reciprocity_columns() {
     let conn = Connection::open_in_memory().unwrap();

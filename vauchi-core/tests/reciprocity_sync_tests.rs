@@ -5,6 +5,7 @@
 use vauchi_core::identity::Identity;
 use vauchi_core::sync::delta::{ReciprocityConfirmPayload, VersionedPayload};
 
+// @internal
 #[test]
 fn reciprocity_confirm_encode_decode_roundtrip() {
     let identity = Identity::create("Alice");
@@ -35,6 +36,7 @@ fn reciprocity_confirm_encode_decode_roundtrip() {
     }
 }
 
+// @internal
 #[test]
 fn reciprocity_confirm_rejects_wrong_signature() {
     let identity_a = Identity::create("Alice");
@@ -57,6 +59,7 @@ fn reciprocity_confirm_rejects_wrong_signature() {
     }
 }
 
+// @internal
 #[test]
 fn reciprocity_confirm_rejects_wrong_recipient() {
     let identity = Identity::create("Alice");
@@ -79,6 +82,7 @@ fn reciprocity_confirm_rejects_wrong_recipient() {
     }
 }
 
+// @internal
 #[test]
 fn unknown_version_byte_returns_error() {
     let data = [0xFF, 0x00, 0x01];

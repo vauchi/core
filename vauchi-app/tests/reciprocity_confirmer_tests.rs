@@ -27,6 +27,7 @@ fn make_confirmer() -> ReciprocityConfirmer {
     )
 }
 
+// @internal
 #[test]
 fn start_emits_deposit_command() {
     let mut confirmer = make_confirmer();
@@ -45,6 +46,7 @@ fn start_emits_deposit_command() {
     }
 }
 
+// @internal
 #[test]
 fn escrow_ready_triggers_retrieve() {
     let mut confirmer = make_confirmer();
@@ -57,6 +59,7 @@ fn escrow_ready_triggers_retrieve() {
     matches!(&cmds[0], ExchangeCommand::RelayEscrowRetrieve { .. });
 }
 
+// @internal
 #[test]
 fn correct_blob_confirms() {
     let mut confirmer = make_confirmer();
@@ -71,6 +74,7 @@ fn correct_blob_confirms() {
     assert!(confirmer.is_done());
 }
 
+// @internal
 #[test]
 fn wrong_blob_falls_to_pending() {
     let mut confirmer = make_confirmer();
@@ -85,6 +89,7 @@ fn wrong_blob_falls_to_pending() {
     assert!(confirmer.is_done());
 }
 
+// @internal
 #[test]
 fn deposit_failure_falls_to_pending() {
     let mut confirmer = make_confirmer();
@@ -100,6 +105,7 @@ fn deposit_failure_falls_to_pending() {
     assert_eq!(confirmer.reciprocity(), Reciprocity::Pending);
 }
 
+// @internal
 #[test]
 fn persisted_state_roundtrip() {
     let confirmer = make_confirmer();
@@ -114,6 +120,7 @@ fn persisted_state_roundtrip() {
     assert!(!resumed.is_done());
 }
 
+// @internal
 #[test]
 fn resumed_confirmer_skips_to_polling() {
     let mut confirmer = make_confirmer();
@@ -129,6 +136,7 @@ fn resumed_confirmer_skips_to_polling() {
     matches!(&cmds[0], ExchangeCommand::RelayEscrowCheck { .. });
 }
 
+// @internal
 #[test]
 fn ignores_events_for_different_gate() {
     let mut confirmer = make_confirmer();

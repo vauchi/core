@@ -35,8 +35,10 @@ pub fn load_or_generate_fallback_key(data_dir: &Path) -> Result<SymmetricKey, St
     let key_path = data_dir.join(".fallback-key");
 
     if key_path.exists() {
-        let bytes =
-            std::fs::read(&key_path).map_err(|e| StorageError::Encryption(e.to_string()))?;
+        // F5 audit fix: wrap in Zeroizing so raw key bytes are cleared on drop
+        let bytes = zeroize::Zeroizing::new(
+            std::fs::read(&key_path).map_err(|e| StorageError::Encryption(e.to_string()))?,
+        );
         if bytes.len() != 32 {
             return Err(StorageError::InvalidData(format!(
                 "Invalid fallback key length ({}), expected 32. Delete {} to regenerate.",

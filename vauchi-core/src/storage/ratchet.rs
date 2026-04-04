@@ -80,13 +80,15 @@ impl Storage {
             Ok((encrypted, is_initiator)) => {
                 // Decrypt with per-contact derived key
                 let ratchet_key = self.derive_ratchet_key(contact_id);
-                let state_json = crate::crypto::decrypt(&ratchet_key, &encrypted)
+                // F6 audit fix: wrap in Zeroizing — contains root_key, DH secrets, chain keys
+                let mut state_json = crate::crypto::decrypt(&ratchet_key, &encrypted)
                     .map_err(|e| StorageError::Encryption(e.to_string()))?;
 
-                // Deserialize
+                // Deserialize, then zeroize the JSON buffer
                 let serialized: crate::crypto::ratchet::SerializedRatchetState =
                     serde_json::from_slice(&state_json)
                         .map_err(|e| StorageError::Serialization(e.to_string()))?;
+                zeroize::Zeroize::zeroize(&mut state_json);
 
                 let state = DoubleRatchetState::deserialize(serialized)
                     .map_err(|e| StorageError::Serialization(e.to_string()))?;

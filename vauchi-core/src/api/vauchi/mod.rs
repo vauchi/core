@@ -282,7 +282,9 @@ impl Vauchi {
                 VauchiError::Configuration(format!("Failed to load SMK from SecureStorage: {}", e))
             })?
         {
-            let smk_array: [u8; 32] = smk_bytes.try_into().map_err(|_| {
+            // F5 audit fix: wrap in Zeroizing so the Vec is cleared on drop
+            let smk_bytes = zeroize::Zeroizing::new(smk_bytes);
+            let smk_array: [u8; 32] = smk_bytes.as_slice().try_into().map_err(|_| {
                 VauchiError::Configuration("SMK in SecureStorage has invalid length".into())
             })?;
             let smk = ShreddingMasterKey::from_bytes(smk_array);

@@ -4,7 +4,9 @@
 
 //! Integration tests for PlatformAppEngine.
 
-use vauchi_platform::PlatformAppEngine;
+use std::sync::{Arc, Mutex};
+
+use vauchi_platform::{PlatformAppEngine, PlatformEventListener};
 
 /// Helper: create a PlatformAppEngine with a temp directory.
 fn create_engine() -> (std::sync::Arc<PlatformAppEngine>, tempfile::TempDir) {
@@ -222,4 +224,135 @@ fn has_identity_returns_true_after_onboarding() {
 fn form_has_data_returns_false_on_non_form_screen() {
     let (engine, _dir) = create_engine();
     assert!(!engine.form_has_data().expect("form_has_data"));
+}
+
+// ============================================================================
+// Event listener (PlatformEventListener)
+// ============================================================================
+
+/// Mock listener that records all `on_screens_invalidated` calls.
+struct RecordingListener {
+    calls: Arc<Mutex<Vec<Vec<String>>>>,
+}
+
+impl PlatformEventListener for RecordingListener {
+    fn on_screens_invalidated(&self, screen_ids: Vec<String>) {
+        self.calls.lock().unwrap().push(screen_ids);
+    }
+}
+
+// @scenario: event-listener.feature - Event listener receives screen invalidation on card update
+#[test]
+fn event_listener_receives_invalidation_on_card_update() {
+    let (engine, _dir) = create_engine();
+    drive_onboarding(&engine);
+
+    // Register a mock listener
+    let calls: Arc<Mutex<Vec<Vec<String>>>> = Arc::new(Mutex::new(Vec::new()));
+    let listener = RecordingListener {
+        calls: Arc::clone(&calls),
+    };
+    engine
+        .set_event_listener(Box::new(listener))
+        .expect("register listener");
+
+    // Add a field to own card — this triggers OwnCardUpdated event
+    // via ContactManager, unlike update_display_name which skips dispatch.
+    let r = engine
+        .handle_action_json(r#"{"ActionPressed": {"action_id": "add_field"}}"#.into())
+        .expect("open add field dialog");
+    let v: serde_json::Value = serde_json::from_str(&r).expect("parse");
+    assert_eq!(
+        v["NavigateTo"]["screen_id"], "form_add_field",
+        "should open add-field form, got: {v}"
+    );
+
+    // Select entry type
+    engine
+        .handle_action_json(
+            r#"{"ListItemSelected": {"component_id": "entry_types", "item_id": "email"}}"#.into(),
+        )
+        .expect("select email type");
+
+    // Enter field value (required — empty value is rejected)
+    engine
+        .handle_action_json(
+            r#"{"TextChanged": {"component_id": "field_value", "value": "test@example.com"}}"#
+                .into(),
+        )
+        .expect("enter value");
+
+    // Submit — calls add_own_field → ContactManager dispatches OwnCardUpdated
+    engine
+        .handle_action_json(r#"{"ActionPressed": {"action_id": "submit"}}"#.into())
+        .expect("submit field");
+
+    // Verify the listener was called with "my_info"
+    let recorded = calls.lock().unwrap();
+    assert!(
+        !recorded.is_empty(),
+        "listener should have been called at least once"
+    );
+    let all_screen_ids: Vec<&String> = recorded.iter().flat_map(|v| v.iter()).collect();
+    assert!(
+        all_screen_ids.contains(&&"my_info".to_string()),
+        "should include my_info screen, got: {all_screen_ids:?}"
+    );
+}
+
+// @scenario: event-listener.feature - Replacing event listener unregisters previous one
+#[test]
+fn replacing_event_listener_unregisters_previous() {
+    let (engine, _dir) = create_engine();
+    drive_onboarding(&engine);
+
+    // Register first listener
+    let calls_1: Arc<Mutex<Vec<Vec<String>>>> = Arc::new(Mutex::new(Vec::new()));
+    let listener_1 = RecordingListener {
+        calls: Arc::clone(&calls_1),
+    };
+    engine
+        .set_event_listener(Box::new(listener_1))
+        .expect("register first listener");
+
+    // Replace with second listener
+    let calls_2: Arc<Mutex<Vec<Vec<String>>>> = Arc::new(Mutex::new(Vec::new()));
+    let listener_2 = RecordingListener {
+        calls: Arc::clone(&calls_2),
+    };
+    engine
+        .set_event_listener(Box::new(listener_2))
+        .expect("register second listener");
+
+    // Trigger an event via add-field (dispatches OwnCardUpdated)
+    engine
+        .handle_action_json(r#"{"ActionPressed": {"action_id": "add_field"}}"#.into())
+        .expect("open add field dialog");
+    engine
+        .handle_action_json(
+            r#"{"ListItemSelected": {"component_id": "entry_types", "item_id": "phone"}}"#.into(),
+        )
+        .expect("select phone type");
+    engine
+        .handle_action_json(
+            r#"{"TextChanged": {"component_id": "field_value", "value": "+1234567890"}}"#.into(),
+        )
+        .expect("enter value");
+    engine
+        .handle_action_json(r#"{"ActionPressed": {"action_id": "submit"}}"#.into())
+        .expect("submit field");
+
+    // First listener should NOT have been called (unregistered)
+    let recorded_1 = calls_1.lock().unwrap();
+    assert!(
+        recorded_1.is_empty(),
+        "first listener should not receive events after replacement, got: {recorded_1:?}"
+    );
+
+    // Second listener SHOULD have been called
+    let recorded_2 = calls_2.lock().unwrap();
+    assert!(
+        !recorded_2.is_empty(),
+        "second listener should have received events"
+    );
 }

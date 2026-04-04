@@ -97,7 +97,7 @@ pub use mobile_verifier_event::{
 };
 pub use mobile_wifi_aware::{MobileWifiAwareStatus, wifi_aware_check_availability};
 pub use multipart_qr::{MobileMultipartDecoder, MultipartDecoder, encode_multipart};
-pub use platform_app_engine::PlatformAppEngine;
+pub use platform_app_engine::{PlatformAppEngine, PlatformEventListener};
 pub use types::{
     MobileAhaMoment, MobileAhaMomentType, MobileAuthMode, MobileBorderRadiusTokens,
     MobileBroadcastResult, MobileConsentRecord, MobileConsentStatus, MobileConsentType,

@@ -736,8 +736,8 @@ fn test_schema_version_after_all_migrations() {
     // Verify final schema version
     let version = MigrationRunner::current_version(&conn).unwrap();
     assert_eq!(
-        version, 39,
-        "Schema version should be 39 after all migrations, got {}",
+        version, 40,
+        "Schema version should be 40 after all migrations, got {}",
         version
     );
 }
@@ -1177,4 +1177,23 @@ fn test_migration_callback_failure_rolls_back() {
 
     let version = MigrationRunner::current_version(&conn).unwrap();
     assert_eq!(version, 0, "Version should be 0 after callback rollback");
+}
+
+#[test]
+fn test_migration_v40_adds_reciprocity_columns() {
+    let conn = Connection::open_in_memory().unwrap();
+    let key = SymmetricKey::generate();
+
+    run_migrations_up_to(&conn, &key, 39);
+    let cols_before = get_column_names(&conn, "contacts");
+    assert!(!cols_before.contains(&"reciprocity".to_string()));
+
+    run_migrations_up_to(&conn, &key, 40);
+    let cols_after = get_column_names(&conn, "contacts");
+    for col in ["reciprocity", "confirmation_channel", "confirmation_state"] {
+        assert!(
+            cols_after.contains(&col.to_string()),
+            "contacts table missing column after v40: {col}",
+        );
+    }
 }

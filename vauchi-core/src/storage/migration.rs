@@ -459,6 +459,11 @@ pub fn all_migrations() -> Vec<Migration> {
             name: "ohttp_key_cache",
             action: MigrationAction::Sql(MIGRATION_V39_OHTTP_KEY_CACHE),
         },
+        Migration {
+            version: 40,
+            name: "reciprocity_confirmation",
+            action: MigrationAction::Sql(MIGRATION_V40_RECIPROCITY),
+        },
     ]
 }
 
@@ -694,6 +699,17 @@ const MIGRATION_V39_OHTTP_KEY_CACHE: &str = "
         key_bytes BLOB NOT NULL,
         fetched_at INTEGER NOT NULL
     );
+";
+
+/// Migration v40: Reciprocity confirmation columns on contacts.
+///
+/// Tracks whether the other party also completed the exchange (orthogonal
+/// to trust scoring per ADR-034). `confirmation_state` stores encrypted
+/// confirmer state for relaunch recovery.
+const MIGRATION_V40_RECIPROCITY: &str = "
+    ALTER TABLE contacts ADD COLUMN reciprocity TEXT DEFAULT NULL;
+    ALTER TABLE contacts ADD COLUMN confirmation_channel TEXT DEFAULT NULL;
+    ALTER TABLE contacts ADD COLUMN confirmation_state BLOB DEFAULT NULL;
 ";
 
 const MIGRATION_V35_LOCAL_GROUPS: &str = "

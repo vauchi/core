@@ -13,9 +13,6 @@
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
-use futures_util::SinkExt;
-use tokio_tungstenite::tungstenite::Message;
-
 use vauchi_core::{
     ContactCard, Identity, IdentityBackup, SocialNetworkRegistry, Storage, SymmetricKey, Vauchi,
     VauchiConfig,
@@ -53,7 +50,6 @@ mod multipart_qr;
 mod multistage_exchange;
 mod platform_app_engine;
 mod protocol;
-mod sync;
 mod types;
 
 // Re-export public types
@@ -765,33 +761,42 @@ pub fn widget_panic_shred(
 
 // === Revocation Sender ===
 
-/// Sends identity revocation messages to contacts via the relay.
+/// Sends identity revocation messages to contacts via HTTP transport.
 ///
-/// Opens a one-shot WebSocket connection per call and sends
-/// the revocation as `SimplePayload::IdentityRevoked`.
+/// Wraps a `RelayClient<HttpTransportAdapter>` which implements
+/// `RevocationSender` via the Transport trait.
 struct MobileRevocationSender {
-    relay_url: String,
-    pinned_cert: Option<String>,
-    runtime: tokio::runtime::Runtime,
+    client: vauchi_core::network::RelayClient<vauchi_core::network::HttpTransportAdapter>,
 }
 
 impl MobileRevocationSender {
     fn new(
         relay_url: &str,
-        _sender_id: &str,
-        pinned_cert: Option<String>,
+        sender_id: &str,
+        _pinned_cert: Option<String>,
     ) -> Result<Self, vauchi_core::api::ShredError> {
-        let runtime = tokio::runtime::Builder::new_current_thread()
-            .enable_all()
-            .build()
-            .map_err(|e| {
-                vauchi_core::api::ShredError::FileError(format!("Tokio runtime: {}", e))
-            })?;
-        Ok(Self {
-            relay_url: relay_url.to_string(),
-            pinned_cert,
-            runtime,
-        })
+        use vauchi_core::network::{
+            HttpTransport, HttpTransportAdapter, HttpTransportConfig, ProxyConfig, RelayClient,
+            RelayClientConfig, TransportConfig,
+        };
+
+        let http_url = ws_to_http(relay_url);
+        let transport = HttpTransport::new(HttpTransportConfig {
+            relay_url: http_url.clone(),
+            timeout_ms: 10_000,
+            proxy: ProxyConfig::None,
+            allow_direct: true,
+        });
+        let adapter = HttpTransportAdapter::new(transport);
+        let config = RelayClientConfig {
+            transport: TransportConfig {
+                server_url: http_url,
+                ..TransportConfig::default()
+            },
+            ..RelayClientConfig::default()
+        };
+        let client = RelayClient::new(adapter, config, sender_id.to_string());
+        Ok(Self { client })
     }
 }
 
@@ -800,32 +805,21 @@ impl vauchi_core::api::RevocationSender for MobileRevocationSender {
         &mut self,
         revocation: &vauchi_core::network::IdentityRevoked,
     ) -> Result<bool, vauchi_core::api::ShredError> {
-        let simple = protocol::IdentityRevoked {
-            sender_id: revocation.sender_id.clone(),
-            recipient_id: revocation.recipient_id.clone(),
-            timestamp: revocation.timestamp,
-            signature: revocation.signature.to_vec(),
-        };
-        let envelope = protocol::create_envelope(protocol::MessagePayload::IdentityRevoked(simple));
-        let data = protocol::encode_message(&envelope)
-            .map_err(|e| vauchi_core::api::ShredError::FileError(format!("Encode: {}", e)))?;
+        self.client
+            .connect()
+            .map_err(|e| vauchi_core::api::ShredError::FileError(format!("Connect: {e}")))?;
+        self.client.send_revocation(revocation)
+    }
+}
 
-        self.runtime.block_on(async {
-            let mut socket =
-                cert_pinning::connect_with_pinning(&self.relay_url, self.pinned_cert.as_deref())
-                    .await
-                    .map_err(|e| {
-                        vauchi_core::api::ShredError::FileError(format!("Connect: {e}"))
-                    })?;
-
-            socket
-                .send(Message::Binary(data))
-                .await
-                .map_err(|e| vauchi_core::api::ShredError::FileError(format!("Send: {}", e)))?;
-
-            let _ = socket.close(None).await;
-            Ok(true)
-        })
+/// Convert wss:// to https:// and ws:// to http://.
+fn ws_to_http(url: &str) -> String {
+    if let Some(rest) = url.strip_prefix("wss://") {
+        format!("https://{rest}")
+    } else if let Some(rest) = url.strip_prefix("ws://") {
+        format!("http://{rest}")
+    } else {
+        url.to_string()
     }
 }
 
@@ -1549,25 +1543,18 @@ mod tests {
 
     // @scenario: security:Contact card signatures verified
     #[test]
-    fn test_revocation_to_simple_conversion() {
-        // Core IdentityRevoked should convert to SimpleIdentityRevoked correctly
-        let core_revoked = vauchi_core::network::IdentityRevoked {
+    fn test_identity_revoked_fields() {
+        let revoked = vauchi_core::network::IdentityRevoked {
             sender_id: "sender_hex".to_string(),
             recipient_id: "recipient_hex".to_string(),
             timestamp: 1700000000,
             signature: [0xAB; 64],
         };
-        let simple = protocol::IdentityRevoked {
-            sender_id: core_revoked.sender_id.clone(),
-            recipient_id: core_revoked.recipient_id.clone(),
-            timestamp: core_revoked.timestamp,
-            signature: core_revoked.signature.to_vec(),
-        };
-        assert_eq!(simple.sender_id, "sender_hex");
-        assert_eq!(simple.recipient_id, "recipient_hex");
-        assert_eq!(simple.timestamp, 1700000000);
-        assert_eq!(simple.signature.len(), 64);
-        assert!(simple.signature.iter().all(|b| *b == 0xAB));
+        assert_eq!(revoked.sender_id, "sender_hex");
+        assert_eq!(revoked.recipient_id, "recipient_hex");
+        assert_eq!(revoked.timestamp, 1700000000);
+        assert_eq!(revoked.signature.len(), 64);
+        assert!(revoked.signature.iter().all(|b| *b == 0xAB));
     }
 
     // @scenario: contacts_management:View contacts list

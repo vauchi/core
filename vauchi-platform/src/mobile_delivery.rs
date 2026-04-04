@@ -6,41 +6,73 @@
 
 use std::sync::Arc;
 
-use vauchi_core::{ContactCard, Identity, IdentityBackup};
+use vauchi_core::{ContactCard, Identity, IdentityBackup, Vauchi, VauchiConfig};
 
 use super::error::{MobileError, lock_or};
 use super::types::{
     MobileDeliveryRecord, MobileDeliveryStatus, MobileDeliverySummary, MobileDeviceDeliveryRecord,
     MobileRetryEntry, MobileSyncResult, MobileSyncStatus,
 };
-use super::{IdentityData, VauchiPlatform, sync};
+use super::{IdentityData, VauchiPlatform};
 
 #[uniffi::export]
 impl VauchiPlatform {
     // === Sync Operations ===
 
-    /// Sync with relay server.
+    /// Sync with relay server via OHTTP-encrypted HTTP.
+    ///
+    /// Creates a temporary `Vauchi` instance, connects, syncs, and maps the
+    /// outcome to `MobileSyncResult`. All synchronous — no tokio runtime needed.
     pub fn sync(&self) -> Result<MobileSyncResult, MobileError> {
+        use vauchi_core::api::VauchiSyncOutcome;
+
         *lock_or(&self.sync_status)? = MobileSyncStatus::Syncing;
 
-        let identity = self.get_identity()?;
-        let pinned_cert = self.get_pinned_cert();
+        let result = (|| -> Result<MobileSyncResult, MobileError> {
+            let config = VauchiConfig::with_storage_path(&self.storage_path)
+                .with_relay_url(&self.relay_url)
+                .with_storage_key(self.storage_key.clone());
+            let mut vauchi = Vauchi::new(config)?;
 
-        let rt = tokio::runtime::Builder::new_current_thread()
-            .enable_all()
-            .build()
-            .map_err(|e| MobileError::Internal(format!("Runtime error: {}", e)))?;
+            vauchi
+                .connect()
+                .map_err(|e| MobileError::NetworkError(format!("Connect: {e}")))?;
 
-        let result = rt.block_on(sync::do_sync_async(
-            &self.storage_path,
-            self.storage_key.clone(),
-            &identity,
-            &self.relay_url,
-            pinned_cert.as_deref(),
-        ));
+            let outcome = vauchi
+                .sync()
+                .map_err(|e| MobileError::SyncFailed(format!("{e}")))?;
 
-        // Status update is best-effort — never override the real sync result
-        // if the status lock happens to be poisoned.
+            vauchi.disconnect();
+
+            match outcome {
+                VauchiSyncOutcome::Ok {
+                    received,
+                    sent,
+                    acknowledged: _,
+                    errors: _,
+                } => Ok(MobileSyncResult {
+                    contacts_added: 0,
+                    cards_updated: received as u32,
+                    updates_sent: sent as u32,
+                    total: (received + sent) as u32,
+                    has_changes: received > 0 || sent > 0,
+                    updated_contact_names: vec![],
+                }),
+                VauchiSyncOutcome::TooSoon => Ok(MobileSyncResult {
+                    contacts_added: 0,
+                    cards_updated: 0,
+                    updates_sent: 0,
+                    total: 0,
+                    has_changes: false,
+                    updated_contact_names: vec![],
+                }),
+                VauchiSyncOutcome::NotConnected => {
+                    Err(MobileError::NetworkError("Not connected".into()))
+                }
+                VauchiSyncOutcome::NoIdentity => Err(MobileError::Internal("No identity".into())),
+            }
+        })();
+
         match &result {
             Ok(_) => {
                 let _ = lock_or(&self.sync_status).map(|mut g| *g = MobileSyncStatus::Idle);
@@ -382,42 +414,19 @@ impl VauchiPlatform {
     }
 }
 
-// Async sync method — runs sync in a background thread to prevent UI freeze.
+// Async sync method — runs sync on a blocking thread to prevent UI freeze.
 // Feature-gated behind `async-sync` (default) which pulls in tokio.
 #[cfg(feature = "async-sync")]
 #[uniffi::export(async_runtime = "tokio")]
 impl VauchiPlatform {
-    /// Async version of sync using native async WebSocket.
+    /// Async version of sync for mobile UI threads.
     ///
-    /// Use this from mobile UI threads to prevent freezing.
-    /// Storage is opened in scoped blocks and dropped before `.await` to keep
-    /// the future `Send` (required by UniFFI async exports).
+    /// Delegates to the synchronous `sync()` via `spawn_blocking` so
+    /// the core OHTTP HTTP calls don't block the async runtime.
     pub async fn sync_async(self: Arc<Self>) -> Result<MobileSyncResult, MobileError> {
-        *lock_or(&self.sync_status)? = MobileSyncStatus::Syncing;
-
-        let identity = self.get_identity()?;
-        let pinned_cert = self.get_pinned_cert();
-
-        let result = sync::do_sync_async(
-            &self.storage_path,
-            self.storage_key.clone(),
-            &identity,
-            &self.relay_url,
-            pinned_cert.as_deref(),
-        )
-        .await;
-
-        // Status update is best-effort — never override the real sync result
-        // if the status lock happens to be poisoned.
-        match &result {
-            Ok(_) => {
-                let _ = lock_or(&self.sync_status).map(|mut g| *g = MobileSyncStatus::Idle);
-            }
-            Err(_) => {
-                let _ = lock_or(&self.sync_status).map(|mut g| *g = MobileSyncStatus::Error);
-            }
-        }
-
-        result
+        let platform = self.clone();
+        tokio::task::spawn_blocking(move || platform.sync())
+            .await
+            .map_err(|e| MobileError::Internal(format!("Sync task panicked: {e}")))?
     }
 }

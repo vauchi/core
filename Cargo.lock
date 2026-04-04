@@ -3421,18 +3421,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "rustls-native-certs"
-version = "0.8.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "612460d5f7bea540c490b2b6395d8e34a953e52b491accd6c86c8164c5932a63"
-dependencies = [
- "openssl-probe 0.2.1",
- "rustls-pki-types",
- "schannel",
- "security-framework 3.7.0",
-]
-
-[[package]]
 name = "rustls-pemfile"
 version = "2.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4131,22 +4119,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "tokio-tungstenite"
-version = "0.24.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "edc5f74e248dc973e0dbb7b74c7e0d6fcc301c694ff50049504004ef4d0cdcd9"
-dependencies = [
- "futures-util",
- "log",
- "rustls",
- "rustls-native-certs 0.8.3",
- "rustls-pki-types",
- "tokio",
- "tokio-rustls",
- "tungstenite",
-]
-
-[[package]]
 name = "toml"
 version = "0.5.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4300,7 +4272,7 @@ dependencies = [
  "native-tls",
  "rand 0.8.5",
  "rustls",
- "rustls-native-certs 0.7.3",
+ "rustls-native-certs",
  "rustls-pki-types",
  "sha1",
  "thiserror 1.0.69",
@@ -4605,7 +4577,7 @@ dependencies = [
 
 [[package]]
 name = "vauchi-app"
-version = "0.16.0"
+version = "0.17.0"
 dependencies = [
  "hex",
  "proptest",
@@ -4624,7 +4596,7 @@ dependencies = [
 
 [[package]]
 name = "vauchi-cabi"
-version = "0.16.0"
+version = "0.17.0"
 dependencies = [
  "cbindgen",
  "serde_json",
@@ -4636,7 +4608,7 @@ dependencies = [
 
 [[package]]
 name = "vauchi-core"
-version = "0.16.0"
+version = "0.17.0"
 dependencies = [
  "argon2",
  "async-trait",
@@ -4690,31 +4662,27 @@ dependencies = [
 
 [[package]]
 name = "vauchi-platform"
-version = "0.16.0"
+version = "0.17.0"
 dependencies = [
  "base64",
  "crc32fast",
  "criterion",
- "futures-util",
  "hex",
  "proptest",
- "rustls",
  "serde",
  "serde_json",
  "tempfile",
  "thiserror 2.0.18",
  "tokio",
- "tokio-tungstenite",
  "uniffi",
  "vauchi-app",
  "vauchi-core",
- "webpki-roots 0.26.11",
  "zxcvbn",
 ]
 
 [[package]]
 name = "vauchi-protocol"
-version = "0.16.0"
+version = "0.17.0"
 dependencies = [
  "serde",
  "serde_json",

@@ -60,8 +60,8 @@ impl Storage {
         let mut map = std::collections::HashMap::new();
         for row in rows {
             let (field_id, encrypted) = row?;
-            let plain =
-                crate::crypto::decrypt(&self.encryption_key, &encrypted).unwrap_or(encrypted); // Legacy plaintext: return as-is
+            let plain = crate::crypto::decrypt(&self.encryption_key, &encrypted)
+                .map_err(|e| StorageError::Encryption(format!("Decrypt field note: {}", e)))?;
             map.insert(field_id, plain);
         }
         Ok(map)

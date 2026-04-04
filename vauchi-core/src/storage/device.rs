@@ -282,19 +282,16 @@ impl Storage {
 
         let mut states = Vec::new();
         for (encrypted, plaintext) in rows {
-            let json = if let Some(enc) = encrypted {
-                if !enc.is_empty() {
-                    match crate::crypto::decrypt(&self.encryption_key, &enc) {
-                        Ok(decrypted) => String::from_utf8(decrypted).ok(),
-                        Err(_) => None,
-                    }
-                } else {
-                    None
-                }
+            let json = if let Some(enc) = encrypted
+                && !enc.is_empty()
+            {
+                let decrypted = crate::crypto::decrypt(&self.encryption_key, &enc)
+                    .map_err(|e| StorageError::Encryption(format!("Decrypt sync state: {}", e)))?;
+                String::from_utf8(decrypted)
+                    .map_err(|e| StorageError::Serialization(e.to_string()))?
             } else {
-                None
+                plaintext
             };
-            let json = json.unwrap_or(plaintext);
             if !json.is_empty()
                 && let Ok(state) = InterDeviceSyncState::from_json(&json)
             {

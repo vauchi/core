@@ -51,7 +51,9 @@ impl Storage {
         match result {
             Ok(Some(encrypted)) => {
                 let plain =
-                    crate::crypto::decrypt(&self.encryption_key, &encrypted).unwrap_or(encrypted); // Legacy plaintext: return as-is
+                    crate::crypto::decrypt(&self.encryption_key, &encrypted).map_err(|e| {
+                        StorageError::Encryption(format!("Decrypt personal notes: {}", e))
+                    })?;
                 Ok(Some(plain))
             }
             Ok(None) => Ok(None),

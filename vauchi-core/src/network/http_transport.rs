@@ -785,7 +785,7 @@ mod tests {
         let (encrypted_request, response_nonce) = client.encapsulate(&padded_request).unwrap();
 
         // === Server: OHTTP decrypt + unpad + parse ===
-        let mut server = ohttp::Server::new(key_config).unwrap();
+        let server = ohttp::Server::new(key_config).unwrap();
         let (decrypted, srv_resp) = server.decapsulate(&encrypted_request).unwrap();
         let unpadded = padding::unpad(&decrypted).expect("server must unpad");
         let parsed: serde_json::Value = serde_json::from_slice(&unpadded).unwrap();

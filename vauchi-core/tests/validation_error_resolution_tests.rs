@@ -18,10 +18,10 @@ fn onboarding_empty_name_returns_update_screen_with_error() {
     let mut engine = AppEngine::new(vauchi);
 
     // We start on onboarding. Navigate to the name step.
-    engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "create_new".into(),
     });
-    engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "get_started".into(),
     });
 
@@ -70,20 +70,20 @@ fn onboarding_valid_name_after_error_navigates_forward() {
     let mut engine = AppEngine::new(vauchi);
 
     // Navigate to name step
-    engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "create_new".into(),
     });
-    engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "get_started".into(),
     });
 
     // Trigger validation error
-    engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "continue".into(),
     });
 
     // Now enter a valid name and submit
-    engine.handle_action(UserAction::TextChanged {
+    let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "display_name".into(),
         value: "Alice".into(),
     });

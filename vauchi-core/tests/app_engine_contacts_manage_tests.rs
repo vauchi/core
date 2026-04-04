@@ -440,7 +440,7 @@ fn contact_limit_edit_then_save() {
 }
 
 #[test]
-fn contact_limit_save_invalid_returns_validation_error() {
+fn contact_limit_save_invalid_returns_update_screen_with_validation_error() {
     let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
     let mut engine = AppEngine::new(vauchi);
@@ -457,14 +457,32 @@ fn contact_limit_save_invalid_returns_validation_error() {
         value: "not_a_number".into(),
     });
 
-    // Save should fail
+    // Save should fail — AppEngine resolves ValidationError into
+    // UpdateScreen with the error injected into the component.
     let result = engine.handle_action(UserAction::ActionPressed {
         action_id: "save".into(),
     });
-    assert!(
-        matches!(result, ActionResult::ValidationError { .. }),
-        "save with invalid number should return ValidationError, got {result:?}"
-    );
+    match &result {
+        ActionResult::UpdateScreen(screen) => {
+            let has_error = screen.components.iter().any(|c| {
+                matches!(
+                    c,
+                    Component::TextInput {
+                        id,
+                        validation_error: Some(_),
+                        ..
+                    } if id == "limit_input"
+                )
+            });
+            assert!(
+                has_error,
+                "UpdateScreen should have validation_error on limit_input, got {result:?}"
+            );
+        }
+        other => {
+            panic!("save with invalid number should return UpdateScreen with error, got {other:?}")
+        }
+    }
 }
 
 #[test]

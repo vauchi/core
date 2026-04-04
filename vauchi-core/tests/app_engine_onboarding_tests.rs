@@ -10,7 +10,7 @@ use common::app_engine_helpers::{
     drive_onboarding, drive_onboarding_with_backup, drive_onboarding_without_name,
 };
 use vauchi_app::ui::{
-    ActionResult, AppEngine, AppScreen, FormDialogType, UserAction, WorkflowEngine,
+    ActionResult, AppEngine, AppScreen, Component, FormDialogType, UserAction, WorkflowEngine,
 };
 use vauchi_core::api::Vauchi;
 
@@ -76,24 +76,35 @@ fn app_engine_starts_on_home_with_identity() {
 }
 
 #[test]
-fn onboarding_completion_without_name_returns_validation_error() {
+fn onboarding_completion_without_name_returns_update_screen_with_error() {
     let vauchi = Vauchi::in_memory().unwrap();
     let mut engine = AppEngine::new(vauchi);
 
     let result = drive_onboarding_without_name(&mut engine);
 
-    match result {
-        ActionResult::ValidationError {
-            component_id,
-            message,
-        } => {
-            assert_eq!(component_id, "display_name");
+    // AppEngine resolves ValidationError into UpdateScreen with the error
+    // injected into the matching component.
+    match &result {
+        ActionResult::UpdateScreen(screen) => {
+            let has_error = screen.components.iter().any(|c| {
+                matches!(
+                    c,
+                    Component::TextInput {
+                        id,
+                        validation_error: Some(msg),
+                        ..
+                    } if id == "display_name" && !msg.is_empty()
+                )
+            });
             assert!(
-                !message.is_empty(),
-                "validation message should not be empty"
+                has_error,
+                "UpdateScreen should have validation_error on display_name, got {result:?}"
             );
         }
-        other => panic!("expected ValidationError, got {:?}", other),
+        other => panic!(
+            "expected UpdateScreen with validation error, got {:?}",
+            other
+        ),
     }
     assert_eq!(
         engine.current_app_screen(),
@@ -108,7 +119,7 @@ fn onboarding_completion_without_name_returns_validation_error() {
 
 /// Verify that a whitespace-only name is also rejected.
 #[test]
-fn onboarding_completion_with_empty_name_returns_validation_error() {
+fn onboarding_completion_with_empty_name_returns_update_screen_with_error() {
     let vauchi = Vauchi::in_memory().unwrap();
     let mut engine = AppEngine::new(vauchi);
 
@@ -129,18 +140,29 @@ fn onboarding_completion_with_empty_name_returns_validation_error() {
         action_id: "continue".into(),
     });
 
-    match result {
-        ActionResult::ValidationError {
-            component_id,
-            message,
-        } => {
-            assert_eq!(component_id, "display_name");
+    // AppEngine resolves ValidationError into UpdateScreen with the error
+    // injected into the matching component.
+    match &result {
+        ActionResult::UpdateScreen(screen) => {
+            let has_error = screen.components.iter().any(|c| {
+                matches!(
+                    c,
+                    Component::TextInput {
+                        id,
+                        validation_error: Some(msg),
+                        ..
+                    } if id == "display_name" && !msg.is_empty()
+                )
+            });
             assert!(
-                !message.is_empty(),
-                "validation message should not be empty"
+                has_error,
+                "UpdateScreen should have validation_error on display_name, got {result:?}"
             );
         }
-        other => panic!("expected ValidationError, got {:?}", other),
+        other => panic!(
+            "expected UpdateScreen with validation error, got {:?}",
+            other
+        ),
     }
     assert!(
         !engine.has_identity(),

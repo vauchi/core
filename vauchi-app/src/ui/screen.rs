@@ -75,6 +75,38 @@ impl ScreenModel {
             deprecated_components: Vec::new(),
         }
     }
+
+    /// Return a copy with `validation_error` set on the component matching
+    /// `component_id`. Works for `TextInput` and `PinInput` components.
+    ///
+    /// If no matching component is found, the screen is returned unchanged.
+    /// This allows `AppEngine` to convert `ActionResult::ValidationError`
+    /// into `ActionResult::UpdateScreen` so frontends never need to patch
+    /// the model themselves.
+    pub fn with_validation_error(mut self, component_id: &str, message: String) -> Self {
+        for component in &mut self.components {
+            match component {
+                Component::TextInput {
+                    id,
+                    validation_error,
+                    ..
+                } if id == component_id => {
+                    *validation_error = Some(message);
+                    return self;
+                }
+                Component::PinInput {
+                    id,
+                    validation_error,
+                    ..
+                } if id == component_id => {
+                    *validation_error = Some(message);
+                    return self;
+                }
+                _ => {}
+            }
+        }
+        self
+    }
 }
 
 // INLINE_TEST_REQUIRED: backward-compat + schema_version tests

@@ -382,6 +382,28 @@ impl WorkflowEngine for AppEngine {
         }
 
         let result = self.engine.handle_action(action);
-        self.route_result(result)
+        let result = self.route_result(result);
+        self.resolve_validation_error(result)
+    }
+}
+
+impl AppEngine {
+    /// Convert `ValidationError` into `UpdateScreen` with the error injected
+    /// into the matching component. This ensures frontends never receive
+    /// `ValidationError` and never need to patch the `ScreenModel` themselves.
+    fn resolve_validation_error(&self, result: ActionResult) -> ActionResult {
+        match result {
+            ActionResult::ValidationError {
+                component_id,
+                message,
+            } => {
+                let screen = self
+                    .engine
+                    .current_screen()
+                    .with_validation_error(&component_id, message);
+                ActionResult::UpdateScreen(screen)
+            }
+            other => other,
+        }
     }
 }

@@ -175,16 +175,27 @@ fn form_dialog_edit_name_empty_returns_validation_error() {
         action_id: "submit".into(),
     });
 
-    assert!(
-        matches!(
-            result,
-            ActionResult::ValidationError {
-                ref component_id,
-                ..
-            } if component_id == "display_name"
-        ),
-        "Empty name should return ValidationError, got {result:?}"
-    );
+    // AppEngine resolves ValidationError into UpdateScreen with the error
+    // injected into the matching component.
+    match &result {
+        ActionResult::UpdateScreen(screen) => {
+            let has_error = screen.components.iter().any(|c| {
+                matches!(
+                    c,
+                    Component::TextInput {
+                        id,
+                        validation_error: Some(_),
+                        ..
+                    } if id == "display_name"
+                )
+            });
+            assert!(
+                has_error,
+                "UpdateScreen should have validation_error on display_name, got {result:?}"
+            );
+        }
+        other => panic!("Empty name should return UpdateScreen with error, got {other:?}"),
+    }
 }
 
 #[test]
@@ -242,16 +253,27 @@ fn form_dialog_add_field_empty_value_returns_validation_error() {
         action_id: "submit".into(),
     });
 
-    assert!(
-        matches!(
-            result,
-            ActionResult::ValidationError {
-                ref component_id,
-                ..
-            } if component_id == "field_value"
-        ),
-        "Empty value should return ValidationError, got {result:?}"
-    );
+    // AppEngine resolves ValidationError into UpdateScreen with the error
+    // injected into the matching component.
+    match &result {
+        ActionResult::UpdateScreen(screen) => {
+            let has_error = screen.components.iter().any(|c| {
+                matches!(
+                    c,
+                    Component::TextInput {
+                        id,
+                        validation_error: Some(_),
+                        ..
+                    } if id == "field_value"
+                )
+            });
+            assert!(
+                has_error,
+                "UpdateScreen should have validation_error on field_value, got {result:?}"
+            );
+        }
+        other => panic!("Empty value should return UpdateScreen with error, got {other:?}"),
+    }
 }
 
 #[test]

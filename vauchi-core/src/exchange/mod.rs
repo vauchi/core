@@ -70,6 +70,7 @@ pub mod mode;
 pub mod mode_availability;
 pub mod mode_payload;
 pub mod persisted_state;
+pub mod reciprocity;
 pub mod relay_exchange;
 pub mod tcp_transport;
 
@@ -127,6 +128,7 @@ pub use proximity::{
     ManualConfirmationVerifier, ProximityConfidence, ProximityError, ProximityVerifier,
 };
 pub use qr::{ExchangeQR, check_clock_drift};
+pub use reciprocity::{ConfirmationChannel, Reciprocity};
 pub use session::{
     DefaultPlatformCallbacks, DuplicateAction, ExchangeEvent, ExchangePlatformCallbacks,
     ExchangeSession, ExchangeState, ExchangeTransport,

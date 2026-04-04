@@ -683,6 +683,7 @@ mod tests {
 
     // ── C3: Payload padding tests ──────────────────────────────────
 
+    // @scenario: sync:OHTTP payload padding
     #[test]
     fn test_ohttp_request_padded_to_valid_bucket() {
         use crate::crypto::padding;
@@ -704,6 +705,7 @@ mod tests {
         );
     }
 
+    // @scenario: sync:OHTTP payload padding
     #[test]
     fn test_ohttp_request_padding_roundtrips_with_relay_unpad() {
         use crate::crypto::padding;
@@ -731,6 +733,7 @@ mod tests {
         assert_eq!(parsed["recipient_id"], "a".repeat(64));
     }
 
+    // @scenario: sync:OHTTP payload padding
     #[test]
     fn test_ohttp_response_unpadding() {
         use crate::crypto::padding;
@@ -751,6 +754,7 @@ mod tests {
         assert_eq!(parsed.blob_id.as_deref(), Some("abc123"));
     }
 
+    // @scenario: sync:OHTTP payload padding
     #[test]
     fn test_ohttp_response_unpadding_rejects_invalid() {
         // Garbage bytes should fail cleanly, not panic
@@ -759,6 +763,7 @@ mod tests {
         assert!(result.is_err(), "garbage bytes must produce an error");
     }
 
+    // @scenario: sync:OHTTP payload padding
     #[test]
     fn test_ohttp_full_crypto_roundtrip_with_padding() {
         use crate::crypto::padding;

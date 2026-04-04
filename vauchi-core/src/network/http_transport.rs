@@ -356,6 +356,30 @@ impl HttpTransport {
         serde_json::to_vec(&inner).map_err(|e| NetworkError::Serialization(e.to_string()))
     }
 
+    /// Build and pad an OHTTP request payload.
+    ///
+    /// Serializes the action envelope, then pads to a fixed bucket size so the
+    /// OHTTP relay cannot distinguish action types by encrypted blob size.
+    /// Matches relay-side `padding::unpad()` (relay/src/http_api.rs).
+    fn build_padded_ohttp_payload<Req: Serialize>(
+        action: &str,
+        body: &Req,
+    ) -> Result<Vec<u8>, NetworkError> {
+        let envelope = Self::build_ohttp_envelope(action, body)?;
+        Ok(crate::crypto::padding::pad(&envelope))
+    }
+
+    /// Unpad and parse an OHTTP response from the relay.
+    ///
+    /// The relay pads all OHTTP responses to bucket sizes before encryption
+    /// (relay/src/http_api.rs). This reverses that padding before JSON parsing.
+    fn parse_padded_ohttp_response(padded: &[u8]) -> Result<V2Response, NetworkError> {
+        let unpadded = crate::crypto::padding::unpad(padded).ok_or_else(|| {
+            NetworkError::InvalidMessage("invalid padding in OHTTP response".into())
+        })?;
+        serde_json::from_slice(&unpadded).map_err(|e| NetworkError::Serialization(e.to_string()))
+    }
+
     /// Encrypt a request via OHTTP and decrypt the response.
     fn post_via_ohttp<Req: Serialize>(
         &self,
@@ -363,10 +387,10 @@ impl HttpTransport {
         action: &str,
         body: &Req,
     ) -> Result<V2Response, NetworkError> {
-        let inner_bytes = Self::build_ohttp_envelope(action, body)?;
+        let padded_payload = Self::build_padded_ohttp_payload(action, body)?;
 
-        // Encrypt
-        let (encrypted, response_decryptor) = ohttp.encapsulate(&inner_bytes)?;
+        // Encrypt padded payload
+        let (encrypted, response_decryptor) = ohttp.encapsulate(&padded_payload)?;
 
         // POST encrypted blob
         let agent = self.get_agent()?;
@@ -386,9 +410,8 @@ impl HttpTransport {
         // Decrypt
         let plain_response = response_decryptor.decapsulate(&enc_response)?;
 
-        // Parse
-        serde_json::from_slice(&plain_response)
-            .map_err(|e| NetworkError::Serialization(e.to_string()))
+        // Unpad and parse
+        Self::parse_padded_ohttp_response(&plain_response)
     }
 
     /// Returns a reference to the cached agent, or the construction error.
@@ -650,5 +673,133 @@ mod tests {
             Some(&serde_json::Value::String("abc123".into())),
             "OHTTP inner envelope must include body fields"
         );
+    }
+
+    // ── C3: Payload padding tests ──────────────────────────────────
+
+    #[test]
+    fn test_ohttp_request_padded_to_valid_bucket() {
+        use crate::crypto::padding;
+
+        #[derive(Serialize)]
+        struct TestBody {
+            mailbox_id: String,
+        }
+
+        let body = TestBody {
+            mailbox_id: "abc123".to_string(),
+        };
+        let padded = HttpTransport::build_padded_ohttp_payload("send", &body)
+            .expect("padded payload must build");
+        assert!(
+            padding::is_valid_bucket_size(padded.len()),
+            "padded request size {} must be a valid bucket",
+            padded.len()
+        );
+    }
+
+    #[test]
+    fn test_ohttp_request_padding_roundtrips_with_relay_unpad() {
+        use crate::crypto::padding;
+
+        #[derive(Serialize)]
+        struct TestBody {
+            recipient_id: String,
+            ciphertext: String,
+        }
+
+        let body = TestBody {
+            recipient_id: "a".repeat(64),
+            ciphertext: "dGVzdA==".to_string(),
+        };
+        let padded = HttpTransport::build_padded_ohttp_payload("send", &body)
+            .expect("padded payload must build");
+
+        // Simulate relay-side unpad (relay/src/http_api.rs:353)
+        let unpadded = padding::unpad(&padded).expect("relay must be able to unpad client request");
+        let parsed: serde_json::Value =
+            serde_json::from_slice(&unpadded).expect("unpadded payload must be valid JSON");
+
+        assert_eq!(parsed["action"], "send");
+        assert_eq!(parsed["version"], 2);
+        assert_eq!(parsed["recipient_id"], "a".repeat(64));
+    }
+
+    #[test]
+    fn test_ohttp_response_unpadding() {
+        use crate::crypto::padding;
+
+        // Simulate relay-side response padding (relay/src/http_api.rs:397)
+        let response = serde_json::json!({
+            "status": "ok",
+            "blob_id": "abc123"
+        });
+        let resp_bytes = serde_json::to_vec(&response).unwrap();
+        let padded_response = padding::pad(&resp_bytes);
+
+        // Client-side unpad
+        let parsed = HttpTransport::parse_padded_ohttp_response(&padded_response)
+            .expect("client must parse padded relay response");
+
+        assert_eq!(parsed.status, "ok");
+        assert_eq!(parsed.blob_id.as_deref(), Some("abc123"));
+    }
+
+    #[test]
+    fn test_ohttp_response_unpadding_rejects_invalid() {
+        // Garbage bytes should fail cleanly, not panic
+        let garbage = vec![0xFF; 100];
+        let result = HttpTransport::parse_padded_ohttp_response(&garbage);
+        assert!(result.is_err(), "garbage bytes must produce an error");
+    }
+
+    #[test]
+    fn test_ohttp_full_crypto_roundtrip_with_padding() {
+        use crate::crypto::padding;
+        use ohttp::{KeyConfig, SymmetricSuite, hpke};
+
+        // Server key pair
+        let key_config = KeyConfig::new(
+            0,
+            hpke::Kem::X25519Sha256,
+            vec![SymmetricSuite::new(
+                hpke::Kdf::HkdfSha256,
+                hpke::Aead::Aes128Gcm,
+            )],
+        )
+        .unwrap();
+        let encoded = key_config.encode().unwrap();
+
+        // === Client: build + pad + OHTTP encrypt ===
+        #[derive(Serialize)]
+        struct TestBody {
+            mailbox_id: String,
+        }
+        let body = TestBody {
+            mailbox_id: "test".to_string(),
+        };
+        let padded_request = HttpTransport::build_padded_ohttp_payload("fetch", &body).unwrap();
+        assert!(padding::is_valid_bucket_size(padded_request.len()));
+
+        let client = OhttpClient::new(encoded).unwrap();
+        let (encrypted_request, response_nonce) = client.encapsulate(&padded_request).unwrap();
+
+        // === Server: OHTTP decrypt + unpad + parse ===
+        let mut server = ohttp::Server::new(key_config).unwrap();
+        let (decrypted, srv_resp) = server.decapsulate(&encrypted_request).unwrap();
+        let unpadded = padding::unpad(&decrypted).expect("server must unpad");
+        let parsed: serde_json::Value = serde_json::from_slice(&unpadded).unwrap();
+        assert_eq!(parsed["action"], "fetch");
+
+        // === Server: respond + pad + OHTTP encrypt ===
+        let response = serde_json::json!({"status": "ok", "blobs": []});
+        let resp_bytes = serde_json::to_vec(&response).unwrap();
+        let padded_resp = padding::pad(&resp_bytes);
+        let encrypted_resp = srv_resp.encapsulate(&padded_resp).unwrap();
+
+        // === Client: OHTTP decrypt + unpad + parse ===
+        let decrypted_resp = response_nonce.decapsulate(&encrypted_resp).unwrap();
+        let parsed_resp = HttpTransport::parse_padded_ohttp_response(&decrypted_resp).unwrap();
+        assert_eq!(parsed_resp.status, "ok");
     }
 }

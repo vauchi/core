@@ -350,14 +350,16 @@ impl Vauchi {
         // health check runs again. This is fine for correctness.
         ctrl.connect()?;
 
-        // Load ratchet states for all contacts
+        // Load ratchet states for all contacts, preserving is_initiator for save-back
+        let mut initiator_flags: std::collections::HashMap<String, bool> =
+            std::collections::HashMap::new();
         for contact in contacts {
             if !contact.is_exchanged() || contact.is_blocked() {
                 continue;
             }
-            if let Ok(Some((ratchet, _is_initiator))) =
-                self.storage.load_ratchet_state(contact.id())
+            if let Ok(Some((ratchet, is_initiator))) = self.storage.load_ratchet_state(contact.id())
             {
+                initiator_flags.insert(contact.id().to_string(), is_initiator);
                 ctrl.register_ratchet(contact.id(), ratchet);
             }
         }
@@ -382,10 +384,13 @@ impl Vauchi {
         // drop, causing desync on next sync cycle.
         let ratchets = ctrl.into_ratchets();
         for (contact_id, ratchet) in &ratchets {
-            // Best-effort: if save fails for one contact, continue
-            // with others. The ratchet is still advanced in the
-            // recipient's state, so worst case we re-derive on retry.
-            let _ = self.storage.save_ratchet_state(contact_id, ratchet, false);
+            let is_initiator = initiator_flags
+                .get(contact_id.as_str())
+                .copied()
+                .unwrap_or(false);
+            let _ = self
+                .storage
+                .save_ratchet_state(contact_id, ratchet, is_initiator);
         }
 
         Ok(result)

@@ -145,6 +145,63 @@ fn confirmation_escrow_keys_differ_from_card_escrow() {
     assert_ne!(card.gate_hash, confirm.gate_hash);
 }
 
+// ── Task 10: Passive timer ──
+
+use vauchi_core::contact::VisibilityRules;
+
+fn make_contact_with_timestamp(ts: u64) -> Contact {
+    Contact::from_sync_data(
+        [1u8; 32],
+        ContactCard::new("Alice"),
+        SymmetricKey::generate(),
+        ts,
+        false,
+        VisibilityRules::new(),
+    )
+}
+
+#[test]
+fn reciprocity_pending_within_7_days_stays_pending() {
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+    let mut contact = make_contact_with_timestamp(now - 3600); // 1 hour ago
+    contact.set_reciprocity(Reciprocity::Pending);
+    assert_eq!(contact.reciprocity(), Reciprocity::Pending);
+}
+
+#[test]
+fn reciprocity_pending_expires_after_7_days() {
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+    let mut contact = make_contact_with_timestamp(now - 8 * 86400); // 8 days ago
+    contact.set_reciprocity(Reciprocity::Pending);
+    assert_eq!(contact.reciprocity(), Reciprocity::Unreciprocated);
+}
+
+#[test]
+fn unreciprocated_upgrades_to_confirmed_on_late_arrival() {
+    let mut contact = make_test_contact();
+    contact.set_reciprocity(Reciprocity::Unreciprocated);
+    // Simulate receiving a valid ReciprocityConfirm after window
+    contact.set_reciprocity(Reciprocity::Confirmed);
+    assert_eq!(contact.reciprocity(), Reciprocity::Confirmed);
+}
+
+#[test]
+fn confirmed_not_affected_by_timer() {
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+    let mut contact = make_contact_with_timestamp(now - 30 * 86400); // 30 days ago
+    contact.set_reciprocity(Reciprocity::Confirmed);
+    assert_eq!(contact.reciprocity(), Reciprocity::Confirmed);
+}
+
 // ── Task 5: Token derivation in key agreement ──
 
 use vauchi_core::exchange::proximity::MockProximityVerifier;

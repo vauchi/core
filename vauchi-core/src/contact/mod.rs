@@ -461,11 +461,32 @@ impl Contact {
     }
 
     /// Returns the reciprocity status. `None` in ExchangedData maps to `Unknown` (legacy).
+    ///
+    /// Includes a passive 7-day timer: `Pending` contacts whose exchange timestamp
+    /// is older than 7 days are reported as `Unreciprocated` (design spec §6.3).
+    /// This is a read-time check — the stored value stays `Pending` until explicitly
+    /// written by the relaunch recovery scan.
     pub fn reciprocity(&self) -> Reciprocity {
-        self.kind
-            .exchanged_data()
-            .and_then(|d| d.reciprocity)
-            .unwrap_or(Reciprocity::Unknown)
+        match self.kind.exchanged_data().and_then(|d| d.reciprocity) {
+            Some(Reciprocity::Pending) => {
+                let now = SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .unwrap_or_default()
+                    .as_secs();
+                let exchange_ts = self
+                    .kind
+                    .exchanged_data()
+                    .map(|d| d.exchange_timestamp)
+                    .unwrap_or(0);
+                if now > exchange_ts + 7 * 24 * 60 * 60 {
+                    Reciprocity::Unreciprocated
+                } else {
+                    Reciprocity::Pending
+                }
+            }
+            Some(r) => r,
+            None => Reciprocity::Unknown,
+        }
     }
 
     /// Returns the confirmation channel, if reciprocity has been resolved.

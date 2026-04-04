@@ -734,3 +734,53 @@ fn from_screen_id_more_roundtrips() {
     let parsed = AppScreen::from_screen_id(id).expect("from_screen_id must handle 'more'");
     assert_eq!(parsed, AppScreen::More);
 }
+
+// ============================================================================
+// Empty state: go_exchange action routing
+// ============================================================================
+
+// @scenario: onboarding.feature - Empty state with guidance
+#[test]
+fn go_exchange_from_contacts_navigates_to_exchange() {
+    let mut vauchi = Vauchi::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    let mut engine = AppEngine::new(vauchi);
+    engine.navigate_to(AppScreen::Contacts);
+
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "go_exchange".into(),
+    });
+
+    match result {
+        ActionResult::NavigateTo(screen) => {
+            assert_eq!(
+                screen.screen_id, "exchange_mode_selection",
+                "go_exchange should navigate to exchange screen"
+            );
+        }
+        other => panic!("Expected NavigateTo, got {other:?}"),
+    }
+}
+
+// @scenario: onboarding.feature - Prompt for first exchange
+#[test]
+fn go_exchange_from_my_info_navigates_to_exchange() {
+    let mut vauchi = Vauchi::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    let mut engine = AppEngine::new(vauchi);
+    engine.navigate_to(AppScreen::MyInfo);
+
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "go_exchange".into(),
+    });
+
+    match result {
+        ActionResult::NavigateTo(screen) => {
+            assert_eq!(
+                screen.screen_id, "exchange_mode_selection",
+                "go_exchange should navigate to exchange screen"
+            );
+        }
+        other => panic!("Expected NavigateTo, got {other:?}"),
+    }
+}

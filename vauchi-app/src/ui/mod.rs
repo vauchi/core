@@ -90,3 +90,62 @@ pub use settings::{SettingsConfig, SettingsEngine};
 pub use support::SupportEngine;
 #[cfg(any(feature = "network-native-tls", feature = "network-rustls"))]
 pub use sync_status::SyncStatusEngine;
+
+/// Map a [`VauchiEvent`] to the screen IDs it invalidates.
+///
+/// This is the **single source of truth** for event→screen mapping.
+/// All consumers (vauchi-platform, vauchi-cabi, linux-gtk, etc.) must call
+/// this function rather than maintaining their own copy.
+///
+/// Returns an empty slice for events that don't affect any screen.
+///
+/// `VauchiEvent` is `#[non_exhaustive]` — unknown future variants return
+/// an empty slice. When adding a new `VauchiEvent` variant, update this
+/// function to include the relevant screen IDs.
+pub fn affected_screens(event: &vauchi_core::api::VauchiEvent) -> Vec<&'static str> {
+    use vauchi_core::api::VauchiEvent;
+
+    match event {
+        VauchiEvent::ContactAdded { .. }
+        | VauchiEvent::ContactUpdated { .. }
+        | VauchiEvent::ContactRemoved { .. }
+        | VauchiEvent::ContactHidden { .. }
+        | VauchiEvent::ContactUnhidden { .. }
+        | VauchiEvent::ContactBlocked { .. }
+        | VauchiEvent::ContactUnblocked { .. }
+        | VauchiEvent::ContactSoftDeleted { .. }
+        | VauchiEvent::ContactArchived { .. }
+        | VauchiEvent::ContactUnarchived { .. } => {
+            vec!["contacts", "contact_detail"]
+        }
+        VauchiEvent::OwnCardUpdated { .. } => vec!["my_info"],
+        VauchiEvent::SyncStateChanged { .. }
+        | VauchiEvent::SyncProgress { .. }
+        | VauchiEvent::LabelSyncCompleted { .. } => {
+            vec!["sync", "contacts"]
+        }
+        VauchiEvent::MessageDelivered { .. }
+        | VauchiEvent::MessageFailed { .. }
+        | VauchiEvent::DeliveryStatusUpdate { .. }
+        | VauchiEvent::PreExpiryWarning { .. } => {
+            vec!["delivery_status"]
+        }
+        VauchiEvent::ConnectionStateChanged { .. }
+        | VauchiEvent::RelayHealthChanged { .. }
+        | VauchiEvent::RelayFailover { .. } => {
+            vec!["sync"]
+        }
+        VauchiEvent::IncomingUpdate { .. } => {
+            vec!["contacts", "contact_detail"]
+        }
+        VauchiEvent::VisibilityChanged { .. } => {
+            vec!["my_info", "contacts"]
+        }
+        VauchiEvent::EmergencyAlertReceived { .. } | VauchiEvent::EmergencyBroadcastSent { .. } => {
+            vec!["contacts"]
+        }
+        VauchiEvent::DowngradeDetected { .. } | VauchiEvent::Error { .. } => vec![],
+        // #[non_exhaustive] — unknown future variants don't invalidate screens.
+        _ => vec![],
+    }
+}

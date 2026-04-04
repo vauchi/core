@@ -353,61 +353,14 @@ impl PlatformAppEngine {
         let new_id = engine
             .vauchi()
             .add_event_handler(Arc::new(move |event: VauchiEvent| {
-                let screen_ids = affected_screens(&event);
+                let screen_ids = vauchi_app::ui::affected_screens(&event);
                 if !screen_ids.is_empty() {
-                    listener_clone.on_screens_invalidated(screen_ids);
+                    let owned: Vec<String> = screen_ids.into_iter().map(String::from).collect();
+                    listener_clone.on_screens_invalidated(owned);
                 }
             }));
 
         *handler_id_slot = Some(new_id);
         Ok(())
-    }
-}
-
-/// Map a `VauchiEvent` to the screen IDs that would be affected.
-fn affected_screens(event: &VauchiEvent) -> Vec<String> {
-    match event {
-        VauchiEvent::ContactAdded { .. }
-        | VauchiEvent::ContactUpdated { .. }
-        | VauchiEvent::ContactRemoved { .. }
-        | VauchiEvent::ContactHidden { .. }
-        | VauchiEvent::ContactUnhidden { .. }
-        | VauchiEvent::ContactBlocked { .. }
-        | VauchiEvent::ContactUnblocked { .. }
-        | VauchiEvent::ContactSoftDeleted { .. }
-        | VauchiEvent::ContactArchived { .. }
-        | VauchiEvent::ContactUnarchived { .. } => {
-            vec!["contacts".into(), "contact_detail".into()]
-        }
-        VauchiEvent::OwnCardUpdated { .. } => vec!["my_info".into()],
-        VauchiEvent::SyncStateChanged { .. }
-        | VauchiEvent::SyncProgress { .. }
-        | VauchiEvent::LabelSyncCompleted { .. } => {
-            vec!["sync".into(), "contacts".into()]
-        }
-        VauchiEvent::MessageDelivered { .. }
-        | VauchiEvent::MessageFailed { .. }
-        | VauchiEvent::DeliveryStatusUpdate { .. }
-        | VauchiEvent::PreExpiryWarning { .. } => {
-            vec!["delivery_status".into()]
-        }
-        VauchiEvent::ConnectionStateChanged { .. }
-        | VauchiEvent::RelayHealthChanged { .. }
-        | VauchiEvent::RelayFailover { .. } => {
-            vec!["sync".into()]
-        }
-        VauchiEvent::IncomingUpdate { .. } => {
-            vec!["contacts".into(), "contact_detail".into()]
-        }
-        VauchiEvent::VisibilityChanged { .. } => {
-            vec!["my_info".into(), "contacts".into()]
-        }
-        VauchiEvent::EmergencyAlertReceived { .. } | VauchiEvent::EmergencyBroadcastSent { .. } => {
-            vec!["contacts".into()]
-        }
-        VauchiEvent::DowngradeDetected { .. } | VauchiEvent::Error { .. } => vec![],
-        // VauchiEvent is #[non_exhaustive] — unknown future variants
-        // don't invalidate any specific screen.
-        _ => vec![],
     }
 }

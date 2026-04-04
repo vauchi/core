@@ -193,14 +193,13 @@ impl super::transport::Transport for HttpTransportAdapter {
             return Ok(None);
         }
 
-        let blobs = self.http.fetch(&self.registered_tokens)?;
-        if blobs.is_empty() {
-            return Ok(None);
-        }
-
-        // Buffer all fetched blobs, return the first one
-        for blob in blobs {
-            self.pending_blobs.push_back(blob);
+        // Relay accepts at most 100 tokens per fetch request.
+        const MAX_FETCH_TOKENS: usize = 100;
+        for chunk in self.registered_tokens.chunks(MAX_FETCH_TOKENS) {
+            let blobs = self.http.fetch(chunk)?;
+            for blob in blobs {
+                self.pending_blobs.push_back(blob);
+            }
         }
 
         if let Some(blob) = self.pending_blobs.pop_front() {

@@ -21,7 +21,7 @@ use vauchi_core::{
 // === Modules ===
 
 mod audio;
-mod cert_pinning;
+
 mod content;
 mod device_link_relay;
 mod diagnostic;
@@ -907,14 +907,6 @@ impl VauchiPlatform {
         let backup = IdentityBackup::new(identity_data.backup_data.clone());
         Identity::import_backup(&backup, "__internal_storage_key__")
             .map_err(|e| MobileError::CryptoError(e.to_string()))
-    }
-
-    /// Get pinned certificate if set.
-    pub(crate) fn get_pinned_cert(&self) -> Option<String> {
-        let Ok(guard) = lock_or(&self.pinned_cert_pem) else {
-            return None;
-        };
-        guard.clone()
     }
 
     /// Get our contact card, or create a default one from the identity.

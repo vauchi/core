@@ -154,64 +154,39 @@ impl VauchiPlatform {
 
     /// Send device link request via relay and wait for response (new device / responder).
     ///
-    /// Connects to the relay, sends the encrypted request targeting the existing
-    /// device's identity, and waits for the encrypted response.
+    /// Uses two HTTP exchange cycles: creates a return channel, claims the
+    /// existing device's offer with our request, then polls for the response.
     pub fn send_device_link_request(
         &self,
-        target_identity: String,
+        _target_identity: String,
         sender_token: String,
         encrypted_request: Vec<u8>,
         timeout_secs: u64,
     ) -> Result<Vec<u8>, MobileError> {
-        let relay_url = self.relay_url.clone();
-        let pinned_cert = self.get_pinned_cert();
-
         let msg = device_link_relay::DeviceLinkRelayMessage {
-            target_identity,
+            target_identity: _target_identity,
             sender_token,
             payload: encrypted_request,
         };
 
-        let rt = tokio::runtime::Builder::new_current_thread()
-            .enable_all()
-            .build()
-            .map_err(|e| MobileError::NetworkError(format!("Tokio runtime: {e}")))?;
-
-        rt.block_on(device_link_relay::send_and_receive(
-            &relay_url,
-            pinned_cert.as_deref(),
-            &msg,
-            timeout_secs,
-        ))
-        .map_err(|e| MobileError::NetworkError(e.to_string()))
+        device_link_relay::send_and_receive(&self.relay_url, &msg, timeout_secs)
+            .map_err(|e| MobileError::NetworkError(e.to_string()))
     }
 
     /// Listen for incoming device link request via relay (existing device / initiator).
     ///
-    /// Connects to the relay, registers as a listener for this identity, and
-    /// waits for a new device to send a device link request.
+    /// Creates an exchange offer with our identity, then polls until the new
+    /// device claims it. Returns the encrypted request and a token for the response.
     pub fn listen_for_device_link_request(
         &self,
         timeout_secs: u64,
     ) -> Result<MobileDeviceLinkRequest, MobileError> {
-        let relay_url = self.relay_url.clone();
-        let pinned_cert = self.get_pinned_cert();
         let identity = self.get_identity()?;
         let identity_id = hex::encode(identity.signing_public_key());
 
-        let rt = tokio::runtime::Builder::new_current_thread()
-            .enable_all()
-            .build()
-            .map_err(|e| MobileError::NetworkError(format!("Tokio runtime: {e}")))?;
-
-        let (payload, sender_token) = rt
-            .block_on(device_link_relay::listen_for_request(
-                &relay_url,
-                pinned_cert.as_deref(),
-                &identity_id,
-                timeout_secs,
-            ))
-            .map_err(|e| MobileError::NetworkError(e.to_string()))?;
+        let (payload, sender_token) =
+            device_link_relay::listen_for_request(&self.relay_url, &identity_id, timeout_secs)
+                .map_err(|e| MobileError::NetworkError(e.to_string()))?;
 
         Ok(MobileDeviceLinkRequest {
             encrypted_payload: payload,
@@ -221,28 +196,15 @@ impl VauchiPlatform {
 
     /// Send device link response back via relay (existing device / initiator).
     ///
-    /// After confirming a device link, sends the encrypted response back to the
-    /// new device via the relay using the sender's token for routing.
+    /// Claims the return channel created by the new device, depositing the
+    /// encrypted response payload.
     pub fn send_device_link_response(
         &self,
         sender_token: String,
         encrypted_response: Vec<u8>,
     ) -> Result<(), MobileError> {
-        let relay_url = self.relay_url.clone();
-        let pinned_cert = self.get_pinned_cert();
-
-        let rt = tokio::runtime::Builder::new_current_thread()
-            .enable_all()
-            .build()
-            .map_err(|e| MobileError::NetworkError(format!("Tokio runtime: {e}")))?;
-
-        rt.block_on(device_link_relay::send_response(
-            &relay_url,
-            pinned_cert.as_deref(),
-            &sender_token,
-            encrypted_response,
-        ))
-        .map_err(|e| MobileError::NetworkError(e.to_string()))
+        device_link_relay::send_response(&self.relay_url, &sender_token, encrypted_response)
+            .map_err(|e| MobileError::NetworkError(e.to_string()))
     }
 
     /// Get the device count.

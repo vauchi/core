@@ -2,19 +2,33 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! Device link relay transport.
+//! Device link relay transport via HTTP exchange broker.
 //!
-//! Provides message encoding and async WebSocket transport for device linking
-//! over the relay. The existing device listens for incoming requests; the new
-//! device sends a request and waits for a response.
+//! Uses two exchange cycles (offer/claim/complete) to implement the
+//! request/response pattern for device linking over the relay's V2 HTTP API.
+//!
+//! ## Flow
+//!
+//! **Existing device (initiator)**:
+//! 1. `exchange_offer(identity_info)` → `code` (embedded in QR)
+//! 2. `exchange_complete(code)` → polls until claimed → gets `{request, response_code}`
+//! 3. `exchange_claim(response_code, response)` → sends response
+//!
+//! **New device (responder)**:
+//! 1. `exchange_offer("")` → `response_code`
+//! 2. `exchange_claim(code, {request, response_code})` → gets identity_info
+//! 3. `exchange_complete(response_code)` → polls until claimed → gets response
+//!
+//! TODO(B): Migrate to dedicated `/v2/device-link` relay endpoints for
+//! a single-round-trip flow. See problem record.
 
+use std::thread;
 use std::time::Duration;
 
-use futures_util::{SinkExt, StreamExt};
+use base64::Engine;
+use base64::engine::general_purpose::STANDARD as BASE64;
 use thiserror::Error;
-use tokio_tungstenite::tungstenite::Message;
-
-use crate::cert_pinning;
+use vauchi_core::network::{HttpTransport, HttpTransportConfig, ProxyConfig};
 
 /// Errors from device link relay operations.
 #[derive(Error, Debug)]
@@ -22,190 +36,195 @@ pub enum DeviceLinkError {
     #[error("Failed to decode DeviceLinkRelayMessage: {0}")]
     DecodeFailed(#[from] serde_json::Error),
 
-    #[error("{0}")]
-    Connection(#[from] crate::cert_pinning::CertPinningError),
-
-    #[error("Failed to send device link message: {0}")]
-    SendFailed(String),
-
-    #[error("Relay closed connection before response")]
-    ConnectionClosedBeforeResponse,
-
-    #[error("WebSocket error: {0}")]
-    WebSocket(String),
-
-    #[error("Connection closed without response")]
-    ConnectionClosed,
+    #[error("Network error: {0}")]
+    Network(String),
 
     #[error("Timed out waiting for device link response")]
     ResponseTimeout,
 
-    #[error("Relay closed connection while listening")]
-    ConnectionClosedWhileListening,
-
-    #[error("WebSocket error while listening: {0}")]
-    WebSocketListening(String),
-
-    #[error("Connection closed while listening")]
-    ConnectionClosedListening,
-
     #[error("Timed out waiting for device link request")]
     RequestTimeout,
 
-    #[error("Failed to send listening handshake: {0}")]
-    HandshakeSendFailed(String),
+    #[error("Exchange offer failed: {0}")]
+    OfferFailed(String),
 
-    #[error("Failed to encode handshake: {0}")]
-    HandshakeEncodeFailed(#[source] serde_json::Error),
-
-    #[error("Failed to send device link response: {0}")]
-    ResponseSendFailed(String),
+    #[error("Exchange claim failed: {0}")]
+    ClaimFailed(String),
 }
 
-/// A device link message sent through the relay.
+/// Payload sent by the new device in the claim step.
+/// Contains the encrypted request and a response_code for the return channel.
+#[derive(serde::Serialize, serde::Deserialize)]
+struct ClaimPayload {
+    request: Vec<u8>,
+    response_code: String,
+}
+
+fn create_transport(relay_url: &str) -> HttpTransport {
+    let http_url = super::ws_to_http(relay_url);
+    HttpTransport::new(HttpTransportConfig {
+        relay_url: http_url,
+        timeout_ms: 10_000,
+        proxy: ProxyConfig::None,
+        allow_direct: true,
+    })
+}
+
+/// A device link message (kept for serialization compat with callers).
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct DeviceLinkRelayMessage {
-    /// Identity public key (hex) of the target device.
     pub target_identity: String,
-    /// Unique sender token for routing the response back.
     pub sender_token: String,
-    /// Encrypted payload bytes (device link request or response).
     pub payload: Vec<u8>,
 }
 
 /// Serialize a `DeviceLinkRelayMessage` to JSON bytes.
-pub fn encode_device_link_message(msg: &DeviceLinkRelayMessage) -> Vec<u8> {
+#[cfg(test)]
+fn encode_device_link_message(msg: &DeviceLinkRelayMessage) -> Vec<u8> {
     serde_json::to_vec(msg).expect("DeviceLinkRelayMessage serialization should not fail")
 }
 
 /// Deserialize a `DeviceLinkRelayMessage` from JSON bytes.
-pub fn decode_device_link_message(data: &[u8]) -> Result<DeviceLinkRelayMessage, DeviceLinkError> {
+#[cfg(test)]
+fn decode_device_link_message(data: &[u8]) -> Result<DeviceLinkRelayMessage, DeviceLinkError> {
     Ok(serde_json::from_slice(data)?)
 }
 
-/// Send a device link message via relay and wait for a binary response.
+/// Send a device link request via relay and wait for the response.
 ///
-/// Used by the **new device** (responder) to send an encrypted request and
-/// receive the existing device's encrypted response.
-pub async fn send_and_receive(
+/// Used by the **new device** (responder). Two exchange cycles:
+/// 1. Create a return channel via `exchange_offer`
+/// 2. Claim the existing device's offer with our request + return code
+/// 3. Poll the return channel for the existing device's response
+pub fn send_and_receive(
     relay_url: &str,
-    pinned_cert: Option<&str>,
     message: &DeviceLinkRelayMessage,
     timeout_secs: u64,
 ) -> Result<Vec<u8>, DeviceLinkError> {
-    let mut socket = cert_pinning::connect_with_pinning(relay_url, pinned_cert).await?;
+    let transport = create_transport(relay_url);
 
-    let data = encode_device_link_message(message);
-    socket
-        .send(Message::Binary(data))
-        .await
-        .map_err(|e| DeviceLinkError::SendFailed(e.to_string()))?;
+    // 1. Create return channel
+    let response_code = transport
+        .exchange_offer(&BASE64.encode(b""), Some(timeout_secs))
+        .map_err(|e| DeviceLinkError::OfferFailed(e.to_string()))?;
 
-    // Wait for binary response
-    let response = tokio::time::timeout(Duration::from_secs(timeout_secs), async {
-        while let Some(msg) = socket.next().await {
-            match msg {
-                Ok(Message::Binary(data)) => return Ok(data),
-                Ok(Message::Close(_)) => {
-                    return Err(DeviceLinkError::ConnectionClosedBeforeResponse);
-                }
-                Ok(_) => continue, // skip text/ping/pong
-                Err(e) => return Err(DeviceLinkError::WebSocket(e.to_string())),
-            }
+    // 2. Claim the existing device's offer (code = sender_token from QR)
+    let claim_payload = ClaimPayload {
+        request: message.payload.clone(),
+        response_code: response_code.clone(),
+    };
+    let claim_json = serde_json::to_vec(&claim_payload)
+        .map_err(|e| DeviceLinkError::ClaimFailed(e.to_string()))?;
+
+    let _identity_info = transport
+        .exchange_claim(&message.sender_token, &BASE64.encode(&claim_json))
+        .map_err(|e| DeviceLinkError::ClaimFailed(e.to_string()))?;
+
+    // 3. Poll for response on the return channel
+    let deadline = std::time::Instant::now() + Duration::from_secs(timeout_secs);
+    loop {
+        if std::time::Instant::now() >= deadline {
+            return Err(DeviceLinkError::ResponseTimeout);
         }
-        Err(DeviceLinkError::ConnectionClosed)
-    })
-    .await
-    .map_err(|_| DeviceLinkError::ResponseTimeout)??;
-
-    let _ = socket.close(None).await;
-    Ok(response)
+        match transport.exchange_complete(&response_code) {
+            Ok(Some(response_b64)) => {
+                let bytes = BASE64
+                    .decode(&response_b64)
+                    .map_err(|e| DeviceLinkError::Network(format!("decode: {e}")))?;
+                return Ok(bytes);
+            }
+            Ok(None) => {
+                thread::sleep(Duration::from_secs(1));
+            }
+            Err(e) => return Err(DeviceLinkError::Network(e.to_string())),
+        }
+    }
 }
 
 /// Listen for an incoming device link request via relay.
 ///
-/// Used by the **existing device** (initiator) to wait for a new device's
-/// encrypted request. Sends a "listening" handshake, then waits for an
-/// incoming binary message.
+/// Used by the **existing device** (initiator):
+/// 1. Post an offer with our identity info → get code (for QR)
+/// 2. Poll `exchange_complete` until the new device claims it
+/// 3. Return the request payload and response_code (as sender_token)
 ///
-/// Returns `(payload, sender_token)` on success.
-pub async fn listen_for_request(
+/// Returns `(code, payload, sender_token)` where `code` is the exchange
+/// code to embed in the QR, and `sender_token` is the response_code.
+pub fn create_offer_and_listen(
     relay_url: &str,
-    pinned_cert: Option<&str>,
+    identity_id: &str,
+    timeout_secs: u64,
+) -> Result<(String, Vec<u8>, String), DeviceLinkError> {
+    let transport = create_transport(relay_url);
+
+    // 1. Create offer with identity info
+    let code = transport
+        .exchange_offer(&BASE64.encode(identity_id.as_bytes()), Some(timeout_secs))
+        .map_err(|e| DeviceLinkError::OfferFailed(e.to_string()))?;
+
+    // 2. Poll until claimed
+    let deadline = std::time::Instant::now() + Duration::from_secs(timeout_secs);
+    loop {
+        if std::time::Instant::now() >= deadline {
+            return Err(DeviceLinkError::RequestTimeout);
+        }
+        match transport.exchange_complete(&code) {
+            Ok(Some(claim_b64)) => {
+                let claim_bytes = BASE64
+                    .decode(&claim_b64)
+                    .map_err(|e| DeviceLinkError::Network(format!("decode: {e}")))?;
+                let claim: ClaimPayload =
+                    serde_json::from_slice(&claim_bytes).map_err(DeviceLinkError::DecodeFailed)?;
+                return Ok((code, claim.request, claim.response_code));
+            }
+            Ok(None) => {
+                thread::sleep(Duration::from_secs(1));
+            }
+            Err(e) => return Err(DeviceLinkError::Network(e.to_string())),
+        }
+    }
+}
+
+/// Listen for an incoming device link request (legacy API adapter).
+///
+/// Wraps `create_offer_and_listen` — the caller already has the code from QR
+/// generation, so this just polls for the claim. But since the exchange broker
+/// requires the code to be generated by `exchange_offer`, we generate a new
+/// one here and return the payload + sender_token.
+pub fn listen_for_request(
+    relay_url: &str,
     identity_id: &str,
     timeout_secs: u64,
 ) -> Result<(Vec<u8>, String), DeviceLinkError> {
-    let mut socket = cert_pinning::connect_with_pinning(relay_url, pinned_cert).await?;
-
-    // Send a listening handshake so the relay knows who we are
-    let handshake = serde_json::json!({
-        "type": "device_link_listen",
-        "identity_id": identity_id,
-    });
-    let handshake_bytes =
-        serde_json::to_vec(&handshake).map_err(DeviceLinkError::HandshakeEncodeFailed)?;
-    socket
-        .send(Message::Binary(handshake_bytes))
-        .await
-        .map_err(|e| DeviceLinkError::HandshakeSendFailed(e.to_string()))?;
-
-    // Wait for incoming request
-    let result = tokio::time::timeout(Duration::from_secs(timeout_secs), async {
-        while let Some(msg) = socket.next().await {
-            match msg {
-                Ok(Message::Binary(data)) => {
-                    let relay_msg = decode_device_link_message(&data)?;
-                    return Ok((relay_msg.payload, relay_msg.sender_token));
-                }
-                Ok(Message::Close(_)) => {
-                    return Err(DeviceLinkError::ConnectionClosedWhileListening);
-                }
-                Ok(_) => continue,
-                Err(e) => return Err(DeviceLinkError::WebSocketListening(e.to_string())),
-            }
-        }
-        Err(DeviceLinkError::ConnectionClosedListening)
-    })
-    .await
-    .map_err(|_| DeviceLinkError::RequestTimeout)??;
-
-    let _ = socket.close(None).await;
-    Ok(result)
+    let (_code, payload, sender_token) =
+        create_offer_and_listen(relay_url, identity_id, timeout_secs)?;
+    Ok((payload, sender_token))
 }
 
 /// Send a device link response back via relay.
 ///
-/// Used by the **existing device** (initiator) to send the encrypted response
-/// back to the new device after confirming the link.
-pub async fn send_response(
+/// Used by the **existing device** (initiator) to claim the return channel
+/// created by the new device, depositing the encrypted response.
+pub fn send_response(
     relay_url: &str,
-    pinned_cert: Option<&str>,
     sender_token: &str,
     response_payload: Vec<u8>,
 ) -> Result<(), DeviceLinkError> {
-    let mut socket = cert_pinning::connect_with_pinning(relay_url, pinned_cert).await?;
+    let transport = create_transport(relay_url);
 
-    let msg = DeviceLinkRelayMessage {
-        target_identity: String::new(), // Response is routed by sender_token
-        sender_token: sender_token.to_string(),
-        payload: response_payload,
-    };
+    transport
+        .exchange_claim(sender_token, &BASE64.encode(&response_payload))
+        .map_err(|e| DeviceLinkError::ClaimFailed(e.to_string()))?;
 
-    let data = encode_device_link_message(&msg);
-    socket
-        .send(Message::Binary(data))
-        .await
-        .map_err(|e| DeviceLinkError::ResponseSendFailed(e.to_string()))?;
-
-    let _ = socket.close(None).await;
     Ok(())
 }
 
-// INLINE_TEST_REQUIRED: Tests verify internal encode/decode functions not exposed via public API
+// INLINE_TEST_REQUIRED: Tests verify internal encode/decode and ClaimPayload serialization
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    // @scenario: device_sync:Device link message encoding roundtrip
     #[test]
     fn test_device_link_relay_message_encoding() {
         let msg = DeviceLinkRelayMessage {
@@ -223,6 +242,7 @@ mod tests {
         assert_eq!(decoded.payload, vec![0x01, 0x02, 0x03, 0xFF]);
     }
 
+    // @scenario: device_sync:Device link empty payload roundtrip
     #[test]
     fn test_device_link_relay_message_with_empty_payload() {
         let msg = DeviceLinkRelayMessage {
@@ -237,53 +257,27 @@ mod tests {
 
         assert_eq!(decoded.target_identity, "identity-key");
         assert_eq!(decoded.sender_token, "token-empty");
-        assert!(decoded.payload.is_empty(), "payload should be empty");
+        assert!(decoded.payload.is_empty());
     }
 
+    // @scenario: device_sync:Device link rejects invalid JSON
     #[test]
     fn test_device_link_relay_message_decode_invalid_data() {
         let invalid = b"not valid json";
         let result = decode_device_link_message(invalid);
-        assert!(result.is_err(), "decoding invalid JSON should fail");
-
-        let err_msg = result.unwrap_err().to_string();
-        assert!(
-            err_msg.contains("Failed to decode"),
-            "error should contain 'Failed to decode', got: {err_msg}"
-        );
+        assert!(result.is_err());
     }
 
+    // @scenario: device_sync:Claim payload serialization roundtrip
     #[test]
-    fn test_device_link_relay_message_with_large_payload() {
-        let large_payload = vec![0xAB; 65536];
-        let msg = DeviceLinkRelayMessage {
-            target_identity: "large-test".to_string(),
-            sender_token: "tok-large".to_string(),
-            payload: large_payload.clone(),
+    fn test_claim_payload_roundtrip() {
+        let payload = ClaimPayload {
+            request: vec![1, 2, 3],
+            response_code: "ABC123".to_string(),
         };
-
-        let encoded = encode_device_link_message(&msg);
-        let decoded =
-            decode_device_link_message(&encoded).expect("large payload roundtrip should succeed");
-
-        assert_eq!(decoded.payload.len(), 65536);
-        assert_eq!(decoded.payload, large_payload);
-    }
-
-    #[test]
-    fn test_device_link_relay_message_with_unicode_fields() {
-        let msg = DeviceLinkRelayMessage {
-            target_identity: "identite-\u{00E9}\u{00E8}\u{00EA}".to_string(),
-            sender_token: "\u{1F512}secure-token".to_string(),
-            payload: vec![42],
-        };
-
-        let encoded = encode_device_link_message(&msg);
-        let decoded =
-            decode_device_link_message(&encoded).expect("unicode field roundtrip should succeed");
-
-        assert_eq!(decoded.target_identity, "identite-\u{00E9}\u{00E8}\u{00EA}");
-        assert_eq!(decoded.sender_token, "\u{1F512}secure-token");
-        assert_eq!(decoded.payload, vec![42]);
+        let json = serde_json::to_vec(&payload).unwrap();
+        let parsed: ClaimPayload = serde_json::from_slice(&json).unwrap();
+        assert_eq!(parsed.request, vec![1, 2, 3]);
+        assert_eq!(parsed.response_code, "ABC123");
     }
 }

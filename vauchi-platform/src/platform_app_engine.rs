@@ -20,13 +20,32 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
 use vauchi_app::ui::{AppEngine, WorkflowEngine};
-use vauchi_core::api::{Vauchi, VauchiConfig};
+use vauchi_core::api::{HandlerId, Vauchi, VauchiConfig, VauchiEvent};
 use vauchi_core::crypto::SymmetricKey;
 
 use crate::error::MobileError;
 use crate::json_helpers::{
     action_result_to_json, app_screen_from_json, screen_to_json, user_action_from_json,
 };
+
+// ── PlatformEventListener ──────────────────────────────────────────
+
+/// Callback interface for async state-change notifications from core.
+///
+/// Frontends implement this trait (in Swift/Kotlin via UniFFI) and register
+/// it with [`PlatformAppEngine::set_event_listener`]. Core calls
+/// `on_screens_invalidated` when background operations (sync, delivery,
+/// device link) change data that affects rendered screens.
+///
+/// On receiving the callback, frontends should call `invalidate_screen_json`
+/// or `invalidate_all` and re-render the affected screens.
+#[uniffi::export(callback_interface)]
+pub trait PlatformEventListener: Send + Sync {
+    /// Called when one or more screens have stale data due to a background
+    /// operation. `screen_ids` contains the `screen_id` values of affected
+    /// screens (e.g., `["contacts", "delivery_status"]`).
+    fn on_screens_invalidated(&self, screen_ids: Vec<String>);
+}
 
 // ── PlatformAppEngine ───────────────────────────────────────────────
 
@@ -61,6 +80,8 @@ use crate::json_helpers::{
 #[derive(uniffi::Object)]
 pub struct PlatformAppEngine {
     engine: Mutex<AppEngine>,
+    /// Active event listener handler ID, used to unregister on replacement.
+    event_handler_id: Mutex<Option<HandlerId>>,
 }
 
 #[uniffi::export]
@@ -96,6 +117,7 @@ impl PlatformAppEngine {
 
         Ok(Arc::new(Self {
             engine: Mutex::new(AppEngine::new(vauchi)),
+            event_handler_id: Mutex::new(None),
         }))
     }
 
@@ -254,5 +276,109 @@ impl PlatformAppEngine {
             .map_err(|e| MobileError::Internal(format!("Lock failed: {e}")))?;
         engine.set_device_capabilities(caps);
         Ok(())
+    }
+
+    /// Register a listener for async state-change notifications.
+    ///
+    /// Core calls `on_screens_invalidated` when background operations
+    /// (sync, delivery receipts, device link) change data that affects
+    /// rendered screens. Replaces any previously registered listener.
+    ///
+    /// # Usage from Swift
+    ///
+    /// ```swift
+    /// class MyListener: PlatformEventListener {
+    ///     func onScreensInvalidated(screenIds: [String]) {
+    ///         DispatchQueue.main.async {
+    ///             for id in screenIds {
+    ///                 try? engine.invalidateScreenJson(screenJson: "\"\(id)\"")
+    ///             }
+    ///             self.reloadCurrentScreen()
+    ///         }
+    ///     }
+    /// }
+    /// try engine.setEventListener(listener: MyListener())
+    /// ```
+    pub fn set_event_listener(
+        &self,
+        listener: Box<dyn PlatformEventListener>,
+    ) -> Result<(), MobileError> {
+        let listener = Arc::new(listener);
+
+        let engine = self
+            .engine
+            .lock()
+            .map_err(|e| MobileError::Internal(format!("Lock failed: {e}")))?;
+
+        // Remove previous handler if any
+        let mut handler_id_slot = self
+            .event_handler_id
+            .lock()
+            .map_err(|e| MobileError::Internal(format!("Lock failed: {e}")))?;
+        if let Some(old_id) = handler_id_slot.take() {
+            engine.vauchi().remove_event_handler(old_id);
+        }
+
+        // Register a new handler that maps VauchiEvents to screen IDs
+        let listener_clone = Arc::clone(&listener);
+        let new_id = engine
+            .vauchi()
+            .add_event_handler(Arc::new(move |event: VauchiEvent| {
+                let screen_ids = affected_screens(&event);
+                if !screen_ids.is_empty() {
+                    listener_clone.on_screens_invalidated(screen_ids);
+                }
+            }));
+
+        *handler_id_slot = Some(new_id);
+        Ok(())
+    }
+}
+
+/// Map a `VauchiEvent` to the screen IDs that would be affected.
+fn affected_screens(event: &VauchiEvent) -> Vec<String> {
+    match event {
+        VauchiEvent::ContactAdded { .. }
+        | VauchiEvent::ContactUpdated { .. }
+        | VauchiEvent::ContactRemoved { .. }
+        | VauchiEvent::ContactHidden { .. }
+        | VauchiEvent::ContactUnhidden { .. }
+        | VauchiEvent::ContactBlocked { .. }
+        | VauchiEvent::ContactUnblocked { .. }
+        | VauchiEvent::ContactSoftDeleted { .. }
+        | VauchiEvent::ContactArchived { .. }
+        | VauchiEvent::ContactUnarchived { .. } => {
+            vec!["contacts".into(), "contact_detail".into()]
+        }
+        VauchiEvent::OwnCardUpdated { .. } => vec!["my_info".into()],
+        VauchiEvent::SyncStateChanged { .. }
+        | VauchiEvent::SyncProgress { .. }
+        | VauchiEvent::LabelSyncCompleted { .. } => {
+            vec!["sync".into(), "contacts".into()]
+        }
+        VauchiEvent::MessageDelivered { .. }
+        | VauchiEvent::MessageFailed { .. }
+        | VauchiEvent::DeliveryStatusUpdate { .. }
+        | VauchiEvent::PreExpiryWarning { .. } => {
+            vec!["delivery_status".into()]
+        }
+        VauchiEvent::ConnectionStateChanged { .. }
+        | VauchiEvent::RelayHealthChanged { .. }
+        | VauchiEvent::RelayFailover { .. } => {
+            vec!["sync".into()]
+        }
+        VauchiEvent::IncomingUpdate { .. } => {
+            vec!["contacts".into(), "contact_detail".into()]
+        }
+        VauchiEvent::VisibilityChanged { .. } => {
+            vec!["my_info".into(), "contacts".into()]
+        }
+        VauchiEvent::EmergencyAlertReceived { .. } | VauchiEvent::EmergencyBroadcastSent { .. } => {
+            vec!["contacts".into()]
+        }
+        VauchiEvent::DowngradeDetected { .. } | VauchiEvent::Error { .. } => vec![],
+        // VauchiEvent is #[non_exhaustive] — unknown future variants
+        // don't invalidate any specific screen.
+        _ => vec![],
     }
 }

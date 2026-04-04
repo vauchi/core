@@ -20,6 +20,7 @@ mod audio;
 mod config;
 mod exchange;
 mod i18n;
+pub(crate) mod platform_event;
 mod workflow;
 
 pub use app::*;
@@ -67,6 +68,8 @@ pub struct VauchiWorkflow {
 /// Opaque handle to an AppEngine instance.
 pub struct VauchiApp {
     pub(crate) engine: Mutex<AppEngine>,
+    /// Active event handler ID for cleanup on replacement or destroy.
+    pub(crate) event_handler_id: Mutex<Option<vauchi_core::api::HandlerId>>,
 }
 
 /// Opaque handle to an exchange session.
@@ -213,6 +216,7 @@ pub unsafe extern "C" fn vauchi_app_create_from_config(config: *mut CabiConfig) 
 
             Box::into_raw(Box::new(VauchiApp {
                 engine: Mutex::new(AppEngine::new(vauchi)),
+                event_handler_id: Mutex::new(None),
             }))
         })) {
             Ok(result) => result,

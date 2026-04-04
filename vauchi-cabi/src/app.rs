@@ -57,6 +57,7 @@ pub unsafe extern "C" fn vauchi_app_create_with_relay(relay_url: *const c_char) 
         }
         Box::into_raw(Box::new(VauchiApp {
             engine: Mutex::new(engine),
+            event_handler_id: Mutex::new(None),
         }))
     })) {
         Ok(result) => result,
@@ -104,6 +105,7 @@ pub unsafe extern "C" fn vauchi_app_create_with_config(
 
         Box::into_raw(Box::new(VauchiApp {
             engine: Mutex::new(AppEngine::new(vauchi)),
+            event_handler_id: Mutex::new(None),
         }))
     })) {
         Ok(result) => result,
@@ -168,6 +170,7 @@ pub unsafe extern "C" fn vauchi_app_create_with_key(
 
             Box::into_raw(Box::new(VauchiApp {
                 engine: Mutex::new(AppEngine::new(vauchi)),
+                event_handler_id: Mutex::new(None),
             }))
         })) {
             Ok(result) => result,
@@ -485,6 +488,92 @@ pub unsafe extern "C" fn vauchi_app_handle_hardware_event(
     }
 }
 
+/// Type alias for the C event callback function pointer.
+///
+/// Called by core when background operations invalidate screen data.
+/// `screen_ids_json` is a JSON array of screen ID strings, e.g. `["contacts","sync"]`.
+/// `user_data` is the opaque pointer passed to `vauchi_app_set_event_callback`.
+///
+/// The string is owned by core and must NOT be freed by the caller.
+pub type VauchiEventCallback =
+    Option<unsafe extern "C" fn(screen_ids_json: *const c_char, user_data: *mut std::ffi::c_void)>;
+
+/// Register a callback for async state-change notifications.
+///
+/// Core calls `callback` when background operations (sync, delivery,
+/// device link) change data that affects rendered screens. Pass null
+/// to unregister. `user_data` is forwarded to each callback invocation.
+///
+/// # Safety
+/// `handle` must be a valid `VauchiApp` pointer. `callback` (if non-null)
+/// must be safe to call from any thread. `user_data` must remain valid
+/// until the callback is unregistered.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn vauchi_app_set_event_callback(
+    handle: *mut VauchiApp,
+    callback: VauchiEventCallback,
+    user_data: *mut std::ffi::c_void,
+) {
+    if handle.is_null() {
+        return;
+    }
+    // Wrap in Send+Sync wrapper before entering catch_unwind closure
+    let handler = callback.map(|cb| EventCallbackHandler { cb, user_data });
+    let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        // SAFETY: handle is checked for null above
+        let app = unsafe { &*handle };
+        let Ok(engine) = app.engine.lock() else {
+            return;
+        };
+        let Ok(mut handler_id_slot) = app.event_handler_id.lock() else {
+            return;
+        };
+
+        // Remove previous handler
+        if let Some(old_id) = handler_id_slot.take() {
+            engine.vauchi().remove_event_handler(old_id);
+        }
+
+        // Register new handler if callback is non-null
+        if let Some(handler) = handler {
+            let new_id = engine
+                .vauchi()
+                .add_event_handler(std::sync::Arc::new(move |event| {
+                    handler.dispatch(&event);
+                }));
+            *handler_id_slot = Some(new_id);
+        }
+    }));
+}
+
+/// Bundles a C callback function pointer and user_data for cross-thread use.
+///
+/// # Safety
+/// The caller of `vauchi_app_set_event_callback` guarantees that both the
+/// callback and `user_data` remain valid and thread-safe for the lifetime
+/// of the registration.
+struct EventCallbackHandler {
+    cb: unsafe extern "C" fn(*const c_char, *mut std::ffi::c_void),
+    user_data: *mut std::ffi::c_void,
+}
+
+// SAFETY: caller of vauchi_app_set_event_callback guarantees thread-safety
+unsafe impl Send for EventCallbackHandler {}
+// SAFETY: caller of vauchi_app_set_event_callback guarantees thread-safety
+unsafe impl Sync for EventCallbackHandler {}
+
+impl EventCallbackHandler {
+    fn dispatch(&self, event: &vauchi_core::api::VauchiEvent) {
+        let screen_ids = crate::platform_event::affected_screens_json(event);
+        if let Ok(json) = std::ffi::CString::new(screen_ids) {
+            // SAFETY: caller guarantees callback + user_data are valid
+            unsafe {
+                (self.cb)(json.as_ptr(), self.user_data);
+            }
+        }
+    }
+}
+
 /// Create a new AppEngine with persistent storage and platform keyring.
 ///
 /// Uses `PlatformKeyring` (D-Bus Secret Service on Linux, Keychain on macOS)
@@ -529,6 +618,7 @@ pub unsafe extern "C" fn vauchi_app_create_with_keyring(
             {
                 return Box::into_raw(Box::new(VauchiApp {
                     engine: Mutex::new(AppEngine::new(vauchi)),
+                    event_handler_id: Mutex::new(None),
                 }));
             }
         }
@@ -541,6 +631,7 @@ pub unsafe extern "C" fn vauchi_app_create_with_keyring(
 
         Box::into_raw(Box::new(VauchiApp {
             engine: Mutex::new(AppEngine::new(vauchi)),
+            event_handler_id: Mutex::new(None),
         }))
     })) {
         Ok(result) => result,

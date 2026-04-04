@@ -377,11 +377,11 @@ impl WorkflowEngine for AppEngine {
             }
         }
 
-        // "Go exchange" from empty contacts list → navigate to Exchange screen
+        // "Go exchange" from empty contacts or MyInfo → navigate to Exchange screen
         if matches!(
             &action,
             UserAction::ActionPressed { action_id } if action_id == "go_exchange"
-        ) && self.screen == AppScreen::Contacts
+        ) && matches!(self.screen, AppScreen::Contacts | AppScreen::MyInfo)
         {
             let screen = self.navigate_to(AppScreen::Exchange);
             return ActionResult::NavigateTo(screen);

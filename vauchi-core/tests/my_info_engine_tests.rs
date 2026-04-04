@@ -222,3 +222,69 @@ fn test_preview_view_shows_banner_and_fields() {
         "Expected hidden field mf2 with Hidden visibility"
     );
 }
+
+// ============================================================================
+// Exchange prompt (first-exchange UX)
+// ============================================================================
+
+// @scenario: onboarding.feature - Prompt for first exchange
+#[test]
+fn my_info_shows_exchange_prompt_when_no_contacts() {
+    let engine = MyInfoEngine::new(MyInfoProgress::default())
+        .with_own_card("Alice".into(), sample_own_fields())
+        .with_exchange_prompt(true);
+    let screen = engine.current_screen();
+
+    // Should have an exchange_prompt InfoPanel
+    let prompt = screen
+        .components
+        .iter()
+        .find(|c| matches!(c, Component::InfoPanel { id, .. } if id == "exchange_prompt"));
+    assert!(
+        prompt.is_some(),
+        "Expected exchange_prompt InfoPanel, got: {:?}",
+        screen
+            .components
+            .iter()
+            .map(|c| match c {
+                Component::InfoPanel { id, .. } => format!("InfoPanel({id})"),
+                Component::CardPreview { .. } => "CardPreview".into(),
+                Component::FieldList { .. } => "FieldList".into(),
+                _ => "Other".into(),
+            })
+            .collect::<Vec<_>>()
+    );
+
+    // Should have go_exchange as first action (primary)
+    assert_eq!(screen.actions[0].id, "go_exchange");
+    assert_eq!(screen.actions[0].style, ActionStyle::Primary);
+
+    // add_field should be demoted to secondary
+    let add_field = screen.actions.iter().find(|a| a.id == "add_field").unwrap();
+    assert_eq!(add_field.style, ActionStyle::Secondary);
+}
+
+#[test]
+fn my_info_hides_exchange_prompt_when_has_contacts() {
+    let engine = MyInfoEngine::new(MyInfoProgress::default())
+        .with_own_card("Alice".into(), sample_own_fields())
+        .with_exchange_prompt(false);
+    let screen = engine.current_screen();
+
+    // No exchange prompt
+    let prompt = screen
+        .components
+        .iter()
+        .any(|c| matches!(c, Component::InfoPanel { id, .. } if id == "exchange_prompt"));
+    assert!(!prompt, "Should not show exchange prompt when has contacts");
+
+    // No go_exchange action
+    assert!(
+        !screen.actions.iter().any(|a| a.id == "go_exchange"),
+        "Should not have go_exchange action"
+    );
+
+    // add_field should be primary
+    assert_eq!(screen.actions[0].id, "add_field");
+    assert_eq!(screen.actions[0].style, ActionStyle::Primary);
+}

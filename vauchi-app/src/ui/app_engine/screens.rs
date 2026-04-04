@@ -129,10 +129,12 @@ impl AppEngine {
                     })
                     .collect();
 
+                let has_contacts = vauchi.contact_count().unwrap_or(0) > 0;
                 Box::new(
                     MyInfoEngine::new(progress)
                         .with_own_card(display_name, own_fields)
-                        .with_groups(group_tabs),
+                        .with_groups(group_tabs)
+                        .with_exchange_prompt(!has_contacts),
                 )
             }
             AppScreen::MyInfoEntryDetail { field_id } => {

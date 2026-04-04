@@ -58,6 +58,8 @@ pub struct MyInfoEngine {
     view_mode: MyInfoViewMode,
     /// Data for the PreviewAs view mode — my card as seen by a specific contact.
     preview_data: Option<SharedInfoView>,
+    /// Show a first-exchange prompt (user has no contacts yet).
+    show_exchange_prompt: bool,
 }
 
 impl MyInfoEngine {
@@ -68,6 +70,7 @@ impl MyInfoEngine {
             groups: Vec::new(),
             view_mode: MyInfoViewMode::EntryView,
             preview_data: None,
+            show_exchange_prompt: false,
         }
     }
 
@@ -87,6 +90,12 @@ impl MyInfoEngine {
     /// Set the preview data for PreviewAs view mode.
     pub fn with_preview(mut self, data: SharedInfoView) -> Self {
         self.preview_data = Some(data);
+        self
+    }
+
+    /// Show a first-exchange prompt when the user has no contacts.
+    pub fn with_exchange_prompt(mut self, show: bool) -> Self {
+        self.show_exchange_prompt = show;
         self
     }
 
@@ -275,11 +284,27 @@ impl WorkflowEngine for MyInfoEngine {
             };
         }
 
-        let components = match &self.view_mode {
+        let mut components = Vec::new();
+
+        // First-exchange prompt: shown when user has no contacts yet
+        if self.show_exchange_prompt {
+            components.push(Component::InfoPanel {
+                id: "exchange_prompt".into(),
+                icon: Some("exchange".into()),
+                title: "Ready to exchange?".into(),
+                items: vec![InfoItem {
+                    icon: Some("people".into()),
+                    title: "Find someone nearby".into(),
+                    detail: "Share your contact card in person — private and secure.".into(),
+                }],
+            });
+        }
+
+        components.extend(match &self.view_mode {
             MyInfoViewMode::EntryView => self.build_entry_view(),
             MyInfoViewMode::GroupView { selected_tab } => self.build_group_view(*selected_tab),
             MyInfoViewMode::PreviewAs { .. } => unreachable!("handled above"),
-        };
+        });
 
         let view_label = match &self.view_mode {
             MyInfoViewMode::EntryView => "Group View",
@@ -288,7 +313,19 @@ impl WorkflowEngine for MyInfoEngine {
         };
 
         let at_field_limit = self.own_fields.len() >= vauchi_core::contact_card::MAX_FIELDS;
-        let actions = vec![
+        let mut actions = Vec::new();
+
+        // Exchange shortcut when user has no contacts
+        if self.show_exchange_prompt {
+            actions.push(ScreenAction {
+                id: "go_exchange".into(),
+                label: "Exchange Now".into(),
+                style: ActionStyle::Primary,
+                enabled: true,
+            });
+        }
+
+        actions.extend([
             ScreenAction {
                 id: "add_field".into(),
                 label: if at_field_limit {
@@ -299,7 +336,11 @@ impl WorkflowEngine for MyInfoEngine {
                 } else {
                     "Add Entry".into()
                 },
-                style: ActionStyle::Primary,
+                style: if self.show_exchange_prompt {
+                    ActionStyle::Secondary
+                } else {
+                    ActionStyle::Primary
+                },
                 enabled: !at_field_limit,
             },
             ScreenAction {
@@ -314,7 +355,7 @@ impl WorkflowEngine for MyInfoEngine {
                 style: ActionStyle::Secondary,
                 enabled: true,
             },
-        ];
+        ]);
 
         ScreenModel {
             screen_id: "my_info".into(),

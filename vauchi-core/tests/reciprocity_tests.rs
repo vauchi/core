@@ -6,6 +6,7 @@ use vauchi_core::contact::Contact;
 use vauchi_core::contact_card::ContactCard;
 use vauchi_core::crypto::SymmetricKey;
 use vauchi_core::exchange::reciprocity::{ConfirmationChannel, Reciprocity};
+use vauchi_core::storage::Storage;
 
 #[test]
 fn reciprocity_serde_roundtrip() {
@@ -76,4 +77,36 @@ fn contact_set_confirmation_channel() {
         contact.confirmation_channel(),
         Some(ConfirmationChannel::RelayEscrow)
     );
+}
+
+#[test]
+fn reciprocity_storage_roundtrip() {
+    let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
+    let mut contact = make_test_contact();
+    let id = contact.id().to_string();
+
+    contact.set_reciprocity(Reciprocity::Pending);
+    contact.set_confirmation_channel(ConfirmationChannel::RelayEscrow);
+    storage.save_contact(&contact).unwrap();
+
+    let loaded = storage.load_contact(&id).unwrap().unwrap();
+    assert_eq!(loaded.reciprocity(), Reciprocity::Pending);
+    assert_eq!(
+        loaded.confirmation_channel(),
+        Some(ConfirmationChannel::RelayEscrow)
+    );
+}
+
+#[test]
+fn reciprocity_storage_null_defaults_to_unknown() {
+    let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
+    let contact = make_test_contact();
+    let id = contact.id().to_string();
+
+    // Save without setting reciprocity
+    storage.save_contact(&contact).unwrap();
+
+    let loaded = storage.load_contact(&id).unwrap().unwrap();
+    assert_eq!(loaded.reciprocity(), Reciprocity::Unknown);
+    assert_eq!(loaded.confirmation_channel(), None);
 }

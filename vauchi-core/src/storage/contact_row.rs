@@ -11,6 +11,7 @@ use crate::contact_card::ContactCard;
 use crate::crypto::SymmetricKey;
 use crate::crypto::cek::ContentEncryptionKey;
 use crate::exchange::TrustMetrics;
+use crate::exchange::reciprocity::{ConfirmationChannel, Reciprocity};
 use crate::types::ExchangeTransport;
 
 /// Internal struct for database row data.
@@ -44,6 +45,8 @@ pub(super) struct ContactRow {
     pub deleted_at: Option<i64>,
     pub archived: i32,
     pub archived_at: Option<i64>,
+    pub reciprocity: Option<String>,
+    pub confirmation_channel: Option<String>,
 }
 
 impl Storage {
@@ -223,6 +226,19 @@ impl Storage {
             .trust_metrics
             .and_then(|s| serde_json::from_str(&s).ok());
         contact.set_trust_metrics(trust_metrics);
+
+        // Restore reciprocity from storage (TEXT column, NULL for legacy contacts)
+        if let Some(r) = row
+            .reciprocity
+            .and_then(|s| serde_json::from_value::<Reciprocity>(serde_json::Value::String(s)).ok())
+        {
+            contact.set_reciprocity(r);
+        }
+        if let Some(c) = row.confirmation_channel.and_then(|s| {
+            serde_json::from_value::<ConfirmationChannel>(serde_json::Value::String(s)).ok()
+        }) {
+            contact.set_confirmation_channel(c);
+        }
 
         // Restore soft-delete / archive state
         if let Some(ts) = row.deleted_at {

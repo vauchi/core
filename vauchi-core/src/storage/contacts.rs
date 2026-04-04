@@ -127,6 +127,25 @@ impl Storage {
             return Err(StorageError::Serialization("Unknown contact kind".into()));
         };
 
+        // Serialize reciprocity fields (plain text, snake_case per serde)
+        let reciprocity_str: Option<String> = contact.kind().exchanged_data().and_then(|ex| {
+            ex.reciprocity.map(|r| {
+                serde_json::to_value(r)
+                    .ok()
+                    .and_then(|v| v.as_str().map(String::from))
+                    .unwrap_or_default()
+            })
+        });
+        let confirmation_channel_str: Option<String> =
+            contact.kind().exchanged_data().and_then(|ex| {
+                ex.confirmation_channel.map(|c| {
+                    serde_json::to_value(c)
+                        .ok()
+                        .and_then(|v| v.as_str().map(String::from))
+                        .unwrap_or_default()
+                })
+            });
+
         // Upsert (not INSERT OR REPLACE which cascades deletes to field_notes)
         self.conn.execute(
             "INSERT INTO contacts
@@ -136,8 +155,9 @@ impl Storage {
               exchange_transport, has_recovered, card_updated_at,
               relay_url, relay_noise_pubkey, trust_metrics,
               contact_kind, import_source, imported_at, original_uid,
-              deleted_at, archived, archived_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25, ?26, ?27, ?28)
+              deleted_at, archived, archived_at,
+              reciprocity, confirmation_channel)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25, ?26, ?27, ?28, ?29, ?30)
              ON CONFLICT(id) DO UPDATE SET
                public_key              = excluded.public_key,
                display_name            = excluded.display_name,
@@ -164,7 +184,9 @@ impl Storage {
                original_uid            = excluded.original_uid,
                deleted_at              = excluded.deleted_at,
                archived                = excluded.archived,
-               archived_at             = excluded.archived_at",
+               archived_at             = excluded.archived_at,
+               reciprocity             = excluded.reciprocity,
+               confirmation_channel    = excluded.confirmation_channel",
             params![
                 contact.id(),
                 public_key_bytes,
@@ -194,6 +216,8 @@ impl Storage {
                 contact.deleted_at().map(|t| t as i64),
                 contact.is_archived() as i32,
                 contact.archived_at().map(|t| t as i64),
+                reciprocity_str,
+                confirmation_channel_str,
             ],
         )?;
 
@@ -209,7 +233,8 @@ impl Storage {
                     proposal_trusted, cek_encrypted, exchange_transport, has_recovered,
                     card_updated_at, relay_url, relay_noise_pubkey, trust_metrics,
                     contact_kind, import_source, imported_at, original_uid,
-                    deleted_at, archived, archived_at
+                    deleted_at, archived, archived_at,
+                    reciprocity, confirmation_channel
              FROM contacts WHERE id = ?1",
         )?;
 
@@ -243,6 +268,8 @@ impl Storage {
                 deleted_at: row.get(25)?,
                 archived: row.get(26)?,
                 archived_at: row.get(27)?,
+                reciprocity: row.get(28)?,
+                confirmation_channel: row.get(29)?,
             })
         });
 
@@ -262,7 +289,8 @@ impl Storage {
                     proposal_trusted, cek_encrypted, exchange_transport, has_recovered,
                     card_updated_at, relay_url, relay_noise_pubkey, trust_metrics,
                     contact_kind, import_source, imported_at, original_uid,
-                    deleted_at, archived, archived_at
+                    deleted_at, archived, archived_at,
+                    reciprocity, confirmation_channel
              FROM contacts
              WHERE deleted_at IS NULL AND archived = 0
              ORDER BY display_name",
@@ -298,6 +326,8 @@ impl Storage {
                 deleted_at: row.get(25)?,
                 archived: row.get(26)?,
                 archived_at: row.get(27)?,
+                reciprocity: row.get(28)?,
+                confirmation_channel: row.get(29)?,
             })
         })?;
 
@@ -330,7 +360,8 @@ impl Storage {
                     proposal_trusted, cek_encrypted, exchange_transport, has_recovered,
                     card_updated_at, relay_url, relay_noise_pubkey, trust_metrics,
                     contact_kind, import_source, imported_at, original_uid,
-                    deleted_at, archived, archived_at
+                    deleted_at, archived, archived_at,
+                    reciprocity, confirmation_channel
              FROM contacts
              WHERE deleted_at IS NULL AND archived = 0
              ORDER BY display_name
@@ -367,6 +398,8 @@ impl Storage {
                 deleted_at: row.get(25)?,
                 archived: row.get(26)?,
                 archived_at: row.get(27)?,
+                reciprocity: row.get(28)?,
+                confirmation_channel: row.get(29)?,
             })
         })?;
 
@@ -404,7 +437,8 @@ impl Storage {
                     proposal_trusted, cek_encrypted, exchange_transport, has_recovered,
                     card_updated_at, relay_url, relay_noise_pubkey, trust_metrics,
                     contact_kind, import_source, imported_at, original_uid,
-                    deleted_at, archived, archived_at
+                    deleted_at, archived, archived_at,
+                    reciprocity, confirmation_channel
              FROM contacts
              WHERE display_name != '' AND display_name LIKE ?1 COLLATE NOCASE
                AND deleted_at IS NULL AND archived = 0
@@ -441,6 +475,8 @@ impl Storage {
                 deleted_at: row.get(25)?,
                 archived: row.get(26)?,
                 archived_at: row.get(27)?,
+                reciprocity: row.get(28)?,
+                confirmation_channel: row.get(29)?,
             })
         })?;
 
@@ -458,7 +494,8 @@ impl Storage {
                     proposal_trusted, cek_encrypted, exchange_transport, has_recovered,
                     card_updated_at, relay_url, relay_noise_pubkey, trust_metrics,
                     contact_kind, import_source, imported_at, original_uid,
-                    deleted_at, archived, archived_at
+                    deleted_at, archived, archived_at,
+                    reciprocity, confirmation_channel
              FROM contacts
              WHERE display_name = '' AND deleted_at IS NULL AND archived = 0",
         )?;
@@ -493,6 +530,8 @@ impl Storage {
                 deleted_at: row.get(25)?,
                 archived: row.get(26)?,
                 archived_at: row.get(27)?,
+                reciprocity: row.get(28)?,
+                confirmation_channel: row.get(29)?,
             })
         })?;
 
@@ -539,7 +578,8 @@ impl Storage {
                     proposal_trusted, cek_encrypted, exchange_transport, has_recovered,
                     card_updated_at, relay_url, relay_noise_pubkey, trust_metrics,
                     contact_kind, import_source, imported_at, original_uid,
-                    deleted_at, archived, archived_at
+                    deleted_at, archived, archived_at,
+                    reciprocity, confirmation_channel
              FROM contacts
              WHERE archived = 1 AND deleted_at IS NULL
              ORDER BY display_name",
@@ -575,6 +615,8 @@ impl Storage {
                 deleted_at: row.get(25)?,
                 archived: row.get(26)?,
                 archived_at: row.get(27)?,
+                reciprocity: row.get(28)?,
+                confirmation_channel: row.get(29)?,
             })
         })?;
 

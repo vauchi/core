@@ -587,17 +587,18 @@ mod tests {
     // W-4: http_relay_url() scheme conversion
     // =========================================================================
 
-    fn vauchi_with_server_url(url: &str) -> Vauchi {
+    fn vauchi_with_server_url(url: &str) -> (Vauchi, tempfile::TempDir) {
         use crate::api::VauchiConfig;
-        let mut cfg = VauchiConfig::default();
-        cfg.relay.server_url = url.to_string();
-        Vauchi::new(cfg).expect("Vauchi::new must succeed")
+        let dir = tempfile::tempdir().expect("tempdir must succeed");
+        let cfg = VauchiConfig::with_storage_path(dir.path().join("vauchi.db")).with_relay_url(url);
+        let v = Vauchi::new(cfg).expect("Vauchi::new must succeed");
+        (v, dir)
     }
 
     // @scenario: ohttp_sync :: URL scheme conversion wss to https
     #[test]
     fn test_http_relay_url_wss_converts_to_https() {
-        let v = vauchi_with_server_url("wss://relay.example.com/ws");
+        let (v, _dir) = vauchi_with_server_url("wss://relay.example.com/ws");
         assert_eq!(
             v.http_relay_url(),
             "https://relay.example.com/ws",
@@ -608,7 +609,7 @@ mod tests {
     // @scenario: ohttp_sync :: URL scheme conversion ws to http
     #[test]
     fn test_http_relay_url_ws_converts_to_http() {
-        let v = vauchi_with_server_url("ws://relay.local/ws");
+        let (v, _dir) = vauchi_with_server_url("ws://relay.local/ws");
         assert_eq!(
             v.http_relay_url(),
             "http://relay.local/ws",
@@ -619,7 +620,7 @@ mod tests {
     // @scenario: ohttp_sync :: URL scheme passthrough for https
     #[test]
     fn test_http_relay_url_https_unchanged() {
-        let v = vauchi_with_server_url("https://relay.example.com");
+        let (v, _dir) = vauchi_with_server_url("https://relay.example.com");
         assert_eq!(
             v.http_relay_url(),
             "https://relay.example.com",
@@ -630,7 +631,7 @@ mod tests {
     // @scenario: ohttp_sync :: URL scheme passthrough for http
     #[test]
     fn test_http_relay_url_http_unchanged() {
-        let v = vauchi_with_server_url("http://relay.local");
+        let (v, _dir) = vauchi_with_server_url("http://relay.local");
         assert_eq!(
             v.http_relay_url(),
             "http://relay.local",

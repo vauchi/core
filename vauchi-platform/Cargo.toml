@@ -47,16 +47,6 @@ base64 = "0.22"
 # Hex encoding for public IDs
 hex = "0.4"
 
-# WebSocket for sync (async, rustls for Android/iOS cross-compilation)
-tokio-tungstenite = { version = "0.24", default-features = false, features = ["connect", "rustls-tls-native-roots"] }
-
-# Stream/Sink combinators for async WebSocket
-futures-util = "0.3"
-
-# TLS for certificate pinning (aws-lc-rs backend — matches vauchi-core, eliminates ring duplication)
-rustls = { version = "0.23", default-features = false, features = ["aws_lc_rs", "std", "tls12"] }
-webpki-roots = "0.26"
-
 # Password strength checking
 zxcvbn = "3.0"
 

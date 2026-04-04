@@ -239,7 +239,7 @@ impl<'a> ShredManager<'a> {
         let data_dir_absent = !self.data_dir.exists();
         let pre_signed_absent = !PreSignedShredMessages::file_path(&self.data_dir).exists();
 
-        let all_clear = smk_absent && database_absent && pre_signed_absent;
+        let all_clear = smk_absent && database_absent && pre_signed_absent && data_dir_absent;
 
         ShredVerification {
             smk_absent,
@@ -299,6 +299,21 @@ impl<'a> ShredManager<'a> {
                 success = false;
             }
         }
+
+        // Clean pre-migration backup files (F8 audit fix)
+        if let Ok(entries) = std::fs::read_dir(&self.data_dir) {
+            for entry in entries.flatten() {
+                let name = entry.file_name();
+                let name_str = name.to_string_lossy();
+                if name_str.contains(".pre-migration-v")
+                    && name_str.ends_with(".bak")
+                    && secure_overwrite_file(&entry.path()).is_err()
+                {
+                    success = false;
+                }
+            }
+        }
+
         success
     }
 

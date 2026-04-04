@@ -44,6 +44,10 @@ impl Storage {
         storage.run_migrations()?;
         // T2-12: Clean up old terminal delivery records on startup
         let _ = storage.run_startup_maintenance();
+        // F4 audit fix: remove pre-migration .bak files after successful migration
+        if let Some(ref db) = storage.db_path {
+            Self::cleanup_migration_backups(db);
+        }
         Ok(storage)
     }
 
@@ -162,6 +166,25 @@ impl Storage {
     /// Rolls back the current transaction.
     pub fn rollback(&self) {
         let _ = self.conn.execute_batch("ROLLBACK");
+    }
+
+    /// Removes `.pre-migration-v*.bak` files left by migration backups (F4 audit fix).
+    ///
+    /// Called on startup after migrations succeed. These backups are created by
+    /// `VACUUM INTO` before migration runs; once migration commits, the backup
+    /// is no longer needed and should not persist on disk.
+    fn cleanup_migration_backups(db_path: &std::path::Path) {
+        if let Some(dir) = db_path.parent()
+            && let Ok(entries) = std::fs::read_dir(dir)
+        {
+            for entry in entries.flatten() {
+                let name = entry.file_name();
+                let name_str = name.to_string_lossy();
+                if name_str.contains(".pre-migration-v") && name_str.ends_with(".bak") {
+                    let _ = std::fs::remove_file(entry.path());
+                }
+            }
+        }
     }
 
     /// Returns a reference to the underlying connection (testing only).

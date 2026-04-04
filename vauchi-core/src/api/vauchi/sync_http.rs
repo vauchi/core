@@ -522,6 +522,7 @@ mod tests {
     // W-3: is_ohttp_key_error heuristic
     // =========================================================================
 
+    // @scenario: ohttp_sync :: key error heuristic matches HTTP 400
     #[test]
     fn test_is_ohttp_key_error_http_400() {
         let err = VauchiError::Network(NetworkError::ConnectionFailed(
@@ -533,6 +534,7 @@ mod tests {
         );
     }
 
+    // @scenario: ohttp_sync :: key error heuristic matches ohttp keyword
     #[test]
     fn test_is_ohttp_key_error_ohttp_in_message() {
         let err = VauchiError::Network(NetworkError::RelayRejected(
@@ -544,6 +546,7 @@ mod tests {
         );
     }
 
+    // @scenario: ohttp_sync :: key error heuristic rejects storage errors
     #[test]
     fn test_is_ohttp_key_error_storage_error_is_false() {
         let err = VauchiError::Storage(StorageError::NotFound("key".to_string()));
@@ -553,6 +556,7 @@ mod tests {
         );
     }
 
+    // @scenario: ohttp_sync :: key error heuristic rejects connection refused
     #[test]
     fn test_is_ohttp_key_error_connection_refused_is_false() {
         let err = VauchiError::Network(NetworkError::ConnectionFailed(
@@ -564,6 +568,7 @@ mod tests {
         );
     }
 
+    // @scenario: ohttp_sync :: key error heuristic rejects timeout
     #[test]
     fn test_is_ohttp_key_error_timeout_is_false() {
         let err = VauchiError::Network(NetworkError::Timeout);
@@ -584,6 +589,7 @@ mod tests {
         Vauchi::new(cfg).expect("Vauchi::new must succeed")
     }
 
+    // @scenario: ohttp_sync :: URL scheme conversion wss to https
     #[test]
     fn test_http_relay_url_wss_converts_to_https() {
         let v = vauchi_with_server_url("wss://relay.example.com/ws");
@@ -594,6 +600,7 @@ mod tests {
         );
     }
 
+    // @scenario: ohttp_sync :: URL scheme conversion ws to http
     #[test]
     fn test_http_relay_url_ws_converts_to_http() {
         let v = vauchi_with_server_url("ws://relay.local/ws");
@@ -604,6 +611,7 @@ mod tests {
         );
     }
 
+    // @scenario: ohttp_sync :: URL scheme passthrough for https
     #[test]
     fn test_http_relay_url_https_unchanged() {
         let v = vauchi_with_server_url("https://relay.example.com");
@@ -614,6 +622,7 @@ mod tests {
         );
     }
 
+    // @scenario: ohttp_sync :: URL scheme passthrough for http
     #[test]
     fn test_http_relay_url_http_unchanged() {
         let v = vauchi_with_server_url("http://relay.local");

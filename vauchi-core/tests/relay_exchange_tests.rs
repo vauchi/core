@@ -18,18 +18,21 @@ fn test_transport() -> HttpTransport {
     })
 }
 
+// @scenario: relay_exchange :: offer endpoint exists on HttpTransport
 #[test]
 fn test_exchange_offer_method_exists() {
     let t = test_transport();
     assert!(t.exchange_offer("cGF5bG9hZA==", Some(300)).is_err());
 }
 
+// @scenario: relay_exchange :: claim endpoint exists on HttpTransport
 #[test]
 fn test_exchange_claim_method_exists() {
     let t = test_transport();
     assert!(t.exchange_claim("123456", "cmVzcA==").is_err());
 }
 
+// @scenario: relay_exchange :: complete endpoint exists on HttpTransport
 #[test]
 fn test_exchange_complete_method_exists() {
     let t = test_transport();
@@ -40,6 +43,7 @@ fn test_exchange_complete_method_exists() {
 
 use vauchi_core::exchange::relay_exchange::derive_sas;
 
+// @scenario: relay_exchange :: SAS derivation is deterministic
 #[test]
 fn test_sas_deterministic() {
     let s = [42u8; 32];
@@ -48,6 +52,7 @@ fn test_sas_deterministic() {
     assert_eq!(derive_sas(&s, &a, &b), derive_sas(&s, &a, &b));
 }
 
+// @scenario: relay_exchange :: SAS derivation is order independent
 #[test]
 fn test_sas_order_independent() {
     let s = [42u8; 32];
@@ -56,6 +61,7 @@ fn test_sas_order_independent() {
     assert_eq!(derive_sas(&s, &a, &b), derive_sas(&s, &b, &a));
 }
 
+// @scenario: relay_exchange :: SAS format is XXX-XXX
 #[test]
 fn test_sas_format() {
     let sas = derive_sas(&[42u8; 32], &[1u8; 32], &[2u8; 32]);
@@ -65,6 +71,7 @@ fn test_sas_format() {
     assert!(sas[4..].chars().all(|c| c.is_ascii_digit()));
 }
 
+// @scenario: relay_exchange :: different shared secrets produce different SAS
 #[test]
 fn test_sas_different_secrets_differ() {
     let a = [1u8; 32];
@@ -75,6 +82,7 @@ fn test_sas_different_secrets_differ() {
     );
 }
 
+// @scenario: relay_exchange :: both X3DH sides derive matching SAS
 #[cfg(feature = "testing")]
 #[test]
 fn test_sas_both_sides_match() {
@@ -97,6 +105,7 @@ fn test_sas_both_sides_match() {
 
 use vauchi_core::api::Vauchi;
 
+// @scenario: relay_exchange :: start requires identity
 #[test]
 fn test_start_exchange_needs_identity() {
     let vauchi = Vauchi::in_memory().unwrap();
@@ -109,6 +118,7 @@ fn test_start_exchange_needs_identity() {
     );
 }
 
+// @scenario: relay_exchange :: claim requires identity
 #[test]
 fn test_claim_exchange_needs_identity() {
     let vauchi = Vauchi::in_memory().unwrap();
@@ -121,6 +131,7 @@ fn test_claim_exchange_needs_identity() {
     );
 }
 
+// @scenario: relay_exchange :: complete requires identity
 #[cfg(feature = "testing")]
 #[test]
 fn test_complete_exchange_needs_identity() {
@@ -136,6 +147,7 @@ fn test_complete_exchange_needs_identity() {
     );
 }
 
+// @scenario: relay_exchange :: start with identity reaches network layer
 #[test]
 fn test_start_exchange_with_identity_fails_at_network() {
     let mut vauchi = Vauchi::in_memory().unwrap();
@@ -151,6 +163,7 @@ fn test_start_exchange_with_identity_fails_at_network() {
     );
 }
 
+// @scenario: relay_exchange :: claim with identity reaches network layer
 #[test]
 fn test_claim_exchange_with_identity_fails_at_network() {
     let mut vauchi = Vauchi::in_memory().unwrap();

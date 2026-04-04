@@ -60,6 +60,7 @@ fn test_ohttp_cache_upsert_overwrites() {
 /// Verifies that the cache key includes the relay URL so that entries
 /// are truly isolated — a stale-key eviction for relay-A never silently
 /// removes relay-B's still-valid key.
+// @scenario: ohttp_cache :: clearing one relay key preserves others
 #[test]
 fn test_ohttp_cache_clear_does_not_affect_other_relays() {
     let storage = open_storage();

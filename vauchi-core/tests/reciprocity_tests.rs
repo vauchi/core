@@ -144,3 +144,55 @@ fn confirmation_escrow_keys_differ_from_card_escrow() {
     let confirm = ConfirmationEscrowKeys::derive(&shared_secret, EscrowRole::Initiator);
     assert_ne!(card.gate_hash, confirm.gate_hash);
 }
+
+// ── Task 5: Token derivation in key agreement ──
+
+use vauchi_core::exchange::proximity::MockProximityVerifier;
+use vauchi_core::exchange::session::{ExchangeEvent, ExchangeSession};
+use vauchi_core::identity::Identity;
+
+#[test]
+fn key_agreement_derives_confirmation_tokens() {
+    let identity_a = Identity::create("Alice");
+    let card_a = ContactCard::new("Alice");
+    let mut session_a =
+        ExchangeSession::new_qr(identity_a, card_a, MockProximityVerifier::success());
+
+    let identity_b = Identity::create("Bob");
+    let card_b = ContactCard::new("Bob");
+    let mut session_b =
+        ExchangeSession::new_qr(identity_b, card_b, MockProximityVerifier::success());
+
+    // Both start QR
+    session_a.apply(ExchangeEvent::StartQR).unwrap();
+    session_b.apply(ExchangeEvent::StartQR).unwrap();
+
+    // A scans B's QR
+    let qr_b = session_b.qr().unwrap().clone();
+    session_a.apply(ExchangeEvent::ProcessQR(qr_b)).unwrap();
+    session_a.apply(ExchangeEvent::TheyScannedOurQR).unwrap();
+
+    // Before key agreement, tokens should be None
+    assert!(session_a.our_confirmation_token().is_none());
+
+    // Perform key agreement
+    session_a.apply(ExchangeEvent::PerformKeyAgreement).unwrap();
+
+    // After key agreement, tokens should be populated
+    let our_token = session_a
+        .our_confirmation_token()
+        .expect("our_confirmation_token should be set after key agreement");
+    let their_token = session_a
+        .expected_their_token()
+        .expect("expected_their_token should be set after key agreement");
+
+    // Tokens must be different (asymmetric — bound to different identity keys)
+    assert_ne!(our_token, their_token);
+
+    // Escrow keys should also be populated
+    let (gate, our_slot, their_slot) = session_a
+        .confirmation_escrow()
+        .expect("confirmation escrow should be set after key agreement");
+    assert!(!gate.is_empty());
+    assert_ne!(our_slot, their_slot);
+}

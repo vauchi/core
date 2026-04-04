@@ -166,6 +166,16 @@ pub struct ExchangeSession {
     /// Pending commands to be sent to the frontend (ADR-031).
     /// Populated by `apply_hardware_event()` and drained by `drain_commands()`.
     pending_commands: Vec<ExchangeCommand>,
+    /// Our reciprocity confirmation token (derived in key agreement).
+    our_confirmation_token: Option<[u8; 32]>,
+    /// Token we expect from the peer (derived in key agreement).
+    expected_their_token: Option<[u8; 32]>,
+    /// Confirmation escrow gate hash (derived in key agreement).
+    confirmation_gate_hash: Option<String>,
+    /// Our confirmation escrow slot hash.
+    confirmation_our_slot: Option<String>,
+    /// Their confirmation escrow slot hash.
+    confirmation_their_slot: Option<String>,
 }
 
 // Compile-time assertion: ExchangeSession must be Send + Sync because
@@ -221,6 +231,11 @@ impl ExchangeSession {
             their_relay_noise_pubkey: None,
             debug_log: None,
             pending_commands: Vec::new(),
+            our_confirmation_token: None,
+            expected_their_token: None,
+            confirmation_gate_hash: None,
+            confirmation_our_slot: None,
+            confirmation_their_slot: None,
         }
     }
 
@@ -258,6 +273,11 @@ impl ExchangeSession {
             their_relay_noise_pubkey: None,
             debug_log: None,
             pending_commands: Vec::new(),
+            our_confirmation_token: None,
+            expected_their_token: None,
+            confirmation_gate_hash: None,
+            confirmation_our_slot: None,
+            confirmation_their_slot: None,
         }
     }
 
@@ -300,6 +320,11 @@ impl ExchangeSession {
             their_relay_noise_pubkey: None,
             debug_log: None,
             pending_commands: Vec::new(),
+            our_confirmation_token: None,
+            expected_their_token: None,
+            confirmation_gate_hash: None,
+            confirmation_our_slot: None,
+            confirmation_their_slot: None,
         }
     }
 
@@ -352,6 +377,11 @@ impl ExchangeSession {
             their_relay_noise_pubkey: None,
             debug_log: None,
             pending_commands: Vec::new(),
+            our_confirmation_token: None,
+            expected_their_token: None,
+            confirmation_gate_hash: None,
+            confirmation_our_slot: None,
+            confirmation_their_slot: None,
         }
     }
 
@@ -594,6 +624,28 @@ impl ExchangeSession {
     /// get the list of hardware actions they need to perform.
     pub fn drain_commands(&mut self) -> Vec<ExchangeCommand> {
         std::mem::take(&mut self.pending_commands)
+    }
+
+    /// Our reciprocity confirmation token, if key agreement has been performed.
+    pub fn our_confirmation_token(&self) -> Option<&[u8; 32]> {
+        self.our_confirmation_token.as_ref()
+    }
+
+    /// The token we expect from the peer, if key agreement has been performed.
+    pub fn expected_their_token(&self) -> Option<&[u8; 32]> {
+        self.expected_their_token.as_ref()
+    }
+
+    /// Confirmation escrow identifiers (gate, our_slot, their_slot).
+    pub fn confirmation_escrow(&self) -> Option<(&str, &str, &str)> {
+        match (
+            &self.confirmation_gate_hash,
+            &self.confirmation_our_slot,
+            &self.confirmation_their_slot,
+        ) {
+            (Some(g), Some(o), Some(t)) => Some((g, o, t)),
+            _ => None,
+        }
     }
 
     /// Queues a command for the frontend.
@@ -1073,6 +1125,34 @@ impl ExchangeSession {
         info.extend_from_slice(eph_hi);
         let derived = HKDF::derive_key(None, &*shared_bytes, &info);
         let shared_key = crate::crypto::SymmetricKey::from_bytes(*derived);
+
+        // Derive reciprocity confirmation tokens (design spec §2).
+        // Asymmetric: each side's token binds their own identity key.
+        let our_confirm_info = [b"vauchi-reciprocity-confirm-v1".as_slice(), our_id].concat();
+        let their_confirm_info = [
+            b"vauchi-reciprocity-confirm-v1".as_slice(),
+            their_public_key.as_slice(),
+        ]
+        .concat();
+        let our_confirm = HKDF::derive_key(None, &*shared_bytes, &our_confirm_info);
+        let their_confirm = HKDF::derive_key(None, &*shared_bytes, &their_confirm_info);
+        self.our_confirmation_token = Some(*our_confirm);
+        self.expected_their_token = Some(*their_confirm);
+
+        // Derive confirmation escrow keys (design spec §3.5).
+        // Role: smaller identity key = Initiator.
+        let escrow_role = if our_id.as_slice() < their_public_key.as_slice() {
+            super::escrow::EscrowRole::Initiator
+        } else {
+            super::escrow::EscrowRole::Responder
+        };
+        let confirm_escrow = super::confirmation_escrow::ConfirmationEscrowKeys::derive(
+            &*shared_bytes,
+            escrow_role,
+        );
+        self.confirmation_gate_hash = Some(confirm_escrow.gate_hash);
+        self.confirmation_our_slot = Some(confirm_escrow.our_slot);
+        self.confirmation_their_slot = Some(confirm_escrow.their_slot);
 
         self.state = ExchangeState::AwaitingCardExchange {
             their_public_key,

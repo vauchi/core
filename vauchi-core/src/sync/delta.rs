@@ -524,6 +524,15 @@ impl VersionedPayload {
         buf
     }
 
+    /// Encode a reciprocity confirmation with version prefix.
+    pub fn encode_reciprocity(payload: &ReciprocityConfirmPayload) -> Vec<u8> {
+        let inner = payload.encode();
+        let mut buf = Vec::with_capacity(1 + inner.len());
+        buf.push(PAYLOAD_VERSION_RECIPROCITY);
+        buf.extend_from_slice(&inner);
+        buf
+    }
+
     /// Decode a version-tagged payload.
     pub fn decode(data: &[u8]) -> Result<Self, DeltaError> {
         if data.is_empty() {
@@ -575,9 +584,11 @@ impl ReciprocityConfirmPayload {
     }
 
     /// Encode to wire format (without version byte prefix).
+    ///
+    /// Use `VersionedPayload::encode_reciprocity()` to get the full
+    /// wire format with the 0x03 prefix.
     pub fn encode(&self) -> Vec<u8> {
-        let mut buf = Vec::with_capacity(97);
-        buf.push(PAYLOAD_VERSION_RECIPROCITY);
+        let mut buf = Vec::with_capacity(96);
         buf.extend_from_slice(&self.token);
         buf.extend_from_slice(&self.signature);
         buf

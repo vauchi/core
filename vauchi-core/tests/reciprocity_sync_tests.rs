@@ -12,7 +12,13 @@ fn reciprocity_confirm_encode_decode_roundtrip() {
     let recipient_pk = [0xCD; 32];
 
     let payload = ReciprocityConfirmPayload::new(token, &identity, &recipient_pk);
-    let encoded = payload.encode();
+
+    // Inner encode (no version prefix)
+    let inner = payload.encode();
+    assert_eq!(inner.len(), 96, "inner payload: 32 + 64 = 96 bytes");
+
+    // Full wire format (with version prefix)
+    let encoded = VersionedPayload::encode_reciprocity(&payload);
     assert_eq!(encoded[0], 0x03, "version byte must be 0x03");
     assert_eq!(encoded.len(), 97, "wire format: 1 + 32 + 64 = 97 bytes");
 
@@ -37,7 +43,7 @@ fn reciprocity_confirm_rejects_wrong_signature() {
     let recipient_pk = [0xCD; 32];
 
     let payload = ReciprocityConfirmPayload::new(token, &identity_a, &recipient_pk);
-    let encoded = payload.encode();
+    let encoded = VersionedPayload::encode_reciprocity(&payload);
 
     let decoded = VersionedPayload::decode(&encoded).unwrap();
     match decoded {
@@ -59,7 +65,7 @@ fn reciprocity_confirm_rejects_wrong_recipient() {
     let wrong_recipient = [0xEF; 32];
 
     let payload = ReciprocityConfirmPayload::new(token, &identity, &recipient_pk);
-    let encoded = payload.encode();
+    let encoded = VersionedPayload::encode_reciprocity(&payload);
 
     let decoded = VersionedPayload::decode(&encoded).unwrap();
     match decoded {

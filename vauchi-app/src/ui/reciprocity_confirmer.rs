@@ -115,19 +115,19 @@ impl ReciprocityConfirmer {
     pub fn handle_event(&mut self, event: &ExchangeHardwareEvent) -> Vec<ExchangeCommand> {
         match event {
             ExchangeHardwareEvent::RelayEscrowReady { gate_hash }
-                if gate_hash == self.escrow_gate.as_bytes() =>
+                if *gate_hash == self.gate_bytes() =>
             {
                 // Gate has ≥2 deposits — retrieve their blob
                 vec![self.make_retrieve_command()]
             }
             ExchangeHardwareEvent::RelayEscrowBlobReceived { gate_hash, blob }
-                if gate_hash == self.escrow_gate.as_bytes() =>
+                if *gate_hash == self.gate_bytes() =>
             {
                 self.handle_blob_received(blob);
                 Vec::new()
             }
             ExchangeHardwareEvent::RelayEscrowFailed { gate_hash, .. }
-                if gate_hash == self.escrow_gate.as_bytes() =>
+                if *gate_hash == self.gate_bytes() =>
             {
                 self.handle_escrow_failed()
             }
@@ -168,6 +168,20 @@ impl ReciprocityConfirmer {
 
     // ── Private helpers ──
 
+    fn gate_bytes(&self) -> Vec<u8> {
+        hex::decode(&self.escrow_gate).unwrap_or_else(|_| self.escrow_gate.as_bytes().to_vec())
+    }
+
+    fn our_slot_bytes(&self) -> Vec<u8> {
+        hex::decode(&self.escrow_our_slot)
+            .unwrap_or_else(|_| self.escrow_our_slot.as_bytes().to_vec())
+    }
+
+    fn their_slot_bytes(&self) -> Vec<u8> {
+        hex::decode(&self.escrow_their_slot)
+            .unwrap_or_else(|_| self.escrow_their_slot.as_bytes().to_vec())
+    }
+
     fn handle_blob_received(&mut self, blob: &[u8]) {
         if blob.len() == 32 && blob == self.expected_their_token.as_slice() {
             self.level = CascadeLevel::Done;
@@ -193,8 +207,8 @@ impl ReciprocityConfirmer {
     fn make_deposit_command(&mut self) -> ExchangeCommand {
         self.deposit_sent = true;
         ExchangeCommand::RelayEscrowDeposit {
-            gate_hash: self.escrow_gate.as_bytes().to_vec(),
-            slot_hash: self.escrow_our_slot.as_bytes().to_vec(),
+            gate_hash: self.gate_bytes(),
+            slot_hash: self.our_slot_bytes(),
             encrypted_card: self.our_token.to_vec(),
             ttl_seconds: ESCROW_TTL_SECONDS,
         }
@@ -202,15 +216,15 @@ impl ReciprocityConfirmer {
 
     fn make_check_command(&self) -> ExchangeCommand {
         ExchangeCommand::RelayEscrowCheck {
-            gate_hash: self.escrow_gate.as_bytes().to_vec(),
+            gate_hash: self.gate_bytes(),
             suggested_interval_ms: ESCROW_POLL_INTERVAL_MS,
         }
     }
 
     fn make_retrieve_command(&self) -> ExchangeCommand {
         ExchangeCommand::RelayEscrowRetrieve {
-            gate_hash: self.escrow_gate.as_bytes().to_vec(),
-            slot_hash: self.escrow_their_slot.as_bytes().to_vec(),
+            gate_hash: self.gate_bytes(),
+            slot_hash: self.their_slot_bytes(),
         }
     }
 }

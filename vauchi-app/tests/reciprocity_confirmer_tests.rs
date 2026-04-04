@@ -6,13 +6,22 @@ use vauchi_app::ui::reciprocity_confirmer::ReciprocityConfirmer;
 use vauchi_core::exchange::command::{ExchangeCommand, ExchangeHardwareEvent};
 use vauchi_core::exchange::reciprocity::Reciprocity;
 
+// Use valid hex strings for gate/slot hashes (matches production encoding)
+const GATE_HEX: &str = "aabbccdd00112233445566778899aabbccddeeff00112233445566778899aabb";
+const SLOT_OURS_HEX: &str = "1111111111111111111111111111111111111111111111111111111111111111";
+const SLOT_THEIRS_HEX: &str = "2222222222222222222222222222222222222222222222222222222222222222";
+
+fn gate_bytes() -> Vec<u8> {
+    hex::decode(GATE_HEX).unwrap()
+}
+
 fn make_confirmer() -> ReciprocityConfirmer {
     ReciprocityConfirmer::new(
         [0xAA; 32],
         [0xBB; 32],
-        "gate123".to_string(),
-        "slot_ours".to_string(),
-        "slot_theirs".to_string(),
+        GATE_HEX.to_string(),
+        SLOT_OURS_HEX.to_string(),
+        SLOT_THEIRS_HEX.to_string(),
         1000,
         true,
     )
@@ -42,7 +51,7 @@ fn escrow_ready_triggers_retrieve() {
     confirmer.start();
 
     let cmds = confirmer.handle_event(&ExchangeHardwareEvent::RelayEscrowReady {
-        gate_hash: b"gate123".to_vec(),
+        gate_hash: gate_bytes(),
     });
     assert_eq!(cmds.len(), 1);
     matches!(&cmds[0], ExchangeCommand::RelayEscrowRetrieve { .. });
@@ -54,7 +63,7 @@ fn correct_blob_confirms() {
     confirmer.start();
 
     confirmer.handle_event(&ExchangeHardwareEvent::RelayEscrowBlobReceived {
-        gate_hash: b"gate123".to_vec(),
+        gate_hash: gate_bytes(),
         blob: [0xBB; 32].to_vec(),
     });
 
@@ -68,7 +77,7 @@ fn wrong_blob_falls_to_pending() {
     confirmer.start();
 
     confirmer.handle_event(&ExchangeHardwareEvent::RelayEscrowBlobReceived {
-        gate_hash: b"gate123".to_vec(),
+        gate_hash: gate_bytes(),
         blob: [0xFF; 32].to_vec(),
     });
 
@@ -77,18 +86,15 @@ fn wrong_blob_falls_to_pending() {
 }
 
 #[test]
-fn deposit_failure_retries_then_falls_to_pending() {
+fn deposit_failure_falls_to_pending() {
     let mut confirmer = make_confirmer();
     confirmer.start();
 
     let fail_event = ExchangeHardwareEvent::RelayEscrowFailed {
-        gate_hash: b"gate123".to_vec(),
+        gate_hash: gate_bytes(),
         reason: "network error".into(),
     };
 
-    // Deposit was sent by start() — failure goes to retry/fallthrough
-    // But deposit_sent is already true, so it falls to pending immediately
-    // (retries only apply when deposit itself failed before being sent)
     let cmds = confirmer.handle_event(&fail_event);
     assert!(cmds.is_empty());
     assert_eq!(confirmer.reciprocity(), Reciprocity::Pending);
@@ -101,7 +107,7 @@ fn persisted_state_roundtrip() {
 
     assert_eq!(state.our_token, [0xAA; 32]);
     assert_eq!(state.expected_their_token, [0xBB; 32]);
-    assert_eq!(state.gate_hash, "gate123");
+    assert_eq!(state.gate_hash, GATE_HEX);
 
     let resumed = ReciprocityConfirmer::from_persisted(state, 1000);
     assert_eq!(resumed.reciprocity(), Reciprocity::Pending);
@@ -111,7 +117,7 @@ fn persisted_state_roundtrip() {
 #[test]
 fn resumed_confirmer_skips_to_polling() {
     let mut confirmer = make_confirmer();
-    confirmer.start(); // sends deposit
+    confirmer.start();
 
     let state = confirmer.to_persisted_state();
     assert!(state.deposit_sent);
@@ -119,7 +125,6 @@ fn resumed_confirmer_skips_to_polling() {
     let mut resumed = ReciprocityConfirmer::from_persisted(state, 1000);
     let cmds = resumed.start();
 
-    // Should emit check (poll), not deposit again
     assert_eq!(cmds.len(), 1);
     matches!(&cmds[0], ExchangeCommand::RelayEscrowCheck { .. });
 }

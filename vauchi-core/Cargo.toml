@@ -491,5 +491,13 @@ name = "relay_exchange_tests"
 required-features = ["network-http"]
 
 [[test]]
+name = "rekey_coverage_tests"
+required-features = ["testing"]
+
+[[test]]
+name = "storage_anti_pattern_tests"
+required-features = ["testing"]
+
+[[test]]
 name = "schema_gen"
 required-features = ["schema-gen"]

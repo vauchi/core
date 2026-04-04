@@ -15,7 +15,7 @@ description = "Core library for Vauchi - privacy-focused contact card exchange"
 
 
 [features]
-default = ["network", "storage"]
+default = ["network", "network-http", "storage"]
 storage = ["rusqlite"]
 network = ["network-native-tls", "storage"]
 network-native-tls = ["tungstenite", "tungstenite/handshake", "tungstenite/native-tls", "native-tls", "snow"]

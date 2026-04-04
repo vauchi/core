@@ -62,6 +62,49 @@ impl Vauchi {
         Ok(queued)
     }
 
+    /// Queues an initial card update for a newly exchanged contact.
+    ///
+    /// After a contact exchange (QR or relay), the initiator must send the
+    /// first ratchet message to establish the responder's receive chain.
+    /// This method encrypts the full own card as a delta (empty → current)
+    /// and queues it for delivery on the next `sync()` call.
+    pub fn queue_initial_card_for_contact(&self, contact_id: &str) -> VauchiResult<()> {
+        use crate::contact_card::ContactCard;
+        use crate::storage::{PendingUpdate, UpdateStatus};
+
+        let identity = self
+            .identity
+            .as_ref()
+            .ok_or(VauchiError::IdentityNotInitialized)?;
+
+        let our_card = self
+            .storage
+            .load_own_card()?
+            .unwrap_or_else(|| ContactCard::new(identity.display_name()));
+        let empty_card = ContactCard::new(identity.display_name());
+
+        let encrypted = self.prepare_card_update_for_contact(contact_id, &empty_card, &our_card)?;
+
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+
+        let update = PendingUpdate {
+            id: uuid::Uuid::new_v4().to_string(),
+            contact_id: contact_id.to_string(),
+            update_type: "card_delta".to_string(),
+            payload: encrypted,
+            created_at: now,
+            retry_count: 0,
+            status: UpdateStatus::Pending,
+            target_relay_url: None,
+        };
+        self.storage.queue_update(&update)?;
+
+        Ok(())
+    }
+
     /// Prepares an encrypted card update for a single contact.
     ///
     /// Single crypto path for card propagation (ADR-021). Handles:

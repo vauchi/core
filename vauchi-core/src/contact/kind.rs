@@ -12,6 +12,7 @@ use serde::{Deserialize, Serialize};
 use crate::contact::VisibilityRules;
 use crate::crypto::SymmetricKey;
 use crate::exchange::TrustMetrics;
+use crate::exchange::reciprocity::{ConfirmationChannel, Reciprocity};
 use crate::types::{ExchangeTransport, ProximityConfidence};
 
 /// Distinguishes exchanged contacts (with crypto) from imported contacts (no crypto).
@@ -92,6 +93,10 @@ pub struct ExchangedData {
     pub(crate) trust_metrics: Option<TrustMetrics>,
     /// Our visibility rules for this contact (what they can see of our card).
     pub(crate) visibility_rules: VisibilityRules,
+    /// Whether the other party also completed the exchange. None = legacy.
+    pub(crate) reciprocity: Option<Reciprocity>,
+    /// Which confirmation channel resolved reciprocity. None = unresolved.
+    pub(crate) confirmation_channel: Option<ConfirmationChannel>,
 }
 
 #[cfg(any(test, feature = "testing"))]
@@ -127,6 +132,8 @@ impl ExchangedData {
             relay_noise_pubkey,
             trust_metrics,
             visibility_rules,
+            reciprocity: None,
+            confirmation_channel: None,
         }
     }
 

@@ -34,6 +34,7 @@ use crate::contact_card::ContactCard;
 use crate::crypto::SymmetricKey;
 use crate::crypto::cek::ContentEncryptionKey;
 use crate::exchange::TrustMetrics;
+use crate::exchange::reciprocity::{ConfirmationChannel, Reciprocity};
 use crate::types::{ExchangeTransport, ProximityConfidence};
 
 /// Error type for contact operations that require a specific contact kind.
@@ -119,6 +120,8 @@ impl Contact {
                 relay_noise_pubkey: None,
                 trust_metrics: None,
                 visibility_rules: VisibilityRules::new(),
+                reciprocity: None,
+                confirmation_channel: None,
             }),
             hidden: false,
             blocked: false,
@@ -215,6 +218,8 @@ impl Contact {
                 relay_noise_pubkey: None,
                 trust_metrics: None,
                 visibility_rules,
+                reciprocity: None,
+                confirmation_channel: None,
             }),
             hidden,
             blocked,
@@ -452,6 +457,35 @@ impl Contact {
     pub fn set_trust_metrics(&mut self, metrics: Option<TrustMetrics>) {
         if let Some(data) = self.kind.exchanged_data_mut() {
             data.trust_metrics = metrics;
+        }
+    }
+
+    /// Returns the reciprocity status. `None` in ExchangedData maps to `Unknown` (legacy).
+    pub fn reciprocity(&self) -> Reciprocity {
+        self.kind
+            .exchanged_data()
+            .and_then(|d| d.reciprocity)
+            .unwrap_or(Reciprocity::Unknown)
+    }
+
+    /// Returns the confirmation channel, if reciprocity has been resolved.
+    pub fn confirmation_channel(&self) -> Option<ConfirmationChannel> {
+        self.kind
+            .exchanged_data()
+            .and_then(|d| d.confirmation_channel)
+    }
+
+    /// Sets the reciprocity status (no-op for imported contacts).
+    pub fn set_reciprocity(&mut self, reciprocity: Reciprocity) {
+        if let Some(data) = self.kind.exchanged_data_mut() {
+            data.reciprocity = Some(reciprocity);
+        }
+    }
+
+    /// Sets the confirmation channel (no-op for imported contacts).
+    pub fn set_confirmation_channel(&mut self, channel: ConfirmationChannel) {
+        if let Some(data) = self.kind.exchanged_data_mut() {
+            data.confirmation_channel = Some(channel);
         }
     }
 

@@ -2,6 +2,9 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+use vauchi_core::contact::Contact;
+use vauchi_core::contact_card::ContactCard;
+use vauchi_core::crypto::SymmetricKey;
 use vauchi_core::exchange::reciprocity::{ConfirmationChannel, Reciprocity};
 
 #[test]
@@ -41,5 +44,36 @@ fn reciprocity_snake_case_serialization() {
     assert_eq!(
         serde_json::to_string(&ConfirmationChannel::RelayEscrow).unwrap(),
         "\"relay_escrow\""
+    );
+}
+
+fn make_test_contact() -> Contact {
+    Contact::from_exchange(
+        [1u8; 32],
+        ContactCard::new("Alice"),
+        SymmetricKey::generate(),
+    )
+}
+
+#[test]
+fn contact_reciprocity_defaults_to_unknown() {
+    let contact = make_test_contact();
+    assert_eq!(contact.reciprocity(), Reciprocity::Unknown);
+}
+
+#[test]
+fn contact_set_reciprocity() {
+    let mut contact = make_test_contact();
+    contact.set_reciprocity(Reciprocity::Confirmed);
+    assert_eq!(contact.reciprocity(), Reciprocity::Confirmed);
+}
+
+#[test]
+fn contact_set_confirmation_channel() {
+    let mut contact = make_test_contact();
+    contact.set_confirmation_channel(ConfirmationChannel::RelayEscrow);
+    assert_eq!(
+        contact.confirmation_channel(),
+        Some(ConfirmationChannel::RelayEscrow)
     );
 }

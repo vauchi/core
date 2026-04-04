@@ -21,6 +21,8 @@ use vauchi_core::exchange::link_mode::{self, LinkInitiation};
 use vauchi_core::exchange::mode::ExchangeMode;
 use vauchi_core::exchange::{ExchangeEvent, ExchangeSession};
 
+use crate::ui::reciprocity_confirmer::ReciprocityConfirmer;
+
 /// Configuration for starting an exchange.
 #[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -75,6 +77,8 @@ pub struct ExchangeEngine {
     /// Decrypted card bytes from Link mode exchange (set on ExchangeComplete).
     /// Callers check `link_received_card_bytes()` after Success to save the contact.
     link_received_card: Option<Vec<u8>>,
+    /// Reciprocity confirmation cascade driver (created on exchange completion).
+    reciprocity_confirmer: Option<ReciprocityConfirmer>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -161,6 +165,7 @@ impl ExchangeEngine {
             pending_link_commands,
             escrow_keys: None,
             link_received_card: None,
+            reciprocity_confirmer: None,
         }
     }
 
@@ -198,6 +203,7 @@ impl ExchangeEngine {
                     pending_link_commands: Vec::new(),
                     escrow_keys: None,
                     link_received_card: None,
+                    reciprocity_confirmer: None,
                 };
             }
             session.emit_initial_commands();
@@ -216,6 +222,7 @@ impl ExchangeEngine {
             pending_link_commands: Vec::new(),
             escrow_keys: None,
             link_received_card: None,
+            reciprocity_confirmer: None,
         }
     }
 
@@ -251,6 +258,18 @@ impl ExchangeEngine {
     /// the contact, matching the QR path's `session.extract_contact()` pattern.
     pub fn link_received_card_bytes(&self) -> Option<&[u8]> {
         self.link_received_card.as_deref()
+    }
+
+    /// Returns the confirmation state for persistence (crash recovery).
+    ///
+    /// Available after exchange completion. The platform layer should
+    /// encrypt and save this to the contact's `confirmation_state` column.
+    pub fn confirmation_state(
+        &self,
+    ) -> Option<crate::ui::reciprocity_confirmer::ConfirmationState> {
+        self.reciprocity_confirmer
+            .as_ref()
+            .map(|c| c.to_persisted_state())
     }
 
     pub fn selected_groups(&self) -> &[String] {
@@ -613,6 +632,12 @@ impl WorkflowEngine for ExchangeEngine {
                 return None;
             }
         };
+        // Clone event for confirmer routing (event is consumed by session)
+        let event_for_confirmer = if self.reciprocity_confirmer.is_some() {
+            Some(event.clone())
+        } else {
+            None
+        };
         if let Err(e) = session.apply_hardware_event(event) {
             // The session rejected the event (invalid state, malformed QR, etc.).
             // Transition to Failed so the UI reflects the error.
@@ -620,12 +645,46 @@ impl WorkflowEngine for ExchangeEngine {
             self.step = ExchangeStep::Failed;
             return Some(ActionResult::UpdateScreen(self.build_screen()));
         }
-        let commands = session.drain_commands();
+        let mut commands = session.drain_commands();
+
+        // Route escrow events to reciprocity confirmer if active
+        if let Some(ref mut confirmer) = self.reciprocity_confirmer {
+            if let Some(ref evt) = event_for_confirmer {
+                let cmds = confirmer.handle_event(evt);
+                commands.extend(cmds);
+            }
+            if confirmer.is_done() {
+                self.reciprocity_confirmer = None;
+            }
+        }
 
         // Sync engine step from session state
         match session.state() {
             vauchi_core::exchange::ExchangeState::Complete { .. } => {
                 self.step = ExchangeStep::Success;
+                // Create reciprocity confirmer from session tokens
+                if self.reciprocity_confirmer.is_none()
+                    && let (Some(our_token), Some(their_token)) = (
+                        session.our_confirmation_token().copied(),
+                        session.expected_their_token().copied(),
+                    )
+                    && let Some((gate, our_slot, their_slot)) = session.confirmation_escrow()
+                {
+                    let mut confirmer = ReciprocityConfirmer::new(
+                        our_token,
+                        their_token,
+                        gate.to_string(),
+                        our_slot.to_string(),
+                        their_slot.to_string(),
+                        std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .unwrap_or_default()
+                            .as_secs(),
+                        true,
+                    );
+                    commands.extend(confirmer.start());
+                    self.reciprocity_confirmer = Some(confirmer);
+                }
             }
             vauchi_core::exchange::ExchangeState::Failed { error } => {
                 self.failure_detail = Some(error.user_message().to_string());

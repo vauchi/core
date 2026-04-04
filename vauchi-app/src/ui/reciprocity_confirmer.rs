@@ -15,6 +15,7 @@
 use serde::{Deserialize, Serialize};
 use vauchi_core::exchange::command::{ExchangeCommand, ExchangeHardwareEvent};
 use vauchi_core::exchange::reciprocity::Reciprocity;
+use zeroize::Zeroize;
 
 /// Confirmation cascade level (Phase 1: escrow only).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -51,6 +52,13 @@ pub struct ReciprocityConfirmer {
     level: CascadeLevel,
     deposit_retry_count: u32,
     deposit_sent: bool,
+}
+
+impl Drop for ReciprocityConfirmer {
+    fn drop(&mut self) {
+        self.our_token.zeroize();
+        self.expected_their_token.zeroize();
+    }
 }
 
 const MAX_DEPOSIT_RETRIES: u32 = 3;
@@ -183,7 +191,8 @@ impl ReciprocityConfirmer {
     }
 
     fn handle_blob_received(&mut self, blob: &[u8]) {
-        if blob.len() == 32 && blob == self.expected_their_token.as_slice() {
+        use subtle::ConstantTimeEq;
+        if blob.len() == 32 && bool::from(blob.ct_eq(self.expected_their_token.as_slice())) {
             self.level = CascadeLevel::Done;
         } else {
             // Invalid blob — fall through to pending (don't retry)
@@ -192,14 +201,14 @@ impl ReciprocityConfirmer {
     }
 
     fn handle_escrow_failed(&mut self) -> Vec<ExchangeCommand> {
-        if !self.deposit_sent {
-            // Deposit failed — retry up to MAX_DEPOSIT_RETRIES
-            self.deposit_retry_count += 1;
-            if self.deposit_retry_count <= MAX_DEPOSIT_RETRIES {
-                return vec![self.make_deposit_command()];
-            }
+        // Retry up to MAX_DEPOSIT_RETRIES on any escrow failure
+        // (deposit rejected, poll timeout, network error).
+        // deposit_sent is for crash recovery only (skip re-deposit on relaunch).
+        self.deposit_retry_count += 1;
+        if self.deposit_retry_count <= MAX_DEPOSIT_RETRIES {
+            return vec![self.make_deposit_command()];
         }
-        // Exhausted retries or poll failed — fall through to pending
+        // Exhausted retries — fall through to pending (relay sync takes over)
         self.level = CascadeLevel::Pending;
         Vec::new()
     }

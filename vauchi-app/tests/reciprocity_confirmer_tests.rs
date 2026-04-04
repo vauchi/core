@@ -91,7 +91,7 @@ fn wrong_blob_falls_to_pending() {
 
 // @internal
 #[test]
-fn deposit_failure_falls_to_pending() {
+fn deposit_failure_retries_up_to_3_times() {
     let mut confirmer = make_confirmer();
     confirmer.start();
 
@@ -100,9 +100,18 @@ fn deposit_failure_falls_to_pending() {
         reason: "network error".into(),
     };
 
+    // First 3 failures should produce retry deposit commands
+    for i in 0..3 {
+        let cmds = confirmer.handle_event(&fail_event.clone());
+        assert_eq!(cmds.len(), 1, "retry {i} should emit a deposit command");
+        assert!(!confirmer.is_done(), "retry {i} should not be done");
+    }
+
+    // 4th failure exhausts retries — falls to pending
     let cmds = confirmer.handle_event(&fail_event);
-    assert!(cmds.is_empty());
+    assert!(cmds.is_empty(), "exhausted retries should emit nothing");
     assert_eq!(confirmer.reciprocity(), Reciprocity::Pending);
+    assert!(confirmer.is_done());
 }
 
 // @internal

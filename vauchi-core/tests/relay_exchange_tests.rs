@@ -6,8 +6,8 @@
 
 #![cfg(feature = "network-http")]
 
+use vauchi_core::network::ProxyConfig;
 use vauchi_core::network::http_transport::{HttpTransport, HttpTransportConfig};
-use vauchi_core::network::transport::ProxyConfig;
 
 fn test_transport() -> HttpTransport {
     HttpTransport::new(HttpTransportConfig {

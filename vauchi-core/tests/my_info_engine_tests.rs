@@ -264,6 +264,7 @@ fn my_info_shows_exchange_prompt_when_no_contacts() {
     assert_eq!(add_field.style, ActionStyle::Secondary);
 }
 
+// @scenario: onboarding.feature - Exchange prompt hidden when contacts exist
 #[test]
 fn my_info_hides_exchange_prompt_when_has_contacts() {
     let engine = MyInfoEngine::new(MyInfoProgress::default())

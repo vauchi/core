@@ -3,6 +3,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 //! Re-encryption (rekey) of all encrypted columns when the storage encryption key changes.
+//!
+//! The [`ENCRYPTED_COLUMNS`] registry lists every `(table, column)` pair that rekey must
+//! handle. The PRAGMA-based exhaustiveness test in `rekey_coverage_tests.rs` discovers all
+//! `_encrypted`/`_hmac`/`encrypted_blob` columns from the live schema and asserts they
+//! appear in this registry. Adding a new encrypted column to a migration without updating
+//! this registry will fail that test.
 
 use hmac::{Hmac, Mac};
 use rusqlite::params;
@@ -14,6 +20,86 @@ use crate::crypto::{SymmetricKey, decrypt, encrypt, kdf::HKDF};
 type HmacSha256 = Hmac<Sha256>;
 
 use super::{Storage, StorageError};
+
+/// Exhaustive registry of every encrypted column handled by rekey.
+///
+/// The PRAGMA-based test in `rekey_coverage_tests.rs` compares this list against the live
+/// schema. If a migration adds a new `_encrypted`/`_hmac`/`encrypted_blob` column and this
+/// registry is not updated, that test fails with a clear message.
+///
+/// Columns intentionally skipped (with documented reason) go in [`REKEY_SKIP_COLUMNS`].
+#[cfg(feature = "testing")]
+pub const ENCRYPTED_COLUMNS: &[(&str, &str)] = &[
+    // V1 baseline
+    ("contacts", "card_encrypted"),
+    ("contacts", "shared_key_encrypted"),
+    ("identity", "backup_data_encrypted"),
+    ("contact_ratchets", "ratchet_state_encrypted"),
+    // V4 contact extras
+    ("contacts", "personal_notes_encrypted"),
+    ("contacts", "avatar_encrypted"),
+    // V32 contact field notes
+    ("contact_field_notes", "note_encrypted"),
+    // V13 crypto-shredding
+    ("contacts", "cek_encrypted"),
+    // V14 high-priority
+    ("own_card", "card_json_encrypted"),
+    ("device_registry", "registry_json_encrypted"),
+    ("device_sync_state", "state_json_encrypted"),
+    ("visibility_labels", "contacts_json_encrypted"),
+    ("visibility_labels", "visible_fields_json_encrypted"),
+    // V15 medium-priority
+    ("device_info", "device_info_encrypted"),
+    ("version_vector", "vector_json_encrypted"),
+    ("contact_sync_timestamps", "last_sync_at_encrypted"),
+    ("pending_updates", "payload_encrypted"),
+    ("retry_entries", "payload_encrypted"),
+    ("device_sync_checkpoints", "items_json_encrypted"),
+    ("recovery_responses", "response_encrypted"),
+    ("deletion_state", "state_json_encrypted"),
+    ("sync_checkpoints", "state_json_encrypted"),
+    // V16 low-priority
+    ("field_validations", "field_value_encrypted"),
+    ("field_validations", "signature_encrypted"),
+    ("ux_state", "aha_tracker_json_encrypted"),
+    ("ux_state", "demo_contact_json_encrypted"),
+    ("audit_log", "details_encrypted"),
+    // V18 visibility rules
+    ("contacts", "visibility_rules_encrypted"),
+    // V19 app password / duress
+    ("identity", "password_hash_encrypted"),
+    ("identity", "duress_hash_encrypted"),
+    // V20 duress settings
+    ("duress_settings", "alert_contact_ids_encrypted"),
+    ("duress_settings", "alert_message_encrypted"),
+    // V21 decoy contacts
+    ("decoy_contacts", "card_encrypted"),
+    // V22 emergency config
+    ("emergency_config", "trusted_contact_ids_encrypted"),
+    ("emergency_config", "message_encrypted"),
+    // V23 label name encryption
+    ("visibility_labels", "name_encrypted"),
+    ("visibility_labels", "name_hmac"),
+    // V26 recovery settings
+    ("recovery_settings", "settings_encrypted"),
+    // V29 onboarding progress
+    ("ux_state", "onboarding_progress_encrypted"),
+    // V30 label display name override
+    ("visibility_labels", "display_name_override_encrypted"),
+    // V38 exchange state crash recovery
+    ("exchange_states", "encrypted_blob"),
+];
+
+/// Encrypted columns intentionally skipped by rekey, with documented reason.
+#[cfg(feature = "testing")]
+pub const REKEY_SKIP_COLUMNS: &[(&str, &str, &str)] = &[
+    // Deprecated in 2026-03-24, never written to, always NULL.
+    (
+        "ux_state",
+        "tor_config_encrypted",
+        "deprecated, always NULL",
+    ),
+];
 
 /// Try to decrypt data with the old key; if decryption fails, treat it as
 /// plaintext and encrypt directly with the new key. This self-heals columns
@@ -68,7 +154,7 @@ impl Storage {
         self.wal_checkpoint()?;
 
         let old_key = &self.encryption_key;
-        const TOTAL_TABLES: u32 = 21;
+        const TOTAL_TABLES: u32 = 28;
         let mut completed: u32 = 0;
 
         let report = |completed: &mut u32, table: &str| {
@@ -335,17 +421,29 @@ impl Storage {
             }
             report(&mut completed, "device_sync_state");
 
-            // Re-encrypt visibility_labels: contacts_json_encrypted, visible_fields_json_encrypted, name_encrypted, name_hmac
+            // Re-encrypt visibility_labels: contacts_json, visible_fields_json, name, name_hmac, display_name_override
             {
                 let mut stmt = self
                     .conn
-                    .prepare("SELECT id, contacts_json_encrypted, visible_fields_json_encrypted, name_encrypted FROM visibility_labels WHERE contacts_json_encrypted IS NOT NULL")
+                    .prepare("SELECT id, contacts_json_encrypted, visible_fields_json_encrypted, name_encrypted, display_name_override_encrypted FROM visibility_labels WHERE contacts_json_encrypted IS NOT NULL")
                     .map_err(|e| StorageError::Migration(format!("Read labels: {}", e)))?;
 
                 #[allow(clippy::type_complexity)]
-                let rows: Vec<(String, Vec<u8>, Option<Vec<u8>>, Option<Vec<u8>>)> = stmt
+                let rows: Vec<(
+                    String,
+                    Vec<u8>,
+                    Option<Vec<u8>>,
+                    Option<Vec<u8>>,
+                    Option<Vec<u8>>,
+                )> = stmt
                     .query_map([], |row| {
-                        Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?))
+                        Ok((
+                            row.get(0)?,
+                            row.get(1)?,
+                            row.get(2)?,
+                            row.get(3)?,
+                            row.get(4)?,
+                        ))
                     })
                     .map_err(|e| StorageError::Migration(format!("Query labels: {}", e)))?
                     .collect::<Result<Vec<_>, _>>()
@@ -356,7 +454,7 @@ impl Storage {
                     HKDF::derive_key(None, new_key.as_bytes(), b"Vauchi_Label_Name_HMAC_v1");
                 let new_hmac_key_ref: &[u8] = &*new_hmac_key_bytes;
 
-                for (id, contacts_enc, fields_enc, name_enc) in &rows {
+                for (id, contacts_enc, fields_enc, name_enc, override_enc) in &rows {
                     let contacts_new = if !contacts_enc.is_empty() {
                         let plain = decrypt(old_key, contacts_enc).map_err(|e| {
                             StorageError::Migration(format!("Decrypt label contacts {}: {}", id, e))
@@ -410,10 +508,25 @@ impl Storage {
                         (None, None)
                     };
 
+                    let override_new = if let Some(enc) = override_enc {
+                        if !enc.is_empty() {
+                            let plain = decrypt(old_key, enc).map_err(|e| {
+                                StorageError::Migration(format!("Decrypt label override: {}", e))
+                            })?;
+                            Some(encrypt(&new_key, &plain).map_err(|e| {
+                                StorageError::Migration(format!("Encrypt label override: {}", e))
+                            })?)
+                        } else {
+                            Some(enc.clone())
+                        }
+                    } else {
+                        None
+                    };
+
                     self.conn.execute(
-                        "UPDATE visibility_labels SET contacts_json_encrypted = ?1, visible_fields_json_encrypted = ?2, name_encrypted = ?3, name_hmac = ?4 WHERE id = ?5",
-                        params![contacts_new, fields_new, name_new, name_hmac_new, id],
-                    ).map_err(|e| StorageError::Migration(format!("Update label {}: {}", id, e)))?;
+                        "UPDATE visibility_labels SET contacts_json_encrypted = ?1, visible_fields_json_encrypted = ?2, name_encrypted = ?3, name_hmac = ?4, display_name_override_encrypted = ?5 WHERE id = ?6",
+                        params![contacts_new, fields_new, name_new, name_hmac_new, override_new, id],
+                    ).map_err(|e| StorageError::Migration(format!("Update label: {}", e)))?;
                 }
             }
             report(&mut completed, "visibility_labels");
@@ -744,20 +857,21 @@ impl Storage {
             }
             report(&mut completed, "field_validations");
 
-            // Re-encrypt ux_state: aha_tracker_json_encrypted, demo_contact_json_encrypted
+            // Re-encrypt ux_state: aha_tracker, demo_contact, onboarding_progress
             {
                 let result = self.conn.query_row(
-                    "SELECT id, aha_tracker_json_encrypted, demo_contact_json_encrypted FROM ux_state WHERE id = 1",
+                    "SELECT id, aha_tracker_json_encrypted, demo_contact_json_encrypted, onboarding_progress_encrypted FROM ux_state WHERE id = 1",
                     [],
                     |row| {
                         let id: i64 = row.get(0)?;
                         let aha: Option<Vec<u8>> = row.get(1)?;
                         let demo: Option<Vec<u8>> = row.get(2)?;
-                        Ok((id, aha, demo))
+                        let onboarding: Option<Vec<u8>> = row.get(3)?;
+                        Ok((id, aha, demo, onboarding))
                     },
                 );
 
-                if let Ok((id, aha_enc, demo_enc)) = result {
+                if let Ok((id, aha_enc, demo_enc, onboarding_enc)) = result {
                     if let Some(enc) = aha_enc
                         && !enc.is_empty()
                     {
@@ -789,6 +903,20 @@ impl Storage {
                                 "UPDATE ux_state SET demo_contact_json_encrypted = ?1 WHERE id = ?2",
                                 params![new_enc, id],
                             ).map_err(|e| StorageError::Migration(format!("Update demo_contact: {}", e)))?;
+                    }
+                    if let Some(enc) = onboarding_enc
+                        && !enc.is_empty()
+                    {
+                        let plain = decrypt(old_key, &enc).map_err(|e| {
+                            StorageError::Migration(format!("Decrypt onboarding: {}", e))
+                        })?;
+                        let new_enc = encrypt(&new_key, &plain).map_err(|e| {
+                            StorageError::Migration(format!("Encrypt onboarding: {}", e))
+                        })?;
+                        self.conn.execute(
+                                "UPDATE ux_state SET onboarding_progress_encrypted = ?1 WHERE id = ?2",
+                                params![new_enc, id],
+                            ).map_err(|e| StorageError::Migration(format!("Update onboarding: {}", e)))?;
                     }
                 }
             }
@@ -825,6 +953,285 @@ impl Storage {
                 }
             }
             report(&mut completed, "audit_log");
+
+            // Re-encrypt contacts: cek_encrypted, visibility_rules_encrypted (nullable)
+            {
+                let mut stmt = self.conn
+                    .prepare("SELECT id, cek_encrypted, visibility_rules_encrypted FROM contacts WHERE cek_encrypted IS NOT NULL OR visibility_rules_encrypted IS NOT NULL")
+                    .map_err(|e| StorageError::Migration(format!("Read contact crypto: {}", e)))?;
+
+                #[allow(clippy::type_complexity)]
+                let rows: Vec<(String, Option<Vec<u8>>, Option<Vec<u8>>)> = stmt
+                    .query_map([], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)))
+                    .map_err(|e| StorageError::Migration(format!("Query contact crypto: {}", e)))?
+                    .collect::<Result<Vec<_>, _>>()
+                    .map_err(|e| {
+                        StorageError::Migration(format!("Collect contact crypto: {}", e))
+                    })?;
+
+                for (id, cek_enc, vis_enc) in &rows {
+                    if let Some(enc) = cek_enc
+                        && !enc.is_empty()
+                    {
+                        let plain = decrypt(old_key, enc)
+                            .map_err(|e| StorageError::Migration(format!("Decrypt cek: {}", e)))?;
+                        let new_enc = encrypt(&new_key, &plain)
+                            .map_err(|e| StorageError::Migration(format!("Encrypt cek: {}", e)))?;
+                        self.conn
+                            .execute(
+                                "UPDATE contacts SET cek_encrypted = ?1 WHERE id = ?2",
+                                params![new_enc, id],
+                            )
+                            .map_err(|e| StorageError::Migration(format!("Update cek: {}", e)))?;
+                    }
+                    if let Some(enc) = vis_enc
+                        && !enc.is_empty()
+                    {
+                        let plain = decrypt(old_key, enc).map_err(|e| {
+                            StorageError::Migration(format!("Decrypt visibility_rules: {}", e))
+                        })?;
+                        let new_enc = encrypt(&new_key, &plain).map_err(|e| {
+                            StorageError::Migration(format!("Encrypt visibility_rules: {}", e))
+                        })?;
+                        self.conn
+                            .execute(
+                                "UPDATE contacts SET visibility_rules_encrypted = ?1 WHERE id = ?2",
+                                params![new_enc, id],
+                            )
+                            .map_err(|e| {
+                                StorageError::Migration(format!("Update visibility_rules: {}", e))
+                            })?;
+                    }
+                }
+            }
+            report(&mut completed, "contacts_crypto");
+
+            // Re-encrypt identity: password_hash_encrypted, duress_hash_encrypted (nullable)
+            {
+                let result: Result<(i64, Option<Vec<u8>>, Option<Vec<u8>>), _> = self.conn.query_row(
+                    "SELECT id, password_hash_encrypted, duress_hash_encrypted FROM identity WHERE id = 1",
+                    [],
+                    |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+                );
+
+                if let Ok((id, pw_enc, duress_enc)) = result {
+                    if let Some(enc) = pw_enc
+                        && !enc.is_empty()
+                    {
+                        let plain = decrypt(old_key, &enc).map_err(|e| {
+                            StorageError::Migration(format!("Decrypt password_hash: {}", e))
+                        })?;
+                        let new_enc = encrypt(&new_key, &plain).map_err(|e| {
+                            StorageError::Migration(format!("Encrypt password_hash: {}", e))
+                        })?;
+                        self.conn
+                            .execute(
+                                "UPDATE identity SET password_hash_encrypted = ?1 WHERE id = ?2",
+                                params![new_enc, id],
+                            )
+                            .map_err(|e| {
+                                StorageError::Migration(format!("Update password_hash: {}", e))
+                            })?;
+                    }
+                    if let Some(enc) = duress_enc
+                        && !enc.is_empty()
+                    {
+                        let plain = decrypt(old_key, &enc).map_err(|e| {
+                            StorageError::Migration(format!("Decrypt duress_hash: {}", e))
+                        })?;
+                        let new_enc = encrypt(&new_key, &plain).map_err(|e| {
+                            StorageError::Migration(format!("Encrypt duress_hash: {}", e))
+                        })?;
+                        self.conn
+                            .execute(
+                                "UPDATE identity SET duress_hash_encrypted = ?1 WHERE id = ?2",
+                                params![new_enc, id],
+                            )
+                            .map_err(|e| {
+                                StorageError::Migration(format!("Update duress_hash: {}", e))
+                            })?;
+                    }
+                }
+            }
+            report(&mut completed, "identity_passwords");
+
+            // Re-encrypt duress_settings: alert_contact_ids_encrypted, alert_message_encrypted
+            {
+                let result: Result<(Option<Vec<u8>>, Option<Vec<u8>>), _> = self.conn.query_row(
+                    "SELECT alert_contact_ids_encrypted, alert_message_encrypted FROM duress_settings WHERE id = 1",
+                    [],
+                    |row| Ok((row.get(0)?, row.get(1)?)),
+                );
+
+                if let Ok((ids_enc, msg_enc)) = result {
+                    if let Some(enc) = ids_enc
+                        && !enc.is_empty()
+                    {
+                        let plain = decrypt(old_key, &enc).map_err(|e| {
+                            StorageError::Migration(format!("Decrypt duress_ids: {}", e))
+                        })?;
+                        let new_enc = encrypt(&new_key, &plain).map_err(|e| {
+                            StorageError::Migration(format!("Encrypt duress_ids: {}", e))
+                        })?;
+                        self.conn.execute(
+                                "UPDATE duress_settings SET alert_contact_ids_encrypted = ?1 WHERE id = 1",
+                                params![new_enc],
+                            ).map_err(|e| StorageError::Migration(format!("Update duress_ids: {}", e)))?;
+                    }
+                    if let Some(enc) = msg_enc
+                        && !enc.is_empty()
+                    {
+                        let plain = decrypt(old_key, &enc).map_err(|e| {
+                            StorageError::Migration(format!("Decrypt duress_msg: {}", e))
+                        })?;
+                        let new_enc = encrypt(&new_key, &plain).map_err(|e| {
+                            StorageError::Migration(format!("Encrypt duress_msg: {}", e))
+                        })?;
+                        self.conn.execute(
+                                "UPDATE duress_settings SET alert_message_encrypted = ?1 WHERE id = 1",
+                                params![new_enc],
+                            ).map_err(|e| StorageError::Migration(format!("Update duress_msg: {}", e)))?;
+                    }
+                }
+                // Table may not have a row — that's fine, query_row returns Err(QueryReturnedNoRows)
+            }
+            report(&mut completed, "duress_settings");
+
+            // Re-encrypt decoy_contacts: card_encrypted (multi-row)
+            {
+                let mut stmt = self
+                    .conn
+                    .prepare("SELECT id, card_encrypted FROM decoy_contacts")
+                    .map_err(|e| StorageError::Migration(format!("Read decoys: {}", e)))?;
+
+                let rows: Vec<(String, Vec<u8>)> = stmt
+                    .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))
+                    .map_err(|e| StorageError::Migration(format!("Query decoys: {}", e)))?
+                    .collect::<Result<Vec<_>, _>>()
+                    .map_err(|e| StorageError::Migration(format!("Collect decoys: {}", e)))?;
+
+                for (id, enc) in &rows {
+                    let plain = decrypt(old_key, enc)
+                        .map_err(|e| StorageError::Migration(format!("Decrypt decoy: {}", e)))?;
+                    let new_enc = encrypt(&new_key, &plain)
+                        .map_err(|e| StorageError::Migration(format!("Encrypt decoy: {}", e)))?;
+                    self.conn
+                        .execute(
+                            "UPDATE decoy_contacts SET card_encrypted = ?1 WHERE id = ?2",
+                            params![new_enc, id],
+                        )
+                        .map_err(|e| StorageError::Migration(format!("Update decoy: {}", e)))?;
+                }
+            }
+            report(&mut completed, "decoy_contacts");
+
+            // Re-encrypt emergency_config: trusted_contact_ids_encrypted, message_encrypted
+            {
+                let result: Result<(Option<Vec<u8>>, Option<Vec<u8>>), _> = self.conn.query_row(
+                    "SELECT trusted_contact_ids_encrypted, message_encrypted FROM emergency_config WHERE id = 1",
+                    [],
+                    |row| Ok((row.get(0)?, row.get(1)?)),
+                );
+
+                if let Ok((ids_enc, msg_enc)) = result {
+                    if let Some(enc) = ids_enc
+                        && !enc.is_empty()
+                    {
+                        let plain = decrypt(old_key, &enc).map_err(|e| {
+                            StorageError::Migration(format!("Decrypt emergency_ids: {}", e))
+                        })?;
+                        let new_enc = encrypt(&new_key, &plain).map_err(|e| {
+                            StorageError::Migration(format!("Encrypt emergency_ids: {}", e))
+                        })?;
+                        self.conn.execute(
+                                "UPDATE emergency_config SET trusted_contact_ids_encrypted = ?1 WHERE id = 1",
+                                params![new_enc],
+                            ).map_err(|e| StorageError::Migration(format!("Update emergency_ids: {}", e)))?;
+                    }
+                    if let Some(enc) = msg_enc
+                        && !enc.is_empty()
+                    {
+                        let plain = decrypt(old_key, &enc).map_err(|e| {
+                            StorageError::Migration(format!("Decrypt emergency_msg: {}", e))
+                        })?;
+                        let new_enc = encrypt(&new_key, &plain).map_err(|e| {
+                            StorageError::Migration(format!("Encrypt emergency_msg: {}", e))
+                        })?;
+                        self.conn
+                            .execute(
+                                "UPDATE emergency_config SET message_encrypted = ?1 WHERE id = 1",
+                                params![new_enc],
+                            )
+                            .map_err(|e| {
+                                StorageError::Migration(format!("Update emergency_msg: {}", e))
+                            })?;
+                    }
+                }
+            }
+            report(&mut completed, "emergency_config");
+
+            // Re-encrypt recovery_settings: settings_encrypted (singleton)
+            {
+                let result: Result<(Option<Vec<u8>>,), _> = self.conn.query_row(
+                    "SELECT settings_encrypted FROM recovery_settings WHERE id = 1",
+                    [],
+                    |row| Ok((row.get(0)?,)),
+                );
+
+                if let Ok((Some(enc),)) = result
+                    && !enc.is_empty()
+                {
+                    let plain = decrypt(old_key, &enc).map_err(|e| {
+                        StorageError::Migration(format!("Decrypt recovery_settings: {}", e))
+                    })?;
+                    let new_enc = encrypt(&new_key, &plain).map_err(|e| {
+                        StorageError::Migration(format!("Encrypt recovery_settings: {}", e))
+                    })?;
+                    self.conn
+                        .execute(
+                            "UPDATE recovery_settings SET settings_encrypted = ?1 WHERE id = 1",
+                            params![new_enc],
+                        )
+                        .map_err(|e| {
+                            StorageError::Migration(format!("Update recovery_settings: {}", e))
+                        })?;
+                }
+            }
+            report(&mut completed, "recovery_settings");
+
+            // Re-encrypt exchange_states: encrypted_blob (multi-row, crash recovery)
+            {
+                let mut stmt = self
+                    .conn
+                    .prepare("SELECT exchange_id, encrypted_blob FROM exchange_states")
+                    .map_err(|e| StorageError::Migration(format!("Read exchange_states: {}", e)))?;
+
+                let rows: Vec<(String, Vec<u8>)> = stmt
+                    .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))
+                    .map_err(|e| StorageError::Migration(format!("Query exchange_states: {}", e)))?
+                    .collect::<Result<Vec<_>, _>>()
+                    .map_err(|e| {
+                        StorageError::Migration(format!("Collect exchange_states: {}", e))
+                    })?;
+
+                for (id, enc) in &rows {
+                    let plain = decrypt(old_key, enc).map_err(|e| {
+                        StorageError::Migration(format!("Decrypt exchange_state: {}", e))
+                    })?;
+                    let new_enc = encrypt(&new_key, &plain).map_err(|e| {
+                        StorageError::Migration(format!("Encrypt exchange_state: {}", e))
+                    })?;
+                    self.conn
+                        .execute(
+                            "UPDATE exchange_states SET encrypted_blob = ?1 WHERE exchange_id = ?2",
+                            params![new_enc, id],
+                        )
+                        .map_err(|e| {
+                            StorageError::Migration(format!("Update exchange_state: {}", e))
+                        })?;
+                }
+            }
+            report(&mut completed, "exchange_states");
 
             Ok(())
         })();

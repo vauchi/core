@@ -128,6 +128,9 @@ pub use secure::{FileKeyStorage, SecureStorage};
 #[cfg(any(test, feature = "testing"))]
 pub use secure::MemoryKeyStorage;
 
+#[cfg(feature = "testing")]
+pub use rekey::{ENCRYPTED_COLUMNS, REKEY_SKIP_COLUMNS};
+
 #[cfg(feature = "secure-storage")]
 pub use secure::PlatformKeyring;
 

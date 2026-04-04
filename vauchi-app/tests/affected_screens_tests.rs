@@ -8,6 +8,7 @@ use vauchi_app::ui::affected_screens;
 use vauchi_core::api::VauchiEvent;
 use vauchi_core::{ConnectionState, SyncState};
 
+// @internal
 #[test]
 fn contact_events_invalidate_contacts_and_detail() {
     let events = [
@@ -54,6 +55,7 @@ fn contact_events_invalidate_contacts_and_detail() {
     }
 }
 
+// @internal
 #[test]
 fn own_card_updated_invalidates_my_info() {
     let event = VauchiEvent::OwnCardUpdated {
@@ -62,6 +64,7 @@ fn own_card_updated_invalidates_my_info() {
     assert_eq!(affected_screens(&event), vec!["my_info"]);
 }
 
+// @internal
 #[test]
 fn sync_events_invalidate_sync_and_contacts() {
     let events = [
@@ -89,6 +92,7 @@ fn sync_events_invalidate_sync_and_contacts() {
     }
 }
 
+// @internal
 #[test]
 fn delivery_events_invalidate_delivery_status() {
     let events = [
@@ -120,6 +124,7 @@ fn delivery_events_invalidate_delivery_status() {
     }
 }
 
+// @internal
 #[test]
 fn connection_events_invalidate_sync() {
     let events = [
@@ -142,6 +147,7 @@ fn connection_events_invalidate_sync() {
     }
 }
 
+// @internal
 #[test]
 fn incoming_update_invalidates_contacts_and_detail() {
     let event = VauchiEvent::IncomingUpdate {
@@ -150,6 +156,7 @@ fn incoming_update_invalidates_contacts_and_detail() {
     assert_eq!(affected_screens(&event), vec!["contacts", "contact_detail"]);
 }
 
+// @internal
 #[test]
 fn visibility_changed_invalidates_my_info_and_contacts() {
     let event = VauchiEvent::VisibilityChanged {
@@ -159,6 +166,7 @@ fn visibility_changed_invalidates_my_info_and_contacts() {
     assert_eq!(affected_screens(&event), vec!["my_info", "contacts"]);
 }
 
+// @internal
 #[test]
 fn emergency_events_invalidate_contacts() {
     let events = [
@@ -184,6 +192,7 @@ fn emergency_events_invalidate_contacts() {
     }
 }
 
+// @internal
 #[test]
 fn non_screen_events_return_empty() {
     let events = [

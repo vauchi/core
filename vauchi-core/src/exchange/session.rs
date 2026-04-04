@@ -166,10 +166,10 @@ pub struct ExchangeSession {
     /// Pending commands to be sent to the frontend (ADR-031).
     /// Populated by `apply_hardware_event()` and drained by `drain_commands()`.
     pending_commands: Vec<ExchangeCommand>,
-    /// Our reciprocity confirmation token (derived in key agreement).
-    our_confirmation_token: Option<[u8; 32]>,
-    /// Token we expect from the peer (derived in key agreement).
-    expected_their_token: Option<[u8; 32]>,
+    /// Our reciprocity confirmation token (derived in key agreement, zeroized on drop).
+    our_confirmation_token: Option<zeroize::Zeroizing<[u8; 32]>>,
+    /// Token we expect from the peer (derived in key agreement, zeroized on drop).
+    expected_their_token: Option<zeroize::Zeroizing<[u8; 32]>>,
     /// Confirmation escrow gate hash (derived in key agreement).
     confirmation_gate_hash: Option<String>,
     /// Our confirmation escrow slot hash.
@@ -628,12 +628,12 @@ impl ExchangeSession {
 
     /// Our reciprocity confirmation token, if key agreement has been performed.
     pub fn our_confirmation_token(&self) -> Option<&[u8; 32]> {
-        self.our_confirmation_token.as_ref()
+        self.our_confirmation_token.as_deref()
     }
 
     /// The token we expect from the peer, if key agreement has been performed.
     pub fn expected_their_token(&self) -> Option<&[u8; 32]> {
-        self.expected_their_token.as_ref()
+        self.expected_their_token.as_deref()
     }
 
     /// Confirmation escrow identifiers (gate, our_slot, their_slot).
@@ -1136,8 +1136,8 @@ impl ExchangeSession {
         .concat();
         let our_confirm = HKDF::derive_key(None, &*shared_bytes, &our_confirm_info);
         let their_confirm = HKDF::derive_key(None, &*shared_bytes, &their_confirm_info);
-        self.our_confirmation_token = Some(*our_confirm);
-        self.expected_their_token = Some(*their_confirm);
+        self.our_confirmation_token = Some(our_confirm);
+        self.expected_their_token = Some(their_confirm);
 
         // Derive confirmation escrow keys (design spec §3.5).
         // Role: smaller identity key = Initiator.

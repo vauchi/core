@@ -136,24 +136,61 @@ fn contact_list_select_opens_contact() {
     }
 }
 
+// @scenario: onboarding.feature - Empty state with guidance
 #[test]
-fn contact_list_empty_has_no_contacts() {
+fn contact_list_empty_shows_guidance() {
     let engine = ContactListEngine::new(vec![]);
     let screen = engine.current_screen();
 
-    let contacts = extract_contacts(&screen);
-    assert!(contacts.is_empty(), "Empty engine should have no contacts");
-
-    // Verify searchable is still true
-    match &screen.components[0] {
-        Component::ContactList { searchable, .. } => {
-            assert!(
-                searchable,
-                "ContactList should be searchable even when empty"
-            );
+    // Empty list should show InfoPanel, not ContactList
+    let info = screen
+        .components
+        .iter()
+        .find(|c| matches!(c, Component::InfoPanel { .. }));
+    assert!(
+        info.is_some(),
+        "Empty contacts should show InfoPanel guidance, got: {:?}",
+        screen.components
+    );
+    match info.unwrap() {
+        Component::InfoPanel {
+            id, title, items, ..
+        } => {
+            assert_eq!(id, "empty_state");
+            assert!(!title.is_empty(), "InfoPanel should have a title");
+            assert!(!items.is_empty(), "InfoPanel should have guidance items");
         }
-        _ => panic!("Expected ContactList component"),
+        _ => unreachable!(),
     }
+
+    // Should also have an exchange action
+    let exchange_action = screen.actions.iter().find(|a| a.id == "go_exchange");
+    assert!(
+        exchange_action.is_some(),
+        "Empty contacts should have a 'go exchange' action"
+    );
+}
+
+// @scenario: onboarding.feature - Search with no results still shows ContactList
+#[test]
+fn contact_list_search_no_results_shows_empty_list_not_guidance() {
+    let mut engine = ContactListEngine::new(sample_contacts());
+    let _ = engine.handle_action(UserAction::SearchChanged {
+        component_id: "contacts".into(),
+        query: "nonexistent".into(),
+    });
+    let screen = engine.current_screen();
+
+    // Search with no results should show empty ContactList (not InfoPanel)
+    // because the user is actively searching — guidance would be confusing
+    let has_contact_list = screen
+        .components
+        .iter()
+        .any(|c| matches!(c, Component::ContactList { .. }));
+    assert!(
+        has_contact_list,
+        "Search with no results should show ContactList, not InfoPanel"
+    );
 }
 
 // --- Field search tests ---

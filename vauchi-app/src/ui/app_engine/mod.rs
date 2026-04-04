@@ -377,6 +377,16 @@ impl WorkflowEngine for AppEngine {
             }
         }
 
+        // "Go exchange" from empty contacts list → navigate to Exchange screen
+        if matches!(
+            &action,
+            UserAction::ActionPressed { action_id } if action_id == "go_exchange"
+        ) && self.screen == AppScreen::Contacts
+        {
+            let screen = self.navigate_to(AppScreen::Exchange);
+            return ActionResult::NavigateTo(screen);
+        }
+
         if let Some(result) = self.handle_undo(&action) {
             return result;
         }

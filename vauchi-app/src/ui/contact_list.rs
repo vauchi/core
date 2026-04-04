@@ -111,15 +111,46 @@ impl WorkflowEngine for ContactListEngine {
             });
         }
 
+        // Empty state: when the user has no contacts at all (not just
+        // empty search results), show guidance encouraging first exchange.
+        let filtered = self.filtered_contacts();
+        let components = if self.all_contacts.is_empty() {
+            vec![Component::InfoPanel {
+                id: "empty_state".into(),
+                icon: Some("people".into()),
+                title: "No contacts yet".into(),
+                items: vec![InfoItem {
+                    icon: Some("exchange".into()),
+                    title: "Exchange cards in person".into(),
+                    detail: "Meet someone nearby and share your contact card securely.".into(),
+                }],
+            }]
+        } else {
+            vec![Component::ContactList {
+                id: "contacts".into(),
+                contacts: filtered,
+                searchable: true,
+            }]
+        };
+
+        // Add exchange shortcut when empty
+        if self.all_contacts.is_empty() {
+            actions.insert(
+                0,
+                ScreenAction {
+                    id: "go_exchange".into(),
+                    label: "Exchange Now".into(),
+                    style: ActionStyle::Primary,
+                    enabled: true,
+                },
+            );
+        }
+
         ScreenModel {
             screen_id: "contact_list".into(),
             title: "Contacts".into(),
             subtitle: None,
-            components: vec![Component::ContactList {
-                id: "contacts".into(),
-                contacts: self.filtered_contacts(),
-                searchable: true,
-            }],
+            components,
             actions,
             progress: None,
             ..Default::default()

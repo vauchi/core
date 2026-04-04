@@ -284,12 +284,20 @@ impl PlatformAppEngine {
     /// (sync, delivery receipts, device link) change data that affects
     /// rendered screens. Replaces any previously registered listener.
     ///
+    /// # Threading — IMPORTANT
+    ///
+    /// The callback may fire **on the same thread** that called
+    /// `handle_action_json` (synchronous event dispatch). The callback
+    /// **must not** call back into `PlatformAppEngine` methods directly —
+    /// doing so would deadlock on the internal Mutex. Always dispatch
+    /// to a separate queue/thread before touching the engine.
+    ///
     /// # Usage from Swift
     ///
     /// ```swift
     /// class MyListener: PlatformEventListener {
     ///     func onScreensInvalidated(screenIds: [String]) {
-    ///         DispatchQueue.main.async {
+    ///         DispatchQueue.main.async {  // REQUIRED — never call engine synchronously
     ///             for id in screenIds {
     ///                 try? engine.invalidateScreenJson(screenJson: "\"\(id)\"")
     ///             }
@@ -298,6 +306,22 @@ impl PlatformAppEngine {
     ///     }
     /// }
     /// try engine.setEventListener(listener: MyListener())
+    /// ```
+    ///
+    /// # Usage from Kotlin
+    ///
+    /// ```kotlin
+    /// class MyListener : PlatformEventListener {
+    ///     override fun onScreensInvalidated(screenIds: List<String>) {
+    ///         viewModelScope.launch {  // REQUIRED — never call engine synchronously
+    ///             for (id in screenIds) {
+    ///                 engine.invalidateScreenJson("\"$id\"")
+    ///             }
+    ///             reloadCurrentScreen()
+    ///         }
+    ///     }
+    /// }
+    /// engine.setEventListener(MyListener())
     /// ```
     pub fn set_event_listener(
         &self,

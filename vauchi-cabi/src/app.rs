@@ -504,6 +504,14 @@ pub type VauchiEventCallback =
 /// device link) change data that affects rendered screens. Pass null
 /// to unregister. `user_data` is forwarded to each callback invocation.
 ///
+/// # Threading — IMPORTANT
+///
+/// The callback may fire **on the same thread** that called
+/// `vauchi_app_handle_action` (synchronous event dispatch). The callback
+/// **must not** call back into any `vauchi_app_*` function directly —
+/// doing so would deadlock on the internal Mutex. Always defer
+/// processing to a separate thread or event loop iteration.
+///
 /// # Safety
 /// `handle` must be a valid `VauchiApp` pointer. `callback` (if non-null)
 /// must be safe to call from any thread. `user_data` must remain valid

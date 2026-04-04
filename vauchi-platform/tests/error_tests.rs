@@ -17,9 +17,10 @@ fn test_storage_error_conversion() {
         msg.contains("Storage error"),
         "Should be StorageError variant, got: {msg}"
     );
+    // F9 audit fix: user_message() strips internal details — only generic message survives
     assert!(
-        msg.contains("test record"),
-        "Should preserve error message, got: {msg}"
+        msg.contains("storage error occurred"),
+        "Should use sanitized user message, got: {msg}"
     );
 }
 

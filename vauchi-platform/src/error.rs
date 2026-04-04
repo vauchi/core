@@ -107,7 +107,8 @@ impl From<vauchi_core::network::NetworkError> for MobileError {
 
 impl From<vauchi_core::StorageError> for MobileError {
     fn from(err: vauchi_core::StorageError) -> Self {
-        MobileError::StorageError(err.to_string())
+        // Use user_message() to strip internal details (F9 audit fix)
+        MobileError::StorageError(err.user_message().to_string())
     }
 }
 
@@ -115,7 +116,9 @@ impl From<vauchi_core::VauchiError> for MobileError {
     fn from(err: vauchi_core::VauchiError) -> Self {
         match err {
             vauchi_core::VauchiError::ContactNotFound(id) => MobileError::ContactNotFound(id),
-            vauchi_core::VauchiError::Storage(e) => MobileError::StorageError(e.to_string()),
+            vauchi_core::VauchiError::Storage(e) => {
+                MobileError::StorageError(e.user_message().to_string())
+            }
             other => MobileError::Internal(other.to_string()),
         }
     }

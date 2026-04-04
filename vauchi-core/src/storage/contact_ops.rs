@@ -27,10 +27,7 @@ impl Storage {
         )?;
 
         if rows_affected == 0 {
-            return Err(StorageError::NotFound(format!(
-                "Contact not found: {}",
-                contact_id
-            )));
+            return Err(StorageError::NotFound("Contact not found".to_string()));
         }
 
         Ok(())
@@ -57,10 +54,9 @@ impl Storage {
                 Ok(Some(plain))
             }
             Ok(None) => Ok(None),
-            Err(rusqlite::Error::QueryReturnedNoRows) => Err(StorageError::NotFound(format!(
-                "Contact not found: {}",
-                contact_id
-            ))),
+            Err(rusqlite::Error::QueryReturnedNoRows) => {
+                Err(StorageError::NotFound("Contact not found".to_string()))
+            }
             Err(e) => Err(StorageError::Database(e)),
         }
     }
@@ -75,10 +71,7 @@ impl Storage {
         )?;
 
         if rows_affected == 0 {
-            return Err(StorageError::NotFound(format!(
-                "Contact not found: {}",
-                contact_id
-            )));
+            return Err(StorageError::NotFound("Contact not found".to_string()));
         }
 
         Ok(())
@@ -263,10 +256,7 @@ impl Storage {
         )?;
 
         if rows_affected == 0 {
-            return Err(StorageError::NotFound(format!(
-                "Contact not found: {}",
-                contact_id
-            )));
+            return Err(StorageError::NotFound("Contact not found".to_string()));
         }
 
         Ok(())
@@ -293,10 +283,9 @@ impl Storage {
                 Ok(Some(ContentEncryptionKey::from_bytes(cek_array)))
             }
             Ok(None) => Ok(None),
-            Err(rusqlite::Error::QueryReturnedNoRows) => Err(StorageError::NotFound(format!(
-                "Contact not found: {}",
-                contact_id
-            ))),
+            Err(rusqlite::Error::QueryReturnedNoRows) => {
+                Err(StorageError::NotFound("Contact not found".to_string()))
+            }
             Err(e) => Err(StorageError::Database(e)),
         }
     }
@@ -326,7 +315,7 @@ impl Storage {
             )
             .map_err(|e| match e {
                 rusqlite::Error::QueryReturnedNoRows => {
-                    StorageError::NotFound(format!("Contact: {}", contact_id))
+                    StorageError::NotFound("Contact not found".to_string())
                 }
                 other => StorageError::Database(other),
             })?;
@@ -355,7 +344,7 @@ impl Storage {
             )
             .map_err(|e| match e {
                 rusqlite::Error::QueryReturnedNoRows => {
-                    StorageError::NotFound(format!("Contact: {}", contact_id))
+                    StorageError::NotFound("Contact not found".to_string())
                 }
                 other => StorageError::Database(other),
             })?;

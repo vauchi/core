@@ -244,7 +244,7 @@ impl Storage {
             .execute("DELETE FROM visibility_labels WHERE id = ?1", [label_id])?;
 
         if changes == 0 {
-            return Err(StorageError::NotFound(format!("Label: {}", label_id)));
+            return Err(StorageError::NotFound("Label not found".to_string()));
         }
 
         Ok(())
@@ -409,7 +409,9 @@ impl Storage {
         )?;
 
         if existing > 0 {
-            return Err(StorageError::AlreadyExists(format!("Label: {}", name)));
+            return Err(StorageError::AlreadyExists(
+                "Label with this name already exists".to_string(),
+            ));
         }
 
         // Check max labels
@@ -478,7 +480,7 @@ impl Storage {
         )?;
 
         if changes == 0 {
-            return Err(StorageError::NotFound(format!("Label: {}", label_id)));
+            return Err(StorageError::NotFound("Label not found".to_string()));
         }
 
         Ok(())

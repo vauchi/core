@@ -156,7 +156,7 @@ impl Storage {
             )
             .map_err(|e| match e {
                 rusqlite::Error::QueryReturnedNoRows => {
-                    StorageError::NotFound(format!("local_group:{}", group_id))
+                    StorageError::NotFound("Local group not found".to_string())
                 }
                 other => StorageError::from(other),
             })?;

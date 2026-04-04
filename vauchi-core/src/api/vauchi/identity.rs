@@ -13,6 +13,7 @@ use crate::storage::SecureStorage;
 
 use super::super::contact_manager::ContactManager;
 use super::super::error::{VauchiError, VauchiResult};
+use super::super::events::VauchiEvent;
 use super::{SMK_KEY_NAME, Vauchi};
 
 impl Vauchi {
@@ -244,9 +245,16 @@ impl Vauchi {
             .storage
             .load_own_card()?
             .unwrap_or_else(|| ContactCard::new(name));
+        let old_name = card.display_name().to_string();
         card.set_display_name(name)
             .map_err(|e| VauchiError::InvalidState(e.to_string()))?;
         self.storage.save_own_card(&card)?;
+
+        if old_name != name {
+            self.events.dispatch(VauchiEvent::OwnCardUpdated {
+                changed_fields: vec!["display_name".into()],
+            });
+        }
 
         Ok(())
     }

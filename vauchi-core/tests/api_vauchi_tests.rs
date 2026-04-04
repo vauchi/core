@@ -527,6 +527,66 @@ fn test_update_display_name() {
     );
 }
 
+// @scenario: identity.feature - Display name change dispatches OwnCardUpdated event
+#[test]
+fn test_update_display_name_dispatches_event() {
+    let mut wb = create_test_vauchi();
+    wb.create_identity("Alice").unwrap();
+
+    let events: std::sync::Arc<std::sync::Mutex<Vec<VauchiEvent>>> =
+        std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+    let events_clone = events.clone();
+    wb.add_event_handler(std::sync::Arc::new(move |event: VauchiEvent| {
+        events_clone.lock().unwrap().push(event);
+    }));
+
+    wb.update_display_name("Alice Smith").unwrap();
+
+    let captured = events.lock().unwrap();
+    let card_events: Vec<_> = captured
+        .iter()
+        .filter(|e| matches!(e, VauchiEvent::OwnCardUpdated { .. }))
+        .collect();
+    assert_eq!(
+        card_events.len(),
+        1,
+        "expected exactly one OwnCardUpdated event, got: {card_events:?}"
+    );
+    match &card_events[0] {
+        VauchiEvent::OwnCardUpdated { changed_fields } => {
+            assert_eq!(changed_fields, &["display_name"]);
+        }
+        _ => unreachable!(),
+    }
+}
+
+// @scenario: identity.feature - Same display name does not dispatch event
+#[test]
+fn test_update_display_name_same_value_no_event() {
+    let mut wb = create_test_vauchi();
+    wb.create_identity("Alice").unwrap();
+
+    let events: std::sync::Arc<std::sync::Mutex<Vec<VauchiEvent>>> =
+        std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+    let events_clone = events.clone();
+    wb.add_event_handler(std::sync::Arc::new(move |event: VauchiEvent| {
+        events_clone.lock().unwrap().push(event);
+    }));
+
+    // Update to same name — no event should fire
+    wb.update_display_name("Alice").unwrap();
+
+    let captured = events.lock().unwrap();
+    let card_events: Vec<_> = captured
+        .iter()
+        .filter(|e| matches!(e, VauchiEvent::OwnCardUpdated { .. }))
+        .collect();
+    assert!(
+        card_events.is_empty(),
+        "no event expected for same name, got: {card_events:?}"
+    );
+}
+
 #[test]
 fn test_update_display_name_empty_fails() {
     let mut wb = create_test_vauchi();

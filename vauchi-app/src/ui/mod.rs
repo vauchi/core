@@ -41,6 +41,7 @@ mod more;
 mod my_info;
 mod my_info_entry_detail;
 mod onboarding;
+pub mod reciprocity_confirmer;
 mod recovery_status;
 mod screen;
 mod settings;

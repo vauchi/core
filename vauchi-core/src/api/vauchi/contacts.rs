@@ -612,4 +612,29 @@ impl Vauchi {
         }
         Ok(count)
     }
+
+    /// Expire pending reciprocity confirmations older than 7 days.
+    ///
+    /// Called at startup / session-init to persist the passive timer's
+    /// read-time `Pending → Unreciprocated` transition into storage.
+    /// Returns the number of contacts transitioned.
+    pub fn expire_pending_reciprocity(&self) -> VauchiResult<usize> {
+        use crate::exchange::reciprocity::Reciprocity;
+
+        let pending = self.storage.list_contacts_by_reciprocity("pending")?;
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
+        let mut count = 0;
+        for mut contact in pending {
+            let ts = contact.exchange_timestamp().unwrap_or(0);
+            if now > ts + 7 * 24 * 60 * 60 {
+                contact.set_reciprocity(Reciprocity::Unreciprocated);
+                self.storage.save_contact(&contact)?;
+                count += 1;
+            }
+        }
+        Ok(count)
+    }
 }

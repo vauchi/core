@@ -667,4 +667,105 @@ impl Storage {
             Err(e) => Err(StorageError::Database(e)),
         }
     }
+
+    /// List contacts with a specific reciprocity status (e.g., "pending").
+    ///
+    /// Used by the relaunch recovery scan to find contacts whose
+    /// reciprocity confirmation cascade should be resumed or expired.
+    pub fn list_contacts_by_reciprocity(
+        &self,
+        reciprocity: &str,
+    ) -> Result<Vec<Contact>, StorageError> {
+        let mut stmt = self.conn.prepare(
+            "SELECT id, public_key, display_name, card_encrypted, shared_key_encrypted,
+                    visibility_rules_json, visibility_rules_encrypted, exchange_timestamp,
+                    fingerprint_verified, blocked, hidden, favorite, recovery_trusted,
+                    proposal_trusted, cek_encrypted, exchange_transport, has_recovered,
+                    card_updated_at, relay_url, relay_noise_pubkey, trust_metrics,
+                    contact_kind, import_source, imported_at, original_uid,
+                    deleted_at, archived, archived_at,
+                    reciprocity, confirmation_channel
+             FROM contacts
+             WHERE reciprocity = ?1 AND deleted_at IS NULL",
+        )?;
+
+        let rows = stmt.query_map(params![reciprocity], |row| {
+            Ok(ContactRow {
+                id: row.get(0)?,
+                public_key: row.get(1)?,
+                display_name: row.get(2)?,
+                card_encrypted: row.get(3)?,
+                shared_key_encrypted: row.get(4)?,
+                visibility_rules_json: row.get(5)?,
+                visibility_rules_encrypted: row.get(6)?,
+                exchange_timestamp: row.get(7)?,
+                fingerprint_verified: row.get(8)?,
+                blocked: row.get(9)?,
+                hidden: row.get(10)?,
+                favorite: row.get(11)?,
+                recovery_trusted: row.get(12)?,
+                proposal_trusted: row.get(13)?,
+                cek_encrypted: row.get(14)?,
+                exchange_transport: row.get(15)?,
+                has_recovered: row.get(16)?,
+                card_updated_at: row.get(17)?,
+                relay_url: row.get(18)?,
+                relay_noise_pubkey: row.get(19)?,
+                trust_metrics: row.get(20)?,
+                contact_kind: row.get(21)?,
+                import_source: row.get(22)?,
+                imported_at: row.get(23)?,
+                original_uid: row.get(24)?,
+                deleted_at: row.get(25)?,
+                archived: row.get(26)?,
+                archived_at: row.get(27)?,
+                reciprocity: row.get(28)?,
+                confirmation_channel: row.get(29)?,
+            })
+        })?;
+
+        let mut contacts = Vec::new();
+        for row_result in rows {
+            let row = row_result?;
+            contacts.push(self.row_to_contact(row)?);
+        }
+        Ok(contacts)
+    }
+
+    /// Save encrypted confirmation state for crash recovery (design spec §5.1).
+    pub fn update_confirmation_state(
+        &self,
+        contact_id: &str,
+        state_bytes: &[u8],
+    ) -> Result<(), StorageError> {
+        let encrypted = crate::crypto::encrypt(&self.encryption_key, state_bytes)
+            .map_err(|e| StorageError::Encryption(e.to_string()))?;
+        self.conn.execute(
+            "UPDATE contacts SET confirmation_state = ?1 WHERE id = ?2",
+            params![encrypted, contact_id],
+        )?;
+        Ok(())
+    }
+
+    /// Load and decrypt confirmation state for crash recovery.
+    pub fn load_confirmation_state(
+        &self,
+        contact_id: &str,
+    ) -> Result<Option<Vec<u8>>, StorageError> {
+        let result: Result<Option<Vec<u8>>, _> = self.conn.query_row(
+            "SELECT confirmation_state FROM contacts WHERE id = ?1",
+            params![contact_id],
+            |row| row.get(0),
+        );
+        match result {
+            Ok(Some(encrypted)) => {
+                let decrypted = crate::crypto::decrypt(&self.encryption_key, &encrypted)
+                    .map_err(|e| StorageError::Encryption(e.to_string()))?;
+                Ok(Some(decrypted))
+            }
+            Ok(None) => Ok(None),
+            Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+            Err(e) => Err(StorageError::Database(e)),
+        }
+    }
 }

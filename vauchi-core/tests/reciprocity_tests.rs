@@ -111,6 +111,79 @@ fn reciprocity_storage_null_defaults_to_unknown() {
     assert_eq!(loaded.confirmation_channel(), None);
 }
 
+// ── Stretch: storage query + confirmation_state persistence ──
+
+#[test]
+fn list_contacts_by_reciprocity_filters_correctly() {
+    let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
+
+    let mut c1 = make_contact_with_timestamp(1000);
+    c1.set_reciprocity(Reciprocity::Pending);
+    storage.save_contact(&c1).unwrap();
+
+    let mut c2 = Contact::from_sync_data(
+        [2u8; 32],
+        ContactCard::new("Bob"),
+        SymmetricKey::generate(),
+        1000,
+        false,
+        VisibilityRules::new(),
+    );
+    c2.set_reciprocity(Reciprocity::Confirmed);
+    storage.save_contact(&c2).unwrap();
+
+    let pending = storage.list_contacts_by_reciprocity("pending").unwrap();
+    assert_eq!(pending.len(), 1);
+    assert_eq!(pending[0].display_name(), "Alice");
+
+    let confirmed = storage.list_contacts_by_reciprocity("confirmed").unwrap();
+    assert_eq!(confirmed.len(), 1);
+    assert_eq!(confirmed[0].display_name(), "Bob");
+
+    let empty = storage.list_contacts_by_reciprocity("unknown").unwrap();
+    assert!(empty.is_empty());
+}
+
+#[test]
+fn confirmation_state_persistence_roundtrip() {
+    use vauchi_app::ui::reciprocity_confirmer::ConfirmationState;
+
+    let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
+    let contact = make_test_contact();
+    let id = contact.id().to_string();
+    storage.save_contact(&contact).unwrap();
+
+    let state = ConfirmationState {
+        our_token: [0xAA; 32],
+        expected_their_token: [0xBB; 32],
+        gate_hash: "gate123".to_string(),
+        our_slot: "slot_a".to_string(),
+        their_slot: "slot_b".to_string(),
+        deposit_sent: true,
+    };
+    let state_bytes = serde_json::to_vec(&state).unwrap();
+    storage
+        .update_confirmation_state(&id, &state_bytes)
+        .unwrap();
+
+    let loaded_bytes = storage.load_confirmation_state(&id).unwrap().unwrap();
+    let loaded: ConfirmationState = serde_json::from_slice(&loaded_bytes).unwrap();
+    assert_eq!(loaded.our_token, [0xAA; 32]);
+    assert_eq!(loaded.gate_hash, "gate123");
+    assert!(loaded.deposit_sent);
+}
+
+#[test]
+fn confirmation_state_none_for_new_contact() {
+    let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
+    let contact = make_test_contact();
+    let id = contact.id().to_string();
+    storage.save_contact(&contact).unwrap();
+
+    let loaded = storage.load_confirmation_state(&id).unwrap();
+    assert!(loaded.is_none());
+}
+
 // ── Task 4: Confirmation escrow key derivation ──
 
 use vauchi_core::exchange::confirmation_escrow::ConfirmationEscrowKeys;

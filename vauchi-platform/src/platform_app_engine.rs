@@ -135,7 +135,10 @@ impl PlatformAppEngine {
     /// Handles a user action (as JSON) and returns the result as JSON.
     ///
     /// The action JSON must match the `UserAction` enum format.
-    /// The result JSON matches the `ActionResult` enum.
+    /// The result JSON matches the `ActionResult` enum. Note:
+    /// `ValidationError` is never returned — validation errors are
+    /// resolved into `UpdateScreen` with the error injected into the
+    /// matching component's `validation_error` field.
     pub fn handle_action_json(&self, action_json: String) -> Result<String, MobileError> {
         let action = user_action_from_json(&action_json)?;
         let mut engine = self

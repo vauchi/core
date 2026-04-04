@@ -77,7 +77,7 @@ impl ScreenModel {
     }
 
     /// Return a copy with `validation_error` set on the component matching
-    /// `component_id`. Works for `TextInput` and `PinInput` components.
+    /// `component_id`. Works for `TextInput`, `PinInput`, and `EditableText`.
     ///
     /// If no matching component is found, the screen is returned unchanged.
     /// This allows `AppEngine` to convert `ActionResult::ValidationError`
@@ -95,6 +95,14 @@ impl ScreenModel {
                     return self;
                 }
                 Component::PinInput {
+                    id,
+                    validation_error,
+                    ..
+                } if id == component_id => {
+                    *validation_error = Some(message);
+                    return self;
+                }
+                Component::EditableText {
                     id,
                     validation_error,
                     ..

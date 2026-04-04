@@ -374,6 +374,12 @@ impl HttpTransport {
     /// The relay pads all OHTTP responses to bucket sizes before encryption
     /// (relay/src/http_api.rs). This reverses that padding before JSON parsing.
     fn parse_padded_ohttp_response(padded: &[u8]) -> Result<V2Response, NetworkError> {
+        if !crate::crypto::padding::is_valid_bucket_size(padded.len()) {
+            return Err(NetworkError::InvalidMessage(format!(
+                "OHTTP response has non-bucket size {} — possible relay bug or tampering",
+                padded.len()
+            )));
+        }
         let unpadded = crate::crypto::padding::unpad(padded).ok_or_else(|| {
             NetworkError::InvalidMessage("invalid padding in OHTTP response".into())
         })?;

@@ -499,5 +499,17 @@ name = "storage_anti_pattern_tests"
 required-features = ["testing"]
 
 [[test]]
+name = "reciprocity_tests"
+required-features = ["testing"]
+
+[[test]]
+name = "reciprocity_sync_tests"
+required-features = ["testing"]
+
+[[test]]
+name = "exchange_reciprocity_integration_tests"
+required-features = ["testing"]
+
+[[test]]
 name = "schema_gen"
 required-features = ["schema-gen"]

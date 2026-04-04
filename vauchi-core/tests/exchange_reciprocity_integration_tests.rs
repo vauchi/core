@@ -6,8 +6,7 @@
 //! confirmation tokens (HKDF derivation symmetry).
 
 use vauchi_core::contact_card::ContactCard;
-use vauchi_core::exchange::proximity::MockProximityVerifier;
-use vauchi_core::exchange::session::{ExchangeEvent, ExchangeSession};
+use vauchi_core::exchange::{ExchangeEvent, ExchangeSession, MockProximityVerifier};
 use vauchi_core::identity::Identity;
 
 /// Drives two sessions through a full mutual QR exchange up to key agreement.

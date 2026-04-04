@@ -277,8 +277,7 @@ fn confirmed_not_affected_by_timer() {
 
 // ── Task 5: Token derivation in key agreement ──
 
-use vauchi_core::exchange::proximity::MockProximityVerifier;
-use vauchi_core::exchange::session::{ExchangeEvent, ExchangeSession};
+use vauchi_core::exchange::{ExchangeEvent, ExchangeSession, MockProximityVerifier};
 use vauchi_core::identity::Identity;
 
 #[test]

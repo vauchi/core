@@ -1584,12 +1584,9 @@ fn migrate_v23_encrypt_label_names(
 ) -> Result<(), StorageError> {
     use crate::crypto::HKDF;
 
-    // Add new columns
-    conn.execute_batch(
-        "ALTER TABLE visibility_labels ADD COLUMN name_encrypted BLOB;
-         ALTER TABLE visibility_labels ADD COLUMN name_hmac BLOB;",
-    )
-    .map_err(|e| StorageError::Migration(format!("Add label name columns: {}", e)))?;
+    // Add new columns (idempotent for crash recovery — F1 audit fix)
+    add_column_if_not_exists(conn, "visibility_labels", "name_encrypted", "BLOB")?;
+    add_column_if_not_exists(conn, "visibility_labels", "name_hmac", "BLOB")?;
 
     // Derive HMAC key for label name lookups
     let hmac_key_bytes = HKDF::derive_key(None, key.as_bytes(), b"Vauchi_Label_Name_HMAC_v1");
@@ -1670,10 +1667,21 @@ fn migrate_v24_per_contact_ratchet_keys(
         let derived_bytes = HKDF::derive_key(None, key.as_bytes(), &info);
         let derived_key = SymmetricKey::from_bytes(*derived_bytes);
 
-        // Re-encrypt with per-contact key
+        // Re-encrypt with per-contact key + roundtrip verify (F2 audit fix)
         let re_encrypted = crate::crypto::encrypt(&derived_key, &plaintext).map_err(|e| {
             StorageError::Migration(format!("Re-encrypt ratchet {}: {}", contact_id, e))
         })?;
+        let verify = crate::crypto::decrypt(&derived_key, &re_encrypted).map_err(|e| {
+            StorageError::Migration(format!("Verify ratchet {}: {}", contact_id, e))
+        })?;
+        if verify != plaintext {
+            return Err(StorageError::Migration(format!(
+                "Ratchet roundtrip mismatch for {} ({} vs {} bytes)",
+                contact_id,
+                verify.len(),
+                plaintext.len(),
+            )));
+        }
 
         conn.execute(
             "UPDATE contact_ratchets SET ratchet_state_encrypted = ?1 WHERE contact_id = ?2",

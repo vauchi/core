@@ -29,9 +29,17 @@ fn collect_source_files(dir: &Path, files: &mut Vec<std::path::PathBuf>) {
 }
 
 fn source_files() -> Vec<std::path::PathBuf> {
-    let src = Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
+    let workspace = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .expect("workspace root");
     let mut files = Vec::new();
-    collect_source_files(&src, &mut files);
+    // Scan all three crates (vauchi-core, vauchi-platform, vauchi-cabi)
+    for crate_name in &["vauchi-core", "vauchi-platform", "vauchi-cabi"] {
+        let src = workspace.join(crate_name).join("src");
+        if src.exists() {
+            collect_source_files(&src, &mut files);
+        }
+    }
     files
 }
 

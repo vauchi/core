@@ -76,11 +76,11 @@ fn run_qr_exchange(
         .unwrap();
 
     let alice_contact = match alice_session.state() {
-        ExchangeState::Complete { contact } => contact.clone(),
+        ExchangeState::Complete { contact } => *contact.clone(),
         other => panic!("Expected Complete state, got {:?}", other),
     };
     let bob_contact = match bob_session.state() {
-        ExchangeState::Complete { contact } => contact.clone(),
+        ExchangeState::Complete { contact } => *contact.clone(),
         other => panic!("Expected Complete state, got {:?}", other),
     };
 

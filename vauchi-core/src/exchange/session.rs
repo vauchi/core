@@ -64,7 +64,7 @@ pub enum ExchangeState {
         device_id: String,
     },
     /// Exchange completed successfully
-    Complete { contact: Contact },
+    Complete { contact: Box<Contact> },
     /// Exchange failed
     Failed { error: ExchangeError },
 }
@@ -998,7 +998,7 @@ impl ExchangeSession {
         contact.set_trust_metrics(Some(self.build_trust_metrics()));
 
         self.state = ExchangeState::Complete {
-            contact: contact.clone(),
+            contact: Box::new(contact.clone()),
         };
         self.debug_event(ExchangeDebugEvent::ExchangeCompleted);
         Ok(())
@@ -1130,7 +1130,7 @@ impl ExchangeSession {
         contact.set_trust_metrics(Some(self.build_trust_metrics()));
 
         self.state = ExchangeState::Complete {
-            contact: contact.clone(),
+            contact: Box::new(contact.clone()),
         };
         self.debug_event(ExchangeDebugEvent::ExchangeCompleted);
 

@@ -49,7 +49,7 @@ fn run_full_qr_exchange_with_mock() -> Contact {
         .unwrap();
 
     match bob_session.state() {
-        ExchangeState::Complete { contact } => contact.clone(),
+        ExchangeState::Complete { contact } => *contact.clone(),
         other => panic!("Expected Complete state, got {:?}", other),
     }
 }
@@ -86,7 +86,7 @@ fn run_full_qr_exchange_with_verifier_chain() -> Contact {
         .unwrap();
 
     match bob_session.state() {
-        ExchangeState::Complete { contact } => contact.clone(),
+        ExchangeState::Complete { contact } => *contact.clone(),
         other => panic!("Expected Complete state, got {:?}", other),
     }
 }
@@ -295,11 +295,11 @@ fn test_mutual_qr_exchange_both_sides_have_trust_metrics() {
         .unwrap();
 
     let alice_contact = match alice_session.state() {
-        ExchangeState::Complete { contact } => contact.clone(),
+        ExchangeState::Complete { contact } => *contact.clone(),
         other => panic!("Expected Complete for Alice, got {:?}", other),
     };
     let bob_contact = match bob_session.state() {
-        ExchangeState::Complete { contact } => contact.clone(),
+        ExchangeState::Complete { contact } => *contact.clone(),
         other => panic!("Expected Complete for Bob, got {:?}", other),
     };
 

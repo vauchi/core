@@ -236,7 +236,7 @@ impl MobileExchangeSession {
     pub fn extract_contact(&self) -> Result<Contact, MobileError> {
         let inner = lock_or(&self.inner)?;
         match inner.state() {
-            ExchangeState::Complete { contact } => Ok(contact.clone()),
+            ExchangeState::Complete { contact } => Ok(*contact.clone()),
             _ => Err(MobileError::ExchangeFailed(
                 "Session not in Complete state — drive the state machine first".into(),
             )),

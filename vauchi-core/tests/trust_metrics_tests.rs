@@ -285,7 +285,7 @@ fn run_full_qr_exchange() -> Contact {
         .unwrap();
 
     match bob_session.state() {
-        ExchangeState::Complete { contact } => contact.clone(),
+        ExchangeState::Complete { contact } => *contact.clone(),
         other => panic!("Expected Complete state, got {:?}", other),
     }
 }

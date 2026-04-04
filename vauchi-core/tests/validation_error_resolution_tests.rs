@@ -9,6 +9,7 @@
 use vauchi_app::ui::{ActionResult, AppEngine, Component, UserAction, WorkflowEngine};
 use vauchi_core::api::Vauchi;
 
+// @scenario: onboarding.feature :: Empty name rejected with inline validation error
 /// Pressing "continue" on the onboarding name screen with an empty name
 /// must return `UpdateScreen` (not `ValidationError`) with the error
 /// injected into the `display_name` TextInput component.
@@ -62,6 +63,7 @@ fn onboarding_empty_name_returns_update_screen_with_error() {
     }
 }
 
+// @scenario: onboarding.feature :: Valid name after validation error navigates forward
 /// After a validation error, submitting with valid input must succeed
 /// (navigate away from the name step).
 #[test]
@@ -98,6 +100,7 @@ fn onboarding_valid_name_after_error_navigates_forward() {
     );
 }
 
+// @scenario: screen_model :: with_validation_error injects error into TextInput
 /// The `with_validation_error` method on `ScreenModel` correctly injects
 /// errors into `TextInput` components and leaves non-matching components
 /// unchanged.
@@ -160,6 +163,7 @@ fn screen_model_with_validation_error_injects_into_text_input() {
     }
 }
 
+// @scenario: screen_model :: with_validation_error injects error into PinInput
 /// `with_validation_error` works for `PinInput` components too.
 #[test]
 fn screen_model_with_validation_error_injects_into_pin_input() {

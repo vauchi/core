@@ -34,6 +34,8 @@ pub struct ValidationSummary {
 
 /// Version byte for CEK-wrapped payloads (crypto-shredding enabled).
 pub const PAYLOAD_VERSION_CEK: u8 = 0x02;
+/// Version byte for reciprocity confirmation payload.
+pub const PAYLOAD_VERSION_RECIPROCITY: u8 = 0x03;
 
 /// Delta encoding error types.
 #[derive(Error, Debug)]
@@ -62,6 +64,9 @@ pub enum DeltaError {
 
     #[error("CEK payload decode error: {0}")]
     CekDecodeError(String),
+
+    #[error("invalid payload: {0}")]
+    InvalidPayload(String),
 }
 
 /// A delta update containing only changed fields.
@@ -505,6 +510,8 @@ impl CekWrappedPayload {
 pub enum VersionedPayload {
     /// CEK-wrapped format: contains rotated CEK + CEK-encrypted delta (version 0x02).
     CekWrapped(CekWrappedPayload),
+    /// Reciprocity confirmation (version 0x03): token + Ed25519 signature.
+    ReciprocityConfirm(ReciprocityConfirmPayload),
 }
 
 impl VersionedPayload {
@@ -528,8 +535,94 @@ impl VersionedPayload {
                 let payload = CekWrappedPayload::decode(&data[1..])?;
                 Ok(VersionedPayload::CekWrapped(payload))
             }
+            PAYLOAD_VERSION_RECIPROCITY => {
+                let payload = ReciprocityConfirmPayload::decode(&data[1..])?;
+                Ok(VersionedPayload::ReciprocityConfirm(payload))
+            }
             v => Err(DeltaError::UnknownPayloadVersion(v)),
         }
+    }
+}
+
+// =============================================================================
+// Reciprocity Confirmation Payload (v0x03)
+// =============================================================================
+
+const RECIPROCITY_DOMAIN: &[u8] = b"vauchi-reciprocity-confirm-v1";
+
+/// Reciprocity confirmation payload (version byte 0x03).
+///
+/// Wire format: `0x03 || token(32) || signature(64)` = 97 bytes.
+/// Signature covers: `domain(29) || sender_pk(32) || recipient_pk(32) || token(32)` = 125 bytes.
+#[derive(Debug)]
+pub struct ReciprocityConfirmPayload {
+    token: [u8; 32],
+    signature: [u8; 64],
+}
+
+impl ReciprocityConfirmPayload {
+    /// Create and sign a new reciprocity confirmation.
+    pub fn new(
+        token: [u8; 32],
+        identity: &crate::identity::Identity,
+        recipient_pk: &[u8; 32],
+    ) -> Self {
+        let message =
+            Self::build_signed_message(&token, identity.signing_public_key(), recipient_pk);
+        let sig = identity.sign(&message);
+        let signature = *sig.as_bytes();
+        Self { token, signature }
+    }
+
+    /// Encode to wire format (without version byte prefix).
+    pub fn encode(&self) -> Vec<u8> {
+        let mut buf = Vec::with_capacity(97);
+        buf.push(PAYLOAD_VERSION_RECIPROCITY);
+        buf.extend_from_slice(&self.token);
+        buf.extend_from_slice(&self.signature);
+        buf
+    }
+
+    /// Decode from wire format (after version byte has been stripped).
+    pub fn decode(data: &[u8]) -> Result<Self, DeltaError> {
+        if data.len() != 96 {
+            return Err(DeltaError::InvalidPayload(format!(
+                "reciprocity confirm: expected 96 bytes, got {}",
+                data.len()
+            )));
+        }
+        let mut token = [0u8; 32];
+        token.copy_from_slice(&data[..32]);
+        let mut signature = [0u8; 64];
+        signature.copy_from_slice(&data[32..96]);
+        Ok(Self { token, signature })
+    }
+
+    /// Returns the confirmation token.
+    pub fn token(&self) -> &[u8; 32] {
+        &self.token
+    }
+
+    /// Verify the Ed25519 signature against sender and recipient public keys.
+    pub fn verify(&self, sender_pk: &[u8; 32], recipient_pk: &[u8; 32]) -> bool {
+        use crate::crypto::signing::{PublicKey, Signature};
+        let message = Self::build_signed_message(&self.token, sender_pk, recipient_pk);
+        let pk = PublicKey::from_bytes(*sender_pk);
+        let sig = Signature::from_bytes(self.signature);
+        pk.verify(&message, &sig)
+    }
+
+    fn build_signed_message(
+        token: &[u8; 32],
+        sender_pk: &[u8; 32],
+        recipient_pk: &[u8; 32],
+    ) -> Vec<u8> {
+        let mut msg = Vec::with_capacity(125);
+        msg.extend_from_slice(RECIPROCITY_DOMAIN);
+        msg.extend_from_slice(sender_pk);
+        msg.extend_from_slice(recipient_pk);
+        msg.extend_from_slice(token);
+        msg
     }
 }
 

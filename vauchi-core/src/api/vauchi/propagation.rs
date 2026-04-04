@@ -302,6 +302,11 @@ impl Vauchi {
                         .map_err(|e| VauchiError::Crypto(format!("CEK decrypt: {:?}", e)))?;
                     (decrypted, Some(cek))
                 }
+                Ok(VersionedPayload::ReciprocityConfirm(_confirm)) => {
+                    // TODO(reciprocity): handle ReciprocityConfirm in receive path
+                    // For now, skip — the confirmer will handle this once wired.
+                    return Ok(Vec::new());
+                }
                 Err(e) => {
                     return Err(VauchiError::Serialization(format!("payload decode: {}", e)));
                 }

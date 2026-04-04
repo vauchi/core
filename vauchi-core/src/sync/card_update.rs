@@ -241,6 +241,12 @@ fn decode_versioned_payload(
                     .map_err(|_| CardUpdateError::CekDecryptionFailed)?;
                 Ok((decrypted, Some(cek)))
             }
+            Ok(VersionedPayload::ReciprocityConfirm(_)) => {
+                // ReciprocityConfirm is not a card delta — handled at caller level
+                Err(CardUpdateError::InvalidPayload(
+                    "reciprocity confirm not handled here".into(),
+                ))
+            }
             Err(e) => Err(CardUpdateError::InvalidPayload(e.to_string())),
         }
     } else {

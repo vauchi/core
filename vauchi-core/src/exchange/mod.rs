@@ -61,6 +61,7 @@ pub mod audio_cpal;
 pub mod capability;
 pub mod card_snapshot;
 pub mod command;
+pub mod confirmation_escrow;
 pub mod device_link;
 pub mod escrow;
 pub mod exchange_id;

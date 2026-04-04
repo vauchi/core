@@ -110,3 +110,37 @@ fn reciprocity_storage_null_defaults_to_unknown() {
     assert_eq!(loaded.reciprocity(), Reciprocity::Unknown);
     assert_eq!(loaded.confirmation_channel(), None);
 }
+
+// ── Task 4: Confirmation escrow key derivation ──
+
+use vauchi_core::exchange::confirmation_escrow::ConfirmationEscrowKeys;
+use vauchi_core::exchange::escrow::EscrowRole;
+
+#[test]
+fn confirmation_escrow_keys_derive_produces_different_slots() {
+    let shared_secret = [42u8; 32];
+    let keys = ConfirmationEscrowKeys::derive(&shared_secret, EscrowRole::Initiator);
+    assert_ne!(keys.our_slot, keys.their_slot);
+    assert!(!keys.gate_hash.is_empty());
+}
+
+#[test]
+fn confirmation_escrow_keys_roles_are_symmetric() {
+    let shared_secret = [42u8; 32];
+    let init = ConfirmationEscrowKeys::derive(&shared_secret, EscrowRole::Initiator);
+    let resp = ConfirmationEscrowKeys::derive(&shared_secret, EscrowRole::Responder);
+    // Same gate
+    assert_eq!(init.gate_hash, resp.gate_hash);
+    // Swapped slots
+    assert_eq!(init.our_slot, resp.their_slot);
+    assert_eq!(init.their_slot, resp.our_slot);
+}
+
+#[test]
+fn confirmation_escrow_keys_differ_from_card_escrow() {
+    use vauchi_core::exchange::escrow::EscrowKeys;
+    let shared_secret = [42u8; 32];
+    let card = EscrowKeys::derive(&shared_secret, EscrowRole::Initiator);
+    let confirm = ConfirmationEscrowKeys::derive(&shared_secret, EscrowRole::Initiator);
+    assert_ne!(card.gate_hash, confirm.gate_hash);
+}

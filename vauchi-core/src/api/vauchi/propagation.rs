@@ -85,6 +85,12 @@ impl Vauchi {
 
         let encrypted = self.prepare_card_update_for_contact(contact_id, &empty_card, &our_card)?;
 
+        // Load contact to get relay_url for per-contact relay routing
+        let relay_url = self
+            .storage
+            .load_contact(contact_id)?
+            .and_then(|c| c.relay_url().map(String::from));
+
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .map(|d| d.as_secs())
@@ -98,7 +104,7 @@ impl Vauchi {
             created_at: now,
             retry_count: 0,
             status: UpdateStatus::Pending,
-            target_relay_url: None,
+            target_relay_url: relay_url,
         };
         self.storage.queue_update(&update)?;
 

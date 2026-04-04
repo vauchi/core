@@ -405,6 +405,14 @@ impl AppEngine {
                     let is_hidden = contact.is_hidden();
                     let is_imported = contact.is_imported();
 
+                    // Reciprocity status (design spec §6.3)
+                    use vauchi_core::exchange::reciprocity::Reciprocity;
+                    let reciprocity_status = match contact.reciprocity() {
+                        Reciprocity::Pending => "Awaiting confirmation".to_string(),
+                        Reciprocity::Unreciprocated => "May not have your card".to_string(),
+                        _ => String::new(),
+                    };
+
                     match shared_info {
                         Some(info) => Box::new(
                             ContactDetailEngine::with_shared_info(
@@ -415,6 +423,7 @@ impl AppEngine {
                             )
                             .with_field_notes(field_notes)
                             .with_trust(trust_level, proposal_trusted)
+                            .with_reciprocity(reciprocity_status.clone())
                             .with_hidden(is_hidden)
                             .with_imported(is_imported),
                         ),
@@ -422,6 +431,7 @@ impl AppEngine {
                             ContactDetailEngine::new(item, fields, personal_note)
                                 .with_field_notes(field_notes)
                                 .with_trust(trust_level, proposal_trusted)
+                                .with_reciprocity(reciprocity_status)
                                 .with_hidden(is_hidden)
                                 .with_imported(is_imported),
                         ),

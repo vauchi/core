@@ -141,6 +141,17 @@ pub struct MobileContact {
     pub transport_proximity: String,
     /// Whether this contact has trust metrics recorded from a full exchange session.
     pub has_trust_metrics: bool,
+    /// Exchange reciprocity status (orthogonal to trust level).
+    pub reciprocity: MobileReciprocity,
+}
+
+/// Exchange reciprocity status — whether the other party also completed the exchange.
+#[derive(Debug, Clone, uniffi::Enum)]
+pub enum MobileReciprocity {
+    Confirmed,
+    Pending,
+    Unreciprocated,
+    Unknown,
 }
 
 impl From<&Contact> for MobileContact {
@@ -196,6 +207,15 @@ impl From<&Contact> for MobileContact {
             proposal_trusted: contact.is_proposal_trusted(),
             transport_proximity,
             has_trust_metrics,
+            reciprocity: {
+                use vauchi_core::exchange::reciprocity::Reciprocity;
+                match contact.reciprocity() {
+                    Reciprocity::Confirmed => MobileReciprocity::Confirmed,
+                    Reciprocity::Pending => MobileReciprocity::Pending,
+                    Reciprocity::Unreciprocated => MobileReciprocity::Unreciprocated,
+                    _ => MobileReciprocity::Unknown,
+                }
+            },
         }
     }
 }

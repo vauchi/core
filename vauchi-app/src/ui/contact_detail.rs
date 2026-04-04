@@ -46,6 +46,8 @@ pub struct ContactDetailEngine {
     field_notes: HashMap<String, String>,
     /// Computed trust level display string (read-only).
     trust_level: String,
+    /// Exchange reciprocity status display string (read-only).
+    reciprocity_status: String,
     /// Whether this contact is trusted for simplified contact proposals (user-editable).
     proposal_trusted: bool,
     /// Whether this contact is hidden from the main contact list.
@@ -65,6 +67,7 @@ impl ContactDetailEngine {
             personal_note,
             field_notes: HashMap::new(),
             trust_level: String::new(),
+            reciprocity_status: String::new(),
             proposal_trusted: false,
             is_hidden: false,
             is_imported: false,
@@ -86,6 +89,7 @@ impl ContactDetailEngine {
             personal_note,
             field_notes: HashMap::new(),
             trust_level: String::new(),
+            reciprocity_status: String::new(),
             proposal_trusted: false,
             is_hidden: false,
             is_imported: false,
@@ -102,6 +106,12 @@ impl ContactDetailEngine {
     pub fn with_trust(mut self, trust_level: String, proposal_trusted: bool) -> Self {
         self.trust_level = trust_level;
         self.proposal_trusted = proposal_trusted;
+        self
+    }
+
+    /// Attach reciprocity status string.
+    pub fn with_reciprocity(mut self, status: String) -> Self {
+        self.reciprocity_status = status;
         self
     }
 
@@ -185,6 +195,13 @@ impl ContactDetailEngine {
                         icon: None,
                         title: "Trust".into(),
                         detail: self.trust_level.clone(),
+                    });
+                }
+                if !self.reciprocity_status.is_empty() {
+                    contact_info_items.push(InfoItem {
+                        icon: None,
+                        title: "Exchange status".into(),
+                        detail: self.reciprocity_status.clone(),
                     });
                 }
                 components.push(Component::InfoPanel {

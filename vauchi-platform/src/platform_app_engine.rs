@@ -107,7 +107,9 @@ impl PlatformAppEngine {
         let key_array: [u8; 32] = storage_key_bytes.try_into().map_err(|_| {
             MobileError::StorageError("Storage key must be exactly 32 bytes".to_string())
         })?;
-        let storage_key = SymmetricKey::from_bytes_unchecked(key_array);
+        let storage_key = SymmetricKey::try_from_bytes(key_array).map_err(|_| {
+            MobileError::StorageError("Degenerate storage key rejected".to_string())
+        })?;
 
         let config = VauchiConfig::with_storage_path(&storage_path)
             .with_relay_url(&relay_url)

@@ -153,7 +153,10 @@ pub unsafe extern "C" fn vauchi_app_create_with_key(
 
             let mut arr = [0u8; 32];
             arr.copy_from_slice(std::slice::from_raw_parts(key_bytes, 32));
-            let key = SymmetricKey::from_bytes_unchecked(arr);
+            let key = match SymmetricKey::try_from_bytes(arr) {
+                Ok(k) => k,
+                Err(_) => return std::ptr::null_mut(),
+            };
             arr.zeroize();
 
             let storage_path = data_path.join("vauchi.db");

@@ -66,9 +66,12 @@ impl ProximityRunner {
     pub fn start(&self) -> Vec<ExchangeCommand> {
         match self.method {
             ProximityMethod::Audio => {
-                vec![ExchangeCommand::AudioEmitChallenge {
-                    data: vec![0; 16], // Populated from session key in Phase 1
-                }]
+                vec![
+                    ExchangeCommand::AudioEmitChallenge {
+                        data: vec![0; 16], // Populated from session key in Phase 1
+                    },
+                    ExchangeCommand::AudioListenForResponse { timeout_ms: 5000 },
+                ]
             }
             ProximityMethod::Accelerometer | ProximityMethod::Impact => {
                 vec![ExchangeCommand::AccelerometerStart]
@@ -87,7 +90,6 @@ impl ProximityRunner {
         match (self.method, event) {
             // Audio: response received — verify
             (ProximityMethod::Audio, ExchangeHardwareEvent::AudioResponseReceived { data }) => {
-                // Phase 1: verify response against challenge
                 let verified = !data.is_empty();
                 self.result = Some(ProximityRunnerResult {
                     method: self.method,
@@ -95,7 +97,7 @@ impl ProximityRunner {
                     verified,
                 });
                 self.done = true;
-                vec![ExchangeCommand::AccelerometerStop]
+                vec![ExchangeCommand::AudioStop]
             }
 
             // Accelerometer: accumulate samples for correlation
@@ -176,13 +178,17 @@ mod tests {
     use super::*;
 
     #[test]
-    fn audio_runner_starts_with_emit_challenge() {
+    fn audio_runner_starts_with_emit_challenge_and_listen() {
         let runner = ProximityRunner::new(ProximityMethod::Audio);
         let cmds = runner.start();
-        assert_eq!(cmds.len(), 1);
+        assert_eq!(cmds.len(), 2);
         assert!(matches!(
             cmds[0],
             ExchangeCommand::AudioEmitChallenge { .. }
+        ));
+        assert!(matches!(
+            cmds[1],
+            ExchangeCommand::AudioListenForResponse { .. }
         ));
     }
 
@@ -269,6 +275,28 @@ mod tests {
         });
         // Not done yet — needs envelope exchange (Phase 3)
         assert!(!runner.is_done());
+    }
+
+    #[test]
+    fn audio_response_emits_audio_stop() {
+        let mut runner = ProximityRunner::new(ProximityMethod::Audio);
+        let cmds = runner.feed_event(&ExchangeHardwareEvent::AudioResponseReceived {
+            data: vec![1, 2, 3],
+        });
+        assert!(runner.is_done());
+        assert!(runner.result().unwrap().verified);
+        assert_eq!(cmds.len(), 1);
+        assert!(matches!(cmds[0], ExchangeCommand::AudioStop));
+    }
+
+    #[test]
+    fn audio_empty_response_is_unverified() {
+        let mut runner = ProximityRunner::new(ProximityMethod::Audio);
+        runner.feed_event(&ExchangeHardwareEvent::AudioResponseReceived { data: vec![] });
+        assert!(runner.is_done());
+        let result = runner.result().unwrap();
+        assert!(!result.verified);
+        assert_eq!(result.confidence, 0.0);
     }
 
     #[test]

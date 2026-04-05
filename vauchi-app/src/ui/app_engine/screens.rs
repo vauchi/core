@@ -10,14 +10,14 @@ use super::AppEngine;
 use super::AppScreen;
 use super::initials;
 use crate::ui::backup_recovery::BackupRecoveryEngine;
-use crate::ui::component::{ContactItem, FieldDisplay, UiFieldVisibility};
+use crate::ui::component::{ContactItem, FieldDisplay, Status, UiFieldVisibility};
 use crate::ui::contact_detail::{ContactDetailEngine, ContactNotFoundEngine, SharedInfoView};
 use crate::ui::contact_edit::{ContactEditEngine, EditableContact, EditableField};
 use crate::ui::contact_limit::ContactLimitEngine;
 use crate::ui::contact_list::ContactListEngine;
 use crate::ui::contact_merge::{ContactMergeEngine, MergePreview};
 use crate::ui::contact_visibility::ContactVisibilityEngine;
-use crate::ui::delivery::DeliveryStatusEngine;
+use crate::ui::delivery::{DeliveryItem, DeliveryStatusEngine};
 use crate::ui::device_linking::DeviceLinkingEngine;
 use crate::ui::duplicate_detection::DuplicateDetectionEngine;
 use crate::ui::duress_pin::{DuressConfig, DuressPinEngine};
@@ -269,7 +269,10 @@ impl AppEngine {
                 Box::new(DuressPinEngine::new(config))
             }
             AppScreen::EmergencyShred => Box::new(EmergencyShredEngine::new()),
-            AppScreen::DeliveryStatus => Box::new(DeliveryStatusEngine::new(vec![])),
+            AppScreen::DeliveryStatus => {
+                let items = Self::load_delivery_items(vauchi);
+                Box::new(DeliveryStatusEngine::new(items))
+            }
             AppScreen::Sync => {
                 let relay_url = vauchi.config().relay.server_url.clone();
                 let contact_count = vauchi.list_contacts().map(|c| c.len()).unwrap_or(0);
@@ -670,6 +673,61 @@ impl AppEngine {
                 .collect(),
             Err(_) => vec![],
         }
+    }
+
+    fn load_delivery_items(vauchi: &Vauchi) -> Vec<DeliveryItem> {
+        let records = vauchi
+            .storage()
+            .get_all_delivery_records()
+            .unwrap_or_default();
+
+        // Build contact name lookup for recipient IDs.
+        let contacts: HashMap<String, String> = vauchi
+            .list_contacts()
+            .unwrap_or_default()
+            .into_iter()
+            .map(|c| (c.id().to_string(), c.display_name().to_string()))
+            .collect();
+
+        records
+            .into_iter()
+            .map(|r| {
+                let contact_name = contacts
+                    .get(&r.recipient_id)
+                    .cloned()
+                    .unwrap_or_else(|| r.recipient_id.clone());
+
+                let (status, detail, retryable) = match &r.status {
+                    vauchi_core::storage::DeliveryStatus::Queued => {
+                        (Status::Pending, Some("Queued".into()), false)
+                    }
+                    vauchi_core::storage::DeliveryStatus::Sent => {
+                        (Status::InProgress, Some("Sent to relay".into()), false)
+                    }
+                    vauchi_core::storage::DeliveryStatus::Stored => {
+                        (Status::InProgress, Some("Stored on relay".into()), false)
+                    }
+                    vauchi_core::storage::DeliveryStatus::Delivered => {
+                        (Status::Success, None, false)
+                    }
+                    vauchi_core::storage::DeliveryStatus::Expired => {
+                        (Status::Warning, Some("Expired".into()), true)
+                    }
+                    vauchi_core::storage::DeliveryStatus::Failed { reason } => {
+                        (Status::Failed, Some(reason.clone()), true)
+                    }
+                    _ => (Status::Pending, None, false),
+                };
+
+                DeliveryItem {
+                    contact_id: r.recipient_id,
+                    contact_name,
+                    status,
+                    detail,
+                    retryable,
+                }
+            })
+            .collect()
     }
 
     fn default_help_items() -> Vec<HelpItem> {

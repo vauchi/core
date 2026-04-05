@@ -74,6 +74,7 @@ pub mod persisted_state;
 pub mod proximity_runner;
 pub mod reciprocity;
 pub mod relay_exchange;
+pub mod shake_protocol;
 pub mod tcp_transport;
 
 #[allow(deprecated)]

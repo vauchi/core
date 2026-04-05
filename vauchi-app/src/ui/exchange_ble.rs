@@ -743,6 +743,53 @@ mod tests {
         assert!(matches!(outcome, BleHardwareOutcome::Ignored));
     }
 
+    // ── Bump mode edge cases ────────────────────────────────────
+
+    #[test]
+    fn bump_weak_impact_completes_with_unverified_proximity() {
+        let mut flow = BleExchangeFlow::new(ExchangeMode::Bump);
+        advance_to_exchanging(&mut flow);
+
+        // Card data
+        flow.handle_event(&ExchangeHardwareEvent::BleCharacteristicNotified {
+            uuid: "c".into(),
+            data: vec![1, 2],
+        });
+
+        // Weak impact (1g < 2.5g threshold) — still completes (impact doesn't block)
+        let outcome = flow.handle_event(&ExchangeHardwareEvent::ImpactDetected {
+            timestamp_ms: 0,
+            magnitude_milli_g: 1000, // 1g
+        });
+
+        assert_eq!(*flow.step(), BleStep::Complete);
+        assert!(matches!(outcome, BleHardwareOutcome::Complete { .. }));
+        let prox = flow.proximity_result().unwrap();
+        assert!(!prox.verified);
+        assert!(prox.confidence < 0.6);
+    }
+
+    #[test]
+    fn bump_strong_impact_has_capped_confidence() {
+        let mut flow = BleExchangeFlow::new(ExchangeMode::Bump);
+        advance_to_exchanging(&mut flow);
+
+        flow.handle_event(&ExchangeHardwareEvent::BleCharacteristicNotified {
+            uuid: "c".into(),
+            data: vec![1],
+        });
+
+        // Very strong impact (10g) — confidence capped at 0.6 per spec
+        flow.handle_event(&ExchangeHardwareEvent::ImpactDetected {
+            timestamp_ms: 0,
+            magnitude_milli_g: 10000,
+        });
+
+        let prox = flow.proximity_result().unwrap();
+        assert!(prox.verified);
+        assert!((prox.confidence - 0.6).abs() < f32::EPSILON);
+    }
+
     // ── Complete step ignores events ───────────────────────────────
 
     #[test]

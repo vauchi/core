@@ -64,6 +64,8 @@ pub struct ExchangeEngine {
     session: Option<ExchangeSession>,
     /// User-friendly error detail shown on the Failed screen (T1-2).
     failure_detail: Option<String>,
+    /// Whether relay fallback is available on the Failed screen (BLE mode failures).
+    ble_fallback_available: bool,
     /// Mode selection sub-engine (created on demand).
     mode_selection: Option<ModeSelectionEngine>,
     /// Field preview config (built when entering FieldPreview step).
@@ -174,6 +176,7 @@ impl ExchangeEngine {
             selected_groups: Vec::new(),
             session: None,
             failure_detail: None,
+            ble_fallback_available: false,
             mode_selection,
             field_preview: None,
             link_initiation,
@@ -213,6 +216,7 @@ impl ExchangeEngine {
                     selected_groups: Vec::new(),
                     session: None,
                     failure_detail: None,
+                    ble_fallback_available: false,
                     mode_selection,
                     field_preview: None,
                     link_initiation: None,
@@ -233,6 +237,7 @@ impl ExchangeEngine {
             selected_groups: Vec::new(),
             session: Some(session),
             failure_detail: None,
+            ble_fallback_available: false,
             mode_selection,
             field_preview: None,
             link_initiation: None,
@@ -417,6 +422,7 @@ impl ExchangeEngine {
             }
             BleHardwareOutcome::FailedWithFallback { reason } => {
                 self.failure_detail = Some(reason);
+                self.ble_fallback_available = true;
                 self.step = ExchangeStep::Failed;
                 ActionResult::UpdateScreen(self.build_screen())
             }
@@ -626,34 +632,44 @@ impl ExchangeEngine {
                 progress: Some(self.progress()),
                 ..Default::default()
             },
-            ExchangeStep::Failed => ScreenModel {
-                screen_id: "exchange_failed".into(),
-                title: "Failed".into(),
-                subtitle: None,
-                components: vec![Component::StatusIndicator {
-                    id: "failed_status".into(),
-                    icon: None,
-                    title: "Exchange Failed".into(),
-                    detail: self.failure_detail.clone(),
-                    status: Status::Failed,
-                }],
-                actions: vec![
-                    ScreenAction {
-                        id: "retry".into(),
-                        label: "Retry".into(),
-                        style: ActionStyle::Primary,
-                        enabled: true,
-                    },
-                    ScreenAction {
-                        id: "cancel".into(),
-                        label: "Cancel".into(),
+            ExchangeStep::Failed => {
+                let mut actions = vec![ScreenAction {
+                    id: "retry".into(),
+                    label: "Retry".into(),
+                    style: ActionStyle::Primary,
+                    enabled: true,
+                }];
+                // BLE failures offer relay fallback (Phase 4 degradation)
+                if self.ble_fallback_available {
+                    actions.push(ScreenAction {
+                        id: "fallback_relay".into(),
+                        label: "Switch to encrypted relay".into(),
                         style: ActionStyle::Secondary,
                         enabled: true,
-                    },
-                ],
-                progress: Some(self.progress()),
-                ..Default::default()
-            },
+                    });
+                }
+                actions.push(ScreenAction {
+                    id: "cancel".into(),
+                    label: "Cancel".into(),
+                    style: ActionStyle::Secondary,
+                    enabled: true,
+                });
+                ScreenModel {
+                    screen_id: "exchange_failed".into(),
+                    title: "Failed".into(),
+                    subtitle: None,
+                    components: vec![Component::StatusIndicator {
+                        id: "failed_status".into(),
+                        icon: None,
+                        title: "Exchange Failed".into(),
+                        detail: self.failure_detail.clone(),
+                        status: Status::Failed,
+                    }],
+                    actions,
+                    progress: Some(self.progress()),
+                    ..Default::default()
+                }
+            }
         }
     }
 }
@@ -995,6 +1011,7 @@ impl WorkflowEngine for ExchangeEngine {
             {
                 self.scanned_data = None;
                 self.failure_detail = None;
+                self.ble_fallback_available = false;
                 // Restore to the correct sub-flow based on selected mode
                 if self.config.mode == Some(ExchangeMode::Link) {
                     return self.start_link_mode();
@@ -1008,6 +1025,13 @@ impl WorkflowEngine for ExchangeEngine {
                 }
                 self.step = ExchangeStep::Qr(QrStep::ShowQr);
                 ActionResult::NavigateTo(self.build_screen())
+            }
+            (ExchangeStep::Failed, UserAction::ActionPressed { action_id })
+                if action_id == "fallback_relay" =>
+            {
+                self.ble_fallback_available = false;
+                self.failure_detail = None;
+                self.start_link_mode()
             }
             (ExchangeStep::Failed, UserAction::ActionPressed { action_id })
                 if action_id == "cancel" =>
@@ -1974,6 +1998,97 @@ mod tests {
             engine.step,
             ExchangeStep::Link(LinkStep::WaitingForResponse),
             "step must not change for unknown gate"
+        );
+    }
+
+    // ── Phase 4: BLE fallback degradation tests ────────────────────
+
+    // @internal
+    #[test]
+    fn ble_failure_shows_relay_fallback_action() {
+        let mut engine = ExchangeEngine::new(ExchangeConfig {
+            mode: Some(ExchangeMode::Magic),
+            ..config_no_groups()
+        });
+        // Simulate BLE failure via apply_ble_outcome
+        engine.apply_ble_outcome(BleHardwareOutcome::FailedWithFallback {
+            reason: "BLE timeout".into(),
+        });
+        assert_eq!(engine.step, ExchangeStep::Failed);
+        assert!(engine.ble_fallback_available);
+
+        let screen = engine.build_screen();
+        assert!(
+            screen.actions.iter().any(|a| a.id == "fallback_relay"),
+            "Failed screen must show relay fallback for BLE failures"
+        );
+    }
+
+    // @internal
+    #[test]
+    fn non_ble_failure_does_not_show_relay_fallback() {
+        let mut engine = ExchangeEngine::new(config_no_groups());
+        engine.mark_failed();
+        assert!(!engine.ble_fallback_available);
+
+        let screen = engine.build_screen();
+        assert!(
+            !screen.actions.iter().any(|a| a.id == "fallback_relay"),
+            "Non-BLE failure must not show relay fallback"
+        );
+    }
+
+    // @internal
+    #[test]
+    fn fallback_relay_action_switches_to_link_mode() {
+        let mut engine = ExchangeEngine::new(ExchangeConfig {
+            mode: Some(ExchangeMode::Magic),
+            ..config_no_groups()
+        });
+        engine.apply_ble_outcome(BleHardwareOutcome::FailedWithFallback {
+            reason: "timeout".into(),
+        });
+        assert_eq!(engine.step, ExchangeStep::Failed);
+
+        let result = engine.handle_action(UserAction::ActionPressed {
+            action_id: "fallback_relay".into(),
+        });
+
+        assert_eq!(
+            engine.step,
+            ExchangeStep::Link(LinkStep::ShareUrl),
+            "Fallback must switch to Link mode"
+        );
+        assert!(!engine.ble_fallback_available);
+        assert!(engine.failure_detail.is_none());
+        // Should return commands for link mode setup
+        assert!(
+            matches!(result, ActionResult::ExchangeCommands { .. }),
+            "Expected ExchangeCommands for link setup"
+        );
+    }
+
+    // @internal
+    #[test]
+    fn retry_clears_ble_fallback_flag() {
+        let mut engine = ExchangeEngine::new(ExchangeConfig {
+            mode: Some(ExchangeMode::Bump),
+            ..config_no_groups()
+        });
+        engine.apply_ble_outcome(BleHardwareOutcome::FailedWithFallback {
+            reason: "disconnect".into(),
+        });
+        assert!(engine.ble_fallback_available);
+
+        let _ = engine.handle_action(UserAction::ActionPressed {
+            action_id: "retry".into(),
+        });
+
+        assert!(!engine.ble_fallback_available);
+        assert_eq!(
+            engine.step,
+            ExchangeStep::Ble(BleStep::Discovering),
+            "Retry in Bump mode must return to BLE discovering"
         );
     }
 }
